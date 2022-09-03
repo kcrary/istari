@@ -1,0 +1,333 @@
+
+signature PICKLING =
+   sig
+
+      type constant
+      type term
+
+      exception UnknownConstant
+      exception Paranoid
+
+      val puSymbol : Symbol.symbol Pickle.pu
+      val puConstant : constant Pickle.pu
+      val puTerm : term Pickle.pu
+
+   end
+
+
+signature PICKLING_PRIV =
+   sig
+
+      include PICKLING
+
+      val primitive : constant -> int -> unit
+
+   end
+
+
+functor PicklingFun (structure Term : TERM
+                     structure Trail : TRAIL_PRIV
+                                       where type term = Term.term
+                                       where type ebind = Term.ebind
+                     structure Constant : CONSTANT_INTERNAL
+                                          where type constant = Term.constant
+                                          where type term = Term.term)
+   :>
+   PICKLING_PRIV
+   where type constant = Term.constant
+   where type term = Term.term
+   =
+   struct
+
+      (* Locally-unique identifiers (luids) allow us to determine which constant
+         (from an internal point of view) a constant reference is referring to.
+
+         An luid consists of a nonce and a counter:
+
+         - The nonce (see nonce-sig.iml) captures a particular run of the refiner.
+           We cannot guarantee that it is globally unique, but it is unique enough
+           to change whenever a library is recomputed, which is the point.
+
+         - The counter indicates a particular constant from a run of the refiner.
+           It's easy to ensure they are unique.
+      *)
+
+      type nonce = Word32.word
+      type luid = nonce * int
+
+      structure C = Constant
+      structure T = Term
+      structure P = Pickle
+
+      type constant = C.constant
+      type term = T.term
+
+      exception UnknownConstant
+      exception Paranoid  (* Not actually raised here, but it's convenient to have it live here. *)
+
+
+      val puSymbol = P.wrap Symbol.toValue Symbol.fromValue P.string
+
+
+
+      (* Pickling constants (luid management) *)
+
+      structure CT = HashTable (structure Key = Constant.Hashable)
+
+      structure LT = HashTable (structure Key =
+                                   ProductHashable
+                                   (structure X = Word32Hashable
+                                    structure Y = IntHashable))
+
+      (* NB!  These tables are intentionally not rewindable, like the constant table. *)
+      
+      val constantToLuidTable : luid CT.table = CT.table 199
+      val luidToConstantTable : C.constant LT.table = LT.table 199
+      val theCounter = ref 0
+
+
+      (* Constants need to be able to refer to terms.  Rather than wrap everything in a
+         messy fixpoint, we'll backpatch.
+      *)
+
+      val puTermRef : T.term P.pu option ref = ref NONE
+
+      val puTermSusp = Susp.delay (fn () => Option.valOf (!puTermRef))
+
+      val puTermFwd = P.lift (fn () => Susp.force puTermSusp)
+
+
+      val puNonce = P.word32
+
+      val puLuid = P.pair puNonce P.int
+
+      val puInfo = 
+         P.tuple3
+            (P.option puTermFwd)
+            (P.list puSymbol)
+            Constant.puOpacity
+
+
+      val puConstant =
+         P.wrap 
+            (fn const =>
+                let
+                   val (luid, old) =
+                      CT.lookupOrInsert' constantToLuidTable const
+                         (fn () =>
+                             let
+                                val i = !theCounter
+
+                                val luid = (Nonce.nonce (), i)
+                             in
+                                theCounter := i+1;
+
+                                LT.insert luidToConstantTable luid const;
+
+                                luid
+                             end)
+                in
+                   if old then
+                      (luid, NONE)
+                   else
+                      (luid,
+                       SOME (C.definitionTrue const, C.path const, C.opacity const))
+                end)
+
+            (fn (luid, info) =>
+                (case info of
+                    NONE =>
+                       (case LT.find luidToConstantTable luid of
+                           NONE => 
+                              (* The luid isn't meaningful yet, and no info. *)
+                              raise UnknownConstant
+       
+                         | SOME const => const)
+
+                  | SOME (def, path, opac) =>
+                       (* It's the first time we've seen this constant while loading this file,
+                          and by uniqueness of nonces, we haven't seen it in any other files.
+                          So this is the first time we've seen this constant, unless we're reloading
+                          the file (or unless the file is corrupt).
+
+                          (It can actually happen that we are reloading a file, despite the load system
+                          ignoring files we've seen before.  If a file is loaded, and then the state is
+                          rewound, the load system thinks it's seeing it for the first time, but the
+                          constant still appears in the table, because constants are forever.)
+                       *)
+                       LT.lookupOrInsert luidToConstantTable luid
+                          (fn () =>
+                              (* This really is the first time we've seen this constant; create it. *)
+                              let
+                                 val const = C.declare def path
+                              in
+                                 C.setOpacity const opac;
+       
+                                 CT.insert constantToLuidTable const luid;
+
+                                 const
+                              end)))
+
+            (P.pair puLuid (P.option puInfo))
+
+
+      val zero = Word32.fromInt 0
+
+      (* Insert a primitive into the table with nonce 0. *)
+      fun primitive const i =
+         (
+         LT.insert luidToConstantTable (zero, i) const;
+         CT.insert constantToLuidTable const (zero, i)
+         )
+
+
+
+      (* Pickling *)
+
+      fun clean m s =
+         (case m of
+             T.Var i =>
+                (case T.substVar i s of
+                    T.Idx j =>
+                       T.Var j
+
+                  | T.Term m' =>
+                       clean m' T.id)
+
+           | T.Const _ => m
+
+           | T.Elim (m1, spine) =>
+                T.Elim (clean m1 s, map (fn elim => cleanElim elim s) spine)
+
+           | T.Lam (b, m1) =>
+                T.Lam (b, clean m1 (T.under 1 s))
+
+           | T.Pair (m1, m2) =>
+                T.Pair (clean m1 s, clean m2 s)
+
+           | T.Next m1 =>
+                T.Next (clean m1 s)
+
+           | T.Triv => m
+
+           | T.Sub (m1, s') =>
+                clean m1 (T.compose s' s)
+
+           | T.Evar eb =>
+                (case T.readEbind eb of
+                    NONE =>
+                       (
+                       Trail.setEbind eb T.Triv;
+                       Trail.commit ();
+                       T.Triv
+                       )
+
+                  | SOME m1 =>
+                       clean m1 s)
+
+           | T.Marker _ => m)
+      
+      and cleanElim elim s =
+         (case elim of
+             T.App m => T.App (clean m s)
+
+           | _ => elim)
+
+
+      val impossible = Fail "impossible"
+
+ 
+      fun ppuElim puTerm =
+         P.alt
+            (fn T.App _ => 0
+              | T.Pi1 => 1
+              | T.Pi2 => 2
+              | T.Prev => 3)
+            
+            [
+            P.wrap
+               (fn T.App m => m
+                 | _ => raise impossible)
+               T.App
+               puTerm,
+
+            P.const T.Pi1,
+
+            P.const T.Pi2,
+
+            P.const T.Prev
+            ]
+
+
+      val puTerm =
+         P.wrap (fn m => clean m T.id) (fn m => m)
+            (P.fix
+                (fn puTerm =>
+                    let
+                       val puElim = ppuElim puTerm
+                    in
+                       P.alt
+                          (fn T.Var _ => 0
+                            | T.Const _ => 1
+                            | T.Elim _ => 2
+                            | T.Lam _ => 3
+                            | T.Pair _ => 4
+                            | T.Next _ => 5
+                            | T.Triv => 6
+                            | T.Marker _ => 7
+          
+                            (* can't happen in cleaned terms *)
+                            | T.Sub _ => raise impossible
+                            | T.Evar _ => raise impossible)
+          
+                          [
+                          P.wrap
+                             (fn T.Var i => i
+                               | _ => raise impossible)
+                             T.Var
+                             P.int,
+          
+                          P.wrap
+                             (fn T.Const const => const
+                               | _ => raise impossible)
+                             T.Const
+                             puConstant,
+          
+                          P.wrap
+                             (fn T.Elim (m, spine) => (m, spine)
+                               | _ => raise impossible)
+                             T.Elim
+                             (P.pair puTerm (P.list puElim)),
+          
+                          P.wrap
+                             (fn T.Lam (b, m) => (b, m)
+                               | _ => raise impossible)
+                             T.Lam
+                             (P.pair (P.option puSymbol) puTerm),
+          
+                          P.wrap
+                             (fn T.Pair (m1, m2) => (m1, m2)
+                               | _ => raise impossible)
+                             T.Pair
+                             (P.pair puTerm puTerm),
+          
+                          P.wrap
+                             (fn T.Next m => m
+                               | _ => raise impossible)
+                             T.Next
+                             puTerm,
+          
+                          P.const T.Triv,
+          
+                          P.wrap
+                             (fn T.Marker sym => sym
+                               | _ => raise impossible)
+                             T.Marker
+                             puSymbol
+                          ]
+                    end))
+
+
+      val () = puTermRef := SOME puTerm
+
+   end

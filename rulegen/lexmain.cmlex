@@ -1,0 +1,59 @@
+sml
+name LexMainFun
+
+alphabet 128
+
+set whitespace = (or 32 9 13 10)
+
+set letter = (range 'A 'Z 'a 'z)
+set digit = (range '0 '9)
+set alphanumeric = (or letter digit '_ '')
+
+regexp ident = (seq letter (* alphanumeric))
+
+function lex : t =
+   (+ whitespace) => skip
+   ident => ident
+
+   "#1" => pi1
+   "#2" => pi2
+   "#prev" => prev
+
+   '( => lparen
+   ') => rparen
+   '[ => lbracket
+   '] => rbracket
+   '{ => lbrace
+   '} => rbrace
+
+   ': => colon
+   ', => comma
+   '$ => dollar
+   '. => dot
+   "..." => ellipsis
+   '= => equal
+   ">>" => iif
+   '; => semicolon
+   '/ => slash
+   "<:" => subtype
+   "|-" => turnstile
+
+   "(*" => enter_comment
+
+   eos => eof
+   epsilon => error
+
+
+set comment_normal = (~ '( '*)
+
+function comment : u =
+   "(*" => reenter_comment
+   "*)" => exit_comment
+
+   '( => comment_skip
+   '* => comment_skip
+   
+   (+ comment_normal) => comment_skip
+
+   eos => comment_error
+   epsilon => comment_error

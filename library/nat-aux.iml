@@ -1,0 +1,294 @@
+
+structure ParseNat =
+   struct
+
+      structure T = ETerm
+
+      val leq = Susp.delay (fn () => parseConstant /Nat.leq/)
+      val lt = Susp.delay (fn () => parseConstant /Nat.lt/)
+      val plus = Susp.delay (fn () => parseConstant /Nat.plus/)
+      val minus = Susp.delay (fn () => parseConstant /Nat.minus/)
+
+      fun parseLeq m n = T.apply2 (Susp.force leq) m n
+      fun parseLt m n = T.apply2 (Susp.force lt) m n
+      fun parsePlus m n = T.apply2 (Susp.force plus) m n
+      fun parseMinus m n = T.apply2 (Susp.force minus) m n
+
+   end
+
+
+grammardef Nat 
+
+   open ParseNat
+
+   rule Term(30)  ::= Term(31) "<=" Term(31) => parseLeq
+   rule Term(30)  ::= Term(31) "<" Term(31) => parseLt
+   rule Term(50)  ::= Term(50) "+" Term(51) => parsePlus
+   rule Term(50)  ::= Term(50) "-" Term(51) => parseMinus
+
+end
+
+grammaron Nat
+
+
+
+functor AfterNat () :>
+   sig
+      val natPrimInduction : Tactic.tactic
+   end
+   =
+   struct
+
+      structure D = Directory
+      structure J = Judgement
+      structure R = Reduction
+      structure T = Term
+      structure TC = Typecheck
+
+      open Tactic
+      open CasePervasive
+
+
+      val natPrimInductionPriority =
+         let
+            do (jud, dir) = withgoal
+
+            val c = J.concl jud
+            val dir' = D.tl dir
+         in
+            goalContextCase
+            /
+             | $hyp 0 $tm \Prim.nat\ =>
+               \fnc =>
+                   (* nat |- C *)
+                   refine (Rule.reduceHyp 0 R.unfold)
+                   >>
+                   (* mu . unit % 0 |- C = C[0 . ^2][0 . id] *)
+                   refine (Rule.muInd
+                              (T.apply2 Prim.sum (T.Const Prim.unit) T.zero)
+                              (T.Sub (c, T.Idot (0, T.Shift 2)))
+                              T.zero)
+                   >>> [
+                       (* blahblah, Type |- unit & 0 : Type *)
+                       refine (Rule.sumForm (T.evar ()) (T.evar ()))
+                       >>> [
+                           (* blah, Type |- unit : Type *)
+                           refine Rule.unitForm >> done,
+       
+                           (* blah, Type |- 0 : Type *)
+                           refine (Rule.hypothesisOfTp 0) >> done
+                           ],
+                       
+                       refine Rule.checkPositive >> done,
+       
+                       (* blahblah,
+                          Type,
+                          (unit % 0),
+                          1 <: mu . unit % 0,
+                          forall 2 . C[0 . ^5] |- C[2 . ^5]
+                       *)
+                       refine (Rule.weaken 4 1)
+                       >>
+                       (* Type,
+                          (unit % 0),
+                          1 <: mu . unit % 0,
+                          forall 2 . C[0 . ^4] |- C[2 . ^4]
+                       *)
+                       refine (Rule.sumLeft 2 (T.evar ()) (T.evar ()) (T.evar ()))
+                       >>> [
+                           (* Type, unit, <sub>, <ih> |- C[inl 2 . ^4] *)
+                           refine (Rule.unitLeft 2 (T.evar ()))
+                           >>
+                           (* Type, <sub>, <ih> |- C[inl () . ^3] *)
+                           refine (Rule.weaken 0 3)
+                           >>
+                           (* |- C[inl () . id] *)
+                           refine (Rule.unreduceAt 0 c
+                                      (T.Const Prim.zero)
+                                      R.unfold)
+                           >>
+                           (* |- C[zero . id] *)
+                           chdir dir' >> idtacM TC.Primary,
+       
+                           (* Type, 0, <sub>, <ih> |- C[inr 2 . ^4]
+                                                    = C[0 . ^5][inr 2 . id]
+                           *)
+                           refine (Rule.unreduceAt 0 
+                                      (T.Sub (c, T.Idot (0, T.Shift 5)))
+                                      (T.apply1 Prim.succ (T.Var 2))
+                                      (R.trans [R.unfold, R.beta 1]))
+                           >>
+                           (* Type, 0, <sub>, <ih> |- C[0 . ^5][succ 2 . id]
+                                                    = C[succ 2 . ^4]
+                           *)
+                           refine (Rule.unreduceHyp 1
+                                      (T.apply2 Prim.subtype
+                                          (T.Var 1)
+                                          (T.Const Prim.nat))
+                                      (R.within [2] R.unfold))
+                           >>
+                           chdir (Directory.bindhs dir' [NONE, NONE, NONE, NONE])
+                           >>
+                           idtacM TC.Primary
+                           ],
+       
+                       (* mu . unit % 0 |- 0 : (mu . unit % 0) *)
+                       refine (Rule.hypothesisOf 0) >> done
+                       ]\
+
+             | _ =>
+               \fnc => fail "type error in nat induction"\
+            /
+         end
+
+      val natPrimInduction = TC.withTypecheckSnd natPrimInductionPriority
+
+   end
+
+
+
+functor AfterLeq () :> sig end =
+   struct
+
+      val leq = parseConstant /Nat.leq/
+      val lt = parseConstant /Nat.lt/
+
+
+      structure U = Show.Unparsing
+
+      fun register k arity prec unp =
+         ConstantTable.insert U.unparsingTable k (arity, prec, unp)
+
+
+      val () =
+         register leq 2 30
+         (U.wrap
+             (U.apply2 leq U.show U.show)
+             (fn (a, b) => U.append [a 31, 
+                                     U.break 1, U.string "<= ", b 31]))
+
+      val () =
+         register lt 2 30
+         (U.wrap
+             (U.apply2 lt U.show U.show)
+             (fn (a, b) => U.append [a 31, 
+                                     U.break 1, U.string "< ", b 31]))
+
+   end
+
+
+
+functor AfterLtWellFounded () :> sig end =
+   struct
+
+      structure J = Judgement
+      structure T = Term
+      
+      open Tactic
+
+      val lt_well_founded = parseConstant /Nat.lt_well_founded/
+
+
+      val natInduction =
+         let
+            do (jud, dir) = withgoal
+
+            do (b, tac) =
+               BackchainInternal.soMain
+                  (J.context jud)
+                  (T.apply1 lt_well_founded T.zero)
+                  (fn msg => fail msg)
+         in
+            refine (Rule.assert b (T.evar ()))
+            >>> [
+                tac,
+
+                chdir (Directory.bind0 dir)
+                >>
+                InductionInternal.accInduction
+                ]
+         end
+
+      val () = ConstantTable.insert InductionInternal.inductionTactics Prim.nat natInduction
+
+   end
+
+
+
+functor AfterMinus () :> sig end =
+   struct
+
+      val plus = parseConstant /Nat.plus/
+      val minus = parseConstant /Nat.minus/
+
+
+      structure U = Show.Unparsing
+
+      fun register k arity prec unp =
+         ConstantTable.insert U.unparsingTable k (arity, prec, unp)
+
+
+      val () =
+         register plus 2 50
+         (U.wrap
+             (U.apply2 plus U.show U.show)
+             (fn (a, b) => U.append [a 50, 
+                                     U.break 1, U.string "+ ", b 51]))
+
+      val () =
+         register minus 2 50
+         (U.wrap
+             (U.apply2 minus U.show U.show)
+             (fn (a, b) => U.append [a 50, 
+                                     U.break 1, U.string "- ", b 51]))
+
+   end
+
+
+
+functor AfterNatAll () :> sig end =
+   struct
+
+      structure B = BackchainInternal
+      structure H = ConstantTable
+      
+      val leq = parseConstant /Nat.leq/
+      val plus = parseConstant /Nat.plus/
+      val minus = parseConstant /Nat.minus/
+      
+      val () =
+         H.insert EqualityTacticInternal.reflexivityTactics leq
+         (BackchainInternal.witnessPriority /Nat.leq_refl _/)
+      
+      val () =
+         H.insert EqualityTacticInternal.transitivityTactics leq
+         (fn n => BackchainInternal.witnessPriority /Nat.leq_trans _ \n\ _ __ __/)
+
+      val () =
+         List.app 
+            (fn (hconst, i, const1, const2, cov, tacfn) => 
+               RewriteInternal.CICTable.insert RewriteInternal.compatibilityTable (hconst, i, const1) (const2, cov, tacfn))
+            [
+            (Prim.succ, 0, leq, leq, true,
+             andthenOn 2 (B.witnessPriority /plus_succ_succ _ _ __/)),
+          
+            (plus, 0, leq, leq, true,
+             andthenOn 4 (B.witnessPriority /plus_leq _ _ _ _ __ __/)),
+          
+            (plus, 1, leq, leq, true,
+             andthenOn 5 (B.witnessPriority /plus_leq _ _ _ _ __ __/)),
+          
+            (minus, 0, leq, leq, true,
+             andthenOn 4 (B.witnessPriority /minus_leq _ _ _ _ __ __/)),
+          
+            (minus, 1, leq, leq, false,
+             andthenOn 5 (B.witnessPriority /plus_leq _ _ _ _ __ __/)),
+          
+            (leq, 0, leq, Prim.arrow, false,
+             andthenOn 4 (B.witnessPriority /leq_implication _ _ _ _ __ __/)),
+          
+            (leq, 1, leq, Prim.arrow, true,
+             andthenOn 5 (B.witnessPriority /leq_implication _ _ _ _ __ __/)),
+            ]
+
+  end

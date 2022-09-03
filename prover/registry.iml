@@ -1,0 +1,196 @@
+
+signature REGISTRY =
+   sig
+
+      type item
+
+      exception Registry
+
+      val write : Symbol.symbol -> item -> unit
+      val read : Symbol.symbol list -> item
+
+      val toTerm : item -> Term.term
+      val toReduction : item -> Reduction.reduction
+      val toUreduction1 : item -> Reduction.ureduction1
+      val toUreduction2 : item -> Reduction.ureduction2
+
+      val fromTerm : Term.term -> item
+      val fromReduction : Reduction.reduction -> item
+      val fromUreduction1 : Reduction.ureduction1 -> item
+      val fromUreduction2 : Reduction.ureduction2 -> item
+
+      (* register for normalization *)
+      val register : Reduction.ureduction2 -> unit
+
+   end
+
+
+signature REGISTRY_INTERNAL =
+   sig
+
+      include REGISTRY
+
+
+      val puItem : item Pickle.pu
+
+      (* Applies to all local items in the registry. *)
+      val appLocal : (Symbol.symbol list * item -> unit) -> unit
+
+      (* Returns all reductions registered for normalization. *)
+      val registered : unit -> Reduction.ureduction2 list
+
+      val import : Symbol.symbol list -> item -> unit
+
+   end
+
+
+
+structure RegistryInternal :> REGISTRY_INTERNAL =
+   struct
+
+      structure C = CheckpointedRef
+      structure P = Pickle
+      structure R = ReductionInternal
+
+      datatype item =
+         Term of Term.term
+       | Reduction of Reduction.reduction
+       | Ureduction1 of Reduction.ureduction1
+       | Ureduction2 of Reduction.ureduction2
+
+      exception Registry
+
+      fun signalError msg =
+         raise (Message.Error (Registry,
+                               String.concat
+                                  [
+                                  "Error: ",
+                                  msg,
+                                  ".\n"
+                                  ]))
+
+      fun signalSortError () = signalError "item has the wrong sort"
+
+
+      structure DL =
+         RedBlackDict (structure Key = ListOrdered (structure Ordered = SymbolOrdered))
+
+
+      
+      (* bool=true indicates imported *)
+      val theRegistry : (item * bool) DL.dict C.cref = C.new DL.empty
+
+      fun writeFull address x =
+         (case address of
+             [] => signalError "empty address"
+          
+           | _ =>
+                C.assign
+                   theRegistry
+                   (DL.insertMerge (C.deref theRegistry) address x
+                       (fn _ =>
+                           (* already present *)
+                           signalError "already present in registry")))
+       
+      fun write name item =
+         writeFull (Namespace.currentModule () @ [name]) (item, false)
+
+      fun import fullname item =
+         writeFull fullname (item, true)
+       
+      fun read name =
+         (case name of
+             [] => signalError "empty address"
+
+           | _ =>
+                (case DL.find (C.deref theRegistry) name of
+                    NONE => signalError "not present in registry"
+
+                  | SOME (item, _) => item))
+
+      fun toTerm item =
+         (case item of
+             Term x => x
+           | _ => signalSortError ())
+
+      fun toReduction item =
+         (case item of
+             Reduction x => x
+           | _ => signalSortError ())
+
+      fun toUreduction1 item =
+         (case item of
+             Ureduction1 x => x
+           | _ => signalSortError ())
+
+      fun toUreduction2 item =
+         (case item of
+             Ureduction2 x => x
+           | _ => signalSortError ())
+
+      val fromTerm = Term
+      val fromReduction = Reduction
+      val fromUreduction1 = Ureduction1
+      val fromUreduction2 = Ureduction2
+
+
+      val puItem =
+         P.alt
+            (fn Term _ => 0
+              | Reduction _ => 1
+              | Ureduction1 _ => 2
+              | Ureduction2 _ => 3)
+            [
+            P.wrap
+               (fn Term t => t
+                 | _ => raise (Fail "impossible"))
+               Term
+               Pickling.puTerm,
+
+            P.wrap
+               (fn Reduction r => r
+                 | _ => raise (Fail "impossible"))
+               Reduction
+               R.puReduction,
+
+            P.wrap
+               (fn Ureduction1 r => r
+                 | _ => raise (Fail "impossible"))
+               Ureduction1
+               R.puUreduction1,
+
+            P.wrap
+               (fn Ureduction2 r => r
+                 | _ => raise (Fail "impossible"))
+               Ureduction2
+               R.puUreduction2
+            ]
+
+      fun appLocal f =
+         DL.app
+            (fn (addr, (item, imported)) =>
+                if imported then
+                   ()
+                else
+                   f (addr, item))
+            (C.deref theRegistry)
+
+
+
+      val theRegistered : Reduction.ureduction2 list C.cref = C.new []
+
+      fun register r =
+         (
+         C.assign theRegistered (r :: C.deref theRegistered);
+         NormalizeInternal.register r
+         )
+
+      fun registered () = C.deref theRegistered
+
+   end
+
+
+structure Registry 
+   :> REGISTRY where type item = RegistryInternal.item
+   = RegistryInternal
+

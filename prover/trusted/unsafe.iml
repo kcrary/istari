@@ -1,0 +1,84 @@
+
+(* The name "Unsafe" is taken by an SML/NJ top-level module. *)
+
+signature UNSAFE =
+   sig
+
+      type term
+      type ebind
+
+      val allow : unit -> unit  (* cannot be undone *)
+      val allowed : unit -> bool
+
+      exception UnsafeIsAllowed
+      val insistSafe : unit -> unit
+
+      exception UnsafeNotAllowed
+      val setEbind : ebind -> term -> unit
+      val unsetEbind : ebind -> unit
+
+      exception Paranoid
+      val setParanoid : unit -> unit  (* cannot be undone, incompatible with unsafe *)
+      val getParanoid : unit -> bool
+
+   end
+
+
+functor UnsafeFun (structure Term : TERM_PRIV
+                   structure Trail : TRAIL_PRIV
+                                     where type term = Term.term
+                                     where type ebind = Term.ebind)
+   :> UNSAFE 
+      where type term = Trail.term
+      where type ebind = Trail.ebind
+   =
+   struct
+
+      type term = Term.term
+      type ebind = Term.ebind
+
+      (* cannot both be true *)
+      val unsafe = ref false
+      val paranoid = ref false
+
+      exception Paranoid
+
+      fun allow () =
+         if !paranoid then
+            raise Paranoid
+         else
+            unsafe := true
+
+      fun allowed () = !unsafe
+
+      exception UnsafeIsAllowed
+
+      fun insistSafe () =
+         if !unsafe then
+            raise UnsafeIsAllowed
+         else
+            ()
+
+      exception UnsafeNotAllowed
+
+      fun setEbind e m =
+         if !unsafe then
+            Trail.setEbind e m
+         else
+            raise UnsafeNotAllowed
+
+      fun unsetEbind (r, _) =
+         if !unsafe then
+            r := NONE
+         else
+            raise UnsafeNotAllowed
+
+      fun setParanoid () =
+         if !unsafe then
+            raise UnsafeIsAllowed
+         else
+            paranoid := true
+
+      fun getParanoid () = !paranoid
+
+   end

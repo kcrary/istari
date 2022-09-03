@@ -1,0 +1,287 @@
+
+signature GENERALIZE =
+   sig
+
+      type eterm = ETerm.eterm
+      type symbol = Symbol.symbol
+      type tactic = Tactic.tactic
+
+      (* pattern m n occ
+
+         if    m appears max(occ) times in n
+         then  returns INL n'
+               where
+               n' is obtained by replacing the occ occurrences of m in by a variable
+               such that n'[m . id] = n
+               (occ = NONE is taken to mean all occurrences)
+         else  returns INR i
+               where m appears i times in n
+      *)
+      val pattern : Term.term -> Term.term -> int list option -> (Term.term, int) Sum.sum
+
+      val generalizeGenRaw : eterm -> eterm -> int list option -> symbol option -> tactic
+      val generalizeGen : eterm -> eterm -> int list option -> symbol option -> tactic
+
+      val generalizeAtRaw : eterm -> eterm -> int list -> symbol option -> tactic
+      val generalizeAt : eterm -> eterm -> int list -> symbol option -> tactic
+
+      val generalizeRaw : eterm -> eterm -> symbol option -> tactic
+      val generalize : eterm -> eterm -> symbol option -> tactic
+
+   end
+
+
+signature GENERALIZE_INTERNAL =
+   sig
+
+      include GENERALIZE
+
+
+      val generalizeGenPriority : eterm -> eterm -> int list option -> symbol option -> Typecheck.priority Tactic.tacticm
+
+   end
+
+
+structure GeneralizeInternal :> GENERALIZE_INTERNAL =
+   struct
+
+      structure T = Term
+      structure N = Normalize
+      structure D = Directory
+      structure J = Judgement
+      structure C = Oldcase
+      structure TC = Typecheck
+
+      val ? = C.?
+
+      open Tactic
+
+      type eterm = ETerm.eterm
+      type symbol = Symbol.symbol
+
+
+      (* patternLoop m n depth i occ
+
+         if    m and n are simple
+               occ is sorted
+               i <= everything in occ
+         then  return (i', occ', n')
+               where
+               i' = i - the number of occurrences of m in n or occ = []
+               occ' = all elements of occ >= i'
+               n' is n where the occ-i occurrences of m in n are replaced by
+                 Var (depth + the depth of the occurence within n)
+                 and everything else is shifted
+                 (occ = NONE is taken to mean all occurrences)
+               (so n' [m . id] = n)
+      *)
+      fun patternLoop m n depth i occ =
+         (case occ of
+             SOME [] =>
+                (i, occ, T.Sub (n, T.under depth T.shift1))
+
+           | SOME (j :: rest) =>
+                let
+                   val mark = Trail.mark ()
+                in
+                   (case Identical.identicalPrefixSimp m n of
+                       NONE =>
+                          (
+                          Trail.rewind mark;
+                          patternTerm m n depth i occ
+                          )
+       
+                     | SOME spine =>
+                          if i = j then
+                             (i+1, SOME rest,
+                              T.Elim (T.Var depth, T.ssubst spine (T.under depth T.shift1)))
+                          else
+                             (
+                             Trail.rewind mark;
+                             (i+1, occ, 
+                              T.Sub (n, T.under depth T.shift1))
+                             ))
+                end
+
+           | NONE =>
+                let
+                   val mark = Trail.mark ()
+                in
+                   (case Identical.identicalPrefixSimp m n of
+                       NONE =>
+                          (
+                          Trail.rewind mark;
+                          patternTerm m n depth i NONE
+                          )
+
+                     | SOME spine =>
+                          (i+1, NONE,
+                           T.Elim (T.Var depth, T.ssubst spine (T.under depth T.shift1))))
+                end)
+
+      and patternTerm m n depth i occ =
+         (case n of
+             T.Elim (T.Var v, spine) =>
+                let
+                   val (i', occ', spine') = patternSpine m spine depth i occ
+
+                   val v' =
+                      if v < depth then
+                         v
+                      else
+                         v+1
+                in
+                   (i', occ', T.Elim (T.Var v', spine'))
+                end
+
+           | T.Elim (h as T.Const const, spine) =>
+                let
+                   val (i', occ', spine') = patternSpine m spine depth i occ
+                in
+                   (i', occ', T.Elim (h, spine'))
+                end
+
+           | T.Elim (h as T.Sub _, spine) =>
+                let
+                   val (i', occ', spine') = patternSpine m spine depth i occ
+                in
+                   (i', occ', T.Elim (T.Sub (h, T.under depth T.shift1), spine'))
+                end
+
+           | T.Elim (n1, spine) =>
+                let
+                   val (i', occ', n1') = patternLoop m n1 depth i occ
+                   val (i'', occ'', spine') = patternSpine m spine depth i' occ'
+                in
+                   (i'', occ'', T.Elim (n1', spine'))
+                end
+
+           | T.Lam (binder, n1) =>
+                let
+                   val m' = N.simplify (T.Sub (m, T.shift1))
+
+                   val (i', occ', n1') = patternLoop m' (N.simplify n1) (depth+1) i occ
+                in
+                   (i', occ', T.Lam (binder, n1'))
+                end
+
+           | T.Pair (n1, n2) =>
+                let
+                   val (i', occ', n1') = patternLoop m (N.simplify n1) depth i occ
+                   val (i'', occ'', n2') = patternLoop m (N.simplify n2) depth i' occ'
+                in
+                   (i'', occ'', T.Pair (n1', n2'))
+                end
+
+           | T.Next n1 =>
+                let
+                   val (i', occ', n1') = patternLoop m (N.simplify n1) depth i occ
+                in
+                   (i', occ', T.Next n1')
+                end
+
+           | T.Triv => (i, occ, n)
+
+           | T.Marker _ => (i, occ, n)
+
+           | _ =>
+                (* n is simple *)
+                raise (Fail "impossible"))
+
+      and patternSpine m spine depth i occ =
+         (case spine of
+             [] =>
+                (i, occ, [])
+
+           | T.App n :: rest =>
+                let
+                   val (i', occ', n') = patternLoop m (N.simplify n) depth i occ
+                   val (i'', occ'', rest') = patternSpine m rest depth i' occ'
+                in
+                   (i'', occ'', T.App n' :: rest')
+                end
+
+           | elim :: rest =>
+                let
+                   val (i', occ', rest') = patternSpine m rest depth i occ
+                in
+                   (i', occ', elim :: rest')
+                end)
+
+      fun pattern m n occ =
+         let
+            val (i, occ', n') =
+               patternLoop 
+                  (N.simplify m)
+                  (N.simplify n)
+                  0 0
+                  (Option.map
+                      (fn l => Juliasort.sort (fn (x, y) => Int.compare x y) l)
+                      occ)
+         in
+            (case occ' of
+                SOME (_ :: _) => Sum.INR i
+
+              | _ => Sum.INL n')
+         end
+
+      fun generalizeGenPriority em ea occ name =
+         let
+            do (jud, dir) = withgoal
+            val idir = D.idir dir
+
+            val m = em idir
+            val a = ea idir
+         in
+            (case pattern m (J.concl jud) occ of
+                Sum.INL b =>
+                   refine (Rule.assert (T.apply2 Prim.ov a m) (J.concl jud))
+                   >>> [
+                       idtacM TC.Secondary,
+
+                       refine (Rule.forallElim 
+                                  (T.Sub (a, T.shift1)) 
+                                  (T.Sub (b, T.Idot (0, T.Shift 2)))
+                                  (T.Sub (m, T.shift1)))
+                       >>> [
+                           refine (Rule.forallIntro
+                                      (T.Sub (a, T.shift1)) 
+                                      (T.Sub (b, T.Idot (0, T.Shift 2))))
+                           >>> [
+                               refine (Rule.inhabitedForm (T.evar ()))
+                               >> refine (Rule.inhabitant (T.evar ()) (T.evar ()))
+                               >> refine (Rule.hypothesis 0) >> done,
+
+                               refine (Rule.weaken 1 1)
+                               >> chdir (D.bindh dir name)
+                               >> idtacM TC.Primary
+                               ],
+
+                           refine (Rule.hypothesis 0) >> done
+                           ]
+                       ]
+            
+              | Sum.INR i =>
+                   fail (String.concat ["only ", Int.toString i, " occurrences found"]))
+         end
+
+      fun generalizeGenRaw em ea occ name = generalizeGenPriority em ea occ name >> idtac
+
+      fun generalizeGen em ea occ name = Typecheck.withTypecheckSnd $ generalizeGenPriority em ea occ name
+
+      fun generalizeAtRaw em ea occ name =
+         generalizeGenRaw em ea (SOME occ) name
+
+      fun generalizeAt em ea occ name =
+         generalizeGen em ea (SOME occ) name
+
+      fun generalizeRaw em ea name =
+         generalizeGenRaw em ea NONE name
+
+      fun generalize em ea name =
+         generalizeGen em ea NONE name
+
+   end
+
+
+structure Generalize :> GENERALIZE = GeneralizeInternal

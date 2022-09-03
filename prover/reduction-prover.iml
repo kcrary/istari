@@ -1,0 +1,236 @@
+
+signature REDUCTION_PROVER =
+   sig
+
+      exception ReductionProver
+
+      val start : Term.term -> unit
+      val done : unit -> Term.term * Reduction.reduction
+
+      val show : unit -> unit
+
+      val apply : Reduction.reduction -> unit
+      val unfold : unit -> unit
+      val beta : int -> unit
+      val betas : unit -> unit
+      val user1 : Reduction.ureduction1 -> unit
+      val user2 : Reduction.ureduction2 -> unit
+      val unroll : Constant.constant -> unit
+
+      val enter : int list -> unit
+      val leave : unit -> unit
+
+   end
+
+
+structure ReductionProver :> REDUCTION_PROVER =
+   struct
+
+      structure T = Term
+      structure N = Normalize
+      structure R = Reduction
+      structure C = CheckpointedRef
+
+
+      exception Error = Message.Error
+
+      exception ReductionProver
+
+      fun signal msg =
+         raise (Error (ReductionProver,
+                       String.concat
+                          [
+                          "Error: ",
+                          msg,
+                          ".\n"
+                          ]))
+
+
+      fun nocont _ _ = signal "top frame"
+
+      val underway = C.new false
+      val depth = C.new 0
+      val reductions : R.reduction list C.cref = C.new []
+      val cont : (T.term -> R.reduction -> unit) C.cref = C.new nocont
+      val curr = C.new T.Triv
+
+      fun showMain () =
+         Message.message 10 0
+         (fn () =>
+             (
+             print "========================================\n";
+             print "(depth ";
+             print (Int.toString (C.deref depth));
+             print ")\n\n";
+             Show.showLiteral (C.deref curr);
+             print "----------------------------------------\n"
+             ))
+
+      fun start m =
+         if C.deref underway then
+            signal "proof underway"
+         else
+            (
+            Message.clear ();
+            C.assign underway true;
+            C.assign depth 0;
+            C.assign reductions [];
+            C.assign cont nocont;
+            C.assign curr m;
+            showMain ()
+            )
+
+      fun action f =
+         if C.deref underway then
+            (
+            Message.clear ();
+
+            try f () with
+               exn as (Error (_, msg)) =>
+                  (
+                  print msg;
+                  raise exn
+                  )
+            )
+         else
+            signal "Error: no proof underway"
+
+      fun done () =
+         if C.deref underway then
+            if C.deref depth = 0 then
+               let
+                  val () = Message.clear ()
+                  val m = C.deref curr
+                  val r = R.trans (List.rev (C.deref reductions))
+               in
+                  C.assign underway false;
+                  C.assign reductions [];
+                  C.assign cont nocont;
+                  C.assign curr T.Triv;
+                  (m, r)
+               end
+            else
+               signal "not top frame"
+         else
+            signal "no proof underway"
+         
+            
+      fun show () = action (fn () => showMain ())
+
+      fun apply red =
+         action
+         (fn () =>
+             (try
+                 let
+                    val m = R.reduce red (C.deref curr)
+                 in
+                    C.assign curr m;
+                    C.assign reductions (red :: C.deref reductions);
+                    showMain ()
+                 end
+              with R.Reduce => signal "reduction error"))
+         
+      fun unfold () = apply R.unfold
+      fun beta n = apply (R.beta n)
+      fun betas () = apply R.betas
+      fun user1 red = apply (R.user1 red)
+      fun user2 red = apply (R.user2 red)
+
+      fun unroll const =
+         (case Database.findUnroll const of
+             SOME red => apply red
+
+           | NONE => signal "cannot unroll constant")
+
+
+      exception BadSubterm
+
+      fun subterm1 i m =
+         (case N.simplify m of
+             T.Elim (h, spine) =>
+                (case Int.compare i 0 of
+                    LESS => raise BadSubterm
+
+                  | EQUAL =>
+                       (h, (fn h' => T.Elim (h', spine)))
+
+                  | GREATER =>
+                       (case List.splitOpt spine (i-1) of
+                           SOME (spine1, T.App n :: spine2) =>
+                              (n, (fn n' => T.Elim (h, spine1 @ T.App n' :: spine2)))
+
+                         | _ =>
+                              raise BadSubterm))
+
+           | T.Lam (binder, n) =>
+                if i = 0 then
+                   (n, (fn n' => T.Lam (binder, n')))
+                else
+                   raise BadSubterm
+
+           | T.Pair (n1, n2) =>
+                if i = 0 then
+                   (n1, (fn n1' => T.Pair (n1', n2)))
+                else if i = 1 then
+                   (n2, (fn n2' => T.Pair (n1, n2')))
+                else
+                   raise BadSubterm
+
+           | T.Next n =>
+                if i = 0 then
+                   (n, (fn n' => T.Next n'))
+                else
+                   raise BadSubterm
+
+           | _ => raise BadSubterm)
+
+
+      fun subterm l m =
+         (case l of
+             [] => (m, (fn m' => m'))
+
+           | i :: rest =>
+                let
+                   val (n, f) = subterm1 i m
+                
+                   val (p, g) = subterm rest n
+                in
+                   (p, (fn p' => f (g p')))
+                end)
+
+
+      fun enter l =
+         action
+         (fn () =>
+             (try
+                 let
+                    val (m, f) = subterm l (C.deref curr)
+    
+                    val olddepth = C.deref depth
+                    val oldcont = C.deref cont
+                    val oldreductions = C.deref reductions
+    
+                    fun k n r =
+                       (
+                       C.assign depth olddepth;
+                       C.assign cont oldcont;
+                       C.assign reductions (R.within l r :: oldreductions);
+                       C.assign curr (f n);
+                       showMain ()
+                       )
+                 in
+                    C.assign depth (olddepth + 1);
+                    C.assign cont k;
+                    C.assign reductions [];
+                    C.assign curr m;
+                    showMain ()
+                 end
+              with BadSubterm => signal "invalid subterm"))
+
+
+      fun leave () =
+         action
+         (fn () =>
+             C.deref cont (C.deref curr) (R.trans (List.rev (C.deref reductions))))
+
+   end

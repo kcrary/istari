@@ -1,0 +1,393 @@
+
+signature NAMESPACE =
+   sig
+
+      type constant = Constant.constant
+      type symbol = Symbol.symbol
+      type address = symbol list  (* nonempty *)
+
+      exception Namespace  (* signalled for any error *)
+      
+      val declare : symbol -> Term.term option -> constant
+
+      val resolve : address -> constant
+      val resolveOpt : address -> constant option
+
+      val name : constant -> address
+      val fullname : constant -> address
+      val toString : constant -> string
+      val dump : address -> (address * constant * Term.term option) list
+
+      val moduleExists : address -> bool
+
+      val beginModule : string -> unit
+      val beginModuleSym : symbol -> unit
+      val endModule : unit -> unit
+      val openModule : address -> unit
+
+      val alias : symbol -> constant -> unit
+
+      val currentModule : unit -> symbol list
+
+   end
+
+
+signature NAMESPACE_INTERNAL =
+   sig
+
+      include NAMESPACE
+
+
+      (* reify sym v
+
+         If     J is |- A  and  v validates J
+         then   declares a constant (const) using v's extract as its definition
+                (if extracts are supported), and sym as its name
+         and    returns (const, J', v')
+         where  J' is |- const : A  and  v' validates J'
+      *)
+      val reify : Symbol.symbol -> Judgement.djudgement -> Refine.validation -> Term.constant * Judgement.djudgement * Refine.validation
+
+      
+      (* Apply to all local namespace entries. *)
+      val appLocal : (address * constant -> unit) -> unit
+
+      (* Like alias, but marks the entry as imported. *)
+      val import : symbol -> constant -> unit
+
+   end
+
+
+structure NamespaceInternal :> NAMESPACE_INTERNAL =
+   struct
+
+      structure C = ConstantInternal
+      structure D = SymbolDict
+      structure R = CheckpointedRef
+      structure T = Term
+
+      type constant = C.constant
+      type symbol = Symbol.symbol
+      type address = symbol list
+
+
+
+      exception Error = Message.Error
+
+      exception Namespace
+
+      fun signalError str =
+         raise (Error (Namespace,
+                       String.concat 
+                          [
+                          "Error: ",
+                          str,
+                          ".\n"
+                          ]))
+
+
+
+      (* In C (defs, mods):
+         defs maps symbols to constants (with a bool indicating if it was imported)
+         mods maps symbols to submodules
+      *)
+      datatype context = C of (constant * bool) D.dict * context D.dict
+      
+      fun union (C (c1, s1)) (C (c2, s2)) =
+         C (D.union c1 c2 (fn (_, _, x) => x), D.union s1 s2 (fn (_, _, x) => x))
+
+      fun resolveMain (ctx as C (_, d)) address =
+         (case address of
+             nil => signalError "empty address"
+
+           | [sym] => SOME (ctx, sym)
+
+           | h :: t =>
+                (case D.find d h of
+                    NONE => NONE
+
+                  | SOME ctx' => resolveMain ctx' t))
+
+      fun resolveMod ctx address =
+         (case resolveMain ctx address of
+             NONE => NONE
+
+           | SOME (C (_, d), sym) => D.find d sym)
+
+      fun resolveDec ctx address =
+         (case resolveMain ctx address of
+             NONE => NONE
+
+           | SOME (C (d, _), sym) =>
+                (case D.find d sym of
+                    NONE => NONE
+
+                  | SOME (const, _) => SOME const))
+      
+
+
+      val empty = C (D.empty, D.empty)
+
+      val initial =
+         C (List.foldl
+               (* view primitives as imported *)
+               (fns (sym, const) d => D.insert d sym (const, true))
+               D.empty
+               Prim.primitives,
+            D.empty)
+
+      val theContext : context R.cref = R.new initial
+      val theModule : context R.cref = R.new initial
+      val thePath : symbol list R.cref = R.new []
+      val endFn : (unit -> unit) R.cref = R.new (fn () => signalError "not in module")
+
+
+      
+
+      fun insertLoop (C (defs, mods)) path sym const =
+         C (D.insert defs sym const,
+            (case path of
+                [] => mods
+
+              | modsym :: rest =>
+                   let
+                      val (_, _, mods') =
+                         D.operate mods modsym
+                            (fn () => insertLoop (C (D.empty, D.empty)) rest sym const)
+                            (fn c => insertLoop c rest sym const)
+                   in
+                      mods'
+                   end))
+
+
+      fun insert sym f =
+         let
+            val C (defs, mods) = R.deref theModule
+            val context = R.deref theContext
+            val path = R.deref thePath
+         in
+            if D.member defs sym then
+               signalError (String.concat ["name ", Symbol.toValue sym, " is already declared"])
+            else
+               let
+                  val (entry, x) = f ()
+               in
+                  R.assign theModule (C (D.insert defs sym entry, mods));
+                  R.assign theContext (insertLoop context path sym entry);
+
+                  x
+               end
+         end
+
+
+      fun declare sym def =
+         let
+            val path = R.deref thePath
+         in
+            insert sym 
+               (fn () => 
+                   let
+                      val const = ConstantInternal.declare def (sym :: List.rev path)
+                   in
+                      ((const, false), const)
+                   end)
+         end
+
+
+      fun reify sym jud v =
+         let
+            val path = R.deref thePath
+         in
+            insert sym
+               (fn () =>
+                   let
+                      val all as (const, jud', v') = 
+                         Refine.reify jud v (sym :: List.rev path)
+                   in
+                      ((const, false), all)
+                   end)
+         end
+         
+
+      fun alias sym const =
+         insert sym (fn () => ((const, false), ()))
+
+
+      fun import sym const =
+         insert sym (fn () => ((const, true), ()))
+
+
+
+      fun resolveOpt address = resolveDec (R.deref theContext) address
+
+      fun resolve address =
+         (case resolveDec (R.deref theContext) address of
+             SOME k => k
+
+           | NONE =>
+                signalError ("no constant " ^ String.concatWith "." (map Symbol.toValue address)))
+
+
+
+      val question = Symbol.fromValue "?"
+
+      fun nameloop const l address =
+         (case l of
+             nil =>
+                (* Didn't find it.  This is an orphaned constant (declared in a
+                   history that got unwound).  Name it "?.address".
+                *)
+                question :: address
+
+           | h :: t =>
+                let
+                   val address' = h :: address
+                in
+                   (case resolveOpt address' of
+                       NONE =>
+                          nameloop const t address'
+
+                     | SOME const' =>
+                          if Constant.eq (const, const') then
+                             address'
+                          else
+                             nameloop const t address')
+                end)
+
+      fun name const = nameloop const (C.path const) []
+
+      fun fullname const = 
+         let
+            val address = List.rev (C.path const)
+         in
+            if
+               (case resolveOpt address of
+                   NONE => false
+
+                 | SOME const' => Constant.eq (const, const'))
+            then
+               address
+            else
+               (* Didn't find it.  This is an orphaned constant (declared in a
+                  history that got unwound).  Name it "?.address".
+               *)
+               question :: address
+         end
+
+
+      fun toString const = String.concatWith "." (map Symbol.toValue (name const))
+
+
+
+      fun dumpContext (C (defs, submods)) path acc =
+         let
+            val acc' =
+               D.foldl
+                  (fn (sym, ctx, acc) =>
+                      dumpContext ctx (sym :: path) acc)
+                  acc
+                  submods
+
+            val acc'' =
+               D.foldl
+                  (fn (sym, (const, _), acc) =>
+                      (List.rev (sym :: path), const, C.definition const) :: acc)
+                  acc'
+                  defs
+         in
+            acc''
+         end
+
+      fun dump address =
+         let
+            val ctx =
+               (case address of
+                   [] => R.deref theContext
+
+                 | _ => 
+                      (case resolveMod (R.deref theContext) address of
+                          SOME ctx => ctx
+
+                        | NONE => signalError "no such address"))
+         in
+            dumpContext ctx [] []
+         end
+
+
+
+      fun appLocalLoop (C (defs, submods)) path f =
+         (
+         D.app
+            (fn (sym, ctx) => appLocalLoop ctx (sym :: path) f)
+            submods;
+
+         D.app
+            (fn (sym, (const, imported)) =>
+                if imported then
+                   ()
+                else
+                   f (List.rev (sym :: path), const))
+            defs
+         )
+
+      fun appLocal f = appLocalLoop (R.deref theContext) [] f
+
+
+
+      fun moduleExists address =
+         Option.isSome (resolveMod (R.deref theContext) address)
+
+
+
+      fun beginModuleSym sym =
+         let
+            val C (currDefs, currMods) = R.deref theModule
+         in
+            if D.member currMods sym then
+               raise (Error (Namespace,
+                             String.concat 
+                                [
+                                "Error: name ",
+                                Symbol.toValue sym,
+                                " is already declared.\n"
+                                ]))
+            else
+               let
+                  val C (oldDefs, oldMods) = R.deref theContext
+                  val oldPath = R.deref thePath
+                  val oldEndFn = R.deref endFn
+               
+                  fun newEndFn () =
+                     let
+                        val this = R.deref theModule
+                     in
+                        R.assign theModule (C (currDefs, D.insert currMods sym this));
+                        R.assign theContext (C (oldDefs, D.insert oldMods sym this));
+                        R.assign thePath oldPath;
+                        R.assign endFn oldEndFn
+                     end
+               in
+                  R.assign theModule (C (D.empty, D.empty));
+                  R.assign thePath (oldPath @ [sym]);
+                  R.assign endFn newEndFn
+               end
+         end
+
+      fun beginModule name = beginModuleSym (Symbol.fromValue name)
+
+      fun endModule () = R.deref endFn ()
+
+      fun openModule address =
+         (case resolveMod (R.deref theContext) address of
+             NONE => signalError "no such module"
+
+           | SOME (ctx as C (defs, _)) =>
+                R.assign theContext (union (R.deref theContext) ctx))
+
+      fun currentModule () = R.deref thePath
+
+   end
+
+
+structure Namespace :> NAMESPACE = NamespaceInternal
+

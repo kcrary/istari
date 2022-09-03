@@ -1,0 +1,1494 @@
+
+(* Explicitly typed terms, with verifications. *)
+
+signature XTERM =
+   sig
+
+      (* A xterm is
+         - (M, A, tac)       where tac proves M : A, or
+         - (A, bogus, tac)   where tac proves A : type
+
+         An mterm is
+         - (M, A, J, v)      where v validates J and J is M : A
+         - (M, bogus, J, v)  where v validates J and J is M : type
+      *)
+
+      type term = Term.term
+      type xterm = term * term * Tactic.tactic
+      type mxterm = term * term * Judgement.djudgement * Refine.validation
+
+      val term : xterm -> term
+
+      (* var i A
+
+         G |- i : A[^i+1]
+         >>
+         G(i) = A
+      *)
+      val var : int -> xterm -> xterm
+
+      (* vart i A
+
+         G |- i : A
+         >>
+         G(i) = A' and A = A'[^i+1]
+      *)
+      val vart : int -> term -> xterm
+
+      val constant : Constant.constant -> xterm
+
+      val arrow : xterm -> xterm -> xterm
+      val arrowDep : xterm -> xterm -> xterm
+      val arrowUniv : xterm -> xterm -> xterm
+      val lam : Term.binder -> xterm -> xterm -> xterm
+
+      val forall : Term.binder -> xterm -> xterm -> xterm
+      val forallUniv : Term.binder -> xterm -> xterm -> xterm
+      val lamAll : Term.binder -> xterm -> xterm -> xterm   (* fn (x : A) . M *)
+
+      val intersectUniv : Term.binder -> xterm -> xterm -> xterm
+      val lamInt : Term.binder -> xterm -> xterm -> xterm   (* A |- M *)
+
+      val app : xterm -> xterm -> xterm
+      val apps : xterm -> xterm list -> xterm
+      val appGuard : xterm -> Tactic.tactic -> xterm
+
+      val prod : xterm -> xterm -> xterm
+      val prodUniv : xterm -> xterm -> xterm
+      val pair : xterm -> xterm -> xterm
+      val pi1 : xterm -> xterm
+      val pi2 : xterm -> xterm
+      val tuple : xterm list -> xterm
+
+      (* if    G, A, B[^], G'[(1, 0) . ^2]] |- M : C[under_i (1, 0) . ^2]
+               i = |G'|
+         then  G, A & B, G' |- splitProd i M C : C
+      *)
+      val splitProd : int -> xterm -> term -> xterm
+
+      val exists : Term.binder -> xterm -> xterm -> xterm
+      val existsUniv : Term.binder -> xterm -> xterm -> xterm
+      val pairEx : xterm -> xterm -> xterm -> xterm  (* <M, N> : A *)
+      val pi1Ex : xterm -> xterm
+      val pi2Ex : xterm -> xterm
+      val tupleEx : xterm list -> xterm -> xterm   (* <M1, ... <Mn, ()>> : A *)
+
+      (* if    G, A, B, G'[(1, 0) . ^2] |- M : C[under_i (1, 0) . ^2]
+               i = |G'|
+         then  G, exists A . B, G' |- splitExists i M C : C
+      *)
+      val splitExists : int -> xterm -> term -> xterm
+
+      (* G |- exists A . B : type  -->  G, A |- B : type *)
+      val existsInv2 : xterm -> xterm
+
+
+      val sumUniv : xterm -> xterm -> xterm
+      val inN : int -> xterm -> xterm -> xterm               (* inr ... inr inl M : A *)
+      val cas : xterm -> xterm -> xterm -> xterm -> xterm    (* sumcase(M, .N, .P) : C[M . id] *)
+      val multicase : xterm -> xterm list -> xterm -> xterm
+      
+      val unit : xterm
+      val unitUniv : xterm -> xterm   (* unit : Ui *)
+      val triv : xterm
+
+      (* if    G, G'[() . id] |- M : C[under_i () . id]
+               i = |G'|
+         then  G, unit, G' |- splitUnit i M C : C
+      *)
+      val splitUnit : int -> xterm -> term -> xterm
+
+      val voidUniv : xterm -> xterm   (* void : Ui *)
+
+      val nat : int -> xterm
+
+      val univ : xterm -> xterm
+      val univUniv : xterm -> xterm
+      val forget : xterm -> xterm
+      val cumulativeSucc : xterm -> xterm
+      val lsucc : xterm -> xterm
+    
+      val weaken : xterm -> int -> xterm
+      val weakenUnder : xterm -> int -> int -> xterm
+
+      val hole : term -> term -> xterm
+      val inhabitant : xterm -> Tactic.tactic
+      val compact : Judgement.context -> xterm -> xterm
+
+      val use : mxterm -> xterm
+      val mobilize : Judgement.context -> xterm -> mxterm
+      
+
+      (* (s, action)
+
+         G |- s : G'
+         if  tac proves G' |- C  then  action C tac proves G |- C[s]
+      *)
+      datatype xsub_action =
+         Easy of (int * int) list  (* shifts, with the last shift given first *)
+       | Hard of term -> Tactic.tactic -> Tactic.tactic
+
+      type xsub = Term.sub * xsub_action
+
+      val sub : xterm -> xsub -> xterm
+
+      val id : xsub
+      val shift : int -> xsub
+      val dot : xterm -> xterm -> xsub -> xsub  (* dot M A s = M . s, where M : A[s] *)
+      val compose : xsub -> xsub -> xsub
+
+      val underShift : int -> int -> xsub       (* underShift i j = under_i ^j *)
+      val dotid : xterm -> xsub
+      val underEasy : int -> xsub -> xsub       (* underEasy k s = under_k s, but s must be Easy *)
+      val under : xterm list -> xsub -> xsub    (* under [Ai | i = 1 .. k] s = under_k s
+                                                   where G, A1[s], ..., Ak[under_k-1 s] |- under_k s : G', A1, ..., Ak *)
+
+      val existsLeft : xterm -> xsub            (* existsLeft (exists A . B) = s, where G, (exists A . B) |- s : G, A, B *)
+      val prodLeft : xsub                       (* G, A & B |- prodLeft : G, A, B[^] *)
+
+   end
+
+
+structure XTerm :> 
+   sig
+      include XTERM
+      val elements : Term.term list ref 
+   end
+   =
+   struct
+
+      structure T = Term
+
+      open Tactic
+      open CasePervasive
+
+
+      type term = T.term
+      type xterm = T.term * T.term * tactic
+      type mxterm = term * term * Judgement.djudgement * Refine.validation
+
+
+      val elements : T.term list ref = ref []
+
+      fun error str l =
+         (
+         elements := l;
+         raise (Fail ("xterm error: str"))
+         )
+
+
+      fun checkNo _ = ()
+
+      fun checkYes l =
+         (case l of
+             [] => ()
+
+           | (m, n) :: rest =>
+                if Unify.unify1 m n then
+                   checkYes rest
+                else
+                   raise Case.Backtrack)
+
+(* for debugging
+      val check = checkYes
+*)
+      val check = checkNo
+      
+
+
+      val bogus = T.Const Prim.bogus
+
+
+      fun natTerm i =
+         if i = 0 then
+            T.Const Prim.zero
+         else
+            T.apply1 Prim.succ (natTerm (i-1))
+
+
+      fun term (m, _, _) = m
+
+
+      fun var i (a, u, _) =
+         termCaseX u
+         / \Prim.bogus\ =!>
+           \(fnc =>
+                (T.Var i,
+                 T.Sub (a, T.Shift (i+1)),
+                 refine (Rule.hypothesisOf i)))\
+
+         | _ => \(fnc => error "var" [natTerm i, a, u])\
+         /
+
+
+      fun vart i a =
+         (T.Var i,
+          a,
+          refine (Rule.hypothesisOf i))
+
+
+      fun constant const =
+         try
+            let
+               val (a, tac) = Infer.inferConstant const
+            in
+               (T.Const const, a, tac)
+            end
+         with _ => error "constant" [(T.Const const)]
+
+
+      fun arrow (a, u, atac) (b, u', btac) =
+         term2CaseX u u'
+         / \Prim.bogus\ ; \Prim.bogus\ =>
+           \(fnc =>
+                (T.apply2 Prim.arrow a b,
+                 bogus,
+       
+                 refine (Rule.arrowForm a b)
+                 >>> [atac, refine (Rule.weaken 0 1) >> btac]))\
+
+         | _ => \(fnc => error "arrow" [a, u, b, u'])\
+         /
+
+
+      fun arrowDep (a, u, atac) (b, u', btac) =
+         term2CaseX u u'
+         / \Prim.bogus\ ; \Prim.bogus\ =!>
+           \(fnc =>
+                let
+                   val b' = T.Sub (b, T.Dot (bogus, T.id))
+                in
+                   check [(T.Sub (b', T.shift1), b)];
+
+                   (T.apply2 Prim.arrow a b',
+                    bogus,
+          
+                    refine (Rule.arrowForm a b')
+                    >>> [atac, btac])
+                end)\
+
+         | _ => \(fnc => error "arrowDep" [a, u, b, u'])\
+         /
+
+
+      fun arrowUniv (a, u, atac) (b, u', btac) =
+         term2CaseX u u'
+         / \Prim.univ\ ? ; \Prim.univ\ ? =!>
+           \(fnc lv lv' =>
+                (
+                check [(lv, lv')];
+                (T.apply2 Prim.arrow a b,
+                 u,
+       
+                 refine (Rule.arrowFormUniv a b lv)
+                 >>> [atac, refine (Rule.weaken 0 1) >> btac])
+                ))\
+
+         | _ => \(fnc => error "arrowUniv" [a, u, b, u'])\
+         /
+
+
+      fun lam binder (a, u, atac) (m, b, mtac) =
+         termCaseX u
+         / \Prim.bogus\ =!>
+           \(fnc =>
+                let
+                   (* b shouldn't mention 0 *)
+                   val b' = T.Sub (b, T.Dot (bogus, T.id))
+                in
+                   check [(T.Sub (b', T.shift1), b)];
+
+                   (T.Lam (binder, m),
+                    T.apply2 Prim.arrow a b',
+       
+                    refine (Rule.arrowIntroOf a b' m)
+                    >>> [atac, mtac])
+                end)\
+
+         | _ => \(fnc => error "lam" [a, u, m, b])\
+         /
+
+
+      fun forall binder (a, u, atac) (b, u', btac) =
+         term2CaseX u u'
+         / \Prim.bogus\ ; \Prim.bogus\ =!>
+           \(fnc =>
+                (
+                (T.apply2 Prim.forall a (T.Lam (binder, b)), 
+                 bogus,
+ 
+                 refine (Rule.forallForm a b)
+                 >>> [atac, btac])
+                ))\
+
+         | _ => \(fnc => error "forall" [a, u, b, u'])\
+         /
+
+
+      fun forallUniv binder (a, u, atac) (b, u', btac) =
+         term2CaseX u u'
+         / \Prim.univ\ ? ; \Prim.univ\ ? =!>
+           \(fnc lv lv' =>
+                (
+                check [(T.Sub (lv, T.shift1), lv')];
+                (T.apply2 Prim.forall a (T.Lam (binder, b)), 
+                 u,
+ 
+                 refine (Rule.forallFormUniv a b lv)
+                 >>> [atac, btac])
+                ))\
+
+         | _ => \(fnc => error "forallUniv" [a, u, b, u'])\
+         /
+
+
+      fun lamAll binder (a, u, atac) (m, b, mtac) =
+         termCaseX u
+         / \Prim.bogus\ =!>
+           \(fnc =>
+                (T.Lam (binder, m),
+                 T.apply2 Prim.forall a (T.Lam (binder, b)),
+                 
+                 refine (Rule.forallIntroOf a b m)
+                 >>> [atac, mtac]))\
+
+         | _ => \(fnc => error "lamAll" [a, u, m, b])\
+         /
+
+
+      fun intersectUniv binder (a, u, atac) (b, u', btac) =
+         term2CaseX u u'
+         / \Prim.univ\ ? ; \Prim.univ\ ? =!>
+           \(fnc lv lv' =>
+                (
+                check [(lv, lv')];
+                (T.apply2 Prim.intersect a (T.Lam (binder, b)), 
+                 u,
+ 
+                 refine (Rule.intersectFormUniv a b lv)
+                 >>> [atac, btac])
+                ))\
+
+         | _ => \(fnc => error "intersectUniv" [a, u, b, u'])\
+         /
+
+
+      fun lamInt binder (a, u, atac) (m, b, mtac) =
+         termCaseX u
+         / \Prim.bogus\ =!>
+           \(fnc =>
+                let
+                   val m' = T.Sub (m, T.Dot (bogus, T.id))
+                in
+                   check [(T.Sub (m', T.shift1), m)];
+
+                   (m',
+                    T.apply2 Prim.intersect a (T.Lam (binder, b)),
+          
+                    refine (Rule.intersectIntroOf a b m')
+                    >>> [atac, mtac])
+                end)\
+
+         | _ => \(fnc => error "lamInt" [a, u, m, b])\
+         /
+       
+
+      fun app (m, ab, mtac) (p, a, ptac) =
+         termCaseX ab
+         / \Prim.arrow\ ? ? =!>
+           \(fnc a' b =>
+                (
+                check [(a, a')];
+                (T.app m p, 
+                 b,
+ 
+                 refine (Rule.arrowElimOf a b m p)
+                 >>> [mtac, ptac])
+                ))\
+
+         | \Prim.forall\ ? (fn . ?) =!>
+           \(fnc a' b =>
+                (
+                check [(a, a')];
+                (T.app m p,
+                 T.Sub (b, T.Dot (p, T.id)),
+ 
+                 refine (Rule.forallElimOf a b m p)
+                 >>> [mtac, ptac])
+                ))\
+
+         | \Prim.intersect\ ? (fn . ?) =!>
+           \(fnc a' b =>
+               (
+               check [(a, a')];
+              
+               (m,
+                T.Sub (b, T.Dot (p, T.id)),
+
+                refine (Rule.intersectElimOf a b m p)
+                >>> [mtac, ptac])
+               ))\
+
+         | _ => \(fnc => error "app" [m, ab, p, a])\
+         /
+                
+      
+      fun apps m l =
+         List.foldl (fns n f => app f n) m l
+
+
+      fun appGuard (m, ab, mtac) atac =
+         termCaseX ab
+         / \Prim.guard\ ? ? =!>
+           \(fnc a b =>
+                (
+                m,
+                b,
+
+                refine (Rule.guardElimOf a b m)
+                >>> [mtac, atac]))\
+
+         | _ => \(fnc => error "appGuard" [m, ab])\
+         /
+
+
+      fun prod (a, u, atac) (b, u', btac) =
+         term2CaseX u u'
+         / \Prim.bogus\ ; \Prim.bogus\ =>
+           \(fnc =>
+                (T.apply2 Prim.prod a b, 
+                 bogus,
+       
+                 refine (Rule.prodForm a b)
+                 >>> [atac, btac]))\
+
+         | _ => \(fnc => error "prod" [a, u, b, u'])\
+         /
+
+
+      fun prodUniv (a, u, atac) (b, u', btac) =
+         term2CaseX u u'
+         / \Prim.univ\ ? ; \Prim.univ\ ? =!>
+           \(fnc lv lv' =>
+                (
+                check [(lv, lv')];
+                (T.apply2 Prim.prod a b, 
+                 u,
+       
+                 refine (Rule.prodFormUniv a b lv)
+                 >>> [atac, btac])
+                ))\
+
+         | _ => \(fnc => error "prodUniv" [a, u, b, u'])\
+         /
+
+
+      fun pair (m, a, mtac) (n, b, ntac) =
+         (T.Pair (m, n),
+          T.apply2 Prim.prod a b,
+
+          refine (Rule.prodIntroOf a b m n)
+          >>> [mtac, ntac])
+
+
+      fun pi1 (m, ab, mtac) =
+         termCaseX ab
+         / \Prim.prod\ ? ? =!>
+           \(fnc a b =>
+                (T.pi1 m, 
+                 a,
+ 
+                 refine (Rule.prodElim1Of a b m) 
+                 >> mtac))\
+
+         | _ => \(fnc => error "pi1" [m, ab])\
+         /
+
+
+      fun pi2 (m, ab, mtac) =
+         termCaseX ab
+         / \Prim.prod\ ? ? =!>
+           \(fnc a b =>
+                (T.pi2 m, 
+                 b,
+ 
+                 refine (Rule.prodElim2Of a b m)
+                 >> mtac))\
+
+         | _ => \(fnc => error "pi2" [m, ab])\
+         /
+
+
+      fun splitProd i (m, a, mtac) c =
+         unitCaseX
+         / _ =!>
+           \(fnc =>
+                let
+                   val () =
+                      check [(a, T.Sub (c, T.under i (T.Dot (T.Pair (T.Var 1, T.Var 0), T.Shift 2))))]
+                   
+                   val m' = 
+                      T.Sub (m, T.under i
+                                   (T.Dot (T.Elim (T.Var 0, [T.Pi2]), 
+                                           T.Dot (T.Elim (T.Var 0, [T.Pi1]), T.shift1))))
+                in
+                   (m', c,
+
+                    refine (Rule.prodLeft i (T.evar ()) (T.evar ()) (T.apply2 Prim.ov c m'))
+                    >> mtac)
+                end)\
+
+         | _ => \(fnc => error "splitProd" [natTerm i, m, a, c])\
+         /
+
+
+      fun exists binder (a, u, atac) (b, u', btac) =
+         term2CaseX u u'
+         / \Prim.bogus\ ; \Prim.bogus\ =!>
+           \(fnc =>
+                (T.apply2 Prim.exists a (T.Lam (binder, b)), 
+                 bogus,
+       
+                 refine (Rule.existsForm a b)
+                 >>> [atac, btac]))\
+
+         | _ => \(fnc => error "exists" [a, u, b, u'])\
+         /
+
+
+      fun existsUniv binder (a, u, atac) (b, u', btac) =
+         term2CaseX u u'
+         / \Prim.univ\ ? ; \Prim.univ\ ? =!>
+           \(fnc lv lv' =>
+                (
+                check [(T.Sub (lv, T.shift1), lv')];
+                (T.apply2 Prim.exists a (T.Lam (binder, b)), 
+                 u,
+ 
+                 refine (Rule.existsFormUniv a b lv)
+                 >>> [atac, btac])
+                ))\
+
+         | _ => \(fnc => error "existsUniv" [a, u, b, u'])\
+         /
+
+
+      fun pairEx (m, a, mtac) (n, bm, ntac) (b, u, btac) =
+         termCaseX u
+         / \Prim.bogus\ =!>
+           \(fnc =>
+                (
+                check [(bm, T.Sub (b, T.Dot (m, T.id)))];
+                (T.Pair (m, n),
+                 T.apply2 Prim.exists a (T.Lam (NONE, b)),
+       
+                 refine (Rule.existsIntroOf a b m n)
+                 >>> [btac, mtac, ntac])
+                ))\
+
+         | _ => \(fnc => error "pairEx" [m, a, n, bm, b, u])\
+         /
+
+
+      fun pi1Ex (m, ab, mtac) =
+         termCaseX ab
+         / \Prim.exists\ ? (fn . ?) =!>
+           \(fnc a b =>
+                (T.pi1 m, 
+                 a,
+ 
+                 refine (Rule.existsElim1Of a b m) >> mtac))\
+
+         | _ => \(fnc => error "pi1Ex" [m, ab])\
+         /
+
+
+      fun pi2Ex (m, ab, mtac) =
+         termCaseX ab
+         / \Prim.exists\ ? (fn . ?) =!>
+           \(fnc a b =>
+                (T.pi2 m,
+                 T.Sub (b, T.Dot (T.pi1 m, T.id)),
+ 
+                 refine (Rule.existsElim2Of a b m) >> mtac))\
+
+         | _ => \(fnc => error "pi2Ex" [m, ab])\
+         /
+
+
+      fun splitExists i (m, a, mtac) c =
+         unitCaseX
+         / _ =!>
+           \(fnc =>
+                let
+                   val () =
+                      check [(a, T.Sub (c, T.under i (T.Dot (T.Pair (T.Var 1, T.Var 0), T.Shift 2))))]
+                   
+                   val m' = 
+                      T.Sub (m, T.under i
+                                   (T.Dot (T.Elim (T.Var 0, [T.Pi2]), 
+                                           T.Dot (T.Elim (T.Var 0, [T.Pi1]), T.shift1))))
+                in
+                   (m', c,
+
+                    refine (Rule.existsLeft i (T.evar ()) (T.evar ()) (T.apply2 Prim.ov c m'))
+                    >> mtac)
+                end)\
+
+         | _ => \(fnc => error "splitExists" [natTerm i, m, a, c])\
+         /
+
+
+      fun existsInv2 (ab, u, abtac) =
+         term2CaseX ab u
+         / \Prim.exists\ ? (fn . ?) ; \Prim.bogus\ =!>
+           \(fnc a b =>
+                (b,
+                 bogus,
+ 
+                 (* G, A |- B : type
+                          = B[0 . ^2][0 . id] : type
+                 *)
+                 refine (Rule.existsFormInv2
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.Idot (0, T.Shift 2)))
+                            T.zero)
+                 >>> [
+                     (* G, A |- exists A[^] . B[0 . ^2] : type *)
+                     refine (Rule.weaken 0 1)
+                     >>
+                     (* G |- exists A . B : type *)
+                     abtac,
+ 
+                     (* G, A |- 0 : A[^] *)
+                     refine (Rule.hypothesisOf 0)
+                     ]))\
+
+         | _ => \(fnc => error "existsInv2" [ab, u])\
+         /
+
+
+      fun sumUniv (a, u, atac) (b, u', btac) =
+         term2CaseX u u'
+         / \Prim.univ\ ? ; \Prim.univ\ ? =!>
+           \(fnc lv lv' =>
+                (
+                check [(lv, lv')];
+                (T.apply2 Prim.sum a b,
+                 u,
+ 
+                 refine (Rule.sumFormUniv a b lv)
+                 >>> [atac, btac])
+                ))\
+
+         | _ => \(fnc => error "sumUniv" [a, u, b, u'])\
+         /
+
+         
+      val unit =
+         (T.Const Prim.unit,
+          bogus,
+          refine Rule.unitForm)
+
+
+      fun unitUniv (lv, a, lvtac) =
+         unitCaseX
+         / _ =!>
+           \(fnc =>
+                (
+                check [(a, T.Const Prim.level)];
+                (T.Const Prim.unit,
+                 T.apply1 Prim.univ lv,
+                 
+                 refine (Rule.unitFormUniv lv) >> lvtac)
+                ))\
+
+         | _ => \(fnc => error "unitUniv" [lv, a])\
+         /
+          
+
+      val triv =
+         (T.Triv,
+          T.Const Prim.unit,
+          refine Rule.unitIntroOf)
+
+
+      fun splitUnit i (m, a, mtac) c =
+         unitCaseX
+         / _ =!>
+           \(fnc =>
+                (
+                check [(a, T.Sub (c, T.under i (T.Dot (T.Triv, T.id))))];
+
+                (T.Sub (m, T.underShift i 1),
+                 c,
+
+                 refine (Rule.unitLeft i (T.apply2 Prim.ov c (T.Sub (m, T.underShift i 1))))
+                 >> mtac)
+                ))\
+
+         | _ => \(fnc => error "splitUnit" [natTerm i, m, a, c])\
+         /
+
+
+      fun tuple ms = List.foldr pair triv ms
+
+
+      fun voidUniv (lv, a, lvtac) =
+         unitCaseX
+         / _ =!>
+           \(fnc =>
+                (
+                check [(a, T.Const Prim.level)];
+                (T.Const Prim.void,
+                 T.apply1 Prim.univ lv,
+                 
+                 refine (Rule.voidFormUniv lv) >> lvtac)
+                ))\
+
+         | _ => \(fnc => error "voidUniv" [lv, a])\
+         /
+          
+
+      fun nat i =
+         if i = 0 then
+            (T.Const Prim.zero,
+             T.Const Prim.nat,
+
+             refine Rule.zeroType)
+         else
+            let
+               val (m, _, mtac) = nat (i-1)
+            in
+               (T.apply1 Prim.succ m,
+                T.Const Prim.nat,
+
+                refine (Rule.arrowElimOf (T.Const Prim.nat) (T.Const Prim.nat) (T.Const Prim.succ) m)
+                >>> [refine Rule.succType, mtac])
+            end
+
+
+      fun univ (lv, a, lvtac) =
+         unitCaseX
+         / _ =!>
+           \(fnc =>
+                (
+                check [(a, T.Const Prim.level)];
+                (T.apply1 Prim.univ lv,
+                 bogus,
+       
+                 refine (Rule.univForm lv) >> lvtac)
+                ))\
+
+         | _ => \(fnc => error "univ" [lv, a])\
+         /
+
+
+      fun univUniv (lv, a, lvtac) =
+         termCaseX a
+         / \Prim.level\ =!>
+           \(fnc =>
+                (T.apply1 Prim.univ lv,
+                 T.apply1 Prim.univ (T.apply1 Prim.lsucc lv),
+       
+                 refine (Rule.univFormUnivSucc lv) >> lvtac))\
+
+         | _ => \(fnc => error "univUniv" [lv, a])\
+         /
+
+
+      fun forget (a, u, atac) =
+         termCaseX u
+         / \Prim.univ\ ? =!>
+           \(fnc lv =>
+                (a, 
+                 bogus,
+ 
+                 refine (Rule.univForgetOf a lv) >> atac))\
+
+         | _ => \(fnc => error "forget" [a, u])\
+         /
+
+
+      fun cumulativeSucc (a, u, atac) =
+         termCaseX u
+         / \Prim.univ\ ? =!>
+           \(fnc lv =>
+                (a,
+                 T.apply1 Prim.univ (T.apply1 Prim.lsucc lv),
+
+                 refine (Rule.univCumulativeSuccOf a lv)
+                 >> atac))\
+
+         | _ => \(fnc => error "cumulativeSucc" [a, u])\
+         /
+
+
+      fun lsucc (lv, a, lvtac) =
+         unitCaseX
+         / _ =!>
+           \(fnc =>
+                (
+                check [(a, Term.Const Prim.level)];
+       
+                (T.apply1 Prim.lsucc lv,
+                 a,
+                 
+                 refine (Rule.lsuccLevel lv)
+                 >> lvtac)
+                ))\
+
+         | _ => \(fnc => error "lsucc" [lv, a])\
+         /
+
+
+      fun weaken (m, a, mtac) i =
+         (T.Sub (m, T.Shift i),
+          T.Sub (a, T.Shift i),
+
+          refine (Rule.weaken 0 i) >> mtac)
+
+
+      fun weakenUnder (m, a, mtac) j i =
+         (T.Sub (m, T.under j (T.Shift i)),
+          T.Sub (a, T.under j (T.Shift i)),
+
+          refine (Rule.weaken j i) >> mtac)
+
+
+
+      (* tupleExLoop A [... (Mi, Bi, taci) ...]
+
+         If    each taci proves G |- Mi : Bi where Bi is the corresponding component of A, appropriately instantiated
+         then  returns tac
+         where tac proves G, A : type |- (M1, ... (Mm, ()))[^] : A[^]
+      *)
+      fun tupleExLoop a l =
+         termCaseX a
+         /
+          | \Prim.unit\ =>
+            \(fnc =>
+                 (case l of
+                     [] =>
+                        (* G, unit : type |- () : unit *)
+                        refine Rule.unitIntroOf
+ 
+                   | _ =>
+                        (* too many arguments *)
+                        raise (Fail "precondition")))\
+
+          | \Prim.exists\ ? (fn . ?) =>
+            \fnc b c =>
+                (case l of
+                    (m, b', mtac) :: rest =>
+                       (
+                       check [(b, b')];
+
+                       (* G, (exists B . C) : type |- (M[^], Rest[^]) : exists B[^] . C[0 . ^2] *)
+                       refine (Rule.assert (T.Sub (T.apply2 Prim.ov b m, T.shift1)) (T.evar ()))
+                       >>> [
+                           (* G, (exists B . C) : type |- M[^] : B[^] *)
+                           refine (Rule.weaken 0 1)
+                           >>
+                           (* G |- M : B *)
+                           mtac,
+
+                           (* G, (exists B . C) : type, M[^] : B[^] |- (M[^2], Rest[^2]) : exists B[^2] . C[0 . ^3] *)
+                           refine (Rule.existsIntroOf (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                           >>> [
+                               (* G, (exists B . C) : type, M[^] : B[^], B[^2] |- C[0 . ^3] : type
+                                                                                = C[0 . ^4][0 . id] *)
+                               refine (Rule.existsFormInv2 (T.Sub (b, T.Shift 3)) (T.Sub (c, T.Idot (0, T.Shift 4))) T.zero)
+                               >>> [
+                                   (* G, (exists B . C) : type, M[^] : B[^], B[^2] |- exists B[^3] . C[0 . ^4] : type *)
+                                   refine (Rule.hypothesis 2),
+                                   
+                                   (* G, (exists B . C) : type, M[^] : B[^], B[^2] |- 0 : B[^3] *)
+                                   refine (Rule.hypothesisOf 0)
+                                   ],
+    
+                               (* G, (exists B . C) : type, M[^] : B[^] |- M[^2] : B[^2] *)
+                               refine (Rule.hypothesis 0),
+    
+                               (* G, (exists B . C) : type, M[^] : B[^] |- Rest[^2] : C[0 . ^3][M[^2] . id]
+                                                                         = Rest[^2] : C[M[^2] . ^2]
+                               *)
+                               refine (Rule.assert (T.apply1 Prim.istp (T.Sub (c, T.Dot (T.Sub (m, T.Shift 2), T.Shift 2)))) (T.evar ()))
+                               >>> [
+                                   (* G, (exists B. C) : type, M[^] : B[^] |- C[M[^2] . ^2] : type
+                                                                            = C[0 . ^3][M[^2] . id]
+                                   *)
+                                   refine (Rule.existsFormInv2 (T.Sub (b, T.Shift 2)) (T.Sub (c, T.Idot (0, T.Shift 3))) (T.Sub (m, T.Shift 2)))
+                                   >>> [
+                                       (* G, (exists B . C) : type, M[^] : B[^] |- exists B[^2] . C[0 . ^3] : type *)
+                                       refine (Rule.hypothesis 1),
+    
+                                       (* G, (exists B . C) : type, M[^] : B[^] |- M[^2] : B[^2] *)
+                                       refine (Rule.hypothesis 0)
+                                       ],
+    
+                                   (* G, (exists B . C) : type, M[^] : B[^], C[M[^2] . ^2] : type |- Rest[^3] : C[M[^3] . ^3] *)
+                                   refine (Rule.weaken 1 2)
+                                   >>
+                                   (* G, C[M . id] : type |- Rest[^1] : C[M[^] . ^] *)
+                                   tupleExLoop (T.Sub (c, T.Dot (m, T.id))) rest
+                                   ]
+                               ]
+                           ]
+                       )
+
+                  | [] =>
+                       (* too few arguments *)
+                       raise (Fail "precondition"))\
+
+
+         | _ => \(fnc => raise Case.Backtrack)\
+         /
+
+      fun tupleEx l (a, u, atac) =
+         termCaseX u
+         / \Prim.bogus\ =!>
+           \(fnc =>
+                let
+                   val tac = tupleExLoop a l
+                in
+                   (List.foldr (fns (m, _, _) n => T.Pair (m, n)) T.Triv l,
+                    a,
+           
+                    lift (fn () =>
+                             (* G |- _tuple_ : A *)
+                             refine (Rule.assert (T.apply1 Prim.istp a) (T.evar ()))
+                             >>> [
+                                 (* G |- A : type *)
+                                 atac,
+                    
+                                 (* G, A : type |- _tuple_[^] : A[^] *)
+                                 tac
+                                 ])
+                    )
+                end)\
+
+         | _ => \(fnc =>
+                     error "tupleEx"
+                        (List.foldr
+                            (fns (m, b, _) l' =>
+                                m :: b :: l')
+                            [a, u]
+                            l))\
+         /
+
+
+
+      (* inNLoop A i B tac
+
+         If    tac proves G |- M : B where B is the ith disjunct in A
+         then  returns tac
+         where tac proves G, A : type |- inr^i (inl M[^]) : A[^]
+      *)
+      fun inNLoop a i b' tac =
+         termCaseX a
+         / \Prim.sum\ ? ? =>
+           \fnc b c =>
+               if i = 0 then
+                  (
+                  check [(b, b')];
+
+                  (* G, (B % C) : type |- inl M[^] : B[^] % C[^] *)
+                  refine (Rule.sumIntro1Of (T.evar ()) (T.evar ()) (T.evar ()))
+                  >>> [
+                      (* G, (B % C) : type |- C[^] : type *)
+                      refine (Rule.sumFormInv2 (T.Sub (b, T.shift1)) (T.evar ()))
+                      >>
+                      (* G, (B % C) : type |- B[^] % C[^] : type *)
+                      refine (Rule.hypothesis 0),
+  
+                      (* G, (B % C) : type |- M[^] : B[^] *)
+                      refine (Rule.weaken 0 1)
+                      >>
+                      (* G |- M : B *)
+                      tac
+                      ]
+                  )
+               else
+                  (* G, (B % C) : type |- inr N[^] : B[^] % C[^] *)
+                  refine (Rule.sumIntro2Of (T.evar ()) (T.evar ()) (T.evar ()))
+                  >>> [
+                      (* G, (B % C) : type |- B[^] : type *)
+                      refine (Rule.sumFormInv1 (T.evar ()) (T.Sub (c, T.shift1)))
+                      >>
+                      (* G, (B % C) : type |- B[^] % C[^] : type *)
+                      refine (Rule.hypothesis 0),
+  
+                      (* G, (B % C) : type |- N[^] : C[^] *)
+                      refine (Rule.assert (T.apply1 Prim.istp (T.Sub (c, T.shift1))) (T.evar ()))
+                      >>> [
+                          (* G, (B % C) : type |- C[^] : type *)
+                          refine (Rule.sumFormInv2 (T.Sub (b, T.shift1)) (T.evar ()))
+                          >>
+                          (* G, (B % C) : type |- B[^] % C[^] : type *)
+                          refine (Rule.hypothesis 0),
+                      
+                          (* G, (B % C) : type, C[^] : type |- N[^2] : C[^2] *)
+                          refine (Rule.weaken 1 1)
+                          >>
+                          (* G, C : type |- N[^1] : C[^1] *)
+                          inNLoop c (i-1) b' tac
+                          ]
+                      ]\
+
+         | _ => \(fnc => raise Case.Backtrack)\
+         /
+  
+      fun inNTerm i m =
+         if i = 0 then
+            T.apply1 Prim.inl m
+         else
+            T.apply1 Prim.inr (inNTerm (i-1) m)
+
+      fun inN i (m, b, mtac) (a, u, atac) =
+         termCaseX u
+         / \Prim.bogus\ =!>
+           \(fnc =>
+                let
+                   val tac = inNLoop a i b mtac
+                in
+                   (inNTerm i m,
+                    a,
+          
+                    lift (fn () =>
+                             (* G |- _injection_ : A *)
+                             refine (Rule.assert (T.apply1 Prim.istp a) (T.evar ()))
+                             >>> [
+                                 (* G |- A : type *)
+                                 atac,
+                    
+                                 (* G, A : type |- _injection_[^] : A[^] *)
+                                 tac
+                                 ]))
+                end)\
+
+         | _ => \(fnc => error "inN" [natTerm i, m, b, a, u])\
+         /
+
+
+
+      fun cas (m, a, mtac) (n, b, ntac) (p, b', ptac) (c, d, ctac) =
+         term2CaseX a d
+         / \Prim.sum\ ? ? ; \Prim.bogus\ =!>
+           \(fnc a1 a2 =>
+                (
+                check [(b, T.Sub (c, T.Dot (T.apply1 Prim.inl T.zero, T.shift1))),
+                       (b', T.Sub (c, T.Dot (T.apply1 Prim.inr T.zero, T.shift1)))];
+
+                (T.apply3 Prim.sumcase m (T.Lam (NONE, n)) (T.Lam (NONE, p)),
+                 T.Sub (c, T.Dot (m, T.id)),
+
+                 refine (Rule.sumElimOf a1 a2 c m n p)
+                 >>> [mtac, ntac, ptac])
+                ))\
+
+         | _ => \(fnc => error "cas" [m, a, n, b, p, b', c, d])\
+         /
+
+
+
+      (* A = ... % Ai % ... % void
+         G |- Ai : type 
+         G, A |- C : type
+         G, Ai |- Li : C[inr ... inl 0 . ^]
+
+         want:
+         G, A |- <output> : C
+      *)
+      fun multicaseLoop a l c =
+         (case l of
+             [] =>
+                termCaseX a
+                / \Prim.void\ =>
+                  \(fnc =>
+                       (T.apply1 Prim.abort T.zero,
+                        
+                        refine (Rule.voidElim (T.evar ()))
+                        >>
+                        refine (Rule.hypothesis 0)))\
+
+                | _ => \(fnc => raise Case.Backtrack)\
+                /
+
+           | (n, b, ntac) :: rest =>
+                termCaseX a
+                / \Prim.sum\ ? ? =>
+                  \(fnc a1 a2 =>
+                       let
+                          val (p, ptac) =
+                             multicaseLoop a2 rest (T.Sub (c, T.Dot (T.apply1 Prim.inr T.zero, T.shift1)))
+                       in
+                          check [(b, T.Sub (c, T.Dot (T.apply1 Prim.inl T.zero, T.shift1)))];
+
+                          (T.apply3 Prim.sumcase T.zero
+                              (T.Sub (T.Lam (NONE, n), T.shift1))
+                              (T.Sub (T.Lam (NONE, p), T.shift1)),
+
+                           (* G, A1 % A2 |- <output> : C = C[0 . ^2][0 . id] *)
+                           refine (Rule.sumElimOf 
+                                      (T.Sub (a1, T.shift1)) (T.Sub (a2, T.shift1)) (T.Sub (c, T.underShift 1 1))
+                                      T.zero 
+                                      (T.Sub (n, T.underShift 1 1))
+                                      (T.Sub (p, T.underShift 1 1)))
+                           >>> [
+                               (* G, A1 % A2 |- 0 : A1[^] % A2[^] *)
+                               refine (Rule.hypothesisOf 0),
+
+                               (* G, A1 % A2, A1[^] |- N[0 . ^2] : C[0 . ^2][inl 0 . ^] = C[inl 0 . ^2] *)
+                               refine (Rule.weaken 1 1)
+                               >>
+                               (* G, A1 |- N : C[inl 0 . ^] *)
+                               ntac,
+
+                               (* G, A1 % A2, A2[^] |- P[0 . ^2] : C[0 . ^2][inr 0 . ^] = C[inr 0 . ^2] *)
+                               refine (Rule.weaken 1 1)
+                               >> 
+                               (* G, A2 |- P : C[inr 0 . ^] *)
+                               ptac
+                               ])
+                       end)\
+
+                | _ => \(fnc => raise Case.Backtrack)\
+                /)
+
+      fun multicase (m, a, mtac) l (c, d, _) =
+         term2CaseX a d
+         / \Prim.sum\ ? ? ; \Prim.bogus\ =!>
+           \(fnc a1 a2 =>
+                (case l of
+                    [] => raise Case.Backtrack
+
+                  | (n, b, ntac) :: rest =>
+                       let
+                          val (p, ptac) =
+                             multicaseLoop a2 rest (T.Sub (c, T.Dot (T.apply1 Prim.inr T.zero, T.shift1)))
+                       in
+                          check [(b, T.Sub (c, T.Dot (T.apply1 Prim.inl T.zero, T.shift1)))];
+
+                          (T.apply3 Prim.sumcase m (T.Lam (NONE, n)) (T.Lam (NONE, p)),
+                           T.Sub (c, T.Dot (m, T.id)),
+
+                           refine (Rule.sumElimOf a1 a2 c m n p)
+                           >>> [mtac, ntac, ptac])
+                       end))\
+
+         | \Prim.void\ ; \Prim.bogus\ =!>
+           \(fnc =>
+                (case l of
+                    [] =>
+                       (T.apply1 Prim.abort m,
+                        T.Sub (c, T.Dot (m, T.id)),
+       
+                        refine (Rule.voidElim (T.Sub (c, T.Dot (m, T.id))))
+                        >>
+                        refine (Rule.inhabitant (T.Const Prim.void) m)
+                        >>
+                        mtac)
+
+                  | _ => raise Case.Backtrack))\
+       
+         | _ => \(fnc =>
+                     error "multicase"
+                        (m :: a ::
+                         List.foldr
+                            (fns (m, b, _) l' => m :: b :: l')
+                            [c, d]
+                            l))\
+        /
+
+
+
+      fun hole m a = (m, a, idtac)
+
+
+
+      fun inhabitant (m, a, tac) =
+         refine (Rule.inhabitant a m)
+         >> tac
+
+
+      fun mobilize ctx (m, a, tac) =
+         let
+            val jud = 
+               termCaseX a
+               /| \Prim.bogus\ =>
+                  \(fnc => Judgement.make ctx (T.apply1 Prim.istp m))\
+
+                | _ =>
+                  \(fnc => Judgement.make ctx (T.apply2 Prim.ov a m))\
+               /
+         in
+            (case Tactic.execute (jud, Directory.empty) tac of
+                Sum.INL v =>
+                   (m, a, jud, v)
+
+              | Sum.INR msg =>
+                   raise (Fail ("xterm internal proof failure: " ^ msg)))
+         end
+
+
+      fun use (m, a, jud, v) = (m, a, cast jud v)
+
+      fun compact ctx m = use (mobilize ctx m)
+
+
+      datatype xsub_action =
+         Easy of (int * int) list
+       | Hard of Term.term -> Tactic.tactic -> Tactic.tactic
+
+      type xsub = Term.sub * xsub_action
+
+      fun perform action =
+         (case action of
+             Easy l =>
+                (fns _ tac =>
+                    (* substitution works backward *)
+                    List.foldr
+                       (fns (i, j) tac => refine (Rule.weaken i j) >> tac)
+                       idtac
+                       l
+                    >> tac)
+
+           | Hard stac => stac)
+
+
+
+      fun sub (m, a, mtac) (s, action) =
+         (T.Sub (m, s),
+          T.Sub (a, s),
+          lift (fn () => perform action (T.apply2 Prim.ov a m) mtac))
+
+
+      val id = (T.id, Easy [])
+
+
+      fun shift i =
+         (T.Shift i, Easy [(0, i)])
+
+
+      fun underShift i j =
+         (T.underShift i j,  Easy [(i, j)])
+         
+
+      fun dotid (m, a, mtac) =
+         (T.Dot (m, T.id),
+
+          Hard
+          (fns c ctac =>
+              (* G |- C[M . id] *)
+              refine (Rule.generalize a c m)
+              >>> [
+                  (* G |- M : A *)
+                  mtac,
+
+                  (* G, A |- C *)
+                  ctac
+                  ]))
+
+
+      (* G2 |- s : G3
+         G1 |- s' : G2
+
+         tac proves G2 |- C[s]  from  G3 |- C
+         tac' proves G1 |- C[s][s']  from  G2 |- C[s]
+
+         so tac' C[s] >> tac C proves G1 |- J[s][s']  from  G3 |- J
+      *)
+      fun compose (s, action) (s', action') =
+         (T.compose s s',
+
+          (case (action, action') of
+              (Easy l, Easy l') => Easy (l' @ l)
+
+            | _ =>
+                 Hard
+                 (fns c ctac =>
+                     perform action' (T.Sub (c, s)) 
+                        (perform action c ctac))))
+             
+
+      fun dot (m, a_s, mtac) (a, u, atac) (s, action) =
+         termCaseX u
+         / \Prim.bogus\ =!>
+           \(fnc =>
+                (
+                (* a_s should be A[s] *)
+                check [(a_s, T.Sub (a, s))];
+
+                (T.Dot (m, s),
+       
+                 Hard
+                 (fns c ctac =>
+                     (* G |- C[M . s] = C[0 . (s o ^)][M . id] *)
+                     refine (Rule.forallElim
+                                a_s
+                                (T.Sub (c, T.under 1 s))
+                                m)
+                     >>> [
+                         (* G |- forall A[s] . C[0 . (s o ^)]
+                               = (forall A . C)[s]
+                         *)
+                         perform action (T.apply2 Prim.forall a (T.Lam (NONE, c)))
+                            (
+                            (* G' |- forall A . C *)
+                            refine (Rule.forallIntro a c)
+                            >>> [
+                                (* G' |- A : type *)
+                                atac,
+   
+                                (* G', A |- C *)
+                                ctac
+                                ]
+                            ),
+   
+                         (* G |- M : A[s] *)
+                         mtac
+                         ]))
+                ))\
+
+         | _ => \(fnc => error "dot" [m, a_s, a, u, T.Sub (T.Triv, s)])\
+         /
+
+
+      
+
+      (* k = |al| *)
+      fun underHard k al s stac c ctac =
+         (case al of
+             [] =>
+                (* G |- C[under_0 s] = C[s] *)
+                stac c
+                   (
+                   (* G' |- C *)
+                   ctac
+                   )
+
+           | (ak, u, aktac) :: rest =>
+                termCaseX u
+                / \Prim.bogus\ =!>
+                  \(fnc =>
+                       (* G, A1[s], ..., Ak[under_k-1 s] |- C[under_k s]
+                                                          = C[0 . (under_k-1 s o ^)]
+                                                          = C[0 . (under_k-1 s o ^2)][0 . id]
+                       *)
+                       refine (Rule.forallElim
+                                  (T.Sub (ak, T.compose (T.under (k-1) s) T.shift1))
+                                  (T.Sub (c, T.Idot (0, T.compose (T.under (k-1) s) (T.Shift 2))))
+                                  T.zero)
+                       >>> [
+                           (* G, A1[s] ... Ak[under_k-1 s] |- forall Ak[under_k-1 s o ^] . C[0 . (under_k-1 s o ^2)]
+                                                            = (forall Ak . C)[under_k-1 s o ^]
+                           *)
+                           refine (Rule.weaken 0 1)
+                           >>
+                           (* G, A1[s] ... Ak-1[under_k-2 s] |- (forall Ak . C)[under_k-1 s] *)
+                           underHard (k-1) rest s stac 
+                              (T.apply2 Prim.forall ak (T.Lam (NONE, c)))
+                              (
+                              (* G, A1, ..., Ak-1 |- forall Ak . C *)
+                              refine (Rule.forallIntro ak c)
+                              >>> [
+                                  (* G, A1, ..., Ak-1 |- Ak : type *)
+                                  aktac,
+
+                                  (* G, A1, ..., Ak-1 |- C *)
+                                  ctac
+                                  ]
+                              ),
+       
+                           (* G, A1[s] ... Ak[under_k-1 s] |- 0 : Ak[under_k-1 s o ^] *)
+                           refine (Rule.hypothesisOf 0)
+                           ])\
+
+                | _ => \(fnc => raise Case.Backtrack)\
+               /)
+
+      fun under al (s, action) =
+         unitCaseX
+         / _ =!>
+           \(fnc =>
+                let
+                   val k = List.length al
+                in
+                   (T.under k s,
+          
+                    (case action of
+                        Easy sl =>
+                           Easy (List.map (fn (i, j) => (i+k, j)) sl)
+           
+                      | Hard stac =>
+                           Hard (underHard k al s stac)))
+                end)\
+
+         | _ => \(fnc => error "under" (List.foldr (fns (a, u, _) l => a :: u :: l) [T.Sub (T.Triv, s)] al))\
+        /
+
+
+      fun underEasy k (s, action) =
+         (case action of
+             Easy sl =>
+                (T.under k s, Easy (List.map (fn (i, j) => (i+k, j)) sl))
+ 
+           | Hard _ =>
+                error "underEasy" [T.Sub (T.Triv, s)])
+
+
+      val prodLeft =
+         let
+            val s =
+               T.Dot (T.Elim (T.Var 0, [T.Pi2]),
+                       T.Dot (T.Elim (T.Var 0, [T.Pi1]),
+                              T.shift1))
+         in
+            (s,
+      
+             Hard
+             (fns c ctac =>
+                 (* G, A & B |- C[0 #2 . 0 #1 . ^] *)
+                 refine (Rule.prodLeft 0 (T.evar ()) (T.evar ()) (T.Sub (c, s)))
+                 (* G, A, B |- C[(1, 0) #2 . (1, 0) #1 . ^2]
+                             = C[0 . 1 . ^2]
+                             = C
+                 *)
+                 >>
+                 ctac
+                 ))
+         end
+
+
+      fun existsLeft (ab, u, _) =
+         termCaseX ab
+         / \Prim.exists\ ? (fn . ?) =>
+           \fnc a b =>
+               let
+                  val s = 
+                     T.Dot (T.Elim (T.Var 0, [T.Pi2]),
+                            T.Dot (T.Elim (T.Var 0, [T.Pi1]),
+                                   T.shift1))
+               in
+                  (s, 
+
+                   Hard
+                   (fns c ctac =>
+                       (* G, exists A . B |- C[0 #2 . 0 #1 . ^] *)
+                       refine (Rule.existsLeft 0 a b (T.Sub (c, s)))
+                       (* G, A, B |- C[(1, 0) #2 . (1, 0) #1 . ^2]
+                                   = C[0 . 1 . ^2]
+                                   = C
+                       *)
+                       >>
+                       ctac
+                       ))
+               end\
+
+         | _ =>
+           \(fnc => error "existsLeft" [ab, u])\
+         /
+
+   end
+

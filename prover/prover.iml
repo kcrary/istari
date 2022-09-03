@@ -1,0 +1,544 @@
+
+signature PROVER =
+   sig
+
+      exception Prover
+
+      val apply : Tactic.tactic -> unit
+      val enter : unit -> unit
+      val leave : unit -> unit
+
+      val reorder : Message.label Reorder.reordering -> unit
+      val pull : int -> unit
+      val push : int -> unit
+
+      val entern : int -> unit
+
+      val lemma : string -> ETerm.eterm -> unit
+      val abandon : unit -> unit
+      val qed : unit -> unit
+
+      val show : unit -> unit
+      val showFull : unit -> unit
+      val showLiteral : unit -> unit
+      val alwaysShowFull : bool ref
+
+      val goals : unit -> Tactic.judgement list
+      val currentGoal : unit -> Tactic.judgement
+      val currentConcl : unit -> Term.term
+      val goalCaseX : 'a Oldcase.matcher -> 'a
+      val goalCaseXAlt : 'a Oldcase.matcher list -> 'a
+      val idir : unit -> Directory.idirectory
+      val parseCurr : ETerm.eterm -> Term.term
+      val showCurr : Term.term -> unit
+
+      val detail : unit -> unit
+
+      val openGoal : Tactic.judgement -> unit
+
+      val originalGoals : unit -> Tactic.judgement list
+      val showOriginalGoals : unit -> unit
+
+   end
+
+
+signature PROVER_INTERNAL =
+   sig
+
+      include PROVER
+
+
+      val setGoals : Tactic.judgement list -> (Refine.validation list -> unit) -> unit
+
+      (* sets a persistent checkpoint if not within a lemma *)
+      val checkpoint : unit -> unit
+
+      (* called before lemmas *)
+      val beforeLemmaHook : (unit -> unit) ref
+
+   end
+
+
+structure ProverInternal :> PROVER_INTERNAL =
+   struct
+
+      structure R = CheckpointedRef
+      structure J = Judgement
+      structure T = Term
+      structure C = Oldcase
+
+      type validation = Refine.validation
+      type judgement = Tactic.judgement
+      type label = Message.label
+
+      val ? = C.?
+      val blank = Message.blank
+
+      exception Prover
+
+      fun signalProver msg =
+         raise (Message.Error (Prover,
+                               String.concat
+                                  [
+                                  "Error: ",
+                                  msg,
+                                  ".\n"
+                                  ]))
+
+
+
+      fun withHandler f =
+         try
+            f ()
+         with
+            exn as (Message.Error (_, msg)) =>
+               (
+               print msg;
+               raise exn
+               )
+
+
+
+      (* The state of a proof underway is (d, juds, k)
+         where:
+         d is the current depth
+         juds are the current goals
+         k is a continuation expecting validations for all the current goals
+            and updating the state accordingly
+
+         Note that k expects a list of the same length as juds.
+         (The unit in the type of goals is to match up with the tactic type.)
+      *)
+
+      type state = int * (label * judgement) list * (Refine.validation list -> unit)
+
+      val theState : state option R.cref = R.new NONE
+
+      fun state () =
+         (case R.deref theState of
+             NONE =>
+                signalProver "no proof underway"
+
+           | SOME st => st)
+
+
+
+      val alwaysShowFull = ref false
+
+      fun showGoal shower i label goal =
+         (
+         print "[goal ";
+         print (Int.toString i);
+         print "]\n";
+         Message.printLabel label;
+         
+         shower goal;
+         print "\n"
+         )
+
+      fun showGoalsLoop shower i goals =
+         (case goals of
+             [] => ()
+
+           | (label, goal) :: rest =>
+                (
+                showGoalsLoop shower (i+1) rest;
+                showGoal shower i label goal
+                ))
+
+      fun showGoalsGen depth goals showfirst showrest =
+         (
+         print "========================================\n";
+         (case goals of
+             [] =>
+                (
+                print "no goals (depth ";
+                print (Int.toString depth);
+                print ")\n"
+                )
+
+           | [(label, goal)] =>
+                (
+                Message.printLabel label;
+                showfirst goal;
+                print "\n1 goal (depth ";
+                print (Int.toString depth);
+                print ")\n"
+                )
+
+           | (label, goal) :: rest =>
+                (
+                showGoalsLoop showrest 1 rest;
+                showGoal showfirst 0 label goal;
+
+                print (Int.toString (List.length goals));
+                print " goals (depth ";
+                print (Int.toString depth);
+                print ")\n"
+                ));
+         print "----------------------------------------\n"
+         )
+
+      fun showGoalsMain showfirst showrest =
+         (case R.deref theState of
+             SOME (depth, goals, _) =>
+                showGoalsGen depth goals showfirst showrest
+
+           | NONE => ())
+
+      fun showerShort (jud, dir) = Show.show dir (J.concl jud)
+
+      fun showerLong goal = Show.showJudgement goal
+
+      fun showerLiteral (jud, _) = Show.showLiteralJudgement jud;
+
+      fun showGoals () =
+         if !alwaysShowFull then
+            showGoalsMain showerLong showerLong
+         else
+            showGoalsMain showerLong showerShort
+
+      fun show () = withHandler showGoals
+
+      fun showFull () = withHandler (fn () => showGoalsMain showerLong showerLong)
+
+      fun showLiteral () = withHandler (fn () => showGoalsMain showerLiteral showerLiteral)
+
+      fun detail () =
+         (case R.deref theState of
+             NONE => signalProver "no proof underway"
+
+           | SOME (_, [], _) => raise (Fail "no current goal")
+         
+           | SOME (_, (label, jud) :: _, _) => Message.detail label)
+
+
+
+
+      fun action f =
+         withHandler
+         (fn () =>
+             (
+             Message.clear ();
+
+             f (state ());
+
+             Message.message 10 0 showGoals
+             ))
+
+
+      extension Answer of (label * judgement) list * Tactic.validator
+
+      fun apply tac =
+         action
+         (fn (_, [], _) => signalProver "no current goal"
+
+           | (d, [(_, goal)], k) =>
+                (case
+                    tac goal
+                       (fn msg => signalProver msg)
+                       (fn (subgoals, validate, _) =>
+                           Answer (subgoals, validate))
+                 of
+                    Answer (subgoals, validate) =>
+                       R.assign theState
+                       (SOME
+                           (d, subgoals,
+                            (fn vs => 
+                                (case validate vs of
+                                    (v, []) => k [v]
+ 
+                                  | _ => raise Refine.ValidationFailure))))
+
+                  | _ => raise (Fail "impossible"))
+
+           | (_, _ :: _, _) => signalProver "multiple current goals")
+
+
+      fun enter () =
+         action
+         (fn (_, [], _) => signalProver "no current goals"
+
+           | (d, goal :: rest, k) =>
+                let
+                   fun k' vs =
+                      (case vs of
+                          [v] =>
+                             R.assign theState
+                             (SOME (d, rest, (fn vs' => k (v :: vs'))))
+
+                        | _ => raise (Fail "convention violated"))
+                in
+                   R.assign theState
+                   (SOME (d+1, [goal], k'))
+                end)
+
+
+      fun leave () =
+         action
+         (fn (d, [], k) =>
+                if d = 0 then
+                   (* To end the proof, we want to use qed instead of leave. *)
+                   signalProver "top frame"
+                else
+                   k []
+
+           | _ => signalProver "current goals exist")
+
+
+      fun reorder reord =
+         action
+         (fn (d, goals, k) =>
+             (try
+                 let
+                    val (goals', perm) = reord goals
+                 in
+                    R.assign theState
+                    (SOME (d, goals', (fn vs => k (perm vs))))
+                 end
+              with
+                 Reorder.Reorder msg => signalProver msg))
+                
+      fun pull i = reorder (Reorder.pull i)
+      fun push i = reorder (Reorder.push i)
+
+
+      fun entern i =
+         (
+         pull i;
+         enter ()
+         )
+                      
+
+      fun qed () =
+         (
+         Message.clear ();
+         withHandler
+         (fn () =>
+             (case state () of
+                 (0, [], k) => k []
+
+               | _ => signalProver "proof incomplete"))
+         )
+
+
+      fun abandon () =
+         (
+         Message.clear ();
+         withHandler
+         (fn () =>
+             (case R.deref theState of
+                 SOME _ =>
+                    R.assign theState NONE
+
+               | NONE =>
+                    signalProver "no proof underway"))
+         )
+
+
+         
+      val beforeLemmaHook : (unit -> unit) ref = ref (fn () => ())
+
+      val theOriginalGoals : (label * judgement) list option R.cref = R.new NONE
+
+
+
+      fun sanitize depth m =
+         sanitizeWhnf depth (Normalize.whnf m)
+
+      and sanitizeWhnf depth m =
+         (case m of
+             T.Elim (T.Var i, spine) =>
+                if i < depth then
+                   sanitizeSpine depth spine
+                else
+                   signalProver "lemma statement is not closed"
+
+           | T.Elim (T.Const _, spine) =>
+                sanitizeSpine depth spine
+
+           | T.Elim (T.Sub _, _) =>
+                signalProver "lemma statement contains unresolved evars"
+
+           | T.Elim (m1, spine) =>
+                (
+                sanitizeWhnf depth m1;
+                sanitizeSpine depth spine
+                )
+
+           | T.Lam (_, m1) =>
+                sanitize (depth+1) m1
+
+           | T.Pair (m1, m2) =>
+                (
+                sanitize depth m1;
+                sanitize depth m2
+                )
+
+           | T.Next m1 =>
+                sanitize depth m1
+
+           | T.Triv => ()
+
+           | T.Marker _ =>
+                signalProver "lemma statement contains markers"
+
+           | _ =>
+                (* m is in whnf *)
+                raise (Fail "precondition"))
+
+      and sanitizeSpine depth spine =
+         List.app
+            (fn T.App m => sanitize depth m
+              | _ => ())
+            spine
+
+      fun lemma name ea =
+         withHandler
+         (fn () =>
+             (case R.deref theState of
+                 NONE =>
+                    let
+                       val sym = Symbol.fromValue name
+
+                       val () =
+                          (case Namespace.resolveOpt [sym] of
+                              NONE => ()
+
+                            | SOME _ =>
+                                 signalProver (String.concat
+                                                   ["lemma name ", name, " already in use"]))
+                       
+                       val a = ea Directory.iempty
+                       val jud = J.make Seq.empty a
+
+                       val goals = [(blank, (jud, Directory.empty))]
+
+                       fun k vs =
+                          (case vs of
+                              [v] =>
+                                 let
+                                    val () = sanitize 0 a
+                                    val (const, jud', v') = NamespaceInternal.reify sym jud v
+                                 in
+                                    R.assign theState NONE;
+                                    R.assign theOriginalGoals NONE;
+                                    Database.enterType const jud' v';
+                                    print "Lemma ";
+                                    print name;
+                                    print " defined.\n"
+                                 end
+
+                            | _ => raise (Fail "convention violated"))
+                    in
+                       !beforeLemmaHook ();
+                       R.assign theState (SOME (0, goals, k));
+                       R.assign theOriginalGoals (SOME goals);
+
+                       Message.message 10 0 showGoals
+                    end
+          
+               | SOME _ =>
+                    signalProver "proof underway"))
+
+
+      fun setGoals goals k =
+         withHandler
+         (fn () =>
+             (case R.deref theState of
+                 NONE =>
+                    let
+                       val goals' = map (fn goal => (blank, goal)) goals
+
+                       fun k' vs =
+                          (
+                          R.assign theState NONE;
+                          R.assign theOriginalGoals NONE;
+                          k vs
+                          )
+                    in
+                       !beforeLemmaHook ();
+                       R.assign theState (SOME (0, goals', k'));
+                       R.assign theOriginalGoals (SOME goals');
+                       Message.message 10 0 showGoals
+                    end
+          
+               | SOME _ =>
+                    signalProver "proof underway"))
+
+
+      fun openGoal goal =
+         setGoals [goal] (fn _ => print "Goal complete.\n")
+      
+
+      fun originalGoals () =
+         (case R.deref theOriginalGoals of
+             SOME goals =>
+                map (fn (_, jud) => jud) goals
+
+           | NONE => signalProver "no proof underway")
+
+      fun showOriginalGoals () =
+         withHandler
+         (fn () =>
+             (case R.deref theOriginalGoals of
+                 SOME goals =>
+                    showGoalsGen 0 goals showerLong showerLong
+
+               | NONE =>
+                    signalProver "no proof underway"))
+
+
+
+
+      fun goals () =
+         (case R.deref theState of
+             NONE => signalProver "no proof underway"
+
+           | SOME (_, l, _) => map (fn (_, jud) => jud) l)
+
+      fun currentGoal () =
+         (case R.deref theState of
+             NONE => signalProver "no proof underway"
+
+           | SOME (_, [], _) => signalProver "no current goal"
+         
+           | SOME (_, (_, jud) :: _, _) => jud)
+
+      fun currentConcl () =
+         let
+            val (jud, _) = currentGoal ()
+         in
+            J.concl jud
+         end
+
+      fun goalCaseX matcher = C.termCaseX (currentConcl ()) matcher
+      fun goalCaseXAlt l = C.termCaseXAlt (currentConcl ()) l
+         
+      fun idir () =
+         let
+            val (_, dir) = currentGoal ()
+         in
+            Directory.idir dir
+         end
+
+      fun parseCurr em = em (idir ())
+
+      fun showCurr m =
+         let
+            val (_, dir) = currentGoal ()
+         in
+            Show.show dir m
+         end
+
+
+      fun checkpoint () =
+         (case R.deref theState of
+             NONE => !beforeLemmaHook ()
+
+           | _ => ())
+
+   end
+
+
+structure Prover :> PROVER = ProverInternal

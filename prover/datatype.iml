@@ -1,0 +1,2992 @@
+
+signature DATATYPE =
+   sig
+
+      type symbol = Symbol.symbol
+      type eterm = ETerm.eterm
+
+      type typedef =
+         (symbol * eterm) list               (* invisible persistent arguments *)
+         *
+         (symbol * eterm) list               (* persistent arguments *)
+         *
+         eterm                               (* universe *)
+         *
+         (* each mutually recursive data type *)
+            (
+            symbol                           (* name *)
+            *
+            (symbol option * eterm) list     (* type arguments (datatypes not in scope) 
+                                                SOME indicates the argument arose from a forall
+                                             *)
+            * 
+            (* each constructor *)
+               (
+               symbol                        (* name *)
+               *
+               eterm                         (* type (datatypes in scope) *)
+               ) list
+            ) list
+
+      exception Datatype
+
+      val typedefRaw : typedef -> unit
+      val typedef : typedef -> unit
+
+   end
+
+
+signature DATATYPE_INTERNAL =
+   sig
+
+      include DATATYPE
+
+
+      val write : (Word8.word -> unit) -> unit
+      val read : (unit -> Word8.word) -> unit
+
+   end
+
+
+structure DatatypeInternal :> DATATYPE_INTERNAL =
+   struct
+
+      structure C = Oldcase
+      structure CR = CheckpointedRef
+      structure D = Directory
+      structure DE = DestructInternal
+      structure I = Invert
+      structure IP = IntroPattern
+      structure J = Judgement
+      structure N = NormalizeInternal
+      structure P = Pickle
+      structure PP = Pickling
+      structure R = ReductionInternal
+      structure RR = RegistryInternal
+      structure S = Seq
+      structure T = Term
+      structure U = Unify
+      structure X = XTerm
+
+      type symbol = Symbol.symbol
+      type term = Term.term
+      type eterm = ETerm.eterm
+
+      open Tactic
+      open CasePervasive
+
+      val ? = C.?
+
+
+      exception Datatype
+
+      fun signalDatatype msg =
+         raise (Message.Error (Datatype,
+                               String.concat
+                                  [
+                                  "Error: ",
+                                  msg,
+                                  ".\n"
+                                  ]))
+
+      
+
+      structure ID = RedBlackDict (structure Key = IntOrdered)
+      structure CD = RedBlackDict (structure Key = Constant.Ordered)
+
+
+
+      datatype 't conarg =
+         External of T.binder option * 't  (* SOME indicates the argument arose from a forall *)
+       | Internal of int * 't list  (* indices *)
+
+
+      (* Orignal representation: uses eterms with user names. *)
+      type typedef =
+         (symbol * eterm) list
+         * (symbol * eterm) list
+         * eterm
+         * (symbol
+            * (symbol option * eterm) list
+            * (symbol * eterm) list) list
+
+      (* Resolved representation: organized, and uses terms in place of eterms.
+         In the inner list, each element is (sym, conargs, indices).
+      *)
+      type rtypedef =
+         (symbol * term) list
+         * (symbol * term) list
+         * term
+         * (symbol
+            * (symbol option * term) list
+            * (symbol * term conarg list * term list) list) list
+
+      type mxterm = X.mxterm
+
+      (* Internal representation: as resolved, but with mxterms. *)
+      type itypedef =
+         (symbol * mxterm) list
+         * (symbol * mxterm) list
+         * mxterm
+         * (symbol
+            * (symbol option * mxterm) list
+            * (symbol 
+               * (mxterm conarg) list 
+               * mxterm list) list) list
+
+
+
+
+
+      (* natrecl i f x = f 0 (f 1 (... (f (i-1) x) ...)) *)
+      fun natrecl i f x =
+         if i = 0 then
+            x
+         else
+            natrecl (i-1) f (f (i-1) x)
+      
+      (* natrecr i f x = f (i-1) (f (i-2) (... (f 0 x) ...)) *)
+      fun natrecr i f x = natrecl i (fns j y => f (i-1-j) y) x
+
+      (* natmapl i f = [f 0, ..., f (i-1)] *)
+      fun natmapl i f = natrecl i (fns j l => f j :: l) []
+
+      (* natmapr i f = [f (i-1), ..., f 0] *)
+      fun natmapr i f = natrecr i (fns j l => f j :: l) []
+
+      fun maprev f l = List.foldl (fns x l' => f x :: l') [] l
+
+
+      (* precondition: l1 and l2 have equal lengths *)
+      fun foldl2 f x l1 l2 =
+         (case (l1, l2) of
+             ([], []) => x
+
+           | (x1 :: rest1, x2 :: rest2) =>
+                foldl2 f (f x1 x2 x) rest1 rest2
+
+           | _ => raise (Fail "precondition"))
+
+
+      (* precondition: l1 and l2 have equal lengths *)
+      fun foldr2 f x l1 l2 =
+         (case (l1, l2) of
+             ([], []) => x
+
+           | (x1 :: rest1, x2 :: rest2) =>
+                f x1 x2 (foldr2 f x rest1 rest2)
+
+           | _ => raise (Fail "precondition"))
+
+
+      (* precondition: l1 and l2 have equal lengths *)
+      fun map2 f l1 l2 =
+         let
+            val l =
+               foldl2
+                  (fns x1 x2 l => f x1 x2 :: l)
+                  []
+                  l1 l2
+         in
+            List.rev l
+         end
+
+
+      fun bifoldLoop f g z h l =
+         (case l of
+             [] => (z, h (g z))
+
+           | x :: rest =>
+                let
+                   val (z', k) = f x z
+                in
+                   bifoldLoop f g z' (fn y => h (k y)) rest
+                end)
+
+      fun bifold f g z l = bifoldLoop f g z (fn y => y) l
+
+      fun bifold2Loop f g z h l1 l2 =
+         (case (l1, l2) of
+             ([], []) => (z, h (g z))
+
+           | (x1 :: rest1, x2 :: rest2) =>
+                let
+                   val (z', k) = f x1 x2 z
+                in
+                   bifold2Loop f g z' (fn y => h (k y)) rest1 rest2
+                end
+
+           | _ => raise (Fail "precondition"))
+
+      (* precondition: l1 and l2 have equal lengths *)         
+      fun bifold2 f g z l1 l2 = bifold2Loop f g z (fn y => y) l1 l2
+
+
+      fun natTerm i =
+         if i = 0 then
+            T.Const Prim.zero
+         else
+            T.apply1 Prim.succ (natTerm (i-1))
+
+
+      fun resolve ((invis, pers, univ, dts) : typedef) : rtypedef =
+         try
+            let
+               val (revinvis', invisdir) =
+                  List.foldl
+                     (fns (sym, em) (l, dir) =>
+                         ((sym, em dir) :: l,
+                          D.ibind dir sym))
+                     ([], D.iempty)
+                     invis
+   
+               (* Invisible variables are available to each other, persistent variables,
+                  and the universe, but nothing else.
+               *)
+   
+               val (revpers', visdir, fulldir) =
+                  List.foldl
+                     (fns (sym, em) (l, dir, fulldir) =>
+                         ((sym, em fulldir) :: l,
+                          D.ibind dir sym,
+                          D.ibind fulldir sym))
+                     ([], D.iempty, invisdir)
+                     pers
+   
+               val univ' = univ fulldir
+   
+               val (bodydir, num, arities) =
+                  List.foldl
+                     (fns (sym, args, _) (dir, i, arities) => 
+                         (D.ibind dir sym,
+                          i+1,
+                          ID.insert arities i (List.length args)))
+                     (visdir, 0, ID.empty)
+                     dts
+   
+               (* There are num datatypes, with bodydir directing the ith datatype to
+                  deBruijn index num-1-i.
+               *)
+               
+               fun recmatcher sym depth p =
+                  C.wrapk
+                     (C.elim C.whatVar C.swhat)
+                     (fn (i, spine) =>
+                         if i - depth < 0 orelse i - depth >= num then
+                            raise C.Backtrack
+                         else
+                            let
+                               val j = num - (i - depth) - 1
+   
+                               val args =
+                                  List.map
+                                     (fn T.App c =>
+                                         (case U.prune c p of
+                                             SOME c' => c'
+   
+                                           | NONE =>
+                                                signalDatatype ("misplaced recursive reference in " ^ Symbol.toValue sym))
+   
+                                       | _ => signalDatatype (String.concat
+                                                                 [
+                                                                 "recursive reference in ",
+                                                                 Symbol.toValue sym,
+                                                                 " contains a type error"
+                                                                 ]))
+                                     spine
+                            in
+                               if ID.lookup arities j = List.length args then
+                                  (j, args)
+                               else
+                                  signalDatatype (String.concat [
+                                                                "recursive reference in ",
+                                                                Symbol.toValue sym,
+                                                                " has the wrong arity"
+                                                                ])
+                            end)
+   
+               (* in datatype i, under depth binders (syntactically), and under substitution s (to adjust to the typing context) *)
+               fun cleanup sym i m depth s acc =
+                  let
+                     val p =
+                        natrecl depth
+                           (fns j p => I.Pidot (j, p))
+                           (natrecl num
+                               (fns _ p => I.Pundef p)
+                               (I.Pshift depth))
+   
+                     (* p = 0 .. depth-1 . UNDEF_1 .. UNDEF_num . ^depth *)
+                  in
+                     C.termCaseXAlt m
+                        [
+                        C.apply2 Prim.forall C.what (C.lamb C.what) ?
+                        (fn (a, (binder, b)) =>
+                            (case U.prune a p of
+                                SOME a' =>
+                                   cleanup sym i b (depth+1) (T.under 1 s) (External (SOME binder, T.Sub (a', s)) :: acc)
+   
+                              | NONE =>
+                                   signalDatatype ("misplaced recursive reference in " ^ Symbol.toValue sym))),
+      
+                        C.apply2 Prim.arrow C.what C.what ?
+                        (fn (a, b) =>
+                            C.termCaseXAlt a
+                               [
+                               recmatcher sym depth p ?
+                               (fn (j, args) =>
+                                   cleanup sym i b depth s (Internal (j, map (fn t => T.Sub (t, s)) args) :: acc)),
+                                  
+                               C.wild ?
+                               (fn () =>
+                                   (case U.prune a p of
+                                       SOME a' => cleanup sym i b depth (T.compose s T.shift1) (External (NONE, T.Sub (a', s)) :: acc)
+   
+                                     | NONE =>
+                                          signalDatatype ("misplaced recursive reference in " ^ Symbol.toValue sym)))
+                               ]),
+   
+                        recmatcher sym depth p ?
+                        (fn (j, args) =>
+                            if i = j then
+                               (sym, List.rev acc, map (fn t => T.Sub (t, s)) args)
+                            else
+                               signalDatatype (String.concat
+                                                  [
+                                                  "right-hand-side of ",
+                                                  Symbol.toValue sym,
+                                                  " is the wrong datatype"
+                                                  ])),
+      
+                        C.wild ?
+                        (fn () =>
+                            signalDatatype "illegal constructor type")
+                        ]
+                  end
+   
+               val dts' =
+                  List.mapi
+                     (fns i (dtsym, args, dcons) =>
+                         let
+                            val (revargs', dir) =
+                               List.foldl
+                                  (fns (symopt, em) (l, dir) =>
+                                      (case symopt of
+                                          SOME sym =>
+                                             ((symopt, em dir) :: l,
+                                              D.ibind dir sym)
+   
+                                        | NONE =>
+                                             ((NONE, em dir) :: l, 
+                                              D.ibind0 dir)))
+                                  (* NB: visdir not bodydir. The datatypes aren't in scope here. *)
+                                  ([], visdir)
+                                  args
+   
+                            val dcons' =
+                               List.map
+                                  (fns (dconsym, em) =>
+                                      cleanup dconsym i (em bodydir) 0 T.id [])
+                                  dcons
+                         in
+                            (dtsym, List.rev revargs', dcons')
+                         end)
+                     dts
+            in
+               (List.rev revinvis', List.rev revpers', univ', dts')
+            end
+         with
+            D.Unbound sym =>
+               signalDatatype ("unbound identifier " ^ Symbol.toValue sym)
+
+
+
+      type 'a res = judgement list * (validation list -> 'a * validation list)
+
+      fun 'a unitres (goal, f : validation -> 'a) : 'a res =
+         ([goal],
+          (fn [] =>
+                 raise Refine.ValidationFailure
+
+            | v :: vrest =>
+                 (f v, vrest)))
+
+      val nilres : 'a list res = ([], (fn vs => ([], vs)))
+
+      fun 'a consres ((goal, f1) : judgement * (validation -> 'a)) ((goals, f2) : 'a list res) : 'a list res =
+         (goal :: goals,
+          (fn [] =>
+                 raise Refine.ValidationFailure
+
+            | v :: vrest =>
+                 let
+                    val x = f1 v
+
+                    val (l, leftover) = f2 vrest
+                 in
+                    (x :: l, leftover)
+                 end))
+
+      fun 'c joinres2 (g : 'a -> 'b -> 'c) ((goals1, f1) : 'a res) ((goals2, f2) : 'b res) : 'c res =
+         (goals1 @ goals2,
+          (fn vs =>
+              let
+                 val (x1, vs) = f1 vs
+                 val (x2, vs) = f2 vs
+              in
+                 (g x1 x2, vs)
+              end))
+
+      fun 'd joinres3 (g : 'a -> 'b -> 'c -> 'd) ((goals1, f1) : 'a res) ((goals2, f2) : 'b res) ((goals3, f3) : 'c res) : 'd res =
+         (goals1 @ goals2 @ goals3,
+          (fn vs =>
+              let
+                 val (x1, vs) = f1 vs
+                 val (x2, vs) = f2 vs
+                 val (x3, vs) = f3 vs
+              in
+                 (g x1 x2 x3, vs)
+              end))
+
+      fun 'e joinres4 (g : 'a -> 'b -> 'c -> 'd -> 'e) ((goals1, f1) : 'a res) ((goals2, f2) : 'b res) ((goals3, f3) : 'c res) ((goals4, f4) : 'd res) : 'e res =
+         (goals1 @ goals2 @ goals3 @ goals4,
+          (fn vs =>
+              let
+                 val (x1, vs) = f1 vs
+                 val (x2, vs) = f2 vs
+                 val (x3, vs) = f3 vs
+                 val (x4, vs) = f4 vs
+              in
+                 (g x1 x2 x3 x4, vs)
+              end))
+
+      fun 'b mapres (g : 'a -> 'b res) (l : 'a list) : 'b list res =
+         List.foldr
+            (fns x res =>
+                joinres2 (fns y ys => y :: ys) (g x) res)
+            nilres
+            l
+
+      fun 'c mapres2 (g : 'a -> 'b -> 'c res) (l1 : 'a list) (l2 : 'b list) : 'c list res =
+         foldr2
+            (fns x y res =>
+                joinres2 (fns z zs => z :: zs) (g x y) res)
+            nilres
+            l1 l2
+
+      fun growres dir ctx a g goals =
+         let
+            val jud = J.make ctx a
+         in
+            consres
+               ((jud, dir), (fn v => g jud v))
+               goals
+         end
+
+
+
+      (* Reprocess:
+         1. generates typechecking goals, and
+         2. defines a function that builds a itypedef from validations for those goals.
+
+         In the itypedef, each term comes with a tactic that proves it is well-formed 
+         (using the validations from the typechecking goals).
+      *)
+      fun reprocess ((invis, pers, univ, dts) : rtypedef) : judgement list * (validation list -> itypedef) =
+         let
+            val ((invisdir, invisctx), invisres) =
+               bifold
+                  (fns (sym, a) (dir, ctx) =>
+                      ((D.bind dir sym,
+                        S.cons (J.Tm a) ctx),
+
+                       growres dir ctx
+                          (T.apply1 Prim.istp a)
+                          (fns jud v => (sym, (a, T.Const Prim.bogus, jud, v)))))
+                  (fn _ => nilres)
+                  (D.empty, S.empty)
+                  invis
+
+            
+            val ((fulldir, fullctx), persres) =
+               bifold
+                  (fns (sym, a) (dir, ctx) =>
+                      ((D.bind dir sym,
+                        S.cons (J.Tm a) ctx),
+
+                       growres dir ctx
+                          (T.apply1 Prim.istp a)
+                          (fns jud v => (sym, (a, T.Const Prim.bogus, jud, v)))))
+                  (fn _ => nilres)
+                  (invisdir, invisctx)
+                  pers
+
+            val univjud = J.make fullctx (T.apply2 Prim.ov (T.Const Prim.level) univ)
+
+            val univtacres =
+               unitres
+               ((univjud, fulldir), (fn v => (univjud, v)))
+
+
+            val dtsres =
+               mapres
+                  (fn (dtsym, tyargs, dcons) =>
+                      let
+                         val (_, tyargres) =
+                            bifold
+                               (fns (symopt, a) (dir, ctx, depth) =>
+                                   let
+                                      val t = T.apply1 Prim.univ (T.Sub (univ, T.Shift depth))
+                                   in
+                                      ((D.bindh dir symopt,
+                                        S.cons (J.Tm a) ctx,
+                                        depth+1),
+                                       
+                                       growres dir ctx
+                                          (T.apply2 Prim.ov t a)
+                                          (fns jud v => (symopt, (a, t, jud, v))))
+                                   end)
+                               (fn _ => nilres)
+                               (fulldir, fullctx, 0)
+                               tyargs
+                               
+                         val dconsres =
+                            mapres
+                               (fns (dconsym, conargs, indices) =>
+                                   let
+                                      val ((dir, ctx, depth), conargsres) =
+                                         bifold
+                                            (fns arg (dir, ctx, depth) =>
+                                                (case arg of
+                                                    External (binderopt, a) =>
+                                                       let
+                                                          val t = T.apply1 Prim.univ (T.Sub (univ, T.Shift depth))
+                                                       in
+                                                          ((D.bindh dir (Option.join binderopt),
+                                                            S.cons (J.Tm a) ctx,
+                                                            depth+1),
+   
+                                                           growres dir ctx
+                                                              (T.apply2 Prim.ov t a)
+                                                              (fns jud v => External (binderopt, (a, t, jud, v))))
+                                                       end
+
+                                                  | Internal (i, iindices) =>
+                                                       let
+                                                          val (_, tyargsi, _) = List.nth dts i
+
+                                                          val (_, iindicesres) =
+                                                             bifold2
+                                                                (fns index (symopt, tyarg) st =>
+                                                                    (* st puts tyargs in the same context as the indices *)
+                                                                    let
+                                                                       val t = T.Sub (tyarg, st)
+                                                                    in
+                                                                       (T.Dot (index, st),
+   
+                                                                        growres dir ctx
+                                                                           (T.apply2 Prim.ov t index)
+                                                                           (fns jud v => (index, t, jud, v)))
+                                                                    end)
+                                                                (fn _ => nilres)
+                                                                (T.Shift depth)
+                                                                iindices tyargsi
+                                                       in
+                                                          ((dir, ctx, depth),
+
+                                                           joinres2
+                                                              (fns iindices' rest => Internal (i, iindices') :: rest)
+                                                              iindicesres)
+                                                       end))
+                                            (fn _ => nilres)
+                                            (fulldir, fullctx, 0)
+                                            conargs
+
+                                      val (_, indicesres) =
+                                         bifold2
+                                            (fns index (symopt, tyarg) st =>
+                                                let
+                                                   val t = T.Sub (tyarg, st)
+                                                in
+                                                   (T.Dot (index, st),
+   
+                                                    growres dir ctx
+                                                       (T.apply2 Prim.ov t index)
+                                                       (fns jud v => (index, t, jud, v)))
+                                                end)
+                                            (fn _ => nilres)
+                                            (T.Shift depth)
+                                            indices tyargs
+                                   in
+                                      joinres2
+                                         (fns conargs' indices' => (dconsym, conargs', indices'))
+                                         conargsres indicesres
+                                   end)
+                               dcons
+                      in
+                         joinres2
+                            (fns tyargs' dcons' => (dtsym, tyargs', dcons'))
+                            tyargres dconsres
+                      end)
+                  dts
+                  
+            val (goals, f) =
+               joinres4
+                  (fns invis' pers' (univjud, univv) dts' => 
+                      (invis', pers', (univ, T.Const Prim.level, univjud, univv), dts'):itypedef)
+                  invisres persres univtacres dtsres
+         in
+            (goals, (fn vs => 
+                        (case f vs of 
+                            (x, []) => x
+
+                          | _ => raise Refine.ValidationFailure)))
+         end
+
+
+
+      (* Flattens the recursive bundle, producing (for each constructor):
+
+         (i, j, name, args, |args|, indices)
+
+         where the constructor:
+            belongs to datatype #i
+            is #j over all
+            has the given name, arguments, and indices
+      *)
+      fun flattenDts dts =
+         let
+            val (l, _, _) =
+               List.foldl
+                  (fns (_, _, dcons) (l, i, j) =>
+                      let
+                         val (l', j') =
+                            List.foldl
+                               (fns (name, args, indices) (l, j) => 
+                                   ((i, j, name, args, List.length args, indices) :: l,
+                                    j+1))
+                               (l, j)
+                               dcons
+                      in
+                         (l', i+1, j')
+                      end)
+                  ([], 0, 0)
+                  dts
+         in
+            List.rev l
+         end
+
+
+
+      extension Answer of (Message.label * judgement) list * Tactic.validator
+
+      fun execute ctx a tac =
+         let
+            val jud = J.make ctx a
+         in
+            (case Tactic.execute (jud, D.empty) tac of
+                Sum.INL v =>
+                   (jud, v)
+
+              | Sum.INR msg => raise (Fail ("datatype internal proof failure: " ^ msg)))
+         end
+         
+
+      (* check a proof, and turn it into a tactic *)
+      fun compactProof ctx a tac =
+         let
+            val (jud, v) = execute ctx a tac
+         in
+            cast jud v
+         end
+
+
+
+
+      (* Load stuff from the libraries
+
+         We put all this stuff into suspensions, since the libraries aren't loaded yet
+         when this code is run.
+
+         A subtle point is what happens if the libraries get loaded, the suspensions are
+         forced, and the loading of the libraries gets rewound.  The suspensions won't
+         be forced again until the libraries are reloaded, at we are guaranteed that the
+         the same constants will be used when the libraries are reloaded, so the next time
+         the suspensions are forced, everything will be fine.
+      *)
+
+      fun loadSymbol module str =
+         Susp.delay (fn () => Namespace.resolve [module, Symbol.fromValue str])
+
+      val datatypeSym = Symbol.fromValue "Datatype"
+      val natSym = Symbol.fromValue "Nat"
+
+      val constAcc = loadSymbol (Symbol.fromValue "Acc") "Acc"
+      val constLeq = loadSymbol natSym "leq"
+      val constLeq_0_min = loadSymbol natSym "leq_0_min"
+      val constLeq_succ_succ = loadSymbol natSym "leq_succ_succ"
+      val constList = loadSymbol datatypeSym "list"
+      val constNil = loadSymbol datatypeSym "nil"
+      val constCons = loadSymbol datatypeSym "cons"
+      val constListRec = loadSymbol datatypeSym "list_rec"
+      val constRep = loadSymbol datatypeSym "rep"
+      val constDt = loadSymbol datatypeSym "dt"
+      val constCon = loadSymbol datatypeSym "con"
+      val constUnroll = loadSymbol datatypeSym "unroll_datatype"
+      val constSubtermDt = loadSymbol datatypeSym "subterm"
+      val constSubtermTrans = loadSymbol datatypeSym "subterm_trans"
+      val constSubtermWellFounded = loadSymbol datatypeSym "subterm_well_founded"
+      val constStrip = loadSymbol datatypeSym "strip"
+      val constSubtermCon = loadSymbol datatypeSym "subterm_con"
+      val constIter = loadSymbol datatypeSym "dt_iter"
+
+      fun xvar i ctx = X.var i (List.nth ctx i)
+
+      fun xconstant const = X.constant (Susp.force const)
+
+      fun xlist lv a =
+         X.apps (xconstant constList) [lv, a]
+
+      fun xnil lv a =
+         X.apps (xconstant constNil) [lv, a]
+
+      fun xcons lv a h t =
+         X.apps (xconstant constCons) [lv, a, h, t]
+
+      fun xcon lv a dcons n tac x y =
+         X.apps
+            (X.appGuard
+                (X.apps (xconstant constCon) [lv, a, dcons, n])
+                tac)
+            [x, y]
+
+      fun xsubtermcon lv a dcons n tac x y =
+         X.apps
+            (X.appGuard
+                (X.apps (xconstant constSubtermCon) [lv, a, dcons, n])
+                tac)
+            [x, y]
+
+      fun xcompact ctx m =
+         X.compact
+            (List.foldr
+                (fns (c, _, _) g => Seq.cons (J.Tm c) g)
+                Seq.empty
+                ctx)
+            m
+
+
+      fun xleqProof m n =
+         if m = 0 then
+            X.app (X.constant (Susp.force constLeq_0_min)) (X.nat n)
+         else
+            X.apps
+               (X.constant (Susp.force constLeq_succ_succ))
+               [
+               X.nat (m-1),
+               X.nat (n-1),
+               xleqProof (m-1) (n-1)
+               ]
+               
+      fun proveLeq m n =
+         let
+            val (x, _, xtac) = xleqProof m n
+         in
+            refine (Rule.inhabitant (T.evar ()) x)
+            >> xtac
+         end
+         
+
+
+      fun xadjust depth (depth', m) = X.weaken m (depth - depth')
+
+
+
+      fun unshift m = T.Sub (m, T.Dot (T.Const Prim.bogus, T.id))
+
+
+
+      fun define sym ((def, deft, deftac):X.xterm) t =
+         let
+            val const = Namespace.declare sym (SOME (N.simplifyAll def))
+
+(* for debugging
+            val () =
+               if Unify.unify1 deft t then
+                  ()
+               else
+                  (
+                  X.elements := [deft, t];
+                  raise (Fail "definition mismatch")
+                  )
+*)
+
+            val () = Constant.setOpacity const Constant.SOFT  (* for now *)
+
+            val (jud, v) =
+               execute Seq.empty (T.apply2 Prim.ov t (T.Const const)) deftac
+
+            val typingName = Symbol.toValue sym ^ "_type"
+
+            val (typingConst, typingJud, typingV) =
+               NamespaceInternal.reify (Symbol.fromValue typingName) jud v
+         in
+            Database.enterType typingConst typingJud typingV;
+            Define.recordTyping typingName;
+            const
+         end
+
+
+      val xsym = Symbol.fromValue "x"
+      val ysym = Symbol.fromValue "y"
+      val zsym = Symbol.fromValue "z"
+
+
+
+      fun close const = Constant.abstract const
+
+
+      (* for unpackConstr *)
+      datatype entry = Item of (int * term) | Subst of T.sub
+
+
+
+      val list_rec_cons = Susp.delay (fn () => RR.toUreduction2 $ RR.read $ List.map Symbol.fromValue ["Datatype", "list_rec_cons"])
+      val con_unroll = Susp.delay (fn () => Option.valOf $ Database.findUnroll $ Namespace.resolve $ List.map Symbol.fromValue ["Datatype", "con"])
+      val dt_iter_unroll = Susp.delay (fn () => Option.valOf $ Database.findUnroll $ Namespace.resolve $ List.map Symbol.fromValue ["Datatype", "dt_iter"])
+
+      val reductions =
+         Susp.delay
+            (fn () =>
+                List.foldl
+                   (fns (const, r) d => CD.insert d const r)
+                   CD.empty
+                   [
+                   (Prim.natcase, [R.user2 Prim.natcase_succ, R.user2 Prim.natcase_zero]),
+                   (Prim.sumcase, [R.user2 Prim.sumcase_inr, R.user2 Prim.sumcase_inl]),
+                   (Susp.force constListRec, [R.user2 (Susp.force list_rec_cons)]),
+                   (Susp.force constCon, [Susp.force con_unroll])
+                   ])
+
+
+      (* This isn't fully general (although it shouldn't be hard to make it so).
+         It's just enough to reduce datatype iterators.
+      *)
+
+      fun reductionNorm d m acc =
+         let
+            val l =
+               (case N.simplify m of
+                   T.Elim (T.Const const, _) =>
+                      (case CD.find d const of
+                          NONE => []
+
+                        | SOME l => l)
+
+                 | _ => [])
+         in
+            (case
+                List.findmap 
+                   (fn r =>
+                       (try
+                           SOME (r, R.reduce r m)
+                        with R.Reduce => NONE))
+                   l
+             of
+                NONE =>
+                   (m, R.trans (List.rev acc))
+
+              | SOME (r, m') =>
+                   reduction d m' (r :: acc))
+         end
+
+      and reduction d m acc =
+         let
+            val m' = N.simplify (R.reduce R.betas m)
+         in
+            (case m' of
+                T.Elim (h, spine) =>
+                   let
+                      val (spine', rs) =
+                         List.foldr
+                            (fns elim (spine', rs) =>
+                                (case elim of
+                                    T.App n =>
+                                       let
+                                          val (n', r) = reduction d n []
+                                       in
+                                          (T.App n' :: spine', r :: rs)
+                                       end
+
+                                  | _ =>
+                                       (elim :: spine', rs)))
+                            ([], [])
+                            spine
+                   in
+                      reductionNorm d (T.Elim (h, spine')) (R.compat rs :: R.betas :: acc)
+                   end
+
+              | T.Pair (m1, m2) =>
+                   let
+                      val (m1', r1) = reduction d m1 []
+                      val (m2', r2) = reduction d m2 []
+                   in
+                      (T.Pair (m1', m2'),
+                       R.trans (List.rev (R.within [1] r2 :: R.within [0] r1 :: R.betas :: acc)))
+                   end
+
+              | _ => 
+                   (m', R.trans (List.rev (R.betas :: acc))))
+         end
+
+
+         
+      (* the stuff destructor needs *)
+      type environment =
+         (symbol * mxterm) list        (* invis *)
+         * (symbol * mxterm) list      (* pers *)
+         * mxterm                      (* univ *)
+         * mxterm                      (* a *)
+         * mxterm                      (* dcons *)
+         *
+         (* for each datatype, in order *)
+         (Constant.constant
+           * R.reduction               (* unfolds the constant *)
+           * (T.binder * mxterm) list  (* the datatype's arguments *)
+           * mxterm                    (* the disjunct of "a" corresponding to this datatype *)
+         ) list
+         *
+         (* for each constructor, in order *)
+         (Constant.constant
+           * R.reduction               (* unfolds the constant *)
+           * int                       (* belongs to this datatype # *)
+           * int                       (* is constructor # *)
+           * mxterm conarg list        (* the constructor's arguments *)
+           * int                       (* the constructor's # of arguments *)
+           * mxterm list               (* the constructor's indices *)
+         ) list
+
+
+      val pumx : mxterm P.pu =
+         P.wrap
+            (fn (m, a, jud, v) => (m, a, (jud, v)))
+            (fn (m, a, (jud, v)) => (m, a, jud, v))
+            (P.tuple3 PP.puTerm PP.puTerm Refine.pu)
+
+      val puConarg : mxterm conarg P.pu =
+         P.alt
+            (fn External _ => 0 | Internal _ => 1)
+            [
+            P.wrap
+               (fn External (binder, m) => (binder, m)
+                 | _ => raise (Fail "impossible"))
+               External
+               (P.pair (P.option (P.option PP.puSymbol)) pumx),
+
+            P.wrap
+               (fn Internal (sym, l) => (sym, l)
+                 | _ => raise (Fail "impossible"))
+               Internal
+               (P.pair P.int (P.list pumx))
+            ]
+
+      val puEnvironment : environment P.pu =
+         P.tuple7
+            (P.list (P.pair PP.puSymbol pumx))
+            (P.list (P.pair PP.puSymbol pumx))
+            pumx
+            pumx
+            pumx
+            (P.list
+                (P.tuple4
+                    PP.puConstant
+                    R.puReduction
+                    (P.list (P.pair (P.option PP.puSymbol) pumx))
+                    pumx))
+            (P.list
+                (P.tuple7
+                    PP.puConstant
+                    R.puReduction
+                    P.int
+                    P.int
+                    (P.list puConarg)
+                    P.int
+                    (P.list pumx)))
+
+
+      val theDatatypes : (Constant.constant list * environment) list CR.cref = CR.new []
+         
+
+      (* We manually closure-convert the destructor function so we can pickle its environment. *)
+
+      fun destructor ((invis, pers, univ_mobile, a_mobile, dcons_mobile, tplist, conlist):environment) =
+         let
+            val a = X.use a_mobile
+            val dcons = X.use dcons_mobile
+            val univ = X.use univ_mobile
+
+            val typeInfo = Array.fromList tplist
+            val conInfo = Array.fromList conlist
+            
+            val (_, typeConstantsInvert) =
+               List.foldl
+                  (fns (const, _, _, _) (i, d) =>
+                      (i+1, CD.insert d const i))
+                  (0, CD.empty)
+                  tplist
+
+
+            exception TypeError
+
+            (* X.dot is not very efficient.  We should build functions with
+               univ, a, and dcons so we don't have to do this work repeatedly.
+            *)
+
+            fun collectInvis l s =
+               (case l of
+                   [] =>
+                      s
+
+                 | (_, c) :: l' =>
+                      let
+                         val c = X.use c
+                      in
+                         collectInvis l'
+                            (X.dot (X.hole (T.evar ()) (T.Sub (X.term c, fst s))) c s)
+                      end)
+                         
+
+            fun collectPers l spine s persactrev =
+               (case (l, spine) of
+                   ([], _) => 
+                      (s, List.rev persactrev, spine)
+
+                 | ((_, c) :: l', T.App m :: spine') =>
+                      let
+                         val c = X.use c
+                      in
+                         collectPers l' spine'
+                            (X.dot (X.hole m (T.Sub (X.term c, fst s))) c s)
+                            (m :: persactrev)
+                      end
+
+                 | _ => raise TypeError)
+
+
+            fun collectArgs l spine s constituents =
+               (case (l, spine) of
+                   ([], []) =>
+                      List.rev constituents
+
+                 | ((_, c) :: l', T.App m :: spine') =>
+                      let
+                         val c = X.use c
+                         val m' = X.hole m (T.Sub (X.term c, fst s))
+                      in
+                         collectArgs l' spine' (X.dot m' (X.forget c) s) (m' :: constituents)
+                      end
+
+                 | _ => raise TypeError)
+
+
+
+
+            (* splitArgs cur hyp s persact pat set conargs
+
+               context looks like:
+               G, ..cur processed arguments.., <external>, <internal>, ..hyp..
+
+               G, ..processed arguments.. |- s : ..procesed external arguments..
+               G |- persact_i : pers_i[persact_i-1 ... persact_0 . id]
+               conargs still to examine
+
+               end with context looking like:
+               G, ..processed arguments.., ..hyp..
+            *)
+            fun splitArgs cur hyp s persact conargs =
+               (case conargs of
+                   [] =>
+                      refine (Rule.unitLeft hyp (T.evar ()))
+                      >>
+                      refine (Rule.unitLeft hyp (T.evar ()))
+
+                 | External _ :: rest =>
+                      refine (Rule.existsLeft (hyp+1) (T.evar ()) (T.evar ()) (T.evar ()))
+                      >>
+                      splitArgs (cur+1) hyp (T.under 1 s) persact rest
+
+                 | Internal (i, indices) :: rest =>
+                      refine (Rule.prodLeft hyp (T.evar ()) (T.evar ()) (T.evar ()))
+                      >>
+                      refine (Rule.exchange (hyp+1) 1 1)
+                      >>
+                      let
+                         val (const, red, _, _) = Array.sub typeInfo i
+                      in
+                         refine (Rule.unreduceHyp (hyp+2)
+                                    (T.Elim 
+                                        (T.Const const,
+                                         List.map
+                                            (fn m => T.App (T.Sub (m, T.Shift cur)))
+                                            persact
+                                         @
+                                         List.map 
+                                            (fn (m, _, _, _) => T.App (T.Sub (m, s)))
+                                            indices))
+                                    red)
+                      end
+                      >>
+                      splitArgs (cur+1) hyp (T.compose s T.shift1) persact rest)
+
+
+            fun destArgs hyp pats num set =
+               if num = 0 then
+                  idtacM (S.empty, DE.Principal (pats, set))
+               else
+                  let
+                     do (vars1, (pats', set1)) =
+                        DE.andthenp S.empty $ destArgs (hyp+1) pats (num-1) set
+
+                     val (pat, pats'') = 
+                        (case pats' of
+                            [] => (IP.Ident NONE, [])
+         
+                          | pat :: pats'' => (pat, pats''))
+
+                     do (vars2, set2) =
+                        DE.andthenp vars1 $ DE.dest hyp pat set1
+                  in
+                     idtacM (S.append vars1 vars2, DE.Principal (pats'', set2))
+                  end
+
+
+            fun destOne hyp persact jud pat (_, _, i, j, args, numargs, indices) set =
+               (case pat of
+                   IP.And pats =>
+                      let
+                         val v = D.freshSet set
+                      in
+                         (* G, exists (set C . D) . E ... |- ... *)
+                         refine (Rule.existsLeft hyp (T.evar ()) (T.evar ()) (T.evar ()))
+                         >>
+                         (* G, set C . D, E ... |- ... *)
+                         refine (Rule.setLeft (hyp+1) (T.evar ()) (T.evar ()) (T.evar ()))
+                         >>> [
+                             (* G, C |- D : type *)
+                             idtacM (Seq.cons v Seq.empty, DE.Auxiliary),
+       
+                             (* G, C, hide D, E[^] ... |- ... *)
+                             refine (Rule.assert (T.evar ()) (T.evar ()))
+                             >>> [
+                                 (* G, C, hide D, E[^] ... |- D[^hyp+2] *)
+                                 refine (Rule.inhabitant (T.evar ()) T.Triv)
+                                 >>
+                                 (* G, C, D, E[^] ... |- () : D[^hyp+2] *)
+                                 refine (Rule.eqIntro (T.evar ()) (T.evar ()) (T.evar ()))
+                                 >>
+                                 (* G, C, D, E[^] ... |- D[^hyp+2] *)
+                                 refine (Rule.hypothesis (hyp+1)) >> done,
+                                 
+                                 (* G, C, hide D, E[^] ... D[^hyp+2] |- ... *)
+                                 refine (Rule.weaken (hyp+2) 1)
+                                 >>
+                                 cut
+                                    (repeat
+                                        (
+                                        EqualityTacticInternal.injectionSum 0
+                                        >>
+                                        refine (Rule.weaken 1 1)
+                                        ))
+                                 >>
+                                 (* G, C, E ... <equality> |- ... *)
+                                 cut
+                                    (repeatCount
+                                        (
+                                        EqualityTacticInternal.injectionExists 0
+                                        >>
+                                        refine (Rule.weaken 2 1)
+                                        ))
+                                 >>= 
+                                 (* eqs is the number of times the above code ran, which is
+                                    the number of equalities generated.
+                                 *)
+                                 (fn eqs =>
+                                     (* G, C, E ... <equalities>, () = () : unit |- ... *)
+                                     refine (Rule.weaken 0 1)
+                                     >>
+                                     (* G, C, E ... <equalities> |- ... *)
+                                     splitArgs 0 (hyp+eqs) T.id persact args
+                                     >>
+                                     (* G, <arguments>, ..., <equalities> |- ... *)
+                                     refine (Rule.exchange 0 eqs hyp)
+                                     >>
+                                     (* G, <arguments>, <equalities>, ... |- ... *)
+                                     let
+                                        val (conConst, red, _, _, _, _, _) = Array.sub conInfo j
+                                     in
+                                        DE.refold jud hyp (numargs+eqs)
+                                           (T.Elim
+                                               (T.Const conConst,
+                                                List.map
+                                                   (fn m => T.App (T.Sub (m, T.Shift (numargs+eqs))))
+                                                   persact
+                                                @
+                                                natrecr numargs
+                                                   (fns k l => T.App (T.Var (k+eqs)) :: l)
+                                                   []))
+                                           red
+                                     end
+                                     >>
+                                     (* G, <arguments>, <equalities>, ... |- ... *)
+                                     let
+                                        do (vars, (pats', set')) =
+                                           DE.andthenp S.empty $ destArgs hyp pats (numargs+eqs) set
+                                     in
+                                        (case pats' of
+                                            [] =>
+                                               idtacM (vars, DE.Principal set')
+
+                                          | _ =>
+                                               fail "too many patterns supplied for arm")
+                                     end)
+                                 ]
+                             ]
+                      end
+
+                 | _ => fail "datatype pattern expected")
+
+
+            fun destAll hyp persact jud pats tpnum cons set =
+               (case cons of
+                   [] =>
+                      (case pats of
+                          [] =>
+                             refine (Rule.voidElim (T.evar ()))
+                             >>
+                             refine (Rule.hypothesis hyp) >> done
+
+                        | _ =>
+                             fail "datatype pattern has superfluous arms")
+
+                 | (con as (_, _, tpnum', _, _, _, _)) :: rest =>
+                      let
+                         do (pat, pats') =
+                            (fn k =>
+                                if tpnum = tpnum' then
+                                   (case pats of
+                                       pat :: pats' => k (pat, pats')
+
+                                     | _ => fail "datatype pattern has insufficient arms")
+                                else
+                                   k (IP.And [], pats))
+                      in
+                         refine (Rule.sumLeft hyp (T.evar ()) (T.evar ()) (T.evar ()))
+                         >>> [
+                             destOne hyp persact jud pat con set,
+   
+                             destAll hyp persact jud pats' tpnum rest set
+                             ]
+                      end)
+
+
+            fun destDatatype hyp pat set =
+               (case pat of
+                   IP.Or pats =>
+                      let
+                         do (jud, _) = withgoal
+                      in
+                         hypCase (J.hyp jud hyp)
+                         / $tm const? @ ? =>
+                           \(fnc const spine =>
+                                (try
+                                    let
+                                       val i = CD.lookup typeConstantsInvert const
+                                       val (_, red, _, _) = Array.sub typeInfo i
+                                       val sinvis = collectInvis invis X.id
+                                       val (s, persact, spine') = collectPers pers spine sinvis []
+                                       val a_s = X.sub a s
+                                       val (_, _, args, adisj) = Array.sub typeInfo i
+                                    in
+                                       (* G, const @ spine, G' |- C *)
+                                       refine (Rule.reduceHyp hyp red)
+                                       >>
+                                       (* G, rolled, G' |- C *)
+                                       refine (Rule.subsumptionLeft hyp (T.evar ()) (T.evar ()) (T.evar ()))
+                                       >>> [
+                                           (* G, blah |- rolled[^] <:> unrolled[^] *)
+                                           refine (Rule.weaken 0 1)
+                                           >>
+                                           (* G |- rolled <:> unrolled *)
+                                           X.inhabitant
+                                              (X.apps (X.constant (Susp.force constUnroll))
+                                                  [
+                                                  X.sub univ s,
+                                                  a_s,
+                                                  X.sub dcons s,
+           
+                                                  X.inN i
+                                                     (X.tupleEx
+                                                         (collectArgs args spine' s [])
+                                                         (X.forget (X.sub (X.use adisj) s)))
+                                                     (X.forget a_s)
+                                                  ])
+                                           >> idtacM (Seq.empty, DE.Auxiliary),
+                        
+                                           (* G, unrolled, G' |- C *)
+                                           destAll hyp persact jud pats i conlist set
+                                           ]
+                                    end
+                                 with
+                                    TypeError => fail "type error in datatype hypothesis"))\
+       
+                         /
+                      end
+
+                 | _ => fail "datatype pattern expected")
+         in
+            destDatatype
+         end
+
+
+
+      fun makeDatatype (typedef as (invis, pers, univ_mobile, dts) : itypedef) =
+         let
+            val () =
+               if List.null dts then
+                  signalDatatype "empty datatype specification"
+               else
+                  ()
+
+            val allcons = flattenDts dts
+
+            val (ctxPers, xctxPers) =
+               List.foldl
+                  (fns (_, (c as (cterm, _, _, _))) (ctx, xctx) => 
+                      (Seq.cons (J.Tm cterm) ctx,
+                       X.use c :: xctx))
+                  (Seq.empty, [])
+                  (invis @ pers)
+
+
+            (* This should already be compacted, but belt-and-suspenders. *)
+            val univ = X.use univ_mobile
+
+
+
+            (* 1. Build the schema.
+
+               The schema (i, A, [  (Bj, [Mjk | k], Nj)  | j])
+      
+               represents:
+               tp : A -> U i
+               with
+               con_j : forall (x : Bj) .  ... dt (Mjk x) -> ... dt (Nj x)
+      
+               that is:
+               depmu (tp : A -> Ui) . lam (y : A) .
+                  ...
+                  % (exists (x : Bj) .
+                        y = Nj x : A
+                        & (... & tp (Mjk x) & ...))
+                  % ...
+
+               (In datatype.ist, the word "schema" is used for just the constructors
+               portion of this.)
+            *)
+            
+            val indextpsList =
+               List.map
+                  (fn (_, args, _) =>
+                      let
+                         val (_, b) =
+                            (* We are working in G_depth = G, C1, ..., Cdepth
+                             
+                               If the argument type is C, then ctac proves G_depth |- C : Ui[^depth],
+                            *)
+                            bifold
+                               (fns (symopt, c) depth =>
+                                   (depth+1,
+
+                                    (fn t => X.existsUniv symopt (X.use c) t)))
+                               (fn depth => X.unitUniv (X.weaken univ depth))
+                               0
+                               args
+                      in
+                         X.mobilize ctxPers b
+                      end)
+                  dts  
+
+            val a_mobile : X.mxterm =
+               X.mobilize ctxPers $ 
+               List.foldr 
+                  (fns c d => X.sumUniv (X.use c) d)
+                  (X.voidUniv univ) indextpsList
+
+            val a : X.xterm = X.use a_mobile
+
+            val indextps : X.mxterm Array.array = Array.fromList indextpsList
+
+
+
+            (* procIndices j s indices
+
+               If    indices live in G', and are the indices for datatype #j
+                     G, B |- s : G'
+               then  returns G, B |- A[^]
+            *)
+            fun procIndices j s indices =
+               let
+                  val c = X.use (Array.sub indextps j)
+
+                  (* G |- C : Ui *)
+
+                  val n =
+                     X.tupleEx (map (fn p => X.sub (X.use p) s) indices) (X.weaken (X.forget c) 1)
+
+                  (* G, B |- N : C[^]  where  N = (P1[s], .. (Pk[s], ())) *)
+
+               in 
+                  X.inN j n (X.weaken (X.forget a) 1)
+               end
+
+
+            val dconsl : (X.xterm * X.xterm list * X.xterm) list =
+               List.map
+                  (fn (j, _, _, conargs, _, indices) =>
+                      let
+                         val (_, b) =
+                            bifold
+                               (fns conarg depth =>
+                                   (case conarg of
+                                       External (_, c) =>
+                                          (depth+1,
+
+                                           (fn b =>
+                                               X.existsUniv NONE (X.use c) b))
+
+                                     | Internal _ =>
+                                          (depth,
+                                           (fn b => b))))
+                               (fn depth => X.unitUniv (X.weaken univ depth))
+                               0
+                               conargs
+
+                         val ((_, s), ms) =
+                            (* We are working in Gi = G, C1, ..., Ci.
+                               We have processed i external args already.
+                               B is the full type; T is the remainder of B.
+
+                               G_depth |- T : type.
+                               G, B |- s : Gi, T
+                               (so G, B |- ^ o s : Gi)
+
+                               Computing [.. Mk .. | k]
+                               where     G |- Mk : B -> A
+                            *)
+                            bifold
+                               (fns conarg (t, s) =>
+                                   (case conarg of
+                                       External _ =>
+                                          ((X.existsInv2 t, X.compose (X.existsLeft t) s),
+                                           (fn ms => ms))
+
+                                     | Internal (j', indices') =>
+                                          ((t, s),
+
+                                           (fn ms =>
+                                               let
+                                                  val m = 
+                                                     X.lam NONE (X.forget b)
+                                                        (procIndices j' (X.compose (X.shift 1) s) indices')
+                                               in
+                                                  m :: ms
+                                               end))))
+                               (fn _ => [])
+                               (X.forget b, X.id)
+                               conargs
+
+                         val n = X.lam NONE (X.forget b) (procIndices j (X.compose (X.shift 1) s) indices)
+                      in
+                         (b, ms, n)
+                      end)
+                  allcons
+
+            val dconsarr = Array.fromList dconsl
+
+
+
+
+            (* 2. Rebuild the schema in library terms. *)
+
+            val za = X.arrowUniv (X.var 0 (X.univ univ)) (X.weaken a 1)
+            val elementrhs = X.cumulativeSucc (X.prodUniv (xlist (X.weaken univ 1) za) za)
+            val element = X.existsUniv NONE (X.univUniv univ) elementrhs
+            val suniv = X.lsucc univ
+
+            val dcons_mobile =
+               X.mobilize ctxPers $
+               List.foldr
+                  (fns (b, ms, n) t =>
+                      let
+                         val ba = X.arrowUniv b a
+
+                         val ms' =
+                            List.foldr
+                               (fns m u => xcons univ ba m u)
+                               (xnil univ ba)
+                               ms
+                      in
+                         xcons suniv element
+                            (X.pairEx
+                                b
+                                (X.pair ms' n)
+                                (X.forget elementrhs))
+                            t
+                      end)
+                  (xnil suniv element)
+                  dconsl
+
+            val dcons = X.use dcons_mobile
+            
+
+
+
+            (* 3. Useful definitions *)
+
+            fun wrap m =
+               List.foldr
+                  (fns (sym, d) n => X.lamInt (SOME sym) (X.use d) n)
+                  (List.foldr
+                      (fns (sym, d) n => X.lamAll (SOME sym) (X.use d) n)
+                      m
+                      pers)
+                  invis
+
+            fun wraptp m =
+               List.foldr
+                  (fns (sym, (d, _, _, _)) n => T.apply2 Prim.intersect d (T.Lam (SOME sym, n)))
+                  (List.foldr
+                      (fns (sym, (d, _, _, _)) n => T.apply2 Prim.forall d (T.Lam (SOME sym, n)))
+                      m
+                      pers)
+                  invis
+
+            (* same as wrap/wraptp, but intersections replaced by forall *)
+
+            fun wrapLemma m =
+               List.foldr
+                  (fns (sym, d) n => X.lamAll (SOME sym) (X.use d) n)
+                  (List.foldr
+                      (fns (sym, d) n => X.lamAll (SOME sym) (X.use d) n)
+                      m
+                      pers)
+                  invis
+
+            fun wraptpLemma m =
+               List.foldr
+                  (fns (sym, (d, _, _, _)) n => T.apply2 Prim.forall d (T.Lam (SOME sym, n)))
+                  (List.foldr
+                      (fns (sym, (d, _, _, _)) n => T.apply2 Prim.forall d (T.Lam (SOME sym, n)))
+                      m
+                      pers)
+                  invis
+
+            (* to fill in persistent arguments, when in the scope of persistent arguments *)
+            val (_, topargs) =
+               List.foldr
+                  (fns (_, c) (i, l) => (i+1, X.var i (X.use c) :: l))
+                  (0, [])
+                  (invis @ pers)
+
+            val numberOfVisibleArgs = List.length pers
+            val numberOfPervasiveArgs = numberOfVisibleArgs + List.length invis
+
+            val topvisargsSpine =
+               natrecr numberOfVisibleArgs
+                  (fns i l => T.App (T.Var i) :: l)
+                  []
+
+
+
+
+            (* 4. Define the subterm ordering and associated stuff *)
+
+            val firstName = Symbol.toValue $ n1of3 $ List.hd dts
+
+            (* blah_skel *)
+            val skeletonConst =
+               define
+                  (Symbol.fromValue (firstName ^ "_skel"))
+                  (wrap (X.apps (xconstant constRep) [univ, a, dcons]))
+                  (wraptp (T.apply1 Prim.univ (X.term univ)))
+
+            val skel = X.compact ctxPers $ X.forget $ X.apps (xconstant constRep) [univ, a, dcons]
+
+            val skeltp = 
+               T.Elim (T.Const skeletonConst, topvisargsSpine)
+
+            val subterm =
+               X.compact ctxPers $
+               X.apps (xconstant constSubtermDt)
+                  [
+                  univ,
+                  a,
+                  dcons
+                  ]
+
+            (* blah_subterm *)
+            val subtermConst =
+               define
+                  (Symbol.fromValue (firstName ^ "_subterm"))
+                  (wrap subterm)
+                  (wraptp (T.apply2 Prim.arrow skeltp
+                              (T.apply2 Prim.arrow skeltp
+                                  (T.apply1 Prim.univ (X.term univ)))))
+
+            val () = Database.setImplicits subtermConst numberOfVisibleArgs
+
+            val subtermtp =
+               T.Elim (T.Const subtermConst, topvisargsSpine)
+
+            (* blah_subterm_trans *)
+            val subtermTransConst =
+               let
+                  val a1 = skel
+                  val a2 = X.weaken skel 1
+                  val a3 = X.weaken skel 2
+
+                  val a4 =
+                     X.forget $
+                     X.apps (X.weaken subterm 3)
+                        [
+                        X.var 2 a1,
+                        X.var 1 a2
+                        ]
+
+                  val a5 =
+                     X.forget $
+                     X.apps (X.weaken subterm 4)
+                        [
+                        X.var 2 a2,
+                        X.var 1 a3
+                        ]
+               in
+                  define
+                     (Symbol.fromValue (firstName ^ "_subterm_trans"))
+                     (wrapLemma
+                         (X.lamAll NONE a1
+                             (X.lamAll NONE a2
+                                 (X.lamAll NONE a3
+                                     (X.lam NONE a4
+                                         (X.lam NONE a5
+                                             (X.apps (xconstant constSubtermTrans)
+                                                 [
+                                                 X.weaken univ 5,
+                                                 X.weaken a 5,
+                                                 X.weaken dcons 5,
+                                                 X.var 4 a1,
+                                                 X.var 3 a2,
+                                                 X.var 2 a3,
+                                                 X.var 1 a4,
+                                                 X.var 0 a5
+                                                 ])))))))
+                     (wraptpLemma
+                         (T.apply2 Prim.forall skeltp
+                             (T.Lam (SOME xsym,
+                                     T.apply2 Prim.forall (T.Sub (skeltp, T.shift1))
+                                        (T.Lam (SOME ysym,
+                                                T.apply2 Prim.forall (T.Sub (skeltp, T.Shift 2))
+                                                   (T.Lam (SOME zsym,
+                                                           T.apply2 Prim.arrow
+                                                              (T.Elim (T.Sub (subtermtp, T.Shift 3),
+                                                                       [T.App (T.Var 2), T.App (T.Var 1)]))
+                                                              (T.apply2 Prim.arrow
+                                                                  (T.Elim (T.Sub (subtermtp, T.Shift 3),
+                                                                           [T.App (T.Var 1), T.App (T.Var 0)]))
+                                                                  (T.Elim (T.Sub (subtermtp, T.Shift 3),
+                                                                           [T.App (T.Var 2), T.App (T.Var 0)])))))))))))
+               end
+
+
+            (* blah_subterm_well_founded *)
+            val subtermWellFoundedConst =
+               define
+                  (Symbol.fromValue (firstName ^ "_subterm_well_founded"))
+                  (wrapLemma
+                      (X.lamAll NONE skel
+                          (X.apps (xconstant constSubtermWellFounded)
+                              [
+                              X.weaken univ 1,
+                              X.weaken a 1,
+                              X.weaken dcons 1,
+                              X.var 0 skel
+                              ])))
+                  (wraptpLemma
+                      (T.apply2 Prim.forall skeltp
+                          (T.Lam (SOME xsym,
+                                  T.apply3 (Susp.force constAcc)
+                                     (T.Sub (skeltp, T.shift1))
+                                     (T.Sub (subtermtp, T.shift1))
+                                     T.zero))))
+
+
+
+
+            (* 5. Define the types. *)
+
+            val typeInfoList =
+               List.mapi
+                  (fns j (dtsym, args, constructors) =>
+                      let
+                         val d = X.use (Array.sub indextps j)
+
+                         val numberOfIndexArgs = List.length args
+                         val numberOfTotalArgs = numberOfVisibleArgs + numberOfIndexArgs
+
+                         fun makeType depth args' constituents =
+                            (case args' of
+                                [] =>
+                                   let
+                                      val ind =
+                                         X.inN j
+                                            (X.tupleEx 
+                                                (maprev (xadjust depth) constituents)
+                                                (X.weaken (X.forget d) depth))
+                                            (X.weaken (X.forget a) depth)
+
+                                      val dt =
+                                         X.apps (xconstant constDt)
+                                            [
+                                            X.weaken univ depth,
+                                            X.weaken a depth,
+                                            X.weaken dcons depth,
+                                            ind
+                                            ]
+                                   in
+                                      (ind, 
+
+                                       dt,
+   
+                                       T.apply1 Prim.univ (T.Sub (X.term univ, T.Shift depth)),
+   
+                                       X.lam NONE (X.forget dt)
+                                          (X.apps (xconstant constStrip)
+                                              [
+                                              X.weaken univ (depth+1),
+                                              X.weaken a (depth+1),
+                                              X.weaken dcons (depth+1),
+                                              X.weaken ind 1,
+                                              X.var 0 (X.forget dt)
+                                              ]),
+
+                                       (fn const =>
+                                           T.apply2 Prim.arrow
+                                              (T.Elim (T.Const const,
+                                                       natrecr
+                                                          (numberOfVisibleArgs + depth)
+                                                          (fns i l => T.App (T.Var i) :: l)
+                                                          []))
+                                              (T.Elim (T.Const skeletonConst,
+                                                       natrecr
+                                                          numberOfVisibleArgs
+                                                          (fns i l => T.App (T.Var (i + depth)) :: l)
+                                                          []))))
+                                   end
+                                       
+   
+                              | (symopt, c) :: restArgs =>
+                                   let
+                                      val c = X.use c
+
+                                      val constituents' =
+                                         (depth+1, X.var 0 (X.forget c)) :: constituents
+
+                                      val (ind, body, body_t, strip, strip_t) = makeType (depth+1) restArgs constituents'
+                                   in
+                                      (case symopt of
+                                          NONE =>
+                                             (ind,
+
+                                              X.lam NONE (X.forget c) body,
+
+                                              T.apply2 Prim.arrow (X.term c) (unshift body_t),
+
+                                              X.lamAll NONE (X.forget c) strip,
+
+                                              (fn const =>
+                                                  T.apply2 Prim.forall (X.term c) (T.Lam (NONE, strip_t const))))
+
+                                        | SOME _ =>
+                                             (ind,
+
+                                              X.lamAll symopt (X.forget c) body,
+                                              
+                                              T.apply2 Prim.forall (X.term c) (T.Lam (symopt, body_t)),
+
+                                              X.lamAll NONE (X.forget c) strip,
+
+                                              (fn const =>
+                                                  T.apply2 Prim.forall (X.term c) (T.Lam (symopt, strip_t const)))))
+                                   end)
+
+                         val (ind, dt_def, dt_t, strip_def, strip_t) = makeType 0 args []
+
+                         val const = define dtsym (wrap dt_def) (wraptp dt_t)
+
+                         val red =
+                            R.trans [R.unfold, R.beta numberOfTotalArgs]
+
+                         val red' =
+                            (* This one will still work after const is made opaque. *)
+                            R.user1 $
+                            R.new1 const numberOfTotalArgs
+                               (R.reduce red (T.Elim (T.Const const,
+                                                      natrecr numberOfTotalArgs (fns i l => T.App (T.Var i) :: l) [])))
+                               red
+                               R.refl
+
+                         val stripConst =
+                            define
+                               (Symbol.fromValue (Symbol.toValue dtsym ^ "_strip"))
+                               (wrap strip_def) 
+                               (wraptp (strip_t const))
+                      in
+                         Database.setImplicits stripConst numberOfTotalArgs;
+
+                         print "Datatype ";
+                         print (Symbol.toValue dtsym);
+                         print " defined.\n";
+
+                         (const, red', stripConst, ind, args, numberOfIndexArgs)
+                      end)
+                  dts
+               
+
+            (* typeInfo maps to (const, red, stripConst, ind, args, numberOfIndexArgs)
+
+               const: the datatype's constant
+               red: a reduciton to unroll the datatype
+               stripConst: the datatype's strip function's constant
+               ind: the index term (in a context containing only pervasive arguments and the datatype's arguments)
+               args: the index arguments
+               numberOfIndexArgs: the number of index arguments
+            *)
+
+            val typeInfo = Array.fromList typeInfoList
+            val numberOfTypes = Array.length typeInfo
+
+
+
+
+            (* 6. Define the constructors. *)
+
+            val numberOfConstructors = List.length allcons
+
+            val conInfoList =
+               List.map
+                  (fn (i, j, consym, conargs, _, indices) =>
+                      let
+                         val (tpconst, _, stripconst, _, _, _) = Array.sub typeInfo i
+                         val (b, _, _) = Array.sub dconsarr j
+
+                         fun makeCon depth s conargs xconstituents iconstituents strips =
+                            (* G, G1 |- s : G, G2
+
+                               where |G1| = depth = number of internal or external arguments in scope
+                                 and |G2| = number of external arguments in scope
+
+                               conargs are in G, G2
+                               returns the constructor and its type in G, G1
+                               and returns the subterm lemma and its type in G, G1
+                            *)
+                            (case conargs of
+                                [] =>
+                                   let
+                                      val xtuple = 
+                                         (X.tupleEx
+                                             (maprev (xadjust depth) xconstituents)
+                                             (X.weaken (X.forget b) depth))
+
+                                      val iconstituents' = map (xadjust depth) iconstituents
+
+                                      val conspine = 
+                                         natrecr numberOfVisibleArgs
+                                            (fns i l => T.App (T.Var (i+depth)) :: l)
+                                            (List.map 
+                                                (fn (m, _, _, _) => T.App (T.Sub (m, fst s)))
+                                                indices)
+                                   in
+                                      (xcon
+                                          (X.weaken univ depth)
+                                          (X.weaken a depth)
+                                          (X.weaken dcons depth)
+                                          (X.nat j)
+                                          (proveLeq (j+1) numberOfConstructors)
+                                          xtuple
+                                          (* relying on a nontrivial equality here *)
+                                          (List.foldl X.pair X.triv iconstituents'),
+   
+                                       T.Elim (T.Const tpconst, conspine),
+   
+                                       xsubtermcon
+                                          (X.weaken univ depth)
+                                          (X.weaken a depth)
+                                          (X.weaken dcons depth)
+                                          (X.nat j)
+                                          (proveLeq (j+1) numberOfConstructors)
+                                          xtuple
+                                          (* relying on a nontrivial equality here *)
+                                          (List.foldl X.pair X.triv iconstituents'),
+   
+                                       (fn const =>
+                                           let
+                                              val sp =
+                                                 natrecr
+                                                    numberOfVisibleArgs
+                                                    (fns i l => T.App (T.Var (i + depth)) :: l)
+                                                    []
+       
+                                              val fullskel =
+                                                 T.App $
+                                                 T.Elim (T.Const stripconst,
+                                                         conspine
+                                                         @ [T.App (T.Elim (T.Const const,
+                                                                           natrecr
+                                                                              (numberOfVisibleArgs + depth)
+                                                                              (fns i l => T.App (T.Var i) :: l)
+                                                                              []))])
+                                           in
+                                              foldl2
+                                                 (fns (v, _, _) (stripconst', indices') t =>
+                                                     T.apply2 Prim.prod
+                                                        (T.Elim (T.Const subtermConst,
+                                                                 sp @ [
+                                                                      T.App (T.Elim (T.Const stripconst',
+                                                                                     sp
+                                                                                     @ List.map
+                                                                                          (fn (m, _, _, _) => T.App (T.Sub (m, fst s)))
+                                                                                          indices'
+                                                                                     @ [T.App v])),
+
+                                                                      fullskel
+                                                                      ]))
+                                                        t)
+                                                 (T.Const Prim.unit)
+                                                 iconstituents'
+                                                 strips
+                                           end))
+                                   end
+ 
+                              | External (binderopt, c) :: rest =>
+                                   let
+                                      val csh = X.sub (X.forget (X.use c)) s
+
+                                      val (body, bodytp, subtermbody, subtermbodytp) =
+                                         makeCon
+                                            (depth+1)
+                                            (X.underEasy 1 s)
+                                            rest
+                                            ((depth+1, X.var 0 csh) :: xconstituents)
+                                            iconstituents
+                                            strips
+                                   in
+                                      (case binderopt of
+                                          NONE =>
+                                             (X.lam NONE csh body,
+
+                                              T.apply2 Prim.arrow (X.term csh) (unshift bodytp),
+
+                                              X.lamAll NONE csh subtermbody,
+
+                                              (fn const =>
+                                                  T.apply2 Prim.forall (X.term csh) (T.Lam (NONE, subtermbodytp const))))
+
+                                        | SOME binder =>
+                                             (X.lamAll binder csh body,
+
+                                              T.apply2 Prim.forall (X.term csh) (T.Lam (binder, bodytp)),
+
+                                              X.lamAll binder csh subtermbody,
+
+                                              (fn const =>
+                                                  T.apply2 Prim.forall (X.term csh) (T.Lam (binder, subtermbodytp const)))))
+                                   end
+
+                              | Internal (k, indices) :: rest =>
+                                   let
+                                      val (kconst, _, kstripconst, _, _, _) = Array.sub typeInfo k
+
+                                      val c as (cterm, _, _) = 
+                                         X.forget $
+                                         X.apps
+                                            (X.weaken (X.constant kconst) depth)
+                                            (List.map (fn m => X.weaken m depth) topargs
+                                             @ List.map (fn m => X.sub (X.use m) s) indices)
+
+                                      val (body, bodytp, subtermbody, subtermbodytp) =
+                                         makeCon
+                                            (depth+1)
+                                            (X.compose s (X.shift 1))
+                                            rest
+                                            xconstituents
+                                            ((depth+1, X.var 0 c) :: iconstituents)
+                                            ((kstripconst, indices) :: strips)
+                                   in
+                                      (X.lam NONE c body,
+
+                                       T.apply2 Prim.arrow cterm (unshift bodytp),
+
+                                       X.lamAll NONE c subtermbody,
+                                       
+                                       (fn const =>
+                                           T.apply2 Prim.forall cterm (T.Lam (NONE, subtermbodytp const))))
+                                   end)
+
+                         val (pre_def, pre_t, subtermcon_def, subtermcon_t) = makeCon 0 X.id conargs [] [] []
+
+                         val const = define consym (wrap pre_def) (wraptp pre_t)
+
+                         val numberOfTotalArgs = numberOfVisibleArgs + List.length conargs
+
+                         val red =
+                            R.trans [R.unfold, R.beta numberOfTotalArgs]
+
+                         val red' =
+                            (* This one will still work after const is made opaque. *)
+                            R.user1 $
+                            R.new1 const numberOfTotalArgs
+                               (R.reduce red (T.Elim (T.Const const,
+                                                      natrecr numberOfTotalArgs (fns i l => T.App (T.Var i) :: l) [])))
+                               red
+                               R.refl
+
+                         val subtermConConst =
+                            define
+                               (Symbol.fromValue (Symbol.toValue consym ^ "_subterm"))
+                               (wrapLemma subtermcon_def)
+                               (wraptpLemma (subtermcon_t const))
+                      in
+                         print "Constructor ";
+                         print (Symbol.toValue consym);
+                         print " defined.\n";
+
+                         (const, red', subtermConConst)
+                      end)
+                  allcons
+
+            val conInfo = Array.fromList conInfoList
+
+
+
+
+            (* 7. Define the destructor
+               (Note that we can't just use the iterator.  We want to destruct datatype
+               hypotheses in-place, which the iterator cannot do.)
+            *)
+
+            val environment =
+               (invis,
+                pers,
+                univ_mobile,
+                a_mobile,
+                dcons_mobile,
+
+                map2
+                   (fns (const, red, _, _, args, _) afield => 
+                       (const, red, args, afield))
+                   typeInfoList indextpsList,
+
+                map2 
+                   (fns (const, red, _) (i, j, _, args, numargs, indices) =>
+                       (const, red, i, j, args, numargs, indices))
+                   conInfoList allcons):environment
+
+            val destructor' = destructor environment
+
+            val () =
+               CR.assign theDatatypes
+                  ((List.map
+                       (fn (const, _, _, _, _, _) =>
+                           (
+                           ConstantTable.insert DE.destructTactics const destructor';
+                           const
+                           ))
+                       typeInfoList,
+                    environment) 
+                   :: CR.deref theDatatypes)
+
+
+
+
+            (* 8. Define the iterators *)
+
+
+            (* Builds something under index arguments.
+
+               arrows: use arrows if possible
+               ctx: the context (including pervasives)
+               depth: the size of the context (after pervasives)
+               numberOfArgs: the number of index arguments seen so far
+               s: a substitution from the context containing only pervasives and index arguments
+               args: the index arguments still to be processed
+               f: takes ctx, depth, numberOfArgs, and s; returns an xterm and a type
+            *)
+            fun underIndexArguments arrows ctx depth numberOfArgs s args f =
+               (case args of
+                   [] =>
+                      f ctx depth numberOfArgs s
+
+                 | (binder, arg) :: rest =>
+                      let
+                         val arg' = X.sub (X.forget (X.use arg)) s
+
+                         val (def, t) =
+                            underIndexArguments arrows
+                               (arg' :: ctx)
+                               (depth+1) (numberOfArgs+1)
+                               (X.underEasy 1 s)
+                               rest f
+                      in
+                         if arrows andalso not (Option.isSome binder) then
+                            (X.lam NONE arg' def,
+                             T.apply2 Prim.arrow (X.term arg') (unshift t))
+                         else
+                            (X.lamAll binder arg' def,
+                             T.apply2 Prim.forall (X.term arg') (T.Lam (binder, t)))
+                      end)
+
+
+            (* as above, but the xterm returned is a type, not a term *)
+            fun typeUnderIndexArguments arrows ctx depth numberOfArgs s args f =
+               (case args of
+                   [] =>
+                      f ctx depth numberOfArgs s
+
+                 | (binder, arg) :: rest =>
+                      let
+                         val arg' = X.sub (X.forget (X.use arg)) s
+
+                         val (def, t) =
+                            typeUnderIndexArguments arrows
+                               (arg' :: ctx)
+                               (depth+1) (numberOfArgs+1)
+                               (X.underEasy 1 s)
+                               rest f
+                      in
+                         if arrows andalso not (Option.isSome binder) then
+                            (X.arrowDep arg' def,
+                             T.apply2 Prim.arrow (X.term arg') (unshift t))
+                         else
+                            (X.forall binder arg' def,
+                             T.apply2 Prim.forall (X.term arg') (T.Lam (binder, t)))
+                      end)
+               
+
+            (* Produces the type of an arm
+
+               i: the datatype this is a constructor for
+               j: the constructor this is
+               ctx: the context (including pervasives)
+               depth: the depth where it's going (after pervasives)
+               predindex: the index of the last predicate
+               indices: the constructor's indices (in a context containing pervasives and external args)
+               s: a substitution from a context containing only pervasives and external args
+               constituents: the constructor arguments (but not the recursive results), innermost first
+               conarg: the constructor arguments yet to be processed
+            *)
+            fun makeArmType i j ctx depth predindex indices s constituents conargs =
+               (case conargs of
+                   [] =>
+                      let
+                         val (conConst, _, _) = Array.sub conInfo j
+
+                         val k = predindex + numberOfTypes - 1 - i
+                      in
+                         (X.forget
+                             (X.apps (xvar k ctx)
+                                 (List.map (fn m => X.sub (X.use m) s) indices
+                                  @ [X.apps (X.constant conConst)
+                                        (natrecr numberOfPervasiveArgs (fns h l => xvar (h+depth) ctx :: l)
+                                            (maprev (xadjust depth) constituents))])),
+                          T.Elim (T.Var k, 
+                                  List.map (fn (m, _, _, _) => T.App (T.Sub (m, fst s))) indices
+                                  @ [T.App $
+                                     T.Elim (T.Const conConst,
+                                             natrecr numberOfVisibleArgs (fns h l => T.App (T.Var (h+depth)) :: l)
+                                                (maprev 
+                                                    (fn (depth', (m, _, _)) => 
+                                                        T.App (T.Sub (m, T.Shift (depth-depth'))))
+                                                    constituents))]))
+                      end
+
+                 | External (binderopt, c) :: rest =>
+                      let
+                         val binder = Option.join binderopt
+
+                         val c' = X.sub (X.forget (X.use c)) s
+
+                         val (def, t) =
+                            makeArmType i j
+                               (c' :: ctx)
+                               (depth+1) (predindex+1) indices 
+                               (X.under [c'] s)
+                               ((depth+1, X.var 0 c') :: constituents)
+                               rest
+                      in
+                         (X.forall binder c' def,
+                          T.apply2 Prim.forall (X.term c') (T.Lam (binder, t)))
+                      end
+
+                 | Internal (this_i, these_indices) :: rest =>
+                      let
+                         val (this_const, _, _, _, _, _) = Array.sub typeInfo this_i
+
+                         val indices' = List.map (fn m => X.sub (X.use m) s) these_indices
+
+                         val dom_def =
+                            X.forget $
+                            X.apps (X.constant this_const)
+                               (natrecr numberOfPervasiveArgs (fns h l => xvar (h+depth) ctx :: l)
+                                   indices')
+
+                         val dom_t =
+                            T.Elim (T.Const this_const,
+                                    natrecr numberOfVisibleArgs (fns h l => T.App (T.Var (h+depth)) :: l)
+                                       (List.map (fn (m, _, _) => T.App m) indices'))
+
+                         val k = predindex + numberOfTypes - this_i
+                         
+                         val s' = X.compose s (X.shift 1)
+
+                         val rec_def =
+                            X.forget $
+                            X.apps (xvar k (dom_def :: ctx))
+                               (List.map (fn m => X.sub (X.use m) s') these_indices
+                                @ [X.var 0 dom_def])
+
+                         val rec_t =
+                            T.Elim (T.Var k,
+                                    List.map (fn (m, _, _, _) => T.App (T.Sub (m, fst s'))) these_indices
+                                    @ [T.App (T.Var 0)])
+
+                         val (def, t) =
+                            makeArmType i j
+                               (rec_def :: dom_def :: ctx)
+                               (depth+2) (predindex+2) indices
+                               (X.compose s (X.shift 2))
+                               ((depth+2, X.var 1 dom_def) :: constituents)
+                               rest
+                      in
+                         (X.forall NONE dom_def (X.arrowDep rec_def def),
+                          T.apply2 Prim.forall dom_t
+                             (T.Lam (NONE, T.apply2 Prim.arrow rec_t (unshift t))))
+                      end)
+
+
+
+            (* Builds something under an unpacked constructor.
+
+               The context looks like:
+               G, <external args>, <tuple of remaining external args>,
+                  <internal args>, <tuple of remaining internal args>,
+                  <recursive results>, <tuple of remaining internal results>
+
+               The ending context looks like
+               G, <external args>, <internal args>, <recursive results>
+
+               extnum: number of external args (so far)
+               extern: the type of the tuple of remaining external args
+               intnum: number of internal args (so far)
+               intern: the type of the tuple of remaining internal args
+               (the number of recursive results so far is the same as intnum)
+               rc: the type of the tuple of remaining recursive results
+               constituents: the terms to be passed to f, in reverse order, as a list of entries
+                  each item is a variable index and that variable's type (shiften into the full context)
+                  each substitution in the list is applied to the subsequent elements
+                  (which are actually earlier arguments since the list is reversed)
+               result: the result type, in the current context
+               args: the constructor arguments yet to be processed
+               f: takes the number of added hypotheses (i.e., extnum + 2*intnum)
+                  and a list of xterm arguments to the case (in the order the case expects them),
+                  and returns an xterm
+            *)
+            fun unpackConstr extnum extern intnum intern rc constituents result args f =
+               (case args of
+                   [] =>
+                      (* context is G, ..extnum.., unit, ..intnum.., unit, ..intnum.., unit *)
+                      let
+                         val s1 = T.under (2*intnum + 2) (T.Dot (T.Triv, T.id))
+                         val s2 = T.under (intnum + 1) (T.Dot (T.Triv, T.id))
+                         val s3 = T.Dot (T.Triv, T.id)
+
+                         val s12 = T.compose s1 s2
+                         val s123 = T.compose s12 s3
+
+                         val (_, constituents') =
+                            List.foldl
+                               (fns entry (s, l) =>
+                                   (case entry of
+                                       Item (i, c) =>
+                                          (case T.substVar i s of
+                                              T.Idx i' =>
+                                                 (s, X.vart i' (T.Sub (c, s)) :: l)
+
+                                            | T.Term _ =>
+                                                 (* By construction, we never substitute for these variables, only shift them. *)
+                                                 raise (Fail "impossible"))
+
+                                     | Subst s' =>
+                                          (T.compose s' s, l)))
+                               (s123, [])
+                               constituents
+                         
+                         val def = f (extnum + 2*intnum) constituents'
+                      in
+                         X.splitUnit (2*intnum + 2)
+                            (X.splitUnit (intnum+1)
+                                (X.splitUnit 0
+                                    def
+                                    (T.Sub (result, s12)))
+                                (T.Sub (result, s1)))
+                            result
+                      end
+
+                 | External _ :: rest =>
+                      (* context is G, ..extnum.., extern, ..intnum.., intern, ..intnum.., rc *)
+                      termCaseX extern
+                      / \Prim.exists\ ? (fn . ?) =>
+                        \(fnc c1 c2 =>
+                             let
+                                val i = 2 * intnum + 2
+
+                                val split = T.Dot (T.Pair (T.Var 1, T.Var 0), T.Shift 2)
+
+                                val s = T.under i split
+
+                                val def =
+                                   unpackConstr (extnum+1) c2 intnum
+                                      (T.Sub (intern, T.under intnum split))
+                                      (T.Sub (rc, T.under (2*intnum + 1) split))
+                                      (Item (i+1, T.Sub (c1, T.Shift (i+2))) :: Subst s :: constituents)
+                                      (T.Sub (result, s))
+                                      rest f
+                             in
+                                X.splitExists i def result
+                             end)\
+                      /
+
+                 | Internal _ :: rest =>
+                      (* context is G, ..extnum.., extern, ..intnum.., intern, ..intnum.., rc *)
+                      term2CaseX intern rc
+                      / \Prim.prod\ ? ? ; \Prim.prod\ ? ? =>
+                        \(fnc c1 c2 d1 d2 =>
+                             let
+                                val split = T.Dot (T.Pair (T.Var 1, T.Var 0), T.Shift 2)
+                                val s1 = T.under (intnum+1) split
+                                val s2 = split
+
+                                val s12 = T.compose s1 s2
+
+                                val intnum_split = T.under intnum split
+
+                                val def =
+                                   unpackConstr extnum extern (intnum+1)
+                                      (T.Sub (c2, T.shift1))
+                                      (T.Sub (d2, T.compose intnum_split T.shift1))
+                                      (Item (1, T.Sub (d1, T.compose intnum_split (T.Shift 2)))
+                                       :: Item (intnum+3, T.Sub (c1, T.Shift (intnum+4)))
+                                       :: Subst s12 :: constituents)
+                                      (T.Sub (result, s12))
+                                      rest f
+                             in
+                                X.splitProd (intnum+1)
+                                   (X.splitProd 0 def (T.Sub (result, s1)))
+                                   result
+                             end)\
+                      /)
+
+
+
+            (* Produces the iterator's core (after predicate arguments).
+
+               ctx: the context (including pervasives)
+               depth: the depth where it's going (after pervasives)
+               predindex: the index of the last predicate
+               predicate: the master predicate (residing after the predicates)
+               cases: the cases supplied to the iterator, innermost first
+               cont: a continuation to apply to the result
+               cons: the constructors still to be processed
+            *)
+            fun makeIterCore ctx depth predindex predicate cases cont cons =
+               (case cons of
+                   [] =>
+                      let
+                         val cases' = X.tuple (maprev (xadjust depth) cases)
+                      in
+                         List.mapi
+                            (fns k (name, args, _) =>
+                                let
+                                   val (def, t) =
+                                      underIndexArguments false ctx depth 0 (X.shift depth) args
+                                      (fns _ depth' numberOfArgs s =>
+                                          let
+                                             val (const, _, _, argtuple, _, _) = Array.sub typeInfo k
+                                          in
+                                             (X.apps (xconstant constIter)
+                                                 [
+                                                 X.weaken univ depth',
+                                                 X.weaken a depth',
+                                                 X.weaken dcons depth',
+                                                 X.weaken predicate (predindex + numberOfArgs),
+                                                 X.weaken cases' numberOfArgs,
+                                                 X.sub argtuple s
+                                                 ],
+                    
+                                              T.apply2 Prim.forall
+                                                 (T.Elim (T.Const const,
+                                                          natrecr numberOfVisibleArgs (fns i l => T.App (T.Var (i + depth')) :: l)
+                                                             (natmapr numberOfArgs (fn i => T.App (T.Var i)))))
+                                                 (T.Lam (NONE,
+                                                         T.Elim (T.Var (predindex + numberOfArgs + numberOfTypes - k),
+                                                                 natrecr numberOfArgs (fns i l => T.App (T.Var (i + 1)) :: l)
+                                                                    [T.App T.zero]))))
+                                          end)
+                                in
+                                   cont (name, def, t)
+                                end)
+                            dts
+                      end
+               
+                 | (i, j, _, conargs, _, indices) :: rest =>
+                      let
+                         val (arm_def, arm_t) =
+                            makeArmType i j ctx depth predindex indices (X.shift depth) [] conargs
+
+                         val (b, ms, n) = Array.sub dconsarr j
+
+                         (* This appears after the case is added to the context, so depth+1. *)
+
+                         val b' = X.weaken (X.forget b) (depth+1)
+
+                         val dom =
+                            List.foldr
+                               (fns m l =>
+                                   X.prod
+                                      (X.forget $
+                                       X.apps (xconstant constDt)
+                                          [
+                                          X.weaken univ (depth+2),
+                                          X.weaken a (depth+2),
+                                          X.weaken dcons (depth+2),
+                                          X.app 
+                                             (X.weaken m (depth+2))
+                                             (X.var 0 b')
+                                          ])
+                                      l)
+                               X.unit
+                               ms
+
+                         val (_, rc) =
+                            bifold
+                               (fns m z =>
+                                   (X.pi2 z,
+
+                                    (fn rc =>
+                                        X.prod
+                                           (X.forget $
+                                            X.apps (X.weaken predicate (predindex+3))
+                                               [
+                                               X.app
+                                                  (X.weaken m (depth+3))
+                                                  (X.var 1 b'),
+                                               X.pi1 z
+                                               ])
+                                           rc)))
+                               (fn _ => X.unit)
+                               (X.var 0 dom)
+                               ms
+
+                         (* resides in the context ..., arm_def, b', dom, rc *)
+                         val result =
+                            T.app2 (T.Sub (X.term predicate, T.Shift (predindex+4)))
+                               (T.app
+                                   (T.Sub (X.term n, T.Shift (depth+4)))
+                                   (T.Var 2))
+                               (T.Elim 
+                                   (T.Const (Susp.force constCon),
+                                    [
+                                    T.App (T.Sub (X.term a, T.Shift (depth+4))),
+                                    T.App (T.Sub (X.term dcons, T.Shift (depth+4))),
+                                    T.App (natTerm j),
+                                    T.App (T.Var 2),
+                                    T.App (T.Var 1)
+                                    ]))
+
+                         val thiscase =
+                            X.lamAll NONE b'
+                               (X.lamAll NONE dom
+                                   (X.lam NONE rc
+                                       (unpackConstr 0 (X.term b') 0 (X.term dom) (X.term rc) [] result conargs
+                                           (fns num armargs =>
+                                               (* context is ..., arm_def, ..num.. *)
+                                               X.apps (X.var num arm_def) armargs))))
+
+                         fun cont' (name, iter_def, iter_t) =
+                            cont
+                               (name,
+                                X.lam NONE arm_def iter_def,
+                                T.apply2 Prim.arrow arm_t (unshift iter_t))
+                      in
+                         makeIterCore (arm_def :: ctx) (depth+1) (predindex+1) 
+                            predicate
+                            ((depth+1, thiscase) :: cases)
+                            cont'
+                            rest
+                      end)
+
+
+            (* Produces an arm of the master predicate, corresponding to one of the predicates, using that predicate in scope.
+
+               The context is: G, <pervasives>, <predicates>, <index arguments>, <tuple of the (remaining) index arguments>
+
+               k: which arm of the master predicate we're computing
+               ctx: the context, except for the final element
+               depth: the depth where this is all going, except the final element
+                      (that is, the length of everything between <pervasives> and <tuple of ...>)
+               (the number of predicates is numberOfTypes)
+               numberOfArgs: number of index args seen so far
+               result: the type of the thing, in the full context containing the final element
+               args: the index arguments still to be processed
+            *)
+            fun makeIterPredBody k ctx depth numberOfArgs result args =
+               (case args of
+                   [] =>
+                      (* inside the splitUnit, the context is ctx *)
+                      X.splitUnit 0
+                         (X.apps (xvar (numberOfArgs - 1 + numberOfTypes - k) ctx)
+                             (natmapr numberOfArgs (fn i => xvar i ctx)))
+                         result
+                      
+                 | (_, arg) :: rest =>
+                      let
+                         val s = X.underShift numberOfArgs numberOfTypes
+
+                         (* G, <pervasives>, <predicates>, <index arguments> |- s : G, <pervasives>, <index arguments> *)
+
+                         val arg' = X.sub (X.forget (X.use arg)) s
+
+                         val pred =
+                            makeIterPredBody k 
+                               (arg' :: ctx)
+                               (depth+1) (numberOfArgs+1) 
+                               (T.Sub (result, T.Dot (T.Pair (T.Var 1, T.Var 0), T.Shift 2)))
+                               rest
+                      in
+                         X.splitExists 0 pred result
+                      end)
+
+
+            (* Produces the iterator (after pervasive arguments).
+               Adds predicate arguments and hands off to makeIterCore.
+
+               ctx: the context (including pervasives)
+               depth: the depth where this is all going (after pervasives)
+               (equivalently: the number of datatypes whose predicates are processed already)
+               cont: a continuation to apply to the result
+               dts': the datatypes still to be processed
+            *)
+            fun makeIter ctx depth cont dts' =
+               (case dts' of
+                   [] =>
+                      let
+                         val a' = X.weaken (X.forget a) depth
+
+                         val xresult as (result, _, _) =
+                            X.arrow
+                               (X.forget
+                                   (X.apps (xconstant constDt)
+                                       [
+                                       X.weaken univ (depth+1),
+                                       X.weaken a (depth+1),
+                                       X.weaken dcons (depth+1),
+                                       X.var 0 a'
+                                       ]))
+                               (X.univ (X.weaken univ (depth+1)))
+                               
+                         val (_, _, armsrev) =
+                            List.foldl
+                               (fns (_, args, _) (k, result', armsrev) =>
+                                   (k+1,
+                                    T.Sub (result', T.Dot (T.apply1 Prim.inr (T.Var 0), T.shift1)),
+                                    
+                                    X.weakenUnder
+                                       (makeIterPredBody k ctx depth 0
+                                           (T.Sub (result', T.Dot (T.apply1 Prim.inl (T.Var 0), T.shift1)))
+                                           args)
+                                       1 1
+                                    :: armsrev))
+                               (0, result, [])
+                               dts
+
+                         val fullpredicate =
+                            xcompact ctx $
+                            X.lamAll NONE a' (X.multicase (X.var 0 a') (List.rev armsrev) (X.weakenUnder xresult 1 1))
+                      in
+                         makeIterCore ctx depth 0 fullpredicate [] cont allcons
+                      end
+
+                 | (_, args, _) :: rest =>
+                      let
+                         val (pred_def, pred_t) =
+                            typeUnderIndexArguments false ctx depth 0 (X.shift depth) args
+                            (fns ctx' depth' numberOfArgs _ =>
+                                let
+                                   val (const, _, _, _, _, _) = Array.sub typeInfo depth
+                                   
+                                   val xspine =
+                                      natrecr numberOfPervasiveArgs
+                                         (fns i l => xvar (i + depth') ctx' :: l)
+                                         (natmapr numberOfArgs (fn i => xvar i ctx'))
+
+                                   val spine = 
+                                      natrecr numberOfVisibleArgs
+                                         (fns i l => T.App (T.Var (i + depth')) :: l)
+                                         (natmapr numberOfArgs (fn i => T.App (T.Var i)))
+                                in
+                                   (X.arrow
+                                       (X.forget (X.apps (X.constant const) xspine))
+                                       (X.univ (X.weaken univ depth')),
+          
+                                    T.apply2 Prim.arrow
+                                       (T.Elim (T.Const const, spine))
+                                       (T.apply1 Prim.univ (T.Sub (X.term univ, T.Shift depth'))))
+                                end)
+                                
+                         fun cont' (name, iter_def, iter_t) =
+                            cont
+                               (name,
+                                X.lamAll NONE pred_def iter_def,
+                                T.apply2 Prim.forall pred_t (T.Lam (NONE, iter_t)))
+                      in
+                         makeIter (pred_def :: ctx) (depth+1) cont' rest
+                      end)
+
+
+            val iters = makeIter xctxPers 0 (fn x => x) dts
+
+            val iterInfoList =
+               List.map
+                  (fn (dtname, iter_def, iter_t) =>
+                      let
+                         val name = Symbol.toValue dtname ^ "_iter"
+
+                         val const =
+                            define
+                               (Symbol.fromValue name)
+                               (wrap iter_def)
+                               (wraptp iter_t)
+                      in
+                         print "Iterator ";
+                         print name;
+                         print " defined.\n";
+
+                         (const, name)
+                      end)
+                  iters
+
+            val iterInfo = Array.fromList iterInfoList
+
+
+
+
+            (* 9. Compute the iterator reductions *)
+
+            val reductions' =
+               List.foldl
+                  (fns (const, _) d => CD.insert d const [R.unfold])
+                  (Susp.force reductions)
+                  iterInfoList
+
+            val () =
+               List.app
+                  (fn (i, j, name, conargs, numberOfConargs, _) =>
+                      let
+                         val (iterConst, constName) = Array.sub iterInfo i
+                         val (_, _, _, _, _, numberOfIndexArgs) = Array.sub typeInfo i
+                         val (conConst, _, _) = Array.sub conInfo j
+                         val diu = Susp.force dt_iter_unroll
+
+                         val iterParams = numberOfVisibleArgs + numberOfTypes + numberOfConstructors + numberOfIndexArgs
+                         val conParams = numberOfVisibleArgs + numberOfConargs
+
+                         val d = CD.insert reductions' conConst [R.unfold]
+                         
+                         val before =                           
+                            T.Elim (T.Const iterConst,
+                                    natrecr iterParams (fns i l => T.App (T.Var (i + conParams)) :: l)
+                                       [T.App (T.Elim (T.Const conConst,
+                                                       natrecr conParams (fns i l => T.App (T.Var i) :: l) []))])
+
+                         val (mid, r11) = reduction d before []
+
+                         val (_, r12) = reduction d (R.reduce diu mid) []
+
+                         val r1 = R.trans [r11, diu, r12]
+
+                         val (_, _, caseargs) =
+                            List.foldl
+                               (fns conarg (pos, s, caseargs) =>
+                                   (case conarg of
+                                       External _ =>
+                                          (pos-1, 
+                                           T.Idot (pos, s),
+                                           T.App (T.Var pos) :: caseargs)
+
+                                     | Internal (i', indices) =>
+                                          let
+                                             val (iterConst', _) = Array.sub iterInfo i'
+                                             val (_, _, _, _, _, numberOfIndexArgs') = Array.sub typeInfo i'
+
+                                             val iterParamsBeforeIndex = numberOfVisibleArgs + numberOfTypes + numberOfConstructors
+
+                                             val recarg =
+                                                T.Elim (T.Const iterConst',
+                                                        natrecr iterParamsBeforeIndex 
+                                                           (fns i l => T.App (T.Var (i + numberOfIndexArgs + conParams)) :: l)
+                                                           (List.map (fn (index, _, _, _) => T.App (T.Sub (index, s))) indices
+                                                            @ [T.App (T.Var pos)]))
+                                          in
+                                             (pos-1, s, T.App recarg :: T.App (T.Var pos) :: caseargs)
+                                          end))
+                               (numberOfConargs - 1, T.id, [])
+                               conargs
+
+                         val after =
+                            T.Elim (T.Var (numberOfConstructors - 1 - j + numberOfIndexArgs + conParams),
+                                    List.rev caseargs)
+
+                         val (_, r2) = reduction d after []
+
+                         val r =
+                            Reduction.new2 iterConst iterParams 0 conConst conParams after r1 r2
+                      in
+                         RR.register r;
+                         
+                         RR.write
+                            (Symbol.fromValue (String.concat [constName, "_", Symbol.toValue name]))
+                            (RR.fromUreduction2 r)
+                      end)
+                  allcons
+         in
+            close skeletonConst;
+            close subtermConst;
+            close subtermTransConst;
+            close subtermWellFoundedConst;
+
+            List.app 
+               (fn (const, _, stripConst, _, _, _) =>
+                   (
+                   close const;
+                   close stripConst
+                   )) 
+               typeInfoList;
+
+            List.app 
+               (fn (const, _, subtermConConst) => 
+                   (
+                   close const;
+                   close subtermConConst
+                   ))
+               conInfoList;
+
+            List.app (fn (const, _) => close const) iterInfoList
+         end
+
+
+
+      fun checkLibrariesLoaded () =
+         List.app
+            (fn (module, elem) =>
+                (case Namespace.resolveOpt (map Symbol.fromValue [module, elem]) of
+                    SOME _ => ()
+       
+                  | NONE =>
+                       signalDatatype (module ^ " library not loaded")))
+            (* doesn't really matter which element from the module we pick *)
+            [
+            ("Nat", "leq"),
+            ("Datatype", "dt")
+            ]
+
+
+      fun withHandler f =
+         try
+            f ()
+         with
+            exn as (Message.Error (_, msg)) =>
+               (
+               print msg;
+               raise exn
+               )
+
+
+      fun typedefRaw typedef = 
+         withHandler
+         (fn () =>
+             let
+                val () = ProverInternal.checkpoint ()
+    
+                val () = checkLibrariesLoaded ()
+             
+                val (goals, f) = reprocess (resolve typedef)
+    
+                do vs = ProverInternal.setGoals goals
+             in
+                withHandler (fn () => makeDatatype (f vs))
+             end)
+
+
+      fun typedef typedef = 
+         withHandler
+         (fn () =>
+             let
+                val () = ProverInternal.checkpoint ()
+    
+                val () = checkLibrariesLoaded ()
+    
+                val (goals, f) = reprocess (resolve typedef)
+    
+                val (goals', g) = TypecheckInternal.multigoalTypecheck goals
+             in
+                (case goals' of
+                    [] =>
+                       makeDatatype (f (g []))
+    
+                  | _ =>
+                       let
+                          do vs = ProverInternal.setGoals goals'
+                       in
+                          withHandler (fn () => makeDatatype (f (g vs)))
+                       end)
+             end)
+
+
+      fun write outf =
+         P.pickle 
+            outf
+            (P.list (P.pair (P.list PP.puConstant) puEnvironment))
+            (CR.deref theDatatypes)
+
+
+      fun read inf =
+         (case
+             P.unpickle
+                inf
+                (P.option (P.pair (P.list PP.puConstant) puEnvironment))
+          of
+             NONE => ()
+
+           | SOME (consts, env) =>
+                let
+                   val destructor' = destructor env
+                in
+                   List.app
+                      (fn const => ConstantTable.insert DE.destructTactics const destructor')
+                      consts;
+
+                   read inf
+                end)
+
+   end
+
+
+structure Datatype :> DATATYPE = DatatypeInternal
+
+
+structure ParseDatatype =
+   struct
+
+      fun id x = x
+      val none = NONE
+      val some = SOME
+      val null = []
+      fun sing x = [x]
+      fun cons x y = x :: y
+      fun append x y = x @ y
+
+      fun abindingAnnot xl a = map (fn x => (x, a)) xl
+
+      fun datatypeArgsIntersectForall args args' a = (args, args', a)
+      fun datatypeArgsIntersect args a = (args, [], a)
+      fun datatypeArgsForall args a = ([], args, a)
+      fun datatypeArgsNone m = ([], [], m)
+
+      fun paramForall args rest =
+         map (fn (x, a) => (SOME x, a)) args @ rest
+
+      fun paramArrow a rest =
+         (NONE, a) :: rest
+
+      fun dcon name a = (name, a)
+
+      fun dt name args dcons = (name, args, dcons)
+
+      fun datatypeDef (invis, args, univ) dts = (invis, args, univ, dts)
+
+   end
+
+
+(*
+
+An example of the syntax:
+
+typedef
+   intersect (i : level) .
+   forall (a : U i) .
+   U i
+of
+   tree : nat -> type =
+   | Empty : tree 0
+   | Node : forall (n : nat) . a -> forest n -> tree (succ n)
+
+   and
+   forest : nat -> type =
+   | Nil : forest 0
+   | Cons : forall (m n : nat) . tree m -> forest n -> forest (m + n)
+
+*)
+
+
+grammardef Datatype
+
+   open ParseDatatype
+
+   rule ABinding      ::= "(" Idents ":" Term ")" => abindingAnnot
+
+   rule ABindings     ::= => null
+   rule ABindings     ::= ABinding ABindings => append
+
+   rule DatatypeArgs  ::= "intersect" ABindings "." "forall" ABindings "." "U" Term => datatypeArgsIntersectForall
+   rule DatatypeArgs  ::= "intersect" ABindings "." "U" Term => datatypeArgsIntersect
+   rule DatatypeArgs  ::= "forall" ABindings "." "U" Term => datatypeArgsForall
+   rule DatatypeArgs  ::= "U" Level(1) => datatypeArgsNone
+
+   rule DtType        ::= "type" => null
+   rule DtType        ::= "forall" ABindings "." DtType => paramForall
+   rule DtType        ::= Term(1) "->" DtType => paramArrow
+
+   rule Constructor   ::= "|" Ident ":" Term => dcon
+
+   rule Constructors  ::= => null
+   rule Constructors  ::= Constructor Constructors => cons
+
+   rule Datatype      ::= Ident ":" DtType "=" Constructors => dt
+
+   rule Datatypes     ::= Datatype => sing
+   rule Datatypes     ::= Datatype "and" Datatypes => cons
+
+   rule Datatype      ::= "datatype" DatatypeArgs "of" Datatypes => datatypeDef
+
+end
+
+
+grammaron Datatype

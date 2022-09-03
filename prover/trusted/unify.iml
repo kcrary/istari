@@ -1,0 +1,1358 @@
+
+signature UNIFY =
+   sig
+
+      type term
+      type ebind
+      type sub
+      type psub
+
+      val unify : term -> term -> unit
+      val impossible : unit -> unit
+
+      val solve : unit -> bool
+      val solveUntidy : unit -> bool     (* doesn't rewind on unification failure *)
+
+      val unify1 : term -> term -> bool  (* unify followed by solve *)
+
+      val errorMessage : string ref
+
+
+      (* prune M p
+
+         returns SOME M[p] if M[p] is defined
+      *)
+      val prune : term -> psub -> term option
+
+
+      (* quickPrune M p
+
+         returns true if M[p] is defined
+      *)
+      val quickPrune : term -> psub -> bool
+
+
+      (* setEbindSub E s m  sets  E[s] := m, bool indicates success *)
+      val setEbindSub : ebind -> sub -> term -> bool
+
+   end
+
+
+functor UnifyFun (structure Term : TERM
+                  structure Constant : CONSTANT
+                                       where type constant = Term.constant
+                  structure Trail : TRAIL_PRIV
+                                    where type term = Term.term
+                                    where type ebind = Term.ebind
+                  structure Normalize : NORMALIZE
+                                        where type term = Term.term
+                  structure Invert : INVERT
+                                     where type term = Term.term
+                                     where type sub = Term.sub)
+   :> UNIFY
+      where type term = Term.term
+      where type ebind = Term.ebind
+      where type sub = Term.sub
+      where type psub = Invert.psub
+   =
+   struct
+
+      structure Term = Term
+      open Term
+      open Normalize
+      open Invert
+
+      structure D = RedBlackDict (structure Key = IntOrdered)
+
+      exception Unify
+
+      val errorMessage = ref ""
+
+
+
+      (* pruneEvar E s p
+      
+         binds E and returns M
+         such that M = E[s][p]
+      *)
+      fun pruneEvar e s p =
+         let
+            val p' = composeSubPsub s p
+            (* p' <= s o p *)
+
+            val (s', s'') = restriction p'
+            (* s' o p' = s'' and s'' is everywhere defined *)
+         in
+            (case s' of
+                Shift 0 =>
+                   (* s' = id, so s'' = p' <= s o p *)
+                   Sub (Evar e, s'')
+
+              | _ =>
+                   let
+                      val e' = evar ()
+                   in
+                      (* s'' = s' o p' <= s' o s o p
+                         but s'' isn't partial, so s'' = s' o s o p
+                         so E'[s''] = E'[s'][s][p]
+                      *)
+                      Trail.setEbind e (Sub (e', s'));
+                      Sub (e', s'')
+                   end)
+         end
+         
+
+
+      datatype boolish = NO | MAYBE | YES
+
+      (* masterPrune e d depth m p
+         
+         suppose e = ebindToInt E
+
+         if    m[p] is defined (i.e., contains no undefineds) and E does not occur in m[p]
+         then  returns m[p]
+               and
+               for every i such that i >= depth and i-depth in Range(d),
+                  if i appears in m[p], mark d(i-depth) with yes
+                  if i might appear in m[p], mark d(i-depth) with MAYBE if it's not already YES
+         else  raises Unify
+      *)
+      fun masterPrune e d depth m p = pruneWhnf e d depth (whnf m) p
+
+      and pruneWhnf e d depth m p =
+         (case m of
+             Elim (n, spine) =>
+                let
+                   val n' = pruneHead e d depth n p
+                   val spine' = pruneSpine e d depth spine p
+                in
+                   Elim (n', spine')
+                end
+
+           | Lam (b, m1) =>
+                let
+                   val m1' = masterPrune e d (depth+1) m1 (punder p)
+                in
+                   Lam (b, m1')
+                end
+
+           | Pair (m1, m2) =>
+                let
+                   val m1' = masterPrune e d depth m1 p
+                   val m2' = masterPrune e d depth m2 p
+                in
+                   Pair (m1', m2')
+                end
+
+           | Next m1 =>
+                let
+                   val m1' = masterPrune e d depth m1 p
+                in
+                   Next m1'
+                end
+
+           | Triv => m
+
+           | Marker _ => m
+
+           | _ =>
+                raise (Fail "should be whnf"))
+
+      (* m is a head or an intro (intro arises only in ill-typed cases) *)
+      and pruneHead e d depth m p =
+         (case m of
+             Var i =>
+                (case psubstVar i p of
+                    NONE =>
+                       (
+                       errorMessage := "scope violation";
+                       raise Unify
+                       )
+
+                  | SOME j => 
+                       (
+                       if j >= depth then
+                          (case D.find d (j-depth) of
+                              NONE => ()
+
+                            | SOME r => r := YES)
+                       else
+                          ();
+
+                       Var j
+                       ))
+
+           | Const _ => m
+
+           | Sub (Evar e', s) =>
+                (* whnf ensures evar is free *)
+                if e = ebindToInt e' then
+                   (* occurs check fails *)
+                   (
+                   errorMessage := "occurs check failure";
+                   raise Unify
+                   )
+                else
+                   (* mark variables in d *)
+                   let
+                      val m' = pruneEvar e' s p
+                   in
+                      if D.isEmpty d then
+                         ()
+                      else
+                         (* Mark variables in d that appear in m'.
+                            By construction we know that m' has the form
+                            E'[s'], where s' is made up from Idots and Shift.
+                         *)
+                         (case m' of
+                             Sub (Evar _, s') =>
+                                let
+                                   fun loop t =
+                                      (case t of
+                                          Shift k =>
+                                             let
+                                                val (_, d') = D.partitionlt d (k-depth)
+                                             in
+                                                D.app
+                                                   (fn (_, ref YES) => ()
+                                                     | (_, r) => r := MAYBE)
+                                                   d'
+                                             end
+   
+                                        | Idot (j, t') =>
+                                             (
+                                             if j >= depth then
+                                                (case D.find d (j-depth) of
+                                                    NONE => ()
+   
+                                                  | SOME (ref YES) => ()
+   
+                                                  | SOME r => r := MAYBE)
+                                             else
+                                                ();
+   
+                                             loop t'
+                                             )
+   
+                                        | _ =>
+                                             raise (Fail "impossible"))
+                                in
+                                   loop s'
+                                end
+   
+                           | _ =>
+                                raise (Fail "impossible"));
+
+                      m'
+                   end
+
+           | _ =>
+                (* By precondition this is an intro and intros are all in whnf.
+
+                   As it happens, this must be part of an ill-typed term.  One
+                   wishes we could just reject here, but ill-typed terms can
+                   appear within well-typed terms, so we have to deal with them.
+                *)
+                pruneWhnf e d depth m p)
+
+      and pruneSpine e d depth spine p =
+         pruneSpineLoop e d depth (List.rev spine) p []
+
+      (* expects spine in reverse order *)
+      and pruneSpineLoop e d depth spine p acc =
+         (case spine of
+             [] =>
+                acc
+
+           | App m :: rest =>
+                let
+                   val m' = masterPrune e d depth m p
+                in
+                   pruneSpineLoop e d depth rest p (App m' :: acc)
+                end
+
+           | elim :: rest =>
+                pruneSpineLoop e d depth rest p (elim :: acc))
+
+
+
+      fun prune m p =
+         try
+            SOME (masterPrune ~1 D.empty 0 m p)
+         with Unify => NONE
+
+
+
+      (* quick-prune: don't need to return the result (or check for occurrences) *)
+
+      fun quickPruneMain m p =
+         quickPruneWhnf (whnf m) p
+
+      (* m is in whnf, or m is a head *)
+      and quickPruneWhnf m p =
+         (case m of
+             Var i =>
+                (case psubstVar i p of
+                    NONE => raise Unify
+
+                  | SOME j => ())
+
+           | Const _ => ()
+
+           | Sub (Evar e, s) =>
+                (* whnf ensures evar is free *)
+                (* compare to pruneEvar *)
+                let
+                   val p' = composeSubPsub s p
+                   val (s', _) = restriction p'
+                in
+                   (case s' of
+                       Shift 0 =>
+                          ()
+
+                     | _ =>
+                          Trail.setEbind e (Sub (evar (), s')))
+                end
+                   
+           | Elim (h, spine) =>
+                (
+                quickPruneWhnf h p;
+                List.app
+                   (fn App n => quickPruneMain n p
+                     | _ => ())
+                   spine
+                )
+
+           | Lam (b, m1) =>
+                quickPruneMain m1 (punder p)
+
+           | Pair (m1, m2) =>
+                (
+                quickPruneMain m1 p;
+                quickPruneMain m2 p
+                )
+
+           | Next m1 =>
+                quickPruneMain m1 p
+
+           | Triv => ()
+
+           | Evar _ =>
+                raise (Fail "should be whnf or head")
+
+           | Sub _ =>
+                raise (Fail "should be whnf or head")
+
+           | Marker _ => ())
+
+
+      fun quickPrune m p =
+         let
+            val mark = Trail.mark ()
+         in
+            try
+               (quickPruneMain m p; true)
+            with Unify => (Trail.rewind mark; false)
+         end
+
+
+      fun isSoft opacity =
+         (case opacity of
+             Constant.SOFT => true
+           | Constant.FIRM => true
+           | _ => false)
+         
+
+
+      exception Different
+
+      fun sameMain m n = sameWhnf (whnf m) (whnf n)
+
+      (* m and n are both whnf, or they are both heads *)
+      and sameWhnf m n =
+         (case (m, n) of
+             (Elim (Var i, spine), Elim (Var j, spine')) =>
+                if i = j then
+                   sameSpineMain spine spine'
+                else
+                   raise Different
+
+           | (Elim (Const const, spine), Elim (Const const', spine')) =>
+                if Constant.eq (const, const') then
+                   sameSpineMain spine spine'
+                else if isSoft (Constant.opacity const) then
+                   sameWhnf (whnfHard m) n
+                else if isSoft (Constant.opacity const') then
+                   sameWhnf m (whnfHard n)
+                else
+                   raise Different
+
+           | (Elim (Sub (Evar e1, s1), spine1), Elim (Sub (Evar e2, s2), spine2)) =>
+                if eqEbind e1 e2 then
+                   (
+                   sameSubMain s1 s2;
+                   sameSpineMain spine1 spine2
+                   )
+                else
+                   raise Different
+
+           | (Elim (Var _, _), _) => raise Different
+
+           | (_, Elim (Var _, _)) => raise Different
+
+           | (Elim (Const const, _), _) =>
+                if isSoft (Constant.opacity const) then
+                   sameWhnf (whnfHard m) n
+                else
+                   raise Different
+
+           | (_, Elim (Const const, _)) =>
+                if isSoft (Constant.opacity const) then
+                   sameWhnf m (whnfHard n)
+                else
+                   raise Different
+
+           | (Elim (Sub _, _), _) => raise Different
+
+           | (_, Elim (Sub _, _)) => raise Different
+
+           | (Elim (m1, spine), Elim (n1, spine')) =>
+                (* We've eliminated all the cases in which m1 and n1 are heads,
+                   so m1 and n1 are intros but do not match their spines.
+                   (Thus m and n are ill-typed, but we still have to do something
+                   with them.)  Note that intros are whnfs.
+                *)
+                (
+                sameWhnf m1 n1;
+                sameSpineMain spine spine'
+                )
+
+           | (Lam (_, m'), Lam (_, n')) =>
+                sameMain m' n'
+
+           | (Pair (m1, m2), Pair (n1, n2)) =>
+                (
+                sameMain m1 n1;
+                sameMain m2 n2
+                )
+
+           | (Next m', Next n') =>
+                sameMain m' n'
+
+           | (Triv, Triv) => ()
+
+           | (Marker sym, Marker sym') =>
+                if Symbol.eq (sym, sym') then
+                   ()
+                else
+                   raise Different
+
+           | (Var _, _) =>
+                raise (Fail "should be whnf")
+
+           | (_, Var _) =>
+                raise (Fail "should be whnf")
+
+           | (Const _, _) =>
+                raise (Fail "should be whnf")
+
+           | (_, Const _) =>
+                raise (Fail "should be whnf")
+
+           | (Evar _, _) =>
+                raise (Fail "should be whnf")
+
+           | (_, Evar _) =>
+                raise (Fail "should be whnf")
+
+           | (Sub _, _) =>
+                raise (Fail "should be whnf")
+
+           | (_, Sub _) =>
+                raise (Fail "should be whnf")
+
+           | _ => raise Different)
+
+      and sameSpineMain spine spine' =
+         (case (spine, spine') of
+             ([], []) => ()
+
+           | (elim :: rest, elim' :: rest') =>
+                (
+                sameElim elim elim';
+                sameSpineMain rest rest'
+                )
+
+           | _ => raise Different)
+
+      and sameElim elim elim' =
+         (case (elim, elim') of
+             (App m, App n) => sameMain m n
+
+           | (Pi1, Pi1) => ()
+           | (Pi2, Pi2) => ()
+           | (Prev, Prev) => ()
+
+           | _ => raise Different)
+
+      and sameSubMain s t =
+         (case (s, t) of
+             (Shift i, Shift j) =>
+                if i = j then
+                   ()
+                else
+                   raise Different
+
+           | (Dot (m, s'), Dot (n, t')) =>
+                (
+                sameMain m n;
+                sameSubMain s' t'
+                )
+
+           | (Idot (i, s'), Idot (j, t')) =>
+                if i = j then
+                   sameSubMain s' t'
+                else
+                   raise Different
+
+           | (Dot (m, s'), Idot (j, t')) =>
+                (
+                sameMain m (Var j);
+                sameSubMain s' t'
+                )
+
+           | (Idot (i, s'), Dot (m, t')) =>
+                (
+                sameMain (Var i) m;
+                sameSubMain s' t'
+                )
+
+           | (Dot (m, s'), Shift i) =>
+                (
+                sameMain m (Var i);
+                sameSubMain s' (Shift (i+1))
+                )
+
+           | (Shift i, Dot (m, t')) =>
+                (
+                sameMain (Var i) m;
+                sameSubMain (Shift (i+1)) t'
+                )
+
+           | (Idot (i, s'), Shift j) =>
+                if i = j then
+                   sameSubMain s' (Shift (j+1))
+                else
+                   raise Different
+
+           | (Shift i, Idot (j, t')) =>
+                if i = j then
+                   sameSubMain (Shift (i+1)) t'
+                else
+                   raise Different)
+
+
+      fun sameSpine spine spine' =
+         try
+            (sameSpineMain spine spine'; true)
+         with Different => false
+
+
+      fun sameSub s t =
+         try
+            (sameSubMain s t; true)
+         with Different => false
+
+
+
+      (* collectSpine n s spine =
+          
+         if    spine = i1 ... ij
+         then  return SOME (n+j, ij . ... . i1 . s)
+         else  return NONE
+      *)
+      fun collectSpine n s spine =
+         (case spine of
+             [] => 
+                SOME (n, s)
+
+           | App m :: rest =>
+                (case whnf m of
+                    Elim (Var i, []) =>
+                       collectSpine (n+1) (Idot (i, s)) rest
+
+                  | _ => NONE)
+
+           | _ :: _ =>
+                (* We actually could handle the Prev case, but we would have to generalize a lot.
+                   However, we can't handle Pi1 and Pi2, and Prev alone doesn't seem worth the trouble.
+                *)
+                NONE)
+
+
+
+      (* pruneSpineEta c 0 sp p
+
+         if    sp = rev spine
+         then  n is the largest such that
+                  n <= c, and 
+                  spine = spine1 spine2, and 
+                  spine2[p] = n-1 ... 0
+               and
+               return (n, rev spine1)
+      *)
+      fun pruneSpineEta c i sp p =
+         if i = c then
+            (i, sp)
+         else
+            (case sp of
+                [] =>
+                   (i, sp)
+
+              | App m :: rest =>
+                   (case whnf m of
+                       Var j =>
+                          (case psubstVar j p of
+                              NONE =>
+                                 (i, sp)
+
+                            | SOME j' =>
+                                 if j' = i then
+                                    pruneSpineEta c (i+1) rest p
+                                 else
+                                    (i, sp))
+
+                     | _ =>
+                          (i, sp))
+
+              | _ :: _ =>
+                   (i, sp))
+
+
+      (* if    d(0) = NO, ..., d(i-1) = NO
+         then  return SOME n
+               where n is the largest such d(0)=NO, ..., d(n-1)=NO, and n=c or D(n)=YES
+         or    return NONE if no such n exists (i.e., a MAYBE is encountered before a YES)
+      *)
+      fun confirmEta c d i =
+         if i = c then
+            SOME i
+         else
+            (case ! (D.lookup d i) of
+                NO =>
+                   confirmEta c d (i+1)
+
+              | YES =>
+                   SOME i
+
+              | MAYBE =>
+                   NONE)
+
+
+      (* commonPrefix a i s1 s2
+
+         if    i <= a
+               the first a-i positions in s1 and s2 are Idots
+         then  return (i+b, s1', s2')
+               where
+               b is the largest such that i+b <= a and sk = j0 ... j_b-1 . sk' (for k = 1, 2)
+      *)
+      fun commonPrefix a i s1 s2 =
+         if i = a then
+            (i, s1, s2)
+         else
+            (case (s1, s2) of
+                (Idot (j1, s1'), Idot (j2, s2')) =>
+                   if j1 = j2 then
+                      commonPrefix a (i+1) s1' s2'
+                   else
+                      (i, s1, s2)
+
+              | _ =>
+                   (* By precondition, we know that common arguments will exhibit as Idots, not Shifts or Dots. *)
+                   (i, s1, s2))
+
+
+
+      fun iterateupLoop n f x i =
+         if i = n then
+            x
+         else
+            iterateupLoop n f (f i x) (i+1)
+
+      fun iterateup n f x = iterateupLoop n f x 0
+
+
+
+      val progress = ref false
+      val queue : (term * term) list ref = ref []
+
+      fun defer m n =
+         queue := (m, n) :: !queue
+
+
+      fun solveMain m n =
+         solveWhnf (whnf m) (whnf n)
+
+      and solveWhnf m n =
+         (case (m, n) of
+             (Elim (Var i, spine), Elim (Var j, spine')) =>
+                if i = j then
+                   (
+                   progress := true;
+                   solveSpine spine spine'
+                   )
+                else
+                   (
+                   errorMessage := "clash";
+                   raise Unify
+                   )
+
+           | (Elim (Const const, spine), Elim (Const const', spine')) =>
+                if Constant.eq (const, const') then
+                   (
+                   progress := true;
+                   solveSpine spine spine'
+                   )
+                else if isSoft (Constant.opacity const) then
+                   solveWhnf (whnfHard m) n
+                else if isSoft (Constant.opacity const') then
+                   solveWhnf m (whnfHard n)
+                else
+                   (
+                   errorMessage := "clash";
+                   raise Unify
+                   )
+
+           | (Elim (Sub (Evar e1, s1), spine1), Elim (Sub (Evar e2, s2), spine2)) =>
+                if eqEbind e1 e2 then
+                   (* flex-flex-same *)
+                   if sameSub s1 s2 andalso sameSpine spine1 spine2 then
+                      (* m and n are the same *)
+                      progress := true
+                   else
+                      (case collectSpine 0 s1 spine2 of
+                          NONE =>
+                             (* not in the pattern fragment *)
+                             defer m n
+
+                        | SOME (a, s1') =>
+                             (* a is the number of arguments E1 is given in M.
+                                for any L, (fn ..a times.. fn . L)[s1] spine1 = L[s1']
+                             *)
+                             (case collectSpine 0 s2 spine2 of
+                                 NONE =>
+                                    defer m n
+
+                               | SOME (a', s2') =>
+                                    (* a' is the number of arguments E2 is given in N.
+                                       for any L, (fn ..a' times.. fn . L)[s2] spine2 = L[s2']
+                                    *)
+                                    if a <> a' then
+                                       (* The same evar can't take two different numbers of arguments. *)
+                                       (
+                                       errorMessage := "incompatible spines in evar";
+                                       raise Unify
+                                       )
+                                    else if not (isPatternSub s1' andalso isPatternSub s2') then
+                                       defer m n
+                                    else
+                                       let
+                                          (* To avoid creating eta redices, take as few arguments as possible.
+
+                                             We just constructed s1' and s2' from spine1 and spine2, so we can determine
+                                             how much of spine1 and spine2's tail is in common by looking at s1' and s2'.
+                                          *)
+
+                                          val (b, s1'', s2'') = commonPrefix a 0 s1' s2'
+
+                                          (* si' = j0 . ... . j_b-1 . si''  (for i = 1, 2)
+                                             and b <= a
+
+                                             That means spinei = spinei' j_b-1 ... j0 (for some spinei')
+                                             with the js the same for both i.
+
+                                             We can eliminate those last b arguments from consideration.
+
+                                             So for any L, (fn ..a-b times.. fn . L)[si] spinei' = L[si''].
+                                          *)
+
+                                          val p1 =
+                                             (case invert s1'' of
+                                                 SOME p1 => p1
+
+                                               | NONE =>
+                                                    (* s1' is a pattern substitution, so s1'' must be *)
+                                                    raise (Fail "impossible"))
+
+                                          val p2 =
+                                             (case invert s2'' of
+                                                 SOME p2 => p2
+
+                                               | NONE =>
+                                                    (* s2' is a pattern substitution, so s2'' must be *)
+                                                    raise (Fail "impossible"))
+
+                                          (* p1 o s1'' <= id  and  p2 o s2'' <= id *)
+
+                                          val p =
+                                             (case intersection p1 p2 of
+                                                 NONE =>
+                                                    (* This can't happen in a well-formed constraint.
+
+                                                       Suppose E1 = E2 = fn ..a-b times.. fn . E
+                                                       Then    Ei[si] spinei' = E[si'']
+                                                       So E[s1''] and E[s2''] must have the same type.
+
+                                                       Suppose G |- E[s1''] : A
+                                                       and     G |- E[s2''] : A
+                                                       then    Gi |- E : Ai
+                                                               Ai[si''] = A
+                                                               G  |- si'' : Gi
+                                                       so      Gi |- pi : G
+                                                       
+                                                       But note that G1 = G2, so p1 and p2 must
+                                                       provide the same number of substitutions.
+                                                    *)
+                                                    (
+                                                    errorMessage := "evar in incompatible scopes";
+                                                    raise Unify
+                                                    )
+
+                                               | SOME p => p)
+
+                                          (* p <= p1, p2 *)
+
+                                          val (s, s') = restriction p
+
+                                          (* s o p = s'
+
+                                             so:
+                                             s' o si'' = s o p o si'' <= s o pi o si'' <= s o id = s
+                                             but s' o si'' is fully defined, so s' o si'' = s
+                                             
+                                             We bind:
+                                             E1 = E2 := fn ..a-b times.. fn . E[s']
+                                             for some fresh E
+
+                                             Then:
+                                               M
+                                             = E1[s1] spine1
+                                             = E1[s1] spine1' j_b-1 ... j_0
+                                             = (fn ..a-b times.. fn . E[s'])[s1] spine1' j_b-1 ... j_0
+                                             = E[s'][s1''] j_b-1 ... j_0
+                                             = E[s] j_b-1 ... j_0
+                                             = E[s'][s2''] j_b-1 ... j_0
+                                             = (fn ..a-b times.. fn . E[s'])[s2] spine2' j_b-1 ... j_0
+                                             = E2[s2] spine2' j_b-1 ... j_0
+                                             = E2[s2] spine2
+                                             = N
+                                          *)
+                                       in
+                                          progress := true;
+
+                                          Trail.setEbind e1
+                                             (iterateup (a-b)
+                                                 (fns _ l => Lam (NONE, l))
+                                                 (Sub (evar (), s')))
+                                       end))
+                else
+                   (* flex-flex-different *)
+                   (case 
+                       (case spine1 of
+                           [] => invert s1
+                         | _ => NONE)
+                    of
+                       SOME p =>
+                          let
+                             val n' = masterPrune (ebindToInt e1) D.empty 0 n p
+                          in
+                             progress := true;
+
+                             Trail.setEbind e1 n'
+                          end
+
+                     | NONE =>
+                          (case
+                              (case spine2 of
+                                  [] => invert s2
+                                | _ => NONE)
+                           of
+                              SOME p =>
+                                 let
+                                    val m' = masterPrune (ebindToInt e2) D.empty 0 m p
+                                 in
+                                    progress := true;
+
+                                    Trail.setEbind e2 m'
+                                 end
+
+                            | NONE =>
+                                 (case collectSpine 0 s1 spine2 of
+                                     NONE =>
+                                        (* not in the pattern fragment *)
+                                        defer m n
+                        
+                                   | SOME (a1, s1') =>
+                                        (case collectSpine 0 s2 spine2 of
+                                            NONE =>
+                                               defer m n
+                        
+                                          | SOME (a2, s2') =>
+                                               (* ai is the number of arguments Ei is given.
+                                                  for any L, (fn ..ai times.. fn . L)[si] spinei = L[si']
+                                               *)
+                                               if not (isPatternSub s1' andalso isPatternSub s2') then
+                                                  defer m n
+                                               else
+                                                  let
+                                                     val a = Int.min a1 a2
+                                                     
+                                                     (* To avoid creating eta redices, take as few arguments as possible.
+                        
+                                                        We just constructed s1' and s2' from spine1 and spine2, so we can determine
+                                                        how much of spine1 and spine2's tail is in common by looking at s1' and s2'.
+                                                     *)
+                        
+                                                     val (b, s1'', s2'') = commonPrefix a 0 s1' s2'
+                        
+                                                     (* si' = j0 . ... . j_b-1 . si''  (for i = 1, 2)
+                                                        and b <= a
+                        
+                                                        That means spinei = spinei' j_b-1 ... j0 (for some spinei')
+                                                        with the js the same for both i.
+                        
+                                                        We can eliminate those last b arguments from consideration.
+                        
+                                                        So for any L, (fn ..ai-b times.. fn . L)[si] spinei' = L[si''].
+                                                     *)
+                        
+                                                     val p1 =
+                                                        (case invert s1'' of
+                                                            SOME p1 => p1
+                        
+                                                          | NONE =>
+                                                               (* s1' is a pattern substitution, so s1'' must be *)
+                                                               raise (Fail "impossible"))
+                        
+                                                     (* p1 o s1'' <= id *)
+                        
+                                                     val (s, s') = restriction (composeSubPsub s2'' p1)
+                        
+                                                     (* s o (s2'' o p1) = s'
+                        
+                                                        so:
+                                                        s o (s2'' o p1) = s'
+                                                        s' o s1'' = s o (s2'' o p1) o s1'' <= s o s2''
+                                                        but s' o s1'' is fully defined, so s' o s1'' = s o s2''
+                                                        
+                                                        We bind:
+                                                        E1 := fn ..a1-b times.. fn . E[s']
+                                                        E2 := fn ..a2-b times.. fn . E[s]
+                                                        for some fresh E
+                                                        
+                                                        Then:
+                                                          M
+                                                        = E1[s1] spine1
+                                                        = E1[s1] spine1' j_b-1 ... j0
+                                                        = (fn ..a1-b times.. fn . E[s'])[s1] spine1' j_b_1 ... j0
+                                                        = E[s'][s1''] j_b-1 ... j0
+                                                        = E[s][s2''] j_b-1 ... j0
+                                                        = (fn ..a2-b times.. fn . E[s])[s2] spine2' j_b_1 ... j0
+                                                        = E2[s2] spine2' j_b-1 ... j0
+                                                        = E2[s2] spine2
+                                                        = N
+                                                     *)
+                        
+                                                     val e = evar ()
+                                                  in
+                                                     progress := true;
+                        
+                                                     Trail.setEbind e1
+                                                        (iterateup (a1-b)
+                                                            (fns _ l => Lam (NONE, l))
+                                                            (Sub (e, s')));
+                        
+                                                     Trail.setEbind e2
+                                                        (iterateup (a2-b)
+                                                            (fns _ l => Lam (NONE, l))
+                                                            (Sub (e, s)))
+                                                  end))))
+
+           | (Elim (Sub (Evar e, s), spine), _) =>
+                solveFlexRigid m e s spine n
+
+           | (_, Elim (Sub (Evar e, s), spine)) =>
+                (* This will turn the contraint around if we defer, but that probably doesn't matter. *)
+                solveFlexRigid n e s spine m
+
+           | (Elim (Const const, _), _) =>
+                if isSoft (Constant.opacity const) then
+                   solveWhnf (whnfHard m) n
+                else
+                   (
+                   errorMessage := "clash";
+                   raise Unify
+                   )
+
+           | (_, Elim (Const const, _)) =>
+                if isSoft (Constant.opacity const) then
+                   solveWhnf m (whnfHard n)
+                else
+                   (
+                   errorMessage := "clash";
+                   raise Unify
+                   )
+
+           | (Elim (Var _, _), _) =>
+                (
+                errorMessage := "clash";
+                raise Unify
+                )
+
+           | (_, Elim (Var _, _)) => 
+                (
+                errorMessage := "clash";
+                raise Unify
+                )
+
+           | (Elim (m1, spine), Elim (n1, spine')) =>
+                (* We've eliminated all the cases in which m1 and n1 are heads,
+                   so m1 and n1 are intros but do not match their spines.
+                   (Thus m and n are ill-typed, but we still have to do something
+                   with them.)  Note that intros are whnfs.
+                *)
+                (
+                solveWhnf m1 n1;
+                solveSpine spine spine'
+                )
+
+           | (Lam (_, m1), Lam (_, n1)) =>
+                (
+                progress := true;
+                solveMain m1 n1
+                )
+
+           | (Pair (m1, m2), Pair (n1, n2)) =>
+                (
+                progress := true;
+                solveMain m1 n1;
+                solveMain m2 n2
+                )
+
+           | (Next m1, Next n1) =>
+                (
+                progress := true;
+                solveMain m1 n1
+                )
+
+           | (Triv, Triv) =>
+                progress := true
+
+           | (Marker sym, Marker sym') =>
+                if Symbol.eq (sym, sym') then
+                   progress := true
+                else
+                   (
+                   errorMessage := "clash";
+                   raise Unify
+                   )
+
+           | (Var _, _) =>
+                raise (Fail "should be whnf")
+
+           | (_, Var _) =>
+                raise (Fail "should be whnf")
+
+           | (Const _, _) =>
+                raise (Fail "should be whnf")
+
+           | (_, Const _) =>
+                raise (Fail "should be whnf")
+
+           | (Evar _, _) =>
+                raise (Fail "should be whnf")
+
+           | (_, Evar _) =>
+                raise (Fail "should be whnf")
+
+           | (Sub _, _) =>
+                raise (Fail "should be whnf")
+
+           | (_, Sub _) =>
+                raise (Fail "should be whnf")
+
+           | _ =>
+                (
+                errorMessage := "clash";
+                raise Unify
+                ))
+
+
+      and solveSpine spine spine' =
+         (case (spine, spine') of
+             ([], []) => ()
+
+           | (elim :: rest, elim' :: rest') =>
+                (
+                solveElim elim elim';
+                solveSpine rest rest'
+                )
+
+           | _ => 
+                (
+                errorMessage := "incompatible spines";
+                raise Unify
+                ))
+
+
+      and solveElim elim elim' =
+         (case (elim, elim') of
+             (App m, App n) => solveMain m n
+
+           | (Pi1, Pi1) => ()
+           | (Pi2, Pi2) => ()
+           | (Prev, Prev) => ()
+
+           | _ =>
+                (
+                errorMessage := "elim clash";
+                raise Unify
+                ))
+
+         
+      (* solveFlexRigid M E s spine N
+
+         if    M = E[s] spine
+         then  attempts to unify M with N
+      *)
+      and solveFlexRigid m e s mspine n =
+         (case collectSpine 0 s mspine of
+             NONE =>
+                (* not in the pattern fragment *)
+                defer m n
+
+           | SOME (a, s') =>
+                (* a is the number of arguments E is given.
+                   for any L, (fn ..a times.. fn . L)[s] mspine = L[s']
+                *)
+                (case invert s' of
+                    NONE =>
+                       (* not in the pattern fragment *)
+                       defer m n
+
+                  | SOME p =>
+                       (* p o s' <= id
+
+                          if n[p] is defined we probably want to bind:
+                          E := fn ..a times.. fn . N[p]
+
+                          Then:
+                          M
+                          = E[s] mspine
+                          = (fn ..a times.. fn . N[p])[s] mspine
+                          = N[p][s']
+                          = N
+
+                          But before we make the binding, we have to ensure we aren't creating
+                          an eta redex.
+                       *)
+                       (case n of
+                           Elim (h, nspine) =>
+                              let
+                                 val (b, nspine1rev) = pruneSpineEta a 0 (List.rev nspine) p
+
+                                 (* nspine = nspine1 @ nspine2  
+                                    and  nspine2[p] = b-1 ... 0
+                                    and  b <= a
+                                    and  nspine1rev = rev nspine1
+                                 *)
+
+                                 (* Use references to detect variable appearances. *)
+
+                                 val d =
+                                    iterateup b
+                                       (fns i d => D.insert d i (ref NO))
+                                       D.empty
+
+                                 val h' = pruneHead (ebindToInt e) d 0 h p
+                                 val nspine1' = pruneSpineLoop (ebindToInt e) d 0 nspine1rev p []
+
+                                 (* n[p]
+                                    = (h nspine)[p]
+                                    = (h nspine1 nspine2)[p]
+                                    = h[p] nspine1[p] b-1 ... 0
+                                    = h' nspine1' b-1 ... 0
+
+                                    If b > 0 we have a potential eta redex, taking b arguments.
+                                    Now confirm those arguments don't appear in h' nspine1'.
+                                 *)
+                              in
+                                 (case confirmEta b d 0 of
+                                     NONE =>
+                                        (* We can't tell if this is an eta redex, since a variable
+                                           might or might not appear in the body.
+                                        *)
+                                        defer m n
+
+                                   | SOME c =>
+                                        (* n[p]
+                                          = h' nspine1' b-1 ... c c-1 ... 0
+                                          and c-1 ... 0 do not appear in h' nspine1'
+                                          (nor in b-1 ... c, obviously)
+
+                                          However, c does appear (or c=b), so the eta redex is no
+                                          larger.
+
+                                          So instead of binding:
+                                          E := fn ..a times.. fn . h' nspine1' b-1 ... 0
+
+                                          We bind:
+                                          E := fn ..a-c times.. fn . h' nspine1' b-1 ... c
+                                        *)
+                                        let
+                                           val n'' =
+                                              iterateup (a-c)
+                                                 (fns _ l => Lam (NONE, l))
+                                                 (Elim (h',
+                                                        nspine1'
+                                                        @
+                                                        iterateup c
+                                                           (fns i l => App (Var i) :: l)
+                                                           []))
+                                        in
+                                           progress := true;
+
+                                           Trail.setEbind e n''
+                                        end)
+                              end
+
+                         | _ =>
+                              (* This will clearly not create an eta redex, so do the simple thing. *)
+                              let
+                                 val n' = masterPrune (ebindToInt e) D.empty 0 n p
+
+                                 (* N' = N[p]
+                                    so (fn ..a times.. fn . N')[s] mspine = N'[s'] = N[p][s'] = N
+
+                                    Thus bind:
+                                    E := fn ..a times.. fn . N'
+                                 *)
+
+                                 val n'' =
+                                    iterateup a
+                                       (fns _ l => Lam (NONE, l)) 
+                                       n'
+                              in
+                                 progress := true;
+
+                                 Trail.setEbind e n''
+                              end)))
+
+
+
+      fun solveLoop l =
+         (
+         progress := false;
+         queue := [];
+
+         List.app (fn (m, n) => solveMain m n) l;
+
+         (case !queue of
+             [] => ()
+
+           | l' =>
+                if !progress then
+                   solveLoop (List.rev l')
+                else
+                   (
+                   errorMessage := "ambiguous unification";
+                   raise Unify
+                   ))
+         )
+
+
+
+      datatype constraints =
+         Possible of (term * term) list
+       | Impossible
+
+      val constraints = ref (Possible [])
+
+      fun unify m n =
+         constraints :=
+         (case !constraints of
+             Impossible => Impossible
+
+           | Possible l => Possible ((m, n) :: l))
+
+      fun impossible () = constraints := Impossible
+
+      fun solveUntidy () =
+         (case !constraints of
+             Impossible =>
+                (
+                constraints := Possible [];
+                false
+                )
+
+           | Possible c =>
+                (
+                constraints := Possible [];
+
+                try
+                   (
+                   solveLoop c;
+                   true
+                   )
+                with Unify =>
+                   (
+                   queue := [];  (* gc it *)
+                   false
+                   )
+                ))
+
+      fun solve () =
+         let
+            val mark = Trail.mark ()
+         in
+            if solveUntidy () then
+               true
+            else
+               (
+               Trail.rewind mark;
+               false
+               )
+         end
+
+
+      fun unify1 m n =
+         (
+         unify m n;
+         solve ()
+         )
+
+
+
+      (* Will fail if m contains e, or if s is not invertible. *)
+      fun setEbindSub e s m =
+         let
+            val mark = Trail.mark ()
+         in
+            (try
+                let
+                   val p =
+                      (case invert s of
+                          SOME p => p
+
+                        | NONE => raise Unify)
+
+                   val m' = masterPrune (ebindToInt e) D.empty 0 m p
+                in
+                   Trail.setEbind e m';
+                   true
+                end
+             with Unify => (Trail.rewind mark; false))
+         end
+
+   end

@@ -1,0 +1,404 @@
+
+signature IDENTICAL =
+   sig
+
+      type term = Term.term
+
+      val identical : term -> term -> bool
+
+      (* identicalPrefixSimp m n
+
+         if    m and n are simple
+         then  if    either m or n has an evar head
+               then  return NONE
+               else  return SOME spine  iff  m spine is identical to n
+      *)
+      val identicalPrefixSimp : term -> term -> Term.elim list option
+
+      (* (This doesn't actually deal with identicality, but it makes more sense
+         to put it here than in Unify.)
+
+         unifyPrefix m n
+
+         if    m is whnf, n is simple
+         then  if    neither m nor n has evar head
+                     n can be written as n' spine
+                     m unifies with n'
+               then  return SOME spine
+               else  return NONE
+      *)
+      val unifyPrefix : term -> term -> Term.elim list option
+
+   end
+
+
+structure Identical :> IDENTICAL =
+   struct
+
+      structure N = Normalize
+
+      open Term
+
+      exception NotIdentical
+
+      fun isSoft opacity =
+         (case opacity of
+             Constant.SOFT => true
+           | Constant.FIRM => true
+           | _ => false)
+
+
+      fun identicalMain m n sk =
+         identicalSimp (N.simplify m) (N.simplify n) sk
+
+      and identicalSimp m n sk =
+         (case (m, n) of
+             (Elim (Sub (Evar e, s), []), _) =>
+                Unify.setEbindSub e s n
+                andalso
+                sk ()
+
+           | (_, Elim (Sub (Evar e, s), [])) =>
+                Unify.setEbindSub e s m
+                andalso
+                sk ()
+
+           | (Elim (Sub (Evar e, s), spine), Elim (h, spine')) =>
+                let
+                   val l = List.length spine
+                   val l' = List.length spine'
+                in
+                   l' >= l
+                   andalso
+                   let
+                      val (front, back) = List.split spine' (l' - l)
+                   in
+                      Unify.setEbindSub e s (Elim (h, front))
+                      andalso
+                      identicalSpine spine back sk
+                   end
+                end
+
+           | (Elim (h, spine'), Elim (Sub (Evar e, s), spine)) =>
+                let
+                   val l = List.length spine
+                   val l' = List.length spine'
+                in
+                   l' >= l
+                   andalso
+                   let
+                      val (front, back) = List.split spine' (l' - l)
+                   in
+                      Unify.setEbindSub e s (Elim (h, front))
+                      andalso
+                      identicalSpine spine back sk
+                   end
+                end
+
+           | (Elim (Var i, spine), Elim (Var j, spine')) =>
+                i = j
+                andalso
+                identicalSpine spine spine' sk
+
+           | (Elim (Var _, _), _) => false
+           | (_, Elim (Var _, _)) => false
+
+           | (Elim (Const const, spine), Elim (Const const', spine')) =>
+                Constant.eq (const, const')
+                andalso
+                identicalSpine spine spine' sk
+
+           | (Elim (Const _, _), _) => false
+           | (_, Elim (Const _, _)) => false
+
+           | (Elim (m1, spine), Elim (n1, spine')) =>
+                (* m1 and n1 are intros, and hence simple *)
+                identicalSimp m1 n1 (fn () => identicalSpine spine spine' sk)
+
+           | (Lam (_, m1), Lam (_, n1)) =>
+                identicalMain m1 n1 sk
+
+           | (Pair (m1, m2), Pair (n1, n2)) =>
+                identicalMain m1 n1 (fn () => identicalMain m2 n2 sk)
+
+           | (Next m1, Next n1) =>
+                identicalMain m1 n1 sk
+
+           | (Triv, Triv) => sk ()
+
+           | (Marker sym, Marker sym') =>
+                (* Shouldn't really see these, but easy to handle them. *)
+                Symbol.eq (sym, sym')
+                andalso
+                sk ()
+
+           | _ => false)
+
+      and identicalSpine spine spine' sk =
+         (case (spine, spine') of
+             ([], []) => sk ()
+
+           | (App m :: rest, App n :: rest') =>
+                identicalMain m n (fn () => identicalSpine rest rest' sk)
+
+           | (Pi1 :: rest, Pi1 :: rest') =>
+                identicalSpine rest rest' sk
+
+           | (Pi2 :: rest, Pi2 :: rest') =>
+                identicalSpine rest rest' sk
+
+           | (Prev :: rest, Prev :: rest') =>
+                identicalSpine rest rest' sk
+
+           | _ => false)
+
+      fun identical m n = identicalMain m n (fn () => true)
+
+
+
+      fun identicalPrefixSpine spine spine' =
+         (case (spine, spine') of
+             ([], _) => SOME spine'
+
+           | (App m :: rest, App n :: rest') =>
+                if identical m n then
+                   identicalPrefixSpine rest rest'
+                else
+                   NONE
+
+           | (Pi1 :: rest, Pi1 :: rest') =>
+                identicalPrefixSpine rest rest'
+
+           | (Pi2 :: rest, Pi2 :: rest') =>
+                identicalPrefixSpine rest rest'
+
+           | (Prev :: rest, Prev :: rest') =>
+                identicalPrefixSpine rest rest'
+
+           | _ => NONE)
+
+
+      fun identicalPrefixSimp m n =
+         (case (m, n) of
+             (Elim (Sub _, _), _) => NONE
+
+           | (_, Elim (Sub _, _)) => NONE
+
+           | (Elim (Var i, spine), Elim (Var j, spine')) =>
+                if i = j then
+                   identicalPrefixSpine spine spine'
+                else
+                   NONE
+
+           | (Elim (Var _, _), _) => NONE
+           | (_, Elim (Var _, _)) => NONE
+
+           | (Elim (Const const, spine), Elim (Const const', spine')) =>
+                if Constant.eq (const, const') then
+                   identicalPrefixSpine spine spine'
+                else
+                   NONE
+
+           | (Elim (Const _, _), _) => NONE
+           | (_, Elim (Const _, _)) => NONE
+
+           | (Elim (m1, spine), Elim (n1, spine')) =>
+                (* m1 and n1 are intros, and hence simple *)
+                if identicalSimp m1 n1 (fn () => true) then
+                   identicalPrefixSpine spine spine'
+                else
+                   NONE
+
+           | (_, Elim (n1, spine)) =>
+                (* m and n1 are intros, and hence simple *)
+                if identicalSimp m n1 (fn () => true) then
+                   SOME spine
+                else
+                   NONE
+
+           | (Lam (_, m1), Lam (_, n1)) =>
+                if identical m1 n1 then
+                   SOME []
+                else
+                   NONE
+
+           | (Pair (m1, m2), Pair (n1, n2)) =>
+                if identical m1 n1 andalso identical m2 n2 then
+                   SOME []
+                else
+                   NONE
+
+           | (Next m1, Next n1) =>
+                if identical m1 n1 then
+                   SOME []
+                else
+                   NONE
+
+           | (Triv, Triv) => SOME []
+
+           | (Marker sym, Marker sym') =>
+                (* Shouldn't really see these, but easy to handle them. *)
+                if Symbol.eq (sym, sym') then
+                   SOME []
+                else
+                   NONE
+
+           | _ => NONE)
+                
+
+
+      fun unifyPrefixSpine spine spine' =
+         (case (spine, spine') of
+             ([], _) =>
+                SOME spine'
+
+           | (App m :: rest, App n :: rest') =>
+                if Unify.unify1 m n then
+                   unifyPrefixSpine rest rest'
+                else
+                   NONE
+
+           | (Pi1 :: rest, Pi1 :: rest') =>
+                unifyPrefixSpine rest rest'
+
+           | (Pi2 :: rest, Pi2 :: rest') =>
+                unifyPrefixSpine rest rest'
+
+           | (Prev :: rest, Prev :: rest') =>
+                unifyPrefixSpine rest rest'
+
+           | _ => NONE)
+
+
+      fun unifyPrefixMain m n mark =
+         (case (m, n) of
+             (Elim (Sub _, _), _) => NONE
+
+           | (_, Elim (Sub _, _)) => NONE
+
+           | (Elim (Var i, spine), Elim (Var j, spine')) =>
+                if i = j then
+                   unifyPrefixSpine spine spine'
+                else
+                   NONE
+
+           | (Elim (Const const, spine), Elim (Const const', spine')) =>
+                if Constant.eq (const, const') then
+                   unifyPrefixSpine spine spine'
+                else if isSoft (Constant.opacity const) then
+                   unifyPrefixMain (N.whnfHard m) n mark
+                else if isSoft (Constant.opacity const') then
+                   (case Constant.definition const' of
+                       SOME p =>
+                          unifyPrefixMain m (N.simplify (Elim (p, spine'))) mark
+
+                     | _ =>
+                          (* soft constants always have definitions *)
+                          raise (Fail "impossible"))
+                else
+                   NONE
+
+           | (_, Elim (Const const', spine')) =>
+                if isSoft (Constant.opacity const') then
+                   (case Constant.definition const' of
+                       SOME p =>
+                          unifyPrefixMain m (N.simplify (Elim (p, spine'))) mark
+
+                     | _ =>
+                          (* soft constants always have definitions *)
+                          raise (Fail "impossible"))
+                else
+                   NONE
+
+           | (_, Elim (h as Lam (_, n1), spine)) =>
+                if
+                   (case m of
+                       Elim (Const const, _) => isSoft (Constant.opacity const)
+                     | _ => false)
+                then
+                   unifyPrefixMain (N.whnfHard m) n mark
+                else if Unify.unify1 m h then
+                   SOME spine
+                else
+                   (
+                   Trail.rewind mark;
+                   (case spine of
+                       [] => 
+                          (* impossible with n simple *)
+                          raise (Fail "impossible")
+
+                     | App n2 :: rest =>
+                          unifyPrefixMain m 
+                             (N.simplify (Elim (Sub (n1, Dot (n2, id)), rest))) 
+                             mark
+
+                     | _ => NONE)
+                   )
+
+           | (_, Elim (h as Pair (n1, n2), spine)) =>
+                if
+                   (case m of
+                       Elim (Const const, _) => isSoft (Constant.opacity const)
+                     | _ => false)
+                then
+                   unifyPrefixMain (N.whnfHard m) n mark
+                else if Unify.unify1 m h then
+                   SOME spine
+                else
+                   (
+                   Trail.rewind mark;
+                   (case spine of
+                       [] =>
+                          raise (Fail "impossible")
+
+                     | Pi1 :: rest =>
+                          unifyPrefixMain m
+                             (N.simplify (Elim (n1, rest)))
+                             mark
+
+                     | Pi2 :: rest =>
+                          unifyPrefixMain m
+                             (N.simplify (Elim (n2, rest)))
+                             mark
+
+                     | _ => NONE)
+                   )
+
+           | (_, Elim (h as Next n1, spine)) =>
+                if
+                   (case m of
+                       Elim (Const const, _) => isSoft (Constant.opacity const)
+                     | _ => false)
+                then
+                   unifyPrefixMain (N.whnfHard m) n mark
+                else if Unify.unify1 m h then
+                   SOME spine
+                else
+                   (
+                   Trail.rewind mark;
+                   (case spine of
+                       [] =>
+                          raise (Fail "impossible")
+
+                     | Prev :: rest =>
+                          unifyPrefixMain m
+                             (N.simplify (Elim (n1, rest)))
+                             mark
+
+                     | _ => NONE)
+                   )
+
+           | _ =>
+                if Unify.unify1 m n then
+                   SOME []
+                else
+                   NONE)
+
+      fun unifyPrefix m n =
+         let
+            val mark = Trail.mark ()
+         in
+            unifyPrefixMain m n mark
+         end
+
+   end

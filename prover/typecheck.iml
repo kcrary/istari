@@ -1,0 +1,2693 @@
+
+signature TYPECHECK =
+   sig
+
+      type 'a tacticm = 'a Tactic.tacticm
+      type tactic = Tactic.tactic
+
+      datatype priority = Primary | Secondary
+
+
+      (* run typechecker on current goal *)
+      val typecheck : tactic
+
+      (* run typechecker on all subgoals *)
+      val withTypecheck : tactic -> tactic               
+
+      (* run typechecker on all secondary subgoals *)
+      val withTypecheckSnd : priority tacticm -> tactic
+
+      (* run typechecker for side-effects only *)
+      val inference : tactic
+
+      (* run typechecker on current goal for one layer only *)
+      val typecheck1 : tactic
+
+      (* infer the type of the indicated term *)
+      val inferRaw : ETerm.eterm -> Symbol.symbol option -> tactic
+      val infer : ETerm.eterm -> Symbol.symbol option -> tactic
+
+      val trace : bool ref
+
+   end
+
+
+signature TYPECHECK_INTERNAL =
+   sig
+
+      include TYPECHECK
+
+
+      (* Tactics can add hypotheses, but must not alter existing hypotheses. *)
+
+      val introTactics : tactic ConstantTable.table
+      val istpTactics : tactic ConstantTable.table
+      val eqtpTactics : tactic Constant2Table.table
+      val ofunivTactics : tactic ConstantTable.table
+      val equnivTactics : tactic Constant2Table.table
+      val ofkindTactics : tactic ConstantTable.table
+      val eqkindTactics : tactic Constant2Table.table
+      val subtypeTactics : tactic Constant2Table.table
+      val subtypeLeftTactics : tactic ConstantTable.table
+
+
+      val multigoalTypecheck :
+         Tactic.judgement list
+         -> Tactic.judgement list * (Refine.validation list -> Refine.validation list)
+
+   end
+
+
+
+(* The typechecking algorithm
+   --------------------------
+
+   I
+   A _typecheckable proposition_ has the form:
+   (M : C), (C : type), (C <: C'), (C = C' : type), or (C = C' : Ui)
+
+   The typechecker is invoked on all typecheckable goals that are
+   marked Secondary.
+
+
+   II.
+   Before we begin, we build a table containing all the typing
+   hypotheses.  A hypothesis qualifies for the table if is is of the
+   form:
+
+   forall A1 ... forall An . B
+
+   where B is a typecheckable proposition.
+
+
+   III
+   For goals of the form M : A, put M in basic whnf, and put A in hard whnf.
+   Then:
+
+   1. If A is level and M is an evar, set the goal aside for the level solver.
+
+   2. If M is unknown, defer.
+
+   3. If M has the form (manual M'), generate a subgoal and stop.
+
+   4. If the goal matches a hypothesis in the table, use it.
+
+   5. If M is a variable, attempt to unify its type with A, unless
+      its type is a universe.
+      (Not quite a special case of 8, since A might be intersect, etc.)
+
+   6. If A is known, use any applicable intro or formation rule.
+
+   7. If M is letnext, use the nondependent letnext rule.
+      (The special typing aspects of letnext mean that we cannot handle
+      it the same way as other open-scope elim forms.)
+
+   8. If M is a path then:
+
+      a. Infer the natural type for M, say B.
+
+      b. If M's natural type cannot be inferred because a prefix of its
+         type is an evar, defer.
+
+      c. If B is not of the form Ui, attempt to unify A and B.
+         (Special case of d, but avoids extra subgoals.)
+
+      d. Prove B <: A.
+
+   9. Reject
+
+
+   IV
+   For goals of the form A : type, put A in basic whnf.  Then:
+
+   1. If A is unknown, defer.
+
+   2. If A has the form (manual A'), generate a subgoal and stop.
+
+   3. If the goal matches a hypothesis in the table, use it.
+
+   4. If A is a variable and its sort is type or Ui, then accept.
+
+   5. If A is known, use any applicable formation rule.
+
+   6. Prove A : Ui for fresh i.
+
+
+   V
+   For goals of the form A <: B, put A and B in hard whnf.  Then:
+
+   1. If B is Ui, then:
+
+      a. Attempt to unify A with Uj, for fresh j.
+      
+      b. Prove j <= i and i, j : level
+
+   2. Unify A and B if possible.  If successful, prove A : type.
+
+   3. If the goal matches a hypothesis in the table, use it.
+
+   4. Use any applicable subtyping rule.
+
+   5. Prove A = B : type.
+
+
+   VI
+   For goals of the form A = B : type, put A and B in hard whnf.
+   Then:
+
+   1. Unify A and B if possible.  If successful, prove A : type.
+
+   2. If the goal matches a hypothesis in the table, use it.
+
+   3. Use any applicable type equality rule.
+
+   4. Prove A = B : Ui for unknown i.
+
+
+   VII
+   For goals of the form A = B : Ui, put A and B in hard whnf.  Then:
+
+   1. Unify A and B if possible.  If successful, prove A : Ui.
+
+   2. If the goal matches a hypothesis in the table, use it.
+
+   3. Use any applicable type equality rule.
+
+   4. Try compatibility.
+
+   5. Reject.
+
+
+   VIII
+   For goals of the form A = B : Ki, put A and B in hard whnf.  Then:
+
+   1. Unify A and B if possible.  If successful, prove A : Ki.
+
+   2. If the goal matches a hypothesis in the table, use it.
+
+   3. Use any applicable type equality rule.
+
+   4. Try compatibility.
+
+   5. Reject.
+
+*)
+
+
+structure TypecheckInternal :> TYPECHECK_INTERNAL =
+   struct
+
+      structure D = Directory
+      structure J = Judgement
+      structure N = Normalize
+      structure R = Reduction
+      structure RT = RuleTactic
+      structure S = Seq
+      structure T = Term
+      structure U = Unify
+      
+      open Tactic
+      open CasePervasive
+      exception Backtrack = Case.Backtrack
+
+      datatype priority = Primary | Secondary
+
+      val showPrefixed = Show.showPrefixed
+
+
+
+      (*** Typechecking tables ***)
+      
+      structure H = ConstantTable
+      structure H2 = Constant2Table
+
+      val introTactics : tactic H.table = H.table ()
+      val istpTactics : tactic H.table = H.table ()
+      val eqtpTactics : tactic H2.table = H2.table ()
+      val ofunivTactics : tactic H.table = H.table ()
+      val equnivTactics : tactic H2.table = H2.table ()
+      val ofkindTactics : tactic H.table = H.table ()
+      val eqkindTactics : tactic H2.table = H2.table ()
+      val subtypeTactics : tactic H2.table = H2.table ()
+      val subtypeLeftTactics : tactic H.table = H.table ()
+
+
+
+
+      (*** Tactic manipulation ***)
+
+      fun valcons first rest vs =
+         let
+            val (v, vs') = first vs
+         in
+            v :: rest vs'
+         end
+
+
+      (* precondition: |tacs| = |goals| *)
+      fun andthenloop tacs goals acc fk sk =
+         (case (tacs, goals) of
+             (nil, nil) =>
+                sk (List.rev acc, (fn vs => vs), fk)
+
+           | (tac :: tacs, (_, subgoal) :: rest) =>
+                let
+                   do (subgoals, validate, fk') = tac subgoal fk
+
+                   do (allgoals, valrest, fk'') =
+                      andthenloop tacs rest (List.revAppend subgoals acc) fk'
+                in
+                   sk (allgoals, valcons validate valrest, fk'')
+                end
+
+           | _ =>
+                raise (Fail "precondition1"))
+
+
+      extension ExecuteSuccess of (Message.label * judgement) list
+      extension ExecuteFailure
+
+      fun execute tac goal fk sk =
+         (case
+             tac goal
+                (fn _ => ExecuteFailure)
+                (fn (subgoals, _, _) => ExecuteSuccess subgoals)
+          of
+             ExecuteSuccess subgoals => sk subgoals
+           | ExecuteFailure => fk ()
+           | _ => raise (Fail "impossible"))
+
+         
+
+
+      (*** Destinations ***)
+
+      type destination = tactic ref
+
+      val bogus : tactic = lift (fn () => raise (Fail "unfilled destination"))
+
+      fun newdest () : destination = ref bogus
+
+      fun play d goal fk sk = !d goal fk sk
+
+
+
+
+      (*** Error reporting ***)
+
+      type history = judgement list
+
+      fun bracketNumberString i =
+         if i < 10 then
+            String.concat ["[  ", Int.toString i, "]  "]
+         else if i < 100 then
+            String.concat ["[ ", Int.toString i, "]  "]
+         else
+            String.concat ["[", Int.toString i, "]  "]
+         
+      fun printHistLoop i hist fullsize dir =
+         (case hist of
+             [] => ()
+
+           | (jud, _) :: rest =>
+                let
+                   val size = S.length (J.context jud)
+                in
+                   showPrefixed (bracketNumberString i) dir (T.Sub (J.concl jud, T.Shift (fullsize - size)));
+                   printHistLoop (i+1) rest fullsize dir
+                end)
+
+
+      fun errorDetail history msg details () =
+         let
+            val (ctx, dir) =
+               (case history of
+                   (jud, dir) :: _ => (J.context jud, dir)
+
+                 | [] =>
+                      (* This shouldn't happen, but in case something goes wrong,
+                         we don't want the error handling code to fail.
+                      *)
+                      (S.empty, D.empty))
+
+            val fullsize = S.length ctx
+         in
+            print msg;
+            print "\n";
+
+            details ();
+
+            print "\nwith history:\n";
+            printHistLoop 0 history fullsize dir;
+            print "\n"
+         end
+
+
+      fun error history msg details =
+         idtacM $
+         Message.addDetail
+            (Message.fromString "undischarged typing obligation")
+            (errorDetail history ("Type error: " ^ msg) details)
+
+      fun nonerror history (jud, dir) =
+         idtacM $
+         Message.addDetail
+            (Message.fromString "undischarged typing obligation")
+            (errorDetail history "Non-typechecking typing obligation" (fn () => ()))
+
+      fun unprocessed history (jud, dir) =
+         idtacM $
+         Message.addDetail
+            (Message.fromString "undischarged typing obligation")
+            (errorDetail history "Unprocessed level constraint" (fn () => ()))
+
+      fun badgoalError history (jud, dir) =
+         error history "ill-formed typechecking goal" (fn () => ())
+
+      fun unboundError history i =
+         error history "unbound variable"
+         (fn () =>
+             (
+             print "Index ";
+             print (Int.toString i);
+             print " is out of range.\n"
+             ))
+
+      fun inferDetail dir m aopt () =
+         (
+         showPrefixed "in: " dir m;
+         
+         (case aopt of
+             NONE => ()
+
+           | SOME a =>
+                (
+                print "principal subterm has type:\n";
+                showPrefixed "    " dir a
+                ))
+         )
+
+      fun inferError history dir m aopt msg =
+         error history ("inference failed: " ^ msg)
+         (inferDetail dir m aopt)
+
+      
+
+
+      (*** A rough-and-ready categorization of terms. ***
+
+         We can't categorize them more finely than this, because there might be evars
+         anywhere but the root, so only the root is stable.
+      *)
+
+      datatype pseudohead =
+         (* DeBruijn level, not a deBruijn index, so it's invariant over
+            extending the context.  Counting from 1 because the math is
+            easier.
+         *)
+         Pvar of int
+
+       | Pconst of Constant.constant
+       | Plam
+       | Ppair
+       | Pnext
+       | Ptriv
+       | Pweird
+
+      (* sz is the size of the context in which m lives *)
+      fun pseudohead sz m =
+         (case N.simplify m of
+             T.Elim (T.Var i, _) => Pvar (sz - i)
+           | T.Elim (T.Const const, _) => Pconst const
+
+           | T.Lam _ => Plam
+           | T.Pair _ => Ppair
+           | T.Next _ => Pnext
+           | T.Triv => Ptriv
+
+           | _ => Pweird)
+
+      structure PHO :> ORDERED where type t = pseudohead =
+         struct
+
+            type t = pseudohead
+
+            fun eq pses =
+               (case pses of
+                   (Pvar i, Pvar j) => i = j
+      
+                 | (Pconst const, Pconst const') => Constant.eq (const, const')
+      
+                 | (Plam, Plam) => true
+                 | (Ppair, Ppair) => true
+                 | (Pnext, Pnext) => true
+                 | (Ptriv, Ptriv) => true
+                 | (Pweird, Pweird) => true
+      
+                 | _ => false)
+
+            fun compare pses =
+               (case pses of
+                   (Pvar i, Pvar j) => Int.compare i j
+                 | (Pvar _, _) => LESS
+                 | (_, Pvar _) => GREATER
+
+                 | (Pconst const, Pconst const') => Constant.Ordered.compare (const, const')
+                 | (Pconst _, _) => LESS
+                 | (_, Pconst _) => GREATER
+
+                 | (Plam, Plam) => EQUAL
+                 | (Plam, _) => LESS
+                 | (_, Plam) => GREATER
+
+                 | (Ppair, Ppair) => EQUAL
+                 | (Ppair, _) => LESS
+                 | (_, Ppair) => GREATER
+
+                 | (Pnext, Pnext) => EQUAL
+                 | (Pnext, _) => LESS
+                 | (_, Pnext) => GREATER
+
+                 | (Ptriv, Ptriv) => EQUAL
+                 | (Ptriv, _) => LESS
+                 | (_, Ptriv) => GREATER
+
+                 | (Pweird, Pweird) => EQUAL)
+
+         end
+
+      structure PD =
+         ListDict
+         (structure Key =
+             PairOrdered
+                (structure Ordered1 = IntOrdered
+                 structure Ordered2 = PHO))
+      
+
+
+
+      (*** Tabling ***)
+
+      val tabOv = 0
+      val tabIstp = 1
+      val tabSubtype = 2
+      val tabEqtp = 3
+      val tabEquniv = 4
+      val tabEqkind = 5
+      val tabPositive = 6
+      val tabLleq = 7
+
+
+      (* not checkpointed *)
+      structure H' = HashTable (structure Key = Constant.Hashable)
+
+      (* matcher returns the classifier (e.g., tabOv) and the key term *)
+      val tabledConstants : (T.elim list, unit, int * T.term) Case.matcher H'.table = H'.table 23
+
+      val zilch = T.Marker (Symbol.fromValue "")
+
+      val () =
+         List.app
+            (fn (const, x) => H'.insert tabledConstants const x)
+            (parseMatchClauses
+             /
+                \Prim.ov\ _ ? => \fnc m => (tabOv, m)\
+
+              | \Prim.istp\ ? => \fnc a => (tabIstp, a)\
+
+              | \Prim.subtype\ ? _ => \fnc a => (tabSubtype, a)\
+
+              | \Prim.eqtp\ ? _ => \fnc a => (tabEqtp, a)\
+
+              | \Prim.eq\ @
+                   ($ap (\Prim.univ\ _) $ap ? $ap _ $nil => \fnc a => (tabEquniv, a)\
+                    |
+                    $ap (\Prim.kind\ _) $ap ? $ap _ $nil => \fnc a => (tabEqkind, a)\ )
+
+              | \Prim.lleq\ ? _ => \fnc i => (tabLleq, i)\
+
+              | \Prim.positive\ (fn . ?) =>
+                \fnc a =>
+                    (* a is under a binder, so we have to unshift it *)
+                    (tabPositive, T.Sub (a, T.Dot (zilch, T.id)))\
+             /)
+                        
+
+      type entry = int * T.term * T.term list * T.term
+      type table = entry list PD.dict
+
+      (* Each table entry has the form (sz, C, [A1 ... An], B), meaning:
+
+         If    G = G1, G2 where |G1| = sz
+         then  G1(0) = C = forall A1 ... An . B
+      *)
+
+
+      fun insertTable d tab ps x =
+         (case ps of
+             Pweird => d
+
+           | ps => 
+                PD.insertMerge d (tab, ps) [x] (fn l => x :: l))
+
+      (* buildTableLoop sz G2 table =
+
+         if    sz = |G|
+               G = G1, G2
+         then  adds the material in G2 to the table
+      *)
+      fun buildTableLoop sz ctx table =
+         (case S.expose ctx of
+             S.Nil => table
+
+           | S.Cons (J.Tm c, rest) =>
+                let
+                   (* n = |al| *)
+                   fun innerloop n al a =
+                      termCaseX a
+                      /
+                       | \Prim.forall\ ? (fn . ?) =>
+                         \fnc ai a' =>
+                             innerloop (n+1) (ai :: al) a'\
+
+                       | $as const? @ ? =>
+                         \(fnc b const spine =>
+                              (case H'.find tabledConstants const of
+                                  NONE =>
+                                     buildTableLoop (sz-1) rest table
+ 
+                                | SOME matcher =>
+                                     Case.spineCaseX spine
+                                     (Case.alt
+                                         [
+                                         Case.wrap matcher
+                                         (fn (tab, key) =>
+                                             if
+                                                (case key of
+                                                    T.Elim (T.Var j, _) => j < n
+  
+                                                  | _ => false)
+                                             then
+                                                (* the head variable is bound within this hypothesis *)
+                                                buildTableLoop (sz-1) rest table
+                                             else
+                                                let
+                                                   val entry = (sz, c, List.rev al, b)
+     
+                                                   val table' =
+                                                      insertTable table tab
+                                                         (pseudohead (sz-1+n) key)
+                                                         entry
+                                                in
+                                                   buildTableLoop (sz-1) rest table'
+                                                end),
+  
+                                         Case.wrap Case.wild
+                                         (fn () =>
+                                             buildTableLoop (sz-1) rest table)
+                                         ])))\
+
+                       | _ => 
+                         \(fnc => buildTableLoop (sz-1) rest table)\
+                      /
+                in
+                   innerloop 0 [] c
+                end
+
+           | S.Cons (_, rest) =>
+                buildTableLoop (sz-1) rest table)
+                          
+
+      fun buildTable jud =
+         let
+            val ctx = J.context jud
+         in
+            buildTableLoop (S.length ctx) ctx PD.empty
+         end
+
+
+      fun extendTable oldsz jud table =
+         let
+            val ctx = J.context jud
+            val cursz = Seq.length ctx
+
+            val newctx = Seq.take ctx (cursz-oldsz)
+         in
+            buildTableLoop cursz newctx table
+         end
+      
+
+      (* instantiateLoop a args tac
+
+         if    tac partially proves G |- A
+               A = forall A1 ... An . B
+               args = [N1 ... Nn]
+         then  returns tac'
+               where
+               tac' proves G |- B[Nn .. N1 . id]
+               with subgoals: tac's subgoals then G |- Nj : Aj[Nj-1 ... N1 . id]
+      *)
+      fun instantiateLoop a args tac =
+         (case args of
+             [] => tac
+
+           | n :: rest =>
+                (case N.simplify a of
+                    T.Elim (T.Const const, [T.App dom, T.App codlam]) =>
+                       (case N.simplify codlam of
+                           T.Lam (_, cod) =>
+                              instantiateLoop (T.Sub (cod, T.Dot (n, T.id))) rest
+                                 (* G |- Cod[N . id] *)
+                                 (refine (Rule.forallElim dom cod n)
+                                  >>> [
+                                      (* G |- forall Dom . Cod *)
+                                      tac,
+
+                                      (* G |- N : Dom *)
+                                      idtac
+                                      ])
+
+                         | _ =>
+                              raise (Fail "precondition2"))
+
+                  | _ => raise (Fail "precondition3")))
+
+
+      (* instantiate a newsz args
+
+         if    G(0) = A = forall A1 ... An . B
+               length G' = newsz
+               args = [N1 ... Nn]
+         then  returns tac
+               where
+               tac proves G, G' |- B[Nn ... N1 . ^newsz+1]
+               with subgoals G, G' |- Nj : Aj[Nj-1 ... N1 . ^newsz+1]
+      *)
+      fun instantiate a newsz args =
+         (* G, G' |- B[Nn ... N1 . ^newsz+1]
+                   = B[under_n ^newsz+1][Nn ... N1 . id]
+         *)
+         instantiateLoop (T.Sub (a, T.Shift (newsz+1))) args
+            (* G, G' |- A[^newsz+1] *)
+            (refine (Rule.hypothesis newsz))
+
+
+      (* lookup table tab key G A prove
+
+         Using the table and (tab, key) attempts to prove G |- A.
+
+         Calls prove C M to generate tactics proving G |- M : C.
+      *)
+      fun lookup table tab key ctx aim prove =
+         let
+            val cursz = S.length ctx
+         in
+            (case PD.find table (tab, pseudohead cursz key) of
+                NONE => NONE
+   
+              | SOME entries =>
+                   List.findmap
+                      (fn (oldsz, c, args, b) =>
+                          let
+                             val newsz = cursz - oldsz
+
+                             val s =
+                                List.foldl
+                                   (fns _ s => T.Dot (T.evar (), s))
+                                   (T.Shift (newsz+1))
+                                   args
+                          in
+                             if Unify.unify1 aim (T.Sub (b, s)) then
+                                let
+                                   (* only do this after the check, since the check will usually fail *)
+
+                                   fun loop argsr s actuals tacs =
+                                      (case (argsr, s) of
+                                          ([], T.Shift _) => (actuals, tacs)
+   
+                                        | (a :: rest, T.Dot (e, s')) =>
+                                             let
+                                                val subtac =
+                                                   prove (T.Sub (a, s')) e
+                                             in
+                                                loop rest s' (e :: actuals) (subtac :: tacs)
+                                             end
+   
+                                        | _ =>
+                                             raise (Fail "impossible"))
+   
+                                   val (actuals, tacs) =
+                                      loop (List.rev args) s [] []
+
+                                   val tac =
+                                      instantiate c newsz actuals
+                                      >>> tacs
+                                in
+                                   SOME tac
+                                end
+                             else
+                                NONE
+                          end)
+                      entries)
+         end
+
+
+
+
+      (*** Obligations ***)
+
+      val trace = ref false
+
+      datatype problem =
+         Of
+       | Istp
+       | Subtype
+       | Eqtp
+       | Equniv
+       | Eqkind
+       | Eqrefl
+       | Positive
+       | Lleq
+
+      type obligation = problem * table * judgement * destination * history
+
+
+      datatype 'a tri = YES of 'a | NO | BAD
+
+      fun isTypecheckingGoal jud =
+         termCaseX (J.concl jud)
+         /[
+             \Prim.ov\ @
+                ($ap _ $ap _ $nil => \fnc => YES Of\
+                 | _ => \fnc => BAD\ )
+
+           | \Prim.istp\ @
+                ($ap _ $nil => \fnc => YES Istp\
+                 | _ => \fnc => BAD\ )
+
+           | \Prim.subtype\ @
+                ($ap _ $ap _ $nil => \fnc => YES Subtype\
+                 | _ => \fnc => BAD\ )
+
+           | \Prim.eqtp\ @
+                ($ap _ $ap _ $nil => \fnc => YES Eqtp\
+                 | _ => \fnc => BAD\ )
+
+           | \Prim.eq\ @
+                ($ap (\Prim.univ\ _)
+                    ($ap _ $ap _ $nil => \fnc => YES Equniv\
+                     | _ => \fnc => BAD\ )
+                 |
+                 $ap (\Prim.kind\ _)
+                    ($ap _ $ap _ $nil => \fnc => YES Eqkind\
+                     | _ => \fnc => BAD\ )
+                 |
+                 $ap _ $ap ? $ap ? $nil =>
+                 \(fnc m n =>
+                      if Unify.unify1 m n then
+                         YES Eqrefl
+                      else
+                         NO)\
+                 |
+                 _ => \fnc => BAD\ )
+
+           | \Prim.lleq\ @
+                ($ap _ $ap _ $nil => \fnc => YES Lleq\
+                 | _ => \fnc => BAD\ )
+
+           | \Prim.positive\ @
+                ($ap (fn . _) $nil => \fnc => YES Positive\
+                 | _ => \fnc => BAD\ )
+          ]
+         
+          | _ =>
+            \fnc => NO\
+         /
+                     
+
+      
+      fun wf (jud, dir) =
+         (J.make (J.context jud) (T.apply1 Prim.istp (J.concl jud)), dir)
+
+
+
+      fun assumption jud =
+         contextCaseX (J.context jud)
+         / 
+          | $anyhyp ($tm $unify \J.concl jud\ => \fnc => fn i => SOME i\ )
+          | _ => \fnc => NONE\
+         /
+
+
+      fun processSubgoals oldsz table history goals =
+         List.foldr
+            (fns (_, goal as (jud, dir)) (obs, tacs) =>
+                let
+                   val dest = newdest ()
+                   val table' = extendTable oldsz jud table
+
+                   val (obs', tac) =
+                      (case isTypecheckingGoal jud of
+                          NO =>
+                             (case assumption jud of
+                                 SOME i =>
+                                    ([], refine (Rule.hypothesis i))
+
+                               | NONE =>
+                                    ([(Istp, table', wf goal, dest, history)],
+                                     nonerror (goal :: history) goal))
+
+                        | YES prob =>
+                             ([(prob, table', goal, dest, history)],
+                              play dest)
+
+                        | BAD =>
+                             ([], badgoalError (goal :: history) goal))
+                in
+                   (obs' @ obs, tac :: tacs)
+                end)
+            ([], [])
+            goals
+                 
+      val progress = ref true
+
+      (* obligations to resolve *)
+      val queue : obligation list ref = ref []
+
+      (* obligations that we deferred; try them again if we make progress *)
+      val deferred : obligation list ref = ref []
+
+      (* level constraints, solve these last *)
+      val constraints : (table * judgement * destination * history) list ref = ref []
+
+      val noqueue = ref false
+
+      fun enqueue obs =
+         if !noqueue then
+            List.app (fn (_, _, _, dest, _) => dest := idtac) obs
+         else
+            (
+            if !trace then
+               List.app
+                  (fn (_, _, (jud, dir), _, _) =>
+                      showPrefixed "enqueueing " dir (J.concl jud))
+                  obs
+            else
+               ();
+
+            queue := obs @ !queue
+            )
+
+      fun defer (prob, table, goal, dest, history) =
+         (* avoid duplicating the history's head *)
+         deferred := (prob, table, goal, dest, List.tl history) :: !deferred
+
+      (* NB!  When we put a tactic into the destination that accompanies a goal,
+         we know that that the tactic will be applied to an equivalent goal.
+         However, we do NOT know that it will be applied to the same instance of
+         that goal.  Consequently, we cannot reuse validations without a cast.
+      *)
+
+
+      fun tryRule table history tac (goal as (jud, _)) dest fk =
+         let
+            val sz = Seq.length (J.context jud)
+            do subgoals = execute tac goal fk
+
+            val (obs, tacs) = processSubgoals sz table history subgoals
+         in
+            progress := true;
+            enqueue obs;
+
+            (* We can't reuse tac's results without a cast, and it's
+               probably cheaper (and definitely easier) just to run
+               it again.
+            *)
+            dest := (tac >>> tacs)
+         end
+
+
+      (* immediate table history tab key goal pretac
+
+         table: the table
+         history: the current history
+         tab: the classifier for the portion of the table we need (e.g., tabOv)
+         key: a key to look up in the table
+         goal: what we're trying to prove
+         dest: a destination into which to place the proof
+         pretac: a tactic to run before the table's tactic (e.g., for symmetry)
+      *)
+      fun immediate table history tab key (jud, dir) dest pretac =
+         let
+            val ctx = J.context jud
+            
+            val r = ref []
+
+            fun prove a m =
+               let
+                  val subdest = newdest ()
+
+                  val subgoal =
+                     (Of, table, 
+                      (J.make ctx (T.apply2 Prim.ov a m), dir),
+                      subdest, history)
+               in
+                  r := subgoal :: !r;
+                  play subdest
+               end
+         in
+            (case lookup table tab key ctx (J.concl jud) prove of
+                NONE => false
+
+              | SOME tac =>
+                   (
+                   progress := true;
+                   enqueue (List.rev (!r));
+                   dest := (pretac >> tac);
+                   true
+                   ))
+         end
+
+
+
+
+      (*** Of checking ***)
+
+      fun typecheckOf table (goal as (jud, dir)) dest history =
+         let
+            val ctx = J.context jud
+
+            val (a, m) =
+               (case N.simplify (J.concl jud) of
+                   T.Elim (_, [T.App a, T.App m]) => (N.whnfHard a, N.whnfBasic m)
+
+                 | _ => raise (Fail "precondition4"))
+         in
+            term2CaseX a m
+            /
+             | (* 1. If A is level and M is an evar, set aside. *)
+               \Prim.level\ ; evar? =>
+               \fnc _ =>
+                   constraints := (table, goal, dest, history) :: !constraints\
+
+               (* 2. If M is unknown, defer. *)
+             | _ ; evar? =>
+               \fnc _ =>
+                   defer (Of, table, goal, dest, history)\
+
+               (* 3. If M is marked manual, stop. *)
+             | _ ; \Prim.manual\ _ =>
+               \fnc =>
+                   (
+                   progress := true;
+                   
+                   dest :=
+                      (
+                      (* G |- manual M : A *)
+                      refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 1])))
+                      (* G |- M : A *)
+                      >>
+                      idtacM (Message.fromString "manual typing obligation")
+                      )
+                   )\
+   
+               (* 4. Look in the table. *)
+             | _ =!>
+               \fnc =>
+                   if immediate table history tabOv m goal dest idtac then
+                      ()
+                   else
+                      raise Backtrack\
+   
+               (* 5. If M is a variable, use its type. *)
+             | _ ; var? =!>
+               \fnc i =>
+                   (case S.nthOpt ctx i of
+                       NONE =>
+                          dest := unboundError history i
+   
+                     | SOME (J.Tm b) =>
+                          termCaseX b
+                          /
+                           | \Prim.univ\ _ =>
+                             \fnc => raise Backtrack\
+
+                           | _ =>
+                             \fnc =>
+                                 if U.unify1 (T.Sub (b, T.Shift (i+1))) a then
+                                    (
+                                    progress := true;
+                                    
+                                    dest := refine (Rule.hypothesisOf i)
+                                    )
+                                 else
+                                    raise Backtrack\
+                          /
+
+                     | SOME _ =>
+                          raise Backtrack)\
+
+               (* 6a. Use a formation rule. *)
+             | \Prim.univ\ _ ; const? @ _ =!>
+               \fnc const =>
+                   (case H.find ofunivTactics const of
+                       SOME tac =>
+                          tryRule table history tac goal dest
+                          (fn () =>
+                              dest :=
+                                 error history "ill-formed type expression"
+                                 (fn () =>
+                                     (
+                                     showPrefixed "  expected: " dir a;
+                                     showPrefixed "expression: " dir m;
+                                     print "\n"
+                                     )))
+
+                     | NONE => raise Backtrack)\
+
+               (* 6b. Use a kind formation rule. *)
+             | \Prim.kind\ _ ; const? @ _ =!>
+               \fnc const =>
+                   (case H.find ofkindTactics const of
+                       SOME tac =>
+                          tryRule table history tac goal dest
+                          (fn () =>
+                              dest :=
+                                 error history "ill-formed kind expression"
+                                 (fn () =>
+                                     (
+                                     showPrefixed "  expected: " dir a;
+                                     showPrefixed "expression: " dir m;
+                                     print "\n"
+                                     )))
+
+                     | NONE => raise Backtrack)\
+
+               (* 6c. Use an intro rule. *)
+             | const? @ _ ; _ =!>
+               \fnc const =>
+                   (case H.find introTactics const of
+                       SOME tac =>
+                          tryRule table history tac goal dest
+                          (fn () => raise Backtrack)
+
+                     | NONE => raise Backtrack)\
+
+               (* 7. Letnext *)
+             | _ ; \Prim.letnext\ ? (fn ? . ?) =>
+               \fnc m1 binder m2 =>
+                   let
+                      val e = T.evar ()
+
+                      val goal1 =
+                         (* G |- M1 : future E *)
+                         (J.make ctx (T.apply2 Prim.ov (T.apply1 Prim.future e) m1), dir)
+
+                      val goal2 =
+                         (* G, later E |- M2 : A[^] *)
+                         (J.make 
+                             (Seq.cons (J.Tml e) ctx)
+                             (T.apply2 Prim.ov (T.Sub (a, T.shift1)) m2),
+                          D.bindVary dir binder)
+
+                      val goal3 =
+                         (* promote G |- E : type *)
+                         (J.make (Seq.map J.promote ctx) (T.apply1 Prim.istp e), dir)
+
+                      val dest1 = newdest ()
+                      val dest2 = newdest ()
+                      val dest3 = newdest ()
+                   in
+                      progress := true;
+
+                      dest :=
+                         (
+                         (* G |- letnext M1 (fn . M2) : A *)
+                         refine (Rule.futureElimOfLetnextNondep e a m1 m2)
+                         >>> [
+                             (* promote G |- E : type *)
+                             play dest3,
+
+                             (* G |- M : future E *)
+                             play dest1,
+
+                             (* G, later E |- M2 : A[^] *)
+                             play dest2
+                             ]
+                         );
+
+                      enqueue
+                         [(Of, table, goal1, dest1, history),
+                          (Of, table, goal2, dest2, history),
+                          (Istp, table, goal3, dest3, history)]
+                   end\
+
+               (* 8. Infer. *)
+             | _ =>
+               \fnc =>
+                   let
+                      val r = ref []
+                      val oldsz = Seq.length ctx
+
+                      fun prove subjud binders =
+                         let
+                            val subgoal = (subjud, D.bindsVary dir binders)
+                            val subdest = newdest ()
+                            val table' = extendTable oldsz subjud table
+                         
+                            val (obs, tac) =
+                               (case isTypecheckingGoal subjud of
+                                   NO =>
+                                      (case assumption subjud of
+                                          SOME i =>
+                                             ([], refine (Rule.hypothesis i))
+
+                                        | NONE =>
+                                             ([(Istp, table', wf subgoal, subdest, history)],
+                                              nonerror (subgoal :: history) subgoal))
+
+                                 | YES prob =>
+                                      ([(prob, table', subgoal, subdest, history)],
+                                       play subdest)
+
+                                 | BAD => ([], badgoalError (subgoal :: history) subgoal))
+
+                         in
+                            r := obs @ !r;
+                            tac
+                         end
+                   in
+                      try
+                         let
+                            val (b, mbtac) =
+                               (* may raise exceptions, handled below *)
+                               Infer.infer ctx m prove
+
+                            (* mbtac proves G |- M : B *)
+
+                            val () = enqueue (List.rev (!r))
+  
+                            val isuniv =
+                               (case a of
+                                   T.Elim (T.Const const, _) =>
+                                      Constant.eq (const, Prim.univ)
+
+                                 | _ => false)
+                         in
+                            if not isuniv andalso Unify.unify1 a b then
+                               (
+                               progress := true;
+                               dest := mbtac
+                               )
+                            else
+                               let
+                                  val dest' = newdest ()
+     
+                                  val goal' =
+                                     (* G |- B <: A *)
+                                     (J.make ctx (T.apply2 Prim.subtype b a), dir)
+     
+                                  val matac =
+                                     (* G |- M : A *)
+                                     refine (Rule.subsumptionOf b a m)
+                                     >>> [
+                                         (* G |- B <: A *)
+                                         play dest',
+
+                                         (* G |- M : B *)
+                                         mbtac
+                                         ]
+                               in
+                                  progress := true;
+                                  dest := matac;
+                                  enqueue [(Subtype, table, goal', dest', history)]
+                               end
+                         end
+                      with
+                         Infer.InferError (m', aopt, msg) =>
+                            dest := inferError history dir m' aopt msg
+
+                       | Infer.Ambiguous =>
+                            (* 8b. a strict prefix of M's type is an evar, defer *)
+                            defer (Of, table, goal, dest, history)
+
+                       | Infer.NotPath msg =>
+                            (* 9. M is not a path.  Reject. *)
+                            (
+                            enqueue (List.rev (!r));
+                            
+                            dest :=
+                               error history ("cannot infer type: " ^ msg)
+                               (fn () =>
+                                   (
+                                   showPrefixed "expected: " dir a;
+                                   showPrefixed "    term: " dir m
+                                   ))
+                            )
+                   end\
+            /
+         end
+
+
+
+
+      (*** Istp checking ***)
+
+      fun typecheckIstp table (goal as (jud, dir)) dest history =
+         let
+            val ctx = J.context jud
+
+            val a =
+               (case N.simplify (J.concl jud) of
+                   T.Elim (_, [T.App a]) => N.whnfBasic a
+
+                 | _ => raise (Fail "precondition5"))
+         in
+            termCaseX a
+            /
+               (* 1. If A is unknown, defer. *)
+             | evar? =>
+               \fnc _ =>
+                   defer (Istp, table, goal, dest, history)\
+
+               (* 2. If A is marked manual, stop. *)
+             | \Prim.manual\ _ =>
+               \fnc =>
+                   (
+                   progress := true;
+                   
+                   dest :=
+                      (* G |- manual A : type *)
+                      refine (Rule.reduce (R.within [1] (R.trans [R.unfold, R.beta 1])))
+                      (* G |- A : type *)
+                   )\
+
+               (* 3. Look in the table. *)
+             | _ =!>
+               \fnc =>
+                   if immediate table history tabIstp a goal dest idtac then
+                      ()
+                   else
+                      raise Backtrack\
+   
+               (* 4. If A is a variable, use its binding. *)
+             | var? =!>
+               \fnc i =>
+                   (case S.nthOpt ctx i of
+                       NONE =>
+                          dest := unboundError history i
+   
+                     | SOME J.Tp =>
+                          (
+                          progress := true;
+
+                          dest := refine (Rule.hypothesisOfTp i)
+                          )
+
+                     | SOME (J.Tm b) =>
+                          termCaseX b
+                          /
+                           | \Prim.univ\ ? =>
+                             \fnc u =>
+                                 (
+                                 progress := true;
+
+                                 dest :=
+                                    (
+                                    (* G |- i : type *)
+                                    refine (Rule.univForgetOf (T.evar ()) (T.Sub (u, T.Shift (i+1))))
+                                    >>
+                                    (* G |- i : U u[^i+1] *)
+                                    refine (Rule.hypothesisOf i)
+                                    )
+                                 )\
+
+                           | _ =>
+                             \fnc => raise Backtrack\
+                          /
+
+                     | _ =>
+                          raise Backtrack)\
+
+               (* 5. Use a formation rule. *)
+             | $as const? @ ? =!>
+               \fnc a const spine =>
+                   (
+                   if Constant.eq (const, Prim.ov) then
+                      (* To prove (M : B) : type, we need M : B.  The usual rule below will
+                         check that.  But we might be okay with M : A failing.  The problem
+                         is, when it fails it often does so without meaningfully engaging with
+                         B, which isn't very useful.  So we'll enqueue B : type explicitly.
+
+                         Really should do this only when necessary.
+                      *)
+                      (case spine of
+                          [T.App b, _] =>
+                             let
+                                val goal' =
+                                   (J.make ctx (T.apply1 Prim.istp b), dir)
+                             in
+                                enqueue [(Istp, table, goal', newdest (), history)]
+                             end
+
+                        | _ =>
+                             (* This is an ill-formed of.  It's about to fail badly. *)
+                             ())
+                   else
+                      ();
+
+                   (case H.find istpTactics const of
+                       SOME tac =>
+                          tryRule table history tac goal dest
+                          (fn () =>
+                              dest :=
+                                 error history "ill-formed type expression"
+                                 (fn () =>
+                                     (
+                                     print      "  expected: type\n";
+                                     showPrefixed "expression: " dir a;
+                                     print "\n"
+                                     )))
+
+                     | NONE => raise Backtrack)
+                   )\
+
+               (* 6. Try a universe. *)
+             | _ =>
+               \fnc =>
+                   let
+                      val e = T.evar ()
+                      val dest' = newdest ()
+                      
+                      val goal' = (J.make ctx (T.apply2 Prim.ov (T.apply1 Prim.univ e) a), dir)
+                   in
+                      progress := true;
+
+                      dest :=
+                         (
+                         (* G |- A : type *)
+                         refine (Rule.univForgetOf (T.evar ()) e)
+                         >>
+                         (* G |- A : U e *)
+                         play dest'
+                         );
+
+                      enqueue [(Of, table, goal', dest', history)]
+                   end\
+            /
+         end
+
+   
+
+
+      (*** Subtype checking ***)
+                      
+      fun typecheckSubtype table (goal as (jud, dir)) dest history =
+         let
+            val ctx = J.context jud
+
+            val (a, b) =
+               (case N.simplify (J.concl jud) of
+                   T.Elim (_, [T.App a, T.App b]) => (N.whnfHard a, N.whnfHard b)
+
+                 | _ => raise (Fail "precondition6"))
+         in
+            term2CaseX a b
+            /
+               (* 1. If B is Ui... *)
+             | _ ; \Prim.univ\ ? =>
+               \fnc u =>
+                   let
+                      val e = T.evar ()
+                   in
+                      (* 1a. Unify a with U e *)
+                      if U.unify1 a (T.apply1 Prim.univ e) then
+                         let
+                            val goal1 =
+                               (J.make ctx (T.apply2 Prim.ov (T.Const Prim.level) e),
+                                dir)
+
+                            val goal2 =
+                               (J.make ctx (T.apply2 Prim.ov (T.Const Prim.level) u),
+                                dir)
+
+                            val goal3 =
+                               (J.make ctx (T.apply2 Prim.lleq e u),
+                                dir)
+
+                            val dest1 = ref $ lift (fn () => raise (Fail "dest1"))
+                            val dest2 = ref $ lift (fn () => raise (Fail "dest2"))
+                            val dest3 = ref $ lift (fn () => raise (Fail "dest3"))
+                         in
+                            progress := true;
+
+                            dest :=
+                               (
+                               (* G |- Ue <: Uu *)
+                               refine (Rule.univSub e u)
+                               >>> [
+                                   (* G |- e : level *)
+                                   play dest1,
+   
+                                   (* G |- u : level *)
+                                   play dest2,
+   
+                                   (* G |- lleq e u *)
+                                   play dest3
+                                   ]
+                               );
+
+                            (* 1b. Prove e <= u, and e, u : level. *)
+                            constraints :=
+                               (table, goal1, dest1, history) ::
+                               (table, goal2, dest2, history) ::
+                               (table, goal3, dest3, history) ::
+                               !constraints
+                         end
+                      else
+                         dest :=
+                            error history "cannot establish subtype"
+                            (fn () =>
+                                (
+                                print "expected: universe\n  actual: ";
+                                Show.showIndent 10 dir a;
+                                print "\n"
+                                ))
+                   end\
+                             
+               (* 2. Unify A and B. *)
+             | _ =!>
+               \fnc =>
+                   if U.unify1 a b then
+                      let
+                         val goal' =
+                            (J.make ctx (T.apply1 Prim.istp a), dir)
+                         
+                         val dest' = newdest ()
+                      in
+                         progress := true;
+
+                         dest :=
+                            (
+                            (* G |- A <: A *)
+                            refine (Rule.subtypeRefl (T.evar ()))
+                            >>
+                            (* G |- A : type *)
+                            play dest'
+                            );
+
+                         enqueue [(Istp, table, goal', dest', history)]
+                      end
+                   else
+                      raise Backtrack\
+
+               (* 3. Look in the table. *)
+             | _ =!>
+               \fnc =>
+                   if immediate table history tabSubtype a goal dest idtac then
+                      ()
+                   else
+                      raise Backtrack\
+
+               (* 4a. Use a subtyping rule. *)
+             | const? @ _ ; const? @ _ =!>
+               \fnc const1 const2 =>
+                   (case H2.find subtypeTactics (const1, const2) of
+                       SOME tac =>
+                          tryRule table history tac goal dest
+                          (fn () =>
+                              dest :=
+                                 error history "unexpected subtyping failure"
+                                 (fn () =>
+                                     (
+                                     showPrefixed " first: " dir a;
+                                     showPrefixed "second: " dir b;
+                                     print "\n"
+                                     )))
+
+                     | NONE => raise Backtrack)\
+
+               (* 4b. Use a left-indexed subtyping rule. *)
+             | const? @ _ ; _ =!>
+               \fnc const =>
+                   (case H.find subtypeLeftTactics const of
+                       SOME tac =>
+                          tryRule table history tac goal dest
+                          (fn () =>
+                              dest :=
+                                 error history "unexpected subtyping failure"
+                                 (fn () =>
+                                     (
+                                     showPrefixed " first: " dir a;
+                                     showPrefixed "second: " dir b;
+                                     print "\n"
+                                     )))
+
+                     | NONE => raise Backtrack)\
+
+               (* 5. Try A = B : type *)
+             | _ =>
+               \fnc =>
+                   let
+                      val dest' = newdest ()
+                      val goal' = (J.make ctx (T.apply2 Prim.eqtp a b), dir)
+                   in
+                      progress := true;
+
+                      dest :=
+                         (
+                         (* G |- A <: B *)
+                         refine (Rule.subtypeReflEqtype a b)
+                         >>
+                         (* G |- A = B : type *)
+                         play dest'
+                         );
+
+                      enqueue [(Eqtp, table, goal', dest', history)]
+                   end\
+            /
+         end
+                          
+                   
+
+
+      (*** Eqtype checking ***)
+                      
+      fun typecheckEqtp table (goal as (jud, dir)) dest history =
+         let
+            val ctx = J.context jud
+
+            val (a, b) =
+               (case N.simplify (J.concl jud) of
+                   T.Elim (_, [T.App a, T.App b]) => (N.whnfHard a, N.whnfHard b)
+
+                 | _ => raise (Fail "precondition7"))
+         in
+            term2CaseX a b
+            /
+               (* 1. Unify A and B. *)
+             | _ =!>
+               \fnc =>
+                   if U.unify1 a b then
+                      let
+                         val goal' =
+                            (J.make ctx (T.apply1 Prim.istp a), dir)
+                         
+                         val dest' = newdest ()
+                      in
+                         progress := true;
+
+                         dest :=
+                            (
+                            (* G |- A = A : type *)
+                            refine (Rule.eqtpRefl (T.evar ()))
+                            >>
+                            (* G |- A : type *)
+                            play dest'
+                            );
+
+                         enqueue [(Istp, table, goal', dest', history)]
+                      end
+                   else
+                      raise Backtrack\
+
+               (* 2. Look in the table. *)
+             | _ =!>
+               \fnc =>
+                   if
+                      immediate table history tabEqtp a goal dest idtac
+                   then
+                      ()
+                   else if
+                      immediate table history tabEqtp b goal dest
+                         (lift (fn () => refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))))
+                   then
+                      ()
+                   else
+                      raise Backtrack\
+
+               (* 3. Use a type equality rule. *)
+             | const? @ _ ; const? @ _ =!>
+               \fnc const1 const2 =>
+                   (case H2.find eqtpTactics (const1, const2) of
+                       SOME tac =>
+                          tryRule table history tac goal dest
+                          (fn () =>
+                              dest :=
+                                 error history "unexpected type equality failure"
+                                 (fn () =>
+                                     (
+                                     print      "classifier: type\n";
+                                     showPrefixed "     first: " dir a;
+                                     showPrefixed "    second: " dir b;
+                                     print "\n"
+                                     )))
+
+                     | NONE => raise Backtrack)\
+
+               (* 4. Try A = B : Ui *)
+             | _ =>
+               \fnc =>
+                   let
+                      val e = T.evar ()
+
+                      val dest' = newdest ()
+                      val goal' = 
+                         (J.make ctx (T.apply3 Prim.eq (T.apply1 Prim.univ e) a b), dir)
+                   in
+                      progress := true;
+
+                      dest :=
+                         (
+                         (* G |- A = B : type *)
+                         refine (Rule.univForgetEq a b e)
+                         >>
+                         (* G |- A = B : U e *)
+                         play dest'
+                         );
+
+                      enqueue [(Equniv, table, goal', dest', history)]
+                   end\
+            /
+         end
+
+
+
+
+      (*** Equniv/Eqkind checking ***)
+
+      fun typecheckEqX tactics tab table (goal as (jud, dir)) dest history =
+         let
+            val ctx = J.context jud
+ 
+            val (class, a, b) =
+               (case N.simplify (J.concl jud) of
+                   T.Elim (_, [T.App class, T.App a, T.App b]) => 
+                      (class, N.whnfHard a, N.whnfHard b)
+
+                 | _ => raise (Fail "precondition8"))
+         in
+            term2CaseX a b
+            /
+               (* 1. Unify A and B. *)
+             | _ =!>
+               \fnc =>
+                   if U.unify1 a b then
+                      let
+                         val goal' =
+                            (J.make ctx (T.apply2 Prim.ov class a), dir)
+                         
+                         val dest' = newdest ()
+                      in
+                         progress := true;
+
+                         dest :=
+                            (
+                            (* G |- A = A : Class *)
+                            refine (Rule.eqRefl (T.evar ()) (T.evar ()))
+                            >>
+                            (* G |- A : Class *)
+                            play dest'
+                            );
+
+                         enqueue [(Of, table, goal', dest', history)]
+                      end
+                   else
+                      raise Backtrack\
+
+               (* 2. Look in the table. *)
+             | _ =!>
+               \fnc =>
+                   if
+                      immediate table history tab a goal dest idtac
+                   then
+                      ()
+                   else if
+                      immediate table history tab b goal dest
+                         (lift (fn () => refine (Rule.eqSymm (T.evar ()) (T.evar ()) (T.evar ()))))
+                   then
+                      ()
+                   else
+                      raise Backtrack\
+
+               (* 3. Use a type equality rule. *)
+             | const? @ _ ; const? @ _ =!>
+               \fnc const1 const2 =>
+                   (case H2.find tactics (const1, const2) of
+                       SOME tac =>
+                          tryRule table history tac goal dest
+                          (fn () =>
+                              dest :=
+                                 error history "unexpected type equality failure"
+                                 (fn () =>
+                                     (
+                                     showPrefixed "classifier: " dir class;
+                                     showPrefixed "     first: " dir a;
+                                     showPrefixed "    second: " dir b;
+                                     print "\n"
+                                     )))
+
+                     | NONE => raise Backtrack)\
+
+               (* 4. Compatibility *)
+             | _ =>
+               \fnc =>
+                   let
+                      val r = ref []
+                      val oldsz = Seq.length ctx
+
+                      fun prove subjud binders =
+                         let
+                            val subgoal = (subjud, D.bindsVary dir binders)
+                            val subdest = newdest ()
+                            val table' = extendTable oldsz subjud table
+
+                            val (obs, tac) =
+                               (case isTypecheckingGoal subjud of
+                                   NO =>
+                                      (case assumption subjud of
+                                          SOME i =>
+                                             ([], refine (Rule.hypothesis i))
+
+                                        | NONE =>
+                                             ([(Istp, table', wf subgoal, subdest, history)],
+                                              nonerror (subgoal :: history) subgoal))
+
+                                 | YES prob =>
+                                      ([(prob, table', subgoal, subdest, history)],
+                                       play subdest)
+
+                                 | BAD =>
+                                      ([], badgoalError (subgoal :: history) subgoal))
+                         in
+                            r := obs @ !r;
+                            tac
+                         end
+
+                      (* Used in case of error: check that the equands are well-typed. *)
+                      fun soldieron () =
+                         let
+                            val dest1 = newdest ()
+                            val dest2 = newdest ()
+                         
+                            val goal1 =
+                               (J.make (J.context jud) (T.apply2 Prim.ov class a), dir)
+
+                            val goal2 =
+                               (J.make (J.context jud) (T.apply2 Prim.ov class b), dir)
+                         in
+                            enqueue
+                            [(Of, table, goal1, dest1, history),
+                             (Of, table, goal2, dest2, history)]
+                         end
+                   in
+                      try
+                         let
+                            val (c, abctac) =
+                               (* may raise exceptions, handled below *)
+                               Infer.compat ctx a b prove
+      
+                            (* abctac proves G |- A = B : C *)
+      
+                            val goal' =
+                               (J.make ctx (T.apply2 Prim.subtype c class), dir)
+      
+                            val dest' = newdest ()
+                         in
+                            enqueue (List.rev (!r));
+      
+                            dest :=
+                               (
+                               (* G |- A = B : Class *)
+                               refine (Rule.subsumptionEq c class a b)
+                               >>> [
+                                   (* G |- C <: Class *)
+                                   play dest',
+      
+                                   (* G |- A = B : C *)
+                                   abctac
+                                   ]
+                               );
+      
+                            enqueue [(Subtype, table, goal', dest', history)]
+                         end
+                      with
+                         Infer.InferError (c, dopt, msg) =>
+                            (
+                            dest := inferError history dir c dopt msg;
+                            soldieron ()
+                            )
+
+                       | Infer.Clash =>
+                            (
+                            dest :=
+                               error history "incompatible type paths"
+                               (fn () =>
+                                   (
+                                   showPrefixed " first: " dir a;
+                                   showPrefixed "second: " dir b;
+                                   print "\n"
+                                   ));
+                            soldieron ()
+                            )
+
+                       | Infer.NotPath msg =>
+                            (
+                            dest :=
+                               error history ("cannot establish type equality: " ^ msg)
+                               (fn () =>
+                                   (
+                                   showPrefixed " first: " dir a;
+                                   showPrefixed "second: " dir b;
+                                   print "\n"
+                                   ));
+                            soldieron ()
+                            )
+                   end\
+            /
+         end
+
+      val typecheckEquniv = typecheckEqX equnivTactics tabEquniv
+      val typecheckEqkind = typecheckEqX eqkindTactics tabEqkind
+
+
+
+
+      (*** Reflexivity equality (immediately hands of to Of checking) ***)
+
+      fun typecheckEqrefl table (goal as (jud, dir)) dest history =
+         let
+            val ctx = J.context jud
+            val dest' = newdest ()
+         in
+            (case N.simplify (J.concl jud) of
+                T.Elim (_, [T.App a, T.App m, _]) =>
+                   let
+                      val goal' = (J.make ctx (T.apply2 Prim.ov a m), dir)
+                   in
+                      dest := (refine (Rule.eqRefl a m) >> play dest');
+
+                      enqueue [(Of, table, goal', dest', history)]
+                   end
+
+              | _ =>
+                   (* The goal wouldn't have been tagged Eqrefl if it has any other form. *)
+                   raise (Fail "precondition9"))
+         end
+                
+
+
+
+      (*** Positivity checking ***)
+
+      fun typecheckPositive table (goal as (jud, dir)) dest history =
+         let
+            val ctx = J.context jud
+         in
+            termCaseX (J.concl jud)
+            /
+               \Prim.positive\ (fn . ?) =>
+               \fnc a =>
+                   if
+                      (* a is under a binder so unshift it *)
+                      immediate table history tabPositive (T.Sub (a, T.Dot (T.Triv, T.id))) goal dest idtac
+                   then
+                      ()
+                   else
+                      (* We don't use tryRule here, because we never want to enqueue subgoals. *)
+                      let
+                         do _ =
+                            execute RT.checkPositive goal
+                               (fn () =>
+                                   dest :=
+                                      error history "inductive operator is not positive"
+                                      (fn () =>
+                                          (
+                                          showPrefixed "term: " dir a;
+                                          print "\n"
+                                          )))
+                      in
+                         progress := true;
+                         dest := RT.checkPositive
+                      end\
+            /
+         end
+
+
+
+
+      (*** Level checking ***)
+
+      fun showConstraints cons =
+         List.appi
+            (fns i (_, (jud, dir), _, _) =>
+                termCaseX (J.concl jud)
+                /
+                 | $as \Prim.lleq\ _ _ =>
+                   \fnc a =>
+                       showPrefixed (bracketNumberString i) dir a\
+
+                 | _ => 
+                   \fnc => ()\
+                /)
+            cons
+
+
+      fun resolveLevels () =
+         let
+            val cons = !constraints
+         in
+            if !trace then
+               (
+               print "solving constraints:\n";
+               showConstraints cons
+               )
+            else
+               ();
+
+            (case
+                Level.solve (List.map (fn (_, (jud, _), _, _) => jud) cons)
+             of
+                Level.EXOTIC msg =>
+                   (
+                   Message.message 20 0
+                   (fn () =>
+                       (
+                       print "Warning: not solving exotic constraints: ";
+                       print msg;
+                       print "\n"
+                       ));
+                      
+                   List.app 
+                      (fn (_, goal, dest, history) => dest := unprocessed history goal)
+                      cons
+                   )
+
+              | Level.ERROR msg =>
+                   (
+                   Message.message 20 0 
+                   (fn () =>
+                       (
+                       print "Warning: not solving ill-formed constraints: ";
+                       print msg;
+                       print "\n"
+                       ));
+                      
+                   List.app 
+                      (fn (_, goal, dest, history) => dest := unprocessed history goal)
+                      cons
+                   )
+
+              | result =>
+                   (
+                   (case result of
+                       Level.INCONSISTENT msgs =>
+                          List.app
+                             (fn msg =>
+                                 Message.message 20 0
+                                 (fn () =>
+                                     (
+                                     print "Level error: constraints have no solution: ";
+                                     print msg;
+                                     print "\n"
+                                     )))
+                             msgs
+
+                     | _ => ());
+
+                   List.app
+                      (fn (table, (jud, dir), dest, history) =>
+                          let
+                             val cursz = Seq.length (J.context jud)
+    
+                             fun bounds i =
+                                (case PD.find table (tabLleq, Pvar (cursz-i)) of
+                                    NONE => []
+    
+                                  | SOME entries =>
+                                       List.mapPartial
+                                          (fn (oldsz, a, [], _) =>
+                                              let
+                                                 val newsz = cursz - oldsz
+                                              in
+                                                 termCaseX (T.Sub (a, T.Shift (newsz+1)))
+                                                 /
+                                                  | \Prim.lleq\ ($var \i\ ) ? =>
+                                                    \fnc m =>
+                                                        SOME $
+                                                        (m, 
+                                                         refine (Rule.hypothesis newsz))\
+
+                                                  | _ =>
+                                                    \fnc => NONE\
+                                                 /
+                                              end
+    
+                                            | _ =>
+                                                 (* Ignore a hypothesis that takes arguments, since
+                                                    any ordering it gives us will be over exotic
+                                                    levels anyway.
+                                                 *)
+                                                 NONE)
+                                          entries)
+                          in
+                             (case Level.prove bounds jud of
+                                 SOME tac =>
+                                    dest := tac
+
+                               | NONE =>
+                                    dest :=
+                                       error history "unsatisfied level constraint" (fn () => ()))
+                          end)
+                      cons
+                   ))
+         end
+
+
+
+
+      (*** Main loop ***)
+
+      fun dispatch (prob, table, goal as (jud, dir), dest, history) =
+         let
+            val history' = goal :: history
+         in
+            if !trace then
+               showPrefixed "checking " dir (J.concl jud)
+            else
+               () ;
+
+            (case prob of
+                Of => typecheckOf table goal dest history'
+              | Istp => typecheckIstp table goal dest history'
+              | Subtype => typecheckSubtype table goal dest history'
+              | Eqtp => typecheckEqtp table goal dest history'
+              | Equniv => typecheckEquniv table goal dest history'
+              | Eqkind => typecheckEqkind table goal dest history'
+              | Eqrefl => typecheckEqrefl table goal dest history'
+              | Positive => typecheckPositive table goal dest history'
+
+              | Lleq =>
+                   constraints := (table, goal, dest, history) :: !constraints)
+         end
+
+
+      fun typecheckLoop () =
+         (case !queue of
+             [] =>
+                if !progress andalso not (List.null (!deferred)) then
+                   (
+                   progress := false;
+                   queue := List.rev (!deferred);
+                   deferred := [];
+                   typecheckLoop ()
+                   )
+                else
+                   !deferred
+
+           | ob :: rest =>
+                (
+                queue := rest;
+                dispatch ob;
+                typecheckLoop ()
+                ))
+
+
+      exception ReenteredTypechecker
+      val inChecker = ref false
+
+      fun bracket f =
+         if !inChecker then
+            raise ReenteredTypechecker
+         else
+            let
+               val () =
+                  (
+                  inChecker := true;
+                  progress := false;
+                  deferred := [];
+                  constraints := []
+                  )
+   
+               val x = 
+                  try
+                     Sum.INL (f ())
+                  with exn => Sum.INR exn
+            in
+               queue := [];
+               deferred := [];
+               constraints := [];
+               inChecker := false;
+   
+               (case x of
+                   Sum.INL y => y
+                 | Sum.INR exn => raise exn)
+            end
+         
+
+      (* noq: don't enqueue subgoals or run level solver *)
+      fun masterTypecheck noq obs =
+         bracket
+            (fn () =>
+                (
+                noqueue := noq;
+                queue := obs;
+                typecheckLoop ();
+                
+                if noq then
+                   List.app
+                      (fn (_, _, dest, _) => dest := idtac)
+                      (!constraints)
+                else
+                   resolveLevels ();
+
+                !deferred
+                ))
+
+
+
+
+      (*** Entry points ***)
+
+      fun goalsToTacs goals =
+         List.foldr
+            (fns (pri, goal as (jud, dir)) (obs, tacs) =>
+                (case pri of
+                    Primary => 
+                       (obs, idtac :: tacs)
+
+                  | Secondary =>
+                       let
+                          val dest = newdest ()
+                          val table = buildTable jud
+                          
+                          val (obs', tac) =
+                             (case isTypecheckingGoal jud of
+                                 NO =>
+                                    ([(Istp, table, wf goal, dest, [])],
+                                     nonerror [goal] goal)
+
+                               | YES prob =>
+                                    ([(prob, table, goal, dest, [])],
+                                     play dest)
+
+                               | BAD =>
+                                    ([], badgoalError [goal] goal))
+                       in
+                          (obs' @ obs, tac :: tacs)
+                       end))
+            ([], [])
+            goals
+
+
+
+      fun ambiguous history goal =
+         idtacM $
+         Message.addDetail
+            (Message.fromString "ambiguous typing obligation")
+            (errorDetail (goal :: history) "Ambiguous goal" (fn () => ()))
+
+
+      fun withTypecheckMain tac (goal as (_, dir)) fk sk =
+         let
+            do (subgoals, validate, _) = tac goal fk
+
+            val (obs, tacs) = goalsToTacs subgoals
+
+            val remaining = masterTypecheck false obs
+
+            val () =
+               List.app
+                  (fn (_, _, goal', dest, history) => dest := ambiguous history goal')
+                  remaining
+
+            do (allgoals, subvalidate, _) =
+               andthenloop tacs subgoals [] fk
+         in
+            sk (allgoals, (fn vs => validate (subvalidate vs)), fk)
+         end
+
+
+      fun withTypecheckSnd tac = withTypecheckMain tac
+
+      fun withTypecheck tac = withTypecheckSnd (tac >> idtacM Secondary)
+
+      val typecheck = withTypecheckSnd (idtacM Secondary)
+
+                   
+      fun inference (goal as (jud, dir)) fk sk =
+         let
+            val goal' =
+               (J.make (J.context jud) (T.apply1 Prim.istp (J.concl jud)),
+                dir)
+
+            val (obs, _) = goalsToTacs [(Secondary, goal')]
+         in
+            (* Do all this just for the side effects. *)
+            masterTypecheck false obs;
+
+            idtac goal fk sk
+         end
+
+
+      fun typecheck1 (goal as (jud, dir)) fk sk =
+         (case isTypecheckingGoal jud of
+             YES prob =>
+                let
+                   val dest = newdest ()
+
+                   val remaining =
+                      masterTypecheck true [(prob, buildTable jud, goal, dest, [])]
+
+                   val () =
+                      List.app
+                         (fn (_, _, goal', dest, history) => dest := ambiguous history goal')
+                         remaining
+                in
+                   !dest goal fk sk
+                end
+
+           | _ =>
+                fk "not a typechecking goal")
+
+
+      extension Answer of (Message.label * Tactic.judgement) list * (Refine.validation list -> Refine.validation list)
+
+      fun multigoalTypecheck goals =
+         let
+            val goals' = map (fn goal => (Secondary, goal)) goals
+            val (obs, tacs) = goalsToTacs goals'
+         
+            val remaining = masterTypecheck false obs
+
+            val () =
+               List.app
+                  (fn (_, _, goal', dest, history) => dest := ambiguous history goal')
+                  remaining
+         in
+            (case 
+                andthenloop tacs goals' []
+                (fn msg => raise (Fail ("internal typechecking tactic failure:" ^ msg)))
+                (fn (subgoals, validate, _) => Answer (subgoals, validate))
+             of
+                Answer (subgoals, validate) => (map (fn (_, goal) => goal) subgoals, validate)
+
+              | _ => raise (Fail "impossible"))
+         end
+
+
+
+      
+      (*** Inference entry points ***)
+
+      fun inferMain em symopt =
+         let
+            do (goal as (jud, dir)) = withgoal
+
+            val m = em (D.idir dir)
+         in
+            (case
+                (try
+                    Sum.INL (Infer.infer (J.context jud) m (fns _ _ => idtac))
+                 with
+                    Infer.InferError (m', aopt, msg) =>
+                       Sum.INR (m', aopt, msg)
+
+                  | Infer.NotPath msg =>
+                       Sum.INR (m, NONE, "not a path: " ^ msg))
+             of
+                Sum.INL (a, tac) =>
+                   refine (Rule.assert (T.apply2 Prim.ov a m) (T.evar ()))
+                   >>> [
+                       (* G |- M : A *)
+                       tac >> idtacM Secondary,
+                       
+                       chdir (D.bindh dir symopt) >> idtacM Primary
+                       ]
+
+              | Sum.INR (m', aopt, msg) =>
+                   (
+                   Message.message 20 0
+                      (errorDetail [goal] ("Type error: inference failed: " ^ msg)
+                          (inferDetail dir m' aopt));
+
+                   fail "type error"
+                   ))
+         end
+
+      fun inferRaw em symopt = inferMain em symopt >> idtac
+
+      fun infer em symopt = withTypecheckSnd $ inferMain em symopt
+
+
+
+
+      (*** Populate the tables ***)
+
+      val lambdaOnly =
+         goalCase
+         / \Prim.ov\ _ (fn . _) => \fnc => idtac\ /
+
+      val pairOnly =
+         goalCase
+         / \Prim.ov\ _ (_ , _) => \fnc => idtac\ /
+
+      val nextOnly =
+         goalCase
+         / \Prim.ov\ _ (next _) => \fnc => idtac\ /
+
+      val trivOnly =
+         goalCase
+         / \Prim.ov\ _ () => \fnc => idtac\ /
+
+      fun only const =
+         goalCase
+         / \Prim.ov\ _ (\const\ @ _) => \fnc => idtac\ /
+         
+
+      val () =
+         let
+            val insert = H.insert introTactics
+         in
+            insert Prim.forall (lambdaOnly >> RT.forallIntroOf);
+            insert Prim.arrow (lambdaOnly >> RT.arrowIntroOf);
+            insert Prim.tarrow (lambdaOnly >> RT.tarrowIntroOf);
+            insert Prim.karrow (lambdaOnly >> RT.karrowIntroOf);
+            insert Prim.intersect RT.intersectIntroOf;
+            insert Prim.guard RT.guardIntroOf;
+            insert Prim.foralltp RT.foralltpIntroOf;
+            insert Prim.exists (pairOnly >> RT.existsIntroOf);
+            insert Prim.prod (pairOnly >> RT.prodIntroOf);
+            insert Prim.future (nextOnly >> RT.futureIntroOf);
+            insert Prim.iforall RT.iforallIntroOf;
+            insert Prim.iexists RT.iexistsIntroOf;
+            insert Prim.eq (trivOnly >> RT.eqIntro);
+            insert Prim.ov (trivOnly >> RT.ofIntro);
+            insert Prim.set RT.setIntroOfSquash;
+            insert Prim.squash (trivOnly >> RT.squashIntroOfSquash);
+            insert Prim.quotient RT.quotientIntroOf;
+            insert Prim.eqtp (trivOnly >> RT.eqtpIntro);
+            insert Prim.istp (trivOnly >> RT.istpIntro);
+            insert Prim.unit (trivOnly >> RT.unitIntroOf);
+            insert Prim.bool (first [only Prim.tru >> RT.boolIntro1Of, only Prim.fals >> RT.boolIntro2Of]);
+            insert Prim.sum (first [only Prim.inl >> RT.sumIntro1Of, only Prim.inr >> RT.sumIntro2Of])
+         end
+
+      val eeqtpForm =
+         goalCase
+         /
+            \Prim.istp\ (\Prim.eeqtp\ ? ?) =>
+            \fnc a b =>
+                refine (Rule.assert (T.apply1 Prim.istp a) (T.evar ()))
+                >>> [
+                    idtac,
+
+                    (* A : type |- A[^1] <:> B[^1] : type *)
+                    refine (Rule.assert (T.apply1 Prim.istp (T.Sub (b, T.shift1))) (T.evar ()))
+                    >>> [
+                        (* A : type |- B[^] : type *)
+                        refine (Rule.weaken 0 1),
+
+                        (* A : type, B[^] : type |- A[^2] <:> B[^2] : type *)
+                        refine (Rule.reduce (Reduction.within [1] Reduction.unfold))
+                        >>
+                        refine (Rule.prodForm (T.evar ()) (T.evar ()))
+                        >>> [
+                            refine (Rule.subtypeForm (T.evar ()) (T.evar ()))
+                            >>> [
+                                refine (Rule.hypothesis 1),
+                                refine (Rule.hypothesis 0)
+                                ],
+
+                            refine (Rule.subtypeForm (T.evar ()) (T.evar ()))
+                            >>> [
+                                refine (Rule.hypothesis 0),
+                                refine (Rule.hypothesis 1)
+                                ]
+                            ]
+                        ]
+                    ]\
+         /
+
+      val () =
+         let
+            val insert = H.insert istpTactics
+         in
+            insert Prim.forall RT.forallForm;
+            insert Prim.arrow RT.arrowForm;
+            insert Prim.tarrow RT.tarrowForm;
+            insert Prim.karrow RT.karrowForm;
+            insert Prim.intersect RT.intersectForm;
+            insert Prim.guard RT.guardForm;
+            insert Prim.exists RT.existsForm;
+            insert Prim.prod RT.prodForm;
+            insert Prim.future RT.futureForm;
+            insert Prim.void RT.voidForm;
+            insert Prim.unit RT.unitForm;
+            insert Prim.bool RT.boolForm;
+            insert Prim.wtype RT.wtypeForm;
+            insert Prim.iforall RT.iforallForm;
+            insert Prim.iexists RT.iexistsForm;
+            insert Prim.eq RT.eqForm;
+            insert Prim.ov RT.ofForm;
+            insert Prim.set RT.setForm;
+            insert Prim.quotient RT.quotientForm;
+            insert Prim.univ RT.univForm;
+            insert Prim.kind RT.kindForm;
+            insert Prim.eqtp RT.eqtpForm;
+            insert Prim.istp RT.istpForm;
+            insert Prim.subtype RT.subtypeForm;
+            insert Prim.sum RT.sumForm;
+            insert Prim.nat RT.natForm;
+            insert Prim.level RT.levelForm;
+            insert Prim.lleq RT.lleqForm;
+            insert Prim.squash RT.squashForm;
+            insert Prim.eeqtp eeqtpForm
+         end
+
+      val () =
+         let
+            fun insert const tac = H2.insert eqtpTactics (const, const) tac
+         in
+            insert Prim.forall RT.forallEq;
+            insert Prim.arrow RT.arrowEq;
+            insert Prim.tarrow RT.tarrowEq;
+            insert Prim.karrow RT.karrowEq;
+            insert Prim.intersect RT.intersectEq;
+            insert Prim.guard RT.guardEq;
+            insert Prim.exists RT.existsEq;
+            insert Prim.prod RT.prodEq;
+            insert Prim.future RT.futureEq;
+            insert Prim.void RT.voidEq;
+            insert Prim.unit RT.unitEq;
+            insert Prim.bool RT.boolEq;
+            insert Prim.wtype RT.wtypeEq;
+            insert Prim.iforall RT.iforallEq;
+            insert Prim.iexists RT.iexistsEq;
+            insert Prim.eq RT.eqEq;
+            insert Prim.ov RT.ofEq;
+            insert Prim.set RT.setEq;
+            insert Prim.quotient RT.quotientEq;
+            insert Prim.kind RT.kindEq;
+            insert Prim.eqtp RT.eqtpEq;
+            insert Prim.istp RT.istpEq;
+            insert Prim.subtype RT.subtypeEq;
+            insert Prim.sum RT.sumEq;
+            insert Prim.nat RT.natEq;
+            insert Prim.level RT.levelEq;
+            insert Prim.lleq RT.lleqEq;
+            insert Prim.squash RT.squashEq
+         end
+
+      val () =
+         let
+            fun symmetricize tac = RT.eqtpSymm >> tac >> RT.eqtpSymm
+
+            fun insert const const' tac = 
+               (
+               H2.insert eqtpTactics (const, const') tac;
+               H2.insert eqtpTactics (const', const) (symmetricize tac)
+               )
+         in
+            insert Prim.tarrow Prim.arrow RT.tarrowArrowEq;
+            insert Prim.karrow Prim.arrow RT.karrowArrowEq
+         end
+
+      val () =
+         let
+            fun insert const tac = H.insert ofunivTactics const tac
+         in
+            insert Prim.forall RT.forallFormUniv;
+            insert Prim.arrow RT.arrowFormUniv;
+            insert Prim.tarrow RT.tarrowFormUniv;
+            insert Prim.karrow RT.karrowFormUniv;
+            insert Prim.intersect RT.intersectFormUniv;
+            insert Prim.guard RT.guardFormUniv;
+            insert Prim.exists RT.existsFormUniv;
+            insert Prim.prod RT.prodFormUniv;
+            insert Prim.future RT.futureFormUniv;
+            insert Prim.rec RT.recFormUniv;
+            insert Prim.void RT.voidFormUniv;
+            insert Prim.unit RT.unitFormUniv;
+            insert Prim.bool RT.boolFormUniv;
+            insert Prim.wtype RT.wtypeFormUniv;
+            insert Prim.mu RT.muFormUniv;
+            insert Prim.iforall RT.iforallFormUniv;
+            insert Prim.iexists RT.iexistsFormUniv;
+            insert Prim.eq RT.eqFormUniv;
+            insert Prim.ov RT.ofFormUniv;
+            insert Prim.set RT.setFormUniv;
+            insert Prim.quotient RT.quotientFormUniv;
+            insert Prim.univ RT.univFormUniv;
+            insert Prim.kind RT.kindFormUniv;
+            insert Prim.eqtp RT.eqtpFormUniv;
+            insert Prim.istp RT.istpFormUniv;
+            insert Prim.subtype RT.subtypeFormUniv;
+            insert Prim.sum RT.sumFormUniv;
+            insert Prim.nat RT.natFormUniv;
+            insert Prim.level RT.levelFormUniv;
+            insert Prim.lleq RT.lleqFormUniv;
+            insert Prim.squash RT.squashFormUniv
+         end
+
+      val () =
+         let
+            fun insert const tac = H2.insert equnivTactics (const, const) tac
+         in
+            insert Prim.forall RT.forallEqUniv;
+            insert Prim.arrow RT.arrowEqUniv;
+            insert Prim.tarrow RT.tarrowEqUniv;
+            insert Prim.karrow RT.karrowEqUniv;
+            insert Prim.intersect RT.intersectEqUniv;
+            insert Prim.guard RT.guardEqUniv;
+            insert Prim.exists RT.existsEqUniv;
+            insert Prim.prod RT.prodEqUniv;
+            insert Prim.future RT.futureEqUniv;
+            insert Prim.rec RT.recEqUniv;
+            insert Prim.void RT.voidEqUniv;
+            insert Prim.unit RT.unitEqUniv;
+            insert Prim.bool RT.boolEqUniv;
+            insert Prim.wtype RT.wtypeEqUniv;
+            insert Prim.mu RT.muEqUniv;
+            insert Prim.iforall RT.iforallEqUniv;
+            insert Prim.iexists RT.iexistsEqUniv;
+            insert Prim.eq RT.eqEqUniv;
+            insert Prim.ov RT.ofEqUniv;
+            insert Prim.set RT.setEqUniv;
+            insert Prim.quotient RT.quotientEqUniv;
+            insert Prim.univ RT.univEqUniv;
+            insert Prim.kind RT.kindEqUniv;
+            insert Prim.eqtp RT.eqtpEqUniv;
+            insert Prim.istp RT.istpEqUniv;
+            insert Prim.subtype RT.subtypeEqUniv;
+            insert Prim.sum RT.sumEqUniv;
+            insert Prim.nat RT.natEqUniv;
+            insert Prim.level RT.levelEqUniv;
+            insert Prim.lleq RT.lleqEqUniv;
+            insert Prim.squash RT.squashEqUniv
+         end
+
+      val () =
+         let
+            fun symmetricize tac = RT.eqSymm >> tac >> RT.eqSymm
+
+            fun insert const const' tac = 
+               (
+               H2.insert equnivTactics (const, const') tac;
+               H2.insert equnivTactics (const', const) (symmetricize tac)
+               )
+         in
+            insert Prim.tarrow Prim.arrow RT.tarrowArrowEqUniv;
+            insert Prim.karrow Prim.arrow RT.karrowArrowEqUniv
+         end
+
+      val () =
+         let
+            val insert = H.insert ofkindTactics
+         in
+            insert Prim.tarrow RT.tarrowKind;
+            insert Prim.karrow RT.karrowKind;
+            insert Prim.prod RT.prodKind;
+            insert Prim.future RT.futureKind;
+            insert Prim.rec RT.recKind;
+            insert Prim.unit RT.unitKind;
+            insert Prim.univ RT.univKind
+         end
+
+      val () =
+         let
+            fun insert const tac = H2.insert eqkindTactics (const, const) tac
+         in
+            insert Prim.tarrow RT.tarrowKindEq;
+            insert Prim.karrow RT.karrowKindEq;
+            insert Prim.prod RT.prodKindEq;
+            insert Prim.future RT.futureKindEq;
+            insert Prim.rec RT.recKindEq;
+            insert Prim.unit RT.unitKindEq;
+            insert Prim.univ RT.univKindEq
+         end
+
+      val () =
+         let
+            fun insert const const' tac = H2.insert subtypeTactics (const, const') tac
+         in
+            insert Prim.forall Prim.forall RT.forallSub;
+            insert Prim.arrow Prim.arrow RT.arrowSub;
+            insert Prim.arrow Prim.forall RT.arrowForallSub;
+            insert Prim.forall Prim.arrow RT.forallArrowSub;
+            insert Prim.exists Prim.exists RT.existsSub;
+            insert Prim.prod Prim.prod RT.prodSub;
+            insert Prim.prod Prim.exists RT.prodExistsSub;
+            insert Prim.exists Prim.prod RT.existsProdSub;
+            insert Prim.future Prim.future RT.futureSub;
+            insert Prim.sum Prim.sum RT.sumSub
+         end
+
+      val () =
+         let
+            fun insert const tac = H.insert subtypeLeftTactics const tac
+         in
+            insert Prim.void RT.voidSub;
+            insert Prim.set RT.setSubElim
+         end
+
+
+      fun enterTypingAxiom const a rule =
+         let
+            val jud =
+               J.make Seq.empty (T.apply2 Prim.ov a (T.Const const))
+
+            val v =
+               Sum.outL $
+               Tactic.execute (jud, D.empty) (refine rule)
+         in
+            DatabaseInternal.primType const jud v
+         end
+
+      val () =
+         List.app
+            (fn (const, ea, rule) => enterTypingAxiom const (ETerm.closed ea) rule)
+            [
+            (Prim.abort, /intersect (i : level) (a : U i) . void -> a/, Rule.abortType),
+
+            (Prim.zero, /nat/, Rule.zeroType),
+            (Prim.succ, /nat -> nat/, Rule.succType),
+
+            (Prim.lzero, /level/, Rule.lzeroType),
+            (Prim.lsucc, /level -> level/, Rule.lsuccType),
+            (Prim.lmax, /level -> level -> level/, Rule.lmaxType),
+
+            (Prim.tru, /bool/, Rule.boolIntro1Of),
+            (Prim.fals, /bool/, Rule.boolIntro2Of),
+            (Prim.ite, /intersect (i : level) (a : U i) . bool -> a -> a -> a/, Rule.iteType),
+
+            (Prim.sumcase,
+             /intersect (i : level) (a b c : U i) . sum a b -> (a -> c) -> (b -> c) -> c/,
+             Rule.sumcaseType)
+            ]
+
+   end
+
+
+structure Typecheck :> TYPECHECK = TypecheckInternal
+

@@ -1,0 +1,323 @@
+
+signature INDUCTION =
+   sig
+
+      val inductRaw : Symbol.symbol -> Tactic.tactic
+      val induct : Symbol.symbol -> Tactic.tactic
+
+      val iterateRaw : Symbol.symbol -> Tactic.tactic
+      val iterate : Symbol.symbol -> Tactic.tactic
+
+      val inductMuUnivRaw : Symbol.symbol -> ETerm.eterm -> Tactic.tactic
+      val inductMuUniv : Symbol.symbol -> ETerm.eterm -> Tactic.tactic
+
+   end
+
+
+signature INDUCTION_INTERNAL =
+   sig
+
+      include INDUCTION
+
+
+      (* tactic performs induction on hypothesis 0 *)
+      val inductionTactics : Typecheck.priority Tactic.tacticm ConstantTable.table
+
+
+      val accInduction : Typecheck.priority Tactic.tacticm
+   end
+
+
+structure InductionInternal :> INDUCTION_INTERNAL =
+   struct
+
+      structure T = Term
+      structure J = Judgement
+      structure N = Normalize
+      structure D = Directory
+      structure TC = Typecheck
+      structure H = ConstantTable
+      structure R = Reduction
+
+      open Tactic
+      open CasePervasive
+
+
+      val inductionTactics : TC.priority tacticm H.table = H.table ()
+
+
+      fun inductPriority hyp =
+         let
+            do i = HypTactic.findhyp hyp
+         in
+            (cut $
+             setFailure "hypotheses depend on induction variable" $
+             HypTactic.exchange 0 i 1)
+            >>
+            let
+               do (jud, _) = withgoal
+            in
+               (case J.hyp jud 0 of
+                   J.Tm a =>
+                      (case N.whnfHard a of
+                          T.Elim (T.Const const, _) =>
+                             (case H.find inductionTactics const of
+                                 NONE =>
+                                    fail "not an inductable hypothesis"
+
+                               | SOME tac =>
+                                    tac)
+
+                        | _ =>
+                             fail "not an inductable hypothesis")
+
+                 | _ =>
+                      fail "not an inductable hypothesis")
+            end
+         end
+
+
+      fun inductRaw hyp = inductPriority hyp >> idtac
+
+      fun induct hyp = TC.withTypecheckSnd (inductPriority hyp)
+
+
+      
+      fun iteratePriority hyp =
+         let
+            do i = HypTactic.findhyp hyp
+         in
+            (cut $
+             setFailure "hypotheses depend on iteration variable" $
+             HypTactic.exchange 0 i 1)
+            >>
+            goalContextCase
+            /
+             | $hyp 0 $tm $whnfHard const? @ _ =>
+               \fnc const =>
+                   (case List.rev (Namespace.name const) of
+                       [] =>
+                          (* empty address *)
+                          raise (Fail "invariant")
+
+                     | name :: path =>
+                          (case
+                              Namespace.resolveOpt
+                              (List.rev (Symbol.fromValue (Symbol.toValue name ^ "_iter") :: path))
+                           of
+                              NONE =>
+                                 fail ("no iterator found for " ^ Namespace.toString const)
+                                
+                            | SOME iterator =>
+                                 HypTactic.revert0 
+                                 >>
+                                 BackchainInternal.applyPriority (ETerm.literal (T.Const iterator))
+                                 >>=
+                                 (fn pri =>
+                                     (case pri of
+                                         TC.Primary =>
+                                            Rewrite.reduce [(Symbol.fromValue "concl", SOME (false, [0]))]
+                                            >> idtacM TC.Primary
+
+                                       | _ => idtacM pri))))\
+
+             | _ =>
+               \fnc => fail "not an iteratable hypothesis"\
+            /
+         end
+               
+      fun iterateRaw hyp = iteratePriority hyp >> idtac
+
+      fun iterate hyp = TC.withTypecheckSnd (iteratePriority hyp)
+
+
+
+      val muInduction =
+         let
+            do (jud, dir) = withgoal
+         in
+            goalContextCase
+            / $hyp 0 $tm \Prim.mu\ (fn ? . ?) =>
+              \fnc binder a =>
+                  let
+                     val c = J.concl jud
+                     
+                     val dir' =
+                        D.bindhs
+                        (D.tl dir)
+                        [NONE, NONE, NONE, NONE]
+                  in
+                     refine (Rule.muInd a (T.Sub (c, T.Idot (0, T.Shift 2))) T.zero)
+                     >>> [
+                         chdir (D.bindVary dir binder) >> idtacM TC.Secondary,
+
+                         idtacM TC.Secondary,
+
+                         refine (Rule.weaken 4 1) >>
+                         chdir dir' >> idtacM TC.Primary,
+
+                         refine (Rule.hypothesisOf 0) >> done
+                         ]
+                  end\
+            /
+         end
+
+
+      fun inductMuUnivPriority hyp em =
+         let
+            do i = HypTactic.findhyp hyp
+            do lv = withterm em
+         in
+            (cut $
+             setFailure "hypotheses depend on induction variable" $
+             HypTactic.exchange 0 i 1)
+            >>
+            let
+               do (jud, dir) = withgoal
+
+               val lv' = Term.evar ()
+            in
+               (* lv purportedly lives in G, blah, Gi[^]
+                  we want lv' to live in G, Gi
+               *)
+               if
+                  Unify.unify1 lv (T.Sub (lv', T.under i T.shift1))
+               then
+                  goalContextCase
+                  /
+                   | $hyp 0 $tm \Prim.mu\ (fn ? . ?) =>
+                     \fnc binder a =>
+                         let
+                            val c = J.concl jud
+                            
+                            val dir' =
+                               D.bindhs
+                               (D.tl dir)
+                               [NONE, NONE, NONE, NONE]
+                         in
+                            refine (Rule.muIndUniv a (T.Sub (c, T.Idot (0, T.Shift 2))) (T.Sub (lv', T.shift1)) T.zero)
+                            >>> [
+                                idtacM TC.Secondary,
+      
+                                chdir (D.bindVary dir binder) >> idtacM TC.Secondary,
+      
+                                idtacM TC.Secondary,
+      
+                                refine (Rule.weaken 4 1) >>
+                                chdir dir' >> idtacM TC.Primary,
+      
+                                refine (Rule.hypothesisOf 0) >> done
+                                ]
+                         end\
+
+                   | _ =>
+                     \fnc => fail "not an inductable mu hypothesis"\
+                  /
+               else
+                  fail "level depends on induction variable"
+            end
+         end
+
+
+      fun inductMuUnivRaw hyp em = inductMuUnivPriority hyp em >> idtac
+
+      fun inductMuUniv hyp em = TC.withTypecheckSnd (inductMuUnivPriority hyp em)
+
+
+      
+      val accInduction =
+         goalContextCase
+         / 
+          | $hyp 0 $tm \Prim.acc\ _ _ var? =>
+            \fnc v =>
+                (* move Acc's argument last (except for the Acc itself) *)
+                (cut $ setFailure "hypotheses depend on accessibility argument" $
+                 HypTactic.exchange 1 (v-1) 1)
+                >>
+                let
+                   do (jud, dir) = withgoal
+                in
+                   hypCase (J.hyp jud 0)
+                   /
+                      $tm \Prim.acc\ ? ? ($var \0\ ) =>
+                      \fnc a1 r1 =>
+                          let
+                             (* can't fail unless the directory is corrupt *)
+                             val dir' = D.tl dir
+
+                             val a = T.evar ()
+                             val r = T.evar ()
+                             val c = T.evar ()
+                             val e = T.evar ()
+
+                             val () = Unify.unify (T.Sub (a, T.shift1)) a1
+                             val () = Unify.unify (T.Sub (r, T.shift1)) r1
+                          in
+                             if not (Unify.solve ()) then
+                                fail "unexpected accessibility parameter dependency"
+                             else if not (Unify.unify1 (T.Sub (c, T.shift1)) (J.concl jud)) then
+                                fail "conclusion depends on accessibility hypothesis"
+                             else
+                                (* A', Acc A[^] R[^] 0 |- C[^]
+                                                       = C[1 . ^2]
+                                                       = C[0 . ^3][1 . id]
+
+                                   (A' might not be A, but we have to have at least A' <: A
+                                   or we'll fail.)
+                                *)
+                                refine (Rule.accInd
+                                           (T.Sub (a, T.Shift 2))
+                                           (T.Sub (c, T.Idot (0, T.Shift 3)))
+                                           e
+                                           (T.Var 1)
+                                           (T.Var 0)
+                                           (T.Sub (r, T.Shift 2)))
+                                >>> [
+                                    (* A', Acc A[^] R[^] 0 |- A[^2] : U e *)
+                                    idtacM TC.Secondary,
+                                    
+                                    (* A', Acc A[^] R[^] 0 |- R[^2] : A[^2] -> A[^2] -> U e *)
+                                    idtacM TC.Secondary,
+
+                                    (* A', Acc A[^] R[^] 0,
+                                       A[^2]
+                                       forall A[^3] . R[^4] 0 1 -> C[0 . ^4]]
+                                       |- C[1 . ^4]
+                                    *)
+                                    refine (Rule.weaken 2 2)
+                                    >>
+                                    (* A, forall A[^] . R[^2] 0 1 -> C[0 . ^2] |- C[1 . ^2] *)
+                                    chdir (D.bind0 dir')
+                                    >>
+                                    idtacM TC.Primary,
+
+                                    (* A', Acc A[^] R[^] 0 |- 1 : A[^2] *)
+                                    idtacM TC.Secondary,
+
+                                    (* A', Acc A[^] R[^] 0 |- 0 : Acc A[^2] R[^2] 1 *)
+                                    refine (Rule.hypothesisOf 0) >> done
+                                    ]
+                          end\
+                   /   
+                end\
+
+          | $hyp 0 $tm \Prim.acc\ _ _ _ =>
+            \fnc => fail "accessibility argument is not a variable"\
+
+          | _ =>
+            \fnc => fail "type error in accessibility induction"\
+         /
+
+
+
+      val () =
+         List.app (fn (const, tac) => ConstantTable.insert inductionTactics const tac)
+            [
+            (Prim.mu, muInduction),
+            (Prim.acc, accInduction),
+            ]
+
+   end
+
+
+structure Induction :> INDUCTION = InductionInternal

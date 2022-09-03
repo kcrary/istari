@@ -1,0 +1,231 @@
+
+signature DEFINE =
+   sig
+
+      type symbol = Symbol.symbol
+
+      val define : (symbol * symbol option list * symbol option list) -> ETerm.eterm -> unit
+      val definerec : (symbol * symbol option list * symbol option list) -> ETerm.eterm -> unit
+      val recordTyping : string -> unit
+
+   end
+
+
+signature DEFINE_INTERNAL =
+   sig
+
+      include DEFINE
+
+
+      val recUnroller : Constant.constant -> Reduction.reduction
+
+   end
+
+
+structure DefineInternal :> DEFINE_INTERNAL =
+   struct
+
+      structure T = Term
+      structure R = Reduction
+      structure J = Judgement
+
+      type symbol = Symbol.symbol
+
+      open CasePervasive
+
+
+      fun withHandler f =
+         try
+            f ()
+         with
+            exn as (Directory.Unbound sym) =>
+               (
+               print "Error: unbound identifier ";
+               print (Symbol.toValue sym);
+               print "\n";
+               raise exn
+               )
+
+
+      fun define (name, impargs, expargs) em =
+         withHandler
+         (fn () =>
+             let
+                val () = ProverInternal.checkpoint ()
+
+                val args = impargs @ expargs
+
+                val const = 
+                   Namespace.declare name
+                      (SOME (ETerm.closed (List.foldr ETerm.lam em args)))
+             in
+                Database.setArity const (List.length args);
+                Database.setImplicits const (List.length impargs);
+
+                print "Constant ";
+                print (Symbol.toValue name);
+                print " defined.\n"
+             end)
+
+         
+
+
+      (* if    const unfolds to fix (fn . M)
+         then  red : const --> M[const . id]
+      *)
+      fun recUnroller const =
+         (case Constant.definition const of
+             NONE =>
+                raise (Fail "constant has no definition")
+
+           | SOME def =>
+                termCaseX def
+                /
+                 | \Prim.fix\ (fn . ?) =>
+                   \fnc m =>
+                       let
+                          val r1 =
+                             R.trans 
+                                [
+                                (* const *)
+              
+                                R.unfold, 
+              
+                                (* fix (fn . M) *)
+              
+                                R.user1 Prim.unroll_fix,
+              
+                                (* (fn . M) (fix (fn . M)) *)
+                                ]
+              
+                          val r2 = 
+                             (* (fn . M) const *)
+                             R.within [1] R.unfold
+                             (* (fn . M) (fix (fn . M)) *)
+                       in
+                          R.trans
+                             [
+                             (* const *)
+              
+                             R.user1 
+                                (R.new1 const 0 (T.app (T.Lam (NONE, m)) (T.Const const)) r1 r2),
+              
+                             (* (fn . M) const *)
+              
+                             R.beta 1
+              
+                             (* M[const . id] *)
+                             ]
+                       end\
+
+                 | _ =>
+                   \fnc => raise (Fail "constant's definition has improper form")\
+                /)
+
+
+      fun definerec (name, impargs, expargs) em =
+         withHandler
+         (fn () =>
+             let
+                val () = ProverInternal.checkpoint ()
+
+                val args = impargs @ expargs
+
+                val const =
+                   Namespace.declare name
+                      (SOME (T.apply1 Prim.fix
+                                (ETerm.closed
+                                    (List.foldr ETerm.lam em (SOME name :: args)))))
+
+                val arity = List.length args
+             in
+                Database.setArity const arity;
+                Database.setImplicits const (List.length impargs);
+                Database.setUnroll const
+                   (R.trans [recUnroller const, R.beta arity]);
+
+                print "Constant ";
+                print (Symbol.toValue name);
+                print " defined.\n"
+             end)
+
+
+      fun recordTyping name =
+         let
+            val const = Namespace.resolve [Symbol.fromValue name]
+         in
+            (case Database.findType const of
+                NONE =>
+                   raise (Fail (String.concat ["lemma ", name, " not found in database"]))
+   
+              | SOME (j, v) =>
+                   let
+                      val () =
+                         if Seq.null (J.context j) then
+                            ()
+                         else
+                            raise (Fail (name ^ " is not a typing lemma"))
+
+                      val (a, const') =
+                         termCaseX (J.concl j)
+                         /
+                          | \Prim.ov\ 
+                               ($as \Prim.ov\ _ (const? @ $nil))
+                               \const\ =>
+                            \fnc a x => (a, x)\
+
+                          | _ =>
+                            \fnc => raise (Fail (name ^ " is not a typing lemma"))\
+                         /
+
+                      (* v validates J = |- const : A
+                         where A has the form const' : B
+                      *)
+
+                      val a = Normalize.simplify a
+                      val jud = J.make Seq.empty a
+
+                      val v' =
+                         (case Refine.refine (Rule.inhabitant a (T.Const const)) jud of
+                             ([j'], validator) =>
+                                (case Refine.cast j j' of
+                                    NONE =>
+                                       raise (Fail "impossible")
+
+                                  | SOME f =>
+                                       (case validator [f v] of
+                                           (v', []) => v'
+
+                                         | _ => raise (Fail "impossible")))
+
+                           | _ => raise (Fail "impossible"))
+                   in
+                      Database.enterType const' jud v'
+                   end)
+         end
+
+
+   end
+
+
+structure Define :> DEFINE = DefineInternal
+
+
+structure ParseDefine =
+   struct
+
+      fun definePattern name expargs = (name, [], expargs)
+      fun definePatternImplicits name impargs expargs = (name, impargs, expargs)
+
+   end
+
+
+grammardef Define
+
+   rule DefinePattern ::= Ident OIdents => ParseDefine.definePattern
+   rule DefinePattern ::= Ident "{" OIdents "}" OIdents => ParseDefine.definePatternImplicits
+
+end
+
+
+grammaron Define

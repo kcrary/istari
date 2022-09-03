@@ -1,0 +1,358 @@
+
+signature FILE =
+   sig
+
+      exception LoadError
+
+      (* file name *)
+      val save : string -> unit
+      val load : string -> unit
+
+   end
+
+
+structure File :> FILE =
+   struct
+
+      val magicNumber = Bytestring.fromString "Ist00000"
+
+      structure C = ConstantInternal
+      structure CR = CheckpointedRef
+      structure D = DatabaseInternal
+      structure N = NamespaceInternal
+      structure P = Pickle
+      structure PP = Pickling
+      structure R = ReductionInternal
+      structure RR = RegistryInternal
+      structure T = Term
+
+
+
+      exception Error = Message.Error
+
+      exception LoadError
+
+      fun signalError msg =
+         raise (Error (LoadError,
+                       String.concat
+                          [
+                          "Error: ",
+                          msg,
+                          ".\n"
+                          ]))
+
+
+      fun iterup f x i j =
+         if i = j then
+            x
+         else
+            iterup f (f i x) (i+1) j
+
+      fun input1 ins =
+         (case BinIO.input1 ins of
+             SOME b => b
+           | NONE => raise Pickle.Error)
+
+
+
+      (* Constant table *)
+
+      val puNamespaceEntry = P.pair (P.list PP.puSymbol) PP.puConstant
+            
+
+      (* Representation note:
+         P.list p is pickled as a series of P.option p, ending in NONE.
+      *)
+
+      fun writeNamespace outs =
+         (
+         N.appLocal
+            (fn (addr, const) =>
+                P.pickle
+                   (BinIO.output1 outs)
+                   (P.option puNamespaceEntry)
+                   (SOME (addr, const)));
+
+         P.pickle
+            (BinIO.output1 outs)
+            (P.option puNamespaceEntry)
+            NONE
+         )
+
+
+      fun gotoModule old new =
+         (case (old, new) of
+             ([], []) => ()
+
+           | ([], _) =>
+                List.app N.beginModuleSym new
+
+           | (_, []) =>
+                List.app (fn _ => N.endModule ()) old
+
+           | (sym :: restold, sym' :: restnew) =>
+                if Symbol.eq (sym, sym') then
+                   gotoModule restold restnew
+                else
+                   (
+                   List.app (fn _ => N.endModule ()) old;
+                   List.app N.beginModuleSym new
+                   ))
+
+
+      fun readNamespaceLoop ins currModule =
+         (case 
+             P.unpickle 
+                (fn () => input1 ins)
+                (P.option puNamespaceEntry)
+          of
+             NONE =>
+                gotoModule currModule []
+
+           | SOME (address, const) =>
+                let
+                   val (module, sym) =
+                      (case List.rev address of
+                          [] => raise Pickle.Error
+
+                        | sym :: revmodule =>
+                             (List.rev revmodule, sym))
+
+                   val () = gotoModule currModule module
+                in
+                   N.import sym const;
+
+                   readNamespaceLoop ins module
+                end)
+
+      fun readNamespace ins = readNamespaceLoop ins []
+
+
+
+      (* Database *)
+
+      val puDatabaseEntry =
+         P.option
+            (P.tuple5
+                PP.puConstant
+                (P.option Refine.pu)
+                P.int
+                P.int
+                (P.option R.puReduction))
+
+
+      fun writeDatabase outs =
+         (
+         D.appLocal
+            (fn entry =>
+                P.pickle
+                   (BinIO.output1 outs)
+                   puDatabaseEntry
+                   (SOME entry));
+
+         P.pickle
+            (BinIO.output1 outs)
+            puDatabaseEntry
+            NONE
+         )
+
+
+      fun readDatabase ins =
+         (case
+             P.unpickle 
+                (fn () => input1 ins)
+                puDatabaseEntry
+          of
+             NONE => ()
+
+           | SOME entry =>
+                (
+                D.import entry;
+                readDatabase ins
+                ))
+
+
+
+      (* Registry *)
+
+      val puRegistryEntry =
+         P.option
+            (P.pair
+                (P.list PP.puSymbol)
+                RR.puItem)
+
+
+      fun writeRegistry outs =
+         (
+         RR.appLocal
+            (fn entry => P.pickle (BinIO.output1 outs) puRegistryEntry (SOME entry));
+
+         P.pickle (BinIO.output1 outs) puRegistryEntry NONE;
+
+         P.pickle (BinIO.output1 outs) (P.list R.puUreduction2) (RR.registered ())
+         )
+
+
+      fun readRegistryItems ins =
+         (case
+             P.unpickle
+                (fn () => input1 ins)
+                puRegistryEntry
+          of
+             NONE => ()
+
+           | SOME (name, item) =>
+                (
+                RR.import name item;
+                readRegistryItems ins
+                ))
+
+      fun readRegistryReductions ins =
+         (case
+             P.unpickle
+                (fn () => input1 ins)
+                (P.option R.puUreduction2)
+          of
+             NONE => ()
+
+           | SOME r =>
+                (
+                NormalizeInternal.register r;
+                readRegistryReductions ins
+                ))
+
+      fun readRegistry ins =
+         (
+         readRegistryItems ins;
+         readRegistryReductions ins
+         )
+
+      
+
+      (* All together *)
+
+      fun save filename =
+         let
+            val outs = BinIO.openOut filename
+         in
+            Finally.finally
+               (fn () => 
+                   (
+                   Bytestring.output outs magicNumber;
+                   P.pickle (BinIO.output1 outs) P.word32 (Nonce.nonce ());
+                   P.pickle (BinIO.output1 outs) P.bool (Unsafe.allowed ());
+                   writeNamespace outs;
+                   writeDatabase outs;
+                   writeRegistry outs;
+                   DatatypeInternal.write (BinIO.output1 outs);
+                   print "[";
+                   print filename;
+                   print " written]\n"
+                   ))
+               (fn () => BinIO.closeOut outs)
+         end
+
+
+      structure Word32Ordered
+         :> ORDERED where type t = Word32.word
+         =
+         struct
+            type t = Word32.word
+      
+            fun eq (x, y) = Word32.= x y
+            fun compare (x, y) = Word32.compare x y
+         end
+
+      structure NS = RedBlackSet (structure Elem = Word32Ordered)
+
+      val loaded = CR.new NS.empty
+
+      fun load filename =
+         try
+            if Unsafe.getParanoid () then
+               signalError "paranoid is set"
+            else if not (List.null (N.currentModule ())) then
+               (* We aren't at top level.  Object. *)
+               signalError "load initiated within a module"
+            else
+               let
+                  val ins = BinIO.openIn filename
+               in
+                  try
+                     Finally.finally
+                        (fn () => 
+                            let
+                               val magicNumber' =
+                                  Bytestring.implode
+                                     (List.rev
+                                         (iterup
+                                             (fns _ l =>
+                                                 (case BinIO.input1 ins of
+                                                     NONE =>
+                                                        signalError "imported database was written by an incompatible version of Istari"
+                              
+                                                   | SOME b => b :: l))
+                                             []
+                                             0 8))
+
+                               val () =
+                                  if Bytestring.eq (magicNumber, magicNumber') then
+                                     ()
+                                  else
+                                     signalError "imported database was written by an incompatible version of Istari"
+   
+                               val nonce = P.unpickle (fn () => input1 ins) P.word32
+                            in
+                               if NS.member (CR.deref loaded) nonce then
+                                  (* already loaded; ignore *)
+                                  (
+                                  print "[";
+                                  print filename;
+                                  print " already loaded]\n"
+                                  )
+                               else
+                                  (
+                                  CR.assign loaded (NS.insert (CR.deref loaded) nonce);
+
+                                  if
+                                     P.unpickle (fn () => input1 ins) P.bool
+                                  then
+                                     Unsafe.allow ()
+                                  else
+                                     () ;
+   
+                                  readNamespace ins;
+                                  readDatabase ins;
+                                  readRegistry ins;
+                                  DatatypeInternal.read (fn () => input1 ins);
+                                  print "[";
+                                  print filename;
+                                  print " loaded]\n"
+                                  )
+                            end)
+                     (fn () => BinIO.closeIn ins)
+                  with
+                     Pickle.Error =>
+                        raise (Error (LoadError,
+                                      "Error: imported file is corrupted.\n"))
+
+                   | Pickling.UnknownConstant =>
+                        raise (Error (LoadError,
+                                      "Error: imported file uses an unknown constant.\n(Probably a dependency is not loaded or has changed.)\n"))
+         
+                   | Pickling.Paranoid =>
+                        raise (Error (LoadError,
+                                      "Error: paranoid is set.\n"))
+         
+                   | Refine.NoExtracts =>
+                        raise (Error (LoadError,
+                                      "Error: imported file does not support extracts.\n"))
+               end
+            with
+               exn as (Error (_, msg)) =>
+                  (
+                  print msg;
+                  raise exn
+                  )
+
+   end

@@ -1,0 +1,938 @@
+
+signature ETERM =
+   sig
+
+      type eterm = Directory.idirectory -> Term.term
+      type symbol = Symbol.symbol
+      type binder = symbol option
+
+      exception Unbound of symbol
+      exception UnknownConstant of symbol list
+
+      val var    : symbol -> eterm        (* always a variable *)
+      val short  : symbol -> eterm
+      val long   : symbol list -> eterm   (* always a constant *)
+
+      val shortExplicit : symbol -> eterm
+      val longExplicit : symbol list -> eterm
+
+      val const  : Constant.constant -> eterm
+      val lam    : binder -> eterm -> eterm
+      val app    : eterm -> eterm -> eterm
+      val pair   : eterm -> eterm -> eterm
+      val pi1    : eterm -> eterm
+      val pi2    : eterm -> eterm
+      val next   : eterm -> eterm
+      val prev   : eterm -> eterm
+      val triv   : eterm
+      val evar   : eterm
+      val marker : symbol -> eterm
+
+      val apply1 : Constant.constant -> eterm -> eterm
+      val apply2 : Constant.constant -> eterm -> eterm -> eterm
+      val apply3 : Constant.constant -> eterm -> eterm -> eterm -> eterm
+
+      val additional : symbol option list -> eterm -> eterm
+
+      val literal : Term.term -> eterm
+      val closed  : eterm -> Term.term
+      val withdir : Directory.directory -> eterm -> Term.term
+
+   end
+
+
+structure ETerm :> ETERM =
+   struct
+
+      structure D = Directory
+      structure T = Term
+
+      type eterm = D.idirectory -> Term.term
+      type symbol = Symbol.symbol
+      type binder = symbol option
+
+      exception Unbound = D.Unbound
+
+      fun var x dir = T.Var (D.lookupVar dir x)
+
+      fun implicits n m =
+         (case Int.compare n 0 of
+             LESS =>
+                raise (Invalid "ETerm.implicits")
+
+           | EQUAL =>
+                m
+
+           | GREATER =>
+                let
+                   fun loop n acc =
+                      if n = 0 then
+                         acc
+                      else
+                         loop (n-1) (T.App (T.evar ()) :: acc)
+                in
+                   T.Elim (m, loop n [])
+                end)
+
+      fun shortExplicit x dir =
+         (case D.lookup dir x of
+             D.Hvar i => T.Var i
+           | D.Hconst k => T.Const k)
+
+      fun short x dir =
+         (case D.lookup dir x of
+             D.Hvar i =>
+                T.Var i
+
+           | D.Hconst k =>
+                implicits (Database.findImplicits k) (T.Const k))
+         
+
+      exception UnknownConstant of symbol list
+
+      fun longExplicit syms _ =
+         (case Namespace.resolveOpt syms of
+             NONE =>
+                raise (UnknownConstant syms)
+
+           | SOME const =>
+                T.Const const)
+
+      fun long syms _ =
+         (case Namespace.resolveOpt syms of
+             NONE =>
+                raise (UnknownConstant syms)
+
+           | SOME const =>
+                implicits (Database.findImplicits const) (T.Const const))
+         
+      fun const k _ = T.Const k
+
+      fun lam b m dir = 
+         (case b of
+             NONE =>
+                T.Lam (NONE, m (D.ibind0 dir))
+
+           | SOME x =>
+                T.Lam (SOME x, m (D.ibind dir x)))
+
+      fun app m1 m2 dir = T.Elim (m1 dir, [T.App (m2 dir)])
+
+      fun pair m1 m2 dir = T.Pair (m1 dir, m2 dir)
+
+      fun pi1 m dir = T.Elim (m dir, [T.Pi1])
+
+      fun pi2 m dir = T.Elim (m dir, [T.Pi2])
+
+      fun next m dir = T.Next (m dir)
+
+      fun prev m dir = T.Elim (m dir, [T.Prev])
+
+      fun triv _ = T.Triv
+
+      fun evar _ = T.Evar (T.newEbind ())
+
+      fun marker sym _ = T.Marker sym
+
+      fun apply1 const m1 dir = T.Elim (T.Const const, [T.App (m1 dir)])
+
+      fun apply2 const m1 m2 dir = T.Elim (T.Const const, [T.App (m1 dir), T.App (m2 dir)])
+
+      fun apply3 const m1 m2 m3 dir = T.Elim (T.Const const, [T.App (m1 dir), T.App (m2 dir), T.App (m3 dir)])
+
+      fun additional xs m dir =
+         (case xs of
+             [] =>
+                m dir
+
+           | NONE :: rest =>
+                additional rest m (D.ibind0 dir)
+
+           | SOME x :: rest =>
+                additional rest m (D.ibind dir x))
+
+      fun closed m = m Directory.iempty
+
+      fun literal m _ = m
+
+      fun withdir dir m = m (Directory.idir dir)
+
+   end
+
+
+structure ParseTerm =
+   struct
+
+      structure T = ETerm
+
+
+      fun id x = x
+      val none = NONE
+      val some = SOME
+      val null = []
+      fun sing x = [x]
+      fun duo x y = [x, y]
+      fun cons x y = x :: y
+      fun append x y = x @ y
+
+      fun longid strs = map Symbol.fromValue strs
+
+      fun bindingBare x = [(x, T.evar)]
+      fun bindingAnnot xl a = map (fn x => (x, a)) xl
+
+      val literal = T.literal
+
+      val short = T.short
+      val shortExplicit = T.shortExplicit
+      fun long strs = T.long (map Symbol.fromValue strs)
+      fun longExplicit strs = T.longExplicit (map Symbol.fromValue strs)
+      val var = T.var
+
+      fun level_plus n m =
+         if n = 0 then
+            m
+         else
+            T.apply1 Prim.lsucc (level_plus (n-1) m)
+
+      fun level_max l =
+         (case l of
+             [] => raise (Fail "bad level")
+
+           | [m] => m
+
+           | m1 :: rest =>
+                T.apply2 Prim.lmax m1 (level_max rest))
+
+      fun level_lit n =
+         if n = 0 then
+            T.const Prim.lzero
+         else
+            T.apply1 Prim.lsucc (level_lit (n-1))
+
+      fun univ m = T.apply1 Prim.univ m
+
+
+
+      fun lams xl m = foldr T.lam m xl
+
+      fun forall x a b = T.apply2 Prim.forall a (T.lam x b)
+      fun foralls al b = foldr (fns (x, a) b => forall x a b) b al
+
+      fun exists x a b = T.apply2 Prim.exists a (T.lam x b)
+      fun existss al b = foldr (fns (x, a) b => exists x a b) b al
+
+      fun iforall x a b = T.apply3 Prim.iforall T.evar a (T.lam x b)
+      fun iforalls al b = foldr (fns (x, a) b => iforall x a b) b al
+
+      fun iexists x a b = T.apply3 Prim.iexists T.evar a (T.lam x b)
+      fun iexistss al b = foldr (fns (x, a) b => iexists x a b) b al
+
+      fun intersect x a b = T.apply2 Prim.intersect a (T.lam x b)
+      fun intersects al b = foldr (fns (x, a) b => intersect x a b) b al
+
+      fun foralltp x b = T.apply1 Prim.foralltp (T.lam x b)
+      fun foralltps xl b = foldr foralltp b xl
+
+
+      fun rec x a = T.apply1 Prim.rec (T.lam (SOME x) a)
+      fun mu x a = T.apply1 Prim.mu (T.lam (SOME x) a)
+
+      fun wtype x a b = T.apply2 Prim.wtype a (T.lam (SOME x) b)
+
+      fun quotient x y a b = T.apply2 Prim.quotient a (T.lam (SOME x) (T.lam (SOME y) b))
+
+      val arrow = T.apply2 Prim.arrow
+      val tarrow = T.apply2 Prim.tarrow
+      val karrow = T.apply2 Prim.karrow
+      val guard = T.apply2 Prim.guard
+
+      fun letnext x m n = T.apply2 Prim.letnext m (T.lam (SOME x) n)
+
+      fun sumcase m x n y p = T.apply3 Prim.sumcase m (T.lam x n) (T.lam y p)
+
+      val prod = T.apply2 Prim.prod
+      val sum = T.apply2 Prim.sum
+
+      val app = T.app
+      val pi1 = T.pi1
+      val pi2 = T.pi2
+      val prev = T.prev
+      val next = T.next
+      fun inl m = T.apply1 Prim.inl m
+      fun inr m = T.apply1 Prim.inr m
+      fun ann m a = T.apply2 Prim.ann a m
+
+      fun ap m n = T.apply2 Prim.ap m n
+
+      fun set x a b = T.apply2 Prim.set a (T.lam (SOME x) b)
+
+      val squash = T.apply1 Prim.squash
+
+      fun ov m a = T.apply2 Prim.ov a m
+
+      val istp = T.apply1 Prim.istp
+
+      fun eq m n a = T.apply3 Prim.eq a m n
+
+      val eqtp = T.apply2 Prim.eqtp
+      val subtype = T.apply2 Prim.subtype
+      val eeqtp = T.apply2 Prim.eeqtp
+      val lleq = T.apply2 Prim.lleq
+
+      fun tuple ms =
+         (case ms of
+             [] => raise (Fail "precondition")
+
+           | [m] => m
+
+           | m :: rest =>
+                T.pair m (tuple rest))
+
+      fun number n =
+         if n <= 0 then
+            T.const Prim.zero
+         else
+            T.apply1 Prim.succ (number (n-1))
+
+      val evar = T.evar
+
+      val zilch = Symbol.fromValue ""
+      val hole = T.marker zilch
+
+      val triv = T.triv
+
+      val additional = T.additional 
+
+      fun shortConstant sym = Namespace.resolve [sym]
+      fun longConstant address = Namespace.resolve address
+
+
+
+      structure U = Show.Unparsing
+
+      fun register k arity prec unp =
+         ConstantTable.insert U.unparsingTable k (arity, prec, unp)
+
+
+      fun binderContent str (doms, cod) =
+         U.box $
+         U.append
+            [
+            U.box $
+            U.append
+               [
+               U.string str,
+               U.append
+                  (map 
+                      (fn (arg, dom) => 
+                         U.append
+                            [
+                            U.break 1,
+                            U.string "(",
+                            U.box $ 
+                               U.append
+                               [
+                               U.string arg,
+                               U.break 1,
+                               U.string ": ",
+                               U.box $ dom 0
+                               ],
+                            U.string ")"
+                            ])
+                      doms),
+               U.string " ."
+               ],
+            U.break 1,
+            cod 0,
+            ]
+
+      fun registerBinder k str =
+         register k 2 0
+         (U.wrap
+             (U.fix
+                 (fn unp =>
+                     U.alt
+                        [
+                        U.wrap
+                           (U.apply2 k U.show (U.lam unp))
+                           (fn (dom, (arg, (doms, cod))) => ((arg, dom) :: doms, cod)),
+
+                        U.wrap
+                           U.show
+                           (fn cod => ([], cod)),
+                        ]))
+             (binderContent str))
+
+      fun registerIBinder k str =
+         register k 3 0
+         (U.wrap
+             (U.fix
+                 (fn unp =>
+                     U.alt
+                        [
+                        U.wrap
+                           (U.apply3 k U.wild U.show (U.lam unp))
+                           (fn ((), dom, (arg, (doms, cod))) => ((arg, dom) :: doms, cod)),
+
+                        U.wrap
+                           U.show
+                           (fn cod => ([], cod)),
+                        ]))
+             (binderContent str))
+
+      (* right associative *)
+      fun registerBinary k str prec =
+         register k 2 prec
+         (U.wrap
+             (U.fix
+                 (fn unp =>
+                     U.alt
+                        [
+                        U.wrap
+                           (U.apply2 k U.show unp)
+                           (fn (dom, (doms, cod)) => (dom :: doms, cod)),
+
+                        U.wrap
+                           U.show
+                           (fn cod => ([], cod)),
+                        ]))
+             (fn (doms, cod) =>
+                 U.boxi 0 $
+                 U.append
+                    [
+                    U.append
+                       (map
+                           (fn dom =>
+                               U.append
+                                  [
+                                  dom (prec+1),
+                                  U.break 1,
+                                  U.string str,
+                                  U.string " "
+                                  ])
+                           doms),
+                    cod prec
+                    ]))
+
+      val () = registerBinder Prim.forall "forall"
+      val () = registerBinder Prim.exists "exists"
+      val () = registerIBinder Prim.iforall "iforall"
+      val () = registerIBinder Prim.iexists "iexists"
+      val () = registerBinder Prim.intersect "intersect"
+
+      val () =
+         register Prim.foralltp 1 0
+         (U.wrap
+             (U.fix
+                 (fn unp =>
+                     U.alt
+                        [
+                        U.wrap
+                           (U.apply1 Prim.foralltp (U.lam unp))
+                           (fn (arg, (args, cod)) => (arg :: args, cod)),
+
+                        U.wrap
+                           U.show
+                           (fn cod => ([], cod))
+                        ]))
+             (fns (doms, cod) =>
+                 U.box $
+                 U.append
+                    [
+                    U.box $
+                    U.append
+                       [
+                       U.string "foralltp",
+                       U.append
+                          (map 
+                              (fn arg => 
+                                 U.append
+                                    [
+                                    U.break 1,
+                                    U.string arg
+                                    ])
+                              doms),
+                       U.string " ."
+                       ],
+                    U.break 1,
+                    cod 0
+                    ]))
+
+      val () =
+         register Prim.rec 1 0
+         (U.wrap
+             (U.apply1 Prim.rec (U.lam U.show))
+             (fn (arg, body) =>
+                 U.append [U.string "rec ", U.string arg, U.string " .", U.break 1, body 1]))
+
+      val () =
+         register Prim.mu 1 0
+         (U.wrap
+             (U.apply1 Prim.mu (U.lam U.show))
+             (fn (arg, body) =>
+                 U.append [U.string "mu ", U.string arg, U.string " .", U.break 1, body 1]))
+
+      val () =
+         register Prim.wtype 2 0
+         (U.wrap
+             (U.apply2 Prim.wtype U.show (U.lam U.show))
+             (fn (a, (arg, b)) =>
+                 U.append [
+                          U.string "wtype (",
+                          U.string arg, 
+                          U.string " : ",
+                          U.box (a 0),
+                          U.string ") .",
+                          U.break 1,
+                          b 1
+                          ]))
+
+      val () =
+         register Prim.quotient 2 0
+         (U.wrap
+             (U.apply2 Prim.quotient U.show (U.lam (U.lam U.show)))
+             (fn (a, (x, (y, b))) =>
+                 U.append [
+                          U.string "quotient (",
+                          U.string x,
+                          U.string " ",
+                          U.string y,
+                          U.break 1,
+                          U.string ": ",
+                          a 0,
+                          U.string ") .",
+                          U.break 1,
+                          b 1
+                          ]))
+
+      val () = registerBinary Prim.arrow "->" 0
+      val () = registerBinary Prim.tarrow "-t>" 0
+      val () = registerBinary Prim.karrow "-k>" 0
+      val () = registerBinary Prim.guard "-g>" 0
+
+      val () =
+         register Prim.letnext 2 0
+         (U.wrap
+             (U.apply2 Prim.letnext U.show (U.lam U.show))
+             (fn (m, (x, n)) =>
+                 U.append [
+                          U.string "let next ",
+                          U.string x,
+                          U.string " =",
+                          U.break 1,
+                          m 1,
+                          U.string " in",
+                          U.break 1,
+                          n 0
+                          ]))
+
+      val () =
+         register Prim.sumcase 3 100
+         (U.wrap
+             (U.apply3 Prim.sumcase U.show (U.lam U.show) (U.lam U.show))
+             (fn (m, (x, n), (y, p)) =>
+                 U.append
+                    [
+                    U.string "(",
+
+                    U.boxi 0 $
+                    U.append [
+                             U.string "case ",
+                             U.box (m 1),
+                             U.string " of",
+                             U.break 1,
+                             U.string "| ",
+
+                             U.box $
+                                U.append
+                                   [
+                                   U.string "inl ",
+                                   U.string x,
+                                   U.string " .",
+                                   U.break 1,
+                                   U.box (n 0)
+                                   ],
+
+                             U.break 1,
+                             U.string "| ",
+
+                             U.box $
+                                U.append
+                                   [
+                                   U.string "inr ",
+                                   U.string y,
+                                   U.string " .",
+                                   U.break 1,
+                                   U.box (p 0)
+                                   ],
+
+                             U.string ")"
+                             ]
+                    ]))
+
+      val () =
+         register Prim.inl 1 90
+         (U.wrap
+             (U.apply1 Prim.inl U.show)
+             (fn m => U.append [U.string "inl ", m 91]))
+   
+      val () =
+         register Prim.inr 1 90
+         (U.wrap
+             (U.apply1 Prim.inr U.show)
+             (fn m => U.append [U.string "inr ", m 91]))
+
+      val () =
+         register Prim.ann 2 90
+         (U.wrap
+             (U.apply2 Prim.ann U.show U.show)
+             (fn (a, m) =>
+                 U.append [U.box (m 90), U.break 1, U.string ":> ", U.box (a 91)]))
+   
+      val () =
+         register Prim.ap 2 90
+         (U.wrap
+             (U.apply2 Prim.ap U.show U.show)
+             (fn (f, a) =>
+                 (U.append
+                     [
+                     f 90,
+                     U.break 1,
+                     U.string "ap ",
+                     U.box (a 91)
+                     ])))
+   
+      val () = registerBinary Prim.sum "%" 15
+
+      val () = registerBinary Prim.prod "&" 20
+
+      val () =
+         register Prim.ov 2 0
+         (U.wrap
+             (U.apply2 Prim.ov U.show U.show)
+             (fn (a, m) => U.append [m 1,
+                                     U.break 1, U.string ": ", a 0]))
+
+      val () =
+         register Prim.istp 1 0
+         (U.wrap
+             (U.apply1 Prim.istp U.show)
+             (fn a => U.append [a 1,
+                                U.break 1, U.string ": type"]))
+
+      val () =
+         register Prim.eq 3 30
+         (U.wrap
+             (U.apply3 Prim.eq U.show U.show U.show)
+             (fn (a, m, n) => U.append [m 31, 
+                                        U.break 1, U.string "= ", n 31, 
+                                        U.break 1, U.string ": ", a 31]))
+
+      val () =
+         register Prim.eqtp 2 30
+         (U.wrap
+             (U.apply2 Prim.eqtp U.show U.show)
+             (fn (a, b) => U.append [a 31, 
+                                     U.break 1, U.string "= ", b 31, 
+                                     U.break 1, U.string ": type"]))
+
+      val () =
+         register Prim.subtype 2 30
+         (U.wrap
+             (U.apply2 Prim.subtype U.show U.show)
+             (fn (a, b) => U.append [a 31, 
+                                     U.break 1, U.string "<: ", b 31]))
+
+      val () =
+         register Prim.eeqtp 2 30
+         (U.wrap
+             (U.apply2 Prim.eeqtp U.show U.show)
+             (fn (a, b) => U.append [a 31, 
+                                     U.break 1, U.string "<:> ", b 31]))
+
+      val () =
+         register Prim.set 2 100
+         (U.wrap
+             (U.apply2 Prim.set U.show (U.lam U.show))
+             (fn (a, (arg, b)) =>
+                 U.boxi 0
+                    (U.append
+                        [
+                        U.string "{ ",
+                        U.box 
+                           (U.append
+                               [
+                               U.string arg,
+                               U.string " :",
+                               U.break 1,
+                               a 0
+                               ]),
+                        U.break 1,
+                        U.string "| ",
+                        U.box (b 0),
+                        U.string " }"
+                        ])))
+
+      val () =
+         register Prim.squash 1 100
+         (U.wrap
+             (U.apply1 Prim.squash U.show)
+             (fn a => U.append [
+                               U.string "{ ",
+                               a 0,
+                               U.string " }"
+                               ]))
+
+      val () =
+         register Prim.zero 0 100
+         (U.wrap
+             (U.constant Prim.zero)
+             (fn () => U.string "0"))
+
+      val () =
+         register Prim.succ 1 100
+         (U.wrap
+             (U.fix
+                 (fn unp =>
+                     U.alt
+                        [
+                        U.wrap
+                           (U.constant Prim.zero)
+                           (fn () => 0),
+
+                        U.wrap
+                           (U.apply1 Prim.succ unp)
+                           (fn n => n + 1)
+                        ]))
+             (fn n => U.string (Int.toString n)))
+
+      datatype level_exp =
+         Literal of int
+       | Plus of int * level_exp
+       | Max of level_exp list
+       | Misc of U.content
+
+      fun lsucc e =
+         (case e of
+             Literal n => Literal (n+1)
+           | Plus (n, e') => Plus (n+1, e')
+           | _ => Plus (1, e))
+
+      fun lmax (e1, e2) =
+         (case e2 of
+             Max l => Max (e1 :: l)
+
+           | _ => Max [e1, e2])
+
+      fun showLevel e prec =
+         (case e of
+             Literal n =>
+                U.string (Int.toString n)
+
+           | Plus (n, e) =>
+                U.parens (prec > 0)
+                   (U.append
+                       [
+                       U.string (Int.toString n),
+                       U.break 1,
+                       U.string "+ ",
+                       showLevel e 0
+                       ])
+
+           | Max [] => raise (Fail "impossible")
+
+           | Max (e0 :: l) =>
+                U.append
+                   (
+                   U.string "[" ::
+                   showLevel e0 1 ::
+
+                   List.foldr
+                      (fns e c =>
+                          U.break 1 ::
+                          showLevel e 1 ::
+                          c)
+                      [U.string "]"]
+                      l
+                   )
+
+           | Misc c => c)
+
+      val unparseLevel =
+         U.wrap
+            (U.fix
+                (fn unp =>
+                    U.alt
+                       [
+                       U.wrap
+                          (U.constant Prim.lzero)
+                          (fn () => Literal 0),
+
+                       U.wrap
+                          (U.apply1 Prim.lsucc unp)
+                          lsucc,
+
+                       U.wrap
+                          (U.apply2 Prim.lmax unp unp)
+                          lmax,
+
+                       U.wrap
+                          U.show
+                          (fn c => Misc (c 100))
+                       ]))
+            (fns e prec =>
+                showLevel e (if prec > 0 then 1 else 0))
+
+      val () =
+         register Prim.univ 1 90
+         (U.wrap
+             (U.apply1 Prim.univ unparseLevel)
+             (fn c =>
+                 U.append
+                    [
+                    U.string "U",
+                    U.break 1,
+                    c 91
+                    ]))
+
+      val () =
+         register Prim.lleq 2 30
+         (U.wrap
+             (U.apply2 Prim.lleq unparseLevel unparseLevel)
+             (fn (c, d) => U.append [c 31, 
+                                     U.break 1, U.string "<l= ", d 31]))
+
+      val () =
+         U.reserved :=
+         List.foldl
+            (fns str set => SymbolSet.insert set (Symbol.fromValue str))
+            SymbolSet.empty
+            ["forall", "exists", "iforall", "iexists", "inl", "inr", "rec", "wtype", "quotient"]
+
+   end
+
+
+grammardef Term
+
+   open ParseTerm
+
+   rule Longident  ::= AnyIdent => sing
+   rule Longident  ::= LONGID => longid
+
+   rule Numbers   ::= => null
+   rule Numbers   ::= NUMBER Numbers => cons
+   rule Numbersn  ::= NUMBER Numbers => cons
+
+   rule Idents    ::= => null
+   rule Idents    ::= Ident Idents => cons
+
+   rule OIdent    ::= Ident => some
+   rule OIdent    ::= "_" => none
+
+   rule IdentPat  ::= Ident => some
+   rule IdentPat  ::= "?" => none
+
+   rule OIdents   ::= => null
+   rule OIdents   ::= OIdent OIdents => cons
+
+   rule Binding   ::= OIdent => bindingBare
+   rule Binding   ::= "(" OIdents ":" Term ")" => bindingAnnot
+
+   rule Bindings  ::= => null
+   rule Bindings  ::= Binding Bindings => append
+
+   rule Level(0)  ::= NUMBER "+" Level(0) => level_plus
+   rule Level(1)  ::= "[" Levels "]" => level_max
+   rule Level(1)  ::= NUMBER => level_lit
+   rule Level(1)  ::= Ident => var
+   rule Level(1)  ::= "(" Level(0) ")" => id
+   rule Level(1)  ::= EMBED => id
+
+   rule Levels    ::= Level(1) => sing
+   rule Levels    ::= Level(1) Levels => cons
+
+   rule Term(0)   ::= "fn" OIdents "." Term(0) => lams
+
+   rule Term(0)   ::= "forall" Bindings "." Term(0) => foralls
+   rule Term(0)   ::= "exists" Bindings "." Term(0) => existss
+   rule Term(0)   ::= "iforall" Bindings "." Term(0) => iforalls
+   rule Term(0)   ::= "iexists" Bindings "." Term(0) => iexistss
+   rule Term(0)   ::= "intersect" Bindings "." Term(0) => intersects
+   rule Term(0)   ::= "foralltp" OIdents "." Term(0) => foralltps
+
+   rule Term(0)   ::= "rec" Ident "." Term(1) => rec
+   rule Term(0)   ::= "mu" Ident "." Term(1) => mu
+   rule Term(0)   ::= "wtype" "(" Ident ":" Term(0) ")" "." Term(1) => wtype
+   rule Term(0)   ::= "quotient" "(" Ident Ident ":" Term(0) ")" "." Term(1) => quotient
+
+   rule Term(0)   ::= Term(1) "->" Term(0) => arrow
+   rule Term(0)   ::= Term(1) "-t>" Term(0) => tarrow
+   rule Term(0)   ::= Term(1) "-k>" Term(0) => karrow
+   rule Term(0)   ::= Term(1) "-g>" Term(0) => guard
+
+   rule Term(0)   ::= "let" "next" Ident "=" Term(1) "in" Term(0) => letnext
+
+   rule Term(0)   ::= "case" Term(1) "of" "|" "inl" OIdent "." Term(0) "|" "inr" OIdent "." Term(0) => sumcase
+
+   (* NB: lower precedence than equality *)
+   rule Term(0)   ::= Term(1) ":" Term(0) => ov
+   rule Term(0)   ::= Term(1) ":" "type" => istp
+
+   rule Term(15)  ::= Term(16) "%" Term(15) => sum
+
+   rule Term(20)  ::= Term(21) "&" Term(20) => prod
+
+   rule Term(30)  ::= Term(31) "=" Term(31) ":" Term(31) => eq
+   rule Term(30)  ::= Term(31) "=" Term(31) ":" "type" => eqtp
+   rule Term(30)  ::= Term(31) "<:" Term(31) => subtype
+   rule Term(30)  ::= Term(31) "<:>" Term(31) => eeqtp
+   rule Term(30)  ::= Term(31) "<l=" Term(31) => lleq
+
+   rule Term(90)  ::= Term(90) Term(91) => app
+   rule Term(90)  ::= Term(90) "#1" => pi1
+   rule Term(90)  ::= Term(90) "#2" => pi2
+   rule Term(90)  ::= Term(90) "#prev" => prev
+   rule Term(90)  ::= "pi1" Term(91) => pi1
+   rule Term(90)  ::= "pi2" Term(91) => pi2
+   rule Term(90)  ::= "prev" Term(91) => prev
+   rule Term(90)  ::= "next" Term(91) => next
+   rule Term(90)  ::= "inl" Term(91) => inl
+   rule Term(90)  ::= "inr" Term(91) => inr
+   rule Term(90)  ::= "U" Level(1) => univ
+
+   rule Term(90)  ::= Term(90) ":>" Term(91) => ann
+   rule Term(90)  ::= Term(90) "ap" Term(91) => ap
+
+   rule Term(100) ::= "(" Term ")" => id
+   rule Term(100) ::= "(" TermList ")" => tuple
+   rule TermList  ::= Term(1) "," Term(1) => duo
+   rule TermList  ::= Term(1) "," TermList => cons
+
+   rule Term(100) ::= "{" Ident ":" Term "|" Term "}" => set
+   rule Term(100) ::= "{" Term "}" => squash
+
+   rule Term(100) ::= EMBED => literal
+   rule Term(100) ::= "`l" LTerm => literal
+   rule Term(100) ::= "`i" Ident => short
+   rule Term(100) ::= Ident => short
+   rule Term(100) ::= "`" AnyIdent => shortExplicit
+   rule Term(100) ::= LONGID => long
+   rule Term(100) ::= "`" LONGID => longExplicit
+   rule Term(100) ::= NUMBER => number
+   rule Term(100) ::= "_" => evar
+   rule Term(100) ::= "__" => hole
+   rule Term(100) ::= "(" ")" => triv
+   rule Term(100) ::= "`level" Level(1) => id
+
+   rule Term(0)   ::= "additional" OIdents "." Term(0) => additional
+
+   rule Constant  ::= Longident => longConstant
+
+   reserved "U" "additional" "ap" "case" "exists" "fn" "forall" "iexists" "iforall" "in" "inl" "inl" "inr" "let" "mu" "next" "pi1" "pi2" "prev" "quotient" "rec" "wtype" : Ident
+
+   default Term
+
+end
+
+
+grammaron Term

@@ -1,0 +1,64 @@
+
+grammardef Term
+
+rule Idents    ::= IDENT => sing
+rule Idents    ::= IDENT Idents => Cons
+
+rule Binding   ::= IDENT => bare
+rule Binding   ::= "(" Idents ":" Term ")" => annotated
+
+rule Bindings  ::= => nil
+rule Bindings  ::= Binding Bindings => Cons
+
+rule Term(10)  ::= "fn" Bindings "." Term(10) => lam
+rule Term(100) ::= Term(100) "+" Term(101) => plus
+rule Term(100) ::= Term(100) "-" Term(101) => minus
+rule Term(101) ::= Term(101) "*" Term(102) => times
+rule Term(101) ::= Term(101) "div" Term(102) => div
+rule Term(180) ::= Term(180) Term(181) => app
+rule Term(200) ::= NUMBER => number
+rule Term(200) ::= STRING => string
+rule Term(200) ::= IDENT => ident
+rule Term(200) ::= LONGID => longid
+rule Term(200) ::= "(" Term ")" => id
+
+infix right tupled 5 Next
+
+end
+
+grammaron Term
+
+signature BOGUS =
+   sig
+      structure Foo :
+         sig
+            structure Bar :
+               sig
+                  val baz : unit
+               end
+         end
+
+      val bare : unit
+      val sing : unit
+      val ident : unit
+      val annotated : unit
+      val longid : unit
+      val number : unit
+      val lam : unit
+      val string : unit
+   end
+
+structure Bogus :> BOGUS = struct end
+
+open Bogus
+
+datatype 'a llist = Nil | Cons of 'a * 'a llist
+
+val plus = (+)
+val times = ( * )
+
+fun id x = x
+
+val t = / fn f (x x' : nat) . G.g 1 + x div f x' * (\Foo.Bar.baz + 0\ + 1) /
+
+val x = / (fn str . length str) "foo" / 

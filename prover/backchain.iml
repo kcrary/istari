@@ -1,0 +1,406 @@
+
+signature BACKCHAIN =
+   sig
+
+      type tactic = Tactic.tactic
+
+      val soRaw : ETerm.eterm -> IntroPattern.ipattern -> tactic
+      val so : ETerm.eterm -> IntroPattern.ipattern -> tactic
+
+      val applyRaw : ETerm.eterm -> tactic
+      val apply : ETerm.eterm -> tactic
+
+      val exploitRaw : ETerm.eterm -> IntroPattern.ipattern -> tactic
+      val exploit : ETerm.eterm -> IntroPattern.ipattern -> tactic
+
+      val eexploitRaw : ETerm.eterm -> IntroPattern.ipattern -> tactic
+      val eexploit : ETerm.eterm -> IntroPattern.ipattern -> tactic
+
+      val witnessRaw : ETerm.eterm -> tactic
+      val witness : ETerm.eterm -> tactic
+
+   end
+
+
+signature BACKCHAIN_INTERNAL =
+   sig
+
+      include BACKCHAIN
+
+
+      type 'a tacticm = 'a Tactic.tacticm
+      type priority = Typecheck.priority
+
+      (* soMain G M fk sk
+
+         calls  sk (B, tac)
+         where  G |- M' : B  (for some M' that is M with markers filled in)
+         and    tac partially proves G |- B (marking typing subgoals Secondary)
+         or     calls fk <message>
+      *)
+      val soMain : Judgement.context -> Term.term -> (string -> 'a) -> (Term.term * priority tacticm -> 'a) -> 'a
+      
+
+      (* exploitMain dep A tac sk
+
+         if    tac partially proves G |- A (marking typing subgoals with true)
+         then  calls sk (B, tac')
+               where tac' partially proves G |- B (marking typing subgoals Secondary)
+               and B arises from A using arrow elimination (or forall elim if dep=true)
+      *)
+      val exploitMain : bool -> Term.term -> priority tacticm -> (Term.term * priority tacticm -> 'a) -> 'a
+
+      val applyPriority : ETerm.eterm -> priority tacticm
+      val witnessPriority : ETerm.eterm -> priority tacticm
+
+   end
+
+
+structure BackchainInternal :> BACKCHAIN_INTERNAL =
+   struct
+
+      structure J = Judgement
+      structure N = Normalize
+      structure T = Term
+      structure D = Directory
+      structure DE = DestructInternal
+      structure TC = Typecheck
+
+      type priority = TC.priority
+
+      open Tactic
+      open CasePervasive
+
+
+      (* soSpine A spine tac fk sk
+
+         if    tac partially proves G |- A (marking typing subgoals true)
+         then  calls sk (B, tac')
+               where tac' partially proves G |- B (marking typing subgoals true)a
+               and B arises from using spine on A
+         or    calls fk <message>
+      *)
+      fun soSpine a spine tac fk sk =
+         (case spine of
+             [] =>
+                sk (a, tac)
+
+           | T.App (T.Marker _) :: rest =>
+                (case N.whnf a of
+                    T.Elim (T.Const const, [T.App dom, T.App cod]) =>
+                       if Constant.eq (const, Prim.forall) then
+                          fk "marker used for dependent argument"
+
+                       else if Constant.eq (const, Prim.arrow) then
+                          soSpine cod rest
+                             (refine (Rule.arrowElim dom cod) >>>
+                              [tac, idtacM TC.Primary])
+                             fk sk
+
+                      else
+                         fk "type error in marker application"
+
+                  | _ => fk "type error in marker application")
+
+           | T.App n :: rest =>
+                (case N.whnf a of
+                    T.Elim (T.Const const, [T.App dom, T.App cod]) =>
+                       if Constant.eq (const, Prim.forall) then
+                          (case N.whnf cod of
+                              T.Lam (_, cod') =>
+                                 soSpine
+                                    (T.Sub (cod', T.Dot (n, T.id)))
+                                    rest
+                                    (refine (Rule.forallElim dom cod' n) >>>
+                                     [tac, idtacM TC.Secondary])
+                                    fk sk
+
+                            | _ => fk "type error in application")
+
+                       else if Constant.eq (const, Prim.arrow) then
+                          soSpine cod rest
+                             (refine (Rule.arrowElim dom cod) >>>
+                                 [
+                                 tac,
+                                 refine (Rule.inhabitant dom n) >> idtacM TC.Secondary
+                                 ])
+                             fk sk
+
+                      else
+                         fk "type error in application"
+
+                  | _ => fk "type error in application")
+
+           | T.Pi1 :: rest =>
+                (case N.whnf a of
+                    T.Elim (T.Const const, [T.App a1, T.App a2]) =>
+                       if Constant.eq (const, Prim.exists) then
+                          fk "projection from exists after marker"
+
+                       else if Constant.eq (const, Prim.prod) then
+                          soSpine a1 rest
+                          (refine (Rule.prodElim1 a1 a2) >> tac)
+                          fk sk
+
+                       else
+                          fk "type error in #1"
+
+                  | _ => fk "type error in #1")
+
+           | T.Pi2 :: rest =>
+                (case N.whnf a of
+                    T.Elim (T.Const const, [T.App a1, T.App a2]) =>
+                       if Constant.eq (const, Prim.exists) then
+                          fk "projection from exists after marker"
+
+                       else if Constant.eq (const, Prim.prod) then
+                          soSpine a2 rest
+                          (refine (Rule.prodElim2 a1 a2) >> tac)
+                          fk sk
+
+                       else
+                          fk "type error in #2"
+
+                  | _ => fk "type error in #2")
+
+           | T.Prev :: _ =>
+                (* Cannot typecheck a prev in isolation. *)
+                fk "isolated #prev")
+                          
+
+      (* comment in signature *)
+      fun soMain ctx m fk sk =
+         (case
+             (try
+                 Sum.INL (Infer.inferPartial ctx m (fns _ _ => idtac))
+              with
+                 Infer.InferError (_, _, msg) =>
+                    Sum.INR ("inference failed: " ^ msg)
+
+               | Infer.NotPath msg =>
+                    Sum.INR ("inference failed: " ^ msg))
+          of
+             Sum.INL (a, tac, m', remainder) =>
+                (case remainder of
+                    [] =>
+                       sk (a,
+                           refine (Rule.inhabitant a m) >> tac >> idtacM TC.Secondary)
+
+                  | spine =>
+                       soSpine a spine
+                          (refine (Rule.inhabitant a m') >> tac >> idtacM TC.Secondary)
+                          fk sk)
+
+           | Sum.INR msg => fk msg)
+         
+
+      fun soPriority em pat =
+         let
+            do (jud, dir) = withgoal
+            val m = em (Directory.idir dir)
+
+            do (a, tac) =
+               soMain (J.context jud) m fail
+         in
+            refine (Rule.assert a (J.concl jud)) >>>
+               [
+               tac,
+               DE.destruct0 pat (idtacM TC.Primary)
+               ]
+         end
+
+      fun soRaw em pat = soPriority em pat >> idtac
+
+      fun so em pat = Typecheck.withTypecheckSnd $ soPriority em pat
+
+
+
+      (* applyMain A C tac fk sk
+
+         if    tac partially proves G |- A (marking typing subgoals with true)
+         then  if    C can backchain through A
+               then  calls sk tac'
+               where tac' partially proves G |- C (marking typing subgoals with true)
+               else  calls fk ()
+
+         Note fk and sk have codomain answer.
+      *)
+      fun applyMain a c tac fk sk =
+         if Unify.unify1 a c then
+            sk tac
+         else
+            termCaseX (N.whnf a)
+            /[
+                \Prim.forall\ ? (fn . ?) =>
+                \fnc dom cod =>
+                    let
+                       val e = T.evar ()
+                    in
+                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
+                       (refine (Rule.forallElim dom cod e) 
+                        >>> [tac, idtacM TC.Secondary])
+                       fk sk
+                    end\
+
+              | \Prim.arrow\ ? ? =>
+                \fnc dom cod =>
+                    applyMain cod c
+                    (refine (Rule.arrowElim dom cod) 
+                     >>> [tac, idtacM TC.Primary])
+                    fk sk\
+
+              | \Prim.intersect\ ? (fn . ?) =>
+                \fnc dom cod =>
+                    let
+                       val e = T.evar ()
+                    in
+                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
+                       (refine (Rule.intersectElim dom cod e) 
+                        >>> [tac, idtacM TC.Secondary])
+                       fk sk
+                    end\
+
+              | \Prim.tarrow\ ? ? =>
+                \fnc dom cod =>
+                    applyMain cod c
+                    (refine (Rule.tarrowElim dom cod)
+                     >>> [tac, idtacM TC.Primary])
+                    fk sk\
+
+              | \Prim.karrow\ ? ? =>
+                \fnc dom cod =>
+                    applyMain cod c
+                    (refine (Rule.karrowElim dom cod)
+                     >>> [tac, idtacM TC.Primary])
+                    fk sk\
+
+              | \Prim.prod\ ? ? =>
+                \fnc a1 a2 =>
+                    applyMain a1 c
+                       (refine (Rule.prodElim1 a1 a2) >> tac)
+                       (fn () =>
+                           applyMain a2 c
+                           (refine (Rule.prodElim2 a1 a2) >> tac)
+                           fk sk)
+                       sk\
+             ]
+
+            | _ => \fnc => fk ()\
+            /
+
+      fun applyPriority em =
+         let
+            do (jud, dir) = withgoal
+            val m = em (Directory.idir dir)
+
+            do (a, atac) =
+               soMain (J.context jud) m
+               (fn msg => fail msg)
+
+            (* atac partially proves G |- A *)
+
+            val c = J.concl jud
+         in
+            (* applyMain has to return answer *)
+            fns goal fk sk =>
+            applyMain a c
+               atac
+               (fn () => fk "lemma does not match goal")
+               (fn ctac => ctac goal fk sk)
+         end
+
+      fun applyRaw em = applyPriority em >> idtac
+
+      fun apply em = Typecheck.withTypecheckSnd $ applyPriority em
+
+
+
+      (* comment in signature *)
+      fun exploitMain dep a tac sk =
+         (case N.whnf a of
+             T.Elim (T.Const const, [T.App dom, T.App cod]) =>
+                if Constant.eq (const, Prim.arrow) then
+                   exploitMain dep cod
+                   (refine (Rule.arrowElim dom cod)
+                    >>> [tac, idtacM TC.Primary])
+                   sk
+                else if dep andalso Constant.eq (const, Prim.forall) then
+                   (case N.whnf cod of
+                       T.Lam (_, cod') =>
+                          let
+                             val e = T.evar ()
+                          in
+                             exploitMain dep (T.Sub (cod', T.Dot (e, T.id)))
+                             (refine (Rule.forallElim dom cod' e)
+                              >>> [tac, idtacM TC.Secondary])
+                             sk
+                          end
+
+                     | _ => sk (a, tac))
+                else
+                   sk (a, tac)
+
+           | _ => sk (a, tac))
+
+
+      fun exploitGen dep em pat =
+         let
+            do (jud, dir) = withgoal
+            val m = em (Directory.idir dir)
+
+            do (a, atac) =
+               soMain (J.context jud) m
+               (fn "" => fail "type inference failed"
+                 | msg => fail ("type inference failed: " ^ msg))
+
+            (* atac partially proves G |- A *)
+
+            do (b, btac) = exploitMain dep a atac
+
+            (* btac partially proves G |- B *)
+         in
+            refine (Rule.assert b (J.concl jud)) >>>
+               [
+               btac,
+               DE.destruct0 pat (idtacM TC.Primary)
+               ]
+         end
+
+      fun exploitRaw em pat = exploitGen false em pat >> idtac
+
+      fun eexploitRaw em pat = exploitGen true em pat >> idtac
+
+      fun exploit em pat = Typecheck.withTypecheckSnd $ exploitGen false em pat
+
+      fun eexploit em pat = Typecheck.withTypecheckSnd $ exploitGen true em pat
+
+
+
+      
+      fun witnessPriority em =
+         let
+            do (jud, dir) = withgoal
+            val m = em (Directory.idir dir)
+            
+            do (a, atac) =
+               soMain (J.context jud) m
+               (fn "" => fail "type inference failed"
+                 | msg => fail ("type inference failed: " ^ msg))
+
+            (* atac partially proves G |- A *)
+         in
+            (* checking the match ourselves allows us to produce a better error message *)
+            if Unify.unify1 a (J.concl jud) then
+               atac
+            else
+               fail "witness does not match goal"
+         end
+
+      fun witnessRaw em = witnessPriority em >> idtac
+
+      fun witness em = Typecheck.withTypecheckSnd $ witnessPriority em
+
+   end
+
+
+structure Backchain :> BACKCHAIN = BackchainInternal

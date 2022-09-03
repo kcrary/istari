@@ -1,0 +1,845 @@
+
+signature CASE =
+   sig
+
+      type constant = Term.constant
+      type term = Term.term
+      type spine = Term.elim list
+      type hyp = Judgement.hyp
+      type context = Judgement.context
+
+      type answer = exn
+      type 'a tacticm = 'a Tactic.tacticm
+
+
+      (* matching 'a, adds to 'b, resulting in 'c *)
+      type ('a, 'b, 'c) matcher
+
+      val wild : ('a, 'b, 'b) matcher
+      val what : ('a, 'b, 'b * 'a) matcher
+      val az : ('a, 'b * 'a, 'c) matcher -> ('a, 'b, 'c) matcher  (* "as" *)
+
+      val wrap : ('a, 'b, 'c) matcher -> ('c -> 'd) -> ('a, 'b, 'd) matcher
+      val alt : ('a, 'b, 'c) matcher list -> ('a, 'b, 'c) matcher
+
+      type ('a, 'c) rmatcher
+      val use : ('a, 'c) rmatcher -> ('a, 'b, 'b * 'c) matcher
+      val fix : (('a, 'c) rmatcher -> ('a, unit, 'c) matcher) -> ('a, 'b, 'b * 'c) matcher
+
+      (* backtracks on NONE *)
+      val cond : ('a, 'b, 'c option) matcher -> ('a, 'b, 'c) matcher
+
+      (* returns NONE when the function raises Backtrack *)
+      exception Backtrack
+      val tri : ('a -> 'b) -> ('a -> 'b option)  (* "try" *)
+
+      (* wrapk m f = cond (wrap m (tri f)) *)
+      val wrapk : ('a, 'b, 'c) matcher -> ('c -> 'd) -> ('a, 'b, 'd) matcher
+
+      val seq : ('a, 'c, 'd) matcher -> ('b, 'd, 'e) matcher -> ('a * 'b, 'c, 'e) matcher
+
+
+      (* terms *)
+
+      val constant : constant -> (term, 'a, 'a) matcher
+      val variable : int -> (term, 'a, 'a) matcher
+      val elim : (term, 'a, 'b) matcher -> (spine, 'b, 'c) matcher -> (term, 'a, 'c) matcher
+      val whatConstant : (term, 'a, 'a * constant) matcher
+      val whatVar : (term, 'a, 'a * int) matcher
+      val whatEvar : (term, 'a, 'a * (Term.ebind * Term.sub)) matcher
+
+      val lam : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+      val lamb : (term, 'a * Term.binder, 'b) matcher -> (term, 'a, 'b) matcher
+      val pair : (term, 'a, 'b) matcher -> (term, 'b, 'c) matcher -> (term, 'a, 'c) matcher
+      val next : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+      val triv : (term, 'a, 'a) matcher
+      val marker : Symbol.symbol -> (term, 'a, 'a) matcher
+
+      val unify : term -> (term, 'a, 'a) matcher
+
+      val whnf : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+      val whnfHard : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+
+      val nat : (term, 'a, 'a * int) matcher
+
+      (* a little faster than using alt, elim, and constant *)
+      val paths : (constant * (spine, 'a, 'b) matcher) list -> (term, 'a, 'b) matcher
+
+
+      (* spines *)
+      
+      val null : (spine, 'a, 'a) matcher
+      val app : (term, 'a, 'b) matcher -> (spine, 'b, 'c) matcher -> (spine, 'a, 'c) matcher
+      val pi1 : (spine, 'a, 'b) matcher -> (spine, 'a, 'b) matcher
+      val pi2 : (spine, 'a, 'b) matcher -> (spine, 'a, 'b) matcher
+      val prev : (spine, 'a, 'b) matcher -> (spine, 'a, 'b) matcher
+
+
+      (* hypotheses *)
+
+      val tm : (term, 'a, 'b) matcher -> (hyp, 'a, 'b) matcher
+      val tml : (term, 'a, 'b) matcher -> (hyp, 'a, 'b) matcher
+      val tmh : (term, 'a, 'b) matcher -> (hyp, 'a, 'b) matcher
+      val tp : (hyp, 'a, 'a) matcher
+      val tpl : (hyp, 'a, 'a) matcher
+
+
+      (* contexts
+
+         The hypothesis being matched is shifted into the entire context's scope.
+      *)
+
+      val hyp : int -> (hyp, 'a, 'b) matcher -> (context, 'a, 'b) matcher
+      val anyhyp : (hyp, 'a, int -> 'b) matcher -> (context, 'a, 'b) matcher
+
+
+
+      (* Raises NoMatch when matching fails. *)
+      exception NoMatch
+      val termCaseX : term -> (term, unit, 'a) matcher -> 'a
+      val unitCaseX : (unit, unit, 'a) matcher -> 'a
+      val term2CaseX : term -> term -> (term * term, unit, 'a) matcher -> 'a
+      val term3CaseX : term -> term -> term -> (term * (term * term), unit, 'a) matcher -> 'a
+      val spineCaseX : spine -> (spine, unit, 'a) matcher -> 'a
+      val hypCaseX : hyp -> (hyp, unit, 'a) matcher -> 'a
+      val contextCaseX : context -> (context, unit, 'a) matcher -> 'a
+
+
+
+      (* Backtracks when matching fails.
+         Will not try other matches when the resulting tactic or subsequent tactics fail.
+      *)
+
+      val termCase : term -> (term, unit, 'a tacticm) matcher -> 'a tacticm
+      val unitCase : (unit, unit, 'a tacticm) matcher -> 'a tacticm
+      val term2Case : term -> term -> (term * term, unit, 'a tacticm) matcher -> 'a tacticm
+      val term3Case : term -> term -> term -> (term * term * term, unit, 'a tacticm) matcher -> 'a tacticm
+      val spineCase : spine -> (spine, unit, 'a tacticm) matcher -> 'a tacticm
+      val hypCase : hyp -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+      val contextCase : context -> (context, unit, 'a tacticm) matcher -> 'a tacticm
+      val goalCase : (term, unit, 'a tacticm) matcher -> 'a tacticm
+      val goalContextCase : (context, unit, 'a tacticm) matcher -> 'a tacticm
+
+
+
+      (* Backtracks when matching fails.
+         Tries other matches when the resulting tactic or subsequent tactics fail.
+      *)
+
+      val termCaseB : term -> (term, unit, 'a tacticm) matcher -> 'a tacticm
+      val unitCaseB : (unit, unit, 'a tacticm) matcher -> 'a tacticm
+      val term2CaseB : term -> term -> (term * term, unit, 'a tacticm) matcher -> 'a tacticm
+      val term3CaseB : term -> term -> term -> (term * term * term, unit, 'a tacticm) matcher -> 'a tacticm
+      val spineCaseB : spine -> (spine, unit, 'a tacticm) matcher -> 'a tacticm
+      val hypCaseB : hyp -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+      val contextCaseB : context -> (context, unit, 'a tacticm) matcher -> 'a tacticm
+      val goalCaseB : (term, unit, 'a tacticm) matcher -> 'a tacticm
+      val goalContextCaseB : (context, unit, 'a tacticm) matcher -> 'a tacticm
+
+
+      (* Note on rationale:
+         One may wonder why termCase, etc. are not just polymorphic instead.
+         We want to preserve an invariant on terms (namely, simple form), and
+         that precludes having a polymorphic entry point that could be used
+         with terms not satifying the invariant.
+
+         The alternatives are to resimplify terms repeatedly in every case,
+         which would be expensive, or to create the opportunity for subtle bugs
+         by making it possible for term matching to bypass establishing the 
+         invariant.
+      *)
+
+   end
+
+
+structure Case :> CASE =
+   struct
+
+      structure T = Term
+      structure N = Normalize
+      structure J = Judgement
+
+      type constant = Term.constant
+      type term = Term.term
+      type spine = Term.elim list
+      type hyp = Judgement.hyp
+      type context = Judgement.context
+
+      type answer = exn
+      type 'a tacticm = 'a Tactic.tacticm
+
+      type ('a, 'b, 'c) matcher =
+         'a                                    (* the discriminand *)
+         -> 'b                                 (* the accumulator *)
+         -> (unit -> answer)                   (* failure continuation *)
+         -> ('c * (unit -> answer) -> answer)  (* success continuation *)
+         -> answer
+
+      
+      fun wild _ x fk sk = sk (x, fk)
+
+
+      fun what m x fk sk = sk ((x, m), fk)
+
+
+      fun az f m x fk sk = f m (x, m) fk sk
+      
+
+      fun wrap f g m x fk sk =
+         let
+            do (y, fk') = f m x fk
+         in
+            sk (g y, fk')
+         end
+
+
+      fun alt l m x fk sk =
+         (case l of
+             [] => fk ()
+
+           | f :: rest =>
+                f m x (fn () => alt rest m x fk sk) sk)
+
+         
+      type ('a, 'b) rmatcher =
+         'a
+         -> (unit -> answer)
+         -> ('b * (unit -> answer) -> answer)
+         -> answer
+
+      fun use f m x fk sk =
+         let
+            do (y, fk') = f m fk
+         in
+            sk ((x, y), fk')
+         end
+
+      (* fixr as an rmatcher
+         Just using fix would cause polymorphic recursion, plus this is simpler anyway.
+      *)
+      fun fixr f m fk sk = f (fixr f) m () fk sk
+
+      fun fix f m x fk sk =
+         let
+            do (y, fk') = f (fixr f) m () fk
+         in
+            sk ((x, y), fk')
+         end
+
+         
+      fun cond f m x fk sk =
+         let
+            do (yopt, fk') = f m x fk
+         in
+            (case yopt of
+                SOME y => sk (y, fk')
+               
+              | NONE => fk' ())
+         end
+         
+
+      exception Backtrack
+
+      fun tri f x =
+         (try SOME (f x)
+          with Backtrack => NONE)
+
+
+      fun wrapk f g = cond (wrap f (tri g))
+
+
+      fun seq f g (m, n) x fk sk =
+         let
+            do (y, fk') = f m x fk
+         in
+            g n y fk sk
+         end
+
+
+      fun constant const m x fk sk =
+         (case m of
+             T.Elim (T.Const const', []) =>
+                if Constant.eq (const, const') then
+                   sk (x, fk)
+                else
+                   fk ()
+
+           | _ => fk ())
+
+
+      fun variable i m x fk sk =
+         (case m of
+             T.Elim (T.Var j, []) =>
+                if i = j then
+                   sk (x, fk)
+                else
+                   fk ()
+
+           | _ => fk ())
+
+
+      fun elim f g m x fk sk =
+         (case m of
+             T.Elim (h, spine) =>
+                let
+                   do (y, fk') = f (N.simplify h) x fk
+                in
+                   g spine y fk' sk
+                end
+
+           | _ => fk ())
+
+      
+      fun whatConstant m x fk sk =
+         (case m of
+             T.Elim (T.Const const, []) =>
+                sk ((x, const), fk)
+
+           | _ => fk ())
+
+
+      fun whatVar m x fk sk =
+         (case m of
+             T.Elim (T.Var i, []) =>
+                sk ((x, i), fk)
+
+           | _ => fk ())
+
+
+      fun whatEvar m x fk sk =
+         (case m of
+             T.Elim (T.Sub (T.Evar e, s), []) =>
+                sk ((x, (e, s)), fk)
+
+           | _ => fk ())
+
+
+      fun lam f m x fk sk =
+         (case m of
+             T.Lam (_, n) =>
+                f (N.simplify n) x fk sk
+
+           | _ => fk ())
+
+
+      fun lamb f m x fk sk =
+         (case m of
+             T.Lam (binder, n) =>
+                f (N.simplify n) (x, binder) fk sk
+
+           | _ => fk ())
+
+
+      fun pair f g m x fk sk =
+         (case m of
+             T.Pair (m1, m2) =>
+                let
+                   val m1' = N.simplify m1
+                   val m2' = N.simplify m2
+
+                   do (x, fk') = f m1' x fk
+                in
+                   g m2' x fk' sk
+                end
+
+           | _ => fk ())
+
+
+      fun next f m x fk sk =
+         (case m of
+             T.Next m1 =>
+                f (N.simplify m1) x fk sk
+
+           | _ => fk ())
+
+
+      fun triv m x fk sk =
+         (case m of
+             T.Triv => sk (x, fk)
+
+           | _ => fk ())
+
+
+      fun marker sym m x fk sk =
+         (case m of
+             T.Marker sym' =>
+                if Symbol.eq (sym, sym') then
+                   sk (x, fk)
+                else
+                   fk ()
+
+           | _ => fk ())
+
+
+      fun unify n m x fk sk =
+         if Unify.unify1 n m then
+            sk (x, fk)
+         else
+            fk ()
+
+
+      fun whnf f m x fk sk =
+         f (N.whnf m) x fk sk
+
+
+      fun whnfHard f m x fk sk =
+         f (N.whnfHard m) x fk sk
+
+
+      fun natLoop n m fk sk =
+         (case m of
+             T.Elim (T.Const const, spine) =>
+                if Constant.eq (const, Prim.zero) then
+                   (case spine of
+                       [] =>
+                          sk n
+
+                     | _ =>
+                          fk ())
+                else if Constant.eq (const, Prim.succ) then
+                   (case spine of
+                       [T.App m'] =>
+                          natLoop (n+1) (N.simplify m') fk sk
+
+                     | _ =>
+                          fk ())
+
+                else
+                   fk ()
+
+           | _ => fk ())
+
+      fun nat m x fk sk = 
+         let
+            do n = natLoop 0 m fk
+         in
+            sk ((x, n), fk)
+         end
+         
+
+      fun pathsLoop const spine l x fk sk =
+         (case l of
+             [] => fk ()
+             
+           | (const', f) :: rest =>
+                let
+                   fun fk' () = pathsLoop const spine rest x fk sk
+                in
+                   if Constant.eq (const, const') then
+                      f spine x fk' sk
+                   else
+                      fk' ()
+                end)
+
+      fun paths l m x fk sk =
+         (case m of
+             T.Elim (T.Const const, spine) =>
+                pathsLoop const spine l x fk sk
+
+           | _ => fk ())
+
+
+      fun null spine x fk sk =
+         (case spine of
+             [] => sk (x, fk)
+
+           | _ :: _ => fk ())
+
+
+      fun app f g spine x fk sk =
+         (case spine of
+             T.App m :: rest =>
+                let
+                   do (y, fk') = f (N.simplify m) x fk
+                in
+                   g rest y fk' sk
+                end
+
+           | _ => fk ())
+
+
+      fun pi1 f spine x fk sk =
+         (case spine of
+             T.Pi1 :: rest =>
+                f rest x fk sk
+
+           | _ => fk ())
+
+
+      fun pi2 f spine x fk sk =
+         (case spine of
+             T.Pi2 :: rest =>
+                f rest x fk sk
+
+           | _ => fk ())
+
+
+      fun prev f spine x fk sk =
+         (case spine of
+             T.Prev :: rest =>
+                f rest x fk sk
+
+           | _ => fk ())
+
+
+      fun tm f hyp x fk sk =
+         (case hyp of
+             J.Tm a =>
+                f (N.simplify a) x fk sk
+
+           | _ =>
+                fk ())
+
+
+      fun tml f hyp x fk sk =
+         (case hyp of
+             J.Tml a =>
+                f (N.simplify a) x fk sk
+
+           | _ =>
+                fk ())
+
+
+      fun tmh f hyp x fk sk =
+         (case hyp of
+             J.Tmh a =>
+                f (N.simplify a) x fk sk
+
+           | _ =>
+                fk ())
+
+
+      fun tp hyp x fk sk =
+         (case hyp of
+             J.Tp => sk (x, fk)
+
+           | _ => fk ())
+
+
+      fun tpl hyp x fk sk =
+         (case hyp of
+             J.Tpl => sk (x, fk)
+
+           | _ => fk ())
+
+
+      fun hyp i f ctx x fk sk =
+         (case Seq.nthOpt ctx i of
+             NONE =>
+                fk ()
+
+           | SOME h =>
+                f (J.subHyp h (T.Shift (i+1))) x fk sk)
+
+
+      fun anyhypLoop f i l x fk sk =
+         (case Seq.expose l of
+             Seq.Nil =>
+                fk ()
+
+           | Seq.Cons (h, rest) =>
+                f
+                   (J.subHyp h (T.Shift (i+1)))
+                   x
+                   (fn () => anyhypLoop f (i+1) rest x fk sk)
+                   (fn (g, fk') => sk (g i, fk')))
+
+      fun anyhyp f ctx x fk sk = anyhypLoop f 0 ctx x fk sk
+
+
+      exception NoMatch
+      
+      fun ('a, 'b) caseX (m : 'a) (f : ('a, unit, 'b) matcher) : 'b =
+         let
+            extension Answer of 'b
+         in
+            (case 
+                f m () (fn () => raise NoMatch) (fn (y, _) => Answer y)
+             of
+                Answer y => y
+
+              | _ => raise (Fail "impossible"))
+         end
+
+         
+      fun termCaseX m f = caseX (N.simplify m) f
+      fun term2CaseX m1 m2 f = caseX (N.simplify m1, N.simplify m2) f
+      fun term3CaseX m1 m2 m3 f = caseX (N.simplify m1, (N.simplify m2, N.simplify m3)) f
+
+      fun unitCaseX f = caseX () f
+
+      val spineCaseX = caseX
+      val hypCaseX = caseX
+      val contextCaseX = caseX
+
+
+      fun caseT err x f goal fk sk =
+         f x ()
+            (fn () => fk err)
+            (fn (tac, _) => tac goal fk sk)
+
+
+      fun termCase m f goal fk sk =
+         caseT "no match in termCase" (N.simplify m) f goal fk sk
+
+      fun term2Case m1 m2 f goal fk sk =
+         caseT "no match in term2Case" (N.simplify m1, N.simplify m2) f goal fk sk
+
+      fun term3Case m1 m2 m3 f goal fk sk =
+         caseT "no match in term3Case" (N.simplify m1, N.simplify m2, N.simplify m3) f goal fk sk
+
+      fun unitCase f goal fk sk =
+         caseT "no match in unitCase" () f goal fk sk
+
+      fun spineCase m f goal fk sk = caseT "no match in spineCase" m f goal fk sk
+      fun hypCase m f goal fk sk = caseT "no match in hypCase" m f goal fk sk
+      fun contextCase m f goal fk sk = caseT "no match in contextCase" m f goal fk sk
+
+
+      fun goalCase f (goal as (jud, _)) fk sk =
+         caseT "no match in goalCase" (N.simplify (J.concl jud)) f goal fk sk
+
+
+      fun goalContextCase f (goal as (jud, _)) fk sk =
+         caseT "no match in goalContextCase" (J.context jud) f goal fk sk
+             
+
+      fun caseB err x f goal fk sk =
+         f x ()
+            (fn () => fk err)
+            (fn (tac, fk') => tac goal (fn _ => fk' ()) sk)
+
+
+      fun termCaseB m goal fk sk =
+         caseB "no match in termCaseB" (N.simplify m) goal fk sk
+
+      fun term2CaseB m1 m2 f goal fk sk =
+         caseB "no match in term2CaseB" (N.simplify m1, N.simplify m2) f goal fk sk
+
+      fun term3CaseB m1 m2 m3 f goal fk sk =
+         caseB "no match in term3CaseB" (N.simplify m1, N.simplify m2, N.simplify m3) f goal fk sk
+
+      fun unitCaseB f goal fk sk =
+         caseB "no match in unitCaseB" () f goal fk sk
+
+      fun spineCaseB m f goal fk sk = caseB "no match in spineCaseB" m f goal fk sk
+      fun hypCaseB m f goal fk sk = caseB "no match in hypCaseB" m f goal fk sk
+      fun contextCaseB m f goal fk sk = caseB "no match in contextCaseB" m f goal fk sk
+
+
+      fun goalCaseB f (goal as (jud, _)) fk sk =
+         caseB "no match in goalCaseB" (N.simplify (J.concl jud)) f goal fk sk
+
+
+      fun goalContextCaseB f (goal as (jud, _)) fk sk =
+         caseB "no match in goalContextCaseB" (J.context jud) f goal fk sk
+
+
+      fun parseMatch x = x
+      fun parseMatchClauses x = x
+
+   end
+
+
+structure CasePervasive =
+   struct
+
+      val termCaseX = Case.termCaseX
+      val unitCaseX = Case.unitCaseX
+      val term2CaseX = Case.term2CaseX
+      val term3CaseX = Case.term3CaseX
+      val spineCaseX = Case.spineCaseX
+      val hypCaseX = Case.hypCaseX
+      val contextCaseX = Case.contextCaseX
+      val termCase = Case.termCase
+      val unitCase = Case.unitCase
+      val term2Case = Case.term2Case
+      val term3Case = Case.term3Case
+      val spineCase = Case.spineCase
+      val hypCase = Case.hypCase
+      val contextCase = Case.contextCase
+      val goalCase = Case.goalCase
+      val goalContextCase = Case.goalContextCase
+      val termCaseB = Case.termCaseB
+      val unitCaseB = Case.unitCaseB
+      val term2CaseB = Case.term2CaseB
+      val term3CaseB = Case.term3CaseB
+      val spineCaseB = Case.spineCaseB
+      val hypCaseB = Case.hypCaseB
+      val contextCaseB = Case.contextCaseB
+      val goalCaseB = Case.goalCaseB
+      val goalContextCaseB = Case.goalContextCaseB
+
+      fun parseMatch x = x
+      fun parseMatchClauses x = x
+
+   end
+
+
+
+structure ParseCase =
+   struct
+
+      open Case
+
+      fun id x = x
+
+      val empty = []
+      fun sing x = [x]
+      fun duo x y = [x, y]
+      fun cons h t = h :: t
+
+      fun clause x y = (x, y)
+
+      fun constpath const spine = elim (constant const) spine
+      fun varpath i spine = elim (variable i) spine
+         
+      fun shortConstant name = Namespace.resolve [Symbol.fromValue name]
+      fun longConstant name = Namespace.resolve (map Symbol.fromValue name)
+
+   end
+
+
+grammardef Case
+
+   open ParseCase
+
+   (* Just for Oldcase. *)
+   infix right curried 1 ? ?! ?? ??! ??? ???!
+
+   rule Match(4)      ::= "_" => wild
+   rule Match(4)      ::= "?" => what
+   rule Match(4)      ::= "(" Match(0) ")" => id
+
+   rule Match(3)      ::= "$lit" EMBED => id
+   rule Match(3)      ::= "$as" Match(3) => az
+   rule Match(3)      ::= "$az" Match(3) => az
+
+   rule Match(2)      ::= Match(3) "=>" EMBED => wrap
+   rule Match(2)      ::= Match(3) "=!>" EMBED => wrapk
+
+   rule Match(1)      ::= Match(2) ";" Match(1) => seq
+
+   rule Match(0)      ::= AltMatches => alt
+   rule Match(0)      ::= "|" AltMatches => alt
+   rule AltMatches    ::= Match(1) "|" Match(1) => duo
+   rule AltMatches    ::= Match(1) "|" AltMatches => cons
+
+
+   (* terms *)
+   rule Match(4)      ::= "(" ")" => triv
+   rule Match(4)      ::= EMBED => constant
+   rule Match(4)      ::= MatchConstant => constant
+   rule Match(4)      ::= "const?" => whatConstant
+   rule Match(4)      ::= "var?" => whatVar
+   rule Match(4)      ::= "evar?" => whatEvar
+   rule Match(4)      ::= "nat?" => nat
+
+   rule Match(4)      ::= "(" Matches ")" => id
+   rule Matches       ::= Match(0) "," Match(0) => pair
+   rule Matches       ::= Match(0) "," Matches => pair
+
+   rule Match(3)      ::= Match(4) "@" Match(3) => elim
+   rule Match(3)      ::= EMBED NonemptySpine => constpath
+   rule Match(3)      ::= MatchConstant NonemptySpine => constpath
+   rule Match(3)      ::= "$var" EMBED Spine => varpath
+
+   rule Match(3)      ::= "$use" EMBED => use
+   rule Match(3)      ::= "next" Match(3) => next
+   rule Match(3)      ::= "$marker" EMBED => marker
+   rule Match(3)      ::= "$unify" EMBED => unify
+   rule Match(3)      ::= "$whnf" Match(3) => whnf
+   rule Match(3)      ::= "$whnfHard" Match(3) => whnfHard
+   rule Match(3)      ::= "fn" "." Match(3) => lam
+   rule Match(3)      ::= "fn" "?" "." Match(3) => lamb
+
+   (* term clauses *)
+   rule Match(4)      ::= "[" MatchClauses "]" => paths
+   rule SpineWrap     ::= Spine => id
+   rule SpineWrap     ::= Spine "=>" EMBED => wrap
+   rule SpineWrap     ::= Spine "=!>" EMBED => wrapk
+   rule MatchClause   ::= EMBED "@" Match(2) => clause
+   rule MatchClause   ::= MatchConstant "@" Match(2) => clause
+   rule MatchClause   ::= EMBED SpineWrap => clause
+   rule MatchClause   ::= MatchConstant SpineWrap => clause
+   rule MatchClauses  ::= MatchClause => sing
+   rule MatchClauses  ::= MatchClause "|" MatchClauses => cons
+
+   (* hyps *)
+   rule Match(3)      ::= "$tm" Match(3) => tm
+   rule Match(3)      ::= "$tml" Match(3) => tml
+   rule Match(3)      ::= "$tmh" Match(3) => tmh
+   rule Match(3)      ::= "$tp" => tp
+   rule Match(3)      ::= "$tpl" => tpl
+
+   (* contexts *)
+   rule Match(3)      ::= "$hyp" NUMBER Match(3) => hyp
+   rule Match(3)      ::= "$hyp" EMBED Match(3) => hyp
+   rule Match(3)      ::= "$anyhyp" Match(3) => anyhyp
+
+   (* general spines *)
+   rule Match(3)      ::= "$nil" => null
+   rule Match(3)      ::= "$ap" Match(4) Match(3) => app
+   rule Match(3)      ::= "#1" Match(3) => pi1
+   rule Match(3)      ::= "#2" Match(3) => pi2
+   rule Match(3)      ::= "#prev" Match(3) => prev
+
+   (* special spines *)
+   rule Spine         ::= => null
+   rule Spine         ::= Match(4) Spine => app
+   rule Spine         ::= "#1" Spine => pi1
+   rule Spine         ::= "#2" Spine => pi2
+   rule Spine         ::= "#prev" Spine => prev
+   rule NonemptySpine ::= Match(4) Spine => app
+   rule NonemptySpine ::= "#1" Spine => pi1
+   rule NonemptySpine ::= "#2" Spine => pi2
+   rule NonemptySpine ::= "#prev" Spine => prev
+
+   rule MatchConstant ::= LONGID => longConstant
+
+   reserved "x" "as" "az" "next" "fn" "var" "tm" "tml" "tmh" "tp" "tpl" "ap" : MatchConstant
+
+
+   start termCaseX _ Match
+   start unitCaseX Match
+   start term2CaseX _ _ Match
+   start term3CaseX _ _ _ Match
+   start spineCaseX _ Match
+   start hypCaseX _ Match
+   start contextCaseX _ Match
+   start termCase _ Match
+   start unitCase Match
+   start term2Case _ _ Match
+   start term3Case _ _ _ Match
+   start spineCase _ Match
+   start hypCase _ Match
+   start contextCase _ Match
+   start goalCase Match
+   start goalContextCase Match
+   start termCaseB _ Match
+   start unitCaseB Match
+   start term2CaseB _ _ Match
+   start term3CaseB _ _ _ Match
+   start spineCaseB _ Match
+   start hypCaseB _ Match
+   start contextCaseB _ Match
+   start goalCaseB Match
+   start goalContextCaseB Match
+
+   start parseMatch Match
+   start parseMatchClauses MatchClauses
+
+end
+
+
+grammardef CasePervasive
+
+   open ParseCase
+
+   (* Don't want to use this rule while building the refiner. *)
+   rule MatchConstant ::= IDENT => shortConstant
+
+end
+
+
+grammaron Case

@@ -1,0 +1,835 @@
+
+signature LEVEL =
+   sig
+
+      datatype result =
+         SUCCESS
+       | EXOTIC of string
+       | ERROR of string
+       | INCONSISTENT of string list
+
+      (* Instantiates evars with a potential solution to the universe constraints.
+
+         If it encounters constraints it doesn't like, returns EXOTIC or ERROR
+         and does nothing.
+
+         Ignores contraints where the right-hand-side is a constant or uvar.
+
+         If an inconsistency is detected, drops the offending constraint, but
+         returns INCONSISTENT instead of SUCCESS.
+      *)
+      val solve : Judgement.djudgement list -> result
+
+
+      (* prove bounds C
+
+         The bounds argument maps uvar i to a list [... (m, tac) ...]
+         where tac proves i <= m.
+
+         If the constraint holds, returns SOME tac, where tac proves it.
+         Otherwise returns NONE.
+      *)
+      val prove : (int -> (Term.term * Tactic.tactic) list) -> Judgement.djudgement -> Tactic.tactic option
+
+   end
+
+
+(* The level inference algorithm
+   -----------------------------
+
+   Take level constraints expressed using the grammar:
+
+   l ::= 0 | x | E[s] | succ l | max(l, l)
+   P ::= l <= l
+
+   Evars cannot appear under max on the right-hand-side.  That would
+   lead to exponential blowup: In a constraint with m evars on the
+   left and n on the right, there are n^m ways to assign the lhs evars
+   to rhs evars.  This is only manageable if n = 1.
+
+   1. Write level expressions in the form:
+
+      l ::= max (a, ... bi+x1 ..., ... ci+Ei[si] ...)
+
+   2. In l <= l', reject if l' contains multiple evars.  Set aside the
+      constraint if l' contains zero evars.  (Such constraints create
+      no upward pressure on evars.)
+
+   3. Move constant terms to the right:
+
+      l <= a+E[s]  -->  l-a <= E[s]
+
+      Now all contraints have the form l <= E[s].
+
+   4. Solve evar constraints for E:
+
+      l <= E[s]  ->  l[s^-1] <= E
+
+      Reject if any substitution is uninvertible.
+
+   5. Combine constraints with a common evar on the lhs:
+
+      l1 <= E, ..., ln <= E  --> max(l1, ..., ln) = E
+
+   6. Solve the evar equations using depth-first search.
+
+      * If the lower bound for E does not contain E, then E's solution
+        is the lower bound.
+
+      * If the lower bound for E is max(M, ... ai+E[pi] ...) then check
+        that each ai = 0 and pi <= id.  If not, reject.  If so,
+        let p be the intersection of the ps.  E's solution is M[p].
+
+        Observe that p <= pi <= id.  Suppose M[p] is defined. 
+        Then M[p] = M.  Also M[p] <= M[pi], so M[pi] = M.
+        Thus M[p][pi] = M.  If also E = M[p] then:
+        E = M[p] = M = max(M, M) = max(M, ... M[p][pi] ...)
+          = max(M, ... E[pi] ...).
+
+      Any evars that appear in the solution to E must have been gray
+      when E was visited.  Thus, the dependencies among the solutions
+      point up the spanning tree.
+
+   7. Revisit the solutions and recursively remove dependencies on
+      now-solved evars.  (This will terminate since the remaining
+      dependencies are acyclic.)  Reject if pruning fails.
+
+   8. Simplify the solutions and bind.
+
+   9. Check that the remaining constraints (constant and uvar
+      right-hand-sides) are satisfied.
+
+
+   We represent max(a, ..., bi+xi, ..., ci+Ei[si], ...) as:
+   as (a, [... (bi, xi) ...], [... (ci, Ei, si) ...])
+
+*)
+
+
+
+structure Level :> LEVEL =
+   struct
+
+      structure C = Oldcase
+      structure I = Invert
+      structure J = Judgement
+      structure T = Term
+
+      open Tactic
+
+      val ? = C.?
+      val ?? = C.??
+      val ??! = C.??!
+
+      exception Error of string
+      exception Exotic of string
+      
+      datatype result =
+         SUCCESS
+       | EXOTIC of string
+       | ERROR of string
+       | INCONSISTENT of string list
+
+      (* inconsistencies *)
+      val hasStrictCycle = ref false
+      val hasScopeViolation = ref false
+      val hasInconsistentScope = ref false
+
+
+
+
+      structure EbindOrdered =
+         struct
+         
+            type t = T.ebind
+
+            fun eq (e1, e2) = T.eqEbind e1 e2
+
+            fun compare (e1, e2) = Int.compare (T.ebindToInt e1) (T.ebindToInt e2)
+         end
+
+      structure D = SplayDict (structure Key = EbindOrdered)
+
+
+
+      fun addExpr (a, uvars, evars) n =
+         (Int.max (a+n) 0,
+          map (fn (b, x) => (Int.max (b+n) 0, x)) uvars,
+          map (fn (c, e, s) => (c+n, e, s)) evars)
+
+      fun combine (a, uvars, evars) (b, uvars', evars') =
+         (Int.max a b, uvars @ uvars', evars @ evars')
+
+
+
+      fun checkUvar ctx i =
+         (case Seq.nthOpt ctx i of
+             SOME (J.Tm a) =>
+                if Unify.unify1 a (T.Const Prim.level) then
+                   ()
+                else
+                   raise (Error "level variable does not have type level")
+
+           | SOME _ =>
+                raise (Error "level variable has the wrong sort")
+
+           | _ =>
+                raise (Error "unbound level variable"))
+      
+
+      fun canonize ctx m =
+         C.termCaseXAlt m
+            [
+            C.whatVar ?
+            (fn i => 
+                (
+                checkUvar ctx i;
+                (0, [(0, i)], [])
+                )),
+
+            C.whatEvar ?
+            (fn (e, s) => (0, [], [(0, e, s)])),
+
+            C.constant Prim.lzero ?
+            (fn () => (0, [], [])),
+
+            C.apply1 Prim.lsucc C.what ?
+            (fn m' =>
+                let
+                   val (a, uvars, evars) = canonize ctx m'
+                in
+                   (a+1,
+                    map (fn (b, x) => (b+1, x)) uvars,
+                    map (fn (c, e, s) => (c+1, e, s)) evars)
+                end),
+
+            C.apply2 Prim.lmax C.what C.what ?
+            (fn (m1, m2) =>
+                let
+                   val (a1, uvars1, evars1) = canonize ctx m1
+                   val (a2, uvars2, evars2) = canonize ctx m2
+                in
+                   (Int.max a1 a2,
+                    uvars1 @ uvars2,
+                    evars1 @ evars2)
+                end),
+
+            C.whatPath C.swild ?
+            (fn (const, _) =>
+                raise (Exotic ("unrecognized level operator: " ^ Namespace.toString const))),
+
+            C.wild ?
+            (fn () => raise (Exotic "unrecognized level operator"))
+            ]
+
+
+
+
+      type expression = int * (int * int) list * (int * T.ebind * I.psub) list
+
+
+      fun substUvar p (a, x) =
+         (case I.psubstVar x p of
+             NONE =>
+                (
+                hasScopeViolation := true;
+                NONE
+                )
+
+           | SOME x' => SOME (a, x'))
+
+      fun substEvar p (a, e, p') = (a, e, Invert.composePsub p' p)
+
+      fun subst (expr as (a, uvars, evars)) p =
+         (case p of
+             I.Pshift 0 => expr
+             
+           | _ =>
+                (a,
+                 List.mapPartial (substUvar p) uvars,
+                 List.map (substEvar p) evars))
+
+
+      fun extractConstraints goals =
+         List.foldl
+            (fns jud acc =>
+                C.termCaseXAlt (J.concl jud)
+                   [
+                   C.apply2 Prim.lleq C.what C.what ?
+                   (fn (m, n) =>
+                       let
+                          val ctx = J.context jud
+                          val left = canonize ctx m
+                          val right = canonize ctx n
+                       in
+                          (case right of
+                              (b, [], [(a, e, s)]) =>
+                                 if b > a then
+                                    (* Constraint has an evar under max. *)
+                                    raise (Exotic "evar under lmax")
+                                 else
+                                    (* b <= a, so we're looking at max(b, a+E[s]) = a+E[s] *)
+                                    (case I.invert s of
+                                        NONE =>
+                                           (* Not a pattern substitution. *)
+                                           raise (Exotic "non-pattern substitution")
+   
+                                      | SOME p =>
+                                           let
+                                              val (l, luvars, levars) = addExpr left (~a)
+   
+                                              val luvars' = List.mapPartial (substUvar p) luvars
+   
+                                              val levars' =
+                                                 List.map
+                                                    (fn (c, e', s) => (c, e', I.composeSubPsub s p))
+                                                    levars
+                                           in
+                                              ((l, luvars', levars'), e) :: acc
+                                           end)
+
+                            | (_, _, []) =>
+                                 (* Set aside contraints that put no upward pressure on evars. *)
+                                 acc
+
+                            | _ =>
+                                 (* Constraint has an evar under max. *)
+                                 raise (Exotic "evar under max"))
+                       end),
+
+                   C.wild ?
+                   (fn () => acc)
+                   ])
+            []
+            goals
+
+
+      
+
+      datatype color = WHITE | GRAY | BLACK
+
+
+
+      (* Returns a version of the expression in which all evars are gray.
+         This halts because dependencies form a tree.
+      *)
+      fun apply dictr (a, uvars, evars) =
+         List.foldl
+            (fns (b, e, p) acc =>
+                (case lookup dictr e of
+                    NONE =>
+                       combine (0, [], [(b, e, p)]) acc
+
+                  | SOME expr =>
+                       combine 
+                          (addExpr (subst expr p) b)
+                          acc))
+            (a, uvars, [])
+            evars
+
+
+      and lookup dictr e =
+         (case D.find (!dictr) e of
+             SOME (_, GRAY) => NONE
+
+           | SOME (expr as (_, _, []), BLACK) =>
+                (* optimize this case *)
+                SOME expr
+
+           | SOME (expr, BLACK) =>
+                let
+                   val expr' = apply dictr expr
+                in
+                   (* save this so we don't have to do it again *)
+                   dictr := D.insert (!dictr) e (expr', BLACK);
+
+                   SOME expr'
+                end
+
+           | SOME (_, WHITE) =>
+                raise (Fail "impossible")
+
+           | NONE =>
+                (* This evar hasn't been seen before, which means it only appears on
+                   left-hand-sides.  Give it an empty constraint.
+                *)
+                let
+                   val expr = (0, [], [])
+                in
+                   dictr := D.insert (!dictr) e (expr, BLACK);
+                   
+                   SOME expr
+                end)
+
+
+
+      fun dfs dictr e =
+         (case
+             D.operate (!dictr) e 
+                (fn () => ((0, [], []), BLACK))
+                (fn (left, WHITE) => (left, GRAY)
+                  | (left, color) => (left, color))
+          of
+             (SOME (left as (_, _, evars), WHITE), _, dict) =>
+                let
+                   val () = dictr := dict
+
+                   val () =
+                      List.app
+                         (fn (_, e, _) => dfs dictr e)
+                         evars
+
+                   val (a, uvars', evars') = apply dictr left
+
+                   (* Deal with case in which e depends on itself. *)
+
+                   val (p, evars'') =
+                      List.foldl
+                         (fns (entry as (b, e', p1)) (p2, evars'') =>
+                             if T.eqEbind e e' then
+                                (
+                                if b > 0 then
+                                   (* Constraint requires e to be greater than itself. *)
+                                   hasStrictCycle := true
+                                else
+                                   ();
+
+                                (case I.intersection p1 p2 of
+                                    NONE =>
+                                       (* Constraint requires e to live in incompatible scopes. *)
+                                       (
+                                       hasInconsistentScope := true;
+                                       (p2, evars'')
+                                       )
+
+                                  | SOME p => 
+                                       (p, evars''))
+                                )
+                             else
+                                (p2, entry :: evars''))
+                         (I.Pshift 0, [])
+                         evars'
+                in
+                   dictr :=
+                      D.insert (!dictr) e (subst (a, uvars', evars'') p, BLACK)
+                end
+                
+           | _ => ())
+                
+
+
+      fun add a m =
+         if a = 0 then
+            m
+         else
+            T.apply1 Prim.lsucc (add (a-1) m)
+
+      fun nat a = add a (T.Const Prim.lzero)
+
+
+      fun coalesce l a x hi acc =
+         (case l of
+             [] =>
+                (hi, (a, x) :: acc)
+
+           | (b, y) :: rest =>
+                if x = y then
+                   coalesce rest (Int.max a b) x (Int.max hi b) acc
+                else
+                   coalesce rest b y (Int.max hi b) ((a, x) :: acc))
+
+
+      fun render l =
+         (case l of
+             [] => raise (Fail "precondition")
+
+           | [(a, x)] =>
+                add a (T.Var x)
+
+           | (a, x) :: rest =>
+                T.apply2 Prim.lmax (add a (T.Var x)) (render rest))
+
+
+      fun toTerm a uvars =
+         (case uvars of
+             [] => nat a
+
+           | _ =>
+                (case 
+                    Juliasort.sort (fn ((_, x), (_, y)) => Int.compare x y) uvars
+                 of
+                    (b, x) :: rest =>
+                       let
+                          val (hi, l) = coalesce rest b x b []
+                          val m = render l
+                       in
+                          if a <= hi then
+                             m
+                          else
+                             T.apply2 Prim.lmax (nat a) m
+                       end
+
+                  | [] =>
+                       raise (Fail "impossible")))
+
+
+
+      fun solve goals =
+         try
+            let
+               val () = hasStrictCycle := false
+               val () = hasScopeViolation := false
+               val () = hasInconsistentScope := false
+
+               val constraints = extractConstraints goals
+   
+               val dictr = ref D.empty
+   
+               val queue =
+                  List.foldl
+                     (fns (left, e) queue =>
+                         (
+                         dictr :=
+                            D.insertMerge (!dictr) e (left, WHITE)
+                               (fn (left', _) => (combine left left', WHITE));
+                         
+                         e :: queue
+                         ))
+                     []
+                     constraints
+   
+               val () =
+                  List.app
+                     (fn e =>
+                         (case D.lookup (!dictr) e of
+                             (_, BLACK) => ()
+   
+                           | (_, WHITE) => dfs dictr e
+   
+                           | (_, GRAY) => raise (Fail "impossible")))
+                     queue
+   
+               (* No gray nodes left, so apply always returns ground expressions. *)
+            in
+               (* make the bindings *)
+               D.app
+                  (fn (e, (left, _)) =>
+                      let
+                         val (a, uvars, _) = apply dictr left
+                      in
+                         (* This cannot fail because the identity substitution won't prune
+                            anything, and their are no evars to fail the occurs check.
+                         *)
+                         Unify.setEbindSub e T.id (toTerm a uvars);
+                         ()
+                      end)
+                  (!dictr);
+
+               if !hasStrictCycle orelse !hasScopeViolation orelse !hasInconsistentScope then
+                  INCONSISTENT $
+                  (if !hasStrictCycle then ["strict cycle"] else [])
+                  @ (if !hasScopeViolation then ["scope violation"] else [])
+                  @ (if !hasInconsistentScope then ["inconsistent scope"] else [])
+               else
+                  SUCCESS
+            end
+         with
+            Error msg => ERROR msg
+
+          | Exotic msg => EXOTIC msg
+
+            
+
+
+      exception Unprovable
+
+
+      fun proveLevel ctx m =
+         C.termCaseAlt m
+            [
+            C.constant Prim.lzero ?
+            (fn () => refine Rule.lzeroLevel),
+
+            C.apply1 Prim.lsucc C.what ?
+            (fn m' =>
+                refine (Rule.lsuccLevel m')
+                >> proveLevel ctx m'),
+
+            C.whatEvar ?
+            (fn (e, _) =>
+                (* An evar that is still unbound has no upward pressure, set it to 0. *)
+                (
+                Unify.setEbindSub e T.id (T.Const Prim.lzero);  (* can't fail *)
+                refine Rule.lzeroLevel
+                )),
+
+            C.whatVar ?
+            (fn i => 
+                (
+                checkUvar ctx i;
+                refine (Rule.hypothesisOf i)
+                )),
+
+            C.apply2 Prim.lmax C.what C.what ?
+            (fn (m1, m2) =>
+                refine (Rule.lmaxLevel m1 m2)
+                >>> [
+                    proveLevel ctx m1,
+                    proveLevel ctx m2
+                    ]),
+
+            C.wild ?
+            (fn () => raise Unprovable)
+            ]
+            
+
+      (* successorLevel M tac
+
+         if    tac proves lsucc M = P : level
+         then  returns (N, tac')
+         where tac' proves N = P : level
+
+         Applies successor under maxes.
+      *)
+      fun successorLevel ctx m tac =
+         C.termCaseXAlt m
+            [
+            C.apply2 Prim.lmax C.what C.what ?
+            (fn (m1, m2) =>
+                let
+                   val (n1, tac1) =
+                      successorLevel ctx m1 
+                      (refine (Rule.eqRefl (T.Const Prim.level) (T.apply1 Prim.lsucc m1)) 
+                       >> proveLevel ctx (T.apply1 Prim.lsucc m1))
+
+                   val (n2, tac2) =
+                      successorLevel ctx m2
+                      (refine (Rule.eqRefl (T.Const Prim.level) (T.apply1 Prim.lsucc m2)) >> 
+                       proveLevel ctx (T.apply1 Prim.lsucc m2))
+
+                   (* tac proves succ (max M1 M2) = P
+                      tac1 proves N1 = succ M1
+                      tac2 proves N2 = succ M2
+                   *)
+                in
+                   (
+                   T.apply2 Prim.lmax n1 n2,
+
+                   (* max N1 N2 = P *)
+                   refine (Rule.eqTrans 
+                              (T.Const Prim.level)
+                              (T.evar ())
+                              (T.apply1 Prim.lsucc (T.apply2 Prim.lmax m1 m2))
+                              (T.evar ()))
+                   >>> [
+                       (* max N1 N2 = succ (max M1 M2) *)
+                       refine (Rule.lsuccMaxDistTrans (T.evar ()) (T.evar ()) (T.evar ()))
+                       >>
+                       (* max N1 N2 = max (succ M1) (succ M2) *)
+                       refine (Rule.lmaxEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                       >>> [
+                           (* N1 = succ M1 *)
+                           tac1,
+
+                           (* N2 = succ M2 *)
+                           tac2
+                           ],
+                       
+                       (* succ (max M1 M2) = P *)
+                       tac
+                       ]
+                   )
+                end),
+
+            C.wild ?
+            (fn () => (T.apply1 Prim.lsucc m, tac))
+            ]
+
+
+      (* normalizeLevel M
+
+         returns (N, tac)
+         where tac proves N = M : level
+
+         Pushes successors under maxes.
+      *)
+      fun normalizeLevel ctx m =
+         C.termCaseXAlt m
+            [
+            C.whatEvar ?
+            (fn (e, _) =>
+                (* An evar that is still unbound has no upward pressure, set it to 0. *)
+                (
+                Unify.setEbindSub e T.id (T.Const Prim.lzero);  (* can't fail *)
+
+                (T.Const Prim.lzero,
+                 refine (Rule.eqRefl (T.Const Prim.level) (T.Const Prim.lzero))
+                 >> refine Rule.lzeroLevel)
+                )),
+                 
+            C.apply1 Prim.lsucc C.what ?
+            (fn m' =>
+                let
+                   val (n, tac) = normalizeLevel ctx m'
+                   
+                   (* tac proves N = M' *)
+
+                   val tac' =
+                      (* succ N = succ M' *)
+                      refine (Rule.lsuccEq n m')
+                      >>
+                      (* N = M' *)
+                      tac
+
+                   val (n', tac'') =
+                      successorLevel ctx n tac'
+
+                   (* tac'' proves N' = succ M' *)
+                in
+                   (n', tac'')
+                end),
+
+            C.apply2 Prim.lmax C.what C.what ?
+            (fn (m1, m2) =>
+                let
+                   val (n1, tac1) = normalizeLevel ctx m1
+                   val (n2, tac2) = normalizeLevel ctx m2
+                in
+                   (
+                   T.apply2 Prim.lmax n1 n2,
+
+                   (* max N1 N2 = max M1 M2 *)
+                   refine (Rule.lmaxEq n1 m1 n2 m2)
+                   >>> [tac1, tac2]
+                   )
+                end),
+
+            C.wild ?
+            (fn () =>
+                (
+                m, 
+
+                (* M = M : level *)
+                refine (Rule.eqRefl (T.Const Prim.level) m)
+                >>
+                (* M : level *)
+                proveLevel ctx m
+                ))
+            ]
+
+
+      fun proveConstraint bounds ctx left right =
+         C.spineCaseXAlt [T.App (Normalize.simplify left), T.App (Normalize.simplify right)]
+            [
+            C.app (C.constant Prim.lzero) C.swild ??
+            (fn _ => 
+                refine (Rule.lleqZero right)
+                >> proveLevel ctx right),
+
+            C.app (C.apply2 Prim.lmax C.what C.what) C.swild ??
+            (fn ((m1, m2), ()) =>
+                refine (Rule.lleqMaxL m1 m2 right)
+                >>> [
+                    proveConstraint bounds ctx m1 right,
+                    proveConstraint bounds ctx m2 right
+                    ]),
+
+            C.app C.wild (C.app (C.apply2 Prim.lmax C.what C.what) C.swild) ??
+            (fn ((), ((n1, n2), ())) =>
+                (try
+                    refine (Rule.lleqMaxR1 left n1 n2)
+                    >>> [
+                        proveConstraint bounds ctx left n1,
+                        proveLevel ctx n2
+                        ]
+                 with
+                    Unprovable =>
+                       refine (Rule.lleqMaxR2 left n1 n2)
+                       >>> [
+                           proveConstraint bounds ctx left n2,
+                           proveLevel ctx n1
+                           ])),
+
+            C.app (C.apply1 Prim.lsucc C.what) (C.app (C.apply1 Prim.lsucc C.what) C.swild) ??
+            (fn (m, (n, ())) =>
+                refine (Rule.lleqSucc m n)
+                >> proveConstraint bounds ctx m n),
+
+            C.swild ??!
+            (fn () =>
+                if Unify.unify1 left right then
+                   refine (Rule.lleqRefl left)
+                   >> proveLevel ctx left
+                else
+                   raise C.Backtrack),
+
+            C.app C.what (C.app (C.apply1 Prim.lsucc C.what) C.swild) ??!
+            (fn (m, (n, ())) =>
+                (try
+                    refine (Rule.lleqIncrease m n)
+                    >> proveConstraint bounds ctx m n
+                 with
+                    Unprovable => raise C.Backtrack)),
+
+            C.app C.whatVar C.swild ??
+            (fn (i, ()) =>
+                (case
+                    List.findmap
+                       (fn (middle, tac1) =>
+                           (try
+                               let
+                                  val tac2 = proveConstraint bounds ctx middle right
+                               in
+                                  SOME $
+                                  refine (Rule.lleqTrans left middle right)
+                                  >>> [tac1, tac2]
+                               end
+                            with
+                               Unprovable => NONE))
+                       (bounds i)
+                 of
+                    NONE => raise Unprovable
+
+                  | SOME tac => tac)),
+
+            C.swild ??
+            (fn () => raise Unprovable)
+            ]
+      
+
+      (* Checks that jud holds.  If so, returns a tactic that proves it.
+         If not, raises Inconsistent.
+      *)
+      fun prove bounds jud =
+         let
+            val ctx = J.context jud
+         in
+            C.termCaseXAlt (J.concl jud)
+               [
+               C.apply2 Prim.ov (C.constant Prim.level) C.what ?
+               (fn ((), m) =>
+                   (try
+                       SOME $ proveLevel ctx m
+                    with
+                       Unprovable => NONE)),
+   
+               C.apply2 Prim.lleq C.what C.what ?
+               (fn (left, right) =>
+                   let
+                      val (left', ltac) = normalizeLevel ctx left
+                      val (right', rtac) = normalizeLevel ctx right
+                   in
+                      try
+                         SOME $
+                         refine (Rule.lleqResp left left' right right')
+                         >>> [ltac, rtac, proveConstraint bounds ctx left' right']
+                      with
+                         Unprovable => NONE
+                   end),
+   
+               C.wild ?
+               (fn () => SOME idtac)
+               ]
+         end
+
+   end

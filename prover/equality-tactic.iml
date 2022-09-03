@@ -1,0 +1,1439 @@
+
+signature EQUALITY_TACTIC =
+   sig
+
+      type tactic = Tactic.tactic
+
+      val reflexivityRaw : tactic
+      val reflexivity : tactic
+
+      val symmetryRaw : tactic
+      val symmetry : tactic
+
+      val symmetryInRaw : Symbol.symbol -> tactic
+      val symmetryIn : Symbol.symbol -> tactic
+
+      val transitivityRaw : ETerm.eterm -> tactic
+      val transitivity : ETerm.eterm -> tactic
+      val etransitivity : tactic
+
+      val compatRaw : tactic
+      val compat : tactic
+
+      val decompEq : int -> ETerm.eterm -> tactic
+
+      val extensionalityRaw : Symbol.symbol option list -> tactic
+      val extensionality : Symbol.symbol option list -> tactic
+
+      val setExtensionalityRaw : tactic
+      val setExtensionality : tactic
+
+      val substitutionLiteral : int -> Term.term -> tactic
+      val substitutionRaw : Symbol.symbol -> ETerm.eterm -> tactic
+      val substitution : Symbol.symbol -> ETerm.eterm -> tactic
+      val substRaw : Symbol.symbol -> tactic
+      val subst : Symbol.symbol -> tactic
+
+      val injection : Symbol.symbol -> tactic
+
+
+      (* Tables *)
+
+      type 'a tacticm = 'a Tactic.tacticm
+      type priority = Typecheck.priority
+
+      val reflexivityTactics : priority tacticm ConstantTable.table
+
+      (* takes a tactic for the primary subgoal as its argument *)
+      val symmetryTactics : (priority tacticm -> priority tacticm) ConstantTable.table  
+
+      (* takes the mediating term as its argument *)
+      val transitivityTactics : (Term.term -> priority tacticm) ConstantTable.table
+
+      (* take the hypothesis number to inject as its argument *)
+      val injectionTactics : (int -> tactic) ConstantTable.table
+
+      (* for each (const, tacfn) in the table
+
+         if    the goal is ... (M : A), (N : A) |- M = N : A
+               the head constant of A is const
+               the directory matches the goal if the known hyps are removed
+               ident is a optional ident to use for any bound variable
+
+         and   if    a subgoal is ... (M' : A'), (N' : A') |- M' = N' : A', and
+               then  tac partially proves the subgoal,
+                     leaving the directory matching the new subgoals
+
+         then  tacfn ident tac  partially proves the goal (using tac on the primary subgoal),
+               leaving the directory matching the new subgoals
+      *)
+      val extensionalityTactics : (Symbol.symbol option -> priority tacticm -> priority tacticm) ConstantTable.table
+
+   end
+
+
+signature EQUALITY_TACTIC_INTERNAL =
+   sig
+
+      include EQUALITY_TACTIC
+
+      
+      val reflexivityPriority : priority Tactic.tacticm
+
+      val injectionSum : int -> tactic
+      val injectionExists : int -> tactic
+
+   end
+
+
+
+structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
+   struct
+
+      structure C = Oldcase
+      structure D = Directory
+      structure H = ConstantTable
+      structure J = Judgement
+      structure N = Normalize
+      structure T = Term
+      structure TC = Typecheck
+
+      open Tactic
+      open CasePervasive
+
+      type priority = TC.priority
+      val ? = C.?
+      val ??? = C.???
+
+
+      val reflexivityTactics : priority tacticm H.table = H.table ()
+
+      val reflexivityPriority =
+         let
+            do const = withHeadConst "not a reflexivity goal"
+         in
+            (case H.find reflexivityTactics const of
+                SOME tac => tac
+
+              | NONE => fail "not a reflexivity goal")
+         end
+
+      val reflexivityRaw = reflexivityPriority >> idtac
+
+      val reflexivity = TC.withTypecheckSnd reflexivityPriority
+
+
+      val () =
+         (
+         H.insert reflexivityTactics Prim.eq 
+            (setFailure "terms do not unify" RuleTactic.eqRefl >> idtacM TC.Secondary);
+
+         H.insert reflexivityTactics Prim.eqtp 
+            (setFailure "types do not unify" RuleTactic.eqtpRefl >> idtacM TC.Secondary);
+
+         H.insert reflexivityTactics Prim.subtype
+            (setFailure "types do not unify" RuleTactic.subtypeRefl >> idtacM TC.Secondary)
+         )
+         
+
+
+      val symmetryTactics : (priority tacticm -> priority tacticm) H.table = H.table ()
+
+      val symmetryPriority =
+         let
+            do const = withHeadConst "not a symmetry goal"
+         in
+            (case H.find symmetryTactics const of
+                SOME tacfn => tacfn (idtacM TC.Primary)
+
+              | NONE => fail "not a symmetry goal")
+         end
+
+      (* No typechecking goals are generated for the built-in types (eq and eqtp),
+         but there might be some for ones added by the user.
+      *)
+      val symmetryRaw = symmetryPriority >> idtac
+
+      val symmetry = TC.withTypecheckSnd symmetryPriority
+
+      fun symmetryInLiteral i =
+         let
+            do (dj, _) = withgoal
+         in
+            (case J.hypOpt dj i of
+                NONE =>
+                   (* just found this hypothesis *)
+                   raise (Fail "impossible")
+
+              | SOME (J.Tm a) =>
+                   (case N.simplify a of
+                       T.Elim (T.Const const, spine) =>
+                          (case H.find symmetryTactics const of
+                              SOME tacfn =>
+                                 (case List.rev spine of
+                                     T.App n :: T.App m :: revleft =>
+                                        let
+                                           val a' = 
+                                              T.Sub (T.Elim (T.Const const,
+                                                             List.revAppend revleft [T.App n, T.App m]),
+                                                     T.Shift (i+1))
+                                        in
+                                           refine (Rule.assert a' (J.concl dj))
+                                           >>> [
+                                               tacfn (refine (Rule.hypothesis i) >> done),
+
+                                               refine (Rule.weaken (i+1) 1)
+                                               >> refine (Rule.exchange 0 1 i)
+                                               >> idtacM TC.Primary
+                                               ]
+                                        end
+              
+                                   | _ =>
+                                        fail "hypothesis not symmetrizable")
+
+                            | NONE =>
+                                 fail "hypothesis not symmetrizable")
+       
+                     | _ =>
+                          fail "hypothesis not symmetrizable")
+
+              | _ =>
+                   fail "hypothesis not symmetrizable")
+         end
+
+      fun symmetryInPriority name =
+         let
+            do i = HypTactic.findhyp name
+         in
+            symmetryInLiteral i
+         end
+
+      fun symmetryInRaw name = symmetryInPriority name >> idtac
+
+      fun symmetryIn name = TC.withTypecheckSnd $ symmetryInPriority name
+
+
+
+      fun eeqtpSym tac =
+         goalCase
+         / \Prim.eeqtp\ ? ? =>
+           \(fnc b a =>
+                refine (Rule.assert (T.apply2 Prim.eeqtp a b) (T.evar ()))
+                >>> [
+                    (* A <:> B *)
+                    tac,
+
+                    (* A <:> B |- B[^] <:> A[^] *)
+                    refine (Rule.reduceHyp 0 Reduction.unfold)
+                    >>
+                    (* A <: B & B <: A |- B[^] <:> A[^] *)
+                    refine (Rule.reduce Reduction.unfold)
+                    >>
+                    (* A <: B & B <: A |- B[^] <: A[^] & A[^] <: B[^] *)
+                    refine (Rule.prodIntro (T.evar ()) (T.evar ()))
+                    >>> [
+                        (* A <: B & B <: A |- B[^] <: A[^] *)
+                        refine (Rule.prodElim2 (T.apply2 Prim.subtype (T.Sub (a, T.shift1)) (T.Sub (b, T.shift1))) (T.evar ()))
+                        >>
+                        (* A <: B & B <: A |- A[^] <: B[^] & B[^] <: A[^] *)
+                        refine (Rule.hypothesis 0)
+                        >> done,
+
+                        (* A <: B & B <: A |- A[^] <: B[^] *)
+                        refine (Rule.prodElim1 (T.evar ()) (T.apply2 Prim.subtype (T.Sub (b, T.shift1)) (T.Sub (a, T.shift1))))
+                        >>
+                        (* A <: B & B <: A |- A[^] <: B[^] & B[^] <: A[^] *)
+                        refine (Rule.hypothesis 0)
+                        >> done
+                        ]
+                    ])\
+         /
+
+
+      val () =
+         List.app
+            (fn (const, f) => H.insert symmetryTactics const f)
+            [
+            (Prim.eq, (fn tac => RuleTactic.eqSymm >> tac)),
+            (Prim.eqtp, (fn tac => RuleTactic.eqtpSymm >> tac)),
+            (Prim.eeqtp, eeqtpSym)
+            ]
+
+
+
+      val transitivityTactics : (T.term -> priority tacticm) H.table = H.table ()
+
+      fun transitivityPriority em =
+         let
+            do (jud, dir) = withgoal
+            val m = em (Directory.idir dir)
+         in
+            (case N.simplify (J.concl jud) of
+                T.Elim (T.Const const, _) =>
+                   (case H.find transitivityTactics const of
+                       SOME tac => tac m
+       
+                     | NONE => fail "not a transitivity goal")
+
+              | _ => fail "not a transitivity goal")
+         end
+
+      fun transitivityRaw em = transitivityPriority em >> idtac
+
+      (* No typechecking goals are generated for the built-in types (eq and eqtp),
+         but there might be some for ones added by the user.
+      *)
+      fun transitivity em = TC.withTypecheckSnd $ transitivityPriority em
+
+      val etransitivity = transitivity ETerm.evar
+
+
+      val () =
+         (
+         H.insert transitivityTactics Prim.eq
+            (fn m =>
+                refine (Rule.eqTrans (T.evar ()) (T.evar ()) m (T.evar ()))
+                >> idtacM TC.Primary);
+
+         H.insert transitivityTactics Prim.eqtp
+            (fn m => 
+                refine (Rule.eqtpTrans (T.evar ()) m (T.evar ()))
+                >> idtacM TC.Primary);
+
+         H.insert transitivityTactics Prim.subtype
+            (fn m => 
+                refine (Rule.subtypeTrans (T.evar ()) m (T.evar ()))
+                >> idtacM TC.Primary)
+         )
+
+
+
+
+
+      val idtacPri =
+         goalCase
+         /| \Prim.ov\ _ _ =>
+            \(fnc => idtacM TC.Secondary)\
+
+          | _ =>
+            \(fnc => idtacM TC.Primary)\
+         /
+           
+      fun seqOption l = List.findmap (fn z => z) l
+             
+
+      fun compatPriority () =
+         let
+            do (jud, dir) = withgoal
+         in
+            termCase (J.concl jud)
+            /| \Prim.eq\ @ $ap ? $ap (\Prim.inl\ ?)
+                  (| $ap (\Prim.inl\ ?) $nil =>
+                     \(fnc b m n =>
+                          termCase b
+                          /| \Prim.sum\ ? ? =>
+                             \(fnc b1 b2 =>
+                                  refine (Rule.sumIntro1Eq b1 b2 m n)
+                                  >>> [
+                                      idtacM TC.Secondary,
+                                      idtacM TC.Primary
+                                      ])\
+
+                           | _ =>
+                             \(fnc => fail "result type mismatch")\
+                          /)\
+
+                   | _ =>
+                     \(fnc _ _ => fail "incompatible forms")\
+                  )
+
+             | \Prim.eq\ @ $ap ? $ap (\Prim.inr\ ?)
+                  (| $ap (\Prim.inr\ ?) $nil =>
+                     \(fnc b m n =>
+                          termCase b
+                          /| \Prim.sum\ ? ? =>
+                             \(fnc b1 b2 =>
+                                  refine (Rule.sumIntro2Eq b1 b2 m n)
+                                  >>> [
+                                      idtacM TC.Secondary,
+                                      idtacM TC.Primary
+                                      ])\
+
+                           | _ =>
+                             \(fnc => fail "result type mismatch")\
+                          /)\
+
+                   | _ =>
+                     \(fnc _ _ => fail "incompatible forms")\
+                  )
+
+             | \Prim.eq\ ? ($as (_ @ _)) ($as (_ @ _)) =>
+               \(fnc b m n =>
+                    (case
+                        (try
+                            Sum.INL (Infer.compat (J.context jud) m n (fns _ _ => idtac))
+                         with
+                            Infer.InferError (_, _, msg) =>
+                               Sum.INR ("inference failed: " ^ msg)
+ 
+                          | Infer.NotPath msg =>
+                               Sum.INR ("inference failed: " ^ msg)
+ 
+                          | Infer.Clash =>
+                               Sum.INR "incompatible paths")
+                     of
+                        Sum.INL (a, tac) =>
+                           if Unify.unify1 a b then
+                              tac >> idtacPri
+                           else
+                              (* G |- M = N : B *)
+                              refine (Rule.subsumptionEq a b m n)
+                              >>> [
+                                  (* G |- A <: B *)
+                                  idtacM TC.Secondary,
+ 
+                                  (* G |- M = N : A *)
+                                  tac >> idtacPri
+                                  ]
+ 
+                      | Sum.INR msg => fail msg))\
+
+             | \Prim.eq\ ? (? , ?) (? , ?) =>
+               \(fnc b m1 m2 n1 n2 =>
+                    termCase b
+                    /| \Prim.prod\ ? ? =>
+                       \(fnc b1 b2 =>
+                            refine (Rule.prodIntroEq b1 b2 m1 n1 m2 n2)
+                            >> idtacM TC.Primary)\
+
+                     | \Prim.exists\ ? (fn ? . ?) =>
+                       \(fnc b1 binder b2 =>
+                            refine (Rule.existsIntroEq b1 b2 m1 n1 m2 n2)
+                            >>> [
+                                chdir (D.bindVary dir binder) >> idtacM TC.Secondary,
+                                idtacM TC.Primary,
+                                idtacM TC.Primary
+                                ])\
+
+                     | _ =>
+                       \(fnc => fail "result type mismatch")\
+                    /)\
+
+             | \Prim.eq\ ? (fn ? . ?) (fn ? . ?) =>
+               \(fnc b binder1 m binder2 n =>
+                    termCase b
+                    /| \Prim.arrow\ ? ? =>
+                       \(fnc dom cod =>
+                            refine (Rule.arrowIntroEq dom cod m n)
+                            >>> [
+                                idtacM TC.Secondary,
+
+                                chdir (D.bindVary dir (seqOption [binder1, binder2]))
+                                >> idtacM TC.Primary
+                                ])\
+
+                     | \Prim.forall\ ? (fn ? . ?) =>
+                       \(fnc dom binder cod =>
+                            refine (Rule.forallIntroEq dom cod m n)
+                            >>> [
+                                idtacM TC.Secondary,
+
+                                chdir (D.bindVary dir (seqOption [binder, binder1, binder2]))
+                                >> idtacM TC.Primary
+                                ])\
+
+                     | _ =>
+                       \(fnc => fail "result type mismatch")\
+                    /)\
+
+             | \Prim.eq\ ? (next ?) (next ?) =>
+               \(fnc b m n =>
+                    termCase b
+                    /| \Prim.future\ ? =>
+                       \(fnc b1 =>
+                            refine (Rule.futureIntroEq b1 (T.evar ()) (T.evar ()))
+                            >> idtacM TC.Primary)\
+
+                     | _ =>
+                       \(fnc => fail "result type mismatch")\
+                    /)\
+
+             | \Prim.eq\ _ _ _ =>
+               \(fnc => fail "incompatible forms")\
+
+             | \Prim.eqtp\ ? ? =>
+               \(fnc a b =>
+                    (* G |- A = B : type *)
+                    refine (Rule.univForgetEq a b (T.evar ()))
+                    >>
+                    (* G |- A = B : U i *)
+                    compatPriority ())\
+
+             | _ =>
+               \(fnc => fail "not a compatibility goal")\
+            /
+         end
+
+      val compatRaw = lift compatPriority >> idtac
+
+      val compat =
+         TC.withTypecheckSnd $
+         lift compatPriority
+         >>=
+         (fn tc => first [reflexivityPriority, idtacM tc])
+
+
+
+      fun splitLast l acc =
+         (case l of
+             [] => raise (Fail "precondition")
+
+           | [x] => (List.rev acc, x)
+
+           | h :: t => splitLast t (h :: acc))
+
+
+      exception DecompError of string
+      fun decompEqLoop n t head1 head2 rspine1 rspine2 =
+         if n = 0 then
+            (t,
+             replaceConcl (T.apply3 Prim.eq 
+                              t
+                              (T.Elim (head1, List.rev rspine1))
+                              (T.Elim (head2, List.rev rspine2))))
+         else
+            (case (rspine1, rspine2) of
+                (elim1 :: rest1, elim2 :: rest2) =>
+                    let
+                       val (t', tac) = decompEqLoop (n-1) t head1 head2 rest1 rest2
+                       val m = T.Elim (head1, List.rev rest1)
+                       val n = T.Elim (head2, List.rev rest2)
+                    in
+                       (case (elim1, elim2) of
+                           (T.App p, T.App q) =>
+                              termCaseX (N.whnfHard t')
+                              /| \Prim.arrow\ ? ? =>
+                                 \(fnc a b =>
+                                      (b, 
+                                       refine (Rule.arrowElimEq a b m n p q)
+                                       >>> [tac, idtac]))\
+       
+                               | \Prim.forall\ ? (fn . ?) =>
+                                 \(fnc a b =>
+                                      (T.Sub (b, T.Dot (p, T.id)),
+                                       refine (Rule.forallElimEq a b m n p q)
+                                       >>> [tac, idtac]))\
+       
+                               | _ =>
+                                 \(fnc => raise (DecompError "elims do not match given type"))\
+                              /
+
+                         | (T.Pi1, T.Pi1) =>
+                              termCaseX (N.whnfHard t')
+                              /| \Prim.prod\ ? ? =>
+                                 \(fnc a b =>
+                                      (a,
+                                       refine (Rule.prodElim1Eq a b m n) >> tac))\
+       
+                               | \Prim.exists\ ? (fn . ?) =>
+                                 \(fnc a b =>
+                                      (a,
+                                       refine (Rule.existsElim1Eq a b m n) >> tac))\
+       
+                               | _ =>
+                                 \(fnc => raise (DecompError "elims do not match given type"))\
+                              /
+
+                         | (T.Pi2, T.Pi2) =>
+                              termCaseX (N.whnfHard t')
+                              /| \Prim.prod\ ? ? =>
+                                 \(fnc a b =>
+                                      (b,
+                                       refine (Rule.prodElim2Eq a b m n) >> tac))\
+       
+                               | \Prim.exists\ ? (fn . ?) =>
+                                 \(fnc a b =>
+                                      (T.Sub (b, T.Dot (T.pi1 m, T.id)),
+                                       refine (Rule.existsElim2Eq a b m n) >> tac))\
+       
+                               | _ =>
+                                 \(fnc => raise (DecompError "elims do not match given type"))\
+                              /
+
+                         | (T.Prev, T.Prev) =>
+                              raise (DecompError "cannot decompose prev with decompEq")
+
+                         | _ => raise (DecompError "elims do not match"))
+                    end
+
+              | ([], _) => raise (DecompError "insufficient elims in left-hand equand")
+              | (_, []) => raise (DecompError "insufficient elims in right-hand equand"))
+                       
+
+      fun decompEq n et =
+         let
+            do (jud, dir) = withgoal
+
+            val t = ETerm.withdir dir et
+         in
+            termCase (J.concl jud)
+            /| \Prim.eq\ ? ? ? =>
+               \(fnc c e1 e2 =>
+                    (case (e1, e2) of
+                        (T.Elim (head1, spine1), T.Elim (head2, spine2)) =>
+                           (try
+                               let
+                                  val (t', tac) =
+                                     decompEqLoop n t head1 head2 (List.rev spine1) (List.rev spine2)
+                               in
+                                  if Unify.unify1 t' c then
+                                     tac
+                                  else
+                                     raise (DecompError "mismatch with given type")
+                               end
+                            with DecompError msg => fail msg)
+
+                      | _ => fail "not a decompEq goal"))\
+
+             | _ =>
+               \(fnc => fail "not a decompEq goal")\
+            /
+         end
+
+
+
+      val extensionalityTactics : (Symbol.symbol option -> priority tacticm -> priority tacticm) H.table = H.table ()
+         
+
+      fun assert a = refine (Rule.assert a (T.evar ()))
+
+      fun assert2 a b =
+         refine (Rule.assert a (T.evar ()))
+         >>> [
+             idtac,
+             refine (Rule.assert (T.Sub (b, T.shift1)) (T.evar ()))
+             >>> [
+                 refine (Rule.weaken 0 1),
+                 idtac
+                 ]
+             ]
+
+      fun eassert () = refine (Rule.assert (T.evar ()) (T.evar ()))
+      fun eassert2 () = assert2 (T.evar ()) (T.evar ())
+
+
+
+      fun extensionalityLoop l =
+         (case l of
+             [] =>
+                refine (Rule.weaken 0 2) >> idtacM TC.Primary
+
+           | ident :: rest =>
+                C.goalCaseAlt
+                   [
+                   C.apply3 Prim.eq (C.whatPath C.swild) C.wild C.wild ?
+                   (fn ((const, ()), (), ()) =>
+                       (case H.find extensionalityTactics const of
+                           SOME tacfn =>
+                              tacfn ident (extensionalityLoop rest)
+                              
+                         | NONE =>
+                              fail "not an extensionality goal")),
+    
+                   C.wild ?
+                   (fn () => fail "not an extensionality goal")
+                   ])
+
+
+      fun extensionalityPriority l =
+         C.goalCaseAlt
+            [
+            C.apply3 Prim.eq C.what C.what C.what ?
+            (fn (a, m, n) =>
+                assert2
+                   (T.apply2 Prim.ov a m)
+                   (T.apply2 Prim.ov a n)
+                >>> [
+                    idtacM TC.Secondary,
+                    idtacM TC.Secondary,
+                    extensionalityLoop l
+                    ]),
+
+            C.wild ?
+            (fn () => fail "not an extensionality goal")
+            ]
+
+
+      fun extensionalityRaw l = extensionalityPriority l >> idtac
+
+      fun extensionality l = TC.withTypecheckSnd $ extensionalityPriority l
+
+
+
+      fun forallExt ident tac =
+         C.goalCase $
+         C.apply3 Prim.eq (C.apply2 Prim.forall C.what (C.lam C.what)) C.what C.what ?
+         (fn ((a, b), m, n) =>
+             refine (Rule.forallExt a b m n)
+             >>> [
+                 refine (Rule.hypothesis 1) >> done,
+                 refine (Rule.hypothesis 0) >> done,
+                 
+                 assert2 
+                    (T.apply2 Prim.ov b (T.app (T.Sub (m, T.shift1)) T.zero))
+                    (T.apply2 Prim.ov b (T.app (T.Sub (n, T.shift1)) T.zero))
+                 >>> [
+                     refine (Rule.forallElimOf 
+                                (T.Sub (a, T.shift1))
+                                (T.Sub (b, T.under 1 T.shift1))
+                                (T.Sub (m, T.shift1))
+                                T.zero)
+                     >>> [
+                         refine (Rule.hypothesis 2) >> done,
+                         refine (Rule.hypothesisOf 0) >> done
+                         ],
+    
+                     refine (Rule.forallElimOf 
+                                (T.Sub (a, T.shift1))
+                                (T.Sub (b, T.under 1 T.shift1))
+                                (T.Sub (n, T.shift1))
+                                T.zero)
+                     >>> [
+                         refine (Rule.hypothesis 1) >> done,
+                         refine (Rule.hypothesisOf 0) >> done
+                         ],
+                     
+                     withgoal
+                     (fn (_, dir) =>
+                         chdir (D.bindh dir ident)
+                         >> refine (Rule.weaken 3 2) 
+                         >> tac)
+                     ]
+                 ])
+
+      fun arrowExt ident tac =
+         refine (Rule.arrowExt (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             refine (Rule.hypothesis 1) >> done,
+             refine (Rule.hypothesis 0) >> done,
+             
+             eassert2 ()
+             >>> [
+                 refine (Rule.arrowElimOf (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                 >>> [
+                     refine (Rule.hypothesis 2) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+
+                 refine (Rule.arrowElimOf (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                 >>> [
+                     refine (Rule.hypothesis 1) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+                 
+                 withgoal
+                 (fn (_, dir) =>
+                     chdir (D.bindh dir ident)
+                     >> refine (Rule.weaken 3 2) 
+                     >> tac)
+                 ]
+             ]
+                 
+
+      fun tkarrowExt extrule elimrule ident tac =
+         refine (extrule (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             refine (Rule.weaken 0 2) >> idtacM TC.Secondary,
+
+             refine (Rule.hypothesis 1) >> done,
+             refine (Rule.hypothesis 0) >> done,
+             
+             eassert2 ()
+             >>> [
+                 refine (elimrule (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                 >>> [
+                     refine (Rule.hypothesis 2) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+
+                 refine (elimrule (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                 >>> [
+                     refine (Rule.hypothesis 1) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+                 
+                 withgoal
+                 (fn (_, dir) =>
+                     chdir (D.bindh dir ident)
+                     >> refine (Rule.weaken 3 2) 
+                     >> tac)
+                 ]
+             ]
+                 
+
+      fun existsExt ident tac =
+         C.goalCase $
+         C.apply3 Prim.eq (C.apply2 Prim.exists C.what (C.lam C.what)) C.what C.what ?
+         (fn ((a, b), m, n) =>
+             assert (T.apply3 Prim.eq a (T.pi1 m) (T.pi1 n))
+             >>> [
+                 refine (Rule.weaken 0 2) >> idtacM TC.Primary,
+    
+                 refine (Rule.existsExt 
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.under 1 T.shift1))
+                            (T.Sub (m, T.shift1))
+                            (T.Sub (n, T.shift1)))
+                 >>> [
+                     refine (Rule.hypothesis 2) >> done,
+                     refine (Rule.hypothesis 1) >> done,
+                     refine (Rule.hypothesis 0) >> done,
+    
+                     assert2
+                        (T.apply2 
+                            Prim.ov
+                            (T.Sub (b, T.Dot (T.pi1 (T.Sub (m, T.shift1)), T.shift1)))
+                            (T.pi2 (T.Sub (m, T.shift1))))
+                        (T.apply2 
+                            Prim.ov
+                            (T.Sub (b, T.Dot (T.pi1 (T.Sub (m, T.shift1)), T.shift1)))
+                            (T.pi2 (T.Sub (n, T.shift1))))
+                     >>> [
+                         (* M[^] #2 : B[M[^] #1 . ^] *)
+                         refine (Rule.existsElim2Of 
+                                    (T.Sub (a, T.shift1))
+                                    (T.Sub (b, T.under 1 T.shift1))
+                                    (T.Sub (m, T.shift1)))
+                         >> refine (Rule.hypothesis 2)
+                         >> done,
+    
+                         (* N[^] #2 : B[M[^] #1 . ^] *)
+                         refine (Rule.equivalenceOf
+                                    (T.Sub (b, T.Dot (T.pi1 (T.Sub (n, T.shift1)), T.shift1)))
+                                    (T.Sub (b, T.Dot (T.pi1 (T.Sub (m, T.shift1)), T.shift1)))
+                                    (T.pi2 (T.Sub (n, T.shift1))))
+                         >>> [
+                             refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))
+                             >>
+                             (* B[M[^] #1 . ^] = B[N[^] #1 . ^] : type *)
+                             refine (Rule.existsFormInv2Eq
+                                        (T.Sub (a, T.shift1))
+                                        (T.Sub (b, T.under 1 T.shift1))
+                                        (T.pi1 (T.Sub (m, T.shift1)))
+                                        (T.pi1 (T.Sub (n, T.shift1))))
+                             >>> [
+                                 (* exists A[^] . B[0 . ^2] : type *)
+                                 refine (Rule.inhabitedForm (T.evar ()))
+                                 >> refine (Rule.inhabitant (T.evar ()) (T.evar ()))
+                                 >> refine (Rule.hypothesis 2)
+                                 >> done,
+
+                                 refine (Rule.hypothesis 0) >> done
+                                 ],
+
+                             refine (Rule.existsElim2Of 
+                                        (T.Sub (a, T.shift1))
+                                        (T.Sub (b, T.under 1 T.shift1))
+                                        (T.Sub (n, T.shift1)))
+                             >> refine (Rule.hypothesis 1)
+                             >> done
+                             ],
+
+                         withgoal
+                         (fn (_, dir) =>
+                             chdir (D.bindh dir ident)
+                             >> refine (Rule.weaken 3 2) 
+                             >> tac)
+                         ]
+                     ]
+                 ])
+    
+
+      fun setExt _ tac =
+         C.goalCase $
+         C.apply3 Prim.eq (C.apply2 Prim.set C.what (C.lam C.what)) C.what C.what ?
+         (fn ((a, b), m, n) =>
+             (* ... |- m = n : set a . b *)
+             eassert ()
+             >>> [
+                 (* ... |- forall a . (b : type) *)
+                 refine (Rule.forallIntro a (T.apply1 Prim.istp b))
+                 >>> [
+                     (* ... |- a : type *)
+                     refine (Rule.setFormInv a b)
+                     >>
+                     (* ... |- set a . b : type *)
+                     refine (Rule.inhabitedForm (T.evar ()))
+                     >>
+                     (* ... |- set a . b *)
+                     refine (Rule.inhabitant (T.evar ()) m)
+                     >>
+                     (* ... |- m : set a . b *)
+                     refine (Rule.hypothesis 1) >> done,
+
+                     (* a |- b : type *)
+                     withgoal
+                     (fn (_, dir) =>
+                         chdir (D.bind0 dir)
+                         >>
+                         refine (Rule.weaken 1 2)
+                         >>
+                         idtacM TC.Secondary),
+                     ],
+
+                 (* ... forall a . (b : type) |- m[^] = n[^] : set a[^] . b[0 . ^2] *)
+                 refine (Rule.setElim
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.under 1 T.shift1))
+                            (T.evar ())
+                            (T.Sub (m, T.shift1)))
+                 >>> [
+                     (* ... forall a . (b : type), a[^] |- b[0 . ^2] *)
+                     refine (Rule.forallElim 
+                                (T.Sub (a, T.Shift 2))
+                                   (T.apply1 Prim.istp (T.Sub (b, T.under 1 (T.Shift 2))))
+                                T.zero)
+                     >>> [
+                         (* ... forall a . (b : type), a[^] |- forall a[^2] . (b[0 . ^3] : type) *)
+                         refine (Rule.hypothesis 1) >> done,
+
+                         (* ... forall a . (b : type), a[^] |- 0 : a[^2] *)
+                         refine (Rule.hypothesisOf 0) >> done,
+                         ],
+
+                     (* ... forall a . (b : type) |- m[^] : set a[^] . b[0 . ^2] *)
+                     refine (Rule.hypothesis 2) >> done,
+
+                     (* ... forall a . (b : type), b[0 . ^2][m[^] . id] (hidden) |- m[^2] = n[^2] : set a[^2] . b[0 . ^3]
+                        ... forall a . (b : type), b[m[^] . ^] (hidden) |- m[^2] = n[^2] : set a[^2] . b[0 . ^3]
+                     *)
+                     refine (Rule.setIntroEq 
+                                (T.Sub (a, T.Shift 2))
+                                (T.Sub (b, T.under 1 (T.Shift 2)))
+                                (T.Sub (m, T.Shift 2))
+                                (T.Sub (n, T.Shift 2)))
+                     >>> [
+                         (* ... forall a . (b : type), __, a[^2] |- b[0 . ^3] : type 
+                                                                  = b[0 . ^4][0 . id]
+                         *)
+                         refine (Rule.forallElim 
+                                    (T.Sub (a, T.Shift 3))
+                                    (T.apply1 Prim.istp (T.Sub (b, T.under 1 (T.Shift 3))))
+                                    T.zero)
+                         >>> [
+                             (* ... forall a . (b : type), __, a[^2] |- forall a[^3] . (b[0 . ^4] : type) *)
+                             refine (Rule.hypothesis 2) >> done,
+    
+                             (* ... forall a . (b : type), __, a[^2] |- 0 : a[^3] *)
+                             refine (Rule.hypothesisOf 0) >> done
+                             ],
+
+                         (* ... __, __ |- m[^2] = n[^2] : a[^2] *)
+                         eassert2 ()
+                         >>> [
+                             refine (Rule.setWeakenOf 
+                                        (T.Sub (a, T.Shift 2))
+                                        (T.Sub (b, T.under 1 (T.Shift 2)))
+                                        (T.Sub (m, T.Shift 2)))
+                             >>
+                             refine (Rule.hypothesis 3) >> done,
+    
+                             refine (Rule.setWeakenOf 
+                                        (T.Sub (a, T.Shift 2))
+                                        (T.Sub (b, T.under 1 (T.Shift 2)))
+                                        (T.Sub (n, T.Shift 2)))
+                             >>
+                             refine (Rule.hypothesis 2) >> done,
+    
+                             refine (Rule.weaken 2 4)
+                             >>
+                             tac
+                             ],
+
+                         (* ... forall a . (b : type), b[m[^] . ^] |- b[0 . ^3][m[^2] . id]
+                                                                    = b[m[^2] . ^2]
+                         *)
+                         refine (Rule.hypothesis 0) >> done
+                         ]
+                     ]
+                 ])
+
+
+      val setExtensionalityPriority =
+         C.goalCaseAlt
+            [
+            C.apply3 Prim.eq (C.apply2 Prim.set C.what (C.lam C.what)) C.what C.what ?
+            (fn ((a, b), m, n) =>
+                refine (Rule.setIntroEq a b m n)
+                >>> [
+                    withgoal
+                    (fn (_, dir) => chdir (D.bind0 dir) >> idtacM TC.Secondary),
+
+                    idtacM TC.Primary,
+
+                    idtacM TC.Primary
+                    ]),
+
+            C.wild ?
+            (fn () => fail "not a set extensionality goal")
+            ]
+
+      val setExtensionalityRaw = setExtensionalityPriority >> idtac
+      val setExtensionality = TC.withTypecheckSnd setExtensionalityPriority
+            
+
+         
+      fun prodExt _ tac =
+         refine (Rule.prodExt (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             refine (Rule.hypothesis 1) >> done,
+             refine (Rule.hypothesis 0) >> done,
+             
+             refine (Rule.weaken 0 2) >> idtacM TC.Primary,
+
+             eassert2 ()
+             >>> [
+                 refine (Rule.prodElim2Of (T.evar ()) (T.evar ()) (T.evar ()))
+                 >> refine (Rule.hypothesis 1) >> done,
+
+                 refine (Rule.prodElim2Of (T.evar ()) (T.evar ()) (T.evar ()))
+                 >> refine (Rule.hypothesis 0) >> done,
+
+                 refine (Rule.weaken 2 2) >> tac
+                 ]
+             ]
+
+
+
+      fun futureExt _ _ =
+         refine (Rule.futureExt (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             refine (Rule.hypothesis 1) >> done,
+             refine (Rule.hypothesis 0) >> done,
+
+             (* cannot reestablish the invariant, so stop here *)
+             refine (Rule.weaken 0 2) >> idtacM TC.Primary
+             ]
+
+
+      fun unitExt exttac _ _ =
+         exttac
+         >>> [
+             refine (Rule.hypothesis 1) >> done,
+             refine (Rule.hypothesis 0) >> done
+             ]
+
+
+      structure RT = RuleTactic
+
+      val () =
+         List.app
+            (fn (const, tacfn) => H.insert extensionalityTactics const tacfn)
+            [
+            (Prim.forall, forallExt),
+            (Prim.arrow, arrowExt),
+            (Prim.tarrow, tkarrowExt Rule.tarrowExt Rule.tarrowElimOf),
+            (Prim.karrow, tkarrowExt Rule.karrowExt Rule.karrowElimOf),
+            (Prim.exists, existsExt),
+            (Prim.set, setExt),
+            (Prim.prod, prodExt),
+            (Prim.future, futureExt),
+            (Prim.unit, unitExt RT.unitExt),
+            (Prim.eq, unitExt RT.eqExt),
+            (Prim.ov, unitExt RT.ofExt),
+            (Prim.eqtp, unitExt RT.eqtpExt),
+            (Prim.istp, unitExt RT.istpExt),
+            (Prim.subtype, unitExt RT.subtypeExt),
+            (Prim.squash, unitExt RT.squashExt),
+            ]
+
+
+      fun substitutionLiteral i m =
+         let
+            val m' = T.evar ()
+         in
+            if Unify.unify1 m (T.Sub (m', T.Shift (i+1))) then
+               refine (Rule.substitution i (T.evar ()) (T.evar ()) m')
+               >>> [
+                   idtac,
+                   idtac,
+      
+                   let
+                      do (_, dir) = withgoal
+      
+                      (* We just used hypothesis i, so it has to be in the directory unless it is corrupt. *)
+                      val (d3, d12) = D.split dir i
+                   in
+                      chdir (List.foldl (fns sym d => D.bind d sym) (D.tl d12) d3)
+                   end
+                   ]
+            else
+               fail "substitutend depends on later hypotheses"
+         end
+                
+      fun substitutionPriority hyp em =
+         let
+            do i = HypTactic.findhyp hyp
+            do m = withterm em
+         in
+            substitutionLiteral i m
+            >>> [idtacM TC.Secondary, idtacM TC.Primary, idtacM TC.Primary]
+         end
+
+      fun substitutionRaw hyp em = substitutionPriority hyp em >> idtac
+
+      fun substitution hyp em =
+         TC.withTypecheckSnd $ substitutionPriority hyp em
+
+
+
+      fun substMain reverse i j m =
+         let
+            val m' = T.evar ()
+         in
+            if Unify.unify1 m (T.Sub (m', T.Shift (i+1))) then
+               refine (Rule.substitution i (T.evar ()) (T.evar ()) m')
+               >>> [
+                   idtacM TC.Secondary,
+                   
+                   if reverse then
+                      refine (Rule.eqSymm (T.evar ()) (T.evar ()) (T.evar ()))
+                      >> refine (Rule.hypothesis j) >> done
+                   else
+                      refine (Rule.hypothesis j) >> done,
+      
+                   let
+                      do (_, dir) = withgoal
+      
+                      (* We just used hypotheses i and j, so they have to be there.
+                         They also have to be in the directory unless it is corrupt.
+                         Moreover, j depends on i, so j < i
+                      *)
+                      val (d5, d1234) = D.split dir j
+                      val (d3, d12) = D.split (D.tl d1234) (i - j - 1)
+                      val d1 = D.tl d12
+      
+                      val dir' =
+                         List.foldl
+                            (fns sym d => D.bind d sym)
+                            (List.foldl 
+                                (fns sym d => D.bind d sym)
+                                d1
+                                d3)
+                            d5
+                   in
+                      refine (Rule.weaken j 1)
+                      >> chdir dir'
+                      >> idtacM TC.Primary
+                   end
+                   ]
+            else
+               fail "substitutend depends on later hypotheses"
+         end
+
+      fun substPriority hyp =
+         let
+            do i = HypTactic.findhyp hyp
+         in
+            goalContextCase
+            /| $anyhyp $tm
+                 (| \Prim.eq\ _ ($var \i\) ? =>
+                    \(fnc m => fn j => substMain false i j m)\
+
+                  | \Prim.eq\ _ ? ($var \i\) =>
+                    \(fnc m => fn j => substMain true i j m)\)
+
+             | _ =>
+               \(fnc => fail "no equality hypothesis found")\
+            /
+         end
+
+      fun substRaw hyp = substPriority hyp >> idtac
+
+      fun subst hyp =
+         TC.withTypecheckSnd $ substPriority hyp
+
+
+
+      val injectionTactics : (int -> tactic) H.table = H.table ()
+
+      fun injection hyp =
+         let
+            do i = HypTactic.findhyp hyp
+         in
+            goalContextCase
+            /| $hyp \i\ $tm \Prim.eq\ (const? @ _) _ _ =>
+               \(fnc const =>
+                    (case H.find injectionTactics const of
+                        SOME tac => tac i
+ 
+                      | NONE => fail "not an injectible hypothesis"))\
+
+             | _ =>
+               \(fnc => fail "not an injectible hypothesis")\
+            /
+         end
+
+
+
+      (* i : M = N : nat *)
+      fun injectionNat i =
+         goalContextCase
+         / $hyp \i\ $tm \Prim.eq\ @ $ap \Prim.nat\
+           (
+              $ap \Prim.zero\ $ap \Prim.zero\ $nil =>
+              \(fnc => idtac)\
+
+            | $ap \Prim.zero\ $ap ($as \Prim.succ\ _) $nil =>
+              \(fnc n =>
+                   refine (Rule.voidElim (T.evar ()))
+                   >>
+                   (* void *)
+                   refine (Rule.equivalence (T.Const Prim.unit) (T.Const Prim.void))
+                   >>> [
+                       (* unit = void : type *)
+                       refine (Rule.natElimEqtype 
+                                  (T.Const Prim.unit) (T.Const Prim.unit)
+                                  (T.Const Prim.void) (T.Const Prim.void)
+                                  (T.Const Prim.zero) n)
+                       >>> [
+                           (* zero = succ _ : nat *)
+                           refine (Rule.hypothesis i),
+
+                           (* A |- unit = unit : type *)
+                           refine Rule.unitEq,
+  
+                           (* A |- void = void : type *)
+                           refine Rule.voidEq 
+                           ],
+  
+                       (* unit *)
+                       refine Rule.unitIntro
+                       ])\
+
+            | $ap ($as \Prim.succ\ _) $ap \Prim.zero\ $nil =>
+              \(fnc n =>
+                   refine (Rule.voidElim (T.evar ()))
+                   >>
+                   (* void *)
+                   refine (Rule.equivalence (T.Const Prim.unit) (T.Const Prim.void))
+                   >>> [
+                       (* unit = void : type *)
+                       refine (Rule.natElimEqtype 
+                                  (T.Const Prim.void) (T.Const Prim.void)
+                                  (T.Const Prim.unit) (T.Const Prim.unit)
+                                  n (T.Const Prim.zero))
+                       >>> [
+                           (* succ _ = zero : nat *)
+                           refine (Rule.hypothesis i),
+
+                           (* A |- void = void : type *)
+                           refine Rule.voidEq,
+
+                           (* A |- unit = unit : type *)
+                           refine Rule.unitEq
+                           ],
+  
+                       (* unit *)
+                       refine Rule.unitIntro
+                       ])\
+
+            | $ap ($as \Prim.succ\ ?) $ap ($as \Prim.succ\ ?) $nil =>
+              \(fnc m m' n n' =>
+                   refine (Rule.assert (T.apply3 Prim.eq (T.Const Prim.nat) m' n') (T.evar ()))
+                   >>> [
+                       (* M' = N' : nat
+                          that is:
+                          natcase(succ M', zero, . 0) = sumcase(succ N', zero, . 0) 
+                            : nat [succ M' . id]
+                       *)
+                       refine (Rule.natElimEq
+                                  (T.Const Prim.nat)
+                                  m n (T.Const Prim.zero) (T.Const Prim.zero) T.zero T.zero)
+                       >>> [
+                           (* succ M' = succ N' : nat *)
+                           refine (Rule.hypothesis i),
+  
+                           (* zero = zero : nat *)
+                           refine (Rule.eqRefl (T.Const Prim.nat) (T.Const Prim.zero))
+                           >>
+                           (* zero : nat *)
+                           refine Rule.zeroType,
+                           
+                           (* nat |- 0 = 0 : nat *)
+                           refine (Rule.hypothesisEq 0)
+                           ],
+  
+                       withgoal (fn (_, dir) => chdir (D.bind0 dir))
+                       ])\
+           )
+
+          | _ => \(fnc => fail "not an injection expression")\
+         /
+
+
+
+      (* i : M = N : A % B *)
+      fun injectionSum i =
+         goalContextCase
+         / $hyp \i\ $tm \Prim.eq\ @ $ap (\Prim.sum\ ? ?)
+           (
+              $ap ($as \Prim.inl\ ?) $ap ($as \Prim.inl\ ?) $nil =>
+              \(fnc a b m m' n n' =>
+                   refine (Rule.assert (T.apply3 Prim.eq a m' n') (T.evar ()))
+                   >>> [
+                       (* M' = N' : A
+                          that is:
+                          sumcase(inl M', . 0, . 0) = sumcase(inl N', . 0, . 0) 
+                            : sumcase(0, . A[^2], . B[^2])[inl M' . id]
+                       *)
+                       refine (Rule.sumElimEq
+                                  a b
+                                  (T.apply3 Prim.sumcase 
+                                      T.zero
+                                      (T.Lam (NONE, T.Sub (a, T.Shift 2)))
+                                      (T.Lam (NONE, T.Sub (b, T.Shift 2))))
+                                  m n
+                                  T.zero T.zero T.zero T.zero)
+                       >>> [
+                           (* inl M' = inl N' : A % B *)
+                           refine (Rule.hypothesis i),
+  
+                           (* A |- 0 : 0 : A[^] *)
+                           refine (Rule.hypothesisEq 0),
+  
+                           (* B |- 0 : 0 : B[^] *)
+                           refine (Rule.hypothesisEq 0)
+                           ],
+  
+                       withgoal (fn (_, dir) => chdir (D.bind0 dir))
+                       ])\
+
+            | $ap ($as \Prim.inr\ ?) $ap ($as \Prim.inr\ ?) $nil =>
+              \(fnc a b m m' n n' =>
+                   refine (Rule.assert (T.apply3 Prim.eq b m' n') (T.evar ()))
+                   >>> [
+                       refine (Rule.sumElimEq
+                                  a b
+                                  (T.apply3 Prim.sumcase 
+                                      T.zero
+                                      (T.Lam (NONE, T.Sub (a, T.Shift 2)))
+                                      (T.Lam (NONE, T.Sub (b, T.Shift 2))))
+                                  m n
+                                  T.zero T.zero T.zero T.zero)
+                       >>> [
+                           refine (Rule.hypothesis i),
+  
+                           refine (Rule.hypothesisEq 0),
+  
+                           refine (Rule.hypothesisEq 0)
+                           ],
+  
+                       withgoal (fn (_, dir) => chdir (D.bind0 dir))
+                       ])\
+
+            | $ap ($as \Prim.inl\ _) $ap ($as \Prim.inr\ _) $nil =>
+              \(fnc a b m n =>
+                   refine (Rule.voidElim (T.evar ()))
+                   >>
+                   (* void *)
+                   refine (Rule.equivalence (T.Const Prim.unit) (T.Const Prim.void))
+                   >>> [
+                       (* unit = void : type *)
+                       refine (Rule.sumElimEqtype a b
+                                  (T.Const Prim.unit) (T.Const Prim.unit)
+                                  (T.Const Prim.void) (T.Const Prim.void)
+                                  m n)
+                       >>> [
+                           (* inl M' = inr N' : A % B *)
+                           refine (Rule.hypothesis i),
+  
+                           (* A |- unit = unit : type *)
+                           refine Rule.unitEq,
+  
+                           (* A |- void = void : type *)
+                           refine Rule.voidEq 
+                           ],
+  
+                       (* unit *)
+                       refine Rule.unitIntro
+                       ])\
+                 
+            | $ap ($as \Prim.inr\ _) $ap ($as \Prim.inl\ _) $nil =>
+              \(fnc a b m n =>
+                   refine (Rule.voidElim (T.evar ()))
+                   >>
+                   refine (Rule.equivalence (T.Const Prim.unit) (T.Const Prim.void))
+                   >>> [
+                       refine (Rule.sumElimEqtype a b
+                                  (T.Const Prim.void) (T.Const Prim.void)
+                                  (T.Const Prim.unit) (T.Const Prim.unit)
+                                  m n)
+                       >>> [
+                           refine (Rule.hypothesis i),
+  
+                           refine Rule.voidEq,
+  
+                           refine Rule.unitEq
+                           ],
+  
+                       (* unit *)
+                       refine Rule.unitIntro
+                       ])\
+           )
+
+          | _ => \(fnc => fail "not an injection expression")\
+         /
+
+
+      (* i : M = N : exists A . B *)
+      fun injectionExists i =
+         goalContextCase
+         /| $hyp \i\ $tm \Prim.eq\ (\Prim.exists\ ? (fn . ?)) ($as (? , ?)) ($as (? , ?)) =>
+            \(fnc a b m m1 m2 n n1 n2 =>
+                 refine (Rule.assert (T.apply3 Prim.eq a m1 n1) (T.evar ()))
+                 >>> [
+                     (* M1 = N1 : A *)
+                     refine (Rule.existsElim1Eq a b m n)
+                     >>
+                     (* M = N : exists A . B *)
+                     refine (Rule.hypothesis i),
+
+                     (* M1 = N1 : A |- C *)
+                     refine (Rule.assert 
+                                (T.apply3 Prim.eq 
+                                    (T.Sub (b, T.Dot (T.Sub (m1, T.shift1), T.shift1)))
+                                    (T.Sub (m2, T.shift1))
+                                    (T.Sub (n2, T.shift1)))
+                                (T.evar ()))
+                     >>> [
+                         (* blah |- M2[^] = N2[^] : B[M1[^] . ^] *)
+                         refine (Rule.existsElim2Eq
+                                    (T.Sub (a, T.shift1))
+                                    (T.Sub (b, T.under 1 T.shift1))
+                                    (T.Sub (m, T.shift1))
+                                    (T.Sub (n, T.shift1)))
+                         >>
+                         (* blah |- M[^] = N[^] : (exists A . B)[^] *)
+                         refine (Rule.hypothesis (i+1)),
+
+                         withgoal (fn (_, dir) => chdir (D.bind0 (D.bind0 dir)))
+                         ]
+                     ])\
+
+          | _ => \(fnc => fail "not an injection expression")\
+         /
+
+
+      val () =
+         List.app (fn (const, tac) => H.insert injectionTactics const tac)
+         [
+         (Prim.nat, injectionNat),
+         (Prim.sum, injectionSum),
+         (Prim.exists, injectionExists)
+         ]
+
+   end
+
+
+structure EqualityTactic :> EQUALITY_TACTIC = EqualityTacticInternal

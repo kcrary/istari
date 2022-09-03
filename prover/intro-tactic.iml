@@ -1,0 +1,482 @@
+
+signature INTRO_TACTIC =
+   sig
+
+      type tactic = Tactic.tactic
+      type symbol = Symbol.symbol
+
+      val introRaw : IntroPattern.ipattern list -> tactic
+      val intro : IntroPattern.ipattern list -> tactic
+
+      val split : tactic
+
+      val leftRaw : tactic
+      val left : tactic
+
+      val rightRaw : tactic
+      val right : tactic
+
+      val existsRaw : ETerm.eterm -> tactic
+      val exists : ETerm.eterm -> tactic
+
+      val exactRaw : ETerm.eterm -> tactic
+      val exact : ETerm.eterm -> tactic
+
+      val unhide : tactic
+
+      val introOfRaw : IntroPattern.ipattern list -> tactic
+      val introOf : IntroPattern.ipattern list -> tactic
+
+      val proveLambda : tactic
+
+   end
+
+
+signature INTRO_TACTIC_INTERNAL =
+   sig
+
+      include INTRO_TACTIC
+
+
+      (* A tactic to introduce the type, and a function to find the identifier to use (if any). *)
+      val introTactics : (Typecheck.priority Tactic.tacticm * (Term.term -> Term.binder)) ConstantTable.table
+
+      val splitTactics : tactic ConstantTable.table
+
+      val existsTactics : (Term.term -> Typecheck.priority Tactic.tacticm) ConstantTable.table
+
+   end
+
+
+structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
+   struct
+
+      structure C = Oldcase
+      structure D = DestructInternal
+      structure N = Normalize
+      structure R = Reduction
+      structure RT = RuleTactic
+      structure T = Term
+      structure TC = Typecheck
+      
+      structure H = ConstantTable
+
+      type term = Term.term
+      type symbol = Symbol.symbol
+      val ? = C.?
+      val evar = Term.evar
+
+      open Tactic
+
+
+      val introTactics : (TC.priority tacticm * (T.term -> T.binder)) H.table = H.table ()
+      val splitTactics : tactic H.table = H.table ()
+      val existsTactics : (term -> TC.priority tacticm) H.table = H.table ()
+
+      
+      fun introPriority pats =
+         (case pats of
+             nil => idtacM TC.Primary
+
+           | pat :: rest =>
+                let
+                   do (jud, _) = withgoal
+                   val a = Judgement.concl jud
+                in
+                   (case Normalize.whnfHard a of
+                       T.Elim (T.Const const, spine) =>
+                          (case H.find introTactics const of
+                              SOME (tac, binder) =>
+                                 let
+                                    val pat' =
+                                       (case pat of
+                                           IntroPattern.Ident NONE =>
+                                              IntroPattern.Ident (binder a)
+
+                                         | _ => pat)
+
+                                    do tc = andthenM tac
+                                 in
+                                    (case tc of
+                                        TC.Secondary =>
+                                           idtacM TC.Secondary
+       
+                                      | TC.Primary =>
+                                           D.destruct0 pat' (introPriority rest))
+                                 end
+       
+                            | NONE => fail "conclusion not introable")
+
+                     | _ =>
+                          fail "conclusion not introable")
+                end)
+
+      fun introRaw pats = introPriority pats >> idtac
+
+      fun intro pats = Typecheck.withTypecheckSnd $ introPriority pats
+
+      val () =
+         let
+            val insert = H.insert introTactics
+            fun nobinder _ = NONE
+         in
+            insert Prim.forall 
+               (RT.refine2 Rule.forallIntro >>> [idtacM TC.Secondary, idtacM TC.Primary],
+                RT.binder [2]);
+
+            insert Prim.arrow 
+               (RT.refine2 Rule.arrowIntro >>> [idtacM TC.Secondary, idtacM TC.Primary],
+                nobinder);
+
+            insert Prim.tarrow 
+               (RT.refine2 Rule.tarrowIntro >>> [idtacM TC.Secondary, idtacM TC.Secondary, idtacM TC.Primary],
+                nobinder);
+
+            insert Prim.karrow 
+               (RT.refine2 Rule.karrowIntro >>> [idtacM TC.Secondary, idtacM TC.Secondary, idtacM TC.Primary],
+                nobinder);
+
+            insert Prim.intersect
+               (RT.refine2 Rule.intersectIntro >>> [idtacM TC.Secondary, idtacM TC.Primary],
+                RT.binder [2]);
+
+            insert Prim.guard
+               (RT.refine2 Rule.guardIntro >>> [idtacM TC.Secondary, idtacM TC.Primary],
+                nobinder);
+
+            insert Prim.foralltp
+               (RT.refine1 Rule.foralltpIntro >>> [idtacM TC.Primary],
+                RT.binder [1]);
+
+            insert Prim.iforall 
+               (RT.refine3 Rule.iforallIntro >>> [idtacM TC.Secondary, idtacM TC.Primary],
+                RT.binder [3]);
+
+            insert Prim.subtype 
+               (RT.refine2 Rule.subtypeIntro >>> [idtacM TC.Secondary, idtacM TC.Secondary, idtacM TC.Primary],
+                nobinder)
+         end
+
+      val split =
+         let
+            do const = withHeadConst "conclusion not splitable"
+         in
+            (case H.find splitTactics const of
+                SOME tac => tac
+
+              | NONE => fail "conclusion not splitable")
+         end
+
+      val leftPriority =
+         let
+            do const = withHeadConst "conclusion not leftable"
+         in
+            if Constant.eq (const, Prim.sum) then
+               RuleTactic.sumIntro1
+               >>> [idtacM TC.Secondary, idtacM TC.Primary]
+            else
+               fail "conclusion not leftable"
+         end
+
+      val leftRaw = leftPriority >> idtac
+
+      val left = Typecheck.withTypecheckSnd leftPriority
+
+      val rightPriority =
+         let
+            do const = withHeadConst "conclusion not rightable"
+         in
+            if Constant.eq (const, Prim.sum) then
+               RuleTactic.sumIntro2
+               >>> [idtacM TC.Secondary, idtacM TC.Primary]
+            else
+               fail "conclusion not rightable"
+         end
+
+      val rightRaw = rightPriority >> idtac
+
+      val right = Typecheck.withTypecheckSnd rightPriority
+
+      fun existsPriority m =
+         let
+            do const = withHeadConst "conclusion not existsable"
+            do dir = withidir
+         in
+            (case H.find existsTactics const of
+                SOME tac => tac (m dir)
+
+              | NONE => fail "conclusion not existsable")
+         end
+
+      fun existsRaw m = existsPriority m >> idtac
+
+      fun exists m = Typecheck.withTypecheckSnd $ existsPriority m
+
+      val addbind =
+         let
+            do (_, dir) = withgoal
+         in
+            chdir (Directory.bind0 dir)
+         end
+
+      val () =
+         let
+            val insert = H.insert splitTactics
+         in
+            insert Prim.prod RuleTactic.prodIntro;
+            insert Prim.unit RuleTactic.unitIntro;
+            insert Prim.future RuleTactic.futureIntro;
+            insert Prim.squash RuleTactic.squashIntro
+         end
+
+      val () =
+         let
+            val insert = H.insert existsTactics
+         in
+            insert Prim.exists 
+               (fn m =>
+                   refine (Rule.existsIntro (evar ()) (evar ()) m)
+                   >>> [addbind >> idtacM TC.Secondary, idtacM TC.Secondary, idtacM TC.Primary]);
+
+            insert Prim.set 
+               (fn m => 
+                   refine (Rule.setIntro (evar ()) (evar ()) m)
+                   >>> [addbind >> idtacM TC.Secondary, idtacM TC.Secondary, idtacM TC.Primary]);
+
+            insert Prim.iexists 
+               (fn b =>
+                   refine (Rule.iexistsIntro (evar ()) b (evar ()) (evar ()))
+                   >>> [
+                       idtacM TC.Secondary, 
+                       addbind >> idtacM TC.Secondary, 
+                       idtacM TC.Secondary,
+                       idtacM TC.Primary
+                       ])
+         end
+
+      fun exactRaw m =
+         let
+            do idir = withidir
+         in
+            refine $ Rule.inhabitant (T.evar ()) (m idir)
+         end
+
+      fun exact m = Typecheck.withTypecheckSnd $ (exactRaw m >> idtacM TC.Secondary)
+
+      val unhide =
+         let
+            do const = withHeadConst "cannot unhide"
+         in
+            (case H.find TypecheckInternal.introTactics const of
+                SOME tac =>
+                   cut $ setFailure "cannot unhide" $
+                   Tactic.refine (Rule.inhabitant (T.evar ()) T.Triv)
+                   >> tac 
+                   (* only allow unhide when it works with no extra goals *)
+                   >>> [idtac]
+
+              | NONE =>
+                   fail "cannot unhide")
+         end
+
+
+
+      (* proveLambdaLoop m lamtac
+
+         if    lamtac proves G |- lam . N : A (for arbitrary G, N)
+         then  tactic attempts to prove M : A, possibly unfolding constants
+      *)
+      fun proveLambdaLoop m arrtac =
+         C.termCaseXAlt (N.whnf m)
+            [
+            C.lam C.wild ?
+            (fn () => arrtac),
+
+            C.path Prim.pause C.swild ?
+            (fn () =>
+                (* Don't unfold pause, to avoid looping. *)
+                fail "not a lambda"),
+
+            C.path Prim.fix (C.app C.what C.swild) ?
+            (fn (f, ()) =>
+                let
+                   val tac = proveLambdaLoop (T.app f m) arrtac
+                in
+                   (* Unroll fix explicitly, since we aren't unfolding pause. *)
+                   Tactic.replaceConcl (T.apply2 Prim.ov (T.evar ()) m)
+                   >> refine (Rule.reduce (R.within [2] (R.user1 Prim.unroll_fix)))
+                   >> tac
+                end),
+
+            C.whatPath C.swhat ?
+            (fn (const, spine) =>
+                (case Constant.definition const of
+                    NONE =>
+                       fail "not a lambda"
+
+                  | SOME n =>
+                       let
+                          val tac = proveLambdaLoop (T.Elim (n, spine)) arrtac
+                       in
+                          Tactic.replaceConcl (T.apply2 Prim.ov (T.evar ()) m)
+                          >> refine (Rule.reduce (R.within [2] R.unfold))
+                          >> tac
+                       end)),
+
+            C.wild ?
+            (fn () => fail "not a lambda")
+            ]
+
+      fun proveLambdaArrow m =
+         proveLambdaLoop m
+            (lift 
+                (fn () => 
+                    (* G |- lam . N : void -> whatever *)
+                    refine (Rule.arrowIntroOf (T.Const Prim.void) (T.evar ()) (T.evar ()))
+                    >>> [
+                        (* void : type *)
+                        refine Rule.voidForm,
+    
+                        (* void |- whatever *)
+                        refine (Rule.voidElim (T.evar ()))
+                        >>
+                        (* void |- void *)
+                        refine (Rule.hypothesis 0)
+                        ]))
+
+      fun proveLambdaPi m =
+         proveLambdaLoop m
+            (lift 
+                (fn () => 
+                    (* G |- lam . N : forall void . whatever *)
+                    refine (Rule.forallIntroOf (T.Const Prim.void) (T.evar ()) (T.evar ()))
+                    >>> [
+                        (* void : type *)
+                        refine Rule.voidForm,
+    
+                        (* void |- whatever *)
+                        refine (Rule.voidElim (T.evar ()))
+                        >>
+                        (* void |- void *)
+                        refine (Rule.hypothesis 0)
+                        ]))
+
+
+      val proveLambda =
+         C.goalCaseAlt
+            [
+            C.apply2 Prim.ov (C.apply2 Prim.arrow (C.constant Prim.void) C.wild) C.what ?
+            (fn (_, m) => proveLambdaArrow m),
+
+            C.apply2 Prim.ov (C.apply2 Prim.forall (C.constant Prim.void) (C.lam C.wild)) C.what ?
+            (fn (_, m) => proveLambdaPi m),
+
+            C.wild ?
+            (fn () =>
+                fail "not a proveLambda goal")
+            ]
+
+
+
+      fun introOfPriority pats =
+         (case pats of
+             nil => idtacM TC.Primary
+
+           | pat :: rest =>
+                (C.goalCaseAlt
+                    [
+                    C.apply2 Prim.ov 
+                       (C.whnfHard (C.apply2 Prim.intersect C.wild (C.lamb C.wild)))
+                       C.wild ?
+                    (fn (((), (binder, ())), ()) =>
+                        let
+                           val pat' =
+                              (case pat of
+                                  IntroPattern.Ident NONE =>
+                                     IntroPattern.Ident binder
+
+                                | _ => pat)
+                        in
+                           refine (Rule.intersectIntroOf (T.evar ()) (T.evar ()) (T.evar ()))
+                           >>> [
+                               idtacM TC.Secondary,
+
+                               D.destruct0 pat' (introOfPriority rest)
+                               ]
+                        end),
+
+                    C.apply2 Prim.ov
+                       (C.whnfHard (C.apply2 Prim.guard C.wild C.wild))
+                       C.wild ?
+                    (fn _ =>
+                        refine (Rule.guardIntroOf (T.evar ()) (T.evar ()) (T.evar ()))
+                        >>> [
+                            idtacM TC.Secondary,
+
+                            D.destruct0 pat (introOfPriority rest)
+                            ]),
+
+                    C.apply2 Prim.ov 
+                       (C.whnfHard (C.apply2 Prim.forall C.wild (C.lamb C.wild)))
+                       C.wild ?
+                    (fn (((), (binder, ())), ()) =>
+                        let
+                           val pat' =
+                              (case pat of
+                                  IntroPattern.Ident NONE =>
+                                     IntroPattern.Ident binder
+
+                                | _ => pat)
+                        in
+                           refine (Rule.forallOfExt (T.evar ()) (T.Const Prim.void) (T.evar ()) (T.evar ()) (T.evar ()))
+                           >>> [
+                               idtacM TC.Secondary,
+                               attempt proveLambda >> idtacM TC.Secondary,
+   
+                               D.destruct0 pat' (introOfPriority rest)
+                               ]
+                        end),
+
+                    C.apply2 Prim.ov 
+                       (C.whnfHard (C.apply2 Prim.arrow C.wild C.wild))
+                       C.wild ?
+                    (fn (((), ()), ()) =>
+                        refine (Rule.arrowOfExt (T.evar ()) (T.Const Prim.void) (T.evar ()) (T.evar ()) (T.evar ()))
+                        >>> [
+                            idtacM TC.Secondary,
+                            attempt proveLambda >> idtacM TC.Secondary,
+
+                            D.destruct0 pat (introOfPriority rest)
+                            ]),
+
+                    C.apply2 Prim.ov 
+                       (C.whnfHard (C.apply1 Prim.foralltp (C.lamb C.wild)))
+                       C.wild ?
+                    (fn ((binder, ()), ()) =>
+                        let
+                           val pat' =
+                              (case pat of
+                                  IntroPattern.Ident NONE =>
+                                     IntroPattern.Ident binder
+
+                                | _ => pat)
+                        in
+                           refine (Rule.foralltpIntroOf (T.evar ()) (T.evar ()))
+                           >>> [
+                               D.destruct0 pat' (introOfPriority rest)
+                               ]
+                        end),
+
+                    C.wild ?
+                    (fn () =>
+                        fail "not a conclusion for introOf")
+                    ]))
+
+      fun introOfRaw pats = introOfPriority pats >> idtac
+
+      fun introOf pats = Typecheck.withTypecheckSnd $ introOfPriority pats
+
+   end
+
+
+structure IntroTactic :> INTRO_TACTIC = IntroTacticInternal

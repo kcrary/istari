@@ -1,0 +1,499 @@
+
+signature NORMALIZE =
+   sig
+
+      type term
+      type constant
+
+      (* simplify M
+
+         returns a simple form identical to M
+         (Identical means modulo resolving substitutions and bound evars, and combining elims.)
+
+         A simple form fits the grammar Ms:
+
+         (head)
+         h  ::= i
+              | k
+              | E[s]
+
+         (intro) 
+         Mi ::= \.M
+              | <M, M>
+              | next M
+              | <>
+              | marker
+
+         (simple form)
+         Ms ::= h spine
+              | Mi
+              | Mi nonempty-spine
+
+         Note that E[s] is a head, so we expect to see E[s] @ spine.  We cannot avoid
+         this by pushing evars down to base type, because:
+         1. we don't have the types at this phase
+         2. we don't have eta equivalence
+      *)
+      val simplify : term -> term
+
+
+      (* simplifies recursively *)
+      val simplifyAll : term -> term
+
+
+      (* whnf M
+
+         returns a weak-head norm form beta-equivalent to M
+
+         A weak-head form fits the grammar Mn:
+
+         (weak-head normal form)
+         Mn ::= h spine
+              | Mi
+
+              | Mi nonempty-spine *
+
+         * Provided Mi doesn't form a redex with the spine.
+           (This case arises only for ill-typed terms and can usually be neglected.)
+
+
+         Three strategies are used for normalization:
+         
+         Standard:
+         - Reduces user redices.
+         - Never unfolds soft/firm head constants.
+
+         Hard:
+         - Reduces user redices.
+         - Always unfolds soft/firm head constants.
+
+         Basic:
+         - Never reduces user redices.
+         - Always unfolds soft head constants.
+         - Never unfolds firm head constants.
+         (In other words, unfolds soft head constants but otherwise does only the 
+         minimum necessary to put the term into whnf.  This is used in typechecking,
+         where doing more might remove vital type annotations expressed by firm
+         constants.)
+      *)
+
+
+      val whnf : term -> term
+      val whnfHard : term -> term
+      val whnfBasic : term -> term
+
+
+      (* normalize M
+
+         returns a normal form beta-equivalent to M
+      *)
+      val normalize : term -> term
+      val normalizeHard : term -> term
+
+   end
+
+
+signature NORMALIZE_INTERNAL =
+   sig
+
+      include NORMALIZE
+
+
+      type ureduction2
+
+      (* You probably don't want this.  You probably want Registry.register instead. *)
+      val register : ureduction2 -> unit
+
+   end
+
+
+functor NormalizeFun (structure Term : TERM
+                      structure Constant : CONSTANT
+                                           where type constant = Term.constant
+                                           where type term = Term.term
+                      structure Reduction : REDUCTION_INTERNAL
+                                            where type constant = Term.constant
+                                            where type term = Term.term
+                                            where type elim = Term.elim
+                      structure Prim : PRIM
+                                       where type constant = Term.constant
+                                       where type ureduction2 = Reduction.ureduction2)
+   :> 
+   NORMALIZE_INTERNAL
+   where type term = Term.term
+   where type constant = Term.constant
+   where type ureduction2 = Reduction.ureduction2
+   =
+   struct
+
+      open Term
+
+      type ureduction2 = Reduction.ureduction2
+
+      structure D = RedBlackDict (structure Key = Constant.Ordered)
+      structure H = CheckpointedHashTable (structure Key = Constant.Hashable)
+
+
+      fun elim m spine =
+         (case spine of
+             [] => m
+
+           | _ => Elim (m, spine))
+
+
+      (* ssubstAppend spine1 s spine2 = ssubst spine1 s @ spine2 but optimized *)
+      fun ssubstAppend spine1 s spine2 =
+         (case s of
+             Shift 0 =>
+                spine1 @ spine2
+
+           | _ =>
+                List.revAppend
+                   (List.foldl
+                       (fns e l =>
+                           (case e of
+                               App m => App (Sub (m, s)) :: l
+
+                             | _ => e :: l))
+                       []
+                       spine1)
+                   spine2)
+
+
+
+      (* Need to collect the spines so we aren't repeatedly appending on the right. *)
+
+      fun simplifyMain m s spine =
+         (case m of
+             Var i =>
+                (case substVar i s of
+                    Idx j =>
+                       Elim (Var j, spine)
+
+                  | Term m' =>
+                       simplifyMain m' id spine)
+
+           | Const _ => 
+                Elim (m, spine)
+
+           | Elim (m1, spine') =>
+                (* should optimize this *)
+                simplifyMain m1 s (ssubstAppend spine' s spine)
+
+           | Lam (b, m1) =>
+                elim (Lam (b, Sub (m1, under 1 s))) spine
+
+           | Pair (m1, m2) =>
+                elim (Pair (Sub (m1, s), Sub (m2, s))) spine
+
+           | Next m1 =>
+                elim (Next (Sub (m1, s))) spine
+
+           | Triv => elim m spine
+
+           | Sub (m1, s') =>
+                simplifyMain m1 (compose s' s) spine
+
+           | Evar eb =>
+                (case readEbind eb of
+                    NONE =>
+                       Elim (Sub (m, s), spine)
+
+                  | SOME m' =>
+                       simplifyMain m' s spine)
+
+           | Marker _ => elim m spine)
+
+      fun simplify m = simplifyMain m id []
+
+
+
+      fun simplifyAll m =
+         (case simplify m of
+             Elim (h as Var _, spine) =>
+                Elim (h, map simplifyAllElim spine)
+
+           | Elim (h as Const _, spine) =>
+                Elim (h, map simplifyAllElim spine)
+
+           | Elim (h as Sub _, spine) =>
+                Elim (h, map simplifyAllElim spine)
+
+           | Elim (m', spine) =>
+                Elim (simplifyAll m', map simplifyAllElim spine)
+
+           | Lam (b, m') =>
+                Lam (b, simplifyAll m')
+
+           | Pair (m1, m2) =>
+                Pair (simplifyAll m1, simplifyAll m2)
+
+           | Next m' =>
+                Next (simplifyAll m')
+
+           | m' => m')
+
+      and simplifyAllElim e =
+         (case e of
+             App m => App (simplifyAll m)
+
+           | _ => e)
+
+
+
+      fun isSoft opacity =
+         (case opacity of
+             Constant.SOFT => true
+           | Constant.FIRM => true
+           | _ => false)
+
+
+      fun introMatch m elim =
+         (case (m, elim) of
+             (Lam _, App _) => true
+           | (Pair _, Pi1) => true
+           | (Pair _, Pi2) => true
+           | (Next _, Prev) => true
+           | _ => false)
+
+
+
+      exception TakeSpine
+
+      (* takeSpine n s spine
+
+         if    spine = M1 ... Mn spine'
+         then  return (Mn ... M1 . s, spine')
+      *)
+      fun takeSpine n s spine =
+         if n = 0 then
+            (s, spine)
+         else
+            (case spine of
+                [] => raise TakeSpine
+
+              | App m :: rest =>
+                   takeSpine (n-1) (Dot (m, s)) rest
+
+              | _ => raise TakeSpine)
+                      
+
+
+      (* Hash table indexed by first constant.
+         If const1 maps to d, then d maps const2 to (l, red),
+         where triggers red = (const1, l, const2)
+      *)
+      val redexTable : (int * Reduction.ureduction2 D.dict) H.table = H.table ()
+
+
+
+      (* as above *)
+      datatype strategy =
+         HARD
+       | BASIC
+       | STANDARD
+
+
+      fun whnfMain strategy m s spine =
+         (case m of
+             Var i =>
+                (case substVar i s of
+                    Idx j =>
+                       Elim (Var j, spine)
+
+                  | Term m' =>
+                       whnfMain strategy m' id spine)
+
+           | Const const =>
+                (case strategy of
+                    HARD =>
+                       if isSoft (Constant.opacity const) then
+                          (* unfold the soft/firm constant regardless *)
+                          let
+                             val n = Option.valOf (Constant.definition const)
+                          in
+                             whnfMain HARD n id spine
+                          end
+
+                       else
+                          reduceUser HARD const spine 
+                             (Elim (Const const, spine))
+
+                  | BASIC =>
+                       (case Constant.opacity const of
+                           Constant.SOFT =>
+                              (* unfold the soft constant regardless *)
+                              let
+                                 val n = Option.valOf (Constant.definition const)
+                              in
+                                 whnfMain BASIC n id spine
+                              end
+
+                         | _ =>
+                              Elim (Const const, spine))
+
+                  | STANDARD =>
+                       reduceUser STANDARD const spine
+                          (Elim (Const const, spine)))
+
+           | Elim (m1, spine') =>
+                whnfMain strategy m1 s (ssubstAppend spine' s spine)
+
+           | Lam (b, m1) =>
+                reduce strategy (Lam (b, Sub (m1, under 1 s))) spine
+
+           | Pair (m1, m2) =>
+                reduce strategy (Pair (Sub (m1, s), Sub (m2, s))) spine
+
+           | Next m1 =>
+                reduce strategy (Next (Sub (m1, s))) spine
+
+           | Triv => elim m spine
+
+           | Sub (m1, s') =>
+                whnfMain strategy m1 (compose s' s) spine
+
+           | Evar eb =>
+                (case readEbind eb of
+                    NONE =>
+                       Elim (Sub (m, s), spine)
+
+                  | SOME m' =>
+                       whnfMain strategy m' s spine)
+
+           | Marker _ => elim m spine)
+
+         
+      (* Contract a user redex, if one exists.  Otherwise return default. *)
+      and reduceUser strategy const spine default =
+         (case H.find redexTable const of
+             NONE =>
+                if Constant.eq (const, Prim.letnext) then
+                   (* We have to hardcode letnext, rather than using the ureduction
+                      mechanism, because its active argument expects an intro form
+                      (Next) rather than a constant.
+                   *)
+                   (case spine of
+                       App arg :: App body :: spine' =>
+                          (case whnfMain HARD arg id [] of
+                              Next n =>
+                                 whnfMain strategy body id (App n :: spine')
+
+                            | _ => default)
+
+                     | _ =>
+                          default)
+                else
+                   default
+
+           | SOME (l, d) =>
+                (* Registered reduction exists. *)
+                (case List.splitOpt spine l of
+                    SOME (spine1, App arg :: spine3) =>
+                       (case whnfMain HARD arg id [] of
+                           Elim (Const const', spine2) =>
+                              (case D.find d const' of
+                                  NONE =>
+                                     default
+
+                                | SOME red =>
+                                     (case
+                                         (try
+                                             SOME (Reduction.ureduce2 red spine1 spine2 spine3)
+                                          with
+                                             Reduction.Reduce => NONE)
+                                      of
+                                         SOME q => whnfMain strategy q id []
+
+                                       | NONE =>
+                                            default))
+
+                         | _ =>
+                              default)
+
+                  | _ =>
+                       default))
+
+
+      (* m is an intro *)
+      and reduce strategy m spine =
+         (case (m, spine) of
+             (_, []) => m
+
+           | (Lam (_, m1), App m2 :: rest) =>
+                whnfMain strategy m1 (Dot (m2, id)) rest
+
+           | (Pair (m1, m2), Pi1 :: rest) =>
+                whnfMain strategy m1 id rest
+
+           | (Pair (m1, m2), Pi2 :: rest) =>
+                whnfMain strategy m2 id rest
+
+           | (Next m1, Prev :: rest) =>
+                whnfMain strategy m1 id rest
+
+           | _ =>
+                (* ill-typed in this case *)
+                Elim (m, spine))
+
+
+
+      fun whnf m = whnfMain STANDARD m id []
+      fun whnfHard m = whnfMain HARD m id []
+      fun whnfBasic m = whnfMain BASIC m id []
+      
+
+
+      fun normalizeWhnf w m =
+         (case m of
+             Elim (m, spine) =>
+                Elim (m, map (normalizeElim w) spine)
+
+           | Lam (b, m) =>
+                Lam (b, normalizeMain w m)
+
+           | Pair (m1, m2) =>
+                Pair (normalizeMain w m1, normalizeMain w m2)
+
+           | Next m =>
+                Next (normalizeMain w m)
+
+           | _ => m)
+
+      and normalizeElim w e =
+         (case e of
+             App m => App (normalizeMain w m)
+
+           | _ => e)
+
+      and normalizeMain w m =
+         normalizeWhnf w (w m)
+
+      fun normalize m = normalizeMain whnf m
+
+      fun normalizeHard m = normalizeMain whnfHard m
+
+
+
+
+
+
+      fun register red =
+         let
+            val (const, l, const') = Reduction.triggers red
+         in
+            H.insertMerge
+               redexTable
+               const
+               (l, D.singleton const' red)
+               (fn (l', d) => 
+                   if l = l' then
+                      (l, D.insert d const' red)
+                   else
+                      raise (Fail "incompatible arities in registered reductions"))
+         end
+
+      (* Constants with primitive reductions. *)
+      val () = List.app register Prim.redices
+
+   end

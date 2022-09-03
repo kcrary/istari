@@ -1,0 +1,218 @@
+
+signature DATABASE =
+   sig
+
+      type constant = Constant.constant
+
+      (* Every type entry in the database should have the form
+         const |-> (J, v) 
+         where  J is |- A, v validates J, and A has the form forall ... . const : B.
+
+         This is not checked, but an entry will not work if it doesn't.
+      *)
+
+      val findType : constant -> (Judgement.djudgement * Refine.validation) option
+      val enterType : constant -> Judgement.djudgement -> Refine.validation -> unit
+
+      val findArity : constant -> int
+      val setArity : constant -> int -> unit
+
+      val findImplicits : constant -> int
+      val setImplicits : constant -> int -> unit
+
+      val findUnroll : constant -> Reduction.reduction option
+      val setUnroll : constant -> Reduction.reduction -> unit
+
+   end
+
+
+signature DATABASE_INTERNAL =
+   sig
+
+      include DATABASE
+
+
+      exception Database
+
+      val appLocal : (constant * (Judgement.djudgement * Refine.validation) option * int * int * Reduction.reduction option -> unit) -> unit
+
+      (* marks the entry as imported *)
+      val import : constant * (Judgement.djudgement * Refine.validation) option * int * int * Reduction.reduction option -> unit
+
+      (* like enterType, but doesn't mark the entry local *)
+      val primType : constant -> Judgement.djudgement -> Refine.validation -> unit
+
+   end
+
+
+structure DatabaseInternal :> DATABASE_INTERNAL =
+   struct
+
+      structure H = ConstantTable
+      structure T = Term
+      structure J = Judgement
+
+      type constant = Constant.constant
+
+
+      (* database entry: (type, arity, implicits, unroller, imported?) *)
+
+      val theDatabase : ((Judgement.djudgement * Refine.validation) option * int * int * Reduction.reduction option * bool) H.table = H.table ()
+
+      fun findType const =
+         Option.mapPartial
+            (fn (t, _, _, _, _) => t)
+            (H.find theDatabase const)
+
+      fun enterType const j v =
+         (
+         H.operate theDatabase const
+            (fn () => (SOME (j, v), 0, 0, NONE, false))
+            (fn (_, arity, implicits, unroll, _) => (SOME (j, v), arity, implicits, unroll, false));
+         ()
+         )
+
+      fun primType const j v =
+         (
+         H.operate theDatabase const
+            (fn () => (SOME (j, v), 0, 0, NONE, true))
+            (fn (_, arity, implicits, unroll, _) => (SOME (j, v), arity, implicits, unroll, true));
+         ()
+         )
+
+
+      fun findArity const =
+         (case H.find theDatabase const of
+             SOME (_, arity, _, _, _) => arity
+
+           | NONE => 0)
+
+      fun setArity const arity =
+         (
+         H.operate theDatabase const
+            (fn () => (NONE, arity, 0, NONE, false))
+            (fn (t, _, implicits, unroll, _) => (t, arity, implicits, unroll, false));
+         ()
+         )
+
+      fun primArity const arity =
+         (
+         H.operate theDatabase const
+            (fn () => (NONE, arity, 0, NONE, true))
+            (fn (t, _, implicits, unroll, _) => (t, arity, implicits, unroll, true));
+         ()
+         )
+
+
+      fun findImplicits const =
+         (case H.find theDatabase const of
+             SOME (_, _, implicits, _, _) => implicits
+
+           | NONE => 0)
+
+      fun setImplicits const implicits =
+         (
+         H.operate theDatabase const
+            (fn () => (NONE, 0, implicits, NONE, false))
+            (fn (t, arity, _, unroll, _) => (t, arity, implicits, unroll, false));
+         ()
+         )
+
+
+      fun findUnroll const =
+         (case H.find theDatabase const of
+             SOME (_, _, _, unroll, _) => unroll
+
+           | NONE => NONE)
+
+      fun setUnroll const r =
+         (
+         H.operate theDatabase const
+            (fn () => (NONE, 0, 0, SOME r, false))
+            (fn (t, arity, implicits, _, _) => (t, arity, implicits, SOME r, false));
+         ()
+         )
+
+      fun primUnroll const r =
+         (
+         H.operate theDatabase const
+            (fn () => (NONE, 0, 0, SOME r, true))
+            (fn (t, arity, implicits, _, _) => (t, arity, implicits, SOME r, true));
+         ()
+         )
+
+
+      val () =
+         List.app
+            (fn (const, arity) => primArity const arity)
+            Prim.arities
+
+      val () =
+         List.app
+            (fn r => primUnroll (ReductionInternal.trigger r) (Reduction.user1 r))
+            [
+            Prim.unroll_fix,
+            Prim.unroll_pause,
+            Prim.unroll_wind
+            ]
+
+
+      fun appLocal f =
+         H.app
+            (fn (const, (t, arity, implicits, unroll, imported)) =>
+                if imported then
+                   ()
+                else
+                   f (const, t, arity, implicits, unroll))
+            theDatabase
+
+
+      exception Database
+      exception Merge
+
+      fun mergeOpt opt opt' =
+         (case (opt, opt') of
+             (NONE, _) => opt'
+
+           | (_, NONE) => opt
+
+           | (SOME _, SOME _) => raise Merge)
+
+      fun mergeInt i i' =
+         if i = 0 then
+            i'
+         else if i' = 0 then
+            i
+         else if i = i' then
+            i
+         else
+            raise Merge
+
+      fun merge (t, arity, implicits, unroll, imported) (t', arity', implicits', unroll', imported') =
+         (mergeOpt t t', 
+          mergeInt arity arity',
+          mergeInt implicits implicits',
+          mergeOpt unroll unroll',
+          imported andalso imported')
+
+      fun import (const, t, arity, implicits, unroll) =
+         (
+         H.operate theDatabase const
+            (fn () => (t, arity, implicits, unroll, true))
+            (fn entry => 
+                (try
+                    merge entry (t, arity, implicits, unroll, true)
+                 with
+                    Merge =>
+                       raise (Message.Error (Database,
+                                             String.concat
+                                                ["Error: constant ",
+                                                 Namespace.toString const,
+                                                 " conflicts with an existing database entry.\n"]))));
+         ()
+         )
+
+   end
+
+
+structure Database :> DATABASE = DatabaseInternal

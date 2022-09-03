@@ -1,0 +1,275 @@
+
+structure ParseDatatypeList =
+   struct
+
+      val cons = Susp.delay (fn () => parseConstant /Datatype.cons/)
+
+      fun parseCons em en = ETerm.apply2 (Susp.force cons) em en
+
+   end
+
+
+grammardef DatatypeList
+
+   rule Term(40)  ::= Term(41) "::" Term(40) => ParseDatatypeList.parseCons
+
+end
+
+
+functor AfterList () :> sig end
+   =
+   struct
+
+      structure C = Case
+      structure D = DestructInternal
+      structure IP = IntroPattern
+      structure J = Judgement
+      structure R = Reduction
+      structure S = Seq
+      structure T = Term
+      structure TC = Typecheck
+
+      open Tactic
+
+      
+      val nl = parseConstant /Datatype.nil/
+      val cons = parseConstant /Datatype.cons/
+      val list = parseConstant /Datatype.list/
+      val list_case = parseConstant /Datatype.list_case/
+
+
+      val () =
+         Constant2Table.insert TypecheckInternal.subtypeTactics 
+            (list, list)
+            (witnessRaw /Datatype.list_sub _ _ _ __/);
+
+
+      fun listBodyForm () =
+         (* Type |- unit % A[^] & 0 : Type *)
+         refine (Rule.sumForm (T.evar ()) (T.evar ()))
+         >>> [
+             (* Type |- unit : Type *)
+             refine Rule.unitForm,
+
+             (* Type |- A[^] & 0 : Type *)
+             refine (Rule.prodForm (T.evar ()) (T.evar ()))
+             >>> [
+                 (* Type |- A[^] : Type *)
+                 refine (Rule.weaken 0 1)
+                 (* |- A : Type *),
+
+                 (* Type |- 0 : Type *)
+                 refine (Rule.hypothesisOfTp 0)
+                 ]
+             ]
+
+
+      fun destList i pat set =
+         (case pat of
+             IP.Or [IP.And [], IP.And [p1, p2]] =>
+                let
+                   do (jud, _) = withgoal
+
+                   val c = J.concl jud
+                   val h = J.hyp jud i
+                in
+                   hypCase h
+                   /
+                      $tm \list\ ? =>
+                      \fnc a =>
+                          (* list A ... |- C *)
+                          refine (Rule.subsumptionLeft i
+                                     (T.apply1 list a)
+                                     (T.apply2 Prim.sum 
+                                         (T.Const Prim.unit)
+                                         (T.apply2 Prim.prod a (T.apply1 list a)))
+                                     (T.evar ()))
+                          >>> [
+                              refine (Rule.weaken 0 1)
+                              >>
+                              (* |- list A <:> unit % A & list A *)
+                              refine (Rule.reduce
+                                         (R.trans
+                                             [
+                                             R.within [1] (R.trans [R.unfold, R.beta 1]),
+                                             R.within [2, 2, 2] (R.trans [R.unfold, R.beta 1])
+                                             ]))
+                              >>
+                              (* mu . unit % A[^] & 0 <:> unit % A & (mu . unit % A[^] & 0) *)
+                              refine (Rule.muUnroll (T.evar ()))
+                              >>> [
+                                  listBodyForm ()
+                                  >> idtacM (S.empty, D.Auxiliary),
+   
+                                  refine Rule.checkPositive
+                                  >> done
+                                  ],
+   
+                              (* unit % A & list A ... |- C *)
+                              refine (Rule.sumLeft i (T.evar ()) (T.evar ()) (T.evar ()))
+                              >>> [
+                                  (* unit ... |- C[under_i (inl 0 . ^)] *)
+                                  refine (Rule.unitLeft i (T.evar ()))
+                                  >>
+                                  (* ... |- C[under_i (inl () . id)] *)
+                                  D.refold jud i 0 
+                                     (T.Const nl)
+                                     R.unfold
+                                  >>
+                                  (* ... |- C[under_i nil . id] *)
+                                  idtacM (S.empty, D.Principal set),
+   
+                                  (* A & list A ... |- C[under_i (inr 0 . ^)] *)
+                                  refine (Rule.prodLeft i (T.evar ()) (T.evar ()) (T.evar ()))
+                                  >>
+                                  (* A, list A ... |- C[under_i (inr (1, 0) . ^2)] *)
+                                  D.refold jud i 2
+                                     (T.apply2 cons 
+                                         (T.Var 1)
+                                         (T.Var 0))
+                                     (R.trans [R.unfold, R.beta 2])
+                                  >>
+                                  (* A, list A ... |- C[under_i (cons 1 0 . ^2)] *)
+                                  let
+                                     do (vars1, set1) = D.andthenp S.empty $ D.dest (i+1) p1 set
+                                     do (vars2, set2) = D.andthenp vars1 $ D.dest i p2 set1
+                                  in
+                                     idtacM (S.append vars1 vars2, D.Principal set2)
+                                  end
+                                  ]
+                              ]\
+                   /
+                end
+
+           | _ =>
+                fail "list pattern expected")
+
+      val () =
+         ConstantTable.insert D.destructTactics list destList
+
+
+
+      val listInduction =
+         let
+            do (jud, dir) = withgoal
+         in
+            hypCase (J.hyp jud 0)
+            /
+               $tm \list\ ? =>
+               \fnc a =>   
+                   let
+                      val c = J.concl jud
+
+                      val dir' = Directory.tl dir
+                   in
+                      (* list A |- C *)
+                      refine (Rule.reduceHyp 0 (R.trans [R.unfold, R.beta 1]))
+                      >>
+                      (* mu . unit % A[^] & 0 |- C = C[0 . ^2][0 . id] *)
+                      refine (Rule.muInd
+                                 (T.apply2 Prim.sum
+                                     (T.Const Prim.unit)
+                                     (T.apply2 Prim.prod
+                                         (T.Sub (a, T.Shift 2))
+                                         T.zero))
+                                 (T.Sub (c, T.Idot (0, T.Shift 2)))
+                                 T.zero)
+                      >>> [
+                          (* mu . unit % A[^] & 0, Type |- unit % A[^2] & 0 : Type *)
+                          refine (Rule.weaken 1 1)
+                          >>
+                          (* Type |- unit % A[^] & 0 *)
+                          listBodyForm ()
+                          >>
+                          chdir dir' >> idtacM TC.Secondary,
+
+                          (* mu . unit % A[^] & 0 |- positive (lam . unit % A[^2] & 0) *)
+                          refine Rule.checkPositive >> done,
+
+                          (* mu . unit % A[^] & 0,
+                             Type, 
+                             (unit % A[^2] & 0), 
+                             1 <: mu . unit % A[^4] & 0,
+                             forall 2 . C[0 . ^5] |- C[2 . ^5]
+                          *)
+                          refine (Rule.weaken 4 1)
+                          >>
+                          (* Type,
+                             (unit % A[^] & 0), 
+                             1 <: mu . unit % A[^3] & 0,
+                             forall 2 . C[0 . ^4] |- C[2 . ^4]
+                          *)
+                          refine (Rule.sumLeft 2 (T.evar ()) (T.evar ()) (T.evar ()))
+                          >>> [
+                              (* Type, unit, <sub>, <ih> |- C[inl 2 . ^4] *)
+                              refine (Rule.unitLeft 2 (T.evar ()))
+                              >>
+                              (* Type, <sub>, <ih> |- C[inl () . ^3] *)
+                              refine (Rule.weaken 0 3)
+                              >>
+                              (* |- C[inl () . id] *)
+                              refine (Rule.unreduceAt 0 c
+                                         (T.Const nl)
+                                         R.unfold)
+                              >>
+                              (* |- C[nil A . id] *)
+                              chdir dir' >> idtacM TC.Primary,
+
+                              (* Type, A[^] & 0, <sub>, <ih> |- C[inr 2 . ^4] *)
+                              refine (Rule.prodLeft 2 (T.evar ()) (T.evar ()) (T.evar ()))
+                              >>
+                              (* Type, A[^], 0, <sub>, <ih> |- C[inr (3, 2) . ^5]
+                                                             = C[0 . ^6][inr (3, 2) . id]
+                              *)
+                              refine (Rule.unreduceAt 0
+                                         (T.Sub (c, T.Idot (0, T.Shift 6)))
+                                         (T.apply2 cons
+                                             (T.Var 3)
+                                             (T.Var 2))
+                                         (R.trans [R.unfold, R.beta 2]))
+                              >>
+                              (* Type, A[^], 0, <sub>, <ih> |- C[0 . ^6][cons A[^5] 3 2 . id]
+                                                             = C[3 2 . ^5]
+                              *)
+                              refine (Rule.unreduceHyp 1
+                                         (T.apply2 Prim.subtype
+                                             (T.Var 2)
+                                             (T.apply1 list (T.Sub (a, T.Shift 3))))
+                                         (R.within [2] (R.trans [R.unfold, R.beta 1])))
+                              >>
+                              chdir (Directory.bindhs dir' [NONE, NONE, NONE, NONE, NONE])
+                              >>
+                              idtacM TC.Primary
+                              ],
+                          
+                          (* mu . unit % A[^] & 0 |- 0 : mu . unit % A[^2] & 0 *)
+                          refine (Rule.hypothesisOf 0) >> done
+                          ]
+                   end\
+
+             | _ =>
+               \fnc => fail "type error in list induction"\
+            /
+         end
+
+      val () =
+         ConstantTable.insert InductionInternal.inductionTactics list listInduction
+
+
+
+      structure U = Show.Unparsing
+
+      val () =
+         ConstantTable.insert U.unparsingTable cons
+            (2, 40,
+             (U.wrap
+                 (U.apply2 cons U.show U.show)
+                 (fn (h, t) =>
+                     U.append [
+                              h 41,
+                              U.break 1,
+                              U.string ":: ",
+                              t 40
+                              ])))
+
+   end

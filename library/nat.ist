@@ -1,0 +1,1591 @@
+
+Ctrl.use "nat-aux.iml";
+
+Ctrl.use "acc-load.iml";
+Namespace.openModule (parseLongident /Acc/);
+
+Namespace.beginModule "Nat";
+
+
+Namespace.alias (parseIdent /nat/) Prim.nat;
+Namespace.alias (parseIdent /zero/) Prim.zero;
+Namespace.alias (parseIdent /succ/) Prim.succ;
+Namespace.alias (parseIdent /natcase/) Prim.natcase;
+
+structure P = ReductionProver;
+structure R = Reduction;
+structure RR = Registry;
+
+
+
+(* Primitives *)
+
+lemma "natcase_type"
+/
+  natcase :
+  intersect i (a : U i) .
+    nat
+    -> a
+    -> (nat -> a)
+    -> a
+/;
+
+introOf /i a n hz hs/.
+destruct /n/ /| n/.
+  {
+  reduce //.
+  hypof.
+  }
+
+  {
+  reduce //.
+  typecheck.
+  }
+qed ();
+recordTyping "natcase_type";
+
+
+
+definerec /nat_iter P hz hs n/
+/
+  natcase n hz (fn n' . hs n' (nat_iter P hz hs n'))
+/;
+
+
+structure R = Reduction;
+
+val nat_iter = parseConstant /Nat.nat_iter/;
+val nat_iter_unroll = Option.valOf (Database.findUnroll nat_iter);
+
+val t1 =
+  parseLTerm
+    / nat_iter 2 1 0 zero /;
+
+val r1 =
+  R.trans
+    [
+    nat_iter_unroll,
+    R.user2 Prim.natcase_zero
+    ];
+
+val t2a =
+  parseLTerm
+    / nat_iter 3 2 1 (succ 0) /;
+
+val r2a =
+  R.trans
+    [
+    nat_iter_unroll,
+    R.user2 Prim.natcase_succ,
+    R.beta 1
+    ];
+
+val t2b =
+  parseLTerm
+    / 1 0 (nat_iter 3 2 1 0) /;
+
+val nat_iter_zero = R.new2 nat_iter 3 0 Prim.zero 0 (Term.Var 1) r1 R.refl;
+val nat_iter_succ = R.new2 nat_iter 3 0 Prim.succ 1 t2b r2a R.refl;
+
+
+Registry.write (parseIdent /nat_iter_zero/) (Registry.fromUreduction2 nat_iter_zero);
+Registry.write (parseIdent /nat_iter_succ/) (Registry.fromUreduction2 nat_iter_succ);
+Registry.register nat_iter_zero;
+Registry.register nat_iter_succ;
+
+structure NatTactic = AfterNat ();
+open NatTactic;
+
+
+
+lemma "nat_iter_type"
+/
+  nat_iter :
+  intersect i .
+    forall (P : nat -> U i) .
+      P zero
+      -> (forall (n : nat) . P n -> P (succ n))
+      -> forall (n : nat) . P n
+/;
+
+introOf /i P hz hs n/.
+natPrimInduction.
+  {
+  reduce //.
+  hypof.
+  }
+
+  {
+  reintro /u n Hu IH/.
+  reduce //.
+  typecheck.
+  }
+qed ();
+recordTyping "nat_iter_type";
+
+
+
+
+(* Equality *)
+
+lemma "eq_0_succ_not"
+/
+  forall n . 0 = succ n : nat -> void
+/;
+
+inference.
+intro /n Heq/.
+assert /unit/ /H/ >>> [split, idtac].
+rewrite /unit = void : U 0 in H/.
+  {
+  let
+    val m = Prover.parseCurr /fn x . natcase x unit (fn _ . void)/
+    val p = Prover.parseCurr /0/
+    val q = Prover.parseCurr /succ n/
+    val a = Prover.parseCurr /nat/
+  in
+    Tactic.refine (Rule.arrowElimEq a (Term.evar ()) m m p q)
+  end.
+    {
+    reflexivity.
+    }
+    
+    {
+    hyp /Heq/.
+    }
+  }
+hyp /H/.
+qed ();
+
+
+
+lemma "eq_succ_0_not"
+/
+  forall n . succ n = 0 : nat -> void
+/;
+
+inference.
+intro /n H/.
+apply /eq_0_succ_not _/.
+1:{
+  symmetry.
+  hyp /H/.
+  }
+
+  {
+  typecheck.
+  }
+qed ();
+
+
+
+lemma "succ_inj"
+/
+  forall m n . succ m = succ n : nat -> m = n : nat
+/;
+
+inference.
+intro /m n Heq/.
+let
+  val m = Prover.parseCurr /fn x . natcase x 0 (fn y . y)/
+  val p = Prover.parseCurr /succ m/
+  val q = Prover.parseCurr /succ n/
+  val a = Prover.parseCurr /nat/
+in
+  Tactic.refine (Rule.arrowElimEq a (Term.evar ()) m m p q)
+end.
+  {
+  reflexivity.
+  }
+
+  {
+  hyp /Heq/.
+  }
+qed ();
+
+
+
+
+(* Inequality *)
+
+definerec /leq m/
+/
+  fn n .
+    natcase m
+      unit
+      (fn m' .
+         natcase n
+           void
+           (fn n' . leq m' n'))
+/;
+
+
+
+define /lt m n/
+/
+  leq (succ m) n
+/;
+
+
+
+let
+  val leq = parseConstant /leq/
+in
+  Database.setUnroll leq (Reduction.trans [DefineInternal.recUnroller leq, Reduction.beta 2])
+end;
+
+
+
+structure Nothing = AfterLeq ();
+
+
+
+lemma "leq_type"
+/
+  leq :
+  nat -> nat -> U 0
+/;
+
+introOf /m n/.
+revert /n/.
+natPrimInduction.
+
+(* 0 *)
+{
+intro /n/.
+unroll /leq/.
+reduce //.
+typecheck.
+}
+
+(* succ *)
+{
+reintro /u m Hu IH/.
+intro /n/.
+unroll /leq/.
+reduce //.
+destruct /n/ /| n/.
+  {
+  reduce //.
+  typecheck.
+  }
+
+  {
+  reduce //.
+  apply /IH/.
+  }
+}
+qed ();
+recordTyping "leq_type";
+
+
+
+lemma "lt_type"
+/
+  lt :
+  nat -> nat -> U 0
+/;
+
+introOf /m n/.
+unfold /lt/.
+typecheck.
+qed ();
+recordTyping "lt_type";
+
+
+
+lemma "leq_inhabitant"
+/
+  forall m n .
+    m <= n
+    -> () : m <= n
+/;
+
+inference.
+intro /m/.
+natPrimInduction.
+
+(* 0 *)
+{
+intro /n _/.
+unroll /leq/.
+reduce //.
+typecheck.
+}
+
+(* succ *)
+{
+reintro /u m Hu IH/.
+intro /n Hleq/.
+destruct /n/ /| n/.
+  {
+  unroll /leq in Hleq/.
+  reduce /Hleq/.
+  destruct /Hleq/ /0/.
+  }
+unroll /leq in Hleq in concl/.
+reduce /Hleq concl/.
+apply /IH/.
+hyp /Hleq/.
+}
+qed ();
+
+
+
+lemma "lt_inhabitant"
+/
+  forall m n .
+    m < n
+    -> () : m < n
+/;
+
+inference.
+unfold /lt at all/.
+intro /m n H/.
+apply /leq_inhabitant/.
+hyp /H/.
+qed ();
+
+
+
+lemma "leq_0_min"
+/
+  forall n . leq 0 n
+/;
+
+inference.
+intro /n/.
+unroll /leq/.
+reduce //.
+split.
+qed ();
+
+
+
+lemma "leq_succ_0_not"
+/
+  forall n .
+    succ n <= 0
+    -> void
+/;
+
+inference.
+intro /n H/.
+unroll /leq in H/.
+reduce /H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "leq_succ_succ"
+/
+  forall m n .
+    m <= n
+    -> succ m <= succ n
+/;
+
+inference.
+intro /m n H/.
+unroll /leq/ >> reduce //.
+hyp /H/.
+qed ();
+
+
+
+lemma "leq_succ_invert"
+/
+  forall m n .
+    succ m <= succ n
+    -> m <= n
+/;
+
+inference.
+intro /m n H/.
+unroll /leq in H/ >> reduce /H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "leq_succ"
+/
+  forall n .
+    n <= succ n
+/;
+
+inference.
+intro /n/.
+iterate /n/.
+  {
+  apply /leq_0_min/.
+  }
+
+  {
+  intro /n IH/.
+  apply /leq_succ_succ/.
+  hyp /IH/.
+  }
+qed ();
+
+
+
+lemma "leq_refl"
+/
+  forall n . n <= n
+/;
+
+inference.
+intro /n/.
+iterate /n/.
+
+(* 0 *)
+{
+apply /leq_0_min/.
+}
+
+(* succ *)
+{
+intro /n IH/.
+apply /leq_succ_succ/.
+hyp /IH/.
+}
+qed ();
+
+
+
+lemma "leq_trans"
+/
+  forall m n p .
+    m <= n
+    -> n <= p
+    -> m <= p
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+
+(* 0 *)
+{
+intro /n p _ _/.
+apply /leq_0_min/.
+}
+
+(* succ *)
+{
+intro /m IH n p Hmn Hnp/.
+destruct /n/ /| n/.
+  {
+  so /leq_succ_0_not _ Hmn/ /0/.
+  }
+so /leq_succ_invert _ _ Hmn/ /Hmn'/.
+destruct /p/ /| p/.
+  {
+  so /leq_succ_0_not _ Hnp/ /0/.
+  }
+so /leq_succ_invert _ _ Hnp/ /Hnp'/.
+apply /leq_succ_succ/.
+exact /IH _ _ Hmn' Hnp'/.
+}
+qed ();
+
+
+
+lemma "leq_antisymm"
+/
+  forall m n .
+    m <= n
+    -> n <= m
+    -> m = n : nat
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+
+(* 0 *)
+{
+intro /n Hmn Hnm/.
+destruct /n/ /| n/.
+  {
+  reflexivity.
+  }
+
+  {
+  so /leq_succ_0_not _ Hnm/ /0/.
+  }
+}
+
+(* succ *)
+{
+intro /m IH n Hmn Hnm/.
+destruct /n/ /| n/.
+  {
+  so /leq_succ_0_not _ Hmn/ /0/.
+  }
+
+  {
+  compat.
+  so /leq_succ_invert _ _ Hmn/ /Hmn'/.
+  so /leq_succ_invert _ _ Hnm/ /Hnm'/.
+  exact /IH _ Hmn' Hnm'/.
+  }
+}
+qed ();
+
+
+
+lemma "leq_implication"
+  / forall (m m' n n' : nat) .
+      leq m' m
+      -> leq n n'
+      -> leq m n
+      -> leq m' n' /;
+
+intro /m m' n n' Hm Hn H/.
+apply /leq_trans _ m/.
+  {
+  hyp /Hm/.
+  }
+apply /leq_trans _ n/.
+  {
+  hyp /H/.
+  }
+hyp /Hn/.
+qed ();
+
+
+
+lemma "lt_impl_leq"
+/
+  forall m n .
+    m < n
+    -> m <= n
+/;
+
+inference.
+intro /m n Hmn/.
+unfold /lt in Hmn/.
+apply /leq_trans _ (succ m)/.
+  {
+  apply /leq_succ/.
+  }
+
+  {
+  hyp /Hmn/.
+  }
+qed ();
+
+
+
+lemma "lt_succ"
+/
+  forall n . lt n (succ n)
+/;
+
+inference.
+intro /n/.
+unfold /lt/.
+apply /leq_refl/.
+qed ();
+
+
+
+lemma "lt_trans"
+/
+  forall m n p .
+    m < n
+    -> n < p
+    -> m < p
+/;
+
+inference.
+unfold /lt at all/.
+intro /m n p Hmn Hnp/.
+apply /leq_trans _ n/.
+  {
+  hyp /Hmn/.
+  }
+apply /leq_trans _ (succ n)/.
+  {
+  apply /leq_succ/.
+  }
+
+  {
+  hyp /Hnp/.
+  }
+qed ();
+
+
+
+lemma "lt_0_succ"
+/
+  forall n . 0 < succ n
+/;
+
+inference.
+intro /n/.
+unfold /lt/.
+apply /leq_succ_succ/.
+apply /leq_0_min/.
+qed ();
+
+
+
+lemma "lt_succ_succ"
+/
+  forall m n .
+    m < n
+    -> succ m < succ n
+/;
+
+inference.
+intro /m n Hmn/.
+unfold /lt in Hmn in concl/.
+apply /leq_succ_succ/.
+hyp /Hmn/.
+qed ();
+
+
+
+lemma "lt_well_founded"
+/
+  forall n . Acc nat lt n
+/;
+
+inference.
+intro /n/.
+assert /forall m . m <= n -> Acc nat lt m/ /H/.
+1:{
+  apply /H/.
+  apply /leq_refl/.
+  }
+natPrimInduction.
+
+(* 0 *)
+{
+intro /m Hm/.
+apply /Acc_intro/.
+intro /p Hp/.
+unfold /lt in Hp/.
+so /leq_succ_0_not _ (leq_trans _ _ _ Hp Hm)/ /0/.
+}
+
+(* succ *)
+{
+reintro /u n Hu IH/.
+intro /m Hm/.
+apply /Acc_intro/.
+intro /p Hp/.
+apply /IH n/.
+unfold /lt in Hp/.
+apply /leq_succ_invert/.
+exact /leq_trans _ _ _ Hp Hm/.
+}
+qed ();
+
+
+
+structure Nothing = AfterLtWellFounded ();
+
+
+
+(* Addition and Subtraction *)
+
+definerec /plus m n/
+/
+  natcase m
+    n
+    (fn m' . succ (plus m' n))
+/;
+
+
+definerec /minus m n/
+/
+  natcase n
+    m
+    (fn n' . natcase m 0 (fn m' . minus m' n'))
+/;
+
+
+val plus = parseConstant /plus/;
+val plus_unroll = Option.valOf $ Database.findUnroll plus;
+
+P.start (parseLTerm /plus zero 0/);
+P.apply plus_unroll;
+P.user2 Prim.natcase_zero;
+val (m, r1) = P.done ();
+
+val plus_zero = R.new2 plus 0 1 Prim.zero 0 m r1 R.refl;
+RR.write (parseIdent /plus_zero/) (RR.fromUreduction2 plus_zero);
+RR.register plus_zero;
+
+P.start (parseLTerm /plus (succ 1) 0/);
+P.apply plus_unroll;
+P.user2 Prim.natcase_succ;
+P.beta 1;
+val (m, r1) = P.done ();
+
+val plus_succ = R.new2 plus 0 1 Prim.succ 1 m r1 R.refl;
+RR.write (parseIdent /plus_succ/) (RR.fromUreduction2 plus_succ);
+RR.register plus_succ;
+
+val minus = parseConstant /minus/;
+val minus_unroll = Option.valOf $ Database.findUnroll minus;
+
+P.start (parseLTerm /minus 0 zero/);
+P.apply minus_unroll;
+P.user2 Prim.natcase_zero;
+val (m, r) = P.done ();
+
+val minus_zero = R.new2 minus 1 0 Prim.zero 0 m r R.refl;
+RR.write (parseIdent /minus_zero/) (RR.fromUreduction2 minus_zero);
+RR.register minus_zero;
+
+P.start (parseLTerm /minus 1 (succ 0)/);
+P.apply minus_unroll;
+P.user2 Prim.natcase_succ;
+P.beta 1;
+val (m, r) = P.done ();
+
+val minus_succ = R.new2 minus 1 0 Prim.succ 1 m r R.refl;
+RR.write (parseIdent /minus_succ/) (RR.fromUreduction2 minus_succ);
+RR.register minus_succ;
+
+
+
+structure Nothing = AfterMinus ();
+
+
+
+lemma "plus_type"
+/
+  plus : nat -> nat -> nat
+/;
+
+introOf /m n/.
+induct /m/.
+reintro /IH/.
+destruct /m/ /| m/.
+  {
+  reduce //.
+  hypof.
+  }
+
+  {
+  reduce //.
+  typecheck1.
+  apply /IH/.
+  apply /lt_succ/.
+  }
+qed ();
+recordTyping "plus_type";
+
+
+
+lemma "minus_type"
+/
+  minus : nat -> nat -> nat
+/;
+
+introOf /m n/.
+revert /m/.
+induct /n/.
+reintro /IH/.
+intro /m/.
+destruct /n/ /| n/.
+  {
+  reduce //.
+  typecheck.
+  }
+destruct /m/ /| m/.
+  {
+  reduce //.
+  typecheck.
+  }
+reduce //.
+apply /IH/.
+apply /lt_succ/.
+qed ();
+recordTyping "minus_type";
+
+
+
+lemma "plus_0_l"
+/
+  forall n . 0 + n = n : nat
+/;
+
+inference.
+intro /n/.
+reflexivity.
+qed ();
+
+
+
+lemma "plus_0_r"
+/
+  forall n . n + 0 = n : nat
+/;
+
+inference.
+intro /n/.
+iterate /n/.
+  {
+  reflexivity.
+  }
+
+  {
+  intro /n IH/.
+  compat.
+  hyp /IH/.
+  }
+qed ();
+
+
+
+lemma "plus_assoc"
+/
+  forall m n p . (m + n) + p = m + (n + p) : nat
+/;
+
+inference.
+intro /m n p/.
+iterate /m/.
+
+{
+reflexivity.
+}
+
+{
+intro /m IH/.
+compat.
+hyp /IH/.
+}
+qed ();
+
+
+
+lemma "plus_shift_r"
+/
+  forall m n .
+    m + succ n = succ (m + n) : nat
+/;
+
+inference.
+intro /m n/.
+iterate /m/.
+
+{
+reflexivity.
+}
+
+{
+intro /m IH/.
+compat.
+hyp /IH/.
+}
+qed ();
+
+
+
+lemma "plus_commute"
+/
+  forall m n .
+    m + n = n + m : nat
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+
+{
+intro /n/.
+symmetry.
+apply /plus_0_r/.
+}
+
+{
+intro /m IH n/.
+rewrite /-> plus_shift_r/.
+compat.
+apply /IH/.
+}
+qed ();
+
+
+
+lemma "plus_leq_l"
+/
+  forall m n . m <= m + n
+/;
+
+inference.
+intro /m n/.
+iterate /m/.
+  {
+  apply /leq_0_min/.
+  }
+intro /m IH/.
+apply /leq_succ_succ/.
+hyp /IH/.
+qed ();
+
+
+
+lemma "plus_leq_r"
+/
+  forall m n . n <= m + n
+/;
+
+inference.
+intro /m n/.
+rewrite /-> plus_commute/.
+apply /plus_leq_l/.
+qed ();
+
+
+
+lemma "plus_leq"
+/
+  forall m m' n n' .
+    m <= m'
+    -> n <= n'
+    -> m + n <= m' + n'
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+  {
+  intro /m' n n' _ H/.
+  apply /leq_trans _ n'/ >>> [hyp /H/, apply /plus_leq_r/].
+  }
+intro /m IH m' n n' Hm Hn/.
+destruct /m'/ /| m'/.
+  {
+  so /leq_succ_0_not _ Hm/ /0/.
+  }
+reduce //.
+apply /leq_succ_succ/.
+apply /IH/ >>> [idtac, hyp /Hn/].
+apply /leq_succ_invert/.
+hyp /Hm/.
+qed ();
+
+
+
+lemma "plus_lt_r"
+/
+  forall m n . 
+    0 < n
+    -> m < m + n
+/;
+
+inference.
+intro /m n Hn/.
+iterate /m/.
+
+{
+hyp /Hn/.
+}
+
+{
+intro /m IH/.
+apply /lt_succ_succ/.
+hyp /IH/.
+}
+qed ();
+
+
+
+lemma "plus_minus_cancel_l"
+/
+  forall m n . m + n - m = n : nat
+/;
+
+inference.
+intro /m n/.
+iterate /m/.
+
+{
+reflexivity.
+}
+
+{
+intro /m IH/.
+hyp /IH/.
+}
+qed ();
+
+
+
+lemma "plus_minus_cancel_r"
+/
+  forall m n . m + n - n = m : nat
+/;
+
+inference.
+intro /m n/.
+rewrite /-> plus_commute/.
+apply /plus_minus_cancel_l/.
+qed ();
+
+
+
+lemma "minus_plus_cancel"
+/
+  forall m n .
+    n <= m
+    -> m - n + n = m : nat
+/;
+
+inference.
+intro /m n/.
+revert /m/.
+iterate /n/.
+  {
+  intro /m _/.
+  apply /plus_0_r/.
+  }
+intro /n IH m Hleq/.
+destruct /m/ /| m/.
+  {
+  so /leq_succ_0_not _ Hleq/ /0/.
+  }
+reduce //.
+rewrite /-> plus_shift_r/.
+compat.
+apply /IH/.
+apply /leq_succ_invert/.
+hyp /Hleq/.
+qed ();
+
+
+
+lemma "minus_0_l"
+/
+  forall n . 0 - n = 0 : nat
+/;
+
+inference.
+intro /(| n)/.
+  {
+  reflexivity.
+  }
+
+  {
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "minus_0_r"
+/
+  forall n . n - 0 = n : nat
+/;
+
+inference.
+intro /n/.
+reflexivity.
+qed ();
+
+
+
+lemma "minus_proper"
+/
+  forall m n . m <= n -> m - n = 0 : nat
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+  {
+  intro /n _/.
+  apply /minus_0_l/.
+  }
+intro /m IH n Hleq/.
+destruct /n/ /| n/.
+  {
+  so /leq_succ_0_not m Hleq/ /0/.
+  }
+reduce //.
+apply /IH/.
+apply /leq_succ_invert/.
+hyp /Hleq/.
+qed ();
+
+
+
+lemma "minus_assoc"
+/
+  forall m n p . (m - n) - p = m - (n + p) : nat
+/;
+
+inference.
+intro /m n/.
+revert /m/.
+iterate /n/.
+  {
+  intro /m p/.
+  reflexivity.
+  }
+intro /n IH m p/.
+destruct /m/ /| m/.
+  {
+  reduce //.
+  apply /minus_0_l/.
+  }
+reduce //.
+apply /IH/.
+qed ();
+
+
+
+lemma "minus_succ"
+/
+  forall m n . succ m - succ n = m - n : nat
+/;
+
+inference.
+intro /m n/.
+revert /m/.
+iterate /n/.
+  {
+  intro /m/.
+  reflexivity.
+  }
+intro /n IH m/.
+destruct /m/ /| m/.
+  {
+  reduce //.
+  reflexivity.
+  }
+reduce //.
+apply /IH/.
+qed ();
+
+
+
+lemma "minus_leq_l"
+/
+  forall m n . m - n <= m
+/;
+
+inference.
+intro /m n/.
+revert /m/.
+iterate /n/.
+  {
+  intro /m/.
+  apply /leq_refl/.
+  }
+intro /n IH m/.
+destruct /m/ /| m/.
+  {
+  reduce //.
+  apply /leq_refl/.
+  }
+reduce //.
+apply /leq_trans _ m/.
+  {
+  apply /IH/.
+  }
+
+  {
+  apply /leq_succ/.
+  }
+qed ();
+
+
+
+lemma "minus_leq"
+/
+  forall m m' n n' .
+    m <= m'
+    -> n' <= n
+    -> m - n <= m' - n'
+/;
+
+inference.
+intro /m m' n/.
+revert /m m'/.
+iterate /n/.
+  {
+  intro /m m' n' Hm Hn/.
+  destruct /n'/ /| n'/.
+    {
+    hyp /Hm/.
+    }
+
+    {
+    so /leq_succ_0_not _ Hn/ /0/.
+    }
+  }
+intro /n IH m m' n' Hm Hn/.
+destruct /m/ /| m/.
+  {
+  reduce //.
+  apply /leq_0_min/.
+  }
+reduce //.
+destruct /n'/ /| n'/.
+  {
+  reduce //.
+  apply /leq_trans _ (succ m)/ >>> [idtac, hyp /Hm/].
+  apply /leq_trans _ m/ >>> [idtac, apply /leq_succ/].
+  apply /minus_leq_l/.
+  }
+destruct /m'/ /| m'/.
+  {
+  so /leq_succ_0_not _ Hm/ /0/.
+  }
+reduce //.
+apply /IH/.
+  {
+  apply /leq_succ_invert/.
+  hyp /Hm/.
+  }
+
+  {
+  apply /leq_succ_invert/.
+  hyp /Hn/.
+  }
+qed ();
+
+
+
+lemma "minus_self"
+/
+  forall n . n - n = 0 : nat
+/;
+
+inference.
+intro /n/.
+apply /minus_proper/.
+apply /leq_refl/.
+qed ();
+
+
+
+lemma "minus_succ_l_leq"
+/
+  forall m n . succ m - n <= succ (m - n)
+/;
+
+inference.
+intro /m n/.
+revert /m/.
+iterate /n/.
+  {
+  intro /m/.
+  apply /leq_refl/.
+  }
+intro /n IH m/.
+destruct /m/ /| m/.
+  {
+  reduce //.
+  rewrite /-> minus_0_l/.
+  apply /leq_0_min/.
+  }
+reduce //.
+apply /IH/.
+qed ();
+
+
+
+lemma "minus_succ_l_eq"
+/
+  forall m n .
+    n <= m
+    -> succ m - n = succ (m - n) : nat
+/;
+
+inference.
+intro /m n/.
+revert /m/.
+iterate /n/.
+  {
+  intro /m _/.
+  reflexivity.
+  }
+intro /n IH m Hleq/.
+destruct /m/ /| m/.
+  {
+  so /leq_succ_0_not _ Hleq/ /0/.
+  }
+reduce //.
+apply /IH/.
+apply /leq_succ_invert/.
+hyp /Hleq/.
+qed ();
+
+
+
+
+(* Maximum *)
+
+definerec /max m n/
+/
+  natcase m
+    n
+    (fn m' .
+       natcase n
+         m
+         (fn n' . succ (max m' n')))
+/;
+
+
+
+lemma "max_type"
+/
+  max : nat -> nat -> nat
+/;
+
+introOf /m n/.
+revert /n/.
+induct /m/.
+reintro /IH/.
+destruct /m/ /| m/.
+
+(* 0 *)
+{
+intro /n/.
+unroll /max/.
+reduce //.
+hypof.
+}
+
+(* succ *)
+{
+intro /n/.
+destruct /n/ /| n/.
+  {
+  unroll /max/.
+  reduce //.
+  typecheck.
+  }
+unroll /max/.
+reduce //.
+typecheck1.
+apply /IH/.
+apply /lt_succ/.
+}
+qed ();
+recordTyping "max_type";
+
+
+
+lemma "max_id_l"
+/
+  forall n . max 0 n = n : nat
+/;
+
+inference.
+intro /n/.
+unroll /max/ >> reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "max_id_r"
+/
+  forall n . max n 0 = n : nat
+/;
+
+inference.
+intro /n/.
+unroll /max/.
+destruct /n/ /| n/ >> reduce // >> reflexivity.
+qed ();
+
+
+
+lemma "max_succ"
+/
+  forall m n . max (succ m) (succ n) = succ (max m n) : nat
+/;
+
+inference.
+intro /m n/.
+unroll /max/ >> reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "max_leq_l"
+/
+  forall m n . m <= max m n
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+
+(* zero *)
+{
+intro /n/.
+rewrite /-> max_id_l/.
+apply /leq_0_min/.
+}
+
+(* succ *)
+{
+intro /m IH n/.
+destruct /n/ /| n/.
+  {
+  rewrite /-> max_id_r/.
+  apply /leq_refl/.
+  }
+rewrite /-> max_succ/.
+apply /leq_succ_succ/.
+apply /IH/.
+}
+qed ();
+
+
+
+lemma "max_leq_r"
+/
+  forall m n . n <= max m n
+/;
+
+inference.
+intro /m n/.
+revert /m/.
+iterate /n/.
+
+(* zero *)
+{
+intro /m/.
+rewrite /-> max_id_r/.
+apply /leq_0_min/.
+}
+
+(* succ *)
+{
+intro /n IH m/.
+destruct /m/ /| m/.
+  {
+  rewrite /-> max_id_l/.
+  apply /leq_refl/.
+  }
+rewrite /-> max_succ/.
+apply /leq_succ_succ/.
+apply /IH/.
+}
+qed ();
+
+
+
+lemma "max_lub"
+/
+  forall m n p .
+    m <= p
+    -> n <= p
+    -> max m n <= p
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+
+(* 0 *)
+{
+intro /n p _ Hnp/.
+rewrite /-> max_id_l/.
+hyp /Hnp/.
+}
+
+(* succ *)
+{
+intro /m IH n p Hmp Hnp/.
+destruct /n/ /| n/.
+  {
+  rewrite /-> max_id_r/.
+  hyp /Hmp/.
+  }
+destruct /p/ /| p/.
+  {
+  so /leq_succ_0_not _ Hmp/ /0/.
+  }
+rewrite /-> max_succ/.
+apply /leq_succ_succ/.
+apply /IH/.
+  {
+  apply /leq_succ_invert/.
+  hyp /Hmp/.
+  }
+
+  {
+  apply /leq_succ_invert/.
+  hyp /Hnp/.
+  }
+}
+qed ();
+
+
+
+lemma "max_eq_l"
+/
+  forall m n .
+    n <= m
+    -> max m n = m : nat
+/;
+
+inference.
+intro /m n Hnm/.
+apply /leq_antisymm/.
+  {
+  apply /max_lub/.
+    {
+    apply /leq_refl/.
+    }
+
+    {
+    hyp /Hnm/.
+    }
+  }
+
+  {
+  apply /max_leq_l/.
+  }
+qed ();
+
+
+
+lemma "max_eq_r"
+/
+  forall m n .
+    m <= n
+    -> max m n = n : nat
+/;
+
+inference.
+intro /m n Hmn/.
+apply /leq_antisymm/.
+  {
+  apply /max_lub/.
+    {
+    hyp /Hmn/.
+    }
+
+    {
+    apply /leq_refl/.
+    }
+  }
+
+  {
+  apply /max_leq_r/.
+  }
+qed ();
+
+
+
+Namespace.endModule ();
+
+File.save "nat.isto";

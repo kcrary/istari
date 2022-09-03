@@ -1,0 +1,3577 @@
+
+(* Definitions and proofs in support of datatypes.
+   There's no reason to use any of this directly.
+*)
+
+Ctrl.use "datatype-aux.iml";
+
+Ctrl.use "acc-load.iml";
+Ctrl.use "nat-load.iml";
+
+Namespace.openModule (parseLongident /Acc/);
+Namespace.openModule (parseLongident /Nat/);
+
+Namespace.beginModule "Datatype";
+
+
+
+(***  Lists  ***
+
+   (Just for this module.  We will redefine them once datatypes are defined.)
+*)
+
+define /list a/
+/
+  mu t . unit % a & t
+/;
+
+
+define /nil/
+/
+  inl ()
+/;
+
+
+define /cons h t/
+/
+  inr (h , t)
+/;
+
+
+define /list_case l hnil hcons/
+/
+  case l of
+  | inl _ . hnil
+  | inr ht . hcons (ht #1) (ht #2)
+/;
+
+
+definerec /list_rec hnil hcons l/
+/
+  case l of
+  | inl _ . hnil
+  | inr ht . hcons (ht #1) (ht #2) (list_rec hnil hcons (ht #2))
+/;
+
+
+define /list_iter a P hnil hcons l/
+/
+  list_rec hnil hcons l
+/;
+
+
+
+
+val list = parseConstant /list/;
+val nl = parseConstant /nil/;
+val cons = parseConstant /cons/;
+val list_case = parseConstant /list_case/;
+val list_rec = parseConstant /list_rec/;
+val list_iter = parseConstant /list_iter/;
+
+val list_rec_unroll = Option.valOf $ Database.findUnroll list_rec;
+
+structure P = ReductionProver;
+structure R = Reduction;
+structure RR = Registry;
+structure NR = NormalizeInternal;  (* Can use NR.register when a reduction need not be exported. *)
+
+P.start $ parseLTerm / list_case nil 1 0 /;
+P.unfold ();
+P.beta 3;
+P.enter [1];
+P.unfold ();
+P.leave ();
+P.user2 Prim.sumcase_inl;
+P.beta 1;
+val (_, r1) = P.done ();
+
+val list_case_nil = R.new2 list_case 0 2 nl 0 (Term.Var 1) r1 R.refl;
+NR.register list_case_nil;
+
+P.start $ parseLTerm / list_case (cons 3 2) 1 0 /;
+P.unfold ();
+P.beta 3;
+P.enter [1];
+P.unfold ();
+P.beta 2;
+P.leave ();
+P.user2 Prim.sumcase_inr;
+P.beta 1;
+P.enter [1];
+P.beta 1;
+P.leave ();
+P.enter [2];
+P.beta 1;
+P.leave ();
+val (n, r1) = P.done ();
+
+val list_case_cons = R.new2 list_case 0 2 cons 2 n r1 R.refl;
+NR.register list_case_cons;
+
+P.start $ parseLTerm / list_rec 1 0 nil /;
+P.apply list_rec_unroll;
+P.enter [1];
+P.unfold ();
+P.leave ();
+P.user2 Prim.sumcase_inl;
+P.beta 1;
+val (_, r1) = P.done ();
+
+val list_rec_nil = R.new2 list_rec 2 0 nl 0 (Term.Var 1) r1 R.refl;
+NR.register list_rec_nil;
+
+P.start $ parseLTerm / list_rec 3 2 (cons 1 0) /;
+P.apply list_rec_unroll;
+P.enter [1];
+P.unfold ();
+P.beta 2;
+P.leave ();
+P.user2 Prim.sumcase_inr;
+P.beta 1;
+P.enter [1];
+P.beta 1;
+P.leave ();
+P.enter [2];
+P.beta 1;
+P.leave ();
+P.enter [3, 3];
+P.beta 1;
+P.leave ();
+val (n, r1) = P.done ();
+
+val list_rec_cons = R.new2 list_rec 2 0 cons 2 n r1 R.refl;
+RR.write (parseIdent /list_rec_cons/) (RR.fromUreduction2 list_rec_cons);
+NR.register list_rec_cons;
+
+P.start $ parseLTerm / list_iter 4 3 2 1 0 /;
+P.unfold ();
+P.beta 5;
+val (n, r1) = P.done ();
+
+val list_rec_x = R.user1 $ R.new1 list_iter 5 n r1 R.refl;
+
+P.start $ parseLTerm / list_iter 3 2 1 0 nil /;
+P.apply list_rec_x;
+P.user2 list_rec_nil;
+val (_, r1) = P.done ();
+
+val list_iter_nil = R.new2 list_iter 4 0 nl 0 (Term.Var 1) r1 R.refl;
+RR.register list_iter_nil;
+
+P.start $ parseLTerm / list_iter 5 4 3 2 (cons 1 0) /;
+P.apply list_rec_x;
+P.user2 list_rec_cons;
+val (_, r1) = P.done ();
+
+val m = parseLTerm / 2 1 0 (list_iter 5 4 3 2 0) /;
+P.start m;
+P.enter [3];
+P.apply list_rec_x;
+P.leave ();
+val (_, r2) = P.done ();
+
+val list_iter_cons = R.new2 list_iter 4 0 cons 2 m r1 r2;
+RR.register list_iter_cons;
+
+structure Nothing = AfterList ();
+grammaron DatatypeList;
+
+
+
+lemma "list_type"
+/
+  list : intersect i . U i -> U i
+/;
+
+unfoldHead /list/.
+typecheck.
+qed ();
+recordTyping "list_type";
+
+
+
+lemma "list_sub"
+/
+  forall i (a b : U i) .
+    a <: b
+    -> list a <: list b
+/;
+
+inference.
+intro /i a b Hab/.
+unfold /list at all/.
+intro /x/.
+induct /x/.
+reintro /u x Hu IH/.
+unrollType /mu/.
+destruct /x/ /| h t/.
+  {
+  typecheck.
+  }
+
+  {
+  fold /manual t/.
+  typecheck.
+  apply /IH/.
+  }
+qed ();
+
+
+
+lemma "nil_type" 
+/
+  nil : intersect i (a : U i) . list a
+/;
+
+introOf /i a/.
+unfold /nil/.
+unrollType /list/.
+typecheck.
+qed ();
+recordTyping "nil_type";
+
+
+
+lemma "cons_type" 
+/
+  cons : intersect i (a : U i) . a -> list a -> list a
+/;
+
+introOf /i a h t/.
+unfold /cons/.
+unrollType /list/.
+typecheck.
+qed ();
+recordTyping "cons_type";
+
+
+
+lemma "list_case_type"
+/
+  list_case :
+  intersect i (a b : U i) .
+    list a
+    -> b
+    -> (a -> list a -> b)
+    -> b
+/;
+
+introOf /i a b l hnil hcons/.
+destruct /l/ /| h t/.
+  {
+  reduce //.
+  hypof.
+  }
+
+  {
+  reduce //.
+  typecheck.
+  }
+qed ();
+recordTyping "list_case_type";
+
+
+
+lemma "list_rec_type"
+/
+  list_rec :
+  intersect i (a : U i) (P : list a -> U i) .
+    P nil
+    -> (forall (h : a) (t : list a) . P t -> P (h :: t))
+    -> forall (l : list a) . P l
+/;
+
+inference.
+introOf /i a P hnil hcons l/.
+induct /l/.
+
+(* nil *)
+{
+reduce //.
+hypof.
+}
+
+(* cons *)
+{
+reintro /u l Hu IH/.
+reduce //.
+typecheck.
+}
+qed ();
+recordTyping "list_rec_type";
+
+
+
+lemma "list_iter_type" 
+/
+  list_iter :
+  intersect i . 
+    forall (a : U i) (P : list a -> U i) . 
+      P nil
+      -> (forall (h : a) (t : list a) . P t -> P (h :: t))
+      -> forall (l : list a) . P l
+/;
+
+inference.
+introOf /i a P hnil hcons l/.
+reduceUsing /\list_rec_x\/.
+convertHead /list_rec with list_rec ap i ap a ap P/.
+typecheck.
+qed ();
+recordTyping "list_iter_type";
+
+
+
+definerec /map f l/
+/
+  list_case l nil (fn h t . cons (f h) (map f t))
+/;
+
+
+define /mapx a b f l/
+/
+  list_case l nil (fn h t . cons (f h) (map f t))
+/;
+
+
+
+val map_unroll = Option.valOf $ Database.findUnroll $ parseConstant /map/;
+
+val t1a =
+  parseLTerm
+    / map 0 nil /;
+
+val r1a =
+  R.trans
+    [
+    map_unroll,
+    R.user2 list_case_nil
+    ];
+
+val t1b =
+  parseLTerm /nil/;
+
+val map_nil = R.new2 (parseConstant /map/) 1 0 nl 0 t1b r1a R.refl;
+NR.register map_nil;
+
+val t2a =
+  parseLTerm
+    / map 2 (cons 1 0) /;
+
+val r2a =
+  R.trans
+    [
+    map_unroll,
+    R.user2 list_case_cons,
+    R.beta 2
+    ];
+
+val t2b =
+  parseLTerm
+    / ` cons (2 1) (map 2 0) /;
+
+val map_cons = R.new2 (parseConstant /map/) 1 0 cons 2 t2b r2a R.refl;
+NR.register map_cons;
+
+P.start (parseLTerm /mapx 3 2 1 0/);
+P.unfold ();
+P.beta 4;
+val (_, r1) = P.done ();
+
+val m = parseLTerm /map 1 0/;
+P.start m;
+P.apply map_unroll;
+val (_, r2) = P.done ();
+
+val map_x = R.user1 $ R.new1 (parseConstant /mapx/) 4 m r1 r2;
+
+P.start (parseLTerm /mapx 2 1 0 nil/);
+P.apply map_x;
+P.user2 map_nil;
+val (n, r1) = P.done ();
+
+val mapx_nil = R.new2 (parseConstant /mapx/) 3 0 nl 0 n r1 R.refl;
+RR.register mapx_nil;
+
+P.start (parseLTerm /mapx 4 3 2 (cons 1 0)/);
+P.apply map_x;
+P.user2 map_cons;
+val (_, r1) = P.done ();
+
+val m = parseLTerm /cons (2 1) (mapx 4 3 2 0)/;
+P.start m;
+P.enter [2];
+P.apply map_x;
+P.leave ();
+val (_, r2) = P.done ();
+
+val mapx_cons = R.new2 (parseConstant /mapx/) 3 0 cons 2 m r1 r2;
+RR.register mapx_cons;
+
+
+
+
+lemma "map_type" 
+/
+  map :
+  intersect i (a b : U i) . (a -> b) -> list a -> list b
+/;
+
+inference.
+introOf /i a b f l/.
+induct /l/.
+
+(* nil *)
+{
+reduce //.
+typecheck.
+}
+
+(* cons *)
+{
+reintro /u h t Hu IH/.
+reduce //.
+typecheck.
+}
+qed ();
+recordTyping "map_type";
+
+
+
+lemma "mapx_type" 
+/
+  mapx :
+  intersect i . forall (a b : U i) . (a -> b) -> list a -> list b
+/;
+
+inference.
+introOf /i a b f l/.
+reduceUsing /\map_x\/.
+typecheck.
+qed ();
+recordTyping "mapx_type";
+
+
+
+lemma "compose_mapx"
+/
+  forall i (a b c d : U i) (f : c -> d) (g : a -> b) (l : list a) .
+    b <: c
+    -> mapx c d f (mapx a b g l)
+       =
+       mapx a d (fn x . f (g x)) l
+       : list d
+/;
+
+inference.
+intro /i a b c d f g l Hbc/.
+iterate /l/.
+
+(* nil *)
+{
+reflexivity.
+}
+
+(* cons *)
+{
+intro /h t IH/.
+compat.
+apply /IH/.
+}
+qed ();
+
+
+
+definerec /length l/
+/
+  list_case l 0 (fn _ t . succ (length t))
+/;
+
+
+
+val length_unroll = Option.valOf $ Database.findUnroll $ parseConstant /length/;
+
+val t1a =
+  parseLTerm
+    / Datatype.length Datatype.nil /;
+
+val r1a =
+  R.trans
+    [
+    length_unroll,
+    R.user2 list_case_nil
+    ];
+
+val t1b =
+  parseLTerm /zero/;
+
+val length_nil = R.new2 (parseConstant /length/) 0 0 nl 0 t1b r1a R.refl;
+RR.register length_nil;
+
+val t2a =
+  parseLTerm
+    / Datatype.length (Datatype.cons 1 0) /;
+
+val r2a =
+  R.trans
+    [
+    length_unroll,
+    R.user2 list_case_cons,
+    R.beta 2
+    ];
+
+val t2b =
+  parseLTerm /succ (Datatype.length 0)/;
+
+val length_cons = R.new2 (parseConstant /length/) 0 0 cons 2 t2b r2a R.refl;
+RR.register length_cons;
+
+
+
+lemma "length_type"
+/
+  length : intersect i (a : U i) . list a -> nat
+/;
+
+inference.
+introOf /i a l/.
+induct /l/.
+
+(* 0 *)
+{
+reduce //.
+typecheck.
+}
+
+(* succ *)
+{
+reintro /u l Hu IH/.
+reduce //.
+typecheck.
+}
+qed ();
+recordTyping "length_type";
+
+
+
+lemma "length_0_invert"
+/
+  forall i (a : U i) (l : list a) .
+    length l = 0 : nat
+    -> l = nil : list a
+/;
+
+inference.
+intro /i a l Heq/.
+destruct /l/ /| h t/.
+  {
+  reflexivity.
+  }
+
+  {
+  reduce /Heq/.
+  symmetryIn /Heq/.
+  so /eq_0_succ_not _ Heq/ /0/.
+  }
+qed ();
+
+
+
+lemma "length_succ_invert"
+/
+  forall i (a : U i) (l : list a) n .
+    length l = succ n : nat
+    -> exists h t .
+         l = h :: t : list a
+         & length t = n : nat
+/;
+
+inference.
+intro /i a l n Heq/.
+destruct /l/ /| h t/.
+  {
+  reduce /Heq/.
+  so /eq_0_succ_not _ Heq/ /0/.
+  }
+reduce /Heq/.
+exists /h/.
+exists /t/.
+split.
+  {
+  reflexivity.
+  }
+
+  {
+  apply /succ_inj/.
+  hyp /Heq/.
+  }
+qed ();
+
+
+
+define /hd l/
+/
+  list_case l
+    ()
+    (fn h _ . h)
+/;
+
+
+define /tl l/
+/
+  list_case l
+    ()
+    (fn _ t . t)
+/;
+
+
+definerec /drop i l/
+/
+  natcase i
+    l
+    (fn i' . drop i' (tl l))
+/;
+
+
+define /nth i l/
+/
+  hd (drop i l)
+/;
+
+
+define /hdx a l/
+/
+  hd l
+/;
+
+
+define /tlx a l/
+/
+  tl l
+/;
+
+
+define /dropx a i l/
+/
+  drop i l
+/;
+
+
+define /nthx a i l/
+/
+  nth i l
+/;
+
+
+
+P.start (parseLTerm /hd (cons 1 0)/);
+P.unfold ();
+P.beta 1;
+P.user2 list_case_cons;
+P.beta 2;
+val (_, r1) = P.done ();
+
+val hd_cons = R.new2 (parseConstant /hd/) 0 0 (parseConstant /cons/) 2 (Term.Var 1) r1 R.refl;
+NR.register hd_cons;
+
+P.start (parseLTerm /tl (cons 1 0)/);
+P.unfold ();
+P.beta 1;
+P.user2 list_case_cons;
+P.beta 2;
+val (_, r1) = P.done ();
+
+val tl_cons = R.new2 (parseConstant /tl/) 0 0 (parseConstant /cons/) 2 (Term.Var 0) r1 R.refl;
+NR.register tl_cons;
+
+val drop_unroll = Option.valOf $ Database.findUnroll (parseConstant /drop/);
+
+P.start (parseLTerm /drop zero 0/);
+P.apply drop_unroll;
+P.user2 Prim.natcase_zero;
+val (m, r1) = P.done ();
+
+val drop_zero = R.new2 (parseConstant /drop/) 0 1 Prim.zero 0 m r1 R.refl;
+NR.register drop_zero;
+
+P.start (parseLTerm /drop (succ 1) 0/);
+P.apply drop_unroll;
+P.user2 Prim.natcase_succ;
+P.beta 1;
+val (m, r1) = P.done ();
+
+val drop_succ = R.new2 (parseConstant /drop/) 0 1 Prim.succ 1 m r1 R.refl;
+NR.register drop_succ;
+
+P.start (parseLTerm /nth zero 0/);
+P.unfold ();
+P.beta 2;
+P.enter [1];
+P.user2 drop_zero;
+P.leave ();
+val (m, r1) = P.done ();
+
+val nth_zero = R.new2 (parseConstant /nth/) 0 1 Prim.zero 0 m r1 R.refl;
+NR.register nth_zero;
+
+P.start (parseLTerm /nth (succ 1) 0/);
+P.unfold ();
+P.beta 2;
+P.enter [1];
+P.user2 drop_succ;
+P.leave ();
+val (_, r1) = P.done ();
+
+val m = parseLTerm /nth 1 (tl 0)/;
+P.start m;
+P.unfold ();
+P.beta 2;
+val (_, r2) = P.done ();
+
+val nth_succ = R.new2 (parseConstant /nth/) 0 1 Prim.succ 1 m r1 r2;
+NR.register nth_succ;
+
+P.start (parseLTerm /hdx 1 0/);
+P.unfold ();
+P.beta 2;
+val (m, r1) = P.done ();
+
+val hd_x = R.user1 $ R.new1 (parseConstant /hdx/) 2 m r1 R.refl;
+
+P.start (parseLTerm /tlx 1 0/);
+P.unfold ();
+P.beta 2;
+val (m, r1) = P.done ();
+
+val tl_x = R.user1 $ R.new1 (parseConstant /tlx/) 2 m r1 R.refl;
+
+P.start (parseLTerm /dropx 2 1 0/);
+P.unfold ();
+P.beta 3;
+val (m, r1) = P.done ();
+
+val drop_x = R.user1 $ R.new1 (parseConstant /dropx/) 3 m r1 R.refl;
+
+P.start (parseLTerm /nthx 2 1 0/);
+P.unfold ();
+P.beta 3;
+val (m, r1) = P.done ();
+
+val nth_x = R.user1 $ R.new1 (parseConstant /nthx/) 3 m r1 R.refl;
+
+P.start (parseLTerm /hdx 2 (cons 1 0)/);
+P.unfold ();
+P.beta 2;
+P.user2 hd_cons;
+val (m, r1) = P.done ();
+
+val hdx_cons = R.new2 (parseConstant /hdx/) 1 0 (parseConstant /cons/) 2 m r1 R.refl;
+RR.register hdx_cons;
+
+P.start (parseLTerm /tlx 2 (cons 1 0)/);
+P.unfold ();
+P.beta 2;
+P.user2 tl_cons;
+val (m, r1) = P.done ();
+
+val tlx_cons = R.new2 (parseConstant /tlx/) 1 0 (parseConstant /cons/) 2 m r1 R.refl;
+RR.register tlx_cons;
+
+P.start (parseLTerm /dropx 1 zero 0/);
+P.unfold ();
+P.beta 3;
+P.user2 drop_zero;
+val (m, r1) = P.done ();
+
+val dropx_zero = R.new2 (parseConstant /dropx/) 1 1 Prim.zero 0 m r1 R.refl;
+RR.register dropx_zero;
+
+P.start (parseLTerm /dropx 2 (succ 1) 0/);
+P.unfold ();
+P.beta 3;
+P.user2 drop_succ;
+val (_, r1) = P.done ();
+
+val m = parseLTerm /dropx 2 1 (tlx 2 0)/;
+P.start m;
+P.unfold ();
+P.beta 3;
+P.enter [2];
+P.unfold ();
+P.beta 2;
+P.leave ();
+val (_, r2) = P.done ();
+
+val dropx_succ = R.new2 (parseConstant /dropx/) 1 1 Prim.succ 1 m r1 r2;
+RR.register dropx_succ;
+
+P.start (parseLTerm /nthx 1 zero 0/);
+P.unfold ();
+P.beta 3;
+P.user2 nth_zero;
+val (_, r1) = P.done ();
+
+val m = parseLTerm /hdx 1 0/;
+P.start m;
+P.unfold ();
+P.beta 2;
+val (_, r2) = P.done ();
+
+val nthx_zero = R.new2 (parseConstant /nthx/) 1 1 Prim.zero 0 m r1 r2;
+RR.register nthx_zero;
+
+P.start (parseLTerm /nthx 2 (succ 1) 0/);
+P.unfold ();
+P.beta 3;
+P.user2 nth_succ;
+val (_, r1) = P.done ();
+
+val m = parseLTerm /nthx 2 1 (tlx 2 0)/;
+P.start m;
+P.unfold ();
+P.beta 3;
+P.enter [2];
+P.unfold ();
+P.beta 2;
+P.leave ();
+val (_, r2) = P.done ();
+
+val nthx_succ = R.new2 (parseConstant /nthx/) 1 1 Prim.succ 1 m r1 r2;
+RR.register nthx_succ;
+
+
+
+lemma "hd_type"
+/
+  hd :
+  intersect i (a : U i) .
+  forall (l : list a) .
+    leq 1 (length l)
+    -g> a
+/;
+
+introOf /i a l Hlen/.
+destruct /l/ /| h t/.
+  {
+  reduce /Hlen/.
+  so /leq_succ_0_not _ Hlen/ /0/.
+  }
+reduce //.
+hypof.
+qed ();
+recordTyping "hd_type";
+
+
+
+lemma "tl_type"
+/
+  tl :
+  intersect i (a : U i) .
+  forall (l : list a) .
+    leq 1 (length l)
+    -g> list a
+/;
+
+introOf /i a l Hlen/.
+destruct /l/ /| h t/.
+  {
+  reduce /Hlen/.
+  so /leq_succ_0_not _ Hlen/ /0/.
+  }
+reduce //.
+hypof.
+qed ();
+recordTyping "tl_type";
+
+
+
+lemma "drop_type"
+/
+  drop :
+  intersect i (a : U i) .
+  forall n (l : list a) .
+    leq n (length l)
+    -g> list a
+/;
+
+inference.
+introOf /i a n l Hlen/.
+revert /l Hlen/.
+induct /n/.
+reintro /IH/.
+destruct /n/ /| n/.
+  {
+  intro /l Hlen/.
+  hypof.
+  }
+
+  {
+  intro /l Hlen/.
+  destruct /l/ /| h t/.
+    {
+    reduce /Hlen/.
+    so /leq_succ_0_not _ Hlen/ /0/.
+    }
+  reduce //.
+  apply /IH/ >>> [apply /lt_succ/, idtac].
+  reduce /Hlen/.
+  apply /leq_succ_invert/.
+  hyp /Hlen/.
+  }
+qed ();
+recordTyping "drop_type";
+
+
+
+lemma "drop_length"
+/
+  forall i (a : U i) n (l : list a) .
+    n <= length l
+    -> length (drop n l) = length l - n : nat
+/;
+
+inference.
+intro /i a n/.
+iterate /n/.
+  {
+  intro /l _/.
+  reflexivity.
+  }
+intro /n IH l Hlen/.
+destruct /l/ /| h t/.
+  {
+  so /leq_succ_0_not _ Hlen/ /0/.
+  }
+reduce //.
+apply /IH/.
+reduce /Hlen/.
+apply /leq_succ_invert/.
+hyp /Hlen/.
+qed ();
+
+
+lemma "nth_type"
+/
+  nth :
+  intersect i (a : U i) .
+  forall n (l : list a) .
+    leq (succ n) (length l)
+    -g> a
+/;
+
+inference.
+introOf /i a n l Hlen/.
+unfold /nth/.
+typecheck.
+  {
+  apply /leq_trans _ (succ n)/.
+    {
+    apply /leq_succ/.
+    }
+  hyp /Hlen/.
+  }
+
+  {
+  rewrite /-> drop_length/.
+    {
+    apply /leq_trans _ (succ n)/ >>> [apply /leq_succ/, hyp /Hlen/].
+    }
+  rewrite /1 = succ (n - n) : nat/.
+    {
+    rewrite /-> minus_self/.
+    reflexivity.
+    }
+  rewrite /<- minus_succ_l_eq/ >>> [apply /leq_refl/, idtac].
+  apply /minus_leq/ >>> [hyp /Hlen/, apply /leq_refl/].
+  }
+qed ();
+recordTyping "nth_type";
+
+
+
+lemma "hdx_type"
+/
+  hdx :
+  intersect i .
+  forall (a : U i) (l : list a) .
+    leq 1 (length l)
+    -g> a
+/;
+
+inference.
+introOf /i a l Hlen/.
+reduceUsing /\hd_x\/.
+typecheck.
+qed ();
+recordTyping "hdx_type";
+
+
+
+lemma "tlx_type"
+/
+  tlx :
+  intersect i .
+  forall (a : U i) (l : list a) .
+    leq 1 (length l)
+    -g> list a
+/;
+
+inference.
+introOf /i a l Hlen/.
+reduceUsing /\tl_x\/.
+typecheck.
+qed ();
+recordTyping "tlx_type";
+
+
+
+lemma "dropx_type"
+/
+  dropx :
+  intersect i .
+  forall (a : U i) n (l : list a) .
+    leq n (length l)
+    -g> list a
+/;
+  
+inference.
+introOf /i a n l Hlen/.
+reduceUsing /\drop_x\/.
+typecheck.
+qed ();
+recordTyping "dropx_type";
+
+
+
+lemma "nthx_type"
+/
+  nthx :
+  intersect i .
+  forall (a : U i) n (l : list a) .
+    leq (succ n) (length l)
+    -g> a
+/;
+  
+inference.
+introOf /i a n l Hlen/.
+reduceUsing /\nth_x\/.
+typecheck.
+qed ();
+recordTyping "nthx_type";
+
+
+
+lemma "dropx_length"
+/
+  forall i (a : U i) n (l : list a) .
+    n <= length l
+    -> length (dropx a n l) = length l - n : nat
+/;
+
+inference.
+reduceUsing /\drop_x\/.
+exact /drop_length/.
+qed ();
+
+
+
+lemma "dropx_compose"
+/
+  forall i (a : U i) m n (l : list a) .
+    n + m <= length l
+    -> dropx a m (dropx a n l) = dropx a (n + m) l : list a
+/;
+
+inference.
+intro /i a m n/.
+iterate /n/.
+  {
+  reintro /n l Hlen/.
+  rewrite /<- plus_leq_l in Hlen/.
+  hyp /Hlen/.
+  }
+
+  {
+  reintro /n l Hlen/.
+  rewrite /-> dropx_length/.
+    {
+    rewrite /<- plus_leq_l in Hlen/.
+    hyp /Hlen/.
+    }
+  rewrite /<- plus_minus_cancel_l n m/.
+  rewrite /-> Hlen/.
+  (* XX there should still be the primary goal *)
+  }
+
+  {
+  intro /l Hlen/.
+  reflexivity.
+  }
+intro /n IH l Hlen/.
+  {
+  reintro /Hleq/.
+  rewrite /<- plus_leq_l in Hleq/.
+  hyp /Hleq/.
+  }
+
+  {
+  reintro /Hleq/.
+  rewrite /-> dropx_length/.
+    {
+    rewrite /<- plus_leq_l in Hleq/.
+    hyp /Hleq/.
+    }
+  rewrite /<- plus_minus_cancel_l n m/.
+  apply /minus_leq/ >>> [hyp /Hleq/, reflexivity].
+  }
+destruct /l/ /| h t/.
+  {
+  so /leq_succ_0_not _ Hlen/ /0/.
+  }
+reduce //.
+apply /IH/.
+apply /leq_succ_invert/.
+hyp /Hlen/.
+qed ();
+
+
+lemma "nthx_dropx_compose"
+/
+  forall i (a : U i) m n (l : list a) .
+    succ (n + m) <= length l
+    -> nthx a m (dropx a n l) = nthx a (n + m) l : a
+/;
+
+inference.
+intro /i a m n l Hlen/.
+unfold /nthx at all/.
+unfold /nth at all/.
+unreduceUsing /\drop_x\ with dropx a _ _ at all/.
+unreduceUsing /\hd_x\ with hdx a _ at all/.
+compat.
+  {
+  apply /dropx_compose/.
+  rewrite /<- leq_succ in Hlen/.
+  hyp /Hlen/.
+  }
+assert /succ m <= length (dropx a n l)/ /Hleq/.
+  {
+  rewrite /-> dropx_length/.
+    {
+    rewrite /<- leq_succ in Hlen , <- plus_leq_l in Hlen/.
+    hyp /Hlen/.
+    }
+  rewrite /<- plus_minus_cancel_l n m/.
+  rewrite /<- minus_succ_l_eq/ >>> [apply /plus_leq_l/, idtac].
+  apply /minus_leq/ >>> [hyp /Hlen/, reflexivity].
+  }
+assert /n <= length l/ /Hleq'/.
+  {
+  rewrite /<- leq_succ in Hlen , <- plus_leq_l in Hlen/.
+  hyp /Hlen/.
+  }
+rewrite /-> dropx_length/.
+  {
+  transitivity /succ m/.
+    {
+    apply /leq_succ/.
+    }
+
+    {
+    hyp /Hleq/.
+    }
+  }
+rewrite /<- minus_self m/.
+rewrite /<- minus_succ_l_eq/ >>> [reflexivity, idtac].
+apply /minus_leq/ >>> [hyp /Hleq/, reflexivity].
+qed ();
+
+
+
+
+(***  Multicase, etc.  ***)
+
+definerec /multiprod l/
+/
+  list_case l
+    unit
+    (fn a t . a & multiprod t)
+/;
+
+
+definerec /multisum l/
+/
+  list_case l
+    void
+    (fn a t . a % multisum t)
+/;
+
+
+definerec /multiproj l n x/
+/
+  natcase n
+    (x #1)
+    (fn n' . multiproj (tl l) n' (x #2))
+/;
+
+
+definerec /multicase ts arms x/
+/
+  list_case ts
+    (abort x)
+    (fn a rest .
+       (case x of
+        | inl y . arms #1 y
+        | inr z . multicase rest (arms #2) z))
+/;
+
+
+define /multicasex b ts arms x/
+/
+  list_case ts
+    (abort x)
+    (fn a rest .
+       (case x of
+        | inl y . arms #1 y
+        | inr z . multicase rest (arms #2) z))
+/;
+
+
+
+val multiprod = parseConstant /multiprod/;
+val multisum = parseConstant /multisum/;
+val multicase = parseConstant /multicase/;
+val multicasex = parseConstant /multicasex/;
+val multiprod_unroll = Option.valOf (Database.findUnroll multiprod);
+val multisum_unroll = Option.valOf (Database.findUnroll multisum);
+val multicase_unroll = Option.valOf (Database.findUnroll multicase);
+
+P.start $ parseLTerm /multiprod nil/;
+P.apply multiprod_unroll;
+P.user2 list_case_nil;
+val (_, r1) = P.done ();
+
+val multiprod_nil = R.new2 multiprod 0 0 nl 0 (Term.Const Prim.unit) r1 R.refl;
+RR.register multiprod_nil;
+
+P.start $ parseLTerm /multiprod (cons 1 0)/;
+P.apply multiprod_unroll;
+P.user2 list_case_cons;
+P.beta 2;
+val (t2, r2) = P.done ();
+
+val multiprod_cons = R.new2 multiprod 0 0 cons 2 t2 r2 R.refl;
+RR.register multiprod_cons;
+
+P.start $ parseLTerm /multisum nil/;
+P.apply multisum_unroll;
+P.user2 list_case_nil;
+val (_, r3) = P.done ();
+
+val multisum_nil = R.new2 multisum 0 0 nl 0 (Term.Const Prim.void) r3 R.refl;
+RR.register multisum_nil;
+
+P.start $ parseLTerm /multisum (cons 1 0)/;
+P.apply multisum_unroll;
+P.user2 list_case_cons;
+P.beta 2;
+val (t4, r4) = P.done ();
+
+val multisum_cons = R.new2 multisum 0 0 cons 2 t4 r4 R.refl;
+RR.register multisum_cons;
+
+val multiproj_unroll = Option.valOf $ Database.findUnroll $ parseConstant /multiproj/;
+
+P.start (parseLTerm /multiproj 1 zero 0/);
+P.apply multiproj_unroll;
+P.user2 Prim.natcase_zero;
+val (m, r1) = P.done ();
+
+val multiproj_zero = R.new2 (parseConstant /multiproj/) 1 1 Prim.zero 0 m r1 R.refl;
+NR.register multiproj_zero;
+
+P.start (parseLTerm /multiproj 2 (succ 1) 0/);
+P.apply multiproj_unroll;
+P.user2 Prim.natcase_succ;
+P.beta 1;
+val (m, r1) = P.done ();
+
+val multiproj_succ = R.new2 (parseConstant /multiproj/) 1 1 Prim.succ 1 m r1 R.refl;
+NR.register multiproj_succ;
+
+P.start (parseLTerm /multicase (cons 3 2) 1 0/);
+P.unfold ();
+P.user1 Prim.unroll_fix;
+P.beta 4;
+P.user2 list_case_cons;
+P.beta 2;
+val (_, r1a) = P.done ();
+
+val m = ETerm.closed /additional h t arms x . sumcase x (fn y . arms #1 y) (fn y . multicase t (arms #2) y)/;
+P.start m;
+P.enter [3, 0];
+P.unfold ();
+P.leave ();
+val (_, r1b) = P.done ();
+
+val multicase_cons = R.new2 (parseConstant /multicase/) 0 2 cons 2 m r1a r1b;
+NR.register multicase_cons;
+
+P.start (parseLTerm /multicasex 3 2 1 0/);
+P.unfold ();
+P.beta 4;
+val (_, r1) = P.done ();
+
+val m = parseLTerm /multicase 2 1 0/;
+P.start m;
+P.apply multicase_unroll;
+val (_, r2) = P.done ();
+
+val multicase_x = R.user1 $ R.new1 (parseConstant /multicasex/) 4 m r1 r2;
+
+P.start (parseLTerm /multicasex 4 (cons 3 2) 1 0/);
+P.apply multicase_x;
+P.user2 multicase_cons;
+val (_, r1) = P.done ();
+
+val m = ETerm.closed /additional b h t arms x . sumcase x (fn y . arms #1 y) (fn y . multicasex b t (arms #2) y)/;
+P.start m;
+P.enter [3, 0];
+P.apply multicase_x;
+P.leave ();
+val (_, r2) = P.done ();
+
+val multicasex_cons = R.new2 (parseConstant /multicasex/) 1 2 cons 2 m r1 r2;
+NR.register multicasex_cons;
+
+
+
+lemma "multiprod_type"
+/
+  multiprod :
+  intersect (i : level) . list (U i) -> U i
+/;
+
+introOf /i l/.
+induct /l/.
+
+(* nil *)
+{
+unroll /multiprod/ >> reduce //.
+typecheck.
+}
+
+(* cons *)
+{
+reintro /u a l Hu IH/.
+unroll /multiprod/ >> reduce //.
+typecheck.
+}
+qed ();
+recordTyping "multiprod_type";
+
+
+
+lemma "multisum_type"
+/
+  multisum :
+  intersect (i : level) . list (U i) -> U i
+/;
+
+introOf /i l/.
+induct /l/.
+
+(* nil *)
+{
+unroll /multisum/ >> reduce //.
+typecheck.
+}
+
+(* cons *)
+{
+reintro /u a l Hu IH/.
+unroll /multisum/ >> reduce //.
+typecheck.
+}
+qed ();
+recordTyping "multisum_type";
+
+
+
+lemma "multiproj_type"
+/
+  multiproj :
+  intersect (i : level) .
+  forall (l : list (U i)) n (x : multiprod l) .
+    succ n <= length l
+    -g> nthx (U i) n l
+/;
+
+introOf /i l n x Hlen/.
+revert /l x Hlen/.
+induct /n/.
+reintro /IH/.
+destruct /n/ /| n/.
+
+(* 0 *)
+{
+intro /l x Hlen/.
+destruct /l/ /| a l/.
+  {
+  reduce /Hlen/.
+  so /leq_succ_0_not _ Hlen/ /0/.
+  }
+reduce /x  Hlen  concl/.
+destruct /x/ /y x/.
+reduce //.
+hypof.
+}
+
+(* succ *)
+{
+intro /l x Hlen/.
+destruct /l/ /| a l/.
+  {
+  reduce /Hlen/.
+  so /leq_succ_0_not _ Hlen/ /0/.
+  }
+reduce /x  Hlen  concl/.
+destruct /x/ /y x/.
+reduce //.
+apply /IH/ >>> [apply /lt_succ/, idtac].
+apply /leq_succ_invert/.
+hyp /Hlen/.
+}
+qed ();
+recordTyping "multiproj_type";
+
+
+
+lemma "multicase_type"
+/
+  multicase :
+  intersect (i : level) (b : U i) .
+    forall (ts : list (U i)) .
+      multiprod (mapx (U i) (U i) (fn t . t -> b) ts)
+      -> multisum ts
+      -> b
+/;
+
+introOf /i b ts arms x/.
+revert /arms x/.
+induct /ts/.
+
+(* nil *)
+{
+intro /arms x/.
+destruct /x/ /0/.
+}
+
+(* cons *)
+{
+reintro /u a rest Hu IH/.
+intro /arms x/.
+destruct /arms/ /f arms/.
+reduce //.
+destruct /x/ /x | x/.
+  {
+  reduce //.
+  typecheck.
+  }
+
+  {
+  reduce //.
+  apply /IH/.
+  }
+}
+qed ();
+recordTyping "multicase_type";
+
+
+
+lemma "multicasex_type"
+/
+  multicasex :
+  intersect (i : level) .
+    forall (b : U i) (ts : list (U i)) .
+      multiprod (mapx (U i) (U i) (fn t . t -> b) ts)
+      -> multisum ts
+      -> b
+/;
+
+introOf /i b ts arms x/.
+reduceUsing /\multicase_x\/.
+typecheck.
+qed ();
+recordTyping "multicasex_type";
+
+
+
+lemma "multiprod_mono"
+/
+  forall i (a : U i) (f g : a -> U i) l .
+    (forall x . f x <: g x)
+    -> multiprod (mapx a (U i) f l)
+       <:
+       multiprod (mapx a (U i) g l)
+/;
+
+inference.
+intro /i a f g l Hfg/.
+induct /l/.
+  {
+  reduce //.
+  typecheck.
+  }
+reintro /u h t Hu IH/.
+reduce //.
+typecheck.
+qed ();
+
+
+
+lemma "multisum_mono"
+/
+  forall i j (a : U j) (f g : a -> U i) l .
+    (forall x . f x <: g x)
+    -> multisum (mapx a (U i) f l)
+       <:
+       multisum (mapx a (U i) g l)
+/;
+
+inference.
+intro /i j a f g l Hfg/.
+induct /l/.
+  {
+  reduce //.
+  typecheck.
+  }
+reintro /u h t Hu IH/.
+reduce //.
+typecheck.
+qed ();
+
+
+
+
+(***  Datatype schemas  ***)
+
+define /element i a/
+/
+  exists (b : U i) . list (b -> a) & (b -> a)
+/;
+Constant.setOpacity (parseConstant /element/) Constant.SOFT;
+
+
+
+define /schema i a/
+/
+  list (exists (b : U i) . list (b -> a) & (b -> a))
+/;
+Constant.setOpacity (parseConstant /schema/) Constant.SOFT;
+
+
+
+define /repbody dcons r/
+/
+  multisum
+  (map (fn dcon . dcon #1 & multiprod (map (fn _ . r) (dcon #2 #1))) dcons)
+/;
+Constant.setOpacity (parseConstant /repbody/) Constant.FIRM;
+
+
+
+define /repbodyx i a dcons r/
+/
+  multisum
+  (mapx
+     (exists (b : U i) . list (b -> a) & (b -> a))
+     (U i)
+     (fn dcon . dcon #1 & multiprod (mapx
+                                       (dcon #1 -> a)
+                                       (U i)
+                                       (fn _ . r) 
+                                       (dcon #2 #1))) 
+     dcons)
+/;
+Constant.setOpacity (parseConstant /repbodyx/) Constant.FIRM;
+
+
+
+P.start (parseLTerm /repbodyx 3 2 1 0/);
+P.unfold ();
+P.beta 4;
+P.enter [1];
+P.apply map_x;
+P.enter [1, 0, 2, 1];
+P.apply map_x;
+P.leave ();
+P.leave ();
+val (_, r1) = P.done ();
+
+val m = parseLTerm /repbody 1 0/;
+P.start m;
+P.unfold ();
+P.beta 2;
+val (_, r2) = P.done ();
+
+val repbody_x = R.user1 $ R.new1 (parseConstant /repbodyx/) 4 m r1 r2;
+
+
+
+lemma "repbody_type"
+/
+  repbody :
+  intersect (i : level) (a : U i) . forall (dcons : schema i a) (r : U i) . U i
+/;
+
+introOf /i a dcons r/.
+unfold /repbody/.
+typecheck.
+qed ();
+recordTyping "repbody_type";
+
+
+
+lemma "repbodyx_type"
+/
+  repbodyx :
+  forall (i : level) (a : U i) (dcons : schema i a) (r : U i) . U i
+/;
+
+introOf /i a dcons r/.
+reduceUsing /\repbody_x\/.
+typecheck.
+qed ();
+recordTyping "repbodyx_type";
+
+
+
+lemma "repbody_positive"
+/
+  forall (i : level) a (s : schema i a) .
+    positive (fn r . repbody s r)
+/;
+
+intro /i a l/.
+unfold /schema in l/.
+induct /l/.
+
+(* nil *)
+{
+typecheck.
+}
+
+(* cons *)
+{
+reintro /u h t Hu IH/.
+destruct /h/ /b l n/.
+unfold /repbody/.
+unroll /multisum/.
+reduce //.
+fold /repbody t r within r/.
+Constant.setOpacity (parseConstant /repbody/) Constant.OPAQUE;
+Constant.setOpacity (parseConstant /multiprod/) Constant.OPAQUE;
+typecheck.
+Constant.setOpacity (parseConstant /repbody/) Constant.FIRM;
+Constant.setOpacity (parseConstant /multiprod/) Constant.HARD;
+1:{
+  apply /IH/.
+  }
+clear /u n t Hu IH/.
+induct /l/.
+  {
+  reduce //.
+  typecheck.
+  }
+
+  {
+  reintro /u h t Hu IH/.
+  unroll /multiprod/.
+  reduce //.
+  Constant.setOpacity (parseConstant /multiprod/) Constant.OPAQUE;
+  typecheck.
+  Constant.setOpacity (parseConstant /multiprod/) Constant.HARD;
+  apply /IH/.
+  }
+}
+qed ();
+
+
+define /rep s/
+/
+  mu r . repbody s r
+/;
+
+
+lemma "rep_type"
+/
+  rep :
+  intersect (i : level) (a : U i) . forall (s : schema i a) . U i
+/;
+
+introOf /i a s/.
+unfold /rep/.
+Constant.setOpacity (parseConstant /repbody/) Constant.OPAQUE;
+typecheck.
+Constant.setOpacity (parseConstant /repbody/) Constant.FIRM;
+apply /repbody_positive/.
+qed ();
+recordTyping "rep_type";
+
+
+(* type annotations in predx below *)
+definerec /pred a dcons x ind/
+/
+  multicase
+    (map 
+       (fn dcon . dcon #1 & multiprod (map (fn _ . rep dcons) (dcon #2 #1)))
+       dcons)
+    (list_rec
+       ()
+       (fn dcon _ fs .
+          ((fn y .
+              ind = dcon #2 #2 (y #1) : a
+              &
+              list_rec
+                (fn _ . unit)
+                (fn p _ t z .
+                   pred a dcons (z #1) (p (y #1))
+                   &
+                   t (z #2))
+                (dcon #2 #1)
+                (y #2))
+           ,
+           fs))
+       dcons)
+    x
+/;
+
+
+lemma "pred_type"
+/
+  pred :
+  intersect (i : level) .
+  forall a (dcons : schema i a) .
+    rep dcons -> a -> U i
+/;
+
+introOf /i a dcons x/.
+reduce //.
+introOf /ind/.
+revert /ind/.
+unfold /rep in x/.
+inductMuUnivRaw /x/ /1 + i/.
+  {
+  typecheck.
+  }
+
+  {
+  convertHead /repbody with repbody ap (lsucc i)/.
+  typecheck.
+  }
+
+  {
+  apply /repbody_positive/.
+  }
+reintro /u x _ IH/.
+assert /forall (ind : a) . pred a dcons x ind : U i/ /H/.
+1:{
+  split.
+    {
+    hyp /H/.
+    }
+
+    {
+    clear /IH/.
+    typecheck.
+    }
+  }
+intro /ind/.
+unroll /pred/.
+revert /x/.
+generalizeAt /dcons/ /_/ /0 2 4/ /dcons'/.
+unfold /schema in dcons'/.
+induct /dcons'/.
+
+(* nil *)
+{
+reduce //.
+convertHead /repbody with repbody ap _ ap a/.
+intro /x/.
+typecheck.
+}
+
+(* cons *)
+{
+reintro /u1 dcon dcons' Hu1 IH1/.
+introRaw /x/.
+  {
+  unfold /repbody/.
+  reduce //.
+  typecheck.
+  }
+unfold /repbody in x/.
+reduce /x/.
+destruct /x/ /x | x/.
+  {
+  reduce //.
+  typecheck.
+  destruct /x/ /m args/.
+  destruct /dcon/ /b ps p/.
+  reduce /in concl  in m  in args/.
+  revert /args/.
+  induct /ps/.
+    {
+    reduce //.
+    intro /args/.
+    typecheck.
+    }
+
+    {
+    reintro /u2 p1 ps Hu2 IH2/.
+    intro /args/.
+    destruct /args/ /f args/.
+    reduce //.
+    typecheck.
+    }
+  }
+
+  {
+  reduce //.
+  apply /IH1/.
+  }
+}
+qed ();
+recordTyping "pred_type";
+
+
+
+define /predx i a dcons x ind/
+/
+  (* a     : Ui
+     dcons : list (element i a)
+     x     : rep dcons
+     ind   : a
+  *)
+
+  multicasex (U i)
+    (mapx (* 1+i *)
+       (element i a)
+       (U i)
+       (fn dcon . dcon #1 & multiprod (mapx
+                                         (dcon #1 -> a)
+                                         (U i)
+                                         (fn _ . rep dcons)
+                                         (dcon #2 #1)))
+       dcons)
+    (list_iter (* 1+i *)
+       (element i a)
+       (fn dcons' .
+          multiprod
+            (mapx (* 2+i *)
+               (element i a)
+               (U (1 + i))
+               (fn dcon .
+                  dcon #1 & multiprod (mapx
+                                         (dcon #1 -> a)
+                                         (U i)
+                                         (fn _ . rep dcons)
+                                         (dcon #2 #1))
+                  -> U i)
+               dcons'))
+       ()
+       (fn dcon _ fs .
+          ((fn y .
+              ind = dcon #2 #2 (y #1) : a
+              &
+              list_iter (* 1+i *)
+                (dcon #1 -> a)
+                (fn args .
+                   multiprod (mapx
+                                (dcon #1 -> a)
+                                (U i)
+                                (fn _ . rep dcons)
+                                args)
+                   -> U i)
+                (fn _ . unit)
+                (fn p _ t z .
+                   pred a dcons (z #1) (p (y #1))
+                   &
+                   t (z #2))
+                (dcon #2 #1)
+                (y #2))
+           ,
+           fs))
+       dcons)
+    x
+/;
+
+
+
+val pred_unroll = Option.valOf $ Database.findUnroll (parseConstant /pred/);
+
+P.start (parseLTerm /predx 4 3 2 1 0/);
+P.unfold ();
+P.beta 5;
+P.apply multicase_x;
+P.enter [1];
+P.apply map_x;
+P.enter [1, 0, 2, 1];
+P.apply map_x;
+P.leave ();
+P.leave ();
+P.enter [2];
+P.apply list_rec_x;
+P.enter [2, 0, 0, 0, 0, 0, 2];
+P.apply list_rec_x;
+P.leave ();
+P.leave ();
+val (_, r1) = P.done ();
+
+val m = parseLTerm /pred 3 2 1 0/;
+P.start m;
+P.apply pred_unroll;
+val (_, r2) = P.done ();
+
+val pred_x = R.user1 $ R.new1 (parseConstant /predx/) 5 m r1 r2;
+
+
+
+lemma "predx_type"
+/
+  predx :
+  forall i (a : U i) (dcons : schema i a) .
+    rep dcons -> a -> U i
+/;
+
+inference.
+introOf /i a dcons x ind/.
+reduceUsing /\pred_x\/.
+typecheck.
+qed ();
+recordTyping "predx_type";
+
+
+
+define /dt a dcons ind/
+/
+  { x : rep dcons | pred a dcons x ind }
+/;
+
+
+
+lemma "dt_type"
+/
+  dt :
+  intersect (i : level) .
+  forall a .
+    schema i a -> a -> U i
+/;
+
+introOf /i a dcons ind/.
+unfold /dt/.
+typecheck.
+qed ();
+recordTyping "dt_type";
+
+
+
+lemma "rep_unroll"
+/
+  forall i a (dcons : schema i a) .
+    rep dcons <:> repbody dcons (rep dcons)
+/;
+
+inference.
+intro /i a dcons/.
+unfold /eeqtp/.
+split.
+  {
+  intro /x/.
+  Constant.setOpacity (parseConstant /repbody/) Constant.OPAQUE;
+  unrollTypeUniv /rep with i in x/.
+  Constant.setOpacity (parseConstant /repbody/) Constant.FIRM;
+    {
+    apply /repbody_positive/.
+    }
+   
+    {
+    hypof.
+    }
+  }
+
+  {
+  intro /x/.
+  Constant.setOpacity (parseConstant /repbody/) Constant.OPAQUE;
+  unrollTypeUniv /rep with i/.
+  Constant.setOpacity (parseConstant /repbody/) Constant.FIRM;
+    {
+    hypof.
+    }
+
+    {
+    apply /repbody_positive/.
+    }
+  }
+qed ();
+
+
+
+lemma "unroll_datatype"
+/
+  forall i (a : U i) (dcons : schema i a) (ind : a) .
+    dt a dcons ind
+    <:>
+    multisum
+      (mapx
+         (element i a)
+         (U i)
+         (fn dcon .
+            exists (x : { x : dcon #1 | dcon #2 #2 x = ind : a }) .
+              multiprod 
+                (mapx
+                   (dcon #1 -> a)
+                   (U i)
+                   (fn m . dt a dcons (m x))
+                   (dcon #2 #1)))
+         dcons)
+/;
+
+inference.
+intro /i a dcons ind/.
+unfold /eeqtp/.
+split.
+  {
+  intro /z/.
+  unfold /dt in z/.
+  destruct /z/ /[z Hpred]/.
+  unhide.
+  unreduceUsing /\pred_x\ with predx i a dcons z ind in Hpred/.
+  rewrite /-> rep_unroll in z/.
+  unreduceUsing /\repbody_x\ with repbodyx i a dcons (rep dcons) in z/.
+  revert /z Hpred/.
+  unfold /predx/.
+  generalizeAt /dcons/ /_/ /0 3 7 9/ /dconsind/.
+  unfold /schema in dconsind/.
+  induct /dconsind/.
+    {
+    unfold /repbodyx/.
+    reduce //.
+    intro /0/.
+    }
+  reintro /u dcon dconind Hu IH/.
+  fold /schema i a in Hu/.
+  destruct /dcon/ /b ms n/.
+  intro /z/.
+  unfold /repbodyx in z/.
+  reduce /z/.
+  destruct /z/ /data subs | z/.
+    {
+    clear /IH/.
+    reduce //.
+    intro /H/.
+    destruct /H/ /Heq Hrec/.
+    convert /manual subs/.
+    typecheck.
+      {
+      split.
+      symmetry.
+      hyp /Heq/.
+      }
+    clear /u Hu dconind/.
+    revert /subs Hrec/.
+    induct /ms/.
+      {
+      reduce //.
+      intro /subs _/.
+      hypof.
+      }
+    reintro /u m ms Hu IH/.
+    intro /subs Hrec/.
+    destruct /subs/ /sub subs/.
+    destruct /Hrec/ /Hsub Hrec/.
+    typecheck1.
+      {
+      unfold /dt/.
+      typecheck.
+      split.
+      hyp /Hsub/.
+      }
+    apply /IH/.
+    hyp /Hrec/.
+    }
+
+    {
+    reduce //.
+    (* XX why is this necessary? *)
+    convertHead /multicasex with multicasex ap (lsucc i)/.
+    intro /H/.
+      {
+      symmetry.
+      apply /compose_mapx/.
+      typecheck.
+      }
+    typecheck1 >>> [typecheck, idtac].
+    apply /IH/.
+    hyp /H/.
+    }
+  }
+
+  {
+  intro /z/.
+  unfold /dt/.
+  unreduceUsing /\pred_x\ with predx i a dcons x ind within x/.
+  assert /(z : rep dcons) & { predx i a dcons z ind }/ /H/.
+  1:{
+    destruct /H/ /Hof Hpred/.
+    typecheck.
+    }
+  rewrite /-> rep_unroll/.
+  unreduceUsing /\repbody_x\ with repbodyx i a dcons (rep dcons)/.
+  unfold /predx/.
+  revert /z/.
+  generalizeAt /dcons/ /_/ /1 2 5 9/ /dconind/.
+  unfold /schema in dconind/.
+  induct /dconind/.
+    {
+    reduce //.
+    intro /0/.
+    }
+  reintro /u dcon dconind Hu IH/.
+  intro /z/.
+  destruct /z/ /z | z/.
+    {
+    clear /IH/.
+    destruct /z/ /[data Hind] subs/.
+    destruct /dcon/ /b ms n/.
+    reduce /concl subs data Hind/.
+    split.
+      {
+      unfold /repbodyx/.
+      reduce //.
+      convert /manual subs/.
+      typecheck.
+      clear /u dconind Hu Hind/.
+      typecheck1.
+      apply /multiprod_mono/.
+      intro /f x/.
+      unfold /dt in x/.
+      destruct /x/ /[x _]/.
+      hypof.
+      }
+      
+      {
+      clear /u dconind Hu/.
+      assert /ind = n data : a/ /Hind'/.
+        {
+        unhide.
+        symmetry.
+        hyp /Hind/.
+        }
+      clear /Hind/.
+      revert /subs Hind'/.
+      induct /ms/.
+        {
+        reduce //.
+        intro /subs Hind/.
+        split.
+        split >>> [hyp /Hind/, split].
+        }
+      reintro /u m ms Hu IH/.
+      reduce //.
+      intro /subs Hind/.
+      destruct /subs/ /sub subs/.
+      reduce //.
+      soRaw /IH ms subs Hind/ /[H]/ >> attempt (typecheck >> done).
+        {
+        convert /manual subs/.
+        typecheck.
+        typecheck1.
+        apply /multiprod_mono/.
+        intro /f x/.
+        unfold /dt in x/.
+        destruct /x/ /[x _]/.
+        hypof.
+        }
+      clear /IH/.
+      unfold /dt in sub/.
+      destruct /sub/ /[ sub Hsub ]/.
+      split.
+      destruct /H/ /_ Hrec/.
+      split.
+        {
+        hyp /Hind/.
+        }
+      split.
+        {
+        hyp /Hsub/.
+        }
+
+        {
+        hyp /Hrec/.
+        }
+      }
+    }
+
+    {
+    reduce //.
+    so /IH dconind z/ /H/.
+    clear /IH/.
+    destruct /H/ /Hz Hpred/.
+    split.
+      {
+      clear /Hpred/.
+      unfold /repbodyx/.
+      reduce //.
+      unfold /repbodyx in Hz/.
+      typecheck.
+      }
+
+      {
+      hyp /Hpred/.
+      }
+    }
+  }
+qed ();
+
+
+
+definerec /con a dcons n x y/
+/
+  natcase n
+    (inl (x , y))
+    (fn n' . inr (con a dcons n' x y))
+/;
+
+
+val con_unroll = Option.valOf $ Database.findUnroll (parseConstant /con/);
+
+P.start $ parseLTerm / con 3 2 zero 1 0 /;
+P.apply con_unroll;
+P.user2 Prim.natcase_zero;
+val (m, r1) = P.done ();
+
+val con_zero = R.new2 (parseConstant /con/) 2 2 Prim.zero 0 m r1 R.refl;
+
+P.start $ parseLTerm / con 4 3 (succ 2) 1 0 /;
+P.apply con_unroll;
+P.user2 Prim.natcase_succ;
+P.beta 1;
+val (m, r1) = P.done ();
+
+val con_succ = R.new2 (parseConstant /con/) 2 2 Prim.succ 1 m r1 R.refl;
+
+
+
+lemma "con_type"
+/
+  con :
+  intersect i .
+  forall (a : U i) (dcons : schema i a) n .
+    leq (succ n) (length dcons)
+    -g> forall (x : nthx (element i a) n dcons #1).
+          multiprod
+            (mapx
+               (nthx (element i a) n dcons #1 -> a)
+               (U i)
+               (fn m . dt a dcons (m x))
+               (nthx (element i a) n dcons #2 #1))
+          -> dt a dcons (nthx (element i a) n dcons #2 #2 x)
+/;
+
+introOf /i a dcons n Hlen x y/.
+unfold /schema in dcons/.
+rewrite /-> unroll_datatype/.
+revert /Hlen x y/.
+generalizeAt /dcons/ /_/ /0 1 2 4 5 7/ /dcons'/.
+revert /dcons'/.
+induct /n/.
+reintro /IH/.
+destruct /n/ /| n/.
+
+(* 0 *)
+{
+intro /dcons' Hlen x y/.
+unroll /con/.
+reduce //.
+destruct /dcons'/ /| dcon dcons'/.
+  {
+  reduce /Hlen/.
+  so /leq_succ_0_not _ Hlen/ /0/.
+  }
+typecheck.
+split.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /dcons' Hlen/.
+destruct /dcons'/ /| dcon dcons'/.
+  {
+  reduce /Hlen/.
+  so /leq_succ_0_not _ Hlen/ /0/.
+  }
+reduce /Hlen/.
+so /leq_succ_invert _ _ Hlen/ /Hlen'/.
+intro /x y/.
+unroll /con/.
+reduce //.
+typecheck.
+apply /IH/ >>> [apply /lt_succ/, idtac].
+hyp /Hlen'/.
+}
+qed ();
+recordTyping "con_type";
+
+
+
+
+(***  Subterms  ***
+
+   We're defining x to be a subterm of y if y's height is greater.
+   This isn't really right, but it's expedient.  Defining subterms
+   this way is *much* easier.  
+
+   We'll make subterm opaque so one can't easily notice.  But if
+   we generalize datatypes to allow infinitary constructors, we'll
+   have to throw this out and do it right.
+*)
+
+definerec /height dcons x/
+/
+  multicase
+    (map 
+       (fn dcon . dcon #1 & multiprod (map (fn _ . rep dcons) (dcon #2 #1)))
+       dcons)
+    (list_rec
+       ()
+       (fn dcon _ fs .
+          ((fn y .
+              list_rec
+                (fn _ . 0)
+                (fn _ _ t z . max (succ (height dcons (z #1))) (t (z #2)))
+                (dcon #2 #1)
+                (y #2))
+           ,
+           fs))
+       dcons)
+    x
+/;
+
+
+
+lemma "height_type"
+/
+  height :
+  intersect (i : level) (a : U i) .
+  forall (dcons : schema i a).
+    rep dcons -> nat
+/;
+
+introOf /i a dcons x/.
+unfold /rep in x/.
+inductMuUnivRaw /x/ /i/.
+  {
+  hypof.
+  }
+
+  {
+  typecheck.
+  }
+
+  {
+  apply /repbody_positive/.
+  }
+reintro /u1 x Hu1 IH1/.
+assert /height dcons x : nat/ /H/.
+1:{
+  clear /IH1/.
+  split >>> [hyp /H/, typecheck].
+  }
+unroll /height/.
+revert /x/.
+generalizeAt /dcons/ /_/ /0 2 4/ /dconind/.
+unfold /schema in dconind/.
+induct /dconind/.
+  {
+  unfold /repbody/.
+  reduce //.
+  intro /0/.
+  }
+reintro /u2 dcon dconind Hu2 IH2/.
+destruct /dcon/ /b ps p/.
+unfold /repbody/.
+reduce //.
+intro /x/.
+destruct /x/ /x | x/.
+  {
+  destruct /x/ /data subs/.
+  reduce //.
+  revert /subs/.
+  induct /ps/.
+    {
+    reduce //.
+    intro /_/.
+    typecheck.
+    }
+  reintro /u3 p1 ps Hu3 IH3/.
+  intro /subs/.
+  typecheck.
+  }
+
+  {
+  reduce //.
+  apply /IH2/.
+  }
+qed ();
+recordTyping "height_type";
+
+
+
+define /strip a dcons ind x/
+/
+  x
+/;
+
+
+
+lemma "strip_type"
+/
+  strip :
+  intersect i .
+  forall (a : U i) (dcons : schema i a) (ind : a) .
+    dt a dcons ind -> rep dcons
+/;
+
+inference.
+introOf /i a dcons ind x/.
+unfold /strip/.
+unfold /dt in x/.
+typecheck.
+qed ();
+recordTyping "strip_type";
+
+
+
+define /subterm dcons x y/
+/
+  height dcons x < height dcons y
+/;
+
+
+
+(* With the current version of subterm, we could put it in U 0,
+   but that would reveal our definition.  It won't be possible
+   if we define subterms correctly.
+*)
+lemma "subterm_type"
+/
+  subterm :
+  intersect i (a : U i) .
+  forall (dcons : schema i a) .
+    rep dcons -> rep dcons -> U i
+/;
+
+inference.
+introOf /i a dcons x y/.
+unfold /subterm/.
+typecheck.
+qed ();
+recordTyping "subterm_type";
+
+
+
+lemma "subterm_trans"
+/
+  forall i (a : U i) (dcons : schema i a) (x y z : rep dcons) .
+    subterm dcons x y
+    -> subterm dcons y z
+    -> subterm dcons x z
+/;
+
+inference.
+unfold /subterm at all/.
+intro /i a dcons x y z Hxy Hyz/.
+apply /lt_trans _ (height dcons y)/.
+  {
+  hyp /Hxy/.
+  }
+
+  {
+  hyp /Hyz/.
+  }
+qed ();
+
+
+
+lemma "subterm_well_founded"
+/
+  forall i (a : U i) (dcons : schema i a) (x : rep dcons) .
+    Acc (rep dcons) (subterm dcons) x
+/;
+
+inference.
+intro /i a dcons x/.
+assert /height dcons x = _ : nat/ /Heq/.
+  {
+  reflexivity.
+  }
+revert /Heq/.
+generalizeAt /height dcons x/ /nat/ /0/ /n/.
+revert /x/.
+induct /n/.
+reintro /IH/.
+intro /x Heq/.
+moveBefore /x/ /n/.
+subst /n/.
+apply /Acc_intro/.
+intro /y Hyx/.
+apply /IH/.
+2:{
+  reflexivity.
+  }
+
+  {
+  typecheck.
+  }
+unfold /subterm in Hyx/.
+hyp /Hyx/.
+qed ();
+
+
+
+define /pheight a dcons b ms x y/
+/
+  list_rec
+    (fn _ . 0)
+    (fn _ _ t z . max (succ (height dcons (z #1))) (t (z #2)))
+    ms
+    y
+/;
+
+
+
+lemma "pheight_type"
+/
+  pheight :
+  intersect i .
+  forall (a : U i) (dcons : schema i a) (b : U i) (ms : list (b -> a)) (x : b) .
+    multiprod
+      (mapx
+         (b -> a)
+         (U i)
+         (fn m . dt a dcons (m x))
+         ms)
+    -> nat
+/;
+
+inference.
+introOf /i a dcons b ms x y/.
+revert /y/.
+induct /ms/.
+
+(* nil *)
+{
+intro /y/.
+unfold /pheight/.
+reduce //.
+typecheck.
+}
+
+(* cons *)
+{
+reintro /u h t Hu IH/.
+intro /y/.
+destruct /y/ /y z/.
+unfold /pheight/.
+reduce //.
+fold /pheight a dcons b t x z/.
+assert /forall (ind : a) . dt a dcons ind <: rep dcons/ /Hsub/.
+  {
+  intro /ind/.
+  unfold /dt/.
+  typecheck.
+  }
+typecheck.
+}
+qed ();
+recordTyping "pheight_type";
+
+
+
+lemma "height_eq_pheight"
+/
+  forall i (a : U i) (dcons : schema i a) n .
+    leq (succ n) (length dcons)
+    -> forall 
+         (x : nthx (element i a) n dcons #1)
+         (y : multiprod
+                (mapx
+                   (nthx (element i a) n dcons #1 -> a)
+                   (U i)
+                   (fn m . dt a dcons (m x))
+                   (nthx (element i a) n dcons #2 #1))) .
+           height dcons (con a dcons n x y)
+           =
+           pheight a dcons 
+             (nthx (element i a) n dcons #1)
+             (nthx (element i a) n dcons #2 #1)
+             x y
+           : nat
+/;
+
+inference.
+intro /i a dcons/.
+unfold /schema in dcons/.
+fold /element i a in dcons/.
+unroll /height/.
+fold /pheight a dcons (nthx (element i a) n dcons #1) (dcon #2 #1) x (y1 #2) within n x _ dcon _ _ y1/.
+generalizeAt /dcons/ /_/ /0 1 2 4 6 8 9 12 13/ /dcons'/.
+induct /dcons'/.
+
+(* nil *)
+{
+intro /n Hn/.
+so /leq_succ_0_not _ Hn/ /0/.
+}
+
+(* cons *)
+{
+reintro /u dcon dcons' Hu IH/.
+intro /n Hn x y/.
+destruct /n/ /| n/.
+  {
+  reduce //.
+  unroll /con/.
+  reduce //.
+  reflexivity.
+  }
+
+  {
+  reduce //.
+  unroll /con/.
+  reduce //.
+  apply /IH/.
+  apply /leq_succ_invert/.
+  hyp /Hn/.
+  }
+}
+qed ();
+
+
+
+lemma "subterm_con"
+/
+  forall (i : level) (a : U i) (dcons : schema i a) n .
+    leq (succ n) (length dcons)
+    -g> forall 
+          (x : nthx (element i a) n dcons #1)
+          (y : multiprod
+                 (mapx
+                    (nthx (element i a) n dcons #1 -> a)
+                    (U i)
+                    (fn m . dt a dcons (m x))
+                    (nthx (element i a) n dcons #2 #1))) .
+            list_iter
+              (nthx (element i a) n dcons #1 -> a)
+              (fn ms .
+                 multiprod
+                   (mapx
+                      (nthx (element i a) n dcons #1 -> a)
+                      (U i)
+                      (fn m . dt a dcons (m x))
+                      ms)
+                 -> U i)
+              (fn _ . unit)
+              (fn m _ t p .
+                 subterm dcons
+                   (strip a dcons (m x) (p #1))
+                   (strip a dcons (nthx (element i a) n dcons #2 #2 x)
+                      (con a dcons n x y))
+                 & t (p #2))
+              (nthx (element i a) n dcons #2 #1)
+              y
+/;
+
+inference.
+intro /i a dcons k Hk x y/.
+assert /forall (ind : a) . dt a dcons ind <: rep dcons/ /Hsub/.
+  {
+  intro /ind/.
+  unfold /dt/.
+  typecheck.
+  }
+assert /pheight a dcons
+          (nthx (element i a) k dcons #1)
+          (nthx (element i a) k dcons #2 #1)
+          x y
+        <= height dcons (con a dcons k x y)/ /Hleq/.
+  {
+  rewrite /-> height_eq_pheight/.
+    {
+    hyp /Hk/.
+    }
+  apply /leq_refl/.
+  }
+revert /Hleq/.
+unfold /strip at 1/.
+generalize /con a dcons k x y/ /rep dcons/ /w/.
+revert /x y/.
+generalize /nthx (element i a) k dcons/ /_/ /z/.
+destruct /z/ /b ms n/.
+reduce //.
+intro /x/.
+induct /ms/.
+
+(* nil *)
+{
+intro /y Hy/.
+split.
+}
+
+(* cons *)
+{
+reintro /u m ms Hu IH/.
+intro /(y z) Hyz/.
+unfold /pheight in Hyz/.
+reduce /Hyz/.
+fold /pheight a dcons b ms x z in Hyz/.
+split.
+  {
+  clear /IH/.
+  unfold /subterm/.
+  unfold /strip/.
+  unfold /lt/.
+  apply /leq_trans/.
+  2:{
+    hyp /Hyz/.
+    }
+  
+    {
+    typecheck.
+    }
+  apply /max_leq_l/.
+  }
+
+  {
+  apply /IH/.
+  apply /leq_trans/.
+  2:{
+    hyp /Hyz/.
+    }
+
+    {
+    typecheck.
+    }
+  apply /max_leq_r/.
+  }
+}
+qed ();
+
+
+
+
+(***  Iteration  ***)
+
+definerec /mapi a b n l f/
+/
+  list_case l
+    nil
+    (fn h t . f n h :: mapi a b (succ n) t f)
+/;
+
+
+
+val mapi = parseConstant /mapi/;
+val mapi_unroll = Option.valOf $ Database.findUnroll mapi;
+
+P.start (parseLTerm /mapi 3 2 1 nil 0/);
+P.apply mapi_unroll;
+P.user2 list_case_nil;
+val (m, r) = P.done ();
+
+val mapi_nil = R.new2 mapi 3 1 (parseConstant /nil/) 0 m r R.refl;
+RR.register mapi_nil;
+
+P.start (parseLTerm /mapi 5 4 3 (cons 2 1) 0/);
+P.apply mapi_unroll;
+P.user2 list_case_cons;
+P.beta 2;
+val (m, r) = P.done ();
+
+val mapi_cons = R.new2 mapi 3 1 (parseConstant /cons/) 2 m r R.refl;
+RR.register mapi_cons;
+
+
+
+lemma "mapi_type"
+/
+  mapi :
+  intersect i .
+  forall (a b : U i) (n : nat) (l : list a) .
+    (forall (m : nat) (x : a) .
+       n <= m
+       -g> succ (m - n) <= length l
+       -g> nthx a (m - n) l = x : a
+       -g> b)
+    -> list b
+/;
+
+inference.
+introOf /i a b n l f/.
+revert /n f/.
+induct /l/.
+  {
+  intro /n f/.
+  typecheck.
+  }
+reintro /u h t Hu IH/.
+intro /n f/.
+convert /manual f/.
+typecheck.
+  {
+  apply /leq_refl/.
+  }
+
+  {
+  apply /leq_succ_succ/.
+  rewrite /-> minus_self/.
+  apply /leq_0_min/.
+  }
+
+  {
+  rewrite /(n - n) = 0 : {m : nat | m <= length t}/.
+    {
+    reintro /m/.
+    reduce //.
+    apply /leq_succ_succ/.
+    destruct /m/ /[m H]/.
+    exact /()/.
+    apply /leq_inhabitant/.
+    exact /H/.
+    }
+
+    {
+    setExtensionality.
+      {
+      apply /minus_self/.
+      }
+
+      {
+      rewrite /-> minus_self/.
+      apply /leq_0_min/.
+      }
+    }
+  reduce //.
+  reflexivity.
+  }
+
+  {
+  typecheck1.
+  typecheck1 >>> [typecheck, idtac, typecheck].
+  typecheck1 >>> [typecheck, idtac, typecheck].
+  intro /y/.
+  introOf /Hnm Hlen Heq/.
+  destruct /m/ /| m/.
+    {
+    so /leq_succ_0_not _ Hnm/ /0/.
+    }
+  reduce /Hlen Heq/.
+  typecheck.
+    {
+    apply /leq_trans _ (succ n)/.
+      {
+      apply /leq_succ/.
+      }
+    hyp /Hnm/.
+    }
+
+    {
+    apply /leq_succ_succ/.
+    apply /leq_trans _ (succ (m - n))/.
+      {
+      apply /minus_succ_l_leq/.
+      }
+    hyp /Hlen/.
+    }
+
+    {
+    rewrite /(succ m - n) = succ (m - n) : {p : nat | p <= length t}/.
+      {
+      reintro /p/.
+      reduce //.
+      apply /leq_succ_succ/.
+      destruct /p/ /[p H]/.
+      exact /()/.
+      apply /leq_inhabitant/.
+      exact /H/.
+      }
+  
+      {
+      setExtensionality.
+        {
+        apply /minus_succ_l_eq/.
+        apply /leq_succ_invert/.
+        hyp /Hnm/.
+        }
+  
+        {
+        apply /leq_trans _ (succ (m - n))/.
+          {
+          apply /minus_succ_l_leq/.
+          }
+        hyp /Hlen/.
+        }
+      }
+    reduce //.
+    hyp /Heq/.
+    }
+  }
+qed ();
+recordTyping "mapi_type";
+
+
+
+definerec /dt_iter a dcons p fs_full _ x_full/
+/
+  list_rec
+    (fn x _ . abort x)
+    (fn dcon _ g x fs .
+       sumcase x
+         (fn y .
+            fs #1 (y #1) (y #2)
+              (list_rec
+                 (fn _ . ())
+                 (fn m _ h z .
+                    (dt_iter a dcons p fs_full (m (y #1)) (z #1) ,
+                     h (z #2)))
+                 (dcon #2 #1)
+                 (y #2)))
+         (fn y . g y (fs #2)))
+    dcons
+    x_full
+    fs_full
+/;
+
+
+
+define /dt_iter_arms i a dcons p m dcons'/
+/
+  mapi
+    (element i a)
+    (U i)
+    m
+    dcons'
+    (fn n dcon .
+       forall
+         (x : dcon #1)
+         (y : multiprod
+                (mapx
+                   (dcon #1 -> a)
+                   (U i)
+                   (fn m . dt a dcons (m x))
+                   (dcon #2 #1))) .
+           list_iter
+             (dcon #1 -> a)
+             (fn l .
+                multiprod
+                  (mapx
+                     (dcon #1 -> a)
+                     (U i)
+                     (fn m . dt a dcons (m x))
+                     l)
+                -> U i)
+             (fn _ . unit)
+             (fn m _ rest z . p (m x) (z #1) & rest (z #2))
+             (dcon #2 #1)
+             y
+           -> p (dcon #2 #2 x) (con a dcons n x y))
+/;
+
+
+
+lemma "dt_iter_arms_type"
+/
+  dt_iter_arms :
+  forall i (a : U i) (dcons : schema i a) 
+    (p : forall (ind : a) . dt a dcons ind -> U i) m (dcons' : schema i a) .
+      m <= length dcons
+      -g> dropx (element i a) m dcons = dcons' : schema i a
+      -g> list (U i)
+/;
+
+inference.
+introOf /i a dcons p m dcons' Hlen Heq/.
+unfold /dt_iter_arms/.
+assert /forall n .
+          m <= n
+          -> succ (n - m) <= length dcons'
+          -> succ n <= length dcons/ /Hlenif/.
+  {
+  intro /n Hn Hlen'/.
+  so /dropx_length _ _ _ _ Hlen/ /H/.
+  fold /element i a in H/.
+  rewrite /-> Heq in H/.
+  moveBefore /H/ /Hlen'/.
+  rewrite /-> H in Hlen'/.
+  rewrite /<- minus_succ_l_eq in Hlen'/ >>> [assumption, idtac].
+  so /plus_leq _ _ m m Hlen' (leq_refl _)/ /H'/.
+  rewrite /-> minus_plus_cancel in H' at all/ >> attempt assumption.
+  rewrite /<- leq_succ/.
+  hyp /Hn/.
+  }
+assert /forall n (dcon : element i a) .
+          m <= n
+          -> succ (n - m) <= length dcons'
+          -> nthx (element i a) (n - m) dcons' = dcon : element i a
+          -> dcon = nthx (element i a) n dcons : element i a/ /Hcomp/.
+  {
+  inference.
+  intro /n dcon Hn Hlen' Heq'/.
+  symmetry.
+  so /Hlenif n Hn Hlen'/ /Hlen''/.
+  transitivity /_/ >>> [idtac, hyp /Heq'/].
+  transitivity /nthx (element i a) (n - m) (dropx (element i a) m dcons)/.
+  1:{
+    symmetry.
+    compat >>> [idtac, hyp /Hlen'/].
+    symmetry.
+    hyp /Heq/.
+    }
+  rewrite /-> nthx_dropx_compose/.
+    {
+    rewrite /-> plus_commute/.
+    rewrite /-> minus_plus_cancel/ >>> [hyp /Hn/, hyp /Hlen''/].
+    }
+  compat.
+    {
+    rewrite /-> plus_commute/.
+    rewrite /-> minus_plus_cancel/ >>> [assumption, reflexivity].
+    }
+
+    {
+    hyp /Hlen''/.
+    }
+  }
+typecheck.
+  {
+  reintro /n dcon Hn Hlen' Heq' x y w/.
+  symmetry.
+  decompEq 3 /element i a/ >>> [idtac, reflexivity].
+  apply /Hcomp/ >> assumption.
+  }
+
+  {
+  reintro /n dcon Hn Hlen' Heq' x y w/.
+  apply /Hlenif/ >> assumption.
+  }
+
+  {
+  reintro /n dcon Hn Hlen' Heq' x y w/.
+  decompEq 1 /element i a/.
+  apply /Hcomp/ >> assumption.
+  }
+
+  {
+  reintro /n dcon Hn Hlen' Heq' x y w/.
+  compat.
+    {
+    subsume /U i/ >>> [typecheck, idtac].
+    typecheck1 >>> [idtac, typecheck].
+    decompEq 1 /element i a/.
+    apply /Hcomp/ >> assumption.
+    }
+
+    {
+    decompEq 2 /element i a/.
+    apply /Hcomp/ >> assumption.
+    }
+  }
+qed ();
+recordTyping "dt_iter_arms_type";
+
+
+
+lemma "unwrap_con"
+/
+  forall i (a : U i) (dcons : schema i a) n .
+    succ n <= length dcons
+    -> forall
+         (x : nthx (element i a) n dcons #1)
+         (y : multiprod 
+                (mapx
+                   (nthx (element i a) n dcons #1 -> a)
+                   (U i)
+                   (fn m . dt a dcons (m x))
+                   (nthx (element i a) n dcons #2 #1))) .
+           con a dcons n x y 
+             = nat_iter bogus (fn z . z) (fn _ r z . r (inr z)) n (inl (x , y)) 
+             : dt a dcons (nthx (element i a) n dcons #2 #2 x)
+/;
+
+inference.
+intro /i a dcons n Hlen x y/.
+assert /
+  forall n' .
+    n = n' : nat
+    -> con a dcons n x y
+       = nat_iter bogus (fn z . z) (fn _ r z . inr (r z)) n' (inl (x , y))
+       : dt a dcons (nthx (element i a) n dcons #2 #2 x)
+/ /Hprop/.
+  (* This part is similar to con_type.  We need two versions of n in the sequel. *)
+  {
+  inference.
+  unfold /schema in dcons/.
+  rewrite /-> unroll_datatype/.
+  revert /Hlen x y/.
+  generalizeAt /dcons/ /_/ /0 1 2 4 5 7/ /dcons'/.
+  revert /dcons'/.
+  induct /n/.
+  reintro /IH/.
+  intro /dcons' Hlen x y n' Heqn/.
+  destruct /n/ /| n/.
+    (* 0 *)
+    {
+    destruct /n'/ /| n'/.
+    1:{
+      injection /Heqn/.
+      }
+    destruct /dcons'/ /| dcon dcons'/.
+      {
+      so /leq_succ_0_not _ Hlen/ /0/.
+      }
+    unroll /con/.
+    reduce //.
+    typecheck.
+    split.
+    reflexivity.
+    }
+    
+    (* succ *)
+    {
+    destruct /n'/ /| n'/.
+      {
+      injection /Heqn/.
+      }
+    destruct /dcons'/ /| dcon dcons'/.
+      {
+      so /leq_succ_0_not _ Hlen/ /0/.
+      }
+    unroll /con/.
+    reduce //.
+    so /leq_succ_invert _ _ Hlen/ /Hlen'/.
+    compat.
+    apply /IH/ >>> [apply /lt_succ/, hyp /Hlen'/, idtac].
+    injection /Heqn/.
+    assumption.
+    }
+  }
+
+  (* This part is just annoying.  We need to reverse the order in which we build the inrs. *)
+  {
+  convert /nat_iter bogus (fn z . z) (fn _ r z . inr (r z)) 0 (inl (x , y))/.
+  assert /n + 0 = n : nat/ /Heq/.
+    {
+    apply /plus_0_r/.
+    }
+  revert /Heq/.
+  generalize /0/ /_/ /p/.
+  generalizeAt /n/ /_/ /0 4/ /m/.
+  revert /p/.
+  induct /m/.
+  reintro /IH/.
+  intro /p Heq/.
+  destruct /m/ /| m/.
+    {
+    reduce //.
+    apply /Hprop/.
+    symmetry.
+    hyp /Heq/.
+    }
+
+    {
+    reduce //.
+    witness /IH m (lt_succ m) (succ p) __/.
+    rewrite /-> plus_shift_r/.
+    hyp /Heq/.
+    }
+  }
+qed ();
+
+
+
+lemma "dt_iter_type"
+/
+  dt_iter :
+  intersect (i : level) .
+  forall 
+    (a : U i)
+    (dcons : schema i a)
+    (p : forall (ind : a) . dt a dcons ind -> U i) .
+      multiprod
+        (mapi
+           (element i a)
+           (U i)
+           0
+           dcons 
+           (fn n dcon .
+              forall
+                (x : dcon #1)
+                (y : multiprod
+                       (mapx
+                          (dcon #1 -> a)
+                          (U i)
+                          (fn m . dt a dcons (m x))
+                          (dcon #2 #1))) .
+                  list_iter
+                    (dcon #1 -> a)
+                    (fn l .
+                       multiprod
+                         (mapx
+                            (dcon #1 -> a)
+                            (U i)
+                            (fn m . dt a dcons (m x))
+                            l)
+                       -> U i)
+                    (fn _ . unit)
+                    (fn m _ rest z . p (m x) (z #1) & rest (z #2))
+                    (dcon #2 #1)
+                    y
+                  -> p (dcon #2 #2 x) (con a dcons n x y)))
+      -> forall (ind : a) (x : dt a dcons ind) . p ind x
+/;
+
+introOf /i a dcons p/.
+fold /dt_iter_arms i a dcons p 0 dcons/.
+so /leq_0_min (length dcons)/ /Hleq0/.
+introOf /f ind x/.
+revert /f/.
+clear /Hleq0/.
+assert /forall (ind : a) . dt a dcons ind <: rep dcons/ /Hsub/.
+  {
+  intro /ind'/.
+  unfold /dt/.
+  typecheck.
+  }
+assert /height dcons x <= height dcons x/ /Hleq/.
+  {
+  reflexivity.
+  }
+revert /Hleq/.
+generalizeAt /height dcons x/ /nat/ /1/ /h/.
+revert /ind x/.
+induct /h/.
+reintro /IH/.
+so /leq_0_min (length dcons)/ /Hleq0/.
+intro /ind x Hh fs/.
+rewrite /-> unroll_datatype in x/.
+assert /pause 0 + length dcons = length dcons : nat/ /Hlen/.
+  {
+  unfold /pause/.
+  reflexivity.
+  }
+assert /dropx (element i a) (pause 0) dcons = dcons : list (element i a)/ /Heq/.
+  {
+  unfold /pause/.
+  reduce //.
+  reflexivity.
+  }
+unroll /height in Hh/.
+unroll /dt_iter/.
+generalizeAt /fs/ /_/ /0/ /full/.
+convert /p ind (nat_iter bogus (fn z . z) (fn _ r z . r (inr z)) 0 x)/.
+fold /pause 0/.
+revert /x Hh Hlen Heq fs/.
+generalizeAt /dcons/ /_/ /1 3 5 6 9 11 13/ /dcons'/.
+generalizeAt /0/ /_/ /1 2 3 4/ /n/.
+unfold /pause at all/.
+revert /n/.
+unfold /schema in dcons'/.
+fold /element i a in dcons'/.
+induct /dcons'/.
+  {
+  intro /n x/.
+  destruct /x/ /0/.
+  }
+reintro /u dcon dcons' Hu IH1/.
+destruct /dcon/ /b ms q/.
+intro /n x/.
+destruct /x/ /x | x/.
+  {
+  reduce //.
+  clear /IH1/.
+  destruct /x/ /[x Hind] y/.
+  fold /list_iter (b -> a) (fn ms . multiprod (mapx (b -> a) (U i) (fn m . dt a dcons (m x)) ms) -> nat) _ _ _/.
+  intro /Hh Hlen/.
+  assert /n <= length dcons/ /Hlenn/.
+    {
+    rewrite /<- Hlen/.
+    apply /plus_leq_l/.
+    }
+  intro /Heq fs/.
+  unfold /dt_iter_arms in fs/.
+  reduce /fs/.
+  fold /dt_iter_arms i a dcons p (succ n) dcons' in fs/.
+  destruct /fs/ /f fs/.
+  reduce //.
+  unhide.
+  fold /(list_iter (b -> a) 
+           (fn ms .
+              forall (z : multiprod (mapx (b -> a) (U i) (fn m . dt a dcons (m x)) ms)) .
+                list_iter
+                  (b -> a)
+                  (fn ms' . multiprod (mapx (b -> a) (U i) (fn m . dt a dcons (m x)) ms') -> U i)
+                  (fn _ . unit)
+                  (fn m _ r z' .
+                     p (m x) (z' #1) & r (z' #2))
+                  ms
+                  z)
+           _ _ _)/.
+  fold /manual (list_iter _ _ _ _ _ _)/.
+  typecheck.
+    {
+    assert /nthx (element i a) n dcons = (b , ms , q) : element i a/ /Heq'/.
+      {
+      unfold /nthx/.
+      unfold /nth/.
+      fold /dropx (element i a) n dcons/.
+      fold /hdx (element i a) _/.
+      convert /hdx (element i a) ((b , ms , q) :: dcons')/.
+      compat.
+        {
+        hyp /Heq/.
+        }
+
+        {
+        rewrite /-> dropx_length/ >>> [assumption, idtac].
+        rewrite /<- Hlen/.
+        rewrite /-> plus_minus_cancel_l/.
+        apply /leq_succ_succ/.
+        apply /leq_0_min/.
+        }
+      }
+    assert /b = nthx (element i a) n dcons #1 : U i/ /Heqb/.
+      {
+      symmetry.
+      convert /(b , ms , q) #1/.
+      decompEq 1 /element i a/.
+      hyp /Heq'/.
+      }
+    eqtp /dt a dcons (nthx (element i a) n dcons #2 #2 x)/.
+      {
+      compat.
+      convert /(b , ms , q) #2 #2/.
+      decompEq 3 /element i a/ >>> [hyp /Heq'/, reflexivity].
+      }
+
+      {
+      apply /unwrap_con/.
+        {
+        rewrite /<- Hlen/.
+        rewrite /-> plus_shift_r/.
+        apply /leq_succ_succ/.
+        apply /plus_leq_l/.
+        }
+      compat.
+        {
+        typecheck.
+        subsume /U i/ >> typecheck.
+        }
+      symmetry.
+      eqtp /list (nthx (element i a) n dcons #1 -> a)/.
+        {
+        typecheck.
+        symmetry >> hyp /Heqb/.
+        }
+      convert /(b , ms , q) #2 #1/.
+      decompEq 2 /element i a/.
+      hyp /Heq'/.
+      }
+    }
+  clear /Heq f fs Hlen Hlenn/.
+  revert /y Hh/.
+  induct /ms/.
+    {
+    reduce //.
+    intro /_ _/.
+    typecheck.
+    }
+  reintro /v m ms Hv IH2/.
+  intro /y Hh/.
+  typecheck1.
+    {
+    clear /IH2/.
+    apply /IH (height dcons (y #1))/ >>> [idtac, reflexivity].
+    unfold /lt/.
+    rewrite /<- Hh/.
+    apply /max_leq_l/.
+    }
+    
+    {
+    apply /IH2/.
+    rewrite /<- Hh/.
+    apply /max_leq_r/.
+    }
+  }
+
+  {
+  clear /IH/.
+  reduce //.
+  unreduceUsing /\multicase_x\ with multicasex nat _ _ _/.
+  unreduceUsing /\map_x\ with mapx (element i a) (U i) _ _/.
+  fold /list_iter 
+          (element i a)
+          (fn dcons' . 
+             multiprod 
+               (mapx 
+                  (U i) (U i) (fn t . t -> nat) 
+                  (mapx
+                     (element i a)
+                     (U i)
+                     (fn dcon .
+                        dcon #1
+                        & multiprod (map (fn v0 . rep dcons) (dcon #2 #1)))
+                     dcons')))
+          _ _ _/.
+  fold /list_iter
+          (dcon #1 -> a)
+          (fn ms' . 
+             multiprod (map (fn _ . rep dcons) ms')
+             -> nat)
+          _ _ _ within dcon _ _ _/.
+  introRaw /Hh/.
+    {
+    fold /manual x/.
+    typecheck.
+    typecheck1.
+    apply /multisum_mono/.
+    intro /dcon/.
+    typecheck1 >>> [typecheck, idtac, typecheck].
+    unreduceUsing /\map_x\ with mapx (dcon #1 -> a) (U i) _ _/.
+    apply /multiprod_mono/.
+    intro /m/.
+    apply /Hsub/.
+    }
+  intro /Hlen/.
+  assert /n <= length dcons/ /Hleq/.
+    {
+    rewrite /<- Hlen/.
+    apply /plus_leq_l/.
+    }
+  intro /Heq fs/.
+  exploit /IH1 dcons' (succ n) x (manual Hh)/ /H/.
+    {
+    unreduceUsing /\multicase_x\ with multicasex nat _ _ _/.
+    unreduceUsing /\map_x\ with mapx (element i a) (U i) _ _/.
+    fold /list_iter 
+            (element i a)
+            (fn dcons' . 
+               multiprod 
+                 (mapx 
+                    (U i) (U i) (fn t . t -> nat) 
+                    (mapx
+                       (element i a)
+                       (U i)
+                       (fn dcon .
+                          dcon #1
+                          & multiprod (map (fn v0 . rep dcons) (dcon #2 #1)))
+                       dcons')))
+            _ _ _/.
+    fold /list_iter
+            (dcon #1 -> a)
+            (fn ms' . 
+               multiprod (map (fn _ . rep dcons) ms')
+               -> nat)
+            _ _ _ within dcon _ _ _/.
+    typecheck.
+    }
+
+    {
+    reduce //.
+    rewrite /-> plus_shift_r in Hlen/.
+    hyp /Hlen/.
+    }
+
+    {
+    assert /succ n <= length dcons/ /Hlt/.
+      {
+      rewrite /<- Hlen/.
+      rewrite /-> plus_shift_r/.
+      apply /leq_succ_succ/.
+      apply /plus_leq_l/.
+      }
+    rewrite /succ n = n + 1 : { w : nat | w = succ n : nat }/.
+      {
+      reintro /w/.
+      destruct /w/ /[w Hw]/.
+      assert /w = succ n : nat/ /Hw'/.
+        {
+        unhide.
+        hyp /Hw/.
+        }
+      subst /w/.
+      hyp /Hlt/.
+      }
+
+      {
+      setExtensionality.
+        {
+        rewrite /-> plus_commute/.
+        reflexivity.
+        }
+
+        {
+        reflexivity.
+        }
+      }
+    rewrite /<- dropx_compose/.
+      {
+      rewrite /-> plus_commute/.
+      hyp /Hlt/.
+      }
+    reduce //.
+    convert /tlx (element i a) ((b , ms , q) :: dcons')/.
+    compat.
+      {
+      hyp /Heq/.
+      }
+
+      {
+      rewrite /-> dropx_length/ >>> [hyp /Hleq/, idtac].
+      rewrite /<- Hlt/.
+      change /concl/ /1 <= 1 + n - n/.
+      rewrite /-> plus_minus_cancel_r 1 n/.
+      reflexivity.
+      }
+    }
+  clear /IH1 Hh/.
+  apply /H/.
+  clear /H/.
+  unfold /dt_iter_arms in fs/.
+  reduce /fs/.
+  fold /dt_iter_arms i a dcons p (succ n) dcons' in fs/.
+  typecheck.
+  }
+qed ();
+recordTyping "dt_iter_type";
+
+
+
+Constant.setOpacity (parseConstant /dt/) Constant.OPAQUE;
+Constant.setOpacity (parseConstant /con/) Constant.OPAQUE;
+Constant.setOpacity (parseConstant /rep/) Constant.OPAQUE;
+Constant.setOpacity (parseConstant /strip/) Constant.OPAQUE;
+Constant.setOpacity (parseConstant /subterm/) Constant.OPAQUE;
+
+RR.register con_zero;
+RR.register con_succ;
+
+
+Namespace.endModule ();
+
+File.save "datatype.isto";
+
+grammaroff DatatypeList;

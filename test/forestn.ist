@@ -1,0 +1,943 @@
+
+(*
+
+datatype tree a : nat -> type = 
+  Empty : tree a 0
+| Node  : forall n . a -> forest a n -> tree a (succ n)
+
+and forest a : nat -> type =
+  Nil  : forest a 0
+| Cons : forall m n . tree a m -> forest a n -> forest a (m + n)
+
+*)
+
+
+val plusConst = Namespace.declare (`"plus") NONE;
+
+
+Unsafe.allow ();
+
+lemma "plus_type"
+  / plus : nat -> nat -> nat /;
+
+trustme.
+qed ();
+recordTyping "plus_type";
+
+
+
+define /tf/ 
+  / fn a . 
+      wtype (x : unit % nat & a % unit % nat & nat) .
+        (case x of
+         | inl _ . void
+         | inr x .
+             (case x of
+              | inl _ . unit
+              | inr x .
+                  (case x of
+                   | inl _ . void
+                   | inr _ . bool))) /;
+
+
+lemma "tf_type" / tf : intersect (i : level) . U i -> U i /;
+                  
+unfold /tf/.
+typecheck.
+qed ();
+recordTyping "tf_type";
+
+
+lemma "tf_roll"
+  / forall i (a : U i) .
+      (exists (x : unit % nat & a % unit % nat & nat) .
+         (case x of
+          | inl _ . void
+          | inr x .
+              (case x of
+               | inl _ . unit
+               | inr x .
+                   (case x of
+                    | inl _ . void
+                    | inr _ . bool)))
+         -> tf a)
+      <:
+      tf a /;
+
+intro /i a/.
+unfold /tf at 0 0/.
+reduce //.
+RuleTactic.refine2 Rule.wtypeRoll >> typecheck.
+qed ();
+
+
+lemma "tf_unroll"
+  / forall i (a : U i) .
+      tf a
+      <:
+      (exists (x : unit % nat & a % unit % nat & nat) .
+         (case x of
+          | inl _ . void
+          | inr x .
+              (case x of
+               | inl _ . unit
+               | inr x .
+                   (case x of
+                    | inl _ . void
+                    | inr _ . bool)))
+         -> tf a) /;
+
+intro /i a/.
+unfold /tf at 0 0/.
+reduce //.
+RuleTactic.refine2 Rule.wtypeUnroll >> typecheck.
+qed ();
+
+
+
+lemma "tf_eeqtp"
+  / forall i (a : U i) .
+      tf a
+      <:>
+      (exists (x : unit % nat & a % unit % nat & nat) .
+         (case x of
+          | inl _ . void
+          | inr x .
+              (case x of
+               | inl _ . unit
+               | inr x .
+                   (case x of
+                    | inl _ . void
+                    | inr _ . bool)))
+         -> tf a) /;
+
+intro /i a/.
+unfold /eeqtp/.
+reduce //.
+split.
+  {
+  apply /tf_unroll/.
+  }
+
+  {
+  apply /tf_roll/.
+  }
+qed ();
+
+
+define /istf/
+  / fn a t .
+      wind (fn x y z .
+              (case x of
+               | inl _ . 
+                   ((fn n . 0 = n : nat) ,
+                    (fn _ . void))
+
+               | inr x .
+                   (case x of
+                    | inl x . 
+                        ((fn n . z () #2 (x #1) & succ (x #1) = n : nat) ,
+                         (fn _ . void))
+
+                    | inr x .
+                        (case x of
+                         | inl _ . 
+                              ((fn _ . void) ,
+                               (fn n . 0 = n : nat))
+
+                         | inr x .
+                             ((fn _ . void) ,
+                              (fn n .
+                                 z true #1 (x #1)
+                                 & z false #2 (x #2)
+                                 & plus (x #1) (x #2) = n : nat)))))) t /;
+
+
+lemma "istf_type"
+  / istf : intersect (i : level) . forall (a : U i) . tf a -> (nat -> U i) & (nat -> U i) /;
+
+unfold /istf/.
+typecheck.
+reintro /i a t/.
+Tactic.refine (Rule.wtypeElimOf 
+                 (Term.evar ()) (Term.evar ())
+                 (Prover.parseCurr / additional _ . (nat -> U i) & (nat -> U i) /)
+                 (Term.evar ()) (Term.evar ())).
+  {
+  unfold /tf in t/.
+  typecheck.
+  }
+let do (_, dir) = Tactic.withgoal in Tactic.chdir (Directory.binds dir (parseIdents /x f IH/)) end.
+withTypecheck $ destruct /x/ /() | ? | () | ?/ >> reduce //.
+qed ();
+recordTyping "istf_type";
+
+
+
+define /tree/
+  / fn a n . { t : tf a | istf a t #1 n } /;
+
+
+lemma "tree_type"
+  / tree : intersect (i : level) . U i -> nat -> U i /;
+
+unfold /tree/.
+typecheck.
+qed ();
+recordTyping "tree_type";
+
+
+
+define /forest/
+  / fn a n . { t : tf a | istf a t #2 n } /;
+
+
+lemma "forest_type"
+  / forest : intersect (i : level) . U i -> nat -> U i /;
+
+unfold /forest/.
+typecheck.
+qed ();
+recordTyping "forest_type";
+
+
+
+define /Empty/
+  / fn a . (inl () , (fn _ . ())) /;
+
+
+lemma "Empty_type"
+  / Empty : intersect (i : level) . forall (a : U i) . tree a 0 /;
+
+unfold /Empty/.
+typecheck.
+reintro /i a/.
+unfold /tree/.
+typecheck.
+  {
+  rewrite /-> tf_eeqtp/ >> typecheck.
+  reintro /x/.
+  destruct /x/ /0/.
+  }
+
+  {
+  split.
+  unfold /istf/.
+  reduce //.
+  unroll /wind/.
+  reduce //.
+  reflexivity.
+  }
+qed ();
+recordTyping "Empty_type";
+
+
+
+define /Node/
+  / fn a n x t . (inr (inl (n , x)) , (fn _ . t)) /;
+
+
+lemma "Node_type"
+  / Node : intersect (i : level) . forall (a : U i) (n : nat) . a -> forest a n -> tree a (succ n) /;
+
+unfold /Node/.
+typecheck.
+reintro /i a n x f/.
+unfold /forest in f/.
+reduce /f/.
+destruct /f/ /[ f Hf ]/.
+unfold /tree/.
+typecheck.
+  {
+  rewrite /-> tf_eeqtp/ >> typecheck.
+  }
+
+  {
+  split.
+  unfold /istf/.
+  reduce //.
+  unroll /wind/.
+  reduce //.
+  fold /istf a f #2/.
+  split.
+    {
+    hyp /Hf/.
+    }
+
+    {
+    reflexivity.
+    }
+  }
+qed ();
+recordTyping "Node_type";
+
+
+
+define /Nil/
+  / fn a . (inr (inr (inl ())) , (fn _ . ())) /;
+
+
+lemma "Nil_type"
+  / Nil : intersect (i : level) . forall (a : U i) . forest a 0 /;
+
+unfold /Nil/.
+typecheck.
+reintro /i a/.
+unfold /forest/.
+typecheck.
+  {
+  rewrite /-> tf_eeqtp/ >> typecheck.
+  reintro /x/.
+  destruct /x/ /0/.
+  }
+
+  {
+  split.
+  unfold /istf/.
+  reduce //.
+  unroll /wind/.
+  reduce //.
+  reflexivity.
+  }
+qed ();
+recordTyping "Nil_type";
+
+
+define /Cons/
+  / fn a m n t f . (inr (inr (inr (m , n))) , (fn b . ite b t f)) /;
+
+
+lemma "Cons_type"
+  / Cons : intersect (i : level) . forall (a : U i) (m n : nat) . tree a m -> forest a n -> forest a (plus m n) /;
+
+unfold /Cons/.
+typecheck.
+reintro /i a m n t f/.
+unfold /tree in t/.
+unfold /forest in f/.
+reduce /t/.
+reduce /f/.
+destruct /t/ /[ t Ht ]/.
+destruct /f/ /[ f Hf ]/.
+unfold /forest/.
+reduce //.
+typecheck.
+  {
+  rewrite /-> tf_eeqtp/ >> typecheck.
+  }
+
+  {
+  split.
+  unfold /istf/.
+  reduce //.
+  unroll /wind/.
+  reduce //.
+  fold /istf a t #1/.
+  fold /istf a f #2/.
+  split.
+    {
+    hyp /Ht/.
+    }
+
+    {
+    split.
+      {
+      hyp /Hf/.
+      }
+
+      {
+      reflexivity.
+      }
+    }
+  }
+qed ();
+recordTyping "Cons_type";
+
+
+
+define /tf_ind/
+  / fn a P Q hempty hnode hnil hcons t .
+      wind
+        (fn d f ih .
+           (case d of
+            | inl _ . hempty
+            | inr d .
+                (case d of
+                 | inl x . hnode (x #1) (x #2) (f ()) (ih ())
+                 | inr d .
+                     (case d of
+                      | inl _ . hnil
+                      | inr x . hcons (x #1) (x #2) (f true) (f false) (ih true) (ih false)))))
+        t /;
+
+
+
+lemma "tf_ind_pretype"
+  /forall (i : level) (a : U i) (P : forall (n : nat) . tree a n -> U i) (Q : forall (n : nat) . forest a n -> U i)
+      (hemp : P 0 (Empty a))
+      (hnode : forall n x f . Q n f -> P (succ n) (Node a n x f))
+      (hnil : Q 0 (Nil a))
+      (hcons : forall m n t f . P m t -> Q n f -> Q (plus m n) (Cons a m n t f))
+      (t : tf a) .
+        (forall (n : nat) . { istf a t #1 n } -> tf_ind a P Q hemp hnode hnil hcons t : P n t)
+        & (forall (n : nat) . { istf a t #2 n } -> tf_ind a P Q hemp hnode hnil hcons t : Q n t) /;
+
+intro /i a P Q hemp hnode hnil hconst t/.
+let
+  do (jud, _) = Tactic.withgoal
+in
+  Tactic.refine (Rule.wtypeElim (Term.evar ()) (Term.evar ()) 
+                   (Term.Sub (Judgement.concl jud, Term.under 1 Term.shift1))
+                   (Prover.parseCurr /t/))
+end.
+  {
+  unfold /tf in t/.
+  hypof.
+  }
+let do (_, dir) = Tactic.withgoal in Tactic.chdir (Directory.binds dir (parseIdents /d f IH/)) end.
+clear /t/.
+fold /tf a in f/.
+assert /(d , f) : tf a/ /Hof/.
+  {
+  rewrite /-> tf_eeqtp/ >> typecheck.
+  }
+split.
+  {
+  intro /n Ht/.
+  destruct /d/ /() | (m z) | () | (m1 m2)/ >> reduce /IH/.
+    {
+    unfold /tf_ind/ >> unroll /wind/ >> reduce //.
+    eeqtp >>> [idtac, hypof].
+    destruct /Ht/ /[ Ht ]/.
+    compat.
+      {
+      unfold /istf in Ht/ >> unroll /wind in Ht/ >> reduce /Ht/.
+      hyp /Ht/.
+      }
+    unfold /Empty , tree/ >> reduce //.
+    setExtensionality.
+      {
+      rewrite /-> tf_eeqtp/ >> typecheck.
+      withTypecheck $ extensionalityRaw /_ x/.
+        {
+        destructn 0 /0/.
+        }
+
+        {
+        destruct /x/ /0/.
+        }
+      }
+
+      {
+      unfold /istf/ >> unroll /wind/ >> reduce //.
+      reflexivity.
+      }
+    }
+
+    {
+    unfold /istf in Ht/ >> unroll /wind in Ht/ >> reduce /Ht/.
+    fold /istf a (f ()) #2 in Ht/.
+    unfold /tf_ind/ >> unroll /wind/ >> reduce //.
+    fold /tf_ind a P Q hemp hnode hnil hconst (f ())/.
+    destruct /Ht/ /[ Ht ]/.
+    inferRaw /hnode m z (f ()) (tf_ind a P Q hemp hnode hnil hconst (f ()))/ /Hof'/.
+      {
+      typecheck.
+      }
+
+      {
+      typecheck.
+      }
+
+      {
+      unfold /forest/ >> reduce //.
+      typecheck.
+      split.
+      exact /Ht #1/.
+      }
+
+      {
+      apply /IH/.
+      split.
+      exact /Ht #1/.
+      }
+
+      {
+      eeqtp >>> [idtac, hyp /Hof'/].
+      compat.
+        {
+        exact /Ht #2/.
+        }
+      unfold /Node , tree/ >> reduce //.
+      setExtensionality.
+        {
+        rewrite /-> tf_eeqtp/ >> typecheck.
+        extensionality /_ x/.
+          {
+          reflexivity.
+          }
+
+          {
+          destruct /x/ /()/.
+          reflexivity.
+          }
+        }
+
+        {
+        unfold /istf/ >> unroll /wind/ >> reduce //.
+        fold /istf a (f ()) #2/.
+        split.
+          {
+          exact /Ht #1/.
+          }
+
+          {
+          reflexivity.
+          }
+        }
+      }
+    }
+
+    {
+    unfold /istf in Ht/ >> unroll /wind in Ht/ >> reduce /Ht/.
+    destruct /Ht/ /[ Ht ]/.
+    exactRaw /()/.
+    destruct /Ht/ /0/.
+    }
+
+    {
+    unfold /istf in Ht/ >> unroll /wind in Ht/ >> reduce /Ht/.
+    destruct /Ht/ /[ Ht ]/.
+    exactRaw /()/.
+    destruct /Ht/ /0/.
+    }
+  }
+
+  {
+  intro /n Hf/.
+  destruct /d/ /() | m z | () | m1 m2/.
+    {
+    unfold /istf in Hf/ >> unroll /wind in Hf/ >> reduce /Hf/.
+    destruct /Hf/ /[ Hf ]/.
+    exactRaw /()/.
+    destruct /Hf/ /0/.
+    }
+
+    {
+    unfold /istf in Hf/ >> unroll /wind in Hf/ >> reduce /Hf/.
+    destruct /Hf/ /[ Hf ]/.
+    exactRaw /()/.
+    destruct /Hf/ /0/.
+    }
+
+    {
+    unfold /tf_ind/ >> unroll /wind/ >> reduce //.
+    eeqtp >>> [idtac, hypof].
+    destruct /Hf/ /[ Hf ]/. 
+    compat.
+      {
+      unfold /istf in Hf/ >> unroll /wind in Hf/ >> reduce /Hf/.
+      hyp /Hf/.
+      }
+    unfold /Nil , forest/ >> reduce //.
+    setExtensionality.
+      {
+      rewrite /-> tf_eeqtp/ >> typecheck.
+      withTypecheck $ extensionalityRaw /_ x/.
+        {
+        destructn 0 /0/.
+        }
+
+        {
+        destruct /x/ /0/.
+        }
+      }
+
+      {
+      unfold /istf/ >> unroll /wind/ >> reduce //.
+      reflexivity.
+      }
+    }
+
+    {
+    unfold /istf in Hf/ >> unroll /wind in Hf/ >> reduce /Hf/.
+    fold /istf a (f true) #1 in Hf/.
+    fold /istf a (f false) #2 in Hf/.
+    unfold /tf_ind/ >> unroll /wind/ >> reduce //.
+    fold /tf_ind a P Q hemp hnode hnil hconst (f true)/.
+    fold /tf_ind a P Q hemp hnode hnil hconst (f false)/.
+    destruct /Hf/ /[ Hf ]/.
+    goalCase
+    / of _ ? => \fnc m => inferRaw (ETerm.literal m) /Hof'/ \/.
+      {
+      typecheck.
+      }
+
+      {
+      typecheck.
+      }
+
+      {
+      unfold /tree/ >> reduce //.
+      typecheck.
+      split.
+      exact /Hf #1/.
+      }
+
+      {
+      unfold /forest/ >> reduce //.
+      typecheck.
+      split.
+      exact /Hf #2 #1/.
+      }
+
+      {
+      apply /IH/.
+      split.
+      exact /Hf #1/.
+      }
+      
+      {
+      apply /IH/.
+      split.
+      exact /Hf #2 #1/.
+      }
+
+      {
+      eeqtp >>> [idtac, hyp /Hof'/].
+      clear /Hof'/.
+      compat.
+        {
+        exact /Hf #2 #2/.
+        }
+      unfold /Cons , forest/ >> reduce //.
+      setExtensionality.
+        {
+        rewrite /-> tf_eeqtp/ >> typecheck.
+        extensionality /_ x/.
+          {
+          reflexivity.
+          }
+          
+          {
+          destruct /x/ /() | ()/ >> reduce // >> reflexivity.
+          }
+        }
+        
+        {
+        unfold /istf/ >> unroll /wind/ >> reduce //.
+        fold /istf a (f true) #1/.
+        fold /istf a (f false) #2/.
+        split.
+          {
+          exact /Hf #1/.
+          }
+        split.
+          {
+          exact /Hf #2 #1/.
+          }
+        reflexivity.
+        }
+      }
+    }
+  }
+qed ();
+
+
+
+define /tree_ind/ /fn a P Q hempty hnode hnil hcons _ t . tf_ind a P Q hempty hnode hnil hcons t /;
+
+
+
+lemma "tree_ind_type"
+  / tree_ind :
+      intersect (i : level) .
+        forall (a : U i) (P : forall (n : nat) . tree a n -> U i) (Q : forall (n : nat) . forest a n -> U i) .
+          P 0 (Empty a)
+          -> (forall n x f . Q n f -> P (succ n) (Node a n x f))
+          -> Q 0 (Nil a)
+          -> (forall m n t f . P m t -> Q n f -> Q (plus m n) (Cons a m n t f))
+          -> forall (n : nat) (t : tree a n) . P n t /;
+
+typecheck.
+reintro /i/.
+unfold /tree_ind/.
+typecheck.
+reintro /a P Q hempty hnode hnil hcons n t/.
+unfold /tree in t/ >> reduce /t/.
+destruct /t/ /[ t Ht ]/.
+apply /tf_ind_pretype/.
+split.
+hyp /Ht/.
+qed ();
+recordTyping "tree_ind_type";
+
+
+
+define /forest_ind/ /fn a P Q hempty hnode hnil hcons _ f . tf_ind a P Q hempty hnode hnil hcons f /;
+
+
+
+lemma "forest_ind_type"
+  / forest_ind :
+      intersect (i : level) .
+        forall (a : U i) (P : forall (n : nat) . tree a n -> U i) (Q : forall (n : nat) . forest a n -> U i) .
+          P 0 (Empty a)
+          -> (forall n x f . Q n f -> P (succ n) (Node a n x f))
+          -> Q 0 (Nil a)
+          -> (forall m n t f . P m t -> Q n f -> Q (plus m n) (Cons a m n t f))
+          -> forall (n : nat) (f : forest a n) . Q n f /;
+
+typecheck.
+reintro /i/.
+unfold /forest_ind/.
+typecheck.
+reintro /a P Q hempty hnode hnil hcons n f/.
+unfold /forest in f/ >> reduce /f/.
+destruct /f/ /[ f Hf ]/.
+apply /tf_ind_pretype/.
+split.
+hyp /Hf/.
+qed ();
+recordTyping "forest_ind_type";
+
+
+
+
+structure R = Reduction;
+
+val tree_ind = Namespace.resolve [`"tree_ind"];
+val forest_ind = Namespace.resolve [`"forest_ind"];
+val cEmpty = Namespace.resolve [`"Empty"];
+val cNode = Namespace.resolve [`"Node"];
+val cNil = Namespace.resolve [`"Nil"];
+val cCons = Namespace.resolve [`"Cons"];
+
+
+val t1a =
+  parseLTerm
+    / tree_ind 8 7 6 5 4 3 2 1 (Empty 0) /;
+
+val r1a =
+  R.trans
+    [
+    R.unfold,
+    R.beta 9,
+    R.unfold,
+    R.beta 8,
+    R.within [2] R.unfold,
+    R.user1 Prim.unroll_wind,
+    R.beta 3,
+    R.within [1] (R.beta 2),
+    R.user2 Prim.sumcase_inl,
+    R.beta 1
+    ];
+
+Show.showLiteral (Normalize.simplifyAll (R.reduce r1a t1a));
+
+val r1 = R.new2 tree_ind 8 0 cEmpty 1 (Term.Var 5) r1a R.refl;
+val () = Registry.register r1;
+
+
+val t2a =
+  parseLTerm
+    / tree_ind 11 10 9 8 7 6 5 4 (Node 3 2 1 0) /;
+
+val t2b =
+  parseLTerm
+    / 7 2 1 0 (forest_ind 11 10 9 8 7 6 5 2 0) /;
+
+val r2a =
+  R.trans
+    [
+    R.unfold,
+    R.beta 9,
+    R.unfold,
+    R.beta 8,
+    R.within [2] (R.trans [R.unfold, R.beta 4]),
+    R.user1 Prim.unroll_wind,
+    R.beta 3,
+    R.within [1] (R.beta 1),
+    R.user2 Prim.sumcase_inr,
+    R.beta 1,
+    R.user2 Prim.sumcase_inl,
+    R.beta 1,
+    R.compat
+      [
+      R.beta 1,
+      R.beta 1,
+      R.beta 2,
+      R.trans [R.beta 1, R.within [2] (R.beta 2)]
+      ]
+    ];
+
+val r2b =
+  R.within [4]
+    (R.trans
+       [
+       R.unfold,
+       R.beta 9,
+       R.unfold,
+       R.beta 8
+       ]);
+
+Show.showLiteral (Normalize.simplifyAll (R.reduce r2a t2a));
+Show.showLiteral (Normalize.simplifyAll (R.reduce r2b t2b));
+
+val r2 = R.new2 tree_ind 8 0 cNode 4 t2b r2a r2b;
+val () = Registry.register r2;
+
+
+val t3a =
+  parseLTerm
+    / forest_ind 8 7 6 5 4 3 2 1 (Nil 0) /;
+
+val r3a =
+  R.trans
+    [
+    R.unfold,
+    R.beta 9,
+    R.unfold,
+    R.beta 8,
+    R.within [2] R.unfold,
+    R.user1 Prim.unroll_wind,
+    R.beta 3,
+    R.within [1] (R.beta 2),
+    R.user2 Prim.sumcase_inr,
+    R.beta 1,
+    R.user2 Prim.sumcase_inr,
+    R.beta 1,
+    R.user2 Prim.sumcase_inl,
+    R.beta 1,
+    ];
+
+Show.showLiteral (Normalize.simplifyAll (R.reduce r3a t3a));
+
+val r3 = R.new2 forest_ind 8 0 cNil 1 (Term.Var 3) r3a R.refl;
+val () = Registry.register r3;
+
+
+val t4a =
+  parseLTerm
+    / forest_ind 12 11 10 9 8 7 6 5 (Cons 4 3 2 1 0) /;
+
+val t4b =
+  parseLTerm
+    / 6 3 2 1 0 (tree_ind 12 11 10 9 8 7 6 5 1) (forest_ind 12 11 10 9 8 7 6 5 0) /;
+
+val r4a =
+  R.trans
+    [
+    R.unfold,
+    R.beta 9,
+    R.unfold,
+    R.beta 8,
+    R.within [2] (R.trans [R.unfold, R.beta 5]),
+    R.user1 Prim.unroll_wind,
+    R.beta 3,
+    R.within [1] (R.beta 1),
+    R.user2 Prim.sumcase_inr,
+    R.beta 1,
+    R.user2 Prim.sumcase_inr,
+    R.beta 1,
+    R.user2 Prim.sumcase_inr,
+    R.beta 1,
+    R.compat
+      [
+      R.beta 1,
+      R.beta 1,
+      R.trans [R.beta 2, R.user2 Prim.ite_tru],
+      R.trans [R.beta 2, R.user2 Prim.ite_fals],
+      R.trans [R.beta 1, R.within [2] (R.trans [R.beta 2, R.user2 Prim.ite_tru])],
+      R.trans [R.beta 1, R.within [2] (R.trans [R.beta 2, R.user2 Prim.ite_fals])]
+      ]
+    ];
+
+val r4b =
+  R.compat
+    [
+    R.refl,
+    R.refl,
+    R.refl,
+    R.refl,
+    R.trans
+      [
+      R.unfold,
+      R.beta 9,
+      R.unfold,
+      R.beta 8
+      ],
+    R.trans
+      [
+      R.unfold,
+      R.beta 9,
+      R.unfold,
+      R.beta 8
+      ]
+    ];
+
+Show.showLiteral (Normalize.simplifyAll (R.reduce r4a t4a));
+Show.showLiteral (Normalize.simplifyAll (R.reduce r4b t4b));
+
+val r4 = R.new2 forest_ind 8 0 cCons 5 t4b r4a r4b;
+val () = Registry.register r4;
+
+
+
+lemma "plus_id" / forall (n : nat) . plus 0 n = n : nat /;
+
+trustme.
+qed ();
+
+
+
+lemma "plus_comm" / forall (m n : nat) . plus m n = plus n m : nat /;
+
+trustme.
+qed ();
+
+
+
+lemma "type_tree"
+  / forall i (a : U i) (x : a) .
+      Node _ (plus 0 (plus 1 0)) x (Cons _ 0 (plus 1 0) (Empty _) (Cons _ 1 0 (Node a 0 x (Nil _)) (Nil _))) : tree a (succ (plus 0 (plus 1 0))) /;
+
+intro /i a x/.
+typecheck.
+qed ();
+
+
+lemma "type_tree2"
+  / forall i (a : U i) (x : a) .
+      Node _ _ x (Cons _ 0 (plus 1 0) (Empty _) (Cons _ 1 0 (Node a 0 x (Nil _)) (Nil _))) : tree a 2 /;
+
+intro /i a x/.
+typecheck.
+rewrite /-> plus_id , -> plus_comm , -> plus_id/.
+reflexivity.
+qed ();
+
+
+
+lemma "make_a_type"
+  / forall i (a : U i) (x : a) .
+      tree_ind a (fn . U i) (fn . U i)
+        unit
+        (fn _ _ _ c . a & c)
+        void
+        (fn m n _ _ b c . m = n : nat % b % c)
+        _
+        (Node _ 1 x (Cons _ 0 1 (Empty _) (Cons _ 1 0 (Node a 0 x (Nil _)) (Nil _)))) /;
+
+intro /i a x/.
+split.
+  {
+  hyp /x/.
+  }
+
+  {
+  right.
+  left.
+  split.
+  }
+qed ();

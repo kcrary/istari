@@ -1,0 +1,572 @@
+
+signature TACTIC =
+   sig
+      
+      type judgement = Judgement.djudgement * Directory.directory
+      type validation = Refine.validation
+      type validator = validation list -> validation * validation list
+      type answer = exn
+
+      (* The success continuation takes the failure continuation as an argument.
+         It can be used to backtrack.
+      *)
+
+      type 'a tacticm = 
+         judgement
+         -> (string -> answer)                                                   (* failure continuation *)
+         -> (('a * judgement) list * validator * (string -> answer) -> answer)   (* success continuation *)
+         -> answer
+
+      type tactic = Message.label tacticm
+
+
+      (* control flow *)
+
+      val idtac : tactic
+      val idtacM : 'a -> 'a tacticm
+      val fail : string -> 'a tacticm
+      val cut : 'a tacticm -> 'a tacticm
+      val lift : (unit -> 'a tacticm) -> 'a tacticm
+      val done : 'a tacticm  (* Like fail, but without the stigma. *)
+
+
+      (* combination *)
+
+      val andthen : 'a tacticm -> 'b tacticm -> 'b tacticm
+      val andthenl : 'a tacticm -> 'b tacticm list -> 'b tacticm
+      val andthenlPad : 'a tacticm -> 'b tacticm list -> 'b tacticm -> 'b tacticm
+      val andthenOn : int -> 'a tacticm -> 'a tacticm -> 'a tacticm
+
+      val andthenM : 'a tacticm -> ('a -> 'b tacticm) -> 'b tacticm
+      val andthenlM : 'a tacticm -> ('a -> 'b tacticm) list -> 'b tacticm
+      val andthenlPadM : 'a tacticm -> ('a -> 'b tacticm) list -> ('a -> 'b tacticm) -> 'b tacticm
+      val andthenOnM : int -> 'a tacticm -> ('a -> 'a tacticm) -> 'a tacticm
+
+      val andthenFoldM :
+         'a tacticm 
+         -> ('a -> 'b -> 'c tacticm * 'b)
+         -> ('b -> string option)
+         -> 'b
+         -> 'c tacticm
+
+      val attempt : tactic -> tactic
+      val first : 'a tacticm list -> 'a tacticm
+      val repeat : tactic -> tactic
+      val repeatCount : tactic -> int tacticm
+      val repeatn : int -> tactic -> tactic
+      val orthen : 'a tacticm -> (unit -> 'a tacticm) -> 'a tacticm
+
+
+      (* direct computation *)
+
+      val replaceJudgement : Judgement.djudgement -> tactic
+      val replaceHyp : int -> Judgement.hyp -> tactic
+      val replaceConcl : Term.term -> tactic
+
+
+      (* miscellaneous *)
+
+      val withgoal : (judgement -> 'a tacticm) -> 'a tacticm
+      val withidir : (Directory.idirectory -> 'a tacticm) -> 'a tacticm
+      val withterm : ETerm.eterm -> (Term.term -> 'a tacticm) -> 'a tacticm
+      val withHeadConst : string -> (Constant.constant -> 'a tacticm) -> 'a tacticm
+
+      val setFailure : string -> 'a tacticm -> 'a tacticm
+      val transformFailure : (string -> string) -> 'a tacticm -> 'a tacticm
+
+
+      (* primitive actions *)
+
+      val refine : Rule.rule -> tactic
+      val chdir : Directory.directory -> tactic
+      val cast : Judgement.djudgement -> Refine.validation -> tactic
+      val execute : judgement -> tactic -> (Refine.validation, string) Sum.sum
+
+
+      val >> : 'a tacticm -> 'b tacticm -> 'b tacticm                 (* andthen *)
+      val >>> : 'a tacticm -> 'b tacticm list -> 'b tacticm           (* andthenl *)
+      val >>= : 'a tacticm -> ('a -> 'b tacticm) -> 'b tacticm        (* andthenM *)
+      val >>>= : 'a tacticm -> ('a -> 'b tacticm) list -> 'b tacticm  (* andthenlM *)
+
+   end
+
+
+signature TACTIC_INTERNAL =
+   sig
+
+      include TACTIC
+
+
+      val interrupt : (Rule.rule -> judgement -> unit) ref
+
+   end
+
+
+
+structure TacticInternal :> TACTIC_INTERNAL =
+   struct
+
+      structure J = Judgement
+
+      type judgement = Judgement.djudgement * Directory.directory
+      type validation = Refine.validation
+      
+      type validator = validation list -> validation * validation list
+      type failure = string
+      type answer = exn
+
+      type 'a tacticm = 
+         judgement
+         -> (string -> answer)                                            (* failure continuation *)
+         -> (('a * judgement) list * validator * (string -> answer) -> answer)   (* success continuation *)
+         -> answer
+
+      type tactic = Message.label tacticm
+
+
+      fun valhd vs =
+         (case vs of
+             nil => raise Refine.ValidationFailure
+
+           | v :: vs' => (v, vs'))
+                
+      
+      fun valcons first rest vs =
+         let
+            val (v, vs') = first vs
+         in
+            v :: rest vs'
+         end
+
+      val blank = Message.blank
+
+
+
+
+      fun idtac goal fk sk = sk ([(blank, goal)], valhd, fk)
+
+      fun idtacM x goal fk sk = sk ([(x, goal)], valhd, fk)
+
+      fun fail msg _ fk _ = fk msg
+
+      fun cut tac goal fk sk =
+         let
+            do (subgoals, validate, fk') = tac goal fk
+         in
+            sk (subgoals, validate, fk)
+         end
+
+      fun lift tac goal fk sk = tac () goal fk sk
+
+      fun done _ fk _ = fk "no subgoals expected"
+
+
+      fun andthenloop tacs padtac goals acc fk sk =
+         (case goals of
+             nil =>
+                (case tacs of
+                    nil =>
+                       sk (List.rev acc, (fn vs => vs), fk)
+
+                  | _ :: _ =>
+                       fk "too many tactics in andthen")
+
+           | (_, subgoal) :: rest =>
+                let
+                   val (tac, tacs') =
+                      (case tacs of
+                          nil =>
+                             (padtac, nil)
+
+                        | tac :: tacs' => (tac, tacs'))
+
+                   do (subgoals, validate, fk') = tac subgoal fk
+
+                   do (allgoals, valrest, fk'') =
+                      andthenloop tacs' padtac rest (List.revAppend subgoals acc) fk'
+                in
+                   sk (allgoals, valcons validate valrest, fk'')
+                end)
+         
+      fun andthen tac1 tac2 goal fk sk =
+         let
+            do (subgoals, validate, fk') = tac1 goal fk
+
+            do (allgoals, subvalidate, fk'') = andthenloop [] tac2 subgoals [] fk'
+         in
+            sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
+         end
+
+      fun andthenl tac1 tacs goal fk sk =
+         let
+            do (subgoals, validate, fk') = tac1 goal fk
+
+            do (allgoals, subvalidate, fk'') = 
+               andthenloop
+                  tacs
+                  (fail "too few tactics in andthenl")
+                  subgoals [] fk'
+         in
+            sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
+         end
+
+      fun andthenlPad tac1 tacs padtac goal fk sk =
+         let
+            do (subgoals, validate, fk') = tac1 goal fk
+
+            do (allgoals, subvalidate, fk'') = andthenloop tacs padtac subgoals [] fk'
+         in
+            sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
+         end
+
+      fun andthenOnLoop i tac goals acc fk sk =
+         (case goals of
+             nil =>
+                fk "too few subgoals in andthenOn"
+
+           | (branch as (_, subgoal)) :: rest =>
+                if i = 0 then
+                   let
+                      do (subgoals, validate, fk') = tac subgoal fk
+                   in
+                      sk (List.rev (List.revAppend rest (List.revAppend subgoals acc)),
+                          valcons validate (fn vs => vs),
+                          fk')
+                   end
+                else
+                   let
+                      do (allgoals, valrest, fk') =
+                         andthenOnLoop (i-1) tac rest (branch :: acc) fk
+                   in
+                      sk (allgoals, valcons valhd valrest, fk')
+                   end)
+
+      fun andthenOn i tac1 tac2 goal fk sk =
+         let
+            do (subgoals, validate, fk') = tac1 goal fk
+
+            do (allgoals, subvalidate, fk'') = andthenOnLoop i tac2 subgoals [] fk'
+         in
+            sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
+         end
+
+
+
+      (* almost the same *)
+      fun andthenloopM tacs padtac goals acc fk sk =
+         (case goals of
+             nil =>
+                (case tacs of
+                    nil =>
+                       sk (List.rev acc, (fn vs => vs), fk)
+
+                  | _ :: _ =>
+                       fk "too many tactics in andthen")
+
+           | (x, subgoal) :: rest =>
+                let
+                   val (tac, tacs') =
+                      (case tacs of
+                          nil =>
+                             (padtac, nil)
+
+                        | tac :: tacs' => (tac, tacs'))
+
+                   do (subgoals, validate, fk') = tac x subgoal fk
+
+                   do (allgoals, valrest, fk'') =
+                      andthenloopM tacs' padtac rest (List.revAppend subgoals acc) fk'
+                in
+                   sk (allgoals, valcons validate valrest, fk'')
+                end)
+         
+      fun andthenM tac1 tac2 goal fk sk =
+         let
+            do (subgoals, validate, fk') = tac1 goal fk
+
+            do (allgoals, subvalidate, fk'') = andthenloopM [] tac2 subgoals [] fk'
+         in
+            sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
+         end
+
+      fun andthenlM tac1 tacs goal fk sk =
+         let
+            do (subgoals, validate, fk') = tac1 goal fk
+
+            do (allgoals, subvalidate, fk'') = 
+               andthenloopM
+                  tacs
+                  (fn _ => fail "too few tactics in andthenlM")
+                  subgoals [] fk'
+         in
+            sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
+         end
+
+      fun andthenlPadM tac1 tacs padtac goal fk sk =
+         let
+            do (subgoals, validate, fk') = tac1 goal fk
+
+            do (allgoals, subvalidate, fk'') = andthenloopM tacs padtac subgoals [] fk'
+         in
+            sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
+         end
+
+      fun andthenOnLoopM i tac goals acc fk sk =
+         (case goals of
+             nil =>
+                fk "too few subgoals in andthenOn"
+
+           | (branch as (x, subgoal)) :: rest =>
+                if i = 0 then
+                   let
+                      do (subgoals, validate, fk') = tac x subgoal fk
+                   in
+                      sk (List.rev (List.revAppend rest (List.revAppend subgoals acc)),
+                          valcons validate (fn vs => vs),
+                          fk')
+                   end
+                else
+                   let
+                      do (allgoals, valrest, fk') =
+                         andthenOnLoopM (i-1) tac rest (branch :: acc) fk
+                   in
+                      sk (allgoals, valcons valhd valrest, fk')
+                   end)
+
+      fun andthenOnM i tac1 tac2 goal fk sk =
+         let
+            do (subgoals, validate, fk') = tac1 goal fk
+
+            do (allgoals, subvalidate, fk'') = andthenOnLoopM i tac2 subgoals [] fk'
+         in
+            sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
+         end
+
+
+      (* All the other andthen loops could be instances of andthenFoldLoop, but they
+         might be a bit faster inlined.
+      *)
+      fun andthenFoldLoop tacs finish y goals acc fk sk =
+         (case goals of
+             [] =>
+                (case finish y of
+                    NONE =>
+                       sk (List.rev acc, (fn vs => vs), fk)
+
+                  | SOME msg => fk msg)
+
+           | (x, subgoal) :: rest =>
+                let
+                   val (tac, y') = tacs x y
+
+                   do (subgoals, validate, fk') = tac subgoal fk
+
+                   do (allgoals, valrest, fk'') =
+                      andthenFoldLoop tacs finish y' rest (List.revAppend subgoals acc) fk'
+                in
+                   sk (allgoals, valcons validate valrest, fk'')
+                end)
+
+      fun andthenFoldM tac1 tacs finish y goal fk sk =
+         let
+            do (subgoals, validate, fk') = tac1 goal fk
+
+            do (allgoals, subvalidate, fk'') =
+               andthenFoldLoop tacs finish y subgoals [] fk'
+         in
+            sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
+         end
+                   
+
+      
+      fun attempt tac goal fk sk =
+         tac goal (fn _ => sk ([(blank, goal)], valhd, fk)) sk
+
+      fun first tacs goal fk sk =
+         (case tacs of
+             nil => fk "no tactics in first"
+
+           | [tac] => tac goal fk sk
+
+           | tac :: rest =>
+                tac goal (fn _ => first rest goal fk sk) sk)
+
+      fun repeat tac goal = attempt (andthen tac (repeat tac)) goal
+
+      fun repeatCountLoop tac i goal =
+         first [
+               andthen tac (repeatCountLoop tac (i+1)),
+               idtacM i
+               ]
+           goal 
+
+      fun repeatCount tac = repeatCountLoop tac 0
+
+      fun repeatn n tac =
+         if n < 0 then
+            fail "negative repeatn count"
+         else if n = 0 then
+            idtac
+         else
+            andthen tac (repeatn (n-1) tac)
+
+
+      fun orthen tac1 tac2 goal fk sk =
+         tac1 goal
+            (fn _ => tac2 () goal fk sk)
+            sk
+
+
+      fun withgoal tac goal fk sk = tac goal goal fk sk
+
+      fun withidir tac (goal as (_, dir)) fk sk = tac (Directory.idir dir) goal fk sk
+
+      fun withterm m tac (goal as (_, dir)) fk sk = tac (m (Directory.idir dir)) goal fk sk
+
+      fun withHeadConst msg tac (goal as (jud, _)) fk sk =
+         (case Normalize.whnfHard (Judgement.concl jud) of
+             Term.Elim (Term.Const const, _) =>
+                tac const goal fk sk
+
+           | _ =>
+                fk msg)
+
+
+
+      fun setFailure msg tac goal fk sk = tac goal (fn _ => fk msg) sk
+
+      fun transformFailure f tac goal fk sk = tac goal (fn msg => fk (f msg)) sk
+      
+
+
+      fun replaceJudgement jud (jud', dir) fk sk =
+         (case Refine.cast jud jud' of
+             NONE =>
+                fk "replacement is not equivalent"
+
+           | SOME f =>
+                let
+                   fun validate vs =
+                      (case vs of
+                          nil => raise Refine.ValidationFailure
+
+                        | v :: rest => (f v, rest))
+                in
+                   sk ([(blank, (jud, dir))], validate, fk)
+                end)
+
+      fun replaceHyp i h (goal as (jud, _)) fk sk =
+         (case Seq.updateOpt (J.context jud) i h of
+             NONE =>
+                fk "not enough hypotheses"
+
+           | SOME ctx =>
+                replaceJudgement (J.make ctx (J.concl jud)) goal fk sk)
+
+      fun replaceConcl a (goal as (jud, _)) fk sk =
+         replaceJudgement 
+            (J.make (J.context jud) a)
+            goal fk sk
+
+
+      val interrupt : (Rule.rule -> judgement -> unit) ref = ref (fns _ _ => ())
+
+      fun refine rule (goal as (jud, dir)) fk sk =
+         (
+         !interrupt rule goal;
+         (case
+             try
+                SOME (Refine.refine rule jud)
+             with
+                Rule.Failure => NONE
+          of
+             SOME (subgoals, validate) =>
+                sk (map (fn s => (blank, (s, dir))) subgoals, validate, fk)
+
+           | NONE =>
+                fk (String.concat ["rule ", Rule.name rule, " does not apply"]))
+         )
+
+      fun chdir dir (ds, _) fk sk = sk ([(blank, (ds, dir))], valhd, fk)
+
+
+      fun cast jud v (goal as (jud', _)) fk sk =
+         (
+         !interrupt (Rule.identity "cast") goal;
+         let
+            val m = Seq.length (J.context jud)
+            val n =  Seq.length (J.context jud')
+         in
+            if n >= m then
+               (case Refine.refine (Rule.weaken m (n - m)) jud' of
+                   ([jud''], g) =>
+                      (case Refine.cast jud jud'' of
+                          NONE =>
+                             (* This shouldn't ordinarily happen. *)
+                             fk "validation cast failed"
+
+                        | SOME f =>
+                             let
+                                val v' = f v
+                             in
+                                sk ([], (fn vs => g (v' :: vs)), fk)
+                             end)
+                 | _ =>
+                      raise (Fail "impossible"))
+            else
+               fk "validation cast failed"
+         end
+         )
+
+
+      extension Answer of (Refine.validation, string) Sum.sum
+
+      fun execute goal tac =
+         (case
+             tac goal
+                (fn msg => Answer (Sum.INR msg))
+                (fn (subgoals, validate, _) =>
+                    (case subgoals of
+                        [] =>
+                           (case validate [] of
+                               (v, []) => Answer (Sum.INL v)
+       
+                             | _ => raise Refine.ValidationFailure)
+
+                      | _ => Answer (Sum.INR "outstanding goals")))
+          of
+             Answer x => x
+
+           | _ => raise (Fail "impossible"))
+
+
+      val >> = andthen
+      val >>> = andthenl
+      val >>= = andthenM
+      val >>>= = andthenlM
+
+   end
+
+
+structure Tactic :> TACTIC = TacticInternal
+
+
+structure TacticMonad :> MONAD where type 'a m = 'a Tactic.tacticm =
+   struct
+
+      type 'a m = 'a Tactic.tacticm
+      val return = Tactic.idtacM
+      val bind = Tactic.andthenM
+      val seq = Tactic.andthen
+
+   end
+
+
+grammardef Tactic
+
+   infix right curried 1 >> >>> >>= >>>=
+
+end
+
+
+grammaron Tactic

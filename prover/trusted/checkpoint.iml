@@ -1,0 +1,552 @@
+
+signature CHECKPOINT =
+   sig
+
+      type checkpoint
+
+      val checkpoint : unit -> checkpoint
+      val restore : checkpoint -> bool     (* returns true if successful *)
+
+      val beginningOfTime : checkpoint
+
+
+
+      (* For internal use *)
+
+      (* installEager init set
+
+         Data structure states are represented by exns.
+
+         init : the data structure's initial value
+         set  : a function to set the data structure
+
+         Returns a callback notify, which the caller calls to notify
+         the checkpointer about changes in the data structure.
+
+         Set returns true if the set is successful.
+         
+         When restoring a checkpoint from before a data structure was installed,
+         that data structure is reset to its initial value.
+      *)
+      val installEager : exn -> (exn -> bool) -> (exn -> unit)
+
+      
+      (* installLazy init set poll
+
+         set  : a function to set the data structure
+         poll : a function to obtain the current value of the data structure
+      *)
+      val installLazy : (exn -> bool) -> (unit -> exn) -> unit
+
+
+      (* log f
+
+         Record f as the action to undo a data structure operation.
+      *)
+      val log : (unit -> unit) -> unit
+
+
+      (* When a restore fails, the checkpointer goes ahead and restores everything else.
+         A failed restore should NEVER result in unsafety.  Also, at the beginning of a
+         lemma (or the beginning of time) a failed restore should not create a discernably
+         strange state.
+
+         The intention is for restores to fail only because of a committed trail,
+         or because one attempted to restore an obsolete checkpoint.
+      *)
+
+   end
+
+
+structure Checkpoint :> CHECKPOINT =
+   struct
+
+      structure A = Array
+
+      fun iterup f x i j =
+         if i = j then
+            x
+         else
+            iterup f (f i x) (i+1) j
+
+      fun appup f i j =
+         if i = j then
+            ()
+         else
+            (
+            f i;
+            appup f (i+1) j
+            )
+
+
+      extension Null
+
+      datatype info =
+         INFO of { init : exn,
+                   set : exn -> bool }
+
+      val blankInfo =
+         INFO { init = Null,
+                set = (fn _ => true) }
+
+
+      val initialMaxSize = 30
+
+      val theSize    : int ref            = ref 0
+      val theMaxSize : int ref            = ref initialMaxSize
+      val theState   : exn A.array ref    = ref (A.array initialMaxSize Null)
+      val theInfo    : info A.array ref   = ref (A.array initialMaxSize blankInfo)
+      val thePolls   : (unit -> unit) ref = ref (fn () => ())
+
+      type checkpoint = exn A.array
+
+      val beginningOfTime = A.array 0 Null
+
+      (* invariants:
+
+         !theSize < !theMaxSize,
+         for all i < !theSize, theState[i] is a user value
+         for all !theSize <= i < !theMaxSize, !theState[i] = Null
+
+         length of any checkpoint <= !theSize
+      *)
+
+
+
+      fun checkpoint () =
+         (
+         !thePolls ();
+         A.subarray (!theState) 0 (!theSize)
+         )
+
+
+      fun restore arr =
+         let
+            val state = !theState
+            val info = !theInfo
+            val arrlen = Array.length arr
+            val len = !theSize
+
+            (* arrlen <= len by invariant *)
+
+            val () = A.blit arr 0 state 0 arrlen
+
+            val succ =
+               A.foldli 
+                  (fns i st succ =>
+                      let
+                         val INFO { set } = A.sub info i
+                      in
+                         set st andalso succ
+                      end)
+                  true
+                  arr
+            
+            val succ =
+               iterup
+                  (fns i succ =>
+                      let
+                         val INFO { init, set } = A.sub info i
+                      in
+                         A.update state i init;
+                         set init andalso succ
+                      end)
+                  succ
+                  arrlen len
+         in
+            succ
+         end
+
+         
+      fun maybeResize () =
+         if !theSize + 1 >= !theMaxSize then
+            let
+               val maxSize = !theMaxSize
+               val newMaxSize = 2 * maxSize
+               val newState = A.array newMaxSize Null
+               val newInfo = A.array newMaxSize blankInfo
+            in
+               A.blit (!theState) 0 newState 0 maxSize;
+               A.blit (!theInfo) 0 newInfo 0 maxSize;
+               theState := newState;
+               theInfo := newInfo;
+               theMaxSize := newMaxSize
+            end
+         else
+            ()
+
+
+      fun installEager init set =
+         let
+            val () = maybeResize ()
+
+            val i = !theSize
+
+            fun notify st = A.update (!theState) i st
+         in
+            theSize := i+1;
+            A.update (!theState) i init;
+            A.update (!theInfo) i (INFO {init = init, set = set});
+
+            notify
+         end
+
+
+      fun addPoll i poll =
+         let
+            val oldPolls = !thePolls
+
+            fun newPolls () = 
+               (
+               oldPolls (); 
+               A.update (!theState) i (poll ())
+               )
+         in
+            thePolls := newPolls
+         end
+
+      fun installLazy set poll =
+         let
+            val () = maybeResize ()
+
+            val i = !theSize
+
+            val init = poll ()
+         in
+            theSize := i+1;
+            A.update (!theState) i init;
+            A.update (!theInfo) i (INFO {init = init, set = set});
+            addPoll i poll
+         end
+
+
+         
+      (* There's a little bit of excess cost to using Rewind, since it implements
+         commit and tokens, which we never use.  But that cost should be minimal,
+         and it seems preferable to duplicating the code.
+      *)
+
+      structure Rewind =
+         RewindFun (type action = unit -> unit
+                    fun undo f = f ())
+
+      val () =
+         let
+            extension Marker of Rewind.mark
+
+            fun poll () = Marker (Rewind.mark ())
+
+            fun set exn =
+               (case exn of
+                   Marker mark =>
+                      (try
+                          (Rewind.rewind mark; true)
+                       with
+                       Rewind.Rewind =>
+                          (* Since we never commit these, this can only happen
+                             if an obsolete checkpoint was rewound.
+                          *)
+                          false)
+
+                 | _ =>
+                      raise (Fail "unexpected extension"))
+         in
+            installLazy set poll
+         end
+
+      val log = Rewind.log
+
+   end
+
+
+
+signature CHECKPOINTED_REF =
+   sig
+
+      type 'a cref
+
+      (* NB: these aren't as cheap as normal references *)
+      val new : 'a -> 'a cref
+
+      val deref : 'a cref -> 'a
+      val assign : 'a cref -> 'a -> unit
+
+   end
+
+
+structure CheckpointedRef :> CHECKPOINTED_REF =
+   struct
+
+      type 'a cref = 'a ref * ('a -> unit)
+
+      fun 'a new (initial : 'a) =
+         let
+            extension Tag of 'a
+         
+            val r = ref initial
+            
+            val notify =
+               let
+                  fun set ex =
+                     (case ex of
+                         Tag x => (r := x; true)
+      
+                       | _ => raise (Fail "unexpected extension"))
+               in
+                  Checkpoint.installEager (Tag initial) set
+               end
+         in
+            (r, (fn x => notify (Tag x)))
+         end
+
+      fun deref (r, _) = !r
+
+      fun assign (r, notify) x =
+         (
+         r := x;
+         notify x
+         )
+
+   end
+
+
+signature CHECKPOINTED_TABLE =
+   TABLE
+   where type init = unit
+
+
+functor CheckpointedDictTable (structure Dict : DICT)
+   :> CHECKPOINTED_TABLE 
+      where type key = Dict.key
+   =
+   struct
+
+      structure D = Dict
+
+      type init = unit
+      type key = D.key
+      type 'a table = 'a D.dict ref * ('a D.dict -> unit)
+
+      exception Absent = D.Absent
+
+
+      fun 'a table () =
+         let
+            extension Tag of 'a D.dict
+
+            val dr = ref D.empty
+
+            val notify =
+               let
+                  fun set ex =
+                     (case ex of
+                         Tag d => (dr := d; true)
+
+                       | _ => raise (Fail "unexected extension"))
+               in
+                  Checkpoint.installEager (Tag D.empty) set
+               end
+         in
+            (dr, (fn d => notify (Tag d)))
+         end
+
+      
+      fun reset (dr, notify) () =
+         (
+         dr := D.empty;
+         notify D.empty
+         )
+         
+      fun size (dr, _) = D.size (!dr)
+
+      fun member (dr, _) k = D.member (!dr) k
+
+      fun insert (dr, notify) k v =
+         let
+            val d = D.insert (!dr) k v
+         in
+            dr := d;
+            notify d
+         end
+
+      fun remove (dr, notify) k =
+         let
+            val d = D.remove (!dr) k
+         in
+            dr := d;
+            notify d
+         end
+
+      fun find (dr, _) k = D.find (!dr) k
+
+      fun lookup (dr, _) k = D.lookup (!dr) k
+
+      fun operate (dr, notify) k f g =
+         let
+            val (oldv, newv, d) = D.operate (!dr) k f g
+         in
+            dr := d;
+            notify d;
+            
+            (oldv, newv)
+         end
+
+      fun operate' (dr, notify) k f g =
+         let
+            val (oldv, newv, d) = D.operate' (!dr) k f g
+         in
+            dr := d;
+            notify d;
+
+            (oldv, newv)
+         end
+
+      fun insertMerge (dr, notify) k v f =
+         let
+            val d = D.insertMerge (!dr) k v f
+         in
+            dr := d;
+            notify d
+         end
+
+      fun lookupOrInsert (dr, notify) k f =
+         let
+            val (_, v, d) = D.operate (!dr) k f (fn x => x)
+         in
+            dr := d;
+            notify d;
+
+            v
+         end
+
+      fun lookupOrInsert' (dr, notify) k f =
+         let
+            val (old, v, d) = D.operate (!dr) k f (fn x => x)
+         in
+            dr := d;
+            notify d;
+
+            (v, Option.isSome old)
+         end
+
+      fun toList (dr, _) = D.toList (!dr)
+
+      fun fold f x (dr, _) = D.foldl f x (!dr)
+
+      fun app f (dr, _) = D.app f (!dr)
+
+   end
+
+
+functor CheckpointedRedBlackTable (structure Key : ORDERED)
+   :> CHECKPOINTED_TABLE
+      where type key = Key.t
+   =
+   CheckpointedDictTable (structure Dict = RedBlackDict (structure Key = Key))
+
+
+
+functor CheckpointedHashTable (structure Key : HASHABLE)
+   :> CHECKPOINTED_TABLE
+      where type key = Key.t
+   =
+   struct
+
+      structure H = HashTable (structure Key = Key)
+
+      type init = unit
+      type key = H.key
+
+      type 'a table = 'a H.table
+
+      (* Help the compiler produce a compact closure to log. *)
+
+      fun logRemove (table, k) =
+         Checkpoint.log (fn () => H.remove table k)
+
+      fun logInsert (table, k, v) =
+         Checkpoint.log (fn () => H.insert table k v)
+
+      fun log table k x =
+         (case x of
+             NONE => logRemove (table, k)
+
+           | SOME v => logInsert (table, k, v))
+
+      
+      fun table () = H.table 97
+
+      
+      fun reset _ () = raise (Fail "checkpointed hash table reset unimplemented")
+
+
+      exception Absent = H.Absent
+
+      
+      val size = H.size
+      val member = H.member
+
+      fun insert table k v =
+         let
+            val (x, _) = H.operate table k (fn () => v) (fn _ => v)
+         in
+            log table k x
+         end
+
+      fun remove table k =
+         (case H.operate' table k (fn () => NONE) (fn _ => NONE) of
+             (NONE, _) => ()
+
+           | (x as SOME v, _) =>
+                log table k x)
+
+      val find = H.find
+      val lookup = H.lookup
+
+      fun operate table k absentf presentf =
+         let
+            val res as (x, _) = H.operate table k absentf presentf
+         in
+            log table k x;
+            res
+         end
+
+      fun operate' table k absentf presentf =
+         let
+            val res as (x, _) = H.operate' table k absentf presentf
+         in
+            log table k x;
+            res
+         end
+
+      fun insertMerge table k v f =
+         let
+            val (x, _) =
+               H.operate table k (fn () => v) f
+         in
+            log table k x
+         end
+
+      fun lookupOrInsert table k f =
+         let
+            val (x, v) =
+               H.operate table k f (fn v => v)
+         in
+            log table k x;
+            v
+         end
+
+      fun lookupOrInsert' table k f =
+         let
+            val (x, v) =
+               H.operate table k f (fn v => v)
+         in
+            log table k x;
+            (v, Option.isSome x)
+         end
+
+      val toList = H.toList
+      val fold = H.fold
+      val app = H.app
+
+   end

@@ -1,0 +1,229 @@
+
+signature JUDGEMENT =
+   sig
+
+      type symbol = Symbol.symbol
+      type term = Term.term
+
+      datatype hyp =
+         Tm of term
+       | Tml of term
+       | Tmh of term
+       | Tp
+       | Tpl
+       | Tph
+
+      type context = hyp Seq.seq
+      type djudgement
+
+      val subHyp : hyp -> Term.sub -> hyp
+      val subContext : context -> Term.sub -> context
+
+      val promote : hyp -> hyp
+      val unhide : hyp -> hyp
+      val promoteAndUnhide : hyp -> hyp
+
+      val make : context -> term -> djudgement
+
+      val context : djudgement -> context
+      val concl : djudgement -> term
+      val hyp : djudgement -> int -> hyp
+      val hypOpt : djudgement -> int -> hyp option
+
+      val unifyHyp : hyp -> hyp -> unit
+      val unify : djudgement -> djudgement -> unit
+
+      type id
+      val id : djudgement -> id
+      val eq : id * id -> bool
+
+      val puHyp : hyp Pickle.pu
+      val puContext : context Pickle.pu
+
+   end
+
+
+structure Judgement :> JUDGEMENT =
+   struct
+
+      structure S = Seq
+      structure P = Pickle
+
+      type symbol = Symbol.symbol
+      type term = Term.term
+
+      datatype hyp =
+         Tm of term
+       | Tml of term
+       | Tmh of term
+       | Tp
+       | Tpl
+       | Tph
+
+
+      type id = int
+      type context = hyp S.seq
+      type djudgement = context * term * id
+
+      fun subHyp h s =
+         (case h of
+             Tm a => Tm (Term.Sub (a, s))
+           | Tml a => Tml (Term.Sub (a, s))
+           | Tmh a => Tmh (Term.Sub (a, s))
+           | Tp => Tp
+           | Tpl => Tpl
+           | Tph => Tph)
+
+      fun subContextMain hs s =
+         (case S.expose hs of
+             S.Nil => (S.empty, s)
+
+           | S.Cons (h, rest) =>
+                let
+                   val (rest', s') = subContextMain rest s
+                in
+                   (S.cons (subHyp h s') rest',
+                    Term.under 1 s')
+                end)
+
+      fun subContext hs s =
+         let
+            val (g, _) = subContextMain hs s
+         in
+            g
+         end
+
+      fun promote h =
+         (case h of
+             Tml a => Tm a
+           | Tpl => Tp
+           | _ => h)
+
+      fun unhide h =
+         (case h of
+             Tmh a => Tm a
+           | Tph => Tp
+           | _ => h)
+
+      fun promoteAndUnhide h =
+         (case h of
+             Tml a => Tm a
+           | Tmh a => Tm a
+           | Tpl => Tp
+           | Tph => Tp
+           | _ => h)
+          
+      val nextJudgement = ref 0
+
+      fun make g m =
+         let
+            val i = !nextJudgement
+         in
+            nextJudgement := i + 1;
+            (g, m, i)
+         end
+
+      fun context (g, _, _) = g
+      fun concl (_, m, _) = m
+      
+      fun hypOpt (g, _, _) i = S.nthOpt g i
+
+      fun hyp jud i =
+         (case hypOpt jud i of
+             SOME h => h
+
+           | NONE => raise (Fail "no such hypothesis"))
+
+      
+      fun unifyHyp h h' =
+         (case (h, h') of
+             (Tm a, Tm a') =>
+                Unify.unify a a'
+
+           | (Tml a, Tml a') =>
+                Unify.unify a a'
+
+           | (Tmh a, Tmh a') =>
+                Unify.unify a a'
+
+           | (Tp, Tp) => ()
+
+           | (Tpl, Tpl) => ()
+
+           | (Tph, Tph) => ()
+
+           | _ => Unify.impossible ())
+
+      fun unifyContext g g' =
+         (case (S.expose g, S.expose g') of
+             (S.Nil, S.Nil) => ()
+
+           | (S.Cons (h, rest), S.Cons (h', rest')) =>
+                (
+                unifyHyp h h';
+                unifyContext rest rest'
+                )
+
+           | _ => Unify.impossible ())
+
+      fun unify (g, m, _) (g', m', _) =
+         (
+         unifyContext g g';
+         Unify.unify m m'
+         )
+
+      fun id (_, _, i) = i
+
+      fun eq (i : int, j) = i = j
+
+
+
+      val impossible = Fail "impossible"
+
+      val puHyp =
+         P.alt
+            (fn Tm _ => 0
+              | Tml _ => 1
+              | Tmh _ => 2
+              | Tp => 3
+              | Tpl => 4
+              | Tph => 5)
+
+            [
+            P.wrap
+               (fn Tm m => m
+                 | _ => raise impossible)
+               Tm
+               Pickling.puTerm,
+
+            P.wrap
+               (fn Tml m => m
+                 | _ => raise impossible)
+               Tml
+               Pickling.puTerm,
+
+            P.wrap
+               (fn Tmh m => m
+                 | _ => raise impossible)
+               Tmh
+               Pickling.puTerm,
+
+            P.const Tp,
+
+            P.const Tpl,
+
+            P.const Tph,
+            ]
+
+
+      fun puSeq pu =
+         P.listish
+            (fn () => Seq.empty)
+            (fn (h, t) => Seq.cons h t)
+            (fns f l => Seq.foldr (fns x () => f x) () l)
+            pu
+
+
+      val puContext = puSeq puHyp
+
+   end

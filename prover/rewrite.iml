@@ -1,0 +1,3962 @@
+
+signature REWRITE =
+   sig
+
+      type constant = Constant.constant
+      type symbol = Symbol.symbol
+      type tactic = Tactic.tactic
+
+      type rewrite
+      type eterm = ETerm.eterm
+
+
+      type captures = symbol option list
+
+      (* In the rewrites that take a captures argument, say l, the rewrite captures
+         the innermost |l| bindings, and uses l for their names.
+      *)
+
+      val identityRew      : rewrite
+      val usingRew         : bool -> captures -> eterm -> rewrite  (* bool: reverse the direction *)
+      val replaceRew       : captures -> eterm -> eterm -> eterm -> rewrite
+      val convertRew       : captures -> eterm -> rewrite
+      val convertHeadRew   : captures -> constant -> eterm -> rewrite
+      val foldRew          : captures -> eterm -> rewrite
+      val convertFoldRew   : captures -> eterm -> rewrite
+      val unfoldRew        : constant -> int -> rewrite
+      val rollRew          : captures -> eterm -> rewrite
+      val convertRollRew   : captures -> eterm -> rewrite
+      val unrollRew        : constant -> rewrite
+      val unrollTypeRew    : constant -> rewrite
+      val unrollTypeUnivRew : captures -> constant -> eterm -> rewrite
+      val reduceUsingRew   : Reduction.reduction -> rewrite
+      val unreduceUsingRew : captures -> eterm -> Reduction.reduction -> rewrite
+      val convertUnreduceUsingRew : captures -> eterm -> Reduction.reduction -> rewrite
+      val reduceRew        : rewrite
+      val whreduceRew      : rewrite
+
+
+      (* target: hypothesis and occurrences, where
+         occurrences = NONE             means all
+         occurrences = SOME (false, l)  means apply at hit numbers given by l
+         occurrences = SOME (true , l)  means apply at positions given by l
+
+         empty target list means concl at hit 0
+      *)
+      type targets = (symbol * (bool * int list) option) list
+
+      val rewrite          : (rewrite * targets) list -> tactic
+      val rewriteRaw       : (rewrite * targets) list -> tactic
+
+      val testRewrite      : (rewrite * targets) list -> unit
+      val showPosition     : targets -> unit
+
+      val convert          : ((captures * eterm) * targets) list -> tactic
+      val convertHead      : ((captures * constant * eterm) * targets) list -> tactic
+      val fold             : ((captures * eterm) * targets) list -> tactic
+      val convertFold      : ((captures * eterm) * targets) list -> tactic
+      val unfold           : (constant * targets) list -> tactic
+      val unfoldHead       : (constant * targets) list -> tactic
+      val roll             : ((captures * eterm) * targets) list -> tactic
+      val convertRoll      : ((captures * eterm) * targets) list -> tactic
+      val unroll           : (constant * targets) list -> tactic
+      val unrollType       : (constant * targets) list -> tactic
+      val unrollTypeUniv   : ((captures * constant * eterm) * targets) list -> tactic
+      val reduceUsing      : (Reduction.reduction * targets) list -> tactic
+      val unreduceUsing    : ((captures * eterm * Reduction.reduction) * targets) list -> tactic
+      val convertUnreduceUsing : ((captures * eterm * Reduction.reduction) * targets) list -> tactic
+      val reduce           : targets -> tactic
+      val whreduce         : targets -> tactic
+
+   end
+
+
+(* All the type definitions are given here in case the user wants to craft a rewrite. *)
+signature REWRITE_TYPES =
+   sig
+
+      type term = Term.term
+      type tactic = Tactic.tactic
+      type 'a tacticm = 'a Tactic.tacticm
+      type priority = Typecheck.priority
+
+
+      (* All the type definitions are given here in case the user wants to craft a rewrite. *)
+
+      datatype computational_rewrite =
+         Identity
+       | Beta
+
+       | Reduce of Reduction.reduction
+         (* Reduce red: M --> N  where  M reduces to N by red  *)
+
+       | Unreduce of Reduction.reduction
+         (* Unreduce red: N --> M  where  M reduces to N by red *)
+
+
+      type equality_rewrite = term * term * term * Term.elim list * priority tacticm
+
+      (* (A, P, Q, spine, tac) : equality_rewrite
+
+         suppose M is being rewritten to N
+         M = P spine
+         N = Q spine
+         tac partially proves P = Q : A
+      *)
+
+
+      type relation_rewrite = Constant.constant * priority tacticm option * priority tacticm option
+
+      (* (const, ftac, rtac) : relation_rewrite
+
+         suppose M is being rewritten to N
+         then for some R with head const:
+         ftac partially proves R M N
+         rtac partially proves R N M
+         ftac/rtac are not both NONE
+
+         We say tacopt partially proves A if:
+         1. tacopt = NONE, or
+         2. tacopt = SOME tac and tac partially proves A
+      *)
+
+
+      type 'a rewrite_core =
+         (int -> term -> bool) * (int -> term -> (term * 'a) option)
+
+      (* (test, act) : method rewrite_core
+
+         test bvs m : tests whether the rewriter acts on m, when under bvs bound variables,
+                      then (whether yes or no) retracts any bindings
+
+         act bvs m  : tests whether the rewriter acts on m, when under bvs bound variables,
+                      then: if yes, returns the new term and the method that relates them;
+                      if no, retracts any bindings
+
+         For each, m is in simple form.
+      *)
+
+
+      datatype general_rewrite =
+         Computational of computational_rewrite rewrite_core
+       | Equality of equality_rewrite rewrite_core
+       | Relation of relation_rewrite rewrite_core
+
+      (* rewrites can raise this *)
+      exception RewriteFailure of string
+
+
+      (* hypothesis (NONE=concl) being rewritten, the goal *)
+      type rewrite = int option -> Tactic.judgement -> general_rewrite
+
+   end
+
+
+structure RewriteTypes :> REWRITE_TYPES =
+   struct
+
+      type term = Term.term
+      type tactic = Tactic.tactic
+      type 'a tacticm = 'a Tactic.tacticm
+      type priority = Typecheck.priority
+
+      type 'a rewrite_core =
+         (int -> term -> bool) * (int -> term -> (term * 'a) option)
+
+      datatype computational_rewrite =
+         Identity
+       | Beta
+       | Reduce of Reduction.reduction
+       | Unreduce of Reduction.reduction
+
+      type equality_rewrite = term * term * term * Term.elim list * priority tacticm
+
+      type relation_rewrite = Constant.constant * priority tacticm option * priority tacticm option
+
+      datatype general_rewrite =
+         Computational of computational_rewrite rewrite_core
+       | Equality of equality_rewrite rewrite_core
+       | Relation of relation_rewrite rewrite_core
+
+      exception RewriteFailure of string
+
+      type rewrite = int option -> Tactic.judgement -> general_rewrite
+
+   end
+
+
+(* can't include a "where type", so we'll name it *)
+signature REWRITE_SPEC = REWRITE where type rewrite = RewriteTypes.rewrite
+
+
+signature REWRITE_INTERNAL =
+   sig
+
+      include REWRITE_SPEC
+
+
+      type 'a tacticm = 'a Tactic.tacticm
+      type priority = Typecheck.priority
+
+      structure CICTable : CHECKPOINTED_TABLE where type key = constant * int * constant
+
+      val compatibilityTable : (constant * bool * (priority tacticm -> priority tacticm)) CICTable.table
+
+      (* if    compatibilityTable on (hconst, i, const1) = (const2, cov, tacfn)
+               tac partially proves R1 M N, if cov=true
+               tac partially proves R1 N M, if cov=false
+               the head of R1 is const1
+         then  tacfn tac partially proves R2 (hconst spine1 M spine2) (hconst spine1 N spine2)
+               |spine1| = i
+               the head of R2 is const2
+      *)
+
+
+      val weakeningTable : (constant * (priority tacticm -> priority tacticm)) list ConstantTable.table
+
+      (* if    weakeningTable on const1 = (const2, tacfn)
+               tac partially proves R1 M N
+               the head of R1 is const1
+         then  tacfn tac partially proves R2 M N
+               the head of R2 is const2
+      *)
+
+   end
+
+
+structure RewriteInternal :> REWRITE_INTERNAL =
+   struct
+
+      structure B = BackchainInternal
+      structure C = Oldcase
+      structure D = Directory
+      structure H = ConstantTable
+      structure I = Identical
+      structure J = Judgement
+      structure N = Normalize
+      structure R = Reduction
+      structure T = Term
+      structure TC = Typecheck
+
+      val ? = C.?
+
+      open RewriteTypes
+      open Tactic
+
+      type symbol = Symbol.symbol
+      type constant = Constant.constant
+      type eterm = ETerm.eterm
+
+      exception InsufficientHits of string
+
+      val conclSym = Symbol.fromValue "concl"
+
+
+      datatype frame =
+         Felim1 of T.elim list
+       | Felim2 of T.term * T.elim list * T.elim list
+         (* Felim2 (h, left, right)  represents  h (rev left) (App {}) right
+            h is head or intro
+         *)
+       | Flam of T.binder
+       | Fpair1 of term
+       | Fpair2 of term
+       | Fnext
+
+
+      fun contextToPath c path =
+         (case c of
+             [] => path
+
+           | Felim1 _ :: rest =>
+                contextToPath rest (0 :: path)
+
+           | Felim2 (_, left, _) :: rest =>
+                contextToPath rest (1 + List.length left :: path)
+
+           | Flam _ :: rest =>
+                contextToPath rest (0 :: path)
+
+           | Fpair1 _ :: rest =>
+                contextToPath rest (0 :: path)
+
+           | Fpair2 _ :: rest =>
+                contextToPath rest (1 :: path)
+
+           | Fnext :: rest =>
+                contextToPath rest (0 :: path))
+
+
+      fun instantiate c m =
+         (case c of
+             [] => m
+
+           | Felim1 spine :: rest =>
+                instantiate rest (T.Elim (m, spine))
+
+           | Felim2 (h, left, right) :: rest =>
+                instantiate rest
+                (T.Elim (h, List.revAppend left (T.App m :: right)))
+
+           | Flam binder :: rest =>
+                instantiate rest (T.Lam (binder, m))
+
+           | Fpair1 m2 :: rest =>
+                instantiate rest (T.Pair (m, m2))
+
+           | Fpair2 m1 :: rest =>
+                instantiate rest (T.Pair (m1, m))
+
+           | Fnext :: rest =>
+                instantiate rest (T.Next m))
+
+
+      (* instantiateShift C M
+
+         returns    N
+         such that  N[P . id] = C{ M[P[^k] . id] }
+         where      C binds k variables
+      *)
+      fun instantiateShift c m =
+         (case c of
+             [] => m
+
+           | Felim1 spine :: rest =>
+                instantiateShift rest (T.Elim (m, T.ssubst spine T.shift1))
+
+           | Felim2 (h, left, right) :: rest =>
+                instantiateShift rest
+                (T.Elim (T.Sub (h, T.shift1),
+                         List.foldl
+                            (fns elim spine =>
+                                (case elim of
+                                    T.App n => T.App (T.Sub (n, T.shift1)) :: spine
+                                  | _ => elim :: spine))
+                            (T.App m ::
+                             map 
+                                (fn T.App n => T.App (T.Sub (n, T.shift1))
+                                  | elim => elim) 
+                                right)
+                            left))
+
+           | Flam binder :: rest =>
+                (* the interesting case:
+
+                   let C = C'{ \.{} }
+                   and let N = instantiateShift C M = instantiateShift C' (\.M[1 . 0 . ^2])
+
+                   N[P . id]
+                   = C'{ (\.M[1 . 0 . ^2]) [P[^k] . id] }
+                   = C'{ \. M[1 . 0 . ^2] [0 . (P[^k] . id) o ^] }
+                   = C'{ \. M[1 . 0 . ^2] [0 . P[^k+1] . ^] }
+                   = C'{ \. M[P[^k+1] . 0 . ^] }
+                   = C'{ \. M[P[^k+1] . id] }
+                   = C { M[P^k+1 . id] }
+                *)
+                instantiateShift rest (T.Lam (binder, T.Sub (m, T.Idot (1, T.Idot (0, T.Shift 2)))))
+
+           | Fpair1 m2 :: rest =>
+                (* a representative ordinary case:
+
+                   let C = C'{ <{}, M2> }
+                   and let N = instantiateShift C M = instantiateShift C' <M, M2[^]>
+
+                   N[P . id]
+                   = C'{ <M, M2[^]> [P[^k] . id] }
+                   = C'{ <M[P^k . id], M2[^][P[^k] . id]> }
+                   = C'{ <M[P^k . id], M2> }
+                   = C { M[P^k . id] }
+                *)
+                instantiateShift rest (T.Pair (m, T.Sub (m2, T.shift1)))
+
+           | Fpair2 m1 :: rest =>
+                instantiateShift rest (T.Pair (T.Sub (m1, T.shift1), m))
+
+           | Fnext :: rest =>
+                instantiateShift rest (T.Next m))
+
+
+      fun binders c dir acc k =
+         (case c of
+             [] => 
+                let
+                   val bv = List.rev acc
+
+                   val dir =
+                      List.foldl
+                      (fns binder dir => D.bindVary dir binder)
+                      dir
+                      acc
+                in
+                   (dir, bv, k)
+                end
+
+           | Flam binder :: rest =>
+                binders rest dir (binder :: acc) (k+1)
+
+           | _ :: rest =>
+                binders rest dir acc k)
+
+
+
+      (* findMain i P bv bvs C test act fk
+
+         if    P = C'{M}
+               act M = SOME (N, method)
+               M is the ith hit within P
+               bv' are bound by C'
+               bvs' = |bv'|
+         then  returns (M, N, bv'@bv, bvs+bvs', C{C'{}}, method)
+         else  calls fk (i - number of hits in P)
+      *)
+      fun findMain i m bv bvs c test act fk =
+         let
+            val m = N.simplify m
+         in
+            if i = 0 then
+               (case act bvs m of
+                   NONE =>
+                      findTerm i m bv bvs c test act fk
+
+                 | SOME (n, method) =>
+                      (m, n, bv, bvs, c, method))
+            else
+               if test bvs m then
+                  findTerm (i-1) m bv bvs c test act fk
+               else
+                  findTerm i m bv bvs c test act fk
+         end
+
+
+      (* m in simple form *)
+      and findTerm i m bv bvs c test act fk =
+         (case m of
+             T.Elim (h as T.Var _, spine) =>
+                findSpine i spine bv bvs c h [] test act fk
+
+           | T.Elim (h as T.Const _, spine) =>
+                findSpine i spine bv bvs c h [] test act fk
+
+           | T.Elim (h as T.Sub _, spine) =>
+                findSpine i spine bv bvs c h [] test act fk
+
+           | T.Elim (m1, spine) =>
+                let
+                   (* The check we already did should cover the head,
+                      so no need to check m1 again.
+                   *)
+                   do i' = findTerm i m1 bv bvs (Felim1 spine :: c) test act
+                in
+                   findSpine i' spine bv bvs c m1 [] test act fk
+                end
+
+           | T.Lam (binder, m1) =>
+                findMain i m1 (binder :: bv) (bvs + 1) (Flam binder :: c) test act fk
+
+           | T.Pair (m1, m2) =>
+                let
+                   do i' = findMain i m1 bv bvs (Fpair1 m2 :: c) test act
+                in
+                   findMain i' m2 bv bvs (Fpair2 m1 :: c) test act fk
+                end
+
+           | T.Next m1 =>
+                findMain i m1 bv bvs (Fnext :: c) test act fk
+
+           | T.Triv => fk i
+
+           | T.Marker _ => fk i
+
+           (* Other cases impossible for simple m. *)
+           | _ => raise (Fail "impossible"))
+
+
+      (* findSpine i spine bv bvs C h left test act fk
+
+         if    h (rev left) spine = C'{M}
+               h is head or intro
+               act M = SOME (N, method)
+               M is the ith hit within spine
+               bv' are bound by C'
+               bvs' = |bv'|
+         then  returns (M, N, bv'@bv, bvs+bvs', C{C'{}}, method)
+         else  calls fk (i - number of hits in P)
+      *)
+      and findSpine i spine bv bvs c h left test act fk =
+         (case spine of
+             [] => fk i
+
+           | (elim as T.App m) :: rest =>
+                let
+                   do i' = findMain i m bv bvs (Felim2 (h, left, rest) :: c) test act
+                in
+                   findSpine i' rest bv bvs c h (elim :: left) test act fk
+                end
+
+           | elim :: rest =>
+                findSpine i rest bv bvs c h (elim :: left) test act fk)
+
+
+      (* find i P (test, act)
+
+         if    P = C[M]
+               act M = SOME (N, method)
+               M is the ith hit within P
+               bv are bound by C
+               bvs = |bv|
+         then  returns (M, N, bv, bvs, C, method)
+         else  raises (RewriteFailure <message>)
+      *)
+      fun find i m (test, act) =
+         findMain i m [] 0 [] test act
+         (fn i' =>
+             let
+                val hits = i - i'
+             in
+                if hits = 0 then
+                   raise (InsufficientHits "no hits")
+                else
+                   raise (InsufficientHits (String.concat ["hits only ", Int.toString hits, " times"]))
+             end)
+
+
+
+      fun rewriteComputational i core hypopt (jud, _) =
+         (case hypopt of
+             NONE =>
+                (* concl *)
+                let
+                   val p = J.concl jud
+
+                   val (m, n, _, _, c, cr) = find i p core
+                in
+                   (case cr of
+                       Identity =>
+                          idtac
+                    
+                     | Beta =>
+                          replaceConcl (instantiate c n)
+
+                     | Reduce red =>
+                          refine (Rule.reduce (R.within (contextToPath c []) red))
+
+                     | Unreduce red =>
+                          refine (Rule.unreduce 
+                                     (instantiate c n) 
+                                     (R.within (contextToPath c []) red)))
+                end
+
+           | SOME hyp =>
+                let
+                   val (p, f) =
+                      (case J.hypOpt jud hyp of
+                          SOME (J.Tm p) => (p, J.Tm)
+
+                        | SOME (J.Tml p) => (p, J.Tml)
+
+                        | SOME (J.Tmh p) => (p, J.Tmh)
+
+                        | NONE =>
+                             (* this shouldn't happen with a good directory *)
+                             raise (RewriteFailure "nonexistent hypothesis")
+
+                        | SOME _ =>
+                             raise (RewriteFailure "hypothesis has the wrong sort"))
+                
+                   val (m, n, _, _, c, cr) = find i p core
+                in
+                   (case cr of
+                       Identity =>
+                          idtac
+                    
+                     | Beta =>
+                          replaceHyp hyp (f (instantiate c n))
+
+                     | Reduce red =>
+                          refine (Rule.reduceHyp hyp (R.within (contextToPath c []) red))
+
+                     | Unreduce red =>
+                          refine (Rule.unreduceHyp hyp 
+                                     (instantiate c n) 
+                                     (R.within (contextToPath c []) red)))
+                end)
+
+
+
+      fun countdown f i n acc =
+         if i = n then
+            acc
+         else
+            countdown f (i+1) n (f i :: acc)
+
+
+      (* close bv dir A M N tac
+
+         if    tac partially proves M = N : A
+         then  dir' adds bv to dir
+               M' = \. ... \. M
+               N' = \. ... \. N
+               A' = forall E1 ... forall Ek . A
+               dir' adds bv to dir
+               tac' partially proves M' = N' : A'
+               and
+               return (dir', A', M', N', tac')
+
+         tac' sets up directories for all subgoals (and for tac), 
+         assuming dir is the ambient directory.
+
+         Note that dir goes from outside to inside,
+         while A, M, N, and tac go from inside to outside.
+      *)
+      fun close bv dir a m n tac =
+         (case bv of
+             [] => 
+                (dir, a, m, n, chdir dir >> tac)
+
+           | binder :: rest =>
+                let
+                   val dir' = D.bindVary dir binder
+                
+                   val (dir'', a', m', n', tac') = close rest dir' a m n tac
+
+                   (* tac' partially proves M' = N' : A' *)
+
+                   val e = T.evar ()
+                in
+                   (dir'',
+                    T.Elim (T.Const Prim.forall, [T.App e, T.App (T.Lam (binder, a'))]),
+                    T.Lam (binder, m'),
+                    T.Lam (binder, n'),
+                    
+                    (* \.M' = \.N' : forall E . A' *)
+                    refine (Rule.forallIntroEq e a' m' n')
+                    >>> [
+                        (* typechecking goal: E : type *)
+                        chdir dir' >> idtacM TC.Secondary,
+
+                        (* E |- M' = N' : A' *)
+                        tac'
+                        ])
+                end)
+                    
+                   
+      (* propagateEquality hypopt dir M N bv k C A P Q spine tac sequel
+
+         if    dir is the directory for hypopt
+               M = P spine
+               N = Q spine
+               tac partially proves P = Q : A
+               C binds bv
+               |bv| = k
+         then  returns a tactic rewriting C{M} to C{N} in hypopt
+               and running sequel on the primary goal
+      *)
+      fun propagateEquality hypopt dir m n bv k c a p q spine tac sequel =
+         let
+            (* C{ M } = C { P spine } --> C { Q spine } = C{ N }
+               tac partially proves P = Q : A
+               k = |bv|
+            *)
+
+            val (dir', a', p', q', tac') = close bv dir a p q tac
+
+            (* dir' is the directory inside C
+               P' = \. ... \. P
+               Q' = \. ... \. Q
+               A' = forall e1 . ... forall ek . A
+               tac' partially proves P' = Q' : A'
+            *)
+
+            val spine' =
+               countdown (fn i => T.App (T.Var (i+1))) 0 k []
+
+            (* spine' = k ... 1 *)
+
+            val b = instantiateShift c (T.Elim (T.zero, spine' @ T.ssubst spine T.shift1))
+
+            (* B[P' . id] = C{ (0 k ... 1 spine[^]) [P'[^k] . id] }
+                          = C{ P'[^k] k-1 ... 0 spine }
+                          = C{ (\. ... \. P)[^k] k-1 ... 0 spine }
+                          = C{ (\. ... \. P[0 ... k-1 . ^2k]) k-1 ... 0 spine }
+                     =beta= C{ P[0 .. k-1 . ^2k][0 .. k-1 . id] spine }
+                          = C{ P[0 .. k-1 . ^k] spine }
+                          = C{ P[id] spine }
+                          = C{ P spine }
+                          = C{ M }
+
+               similarly B[Q' . id] =beta= C{ N }
+            *)
+
+            val cm = instantiate c m
+            val cn = instantiate c n
+
+            (* the outer directory with one variable added *)
+            val dira = D.bind0 dir
+         in
+            (case hypopt of
+                NONE =>
+                   (* C{M} *)
+                   refine (Rule.equivalence cn cm)
+                   >>> [
+                       (* C{N} = C{M} : type *)
+                       refine (Rule.eqtpSymm cn cm)
+                       >>> [
+                           (* C{M} = C{N} : type
+                              that is:
+                              B[P' . id] = B[Q' . id] : type
+                           *)
+                           refine (Rule.eqtpFunct a' b p' q')
+                           >>> [
+                               (* typechecking goal: A' |- B : type *)
+                               chdir dira >> idtacM TC.Secondary,
+                                
+                               (* P' = Q' : A' *)
+                               tac'
+                               ]
+                           ],
+
+                       (* primary goal: C{N} *)
+                       sequel]
+
+              | SOME hyp =>
+                   (* C{M} ... |- J *)
+                   refine (Rule.equivalenceLeft hyp cm cn (T.evar ()))
+                   >>> [
+                       (* C{M} : type |- C{M} = C{N} : type *)
+                       refine (Rule.weaken 0 1)
+                       >>> [
+                           (* C{M} = C{N} : type
+                              that is:
+                              B[P' . id] = B[Q' . id] : type
+                           *)
+                           refine (Rule.eqtpFunct a' b p' q')
+                           >>> [
+                               (* typechecking goal: A' |- B : type *)
+                               chdir dira >> idtacM TC.Secondary,
+
+                               (* P' = Q' : A' *)
+                               tac'
+                               ]
+                           ],
+
+                       (* C{N} ... |- J *)
+                       sequel
+                       ])
+         end
+
+      fun rewriteEquality i core hypopt (jud, dir) sequel =
+         let
+            val (d, dir) =
+               (case hypopt of
+                   NONE =>
+                      (J.concl jud, dir)
+
+                 | SOME hyp =>
+                      (case J.hypOpt jud hyp of
+                          SOME (J.Tm d) =>
+                             let
+                             in
+                                (d, D.shift dir (hyp+1))
+                             end
+      
+                        | NONE =>
+                             (* this shouldn't happen with a good directory *)
+                             raise (RewriteFailure "nonexistent hypothesis")
+      
+                        | SOME _ =>
+                             raise (RewriteFailure "hypothesis has the wrong sort")))
+
+            val (m, n, bv, k, c, (a, p, q, spine, tac)) = find i d core
+         in
+            propagateEquality hypopt dir m n bv k c a p q spine tac sequel
+         end
+
+      (* propagateImplies dir A B C ftac rtac fk ek sk
+
+         if    dir is the directory within C
+               G is the context within C
+               ftac partially proves G |- A -> B
+               rtac partially proves C |- B -> A
+         then  ftac' partially proves C{A} -> C{B}
+               rtac' partially proves C{B} -> C{A}
+               and
+               calls sk (ftac', rtac')
+         or    C{} = C1{ C2{} }
+               tac partially proves C2{A} = C2{B} : U(I)
+               and
+               calls ek (C1, I, C2{A}, C2{B}, tac)
+         or    calls fk () if impossible
+
+         Does chdir for any subgoals it creates, but not for ftac/rtac.
+      *)
+      fun propagateImplies dir a b c ftac rtac fk ek sk =
+         (case c of
+             [] =>
+                sk (ftac, rtac)
+
+           | Flam binder :: Felim2 (h as T.Const const, [T.App d], []) :: rest =>
+                (* We can only propagate through the rhs of a quantifier. *)
+                if Constant.eq (const, Prim.forall) then
+                   (* C = Rest{ forall D . {} } *)
+                   let
+                      val dom = d
+
+                      (* dir includes binder *)
+                      val dir' = D.tl dir
+
+                      (* tac partially proves G, dom |- cod -> cod' *)
+                      fun incod cod cod' tac =
+                         (* G |- (forall dom . cod) -> (forall dom . cod') *)
+                         refine (Rule.assert 
+                                    (T.apply2 Prim.forall dom (T.Lam (NONE, T.apply2 Prim.arrow cod cod')))
+                                    (T.evar ()))
+                         >>> [
+                             (* G |- forall dom . cod -> cod' *)
+                             refine (Rule.forallIntro dom (T.apply2 Prim.arrow cod cod'))
+                             >>> [
+                                 (* G |- dom : type *)
+                                 chdir dir' >> idtacM TC.Secondary,
+
+                                 (* G, dom |- cod -> cod' *)
+                                 tac
+                                 ],
+
+                             (* G, (forall dom . cod -> cod') |- (forall dom[^] . cod[0 . ^2]) -> (forall dom[^] . cod'[0 . ^2]) *)
+                             refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                             >>> [
+                                 (* G, (forall dom . cod -> cod') |- (forall dom[^] . cod[0 . ^2]) : type *)
+                                 refine (Rule.forallForm
+                                            (T.Sub (dom, T.shift1))
+                                            (T.Sub (cod, T.Idot (0, T.Shift 2))))
+                                 >>> [
+                                     (* G, (forall dom . cod -> cod') |- dom[^] : type *)
+                                     refine (Rule.forallFormInv1
+                                                (T.Sub (dom, T.shift1))
+                                                (T.Sub (T.apply2 Prim.arrow cod cod', T.Idot (0, T.Shift 2))))
+                                     >>
+                                     (* G, (forall dom . cod -> cod') |- forall dom[^] . cod[0 . ^2] -> cod'[0 . ^2] : type *)
+                                     refine (Rule.inhabitedForm (T.evar ()))
+                                     >>
+                                     (* G, (forall dom . cod -> cod') |- forall dom[^] . cod[0 . ^2] -> cod'[0 . ^2]*)
+                                     refine (Rule.hypothesis 0) >> done,
+
+                                     (* G, (forall dom . cod -> cod'), dom[^] |- cod[0 . ^2] : type *)
+                                     refine (Rule.arrowFormInv1
+                                                (T.evar ())
+                                                (T.Sub (cod', T.Idot (0, T.Shift 2))))
+                                     >>
+                                     (* G, (forall dom . cod -> cod'), dom[^] |- cod[0 . ^2] -> cod'[0 . ^2] : type
+                                                                               = (cod[0 . ^3] -> cod'[0 . ^3])[0 . id] : type
+                                     *)
+                                     refine (Rule.forallFormInv2
+                                                (T.Sub (dom, T.Shift 2))
+                                                (T.apply2 Prim.arrow
+                                                    (T.Sub (cod, T.Idot (0, T.Shift 3)))
+                                                    (T.Sub (cod', T.Idot (0, T.Shift 3))))
+                                                T.zero)
+                                     >>> [
+                                         (* G, (forall dom . cod -> cod'), dom[^] |- forall dom[^2] . cod[0 . ^3] -> cod'[0 . ^3] : type *)
+                                         refine (Rule.inhabitedForm (T.evar ()))
+                                         >>
+                                         (* G, (forall dom . cod -> cod'), dom[^] |- forall dom[^2] . cod[0 . ^3] -> cod'[0 . ^3] *)
+                                         refine (Rule.hypothesis 1) >> done,
+
+                                         (* G, (forall dom . cod -> cod'), dom[^] |- 0 : dom[^2] *)
+                                         refine (Rule.hypothesisOf 0) >> done
+                                         ]
+                                     ],
+
+                                 (* G, (forall dom . cod -> cod'), (forall dom[^] . cod[0 . ^2]) |- forall dom[^2] . cod'[0 . ^3] *)
+                                 refine (Rule.forallIntro
+                                            (T.Sub (dom, T.Shift 2))
+                                            (T.Sub (cod', T.Idot (0, T.Shift 3))))
+                                 >>> [
+                                     (* G, (forall dom . cod -> cod'), (forall dom[^] . cod[0 . ^2]) |- dom[^2] : type *)
+                                     refine (Rule.forallFormInv1
+                                                (T.evar ())
+                                                (T.Sub (T.apply2 Prim.arrow cod cod', T.Idot (0, T.Shift 3))))
+                                     >>
+                                     (* G, (forall dom . cod -> cod'), (forall dom[^] . cod[0 . ^2]) |- forall dom[^2] . cod[0 . ^3] -> cod'[0 . ^3] : type *)
+                                     refine (Rule.inhabitedForm (T.evar ()))
+                                     >>
+                                     (* G, (forall dom . cod -> cod'), (forall dom[^] . cod[0 . ^2]) |- forall dom[^2] . cod[0 . ^3] -> cod'[0 . ^3] *)
+                                     refine (Rule.hypothesis 1) >> done,
+
+                                     (* G, (forall dom . cod -> cod'), (forall dom[^] . cod[0 . ^2]), dom[^2] |- cod'[0 . ^3] *)
+                                     refine (Rule.arrowElim
+                                                (T.Sub (cod, T.Idot (0, T.Shift 3)))
+                                                (T.Sub (cod', T.Idot (0, T.Shift 3))))
+                                     >>> [
+                                         (* G, (forall dom . cod -> cod'), (forall dom[^] . cod[0 . ^2]), dom[^2] |- cod[0 . ^3] -> cod'[0 . ^3]
+                                                                                                                   = (cod[0 . ^4] -> cod'[0 . ^4])[0 . id]
+                                         *)
+                                         refine (Rule.forallElim
+                                                    (T.Sub (dom, T.Shift 3))
+                                                    (T.Sub (T.apply2 Prim.arrow cod cod', T.Idot (0, T.Shift 4)))
+                                                    T.zero)
+                                         >>> [
+                                             (* G, (forall dom . cod -> cod'), (forall dom[^] . cod[0 . ^2]), dom[^2] |- forall dom[^3] . cod[0 . ^4] -> cod'[0 . ^4] *)
+                                             refine (Rule.hypothesis 2) >> done,
+
+                                             (* G, (forall dom . cod -> cod'), (forall dom[^] . cod[0 . ^2]), dom[^2] |- 0 : dom[^3] *)
+                                             refine (Rule.hypothesisOf 0) >> done
+                                             ],
+
+                                         (* G, (forall dom . cod -> cod'), (forall dom[^] . cod[0 . ^2]), dom[^2] |- cod[0 . ^3] 
+                                                                                                                   = cod[0 . ^4][0 . id]
+                                         *)
+                                         refine (Rule.forallElim
+                                                    (T.Sub (dom, T.Shift 3))
+                                                    (T.Sub (cod, T.Idot (0, T.Shift 4)))
+                                                    T.zero)
+                                         >>> [
+                                             (* G, (forall dom . cod -> cod'), (forall dom[^] . cod[0 . ^2]), dom[^2] |- forall dom[^3] . cod[0 . ^4] *)
+                                             refine (Rule.hypothesis 1) >> done,
+
+                                             (* G, (forall dom . cod -> cod'), (forall dom[^] . cod[0 . ^2]), dom[^2] |- 0 : dom[^3] *)
+                                             refine (Rule.hypothesisOf 0) >> done
+                                             ]
+                                         ]
+                                     ]
+                                 ]
+                             ]
+                   in
+                      propagateImplies
+                         dir'
+                         (T.Elim (T.Const Prim.forall, [T.App dom, T.App (T.Lam (binder, a))]))
+                         (T.Elim (T.Const Prim.forall, [T.App dom, T.App (T.Lam (binder, b))]))
+                         rest
+                         (Option.map (incod a b) ftac)
+                         (Option.map (incod b a) rtac)
+                         fk ek sk
+                   end
+
+                else if Constant.eq (const, Prim.exists) then
+                   (* C = Rest{ exists D . {} } *)
+                   let
+                      val d1 = d
+
+                      (* dir includes binder *)
+                      val dir' = D.tl dir
+
+                      (* tac partially proves d1 |- d2 -> d2' *)
+                      fun inright d2 d2' tac =
+                         (* G |- (exists d1 . d2) -> (exists d1 . d2') *)
+                         refine (Rule.assert
+                                    (T.apply2 Prim.forall d1 (T.Lam (NONE, T.apply2 Prim.arrow d2 d2')))
+                                    (T.evar ()))
+                         >>> [
+                             (* G |- forall d1 . d2 -> d2' *)
+                             refine (Rule.forallIntro d1 (T.apply2 Prim.arrow d2 d2'))
+                             >>> [
+                                 (* G |- d1 : type *)
+                                 chdir dir' >> idtacM TC.Secondary,
+
+                                 (* G, d1 |- d2 -> d2' *)
+                                 tac
+                                 ],
+
+                             (* G, (forall d1 . d2 -> d2') |- (exists d1[^] . d2[0 . ^2]) -> (exists d1[^] . d2'[0 . ^2]) *)
+                             refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                             >>> [
+                                 (* G, (forall d1 . d2 -> d2') |- (exists d1[^] . d2[0 . ^2]) : type *)
+                                 refine (Rule.existsForm
+                                            (T.Sub (d1, T.shift1))
+                                            (T.Sub (d2, T.Idot (0, T.Shift 2))))
+                                 >>> [
+                                     (* G, (forall d1 . d2 -> d2') |- d1[^] : type *)
+                                     refine (Rule.forallFormInv1
+                                                (T.Sub (d1, T.shift1))
+                                                (T.Sub (T.apply2 Prim.arrow d2 d2', T.Idot (0, T.Shift 2))))
+                                     >>
+                                     (* G, (forall d1 . d2 -> d2') |- forall d1[^] . d2[0 . ^2] -> d2'[0 . ^2] : type *)
+                                     refine (Rule.inhabitedForm (T.evar ()))
+                                     >>
+                                     (* G, (forall d1 . d2 -> d2') |- forall d1[^] . d2[0 . ^2] -> d2'[0 . ^2]*)
+                                     refine (Rule.hypothesis 0) >> done,
+
+                                     (* G, (forall d1 . d2 -> d2'), d1[^] |- d2[0 . ^2] : type *)
+                                     refine (Rule.arrowFormInv1
+                                                (T.evar ())
+                                                (T.Sub (d2', T.Idot (0, T.Shift 2))))
+                                     >>
+                                     (* G, (forall d1 . d2 -> d2'), d1[^] |- d2[0 . ^2] -> d2'[0 . ^2] : type
+                                                                           = (d2[0 . ^3] -> d2'[0 . ^3])[0 . id] : type
+                                     *)
+                                     refine (Rule.forallFormInv2
+                                                (T.Sub (d1, T.Shift 2))
+                                                (T.apply2 Prim.arrow
+                                                    (T.Sub (d2, T.Idot (0, T.Shift 3)))
+                                                    (T.Sub (d2', T.Idot (0, T.Shift 3))))
+                                                T.zero)
+                                     >>> [
+                                         (* G, (forall d1 . d2 -> d2'), d1[^] |- forall d1[^2] . d2[0 . ^3] -> d2'[0 . ^3] : type *)
+                                         refine (Rule.inhabitedForm (T.evar ()))
+                                         >>
+                                         (* G, (forall d1 . d2 -> d2'), d1[^] |- forall d1[^2] . d2[0 . ^3] -> d2'[0 . ^3] *)
+                                         refine (Rule.hypothesis 1) >> done,
+
+                                         (* G, (forall d1 . d2 -> d2'), d1[^] |- 0 : d1[^2] *)
+                                         refine (Rule.hypothesisOf 0) >> done
+                                         ]
+                                     ],
+
+                                 (* G, (forall d1 . d2 -> d2'), (exists d1[^] . d2[0 . ^2]) |- exists d1[^2] . d2'[0 . ^3] *)
+                                 refine (Rule.existsIntro
+                                            (T.Sub (d1, T.Shift 2))
+                                            (T.Sub (d2', T.Idot (0, T.Shift 3)))
+                                            (T.pi1 T.zero))
+                                 >>> [
+                                     (* G, (forall d1 . d2 -> d2'), (exists d1[^] . d2[0 . ^2]), d1[^2] |- d2'[0 . ^3] : type *)
+                                     refine (Rule.weaken 1 2)
+                                     >>
+                                     (* G, d1 |- d2' : type *)
+                                     chdir dir >> idtacM TC.Secondary,
+
+                                     (* G, (forall d1 . d2 -> d2'), (exists d1[^] . d2[0 . ^2]) |- 0 #1 : d1[^2] *)
+                                     refine (Rule.existsElim1Of
+                                                (T.Sub (d1, T.Shift 2))
+                                                (T.Sub (d2, T.Idot (0, T.Shift 3)))
+                                                T.zero)
+                                     >>
+                                     (* G, (forall d1 . d2 -> d2'), (exists d1[^] . d2[0 . ^2]) |- 0 : exists d1[^2] . d2[0 . ^3] *)
+                                     refine (Rule.hypothesisOf 0) >> done,
+
+                                     (* G, (forall d1 . d2 -> d2'), (exists d1[^] . d2[0 . ^2]) |- d2'[0 . ^3][0 #1 . id]
+                                                                                                 = d2'[0 #1 . ^2]
+                                     *)
+                                     refine (Rule.arrowElim (T.Sub (d2, T.Dot (T.pi1 T.zero, T.Shift 2))) (T.evar ()))
+                                     >>> [
+                                         (* G, (forall d1 . d2 -> d2'), (exists d1[^] . d2[0 . ^2]) |- d2[0 #1 . ^2] -> d2'[0 #1 . ^2]
+                                                                                                     = (d2[0 . ^3] -> d2'[0 . ^3])[0 #1 . id]
+                                         *)
+                                         refine (Rule.forallElim
+                                                    (T.Sub (d1, T.Shift 2))
+                                                    (T.Sub (T.apply2 Prim.arrow d2 d2', T.Idot (0, T.Shift 3)))
+                                                    (T.pi1 T.zero))
+                                         >>> [
+                                             (* G, (forall d1 . d2 -> d2'), (exists d1[^] . d2[0 . ^2]) |- forall d1[^2] . d2[0 . ^3] -> d2'[0 . ^3] *)
+                                             refine (Rule.hypothesis 1) >> done,
+                                             
+                                             (* G, (forall d1 . d2 -> d2'), (exists d1[^] . d2[0 . ^2]) |- 0 #1 : d1[^2] *)
+                                             refine (Rule.existsElim1Of
+                                                        (T.Sub (d1, T.Shift 2))
+                                                        (T.Sub (d2, T.Idot (0, T.Shift 3)))
+                                                        T.zero)
+                                             >>
+                                             (* G, (forall d1 . d2 -> d2'), (exists d1[^] . d2[0 . ^2]) |- 0 : exists d1[^2] . d2[0 . ^3] *)
+                                             refine (Rule.hypothesisOf 0) >> done
+                                             ],
+
+                                         (* G, (forall d1 . d2 -> d2'), (exists d1[^] . d2[0 . ^2]) |- d2[0 #1 . ^2] *)
+                                         refine (Rule.inhabitant (T.evar ()) (T.pi2 T.zero))
+                                         >>
+                                         (* G, (forall d1 . d2 -> d2'), (exists d1[^] . d2[0 . ^2]) |- 0 #2 : d2[0 #1 . ^2] 
+                                                                                                            = d2[0 . ^3][0 #1 . id]
+                                         *)
+                                         refine (Rule.existsElim2Of
+                                                    (T.Sub (d1, T.Shift 2))
+                                                    (T.Sub (d2, T.Idot (0, T.Shift 3)))
+                                                    T.zero)
+                                         >>
+                                         (* G, (forall d1 . d2 -> d2'), (exists d1[^] . d2[0 . ^2]) |- 0 : exists d1[^2] . d2[0 . ^3] *)
+                                         refine (Rule.hypothesisOf 0) >> done
+                                         ]
+                                     ]
+                                 ]
+                             ]
+                   in
+                      propagateImplies
+                         dir'
+                         (T.apply2 Prim.exists d1 (T.Lam (binder, a)))
+                         (T.apply2 Prim.exists d1 (T.Lam (binder, b)))
+                         rest
+                         (Option.map (inright a b) ftac)
+                         (Option.map (inright b a) rtac)
+                         fk ek sk
+                   end
+
+                else if Constant.eq (const, Prim.set) then
+                   (* C = Rest{ set D . {} } *)
+                   (case (ftac, rtac) of
+                       (SOME ftac, SOME rtac) =>
+                          (* ftac partially proves G, D |- A -> B
+                             rtac partially proves G, D |- B -> A
+                          *)
+                          let
+                             (* dir includes binder *)
+                             val dir' = D.tl dir
+
+                             val univ = T.evar ()
+                          in
+                             ek
+                             (rest, univ, 
+                              instantiate rest (T.apply2 Prim.set d (T.Lam (binder, a))),
+                              instantiate rest (T.apply2 Prim.set d (T.Lam (binder, b))),
+
+                              (* G |- (set D . A) = (set D . B) : U univ *)
+                              refine (Rule.setEqUniv d d a b univ)
+                              >>> [
+                                  (* G |- D = D : U univ *)
+                                  refine (Rule.eqRefl 
+                                             (T.apply1 Prim.univ univ)
+                                             d)
+                                  >>
+                                  (* G |- D : U univ *)
+                                  chdir dir' >> idtacM TC.Secondary,
+
+                                  (* G, D |- A : U univ *)
+                                  chdir dir >> idtacM TC.Secondary,
+
+                                  (* G, D |- B : U univ *)
+                                  chdir dir >> idtacM TC.Secondary,
+
+                                  (* G, D, A |- B[^] *)
+                                  refine (Rule.arrowElim
+                                             (T.Sub (a, T.shift1))
+                                             (T.Sub (b, T.shift1)))
+                                  >>> [
+                                      (* G, D, A |- A[^] -> B[^] *)
+                                      refine (Rule.weaken 0 1)
+                                      >>
+                                      (* G, D |- A -> B *)
+                                      ftac,
+
+                                      (* G, D, A |- A[^] *)
+                                      refine (Rule.hypothesis 0) >> done
+                                      ],
+
+                                  (* G, D, B |- A[^] *)
+                                  refine (Rule.arrowElim
+                                             (T.Sub (b, T.shift1))
+                                             (T.Sub (a, T.shift1)))
+                                  >>> [
+                                      (* G, D, B |- B[^] -> A[^] *)
+                                      refine (Rule.weaken 0 1)
+                                      >>
+                                      (* G, D |- B -> A *)
+                                      rtac,
+
+                                      (* G, D, B |- B[^] *)
+                                      refine (Rule.hypothesis 0) >> done
+                                      ]
+                                  ])
+                          end
+
+                     | _ =>
+                          (* We could propagate through this, but if we can't get equality,
+                             it hardly seems worthwhile.
+                          *)
+                          fk ())
+
+                else
+                   (* no other quantifiers supported *)
+                   fk ()
+
+           | Felim2 (h as T.Const const, left, right) :: rest =>
+                if Constant.eq (const, Prim.arrow) then
+                   (case (left, right) of
+                       ([], [T.App cod]) =>
+                          (* C = Rest{ {} -> cod } *)
+                          let
+                             (* tac partially proves G |- dom' -> dom *)
+                             fun indom dom dom' tac =
+                                (* G |- (dom -> cod) -> (dom' -> cod) *)
+                                refine (Rule.assert (T.apply2 Prim.arrow dom' dom) (T.evar ()))
+                                >>> [
+                                    (* G |- dom' -> dom *)
+                                    tac,
+
+                                    (* G, dom' -> dom |- (dom[^] -> cod[^]) -> (dom'[^] -> cod[^]) *)
+                                    refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                                    >>> [
+                                        (* G, dom' -> dom |- dom[^] -> cod[^] : type *)
+                                        refine (Rule.arrowForm (T.evar ()) (T.evar ()))
+                                        >>> [
+                                            (* G, dom' -> dom |- dom[^] : type *)
+                                            refine (Rule.weaken 0 1)
+                                            >>
+                                            (* G |- dom : type *)
+                                            chdir dir >> idtacM TC.Secondary,
+
+                                            (* G, dom' -> dom, dom[^] |- cod[^2] : type *)
+                                            refine (Rule.weaken 0 2)
+                                            >>
+                                            (* G |- cod : type *)
+                                            chdir dir >> idtacM TC.Secondary
+                                            ],
+                                        
+                                        (* G, dom' -> dom, dom[^] -> cod[^] |- dom'[^2] -> cod[^2] *)
+                                        refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                                        >>> [
+                                            (* G, dom' -> dom, dom[^] -> cod[^] |- dom'[^2] : type *)
+                                            refine (Rule.arrowFormInv1 (T.evar ()) (T.Sub (dom, T.Shift 2)))
+                                            >>
+                                            (* G, dom' -> dom, dom[^] -> cod[^] |- dom'[^2] -> dom[^2] : type *)
+                                            refine (Rule.inhabitedForm (T.evar ()))
+                                            >>
+                                            (* G, dom' -> dom, dom[^] -> cod[^] |- dom'[^2] -> dom[^2] *)
+                                            refine (Rule.hypothesis 1) >> done,
+
+                                            (* G, dom' -> dom, dom[^] -> cod[^], dom'[^2] |- cod[^3] *)
+                                            refine (Rule.arrowElim (T.Sub (dom, T.Shift 3)) (T.evar ()))
+                                            >>> [
+                                                (* G, dom' -> dom, dom[^] -> cod[^], dom'[^2] |- dom[^3] -> cod[^3] *)
+                                                refine (Rule.hypothesis 1) >> done,
+
+                                                (* G, dom' -> dom, dom[^] -> cod[^], dom'[^2] |- dom[^3] *)
+                                                refine (Rule.arrowElim (T.Sub (dom', T.Shift 3)) (T.evar ()))
+                                                >>> [
+                                                    (* G, dom' -> dom, dom[^] -> cod[^], dom'[^2] |- dom'[^3] -> dom[^3] *)
+                                                    refine (Rule.hypothesis 2) >> done,
+
+                                                    (* G, dom' -> dom, dom[^] -> cod[^], dom'[^2] |- dom'[^3] *)
+                                                    refine (Rule.hypothesis 0) >> done
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                          in
+                             propagateImplies dir
+                                (T.Elim (T.Const Prim.arrow, [T.App a, T.App cod]))
+                                (T.Elim (T.Const Prim.arrow, [T.App b, T.App cod]))
+                                rest
+                                (Option.map (indom a b) rtac)
+                                (Option.map (indom b a) ftac)
+                                fk ek sk
+                          end
+
+                     | ([T.App dom], []) =>
+                          (* C = Rest{ dom -> {} } *)
+                          let
+                             (* tac partially proves G |- cod -> cod' *)
+                             fun incod cod cod' tac =
+                                (* G |- (dom -> cod) -> (dom -> cod') *)
+                                refine (Rule.assert (T.apply1 Prim.istp dom) (T.evar ()))
+                                >>> [
+                                    (* G |- dom : type *)
+                                    chdir dir >> idtacM TC.Secondary,
+
+                                    (* G, dom : type |- (dom[^] -> cod[^]) -> (dom[^] -> cod'[^]) *)
+                                    refine (Rule.assert (T.Sub (T.apply2 Prim.arrow cod cod', T.shift1)) (T.evar ()))
+                                    >>> [
+                                        (* G, dom : type |- cod[^] -> cod'[^] *)
+                                        refine (Rule.weaken 0 1)
+                                        >>
+                                        (* G |- cod -> cod' *)
+                                        tac,
+
+                                        (* G, dom : type, cod[^] -> cod'[^] |- (dom[^2] -> cod[^2]) -> (dom[^2] -> cod'[^2]) *)
+                                        refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                                        >>> [
+                                            (* G, dom : type, cod[^] -> cod'[^] |- dom[^2] -> cod[^2] : type *)
+                                            refine (Rule.arrowForm (T.evar ()) (T.evar ()))
+                                            >>> [
+                                                (* G, dom : type, cod[^] -> cod'[^] |- dom[^2] : type *)
+                                                refine (Rule.hypothesis 1) >> done,
+
+                                                (* G, dom : type, cod[^] -> cod'[^], dom[^2] |- cod[^3] : type *)
+                                                refine (Rule.arrowFormInv1 (T.evar ()) (T.Sub (cod', T.Shift 3)))
+                                                >>
+                                                (* G, dom : type, cod[^] -> cod'[^], dom[^2] |- cod[^3] -> cod'[^3] : type *)
+                                                refine (Rule.inhabitedForm (T.evar ()))
+                                                >>
+                                                (* G, dom : type, cod[^] -> cod'[^], dom[^2] |- cod[^3] -> cod'[^3] *)
+                                                refine (Rule.hypothesis 1) >> done
+                                                ],
+
+                                            (* G, dom : type, cod[^] -> cod'[^], dom[^2] -> cod[^2] |- dom[^3] -> cod'[^3] *)
+                                            refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                                            >>> [
+                                                (* G, dom : type, cod[^] -> cod'[^], dom[^2] -> cod[^2] |- dom[^3] : type *)
+                                                refine (Rule.hypothesis 2) >> done,
+
+                                                (* G, dom : type, cod[^] -> cod'[^], dom[^2] -> cod[^2], dom[^3] |- cod'[^4] *)
+                                                refine (Rule.arrowElim (T.Sub (cod, T.Shift 4)) (T.evar ()))
+                                                >>> [
+                                                    (* G, dom : type, cod[^] -> cod'[^], dom[^2] -> cod[^2], dom[^3] |- cod[^4] -> cod'[^4] *)
+                                                    refine (Rule.hypothesis 2) >> done,
+
+                                                    (* G, dom : type, cod[^] -> cod'[^], dom[^2] -> cod[^2], dom[^3] |- cod[^4] *)
+                                                    refine (Rule.arrowElim (T.Sub (dom, T.Shift 4)) (T.evar ()))
+                                                    >>> [
+                                                        (* G, dom : type, cod[^] -> cod'[^], dom[^2] -> cod[^2], dom[^3] |- dom[^4] -> cod[^4] *)
+                                                        refine (Rule.hypothesis 1) >> done,
+
+                                                        (* G, dom : type, cod[^] -> cod'[^], dom[^2] -> cod[^2], dom[^3] |- dom[^4] *)
+                                                        refine (Rule.hypothesis 0) >> done
+                                                        ]
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                          in
+                             propagateImplies dir
+                                (T.Elim (T.Const Prim.arrow, [T.App dom, T.App a]))
+                                (T.Elim (T.Const Prim.arrow, [T.App dom, T.App b]))
+                                rest
+                                (Option.map (incod a b) ftac)
+                                (Option.map (incod b a) rtac)
+                                fk ek sk
+                          end
+
+                     | _ =>
+                          (* type error *)
+                          fk ())
+
+                else if Constant.eq (const, Prim.prod) then
+                   (case (left, right) of
+                       ([], [T.App d2]) =>
+                          (* C = Rest{ {} & d2 } *)
+                          let
+                             (* tac partially proves G |- d1 -> d1' *)
+                             fun inleft d1 d1' tac =
+                                (* G |- (d1 & d2) -> (d1' & d2) *)
+                                refine (Rule.assert (T.apply1 Prim.istp d2) (T.evar ()))
+                                >>> [
+                                    (* G |- d2 : type *)
+                                    chdir dir >> idtacM TC.Secondary,
+
+                                    (* G, d2 : type |- (d1[^] & d2[^]) -> (d1'[^] & d2[^]) *)
+                                    refine (Rule.assert (T.Sub (T.apply2 Prim.arrow d1 d1', T.shift1)) (T.evar ()))
+                                    >>> [
+                                        (* G, d2 : type |- d1[^] -> d1'[^] *)
+                                        refine (Rule.weaken 0 1)
+                                        >>
+                                        (* G |- d1 -> d1' *)
+                                        tac,
+    
+                                        (* G, d2 : type, d1[^] -> d1'[^] |- (d1[^2] & d2[^2]) -> (d1'[^2] & d2[^2]) *)
+                                        refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                                        >>> [
+                                            (* G, d2 : type, d1[^] -> d1'[^] |- d1[^2] & d2[^2] : type *)
+                                            refine (Rule.prodForm (T.evar ()) (T.evar ()))
+                                            >>> [
+                                                (* G, d2 : type, d1[^] -> d1'[^] |- d1[^2] : type *)
+                                                refine (Rule.arrowFormInv1 (T.evar ()) (T.Sub (d1', T.Shift 2)))
+                                                >>
+                                                (* G, d2 : type, d1[^] -> d1'[^] |- d1[^2] -> d1'[^2] : type *)
+                                                refine (Rule.inhabitedForm (T.evar ()))
+                                                >>
+                                                (* G, d2 : type, d1[^] -> d1'[^] |- d1[^2] -> d1'[^2] *)
+                                                refine (Rule.hypothesis 0) >> done,
+    
+                                                (* G, d2 : type, d1[^] -> d1'[^] |- d2[^2] : type *)
+                                                refine (Rule.hypothesis 1) >> done,
+                                                ],
+    
+                                            (* G, d2 : type, d1[^] -> d1'[^], d1[^2] & d2[^2] |- d1'[^3] & d2[^3] *)
+                                            refine (Rule.prodIntro (T.evar ()) (T.evar ()))
+                                            >>> [
+                                                (* G, d2 : type, d1[^] -> d1'[^], d1[^2] & d2[^2] |- d1'[^3] *)
+                                                refine (Rule.arrowElim (T.Sub (d1, T.Shift 3)) (T.evar ()))
+                                                >>> [
+                                                    (* G, d2 : type, d1[^] -> d1'[^], d1[^2] & d2[^2] |- d1[^3] -> d1'[^3] *)
+                                                    refine (Rule.hypothesis 1) >> done,
+    
+                                                    (* G, d2 : type, d1[^] -> d1'[^], d1[^2] & d2[^2] |- d1[^3] *)
+                                                    refine (Rule.prodElim1 (T.evar ()) (T.Sub (d2, T.Shift 3)))
+                                                    >>
+                                                    (* G, d2 : type, d1[^] -> d1'[^], d1[^2] & d2[^2] |- d1[^3] & d2[^3] *)
+                                                    refine (Rule.hypothesis 0) >> done
+                                                    ],
+                                                
+                                                (* G, d2 : type, d1[^] -> d1'[^], d1[^2] & d2[^2] |- d2[^3] *)
+                                                refine (Rule.prodElim2 (T.Sub (d1, T.Shift 3)) (T.evar ()))
+                                                >>
+                                                (* G, d2 : type, d1[^] -> d1'[^], d1[^2] & d2[^2] |- d1[^3] & d2[^3] *)
+                                                refine (Rule.hypothesis 0) >> done
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                          in
+                             propagateImplies dir
+                                (T.apply2 Prim.prod a d2)
+                                (T.apply2 Prim.prod b d2)
+                                rest
+                                (Option.map (inleft a b) ftac)
+                                (Option.map (inleft b a) rtac)
+                                fk ek sk
+                          end
+
+                     | ([T.App d1], []) =>
+                          (* C = Rest{ d1 & {} } *)
+                          let
+                             (* tac partially proves G |- d2 -> d2' *)
+                             fun inright d2 d2' tac =
+                                (* G |- (d1 & d2) -> (d1 & d2') *)
+                                refine (Rule.assert (T.apply1 Prim.istp d1) (T.evar ()))
+                                >>> [
+                                    (* G |- d1 : type *)
+                                    chdir dir >> idtacM TC.Secondary,
+
+                                    (* G, d1 : type |- (d1[^] & d2[^]) -> (d1[^] & d2'[^]) *)
+                                    refine (Rule.assert (T.Sub (T.apply2 Prim.arrow d2 d2', T.shift1)) (T.evar ()))
+                                    >>> [
+                                        (* G, d1 : type |- d2[^] -> d2'[^] *)
+                                        refine (Rule.weaken 0 1)
+                                        >>
+                                        (* G |- d2 -> d2' *)
+                                        tac,
+    
+                                        (* G, d1 : type, d2[^] -> d2'[^] |- (d1[^2] & d2[^2]) -> (d1[^2] & d2'[^2]) *)
+                                        refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                                        >>> [
+                                            (* G, d1 : type, d2[^] -> d2'[^] |- d1[^2] & d2[^2] : type *)
+                                            refine (Rule.prodForm (T.evar ()) (T.evar ()))
+                                            >>> [
+                                                (* G, d1 : type, d2[^] -> d2'[^] |- d1[^2] : type *)
+                                                refine (Rule.hypothesis 1) >> done,
+    
+                                                (* G, d1 : type, d2[^] -> d2'[^] |- d2[^2] : type *)
+                                                refine (Rule.arrowFormInv1 (T.evar ()) (T.Sub (d2', T.Shift 2)))
+                                                >>
+                                                (* G, d1 : type, d2[^] -> d2'[^] |- d2[^2] -> d2'[^2] : type *)
+                                                refine (Rule.inhabitedForm (T.evar ()))
+                                                >>
+                                                (* G, d1 : type, d2[^] -> d2'[^] |- d2[^2] -> d2'[^2] *)
+                                                refine (Rule.hypothesis 0) >> done
+                                                ],
+    
+                                            (* G, d1 : type, d2[^] -> d2'[^], d1[^2] & d2[^2] |- d1[^3] & d2'[^3] *)
+                                            refine (Rule.prodIntro (T.evar ()) (T.evar ()))
+                                            >>> [
+                                                (* G, d1 : type, d2[^] -> d2'[^], d1[^2] & d2[^2] |- d1[^3] *)
+                                                refine (Rule.prodElim1 (T.evar ()) (T.Sub (d2, T.Shift 3)))
+                                                >>
+                                                (* G, d1 : type, d2[^] -> d2'[^], d1[^2] & d2[^2] |- d1[^3] & d2[^3] *)
+                                                refine (Rule.hypothesis 0) >> done,
+    
+                                                (* G, d1 : type, d2[^] -> d2'[^], d1[^2] & d2[^2] |- d2'[^3] *)
+                                                refine (Rule.arrowElim (T.Sub (d2, T.Shift 3)) (T.evar ()))
+                                                >>> [
+                                                    (* G, d1 : type, d2[^] -> d2'[^], d1[^2] & d2[^2] |- d2[^3] -> d2'[^3] *)
+                                                    refine (Rule.hypothesis 1) >> done,
+    
+                                                    (* G, d1 : type, d2[^] -> d2'[^], d1[^2] & d2[^2] |- d2[^3] *)
+                                                    refine (Rule.prodElim2 (T.Sub (d1, T.Shift 3)) (T.evar ()))
+                                                    >>
+                                                    (* G, d1 : type, d2[^] -> d2'[^], d1[^2] & d2[^2] |- d1[^3] & d2[^3] *)
+                                                    refine (Rule.hypothesis 0) >> done
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                          in
+                             propagateImplies dir
+                                (T.apply2 Prim.prod d1 a)
+                                (T.apply2 Prim.prod d1 b)
+                                rest
+                                (Option.map (inright a b) ftac)
+                                (Option.map (inright b a) rtac)
+                                fk ek sk
+                          end
+
+                     | _ =>
+                          (* type error *)
+                          fk ())
+
+                else if Constant.eq (const, Prim.sum) then
+                   (case (left, right) of
+                       ([], [T.App d2]) =>
+                          (* C = Rest{ {} % d2 } *)
+                          let
+                             (* tac partially proves G |- d1 -> d1' *)
+                             fun inleft d1 d1' tac =
+                                (* G |- (d1 % d2) -> (d1' % d2) *)
+                                refine (Rule.assert (T.apply1 Prim.istp d2) (T.evar ()))
+                                >>> [
+                                    (* G |- d2 : type *)
+                                    chdir dir >> idtacM TC.Secondary,
+
+                                    (* G, d2 : type |- (d1[^] % d2[^]) -> (d1'[^] % d2[^]) *)
+                                    refine (Rule.assert (T.Sub (T.apply2 Prim.arrow d1 d1', T.shift1)) (T.evar ()))
+                                    >>> [
+                                        (* G, d2 : type |- d1[^] -> d1'[^] *)
+                                        refine (Rule.weaken 0 1)
+                                        >>
+                                        (* G |- d1 -> d1' *)
+                                        tac,
+    
+                                        (* G, d2 : type, d1[^] -> d1'[^] |- (d1[^2] % d2[^2]) -> (d1'[^2] % d2[^2]) *)
+                                        refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                                        >>> [
+                                            (* G, d2 : type, d1[^] -> d1'[^] |- d1[^2] % d2[^2] : type *)
+                                            refine (Rule.sumForm (T.evar ()) (T.evar ()))
+                                            >>> [
+                                                (* G, d2 : type, d1[^] -> d1'[^] |- d1[^2] : type *)
+                                                refine (Rule.arrowFormInv1 (T.evar ()) (T.Sub (d1', T.Shift 2)))
+                                                >>
+                                                (* G, d2 : type, d1[^] -> d1'[^] |- d1[^2] -> d1'[^2] : type *)
+                                                refine (Rule.inhabitedForm (T.evar ()))
+                                                >>
+                                                (* G, d2 : type, d1[^] -> d1'[^] |- d1[^2] -> d1'[^2] *)
+                                                refine (Rule.hypothesis 0) >> done,
+    
+                                                (* G, d2 : type, d1[^] -> d1'[^] |- d2[^2] : type *)
+                                                refine (Rule.hypothesis 1) >> done
+                                                ],
+    
+                                            (* G, d2 : type, d1[^] -> d1'[^], d1[^2] % d2[^2] |- d1'[^3] % d2[^3] 
+                                                                                               = (d1'[^4] % d2[^4])[0 . id]
+                                            *)
+                                            refine (Rule.sumElim
+                                                       (T.Sub (d1, T.Shift 3))
+                                                       (T.Sub (d2, T.Shift 3))
+                                                       (T.Sub (T.apply2 Prim.sum d1' d2, T.Shift 4))
+                                                       T.zero)
+                                            >>> [
+                                                (* G, d2 : type, d1[^] -> d1'[^], d1[^2] % d2[^2] |- 0 : d1[^3] % d2[^3] *)
+                                                refine (Rule.hypothesisOf 0) >> done,
+    
+                                                (* G, d2 : type, d1[^] -> d1'[^], d1[^2] % d2[^2], d1[^3] |- (d1'[^4] % d2[^4])[inl 0 . ^]
+                                                                                                           = d1'[^4] % d2[^4]
+                                                *)
+                                                refine (Rule.sumIntro1 (T.evar ()) (T.evar ()))
+                                                >>> [
+                                                    (* G, d2 : type, d1[^] -> d1'[^], d1[^2] % d2[^2], d1[^3] |- d2[^4] : type *)
+                                                    refine (Rule.hypothesis 3) >> done,
+
+                                                    (* G, d2 : type, d1[^] -> d1'[^], d1[^2] % d2[^2], d1[^3] |- d1'[^4] *)
+                                                    refine (Rule.arrowElim (T.Sub (d1, T.Shift 4)) (T.evar ()))
+                                                    >>> [
+                                                        (* G, d2 : type, d1[^] -> d1'[^], d1[^2] % d2[^2], d1[^3] |- d1[^4] -> d1'[^4] *)
+                                                        refine (Rule.hypothesis 2) >> done,
+
+                                                        (* G, d2 : type, d1[^] -> d1'[^], d1[^2] % d2[^2], d1[^3] |- d1[^4] *)
+                                                        refine (Rule.hypothesis 0) >> done
+                                                        ]
+                                                    ],
+    
+                                                (* G, d2 : type, d1[^] -> d1'[^], d1[^2] % d2[^2], d2[^3] |- (d1'[^4] % d2[^4])[inr 0 . ^]
+                                                                                                           = d1'[^4] % d2[^4]
+                                                *)
+                                                refine (Rule.sumIntro2 (T.evar ()) (T.evar ()))
+                                                >>> [
+                                                    (* G, d2 : type, d1[^] -> d1'[^], d1[^2] % d2[^2], d2[^3] |- d1'[^4] : type *)
+                                                    refine (Rule.weaken 0 4)
+                                                    >>
+                                                    (* G |- d1' : type *)
+                                                    chdir dir >> idtacM TC.Secondary,
+
+                                                    (* G, d2 : type, d1[^] -> d1'[^], d1[^2] % d2[^2], d2[^3] |- d2[^4] *)
+                                                    refine (Rule.hypothesis 0) >> done
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                          in
+                             propagateImplies dir
+                                (T.apply2 Prim.sum a d2)
+                                (T.apply2 Prim.sum b d2)
+                                rest
+                                (Option.map (inleft a b) ftac)
+                                (Option.map (inleft b a) rtac)
+                                fk ek sk
+                          end
+
+                     | ([T.App d1], []) =>
+                          (* C = Rest{ d1 % {} } *)
+                          let
+                             (* tac partially proves G |- d2 -> d2' *)
+                             fun inright d2 d2' tac =
+                                (* G |- (d1 % d2) -> (d1 % d2') *)
+                                refine (Rule.assert (T.apply1 Prim.istp d1) (T.evar ()))
+                                >>> [
+                                    (* G |- d1 : type *)
+                                    chdir dir >> idtacM TC.Secondary,
+
+                                    (* G, d1 : type |- (d1[^] % d2[^]) -> (d1[^] % d2'[^]) *)
+                                    refine (Rule.assert (T.Sub (T.apply2 Prim.arrow d2 d2', T.shift1)) (T.evar ()))
+                                    >>> [
+                                        (* G, d1 : type |- d2[^] -> d2'[^] *)
+                                        refine (Rule.weaken 0 1)
+                                        >>
+                                        (* G |- d2 -> d2' *)
+                                        tac,
+    
+                                        (* G, d1 : type, d2[^] -> d2'[^] |- (d1[^2] % d2[^2]) -> (d1[^2] % d2'[^2]) *)
+                                        refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                                        >>> [
+                                            (* G, d1 : type, d2[^] -> d2'[^] |- d1[^2] % d2[^2] : type *)
+                                            refine (Rule.sumForm (T.evar ()) (T.evar ()))
+                                            >>> [
+                                                (* G, d1 : type, d2[^] -> d2'[^] |- d1[^2] : type *)
+                                                refine (Rule.hypothesis 1) >> done,
+
+                                                (* G, d1 : type, d2[^] -> d2'[^] |- d2[^2] : type *)
+                                                refine (Rule.arrowFormInv1 (T.evar ()) (T.Sub (d2', T.Shift 2)))
+                                                >>
+                                                (* G, d1 : type, d2[^] -> d2'[^] |- d2[^2] -> d2'[^2] : type *)
+                                                refine (Rule.inhabitedForm (T.evar ()))
+                                                >>
+                                                (* G, d1 : type, d2[^] -> d2'[^] |- d2[^2] -> d2'[^2] *)
+                                                refine (Rule.hypothesis 0) >> done,
+                                                ],
+    
+                                            (* G, d1 : type, d2[^] -> d2'[^], d1[^2] % d2[^2] |- d1[^3] % d2'[^3] 
+                                                                                               = (d1[^4] % d2'[^4])[0 . id]
+                                            *)
+                                            refine (Rule.sumElim
+                                                       (T.Sub (d1, T.Shift 3))
+                                                       (T.Sub (d2, T.Shift 3))
+                                                       (T.Sub (T.apply2 Prim.sum d1 d2', T.Shift 4))
+                                                       T.zero)
+                                            >>> [
+                                                (* G, d1 : type, d2[^] -> d2'[^], d1[^2] % d2[^2] |- 0 : d1[^3] % d2[^3] *)
+                                                refine (Rule.hypothesisOf 0) >> done,
+    
+                                                (* G, d1 : type, d2[^] -> d2'[^], d1[^2] % d2[^2], d1[^3] |- (d1[^4] % d2'[^4])[inl 0 . ^]
+                                                                                                           = d1[^4] % d2'[^4]
+                                                *)
+                                                refine (Rule.sumIntro1 (T.evar ()) (T.evar ()))
+                                                >>> [
+                                                    (* G, d1 : type, d2[^] -> d2'[^], d1[^2] % d2[^2], d1[^3] |- d2'[^4] : type *)
+                                                    refine (Rule.weaken 0 4)
+                                                    >>
+                                                    (* G |- d2' : type *)
+                                                    chdir dir >> idtacM TC.Secondary,
+
+                                                    (* G, d1 : type, d2[^] -> d2'[^], d1[^2] % d2[^2], d1[^3] |- d1[^4] *)
+                                                    refine (Rule.hypothesis 0) >> done
+                                                    ],
+    
+                                                (* G, d1 : type, d2[^] -> d2'[^], d1[^2] % d2[^2], d2'[^3] |- (d1[^4] % d2'[^4])[inr 0 . ^]
+                                                                                                            = d1[^4] % d2'[^4]
+                                                *)
+                                                refine (Rule.sumIntro2 (T.evar ()) (T.evar ()))
+                                                >>> [
+                                                    (* G, d1 : type, d2[^] -> d2'[^], d1[^2] % d2[^2], d2[^3] |- d1[^4] : type *)
+                                                    refine (Rule.hypothesis 3) >> done,
+
+                                                    (* G, d1 : type, d2[^] -> d2'[^], d1[^2] % d2[^2], d2[^3] |- d2'[^4] *)
+                                                    refine (Rule.arrowElim (T.Sub (d2, T.Shift 4)) (T.evar ()))
+                                                    >>> [
+                                                        (* G, d1 : type, d2[^] -> d2'[^], d1[^2] % d2[^2], d2[^3] |- d2[^4] -> d2'[^4] *)
+                                                        refine (Rule.hypothesis 2) >> done,
+
+                                                        (* G, d1 : type, d2[^] -> d2'[^], d1[^2] % d2[^2], d2[^3] |- d2[^4] *)
+                                                        refine (Rule.hypothesis 0) >> done
+                                                        ]
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                          in
+                             propagateImplies dir
+                                (T.apply2 Prim.sum d1 a)
+                                (T.apply2 Prim.sum d1 b)
+                                rest
+                                (Option.map (inright a b) ftac)
+                                (Option.map (inright b a) rtac)
+                                fk ek sk
+                          end
+
+                     | _ =>
+                          (* type error *)
+                          fk ())
+                
+                else
+                   (* no other connectives supported *)
+                   fk ()
+                
+           | _ =>
+                (* Cannot propagate implication through anything else. *)
+                fk ())
+
+
+      (* rewriteImplies hypopt dir A B C ftac rtac fk sequel
+
+         if    dir is the directory within C
+               G is the context within C
+               ftac partially proves A -> B
+               rtac partially proves B -> A
+         then  tac partially proves the goal
+                  with a subgoal obtained by replacing C{A} with C{B} in the appropriate place
+                  and runs sequel on that subgoal
+               and
+               returns tac
+         or    calls fk () if impossible
+      *)
+
+      fun rewriteImplies hypopt dir a b c ftac rtac fk sequel =
+         let
+            do (ftac', rtac') =
+               propagateImplies dir a b c ftac rtac fk
+                  (fn (c', univ, a', b', tac) =>
+                      (* Implication has turned into equality.
+                         tac partially proves A' = B' : U univ
+                         want to rewrite C'{A'} to C'{B'}
+                      *)
+                      let
+                         val (dir', bv', k') = binders c' dir [] 0
+                      in
+                         propagateEquality hypopt dir' a' b' bv' k' c' 
+                            (T.apply1 Prim.univ univ) 
+                            a' b' [] tac sequel
+                      end)
+
+            val ca = instantiate c a
+            val cb = instantiate c b
+
+            (* ftac' partially proves C{A} -> C{B}
+               rtac' partially proves C{B} -> C{A}
+            *)
+         in
+            (case hypopt of
+                NONE =>
+                   (case rtac' of
+                       NONE =>
+                          fk ()
+
+                     | SOME tac =>
+                          (* C{A} *)
+                          refine (Rule.arrowElim cb ca)
+                          >>> [
+                              (* C{B} -> C{A} *)
+                              tac,
+
+                              (* C{B} *)
+                              sequel
+                              ])
+
+              | SOME hyp =>
+                   (case ftac' of
+                       NONE =>
+                          fk ()
+
+                     | SOME tac =>
+                          let
+                             val cash = T.Sub (ca, T.Shift (hyp+1))
+                             val cbsh = T.Sub (cb, T.Shift (hyp+1))
+                          in
+                             (* C{A} ... |- J[under hyp ^] *)
+                             refine (Rule.assert cbsh (T.evar ()))
+                             >>> [
+                                 (* C{A} ... |- C{B}[^hyp+1] *)
+                                 refine (Rule.arrowElim cash cbsh)
+                                 >>> [
+                                     (* C{A} ... |- C{B}[^hyp+1] -> C{N}[^hyp+1] *)
+                                     refine (Rule.weaken 0 (hyp+1))
+                                     >>
+                                     (* |- C{A} -> C{B} *)
+                                     tac,
+
+                                     (* C{A} ... |- C{B}[^hyp+1] *)
+                                     refine (Rule.hypothesis hyp) >> done
+                                     ],
+
+                                 (* C{A} ... C{B}[^hyp+1] |- J[under hyp ^][^] *)
+                                 setFailure "dependencies exist on rewritten hypothesis"
+                                    (refine (Rule.weaken (hyp+1) 1))
+                                 >> 
+                                 (* ... C{B}[^hyp] |- J[^] *)
+                                 refine (Rule.exchange 0 1 hyp)
+                                 >>
+                                 (* C{B} ... |- J[under hyp ^] *)
+                                 sequel
+                                 ]
+                          end))
+         end
+
+
+      (* propagateEntails dir A B C ftac rtac fk sk
+
+         if    dir is the directory within C
+               G is the context within C
+               ftac partially proves G, A |- B[^]
+               rtac partially proves G, B |- A[^]
+         then  ftac' partially proves C{A} |- C{B}[^]
+               rtac' partially proves C{B} |- C{A}[^]
+               and
+               calls sk (ftac', rtac')
+         or    calls fk () if impossible
+
+         Does not create any subgoals beyond what ftac/rtac create.
+
+         (That is why we only propagate entailment through prod,
+         and the codomain of forall and arrow; the others would require
+         typing subgoals.  If we generated typing subgoals for entailment,
+         it turns out we would be typechecking a chain of subterms,
+         which is gross.)
+
+         This is for "of", because we cannot use implication for "of": 
+         (M : A) -> (M : B) is well-formed only when M : A and M : B,
+         so the implication is not useful.
+      *)
+      fun propagateEntails dir a b c ftac rtac fk sk =
+         (case c of
+             [] =>
+                sk (ftac, rtac)
+
+           | Flam binder :: Felim2 (h as T.Const const, [T.App d], []) :: rest =>
+                (* We can only propagate through the rhs of a quantifier. *)
+                if Constant.eq (const, Prim.forall) then
+                   (* C = Rest{ forall D . {} } *)
+                   let
+                      val dom = d
+
+                      (* dir includes binder *)
+                      val dir' = D.tl dir
+
+                      (* tac partially proves G, dom, cod |- cod'[^] *)
+                      fun incod cod cod' tac =
+                         (* G, (forall dom . cod) |- forall dom[^] . cod'[0 . ^2] *)
+                         refine (Rule.forallIntro
+                                    (T.Sub (dom, T.shift1))
+                                    (T.Sub (cod', T.Idot (0, T.Shift 2))))
+                         >>> [
+                             (* forall G, (forall dom . cod) |- dom[^] : type *)
+                             refine (Rule.forallFormInv1 (T.Sub (dom, T.shift1)) (T.Sub (cod, T.Idot (0, T.Shift 2))))
+                             >>
+                             (* forall G, (forall dom . cod) |- (forall dom[^] . cod[0 . ^2]) : type *)
+                             refine (Rule.inhabitedForm (T.evar ()))
+                             >>
+                             (* forall G, (forall dom . cod) |- forall dom[^] . cod[0 . ^2] *)
+                             refine (Rule.hypothesis 0) >> done,
+
+                             (* forall G, (forall dom . cod), dom[^] |- cod'[0 . ^2] *)
+                             refine (Rule.assert (T.Sub (cod, T.Idot (0, T.Shift 2))) (T.evar ()))
+                             >>> [
+                                 (* G, (forall dom . cod), dom[^] |- cod[0 . ^2] = cod[0 . ^3][0 . id] *)
+                                 refine (Rule.forallElim
+                                            (T.Sub (dom, T.Shift 2))
+                                            (T.Sub (cod, T.Idot (0, T.Shift 3)))
+                                            T.zero)
+                                 >>> [
+                                     (* forall dom . cod, dom[^] |- forall dom[^2] . cod[0 . ^3]
+                                                                  = (forall dom . cod)[^2]
+                                     *)
+                                     refine (Rule.hypothesis 1) >> done,
+
+                                     (* forall dom . cod, dom[^] |- 0 : dom[^2] *)
+                                     refine (Rule.hypothesisOf 0) >> done
+                                     ],
+
+                                 (* G, (forall dom . cod), dom[^], cod[0 . ^2] |- cod'[1 . ^3] *)
+                                 refine (Rule.weaken 2 1)
+                                 >>
+                                 (* G, dom, cod |- cod'[^] *)
+                                 tac
+                                 ]
+                             ]
+                   in
+                      propagateEntails
+                         dir'
+                         (T.Elim (T.Const Prim.forall, [T.App dom, T.App (T.Lam (binder, a))]))
+                         (T.Elim (T.Const Prim.forall, [T.App dom, T.App (T.Lam (binder, b))]))
+                         rest
+                         (Option.map (incod a b) ftac)
+                         (Option.map (incod b a) rtac)
+                         fk sk
+                   end
+
+                else
+                   (* no other quantifiers supported *)
+                   fk ()
+
+           | Felim2 (h as T.Const const, left, right) :: rest =>
+                if Constant.eq (const, Prim.arrow) then
+                   (case (left, right) of
+                       ([T.App dom], []) =>
+                          (* C = Rest{ dom -> {} } *)
+                          let
+                             (* tac partially proves G, cod |- cod'[^] *)
+                             fun incod cod cod' tac =
+                                (* G, dom -> cod |- dom[^] -> cod'[^] *)
+                                refine (Rule.arrowIntro 
+                                           (T.Sub (dom, T.shift1)) 
+                                           (T.Sub (cod', T.shift1)))
+                                >>> [
+                                    (* G, dom -> cod |- dom[^] : type *)
+                                    refine (Rule.arrowFormInv1
+                                               (T.Sub (dom, T.shift1))
+                                               (T.Sub (cod, T.shift1)))
+                                    >>
+                                    (* G, dom -> cod |- dom[^] -> cod[^] : type *)
+                                    refine (Rule.inhabitedForm (T.evar ()))
+                                    >>
+                                    (* G, dom -> cod |- dom[^] -> cod[^] *)
+                                    refine (Rule.hypothesis 0) >> done,
+
+                                    (* G, dom -> cod, dom[^] |- cod'[^2] *)
+                                    refine (Rule.assert (T.Sub (cod, T.Shift 2)) (T.evar ()))
+                                    >>> [
+                                        (* G, dom -> cod, dom[^] |- cod[^2] *)
+                                        refine (Rule.arrowElim
+                                                   (T.Sub (dom, T.Shift 2))
+                                                   (T.Sub (cod, T.Shift 2)))
+                                        >>> [
+                                            (* G, dom -> cod, dom[^] |- dom[^2] -> cod[^2] *)
+                                            refine (Rule.hypothesis 1) >> done,
+
+                                            (* G, dom -> cod, dom[^] |- dom[^2] *)
+                                            refine (Rule.hypothesis 0) >> done
+                                            ],
+
+                                        (* G, dom -> cod, dom[^], cod[^2] |- cod'[^3] *)
+                                        refine (Rule.weaken 1 2)
+                                        >>
+                                        (* G, cod |- cod'[^] *)
+                                        tac
+                                        ]
+                                    ]
+                          in
+                             propagateEntails dir
+                                (T.Elim (T.Const Prim.arrow, [T.App dom, T.App a]))
+                                (T.Elim (T.Const Prim.arrow, [T.App dom, T.App b]))
+                                rest
+                                (Option.map (incod a b) ftac)
+                                (Option.map (incod b a) rtac)
+                                fk sk
+                          end
+
+                     | _ =>
+                          (* propagating through the domain, or type error *)
+                          fk ())
+
+                else if Constant.eq (const, Prim.prod) then
+                   (case (left, right) of
+                       ([], [T.App d2]) =>
+                          (* C = Rest{ {} & d2 } *)
+                          let
+                             (* tac partially proves G, d1 |- d1'[^] *)
+                             fun inleft d1 d1' tac =
+                                (* G, d1 & d2 |- d1'[^] & d2[^] *)
+                                refine (Rule.prodIntro
+                                           (T.Sub (d1', T.shift1))
+                                           (T.Sub (d2, T.shift1)))
+                                >>> [
+                                    (* G, d1 & d2 |- d1'[^] *)
+                                    refine (Rule.assert (T.Sub (d1, T.shift1)) (T.evar ()))
+                                    >>> [
+                                        (* G, d1 & d2 |- d1[^] *)
+                                        refine (Rule.prodElim1
+                                                   (T.Sub (d1, T.shift1))
+                                                   (T.Sub (d2, T.shift1)))
+                                        >>
+                                        (* G, d1 & d2 |- d1[^] & d2[^] *)
+                                        refine (Rule.hypothesis 0) >> done,
+
+                                        (* G, d1 & d2, d1[^] |- d1'[^2] *)
+                                        refine (Rule.weaken 1 1)
+                                        >>
+                                        (* G, d1 |- d1'[^] *)
+                                        tac
+                                        ],
+
+                                    (* G, d1 & d2 |- d2[^] *)
+                                    refine (Rule.prodElim2
+                                               (T.Sub (d1, T.shift1))
+                                               (T.Sub (d2, T.shift1)))
+                                    >>
+                                    (* G, d1 & d2 |- d1[^] & d2[^] *)
+                                    refine (Rule.hypothesis 0) >> done
+                                    ]
+                          in
+                             propagateEntails dir
+                                (T.apply2 Prim.prod a d2)
+                                (T.apply2 Prim.prod b d2)
+                                rest
+                                (Option.map (inleft a b) ftac)
+                                (Option.map (inleft b a) rtac)
+                                fk sk
+                          end
+
+                     | ([T.App d1], []) =>
+                          (* C = Rest{ d1 & {} } *)
+                          let
+                             (* tac partially proves G, d2 |- d2'[^] *)
+                             fun inright d2 d2' tac =
+                                (* G, d1 & d2 |- d1[^] & d2'[^] *)
+                                refine (Rule.prodIntro
+                                           (T.Sub (d1, T.shift1))
+                                           (T.Sub (d2', T.shift1)))
+                                >>> [
+                                    (* G, d1 & d2 |- d1[^] *)
+                                    refine (Rule.prodElim1
+                                               (T.Sub (d1, T.shift1))
+                                               (T.Sub (d2, T.shift1)))
+                                    >>
+                                    (* G, d1 & d2 |- d1[^] & d2[^] *)
+                                    refine (Rule.hypothesis 0) >> done,
+
+                                    (* G, d1 & d2 |- d2'[^] *)
+                                    refine (Rule.assert (T.Sub (d2, T.shift1)) (T.evar ()))
+                                    >>> [
+                                        (* G, d1 & d2 |- d2[^] *)
+                                        refine (Rule.prodElim2
+                                                   (T.Sub (d1, T.shift1))
+                                                   (T.Sub (d2, T.shift1)))
+                                        >>
+                                        (* G, d1 & d2 |- d1[^] & d2[^] *)
+                                        refine (Rule.hypothesis 0) >> done,
+
+                                        (* G, d1 & d2, d2[^] |- d2'[^2] *)
+                                        refine (Rule.weaken 1 1)
+                                        >>
+                                        (* G, d2 |- d2'[^] *)
+                                        tac
+                                        ]
+                                    ]
+                          in
+                             propagateEntails dir
+                                (T.apply2 Prim.prod d1 a)
+                                (T.apply2 Prim.prod d1 b)
+                                rest
+                                (Option.map (inright a b) ftac)
+                                (Option.map (inright b a) rtac)
+                                fk sk
+                          end
+
+                     | _ =>
+                          (* type error *)
+                          fk ())
+
+                else
+                   (* no other connectives supported *)
+                   fk ()
+                
+           | _ =>
+                (* Cannot propagate entailment through anything else. *)
+                fk ())
+
+
+      (* rewriteEntails hypopt dir A B C ftac rtac fk sequel
+
+         if    dir is the directory within C
+               G is the context within C
+               ftac partially proves G, A |- B[^]
+               rtac partially proves G, B |- A[^]
+         then  tac partially proves the goal
+                  with a subgoal obtained by replacing C{A} with C{B} in the appropriate place
+                  and runs sequel on that subgoal
+               and
+               returns tac
+         or    calls fk () if impossible
+      *)
+
+      fun rewriteEntails hypopt dir a b c ftac rtac fk sequel =
+         let
+            do (ftac', rtac') =
+               propagateEntails dir a b c ftac rtac fk
+
+            val ca = instantiate c a
+            val cb = instantiate c b
+
+            (* ftac' partially proves G', C{A} |- C{B}[^]
+               rtac' partially proves G', C{B} |- C{A}[^]
+               where G' is the ambient context
+            *)
+         in
+            (case hypopt of
+                NONE =>
+                   (case rtac' of
+                       NONE =>
+                          fk ()
+
+                     | SOME tac =>
+                          (* tac partially proves G', C{B} |- C{A}[^] *)
+                          (* C{A} *)
+                          refine (Rule.assert cb (T.evar ()))
+                          >>> [
+                              (* G' |- C{B} *)
+                              sequel,
+
+                              (* G', C{B} |- C{A}[^] *)
+                              tac
+                              ])
+
+              | SOME hyp =>
+                   (case ftac' of
+                       NONE =>
+                          fk ()
+
+                     | SOME tac =>
+                          (* tac partially proves G', C{A} |- C{B}[^] *)
+                          let
+                             val cash = T.Sub (ca, T.Shift (hyp+1))
+                             val cbsh = T.Sub (cb, T.Shift (hyp+1))
+                          in
+                             (* G', C{A} ... |- J[under hyp ^] *)
+                             refine (Rule.assert cbsh (T.evar ()))
+                             >>> [
+                                 (* G', C{A} ... |- C{B}[^hyp+1] *)
+                                 refine (Rule.weaken 0 hyp)
+                                 >>
+                                 (* G', C{A} |- C{B}[^1] *)
+                                 tac,
+
+                                 (* G', C{A} ... C{B}[^hyp+1] |- J[under hyp ^][^] *)
+                                 setFailure "dependencies exist on rewritten hypothesis"
+                                    (refine (Rule.weaken (hyp+1) 1))
+                                 >> 
+                                 (* G' ... C{B}[^hyp] |- J[^] *)
+                                 refine (Rule.exchange 0 1 hyp)
+                                 >>
+                                 (* G', C{B} ... |- J[under hyp ^] *)
+                                 sequel
+                                 ]
+                          end))
+         end
+
+
+      structure CICTable =
+         CheckpointedHashTable 
+         (structure Key =
+             TripleHashable
+             (structure X = Constant.Hashable
+              structure Y = IntHashable
+              structure Z = Constant.Hashable))
+
+      val compatibilityTable : (constant * bool * (priority tacticm -> priority tacticm)) CICTable.table = CICTable.table ()
+      val weakeningTable : (constant * (priority tacticm -> priority tacticm)) list H.table = H.table ()
+
+
+      fun rewriteRelation i core hypopt (jud, dir) sequel =
+         let
+            val (d, dir) =
+               (case hypopt of
+                   NONE =>
+                      (J.concl jud, dir)
+
+                 | SOME hyp =>
+                      (case J.hypOpt jud hyp of
+                          SOME (J.Tm d) =>
+                             let
+                             in
+                                (d, D.shift dir (hyp+1))
+                             end
+      
+                        | NONE =>
+                             (* this shouldn't happen with a good directory *)
+                             raise (RewriteFailure "nonexistent hypothesis")
+      
+                        | SOME _ =>
+                             raise (RewriteFailure "hypothesis has the wrong sort")))
+
+            val (m, n, bv, k, c, (const, ftac, rtac)) = find i d core
+
+            (* C{ M } --> C { N }
+               ftac partially proves R M N
+               rtac partially proves R N M
+               R has head const
+               k = |bv|
+            *)
+
+            (* propagate C const M N ftac rtac fk sequel
+
+               if    ftac partially proves R M N
+                     rtac partially proves R N M
+                     ftac/rtac are not both NONE
+                     R has head const
+               then  tac partially proves the goal
+                        with a subgoal obtained by replacing C{M} with C{N} in the appropriate place
+                        and runs sequel on that subgoal
+                     and
+                     returns tac
+               or    calls fk () if impossible
+            *)
+            fun propagate c const m n ftac rtac fk sequel =
+               (* We have special cases for eq, arrow, eeqtp, and subtype.
+                  - eq and arrow can be used anywhere
+                  - eeqtp can be used at the top-level
+                  - subtype can be used in the type position of an "of" or eq
+
+                  Each of them finalizes the propagation.
+
+                  We also allow subtype to weaken to arrow, but that's not a special case;
+                  it's just in the weakening table.
+               *)
+               if Constant.eq (const, Prim.eq) then
+                  let
+                     val a = T.evar ()
+                  in
+                     (case ftac of
+                         SOME tac =>
+                            propagateEquality hypopt dir m n bv k c a m n [] tac sequel
+   
+                       | NONE =>
+                            (case rtac of
+                                SOME tac =>
+                                   propagateEquality hypopt dir m n bv k c a m n []
+                                   (refine (Rule.eqSymm a m n) >> tac)
+                                   sequel
+
+                              | NONE =>
+                                   raise (Fail "precondition")))
+                  end
+               else if Constant.eq (const, Prim.arrow) then
+                  let
+                     (* the directory inside the context (with the bound variables) *)
+                     val dir' =
+                        List.foldr
+                        (fns binder dir => D.bindVary dir binder)
+                        dir
+                        bv
+
+                     val ftac = Option.map (fn tac => chdir dir' >> tac) ftac
+                     val rtac = Option.map (fn tac => chdir dir' >> tac) rtac
+                  in
+                     rewriteImplies hypopt dir' m n c ftac rtac fk sequel
+                  end
+               else
+                  (case c of
+                      [] =>
+                         if Constant.eq (const, Prim.eeqtp) then
+                            (* ftac partially proves M <:> N
+                               rtac partially proves N <:> M
+                               ftac/rtac are not both NONE
+                            *)
+                            (case hypopt of
+                                NONE =>
+                                   (* M *)
+                                   refine (Rule.subsumption n m)
+                                   >>> [
+                                       (* N <: M *)
+                                       (case (ftac, rtac) of
+                                           (SOME tac, _) =>
+                                              refine (Rule.prodElim2 (T.apply2 Prim.subtype m n) (T.apply2 Prim.subtype n m))
+                                              >>
+                                              (* M <: N & N <: M *)
+                                              refine (Rule.unreduce (T.apply2 Prim.eeqtp m n) R.unfold)
+                                              >>
+                                              (* M <:> N *)
+                                              tac
+     
+                                         | (_, SOME tac) =>
+                                              refine (Rule.prodElim1 (T.apply2 Prim.subtype n m) (T.apply2 Prim.subtype m n))
+                                              >>
+                                              (* N <: M & M <: N *)
+                                              refine (Rule.unreduce (T.apply2 Prim.eeqtp n m) R.unfold)
+                                              >>
+                                              (* N <:> M *)
+                                              tac
+     
+                                         | (NONE, NONE) =>
+                                              raise (Fail "precondition")),
+
+                                       (* N *)
+                                       sequel
+                                       ]
+
+                              | SOME hyp =>
+                                   (* M ... |- J *)
+                                   refine (Rule.subsumptionLeft hyp m n (T.evar ()))
+                                   >>> [
+                                       (* (M : type) |- M[^] <:> N[^] *)
+                                       refine (Rule.weaken 0 1)
+                                       >>
+                                       (* |- M <:> N *)
+                                       (case (ftac, rtac) of
+                                           (SOME tac, _) => tac
+
+                                         | (_, SOME tac) => refine (Rule.eeqtpSymm m n) >> tac
+
+                                         | (NONE, NONE) =>
+                                              raise (Fail "precondition")),
+
+                                       (* N ... |- J *)
+                                       sequel
+                                       ])
+                         else
+                            (* this isn't a relation we can finalize with; see if we can weaken to one *)
+                            let
+                               fun loopWeakenings l =
+                                  (case l of
+                                      [] => 
+                                         (* nothing left to try; backtrack *)
+                                         fk ()
+   
+                                    | (const', tacfn) :: rest =>
+                                         propagate [] const' m n
+                                            (Option.map tacfn ftac)
+                                            (Option.map tacfn rtac)
+                                            (fn () => loopWeakenings rest)
+                                            sequel)
+                            in
+                               (case H.find weakeningTable const of
+                                   NONE => fk ()
+   
+                                 | SOME l => loopWeakenings l)
+                            end
+
+                    | Felim2 (h as T.Const hconst, left, right) :: c' =>
+                         if 
+                            Constant.eq (const, Prim.subtype)
+                            andalso
+                            Constant.eq (hconst, Prim.ov)
+                            andalso
+                            List.null left  (* we are in the type position *)
+                         then
+                            (* Rewriting subtype through the type position of "of".
+
+                               We can't just rewrite M <: N through "of" to obtain
+                               P : M -> P : N, because the latter isn't well-formed
+                               unless we already know P : M, so the implication isn't
+                               useful.
+                            *)
+                            (case right of
+                                [T.App p] =>
+                                   let
+                                      (* the directory inside the context (with the bound variables) *)
+                                      val dir' =
+                                         List.foldr
+                                         (fns binder dir => D.bindVary dir binder)
+                                         dir
+                                         bv
+
+                                      (* tac partially proves G |- A <: B *)
+                                      fun inof p a b tac =
+                                         (* G, P : A |- P[^] : B[^] *)
+                                         refine (Rule.subsumptionOf 
+                                                    (T.Sub (a, T.shift1))
+                                                    (T.Sub (b, T.shift1))
+                                                    (T.Sub (p, T.shift1)))
+                                         >>> [
+                                             (* G, P : A |- A[^] <: B[^] *)
+                                             refine (Rule.weaken 0 1)
+                                             >>
+                                             (* G |- A <: B *)
+                                             chdir dir' >> tac,
+
+                                             (* G, P : A |- P[^] : A[^] *)
+                                             refine (Rule.hypothesis 0) >> done
+                                             ]
+
+                                      val ftac' = Option.map (inof p m n) ftac
+                                      val rtac' = Option.map (inof p n m) rtac
+                                   in
+                                      rewriteEntails hypopt dir' 
+                                         (T.apply2 Prim.ov m p)
+                                         (T.apply2 Prim.ov n p)
+                                         c' ftac' rtac' fk sequel
+                                   end
+
+                              | _ =>
+                                   (* type error, wrong number of arguments for "of" *)
+                                   fk ())
+                         else if 
+                            Constant.eq (const, Prim.subtype)
+                            andalso
+                            Constant.eq (hconst, Prim.eq)
+                            andalso
+                            List.null left  (* we are in the type position *)
+                         then
+                            (* Rewriting subtype through the type position of eq.
+
+                               We can't just rewrite M <: N through eq to obtain
+                               P = Q : M -> P = Q : N, because the latter isn't well-formed
+                               unless we already know P, Q : M, so the implication isn't
+                               useful.
+                            *)
+                            (case right of
+                                [T.App p, T.App q] =>
+                                   let
+                                      (* the directory inside the context (with the bound variables) *)
+                                      val dir' =
+                                         List.foldr
+                                         (fns binder dir => D.bindVary dir binder)
+                                         dir
+                                         bv
+
+                                      (* tac partially proves G |- A <: B *)
+                                      fun inof p q a b tac =
+                                         (* G, P = Q : A |- P[^] = Q[^] : B[^] *)
+                                         refine (Rule.subsumptionEq
+                                                    (T.Sub (a, T.shift1))
+                                                    (T.Sub (b, T.shift1))
+                                                    (T.Sub (p, T.shift1))
+                                                    (T.Sub (q, T.shift1)))
+                                         >>> [
+                                             (* G, P = Q : A |- A[^] <: B[^] *)
+                                             refine (Rule.weaken 0 1)
+                                             >>
+                                             (* G |- A <: B *)
+                                             chdir dir' >> tac,
+
+                                             (* G, P = Q : A |- P[^] = Q[^] : A[^] *)
+                                             refine (Rule.hypothesis 0) >> done
+                                             ]
+
+                                      val ftac' = Option.map (inof p q m n) ftac
+                                      val rtac' = Option.map (inof p q n m) rtac
+                                   in
+                                      rewriteEntails hypopt dir' 
+                                         (T.apply3 Prim.eq m p q)
+                                         (T.apply3 Prim.eq n p q)
+                                         c' ftac' rtac' fk sequel
+                                   end
+
+                              | _ =>
+                                   (* type error, wrong number of arguments for eq *)
+                                   fk ())
+                         else
+                            (* the general case *)
+                            let
+                               val i = List.length left
+   
+                               fun loopWeakenings l =
+                                  (case l of
+                                      [] =>
+                                         (* nothing left to try; backtrack *)
+                                         fk ()
+   
+                                    | (const', tacfn) :: rest =>
+                                         propagate c const' m n
+                                            (Option.map tacfn ftac)
+                                            (Option.map tacfn rtac)
+                                            (fn () => loopWeakenings rest)
+                                            sequel)
+   
+                               fun tryWeakenings () =
+                                  (case H.find weakeningTable const of
+                                      NONE => fk ()
+   
+                                    | SOME l => loopWeakenings l)
+                            in
+                               (case CICTable.find compatibilityTable (hconst, i, const) of
+                                   NONE =>
+                                      tryWeakenings ()
+   
+                                 | SOME (const', cov, tacfn) =>
+                                      let
+                                         val (ftac', rtac') =
+                                            if cov then
+                                               (ftac, rtac)
+                                            else
+                                               (rtac, ftac)
+   
+                                         (* tacfn ftac' partialy proves 
+                                               R2 (hconst spine1 M spine2) (hconst spine1 N spine2)
+                                            with |spine1| = i
+   
+                                            and tacfn rtac' vice versa
+                                         *)
+                                      in
+                                         propagate c' const'
+                                            (T.Elim (h,
+                                                     List.revAppend
+                                                        left 
+                                                        (T.App m :: right)))
+                                            (T.Elim (h,
+                                                     List.revAppend
+                                                        left
+                                                        (T.App n :: right)))
+                                            (Option.map tacfn ftac')
+                                            (Option.map tacfn rtac')
+                                            tryWeakenings
+                                            sequel
+                                      end)
+                            end
+    
+                    | _ =>
+                         (* Cannot propagate a relation through anything else.  Probably we will fail,
+                            but it's possible another choice could have gotten us to equality.
+                         *)
+                         fk ())
+
+            val tac =
+               propagate c const m n ftac rtac
+               (fn () => raise (RewriteFailure "cannot propagate relation"))
+               sequel
+         in
+            tac
+            >>=
+            (fn tc => 
+                first
+                   [
+                   EqualityTacticInternal.reflexivityPriority,
+                   idtacM tc
+                   ])
+         end
+
+
+
+
+      fun rewriteOnce rew sym i nohits sequel =
+         let
+            do hyp = HypTactic.findhypOrConcl sym
+
+            do goal = withgoal
+         in
+            transformFailure (fn msg => "rewrite failed: " ^ msg)
+            (try
+                (case rew hyp goal of
+                    Computational core =>
+                       rewriteComputational i core hyp goal
+                       >>> [sequel]
+
+                  | Equality core =>
+                       rewriteEquality i core hyp goal sequel
+
+                  | Relation core =>
+                       rewriteRelation i core hyp goal sequel)
+             with
+                RewriteFailure msg => fail msg
+              | InsufficientHits msg => nohits msg)
+         end
+
+
+      fun loosenCore (test, act) =
+         let
+            fun test' _ _ = true
+
+            fun act' bvs m =
+               (case act bvs m of
+                   NONE =>
+                      raise (RewriteFailure "rewrite fails at given position")
+
+                 | res as SOME _ => res)
+         in
+            (test', act')
+         end
+
+      fun loosen rew hyp l =
+         (case rew hyp l of
+             Computational core => Computational (loosenCore core)
+           | Equality core => Equality (loosenCore core)
+           | Relation core => Relation (loosenCore core))
+
+
+      fun rewriteLoop rew targets sequel =
+         (case targets of
+             [] =>
+                sequel
+
+           | (hyp, occ) :: rest =>
+                (case occ of
+                    NONE =>
+                       (* rewrite until it fails *)
+                       rewriteOnce rew hyp 0 
+                          (fn _ => rewriteLoop rew rest sequel)
+                          (lift (fn () => rewriteLoop rew targets sequel))
+
+                  | SOME (loose, l) =>
+                       let
+                          val rew' =
+                             if loose then
+                                loosen rew
+                             else
+                                rew
+
+                          fun innerloop l () =
+                             (case l of
+                                 [] =>
+                                    rewriteLoop rew rest sequel
+
+                               | i :: resti =>
+                                    rewriteOnce rew' hyp i fail
+                                       (lift (innerloop resti)))
+                       in
+                          innerloop l ()
+                       end))
+
+      fun rewritePriority aims =
+         (case aims of
+             [] =>
+                idtacM TC.Primary
+
+           | (rew, targets) :: rest =>
+                rewriteLoop rew targets
+                   (lift (fn () => rewritePriority rest)))
+
+
+      fun rewriteRaw tgts = rewritePriority tgts >> idtac
+
+      fun rewrite tgts = Typecheck.withTypecheckSnd $ rewritePriority tgts
+
+
+      fun find' i a core =
+         let
+            val (m, n, bv, _, c, _) = find i a core
+         in
+            (m, n, bv, c)
+         end
+
+      fun testRewriteMain rew sym i f =
+         try
+            let
+               val goal as (jud, dir) = Prover.currentGoal ()
+   
+               val (a, hyp, dir') =
+                  if Symbol.eq (sym, conclSym) then
+                     (Judgement.concl jud, NONE, dir)
+                  else
+                     (case D.lookupOpt (D.idir dir) sym of
+                         SOME (D.Hvar h) =>
+                            ((case J.hypOpt jud h of
+                                 SOME (J.Tm a) => a
+                               | SOME (J.Tml a) => a
+                               | SOME (J.Tmh a) => a
+                               | _ => raise (Invalid "hypothesis has wrong sort")),
+                             SOME h,
+                             D.shift dir (h+1))
+   
+                       | _ =>
+                            raise (Invalid "no such hypothesis"))
+   
+               val mark = Trail.mark ()
+   
+               val (m, n, bv, c) =
+                  (case rew hyp goal of
+                      Computational core => find' i a core
+                    | Equality core => find' i a core
+                    | Relation core => find' i a core)
+   
+               val dir'' =
+                  List.foldr
+                     (fns symopt d => D.bindVary d symopt)
+                     dir'
+                     bv
+            in
+               f dir'' m n dir' c;
+               Trail.rewind mark
+            end
+         with
+            exn as RewriteFailure msg =>
+               (
+               print "Rewrite failed: ";
+               print msg;
+               print "\n";
+               raise exn
+               )
+          | exn as D.Unbound sym =>
+               (
+               print "Unbound identifier ";
+               print (Symbol.toValue sym);
+               print "\n";
+               raise exn
+               )
+
+      val hole = T.Marker (Symbol.fromValue "hole")
+
+      fun testRewrite rews =
+         List.app
+            (fn (rew, targets) =>
+                List.app
+                   (fn (sym, occ) =>
+                       (case occ of
+                           NONE =>
+                              (* all doesn't make sense in this context, skip *)
+                              ()
+
+                         | SOME (loose, l) =>
+                              let
+                                 val rew' = if loose then loosen rew else rew
+                                 
+                                 val str = if loose then "position" else "hit"
+                              in
+                                 List.app
+                                    (fn i =>
+                                        testRewriteMain rew' sym i
+                                        (fns dir m n outerdir c =>
+                                            Message.message 0 0
+                                               (fn () =>
+                                                   (
+                                                   print "Rewriting ";
+                                                   print str;
+                                                   print " ";
+                                                   print (Int.toString i);
+                                                   print "\n";
+                                                   Show.show dir m;
+                                                   print "-->\n";
+                                                   Show.show dir n;
+                                                   print "within:\n";
+                                                   Show.show outerdir (instantiate c hole);
+                                                   print "\n"
+                                                   ))))
+                                    l
+                              end))
+                   targets)
+            rews
+                                     
+
+      fun identityRew _ _ = Computational ((fns _ _ => true), (fns _ m => SOME (m, Identity)))
+
+      fun showPosition targets =
+         List.app
+            (fn (sym, occ) =>
+                (case occ of
+                    NONE =>
+                       (* all doesn't make sense in this context, skip *)
+                       ()
+
+                  | SOME (_, l) =>
+                       List.app
+                          (fn i =>
+                              testRewriteMain identityRew sym i
+                              (fns dir m _ outerdir c =>
+                                  Message.message 0 0
+                                     (fn () =>
+                                         (
+                                         print "Position ";
+                                         print (Int.toString i);
+                                         print ":\n";
+                                         Show.show outerdir (instantiate c hole);
+                                         print "containing:\n";
+                                         Show.show dir m;
+                                         print "\n"
+                                         ))))
+                          l))
+            targets
+             
+      
+
+      (* A rough-and-ready categorization of terms.
+         Slightly different from the one in typecheck.
+      *)
+
+      datatype pseudohead =
+         Pvar of int
+       | Pconst of Constant.constant
+       | Plam
+       | Ppair
+       | Pnext
+       | Ptriv
+       | Pweird
+
+      (* m simple *)
+      fun pseudohead m =
+         (case m of
+             T.Elim (T.Var i, _) => Pvar i
+           | T.Elim (T.Const const, _) => Pconst const
+           | T.Elim (T.Sub _, _) => Pweird
+
+           | T.Lam _ => Plam
+           | T.Elim (T.Lam _, _) => Plam
+
+           | T.Pair _ => Ppair
+           | T.Elim (T.Pair _, _) => Ppair
+
+           | T.Next _ => Pnext
+           | T.Elim (T.Next _, _) => Pnext
+
+           | T.Triv => Ptriv
+
+           | T.Elim (T.Triv, _) =>
+                (* this is always a type error, but might as well be uniform about it *)
+                Ptriv
+
+           | T.Marker _ => Pweird
+           | T.Elim (T.Marker _, _) => Pweird
+
+           | _ =>
+                raise (Fail "precondition"))
+
+      fun pseudoheadEq ps under shift ps' =
+         (case (ps, ps') of
+             (Pvar i, Pvar j) =>
+                (i < under andalso i = j)
+                orelse
+                (i >= under andalso i + shift = j)
+
+           | (Pconst k, Pconst k') => Constant.eq (k, k')
+
+           | (Plam, Plam) => true
+           | (Ppair, Ppair) => true
+           | (Pnext, Pnext) => true
+           | (Ptriv, Ptriv) => true
+           | (Pweird, Pweird) => true
+
+           | _ => false)
+
+
+      type captures = symbol option list
+      type targets = (symbol * (bool * int list) option) list
+
+
+      fun unreduceMain added m red =
+         let
+            val p =
+               (try
+                   N.whnf (R.reduce red m)
+                with
+                   R.Reduce => raise (RewriteFailure "reduction fails on term"))
+
+            val ps = pseudohead p
+
+            fun test bvs n =
+               let
+                  val bvs' = bvs - added
+               in
+                  bvs' >= 0
+                  andalso
+                  pseudoheadEq ps added bvs' (pseudohead n)
+                  andalso
+                  let
+                     val mark = Trail.mark ()
+
+                     val p' =
+                        if bvs' = 0 then
+                           p
+                        else
+                           (* underShift does not disturb weak-head normal form, modulo simplification *)
+                           N.simplify (T.Sub (p, T.underShift added bvs'))
+
+                     val b = Option.isSome (I.unifyPrefix p' n)
+                  in
+                     Trail.rewind mark;
+                     b
+                  end
+               end
+
+            fun act bvs n =
+               let
+                  val bvs' = bvs - added
+               in
+                  if
+                     bvs' >= 0
+                     andalso
+                     pseudoheadEq ps added bvs' (pseudohead n)
+                  then
+                     let
+                        val mark = Trail.mark ()
+
+                        val s = T.underShift added bvs'
+                     in
+                        (case I.unifyPrefix (N.simplify (T.Sub (p, s))) n of
+                            NONE =>
+                               (
+                               Trail.rewind mark;
+                               NONE
+                               )
+   
+                          | SOME spine' =>
+                               SOME (T.Elim (T.Sub (m, s), spine'),
+                                     Unreduce red))
+                     end
+                  else
+                     NONE
+               end
+         in
+            Computational (test, act)
+         end
+
+         
+      fun convertUnreduceMain added m red =
+         let
+            val p =
+               (try
+                   N.whnf (R.reduce red m)
+                with
+                   R.Reduce => raise (RewriteFailure "reduction fails on term"))
+
+            fun test bvs n =
+               let
+                  val bvs' = bvs - added
+               in
+                  if
+                     bvs' >= 0
+                  then
+                     let
+                        val mark = Trail.mark ()
+
+                        val s = T.underShift added bvs'
+                     in
+                        (case I.unifyPrefix (N.simplify (T.Sub (p, s))) n of
+                            NONE =>
+                               (
+                               Trail.rewind mark;
+                               false
+                               )
+   
+                          | SOME _ => true)
+                     end
+                  else
+                     false
+               end
+
+            fun act bvs n =
+               let
+                  val bvs' = bvs - added
+               in
+                  if
+                     bvs' >= 0
+                  then
+                     let
+                        val mark = Trail.mark ()
+
+                        val s = T.underShift added bvs'
+                     in
+                        (case I.unifyPrefix (N.simplify (T.Sub (p, s))) n of
+                            NONE =>
+                               (
+                               Trail.rewind mark;
+                               NONE
+                               )
+   
+                          | SOME spine' =>
+                               SOME (T.Elim (T.Sub (m, s), spine'),
+                                     Unreduce red))
+                     end
+                  else
+                     NONE
+               end
+         in
+            Computational (test, act)
+         end
+         
+            
+
+      fun foldMain main capture em hyp (_, dir) =
+         let
+            val dir' =
+               (case hyp of
+                   NONE => dir
+                 | SOME i => D.shift dir (i+1))
+
+            val m = N.simplify (ETerm.additional capture em (D.idir dir'))
+         in
+            (case m of
+                T.Elim (T.Const const, _) =>
+                   (case Constant.definition const of
+                       NONE =>
+                          raise (RewriteFailure "head constant is opaque")
+
+                     | SOME _ =>
+                          main (List.length capture) m R.unfold)
+
+              | _ => raise (RewriteFailure "term has no head constant"))
+         end
+
+      val foldRew : symbol option list -> eterm -> rewrite = foldMain unreduceMain
+      val convertFoldRew : symbol option list -> eterm -> rewrite = foldMain convertUnreduceMain
+
+      fun fold aims =
+         rewriteRaw
+            (List.map
+                (fn ((capture, em), targets) => (foldRew capture em, targets))
+                aims)
+
+      fun convertFold aims =
+         rewriteRaw
+            (List.map
+                (fn ((capture, em), targets) => (convertFoldRew capture em, targets))
+                aims)
+
+
+
+      fun unreduceUsingMain main capture em red hyp (_, dir) =
+         let
+            val dir' =
+               (case hyp of
+                   NONE => dir
+                 | SOME i => D.shift dir (i+1))
+
+            val m = N.simplify (ETerm.additional capture em (D.idir dir'))
+         in
+            main (List.length capture) m red
+         end
+
+      val unreduceUsingRew : symbol option list -> eterm -> Reduction.reduction -> rewrite = unreduceUsingMain unreduceMain
+      val convertUnreduceUsingRew : symbol option list -> eterm -> Reduction.reduction -> rewrite = unreduceUsingMain convertUnreduceMain
+
+      fun unreduceUsing aims =
+         rewriteRaw
+            (List.map
+                (fn ((capture, em, red), targets) => (unreduceUsingRew capture em red, targets))
+                aims)
+
+      fun convertUnreduceUsing aims =
+         rewriteRaw
+            (List.map
+                (fn ((capture, em, red), targets) => (convertUnreduceUsingRew capture em red, targets))
+                aims)
+
+
+      fun unfoldRew const arity _ _ =
+         (case Constant.definition const of
+             NONE =>
+                raise (RewriteFailure "constant is opaque")
+
+           | SOME m =>
+                let
+                   fun test _ n =
+                      (case n of
+                          T.Elim (T.Const const', _) =>
+                             Constant.eq (const, const')
+
+                        | _ => false)
+
+                   fun act _ n =
+                      (case n of
+                          T.Elim (T.Const const', spine) =>
+                             if Constant.eq (const, const') then
+                                (try
+                                    let
+                                       val n' = R.reduce (R.beta arity) (T.Elim (m, spine))
+                                    in
+                                       SOME (n', Reduce (R.trans [R.unfold, R.beta arity]))
+                                    end
+                                 with
+                                    R.Reduce => NONE)
+                             else
+                                NONE
+
+                        | _ => NONE)
+                in
+                   Computational (test, act)
+                end)
+
+      fun unfold aims =
+         rewriteRaw
+            (List.map
+                (fn (const, targets) => (unfoldRew const (Database.findArity const), targets))
+                aims)
+
+      fun unfoldHead aims =
+         rewriteRaw
+            (List.map
+                (fn (const, targets) => (unfoldRew const 0, targets))
+                aims)
+
+
+
+      fun reduceUsingRew red hyp _ =
+         let
+            fun test _ m =
+               (try
+                   let
+                      val _ = Reduction.reduce red m
+                   in
+                      true
+                   end
+                with
+                   Reduction.Reduce => false)
+
+            fun act _ m =
+               (try
+                   let
+                      val n = Reduction.reduce red m
+                   in
+                      SOME (m, Reduce red)
+                   end
+                with
+                   Reduction.Reduce => NONE)
+         in
+            Computational (test, act)
+         end
+
+      fun reduceUsing aims =
+         rewriteRaw
+            (List.map
+                (fn (red, targets) => (reduceUsingRew red, targets))
+                aims)
+
+
+
+      fun rollMain main capture em hyp (_, dir) =
+         let
+            val dir' =
+               (case hyp of
+                   NONE => dir
+                 | SOME i => D.shift dir (i+1))
+
+            val m = N.simplify (ETerm.additional capture em (D.idir dir'))
+         in
+            (case m of
+                T.Elim (T.Const const, _) =>
+                   (case Database.findUnroll const of
+                       NONE =>
+                          raise (RewriteFailure "term is not unrollable")
+
+                     | SOME red =>
+                          main (List.length capture) m red)
+
+              | _ => raise (RewriteFailure "term has no head constant"))
+         end
+
+      val rollRew : symbol option list -> eterm -> rewrite = rollMain unreduceMain
+      val convertRollRew : symbol option list -> eterm -> rewrite = rollMain convertUnreduceMain
+
+      fun roll aims =
+         rewriteRaw
+            (List.map
+                (fn ((capture, em), targets) => (rollRew capture em, targets))
+                aims)
+
+      fun convertRoll aims =
+         rewriteRaw
+            (List.map
+                (fn ((capture, em), targets) => (convertRollRew capture em, targets))
+                aims)
+
+
+
+      fun unrollRew const hyp _ =
+         let
+            val red =
+               (case Database.findUnroll const of
+                   NONE =>
+                      raise (RewriteFailure "constant is not unrollable")
+
+                 | SOME red => red)
+
+            fun test _ m =
+               (case m of
+                   T.Elim (T.Const const', _) =>
+                      if Constant.eq (const, const') then
+                         (try
+                             (
+                             R.reduce red m;
+                             true
+                             )
+                          with R.Reduce => false)
+                      else
+                         false
+
+                 | _ => false)
+
+            fun act _ m =
+               (case m of
+                   T.Elim (T.Const const', _) =>
+                      if Constant.eq (const, const') then
+                         (try
+                             let
+                                val n = R.reduce red m
+                             in
+                                SOME (n, Reduce red)
+                             end
+                          with R.Reduce => NONE)
+                      else
+                         NONE
+
+                 | _ => NONE)
+         in
+            Computational (test, act)
+         end
+
+      fun unroll aims =
+         rewriteRaw
+            (List.map
+                (fn (const, targets) => (unrollRew const, targets))
+                aims)
+
+
+            
+      fun unrollTypeMain const elevopt hyp (_, dir) =
+         let
+            val dir =
+               (case hyp of
+                   NONE => dir
+
+                 | SOME n =>
+                      D.shift dir (n+1))
+
+            val levopt =
+               (case elevopt of
+                   NONE => NONE
+
+                 | SOME (capture, elev) => 
+                      SOME (ETerm.additional capture elev (D.idir dir)))
+
+            val (arity, red) =
+               if Constant.eq (const, Prim.mu) then
+                  (1, R.refl)
+               else if Constant.eq (const, Prim.rec) then
+                  (1, R.refl)
+               else
+                  (case Constant.definition const of
+                      NONE =>
+                         raise (RewriteFailure "type is not unrollable")
+
+                    | SOME a =>
+                         let
+                            val arity = Database.findArity const
+                         
+                            fun loop i a =
+                               if i = 0 then
+                                  C.termCaseXAlt a
+                                     [
+                                     C.path Prim.mu (C.app (C.lam C.wild) C.null) ?
+                                     (fn _ => ()),
+
+                                     C.path Prim.rec (C.app (C.lam C.wild) C.null) ?
+                                     (fn _ =>
+                                         (case levopt of
+                                             NONE => ()
+
+                                           | SOME _ =>
+                                                (* don't currently have unrolling rule for rec that takes a universe *)
+                                                raise (RewriteFailure "type is not unrollable with a universe"))),
+
+                                     C.wild ?
+                                     (fn () =>
+                                         raise (RewriteFailure "type is not unrollable"))
+                                     ]
+                               else
+                                  (case N.simplify a of
+                                      T.Lam (_, b) => loop (i-1) b
+
+                                    | _ =>
+                                         raise (RewriteFailure "type is not unrollable"))
+
+                            val () = loop arity a
+                         in
+                            (arity, R.trans [R.unfold, R.beta arity])
+                         end)
+
+            fun arityMatch i spine =
+               if i = 0 then
+                  List.null spine
+               else
+                  (case spine of
+                      T.App _ :: rest => arityMatch (i-1) rest
+
+                    | _ => false)
+
+            fun test _ m =
+               (case m of
+                   T.Elim (T.Const const', spine) =>
+                      Constant.eq (const', const)
+                      andalso
+                      arityMatch arity spine
+
+                 | _ => false)
+
+            fun act _ m =
+               (case m of
+                   T.Elim (T.Const const', spine) =>
+                      if 
+                         Constant.eq (const', const)
+                         andalso
+                         arityMatch arity spine
+                      then
+                         C.termCaseXAlt (R.reduce red m)
+                            [
+                            C.path Prim.mu (C.app (C.lamb C.what) C.null) ?
+                            (fn ((binder, body), ()) =>
+                                let
+                                   val ftac =
+                                      (* M <:> Body[M . id] *)
+                                      replaceConcl 
+                                         (T.apply2 Prim.eeqtp m (T.app (T.Lam (NONE, body)) m))
+                                      >>
+                                      (* M <:> (fn . Body) M *)
+                                      refine (Rule.reduce (R.compat [red, R.trans [R.compat [red], R.beta 1]]))
+                                      >>
+                                      (* mu (fn . Body) <:> Body[mu (fn . Body) . id] *)
+                                      (case levopt of
+                                          NONE =>
+                                             refine (Rule.muUnroll body)
+                                             >>> [
+                                                 (* Type |- Body : Type *)
+                                                 chdir (D.bindVary dir binder) >> idtacM TC.Secondary,
+                 
+                                                 (* positive (fn . Body) *)
+                                                 chdir dir
+                                                 >>
+                                                 idtacM TC.Secondary
+                                                 ]
+
+                                        | SOME lev =>
+                                             refine (Rule.muUnrollUniv body lev)
+                                             >>> [
+                                                 (* univ : level *)
+                                                 chdir dir
+                                                 >>
+                                                 idtacM TC.Secondary,
+
+                                                 (* U lev |- Body : U lev *)
+                                                 chdir (D.bindVary dir binder) >> idtacM TC.Secondary,
+
+                                                 (* positive (fn . Body) *)
+                                                 chdir dir
+                                                 >>
+                                                 idtacM TC.Secondary
+                                                 ])
+          
+                                   val rtac =
+                                      (* Body[M . id] <:> M *)
+                                      refine (Rule.eeqtpSymm (T.evar ()) (T.evar ()))
+                                      >>
+                                      (* M <:> Body[M . id] *)
+                                      ftac
+                                in
+                                   SOME (T.Sub (body, T.Dot (m, T.id)),
+                                         (Prim.eeqtp, SOME ftac, SOME rtac))
+                                end),
+          
+                            C.path Prim.rec (C.app (C.lamb C.what) C.null) ?
+                            (fn ((binder, body), ()) =>
+                                let
+                                   val ftac =
+                                      (* M = Body[M . id] : type *)
+                                      replaceConcl 
+                                         (T.apply2 Prim.eqtp m (T.app (T.Lam (NONE, body)) m))
+                                      >>
+                                      (* M = (fn . Body) M : type *)
+                                      refine (Rule.reduce (R.compat [red, R.trans [R.compat [red], R.beta 1]]))
+                                      >>
+                                      (* rec (fn . Body) = Body[rec (fn . Body) . id] : type *)
+                                      refine (Rule.recUnroll body)
+                                      >>
+                                      (* later Type |- Body : Type *)
+                                      chdir (D.bindVary dir binder) >> idtacM TC.Secondary
+          
+                                   val rtac =
+                                      (* Body[M . id] = M : type *)
+                                      refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))
+                                      >>
+                                      (* M = Body[M . id] : type *)
+                                      ftac
+                                in
+                                   SOME (T.Sub (body, T.Dot (m, T.id)),
+                                         (Prim.eqtp, SOME ftac, SOME rtac))
+                                end),
+          
+                            C.wild ?
+                            (fn () => raise (Fail "impossible"))
+                            ]
+                      else
+                         NONE
+
+                 | _ => NONE)
+         in
+            Relation (test, act)
+         end
+
+      fun unrollTypeRew const hyp goal = unrollTypeMain const NONE hyp goal
+
+      fun unrollTypeUnivRew capture const lev hyp goal = unrollTypeMain const (SOME (capture, lev)) hyp goal
+
+      fun unrollType aims =
+         rewrite
+            (List.map
+                (fn (const, targets) => (unrollTypeRew const, targets))
+                aims)
+
+      fun unrollTypeUniv aims =
+         rewrite
+            (List.map
+                (fn ((capture, const, lev), targets) => (unrollTypeUnivRew capture const lev, targets))
+                aims)
+
+
+
+      fun convertRew capture em hyp (_, dir) =
+         let
+            val dir' =
+               (case hyp of
+                   NONE => dir
+                 | SOME i => D.shift dir (i+1))
+
+            val m = ETerm.additional capture em (D.idir dir')
+            val m' = N.whnf m
+
+            val added = List.length capture
+
+            fun test bvs n =
+               if bvs < added then
+                  false
+               else
+                  let
+                     val mark = Trail.mark ()
+   
+                     val s = T.underShift added (bvs-added)
+   
+                     val res = I.unifyPrefix (N.simplify (T.Sub (m', s))) n
+                  in
+                     Trail.rewind mark;
+                     Option.isSome res
+                  end
+
+            fun act bvs n =
+               if bvs < added then
+                  NONE
+               else
+                  let
+                     val mark = Trail.mark ()
+   
+                     val s = T.underShift added (bvs-added)
+                  in
+                     (case I.unifyPrefix (N.simplify (T.Sub (m', s))) n of
+                         NONE => 
+                            (
+                            Trail.rewind mark;
+                            NONE
+                            )
+      
+                       | SOME spine => SOME (T.Elim (T.Sub (m, s), spine), Beta))
+                  end
+            in
+               Computational (test, act)
+            end
+
+      fun convert aims =
+         rewriteRaw
+            (List.map
+                (fn ((capture, em), targets) => (convertRew capture em, targets))
+                aims)
+
+
+      fun convertHeadRew capture const em hyp (_, dir) =
+         let
+            val dir' =
+               (case hyp of
+                   NONE => dir
+                 | SOME i => D.shift dir (i+1))
+
+            val m = ETerm.additional capture em (D.idir dir')
+            val m' = N.whnf m
+
+            val added = List.length capture
+
+            fun test bvs n =
+               if bvs < added then
+                  false
+               else
+                  (case n of
+                      T.Elim (T.Const const', _) =>
+                         Constant.eq (const, const')
+                         andalso
+                         let
+                            val mark = Trail.mark ()
+          
+                            val s = T.underShift added (bvs-added)
+          
+                            val res = I.unifyPrefix (N.simplify (T.Sub (m', s))) n
+                         in
+                            Trail.rewind mark;
+                            Option.isSome res
+                         end
+
+                    | _ => false)
+
+            fun act bvs n =
+               if bvs < added then
+                  NONE
+               else
+                  (case n of
+                      T.Elim (T.Const const', _) =>
+                         if Constant.eq (const, const') then
+                            let
+                               val mark = Trail.mark ()
+             
+                               val s = T.underShift added (bvs-added)
+                            in
+                               (case I.unifyPrefix (N.simplify (T.Sub (m', s))) n of
+                                   NONE => 
+                                      (
+                                      Trail.rewind mark;
+                                      NONE
+                                      )
+                
+                                 | SOME spine =>
+                                      SOME (T.Elim (T.Sub (m, s), spine), Beta))
+                            end
+                         else
+                            NONE
+
+                    | _ => NONE)
+         in
+            Computational (test, act)
+         end
+
+      fun convertHead aims =
+         rewriteRaw
+            (List.map
+                (fn ((capture, const, em), targets) => (convertHeadRew capture const em, targets))
+                aims)
+
+
+
+
+
+      fun reduceRew _ _ =
+         let
+            fun act _ n =
+               SOME (N.normalize n, Beta)
+         in
+            Computational ((fns _ _ => true), act)
+         end
+
+      fun whreduceRew _ _ =
+         let
+            fun act _ n =
+               SOME (N.whnf n, Beta)
+         in
+            Computational ((fns _ _ => true), act)
+         end
+
+      fun reduce targets =
+         rewriteRaw [(reduceRew, targets)]
+
+      fun whreduce targets = rewriteRaw [(whreduceRew, targets)]
+
+
+      fun replaceRew capture em en ea hyp (_, dir) =
+         let
+            val idir =
+               D.idir
+               (case hyp of
+                   NONE => dir
+                 | SOME i => D.shift dir (i+1))
+
+            val (idir', added) =
+               List.foldl
+                  (fns symopt (idir, added) =>
+                      (case symopt of
+                          NONE => (D.ibind0 idir, added+1)
+
+                        | SOME sym => (D.ibind idir sym, added+1)))
+                  (idir, 0)
+                  capture
+
+            val m = N.simplify (em idir')
+            val n = en idir'
+            val a = ea idir'
+
+            fun test bvs p =
+               let
+                  val bvs' = bvs - added
+               in
+                  bvs' >= 0
+                  andalso
+                  let
+                     val mark = Trail.mark ()
+
+                     val m' =
+                        if bvs' = 0 then
+                           m
+                        else
+                           N.simplify (T.Sub (m, T.underShift added bvs'))
+
+                     val hit = Option.isSome (I.identicalPrefixSimp m' p)
+                  in
+                     Trail.rewind mark;
+                     hit
+                  end
+               end
+
+            fun act bvs p =
+               let
+                  val bvs' = bvs - added
+               in
+                  if bvs' >= 0 then
+                     let
+                        val mark = Trail.mark ()
+   
+                        val s = T.underShift added bvs'
+                     in
+                        (case I.identicalPrefixSimp (N.simplify (T.Sub (m, s))) p of
+                            NONE =>
+                               (
+                               Trail.rewind mark;
+                               NONE
+                               )
+      
+                          | SOME spine =>
+                               SOME 
+                               (T.Elim (T.Sub (n, s), spine),
+                                (T.Sub (a, s), T.Sub (m, s), T.Sub (n, s), spine,
+      
+                                 (* M[s] = N[s] : A[s] *)
+                                 idtacM TC.Primary)))
+                     end
+                  else
+                     NONE
+               end
+         in
+            Equality (test, act)
+         end
+
+
+      fun usingRew reverse capture elem hyp (jud, dir) =
+         let
+            val (ctx, dir) =
+               (case hyp of
+                   NONE =>
+                      (J.context jud, dir)
+
+                 | SOME i =>
+                      (case Seq.dropOpt (J.context jud) (i+1) of
+                          SOME ctx =>
+                             (ctx, D.shift dir (i+1))
+
+                        | NONE =>
+                             (* this shouldn't happen with a good directory *)
+                             raise (RewriteFailure "nonexistent hypothesis")))
+
+            val (ctx, dir, added) =
+               List.foldl
+               (fns symopt (ctx, dir, added) =>
+                   let
+                      val dir' = D.bindVary dir symopt
+                   in
+                      (Seq.cons (J.Tm (T.evar ())) ctx, dir', added+1)
+                   end)
+               (ctx, dir, 0)
+               capture
+
+            val lem = elem (D.idir dir)
+
+            do (c, ctac) =
+               B.soMain ctx lem
+               (fn "" => raise (RewriteFailure "type inference failed")
+                 | msg => raise (RewriteFailure ("type inference failed: " ^ msg)))
+
+            (* ctac partially proves G |- C *)
+
+            do (b, btac) = B.exploitMain true c ctac
+               
+            (* btac partially proves G |- B *)
+         in
+            (case N.whnf b of
+                T.Elim (T.Const const, spine) =>
+                   if Constant.eq (const, Prim.eq) then
+                      (case spine of
+                          [T.App a, T.App mPre, T.App nPre] =>
+                             (* btac partially proves G |- Mpre = Npre : A *)
+                             let
+                                val (m, n, btac') =
+                                   if reverse then
+                                      (nPre, mPre,
+                                       refine (Rule.eqSymm a nPre mPre) >> btac)
+                                   else
+                                      (mPre, nPre, btac)
+
+                                (* btac' partially proves G |- M = N : A *)
+
+                                val m = N.simplify m
+                                
+                                fun test bvs p =
+                                   let
+                                      val bvs' = bvs - added
+                                   in
+                                      bvs' >= 0
+                                      andalso
+                                      let
+                                         val mark = Trail.mark ()
+   
+                                         val m' =
+                                            if bvs' = 0 then
+                                               m
+                                            else
+                                               N.simplify (T.Sub (m, T.underShift added bvs'))
+                                         
+                                         val hit = Option.isSome (I.identicalPrefixSimp m' p)
+                                      in
+                                         Trail.rewind mark;
+                                         hit
+                                      end
+                                   end
+
+                                fun act bvs p =
+                                   let
+                                      val bvs' = bvs - added
+                                   in
+                                      if bvs' >= 0 then
+                                         let
+                                            val mark = Trail.mark ()
+      
+                                            val s = T.underShift added bvs'
+                                         in
+                                            (case I.identicalPrefixSimp (N.simplify (T.Sub (m, s))) p of
+                                                NONE =>
+                                                   (
+                                                   Trail.rewind mark;
+                                                   NONE
+                                                   )
+      
+                                              | SOME spine =>
+                                                   SOME
+                                                   (T.Elim (T.Sub (n, s), spine),
+                                                    (T.Sub (a, s), T.Sub (m, s), T.Sub (n, s), spine,
+                                                    
+                                                     (* G ... |- M[s] = N[s] : A[s] *)
+                                                     if bvs' = 0 then
+                                                        btac'
+                                                     else
+                                                        refine (Rule.weaken added bvs') >> chdir dir >> btac')))
+                                         end
+                                      else
+                                         NONE
+                                   end
+                             in
+                                Equality (test, act)
+                             end
+
+                        | _ =>
+                             raise (RewriteFailure "lemma conclusion is ill-formed equality"))
+                   else
+                      (* not equality; a general relation *)
+                      (case List.rev spine of
+                          T.App nPre :: T.App mPre :: _ =>
+                             (* btac partially proves R Mpre Npre *)
+                             let
+                                val btacSymm =
+                                   (case H.find EqualityTactic.symmetryTactics const of
+                                       NONE => NONE
+
+                                     | SOME symmtac => SOME (symmtac btac))
+
+                                (* btacSymm partially proves R Npre Mpre *)
+
+                                val (m, n, ftac, rtac) =
+                                   if reverse then
+                                      (nPre, mPre, btacSymm, SOME btac)
+                                   else
+                                      (mPre, nPre, SOME btac, btacSymm)
+
+                                (* ftac partially proves R M N
+                                   rtac partially proves R N M
+                                *)
+
+                                val m = N.simplify m
+                                
+                                fun test bvs p =
+                                   let
+                                      val bvs' = bvs - added
+                                   in
+                                      bvs' >= 0
+                                      andalso
+                                      let
+                                         val mark = Trail.mark ()
+
+                                         val m' =
+                                            if bvs' = 0 then
+                                               m
+                                            else
+                                               N.simplify (T.Sub (m, T.underShift added bvs'))
+
+                                         val hit = Option.isSome (I.identicalPrefixSimp m' p)
+                                      in
+                                         Trail.rewind mark;
+                                         hit
+                                      end
+                                   end
+
+                                fun act bvs p =
+                                   let
+                                      val bvs' = bvs - added
+                                   in
+                                      if bvs' >=  0 then
+                                         let
+                                            val mark = Trail.mark ()
+
+                                            val s = T.underShift added bvs'
+
+                                            fun f tac =
+                                               if bvs' = 0 then
+                                                  tac
+                                               else
+                                                  refine (Rule.weaken added bvs')
+                                                  >> chdir dir
+                                                  >> tac
+                                         in
+                                            (case I.identicalPrefixSimp (N.simplify (T.Sub (m, s))) p of
+                                                NONE =>
+                                                   (
+                                                   Trail.rewind mark;
+                                                   NONE
+                                                   )
+
+                                              | SOME [] =>
+                                                   SOME
+                                                   (T.Sub (n, s),
+                                                    (const,
+                                                     Option.map f ftac,
+                                                     Option.map f rtac))
+
+                                              | SOME (_ :: _) =>
+                                                   raise (RewriteFailure "cannot rewrite a partial aplication with a relation"))
+                                         end
+                                      else
+                                         NONE
+                                   end
+                             in
+                                Relation (test, act)
+                             end
+
+                        | _ =>
+                             raise (RewriteFailure "lemma conclusion is not a relation"))
+                   
+              | _ =>
+                   raise (RewriteFailure "lemma conclusion does not have constant head"))
+         end
+         
+
+
+      fun weakenSubtypeArrow tac =
+         C.goalCase
+            (C.apply2 Prim.arrow C.what C.what ?
+             (fn (a, b) =>
+                 refine (Rule.assert (T.apply2 Prim.subtype a b) (T.evar ()))
+                 >>> [
+                     (* A <: B *)
+                     tac,
+
+                     (* A <: B |- A[^] -> B[^] *)
+                     refine (Rule.arrowIntro (T.Sub (a, T.shift1)) (T.Sub (b, T.shift1)))
+                     >>> [
+                         (* A <: B |- A[^] : type *)
+                         refine (Rule.subtypeIstp1 (T.Sub (a, T.shift1)) (T.Sub (b, T.shift1)) )
+                         >>
+                         (* A <: B |- A[^] <: B[^] *)
+                         refine (Rule.hypothesis 0) >> done,
+
+                         (* A <: B, A[^] |- B[^2] *)
+                         refine (Rule.subsumption (T.Sub (a, T.Shift 2)) (T.Sub (b, T.Shift 2)))
+                         >>> [
+                             (* A <: B, A[^] |- A[^2] <: B[^2] *)
+                             refine (Rule.hypothesis 1) >> done,
+
+                             (* A <: B, A[^] |- A[^2] *)
+                             refine (Rule.hypothesis 0) >> done
+                             ]
+                         ]
+                     ]))
+
+      fun weakenEeqtpSubtype tac =
+         C.goalCase
+            (C.apply2 Prim.subtype C.what C.what ?
+             (fn (a, b) =>
+                 (* A <: B *)
+                 refine (Rule.prodElim1 (T.evar ()) (T.apply2 Prim.subtype b a))
+                 >>
+                 (* A <: B & B <: A *)
+                 refine (Rule.unreduce (T.apply2 Prim.eeqtp a b) Reduction.unfold)
+                 >>
+                 (* A <:> B *)
+                 tac))
+
+      fun weakenEqtpEeqtp tac =
+         C.goalCase
+            (C.apply2 Prim.eeqtp C.what C.what ?
+             (fn (a, b) =>
+                 (* A <:> B *)
+                 refine (Rule.weakenEqtpEeqtp a b)
+                 >>
+                 (* A = B : type *)
+                 tac))
+
+
+      val () = 
+         List.app
+            (fn (const, const', f) =>
+                H.insertMerge weakeningTable const 
+                   [(const', f)]
+                   (fn l => (const', f) :: l))
+            [
+            (Prim.subtype, Prim.arrow, weakenSubtypeArrow),
+            (Prim.eeqtp, Prim.subtype, weakenEeqtpSubtype),
+            (Prim.eqtp, Prim.eeqtp, weakenEqtpEeqtp),
+            ]
+      
+   end
+
+
+structure Rewrite :> REWRITE where type rewrite = RewriteInternal.rewrite = RewriteInternal
+
+
+structure ParseRewrite =
+   struct
+
+      fun id x = x
+      val null = []
+      fun sing x = [x]
+      fun cons h t = h :: t
+
+      val conclSym = Symbol.fromValue "concl"
+
+      fun occurNums l = SOME (false, l)
+      fun occurPos l = SOME (true, l)
+      val occurAll = NONE
+
+      fun targetInAt ident occ = (ident, occ)
+      fun targetIn ident = (ident, SOME (false, [0]))
+
+      fun targetsAt occ = [(conclSym, occ)]
+      val targetsEmpty = [(conclSym, SOME (false, [0]))]
+
+      val withinNone = []
+      val withinSome = id
+
+      fun rewriteForward m capture = Rewrite.usingRew false capture m
+      fun rewriteBackward m capture = Rewrite.usingRew true capture m
+      fun rewriteRepl m n a capture = Rewrite.replaceRew capture m n a
+
+      fun rewriteAim rew targets = (rew, targets)
+      fun termAim m capture targets = ((capture, m), targets)
+      fun constantAim const targets = (const, targets)
+      fun constantTermAim const m capture targets = ((capture, const, m), targets)
+      fun reductionAim r targets = (r, targets)
+      fun reductionTermAim r m capture targets = ((capture, m, r), targets)
+      
+   end
+
+
+grammardef Rewrite
+
+   open ParseRewrite
+
+   rule Occurrences      ::= Numbersn => occurNums
+   rule Occurrences      ::= "pos" Numbersn => occurPos
+   rule Occurrences      ::= "all" => occurAll
+
+   rule Target           ::= "in" Ident "at" Occurrences => targetInAt
+   rule Target           ::= "in" Ident => targetIn
+
+   rule Targetsn         ::= Target => sing
+   rule Targetsn         ::= Target Targetsn => cons
+   rule Targets          ::= "at" Occurrences => targetsAt
+   rule Targets          ::= => targetsEmpty
+   rule Targets          ::= Targetsn => id
+
+   rule ShortTarget      ::= Target => id
+   rule ShortTarget      ::= Ident "at" Occurrences => targetInAt
+   rule ShortTarget      ::= Ident => targetIn
+   
+   rule ShortTargetsn    ::= ShortTarget => sing
+   rule ShortTargetsn    ::= ShortTarget ShortTargetsn => cons
+   rule ShortTargets     ::= "at" Occurrences => targetsAt
+   rule ShortTargets     ::= => targetsEmpty
+   rule ShortTargets     ::= ShortTargetsn => id
+
+   rule Within           ::= => withinNone
+   rule Within           ::= "within" OIdents => withinSome
+
+   rule Rewrite          ::= EMBED => id
+   rule Rewrite          ::= "->" Term Within => rewriteForward
+   rule Rewrite          ::= "<-" Term Within => rewriteBackward
+   rule Rewrite          ::= Term(31) "=" Term(31) ":" Term(31) Within => rewriteRepl
+
+   rule RewriteAim       ::= Rewrite Targets => rewriteAim
+   rule TermAim          ::= Term Within Targets => termAim
+   rule ConstantAim      ::= Constant Targets => constantAim
+   rule ConstantTermAim  ::= Constant "with" Term Within Targets => constantTermAim
+   rule ReductionAim     ::= EMBED Targets => reductionAim
+   rule ReductionTermAim ::= EMBED "with" Term Within Targets => reductionTermAim
+
+   rule RewriteAims      ::= RewriteAim => sing
+   rule RewriteAims      ::= RewriteAim "," RewriteAims => cons
+
+   rule TermAims         ::= TermAim => sing
+   rule TermAims         ::= TermAim "," TermAims => cons
+
+   rule ConstantAims     ::= ConstantAim => sing
+   rule ConstantAims     ::= ConstantAim "," ConstantAims => cons
+
+   rule ConstantTermAims ::= ConstantTermAim => sing
+   rule ConstantTermAims ::= ConstantTermAim "," ConstantTermAims => cons
+
+   rule ReductionAims    ::= ReductionAim => sing
+   rule ReductionAims    ::= ReductionAim "," ReductionAims => cons
+
+   rule ReductionTermAims ::= ReductionTermAim => sing
+   rule ReductionTermAims ::= ReductionTermAim "," ReductionTermAims => cons
+
+   reserved "at" "in" "within" : Ident
+
+end
+
+
+grammaron Rewrite

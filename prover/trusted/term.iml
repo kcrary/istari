@@ -1,0 +1,314 @@
+
+signature TERM =
+   sig
+
+      type binder = Symbol.symbol option
+      type constant
+
+      type 'a ebind_
+
+      datatype term =
+         Var    of int
+       | Const  of constant
+       | Elim   of term * elim list
+       | Lam    of binder * term
+       | Pair   of term * term
+       | Next   of term
+       | Triv
+       | Sub    of term * sub
+       | Evar   of ebind
+
+       | Marker of Symbol.symbol
+
+      and elim =
+         App    of term
+       | Pi1
+       | Pi2
+       | Prev
+
+      and sub =
+         Shift  of int
+       | Dot    of term * sub
+       | Idot   of int * sub
+
+      and ebind = term ebind_
+
+
+
+      val lam : term -> term
+      val lams : int -> term -> term
+
+      val app : term -> term -> term
+      val app2 : term -> term -> term -> term
+      val app3 : term -> term -> term -> term -> term
+      val pi1 : term -> term
+      val pi2 : term -> term
+      val prev : term -> term
+
+      val zero : term
+      val apply1 : constant -> term -> term
+      val apply2 : constant -> term -> term -> term
+      val apply3 : constant -> term -> term -> term -> term
+      val apply4 : constant -> term -> term -> term -> term -> term
+
+      val id : sub
+      val shift1 : sub
+
+
+
+      val mapElim : (term -> term) -> elim -> elim
+      val mapSpine : (term -> term) -> elim list -> elim list
+
+      (* ssubst spine s = spine[s] *)
+      val ssubst : elim list -> sub -> elim list
+
+
+
+      val newEbind : unit -> ebind
+      val evar : unit -> term
+
+      val eqEbind : ebind -> ebind -> bool
+      val readEbind : ebind -> term option
+
+      (* 1. ebindToInt e = ebindToInt e' iff eqEbind e e'
+         2. ebindToInt e >= 0
+      *)
+      val ebindToInt : ebind -> int
+
+
+
+      datatype front =
+         Idx of int
+       | Term of term
+
+      (* raised when a situation arises in which an illegal index might turn into a valid one *)
+      exception BadIndex
+
+      (* substVar i s
+
+         if    G' |- i : A
+               G  |- s : G'
+         then  G  |- i[s] : A[s]
+               return i[s]
+      *)
+      val substVar : int -> sub -> front
+
+      (* compose s1 s2
+
+         if    G' |- s1 : G''
+               G  |- s2 : G'
+         then  G  |- s' : G''
+               return s1 o s2
+      *)
+      val compose : sub -> sub -> sub
+
+      (* under n s
+
+         if    G  |- s : G'
+               G' |- A : type
+               |H| = n
+         then  s' = 0 . 1 ... n-1 . (s o ^n)
+               G, H[s] |- s' : G', H
+               return s'
+      *)
+      val under : int -> sub -> sub
+
+      (* underShift i j = under i (Shift j) *)
+      val underShift : int -> int -> sub
+
+   end
+
+
+(* Assigning to ebinds is a privileged operation, since it could be used to invalidate
+   proofs, or create cyclic terms.  Use Unify.setEbindSub instead.
+*)
+
+signature TERM_PRIV = TERM where type 'a ebind_ = 'a option ref * int
+
+
+functor TermFun (type constant)
+   :>
+   TERM_PRIV where type constant = constant
+   =
+   struct
+
+      type binder = Symbol.symbol option
+      type constant = constant
+
+      type 'a ebind_ = 'a option ref * int
+
+      datatype term =
+         Var    of int
+       | Const  of constant
+       | Elim   of term * elim list
+       | Lam    of binder * term
+       | Pair   of term * term
+       | Next   of term
+       | Triv
+       | Sub    of term * sub
+       | Evar   of ebind
+
+       | Marker of Symbol.symbol
+
+      and elim =
+         App    of term
+       | Pi1
+       | Pi2
+       | Prev
+
+      and sub =
+         Shift  of int
+       | Dot    of term * sub
+       | Idot   of int * sub
+
+      and ebind = term ebind_
+
+
+      fun lam m = Lam (NONE, m)
+
+      fun lams n m =
+         if n = 0 then
+            m
+         else
+            lam (lams (n-1) m)
+
+      fun app f a = Elim (f, [App a])
+      fun app2 f a b = Elim (f, [App a, App b])
+      fun app3 f a b c = Elim (f, [App a, App b, App c])
+      fun pi1 m = Elim (m, [Pi1])
+      fun pi2 m = Elim (m, [Pi2])
+      fun prev m = Elim (m, [Prev])
+
+      val zero = Var 0
+      fun apply1 prim a = Elim (Const prim, [App a])
+      fun apply2 prim a b = Elim (Const prim, [App a, App b])
+      fun apply3 prim a b c = Elim (Const prim, [App a, App b, App c])
+      fun apply4 prim a b c d = Elim (Const prim, [App a, App b, App c, App d])
+      
+
+      val id = Shift 0
+      val shift1 = Shift 1
+
+
+      fun mapElim f e =
+         (case e of
+             App m => App (f m)
+
+           | _ => e)
+
+      fun mapSpine f spine = map (mapElim f) spine
+
+      fun ssubst spine s =
+         (case s of
+             Shift 0 => spine
+
+           | _ =>
+                mapSpine (fn m => Sub (m, s)) spine)
+
+
+
+      (* Unify.prune relies on no ebind number being negative. *)
+      val nextEbind = ref 0
+
+      fun newEbind () =
+         let
+            val i = !nextEbind
+         in
+            nextEbind := i + 1;
+            (ref NONE, i)
+         end
+
+      fun evar () = Evar (newEbind ())
+
+      fun eqEbind (_, i:int) (_, i') = i = i'
+
+      fun readEbind (ref b, _) = b
+
+      fun ebindToInt (_, i) = i
+
+
+      exception BadIndex
+
+      datatype front =
+         Idx of int
+       | Term of term
+
+      fun substVar i s =
+         (case (i, s) of
+             (0, Dot (m, _)) => 
+                Term m
+
+           | (i, Dot (_, s')) =>
+                substVar (i-1) s'
+
+           | (0, Idot (j, _)) =>
+                Idx j
+
+           | (i, Idot (_, s')) =>
+                substVar (i-1) s'
+
+           | (i, Shift j) =>
+                if i >= 0 andalso j >= 0 then
+                   Idx (i+j)
+                else
+                   raise BadIndex)
+                
+
+
+      fun compose s1 s2 =
+         (case (s1, s2) of
+             (Shift 0, _) => s2
+
+           | (_, Shift 0) => s1
+
+           | (Shift i, Dot (_, s)) =>
+                compose (Shift (i-1)) s
+
+           | (Shift i, Idot (_, s)) =>
+                compose (Shift (i-1)) s
+
+           | (Shift i, Shift j) =>
+                if i >= 0 andalso j >=0 then
+                   Shift (i+j)
+                else
+                   raise BadIndex
+
+           | (Dot (m, s), _) =>
+                Dot (Sub (m, s2), compose s s2)
+
+           | (Idot (i, s), _) =>
+                (case substVar i s2 of
+                    Idx j =>
+                       Idot (j, compose s s2)
+
+                  | Term m =>
+                       Dot (m, compose s s2)))
+
+
+      fun underMain i n s =
+         if i = n then
+            compose s (Shift n)
+         else
+            Idot (i, underMain (i+1) n s)
+
+      fun under n s =
+         (case s of
+             Shift 0 => s
+
+           | _ => underMain 0 n s)
+
+      fun underShiftMain k i j =
+         if k = i then
+            Shift (i + j)
+         else
+            Idot (k, underShiftMain (k+1) i j)
+
+      fun underShift i j =
+         if j = 0 then
+            id
+         else if i = 0 then
+            Shift j
+         else
+            underShiftMain 0 i j
+
+   end

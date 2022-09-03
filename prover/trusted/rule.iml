@@ -1,0 +1,903 @@
+
+signature RULE =
+   sig
+
+      include THE_RULES
+
+      val hypothesis : int -> rule
+      val hypothesisOf : int -> rule
+      val hypothesisEq : int -> rule
+      val hypothesisOfTp : int -> rule
+      val hypothesisEqTp : int -> rule
+
+      val identity : string -> rule
+
+      (* weaken i j, if |G2| = j, and |G3| = i,
+         turns G1, G2, G3 into G1, G3
+      *)
+      val weaken : int -> int -> rule
+
+      (* exchange i j k, if |G2| = k and |G3| = j, and |G4| = i,
+         turns G1, G2, G3, G4 into G1, G3', G2', G4'
+      *)
+      val exchange : int -> int -> int -> rule
+
+      (* if    C reduces to D by red
+         then  reduce red            turns C into D
+               unreduce C red        turns D into C
+               reduceAt i A C red    turns A[under_i (C . id)] into A[under_i (D . id)]
+               unreduceAt i A C red  turns A[under_i (D . id)] into A[under_i (C . id)]
+
+               reduceHyp j red             turns Hj = Tm* C into Tm* D
+               unreduceHhyp j C red        turns Hj = Tm* D into Tm* C
+               reduceHypAt j i H C red     turns Hj = H[under_i (C . id)] into H[under_i (D . id)]
+               unreduceHypAt j i H C red   turns Hj = H[under_i (D . id)] into H[under_i (C . id)]
+          
+         In (un)reduceHypAt the hypothesis need not be Tm* (in which case it has no effect).
+      *)
+      val reduce : Reduction.reduction -> rule
+      val unreduce : term -> Reduction.reduction -> rule
+      val reduceHyp : int -> Reduction.reduction -> rule
+      val unreduceHyp : int -> term -> Reduction.reduction -> rule
+      val reduceAt : int -> term -> term -> Reduction.reduction -> rule
+      val unreduceAt : int -> term -> term -> Reduction.reduction -> rule
+      val reduceHypAt : int -> int -> Judgement.hyp -> term -> Reduction.reduction -> rule
+      val unreduceHypAt : int -> int -> Judgement.hyp -> term -> Reduction.reduction -> rule
+
+      val checkPositive : rule
+      val checkNegative : rule
+
+      (* sumLeft i a b c
+         case analyzes i:(sum a b) with right-hand-side c
+      *)
+      val sumLeft : int -> term -> term -> term -> rule
+
+      exception Failure         (* raised when a rule does not apply *)
+      exception ExtractFailure  (* raised when extract function doesn't see what it expects *)
+
+      val apply : rule -> Judgement.djudgement -> Judgement.djudgement list * (term list -> term)
+      val name : rule -> string
+
+      val trustme : rule
+
+   end
+
+
+structure Rule :> RULE =
+   struct
+
+      structure T = Term
+      structure J = Judgement
+      structure S = Seq
+      structure I = Invert
+      structure U = Unify
+
+      exception Failure
+      exception ExtractFailure
+      
+      fun unifyHyps hyps g =
+         (case (hyps, S.expose g) of
+             (nil, _) => g
+
+           | (_ :: _, S.Nil) => raise Failure
+
+           | (h1 :: rest, S.Cons (h2, g')) =>
+                (
+                J.unifyHyp h1 h2;
+                unifyHyps rest g'
+                ))
+         
+      exception ContextToPsubEasy
+
+      fun contextToPsubMain easy i g =
+         (case S.expose g of
+             S.Nil =>
+                if easy then
+                   raise ContextToPsubEasy
+                else
+                   I.Pshift i
+
+           | S.Cons (J.Tmh _, g') =>
+                I.Pundef (contextToPsubMain false (i+1) g')
+
+           | S.Cons (J.Tp, g') =>
+                I.Pundef (contextToPsubMain false (i+1) g')
+
+           | S.Cons (_, g') =>
+                I.Pidot (i, contextToPsubMain easy (i+1) g'))
+
+      fun contextToPsub g =
+         try
+            contextToPsubMain true 0 g
+         with
+            ContextToPsubEasy => I.Pshift 0
+
+      fun checkHidden jud ms =
+         (case ms of
+             [] => ()
+
+           | _ =>
+                let
+                   val p = contextToPsub (J.context jud)
+                in
+                   (case p of
+                       I.Pshift 0 => ()
+ 
+                     | _ =>
+                          List.app (fn m =>
+                                       if U.quickPrune m p then
+                                          ()
+                                       else
+                                          raise Failure) ms)
+                end)
+
+
+      structure Arg =
+         struct
+
+            type result = J.djudgement list * (T.term list -> T.term)
+            type rule = string * (J.djudgement -> result)
+
+            exception ExtractFailure = ExtractFailure
+
+            datatype context_action =
+               Nothing
+             | Promote
+             | Unhide
+             | PromoteUnhide
+
+            fun applyAction act g =
+               (case act of
+                   Nothing => g
+                 | Promote => S.map J.promote g
+                 | Unhide => S.map J.unhide g
+                 | PromoteUnhide => S.map J.promoteAndUnhide g)
+
+            fun make str hidden a subgoals ext =
+               (str,
+                fn jud =>
+                   let
+                      val () = checkHidden jud hidden
+
+                      val g = J.context jud
+                   in
+                      if U.unify1 a (J.concl jud) then
+                         (map 
+                             (fn (act, h, b) =>
+                                 let
+                                    val g' = applyAction act g
+                                 in
+                                    J.make (S.appendList h g') b
+                                 end)
+                             subgoals,
+                          ext)
+                      else
+                         raise Failure
+                   end)
+
+            fun lmake str hidden i hyps a subgoals ext =
+               (str,
+                fn jud =>
+                   let
+                      val () = checkHidden jud hidden
+
+                      val g = J.context jud
+    
+                      val (g3, g12) =
+                         try
+                            S.split g i
+                         with Invalid _ => raise Failure
+    
+                      val g1 = unifyHyps hyps g12
+                   in
+                      if U.unify1 a (J.concl jud) then
+                         (map
+                             (fn (act, h, subo, b) =>
+                                    let
+                                       val g1' = applyAction act g1
+    
+                                       val g12 = S.appendList h g1'
+    
+                                       val g' =
+                                          (case subo of
+                                              NONE => g12
+    
+                                            | SOME (T.Shift 0) =>
+                                                 S.append g3 g12
+    
+                                            | SOME sub =>
+                                                 S.append (J.subContext g3 sub) g12)
+                                    in
+                                       J.make g' b
+                                    end)
+                                subgoals,
+                             ext)
+                      else
+                         raise Failure
+                   end)
+
+         end
+
+      structure R = RuleFun (structure Arg = Arg)
+      open R
+
+
+      (* Hardcoded rules *)
+
+      fun id l =
+         (case l of
+             [x] => x
+
+           | _ => raise ExtractFailure)
+
+      fun fn0 x l =
+         (case l of
+             [] => x
+
+           | _ => raise ExtractFailure)
+
+      fun fn1 f l =
+         (case l of
+             [x] => f x
+
+           | _ => raise ExtractFailure)
+
+
+      (* This one could be done using the rule generator, but this should be a tiny bit faster. *)
+      fun hypothesis i =
+         ("hypothesis",
+          fn jud =>
+             (case J.hypOpt jud i of
+                 SOME (J.Tm a) =>
+                    if U.unify1 (J.concl jud) (T.Sub (a, T.Shift (i+1))) then
+                       ([], fn0 (T.Var i))
+                    else
+                       raise Failure
+    
+               | _ =>
+                    raise Failure))
+
+
+      (* Okay to unhide, since the variable isn't used in the extract. *)
+      fun hypothesisOf i =
+         ("hypothesisOf",
+          fn jud =>
+             let
+                val a =
+                   (case J.hypOpt jud i of
+                       SOME (J.Tm a) => a
+                     | SOME (J.Tmh a) => a
+                     | _ => raise Failure)
+             in
+                if
+                   U.unify1 (J.concl jud)
+                   (T.apply2 Prim.ov (T.Sub (a, T.Shift (i+1))) (T.Var i))
+                then
+                   ([], fn0 T.Triv)
+                else
+                   raise Failure
+             end)
+
+
+      (* Okay to unhide, since the variable isn't used in the extract. *)
+      fun hypothesisEq i =
+         ("hypothesisEq",
+          fn jud =>
+             let
+                val a =
+                   (case J.hypOpt jud i of
+                       SOME (J.Tm a) => a
+                     | SOME (J.Tmh a) => a
+                     | _ => raise Failure)
+             in
+                if
+                   U.unify1 (J.concl jud)
+                   (T.apply3 Prim.eq (T.Sub (a, T.Shift (i+1))) (T.Var i) (T.Var i))
+                then
+                   ([], fn0 T.Triv)
+                else
+                   raise Failure
+             end)
+
+
+      fun hypothesisOfTp i =
+         ("hypothesisOfTp",
+          fn jud =>
+             let
+                val () =
+                   (case J.hypOpt jud i of
+                       SOME J.Tp => ()
+                     | _ => raise Failure)
+             in
+                if
+                   U.unify1 (J.concl jud)
+                   (T.apply1 Prim.istp (T.Var i))
+                then
+                   ([], fn0 T.Triv)
+                else
+                   raise Failure
+             end)
+
+
+      fun hypothesisEqTp i =
+         ("hypothesisEqTp",
+          fn jud =>
+             let
+                val () =
+                   (case J.hypOpt jud i of
+                       SOME J.Tp => ()
+                     | _ => raise Failure)
+             in
+                if
+                   U.unify1 (J.concl jud)
+                   (T.apply2 Prim.eqtp (T.Var i) (T.Var i))
+                then
+                   ([], fn0 T.Triv)
+                else
+                   raise Failure
+             end)
+
+
+
+      fun evarHyp h =
+         (case h of
+             J.Tm _ => J.Tm (T.evar ())
+           | J.Tml _ => J.Tml (T.evar ())
+           | J.Tmh _ => J.Tmh (T.evar ())
+           | J.Tp => J.Tp
+           | J.Tpl => J.Tpl
+           | J.Tph => J.Tph)
+
+
+      fun identity str =
+         (str,
+          (fn jud =>
+              ([jud],
+               fn1 (fn m => m))))
+
+
+      fun weaken i j =
+         ("weaken",
+          fn jud =>
+             if i < 0 orelse j < 0 orelse i + j > S.length (J.context jud) then
+                raise Failure
+             else
+                let
+                   fun loop g i =
+                      if i = 0 then
+                         S.drop g j
+                      else
+                         (case S.expose g of
+                             S.Nil =>
+                                raise (Fail "impossible")
+    
+                           | S.Cons (h, g') =>
+                                let
+                                   val h' = evarHyp h
+                                in
+                                   J.unifyHyp h (J.subHyp h' (T.under (i-1) (T.Shift j)));
+                                   S.cons h' (loop g' (i-1))
+                                end)
+    
+                   val g' = loop (J.context jud) i
+    
+                   val c = T.evar ()
+                   val () = U.unify (J.concl jud) (T.Sub (c, T.under i (T.Shift j)))
+                in
+                   if U.solve () then
+                      ([J.make g' c],
+                       fn1 (fn m => T.Sub (m, T.under i (T.Shift j))))
+                   else
+                      raise Failure
+                end)
+
+
+      (* |G2| = k, |G3| = j
+
+         G1, G3, G2 |- exchsub j k l : (G1, G2, G3)-l
+         where
+         G-n =def= drop G n
+      *)
+      fun exchsub j k l =
+         if l < j then
+            T.Idot (l + k, exchsub j k (l+1))
+         else if l < j+k then
+            T.Idot (l - j, exchsub j k (l+1))
+         else
+            T.Shift (j + k)
+
+      fun exchange i j k =
+         ("exchange",
+          fn jud =>
+             if i < 0 orelse j < 0 orelse k < 0 orelse i + j + k > S.length (J.context jud) then
+                raise Failure
+             else
+                let
+                   (* have G = G1 G2 G3 G4, where |G2| = k, |G3| = j, |G4| = i
+                      want H = G1 H3 H2 H4,
+                      where H2, H3, and H4 are G2, G3, and G4 under appropriate substitutions
+                   *)
+                   val g123 = S.drop (J.context jud) i
+                   val (g3, g12) = S.split g123 j
+                   val (g2, g1) = S.split g12 k
+    
+                   (* far g l
+    
+                      if    g = G3-l
+                      then  return G1, H3-l
+                   *)
+                   fun far g l =
+                      if l = j then
+                         g1
+                      else
+                         (case S.expose g of
+                             S.Cons (hyp, g') =>
+                                (* G3-l = g', hyp
+                                   so G3-(l+1) = g'
+                                *)
+                                let
+                                   val h' = far g' (l+1)
+                                   val hyp' = evarHyp hyp
+                                in
+                                   (* h' = G1, H3-(l+1)
+                                      hyp lives in G1, G2, G3-(l+1)
+    
+                                      need to check:
+                                      hyp = hyp'[under (j-l-1) ^k]
+                                      so that hyp' lives in G1, H3-(l+1)
+                                   *)
+                                   J.unifyHyp hyp (J.subHyp hyp' (T.under (j-l-1) (T.Shift k)));
+                                   S.cons hyp' h'
+                                end
+    
+                           | S.Nil => raise (Fail "impossible"))
+    
+                   (* mid g l
+    
+                      if    g = G2-l
+                      then  return G1, H3, H2-l
+                   *)
+                   fun mid g l =
+                      if l = k then
+                         far g3 0
+                      else
+                         (case S.expose g of
+                             S.Cons (hyp, g') =>
+                                (* G2-l = g', hyp
+                                   so G2-(l+1) = g'
+                                *)
+                                let
+                                   val h' = mid g' (l+1)
+                                in
+                                   (* h' = G1, H3, H2-(l+1)
+                                      hyp lives in G1, G2-(l+1)
+    
+                                      need to put it in G1, H3, H2-(l+1)
+                                   *)
+                                   S.cons (J.subHyp hyp (T.under (k-l-1) (T.Shift j))) h'
+                                end
+    
+                           | S.Nil => raise (Fail "impossible"))
+    
+                   val s = exchsub j k 0
+                   val sinv = exchsub k j 0
+    
+                   fun near g i =
+                      if i = 0 then
+                         mid g2 0
+                      else
+                         (case S.expose g of
+                             S.Cons (h, g') =>
+                                S.cons (J.subHyp h (T.under (i-1) s)) (near g' (i-1))
+    
+                           | S.Nil =>
+                                raise (Fail "impossible"))
+    
+                   val g' = near (J.context jud) i
+    
+                   val t = T.under i sinv
+                in
+                   if U.solve () then
+                      ([J.make g' (T.Sub (J.concl jud, T.under i s))],
+                       fn1 (fn m => T.Sub (m, t)))
+                   else
+                      raise Failure
+                end)
+
+
+      fun onhyp jud i =
+         (case S.splitOpt (J.context jud) i of
+             NONE => raise Failure
+
+           | SOME (bottom, h_top) =>
+                (case S.expose h_top of
+                    S.Nil => raise Failure
+
+                  | S.Cons (h, top) =>
+                       (h,
+                        (fn h' =>
+                            J.make
+                               (S.append bottom (S.cons h' top))
+                               (J.concl jud)))))
+
+      fun onhypTm jud i =
+         let
+            val (h, f) = onhyp jud i
+         in
+            (case h of
+                J.Tm a =>
+                   (a, (fn a' => f (J.Tm a')))
+
+              | J.Tml a =>
+                   (a, (fn a' => f (J.Tml a')))
+
+              | J.Tmh a =>
+                   (a, (fn a' => f (J.Tmh a')))
+
+              | _ => raise Failure)
+         end
+
+
+      fun reduce red =
+         ("reduce",
+          fn jud =>
+             (try
+                 ([J.make (J.context jud) (Reduction.reduce red (J.concl jud))],
+                  id)
+              with
+                 Reduction.Reduce => raise Failure))
+    
+
+      fun unreduce c red =
+         ("unreduce",
+          fn jud =>
+             (try
+                 if U.unify1 (J.concl jud) (Reduction.reduce red c) then
+                    ([J.make (J.context jud) c], id)
+                 else
+                    raise Failure
+              with
+                 Reduction.Reduce => raise Failure))
+
+         
+      fun reduceHyp i red =
+         ("reduceHyp",
+          fn jud =>
+             let
+                val (c, f) = onhypTm jud i
+             in
+                try 
+                   ([f (Reduction.reduce red c)], id)
+                with
+                   Reduction.Reduce => raise Failure
+             end)
+
+
+      fun unreduceHyp i c red =
+         ("unreduceHyp",
+          fn jud =>
+             let
+                val (d, f) = onhypTm jud i
+             in
+                try
+                   if U.unify1 d (Reduction.reduce red c) then
+                      ([f c], id)
+                   else
+                      raise Failure
+                with
+                   Reduction.Reduce => raise Failure
+             end)
+
+
+      fun reduceAt i a c red =
+         ("reduceAt",
+          fn jud =>
+             let
+                val d =
+                   try
+                      Reduction.reduce red c
+                   with
+                      Reduction.Reduce => raise Failure
+             in
+                if U.unify1 (J.concl jud) (T.Sub (a, T.under i (T.Dot (c, T.id)))) then
+                   ([J.make 
+                        (J.context jud) 
+                        (T.Sub (a, T.under i (T.Dot (d, T.id))))],
+                    id)
+                else
+                   raise Failure
+             end)
+
+
+      fun unreduceAt i a c red =
+         ("unreduceAt",
+          fn jud =>
+             let
+                val d =
+                   try
+                      Reduction.reduce red c
+                   with
+                      Reduction.Reduce => raise Failure
+             in
+                if U.unify1 (J.concl jud) (T.Sub (a, T.under i (T.Dot (d, T.id)))) then
+                   ([J.make 
+                        (J.context jud) 
+                        (T.Sub (a, T.under i (T.Dot (c, T.id))))],
+                    id)
+                else
+                   raise Failure
+             end)
+
+
+      fun unifyHyp1 h h' =
+         (
+         J.unifyHyp h h';
+         Unify.solve ()
+         )
+
+
+      fun reduceHypAt j i h c red =
+         ("reduceHypAt",
+          fn jud =>
+             let
+                val (hj, f) = onhyp jud j
+
+                val d =
+                   try
+                      Reduction.reduce red c
+                   with
+                      Reduction.Reduce => raise Failure
+             in
+                if unifyHyp1 hj (J.subHyp h (T.under i (T.Dot (c, T.id)))) then
+                   ([f (J.subHyp h (T.under i (T.Dot (d, T.id))))],
+                    id)
+                else
+                   raise Failure
+             end)
+
+
+      fun unreduceHypAt j i h c red =
+         ("unreduceHypAt",
+          fn jud =>
+             let
+                val (hj, f) = onhyp jud j
+
+                val d =
+                   try
+                      Reduction.reduce red c
+                   with
+                      Reduction.Reduce => raise Failure
+             in
+                if unifyHyp1 hj (J.subHyp h (T.under i (T.Dot (d, T.id)))) then
+                   ([f (J.subHyp h (T.under i (T.Dot (c, T.id))))],
+                    id)
+                else
+                   raise Failure
+             end)
+                   
+    
+
+      (* true <=> positive; p = punder^i (undef . id);
+         q = undef .. undef (i times) . id
+      *)
+
+      fun checkClosed sign p q a acc =
+         let
+            val mark = Trail.mark ()
+         in
+            if U.quickPrune a p then
+               (* we're happy if a doesn't mention i *)
+               acc
+            else
+               (
+               Trail.rewind mark;
+               (* generate an obligation if a doesn't mention any variable < i *)
+               (case U.prune a q of
+                   NONE =>
+                      (
+                      Trail.rewind mark;
+                      raise Failure
+                      )
+
+                 | SOME b => 
+                      (sign, b) :: acc)
+               )
+         end
+
+      fun checkPosNegMain sign i p q a acc = checkPosNegWhnf sign i p q (Normalize.whnf a) acc
+
+      and checkPosNegWhnf sign i p q a acc =
+         (case a of
+             T.Elim (T.Var j, []) =>
+                if sign orelse i <> j then
+                   acc
+                else
+                   raise Failure
+
+           | T.Elim (T.Const const, spine) =>
+                if Constant.eq (const, Prim.prod) then
+                   (case spine of
+                       [T.App b, T.App c] =>
+                          checkPosNegMain sign i p q b 
+                             (checkPosNegMain sign i p q c acc)
+
+                     | _ =>
+                          raise Failure)
+
+                else if Constant.eq (const, Prim.sum) then
+                   (case spine of
+                       [T.App b, T.App c] =>
+                          checkPosNegMain sign i p q b 
+                             (checkPosNegMain sign i p q c acc)
+
+                     | _ =>
+                          raise Failure)
+
+                else if Constant.eq (const, Prim.arrow) then
+                   (case spine of
+                       [T.App b, T.App c] =>
+                          checkPosNegMain (not sign) i p q b 
+                             (checkPosNegMain sign i p q c acc)
+
+                     | _ =>
+                          raise Failure)
+
+                else if Constant.eq (const, Prim.forall) then
+                   (case spine of
+                       [T.App b, T.App c] =>
+                          checkPosNegMain (not sign) i p q b
+                             (checkPosNegLam sign i p q c acc)
+
+                     | _ =>
+                          raise Failure)
+
+                else if Constant.eq (const, Prim.exists) then
+                   (case spine of
+                       [T.App b, T.App c] =>
+                          checkPosNegMain sign i p q b
+                             (checkPosNegLam sign i p q c acc)
+
+                     | _ =>
+                          raise Failure)
+
+                else if Constant.eq (const, Prim.mu) then
+                   (case spine of
+                       [T.App b] =>
+                          checkPosNegLam sign i p q b acc
+
+                     | _ =>
+                          raise Failure)
+
+                else if Constant.eq (const, Prim.ite) then
+                   (case spine of
+                       [T.App m, T.App b, T.App c] =>
+                          let
+                             val mark = Trail.mark ()
+                          in
+                             if U.quickPrune m p then
+                                checkPosNegMain sign i p q b
+                                   (checkPosNegMain sign i p q c acc)
+                             else
+                                (
+                                Trail.rewind mark;
+                                raise Failure
+                                )
+                          end
+
+                     | _ =>
+                          raise Failure)
+
+                else
+                   (case Constant.definition const of
+                       SOME n =>
+                          checkPosNegMain sign i p q (T.Elim (n, spine)) acc
+
+                     | NONE =>
+                          (* don't unfold an opaque constant *)
+                          checkClosed sign p q a acc)
+
+           | _ =>
+                checkClosed sign p q a acc)
+
+      and checkPosNegLam sign i p q a acc =
+         (case Normalize.whnf a of
+             T.Lam (_, b) =>
+                checkPosNegMain sign (i+1) (I.punder p) (I.Pundef q) b acc
+
+           | _ =>
+                raise Failure)
+
+
+      fun checkPosNeg sign jud =
+         let
+            val a = T.evar ()
+         in
+            if
+               U.unify1
+                  (T.apply1 (if sign then Prim.positive else Prim.negative) (T.Lam (NONE, a)))
+                  (J.concl jud)
+            then
+               let
+                  val obs =
+                     checkPosNegMain sign 0 
+                        (I.Pundef (I.Pshift 0)) (I.Pshift 0)
+                        a []
+
+                  val ctx = J.context jud
+
+                  val subgoals =
+                     List.map 
+                        (fn (sign', b) => 
+                               J.make ctx 
+                                  (T.apply1 
+                                      (if sign' then Prim.positive else Prim.negative)
+                                      (T.Lam (NONE, b))))
+                        obs
+
+                  val n = List.length obs
+
+                  fun validate (vs : T.term list) =
+                     if List.length vs = n then
+                        T.Triv
+                     else
+                        raise ExtractFailure
+               in
+                  (subgoals, validate)
+               end
+            else
+               raise Failure
+         end
+
+      val checkPositive = ("checkPositive", checkPosNeg true)
+
+      val checkNegative = ("checkNegative", checkPosNeg false)
+
+
+
+      fun apply (_, f) = f
+      fun name (str, _) = str
+
+
+      val trustme =
+         ("trustme",
+          fn jud =>
+             if Unsafe.allowed () then
+                ([], fn0 (T.Const Prim.magic))
+             else
+                raise Unsafe.UnsafeNotAllowed)
+
+
+      (* The rule generator can't handle the form the extract takes in this rule
+         (it combines variables from both the near and far zones), and it's not worth
+         implementing it for only one rule.
+      *)
+
+      open Term
+
+      fun substAt m i j k =
+         if i = k then
+            Dot (m, Shift (j+1))
+         else
+            Idot (j, substAt m (i+1) (j+1) k)
+
+      fun sumLeft gsize a b c =
+         Arg.lmake "sumLeft" [] gsize
+         [J.Tm (apply2 Prim.sum a b)]
+         c
+         [
+         (Arg.Nothing, [J.Tm a], SOME (Dot (apply1 Prim.inl zero, Shift 1)),
+          Sub (c, under gsize (Dot (apply1 Prim.inl zero, Shift 1)))),
+          
+         (Arg.Nothing, [J.Tm b], SOME (Dot (apply1 Prim.inr zero, Shift 1)),
+          Sub (c, under gsize (Dot (apply1 Prim.inr zero, Shift 1))))
+         ]
+         (fn [m, n] =>
+                apply3
+                   Prim.sumcase
+                   (Var gsize)
+                   (Lam (NONE, Sub (m, substAt zero 0 1 gsize)))
+                   (Lam (NONE, Sub (n, substAt zero 0 1 gsize)))
+
+           | _ => raise ExtractFailure)
+
+   end

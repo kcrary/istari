@@ -1,0 +1,216 @@
+
+signature REORDER =
+   sig
+
+      exception Reorder of string
+
+      (* NB: When coding a reordering, remember that a validator can be given extra validations
+         at the end, which should be left alone.  You cannot assume that every validation in
+         the list is for one of the goals.
+      *)
+
+      type judgement = Tactic.judgement
+
+      type 'a reordering =
+         ('a * judgement) list 
+         -> ('a * judgement) list * (Refine.validation list -> Refine.validation list)
+
+
+      val id : 'a reordering
+
+      (* swap i j swaps the first i goals with the next j goals *)
+      val swap : int -> int -> 'a reordering
+
+      (* pull i = swap i 1 *)
+      val pull : int -> 'a reordering
+
+      (* push i = swap 1 i *)
+      val push : int -> 'a reordering
+
+      (* rotateForward i = swap i (n-i), where n = number of goals *)
+      val rotateForward : int -> 'a reordering
+
+      (* rotateBackward i = swap (n-i) i, where n = number of goals *)
+      val rotateBackward : int -> 'a reordering
+
+      (* reordering with (compose [r1 ... rn] is the same as reordering with r1 then r2, etc. *)
+      val compose : 'a reordering list -> 'a reordering
+
+      (* When there are n subgoals, withCount f = f n. *)
+      val withCount : (int -> 'a reordering) -> 'a reordering
+
+      (* Contract the first n+1 goals, which must be identical. *)
+      val contract : int -> 'a reordering
+
+      val sort : ('a -> 'a -> bool) -> 'a reordering
+
+      val reorder : 'a Tactic.tacticm -> 'a reordering -> 'a Tactic.tacticm
+
+   end
+
+
+structure Reorder :> REORDER =
+   struct
+
+      open Tactic
+
+      exception Reorder of string
+
+      exception ValidationFailure = Refine.ValidationFailure
+
+      type judgement = Tactic.judgement
+
+      type 'a reordering =
+         ('a * judgement) list 
+         -> ('a * judgement) list * (Refine.validation list -> Refine.validation list)
+
+
+      fun id goals = (goals, (fn vs => vs))
+         
+      fun swap i j goals =
+         (case List.splitOpt goals i of
+             NONE => raise (Reorder "not enough goals")
+
+           | SOME (front, rest) =>
+                (case List.splitOpt rest j of
+                    NONE => raise (Reorder "not enough goals")
+
+                  | SOME (back, remain) =>
+                       (back @ front @ remain,
+                        (fn vs =>
+                            (case List.splitOpt vs j of
+                                NONE => raise ValidationFailure
+
+                              | SOME (frontvs, restvs) =>
+                                   (case List.splitOpt restvs i of
+                                       NONE => raise ValidationFailure
+
+                                     | SOME (backvs, remainvs) =>
+                                          backvs @ frontvs @ remainvs))))))
+
+                                          
+      fun withCount reord goals =
+         reord (List.length goals) goals
+
+
+      fun pull i = swap i 1
+
+      fun push i = swap 1 i
+
+      fun rotateForward i = withCount (fn n => swap i (n-i))
+
+      fun rotateBackward i = withCount (fn n => swap (n-i) i)
+
+
+      fun compose2 r1 r2 goals =
+         let
+            val (goals1, perm1) = r1 goals
+            val (goals2, perm2) = r2 goals1
+         in
+            (goals2, fn vs => perm1 (perm2 vs))
+         end
+
+      fun compose rs = List.foldr compose2 id rs
+             
+
+
+
+      fun contractLoop jud n goals =
+         if n = 0 then
+            (goals, (fns _ vs => vs))
+         else
+            (case goals of
+                [] =>
+                   raise (Reorder "not enough goals")
+
+              | (_, (jud', _)) :: rest =>
+                   (case Refine.cast jud jud' of
+                       NONE =>
+                          raise (Reorder "contracted goals are not identical")
+
+                     | SOME f =>
+                          let
+                             val (goals', g) = contractLoop jud (n-1) rest
+                          in
+                             (goals',
+                              (fns v vs => f v :: g v vs))
+                          end))
+
+      fun contract n goals =
+         if n < 0 then
+            raise (Invalid "Reorder.contract")
+         else
+            (case goals of
+                [] =>
+                   raise (Reorder "not enough goals")
+
+              | (goal as (_, (jud, _))) :: rest =>
+                   let
+                      val (goals', g) = contractLoop jud n rest
+                   in
+                      (goal :: goals',
+                       (fn [] => raise ValidationFailure
+                         | v :: vrest => v :: g v vrest))
+                   end)
+
+
+      fun insert comp (goal as (x, _)) goals =
+         (case goals of
+             [] =>
+                ([goal], (fn vs => vs))
+
+           | (goal' as (y, _)) :: rest =>
+                if comp x y then
+                   (goal :: goals,
+                    (fn vs => vs))
+                else
+                   let
+                      val (rest', f) = insert comp goal rest
+                   in
+                      (goal' :: rest',
+                       (fn [] => raise ValidationFailure
+                         | v2 :: vs =>
+                              (case f vs of
+                                  [] => raise ValidationFailure
+                                | v1 :: vrest =>
+                                     v1 :: v2 :: vrest)))
+                   end)
+
+      fun sort comp goals =
+         (case goals of
+             [] =>
+                ([], (fn vs => vs))
+
+           | goal :: rest =>
+                let
+                   val (rest', f) = sort comp rest
+                   val (goals', g) = insert comp goal rest'
+                in
+                   (goals',
+                    (fn vs =>
+                        (case g vs of
+                            [] => raise ValidationFailure
+
+                          | v1 :: vrest =>
+                               v1 :: f vrest)))
+                end)
+
+
+
+      fun reorder tac reord goal fk sk =
+         let
+            do (subgoals, validate, fk') = tac goal fk
+         in
+            try
+               let
+                  val (subgoals', perm) = reord subgoals
+
+                  fun validate' vs = validate (perm vs)
+               in
+                  sk (subgoals', validate', fk')
+               end
+            with
+               Reorder msg => fk msg
+         end
+
+   end

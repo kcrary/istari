@@ -1,0 +1,168 @@
+sml
+name LexMainFun
+alphabet 256
+
+set whitespace = (or 32 9 13 10)
+
+set letter = (range 'A 'Z 'a 'z)
+set digit = (range '0 '9)
+set alphanumeric = (or letter digit '_ '')
+
+set symbol = (or '! '# '$ '% '& '' '* '+ '- '. ': '< '= '> '? '@ '^ '| '~ '`)
+
+set printable = (range 32 126)
+set stringelem = (- printable '" '\)
+set hexadecimal = (range '0 '9 'A 'F 'a 'f)
+
+regexp ident = (seq letter (* alphanumeric))
+
+regexp longident = (seq (+ (seq ident '.)) (or ident (+ symbol)))
+regexp tlongident = (seq (+ (seq ident '.)) ident)
+
+function main : t =
+   (+ whitespace) => skip
+
+   "grammardef" => enter_grammar
+   longident => main_longid
+   ident => main_ident
+   (+ symbol) => main_ident
+   (seq '' ident) => tyvar
+
+   (+ digit) => number
+   (seq '~ (+ digit)) => nnumber
+   (seq "0x" (+ hexadecimal)) => numberhex
+   (seq "0w" (+ digit)) => wordlit
+   (seq "0wx" (+ hexadecimal)) => wordlithex
+
+   '( => lparen
+   ') => rparen
+   '[ => lbracket
+   '] => rbracket
+   '{ => lbrace
+   '} => rbrace
+
+   (seq (+ digit) ': '{) => number_lbrace
+
+   '/ => enter_term
+   '\ => exit_main
+   "(*" => enter_comment
+   '" => enter_string
+   (seq '# '") => enter_char
+
+   ', => comma
+   '; => semicolon
+   '_ => underscore
+
+   eos => eof
+   epsilon => error
+
+set left = (or '[ '{)
+set right = (or '] '})
+set term_normal = (~ whitespace '( ') left right '/ '\ '")
+
+/* a right delimiter can only appear at the beginning of a lexeme, and a left at the end */
+regexp lexeme = (or (seq (? right) (+ term_normal) (? left)) (seq left (? right)) right)
+
+function grammar : t =
+   (+ whitespace) => skip
+
+   "end" => exit_grammar
+   longident => grammar_longid
+   ident => grammar_ident
+   (+ symbol) => grammar_ident
+
+   (+ digit) => number
+   
+   '( => lparen
+   ') => rparen
+
+   '_ => underscore
+
+   (seq '" '( '") => grammar_string
+   (seq '" ') '") => grammar_string
+
+   (seq '" ident '") => grammar_ident_string
+   (seq '" tlongident '") => error
+   (seq '" lexeme '") => grammar_string  /* idents take precedence over this */
+
+   "(*" => enter_comment
+
+   eos => unclosed_grammar
+   epsilon => error
+
+function term : t =
+   (+ whitespace) => skip
+
+   ident => term_ident
+   tlongident => term_longid
+   (+ digit) => term_number
+   lexeme => term_lexeme  /* previous arms take precedence over this */
+   
+   '( => term_lexeme
+   ') => term_lexeme
+
+   '/ => exit_term
+   '\ => enter_main
+   "(*" => enter_comment
+   '" => enter_string
+
+   eos => unclosed_term
+   epsilon => error
+
+function ipc : t =
+   (+ whitespace) => skip
+
+   "grammardef" => enter_grammar
+   ident => ipc_ident
+   (+ symbol) => ipc_ident
+
+   (+ digit) => number
+
+   '( => lparen
+   ') => rparen
+
+   "(*" => enter_comment
+   "*)" => unbalanced_comment
+
+   eos => eof
+   epsilon => error
+
+set comment_normal = (~ '( '*)
+
+function comment : u =
+   "(*" => reenter_comment
+   "*)" => exit_comment
+
+   '( => comment_skip
+   '* => comment_skip
+   
+   (+ comment_normal) => comment_skip
+
+   eos => unclosed_comment
+   epsilon => comment_error
+
+function string : v =
+   (+ stringelem) => string_elem
+
+   "\n" => string_newline
+   "\\" => string_backslash
+   (seq '\ '") => string_quote
+   (seq "\x" (= 2 hexadecimal)) => string_hex2
+   (seq '\ (+ whitespace) '\) => string_skip
+   (seq '\ (+ whitespace)) => incomplete_string_skip
+   
+   '" => exit_string
+
+   eos => unclosed_string
+   epsilon => string_error
+
+set filename_constituent = (or letter digit '/ '- '_ '.)
+
+function project : w =
+   (+ whitespace) => project_skip
+   (+ filename_constituent) => project_filename
+
+   "(*" => project_comment
+
+   eos => project_eof
+   epsilon => project_error

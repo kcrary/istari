@@ -1,0 +1,458 @@
+
+signature HYP_TACTIC =
+   sig
+
+      type tactic = Tactic.tactic
+      type 'a tacticm = 'a Tactic.tacticm
+      type symbol = Symbol.symbol
+
+      val findhyp : Symbol.symbol -> (int -> 'a tacticm) -> 'a tacticm
+      val findhypOrConcl : Symbol.symbol -> (int option -> 'a tacticm) -> 'a tacticm
+
+      val hyp : symbol -> tactic
+      val hypof : tactic
+
+      val hypofOf : Term.term -> tactic
+      val hypofEq : Term.term -> tactic
+      val hypofIstp : Term.term -> tactic
+      val hypofEqtp : Term.term -> tactic
+
+      val change : symbol -> ETerm.eterm -> tactic
+
+      val renamen : int -> symbol -> tactic
+      val rename : symbol -> symbol -> tactic
+      val reintro : symbol option list -> tactic
+
+      val weaken : int -> int -> tactic
+      val clearn : int -> tactic
+      val clear : symbol list -> tactic
+      val clearAll : tactic
+
+      val exchange : int -> int -> int -> tactic
+      val moven : int -> int -> tactic
+      val moveBefore : symbol -> symbol -> tactic
+      val moveAfter : symbol -> symbol -> tactic
+
+      val revert0 : tactic
+      val revert : symbol list -> tactic
+
+      val assumption : tactic
+
+      val trustme : tactic
+
+   end
+
+
+structure HypTactic :> HYP_TACTIC =
+   struct
+
+      structure T = Term
+      structure N = Normalize
+      structure D = Directory
+      structure J = Judgement
+
+      open Tactic
+      open CasePervasive
+
+      type symbol = Symbol.symbol
+
+      val conclSym = Symbol.fromValue "concl"
+
+      fun findhyp name tac (goal as (_, dir)) fk sk =
+         if Symbol.eq (name, conclSym) then
+            fk "invalid hypothesis concl"
+         else
+            (case D.lookupOpt (D.idir dir) name of
+                SOME (D.Hvar i) =>
+                   tac i goal fk sk
+   
+              | _ =>
+                   fk ("no hypothesis " ^ Symbol.toValue name))
+
+      fun findhypOrConcl name tac (goal as (_, dir)) fk sk =
+         if Symbol.eq (name, conclSym) then
+            tac NONE goal fk sk
+         else
+            (case D.lookupOpt (D.idir dir) name of
+                SOME (D.Hvar i) =>
+                   tac (SOME i) goal fk sk
+
+              | _ =>
+                   fk ("no hypothesis " ^ Symbol.toValue name))
+
+
+      fun bindmany dir l =
+         List.foldl
+            (fns sym d => D.bind d sym)
+            dir
+            l
+
+
+      fun hyp name = 
+         let
+            do i = findhyp name
+         in
+            setFailure "hypothesis does not match goal" $
+            Tactic.refine (Rule.hypothesis i)
+         end
+
+
+      fun hypofOf m =
+         (case N.simplify m of
+             T.Elim (T.Var i, [])  =>
+                setFailure "hypothesis does not match goal" $
+                Tactic.refine (Rule.hypothesisOf i)
+
+           | _ =>
+                fail "not a variable in hypof")
+
+      fun hypofEq m  =
+         (case N.simplify m of
+             T.Elim (T.Var i, []) =>
+                setFailure "hypothesis does not match goal" $
+                Tactic.refine (Rule.hypothesisEq i)
+
+           | _ =>
+                fail "not a variable in hypof")
+         
+      fun hypofIstp a =
+         (case N.simplify a of
+             T.Elim (T.Var i, []) =>
+                let
+                   do (jud, _) = withgoal
+                in
+                   (case J.hypOpt jud i of
+                       NONE =>
+                          (* This could only happen in the most pathological case. *)
+                          fail "unbound variable"
+   
+                     | SOME (J.Tm _) =>
+                          refine (Rule.univForgetOf (T.evar ()) (T.evar ()))
+                          >>
+                          setFailure "hypothesis does not match goal"
+                             (Tactic.refine (Rule.hypothesisOf i))
+   
+                     | SOME J.Tp =>
+                          setFailure "hypothesis does not match goal" $
+                          Tactic.refine (Rule.hypothesisOfTp i)
+   
+                     | SOME _ =>
+                          fail "binding is not usable in hypof")
+                end
+
+           | _ =>
+                fail "not a variable in hypof")
+   
+      fun hypofEqtp a =
+         (case N.simplify a of
+             T.Elim (T.Var i, []) =>
+                let
+                   do (jud, _) = withgoal
+                in
+                   (case J.hypOpt jud i of
+                       NONE =>
+                          fail "unbound variable"
+   
+                     | SOME (J.Tm _) =>
+                          refine (Rule.univForgetEq (T.evar ()) (T.evar ()) (T.evar ()))
+                          >>
+                          setFailure "hypothesis does not match goal"
+                             (Tactic.refine (Rule.hypothesisEq i))
+   
+                     | SOME J.Tp =>
+                          setFailure "hypothesis does not match goal" $
+                          Tactic.refine (Rule.hypothesisEqTp i)
+   
+                     | SOME _ =>
+                          fail "binding is not usable in hypof")
+                end
+
+           | _ =>
+                fail "not a variable in hypof")
+
+      val hypof =
+         let
+            do (jud, _) = withgoal
+         in
+            termCase (J.concl jud)
+            /
+             | \Prim.ov\ _ ? => 
+                  \fnc m => hypofOf m\
+
+             | \Prim.eq\ _ ? _ =>
+                  \fnc m => hypofEq m\
+
+             | \Prim.istp\ ? =>
+                  \fnc a => hypofIstp a\
+             
+             | \Prim.eqtp\ ? _ =>
+                  \fnc a => hypofEqtp a\
+
+             | _ =>
+                  \fnc => fail "conclusion cannot follow from binding"\
+            /
+         end
+
+
+      fun change sym a =
+         if Symbol.eq (sym, conclSym) then
+            let
+               do (_, dir) = withgoal
+            in
+               Tactic.replaceConcl (a (D.idir dir))
+            end
+         else
+            let
+               do i = findhyp sym
+               do (_, dir) = withgoal
+               val dir' = D.shift dir (i+1)
+            in
+               Tactic.replaceHyp i (Judgement.Tm (a (D.idir dir')))
+            end
+
+
+      fun renamen i to =
+         let
+            do (_, dir) = Tactic.withgoal
+         in
+            (case D.splitOpt dir (i+1) of
+                NONE => fail "insufficient hypotheses"
+
+              | SOME (l, dir') =>
+                   (try
+                       chdir (bindmany (D.bind dir' to) (List.tl l))
+                    with
+                       D.Shadow sym =>
+                          fail (String.concat ["identifier ", Symbol.toValue sym, " is in use"])))
+         end
+
+      fun rename from to =
+         let
+            do i = findhyp from
+         in
+            renamen i to
+         end
+
+      fun reintroMain names =
+         let
+            val n = List.length names
+            do (_, dir) = withgoal
+         in
+            try
+               let
+                  val dir' = D.shift dir n
+               in
+                  chdir (bindmany dir' names)
+               end
+            with
+               Invalid _ => fail "context too short for so many names"
+
+             | Directory.Shadow name =>
+                  fail (String.concat ["identifier ", Symbol.toValue name, " is in use"])
+         end
+
+
+      (* names given youngest first, n is the number of younger hyps being kept *)
+      fun reintroLoop n names dir =
+         (case names of
+             [] =>
+                idtacM dir
+
+           | NONE :: rest =>
+                let
+                   val (old, dir') = D.expose dir
+                in
+                   setFailure 
+                      ("cannot clear hypothesis " ^ Symbol.toValue old)
+                      (refine (Rule.weaken n 1))
+                   >>
+                   reintroLoop n rest dir'
+                end
+
+           | SOME name :: rest =>
+                let
+                   do dir' = andthenM $ reintroLoop (n+1) rest (D.tl dir)
+                in
+                   idtacM (D.bind dir' name)
+                end)
+
+      fun reintro names =
+         let
+            do (_, dir) = withgoal
+            do dir' = andthenM $ reintroLoop 0 (List.rev names) dir
+         in
+            chdir dir'
+         end
+
+
+      fun weaken i j =
+         cut (setFailure "cannot clear hypotheses" $ Tactic.refine $ Rule.weaken i j)
+         >>
+         let
+            do (_, dir) = Tactic.withgoal
+         in
+            (case D.splitOpt dir i of
+                NONE =>
+                   fail "bad directory in weaken"
+
+              | SOME (l, dir') =>
+                   (case D.splitOpt dir' j of
+                       NONE =>
+                          fail "bad directory in weaken"
+
+                     | SOME (_, dir'') =>
+                          chdir (bindmany dir'' l)))
+         end
+
+      fun clearn i = weaken i 1
+
+      fun clearLoop l =
+         (case l of
+             [] => idtac
+
+           | name :: rest =>
+                let
+                   do i = findhyp name
+                in
+                   cut (transformFailure 
+                           (fn _ => String.concat ["dependencies on ", Symbol.toValue name, " exist"])
+                           (clearn i))
+                   >> clearLoop rest
+                end)
+         
+      fun clear l = clearLoop (List.rev l)
+
+      val clearAll =
+         let
+            do (jud, _) = withgoal
+         in
+            Tactic.refine (Rule.weaken 0 (Seq.length (Judgement.context jud)))
+            >> chdir Directory.empty
+         end
+
+
+      fun exchange i j k =
+         cut (setFailure "illegal exchange" $ Tactic.refine $ Rule.exchange i j k)
+         >>
+         let
+            do (_, dir) = Tactic.withgoal
+
+            (* We know that i, j, and k are good, assuming dir matches the goal. *)
+
+            val (l4, dir123) = D.split dir i
+            val (l3, dir12) = D.split dir123 j
+            val (l2, dir1) = D.split dir12 k
+         in
+            chdir (bindmany (bindmany (bindmany dir1 l3) l2) l4)
+         end
+
+      fun moven i j =
+         (case Int.compare i j of
+             EQUAL =>
+                idtac
+
+           | LESS =>
+                exchange i 1 (j - i)
+
+           | GREATER =>
+                exchange j (i - j) 1)
+
+      fun moveBefore from to =
+         let
+            do i = findhyp from
+            do jo = findhypOrConcl to
+         in
+            (case jo of
+                SOME j =>
+                   if i <= j then
+                      moven i j
+                   else
+                      moven i (j+1)
+
+              | NONE =>
+                   moven i 0)
+         end
+
+      fun moveAfter from to =
+         let
+            do i = findhyp from
+            do j = findhyp to
+         in
+            if i < j then
+               moven i (j-1)
+            else
+               moven i j
+         end
+
+      val revert0 =
+         let
+            do (jud, dir) = withgoal
+            val (name, dir') = D.expose dir
+            val c = J.concl jud
+         in
+            (case J.hypOpt jud 0 of
+                SOME (J.Tm a) =>
+                   refine (Rule.forallElim (T.Sub (a, T.shift1)) (T.Sub (c, T.Idot (0, T.Shift 2))) T.zero)
+                   >>> [
+                       refine (Rule.weaken 0 1)
+                       >> chdir dir'
+                       >> first [
+                                refine (Rule.unreduce
+                                           (T.apply2 Prim.arrow 
+                                               a 
+                                               (T.Sub (c, T.Dot (T.Triv, T.id))))
+                                           Reduction.unfold),
+
+                                replaceConcl (T.apply2 Prim.forall a (T.Lam (SOME name, c)))
+                                ],
+
+                       refine (Rule.hypothesisOf 0)
+                       ]
+
+              | SOME (J.Tmh a) =>
+                   refine (Rule.arrowElim (T.apply1 Prim.squash (T.Sub (a, T.shift1))) c)
+                   >>> [
+                       refine (Rule.weaken 0 1)
+                       >> chdir dir',
+
+                       refine (Rule.squashIntro (T.evar ()))
+                       >> refine (Rule.hypothesis 0)                             
+                       ]
+
+              | SOME _ =>
+                   fail "hypothesis not revertable"
+
+              | NONE =>
+                   fail "no such hypothesis")
+         end
+
+      fun revertn i =
+         setFailure "cannot revert hypothesis on which others depend" (exchange 0 i 1)
+         >> revert0
+
+      fun revertone hyp =
+         let
+            do i = findhyp hyp
+         in
+            revertn i
+         end
+
+      fun revertLoop hyps =
+         (case hyps of
+             [] => idtac
+
+           | hyp :: rest =>
+                revertone hyp >> revertLoop rest)
+
+      fun revert hyps = revertLoop (List.rev hyps)
+
+      val assumption =
+         setFailure "no matching assumption" $
+         goalContextCaseB
+         /
+            $anyhyp ($tm _ => \fnc => fn i => refine (Rule.hypothesis i)\)
+         /
+
+      val trustme = refine Rule.trustme
+
+   end

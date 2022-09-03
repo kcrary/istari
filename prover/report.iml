@@ -1,0 +1,178 @@
+
+signature REPORT =
+   sig
+
+      val showAll : unit -> unit
+      val showModule : Namespace.address -> unit
+      val show : Namespace.address -> unit
+      val showType : Namespace.address -> unit
+
+   end
+
+
+structure Report :> REPORT =
+   struct
+
+      open CasePervasive
+
+      fun printAddress address =
+         (case address of
+             [] =>
+                (* This shouldn't happen, but fail gracefully. *)
+                ()
+
+           | [sym] =>
+                print (Symbol.toValue sym)
+
+           | sym :: rest =>
+                (
+                print (Symbol.toValue sym);
+                print ".";
+                printAddress rest
+                ))
+
+
+      structure SLO =
+         ListOrdered (structure Ordered =
+                         struct
+                            type t = Symbol.symbol
+                            val eq = Symbol.eq
+
+                            fun compare (s, s') =
+                               String.compare (Symbol.toValue s) (Symbol.toValue s')
+                         end)
+
+
+      fun showConstants address = 
+         List.app
+            (fn (address, _, _) =>
+                (
+                printAddress address;
+                print "\n"
+                ))
+            (Juliasort.sort 
+                (fn ((a1, _, _), (a2, _, _)) => SLO.compare (a1, a2))
+                (Namespace.dump address))
+
+
+      fun showAll () =
+         (
+         print "\nEnvironment contains: \n";
+         showConstants []
+         )
+
+
+      fun showModule addr =
+         if Namespace.moduleExists addr then
+            (
+            print "\nModule ";
+            printAddress addr;
+            print " contains: \n";
+            showConstants addr
+            )
+         else
+            print "Module does not exist.\n\n"
+
+
+      fun show addr =
+         (case Namespace.resolveOpt addr of
+             NONE =>
+                print "No such constant.\n"
+
+           | SOME const =>
+                (
+                print "\n";
+                print (Namespace.toString const);
+
+                let
+                   val arity =
+                      (case Database.findArity const of
+                          0 => []
+
+                        | n =>
+                             ["arity " ^ Int.toString n])
+
+                   val implicits =
+                      (case Database.findImplicits const of
+                          0 => []
+
+                        | n =>
+                             [Int.toString n ^ " implicit arguments"])
+                in
+                   (case String.concatWith ", " (arity @ implicits) of
+                       "" =>
+                          print "\n"
+
+                     | str =>
+                          (
+                          print "  [";
+                          print str;
+                          print "]\n"
+                          ))
+                end;
+
+                (case Constant.definition const of
+                    NONE => ()
+
+                  | SOME m =>
+                       Show.showPrefixed "  = " Directory.empty m);
+
+                (case Database.findType const of
+                    NONE => ()
+
+                  | SOME (jud, _) =>
+                       if Seq.null (Judgement.context jud) then
+                          termCaseX (Judgement.concl jud)
+                          /| \Prim.ov\ ? \const\ =>
+                             \(fnc a =>
+                                  Show.showPrefixed "  : " Directory.empty a)\
+
+                           | _ =>
+                             \(fnc => print "  : (nonstandard)\n")\
+                          /
+                       else
+                          print "  : (nonstandard)\n")
+                ))
+
+
+      fun showType addr =
+         (case Namespace.resolveOpt addr of
+             NONE =>
+                print "No such constant.\n\n"
+
+           | SOME const =>
+                (
+                print "\n";
+                print (Namespace.toString const);
+
+                (case Database.findType const of
+                    NONE =>
+                       print " is untyped.\n"
+
+                  | SOME (jud, _) =>
+                       (
+                       (case Database.findImplicits const of
+                           0 => print "\n"
+
+                         | n =>
+                              (
+                              print "  [";
+                              print (Int.toString n);
+                              print " implicit arguments]\n"
+                              ));
+
+                       if Seq.null (Judgement.context jud) then
+                          termCaseX (Judgement.concl jud)
+                          /| \Prim.ov\ ? \const\ =>
+                             \(fnc a =>
+                                  Show.showPrefixed "  : " Directory.empty a)\
+
+                           | _ =>
+                             \(fnc => print "  : (nonstandard)\n")\
+                          /
+                       else
+                          print "  : (nonstandard)\n")
+                       )
+                ))
+
+   end

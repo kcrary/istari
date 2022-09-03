@@ -1,0 +1,981 @@
+
+signature UNPARSING =
+   sig
+
+      (* Similar interface as a matcher, but not identical. *)
+
+      type constant = Term.constant
+      type content
+      type 'a unparser
+      type 'a sunparser  (* spine unparser *)
+
+      val string : string -> content
+      val break : int -> content
+      val append : content list -> content
+      val box : content -> content
+      val boxi : int -> content -> content  (* box with custom indentation *)
+      val parens : bool -> content -> content
+
+      (* will not match the entire term; returned content takes the precedence as an argument *)
+      val show : (int -> content) unparser
+
+      val wild : unit unparser
+      val variable : int -> unit unparser
+      val constant : constant -> unit unparser
+      val path : constant -> 'a sunparser -> 'a unparser
+
+      val null : unit sunparser
+      val app : 'a unparser -> 'b sunparser -> ('a * 'b) sunparser
+
+      val lam : 'a unparser -> (string * 'a) unparser
+      
+      val wrap : 'a unparser -> ('a -> 'b) -> 'b unparser
+      val wrapcond : 'a unparser -> ('a -> 'b option) -> 'b unparser
+      val alt : 'a unparser list -> 'a unparser
+      val fix : ('a unparser -> 'a unparser) -> 'a unparser
+
+      val apply1 : constant -> 'a unparser -> 'a unparser
+      val apply2 : constant -> 'a unparser -> 'b unparser -> ('a * 'b) unparser
+      val apply3 : constant -> 'a unparser -> 'b unparser -> 'c unparser -> ('a * 'b * 'c) unparser
+
+
+      (* Tables *)
+
+      (* arity, precedence, unparser *)
+      val unparsingTable : (int * int * content unparser) ConstantTable.table
+
+      (* quote these constants *)
+      val reserved : SymbolSet.set ref
+
+   end
+
+
+signature SHOW =
+   sig
+
+      structure Unparsing : UNPARSING
+
+      type judgement = Judgement.djudgement * Directory.directory
+
+      val showClosed : Term.term -> unit
+
+      val show : Directory.directory -> Term.term -> unit
+      val showIndent : int -> Directory.directory -> Term.term -> unit
+      val showPrefixed : string -> Directory.directory -> Term.term -> unit
+      val showPP : PrettyPrint.ppstream -> Directory.directory -> Term.term -> unit
+
+      val showJudgement : judgement -> unit
+      val showJudgementIndent : int -> judgement -> unit
+      val showContext : Judgement.context -> Directory.directory -> unit
+
+
+      val showLiteral : Term.term -> unit
+      val showLiteralSub : Term.sub -> unit
+      val showLiteralJudgement : Judgement.djudgement -> unit
+
+      val showSubstitutions : bool ref
+      val showLiteralBinders : bool ref
+      val showImplicits : bool ref
+      val showVeryLiteral : bool ref
+
+   end
+
+
+structure Show :> SHOW =
+   struct
+
+      structure PP = PrettyPrint
+      structure T = Term
+      structure N = Normalize
+      structure J = Judgement
+      structure S = Seq
+      structure D = Directory
+
+      type judgement = Judgement.djudgement * Directory.directory
+
+      val indent = 2
+      val width = 80
+
+      fun showTop indent f =
+         let
+            val pp = PP.makeStreamIndent TextIO.stdOut width indent
+         in
+            PP.openBox pp PP.Consistent indent;
+            f pp;
+            PP.closeBox pp;
+            PP.flush pp;
+            print "\n"
+         end
+
+      val precMin = 0
+      val precLam = 0
+      val precConstituent = 1
+      val precApp = 90
+      val precSub = 99
+
+      fun lparen pp prec prec' =
+         if prec' < prec then
+            PP.print pp "("
+         else
+            ()
+
+      fun rparen pp prec prec' =
+         if prec' < prec then
+            PP.print pp ")"
+         else
+            ()
+
+
+      val reserved = ref SymbolSet.empty
+
+      fun showAddress pp address =
+         (case address of
+             [] =>
+                (* This shouldn't happen, but fail gracefully. *)
+                ()
+
+           | [sym] =>
+                PP.print pp (Symbol.toValue sym)
+
+           | sym :: rest =>
+                (
+                PP.print pp (Symbol.toValue sym);
+                PP.print pp ".";
+                showAddress pp rest
+                ))
+
+      val showLiteralBinders = ref false
+      val showVeryLiteral = ref false
+
+      fun showLiteralLoop pp prec m =
+         (case m of
+             T.Var i =>
+                (
+                PP.print pp (Int.toString i)
+                )
+
+           | T.Const const =>
+                showAddress pp (Namespace.name const)
+
+           | T.Elim (m1, []) =>
+                showLiteralLoop pp prec m1
+
+           | T.Elim (m1, spine) =>
+                (
+                lparen pp prec precApp;
+                PP.openBox pp PP.Consistent indent;
+                showLiteralLoop pp precApp m1;
+                showLiteralSpine pp spine;
+                PP.closeBox pp;
+                rparen pp prec precApp
+                )
+
+           | T.Lam (bo, m1) =>
+                let
+                   val str =
+                      if !showLiteralBinders then
+                         (case bo of
+                             NONE => "_ "
+   
+                           | SOME sym => Symbol.toValue sym ^ " ")
+                      else
+                         ""
+                in
+                   PP.openBox pp PP.Consistent indent;
+                   lparen pp prec precLam;
+                   PP.print pp "fn ";
+                   PP.print pp str;
+                   PP.print pp ".";
+                   PP.break pp 1;
+                   showLiteralLoop pp precLam m1;
+                   rparen pp prec precLam;
+                   PP.closeBox pp
+                end
+
+           | T.Pair _ =>
+                (
+                PP.print pp "(";
+                PP.openBox pp PP.Consistent 0;
+                showLiteralTuple pp m;  (* prints the close parenthesis *)
+                PP.closeBox pp
+                )
+                
+           | T.Next m1 =>
+                (
+                PP.openBox pp PP.Consistent indent;
+                lparen pp prec precApp;
+                PP.print pp "next";
+                PP.break pp 1;
+                showLiteralLoop pp (precApp+1) m1;
+                rparen pp prec precApp;
+                PP.closeBox pp
+                )
+
+           | T.Triv =>
+                PP.print pp "()"
+
+           | T.Sub (m1, s) =>
+                (
+                PP.openBox pp PP.Consistent indent;
+                lparen pp prec precSub;
+                showLiteralLoop pp precSub m1;
+                PP.break pp 0;
+                PP.print pp "[";
+                PP.openBox pp PP.Consistent indent;
+                showLiteralSubLoop pp s;
+                PP.closeBox pp;
+                PP.print pp "]";
+                rparen pp prec precSub;
+                PP.closeBox pp
+                )
+
+           | T.Evar eb =>
+                (case T.readEbind eb of
+                    SOME m1 => showLiteralLoop pp prec m1
+
+                  | NONE =>
+                       (
+                       PP.print pp "E";
+                       PP.print pp (Int.toString (T.ebindToInt eb))
+                       ))
+
+           | T.Marker sym =>
+                (
+                PP.print pp "_";
+                PP.print pp (Symbol.toValue sym);
+                PP.print pp "_"
+                ))
+
+
+      and showLiteralTuple pp m =
+         (case m of
+             T.Pair (m1, m2) =>
+                (
+                PP.openBox pp PP.Consistent indent;
+                showLiteralLoop pp precConstituent m1;
+                PP.print pp " ,";
+                PP.closeBox pp;
+                PP.break pp 1;
+                showLiteralTuple pp m2
+                )
+
+           | _ =>
+                (
+                PP.openBox pp PP.Consistent indent;
+                showLiteralLoop pp precConstituent m;
+                PP.print pp ")";
+                PP.closeBox pp
+                ))
+                
+
+      and showLiteralSpine pp spine =
+         (case spine of
+             [] => ()
+
+           | elim :: rest =>
+                (
+                PP.break pp 1;
+
+                (case elim of
+                    T.App m =>
+                       showLiteralLoop pp (precApp+1) m
+
+                  | T.Pi1 => PP.print pp "#1"
+                  | T.Pi2 => PP.print pp "#2"
+                  | T.Prev => PP.print pp "#prev");
+
+                showLiteralSpine pp rest
+                ))
+
+      and showLiteralSubLoop pp s =
+         (case s of
+             T.Shift i =>
+                (
+                PP.print pp "^";
+                PP.print pp (Int.toString i)
+                )
+
+           | T.Dot (m, s) =>
+                (
+                showLiteralLoop pp precSub m;
+                PP.print pp " .";
+                PP.break pp 1;
+                showLiteralSubLoop pp s
+                )
+                
+           | T.Idot (i, s) =>
+                (
+                PP.print pp (Int.toString i);
+                PP.print pp " .";
+                PP.break pp 1;
+                showLiteralSubLoop pp s
+                ))
+
+      fun showLiteralMain pp prec m =
+         if !showVeryLiteral then
+            showLiteralLoop pp prec m
+         else
+            showLiteralLoop pp prec (Normalize.simplifyAll m)
+      
+
+      fun showLiteral m =
+         showTop 0 (fn pp => showLiteralMain pp precMin m)
+
+      fun showLiteralSub s =
+         showTop 0 (fn pp => showLiteralSubLoop pp s)
+
+
+      fun showLiteralHyp pp hyp =
+         (case hyp of
+             J.Tm a => 
+                showLiteralMain pp precMin a
+
+           | J.Tml a =>
+                showLiteralMain pp precMin a
+
+           | J.Tmh a =>
+                showLiteralMain pp precMin a
+
+           | J.Tp =>
+                PP.print pp "type"
+
+           | J.Tpl =>
+                PP.print pp "type"
+
+           | J.Tph =>
+                PP.print pp "type")
+
+      fun hypLiteralCategory hyp =
+         (case hyp of
+             J.Tm _ => ""
+
+           | J.Tml _ => "(later) "
+
+           | J.Tmh _ => "(hidden) "
+
+           | J.Tp => ""
+
+           | J.Tpl => "(later) "
+
+           | J.Tph => "(hidden) ")
+
+      fun showLiteralHyps pp hyps =
+         (case S.expose hyps of
+             S.Nil => ()
+
+           | S.Cons (hyp, rest) =>
+                (
+                showLiteralHyps pp rest;
+                PP.print pp (hypLiteralCategory hyp);
+                PP.openBox pp PP.Consistent indent;
+                showLiteralHyp pp hyp;
+                PP.closeBox pp;
+                PP.newline pp
+                ))
+
+      fun showLiteralJudgementIndent indent jud =
+         showTop indent
+         (fn pp =>
+             (
+             showLiteralHyps pp (J.context jud);
+             PP.print pp "|-";
+             PP.newline pp;
+             PP.openBox pp PP.Consistent indent;
+             showLiteralMain pp precMin (J.concl jud)
+             ))
+
+      val showLiteralJudgement = showLiteralJudgementIndent 0
+         
+
+
+      
+      type content = PP.ppstream -> unit
+
+      exception NoMatch
+
+      (* matching the entire term?, margin, dir, term to unparse *)
+      type 'a unparser = bool -> int -> Directory.directory -> T.term -> 'a
+
+      structure H = ConstantTable
+
+      (* arity, precedence, unparser *)
+      val unparsingTable : (int * int * content unparser) H.table = H.table ()
+
+      val showSubstitutions = ref false
+      val showImplicits = ref false
+
+      fun collectLams m s acc =
+         (case m of
+             T.Var i =>
+                (case T.substVar i s of
+                    T.Idx j =>
+                       (List.rev acc, T.Var j)
+
+                  | T.Term m' =>
+                       collectLams m' T.id acc)
+
+           | T.Lam (b, m1) =>
+                collectLams m1 (T.under 1 s) (b :: acc)
+
+           | T.Sub (m1, s') =>
+                collectLams m1 (T.compose s' s) acc
+
+           | T.Evar eb =>
+                (case T.readEbind eb of
+                    NONE => (List.rev acc, T.Sub (m, s))
+
+                  | SOME m' =>
+                       collectLams m' s acc)
+
+           | _ => 
+                (List.rev acc, T.Sub (m, s)))
+
+
+      fun trimSpine n spine =
+         if n = 0 then
+            SOME spine
+         else
+            (case spine of
+                T.App _ :: rest =>
+                   trimSpine (n-1) rest
+
+              | _ => NONE)
+
+
+      (* dir: names of free variables, margin: number to start naming unnamed free variables at *)
+      fun showMain pp margin dir prec m s spine =
+         (case m of
+             T.Var i =>
+                (case T.substVar i s of
+                    T.Idx j =>
+                       showRootSpine pp margin dir prec (T.Var j) T.id spine
+
+                  | T.Term m' =>
+                       showMain pp margin dir prec m' T.id spine)
+
+           | T.Const const =>
+                (case H.find unparsingTable const of
+                    SOME (arity, kprec, unp) =>
+                       (case List.splitOpt spine arity of
+                           NONE =>
+                              showRootSpine pp margin dir prec m T.id spine
+
+                         | SOME (spine1, spine2) =>
+                              (try
+                                  let
+                                     val c = unp true margin dir (T.Elim (T.Const const, spine1))
+                                  in
+                                     showWithSpine pp margin dir prec spine2
+                                     (fn prec' =>
+                                         (
+                                         lparen pp prec' kprec;
+                                         PP.openBox pp PP.Consistent indent;
+                                         c pp;
+                                         PP.closeBox pp;
+                                         rparen pp prec' kprec
+                                         ))
+                                  end
+                               with
+                                  NoMatch => showRootSpine pp margin dir prec m T.id spine))
+
+                  | NONE =>
+                       showRootSpine pp margin dir prec m T.id spine)
+
+           | T.Elim (m1, spine') =>
+                showMain pp margin dir prec m1 s (T.ssubst spine' s @ spine)
+
+           | T.Sub (m1, s') =>
+                showMain pp margin dir prec m1 (T.compose s' s) spine
+
+           | T.Evar e =>
+                (case T.readEbind e of
+                    NONE =>
+                       showRootSpine pp margin dir prec m s spine
+
+                  | SOME m1 =>
+                       showMain pp margin dir prec m1 s spine)
+
+           | _ =>
+                showRootSpine pp margin dir prec m s spine)
+
+      (* m is an intro, or var/const and s=id, or a free evar *)
+      and showRootSpine pp margin dir prec m s spine =
+         (case m of
+             T.Const const =>
+                (* If a constant's name is a reserved word, quote it.
+                   Otherwise, skip implicit arguments.
+                   If the implicit arguments aren't there, quote the name.
+                *)
+                let
+                   val addr = Namespace.name const
+
+                   val quote =
+                      (case addr of
+                          [sym] => SymbolSet.member (!reserved) sym
+                        | _ => false)
+
+                   val (quote', spine') =
+                      if quote then
+                         (true, spine)
+                      else
+                         if !showImplicits then
+                            (false, spine)
+                         else
+                            (case trimSpine (Database.findImplicits const) spine of
+                                NONE =>
+                                   (true, spine)
+   
+                              | SOME spine' =>
+                                   (false, spine'))
+                in
+                   showWithSpine pp margin dir prec spine'
+                   (fn prec' =>
+                       (
+                       if quote' then
+                          PP.print pp "` "
+                       else
+                          ();
+
+                       showAddress pp addr
+                       ))
+                end
+
+           | _ =>
+                showWithSpine pp margin dir prec spine
+                (fn prec' => showRoot pp margin dir prec' m s))
+
+      (* m is an intro, or var and s=id, or a free evar *)
+      and showRoot pp margin dir prec m s =
+         (case m of
+             T.Var i =>
+                (* by precondition, s = id *)
+                (case Directory.nameOpt dir i of
+                    SOME sym =>
+                       PP.print pp (Symbol.toValue sym)
+
+                  | NONE =>
+                       (
+                       PP.print pp "~";
+                       PP.print pp (Int.toString (i - Directory.size dir + margin));
+                       PP.print pp "~"
+                       ))
+
+           | T.Const const =>
+                raise (Fail "precondition")
+
+           | T.Evar e =>
+                (
+                PP.print pp "E";
+                PP.print pp (Int.toString (T.ebindToInt e));
+                showSub pp margin dir s
+                )
+
+           | T.Lam _ =>
+                let
+                   val (bs, m1) = collectLams m s []
+                in
+                   PP.openBox pp PP.Consistent indent;
+                   lparen pp prec precLam;
+                   PP.print pp "fn ";
+                   
+                   let
+                      fun loop dir bs =
+                         (case bs of
+                             [] => dir
+
+                           | b :: rest =>
+                                let
+                                   val (sym, dir') = D.varyAndBind dir b
+                                in
+                                   PP.print pp (Symbol.toValue sym);
+                                   PP.print pp " ";
+                                   loop dir' rest
+                                end)
+
+                      val dir' = loop dir bs
+                   in
+                      PP.print pp ".";
+                      PP.break pp 1;
+                      showMain pp margin dir' precLam m1 T.id [];
+                      rparen pp prec precLam;
+                      PP.closeBox pp
+                   end
+                end
+
+           | T.Pair _ =>
+                (
+                PP.print pp "(";
+                PP.openBox pp PP.Consistent 0;
+                showTuple pp margin dir (N.simplify (T.Sub (m, s)));  (* prints the close parenthesis *)
+                PP.closeBox pp
+                )
+                
+           | T.Next m1 =>
+                (
+                PP.openBox pp PP.Consistent indent;
+                lparen pp prec precApp;
+                PP.print pp "next";
+                PP.break pp 1;
+                showMain pp margin dir (precApp+1) m1 s [];
+                rparen pp prec precApp;
+                PP.closeBox pp
+                )
+
+           | T.Triv =>
+                PP.print pp "()"
+
+           | T.Marker sym =>
+                (
+                PP.print pp "_";
+                PP.print pp (Symbol.toValue sym);
+                PP.print pp "_"
+                )
+
+           | T.Elim _ => raise (Fail "precondition")
+
+           | T.Sub _ => raise (Fail "precondition"))
+
+
+      and showTuple pp margin dir m =
+         (case m of
+             T.Pair (m1, m2) =>
+                (
+                PP.openBox pp PP.Consistent indent;
+                showMain pp margin dir precConstituent m1 T.id [];
+                PP.print pp " ,";
+                PP.closeBox pp;
+                PP.break pp 1;
+                showTuple pp margin dir (N.simplify m2)
+                )
+
+           | _ =>
+                (
+                PP.openBox pp PP.Consistent indent;
+                showMain pp margin dir precConstituent m T.id [];
+                PP.print pp ")";
+                PP.closeBox pp
+                ))
+
+      and showWithSpine pp margin dir prec spine f =
+         (case spine of
+             [] => f prec
+
+           | _ :: _ =>
+                (
+                lparen pp prec precApp;
+                PP.openBox pp PP.Consistent indent;
+                f precApp;
+                showSpine pp margin dir spine;
+                PP.closeBox pp;
+                rparen pp prec precApp
+                ))
+
+      and showSpine pp margin dir spine =
+         (case spine of
+             [] => ()
+
+           | elim :: rest =>
+                (
+                PP.break pp 1;
+
+                (case elim of
+                    T.App m =>
+                       showMain pp margin dir (precApp+1) m T.id []
+
+                  | T.Pi1 => PP.print pp "#1"
+                  | T.Pi2 => PP.print pp "#2"
+                  | T.Prev => PP.print pp "#prev");
+
+                showSpine pp margin dir rest
+                ))
+
+      and showSub pp margin dir s =
+         if !showSubstitutions then
+            (case s of
+                T.Shift 0 => ()
+
+              | _ =>
+                   (
+                   PP.print pp "[";
+                   showLiteralSubLoop pp s;
+                   PP.print pp "]"
+                   ))
+         else
+            ()
+
+      fun showPP pp dir m =
+         showMain pp 0 dir precMin m T.id []
+
+      fun showIndent indent dir m =
+         showTop indent
+         (fn pp => showPP pp dir m)
+
+      fun showPrefixed str dir m =
+         (
+         print str;
+         showIndent (String.length str) dir m
+         )
+
+      val show = showIndent 0
+
+      fun showClosed m = showIndent 0 Directory.empty m
+
+
+
+      structure Unparsing :> UNPARSING =
+         struct
+
+            type constant = T.constant
+            type content = content
+            type 'a unparser = 'a unparser
+            type 'a sunparser = int -> Directory.directory -> T.elim list -> 'a
+
+            fun string str pp = PP.print pp str
+
+            fun break n pp = PP.break pp n
+
+            fun append l pp =
+               List.app (fn c => c pp) l
+
+            fun box c pp =
+               (
+               PP.openBox pp PP.Consistent indent;
+               c pp;
+               PP.closeBox pp
+               )
+
+            fun boxi i c pp =
+               (
+               PP.openBox pp PP.Consistent i;
+               c pp;
+               PP.closeBox pp
+               )
+
+            fun parens b c pp =
+               (
+               if b then
+                  PP.print pp "("
+               else
+                  ();
+
+               c pp;
+
+               if b then
+                  PP.print pp ")"
+               else
+                  ()
+               )
+              
+
+            fun show entire margin dir m =
+               if entire then
+                  raise NoMatch
+               else
+                  (fns prec pp => showMain pp margin dir prec m T.id [])
+
+            fun wild _ _ _ _ = ()
+
+            fun variable i _ _ _ m =
+               (case N.simplify m of
+                   T.Elim (T.Var j, []) =>
+                      if i = j then
+                         ()
+                      else
+                         raise NoMatch
+
+                 | _ => raise NoMatch)
+
+            fun constant const _ _ _ m =
+               (case N.simplify m of
+                   T.Elim (T.Const const', []) =>
+                      if Constant.eq (const, const') then
+                         ()
+                      else
+                         raise NoMatch
+
+                 | _ => raise NoMatch)
+
+            fun lam unp _ margin dir m =
+               (case N.simplify m of
+                   T.Lam (b, n) =>
+                      let
+                         val (sym, dir') = D.varyAndBind dir b
+
+                         val x = unp false margin dir' n
+                      in
+                         (Symbol.toValue sym, x)
+                      end
+
+                 | _ => raise NoMatch)
+
+            fun path const unp _ margin dir m =
+               (case N.simplify m of
+                   T.Elim (T.Const const', spine) =>
+                      if Constant.eq (const, const') then
+                         unp margin dir spine
+                      else
+                         raise NoMatch
+
+                 | _ => raise NoMatch)
+
+            fun null _ _ spine =
+               (case spine of
+                   [] => ()
+
+                 | _ :: _ => raise NoMatch)
+
+            fun app unp1 unp2 margin dir spine =
+               (case spine of
+                   T.App m :: rest =>
+                      let
+                         val x = unp1 false margin dir m
+                         val y = unp2 margin dir rest
+                      in
+                         (x, y)
+                      end
+
+                 | _ => raise NoMatch)
+
+            fun wrap unp f entire margin dir m = f (unp entire margin dir m)
+
+            fun wrapcond unp f entire margin dir m =
+               (case f (unp entire margin dir m) of
+                   NONE => raise NoMatch
+
+                 | SOME x => x)
+
+            fun alt l entire margin dir m =
+               let
+                  fun loop l =
+                     (case l of
+                         [] => raise NoMatch
+
+                       | unp :: rest =>
+                            (try
+                                unp entire margin dir m
+                             with
+                                NoMatch => loop rest))
+               in
+                  loop l
+               end
+
+            fun fix f entire margin dir m = f (fix f) entire margin dir m
+
+            fun apply1 const unp =
+               wrap
+               (path const (app unp null))
+               (fn (x, ()) => x)
+
+            fun apply2 const unp1 unp2 =
+               wrap
+               (path const (app unp1 (app unp2 null)))
+               (fn (x, (y, ())) => (x, y))
+
+            fun apply3 const unp1 unp2 unp3 =
+               wrap
+               (path const (app unp1 (app unp2 (app unp3 null))))
+               (fn (x, (y, (z, ()))) => (x, y, z))
+
+            val unparsingTable = unparsingTable
+            val reserved = reserved
+
+         end
+
+
+
+      fun showHyp pp hyp margin dir =
+         (case hyp of
+             J.Tm a => 
+                showMain pp margin dir precMin a T.id []
+
+           | J.Tml a =>
+                showMain pp margin dir precMin a T.id []
+
+           | J.Tmh a =>
+                showMain pp margin dir precMin a T.id []
+
+           | J.Tp =>
+                PP.print pp "type"
+
+           | J.Tpl =>
+                PP.print pp "type"
+
+           | J.Tph =>
+                PP.print pp "type")
+
+
+      fun hypCategory hyp =
+         (case hyp of
+             J.Tm _ => ""
+
+           | J.Tml _ => " (later)"
+
+           | J.Tmh _ => " (hidden)"
+
+           | J.Tp => ""
+
+           | J.Tpl => " (later)"
+
+           | J.Tph => " (hidden)")
+
+
+      fun showHypsMargin pp hyps margin =
+         (case S.expose hyps of
+             S.Nil => ()
+
+           | S.Cons (hyp, rest) =>
+                (
+                showHypsMargin pp rest (margin+1);
+                PP.print pp "~";
+                PP.print pp (Int.toString margin);
+                PP.print pp "~";
+                PP.print pp (hypCategory hyp);
+                PP.print pp " : ";
+                PP.openBox pp PP.Consistent indent;
+                showHyp pp hyp (margin+1) D.empty;
+                PP.closeBox pp;
+                PP.newline pp
+                ))
+
+      fun showHyps pp hyps dir =
+         (case S.expose hyps of
+             S.Nil => ()
+
+           | S.Cons (hyp, rest) =>
+                (case D.exposeOpt dir of
+                    SOME (x, dir') =>
+                       (
+                       showHyps pp rest dir';
+                       PP.print pp (Symbol.toValue x);
+                       PP.print pp (hypCategory hyp);
+                       PP.print pp " : ";
+                       PP.openBox pp PP.Consistent indent;
+                       showHyp pp hyp 0 dir';
+                       PP.closeBox pp;
+                       PP.newline pp
+                       )
+
+                  | NONE =>
+                       (* This can't happen unless someone has mucked up the directory. *)
+                       showHypsMargin pp hyps 0))
+
+               
+
+      fun showJudgementIndent indent (jud, dir) =
+         showTop indent
+         (fn pp =>
+             (
+             showHyps pp (J.context jud) dir;
+             PP.print pp "|-";
+             PP.newline pp;
+             PP.openBox pp PP.Consistent indent;
+             showMain pp 0 dir precMin (J.concl jud) T.id []
+             ))
+
+      val showJudgement = showJudgementIndent 0
+
+      fun showContext ctx dir =
+         showTop 0
+         (fn pp => showHyps pp ctx dir)
+
+   end

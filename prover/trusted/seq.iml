@@ -1,0 +1,238 @@
+
+signature SEQ =
+   sig
+
+      type 'a seq
+
+      datatype 'a front = Nil | Cons of 'a * 'a seq
+
+      val hide        : 'a front -> 'a seq
+      val expose      : 'a seq -> 'a front
+
+      val empty       : 'a seq
+      val cons        : 'a -> 'a seq -> 'a seq
+      
+      val length      : 'a seq -> int
+      val null        : 'a seq -> bool
+
+      val fromList    : 'a list -> 'a seq
+      val toList      : 'a seq -> 'a list
+      val mapFromList : ('a -> 'b) -> 'a list -> 'b seq
+      val mapToList   : ('a -> 'b) -> 'a seq -> 'b list
+
+      val hd          : 'a seq -> 'a
+      val tl          : 'a seq -> 'a seq
+      val nth         : 'a seq -> int -> 'a
+      val nthOpt      : 'a seq -> int -> 'a option
+      val drop        : 'a seq -> int -> 'a seq
+      val dropOpt     : 'a seq -> int -> 'a seq option
+      val take        : 'a seq -> int -> 'a seq
+      val takeOpt     : 'a seq -> int -> 'a seq option
+      val split       : 'a seq -> int -> 'a seq * 'a seq
+      val splitOpt    : 'a seq -> int -> ('a seq * 'a seq) option
+
+      val insert      : 'a seq -> int -> 'a -> 'a seq
+      val insertOpt   : 'a seq -> int -> 'a -> 'a seq option
+      val remove      : 'a seq -> int -> 'a seq
+      val removeOpt   : 'a seq -> int -> 'a seq option
+      val update      : 'a seq -> int -> 'a -> 'a seq
+      val updateOpt   : 'a seq -> int -> 'a -> 'a seq option
+
+      val append      : 'a seq -> 'a seq -> 'a seq
+      val appendList  : 'a list -> 'a seq -> 'a seq
+      val foldl       : ('a -> 'b -> 'b) -> 'b -> 'a seq -> 'b
+      val foldr       : ('a -> 'b -> 'b) -> 'b -> 'a seq -> 'b
+      val map         : ('a -> 'b) -> 'a seq -> 'b seq
+      val mapi        : (int -> 'a -> 'b) -> 'a seq -> 'b seq
+      val app         : ('a -> unit) -> 'a seq -> unit
+
+   end
+
+
+structure ListSeq :> SEQ =
+   struct
+
+      type 'a seq = 'a list * int
+
+      datatype 'a front = Nil | Cons of 'a * 'a seq
+
+      fun hide f =
+         (case f of
+             Nil => ([], 0)
+           | Cons (h, (t, len)) => (h :: t, len+1))
+
+      fun expose (l, len) =
+         (case l of
+             [] => Nil
+           | h :: t => Cons (h, (t, len-1)))
+
+      val empty = ([], 0)
+
+      fun cons x (y, len) = (x :: y, len+1)
+
+      fun fromList l = (l, List.length l)
+
+      fun toList (l, _) = l
+
+      fun mapFromList f l = List.foldr (fns x (l', n) => (f x :: l', n+1)) ([], 0) l
+
+      fun mapToList f (l, _) = List.map f l
+
+      fun length (_, len) = len
+
+      fun null (_, len) = len = 0
+
+      fun hd (l, _) = List.hd l
+
+      fun tl (l, len) = (List.tl l, len-1)
+
+      fun nth (l, len) n =
+         if n < len then
+            List.nth l n
+         else
+            raise (Invalid "subscript")         
+
+      fun nthOpt (l, len) n =
+         if n < len then
+            List.nthOpt l n
+         else
+            NONE
+
+      fun take (l, len) n =
+         if n <= len then
+            (List.take l n, n)
+         else
+            raise (Invalid "subscript")
+
+      fun takeOpt (l, len) n =
+         if n <= len then
+            (case List.takeOpt l n of
+                NONE => NONE
+   
+              | SOME l' => SOME (l', n))
+         else
+            NONE
+
+      fun drop (l, len) n =
+         if n <= len then
+            (List.drop l n, len-n)
+         else
+            raise (Invalid "subscript")
+
+      fun dropOpt (l, len) n =
+         if n <= len then
+            (case List.dropOpt l n of
+                NONE => NONE
+   
+              | SOME l' => SOME (l', len-n))
+         else
+            raise (Invalid "subscript")
+
+      fun split (l, len) n =
+         if n <= len then
+            let
+               val (l1, l2) = List.split l n
+            in
+               ((l1, n), (l2, len-n))
+            end
+         else
+            raise (Invalid "subscript")
+
+      fun splitOpt (l, len) n =
+         if n <= len then
+            (case List.splitOpt l n of
+                NONE => NONE
+   
+              | SOME (l1, l2) => SOME ((l1, n), (l2, len-n)))
+         else
+            NONE
+
+      fun insert (l, len) i x =
+         if i <= len then
+            let
+               val (front, back) = List.split l i
+            in
+               (front @ x :: back, len+1)
+            end
+         else
+            raise (Invalid "subscript")
+
+
+      fun insertOpt (l, len) i x =
+         if i <= len then
+            (case List.splitOpt l i of
+                NONE => NONE
+              | SOME (front, back) => SOME (front @ x :: back, len+1))
+         else
+            NONE
+
+      fun remove (l, len) i =
+         if i < len then
+            let
+               val (front, back) = List.split l i
+            in
+               (case back of
+                   nil => raise (Fail "impossible")
+   
+                 | _ :: back' => (front @ back', len-1))
+            end
+         else
+            raise (Invalid "subscript")
+
+      fun removeOpt (l, len) i =
+         if i < len then
+            (case List.splitOpt l i of
+                NONE => NONE
+   
+              | SOME (_, nil) => raise (Fail "impossible")
+   
+              | SOME (front, _ :: back) => SOME (front @ back, len-1))
+         else
+            NONE
+
+      fun update (l, len) i x =
+         if i < len then
+            let
+               val (front, back) = List.split l i
+            in
+               (case back of
+                   nil => raise (Fail "impossible")
+   
+                 | _ :: back' => (front @ x :: back', len))
+            end
+         else
+            raise (Invalid "subscript")
+
+      fun updateOpt (l, len) i x =
+         if i < len then
+            (case List.splitOpt l i of
+                NONE => NONE
+   
+              | SOME (_, nil) => raise (Fail "impossible")
+   
+              | SOME (front, _ :: back) => SOME (front @ x :: back, len))
+         else
+            NONE
+
+      fun append (l1, len1) (l2, len2) = (l1 @ l2, len1+len2)
+
+      fun appendList l1 (l2, len2) = 
+         List.foldr
+            (fns x (l, len) => (x :: l, len+1))
+            (l2, len2)
+            l1
+
+      fun foldl f x (l, _) = List.foldl f x l
+
+      fun foldr f x (l, _) = List.foldr f x l
+
+      fun map f (l, len) = (List.map f l, len)
+
+      fun mapi f (l, len) = (List.mapi f l, len)
+
+      fun app f (l, _) = List.app f l
+
+   end
+
+
+structure Seq = ListSeq

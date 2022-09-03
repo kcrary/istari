@@ -1,0 +1,231 @@
+
+signature TERM_UTIL =
+   sig
+
+      type constant = Term.constant
+      type term = Term.term
+      type sub = Term.sub
+
+      val normalize : term -> term
+      
+
+      datatype elim =
+         Eapp of term
+       | Epi1
+       | Epi2
+       | Eprev
+
+      val toSpine : term -> sub -> term * elim list
+      val fromSpine : term -> elim list -> term
+
+
+      datatype pseudohead =
+         Pvar of int
+       | Pconst of constant
+       | Plam
+       | Ppair
+       | Pnext
+       | Ptriv
+       | Pevar
+       | Pmarker
+
+      val pseudohead : term -> sub -> pseudohead
+      val pseudoheadEq : pseudohead * pseudohead -> bool
+
+      datatype head = Hvar of int | Hconst of constant
+      val head : term -> sub -> head option
+
+      val headConstant : term -> sub -> Term.constant option
+
+   end
+
+
+structure TermUtil :> TERM_UTIL =
+   struct
+
+      open Term
+
+
+      fun normalizeWhnf m =
+         (case m of
+             Lam (b, m) =>
+                Lam (b, normalize m)
+
+           | App (m, n) =>
+                App (normalizeWhnf m, normalize n)
+
+           | Pair (m1, m2) =>
+                Pair (normalize m1, normalize m2)
+
+           | Pi1 m => 
+                Pi1 (normalizeWhnf m)
+                       
+           | Pi2 m =>
+                Pi2 (normalizeWhnf m)
+
+           | Next m =>
+                Next (normalize m)
+
+           | Prev m =>
+                Prev (normalizeWhnf m)
+
+           | _ => m)
+
+      and normalize m =
+         normalizeWhnf (whnf m id)
+
+
+
+      datatype elim =
+         Eapp of term
+       | Epi1
+       | Epi2
+       | Eprev
+
+      fun toSpineMain m s acc =
+         (case m of
+             Var i =>
+                (case substVar i s of
+                    Idx j =>
+                       (Var j, acc)
+
+                  | Term m' =>
+                       toSpineMain m' id acc)
+
+           | Const _ => (m, acc)
+
+           | App (m1, m2) =>
+                toSpineMain m1 s (Eapp (Sub (m2, s)) :: acc)
+
+           | Pi1 m1 =>
+                toSpineMain m1 s (Epi1 :: acc)
+
+           | Pi2 m1 =>
+                toSpineMain m1 s (Epi2 :: acc)
+
+           | Prev m1 =>
+                toSpineMain m1 s (Eprev :: acc)
+
+           | Sub (m1, s') =>
+                toSpineMain m1 (compose s' s) acc
+
+           | Evar eb =>
+                (case readEbind eb of
+                    NONE => 
+                       (Sub (m, s), acc)
+
+                  | SOME m' => toSpineMain m' s acc)
+
+           | _ =>
+                (Sub (m, s), acc))
+
+      fun toSpine m s = toSpineMain m s []
+
+      fun fromSpine m spine =
+         (case spine of
+             [] => m
+
+           | Eapp n :: rest =>
+                fromSpine (App (m, n)) rest
+
+           | Epi1 :: rest =>
+                fromSpine (Pi1 m) rest
+
+           | Epi2 :: rest =>
+                fromSpine (Pi2 m) rest
+
+           | Eprev :: rest =>
+                fromSpine (Prev m) rest)
+
+
+
+      datatype pseudohead =
+         Pvar of int
+       | Pconst of constant
+       | Plam
+       | Ppair
+       | Pnext
+       | Ptriv
+       | Pevar
+       | Pmarker
+
+      fun pseudohead m s =
+         (case m of
+             Var i =>
+                (case substVar i s of
+                    Idx j =>
+                       Pvar j
+
+                  | Term m' =>
+                       pseudohead m' id)
+
+           | Const const =>
+                Pconst const
+
+           | App (m1, _) =>
+                pseudohead m1 s
+
+           | Pi1 m1 =>
+                pseudohead m1 s
+
+           | Pi2 m1 =>
+                pseudohead m1 s
+
+           | Prev m1 =>
+                pseudohead m1 s
+
+           | Lam _ => Plam
+
+           | Pair _ => Ppair
+
+           | Next _ => Pnext
+
+           | Triv => Ptriv
+
+           | Evar eb =>
+                (case readEbind eb of
+                    NONE =>
+                       Pevar
+
+                  | SOME m1  =>
+                       pseudohead m1 s)
+
+           | Sub (m1, s') =>
+                pseudohead m1 (compose s' s)
+
+           | Marker _ => Pmarker)
+
+      fun pseudoheadEq pses =
+         (case pses of
+             (Pvar i, Pvar j) => i = j
+
+           | (Pconst k, Pconst k') => Constant.eq (k, k')
+
+           | (Plam, Plam) => true
+           | (Ppair, Ppair) => true
+           | (Pnext, Pnext) => true
+           | (Ptriv, Ptriv) => true
+           | (Pevar, Pevar) => true
+           | (Pmarker, Pmarker) => true
+
+           | _ => false)
+
+
+
+      datatype head = Hvar of int | Hconst of constant
+
+      fun head m s =
+         (case pseudohead m s of
+             Pvar i => SOME (Hvar i)
+
+           | Pconst const => SOME (Hconst const)
+
+           | _ => NONE)
+
+      fun headConstant m s =
+         (case pseudohead m s of
+             Pconst const => SOME const
+
+           | _ => NONE)
+
+   end

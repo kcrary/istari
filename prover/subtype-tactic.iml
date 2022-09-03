@@ -1,0 +1,96 @@
+
+signature SUBTYPE_TACTIC =
+   sig
+
+      type tactic = Tactic.tactic
+
+      val subsume : ETerm.eterm -> tactic
+      val esubsume : tactic
+
+      val eqtp : ETerm.eterm -> tactic
+      val eeqtp : tactic
+
+      val forceExactRaw : ETerm.eterm -> tactic
+      val forceExact : ETerm.eterm -> tactic
+
+   end
+
+
+structure SubtypeTactic :> SUBTYPE_TACTIC =
+   struct
+
+      structure T = Term
+      structure C = Oldcase
+      structure R = Reorder
+      structure TC = Typecheck
+
+      open Tactic
+
+      val ? = C.?
+
+      fun subsume ea =
+         let
+            do a = withterm ea
+         in
+            C.goalCaseAlt
+               [
+               C.apply3 Prim.eq C.what C.what C.what ?
+               (fn (b, m, n) =>
+                   refine (Rule.subsumptionEq a b m n)),
+
+               C.apply2 Prim.ov C.what C.what ?
+               (fn (b, m) =>
+                   refine (Rule.subsumptionOf a b m)),
+
+               C.what ?
+               (fn b =>
+                   refine (Rule.subsumption a b))
+               ]
+         end
+
+      val esubsume = subsume ETerm.evar
+
+      fun eqtp ea =
+         let
+            do a = withterm ea
+         in
+            C.goalCaseAlt
+               [
+               C.apply3 Prim.eq C.what C.what C.what ?
+               (fn (b, m, n) =>
+                   refine (Rule.equivalenceEq a b m n)),
+
+               C.apply2 Prim.ov C.what C.what ?
+               (fn (b, m) =>
+                   refine (Rule.equivalenceOf a b m)),
+
+               C.what ?
+               (fn b =>
+                   refine (Rule.equivalence a b))
+               ]
+         end
+
+      val eeqtp = eqtp ETerm.evar
+
+      fun forceExactPriority em =
+         let
+            do () = lift
+         in
+            (* B *)
+            Reorder.reorder
+               (refine (Rule.equivalence (T.evar ()) (T.evar ())))
+               (Reorder.pull 1)
+            >>> [
+                (* A *)
+                IntroTactic.exactRaw em >> idtacM TC.Secondary,
+
+                (* A = B : type *)
+                idtacM TC.Primary
+                ]
+         end
+
+      fun forceExactRaw em = forceExactPriority em >> idtac
+
+      fun forceExact em = Typecheck.withTypecheckSnd (forceExactPriority em)
+
+   end

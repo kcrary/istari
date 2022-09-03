@@ -1,0 +1,2422 @@
+
+Message.squelch := 1;
+
+
+Ctrl.use "../library/acc-load.iml";
+Ctrl.use "../library/nat-load.iml";
+
+
+
+lemma "injection_zero_succ"
+/
+  forall n . 
+    0 = 0 : nat
+    -> 0 = succ n : nat 
+    -> void
+/;
+
+inference.
+intro /n Heq1 Heq2/.
+injection /Heq1/.
+injection /Heq2/.
+qed ();
+
+
+
+lemma "injection_succ_zero"
+/
+  forall n . succ n = 0 : nat -> void
+/;
+
+inference.
+intro /n Heq/.
+injection /Heq/.
+qed ();
+
+
+
+lemma "injection_succ"
+/
+  forall m n . succ m = succ n : nat -> m = n : nat
+/;
+
+inference.
+intro /m n Heq/.
+injection /Heq/.
+reintro /Heq'/.
+hyp /Heq'/.
+qed ();
+
+
+
+lemma "injection_exists"
+/
+  forall i (a : U i) (b : a -> U i) (x y : a) (v : b x) (w : b y) .
+    (x , v) = (y , w) : (exists (x : a) . b x)
+    -> (x = y : a & v = w : b x)
+/;
+
+inference.
+intro /i a b x y v w Heq/.
+injection /Heq/.
+reintro /Heq1 Heq2/.
+exact /(Heq1 , Heq2)/.
+qed ();
+
+
+
+lemma "injection_inl"
+/
+  forall i (a b : U i) (x y : a) .
+    inl x = inl y : (a % b)
+    -> x = y : a
+/;
+
+inference.
+intro /i a b x y Heq/.
+injection /Heq/.
+reintro /Heq'/.
+hyp /Heq'/.
+qed ();
+
+
+
+lemma "injection_inl_inr"
+/
+  forall i (a b : U i) (x : a) (y : b) .
+    inl x = inr y : (a % b)
+    -> void
+/;
+
+inference.
+intro /i a b x y Heq/.
+injection /Heq/.
+qed ();
+
+
+
+lemma "lam_compat"
+/
+  forall i (a : U i) (f : nat -> a) .
+    (fn x . f (succ x)) = (fn x . f (x + 1)) : (nat -> a)
+/;
+
+inference.
+intro /i a f/.
+compat.
+compat.
+rewrite /-> Nat.plus_commute/.
+reflexivity.
+qed ();
+
+
+
+lemma "lam_compat_dep"
+/
+  forall i (a : nat -> U i) (f : forall (x : nat) . a x) .
+    (fn x . f (succ x)) = (fn x . f (x + 1)) : (forall (x : nat) . a (succ x))
+/;
+
+inference.
+intro /i a f/.
+compat.
+compat.
+rewrite /-> Nat.plus_commute/.
+reflexivity.
+qed ();
+
+
+
+lemma "pair_compat_dep"
+/
+  forall i (a : U i) (b : a -> U i) (x y : a) (z : b x) .
+    x = y : a
+    -> (x , z) = (y , z) : (exists (x : a) . b x)
+/;
+
+inference.
+intro /i a b x y z Heq/.
+compat.
+hyp /Heq/.
+qed ();
+
+
+
+lemma "next_compat"
+/
+  forall i (a : U i) (x y : a) .
+    future (x = y : a)
+    -> next x = next y : (future a)
+/;
+
+inference.
+intro /i a x y Heq/.
+destruct /Heq/ /[Heq]/.
+compat.
+hyp /Heq/.
+qed ();
+
+
+
+lemma "inl_compat"
+/
+  forall i (a b : U i) (x y : a) .
+    x = y : a
+    -> inl x = inl y : (a % b)
+/;
+
+inference.
+intro /i a b x y Heq/.
+compat.
+hyp /Heq/.
+qed ();
+
+
+
+
+lemma "guards"
+/
+  forall i (a b c : U i) (x : a -g> c) .
+    (b -> a)
+    -> x : b -g> c
+/;
+
+inference.
+intro /i a b c x Hba/.
+introOf /H/.
+typecheck.
+apply /Hba/.
+hyp /H/.
+qed ();
+
+
+
+lemma "typecheck_guard"
+/
+  forall i (a b c : U i) (x : a -g> c) .
+    (b -> a)
+    -> x : b -g> c
+/;
+
+inference.
+intro /i a b c x Hba/.
+typecheck.
+reintro /Hb/.
+apply /Hba/.
+hyp /Hb/.
+qed ();
+
+
+
+lemma "infer_guard"
+/
+  forall i (a b c : U i) (x : a -g> c) .
+    (b -> a)
+    -> x : b -g> c
+/;
+
+inference.
+intro /i a b c x Hba/.
+typecheck1 >>> [typecheck, idtac].
+reintro /Hb/.
+infer /x/ /Hx/.
+  {
+  apply /Hba/.
+  hyp /Hb/.
+  }
+hyp /Hx/.
+qed ();
+
+
+
+lemma "infer_guard_ap"
+/
+  forall i (a b c : U i) (x : a -g> c) .
+    (b -> a)
+    -> x : b -g> c
+/;
+
+inference.
+intro /i a b c x Hba/.
+typecheck1 >>> [typecheck, idtac].
+reintro /Hb/.
+infer /x ap (Hba Hb)/ /Hx/.
+unfold /ap in Hx/.
+hyp /Hx/.
+qed ();
+
+
+
+lemma "compat_guard"
+/
+  forall i (a b c : U i) (f : a -> b -g> c) (x x' : a) .
+    b
+    -> x = x' : a
+    -> f x = f x' : c
+/;
+
+intro /i a b c f x x' Hb Heq/.
+compat.
+  {
+  hyp /Heq/.
+  }
+  
+  {
+  hyp /Hb/.
+  }
+qed ();
+
+
+
+lemma "compat_guard_ap"
+/
+  forall i (a b c : U i) (f : a -> b -g> c) (x x' : a) .
+    b
+    -> x = x' : a
+    -> f x = f x' : c
+/;
+
+intro /i a b c f x x' Hb Heq/.
+convert /f x ap Hb/.
+compat.
+hyp /Heq/.
+qed ();
+
+
+
+lemma "level_assumption"
+/
+  forall i j (a : U i) .
+    i <l= j
+    -> a : U j
+/;
+
+inference.
+intro /i j a H/.
+typecheck.
+qed ();
+
+
+
+val four = (4, ETerm.closed /4/);
+
+lemma "embedded"
+/
+  \snd four\ : \Term.Const Prim.nat\
+/;
+
+typecheck.
+qed ();
+
+
+
+lemma "strict_cycle"
+/
+  (fn e . U e : U e) _
+/;
+
+reduce //.
+inference.
+Message.display ();
+Prover.abandon ();
+
+
+lemma "inexpressible_constraint1"
+/
+  (fn e . (forall i (a : U i) . a) : U e) _
+/;
+
+reduce //.
+inference.
+Message.display ();
+Prover.abandon ();
+
+
+lemma "inexpressible_constraint2"
+/
+  (fn e . forall i (a : U i) . a : U e) _
+/;
+
+reduce //.
+inference.
+Message.display ();
+Prover.abandon ();
+
+
+lemma "exotic_cycle"
+/
+  forall (f : level -> level) .
+    (fn e . forall (a : univ (f e)) . a : U e) _
+/;
+
+reduce //.
+inference.
+Message.display ();
+Prover.abandon ();
+
+
+lemma "solve_universe"
+/
+  forall i j .
+    (fn e .
+       forall (a : U i) (b : U j) (c : U e) .
+         a & b & b & c & unit & U i & U 1 : U e)
+    _
+/;
+
+reduce //.
+inference.
+(* solution should be [2 (1 + i) j] *)
+intro /i j a b c/.
+typecheck.
+qed ();
+
+
+
+lemma "solve_universe_simple"
+/
+  (fn e . (unit : U e) & (U e : U (1 + e))) _
+/;
+
+reduce //.
+inference.
+split >> typecheck.
+qed ();
+
+
+
+lemma "univ_include_path"
+/
+  forall i j (f : nat -> U i) . lleq i j -> f 2 : U j
+/;
+
+inference.
+intro /i j f H/.
+typecheck.
+qed ();
+
+
+
+lemma "subtype_univ"
+/
+  forall i j . lleq i j -> U i <: U j
+/;
+
+inference.
+intro /i j H/.
+typecheck.
+qed ();
+
+
+lemma "typecheck_univ"
+/
+  forall i j . lleq (lsucc i) j -> U i : U j
+/;
+
+intro /i j H/.
+typecheck.
+hyp /H/.
+qed ();
+
+
+lemma "typecheck_nat"
+/
+  4 : nat
+/;
+
+typecheck.
+qed ();
+
+
+lemma "destruct_nat_hyp"
+/
+  forall i (P : nat -> U i) (n : nat) . P n -> P n
+/;
+
+intro /i P n H/.
+destruct /n/ /| n/.
+  {
+  hyp /H/.
+  }
+
+  {
+  hyp /H/.
+  }
+qed ();
+
+
+
+lemma "use_natcase"
+/
+  forall (n : nat) .
+    natcase n void (fn _ . unit) : type
+/;
+
+intro /n/.
+destruct /n/ /| | n/.
+  {
+  reduce //.
+  typecheck1.
+  }
+
+  {
+  reduce //.
+  typecheck1.
+  }
+
+  {
+  reduce //.
+  typecheck1.
+  }
+qed ();
+
+
+
+lemma "nat_induction"
+/
+  forall (n : nat) .
+    fix (fn f x . natcase x void (fn y . unit & f y)) n : type
+/;
+
+intro /n/.
+induct /n/.
+reintro /IH/.
+destruct /n/ /| n/.
+  {
+  unroll /fix/.
+  reduce //.
+  typecheck1.
+  }
+
+  {
+  unroll /fix/.
+  reduce //.
+  fold /manual (fix _ _)/.
+  typecheck.
+  apply /IH/.
+  apply /Nat.lt_succ/.
+  }
+qed ();
+
+
+
+define /identity/ /fn x . x/;
+
+lemma "identity_type"
+/
+  identity : foralltp a . a -> a
+/;
+
+unfold /identity/.
+typecheck.
+qed ();
+
+
+
+lemma "identity_type2"
+/
+  identity : foralltp a . a -> a
+/;
+
+introOf /a x/.
+unfold /identity/.
+reduce //.
+typecheck.
+qed ();
+
+
+
+lemma "identity_type3"
+/
+  foralltp a . a -> a
+/;
+
+intro /a x/.
+hyp /x/.
+qed ();
+
+
+
+lemma "induct_mu"
+/
+  forall (x : nat) . x : nat
+/;
+
+intro /x/.
+unfold /nat in x , nat/.
+induct /x/.
+reintro /u x Hu IH/.
+unrollType /mu/.
+destruct /x/ /| x/.
+  {
+  typecheck.
+  }
+
+  {
+  clear /Hu/.
+  typecheck1.
+    {
+    typecheck.
+    }
+  apply /IH/.
+  }
+qed ();
+
+
+lemma "unroll_mu" /
+  forall (x : nat) . x : nat
+/;
+
+intro /x/.
+unrollType /nat in x/.
+unrollType /nat/.
+assert /nat/ /H/.
+  {
+  unrollType /nat/.
+  hyp /x/.
+  }
+clear /H/.
+hypof.
+qed ();
+
+
+
+define /badnat/ /rec t . unit % future t/;
+
+lemma "badnat_type" /badnat : U 0/;
+
+unfold /badnat/.
+typecheck.
+qed ();
+recordTyping "badnat_type";
+
+
+
+lemma "unroll_rec" /
+  forall (x : badnat) . x : badnat
+/;
+
+intro /x/.
+unrollType /badnat in x/.
+unrollType /badnat/.
+assert /badnat/ /H/.
+  {
+  unrollType /badnat/.
+  hyp /x/.
+  }
+clear /H/.
+hypof.
+qed ();
+
+
+
+lemma "intersection" /
+  (fn t u . t -> t) : intersect i j . U i -> U j -> U i
+/;
+
+typecheck.
+qed ();
+
+
+
+lemma "nat_eq_refl" /
+  forall (n : nat) . n = n : nat
+/;
+
+unfold /nat at 0/.
+introRaw /n/.
+  {
+  convert /(mu t . unit % t) : type/.
+  withTypecheck RuleTactic.muForm.
+  }
+let do dir = Tactic.withidir
+in
+  Tactic.refine (Rule.muInd
+                   (/additional t . unit % t/ dir)
+                   (/additional x . x = x : nat/ dir)
+                   (/n/ dir))
+end.
+Prover.pull 2;
+  {
+  Tactic.chdir (Directory.literal (parseIdents /n t x H IH/)).
+  clear /n/.
+  fold /nat in H/.
+
+Prover.abandon ();
+
+
+
+lemma "contract_goals" /
+  forall i (a : U i) . a -> a & unit & a
+/;
+
+intro /i a H/.
+split >>> [idtac, split].
+pull 2;
+Prover.reorder (Reorder.contract 1);
+  {
+  hyp /H/.
+  }
+
+  {
+  split.
+  }
+qed ();
+
+
+
+define /myunit/ /unit/;
+Constant.setOpacity (parseConstant /myunit/) Constant.SOFT;
+
+
+lemma "soft_constant" /
+  forall i (a : U i) (f : unit -> unit) (x : myunit) . myunit
+/;
+
+inference.
+intro /i a f x/.
+apply /f/.
+hyp /x/.
+qed ();
+
+
+
+define /myarrow a b/ /a -> b/;
+Constant.setOpacity (parseConstant /myarrow/) Constant.SOFT;
+
+lemma "soft_constant_2" /
+  forall i (a : U i) . myarrow a a
+/;
+
+inference.
+intro /i a x/.
+hyp /x/.
+qed ();
+
+
+
+lemma "inference" /
+  forall i . (nat : U i)
+/;
+
+inference.
+intro /i/.
+typecheck.
+qed ();
+
+
+
+lemma "extensionalityOf" /
+  forall i (a b : U i) (p : b -> U i) (f : a -> b) .
+    (forall (x : a) . p (f x))
+    -> f : a -> { x : b | p x }
+/;
+
+intro /? ? ? ? ? ?/.
+reintro /H/.
+introOf /x/.
+typecheck.
+split.
+apply /H/.
+qed ();
+
+
+
+lemma "prove_subtype" /
+  forall i (a a' : U i) (b : a -> U i) (b' c : U i) 
+    (x : c -> forall (z : a) . b z) (y : c) (f : (a' -> b') -> c) .
+    a' <: a
+    -> (forall (z : a) . b z <: b')
+    -> f (x y) : c
+/;
+
+intro /i a a' b b' c x y f Ha Hb/.
+assert /forall (z : a') . b z <: b'/ /H/.
+  {
+  intro /z/.
+  apply /Hb/.
+  }
+typecheck.
+qed ();
+  
+
+
+(* inferUsing not currently supported
+
+lemma "infer_using" /
+  forall i (a b : U i) (c : b -> U i) (x : a) (f : forall (y : b) . c y) .
+    a = b : type
+    -> f x : c x
+/;
+
+intro /i a b c x f Heq/.
+assert /f : forall (y : a) . c y/ /Hof/.
+  {
+  eeqtp >>> [idtac , hypof].
+  typecheck1.
+    {
+    symmetry.
+    hyp /Heq/.
+    }
+  reflexivity.
+  }
+inferUsing /Hof/ /__ x/ /Hof'/.
+hyp /Hof'/.
+qed ();
+
+*)
+
+
+
+Prover.openGoal
+  (Judgement.make
+     (Seq.cons (Judgement.Tm (ETerm.closed / 0 : void /)) Seq.empty)
+     (ETerm.closed / 0 : void /),
+   Directory.literalStr ["H"]);
+
+hyp /H/.
+qed ();
+
+
+
+lemma "assert_pattern"
+  / forall i (a : U i) (b : a -> U i) (x : a) (y : b x) . unit /;
+
+intro /i a b x y/.
+assert /exists (x' : a) . b x'/ /x' y'/.
+  {
+  exists /x/.
+  hyp /y/.
+  }
+split.
+qed ();
+
+
+
+lemma "reintro_weaken"
+  / forall (i : level) . 
+      (forall (a : U i) (b : a -> U i) (c : forall (x : a) . b x -> U i) . void -> zero)
+      : type /;
+
+intro /i/.
+fold /manual 0/.
+typecheck.
+reintro /x _ _ v/.
+destruct /v/ /0/.
+qed ();
+
+
+
+lemma "eeqtp_symm"
+  / forall i (a b : U i) . a <:> b -> a <:> b /;
+
+intro /i a b H/.
+symmetry.
+symmetryIn /H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "set_extensionality"
+  / forall i (a : U i) (b : a -> U i) (m n : { x : a | b x }) .
+      m = n : a
+      -> m = n : { x : a | b x } /;
+
+intro /i a b m n Heq/.
+extensionality /_/.
+hyp /Heq/.
+qed ();
+
+
+
+lemma "fixed"
+  / pause (fix (fn t . void -> t)) /;
+
+unroll /fix/ >> reduce /concl/.
+unroll /fix/ >> reduce /concl/.
+unroll /fix/ >> reduce /concl/.
+unroll /pause/.
+intro /_ _ 0/.
+qed ();
+
+
+
+define /myfix/
+  / fn f . pause (fn x . f (pause x x)) (fn x . f (pause x x)) /;
+val myfix = Namespace.resolve [`"myfix"];
+
+structure R = Reduction;
+
+val t1 = parseLTerm /myfix 0/;
+val t2 = parseLTerm /0 (myfix 0)/;
+
+val r1 =
+  R.trans
+    [
+    R.unfold,
+    R.beta 1,
+    R.user1 Prim.unroll_pause,
+    R.beta 1
+    ];
+
+val r2 =
+  R.within [1]
+    (R.trans
+       [
+       R.unfold,
+       R.beta 1
+       ]);
+
+Show.showLiteral (Normalize.simplifyAll (R.reduce r1 t1));
+Show.showLiteral (Normalize.simplifyAll (R.reduce r2 t2));
+
+val r = R.new1 myfix 1 t2 r1 r2;
+
+
+
+lemma "paused"
+  / pause (fn x . void -> pause x x) (fn x . void -> pause x x) /;
+
+reduceUsing /\Reduction.user1 Prim.unroll_pause\/.
+whreduce /concl/.
+unreduceUsing /\Reduction.user1 Prim.unroll_pause\ with pause (fn x . void -> pause x x) (fn x . void -> pause x x)/.
+reduceUsing /\Reduction.user1 Prim.unroll_pause\/.
+convertUnreduceUsing /\Reduction.user1 Prim.unroll_pause\ with pause (fn x . void -> pause x x) (fn x . void -> pause x x)/.
+unroll /pause/.
+whreduce /concl/.
+roll /pause (fn x . void -> pause x x) (fn x . void -> pause x x)/.
+unroll /pause/.
+showPosition /at 0/;
+convertRoll /pause (fn x . void -> pause x x) (fn x . void -> pause x x) at 0/.
+unroll /pause/.
+reduce /concl/.
+unroll /pause/.
+reduce /concl/.
+unroll /pause/.
+reduce /concl/.
+intro /0/.
+qed ();
+
+
+
+define /natind/
+/
+  fix (fn f n hz hs .
+         natcase n hz (fn n' . hs n' (f n' hz hs)))
+/;
+
+
+val t1 =
+  parseLTerm
+    / natind zero 1 0 /;
+
+val r1 =
+  R.trans
+    [
+    R.unfold,
+    R.user1 Prim.unroll_fix,
+    R.beta 4,
+    R.user2 Prim.natcase_zero
+    ];
+
+val natind_zero = R.new2 (parseConstant /natind/) 0 2 (parseConstant /zero/) 0 (Term.Var 1) r1 R.refl;
+
+val t2a =
+  parseLTerm
+    / natind (succ 2) 1 0 /;
+
+val r2a =
+  R.trans
+    [
+    R.unfold,
+    R.user1 Prim.unroll_fix,
+    R.beta 4,
+    R.user2 Prim.natcase_succ,
+    R.beta 1
+    ];
+
+val t2b =
+    parseLTerm
+      / 0 2 (natind 2 1 0) /;
+
+val r2b =
+  R.within [2] R.unfold;
+
+val natind_succ = R.new2 (parseConstant /natind/) 0 2 (parseConstant /succ/) 1 t2b r2a r2b;
+
+Registry.register natind_zero;
+Registry.register natind_succ;
+
+
+
+lemma "reduction"
+  / unit /;
+
+assert /natind 4 unit (fn _ a . nat & a) : type / /H/.
+  {
+  reduce /concl/.
+  typecheck.
+  }
+reduce /H/.
+split.
+qed ();
+
+
+
+define /mynatind/ / natind /;
+val mynatind = Namespace.resolve [`"mynatind"];
+
+val t1 = parseLTerm /mynatind (succ 2) 1 0/;
+val t2 = parseLTerm /0 2 (mynatind 2 1 0)/;
+
+val r1 =
+  R.trans 
+    [
+    R.unfold,
+    R.user2 natind_succ
+    ];
+
+val r2 = R.within [2] R.unfold;
+
+Show.showLiteral (Normalize.simplifyAll (R.reduce r1 t1));
+Show.showLiteral (Normalize.simplifyAll (R.reduce r2 t2));
+
+val r = R.new2 mynatind 0 2 Prim.succ 1 t2 r1 r2;
+
+Show.showLiteral (Normalize.simplifyAll (R.reduce (R.user2 r) t1));
+
+val t1' = parseLTerm /mynatind zero 1 0/;
+val t2' = parseLTerm /1/;
+
+val r1' =
+  R.trans
+    [
+    R.unfold,
+    R.user2 natind_zero
+    ];
+
+Show.showLiteral (Normalize.simplifyAll (R.reduce r1' t1'));
+
+val r' = R.new2 mynatind 0 2 Prim.zero 0 (Term.Var 1) r1' R.refl;
+
+Show.showLiteral (Normalize.simplifyAll (R.reduce (R.user2 r') t1'));
+
+
+
+lemma "myreduction_manual"
+  / unit /;
+
+assert /mynatind 4 unit (fn _ a . nat & a) : type / /H/.
+  {
+  reduce /concl/.
+  showPosition /at 1/;
+  reduceUsing /\R.trans [R.user2 r, R.beta 2]\ at pos 1/.
+  showPosition /at 3/;
+  reduceUsing /\R.trans [R.user2 r, R.beta 2]\ at pos 3/.
+  showPosition /at 5/;
+  reduceUsing /\R.trans [R.user2 r, R.beta 2]\ at pos 5/.
+  showPosition /at 7/;
+  reduceUsing /\R.trans [R.user2 r, R.beta 2]\ at pos 7/.
+  showPosition /at 9/;
+  reduceUsing /\Reduction.user2 r'\ at pos 9/.
+  typecheck.
+  }
+split.
+qed ();
+
+
+Registry.register r;
+Registry.register r';
+
+
+lemma "myreduction"
+  / unit /;
+
+assert /mynatind 4 unit (fn _ a . nat & a) : type / /H/.
+  {
+  reduce /concl/.
+  typecheck.
+  }
+reduce /H/.
+split.
+qed ();
+
+
+define /mypause/ / fn x . x /;
+val mypause = Namespace.resolve [`"mypause"];
+
+val t1 = parseLTerm /mypause 0/;
+
+val r1 =
+  R.trans [R.unfold, R.beta 1];
+
+Show.showLiteral (Normalize.simplifyAll (R.reduce r1 t1));
+
+val r = R.new1 mypause 1 (Term.Var 0) r1 R.refl;
+
+Show.showLiteral (Normalize.simplifyAll (R.reduce (R.user1 r) (ETerm.closed /mypause (nat -> nat)/)));
+
+
+
+lemma "rewrite_subtype_of"
+  / forall i (a b : U i) (x : a) .
+      a <: b
+      -> x : b /;
+
+intro /i a b x H/.
+assert /x : a/ /Hof/.
+  {
+  hypof.
+  }
+rewriteRaw /-> H in Hof/.
+rewriteRaw /<- H/.
+hypof.
+qed ();
+
+
+lemma "rewrite_subtype_of_forall"
+  / forall i (a : U i) (b c : a -> U i) (x : a) (y : b x) .
+      (forall x . b x <: c x)
+      -> y : c x /;
+
+intro /i a b c x y H/.
+assert /y : b x/ /Hof/.
+  {
+  hypof.
+  }
+rewriteRaw /-> H in Hof/.
+  {
+  typecheck.
+  }
+rewriteRaw /<- H/.
+Prover.pull 1;
+  {
+  hypof.
+  }
+hypof.
+qed ();
+
+
+
+lemma "rewrite_subtype_of_connectives"
+  / forall i (a b c d : U i) (x : nat -> a) (y : d) .
+      a <: b
+      -> forall (n : nat) . c -> d & (x n : b) & d /;
+
+intro /i a b c d x y H/.
+assert /forall (n : nat) . c -> d & (x n : a) & d/ /Hof/.
+  {
+  intro /n Hc/.
+  split.
+    {
+    hyp /y/.
+    }
+  split.
+    {
+    typecheck.
+    }
+  hyp /y/.
+  }
+rewriteRaw /-> H in Hof/.
+rewriteRaw /<- H/.
+intro /n Hc/.
+split.
+  {
+  hyp /y/.
+  }
+split.
+  {
+  typecheck.
+  }
+hyp /y/.
+qed ();
+
+
+
+lemma "rewrite_subtype_of_capture"
+  / forall i (a b : nat -> U i) (c d : U i) (x : forall (n : nat) . a n) (y : d) .
+      (forall n . a n <: b n)
+      -> forall (n : nat) . c -> d & (x n : b n) & d /;
+
+intro /i a b c d x y H/.
+assert /forall (n : nat) . c -> d & (x n : a n) & d/ /Hof/.
+  {
+  intro /n Hc/.
+  split.
+    {
+    hyp /y/.
+    }
+  split.
+    {
+    typecheck.
+    }
+  hyp /y/.
+  }
+rewrite /-> H n within n in Hof/.
+rewrite /<- H n within n/.
+intro /n Hc/.
+split.
+  {
+  hyp /y/.
+  }
+split.
+  {
+  typecheck.
+  }
+hyp /y/.
+qed ();
+
+
+
+lemma "rewrite_eeqtp_concl"
+  / forall i (a b : U i) .
+      a <:> b
+      -> a
+      -> b /;
+
+intro /i a b Heq Ha/.
+rewrite /<- Heq/.
+hyp /Ha/.
+qed ();
+
+
+
+lemma "rewrite_eeqtp_hyp"
+  / forall i (a b c : U i) (d : b -> U i) (x : a) .
+      a <:> (b & c)
+      -> (forall (y : b) . d y)
+      -> d (x #1) /;
+
+intro /i a b c d x Heq H/.
+moveBefore /Heq/ /x/.
+rewrite /-> Heq in x/.
+destruct /x/ /y z/.
+reduce /concl/.
+apply /H/.
+qed ();
+
+
+
+lemma "rewrite_subtype_simple1"
+  / forall i (a a' b b' : U i) .
+      a <: a'
+      -> b <: b'
+      -> a & b
+      -> a' & b' /;
+
+intro /i a a' b b' Ha Hb H/.
+destruct /H/ /H1 H2/.
+split.
+  {
+  rewrite /<- Ha/.
+  hyp /H1/.
+  }
+
+  {
+  rewrite /-> Hb in H2/.
+  hyp /H2/.
+  }
+qed ();
+
+
+
+lemma "rewrite_subtype_simple2"
+  / forall i (a a' b b' : U i) .
+      a <: a'
+      -> b <: b'
+      -> a & b
+      -> a' & b' /;
+
+intro /i a a' b b' Ha Hb H/.
+rewrite /-> Ha in H/.
+rewrite /<- Hb/.
+hyp /H/.
+qed ();
+
+
+
+lemma "multi_rewrite"
+  / forall (m m' : nat) .
+      m = m' : nat
+      -> unit
+      -> (m , m) = (m' , m') : (nat & nat) /;
+
+unfold /arrow in concl at 1 0/.
+intro /m m'/.
+fold /_ -> _/.
+fold /_ -> _/.
+intro /Hm _/.
+testRewrite /-> Hm in concl at 1 0/;
+rewrite /-> Hm in concl at 1 0/.
+reflexivity.
+qed ();
+
+
+
+lemma "generalize"
+  / forall (f : nat -> nat) (m n : nat) . (forall n . f m = n : nat) -> f m = f n : nat /;
+
+intro /f m n/.
+generalize /f m/ /nat/ /x/.
+generalizeAt /f n/ /nat/ [0] /y/.
+intro /H/.
+apply /H/.
+qed ();
+
+
+
+lemma "subst"
+  / forall (n : nat) . n = 0 : nat -> n = 0 : nat /;
+
+intro /n H/.
+symmetryIn /H/.
+subst /n/.
+reflexivity.
+qed ();
+
+
+
+lemma "substitution"
+  / forall (n : nat) . n = 0 : nat -> n = 0 : nat /;
+
+intro /n H/.
+substitution /n/ /0/.
+  {
+  hyp /H/.
+  }
+reflexivity.
+qed ();
+
+
+
+lemma "revert"
+  / forall i (a : U i) (x y : a) . x = y : a -> x = y : a /;
+
+intro /i a x y Heq/.
+revert /y x Heq/.
+intro /y x Heq/.
+hyp /Heq/.
+qed ();
+
+
+
+lemma "extensionality"
+  / forall i (a : U i) (b c : a -> U i) (d : forall x . c x -> U i) .
+      (fn t .
+         forall (m n : t) .
+           (forall x y . m x y #1 = n x y #1 : c x)
+           -> (forall x y . m x y #2 #1 = n x y #2 #1 : d x (m x y #1))
+           -> m = n : t)
+      (forall (x : a) . b x -> exists (z : c x) . d x z & (x : a)) /;
+
+reduce /concl/.
+intro /i a b c d m n H1 H2/.
+  {
+  reintro /x y/.
+  symmetry.
+  apply /H1/.
+  }
+extensionality /x y H _ _/.
+  {
+  apply /H1/.
+  }
+
+  {
+  apply /H2/.
+  }
+qed ();
+
+
+lemma "extensionality_arrows"
+  / forall i (a : U i) (b c d e : a -> U i) .
+      (fn t .
+         forall (m n : t) .
+           (forall x y z w . m x y z w = n x y z w : e x)
+           -> m = n : t)
+      (forall (x : a) . b x -> c x -t> d x -k> e x) /;
+
+reduce /concl/.
+intro /i a b c d e m n H/.
+extensionality /x y z w/.
+apply /H/.
+qed ();
+
+
+
+lemma "extensionality_future"
+  / forall i (a b : U i) (m n : a -> future b) .
+      (forall x .
+         let next z = m x
+         in
+         let next z' = n x
+         in
+           future (z = z' : b))
+      -> m = n : (a -> future b) /;
+
+intro /i a b m n H1/.
+extensionality /x/.
+so /H1 x/ /H2/.
+clear /H1/.
+revert /H2/.
+generalize /m x/ /_/ /m'/.
+generalize /n x/ /_/ /n'/.
+intro /H2/.
+clear /m n x/.
+destruct /m'/ /[m'']/.
+destruct /n'/ /[n'']/.
+whreduce /H2/.
+destruct /H2/ /[H3]/.
+extensionality /_/.
+hyp /H3/.
+qed ();
+
+
+
+lemma "extensionality_future2"
+  / forall i (a : U i) (b c : a -> U i)
+      (m n : forall (x : a) . b x -> future (c x)) .
+        (forall (x : a) (y : b x) .
+           let next z = m x y 
+           in
+           let next z' = n x y
+           in
+             future (z = z' : (c x)))
+        -> m = n : (forall (x : a) . b x -> future (c x)) /;
+      
+intro /i a b c m n H1/.
+extensionality /x y/.
+so /H1 x y/ /H2/.
+clear /H1/.
+revert /H2/.
+generalize /m x y/ /_/ /m'/.
+generalize /n x y/ /_/ /n'/.
+intro /H2/.
+clear /m n y/.
+destruct /m'/ /[m'']/.
+destruct /n'/ /[n'']/.
+whreduce /H2/.
+destruct /H2/ /[H3]/.
+extensionality /_/.
+hyp /H3/.
+qed ();
+
+
+
+(* Setting up for rewriting tests:
+
+   leq is compatible with add and succ
+   leq is reflexive and transitive
+   leq through leq becomes implication (contravariant in first position)
+   eqnat is symmetric
+   eqnat weakens to leq
+   eqnat through natop becomes equality (why? who knows)
+
+   Note:
+   eqnat would actually imply equality, but we'll ignore that for the purpose of these tests.
+   no idea what natop is actually supposed to mean; again, just for the tests
+*)
+
+val eqnat = Namespace.declare (`"eqnat") NONE;
+val add = Namespace.declare (`"add") NONE;
+val natop = Namespace.declare (`"natop") NONE;
+
+
+Unsafe.allow ();
+structure H = ConstantTable;
+
+
+lemma "eqnat_istp"
+  / forall (m n : nat) . eqnat m n : type /;
+
+trustme.
+Prover.qed ();
+H.insert TypecheckInternal.istpTactics eqnat (witnessRaw /eqnat_istp _ _/);
+
+
+lemma "add_type"
+  / add : nat -> nat -> nat /;
+
+trustme.
+Prover.qed ();
+recordTyping "add_type";
+
+
+lemma "natop_type"
+  / natop : nat -> nat /;
+
+trustme.
+Prover.qed ();
+recordTyping "natop_type";
+
+
+lemma "succ_compat_leq"
+  / forall (m n : nat) . m <= n -> succ m <= succ n /;
+
+trustme.
+Prover.qed ();
+
+
+lemma "add_compat_leq"
+  / forall (m m' n n' : nat) . m <= m' -> n <= n' -> add m n <= add m' n' /;
+
+trustme.
+Prover.qed ();
+
+
+lemma "natop_compat_eqnat"
+  / forall (m n : nat) . eqnat m n -> natop m = natop n : nat /;
+
+trustme.
+Prover.qed ();
+
+
+lemma "eqnat_symm"
+  / forall (m n : nat) . eqnat m n -> eqnat n m /;
+
+trustme.
+Prover.qed ();
+
+
+lemma "eqnat_impl_leq"
+  / forall (m n : nat) . eqnat m n -> m <= n /;
+
+trustme.
+qed ();
+
+
+val leq = parseConstant /Nat.leq/;
+
+structure B = BackchainInternal;
+
+H.insert EqualityTacticInternal.reflexivityTactics (parseConstant /Nat.leq/)
+(B.witnessPriority /Nat.leq_refl _/);
+
+H.insert EqualityTacticInternal.symmetryTactics eqnat
+(andthenOn 2 (B.witnessPriority /eqnat_symm _ _ __/));
+
+H.insert EqualityTacticInternal.transitivityTactics (parseConstant /Nat.leq/)
+(fn n => B.witnessPriority /Nat.leq_trans _ `l \n\ _ __ __/);
+
+H.insert RewriteInternal.weakeningTable eqnat 
+[(leq, andthenOn 2 (B.witnessPriority /eqnat_impl_leq _ _ __/))];
+
+
+
+lemma "symmetries"
+  / forall (m n : nat) . m = n : nat -> m = n : nat /;
+
+intro /m n H/.
+symmetryIn /H/.
+symmetry.
+hyp /H/.
+qed ();
+
+
+
+lemma "symmetries_eqnat"
+  / forall (m n : nat) . eqnat m n -> eqnat m n /;
+
+intro /m n H/.
+symmetryInRaw /H/.
+  {
+  typecheck.
+  }
+
+  {
+  typecheck.
+  }
+symmetry.
+hyp /H/.
+qed ();
+
+
+
+Namespace.alias (parseIdent /leq/) (parseConstant /Nat.leq/);
+
+
+
+lemma "leq_implication"
+  / forall (m m' n n' : nat) .
+      leq m' m
+      -> leq n n'
+      -> leq m n
+      -> leq m' n' /;
+
+intro /m m' n n' Hm Hn H/.
+transitivity /m/.
+  {
+  hyp /Hm/.
+  }
+transitivity /n/.
+  {
+  hyp /H/.
+  }
+hyp /Hn/.
+qed ();
+
+
+
+List.app 
+  (fn (hconst, i, const1, const2, cov, tacfn) => 
+     RewriteInternal.CICTable.insert RewriteInternal.compatibilityTable (hconst, i, const1) (const2, cov, tacfn))
+  [
+  (Prim.succ, 0, leq, leq, true,
+   andthenOn 2 (B.witnessPriority /succ_compat_leq _ _ __/)),
+
+  (natop, 0, eqnat, Prim.eq, true,
+   andthenOn 2 (B.witnessPriority /natop_compat_eqnat _ _ __/)),
+
+  (add, 0, leq, leq, true,
+   andthenOn 4 (B.witnessPriority /add_compat_leq _ _ _ _ __ __/)),
+
+  (add, 1, leq, leq, true,
+   andthenOn 5 (B.witnessPriority /add_compat_leq _ _ _ _ __ __/)),
+
+  (leq, 0, leq, Prim.arrow, false,
+   andthenOn 4 (B.witnessPriority /leq_implication _ _ _ _ __ __/)),
+
+  (leq, 1, leq, Prim.arrow, true,
+   andthenOn 5 (B.witnessPriority /leq_implication _ _ _ _ __ __/)),
+  ];
+
+
+
+lemma "rewrite_leq"
+  / forall i (a b c : U i) (m n n' p : nat) .
+      (a -> void % b & leq m (add n p) & c % void)
+      -> leq n n'
+      -> a
+      -> leq m (add n' p) /;
+ 
+intro /i a b c m n n' p H Hleq Ha/.
+moveBefore /Hleq/ /H/.
+rewrite /-> Hleq in H/.
+so /H Ha/ /0 | H1 | 0/.
+apply /H1/.
+qed ();
+
+
+
+lemma "rewrite_leq_exists"
+  / forall i (a : U i) (b : a -> U i) (m n n' p : nat) .
+      (exists (x : a) . b x -> leq m (add n p))
+      -> leq n n'
+      -> exists (x : a) . b x -> leq m (add n' p) /;
+ 
+intro /i a b m n n' p H Hleq/.
+moveBefore /Hleq/ /H/.
+rewrite /-> Hleq in H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "rewrite_leq_forall"
+  / forall i (a : U i) (b : a -> U i) (m n n' p : nat) .
+      (forall (x : a) . b x -> leq m (add n p))
+      -> leq n n'
+      -> forall (x : a) . b x -> leq m (add n' p) /;
+ 
+intro /i a b m n n' p H Hleq x Ha/.
+moveBefore /Hleq/ /H/.
+testRewrite /-> Hleq in H , <- Hleq/;
+rewrite /-> Hleq in H/.
+apply /H/ >>> [idtac, hyp /Ha/].
+Message.display ();
+hypof.
+qed ();
+
+
+
+lemma "rewrite_leq_dom"
+  / forall i (a : U i) (m n p p' : nat) .
+      (leq m (add n p) -> a)
+      -> leq p' p
+      -> leq m (add n p')
+      -> a /;
+ 
+intro /i a m n p p' H Hleq Hmnp/.
+moveBefore /Hleq/ /H/.
+rewrite /<- Hleq in H/.
+apply /H/.
+hyp /Hmnp/.
+qed ();
+
+
+
+lemma "rewrite_leq_set"
+  / forall (a : U 0) (b : a -> U 0) (m : a -> nat) (n n' p : nat)
+      (s : { x : a | leq (m x) (add n p) }) .
+      eqnat n n'
+      -> b s
+      -> { leq (m s) (add n' p) } /; 
+
+intro /a b m n n' p s Heq/.
+assert /s : a/ /Hs/.
+  {
+  destruct /s/ /[s _]/.
+  hypof.
+  }
+intro /H/.
+moveBefore /Heq/ /s/.
+testRewrite /-> Heq in s/;
+rewrite /-> Heq in s/.
+destruct /s/ /[s Hs']/.
+split.
+hyp /Hs'/.
+qed ();
+
+
+
+lemma "rewrite_eqnat"
+  / forall i (a : U i) (m n n' p : nat) .
+      (a -> leq m (add n p))
+      -> eqnat n n'
+      -> a
+      -> leq m (add n' p) /;
+ 
+intro /i a m n n' p H Heq Ha/.
+moveBefore /Heq/ /H/.
+rewrite /-> Heq in H/.
+rewrite /<- Heq in H/.
+rewrite /<- Heq/.
+rewrite /-> Heq/.
+rewrite /<- Heq/.
+apply /H/.
+hyp /Ha/.
+qed ();
+
+
+
+lemma "rewrite_to_equality"
+  / forall i (a : U i) (b : nat -> U i) (m n : nat) .
+      b (natop m)
+      -> eqnat m n
+      -> b (natop n) /;
+
+intro /i a b m n H Heq/.
+moveBefore /Heq/ /H/.
+rewrite /<- Heq/.
+rewrite /-> Heq/.
+rewrite /-> Heq in H/.
+rewrite /<- Heq in H/.
+rewrite /-> Heq in H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "rewrite1"
+  / forall i (a b : U i) (c : (a -> a -> b) -> U i) (f g : a -> b) .
+       (f = g : (a -> b))
+       -> c (fn y x . f x)
+       -> c (fn y x . g x) /;
+
+intro /i a b c f g Heq H/.
+rewrite /<- Heq/.
+witness /H/.
+Prover.qed ();
+
+
+
+lemma "rewrite2"
+  / forall i (a b d : U i) (c : (a -> a -> b) -> U i) (f g : a -> b) .
+       (d -> f = g : (a -> b))
+       -> d
+       -> c (fn y x . f x)
+       -> c (fn y x . g x) /;
+
+intro /i a b d c f g Heq Hd H/.
+rewrite /-> Heq in H/.
+  {
+  hyp /Hd/.
+  }
+hyp /H/.
+Prover.qed ();
+
+
+
+lemma "rewrite3"
+  / forall i (a b : U i) (c : b -> U i) (f g : a -> b) (x : a) .
+       (forall (x : a) . f x = g x : b)
+       -> c (f x)
+       -> c (g x) /;
+
+intro /i a b c f g x Heq H/.
+rewrite /<- Heq/.
+hyp /H/.
+Prover.qed ();
+
+
+
+lemma "rewrite4"
+  / forall i (a b : U i) (c : b -> U i) (f g : a -> b) (x : a) .
+       (forall (x : a) . f x = g x : b)
+       -> c (f x)
+       -> c (g x) /;
+
+intro /i a b c f g x Heq H/.
+rewrite /-> Heq in H/.
+hyp /H/.
+Prover.qed ();
+
+
+
+lemma "rewrite5"
+  / forall i (a b : U i) (c : (a -> a -> b) -> U i) (f g : a -> b) .
+       (forall (x : a) . f x = g x : b)
+       -> c (fn y x . f x)
+       -> c (fn y x . g x) /;
+
+intro /i a b c f g Heq H/.
+rewrite /-> Heq within _ in H/.
+witness /H/.
+Prover.qed ();
+
+
+
+lemma "replace"
+  / forall i (a : U i) (b : a -> U i) (x y : a) . (y = x : a) -> b x -> b y /;
+
+intro /i a b x y Heq H/.
+testRewrite /\Rewrite.replaceRew [] /y/ /x/ /a/\ in concl/;
+testRewrite /y = x : a/;
+rewrite /y = x : a/.
+  {
+  hyp /Heq/.
+  }
+hyp /H/.
+Prover.qed ();
+
+
+
+lemma "replace_hyp"
+  / forall i (a : U i) (b : a -> U i) (x y : a) . (y = x : a) -> b x -> b y /;
+
+intro /i a b x y Heq H/.
+testRewrite /\Rewrite.replaceRew [] /x/ /y/ /a/\ in H/;
+rewrite /x = y : a in H at 0/.
+  {
+  symmetry.
+  hyp /Heq/.
+  }
+hyp /H/.
+Prover.qed ();
+
+
+
+lemma "replace_binder"
+  / forall i (a b : U i) (c : (a -> a -> b) -> U i) (f g : a -> b) .
+       (f = g : (a -> b))
+       -> c (fn y x . f x)
+       -> c (fn y x . g x) /;
+
+intro /i a b c f g Heq H/.
+testRewrite /\Rewrite.replaceRew (parseOIdents /x/) /g x/ /f x/ /b/\ in concl/;
+rewrite /g x = f x : b within x/.
+  {
+  symmetry.
+  rewrite /-> Heq/.
+  reflexivity.
+  }
+hyp /H/.
+Prover.qed ();
+
+
+
+lemma "replace_binder_hyp"
+  / forall i (a b : U i) (c : (a -> a -> b) -> U i) (f g : a -> b) .
+       (f = g : (a -> b))
+       -> c (fn y x . f x)
+       -> c (fn y x . g x) /;
+
+intro /i a b c f g Heq H/.
+testRewrite /\Rewrite.replaceRew (parseOIdents /x/) /f x/ /g x/ /b/\ in H/;
+rewrite /f x' = g x' : b within x' in H/.
+  {
+  reintro /x'/.
+  rewrite /-> Heq/.
+  reflexivity.
+  }
+hyp /H/.
+Prover.qed ();
+
+
+
+lemma "replace_with_evar"
+  / forall i (a b : U i) (c : (a -> a -> b) -> U i) (f g : a -> b) .
+       (forall (x : a) . f x = g x : b)
+       -> c (fn y x . f x)
+       -> c (fn y x . g x) /;
+
+intro /i a b c f g Heq H/.
+let val e = Term.evar () in rewrite /g \e\ = f \e\ : b within _/ end.
+  {
+  symmetry.
+  apply /Heq/.
+  }
+hyp /H/.
+Prover.qed ();
+
+
+
+lemma "unfold"
+  / forall i (a : U i) . (a -> a) -> a -> a /;
+
+unfold /arrow in concl at 2/.
+showPosition /concl at 11/;
+reduce /concl/.
+showPosition /concl at 11/;
+convert /((fn v0 v1 . forall (v2 : v0) . v1) a a) within a in concl at pos 11/.
+fold /arrow/.
+unfold /arrow in concl at 2/.
+showPosition /concl at 11/;
+whreduce /concl at 11/.
+testRewrite /\Rewrite.foldRew (parseOIdents /a/) /a -> a/\ in concl at 0/;
+idtac.
+fold /a -> a within a in concl at 0/.
+intro /i a x y/.
+unfold /arrow in x/.
+whreduce /x at 0/.
+showPosition /x at 0/;
+convert /((fn v0 v1 . forall (v2 : v0) . v1) a a) in x at 0/.
+reduce /x/.
+showPosition /x at 1/;
+fold /a -> a in x/.
+apply /x/.
+hyp /y/.
+Prover.qed ();
+
+
+
+lemma "compatibility"
+  / forall i (a : U i) (b : a -> U i) (c d e : U i) (f : forall (x : a) . b x -> c -> d & e) (x x' : a) (y y' : b x) (z : c) .
+      x = x' : a
+      -> y = y' : b x
+      -> f x' y z #1 = f x y' z #1 : d /;
+
+intro /i a b c d e f x x' y y' z Heqx Heqy/.
+compat.
+  {
+  symmetry.
+  hyp /Heqx/.
+  }
+
+  {
+  subsume /b x/.
+    {
+    intro /h/.
+    eeqtp.
+    Prover.pull 1;
+      {
+      hypof.
+      }
+    compat.
+    hyp /Heqx/.
+    }
+  hyp /Heqy/.
+  }
+Prover.qed ();
+
+
+
+lemma "reorder"
+ / forall i (a : U i) (x1 x1' x2 x2' x3 x3' x4 x4' x5 x5' : a) (f : a -> a -> a -> a -> a -> a).
+     x1 = x1' : a
+     -> x2 = x2' : a
+     -> x3 = x3' : a
+     -> x4 = x4' : a
+     -> x5 = x5' : a
+     -> f x1 x2 x3 x4 x5 = f x1' x2' x3' x4' x5' : a /;
+
+intro /i a x1 x1' x2 x2' x3 x3' x4 x4' x5 x5' f h1 h2 h3 h4 h5/.
+Reorder.reorder compat (Reorder.rotateBackward 2)
+>>> [hyp /h4/, hyp /h5/, hyp /h1/, hyp /h2/, hyp /h3/].
+Prover.qed ();
+
+
+
+lemma "refl"
+  / 1 = 1 : nat /;
+
+reflexivity.
+Prover.qed ();
+
+
+
+lemma "refl_type"
+  / nat = nat : type /;
+
+reflexivity.
+Prover.qed ();
+
+
+
+lemma "refl_subtype"
+  / nat <: nat /;
+
+reflexivity.
+Prover.qed ();
+
+
+
+lemma "symm"
+  / 1 = 2 : nat /;
+
+symmetry.
+symmetry.
+Prover.abandon ();
+
+
+
+lemma "symm_type"
+  / nat = bool : type /;
+
+symmetry.
+symmetry.
+Prover.abandon ();
+
+
+
+lemma "backchain"
+  / forall i (a b : U i) (c d : a -> U i) (f : a -> a) (y : a) .
+      (exists (z : a) . unit & (forall (x x' : a) . b -t> d z -k> d x' -> unit & (c (f x) -> d x)))
+      -> d (f y) /;
+
+intro /i a b c d f y g/.
+apply /g #2/.
+Message.display ();
+Prover.abandon ();
+
+
+
+lemma "exploit"
+  / forall i (a : U i) (b : a -> U i) (c d e : U i) 
+      (f : exists (y : a) . b y -> c -> (d -> e) & a) .
+      b (f #1) -> c -> d -> e /;
+
+intro /i a b c d e f x y z/.
+exploit /f #2/ /H/.
+  {
+  hyp /x/.
+  }
+
+  {
+  hyp /y/.
+  }
+
+  {
+  apply /H/.
+  hyp /z/.
+  }
+Prover.qed ();
+
+
+
+lemma "eexploit"
+  / forall i (a : U i) (b : a -> U i) (c d e : U i) 
+      (f : forall (y : a) . b y -> c -> (d -> e) & a)
+      (w : a) .
+      b w -> c -> d -> e /;
+
+intro /i a b c d e f w x y z/.
+eexploit /f/ /H/.
+Message.display ();
+Prover.reorder (Reorder.rotateForward 1);
+  {
+  hyp /x/.
+  }
+
+  {
+  hyp /y/.
+  }
+
+  {
+  apply /H/.
+  hyp /z/.
+  }
+
+  {
+  typecheck.
+  }
+Prover.qed ();
+
+
+
+lemma "witness"
+  / forall i (a : U i) (b : a -> U i) (c d e : U i) 
+      (f : exists (y : a) . b y -> c -> (d -> e) & a) .
+      b (f #1) -> c -> d -> e /;
+
+intro /i a b c d e f x y z/.
+witness /f #2 __ y #1 z/.
+hyp /x/.
+Prover.qed ();
+
+
+
+lemma "so"
+  / forall i (a : U i) (b : a -> U i) (c d e : U i) 
+      (f : exists (y : a) . b y -> c -> (d -> e) & a) .
+      b (f #1) -> c -> d -> e /;
+
+intro /i a b c d e f x y z/.
+so /f #2 x __ #1 _/ /H/.
+Message.display ();
+  {
+  hyp /y/.
+  }
+
+  {
+  Tactic.refine (Rule.hypothesisOf 0).
+  }
+hyp /H/.
+Prover.qed ();
+
+
+
+lemma "so_pattern"
+  / forall i (a b c d : U i)
+      (f : a -> b -> c % d) (g : c -> d).
+      a -> b -> d /;
+
+intro /i a b c d f g x y/.
+so /f x __/ /(H1 | H2)/.
+  {
+  witness /y/.
+  }
+
+  {
+  apply /g/.
+  witness /H1/.
+  }
+
+  {
+  witness /H2/.
+  }
+Prover.qed ();
+
+
+
+lemma "nonidentical_eqtype"
+  / (forall x y . unit -> squash (x = y : nat)) = (forall x y . unit -t> squash (y = x : nat)) : type /;
+
+typecheck1.
+1:{
+  reintro /x/.
+  typecheck1.
+  1:{
+    reintro /y/.
+    withTypecheck $ repeat typecheck1.
+      {
+      reintro /H/.
+      symmetry.
+      hyp /H/.
+      }
+
+      {
+      reintro /H/. 
+      symmetry.
+      hyp /H/.
+      }
+    }
+    
+    {
+    reflexivity.
+    }
+  }
+
+  {
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "intro_destruct"
+  / forall 
+      (x : exists (a : future (unit % nat)) . 
+             (let next a' = a in future (exists z . a' = inr z : (unit % nat))) -> void)
+      (y : { y : (unit % nat) | y = inl () : (unit % nat) }) .
+      future (x #1 #prev = y : (unit % nat)) /;
+
+intro /([ a ] f) (z H)/.
+split.
+unhide.
+destruct /a/ /| a/.
+  {
+  symmetry.
+  hyp /H/.
+  }
+
+  {
+  so /f (next (a , ()))/ /Hfalse/.
+  destruct /Hfalse/ /0/.
+  }
+qed ();
+
+
+
+lemma "typecheck1"
+  / forall (f : nat -> nat) (x : nat) . (forall (y : nat). f y : bool) -> f x : bool /;
+
+intro /f x/.
+introRaw /H/.
+1:{
+  typecheck.
+  }
+reintro /y/.
+typecheck1 >>> [typecheck, idtac].
+typecheck1.
+infer /f y/ /_/.
+Prover.abandon ();
+
+
+
+lemma "typecheck2"
+  / forall i (a : U i) (b : a -> U i) (f : forall (y : a) . a & b y) (x : a) . next (inl (f x #2 , x)) : future (b x & a % void) /;
+
+intro /i a b f x/.
+typecheck.
+Prover.qed ();
+
+
+
+lemma "typecheck3"
+  / forall i (a : U i) (x y : a) (f : a -> unit % a) . sumcase (f x) (fn z . y) (fn z . z) : a/;
+
+intro /i a x y f/.
+typecheck.
+Prover.qed ();
+
+
+
+lemma "typecheck4"
+  / forall i (a b : U i) (f : a -> b) (g : nat -> future a) . letnext (g 2) (fn y . next (f y)) : future b /;
+
+intro /i a b f x/.
+typecheck.
+Prover.qed ();
+
+
+
+lemma "typecheck5"
+  / forall i (a : U i) (f : nat -> void) . abort (f 1) : a /;
+
+intro /i a f/.
+typecheck.
+Prover.qed ();
+
+
+
+lemma "destruct_quotient"
+  / (quotient (x y : nat) . x = y : nat) <: nat /;
+
+assert / (quotient (x y : nat) . x = y : nat) : type / /Histp/.
+  {
+  typecheck.
+    {
+    reintro /x y H/.
+    symmetry.
+    hyp /H/.
+    }
+  
+    {
+    reintro /x y z Hxy Hyz/.
+    etransitivity.
+      {
+      hyp /Hxy/.
+      }
+  
+      {
+      hyp /Hyz/.
+      }
+    }
+  }
+intro /z/.
+destruct /z/ /[ x y H ]/.
+  {
+  typecheck.
+  }
+
+  {
+  typecheck.
+  }
+qed ();
+
+
+
+lemma "and_or"
+  / (unit % void) & unit /;
+
+split.
+  {
+  left.
+  split.
+  }
+
+  {
+  split.
+  }
+qed ();
+
+
+
+lemma "absurdum"
+  / (exists (x : nat) . void % (unit & void) ) -> 0 = 1 : nat /;
+
+intro /x/.
+destruct /x/ /_ (0 | y 0) /.
+qed ();
+
+
+
+lemma "destruction"
+  / forall i (f : (unit % nat) -> univ i) (x : (unit % nat) & f (inl ()) & (forall (x : nat) . f (inr x))) . 
+      f (x #1) /;
+
+intro /i f x/.
+destruct /x/ /(| n) ht ?/.
+  {
+  hyp /ht/.
+  }
+
+  {
+  reintro /hf/.
+  exact /hf n/.
+  }
+qed ();
+
+
+
+lemma "test_formation"
+  / forall i (a b : U(i)) . arrow a b = tarrow a b : type /;
+
+intro /i a b/.
+typecheck1.
+  {
+  hypof.
+  }
+
+  {
+  hypof.
+  }
+qed ();
+
+
+
+lemma "rectype_formation"
+  / forall i . (rec a . future (a -> a)) : U(i) /;
+
+Typecheck.withTypecheck $ introRaw /i/.
+qed ();
+
+
+
+lemma "rectype_formation_type"
+  / (rec a . future (a -> a)) : type /;
+
+RuleTactic.recForm.
+reintro /a/.
+typecheck1.
+typecheck1.
+  {
+  hypof.
+  }
+
+  {
+  clear /v0/.
+  hypof.
+  }
+qed ();
+
+
+lemma "set_formation"
+  / forall (i : level) . { x : nat | x = 0 : nat } = { x : nat | 0 = x : nat } : U(i) /;
+
+intro /i/.
+typecheck.
+  {
+  reintro /x Heq/.
+  symmetry.
+  hyp /Heq/.
+  }
+
+  {
+  reintro /x Heq/.
+  symmetry.
+  hyp /Heq/.
+  }
+qed ();
+
+
+
+lemma "void_implies_void"
+  /void -> void -> void/;
+
+intro /x y/.
+moveAfter /x/ /y/.
+rename /x/ /z/.
+clear /y/.
+hyp /z/.
+qed ();
+
+
+
+lemma "all_whatever"
+  / iforall (x : unit) . unit /;
+
+intro /x/.
+split.
+qed ();
+
+
+
+lemma "test_lrule"
+  /forall (x : (exists (v : void) . void)) . (x : void) -> x : void/;
+
+intro /x/.
+introRaw /w/.
+  {
+  destruct /x/ /x y/.
+  destruct /y/ /0/.
+  }
+
+  {
+  typecheck.
+  }
+qed ();
+
+
+
+lemma "foo"
+  /void -> void -> void/;
+
+apply /void_implies_void/.
+qed ();
+
+
+
+lemma "void_implies_void_form"
+  / (forall (_ : void) . void -> void) : type /;
+
+typecheck1.
+  { typecheck. }
+reintro /x/.
+typecheck1.
+  {
+  typecheck1.
+  }
+reintro /y/.
+typecheck1.
+qed ();
+
+
+
+lemma "bar"
+  / forall (i : level) (a : U(i)) . a -> a /;
+
+intro /i a x/.
+hyp /x/.
+qed ();

@@ -1,0 +1,616 @@
+sml
+name ParseMainFun
+
+terminal UIDENT of identifier
+terminal LIDENT of identifier
+terminal ULIDENT of identifier
+terminal SIDENT of identifier
+terminal USIDENT of identifier
+terminal TYVAR of identifier
+terminal NUMBER of int_span
+terminal WORD of int_span
+terminal STRING of string_span
+terminal CHAR of char_span
+terminal LPAREN of span
+terminal RPAREN of span
+terminal LBRACKET of span
+terminal RBRACKET of span
+terminal LBRACE of span
+terminal RBRACE of span
+terminal NUMBER_LBRACE of int_span
+terminal ARROW of span precr 1
+terminal BAR of span precr 0
+terminal COLON of span precr 0
+terminal COMMA of span
+terminal DARROW of span
+terminal DOT of span
+terminal ELLIPSIS of span
+terminal EQUAL of span
+terminal PERIOD of span
+terminal PERIOD_SEP of span
+terminal SEAL of span
+terminal SEMICOLON of span precr 0
+terminal SEMICOLON_SEP of span precr 0
+terminal TIMES of span
+terminal UNDERSCORE of span
+terminal AND of span
+terminal ANDALSO of span precl 2
+terminal AS of span
+terminal BEGIN of span
+terminal CASE of span
+terminal DATATYPE of span
+terminal DO of span
+terminal ELSE of span
+terminal END of span
+terminal EXTENSION of span
+terminal FN of span
+terminal FNC of span
+terminal FNS of span
+terminal FUN of span
+terminal FUNCTOR of span
+terminal GRAMMARDEF of span
+terminal GRAMMAROFF of span
+terminal GRAMMARON of span
+terminal HANDLE of span precr 0
+terminal IF of span
+terminal IN of span
+terminal INCLUDE of span
+terminal LET of span
+terminal OF of span
+terminal OP of span
+terminal OPEN of span
+terminal ORELSE of span precl 1
+terminal RAISE of span
+terminal REF of span
+terminal SIG of span
+terminal SIGNATURE of span
+terminal STRUCT of span
+terminal STRUCTURE of span
+terminal THEN of span
+terminal TRY of span
+terminal TYPE of span
+terminal VAL of span
+terminal WHERE of span
+terminal WITH of span
+terminal WITHTYPE of span
+terminal PRODUCES of span
+terminal CURRIED of span
+terminal INFIX of span
+terminal START of span
+terminal DEFAULT of span
+terminal LEFT of span
+terminal RIGHT of span
+terminal RESERVED of span
+terminal RULE of span
+terminal TUPLED of span
+terminal ENTER_TERM of span
+terminal EXIT_TERM of span
+terminal ENTER_MAIN of span
+terminal EXIT_MAIN of span
+terminal TIDENT of identifier
+terminal TNUMBER of tnumber
+terminal LEXEME of identifier
+terminal LONGTIDENT of longid
+terminal EOF of span
+terminal FULL
+terminal INCREMENTAL
+terminal IPC
+
+
+nonterminal Semicolon : span =
+   1:SEMICOLON => id_span
+   1:SEMICOLON_SEP => id_span
+
+nonterminal ExpIdent : identifier =
+   1:UIDENT => id_ident
+   1:LIDENT => id_ident
+   1:ULIDENT => id_ident
+   1:SIDENT => id_ident
+   1:USIDENT => id_ident
+   1:TIMES => times_ident
+   1:EQUAL => equal_ident
+
+nonterminal BindableIdent : identifier =
+   1:LIDENT => id_ident
+   1:SIDENT => id_ident
+   1:TIMES => times_ident
+
+nonterminal Variable : identifier =
+   1:LIDENT => id_ident
+   1:SIDENT => id_ident
+   1:TIMES => times_ident
+   1:EQUAL => equal_ident
+   1:REF => ref_ident
+
+nonterminal Constructor : identifier =
+   1:UIDENT => id_ident
+   1:ULIDENT => id_ident
+   1:USIDENT => id_ident
+
+nonterminal BindableConstructor : identifier =
+   1:UIDENT => id_ident
+
+nonterminal TyIdent : identifier =
+   1:LIDENT => id_ident
+   1:ULIDENT => id_ident
+   1:REF => ref_ident
+
+nonterminal ModIdent : identifier =
+   1:UIDENT => id_ident
+
+nonterminal GrammarIdent : identifier =
+   1:UIDENT => id_ident
+
+nonterminal LongConstructor : longid =
+   1:Constructor => sing_longid
+   1:ModIdent DOT 2:LongConstructor => cons_longid
+
+nonterminal LongVariable : longid =
+   1:Variable => sing_longid
+   1:ModIdent DOT 2:LongVariable => cons_longid
+
+nonterminal TyLongid : longid =
+   1:TyIdent => sing_longid
+   1:ModIdent DOT 2:TyLongid => cons_longid
+
+nonterminal ModLongid : longid =
+   1:ModIdent => sing_longid
+   1:ModIdent DOT 2:ModLongid => cons_longid
+
+nonterminal Label : identifier =
+   1:LIDENT => id_ident
+
+nonterminal ExpIdents : idents =
+   1:ExpIdent => sing_idents
+   1:ExpIdent 2:ExpIdents => cons_idents
+
+nonterminal TyIdents : idents =
+   1:TyIdent => sing_idents
+   1:TyIdent 2:TyIdents => cons_idents
+
+nonterminal GrammarIdents : idents =
+   1:GrammarIdent => sing_idents
+   1:GrammarIdent 2:GrammarIdents => cons_idents
+
+
+
+
+
+nonterminal TyAtom : ty =
+   1:TyLongid => ident_ty
+   1:TYVAR => tyvar_ty
+   1:LPAREN 2:Ty 3:RPAREN => paren_ty
+
+nonterminal TyApp : ty =
+   1:TyAtom => id_ty
+   1:TyApp 2:TyLongid => app1_ty
+   1:LPAREN 2:Tys RPAREN 3:TyLongid => appn_ty
+
+nonterminal TyProd : tys_pos =
+   1:TyApp => sing_ty_prod
+   1:TyApp TIMES 2:TyProd => cons_ty_prod
+
+nonterminal Ty : ty =
+   1:TyProd => prod_ty
+   1:Ty ARROW 2:Ty => arrow_ty
+
+nonterminal Tys : tys =
+   1:Ty COMMA 2:Ty => pair_tys
+   1:Ty COMMA 2:Tys => cons_tys
+
+nonterminal TyFields : tyfields =
+   /* epsilon */ => nil_tyfields
+   1:Label COLON 2:Ty => sing_tyfields
+   1:Label COLON 2:Ty COMMA 3:TyFields => cons_tyfields
+
+
+
+nonterminal Tyvars : idents =
+   1:TYVAR => sing_tyvars
+   1:TYVAR COMMA 2:Tyvars => cons_tyvars
+
+nonterminal Tyvarseq : tyvarseq =
+   1:TYVAR => sing_tyvarseq
+   1:LPAREN 2:Tyvars RPAREN => seq_tyvarseq
+   
+nonterminal PatAtom : pat =
+   1:UNDERSCORE => wild_pat
+   1:BindableIdent => ident_pat
+   1:NUMBER => number_pat
+   1:STRING => string_pat
+   1:CHAR => char_pat
+   1:WORD => word_pat
+   1:LPAREN 2:Pats 3:RPAREN => tuple_pat
+   1:LBRACKET 2:Pats 3:RBRACKET => list_pat
+
+nonterminal PatJuxta : pjuxta =
+   1:PatAtom => atom_pjuxta
+   1:LongConstructor => constr_pjuxta
+   1:LongConstructor LBRACE 2:PatFields 3:RBRACE => record_pjuxta
+   1:REF => ref_pjuxta
+
+nonterminal PatJuxtas : pjuxtas_pos =
+   1:PatJuxta => sing_pjuxtas
+   1:PatJuxta 2:PatJuxtas => cons_pjuxtas
+
+nonterminal Pat : pat =
+   1:PatJuxtas => juxta_pat
+   1:BindableIdent AS 2:Pat => as_pat precr 0
+   1:Pat COLON 2:Ty => annot_pat
+
+nonterminal Pats : pats =
+   => nil_pats
+   1:Pat => sing_pats
+   1:Pat COMMA 2:Pats => cons_pats
+
+nonterminal Patseq : pats =
+   1:PatAtom => sing_pats
+   1:PatAtom 2:Patseq => cons_pats
+
+nonterminal PatFields : patfields =
+   /* epsilon */ => nil_patfields
+   ELLIPSIS => nil_patfields
+   1:Label EQUAL 2:Pat => sing_patfields
+   1:Label => ident_sing_patfields
+   1:Label EQUAL 2:Pat COMMA 3:PatFields => cons_patfields
+   1:Label COMMA 2:PatFields => ident_cons_patfields
+
+
+
+nonterminal ExpAtom : exp =
+   1:NUMBER => number_exp
+   1:WORD => word_exp
+   1:STRING => string_exp
+   1:CHAR => char_exp
+   1:LET 2:ExpDecs IN 3:Exp 4:END => let_exp
+   1:LET 2:ExpDecs IN 3:ExpSequence 4:END => let_seq_exp
+   1:LPAREN 2:Exps 3:RPAREN => tuple_exp
+   1:LBRACKET 2:Exps 3:RBRACKET => list_exp
+   LPAREN 1:ExpSequence RPAREN => seq_exp
+   BEGIN 1:ExpSequence END => seq_exp
+   BEGIN 1:Exp END => id_exp
+   1:ENTER_TERM 2:Elements 3:EXIT_TERM => term_exp
+   OP 1:Variable => ident_op_exp
+   OP 1:Constructor => constr_op_exp
+
+nonterminal ExpJuxta : ejuxta =
+   1:LongVariable => ident_ejuxta
+   1:LongConstructor => constr_ejuxta
+   1:ExpAtom => atom_ejuxta
+   1:LongConstructor LBRACE 2:ExpFields 3:RBRACE => record_ejuxta
+
+nonterminal ExpJuxtas : ejuxtas_pos =
+   1:ExpJuxta => sing_ejuxtas
+   1:ExpJuxta 2:ExpJuxtas => cons_ejuxtas
+
+nonterminal Element : element =
+   1:TIDENT => term_ident
+   1:LONGTIDENT => term_longid
+   1:LEXEME => term_lexeme
+   1:LPAREN => term_lparen
+   1:RPAREN => term_rparen
+   1:STRING => term_string
+   1:TNUMBER => term_number
+   ENTER_MAIN 1:Exp EXIT_MAIN => embed_element
+
+nonterminal Elements : elements =
+   /* epsilon */ => nil_elements
+   1:Element 2:Elements => cons_elements
+
+nonterminal Exp : exp =
+   1:ExpJuxtas => juxta_exp
+   1:CASE 2:Exp OF 3:Match => case_exp
+   1:TRY 2:Exp WITH 3:Match => try_exp
+   1:Exp HANDLE 2:Match => handle_exp
+   1:FN 2:Match => fn_exp
+   1:FNC 2:Patseq DARROW 3:Exp => cfn_exp precr 0
+   1:FNC DARROW 2:Exp => cfn_exp_empty precr 0
+   1:FNS 2:Patseq DARROW 3:Exp => mfn_exp precr 0
+   1:FNS 2:Patseq COLON 3:Ty DARROW 4:Exp => mfn_annot_exp precr 0
+   1:Exp COLON 2:Ty => annot_exp
+   1:IF 2:Exp THEN 3:Exp ELSE 4:Exp => if_exp precr 0
+   1:Exp ANDALSO 2:Exp => andalso_exp
+   1:Exp ORELSE 2:Exp => orelse_exp
+   1:RAISE 2:Exp => raise_exp precr 0
+
+nonterminal Exps : exps =
+   => nil_exps
+   1:Exp => sing_exps
+   1:Exp COMMA 2:Exps => cons_exps
+
+nonterminal ExpFields : expfields =
+   /* epsilon */ => nil_expfields
+   1:Label EQUAL 2:Exp => sing_expfields
+   1:Label EQUAL 2:Exp COMMA 3:ExpFields => cons_expfields
+
+nonterminal ExpSequence1 : exps_pos =
+   1:Exp => sing_expsequence
+   1:Exp Semicolon 2:ExpSequence1 => cons_expsequence
+
+nonterminal ExpSequence : exps_pos =
+   1:Exp Semicolon 2:ExpSequence1 => cons_expsequence
+
+
+nonterminal Clause : clause =
+   1:Pat DARROW 2:Exp => form_clause precr 0
+
+nonterminal Clauses : clauses_pos =
+   1:Clause => sing_clauses precr 0
+   1:Clause BAR 2:Clauses => cons_clauses
+
+nonterminal OptionalBar : nothing =
+   /* epsilon */ => form_nothing
+   BAR => form_nothing
+
+nonterminal Match : clauses_pos =
+   OptionalBar 1:Clauses => id_match
+
+
+
+nonterminal Dec : dec =
+   1:VAL 2:Pat EQUAL 3:Exp => val_dec
+   1:VAL 2:Tyvarseq 3:Pat EQUAL 4:Exp => val_tyargs_dec
+   1:FUN 2:Funbinds => fun_dec
+   1:FUN 2:Tyvarseq 3:Funbinds => fun_tyargs_dec
+   1:TYPE 2:TyIdent EQUAL 3:Ty => type_dec
+   1:TYPE 2:Tyvarseq 3:TyIdent EQUAL 4:Ty => type_args_dec
+   1:DATATYPE 2:Tybinds => datatype_dec
+   1:EXTENSION 2:Constructor => extension_noarg_dec
+   1:EXTENSION 2:Constructor OF 3:Ty => extension_dec
+   1:EXTENSION 2:Constructor EQUAL 3:LongConstructor => extension_copy_dec
+   1:OPEN 2:ModLongid => open_dec
+
+nonterminal ExpDec : dec =
+   1:Dec => identity_dec
+   1:DO 2:Pat EQUAL 3:Exp => do_dec
+
+nonterminal ExpDecs : decs =
+   => nil_decs
+   1:ExpDec 2:ExpDecs => cons_decs
+
+nonterminal FunClause : funclause =
+   OptionalOp 1:BindableIdent 2:Patseq EQUAL 3:Exp => form_fundec
+   OptionalOp 1:BindableIdent 2:Patseq COLON 3:Ty EQUAL 4:Exp => annot_fundec
+
+nonterminal OptionalOp : nothing =
+   OP => form_nothing
+   /* epsilon */ => form_nothing
+
+nonterminal FunClauses : funclauses =
+   1:FunClause => sing_funclauses
+   1:FunClause BAR 2:FunClauses => cons_funclauses
+
+nonterminal Funbind : funbind =
+   1:FunClauses => form_funbind
+
+nonterminal Funbinds : funbinds_pos =
+   1:Funbind => sing_funbinds
+   1:Funbind AND 2:Funbinds => cons_funbinds
+
+nonterminal Dconbind : dconbind =
+   1:BindableConstructor => noty_dconbind
+   1:BindableConstructor OF 2:Ty => ty_dconbind
+   1:BindableConstructor OF LBRACE 2:TyFields 3:RBRACE => record_dconbind
+
+nonterminal Dconbinds : dconbinds_pos =
+   1:Dconbind => sing_dconbinds
+   1:Dconbind BAR 2:Dconbinds => cons_dconbinds
+
+nonterminal Tybind : tybind =
+   1:TyIdent EQUAL 2:Dconbinds => data_tybind
+   1:TyIdent EQUAL BAR 2:Dconbinds => data_tybind
+   1:Tyvarseq 2:TyIdent EQUAL 3:Dconbinds => data_args_tybind
+   1:Tyvarseq 2:TyIdent EQUAL BAR 3:Dconbinds => data_args_tybind
+   1:TyIdent EQUAL 2:Ty => ty_tybind
+   1:Tyvarseq 2:TyIdent EQUAL 3:Ty => ty_args_tybind
+
+nonterminal Tybinds : tybinds_pos =
+   1:Tybind => sing_tybinds
+   1:Tybind AndOrWithtype 2:Tybinds => cons_tybinds
+
+/* allow the withtype keyword to substitute for and in datatype bindings */
+nonterminal AndOrWithtype : nothing =
+   AND => form_nothing
+   WITHTYPE => form_nothing
+
+
+
+nonterminal ModDec : dec =
+   1:Dec => identity_dec
+   1:STRUCTURE 2:ModIdent EQUAL 3:Mod => structure_dec
+   1:STRUCTURE 2:ModIdent SEAL 3:Sig EQUAL 4:Mod => structure_seal_dec
+   
+nonterminal ModDecs : decs =
+   => nil_decs
+   1:ModDec 2:ModDecs => cons_decs
+   1:ModDec Semicolon 2:ModDecs => cons_decs
+
+
+
+nonterminal Mod : module =
+   1:ModLongid => ident_mod
+   1:STRUCT 2:ModDecs 3:END => struct_mod
+   1:ModIdent LPAREN 2:Mod 3:RPAREN => app_mod
+   1:ModIdent 2:LPAREN 3:ModDecs 4:RPAREN => app_alt_mod
+   1:Mod SEAL 2:Sig => seal_mod
+
+
+
+nonterminal Spec : spec =
+   1:VAL 2:BindableIdent COLON 3:Ty => val_spec
+   1:TYPE 2:TyIdent => abstype_spec
+   1:TYPE 2:Tyvarseq 3:TyIdent => abstype_args_spec
+   1:TYPE 2:TyIdent EQUAL 3:Ty => type_spec
+   1:TYPE 2:Tyvarseq 3:TyIdent EQUAL 4:Ty => type_args_spec
+   1:DATATYPE 2:Tybinds => datatype_spec
+   1:STRUCTURE 2:ModIdent COLON 3:Sig => mod_spec
+   1:EXTENSION 2:Constructor => extension_noarg_spec
+   1:EXTENSION 2:Constructor OF 3:Ty => extension_spec
+   1:INCLUDE 2:ModIdent => include_spec
+
+nonterminal Specs : specs =
+   => nil_specs
+   1:Spec 2:Specs => cons_specs
+
+
+
+nonterminal Sig : sg =
+   1:ModIdent => ident_sig
+   1:SIG 2:Specs 3:END => sig_sig
+   1:Sig WHERE TYPE 2:TyLongid EQUAL 3:Ty => where_sig
+   1:Sig WHERE TYPE 2:Tyvarseq 3:TyLongid EQUAL 4:Ty => where_args_sig
+
+
+
+nonterminal TopDec : dec =
+   1:STRUCTURE 2:ModIdent EQUAL 3:Mod => structure_dec
+   1:STRUCTURE 2:ModIdent SEAL 3:Sig EQUAL 4:Mod => structure_seal_dec
+   1:SIGNATURE 2:ModIdent EQUAL 3:Sig => signature_dec
+   1:FUNCTOR 2:ModIdent LPAREN 3:ModIdent COLON 4:Sig RPAREN EQUAL 5:Mod => functor_dec
+   1:FUNCTOR 2:ModIdent LPAREN 3:ModIdent COLON 4:Sig RPAREN SEAL 5:Sig EQUAL 6:Mod => functor_seal_dec
+   1:FUNCTOR 2:ModIdent 3:LPAREN 4:Specs 5:RPAREN EQUAL 6:Mod => functor_alt_dec
+   1:FUNCTOR 2:ModIdent 3:LPAREN 4:Specs 5:RPAREN SEAL 6:Sig EQUAL 7:Mod => functor_alt_seal_dec
+
+
+
+nonterminal Assoc : bool =
+   LEFT => bool_true
+   RIGHT => bool_false
+
+nonterminal Mode : bool =
+   CURRIED => bool_true
+   TUPLED => bool_false
+
+nonterminal RhsElem : rhselem =
+   1:GrammarIdent => nonterminal_rhselem
+   1:GrammarIdent LPAREN 2:NUMBER RPAREN => nonterminal_level_rhselem
+   1:TIDENT => terminal_ident_rhselem
+   1:LEXEME => terminal_rhselem
+
+nonterminal Rhs : rhselems =
+   /* epsilon */ => nil_rhs
+   1:RhsElem 2:Rhs => cons_rhs
+
+nonterminal GrammarIdentOpts : identopts =
+   /* epsilon */ => nil_identopts
+   1:GrammarIdent 2:GrammarIdentOpts => cons_identopts
+   UNDERSCORE 1:GrammarIdentOpts => cons_empty_identopts
+
+nonterminal Tidents : idents =
+   1:TIDENT => sing_idents
+   1:TIDENT 2:Tidents => cons_idents
+
+
+nonterminal GDef : gdef =
+   INFIX 1:Assoc 2:Mode 3:NUMBER 4:ExpIdents => infix_gdef
+   1:RULE 2:GrammarIdent PRODUCES 3:Rhs DARROW 4:LongVariable => rule_gdef
+   1:RULE 2:GrammarIdent LPAREN 3:NUMBER RPAREN PRODUCES 4:Rhs DARROW 5:LongVariable => rule_level_gdef
+   RESERVED 1:Tidents COLON 2:GrammarIdent => reserved_gdef
+   START 1:ExpIdent 2:GrammarIdentOpts => start_gdef
+   DEFAULT 1:GrammarIdent => default_gdef
+   STRUCTURE 1:ModIdent EQUAL 2:ModLongid => mod_gdef
+   OPEN 1:ModLongid => open_gdef
+   INCLUDE 1:GrammarIdent => include_gdef
+
+nonterminal GDefs : gdefs =
+   /* epsilon */ => nil_gdefs
+   1:GDef 2:GDefs => cons_gdefs
+
+
+
+nonterminal Directive : directive =
+   1:TopDec => dec_directive
+   1:GRAMMARDEF 2:GrammarIdent 3:GDefs 4:END => grammardef_directive
+   1:GRAMMARON 2:GrammarIdents => grammaron_directive
+   1:GRAMMAROFF 2:GrammarIdents => grammaroff_directive
+
+
+
+/* FULL parsing */
+
+nonterminal Directives : directives =
+   => nil_directives
+   1:Directive 2:Directives => cons_directives
+
+nonterminal FullProgram : program =
+   1:Directives => directives_program
+
+
+
+/* INCREMENTAL parsing */
+
+nonterminal IncDirective : directive =
+   1:Dec => dec_directive
+   1:Directive => id_directive
+
+nonterminal IncDirectives : directives =
+   => nil_directives
+   1:IncDirective 2:IncDirectives => cons_directives
+
+/* Dealing with braces and distinguishing between semicolon and period
+   is handled in parser.sml.
+*/
+
+nonterminal IncProgram : program =
+   1:Exp => exp_program
+   1:IncDirectives => directives_program
+
+
+
+/* IPC parsing */
+
+nonterminal ExpIdentArity : identarity =
+   1:ExpIdent => eia_none
+   1:ExpIdent 2:NUMBER => eia_some
+
+nonterminal ExpIdentArities : identarities =
+   1:ExpIdentArity => sing_eias
+   1:ExpIdentArity 2:ExpIdentArities => cons_eias
+
+nonterminal ModItem : item =
+   1:ModIdent COLON SIG 2:Context END => list_item
+   1:ModIdent COLON 2:UIDENT => name_item
+
+nonterminal ModItems : items =
+   1:ModItem => sing_items
+   1:ModItem 2:ModItems => cons_items
+
+nonterminal SigItem : item =
+   1:ModIdent EQUAL SIG 2:Context END => list_item
+   1:ModIdent EQUAL 2:UIDENT => name_item
+
+nonterminal SigItems : items =
+   1:SigItem => sing_items
+   1:SigItem 2:SigItems => cons_items
+
+nonterminal Entry : context =
+   VAL 1:ExpIdentArities => val_entry
+   TYPE 1:TyIdents => type_entry
+   SIGNATURE 1:SigItems => sig_entry
+   STRUCTURE 1:ModItems => struct_entry
+   FUNCTOR 1:ModItems => fun_entry
+
+nonterminal Context : context =
+   /* epsilon */ => nil_context
+   1:Entry 2:Context => cons_context
+
+nonterminal Import : context =
+   SIGNATURE 1:SigItems => sig_entry
+   STRUCTURE 1:ModItems => struct_entry
+   FUNCTOR 1:ModItems => fun_entry
+
+nonterminal Imports : context =
+   /* epsilon */ => nil_context
+   1:Import 2:Imports => cons_context
+
+
+
+nonterminal Parsed : parsed =
+   FULL 1:FullProgram => program_parsed
+   INCREMENTAL 1:IncProgram => program_parsed
+   IPC 1:Imports => import_parsed
+
+start Parsed
+follower EOF
+follower SEMICOLON_SEP
+follower PERIOD_SEP

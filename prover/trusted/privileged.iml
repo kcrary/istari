@@ -1,0 +1,177 @@
+
+signature PRIVILEGED =
+   sig
+
+      structure Term :
+         TERM
+
+      structure Trail :
+         TRAIL 
+         where type term = Term.term
+         where type ebind = Term.ebind
+
+      structure Constant :
+         CONSTANT_INTERNAL 
+         where type constant = Term.constant
+         where type term = Term.term
+
+      structure Pickling : 
+         PICKLING
+         where type constant = Term.constant
+         where type term = Term.term
+
+      structure Unsafe :
+         UNSAFE
+         where type term = Term.term
+         where type ebind = Term.ebind
+
+      structure Reduction : 
+         REDUCTION_INTERNAL
+         where type constant = Term.constant
+         where type term = Term.term
+         where type elim = Term.elim
+
+      structure Prim : 
+         PRIM
+         where type constant = Term.constant
+         where type ureduction1 = Reduction.ureduction1
+         where type ureduction2 = Reduction.ureduction2
+
+      structure Normalize : 
+         NORMALIZE_INTERNAL
+         where type term = Term.term
+         where type constant = Term.constant
+         where type ureduction2 = Reduction.ureduction2
+
+      structure Invert :
+         INVERT
+         where type term = Term.term
+         where type sub = Term.sub
+
+      structure Unify : 
+         UNIFY
+         where type term = Term.term
+         where type ebind = Term.ebind
+         where type sub = Term.sub
+         where type psub = Invert.psub
+
+   end
+
+
+(* Some trusted modules have privileged interfaces that are used by various other
+   trusted modules.  Also, there are some cyclic dependencies, which we untangle by
+   observing (privately) that constant = int.
+*)
+
+structure Privileged :> PRIVILEGED =
+   struct
+
+      structure Term =
+         TermFun 
+         (type constant = int)
+
+      structure Trail =
+         TrailFun 
+         (structure Term = Term)
+
+      structure Constant =
+         ConstantFun 
+         (structure Term = Term
+          structure Trail = Trail)
+
+      structure Pickling =
+         PicklingFun 
+         (structure Term = Term
+          structure Trail = Trail
+          structure Constant = Constant)
+
+      structure Unsafe =
+         UnsafeFun 
+         (structure Term = Term
+          structure Trail = Trail)
+
+      structure Reduction =
+         ReductionFun
+         (structure Term = Term
+          structure Constant = Constant
+          structure Trail = Trail
+          structure Pickling = Pickling
+          structure Unsafe = Unsafe)
+
+      structure Prim =
+         PrimFun 
+         (structure Term = Term
+          structure Constant = Constant
+          structure Pickling = Pickling
+          structure Reduction = Reduction)
+
+      structure Normalize =
+         NormalizeFun
+         (structure Term = Term
+          structure Constant = Constant
+          structure Reduction = Reduction
+          structure Prim = Prim)
+
+      structure Invert =
+         InvertFun
+         (structure Term = Term
+          structure Normalize = Normalize)
+
+      structure Unify =
+         UnifyFun 
+         (structure Term = Term
+          structure Constant = Constant
+          structure Trail = Trail
+          structure Normalize = Normalize
+          structure Invert = Invert)
+
+   end
+
+
+structure Term = Privileged.Term
+structure Trail = Privileged.Trail
+structure ConstantInternal = Privileged.Constant
+structure Pickling = Privileged.Pickling
+structure Unsafe = Privileged.Unsafe
+structure ReductionInternal = Privileged.Reduction
+structure Prim = Privileged.Prim
+structure NormalizeInternal = Privileged.Normalize
+structure Invert = Privileged.Invert
+structure Unify = Privileged.Unify
+
+
+structure Constant :>
+   CONSTANT
+   where type constant = Term.constant
+   where type term = Term.term
+   where type opacity = ConstantInternal.opacity
+   = ConstantInternal
+
+structure Reduction :>
+   REDUCTION
+   where type constant = Term.constant
+   where type term = Term.term
+   where type elim = Term.elim
+   where type reduction = ReductionInternal.reduction
+   where type ureduction1 = ReductionInternal.ureduction1
+   where type ureduction2 = ReductionInternal.ureduction2
+   = ReductionInternal
+
+structure Normalize :>
+   NORMALIZE
+   where type term = Term.term
+   where type constant = Term.constant
+   = NormalizeInternal
+
+
+structure ConstantTable =
+   CheckpointedHashTable 
+   (structure Key = Constant.Hashable)
+
+structure Constant2Table =
+   CheckpointedHashTable
+   (structure Key =
+       ProductHashable
+       (structure X = Constant.Hashable
+        structure Y = Constant.Hashable))
+

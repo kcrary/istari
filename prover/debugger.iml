@@ -1,0 +1,124 @@
+
+signature DEBUGGER =
+   sig
+
+      val start : (unit -> unit) -> unit
+
+      val step : unit -> unit
+      val goto : int -> unit
+      val run : unit -> unit
+
+      val last : Tactic.judgement ref
+      
+   end
+
+
+
+structure Debugger :> DEBUGGER =
+   struct
+
+      structure T = TacticInternal
+
+      val last = ref (Judgement.make Seq.empty Term.Triv, Directory.empty)
+
+      val bogusCont : unit Cont.cont =
+         Cont.callcc (fn k => (
+                              Cont.callcc (fn k' => Cont.throw k k') : unit;
+                              raise (Fail "don't throw to this")
+                              ))
+
+      val count = ref 0
+      val desired = ref 0
+      val breakpoint : unit Cont.cont ref = ref bogusCont
+      val resume : unit Cont.cont option ref = ref NONE
+
+      fun interrupt rule goal =
+         Cont.callcc
+         (fn ktac =>
+             (
+             count := !count + 1;
+
+             if !count = !desired then
+                (
+                resume := SOME ktac;
+                last := goal;
+                print "========================================\n";
+                Show.showJudgement goal;
+                print "----------------------------------------\n";
+                print "break ";
+                print (Int.toString (!count));
+                print "\n[applying ";
+                print (Rule.name rule);
+                print "]\n";
+                Cont.throw (!breakpoint) ()
+                )
+             else
+                Cont.throw ktac ()
+             ))
+
+      fun start f =
+         (
+         resume := NONE;
+
+         Cont.callcc
+            (fn kdebug =>
+                (
+                breakpoint := kdebug;
+                T.interrupt := interrupt;
+                count := 0;
+                desired := 1;
+                f ();
+                Prover.show ();
+                print "[done]\n";
+                
+                (* SML doesn't like you to re-enter an old top-level interaction,
+                   so throw back to whoever went last.
+                *)
+                Cont.throw (!breakpoint) ()
+                ));
+
+         T.interrupt := (fns _ _ => ())
+         )
+
+      fun goto n =
+         (case !resume of
+             NONE =>
+                print "No tactic underway.\n"
+
+           | SOME ktac =>
+                (
+                resume := NONE;
+                desired := n;
+
+                Cont.callcc
+                   (fn kdebug =>
+                       (
+                       breakpoint := kdebug;
+                       T.interrupt := interrupt;
+                       Cont.throw ktac ()
+                       ));
+
+                T.interrupt := (fns _ _ => ())
+                ))
+
+      fun step () = goto (!count + 1)
+
+      fun run () =
+         (case !resume of
+             NONE =>
+                print "No tactic underway.\n"
+
+           | SOME ktac =>
+                (
+                resume := NONE;
+
+                Cont.callcc
+                   (fn kdebug =>
+                       (
+                       breakpoint := kdebug;
+                       T.interrupt := (fns _ _ => ());
+                       Cont.throw ktac ()
+                       ))
+                ))
+
+   end

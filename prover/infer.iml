@@ -1,0 +1,1167 @@
+
+signature INFER =
+   sig
+
+      type term = Term.term
+      type elim = Term.elim
+
+      exception InferError of term * term option * string
+
+      (* Reported by infer when the term is not a path,
+         by inferConstant when the constant is not in the inference table, and
+         by compat when one or both of the terms are not paths.
+      *)
+      exception NotPath of string
+
+      (* Reported by compat when terms are incompatible paths, or one is not a path. *)
+      exception Clash
+
+      (* Repored by infer when a prefix of the path has an evar type. *)
+      exception Ambiguous
+
+      (* inferVar G i
+
+         returns (A, tac)
+         where  tac proves G |- i : A
+         or raises InferError if i cannot be typed
+      *)
+      val inferVar : Judgement.context -> int -> term * Tactic.tactic
+
+
+      (* inferConstant const
+
+         returns (A, tac)
+         where  tac proves G |- const : A
+         or raises InferError/NotPath if const cannot be typed
+      *)
+      val inferConstant : Constant.constant -> term * Tactic.tactic
+
+
+      (* infer G M prove
+
+         calls prove to generate tactics for subgoals, and
+         returns (A, tac)
+         where
+         tac proves G |- M : A
+
+         or raises InferError/NotPath if no such exists
+
+         Prove takes the djudgement to prove, and any additional bindings.
+      *)
+      val infer :
+         Judgement.context
+         -> term
+         -> (Judgement.djudgement -> Term.binder list -> Tactic.tactic)
+         -> term * Tactic.tactic
+
+
+      (* inferPartial G M prove
+
+         calls prove to generate tactics for subgoals, and
+         returns (A, tac, M', spine)
+         where
+         M = M' spine
+         tac proves G |- M' : A
+         if spine is nonempty, it starts with a marker
+
+         or raises InferError/NotPath if no such exists
+      *)
+      val inferPartial :
+         Judgement.context
+         -> term
+         -> (Judgement.djudgement -> Term.binder list -> Tactic.tactic)
+         -> term * Tactic.tactic * term * elim list
+
+
+      (* compat G M N prove
+
+         calls prove to generate tactics for subgoals, and
+         returns (A, tac)
+         tac proves G |- M = N : A
+
+         or raises InferError/NotPath/Clash if no such exists
+      *)
+      val compat :
+         Judgement.context
+         -> term
+         -> term
+         -> (Judgement.djudgement -> Term.binder list -> Tactic.tactic)
+         -> term * Tactic.tactic
+
+   end
+
+
+structure Infer :> INFER =
+   struct
+
+      structure T = Term
+      structure N = Normalize
+      structure C = Oldcase
+      structure J = Judgement
+      structure S = Seq
+      structure D = Directory
+      structure R = Reduction
+
+      val ? = C.?
+
+      type term = Term.term
+      type elim = Term.elim
+
+      exception InferError of term * term option * string
+      exception NotPath of string
+      exception Clash
+      exception Ambiguous
+
+      open Tactic
+
+
+      fun binddir binder =
+         let
+            do (_, dir) = withgoal
+         in
+            chdir (D.bindVary dir binder)
+         end
+
+
+      fun detectInferError m a spine =
+         (case spine of
+             [] => ()
+
+           | elim :: _ =>
+                (case Normalize.simplify a of
+                    T.Elim (T.Sub _, _) =>
+                       raise Ambiguous
+
+                  | _ =>
+                       raise (InferError
+                                 (T.Elim (m, [elim]), SOME a,
+                                  (case elim of
+                                      T.App (T.Marker _) => "marker encountered"
+
+                                    | T.App _ => "ill-typed application"
+
+                                    | T.Pi1 => "ill-typed projection"
+
+                                    | T.Pi2 => "ill-typed projection"
+
+                                    | T.Prev => "isolated previous")))))
+
+
+      fun detectCompatError m a spine1 spine2 =
+         (case (spine1, spine2) of
+             ([], []) => ()
+
+           | ([], _) => raise Clash
+
+           | (_, []) => raise Clash
+
+           | (elim1 :: _, elim2 :: _) =>
+                (case (elim1, elim2) of
+                    (T.App _, T.App _) =>
+                       raise (InferError (T.Elim (m, [elim1]), SOME a, "ill-typed application"))
+
+                  | (T.Pi1, T.Pi1) =>
+                       raise (InferError (T.Elim (m, [elim1]), SOME a, "ill-typed projection"))
+
+                  | (T.Pi2, T.Pi2) =>
+                       raise (InferError (T.Elim (m, [elim1]), SOME a, "ill-typed projection"))
+
+                  | (T.Prev, T.Prev) =>
+                       raise (InferError (T.Elim (m, [elim1]), SOME a, "isolated previous"))
+
+                  | _ => raise Clash))
+
+
+
+      fun inferVar ctx i =
+         (case Seq.nthOpt ctx i of
+             SOME (J.Tm a) =>
+                (T.Sub (a, T.Shift (i+1)),
+                 refine (Rule.hypothesisOf i))
+
+           | SOME (J.Tmh a) =>
+                (T.Sub (a, T.Shift (i+1)),
+                 refine (Rule.hypothesisOf i))
+
+           | NONE =>
+                raise (InferError (T.Var i, NONE, "head variable is unbound"))
+
+           | SOME _ =>
+                raise (InferError (T.Var i, NONE, "head variable has improper sort")))
+
+
+
+      fun inferConstant const =
+         (case Database.findType const of
+             NONE =>
+                raise (NotPath "head constant has unknown type")
+
+           | SOME (dj, v) =>
+                (* v validates dj *)
+                C.termCaseXAlt (J.concl dj)
+                   [
+                   C.apply2 Prim.ov C.what (C.constant const) ?
+                   (fn (a, ()) =>
+                       (a,
+                        cast dj v >> done)),
+
+                   C.wild ?
+                   (fn () =>
+                       raise (InferError (T.Const const, NONE, "bad entry in inference table")))
+                   ])
+
+
+
+
+      (* inferSpine G M A spine tac invis
+
+         if    tac proves G |- M : A
+         then  calls prove to generate tactics for subgoals, and
+               return (B, tac', M', spine')
+               where
+               M spine = M' spine', and M' is the largest such
+               tac' proves G |- M' : B
+
+         Eliminates intersect/guard/foralltp at the end of the spine only if invis=true.
+      *)
+      fun inferSpine ctx m a spine tac invis prove =
+         if invis orelse not (List.null spine) then
+            C.termCaseXAlt (N.whnfHard a)
+               [
+               C.apply2 Prim.intersect C.what (C.lam C.what) ?
+               (fn (dom, cod) =>
+                   let
+                      val e = T.evar ()
+                      
+                      val etac = prove (J.make ctx (T.apply2 Prim.ov dom e)) []
+
+                      val tac' =
+                         (* G |- M : Cod[E . id] *)
+                         refine (Rule.intersectElimOf dom cod m e)
+                         >>> [
+                             (* G |- M : intersect Dom . Cod *)
+                             tac,
+   
+                             (* G |- E : Dom *)
+                             etac
+                             ]
+                   in
+                      inferSpine ctx m
+                         (T.Sub (cod, T.Dot (e, T.id)))
+                         spine tac' invis prove
+                   end),
+
+               C.apply2 Prim.guard C.what C.what ?
+               (fn (dom, cod) =>
+                   let
+                      val etac = prove (J.make ctx dom) []
+
+                      val tac' =
+                         (* G |- M : Cod *)
+                         refine (Rule.guardElimOf dom cod m)
+                         >>> [
+                             (* G |- M : guard Dom Cod *)
+                             tac,
+   
+                             (* G |- Dom *)
+                             etac
+                             ]
+                   in
+                      inferSpine ctx m cod
+                         spine tac' invis prove
+                   end),
+
+               C.apply1 Prim.foralltp (C.lamb C.what) ?
+               (fn (binder, cod) =>
+                   let
+                      val e = T.evar ()
+
+                      val tac1 = prove (J.make (S.cons J.Tp ctx) (T.apply1 Prim.istp cod)) [binder]
+                      val tac2 = prove (J.make ctx (T.apply1 Prim.istp e)) []
+
+                      val tac' =
+                         (* G |- M : Cod[E . id] *)
+                         refine (Rule.foralltpElimOf cod e m)
+                         >>> [
+                             (* G, type |- Cod : type *)
+                             binddir binder >> tac1,
+
+                             (* G |- M : foralltp . Cod *)
+                             tac,
+
+                             (* G |- E : type *)
+                             tac2
+                             ]
+                   in
+                      inferSpine ctx m
+                         (T.Sub (cod, T.Dot (e, T.id)))
+                         spine tac' invis prove
+                   end),
+
+               C.what ?
+               (fn a' => 
+                   inferSpineElim ctx m a' spine tac invis prove)
+               ]
+         else
+            inferSpineElim ctx m (N.whnfHard a) spine tac invis prove
+            
+
+
+      (* inferSpineElim G M A spine tac invis prove
+
+         As inferSpine except A is hard whnf and not an intersect/guard/foralltp.
+      *)
+      and inferSpineElim ctx m a spine tac invis prove =
+         (case spine of
+             [] =>
+                (a, tac, m, [])
+
+           | T.App (T.Marker _) :: _ =>
+                (* Stop quickly here. *)
+                (a, tac, m, spine)
+
+           | T.App p :: rest =>
+                C.termCaseXAlt a
+                   [
+                   C.apply2 Prim.arrow C.what C.what ?
+                   (fn (dom, cod) =>
+                       let
+                          val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
+
+                          val tac' =
+                             (* G |- M P : Cod *)
+                             refine (Rule.arrowElimOf dom cod m p)
+                             >>> [
+                                 (* G |- M : Dom -> Cod *)
+                                 tac,
+                                 
+                                 (* G |- P : Dom *)
+                                 ptac
+                                 ]
+                       in
+                          inferSpine ctx (T.app m p)
+                             cod rest tac' invis prove
+                       end),
+
+                   C.apply2 Prim.forall C.what (C.lam C.what) ?
+                   (fn (dom, cod) =>
+                       let
+                          val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
+
+                          val tac' =
+                             (* G |- M P : Cod[P . id] *)
+                             refine (Rule.forallElimOf dom cod m p)
+                             >>> [
+                                 (* G |- M : forall Dom . Cod *)
+                                 tac,
+                                 
+                                 (* G |- P : Dom *)
+                                 ptac
+                                 ]
+                       in
+                          inferSpine ctx (T.app m p)
+                             (T.Sub (cod, T.Dot (p, T.id)))
+                             rest tac' invis prove
+                       end),
+
+                   C.apply2 Prim.tarrow C.what C.what ?
+                   (fn (dom, cod) =>
+                       let
+                          val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
+
+                          val tac' =
+                             (* G |- M P : Cod *)
+                             refine (Rule.tarrowElimOf dom cod m p)
+                             >>> [
+                                 (* G |- M : Dom -t> Cod *)
+                                 tac,
+                                 
+                                 (* G |- P : Dom *)
+                                 ptac
+                                 ]
+                       in
+                          inferSpine ctx (T.app m p)
+                             cod rest tac' invis prove
+                       end),
+
+                   C.apply2 Prim.karrow C.what C.what ?
+                   (fn (dom, cod) =>
+                       let
+                          val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
+
+                          val tac' =
+                             (* G |- M P : Cod *)
+                             refine (Rule.karrowElimOf dom cod m p)
+                             >>> [
+                                 (* G |- M : Dom -k> Cod *)
+                                 tac,
+                                 
+                                 (* G |- P : Dom *)
+                                 ptac
+                                 ]
+                       in
+                          inferSpine ctx (T.app m p)
+                             cod rest tac' invis prove
+                       end),
+
+                   C.wild ?
+                   (fn () => (a, tac, m, spine))
+                   ]
+
+           | T.Pi1 :: rest =>
+                C.termCaseXAlt a
+                   [
+                   C.apply2 Prim.prod C.what C.what ?
+                   (fn (a1, a2) =>
+                       let
+                          val tac' =
+                             (* G |- M #1 : A1 *)
+                             refine (Rule.prodElim1Of a1 a2 m)
+                             >>
+                             (* G |- M : A1 & A2 *)
+                             tac
+                       in
+                          inferSpine ctx (T.pi1 m) a1 rest tac' invis prove
+                       end),
+
+                   C.apply2 Prim.exists C.what (C.lam C.what) ?
+                   (fn (a1, a2) =>
+                       let
+                          val tac' =
+                             (* G |- M #1 : A1 *)
+                             refine (Rule.existsElim1Of a1 a2 m)
+                             >>
+                             (* G |- M : exists A1 . A2 *)
+                             tac
+                       in
+                          inferSpine ctx (T.pi1 m) a1 rest tac' invis prove
+                       end),
+
+                   C.wild ?
+                   (fn () => (a, tac, m, spine))
+                   ]
+
+           | T.Pi2 :: rest =>
+                C.termCaseXAlt a
+                   [
+                   C.apply2 Prim.prod C.what C.what ?
+                   (fn (a1, a2) =>
+                       let
+                          val tac' =
+                             (* G |- M #2 : A2 *)
+                             refine (Rule.prodElim2Of a1 a2 m)
+                             >>
+                             (* G |- M : A1 & A2 *)
+                             tac
+                       in
+                          inferSpine ctx (T.pi2 m) a2 rest tac' invis prove
+                       end),
+
+                   C.apply2 Prim.exists C.what (C.lam C.what) ?
+                   (fn (a1, a2) =>
+                       let
+                          val tac' =
+                             (* G |- M #2 : A2[M #1 . id] *)
+                             refine (Rule.existsElim2Of a1 a2 m)
+                             >>
+                             (* G |- M : exists A1 . A2 *)
+                             tac
+                       in
+                          inferSpine ctx (T.pi2 m)
+                             (T.Sub (a2, T.Dot (T.pi1 m, T.id)))
+                             rest tac' invis prove
+                       end),
+
+                   C.wild ?
+                   (fn () => (a, tac, m, spine))
+                   ]
+
+           | T.Prev :: rest =>
+                (* Cannot typecheck a prev in isolation. *)
+                (a, tac, m, spine))
+
+
+
+      (* inferMain G M invis prove
+
+         calls prove to generate tactics for subgoals, and
+         returns (A, tac, M', spine)
+         where
+         M = M' spine, and M' is the largest such
+         tac proves G |- M' : A
+
+         or raises InferError/NotPath if no such exists
+
+         Eliminates intersect/guard/foralltp at the end of the spine only if invis=true.
+      *)
+      fun inferMain ctx m invis prove =
+         C.termCaseXAlt m
+            [
+            C.elim C.whatVar C.swhat ?
+            (fn (i, spine) =>
+                let
+                   val (a, tac) = inferVar ctx i
+                in
+                   inferSpine ctx (T.Var i) a spine tac invis prove
+                end),
+
+            C.elim C.whatConstant C.swhat ?
+            (fn (const, spine) =>
+                (* special cases for typechecking directives *)
+                if Constant.eq (const, Prim.ann) then
+                   (case spine of
+                       T.App a :: T.App m' :: rest =>
+                          let
+                             val ntac = prove (J.make ctx (T.apply2 Prim.ov a m')) []
+
+                             val tac =
+                                (* G |- ann A M' : A *)
+                                refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 2])))
+                                >>
+                                (* G |- M' : A *)
+                                ntac
+                          in
+                             inferSpine ctx (T.apply2 Prim.ann a m') a rest tac invis prove
+                          end
+
+                     | _ =>
+                          raise (InferError (m, NONE, "ill-formed annotation")))
+
+                else if Constant.eq (const, Prim.ap) then
+                   (case spine of
+                       T.App m' :: T.App p :: rest =>
+                          let
+                             val (a, mtac, m'', remainder) = inferMain ctx m' false prove
+
+                             val () = detectInferError m'' a remainder
+                             
+                             (* mtac proves G |- M' : A *)
+                          in
+                             C.termCaseXAlt (N.whnfHard a)
+                                [
+                                C.apply2 Prim.intersect C.what (C.lam C.what) ?
+                                (fn (dom, cod) =>
+                                    let
+                                       val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
+
+                                       val tac' =
+                                          (* G |- ap M' P : Cod[P . id] *)
+                                          refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 2])))
+                                          >>
+                                          (* G |- M' : Cod[P . id] *)
+                                          refine (Rule.intersectElimOf dom cod m' p)
+                                          >>> [
+                                              (* G |- M' : intersect Dom . Cod *)
+                                              mtac,
+                    
+                                              (* G |- P : Dom *)
+                                              ptac,
+                                              ]
+                                    in
+                                       inferSpine ctx
+                                          (T.apply2 Prim.ap m' p)
+                                          (T.Sub (cod, T.Dot (p, T.id)))
+                                          rest tac' invis prove
+                                    end),
+                 
+                                C.apply2 Prim.guard C.what C.what ?
+                                (fn (dom, cod) =>
+                                    let
+                                       val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
+
+                                       val tac' =
+                                          (* G |- ap M' P : Cod *)
+                                          refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 2])))
+                                          >>
+                                          (* G |- M' : Cod *)
+                                          refine (Rule.guardElimOf dom cod m')
+                                          >>> [
+                                              (* G |- M' : guard Dom Cod *)
+                                              mtac,
+                    
+                                              (* G |- Dom *)
+                                              refine (Rule.inhabitant (T.evar ()) p)
+                                              >>
+                                              (* G |- P : Dom *)
+                                              ptac,
+                                              ]
+                                    in
+                                       inferSpine ctx m' cod
+                                          rest tac' invis prove
+                                    end),
+                 
+                                C.apply1 Prim.foralltp (C.lamb C.what) ?
+                                (fn (binder, cod) =>
+                                    let
+                                       val tac1 = prove (J.make (S.cons J.Tp ctx) (T.apply1 Prim.istp cod)) [binder]
+                                       val tac2 = prove (J.make ctx (T.apply1 Prim.istp p)) []
+
+                                       val tac' =
+                                          (* G |- ap M' P : Cod[P . id] *)
+                                          refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 2])))
+                                          >>
+                                          (* G |- M' : Cod[P . id] *)
+                                          refine (Rule.foralltpElimOf cod p m')
+                                          >>> [
+                                              (* G, type |- Cod : type *)
+                                              binddir binder >> tac1,
+                 
+                                              (* G |- M' : foralltp . Cod *)
+                                              mtac,
+                 
+                                              (* G |- P : type *)
+                                              tac2
+                                              ]
+                                    in
+                                       inferSpine ctx
+                                          (T.apply2 Prim.ap m' p)
+                                          (T.Sub (cod, T.Dot (p, T.id)))
+                                          rest tac' invis prove
+                                    end),
+                 
+                                C.wild ?
+                                (fn () =>
+                                    raise (InferError (m, SOME a, "ill-typed visibilized application")))
+                                ]
+                          end
+
+                     | _ =>
+                          raise (InferError (m, NONE, "ill-formed visibilized application")))
+
+                (* the normal case *)
+                else
+                   let
+                      val (a, atac) = inferConstant const
+                   in
+                      inferSpine ctx (T.Const const) a spine atac invis prove
+                   end),
+
+            C.wild ?
+            (fn () => raise (NotPath "not a path"))
+            ]
+
+
+
+      fun infer ctx m prove =
+         let
+            val (a, tac, m', remainder) = inferMain ctx m true prove
+
+            val () = detectInferError m' a remainder
+         in
+            (a, tac)
+         end
+
+
+
+      fun inferPartial ctx m prove =
+         let
+            val (a, tac, m', remainder) = inferMain ctx m true prove
+         in
+            (case remainder of
+                [] => (a, tac, m, [])
+
+              | T.App (T.Marker _) :: _ => (a, tac, m', remainder)
+
+              | _ =>
+                   (
+                   detectInferError m' a remainder;
+                   raise (Fail "unreachable")
+                   ))
+         end
+
+
+
+      (* compatSpine G M N A spine1 spine2 tac invis
+
+         if    tac proves G |- M = N : A
+         then  calls prove to generate tactics for subgoals, and
+               return (B, tac', M', N', spine1', spine2')
+               where
+               M spine1 = M' spine1', N spine2 = N' spine2', and M' and N' are the largest such
+               tac' proves G |- M' = N' : B
+
+         Eliminates intersect/foralltp/guard at the end of spine1 only if invis=true.
+
+         Basically the same code as inferSpine.
+      *)
+      fun compatSpine ctx m n a spine1 spine2 tac invis prove =
+         if invis orelse not (List.null spine1) then
+            C.termCaseXAlt (N.whnfHard a)
+               [
+               C.apply2 Prim.intersect C.what (C.lam C.what) ?
+               (fn (dom, cod) =>
+                   let
+                      val e = T.evar ()
+                      
+                      val etac = prove (J.make ctx (T.apply2 Prim.ov dom e)) []
+
+                      val tac' =
+                         (* G |- M = N : Cod[E . id] *)
+                         refine (Rule.intersectElimEq dom cod m n e)
+                         >>> [
+                             (* G |- M = N : intersect Dom . Cod *)
+                             tac,
+   
+                             (* G |- E : Dom *)
+                             etac
+                             ]
+                      in
+                      compatSpine ctx m n
+                         (T.Sub (cod, T.Dot (e, T.id)))
+                         spine1 spine2 tac' invis prove
+                   end),
+
+               C.apply2 Prim.guard C.what C.what ?
+               (fn (dom, cod) =>
+                   let
+                      val etac = prove (J.make ctx dom) []
+
+                      val tac' =
+                         (* G |- M = N : Cod *)
+                         refine (Rule.guardElimEq dom cod m n)
+                         >>> [
+                             (* G |- M = N : guard Dom Cod *)
+                             tac,
+   
+                             (* G |- Dom *)
+                             etac
+                             ]
+                   in
+                      compatSpine ctx m n cod
+                         spine1 spine2 tac' invis prove
+                   end),
+
+               C.apply1 Prim.foralltp (C.lamb C.what) ?
+               (fn (binder, cod) =>
+                   let
+                      val e = T.evar ()
+
+                      val tac1 = prove (J.make (S.cons J.Tp ctx) (T.apply1 Prim.istp cod)) [binder]
+                      val tac2 = prove (J.make ctx (T.apply1 Prim.istp e)) []
+
+                      val tac' =
+                         (* G |- M = N : Cod[E . id] *)
+                         refine (Rule.foralltpElimEq cod e m n)
+                         >>> [
+                             (* G, type |- Cod : type *)
+                             binddir binder >> tac1,
+
+                             (* G |- M = N : foralltp . Cod *)
+                             tac,
+
+                             (* G |- E : type *)
+                             tac2
+                             ]
+                   in
+                      compatSpine ctx m n
+                         (T.Sub (cod, T.Dot (e, T.id)))
+                         spine1 spine2 tac' invis prove
+                   end),
+
+               C.what ?
+               (fn a' => 
+                   compatSpineElim ctx m n a' spine1 spine2 tac invis prove)
+               ]
+         else
+            compatSpineElim ctx m n (N.whnfHard a) spine1 spine2 tac invis prove
+            
+
+
+      (* compatSpineElim G M N A spine1 spine2 tac invis prove
+
+         As compatSpine except A is hard whnf and not an intersect/guard/foralltp.
+
+         Basically the same code as inferSpineElim.
+      *)
+      and compatSpineElim ctx m n a spine1 spine2 tac invis prove =
+         (case (spine1, spine2) of
+             ([], _) =>
+                (a, tac, m, n, spine1, spine2)
+                
+           | (_, []) =>
+                (a, tac, m, n, spine1, spine2)
+
+           | (T.App (T.Marker _) :: _, _) => 
+                (a, tac, m, n, spine1, spine2)
+
+           | (_, T.App (T.Marker _) :: _) => 
+                (a, tac, m, n, spine1, spine2)
+
+           | (T.App p :: rest1, T.App q :: rest2) =>
+                C.termCaseXAlt a
+                   [
+                   C.apply2 Prim.arrow C.what C.what ?
+                   (fn (dom, cod) =>
+                       let
+                          val pqtac = prove (J.make ctx (T.apply3 Prim.eq dom p q)) []
+
+                          val tac' =
+                             (* G |- M P = N Q : Cod *)
+                             refine (Rule.arrowElimEq dom cod m n p q)
+                             >>> [
+                                 (* G |- M = N : Dom -> Cod *)
+                                 tac,
+                                 
+                                 (* G |- P = Q : Dom *)
+                                 pqtac
+                                 ]
+                       in
+                          compatSpine ctx (T.app m p) (T.app n q)
+                             cod rest1 rest2 tac' invis prove
+                       end),
+
+                   C.apply2 Prim.forall C.what (C.lam C.what) ?
+                   (fn (dom, cod) =>
+                       let
+                          val pqtac = prove (J.make ctx (T.apply3 Prim.eq dom p q)) []
+
+                          val tac' =
+                             (* G |- M P = N Q : Cod[P . id] *)
+                             refine (Rule.forallElimEq dom cod m n p q)
+                             >>> [
+                                 (* G |- M = N : forall Dom . Cod *)
+                                 tac,
+                                 
+                                 (* G |- P = Q : Dom *)
+                                 pqtac
+                                 ]
+                       in
+                          compatSpine ctx (T.app m p) (T.app n q)
+                             (T.Sub (cod, T.Dot (p, T.id)))
+                             rest1 rest2 tac' invis prove
+                       end),
+
+                   C.apply2 Prim.tarrow C.what C.what ?
+                   (fn (dom, cod) =>
+                       let
+                          val pqtac = prove (J.make ctx (T.apply3 Prim.eq dom p q)) []
+
+                          val tac' =
+                             (* G |- M P = N Q : Cod *)
+                             refine (Rule.tarrowElimEq dom cod m n p q)
+                             >>> [
+                                 (* G |- M = N : Dom -t> Cod *)
+                                 tac,
+                                 
+                                 (* G |- P = Q : Dom *)
+                                 pqtac
+                                 ]
+                       in
+                          compatSpine ctx (T.app m p) (T.app n q)
+                             cod rest1 rest2 tac' invis prove
+                       end),
+
+                   C.apply2 Prim.karrow C.what C.what ?
+                   (fn (dom, cod) =>
+                       let
+                          val pqtac = prove (J.make ctx (T.apply3 Prim.eq dom p q)) []
+
+                          val tac' =
+                             (* G |- M P = N Q : Cod *)
+                             refine (Rule.karrowElimEq dom cod m n p q)
+                             >>> [
+                                 (* G |- M = N : Dom -k> Cod *)
+                                 tac,
+                                 
+                                 (* G |- P = Q : Dom *)
+                                 pqtac
+                                 ]
+                       in
+                          compatSpine ctx (T.app m p) (T.app n q)
+                             cod rest1 rest2 tac' invis prove
+                       end),
+
+                   C.wild ?
+                   (fn () =>
+                       (a, tac, m, n, spine1, spine2))
+                   ]
+
+           | (T.Pi1 :: rest1, T.Pi1 :: rest2) =>
+                C.termCaseXAlt a
+                   [
+                   C.apply2 Prim.prod C.what C.what ?
+                   (fn (a1, a2) =>
+                       let
+                          val tac' =
+                             (* G |- M #1 = N #1 : A1 *)
+                             refine (Rule.prodElim1Eq a1 a2 m n)
+                             >>
+                             (* G |- M = N : A1 & A2 *)
+                             tac
+                       in
+                          compatSpine ctx (T.pi1 m) (T.pi1 n) a1 rest1 rest2 tac' invis prove
+                       end),
+
+                   C.apply2 Prim.exists C.what (C.lam C.what) ?
+                   (fn (a1, a2) =>
+                       let
+                          val tac' =
+                             (* G |- M #1 = N #1 : A1 *)
+                             refine (Rule.existsElim1Eq a1 a2 m n)
+                             >>
+                             (* G |- M = N : exists A1 . A2 *)
+                             tac
+                       in
+                          compatSpine ctx (T.pi1 m) (T.pi1 n) a1 rest1 rest2 tac' invis prove
+                       end),
+
+                   C.wild ?
+                   (fn () =>
+                       (a, tac, m, n, spine1, spine2))
+                   ]
+
+           | (T.Pi2 :: rest1, T.Pi2 :: rest2) =>
+                C.termCaseXAlt a
+                   [
+                   C.apply2 Prim.prod C.what C.what ?
+                   (fn (a1, a2) =>
+                       let
+                          val tac' =
+                             (* G |- M #2 = N #2 : A2 *)
+                             refine (Rule.prodElim2Eq a1 a2 m n)
+                             >>
+                             (* G |- M = N : A1 & A2 *)
+                             tac
+                       in
+                          compatSpine ctx (T.pi2 m) (T.pi2 n) a2 rest1 rest2 tac' invis prove
+                       end),
+
+                   C.apply2 Prim.exists C.what (C.lam C.what) ?
+                   (fn (a1, a2) =>
+                       let
+                          val tac' =
+                             (* G |- M #2 = N #2 : A2[M #1 . id] *)
+                             refine (Rule.existsElim2Eq a1 a2 m n)
+                             >>
+                             (* G |- M = N : exists A1 . A2 *)
+                             tac
+                       in
+                          compatSpine ctx (T.pi2 m) (T.pi2 n)
+                             (T.Sub (a2, T.Dot (T.pi1 m, T.id)))
+                             rest1 rest2 tac' invis prove
+                       end),
+
+                   C.wild ?
+                   (fn () =>
+                       (a, tac, m, n, spine1, spine2))
+                   ]
+
+           | (T.Prev :: _, T.Prev :: _) =>
+                (a, tac, m, n, spine1, spine2)
+
+           | _ =>
+                raise Clash)
+
+
+
+      (* compatMain G M N invis prove
+
+         calls prove to generate tactics for subgoals, and
+         returns (A, tac, M', N', spine1, spine2)
+         where
+         M = M' spine1, N = N' spine2, and M' and N' are the largest such
+         tac proves G |- M' = N' : A
+
+         or raises InferError/NotPath/Clash if no such exists
+
+         Eliminates intersect/guard/foralltp at the end of the spine only if invis=true.
+      *)
+      fun compatMain ctx m n invis prove =
+         C.termCaseXAlt m
+            [
+            C.elim C.whatVar C.swhat ?
+            (fn (i, spine1) =>
+                C.termCaseXAlt n
+                   [
+                   C.elim C.whatVar C.swhat ?
+                   (fn (j, spine2) =>
+                       if i = j then
+                          let
+                             val (a, tac) = inferVar ctx i
+
+                             val tac' =
+                                (* G |- i = i : A *)
+                                refine (Rule.eqRefl (T.evar ()) (T.evar ()))
+                                >>
+                                (* G |- i : A *)
+                                tac
+                          in
+                             compatSpine ctx (T.Var i) (T.Var i) a spine1 spine2 tac' invis prove
+                          end
+                       else
+                          raise Clash),
+
+                   C.whatConstant ?
+                   (fn _ => raise Clash),
+
+                   C.wild ?
+                   (fn () => raise (NotPath "second term is not a path"))
+                   ]),
+
+            C.elim C.whatConstant C.swhat ?
+            (fn (const, spine1) =>
+                (* special cases for typechecking directives *)
+                if Constant.eq (const, Prim.ann) then
+                   raise (NotPath "first term is annotated")
+
+                else if Constant.eq (const, Prim.ap) then
+                   (case spine1 of
+                       T.App m' :: T.App p :: rest1 =>
+                          let
+                             val (a, mntac, m'', n', rest1, rest2) =
+                                compatMain ctx m' n false prove
+
+                             val () =
+                                (case rest1 of
+                                    [] => ()
+
+                                  | _ => detectCompatError m'' a rest1 rest2)
+
+                             (* rest1 = []  so  m'' = m'
+                                N = N' rest2
+                                mntac proves G |- M' = N' : A
+                             *)
+                          in
+                             C.termCaseXAlt (N.whnfHard a)
+                                [
+                                C.apply2 Prim.intersect C.what (C.lam C.what) ?
+                                (fn (dom, cod) =>
+                                    let
+                                       val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
+
+                                       val tac' =
+                                          (* G |- ap M' P = N' : Cod[P . id] *)
+                                          refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 2])))
+                                          >>
+                                          (* G |- M' = N' : Cod[P . id] *)
+                                          refine (Rule.intersectElimEq dom cod m' n' p)
+                                          >>> [
+                                              (* G |- M' = N' : intersect Dom . Cod *)
+                                              mntac,
+                    
+                                              (* G |- P : Dom *)
+                                              ptac,
+                                              ]
+                                    in
+                                       compatSpine ctx
+                                          (T.apply2 Prim.ap m' p) n'
+                                          (T.Sub (cod, T.Dot (p, T.id)))
+                                          rest1 rest2 tac' invis prove
+                                    end),
+                 
+                                C.apply2 Prim.guard C.what C.what ?
+                                (fn (dom, cod) =>
+                                    let
+                                       val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
+
+                                       val tac' =
+                                          (* G |- ap M' P = N' : Cod *)
+                                          refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 2])))
+                                          >>
+                                          (* G |- M' = N' : Cod *)
+                                          refine (Rule.guardElimEq dom cod m' n')
+                                          >>> [
+                                              (* G |- M' = N' : guard Dom Cod *)
+                                              mntac,
+                    
+                                              (* G |- Dom *)
+                                              refine (Rule.inhabitant (T.evar ()) p)
+                                              >>
+                                              (* G |- P : Dom *)
+                                              ptac,
+                                              ]
+                                    in
+                                       compatSpine ctx m' n' cod
+                                          rest1 rest2 tac' invis prove
+                                    end),
+                 
+                                C.apply1 Prim.foralltp (C.lamb C.what) ?
+                                (fn (binder, cod) =>
+                                    let
+                                       val tac1 = prove (J.make (S.cons J.Tp ctx) (T.apply1 Prim.istp cod)) [binder]
+                                       val tac2 = prove (J.make ctx (T.apply1 Prim.istp p)) []
+
+                                       val tac' =
+                                          (* G |- ap M' P = N' : Cod[P . id] *)
+                                          refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 2])))
+                                          >>
+                                          (* G |- M' = N' : Cod[P . id] *)
+                                          refine (Rule.foralltpElimEq cod p m' n')
+                                          >>> [
+                                              (* G, type |- Cod : type *)
+                                              binddir binder >> tac1,
+                 
+                                              (* G |- M' = N : foralltp . Cod *)
+                                              mntac,
+                 
+                                              (* G |- P : type *)
+                                              tac2
+                                              ]
+                                    in
+                                       compatSpine ctx
+                                          (T.apply2 Prim.ap m' p) n'
+                                          (T.Sub (cod, T.Dot (p, T.id)))
+                                          rest1 rest2 tac' invis prove
+                                    end),
+                 
+                                C.wild ?
+                                (fn () =>
+                                    raise (InferError (m, SOME a, "ill-typed visibilized application")))
+                                ]
+                          end
+
+                     | _ =>
+                          raise (InferError (m, NONE, "ill-formed visibilized application")))
+
+                (* the normal case *)
+                else
+                   C.termCaseXAlt n
+                      [
+                      C.elim C.whatConstant C.swhat ?
+                      (fn (const', spine2) =>
+                          if Constant.eq (const', Prim.ann) then
+                             raise (NotPath "second term is annotated")
+
+                          else if Constant.eq (const', Prim.ap) then
+                             raise (NotPath "second term is visibilized application")
+
+                          else if Constant.eq (const, const') then
+                             let
+                                val (a, tac) = inferConstant const
+
+                                val tac' =
+                                   (* G |- const = const : A *)
+                                   refine (Rule.eqRefl (T.evar ()) (T.evar ()))
+                                   >>
+                                   (* G |- const : A *)
+                                   tac
+                             in
+                                compatSpine ctx (T.Const const) (T.Const const) a spine1 spine2 tac' invis prove
+                             end
+
+                          else
+                             raise Clash),
+
+                      C.elim C.whatVar C.swild ?
+                      (fn _ => raise Clash),
+
+                      C.wild ?
+                      (fn () => raise (NotPath "second term is not a path"))
+                      ]),
+
+            C.wild ?
+            (fn () => raise (NotPath "first term is not a path"))
+            ]
+
+         
+
+      fun compat ctx m n prove =
+         let
+            val (a, tac, m', n', remain1, remain2) = compatMain ctx m n true prove
+            
+            val () = detectCompatError m' a remain1 remain2
+         in
+            (a, tac)
+         end
+
+   end

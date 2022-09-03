@@ -1,0 +1,301 @@
+
+signature CONSTANT =
+   sig
+
+      type constant
+      type term
+
+      (* The order is the order in which the constants were declared. *)
+      structure Ordered : ORDERED where type t = constant
+      structure Hashable : HASHABLE where type t = constant
+      val eq : constant * constant -> bool
+
+      (* Opacity never matters to soundness; it's definitions that matter to soundness.
+         Opacity may affect the behavior of the prover a lot, though.
+
+         - SOFT means the constant is automatically unfolded by unification, and other
+           tactics that choose to do it, including typechecking.
+         - FIRM is like soft, but not unfolded in typechecking in the subject position.
+         - HARD is normal for constants with a definition.
+         - OPAQUE means the constant cannot be unfolded, even explicitly.
+           (But opacity can still be changed. To make a constant permanently opaque,
+           call abstract.)
+
+         Hard, firm, and soft constants always have definitions.
+      *)
+      datatype opacity = SOFT | FIRM | HARD | OPAQUE
+
+      (* returns the constant's definition if the constant is HARD or SOFT *)
+      val definition : constant -> term option
+
+      val opacity : constant -> opacity
+      val setOpacity : constant -> opacity -> unit
+
+      (* sets opacity to OPAQUE and deletes the definition (cannot be reversed) *)
+      val abstract : constant -> unit
+
+   end
+
+
+signature CONSTANT_INTERNAL =
+   sig
+
+      include CONSTANT
+
+
+      (* Creates a constant with a given definition, and recording a luid and
+         a symbol list, the latter of which the namespace manager uses to recover
+         a constant's name.  (The namespace manager uses the constant's full path
+         name reversed.)
+
+         You probably don't want this.  You probably want Namespace.declare instead.
+      *)
+      val declare : term option -> Symbol.symbol list -> constant
+
+
+      (* Returns the symbol list that was supplied when the constant was declared.
+         You probably don't want this.  You probably want Namespace.name instead.
+      *)
+      val path : constant -> Symbol.symbol list
+
+
+      (* gives the definition if it exists, even if the constant is OPAQUE *)
+      val definitionTrue : constant -> term option
+
+      val puOpacity : opacity Pickle.pu
+
+   end
+
+
+functor ConstantFun (structure Term : TERM 
+                                      where type constant = int
+                     structure Trail : TRAIL_PRIV
+                                       where type term = Term.term
+                                       where type ebind = Term.ebind)
+   :> CONSTANT_INTERNAL
+      where type constant = int
+      where type term = Term.term
+   =
+   struct
+
+      type constant = int
+      type nonce = Word32.word
+      type luid = nonce * int
+
+      structure T = Term
+
+      type term = T.term
+
+   
+      fun eq (i, j) = i = j
+
+      structure Ordered =
+         struct
+            type t = constant
+
+            val eq = eq
+            fun compare (i, j) = Int.compare i j
+         end
+
+      structure Hashable =
+         struct
+            type t = constant
+            
+            val eq = eq
+            val hash = Word.fromInt
+         end
+
+      datatype opacity = SOFT | FIRM | HARD | OPAQUE
+
+      val nextConstant = ref 0
+
+      val bogus = (NONE, [], OPAQUE)
+
+      (* NB:  We never rewind the constant table!   Constants are forever. *)
+
+      val theConstants : (term option * Symbol.symbol list * opacity) ArrayInf.array = ArrayInf.array bogus
+
+      (* invariant: if there is no definition, the opacity is OPAQUE *)
+
+
+      fun definition const =
+         let
+            val (def, _, opac) = ArrayInf.sub (theConstants, const)
+         in
+            (case opac of
+                OPAQUE => NONE
+
+              | _ => def)
+         end
+
+             
+      fun definitionTrue const =
+         let
+            val (def, _, _) = ArrayInf.sub (theConstants, const)
+         in
+            def
+         end
+
+             
+
+      fun path const =
+         let
+            val (_, p, _) = ArrayInf.sub (theConstants, const)
+         in
+            p
+         end
+
+
+      fun opacity const =
+         let
+            val (_, _, opac) = ArrayInf.sub (theConstants, const)
+         in
+            opac
+         end
+
+
+      fun setOpacity const opac =
+         let
+            val (def, path, old) = ArrayInf.sub (theConstants, const)
+         in
+            (case (def, opac) of
+                (NONE, OPAQUE) =>
+                   (* by invariant, no change necessary *)
+                   ()
+
+              | (NONE, _) =>
+                   raise (Fail "invalid opacity for constant with no definition")
+
+              | (SOME _, _) =>
+                   (
+                   ArrayInf.update (theConstants, const, (def, path, opac));
+                   Checkpoint.log 
+                      (fn () =>
+                          ArrayInf.update (theConstants, const, (def, path, old)))
+                   ))
+         end
+
+
+      fun abstract const =
+         let
+            val (def, path, old) = ArrayInf.sub (theConstants, const)
+         in
+            ArrayInf.update (theConstants, const, (NONE, path, OPAQUE));
+            Checkpoint.log
+               (fn () =>
+                   ArrayInf.update (theConstants, const, (def, path, old)))
+         end
+
+
+
+
+      (* Compute the maximum index appearing in m[s], and bind free evars to Triv. *)
+      fun freevars m s =
+         (case m of
+             T.Var i =>
+                (case T.substVar i s of
+                    T.Idx j => j + 1
+
+                  | T.Term m' =>
+                       freevars m' T.id)
+
+           | T.Const _ => 0
+
+           | T.Elim (h, spine) =>
+                List.foldl
+                (fns e j =>
+                    (case e of
+                        T.App n => Int.max (freevars n s) j
+                      | _ => j))
+                (freevars h s)
+                spine
+
+           | T.Lam (_, m1) =>
+                let
+                   val i = freevars m1 (T.under 1 s)
+                in
+                   if i = 0 then
+                      0
+                   else
+                      i - 1
+                end
+
+           | T.Pair (m1, m2) =>
+                Int.max (freevars m1 s) (freevars m2 s)
+
+           | T.Next m1 =>
+                freevars m1 s
+
+           | T.Triv => 0
+
+           | T.Sub (m1, s') =>
+                freevars m1 (T.compose s' s)
+
+           | T.Evar eb =>
+                (case T.readEbind eb of
+                    NONE =>
+                       (
+                       Trail.setEbind eb T.Triv;
+                       0
+                       )
+
+                  | SOME m' =>
+                       freevars m' s)
+
+           | T.Marker _ =>
+                raise (Invalid "definition contains marker"))
+
+
+      (* Turns unbound variables and evars into Triv.  Rejects markers. *)
+      fun crush m =
+         let
+            val i = freevars m T.id
+
+            val () = Trail.commit ()
+
+            fun mksub j =
+               if j = 0 then
+                  T.id
+               else
+                  T.Dot (T.Triv, mksub (j-1))
+         in
+            if i = 0 then
+               m
+            else
+               T.Sub (m, mksub i)
+         end
+
+
+      fun declare def path =
+         let
+            val const = !nextConstant
+
+            val def' = Option.map crush def
+
+            val opac =
+               (case def' of
+                   NONE => OPAQUE
+
+                 | SOME _ => HARD)
+         in
+            Trail.commit ();
+            nextConstant := const + 1;
+            ArrayInf.update (theConstants, const, (def', path, opac));
+            const
+         end
+
+
+      val puOpacity =
+         Pickle.alt
+            (fn SOFT => 0
+              | FIRM => 1
+              | HARD => 2
+              | OPAQUE => 3)
+            [
+            Pickle.const SOFT,
+            Pickle.const FIRM,
+            Pickle.const HARD,
+            Pickle.const OPAQUE
+            ]
+
+   end

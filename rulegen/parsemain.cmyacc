@@ -1,0 +1,152 @@
+sml
+name ParseMainFun
+
+terminal UIDENT of symbol_pos
+terminal LIDENT of symbol_pos
+terminal PI1 of pos
+terminal PI2 of pos
+terminal PREV of pos
+terminal LPAREN of pos
+terminal RPAREN of pos
+terminal LBRACKET of pos
+terminal RBRACKET of pos
+terminal LBRACE of pos
+terminal RBRACE of pos
+terminal COLON of pos
+terminal COMMA of pos
+terminal DOLLAR of pos
+terminal DOT of pos
+terminal ELLIPSIS of pos
+terminal EQUAL of pos
+terminal IF of pos
+terminal SEMICOLON of pos
+terminal SLASH of pos
+terminal SUBTYPE of pos
+terminal TURNSTILE of pos
+terminal DEMOTE of pos
+terminal EXT of pos
+terminal FN of pos
+terminal HIDE of pos
+terminal LRULE of pos
+terminal NEXT of pos
+terminal PROMOTE of pos
+terminal RULE of pos
+terminal TYPE of pos
+terminal KI of pos
+terminal UI of pos
+terminal EOF of pos
+
+
+nonterminal Idents : idents =
+   1:LIDENT => sing_idents
+   1:LIDENT 2:Idents => cons_idents
+
+nonterminal Sub : sub =
+   1:Term SLASH 2:LIDENT => make_sub
+
+nonterminal Subs : subs =
+   1:Sub => sing_subs
+   1:Sub COMMA 2:Subs => cons_subs
+
+nonterminal TermAtom : term =
+   LPAREN 1:Term RPAREN => id_term
+   1:LIDENT => const_term
+   DOLLAR 1:LIDENT => var_term
+   1:UIDENT => metavar_term
+   1:UIDENT LBRACKET 2:Subs RBRACKET => metavar_subs_term
+   LPAREN 1:Term COMMA 2:Term RPAREN => pair_term
+   LPAREN RPAREN => triv_term
+   KI => ki_term
+   UI => ui_term
+
+nonterminal TermApp : term =
+   1:TermAtom => id_term
+   1:TermApp 2:TermAtom => app_term
+   1:TermApp PI1 => pi1_term
+   1:TermApp PI2 => pi2_term
+   1:TermApp PREV => prev_term
+   NEXT 1:TermAtom => next_term
+   1:LIDENT LBRACE 2:LIDENT COLON 3:TermAtom RBRACE 4:TermAtom => bind_term
+
+nonterminal Term : term =
+   1:TermApp => id_term
+   FN 1:Idents DOT 2:TermApp => fn_term
+   1:TermApp EQUAL 2:TermApp COLON 3:TermApp => equal_term
+   1:TermApp COLON 2:TermApp => of_term
+   1:TermApp EQUAL 2:TermApp COLON TYPE => eqtp_term
+   1:TermApp COLON TYPE => istp_term
+   1:TermApp SUBTYPE 2:TermApp => subtype_term
+
+nonterminal Class : class =
+   1:TermAtom => tm_class
+   DEMOTE 1:TermAtom => tml_class
+   HIDE 1:TermAtom => tmh_class
+   TYPE => tp_class
+   DEMOTE TYPE => tpl_class
+   HIDE TYPE => tph_class
+
+nonterminal Hyp : hyp =
+   1:LIDENT COLON 2:Class => make_hyp
+
+nonterminal HypsNonempty : hyps =
+   1:Hyp => sing_hyps
+   2:Hyps COMMA 1:Hyp => cons_hyps
+
+nonterminal Hyps : hyps =
+   /* epsilon */ => nil_hyps
+   1:HypsNonempty => id_hyps
+
+nonterminal Context : context =
+   PROMOTE 1:Hyps => promote_context
+   1:Hyps => ordinary_context
+
+nonterminal CContext : hyps =
+   1:Hyps ELLIPSIS => make_ccontext
+
+nonterminal PContext : pcontext =
+   1:Context ELLIPSIS => long_pcontext
+   1:Context ELLIPSIS LBRACKET 2:Subs RBRACKET => longsub_pcontext
+   1:Context => short_pcontext
+
+nonterminal Rhs : rhs =
+   1:Term EXT 2:UIDENT => ext_rhs
+   1:Term => noext_rhs
+
+nonterminal Premise : premise =
+   1:Context TURNSTILE 2:Rhs => make_premise
+
+nonterminal LPremise : lpremise =
+   1:PContext TURNSTILE 2:Rhs => make_lpremise
+
+nonterminal Premises : premises =
+   /* epsilon */ => nil_premises
+   1:Premise SEMICOLON 2:Premises => cons_premises
+
+nonterminal LPremises : lpremises =
+   /* epsilon */ => nil_lpremises
+   1:LPremise SEMICOLON 2:LPremises => cons_lpremises
+
+nonterminal Concl : concl =
+   1:Term EXT 2:Term => ext_concl
+   1:Term => noext_concl
+
+nonterminal LConcl : lconcl =
+   1:CContext TURNSTILE 2:Term EXT 3:Term => ext_lconcl
+   1:CContext TURNSTILE 2:Term => noext_lconcl
+
+nonterminal Rule : rule =
+   1:Concl IF 2:Premises => make_rule
+
+nonterminal LRule : lrule =
+   1:LConcl IF 2:LPremises => make_lrule
+
+nonterminal Clause : clause =
+   RULE 1:LIDENT 2:Rule => rule_clause
+   LRULE 1:LIDENT 2:LRule => lrule_clause
+
+nonterminal Clauses : clauses =
+   /* epsilon */ => nil_clauses
+   1:Clause 2:Clauses => cons_clauses
+
+start Clauses
+follower EOF

@@ -1,0 +1,375 @@
+
+File.load "../library/acc.isto";
+File.load "../library/nat.isto";
+File.load "../library/datatype.isto";
+
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    forall (a : U i) .
+    U i
+  of
+    tree : nat -> type =
+    | Empty : tree 0
+    | Node : forall (n : nat) . a -> forest n -> tree (succ n)
+    | One : forall (n : nat) . tree n -> tree n
+  
+    and
+    forest : nat -> type =
+    | Nil : forest 0
+    | Cons : forall (m n : nat) . tree m -> forest n -> forest (Nat.plus m n)
+/;
+
+
+
+define /treesize a n x/
+/
+  tree_iter a
+    (fn _ _ . nat)
+    (fn _ _ . nat)
+    0
+    (fn _ _ _ m . (succ m))
+    (fn _ _ m . m)
+    0
+    (fn _ _ _ m1 _ m2 . Nat.plus m1 m2)
+    n
+    x
+/;
+
+
+
+define /forestsize a n x/
+/
+  forest_iter a
+    (fn _ _ . nat)
+    (fn _ _ . nat)
+    0
+    (fn _ _ _ m . (succ m))
+    (fn _ _ m . m)
+    0
+    (fn _ _ _ m1 _ m2 . Nat.plus m1 m2)
+    n
+    x
+/;
+
+
+
+lemma "treesize_type"
+/
+  treesize :
+  intersect i .
+  forall (a : U i) n . tree a n -> nat
+/;
+
+inference.
+introOf /i a n x/.
+unfold /treesize/.
+typecheck.
+qed ();
+recordTyping "treesize_type";
+
+
+lemma "forestsize_type"
+/
+  forestsize :
+  intersect i .
+  forall (a : U i) n . forest a n -> nat
+/;
+
+inference.
+introOf /i a n x/.
+unfold /forestsize/.
+typecheck.
+qed ();
+recordTyping "forestsize_type";
+
+
+
+lemma "reduce_iterator"
+/
+  forall (i : level) (a : U i) n (x : tree a n) .
+    treesize a n x = n : nat
+/;
+
+inference.
+intro /i a n x/.
+apply /tree_iter _ (fn n x . treesize a n x = n : nat) (fn n x . forestsize a n x = n : nat)/ >> reduce // >> clear /n x/.
+  {
+  unfold /treesize/.
+  reduce //.
+  reflexivity.
+  }
+
+  {
+  intro /n x y IH/.
+  unfold /treesize/.
+  reduce //.
+  fold /forestsize a n y/.
+  compat.
+  hyp /IH/.
+  }
+
+  {
+  intro /n x IH/.
+  unfold /treesize/.
+  reduce //.
+  fold /treesize a n x/.
+  hyp /IH/.
+  }
+
+  {
+  unfold /forestsize/.
+  reduce //.
+  reflexivity.
+  }
+
+  {
+  intro /m n x IH1 y IH2/.
+  unfold /forestsize/.
+  reduce //.
+  fold /treesize a m x/.
+  fold /forestsize a n y/.
+  compat.
+    {
+    hyp /IH1/.
+    }
+
+    {
+    hyp /IH2/.
+    }
+  }
+qed ();
+
+
+
+lemma "iterate_tree"
+/
+  forall (i : level) (a : U i) n (x : tree a n) (extra : a) .
+    x = x : tree a n
+/;
+
+inference.
+intro /i a n x extra/.
+apply /tree_iter _ (fn n x . x = x : tree a n) (fn n x . x = x : forest a n)/ >> reduce // >> clear /n x/.
+  {
+  reflexivity.
+  }
+
+  {
+  intro /n z x IH/.
+  compat.
+  }
+
+  {
+  intro /n x IH/.
+  compat.
+  }
+
+  {
+  reflexivity.
+  }
+
+  {
+  intro /m n x IH1 y IH2/.
+  compat.
+  }
+qed ();
+
+
+
+lemma "destruct_tree"
+/
+  forall (i : level) (a : U i) n (x : tree a n) (extra : a) .
+    x = x : tree a n
+/;
+
+inference.
+intro /i a n x extra/.
+assert /tree_strip x = tree_strip x : tree_skel a/ /H/.
+  {
+  reflexivity.
+  }
+revert /H/.
+generalizeAt /tree_strip x/ /_/ /0/ /sk/.
+revert /n x/.
+so /tree_subterm_well_founded _ _ sk/ /H/.
+induct /H/.
+reintro /IH/.
+intro /n x Hsk/.
+destruct /x/ /{ Heq | m x y Heq | m x Heq}/.
+  {
+  reflexivity.
+  }
+
+  {
+  reflexivity.
+  }
+
+  {
+  subst /m/.
+  fold /pause x/.
+  compat.
+  unroll /pause/.
+  apply /IH (tree_strip x)/.
+    {
+    clear /IH/.
+    (* XX why is this necessary? *)
+    moveAfter /sk/ /x/.
+    subst /sk/.
+    apply /One_subterm/.
+    }
+
+    {
+    reflexivity.
+    }
+  }
+qed ();
+
+
+
+lemma "a_tree"
+/
+  forall (i : level) (a : U i) (x : a) .
+    One _ _ (Node _ _ x (Cons _ _ _ (Empty _) (Nil _))) : tree _ _
+/;
+
+inference.
+intro /i a x/.
+typecheck.
+qed ();
+
+
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    forall (a : nat -> U i) .
+    U i
+  of
+    foo : forall (n : nat) . a n -> a n -> type =
+    | fooi : forall (x : a 0) . foo 0 x x
+/;
+
+
+
+lemma "iterate_foo"
+/
+  forall (i : level) (a : nat -> U i) n (x y : a n) (z : foo a n x y) (extra : a 0) .
+    z = z : foo a n x y
+/;
+
+inference.
+intro /i a n x y z extra/.
+revert /n x y z/.
+apply /foo_iter a (fn n x y z . z = z : foo a n x y)/.
+reduce //.
+intro /x/.
+reflexivity.
+qed ();
+
+
+
+lemma "destruct_foo"
+/
+  forall (i : level) (a : nat -> U i) n (x y : a n) (z : foo a n x y) (extra : a 0) .
+    z = z : foo a n x y
+/;
+
+inference.
+intro /i a n x y z extra/.
+destruct /z/ /{m Heq1 Heq2 Heq3}/.
+reflexivity.
+qed ();
+
+
+
+typedef
+/
+  datatype U 0
+  of
+    exp : type =
+    | scomb : exp
+    | kcomb : exp
+    | icomb : exp
+    | app : exp -> exp -> exp 
+/;
+
+
+
+typedef
+/
+  datatype U 0
+  of
+    tp : type =
+    | o : tp
+    | arr : tp -> tp -> tp
+/;
+
+
+
+typedef
+/
+  datatype U 0
+  of
+    dof : exp -> tp -> type =
+
+    | dof_scomb :
+        forall (a b c : tp) .
+          dof scomb 
+            (arr
+               (arr c (arr a b))
+               (arr
+                  (arr c a)
+                  (arr c b)))
+
+    | dof_kcomb :
+        forall (a b : tp) .
+          dof kcomb (arr a (arr b a))
+
+    | dof_icomb :
+        forall (a : tp) .
+          dof icomb (arr a a)
+
+    | dof_app :
+        forall (a b : tp) (m n : exp) .
+          dof m (arr a b)
+          -> dof n a
+          -> dof (app m n) b
+/;
+
+
+
+lemma "kxy"
+/
+  forall a b x y .
+    dof x a
+    -> dof y b
+    -> dof (app (app kcomb x) y) a
+/;
+
+inference.
+intro /a b x y Hx Hy/.
+apply /dof_app b/.
+  {
+  apply /dof_app/.
+  1:{
+    apply /dof_kcomb/.
+    }
+
+    {
+    typecheck.
+    }
+  
+    {
+    hyp /Hx/.
+    }
+  }
+
+  {
+  hyp /Hy/.
+  }
+qed ();
+

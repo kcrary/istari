@@ -1,0 +1,105 @@
+
+signature TRAIL =
+   sig
+
+      type term
+      type ebind
+      
+      exception Bound
+
+      (* When a mark to be rewound is already committed, Rewind is raised.
+         When a mark to be rewound is obsolete (that is, an older mark has
+         been rewound) the behavior is undefined but sound (that is: nothing
+         committed will rewound, and tokens will be properly invalidated for
+         whatever happens to get rewound).  To guard against this, keep all
+         marks local.
+      *)
+
+      type mark
+      exception Rewind
+      val mark : unit -> mark
+      val rewind : mark -> unit
+      val commit : unit -> unit
+      
+      type token
+      val merge : token -> token -> token
+      val token : unit -> token
+      val valid : token -> bool
+      val always : token
+
+   end
+
+
+(* setEbind is a privileged operation, since it could be used to create cyclic terms. 
+   Use Unify.setEbindSub instead.
+*)
+
+signature TRAIL_PRIV =
+   sig
+
+      include TRAIL
+
+      val setEbind : ebind -> term -> unit
+
+   end
+
+
+(* Trail gets access to the definition of ebind_, so it can unwind
+   bindings.  Trail then rexports it with ebind_ hidden, so that no one else
+   can unwind bindings.  This is necessary for soundness.  We need to ensure
+   that tokens are invalidated whenever we undo bindings that depend on them.
+*)
+
+functor TrailFun (structure Term : TERM_PRIV)
+   :> TRAIL_PRIV
+      where type term = Term.term
+      where type ebind = Term.ebind
+   =
+   struct
+
+      type term = Term.term
+      type ebind = Term.ebind
+
+      structure R =
+         RewindFun 
+         (type action = term option ref
+          fun undo (r : action) = r := NONE)
+
+
+      open R
+
+      exception Bound
+
+      fun setEbind (r, _) m =
+         (case !r of
+             NONE =>
+                (
+                R.log r;
+                r := SOME m
+                )
+
+           | SOME _ =>
+                raise Bound)
+
+         
+      val () =
+         let
+            extension Marker of R.mark
+
+            fun poll () = Marker (R.mark ())
+
+            fun set exn =
+               (case exn of
+                   Marker mark =>
+                      (try
+                          (R.rewind mark; true)
+                       with
+                       R.Rewind => false)
+
+                 | _ =>
+                      raise (Fail "unexpected extension"))
+         in
+            Checkpoint.installLazy set poll
+         end
+
+   end

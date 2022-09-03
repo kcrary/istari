@@ -1,0 +1,664 @@
+
+signature REDUCTION =
+   sig
+
+      type constant
+      type term
+      type elim
+
+      type reduction
+      type ureduction1
+      type ureduction2
+
+      val refl : reduction
+      val trans : reduction list -> reduction
+
+      (* if    const unfolds to M
+         then  reduces const @ spine --> M @ spine
+               (spine may be empty)
+      *)
+      val unfold : reduction
+
+      (* beta n
+
+         contracts n beta redices
+      *)
+      val beta : int -> reduction
+
+      (* reduces all top-level beta redices *)
+      val betas : reduction
+
+      val user1 : ureduction1 -> reduction
+      val user2 : ureduction2 -> reduction
+
+      (* within path red  follows path to a subterm, where red is applies
+
+         M elim1 ... elimn  M is subterm 0, Ni is subterm i (where elimi = Ni)
+                            (assuming n >= 1)
+         \.M                M is subterm 0
+         <M0, M1>           Mi is subterm i
+         next M             M is subterm 0
+      *)
+      val within : int list -> reduction -> reduction
+
+      (* applies reductions to the first n arguments *)
+      val compat : reduction list -> reduction
+
+
+      exception Reduce
+
+      val reduce : reduction -> term -> term
+
+
+      (* new1 k n P red1 red2
+         (n is the arity of k)
+
+         if    0 <= n
+         and   k n-1 ... 0  reduces to Q by red1
+               P reduces to Q by red2
+         then  returns a ureduction that reduces
+               k Mn-1 ... M0
+               to
+               P [M0 ... Mn-1 . id]
+         else  raises Reduce
+      *)
+      val new1 : constant -> int -> term -> reduction -> reduction -> ureduction1
+
+
+      (* new2 k l m k' n Q red1 red2
+         (arity of k is l + m + 1, arity of k' is n)
+
+         if    0 <= l, m, n  
+         and   k m+n+l-1 .. m+n+0 (k' m+n-1 ... m+0) m-1 ... 0  reduces to R by red1
+               Q reduces to R by red2
+         then  returns a ureduction that reduces
+               k Pl-1 ... P0 (k' Nn-1 ... N0) Mm-1 ... M0
+               to
+               Q [M0 ... Mm-1 . N0 ... Nn-1 . P0 ... Pl-1 . id]
+         else  raises Reduce
+      *)
+      val new2 : constant -> int -> int -> constant -> int -> term -> reduction -> reduction -> ureduction2
+
+   end
+
+
+
+signature REDUCTION_INTERNAL =
+   sig
+
+      include REDUCTION 
+
+
+      (* trigger red
+
+         if    red = new1 k n p red1 red2
+         then  returns k
+      *)
+      val trigger : ureduction1 -> constant
+
+      (* triggers red
+
+         if    red = new2 k l m k' n Q red1 red2
+         then  returns (k, l, k')
+      *)
+      val triggers : ureduction2 -> constant * int * constant
+
+      (* ureduce1 red spine
+         where trigger(red) = k
+         applies red to k @ spine
+      *)
+      val ureduce1 : ureduction1 -> elim list -> term
+
+      (* ureduce2 red spine1 spine2 spine3
+         where triggers(red) = (k1, l, k2)
+         applies red to k1 @ spine1 (k2 @ spine2) spine3
+      *)
+      val ureduce2 : ureduction2 -> elim list -> elim list -> elim list -> term
+
+
+      val puUreduction1 : ureduction1 Pickle.pu
+      val puUreduction2 : ureduction2 Pickle.pu
+      val puReduction : reduction Pickle.pu
+
+   end
+
+
+
+(* Prim uses backdoor to declare reductions for primitive constants. *)
+signature REDUCTION_PRIV =
+   sig
+
+      include REDUCTION_INTERNAL
+
+      val backdoor1 : constant * int * term -> ureduction1
+      val backdoor2 : constant * int * int * constant * int * term -> ureduction2
+
+   end
+
+
+functor ReductionFun (structure Term : TERM
+                      structure Constant : CONSTANT
+                                           where type constant = Term.constant
+                                           where type term = Term.term
+                      structure Trail : TRAIL
+                      structure Pickling : PICKLING
+                                           where type constant = Term.constant
+                                           where type term = Term.term
+                      structure Unsafe : UNSAFE)
+   :> 
+   REDUCTION_PRIV
+   where type constant = Term.constant
+   where type term = Term.term
+   where type elim = Term.elim
+   =
+   struct
+
+      open Term
+
+      type ureduction1 = constant * int * term
+      type ureduction2 = constant * int * int * constant * int * term
+
+      datatype reduction =
+         Trans of reduction list
+       | Unfold
+       | Beta of int option  (* nonnegative *)
+       | Within of int list * reduction
+       | Compat of reduction list
+       | User1 of ureduction1
+       | User2 of ureduction2
+
+      exception Reduce
+
+      val refl = Trans []
+      fun trans l = Trans l
+      val unfold = Unfold
+      fun beta i = if i < 0 then raise Reduce else Beta (SOME i)
+      val betas = Beta NONE
+      fun within p r = Within (p, r)
+      fun compat l = Compat l
+      val user1 = User1
+      val user2 = User2
+
+
+
+
+      (* takeSpine n s spine
+
+         if    spine = M1 ... Mn spine'
+         then  return (Mn ... M1 . s, spine')
+      *)
+      fun takeSpine n s spine =
+         if n = 0 then
+            (s, spine)
+         else
+            (case spine of
+                [] => raise Reduce
+
+              | App m :: rest =>
+                   takeSpine (n-1) (Dot (m, s)) rest
+
+              | _ => raise Reduce)
+
+
+      fun ureduce1 (const, i, p) spine =
+         let
+            val (s, spine') = takeSpine i id spine
+         in
+            Elim (Sub (p, s), spine')
+         end
+
+      fun ureduce2 (const1, l, m, const2, n, q) spine1 spine2 spine3 =
+         (case takeSpine l id spine1 of
+             (s1, []) =>
+                (case takeSpine n s1 spine2 of
+                    (s2, []) =>
+                       let
+                          val (s3, spine3') = takeSpine m s2 spine3
+                       in
+                          Elim (Sub (q, s3), spine3')
+                       end
+
+                  | _ => raise Reduce)
+
+           | _ => raise Reduce)
+
+
+
+      (* simp m s spine
+
+         if    m[s] @ spine simplifies to h @ spine'
+               (where simple form is as defined subsequently in Normalize)
+         then  returns (h, spine')
+      *)
+      fun simp m s spine =
+         (case m of
+             Var i =>
+                (case substVar i s of
+                    Idx j =>
+                       (Var j, spine)
+
+                  | Term n =>
+                       simp n id spine)
+
+           | Const const =>
+                (m, spine)
+
+           | Elim (m1, spine') =>
+                simp m1 s (ssubst spine' s @ spine)
+
+           | Lam (binder, m1) =>
+                (Lam (binder, Sub (m1, under 1 s)), spine)
+
+           | Pair (m1, m2) =>
+                (Pair (Sub (m1, s), Sub (m2, s)), spine)
+
+           | Next m1 =>
+                (Next (Sub (m1, s)), spine)
+
+           | Triv =>
+                (m, spine)
+
+           | Sub (m', s') =>
+                simp m' (compose s' s) spine
+
+           | Evar eb =>
+                (case readEbind eb of
+                    NONE =>
+                       (Sub (m, s), spine)
+
+                  | SOME m' =>
+                       simp m' s spine)
+
+           | Marker _ =>
+                (m, spine))
+
+
+
+      fun dec iopt = Option.map (fn i => i - 1) iopt
+
+
+      fun reduceMain red m s spine =
+         let
+            val (h, spine') = simp m s spine
+         in
+            reduceHead red h spine'
+         end
+
+
+      (* h @ spine is in simple form *)
+      and reduceHead red h spine =
+         (case red of
+             Trans [] =>
+                Elim (h, spine)
+
+           | Trans (red1 :: rest) =>
+                reduceMain (Trans rest) (reduceHead red1 h spine) id []
+
+           | Unfold =>
+                (case h of
+                    Const const =>
+                       (case Constant.definition const of
+                           SOME m => Elim (m, spine)
+
+                         | NONE => raise Reduce)
+
+                  | _ => raise Reduce)
+
+           | Beta (SOME 0) =>
+                Elim (h, spine)
+
+           | Beta iopt =>
+                (case (h, spine) of
+                    (Lam (_, m1), App m2 :: rest) =>
+                       reduceMain (Beta (dec iopt)) m1 (Dot (m2, id)) rest
+
+                  | (Pair (m1, m2), Pi1 :: rest) =>
+                       reduceMain (Beta (dec iopt)) m1 id rest
+
+                  | (Pair (m1, m2), Pi2 :: rest) =>
+                       reduceMain (Beta (dec iopt)) m2 id rest
+
+                  | (Next m1, Prev :: rest) =>
+                       reduceMain (Beta (dec iopt)) m1 id rest
+
+                  | _ =>
+                       (case iopt of
+                           NONE =>
+                              Elim (h, spine)
+
+                         | SOME _ =>
+                              raise Reduce))
+
+           | Within (path, red) =>
+                (case path of
+                    [] =>
+                       reduceHead red h spine
+
+                  | i :: rest =>
+                       (case spine of
+                           [] =>
+                              (case h of
+                                  Lam (binder, m1) =>
+                                     if i = 0 then
+                                        Lam (binder, reduceMain (Within (rest, red)) m1 id [])
+                                     else
+                                        raise Reduce
+
+                                | Pair (m1, m2) =>
+                                     if i = 0 then
+                                        Pair (reduceMain (Within (rest, red)) m1 id [], m2)
+                                     else if i = 1 then
+                                        Pair (m1, reduceMain (Within (rest, red)) m2 id [])
+                                     else
+                                        raise Reduce
+
+                                | Next m1 =>
+                                     if i = 0 then
+                                        Next (reduceMain (Within (rest, red)) m1 id [])
+                                     else
+                                        raise Reduce
+
+                                | _ =>
+                                     raise Reduce)
+
+                         | _ :: _ =>
+                              (case Int.compare i 0 of
+                                  LESS =>
+                                     raise Reduce
+
+                                | EQUAL =>
+                                     Elim (reduceMain (Within (rest, red)) h id [], spine)
+
+                                | GREATER =>
+                                     Elim (h, reduceElim (Within (rest, red)) (i-1) spine []))))
+
+           | Compat reds =>
+                Elim (h, reduceSpine reds spine [])
+
+           | User1 (ured as (const, _, _)) =>
+                (case h of
+                    Const const' =>
+                       if Constant.eq (const, const') then
+                          ureduce1 ured spine
+                       else
+                          raise Reduce
+
+                  | _ => raise Reduce)
+
+           | User2 (ured as (const1, l, _, const2, _, _)) =>
+                (case h of
+                    Const const1' =>
+                       if Constant.eq (const1, const1') then
+                          (case List.splitOpt spine l of
+                              SOME (spine1, App arg :: spine3) =>
+                                 let
+                                    val (h', spine2) = simp arg id []
+                                 in
+                                    (case h' of
+                                        Const const2' =>
+                                           if Constant.eq (const2, const2') then
+                                              ureduce2 ured spine1 spine2 spine3
+                                           else
+                                              raise Reduce
+
+                                      | _ => raise Reduce)
+                                 end
+
+                            | _ => raise Reduce)
+                       else
+                          raise Reduce
+
+                  | _ => raise Reduce))
+
+
+      (* i >= 0 *)
+      and reduceElim red i spine acc =
+         (case spine of
+             [] => raise Reduce
+
+           | (elim as App m) :: rest =>
+                if i = 0 then
+                   List.revAppend
+                      acc
+                      (App (reduceMain red m id []) :: rest)
+                else
+                   reduceElim red (i-1) rest (elim :: acc)
+
+           | elim :: rest =>
+                if i = 0 then
+                   raise Reduce
+                else
+                   reduceElim red (i-1) rest (elim :: acc))
+
+
+      and reduceSpine reds spine acc =
+         (case reds of
+             [] =>
+                List.revAppend acc spine
+
+           | red :: reds' =>
+                (case spine of
+                    [] => raise Reduce
+
+                  | App m :: spine' =>
+                       reduceSpine reds' spine' (App (reduceMain red m id []) :: acc)
+
+                  | elim :: spine' =>
+                       reduceSpine reds spine' (elim :: acc)))
+
+
+      fun reduce red m = reduceMain red m id []
+
+
+
+      fun same m1 m2 =
+         let
+            val (h1, spine1) = simp m1 id []
+            val (h2, spine2) = simp m2 id []
+         in
+            (case (h1, h2) of
+                (Var i, Var j) => 
+                   i = j
+
+              | (Const const, Const const') => 
+                   Constant.eq (const, const')
+
+              | (Lam (_, m1'), Lam (_, m2')) =>
+                   same m1' m2'
+
+              | (Pair (m1a, m1b), Pair (m2a, m2b)) =>
+                   same m1a m2a
+                   andalso
+                   same m1b m2b
+
+              | (Next m1', Next m2') =>
+                   same m1' m2'
+
+              | (Triv, Triv) =>
+                   true
+
+              | (Marker sym, Marker sym') =>
+                   Symbol.eq (sym, sym')
+
+              | _ =>
+                   (* Free evars are never considered the same. *)
+                   false)
+            andalso
+            sameSpine spine1 spine2
+         end
+
+
+      and sameSpine spine1 spine2 =
+         (case (spine1, spine2) of
+             ([], []) => true
+
+           | (App m :: rest1, App n :: rest2) =>
+                same m n
+                andalso
+                sameSpine rest1 rest2
+
+           | (Pi1 :: rest1, Pi1 :: rest2) =>
+                sameSpine rest1 rest2
+
+           | (Pi2 :: rest1, Pi2 :: rest2) =>
+                sameSpine rest1 rest2
+
+           | (Prev :: rest1, Prev :: rest2) =>
+                sameSpine rest1 rest2
+
+           | _ => false)
+
+
+
+      (* natrec f x i = f (i-1) (f (i-2) (... (f 0 x) ...)) *)
+      fun natrec f x i =
+         if i = 0 then
+            x
+         else
+            f (i-1) (natrec f x (i-1))
+
+
+      fun new1 const n p red1 red2 =
+         if
+            n >= 0 andalso
+            let
+               val p' =
+                  Elim (Const const,
+                        natrec (fns i sp => App (Var i) :: sp) [] n)
+            in
+               same (reduce red1 p') (reduce red2 p)
+            end
+         then
+            (
+            Trail.commit ();
+            (const, n, p)
+            )
+         else
+            raise Reduce
+
+
+      fun new2 const l m const' n q red1 red2 =
+         if
+            l >=0 andalso m >= 0 andalso n >= 0
+            andalso
+            let
+               val q' =
+                  Elim (Const const,
+                        natrec 
+                           (fns i sp => App (Var (m+n+i)) :: sp)
+                           (App (Elim (Const const',
+                                       natrec (fns i sp => App (Var (m+i)) :: sp) [] n))
+                            :: natrec (fns i sp => App (Var i) :: sp) [] m)
+                           l)
+            in
+               same (reduce red1 q') (reduce red2 q)
+            end
+         then
+            (
+            Trail.commit ();
+            (const, l, m, const', n, q)
+            )
+         else
+            raise Reduce
+            
+                           
+      fun trigger (const, _, _) = const
+      fun triggers (const, l, _, const', _, _) = (const, l, const')
+
+      fun backdoor1 ured = ured
+      fun backdoor2 ured = ured
+         
+      structure P = Pickle
+      structure PP = Pickling
+
+
+      val impossible = Fail "impossible"
+
+      val pu1 =
+         P.tuple3 PP.puConstant P.int PP.puTerm
+
+      val pu2 =
+         P.tuple6 PP.puConstant P.int P.int PP.puConstant P.int PP.puTerm
+
+      val puRed =
+         P.fix
+            (fn puRed =>
+                P.alt
+                   (fn Trans _ => 0
+                     | Unfold => 1
+                     | Beta _ => 2
+                     | Within _ => 3
+                     | Compat _ => 4
+                     | User1 _ => 5
+                     | User2 _ => 6)
+                   [
+                   P.wrap
+                      (fn Trans l => l
+                        | _ => raise impossible)
+                      Trans
+                      (P.list puRed),
+
+                   P.const Unfold,
+
+                   P.wrap
+                      (fn Beta i => i
+                        | _ => raise impossible)
+                      Beta
+                      (P.option P.int),
+
+                   P.wrap
+                      (fn Within (l, r) => (l, r)
+                        | _ => raise impossible)
+                      Within
+                      (P.pair (P.list P.int) puRed),
+
+                   P.wrap
+                      (fn Compat l => l
+                        | _ => raise impossible)
+                      Compat
+                      (P.list puRed),
+
+                   P.wrap
+                      (fn User1 r => r
+                        | _ => raise impossible)
+                      User1
+                      pu1,
+
+                   P.wrap
+                      (fn User2 r => r
+                        | _ => raise impossible)
+                      User2
+                      pu2
+                   ])
+
+      val puUreduction1 =
+         P.wrap
+            (fn r => r)
+            (fn r =>
+                if Unsafe.getParanoid () then
+                   raise PP.Paranoid
+                else
+                   r)
+            pu1
+
+      val puUreduction2 =
+         P.wrap
+            (fn r => r)
+            (fn r =>
+                if Unsafe.getParanoid () then
+                   raise PP.Paranoid
+                else
+                   r)
+            pu2
+            
+      val puReduction =
+         P.wrap
+            (fn r => r)
+            (fn r =>
+                if Unsafe.getParanoid () then
+                   raise PP.Paranoid
+                else
+                   r)
+            puRed
+
+   end

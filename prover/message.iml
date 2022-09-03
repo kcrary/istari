@@ -1,0 +1,94 @@
+
+signature MESSAGE =
+   sig
+
+      exception Error of exn * string
+
+
+      val clear : unit -> unit
+
+      (* message order importance f
+
+         Enqueues message f with the given order and importance.
+
+         Messages with higher order are shown last (and are thus more visible)
+          - 0: standard
+          - 10: the status report
+          - 20: error messages
+
+         Messages with higher importance number are less important, and more
+         easily squelched.  Normal is zero.  Squelching takes place at the time
+         a message is enqueued.
+      *)
+      val message : int -> int -> (unit -> unit) -> unit
+
+      (* Display current messages. *)
+      val display : unit -> unit
+
+      (* Current squelch.  (Default zero.) *)
+      val squelch : int ref
+
+
+      type label
+
+      val blank : label
+      val fromString : string -> label
+      val addDetail : label -> (unit -> unit) -> label
+
+      val toString : label -> string
+      val printLabel : label -> unit
+
+      val detail : label -> unit
+
+   end
+
+
+structure Message :> MESSAGE =
+   struct
+
+      exception Error of exn * string
+
+
+      val squelch = ref 0
+      val current : (int * (unit -> unit)) list ref = ref []   (* reverse order *)
+
+      fun clear () = current := []
+
+      fun message ord imp f =
+         if imp > !squelch then
+            ()
+         else
+            current := (ord, f) :: !current
+
+      fun display () =
+         let
+            val l = List.rev (Juliasort.sort (fn ((x, _), (y, _)) => Int.compare y x) (!current))
+         in
+            current := [];
+
+            List.app (fn (_, f) => f ()) l
+         end
+
+
+
+      type label = string * (unit -> unit)
+
+      val blank = ("", (fn () => ()))
+
+      fun fromString str = (str, (fn () => ()))
+
+      fun addDetail (str, _) f = (str, f)
+
+      fun toString (str, _) = str
+
+      fun printLabel ("", _) = ()
+        | printLabel (str, _) =
+             (
+             print "[";
+             print str;
+             print "]\n"
+             )
+
+      fun detail (_, f) = f ()
+
+   end

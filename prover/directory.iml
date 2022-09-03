@@ -1,0 +1,509 @@
+
+signature DIRECTORY =
+   sig
+
+      type symbol = Symbol.symbol
+
+      type directory   (* for input & output *)
+      type idirectory  (* for input only *)
+      type set
+
+      exception Unbound of symbol
+      exception Shadow of symbol
+
+
+      (* Shadowing is permitted. *)
+      val idir                : directory -> idirectory
+      val iempty              : idirectory
+      val ibind0              : idirectory -> idirectory
+      val ibind               : idirectory -> symbol -> idirectory
+      val ibindh              : idirectory -> symbol option -> idirectory
+      val ibinds              : idirectory -> symbol list -> idirectory
+      val ibindhs             : idirectory -> symbol option list -> idirectory
+
+      (* Signals Shadow or returns NONE if an identifier is shadowed. *)
+      val empty               : directory
+      val bind0               : directory -> directory
+      val bind                : directory -> symbol -> directory
+      val bindOpt             : directory -> symbol -> directory option
+      val bindh               : directory -> symbol option -> directory
+      val insistAndBind       : directory -> symbol option -> symbol * directory
+      val insistAndBindOpt    : directory -> symbol option -> (symbol * directory) option
+      val binds               : directory -> symbol list -> directory
+      val bindhs              : directory -> symbol option list -> directory
+      val literal             : symbol list -> directory
+      val literalStr          : string list -> directory
+      
+      (* If the binding would shadow an identifier, produces an alternate. *)
+      val fresh               : directory -> symbol
+      val vary                : directory -> symbol -> symbol
+      val varyAndBind         : directory -> symbol option -> symbol * directory
+      val freshAndBind        : directory -> symbol * directory
+      val bindVary            : directory -> symbol option -> directory
+      val bindsVary           : directory -> symbol option list -> directory
+
+
+
+      (* Signals Unbound if identifier is not in the directory
+         (and not a constant either, if appropriate)
+      *)
+      datatype head = Hvar of int | Hconst of Constant.constant
+      val lookupVar           : idirectory -> symbol -> int
+      val lookupVarOpt        : idirectory -> symbol -> int option
+      val lookup              : idirectory -> symbol -> head
+      val lookupOpt           : idirectory -> symbol -> head option
+
+      (* raises Invalid or returns NONE if the index is out of range *)
+      val name                : directory -> int -> symbol
+      val nameOpt             : directory -> int -> symbol option
+
+      val size                : directory -> int
+
+
+      val expose              : directory -> symbol * directory
+      val exposeOpt           : directory -> (symbol * directory) option
+      val hd                  : directory -> symbol
+      val tl                  : directory -> directory
+      val toList              : directory -> symbol list
+
+      (* the last n symbols in the directory, with the oldest first *)
+      val suffix              : directory -> int -> symbol list
+      val suffixOpt           : directory -> int -> symbol list option
+
+      (* peels n bindings off the directory *)
+      val shift               : directory -> int -> directory
+      val shiftOpt            : directory -> int -> directory option
+
+      (* suffix and shift combined *)
+      val split               : directory -> int -> symbol list * directory
+      val splitOpt            : directory -> int -> (symbol list * directory) option
+
+
+
+      val set                 : directory -> set
+      val freshSet            : set -> symbol
+      val varySet             : set -> symbol -> symbol
+      val bindVarySet         : set -> symbol option -> set
+      val freshAndBindSet     : set -> symbol * set
+      val varyAndBindSet      : set -> symbol option -> symbol * set
+      val insistAndBindSet    : set -> symbol option -> symbol * set
+      val insistAndBindSetOpt : set -> symbol option -> (symbol * set) option
+
+   end
+
+
+
+structure Directory :> DIRECTORY =
+   struct
+
+      type symbol = Symbol.symbol
+
+      structure D = SymbolDict
+      structure S = Seq
+
+
+      exception Error = Message.Error
+
+      exception Unbound of Symbol.symbol
+      exception Shadow of Symbol.symbol
+
+      fun signalUnbound sym =
+         raise (Error (Unbound sym, 
+                       String.concat 
+                          [
+                          "Error: unbound identifier ",
+                          Symbol.toValue sym,
+                          ".\n"
+                          ]))
+
+      fun signalShadow sym =
+         raise (Error (Shadow sym, 
+                       String.concat 
+                          [
+                          "Error: identifier ",
+                          Symbol.toValue sym,
+                          " is already bound.\n"
+                          ]))
+      
+
+
+      (* a directory is (d, i, bv, n)
+
+         d  : a mapping of names to deBruijn levels
+         i  : the current deBruijn level (equal to the length of bv)
+         bv : a sequence ... (sj, dj, nj) ... where sj is the name for deBruijn index j,
+              and dj and nj are the d and n that existed before that binding
+         n  : the next anonymous variable to try
+      *)
+      type directory = int D.dict * int * (symbol * int D.dict * int) S.seq * int
+
+
+      (* an idirectory is (d, i), as above *)
+      type idirectory = int D.dict * int
+
+
+      (* a set is (d, n)
+
+         d : a mapping of names to meaningless numbers
+         n : the next anonymous vairable to try
+      *)
+      type set = int D.dict * int
+
+
+      fun isconst x = Option.isSome (Namespace.resolveOpt [x])
+
+      fun anon d n = 
+         let
+            val x = Symbol.fromValue ("v" ^ Int.toString n)
+         in
+            if D.member d x orelse isconst x then
+               anon d (n+1)
+            else
+               (x, n+1)
+         end
+
+      fun varyloop d x n =
+         let
+            val x' = Symbol.fromValue (Symbol.toValue x ^ Int.toString n)
+         in
+            if D.member d x' orelse isconst x' then
+               varyloop d x (n+1)
+            else
+               x'
+         end
+
+      fun vary (d, _, _, _) x =
+         if D.member d x orelse isconst x then
+            varyloop d x 1
+         else
+            x
+
+      fun varySet (d, _) x =
+         if D.member d x orelse isconst x then
+            varyloop d x 1
+         else
+            x
+
+      fun fresh (d, _, _, n) =
+         let
+            val (x, _) = anon d n
+         in
+            x
+         end
+
+      fun freshSet (d, n) =
+         let
+            val (x, _) = anon d n
+         in
+            x
+         end
+
+
+      fun idir (d, i, _, _) = (d, i)
+
+      val iempty = (D.empty, 0)
+
+      fun ibind0 (d, i) = (d, i+1)
+
+      fun ibind (d, i) x =
+         (D.insert d x i, i+1)
+
+      fun ibindh d vo =
+         (case vo of
+             NONE =>
+                ibind0 d
+
+           | SOME v =>
+                ibind d v)
+
+      fun ibinds d l =
+         List.foldl (fns v d => ibind d v) d l
+
+      fun ibindhs d l =
+         List.foldl (fns v d => ibindh d v) d l
+
+
+
+      fun set (d, _, _, n) = (d, n)
+
+      val empty = (D.empty, 0, S.empty, 0)
+
+      fun freshAndBind (d, i, bv, n) =
+         let
+            val (x, n') = anon d n
+         in
+            (x, (D.insert d x i, i+1, S.cons (x, d, n) bv, n'))
+         end
+
+      fun bind0 dir =
+         let
+            val (_, dir') = freshAndBind dir
+         in
+            dir'
+         end
+
+      fun varyAndBind (dir as (d, i, bv, n)) b =
+         (case b of
+             NONE =>
+                freshAndBind dir
+
+           | SOME x =>
+                let
+                   val x' = vary dir x
+                in
+                   (x', (D.insert d x' i, i+1, S.cons (x', d, n) bv, n))
+                end)
+
+      fun bindVary dir b =
+         let
+            val (_, dir') = varyAndBind dir b
+         in
+            dir'
+         end
+
+      fun bindsVary dir l =
+         List.foldl (fns b dir => bindVary dir b) dir l
+
+      fun freshAndBindSet (set as (d, n)) =
+         let
+            val (x, n') = anon d n
+         in
+            (x, (D.insert d x ~1, n'))
+         end
+
+      fun varyAndBindSet (set as (d, n)) b =
+         (case b of
+             NONE =>
+                freshAndBindSet set
+
+           | SOME x =>
+                let
+                   val x' = varySet set x
+                in
+                   (x', (D.insert d x' ~1, n))
+                end)
+
+      fun bindVarySet set b =
+         let
+            val (_, set') = varyAndBindSet set b
+         in
+            set'
+         end
+
+      fun bindOpt (d, i, bv, n) x =
+         if Option.isSome (D.find d x) orelse isconst x then
+            NONE
+         else
+            SOME (D.insert d x i, i+1, S.cons (x, d, n) bv, n)
+         
+      fun bind dir x =
+         (case bindOpt dir x of
+             SOME dir' => dir'
+
+           | NONE => signalShadow x)
+         
+      fun insistAndBind dir b =
+         (case b of
+             NONE =>
+                freshAndBind dir
+
+           | SOME x =>
+                (x, bind dir x))
+
+      fun insistAndBindOpt dir b =
+         (case b of
+             NONE =>
+                SOME (freshAndBind dir)
+
+           | SOME x =>
+                Option.map (fn dir => (x, dir)) (bindOpt dir x))
+
+      fun bindh dir b =
+         let
+            val (_, dir') = insistAndBind dir b
+         in
+            dir'
+         end
+
+      fun insistAndBindSetOpt (set as (d, n)) b =
+         (case b of
+             NONE =>
+                SOME (freshAndBindSet set)
+
+           | SOME x =>
+                if Option.isSome (D.find d x) orelse isconst x then
+                   NONE
+                else
+                   SOME (x, (D.insert d x ~1, n)))
+
+      fun insistAndBindSet (set as (d, n)) b =
+         (case b of
+             NONE =>
+                freshAndBindSet set
+
+           | SOME x =>
+                if Option.isSome (D.find d x) orelse isconst x then
+                   signalShadow x
+                else
+                   (x, (D.insert d x ~1, n)))
+
+      fun binds d l =
+         List.foldl (fns sym d => bind d sym) d l
+
+      fun bindhs d l =
+         List.foldl (fns symopt d => bindh d symopt) d l
+
+      fun literal l =
+         List.foldl
+            (fns sym d => bind d sym)
+            empty
+            l
+
+      fun literalStr l =
+         List.foldl
+            (fns str d => bind d (Symbol.fromValue str))
+            empty
+            l
+
+
+
+      datatype head = Hvar of int | Hconst of Constant.constant
+
+      fun lookupVarOpt (d, i) x =
+         (case D.find d x of
+             SOME i' =>
+                SOME (i - i' - 1)
+
+           | NONE => NONE)
+
+      fun lookupOpt dir x =
+         (case lookupVarOpt dir x of
+             SOME i => SOME (Hvar i)
+
+           | NONE =>
+                (case Namespace.resolveOpt [x] of
+                    SOME const => SOME (Hconst const)
+
+                  | NONE => NONE))
+
+      fun lookupVar dir x =
+         (case lookupVarOpt dir x of
+             SOME i => i
+
+           | NONE => signalUnbound x)
+
+      fun lookup dir x =
+         (case lookupOpt dir x of
+             SOME h => h
+
+           | NONE => signalUnbound x)
+
+      fun name (_, _, bv, _) i =
+         (case Seq.nthOpt bv i of
+             NONE => raise (Invalid "index out of range")
+
+           | SOME (sym, _, _) => sym)
+
+      fun nameOpt (_, _, bv, _) i =
+         (case Seq.nthOpt bv i of
+             NONE => NONE
+
+           | SOME (sym, _, _) => SOME sym)
+
+      fun size (_, _, bv, _) = S.length bv
+
+      fun exposeOpt (_, i, bv, _) =
+         (case S.expose bv of
+             S.Nil => NONE
+
+           | S.Cons ((x, d, n), bv') =>
+                SOME (x, (d, i-1, bv', n)))
+
+      fun expose dir =
+         (case exposeOpt dir of
+             NONE => raise (Invalid "empty directory")
+             
+           | SOME x => x)
+
+      fun hd (_, _, bv, _) =
+         (case S.expose bv of
+             S.Nil => raise (Invalid "empty directory")
+
+           | S.Cons ((x, _, _), _) => x)
+
+      fun tl (_, i, bv, _) =
+         (case S.expose bv of
+             S.Nil => raise (Invalid "index out of range")
+           | S.Cons ((_, d, n), bv') =>
+                (d, i-1, bv', n))
+
+      fun toList (_, _, bv, _) =
+         List.rev (Seq.foldl (fns (sym, _, _) l => sym :: l) [] bv)
+         
+
+      fun suffixMain bv j acc =
+         if j = 0 then
+            SOME acc
+         else
+            (case S.expose bv of
+                S.Nil => NONE
+
+              | S.Cons ((sym, _, _), bv') =>
+                   suffixMain bv' (j-1) (sym :: acc))
+
+      fun suffixOpt (_, _, bv, _) j = suffixMain bv j []
+
+      fun suffix dir j =
+         (case suffixOpt dir j of
+             NONE => raise (Invalid "index out of range")
+
+           | SOME x => x)
+
+      fun shiftOpt (dir as (_, i, bv, _)) j =
+         if j = 0 then
+            SOME dir
+         else
+            (case S.dropOpt bv (j-1) of
+                NONE => NONE
+
+              | SOME bv' =>
+                   (case S.expose bv' of
+                       S.Nil => NONE
+                     | S.Cons ((_, d, n), bv'') =>
+                          SOME (d, i-j, bv'', n)))
+
+      fun shift dir j =
+         (case shiftOpt dir j of
+             NONE => raise (Invalid "index out of range")
+
+           | SOME x => x)
+
+      fun splitOpt (dir as (_, i, bv, _)) j =
+         if j = 0 then
+            SOME ([], dir)
+         else
+            let
+               fun loop k bv acc =
+                  if k = 0 then
+                     (case S.expose bv of
+                         S.Nil => NONE
+
+                       | S.Cons ((x, d, n), bv') =>
+                            SOME (x :: acc, (d, i-j, bv', n)))
+                  else
+                     (case S.expose bv of
+                         S.Nil => NONE
+
+                       | S.Cons ((x, _, _), bv') =>
+                            loop (k-1) bv' (x :: acc))
+            in
+               loop (j-1) bv []
+            end
+
+      fun split dir j =
+         (case splitOpt dir j of
+             NONE => raise (Invalid "index out of range")
+
+           | SOME x => x)
+
+   end

@@ -1,0 +1,215 @@
+
+signature REWIND =
+   sig
+
+      type action
+
+      val log : action -> unit
+
+      (* Committed actions will never be undone.
+
+         Whenever an action is undone, its token is invalidated.
+
+         If rewind is unable to recover the marked state, it raises Rewind.
+         Some actions may have been undone, but the above guarantees still hold.
+      *)
+
+      type mark
+      exception Rewind
+      val mark : unit -> mark
+      val rewind : mark -> unit
+      val commit : unit -> unit
+      
+
+      (* A token represents a set of marks.  If the trail is rewound before any mark
+         in the set, the token is invalidated.
+      *)
+
+      type token
+      val merge : token -> token -> token
+      val token : unit -> token
+      val valid : token -> bool
+      val always : token
+
+   end
+
+
+functor RewindFun (type action
+                   val undo : action -> unit)
+   :> REWIND where type action = action
+   =
+   struct
+
+      type action = action
+      type mark = int
+      type token = bool ref * int
+
+
+      (* The trail remembers actions that took place since the most recent commit,
+         but before the the most recent mark.  Actions before a commit are gced.
+         Actions after the most recent mark are collected in youngTrail.
+
+         A Cons trail gives an "era"; the actions that took between two marks.
+         It contains: the era's clock, actions performed during that era,
+         the era's validity reference, and the earlier portion of the trail.
+         (Thus, clocks in the trail are sorted with the youngest first.)
+
+         A Nil trail says all the earlier actions are committed.  It includes the
+         clock of the most-recently committed era.
+
+         nextClock is the clock that will be used the next time a mark is created.
+         Thus, nextClock is the current clock as soon as youngTrail is nonempty.
+
+         Similarly, nextValid is the validity reference that will be used the
+         next time a mark is created.  Thus, it is the current validity reference
+         as soon as youngTrail is nonempty.
+      *)
+
+      datatype trail =
+         Nil of int
+       | Cons of int * action list * bool ref * trail
+
+      val theTrail   : trail ref       = ref (Nil 0)
+      val youngTrail : action list ref = ref []
+      val nextClock  : int ref         = ref 1
+      val nextValid  : bool ref ref    = ref (ref true)
+
+
+      fun log action =
+         youngTrail := action :: !youngTrail
+
+
+      fun trailClock () =
+         (case !theTrail of
+             Nil clk => clk
+
+           | Cons (clk, _, _, _) => clk)
+
+
+      fun mark () =
+         (case !youngTrail of
+             [] =>
+                trailClock ()
+
+           | actions =>
+                let
+                   val clk = !nextClock
+                   val valid = !nextValid
+                in
+                   nextClock := clk + 1;
+                   nextValid := ref true;
+                   theTrail := Cons (clk, actions, valid, !theTrail);
+                   youngTrail := [];
+                   
+                   clk
+                end)
+
+
+      fun commit () =
+         (case !youngTrail of
+             [] =>
+                theTrail := Nil (trailClock ())
+
+           | _ :: _ =>
+                (* Act as if we had marked, before erasing the trail. *)
+                let
+                   val clk = !nextClock
+                in
+                   nextClock := clk + 1;
+                   nextValid := ref true;
+                   theTrail := Nil clk;
+                   youngTrail := []
+                end)
+
+
+
+      exception Rewind
+
+      (* we want the clock of the trail's head to show target *)
+      fun rewindLoop target l =
+         (case l of
+             Nil clk =>
+                if target = clk then
+                   theTrail := l
+                else
+                   (* Either the target is committed (target < clk), or
+                      we passed it (clk < target), which means it must have
+                      been rewound earlier.  Either way, signal an error.
+                   *)
+                   (
+                   theTrail := l;
+                   raise Rewind
+                   )
+
+           | Cons (clk, actions, valid, rest) =>
+                (case Int.compare target clk of
+                    EQUAL =>
+                       (* found the target *)
+                       theTrail := l
+
+                  | LESS =>
+                       (
+                       List.app undo actions;
+                       valid := false;
+                       rewindLoop target rest
+                       )
+
+                  | GREATER =>
+                       (* We passed the target, so it must have been rewound earlier. *)
+                       (
+                       theTrail := l;
+                       raise Rewind
+                       )))
+
+      fun rewind target =
+         (
+         List.app undo (!youngTrail);
+         youngTrail := [];
+         !nextValid := false;
+         nextClock := !nextClock + 1;
+         nextValid := ref true;
+         rewindLoop target (!theTrail)
+         )
+
+
+      val alwaysTrue = ref true
+
+      fun token () =
+         (case !youngTrail of
+             [] =>
+                (case !theTrail of
+                    Nil clk => (alwaysTrue, clk)
+
+                  | Cons (clk, _, valid, _) => (valid, clk))
+
+           | _ :: _ => (!nextValid, !nextClock))
+
+
+      fun valid (r, _) = !r
+
+
+      fun merge (tok1 as (valid1, clk1)) (tok2 as (valid2, clk2)) =
+         (* We want to chose the token T such that if either token is
+            invalidated, T is invalidated.
+         *)
+         if clk1 < clk2 then
+            (* Token two is younger, so either one is an ancestor of two,
+               or one is from an alternate branch.  If one is from an
+               alternate branch, it is invalid already, so use one.
+               Otherwise use two, because invalidating one will also
+               invalidate two.
+            *)
+            if !valid1 then
+               tok2
+            else
+               tok1
+         else
+            (* vice versa *)
+            if !valid2 then
+               tok1
+            else
+               tok2
+
+      val always = (alwaysTrue, 0)
+         
+   end
