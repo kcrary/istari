@@ -90,6 +90,40 @@ structure Make :> MAKE =
          end
 
 
+      fun copyLoop ins outs =
+         (case TextIO.input ins of
+             "" => ()
+
+           | str =>
+                (
+                TextIO.output (outs, str);
+                copyLoop ins outs
+                ))
+
+      (* SML basis provides rename, but not copy. *)
+      fun copy infile outfile =
+         let
+            val ins =
+               TextIO.openIn infile
+               handle Io =>
+                  raise (E.GeneralError ("unable to open input file " ^ infile))
+         in
+            Finally.finally
+               (fn () =>
+                   let
+                      val outs =
+                         TextIO.openOut outfile
+                         handle Io =>
+                            raise (E.GeneralError ("unable to open output file " ^ outfile))
+                   in
+                      Finally.finally
+                         (fn () => copyLoop ins outs)
+                         (fn () => TextIO.closeOut outs)
+                   end)
+               (fn () => TextIO.closeIn ins)
+         end
+
+
       fun sunderFilename fullname =
          let
             val fullname =
@@ -198,11 +232,8 @@ structure Make :> MAKE =
 
          The outfile name is used for writing output, but also
          for the list of files to recompile.
-
-         The path is needed because sources corresponding to .ipc files are in the
-         directory where the .ipc file was.
       *)
-      fun processName path basename ext =
+      fun processName basename ext =
          let
             val goodname = 
                String.translate
@@ -223,23 +254,17 @@ structure Make :> MAKE =
                     | (L.SML, "sml") => "sml.sml"
                     | (L.SML, "sig") => "sml.sml"
                     | (L.SML, "ist") => "ist.sml"
-                    | (L.SML, "ipc") => "sml"
+                    | (L.SML, "ipc") => "ipc.sml"
                     | (L.OCAML, "iml") => "iml-ml"
                     | (L.OCAML, "sml") => "sml-ml"
                     | (L.OCAML, "sig") => "sml-ml"
                     | (L.OCAML, "ist") => "ist-ml"
-                    | (L.OCAML, "ipc") => "ml"
+                    | (L.OCAML, "ipc") => "ipc-ml"
 
                     | _ =>
                          raise (E.GeneralError ("unknown file type " ^ Path.joinExt goodname ext)))
-
-            val outfilepath =
-               (case ext of
-                   "ipc" => Path.join path outfilename
-
-                 | _ => outfilename)
          in
-            (goodname, outfilepath)
+            (goodname, outfilename)
          end
 
 
@@ -345,7 +370,15 @@ structure Make :> MAKE =
                   withInstream infile
                   (fn ins =>
                       makeContext ctx (Parser.parseIpc (Stream.fromTextInstream ins)))
+
+               val (basename, _) = Option.valOf (Path.splitExt infile)
+               val sourceExt =
+                  (case !L.target of
+                      L.SML => "sml"
+                    | L.OCAML => "ml")
             in
+               copy (Path.joinExt basename sourceExt) outfile;
+
                currentFilename := oldCurrentFilename;
 
                (ectx, FS.empty)
@@ -427,7 +460,7 @@ structure Make :> MAKE =
                       end
                    else
                       let
-                         val (goodname, outfile) = processName path basename ext
+                         val (goodname, outfile) = processName basename ext
                          val filesym = F.fromValue goodname
       
                          val () =
@@ -539,7 +572,7 @@ structure Make :> MAKE =
                                 )
                              else
                                 let
-                                   val (_, outname) = processName path basename ext
+                                   val (_, outname) = processName basename ext
                                 in
                                    out "   ";
                                    out outname;
@@ -566,7 +599,7 @@ structure Make :> MAKE =
                        let
                           val (path, _, _, ext) = sunderFilename fullname
                        in
-                          if ext = "proj" orelse ext = "ipc" then
+                          if ext = "proj" then
                              " -I " :: path :: l
                           else
                              l
@@ -597,7 +630,7 @@ structure Make :> MAKE =
                                 locals
                              else
                                 let
-                                   val (goodname, outname) = processName path basename ext
+                                   val (goodname, outname) = processName basename ext
                                    val filesym = F.fromValue goodname
                                    val (_, _, deps, _) = D.lookup database filesym
                                    val locals' = FS.insert locals filesym
@@ -617,7 +650,7 @@ structure Make :> MAKE =
                                           ))
                                       (FS.intersection deps locals);
          
-                                   out "\n\tocamlc -c -error-style short -I . $(INCL)";
+                                   out "\n\tocamlc -c -error-style short $(INCL)";
                                    out " -impl ";
                                    out outname;
                                    out "\n\n";
@@ -713,7 +746,7 @@ structure Make :> MAKE =
                             end
                          else
                             let
-                               val (goodname', _) = processName path' basename' ext'
+                               val (goodname', _) = processName basename' ext'
                                val filesym' = F.fromValue goodname'
                             in
                                (case D.find database filesym' of
