@@ -70,6 +70,7 @@ exact arrowEta_valid.
 exact arrowExt_valid.
 exact arrowOfExt_valid.
 exact arrowFormInv1_valid.
+admit.
 exact tarrowKind_valid.
 exact tarrowKindEq_valid.
 exact tarrowForm_valid.
@@ -111,6 +112,8 @@ exact intersectIntroEq_valid.
 admit.
 exact intersectElimOf_valid.
 exact intersectElimEq_valid.
+admit.
+admit.
 admit.
 admit.
 admit.

@@ -70,7 +70,7 @@ Lemma dots_under :
 Proof.
 intros i.
 induct i.
-7
+
 (* 0 *)
 {
 intros s.

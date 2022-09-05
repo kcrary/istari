@@ -74,6 +74,7 @@ signature THE_RULES =
       val arrowExt : term -> term -> term -> term -> rule
       val arrowOfExt : term -> term -> term -> term -> term -> rule
       val arrowFormInv1 : term -> term -> rule
+      val arrowFormInv2 : term -> term -> term -> rule
       val tarrowKind : term -> term -> term -> rule
       val tarrowKindEq : term -> term -> term -> term -> term -> rule
       val tarrowForm : term -> term -> rule
@@ -116,6 +117,8 @@ signature THE_RULES =
       val intersectElimOf : term -> term -> term -> term -> rule
       val intersectElimEq : term -> term -> term -> term -> term -> rule
       val intersectElim : term -> term -> term -> rule
+      val intersectFormInv1 : term -> term -> rule
+      val intersectFormInv2 : term -> term -> term -> rule
       val guardForm : term -> term -> rule
       val guardEq : term -> term -> term -> term -> rule
       val guardFormUniv : term -> term -> term -> rule
@@ -553,6 +556,7 @@ fun arrowEta a b m = Arg.make "arrowEta" [] (Elim (const_eq, [App (Elim (const_a
 fun arrowExt a b m n = Arg.make "arrowExt" [] (Elim (const_eq, [App (Elim (const_arrow, [App (a), App (b), ])), App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_arrow, [App (a), App (b), ])), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_arrow, [App (a), App (b), ])), App (n), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eq, [App (Sub (b, Shift 1)), App (Elim (Sub (m, Shift 1), [App (Var 0), ])), App (Elim (Sub (n, Shift 1), [App (Var 0), ])), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun arrowOfExt a a' b b' m = Arg.make "arrowOfExt" [] (Elim (const_of, [App (Elim (const_arrow, [App (a), App (b), ])), App (m), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_forall, [App (a'), App (Lam (NONE, b')), ])), App (m), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Sub (b, Shift 1)), App (Elim (Sub (m, Shift 1), [App (Var 0), ])), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun arrowFormInv1 a b = Arg.make "arrowFormInv1" [] (Elim (const_istp, [App (a), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_arrow, [App (a), App (b), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun arrowFormInv2 a b m = Arg.make "arrowFormInv2" [] (Elim (const_istp, [App (b), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_arrow, [App (a), App (b), ])), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun tarrowKind a i k = Arg.make "tarrowKind" [] (Elim (const_of, [App (Elim (const_kind, [App (i), ])), App (Elim (const_tarrow, [App (a), App (k), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_kind, [App (i), ])), App (k), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun tarrowKindEq a a' i k k' = Arg.make "tarrowKindEq" [] (Elim (const_eq, [App (Elim (const_kind, [App (i), ])), App (Elim (const_tarrow, [App (a), App (k), ])), App (Elim (const_tarrow, [App (a'), App (k'), ])), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (a), App (a'), ])), (Arg.Unhide, [], Elim (const_eq, [App (Elim (const_kind, [App (i), ])), App (k), App (k'), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun tarrowForm a b = Arg.make "tarrowForm" [] (Elim (const_istp, [App (Elim (const_tarrow, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
@@ -595,6 +599,8 @@ fun intersectIntro a b = Arg.make "intersectIntro" [] (Elim (const_intersect, [A
 fun intersectElimOf a b m p = Arg.make "intersectElimOf" [] (Elim (const_of, [App (Sub (b, Dot (p, Shift 0))), App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_intersect, [App (a), App (Lam (NONE, b)), ])), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (p), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun intersectElimEq a b m n p = Arg.make "intersectElimEq" [] (Elim (const_eq, [App (Sub (b, Dot (p, Shift 0))), App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_intersect, [App (a), App (Lam (NONE, b)), ])), App (m), App (n), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (p), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun intersectElim a b p = Arg.make "intersectElim" [] (Sub (b, Dot (p, Shift 0))) [(Arg.Nothing, [], Elim (const_intersect, [App (a), App (Lam (NONE, b)), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (p), ])), ] (fn [m, _, ] => m | _ => raise Arg.ExtractFailure)
+fun intersectFormInv1 a b = Arg.make "intersectFormInv1" [] (Elim (const_istp, [App (a), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_intersect, [App (a), App (Lam (NONE, b)), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun intersectFormInv2 a b m = Arg.make "intersectFormInv2" [] (Elim (const_istp, [App (Sub (b, Dot (m, Shift 0))), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_intersect, [App (a), App (Lam (NONE, b)), ])), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun guardForm a b = Arg.make "guardForm" [] (Elim (const_istp, [App (Elim (const_guard, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (Sub (b, Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun guardEq a a' b b' = Arg.make "guardEq" [] (Elim (const_eqtp, [App (Elim (const_guard, [App (a), App (b), ])), App (Elim (const_guard, [App (a'), App (b'), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eqtp, [App (Sub (b, Shift 1)), App (Sub (b', Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun guardFormUniv a b i = Arg.make "guardFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_guard, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Elim (const_univ, [App (Sub (i, Shift 1)), ])), App (Sub (b, Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)

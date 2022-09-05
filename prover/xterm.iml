@@ -42,12 +42,27 @@ signature XTERM =
       val arrowUniv : xterm -> xterm -> xterm
       val lam : Term.binder -> xterm -> xterm -> xterm
 
+      (* G |- A -> B : type  -->  G |- A : type *)
+      val arrowInv1 : xterm -> xterm
+
+      (* G |- A -> B : type  -->  G, A |- B : type *)
+      val arrowInv2 : xterm -> xterm
+
       val forall : Term.binder -> xterm -> xterm -> xterm
       val forallUniv : Term.binder -> xterm -> xterm -> xterm
       val lamAll : Term.binder -> xterm -> xterm -> xterm   (* fn (x : A) . M *)
 
+      (* G |- forall A . B : type  -->  G |- A : type *)
+      val forallInv1 : xterm -> xterm
+
+      (* G |- forall A . B : type  -->  G, A |- B : type *)
+      val forallInv2 : xterm -> xterm
+
       val intersectUniv : Term.binder -> xterm -> xterm -> xterm
       val lamInt : Term.binder -> xterm -> xterm -> xterm   (* A |- M *)
+      val intersectInv1 : xterm -> xterm
+      val intersectInv2 : xterm -> xterm
+
 
       val app : xterm -> xterm -> xterm
       val apps : xterm -> xterm list -> xterm
@@ -117,6 +132,8 @@ signature XTERM =
 
       val use : mxterm -> xterm
       val mobilize : Judgement.context -> xterm -> mxterm
+
+      val inhabitedForm : xterm -> xterm
       
 
       (* (s, action)
@@ -309,6 +326,50 @@ structure XTerm :>
          /
 
 
+      fun arrowInv1 (ab, u, abtac) =
+         term2CaseX ab u
+         / \Prim.arrow\ ? ? ; \Prim.bogus\ =!>
+           \(fnc a b =>
+                (a,
+                 bogus,
+ 
+                 (* G |- A : type *)
+                 refine (Rule.arrowFormInv1 a b)
+                 >>
+                 (* G |- A -> B : type *)
+                 abtac))\
+
+         | _ => \(fnc => error "arrowInv1" [ab, u])\
+         /
+
+
+      fun arrowInv2 (ab, u, abtac) =
+         term2CaseX ab u
+         / \Prim.arrow\ ? ? ; \Prim.bogus\ =!>
+           \(fnc a b =>
+                (T.Sub (b, T.shift1),
+                 bogus,
+ 
+                 (* G, A |- B[^] : type *)
+                 refine (Rule.arrowFormInv2
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.shift1))
+                            T.zero)
+                 >>> [
+                     (* G, A |- arrow A[^] B[^] : type *)
+                     refine (Rule.weaken 0 1)
+                     >>
+                     (* G |- arrow A B : type *)
+                     abtac,
+ 
+                     (* G, A |- 0 : A[^] *)
+                     refine (Rule.hypothesisOf 0)
+                     ]))\
+
+         | _ => \(fnc => error "arrowInv2" [ab, u])\
+         /
+
+
       fun forall binder (a, u, atac) (b, u', btac) =
          term2CaseX u u'
          / \Prim.bogus\ ; \Prim.bogus\ =!>
@@ -356,6 +417,52 @@ structure XTerm :>
          /
 
 
+      fun forallInv1 (ab, u, abtac) =
+         term2CaseX ab u
+         / \Prim.forall\ ? (fn . ?) ; \Prim.bogus\ =!>
+           \(fnc a b =>
+                (a,
+                 bogus,
+ 
+                 (* G |- A : type *)
+                 refine (Rule.forallFormInv1 a b)
+                 >>
+                 (* G |- forall A . B : type *)
+                 abtac))\
+
+         | _ => \(fnc => error "forallInv1" [ab, u])\
+         /
+
+
+      fun forallInv2 (ab, u, abtac) =
+         term2CaseX ab u
+         / \Prim.forall\ ? (fn . ?) ; \Prim.bogus\ =!>
+           \(fnc a b =>
+                (b,
+                 bogus,
+ 
+                 (* G, A |- B : type
+                          = B[0 . ^2][0 . id] : type
+                 *)
+                 refine (Rule.forallFormInv2
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.Idot (0, T.Shift 2)))
+                            T.zero)
+                 >>> [
+                     (* G, A |- forall A[^] . B[0 . ^2] : type *)
+                     refine (Rule.weaken 0 1)
+                     >>
+                     (* G |- forall A . B : type *)
+                     abtac,
+ 
+                     (* G, A |- 0 : A[^] *)
+                     refine (Rule.hypothesisOf 0)
+                     ]))\
+
+         | _ => \(fnc => error "forallInv2" [ab, u])\
+         /
+
+
       fun intersectUniv binder (a, u, atac) (b, u', btac) =
          term2CaseX u u'
          / \Prim.univ\ ? ; \Prim.univ\ ? =!>
@@ -392,6 +499,52 @@ structure XTerm :>
          | _ => \(fnc => error "lamInt" [a, u, m, b])\
          /
        
+
+      fun intersectInv1 (ab, u, abtac) =
+         term2CaseX ab u
+         / \Prim.intersect\ ? (fn . ?) ; \Prim.bogus\ =!>
+           \(fnc a b =>
+                (a,
+                 bogus,
+ 
+                 (* G |- A : type *)
+                 refine (Rule.intersectFormInv1 a b)
+                 >>
+                 (* G |- intersect A . B : type *)
+                 abtac))\
+
+         | _ => \(fnc => error "intersectInv1" [ab, u])\
+         /
+
+
+      fun intersectInv2 (ab, u, abtac) =
+         term2CaseX ab u
+         / \Prim.intersect\ ? (fn . ?) ; \Prim.bogus\ =!>
+           \(fnc a b =>
+                (b,
+                 bogus,
+ 
+                 (* G, A |- B : type
+                          = B[0 . ^2][0 . id] : type
+                 *)
+                 refine (Rule.intersectFormInv2
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.Idot (0, T.Shift 2)))
+                            T.zero)
+                 >>> [
+                     (* G, A |- intersect A[^] . B[0 . ^2] : type *)
+                     refine (Rule.weaken 0 1)
+                     >>
+                     (* G |- intersect A . B : type *)
+                     abtac,
+ 
+                     (* G, A |- 0 : A[^] *)
+                     refine (Rule.hypothesisOf 0)
+                     ]))\
+
+         | _ => \(fnc => error "intersectInv2" [ab, u])\
+         /
+
 
       fun app (m, ab, mtac) (p, a, ptac) =
          termCaseX ab
@@ -1235,6 +1388,18 @@ structure XTerm :>
       fun use (m, a, jud, v) = (m, a, cast jud v)
 
       fun compact ctx m = use (mobilize ctx m)
+
+      fun inhabitedForm (m, a, tac) =
+         (a, bogus,
+          
+          (* A : type *)
+          refine (Rule.inhabitedForm a)
+          >>
+          (* A *)
+          refine (Rule.inhabitant a m)
+          >>
+          (* M : A *)
+          tac)
 
 
       datatype xsub_action =

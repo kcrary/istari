@@ -1359,10 +1359,91 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
+      fun mergeLoop n ctx a mergees =
+         if n = 0 then
+            X.tuple mergees
+         else
+            termCaseX (X.term a)
+            /| \Prim.intersect\ _ (fn ? . _) =>
+               \(fnc binder =>
+                    let
+                       val dom = X.intersectInv1 a
+                       val ctx' = Seq.cons (J.Tm (X.term dom)) ctx
+                       val cod = X.compact ctx' (X.intersectInv2 a)
+
+                       val mergees' =
+                          List.map
+                             (fn m => X.app (X.weaken m 1) (X.var 0 dom))
+                             mergees
+                    
+                       val m = mergeLoop (n-1) ctx' cod mergees'
+                    in
+                       X.lamInt binder dom m
+                    end)\
+
+             | \Prim.forall\ _ (fn ? . _) =>
+               \(fnc binder =>
+                    let
+                       val dom = X.forallInv1 a
+                       val ctx' = Seq.cons (J.Tm (X.term dom)) ctx
+                       val cod = X.compact ctx' (X.forallInv2 a)
+
+                       val mergees' =
+                          List.map
+                             (fn m => X.app (X.weaken m 1) (X.var 0 dom))
+                             mergees
+                    
+                       val m = mergeLoop (n-1) ctx' cod mergees'
+                    in
+                       X.lamAll binder dom m
+                    end)\
+
+             | \Prim.arrow\ _ _ =>
+               \(fnc =>
+                    let
+                       val dom = X.arrowInv1 a
+                       val ctx' = Seq.cons (J.Tm (X.term dom)) ctx
+                       val cod = X.compact ctx' (X.arrowInv2 a)
+
+                       val mergees' =
+                          List.map
+                             (fn m => X.app (X.weaken m 1) (X.var 0 dom))
+                             mergees
+                    
+                       val m = mergeLoop (n-1) ctx' cod mergees'
+                    in
+                       X.lam NONE dom m
+                    end)\
+
+             | _ =>
+               \(fnc =>
+                    raise (Fail "unexpected type in merge"))\
+            /
+
+
+      fun merge n consts =
+         let
+            val mergees = List.map X.constant consts
+         in
+            (case mergees of
+                [] => raise (Invalid "empty list")
+
+              | m :: _ =>
+                   let
+                      val a = X.compact Seq.empty (X.inhabitedForm m)
+                   in
+                      mergeLoop n Seq.empty a mergees
+                   end)
+         end
+
+
+
       fun makeDatatype (typedef as (invis, pers, univ_mobile, dts) : itypedef) =
          let
+            val mut = List.length dts
+
             val () =
-               if List.null dts then
+               if mut = 0 then
                   signalDatatype "empty datatype specification"
                else
                   ()
@@ -2752,7 +2833,22 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-            (* 9. Populator the destructor and iterator tables.
+            (* 9. Create merged iterator *)
+
+            val merged as (_, merged_t, _) =
+               merge
+                  (numberOfPervasiveArgs + mut + numberOfConstructors)
+                  (List.map
+                      (fn (const, _) => const)
+                      iterInfoList)
+
+            val jointIter = define (Symbol.fromValue (firstName ^ "_iter_joint")) merged merged_t
+            val () = Constant.setOpacity jointIter Constant.HARD
+
+
+
+
+            (* 10. Populator the destructor and iterator tables.
 
                (Note that we can't just use the iterator for destruct.  We want to destruct datatype
                hypotheses in-place, which the iterator cannot do.)

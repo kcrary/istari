@@ -18,7 +18,7 @@ structure Main :> MAIN =
 
       fun parse () =
          let
-            val ins = TextIO.openIn "../trusted/RULES"
+            val ins = TextIO.openIn "../prover/trusted/RULES"
          in
             Finally.finally
                (fn () => Parser.parse (Stream.fromTextInstream ins))
@@ -40,7 +40,7 @@ structure Main :> MAIN =
       fun rulegen () =
          let
             val rules = elaborate ()
-            val outs = TextIO.openOut "../trusted/the-rules.iml"
+            val outs = TextIO.openOut "../prover/trusted/the-rules.iml"
          in
             Finally.finally
                (fn () => Rulegen.gen outs rules)
@@ -83,7 +83,7 @@ structure Main :> MAIN =
             val rules' = map Elaborate.elaborate rules
          in
             let
-               val outs = TextIO.openOut "../refiner/the-rules.iml"
+               val outs = TextIO.openOut "../prover/trusted/the-rules.iml"
             in
                Finally.finally
                   (fn () => Rulegen.gen outs rules')

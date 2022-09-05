@@ -3,7 +3,10 @@ IPP=../ipp/bin/ipp
 
 .PHONY : sml ocaml ocaml-generated clean
 
-smlnj :
+trusted/the-rules.iml : trusted/RULES
+	cd ../rulegen; make rules
+
+smlnj : trusted/the-rules.iml
 	$(IPP) -t sml -build -B ../ipp/basis prover.proj
 
 ocaml-generated prover.make :
