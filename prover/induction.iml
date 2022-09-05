@@ -24,6 +24,15 @@ signature INDUCTION_INTERNAL =
       val inductionTactics : Typecheck.priority Tactic.tacticm ConstantTable.table
 
 
+      (* maps a datatype constant to (const, nvis, nind)
+
+         const: the datatype's iterator
+         nvis: the number of visible pervasive arguments
+         nind: the number of index arguments
+      *)
+      val iterators : (Constant.constant * int * int) ConstantTable.table
+
+
       val accInduction : Typecheck.priority Tactic.tacticm
    end
 
@@ -83,6 +92,82 @@ structure InductionInternal :> INDUCTION_INTERNAL =
 
 
       
+      val iterators : (Constant.constant * int * int) H.table = H.table ()
+
+
+      exception Iterate of string
+
+      fun tryf f sk =
+         (case
+             (try
+                 Sum.INL (f ())
+              with Iterate msg => Sum.INR msg)
+          of
+             Sum.INL x => sk x
+
+           | Sum.INR msg => fail msg)
+         
+
+      (* Like HypTactic.revert0, except:
+         - it doesn't try to create arrows,
+         - it doesn't bother to create meaningful binders,
+         - it doesn't try to cope with hidden hypotheases, and
+         - its error messages are tailored to what's going on here.
+      *)
+      val revert0 =
+         let
+            do (jud, dir) = withgoal
+            val dir' = D.tl dir
+            val c = J.concl jud
+         in
+            (case J.hypOpt jud 0 of
+                SOME (J.Tm a) =>
+                   refine (Rule.forallElim (T.Sub (a, T.shift1)) (T.Sub (c, T.Idot (0, T.Shift 2))) T.zero)
+                   >>> [
+                       refine (Rule.weaken 0 1)
+                       >> chdir dir',
+
+                       refine (Rule.hypothesisOf 0)
+                       ]
+
+              | SOME _ =>
+                   fail "index argument has the wrong sort"
+
+              | NONE =>
+                   (* We should have failed already if this happens. *)
+                   fail "unexpected missing index argument")
+         end
+
+
+      fun revertVars vars =
+         (case vars of
+             [] => idtac
+
+           | i :: rest =>
+                (cut $
+                 setFailure "hypotheses depend on index argument" $
+                 HypTactic.exchange 0 i 1)
+                >>
+                let
+                   do vars' =
+                      tryf
+                      (fn () =>
+                          List.map
+                             (fn j =>
+                                 (case Int.compare i j of
+                                     LESS => j-1
+
+                                   | GREATER => j
+
+                                   | EQUAL =>
+                                        raise (Iterate "index arguments must be distinct variables")))
+                             rest)
+                in
+                   revert0
+                   >> revertVars vars'
+                end)
+         
+
       fun iteratePriority hyp =
          let
             do i = HypTactic.findhyp hyp
@@ -92,40 +177,70 @@ structure InductionInternal :> INDUCTION_INTERNAL =
              HypTactic.exchange 0 i 1)
             >>
             goalContextCase
-            /
-             | $hyp 0 $tm $whnfHard const? @ _ =>
-               \fnc const =>
-                   (case List.rev (Namespace.name const) of
-                       [] =>
-                          (* empty address *)
-                          raise (Fail "invariant")
+            /| $hyp 0 $tm $whnfHard const? @ ? =>
+               \(fnc const spine =>
+                    (case H.find iterators const of
+                        NONE =>
+                           fail "not an iteratable hypothesis"
 
-                     | name :: path =>
-                          (case
-                              Namespace.resolveOpt
-                              (List.rev (Symbol.fromValue (Symbol.toValue name ^ "_iter") :: path))
-                           of
-                              NONE =>
-                                 fail ("no iterator found for " ^ Namespace.toString const)
-                                
-                            | SOME iterator =>
-                                 HypTactic.revert0 
-                                 >>
-                                 BackchainInternal.applyPriority (ETerm.literal (T.Const iterator))
-                                 >>=
-                                 (fn pri =>
-                                     (case pri of
-                                         TC.Primary =>
-                                            Rewrite.reduce [(Symbol.fromValue "concl", SOME (false, [0]))]
-                                            >> idtacM TC.Primary
+                      | SOME (iter, nvis, nind) =>
+                           let
+                              do vars =
+                                 tryf
+                                 (fn () =>
+                                     let
+                                        val ind =
+                                           (case List.dropOpt spine nvis of
+                                               NONE =>
+                                                  raise (Iterate "type error in iteration hypothesis")
+      
+                                             | SOME ind => ind)
 
-                                       | _ => idtacM pri))))\
+                                        val (nind', vars) =
+                                           List.foldl
+                                              (fns elim (n, vars) =>
+                                                  (case elim of
+                                                      T.App m =>
+                                                         (case N.simplify m of
+                                                             T.Elim (T.Var v, []) => 
+                                                                (* we're about to revert index 0, adjust for that *)
+                                                                (n+1, v-1 :: vars)
+             
+                                                           | _ => 
+                                                                raise (Iterate "index arguments must be variables"))
+
+                                                    | _ => 
+                                                         raise (Iterate "type error in iteration hypothesis")))
+                                              (0, [])
+                                              ind
+                                     in
+                                        if nind = nind' then
+                                           vars
+                                        else
+                                           raise (Iterate "type error in iteration hypothesis")
+                                     end)
+                           in
+                              revert0
+                              >>
+                              revertVars vars
+                              >>
+                              BackchainInternal.applyPriority (ETerm.literal $ T.Elim (T.Const iter, []))
+                              >>=
+                              (fn pri =>
+                                  (case pri of
+                                      TC.Primary =>
+                                         Rewrite.whreduce [(Symbol.fromValue "concl", SOME (false, [0]))]
+                                         >> idtacM TC.Primary
+
+                                    | _ => idtacM pri))
+                           end))\
 
              | _ =>
-               \fnc => fail "not an iteratable hypothesis"\
+               \(fnc => fail "not an iteratable hypothesis")\
             /
          end
-               
+
+
       fun iterateRaw hyp = iteratePriority hyp >> idtac
 
       fun iterate hyp = TC.withTypecheckSnd (iteratePriority hyp)

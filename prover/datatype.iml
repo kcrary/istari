@@ -965,6 +965,15 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
            * mxterm list               (* the constructor's indices *)
          ) list
 
+      datatype datatype_record =
+         (* for each datatype *)
+         (Constant.constant            (* the datatype *)
+           * Constant.constant         (* its iterator *)
+           * int                       (* number of visible pervasive arguments *)
+           * int                       (* the number of index arguments *)
+         ) list
+         * environment
+
 
       val pumx : mxterm P.pu =
          P.wrap
@@ -1012,8 +1021,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                     P.int
                     (P.list pumx)))
 
+      val puDatatypeRecord : datatype_record P.pu =
+         P.pair (P.list (P.tuple4 PP.puConstant PP.puConstant P.int P.int)) puEnvironment
 
-      val theDatatypes : (Constant.constant list * environment) list CR.cref = CR.new []
+      val theDatatypes : datatype_record list CR.cref = CR.new []
          
 
       (* We manually closure-convert the destructor function so we can pickle its environment. *)
@@ -2078,46 +2089,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-            (* 7. Define the destructor
-               (Note that we can't just use the iterator.  We want to destruct datatype
-               hypotheses in-place, which the iterator cannot do.)
-            *)
-
-            val environment =
-               (invis,
-                pers,
-                univ_mobile,
-                a_mobile,
-                dcons_mobile,
-
-                map2
-                   (fns (const, red, _, _, args, _) afield => 
-                       (const, red, args, afield))
-                   typeInfoList indextpsList,
-
-                map2 
-                   (fns (const, red, _) (i, j, _, args, numargs, indices) =>
-                       (const, red, i, j, args, numargs, indices))
-                   conInfoList allcons):environment
-
-            val destructor' = destructor environment
-
-            val () =
-               CR.assign theDatatypes
-                  ((List.map
-                       (fn (const, _, _, _, _, _) =>
-                           (
-                           ConstantTable.insert DE.destructTactics const destructor';
-                           const
-                           ))
-                       typeInfoList,
-                    environment) 
-                   :: CR.deref theDatatypes)
-
-
-
-
-            (* 8. Define the iterators *)
+            (* 7. Define the iterators *)
 
 
             (* Builds something under index arguments.
@@ -2698,7 +2670,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-            (* 9. Compute the iterator reductions *)
+            (* 8. Compute the iterator reductions *)
 
             val reductions' =
                List.foldl
@@ -2776,6 +2748,48 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                             (RR.fromUreduction2 r)
                       end)
                   allcons
+
+
+
+
+            (* 9. Populator the destructor and iterator tables.
+
+               (Note that we can't just use the iterator for destruct.  We want to destruct datatype
+               hypotheses in-place, which the iterator cannot do.)
+            *)
+
+            val environment =
+               (invis,
+                pers,
+                univ_mobile,
+                a_mobile,
+                dcons_mobile,
+
+                map2
+                   (fns (const, red, _, _, args, _) afield => 
+                       (const, red, args, afield))
+                   typeInfoList indextpsList,
+
+                map2 
+                   (fns (const, red, _) (i, j, _, args, numargs, indices) =>
+                       (const, red, i, j, args, numargs, indices))
+                   conInfoList allcons):environment
+
+            val destructor' = destructor environment
+
+            val () =
+               CR.assign theDatatypes
+                  ((map2
+                       (fns (const, _, _, _, _, numberOfIndexArgs) (iter, _) =>
+                           (
+                           ConstantTable.insert DE.destructTactics const destructor';
+                           ConstantTable.insert InductionInternal.iterators const (iter, numberOfVisibleArgs, numberOfIndexArgs);
+                           (const, iter, numberOfVisibleArgs, numberOfIndexArgs)
+                           ))
+                       typeInfoList
+                       iterInfoList,
+                    environment)
+                   :: CR.deref theDatatypes)
          in
             close skeletonConst;
             close subtermConst;
@@ -2873,25 +2887,27 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       fun write outf =
          P.pickle 
             outf
-            (P.list (P.pair (P.list PP.puConstant) puEnvironment))
+            (P.list puDatatypeRecord)
             (CR.deref theDatatypes)
 
 
       fun read inf =
          (case
-             P.unpickle
-                inf
-                (P.option (P.pair (P.list PP.puConstant) puEnvironment))
+             P.unpickle inf (P.option puDatatypeRecord)
           of
              NONE => ()
 
-           | SOME (consts, env) =>
+           | SOME (l, env) =>
                 let
                    val destructor' = destructor env
                 in
                    List.app
-                      (fn const => ConstantTable.insert DE.destructTactics const destructor')
-                      consts;
+                      (fn (const, iter, nvis, nind) => 
+                          (
+                          ConstantTable.insert DE.destructTactics const destructor';
+                          ConstantTable.insert InductionInternal.iterators const (iter, nvis, nind)
+                          ))
+                      l;
 
                    read inf
                 end)
