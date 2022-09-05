@@ -559,26 +559,6 @@ functor ReplFun (structure Platform : PLATFORM
       
             fun reset () = I.reset initial
       
-            fun getTempDir () =
-               (case
-                   Option.mapPartial
-                      (fn dir =>
-                          (let
-                              val dir' = OS.Path.mkCanonical dir
-                           in
-                              if OS.Path.isAbsolute dir' then
-                                 SOME dir'
-                              else
-                                 NONE
-                           end
-                           handle Path.Path => NONE))
-                      (OS.Process.getEnv "TEMPDIR")
-                of
-                   NONE =>
-                      OS.FileSys.getDir ()
-      
-                 | SOME dir => dir)
-      
             val oldout = { say = print, flush = (fn () => ()) }
       
             fun runQuietly () =
@@ -592,7 +572,7 @@ functor ReplFun (structure Platform : PLATFORM
                       *)
                       Platform.resetOutput ();
       
-                      theTempFilename := Path.join (getTempDir ()) localTempFilename;
+                      theTempFilename := OS.FileSys.tmpName ();
                       Platform.captureOutput SR.process;
                       commandQueues := [IQueue.iqueue ()];
              
@@ -624,7 +604,7 @@ functor ReplFun (structure Platform : PLATFORM
                          (* As above. *)
                          Platform.resetOutput ();
          
-                         theTempFilename := Path.join (getTempDir ()) localTempFilename;
+                         theTempFilename := OS.FileSys.tmpName ();
                          Platform.captureOutput SR.process;
                          commandQueues := [q];
 
