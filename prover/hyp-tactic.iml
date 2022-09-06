@@ -30,8 +30,8 @@ signature HYP_TACTIC =
 
       val exchange : int -> int -> int -> tactic
       val moven : int -> int -> tactic
-      val moveBefore : symbol -> symbol -> tactic
-      val moveAfter : symbol -> symbol -> tactic
+      val moveBefore : symbol list -> symbol -> tactic
+      val moveAfter : symbol list -> symbol -> tactic
 
       val revert0 : tactic
       val revert : symbol list -> tactic
@@ -357,32 +357,43 @@ structure HypTactic :> HYP_TACTIC =
            | GREATER =>
                 exchange j (i - j) 1)
 
-      fun moveBefore from to =
-         let
-            do i = findhyp from
-            do jo = findhypOrConcl to
-         in
-            (case jo of
-                SOME j =>
-                   if i <= j then
-                      moven i j
+      fun moveBefore froms to =
+         (case froms of
+             [] => idtac
+
+           | from :: rest =>
+                let
+                   do i = findhyp from
+                   do jo = findhypOrConcl to
+                in
+                   (case jo of
+                       SOME j =>
+                          if i <= j then
+                             moven i j
+                          else
+                             moven i (j+1)
+       
+                     | NONE =>
+                          moven i 0)
+                end
+                >> moveBefore rest to)
+
+      fun moveAfter froms to =
+         (case froms of
+             [] => idtac
+
+           | from :: rest =>
+                moveAfter rest to
+                >>
+                let
+                   do i = findhyp from
+                   do j = findhyp to
+                in
+                   if i < j then
+                      moven i (j-1)
                    else
-                      moven i (j+1)
-
-              | NONE =>
-                   moven i 0)
-         end
-
-      fun moveAfter from to =
-         let
-            do i = findhyp from
-            do j = findhyp to
-         in
-            if i < j then
-               moven i (j-1)
-            else
-               moven i j
-         end
+                      moven i j
+                end)
 
       val revert0 =
          let
