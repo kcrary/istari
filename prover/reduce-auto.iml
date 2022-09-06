@@ -1,0 +1,327 @@
+
+signature AUTO_REDUCE =
+   sig
+
+      type constant = Constant.constant
+      type term = Term.term
+      type reduction = Reduction.reduction
+
+
+      (* autoreduce underlam dp dl m
+
+         Reduces m to normal form, where constants in dp can be reduced unlimited times,
+         and constants in dl can be reduced at most once and only at the root.  Reduces
+         under lambdas if underlam.
+
+         Returns the normal form n, and a reduction from m to n.
+      *)
+      val autoreduce :
+         bool
+         -> (constant * reduction list) list
+         -> (constant * reduction) list
+         -> term
+         -> term * reduction
+
+
+      (* new1 underlam dp dl const n P
+
+         underlam, dp, dl as in autoreduce
+         const, n, P as in Reduction.new1
+
+         dl is available only to the left-hand-reduction
+      *)
+      val new1 : 
+         bool
+         -> (constant * reduction list) list
+         -> (constant * reduction) list
+         -> constant -> int -> term -> Reduction.ureduction1
+
+
+      (* as new1 but uses the lhs's normal form for P *)
+      val new1' : 
+         bool
+         -> (constant * reduction list) list
+         -> (constant * reduction) list
+         -> constant -> int -> Reduction.ureduction1
+
+
+      (* new2 underlam dp dl const l m const' n Q
+
+         underlam, dp, dl as in autoreduce
+         const, l, m, const', n, Q as in Reduction.new2
+
+         dl is available only to the left-hand-reduction
+      *)
+      val new2 : 
+         bool
+         -> (constant * reduction list) list
+         -> (constant * reduction) list
+         -> constant -> int -> int -> constant -> int -> term -> Reduction.ureduction2
+
+
+      (* as new2 but uses the lhs's normal form for P *)
+      val new2' : 
+         bool
+         -> (constant * reduction list) list
+         -> (constant * reduction) list
+         -> constant -> int -> int -> constant -> int -> Reduction.ureduction2
+
+   end
+
+
+structure AutoReduce :> AUTO_REDUCE =
+   struct
+
+      type constant = Constant.constant
+      type term = Term.term
+      type reduction = Reduction.reduction
+
+      structure N = Normalize
+      structure R = Reduction
+      structure T = Term
+
+      structure D = RedBlackDict (structure Key = Constant.Ordered)
+
+      
+      fun reductionNorm underlam dp dl m acc =
+         (case N.simplify m of
+             T.Elim (T.Const const, _) =>
+                (case 
+                    List.findmap 
+                       (fn r =>
+                           (try
+                               SOME (r, R.reduce r m)
+                            with R.Reduce => NONE))
+                       (case D.find dp const of
+                           NONE => []
+ 
+                         | SOME l => l)
+                 of
+                    NONE =>
+                       (case
+                           (case D.find dl const of
+                               NONE => NONE
+
+                             | SOME r =>
+                                  (try
+                                      SOME (r, R.reduce r m)
+                                   with R.Reduce => NONE))
+                        of
+                           NONE =>
+                              (m, R.trans (List.rev acc))
+
+                         | SOME (r, m') =>
+                              reduction underlam dp (D.remove dl const) m' (r :: acc))
+
+                  | SOME (r, m') =>
+                       reduction underlam dp dl m' (r :: acc))
+
+           | _ =>
+                (m, R.trans (List.rev acc)))
+
+
+      and reduction underlam dp dl m acc =
+         let
+            val m' = N.simplify (R.reduce R.betas m)
+         in
+            (case m' of
+                T.Elim (h, spine) =>
+                   let
+                      val (spine', rs) =
+                         List.foldr
+                            (fns elim (spine', rs) =>
+                                (case elim of
+                                    T.App n =>
+                                       let
+                                          val (n', r) = reduction underlam dp D.empty n []
+                                       in
+                                          (T.App n' :: spine', r :: rs)
+                                       end
+
+                                  | _ =>
+                                       (elim :: spine', rs)))
+                            ([], [])
+                            spine
+                   in
+                      reductionNorm underlam dp dl (T.Elim (h, spine')) (R.compat rs :: R.betas :: acc)
+                   end
+
+              | T.Lam (binder, m1) =>
+                   if underlam then
+                      let
+                         val (m1', r1) = reduction underlam dp D.empty m1 []
+                      in
+                         (T.Lam (binder, m1'),
+                          R.trans (List.rev (R.within [0] r1 :: R.betas :: acc)))
+                      end
+                   else
+                      (m', R.trans (List.rev (R.betas :: acc)))
+
+              | T.Pair (m1, m2) =>
+                   let
+                      val (m1', r1) = reduction underlam dp D.empty m1 []
+                      val (m2', r2) = reduction underlam dp D.empty m2 []
+                   in
+                      (T.Pair (m1', m2'),
+                       R.trans (List.rev (R.within [1] r2 :: R.within [0] r1 :: R.betas :: acc)))
+                   end
+
+              | T.Next m1 =>
+                   let
+                      val (m1', r1) = reduction underlam dp D.empty m1 []
+                   in
+                      (T.Next m1',
+                       R.trans (List.rev (R.within [0] r1 :: R.betas :: acc)))
+                   end
+
+              | _ => 
+                   (m', R.trans (List.rev (R.betas :: acc))))
+         end
+
+
+      fun autoreduce underlam dp dl m =
+         let
+            val dp' =
+               List.foldl
+                  (fns (const, l) dp' => D.insert dp' const l)
+                  D.empty
+                  dp
+
+            val dl' =
+               List.foldl
+                  (fns (const, r) dl' => D.insert dl' const r)
+                  D.empty
+                  dl
+         in
+            reduction underlam dp' dl' m [] 
+         end
+
+      
+      (* natrec f x i = f (i-1) (f (i-2) (... (f 0 x) ...)) *)
+      fun natrec f x i =
+         if i = 0 then
+            x
+         else
+            f (i-1) (natrec f x (i-1))
+
+
+      fun new1 underlam dp dl const n p =
+         if n >= 0 then
+            let
+               val before =
+                  T.Elim (T.Const const,
+                          natrec (fns i sp => T.App (T.Var i) :: sp) [] n)
+
+               val dp' =
+                  List.foldl
+                     (fns (const, l) dp' => D.insert dp' const l)
+                     D.empty
+                     dp
+   
+               val dl' =
+                  List.foldl
+                     (fns (const, r) dl' => D.insert dl' const r)
+                     D.empty
+                     dl
+
+               val (_, r1) = reduction underlam dp' dl' before []
+               val (_, r2) = reduction underlam dp' D.empty p []
+            in
+               R.new1 const n p r1 r2
+            end
+         else
+            raise R.Reduce
+
+      
+      fun new1' underlam dp dl const n =
+         if n >= 0 then
+            let
+               val before =
+                  T.Elim (T.Const const,
+                          natrec (fns i sp => T.App (T.Var i) :: sp) [] n)
+
+               val dp' =
+                  List.foldl
+                     (fns (const, l) dp' => D.insert dp' const l)
+                     D.empty
+                     dp
+   
+               val dl' =
+                  List.foldl
+                     (fns (const, r) dl' => D.insert dl' const r)
+                     D.empty
+                     dl
+
+               val (p, r1) = reduction underlam dp' dl' before []
+            in
+               R.new1 const n p r1 R.refl
+            end
+         else
+            raise R.Reduce
+
+      
+      fun new2 underlam dp dl const l m const' n q =
+         if l >= 0 andalso m >= 0 andalso n >= 0 then
+            let
+               val before =
+                  T.Elim (T.Const const,
+                          natrec 
+                             (fns i sp => T.App (T.Var (m+n+i)) :: sp)
+                             (T.App (T.Elim (T.Const const',
+                                             natrec (fns i sp => T.App (T.Var (m+i)) :: sp) [] n))
+                              :: natrec (fns i sp => T.App (T.Var i) :: sp) [] m)
+                             l)
+
+               val dp' =
+                  List.foldl
+                     (fns (const, l) dp' => D.insert dp' const l)
+                     D.empty
+                     dp
+   
+               val dl' =
+                  List.foldl
+                     (fns (const, r) dl' => D.insert dl' const r)
+                     D.empty
+                     dl
+
+               val (_, r1) = reduction underlam dp' dl' before []
+               val (_, r2) = reduction underlam dp' D.empty q []
+            in
+               R.new2 const l m const' n q r1 r2
+            end
+         else
+            raise R.Reduce
+
+
+      fun new2' underlam dp dl const l m const' n =
+         if l >= 0 andalso m >= 0 andalso n >= 0 then
+            let
+               val before =
+                  T.Elim (T.Const const,
+                          natrec 
+                             (fns i sp => T.App (T.Var (m+n+i)) :: sp)
+                             (T.App (T.Elim (T.Const const',
+                                             natrec (fns i sp => T.App (T.Var (m+i)) :: sp) [] n))
+                              :: natrec (fns i sp => T.App (T.Var i) :: sp) [] m)
+                             l)
+
+               val dp' =
+                  List.foldl
+                     (fns (const, l) dp' => D.insert dp' const l)
+                     D.empty
+                     dp
+   
+               val dl' =
+                  List.foldl
+                     (fns (const, r) dl' => D.insert dl' const r)
+                     D.empty
+                     dl
+
+               val (q, r1) = reduction underlam dp' dl' before []
+            in
+               R.new2 const l m const' n q r1 R.refl
+            end
+         else
+            raise R.Reduce
+
+   end

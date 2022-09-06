@@ -48,28 +48,23 @@ define /wf A R a x/
    (We're committed the code for wf by the built-in Acc constant.)
 *)
 
-structure P = ReductionProver;
 structure R = Reduction;
+structure AR = AutoReduce;
 
-P.start (parseLTerm /wf 3 2 1 0/);
-P.unfold ();
-P.beta 4;
-P.user1 Prim.unroll_fix;
-P.beta 3;
-val (_, r1) = P.done ();
+val wf = parseConstant /wf/;
 
-val m = parseLTerm /` exists (eq 3 0 (1 #1)) 
-                        (fn . ` forall 4 
-                                  (fn . ` forall (4 0 2)
-                                            (fn . wf 6 5 (4 #2 1 0) 1)))/;
-P.start m;
-P.enter [2, 0, 2, 0, 2, 0];
-P.unfold ();
-P.beta 4;
-P.leave ();
-val (_, r2) = P.done ();
+val m =
+  parseLTerm /` exists (eq 3 0 (1 #1))
+                  (fn . ` forall 4 
+                            (fn . ` forall (4 0 2)
+                                      (fn . wf 6 5 (4 #2 1 0) 1)))/;
 
-val unroll_wf = R.new1 (parseConstant /wf/) 4 m r1 r2;
+val unroll_wf = 
+  AR.new1 true
+    [(wf, [R.unfold])]
+    [(Prim.fix, R.user1 Prim.unroll_fix)]
+    wf 4 m;
+
 Database.setUnroll (parseConstant /wf/) (R.user1 unroll_wf);
 
 
@@ -101,24 +96,17 @@ recordTyping "wf_type";
    to make it appear that it does.
 *)
 
-P.start (parseLTerm /Acc 2 1 0/);
-P.unfold ();
-P.beta 3;
-val (_, r1) = P.done ();
+val preacc = parseConstant /preacc/;
+val acc = parseConstant /Acc/;
 
 val m = parseLTerm /` exists (preacc 2 1) (fn . wf 3 2 0 1)/;
-P.start m;
-P.enter [1];
-P.unfold ();
-P.beta 2;
-P.leave ();
-P.enter [2, 0];
-P.unfold ();
-P.beta 4;
-P.leave ();
-val (_, r2) = P.done ();
 
-val unfold_acc = R.user1 $ R.new1 (parseConstant /Acc/) 3 m r1 r2;
+val unfold_acc =
+  R.user1 $
+  AR.new1 true
+    [(wf, [R.unfold]), (preacc, [R.unfold]), (acc, [R.unfold])]
+    [(Prim.fix, R.user1 Prim.unroll_fix)]
+    acc 3 m;
 
 
 

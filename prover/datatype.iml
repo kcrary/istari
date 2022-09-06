@@ -51,6 +51,7 @@ signature DATATYPE_INTERNAL =
 structure DatatypeInternal :> DATATYPE_INTERNAL =
    struct
 
+      structure AR = AutoReduce
       structure C = Oldcase
       structure CR = CheckpointedRef
       structure D = Directory
@@ -857,86 +858,13 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       val reductions =
          Susp.delay
             (fn () =>
-                List.foldl
-                   (fns (const, r) d => CD.insert d const r)
-                   CD.empty
-                   [
-                   (Prim.natcase, [R.user2 Prim.natcase_succ, R.user2 Prim.natcase_zero]),
-                   (Prim.sumcase, [R.user2 Prim.sumcase_inr, R.user2 Prim.sumcase_inl]),
-                   (Susp.force constListRec, [R.user2 (Susp.force list_rec_cons)]),
-                   (Susp.force constCon, [Susp.force con_unroll])
-                   ])
-
-
-      (* This isn't fully general (although it shouldn't be hard to make it so).
-         It's just enough to reduce datatype iterators.
-      *)
-
-      fun reductionNorm d m acc =
-         let
-            val l =
-               (case N.simplify m of
-                   T.Elim (T.Const const, _) =>
-                      (case CD.find d const of
-                          NONE => []
-
-                        | SOME l => l)
-
-                 | _ => [])
-         in
-            (case
-                List.findmap 
-                   (fn r =>
-                       (try
-                           SOME (r, R.reduce r m)
-                        with R.Reduce => NONE))
-                   l
-             of
-                NONE =>
-                   (m, R.trans (List.rev acc))
-
-              | SOME (r, m') =>
-                   reduction d m' (r :: acc))
-         end
-
-      and reduction d m acc =
-         let
-            val m' = N.simplify (R.reduce R.betas m)
-         in
-            (case m' of
-                T.Elim (h, spine) =>
-                   let
-                      val (spine', rs) =
-                         List.foldr
-                            (fns elim (spine', rs) =>
-                                (case elim of
-                                    T.App n =>
-                                       let
-                                          val (n', r) = reduction d n []
-                                       in
-                                          (T.App n' :: spine', r :: rs)
-                                       end
-
-                                  | _ =>
-                                       (elim :: spine', rs)))
-                            ([], [])
-                            spine
-                   in
-                      reductionNorm d (T.Elim (h, spine')) (R.compat rs :: R.betas :: acc)
-                   end
-
-              | T.Pair (m1, m2) =>
-                   let
-                      val (m1', r1) = reduction d m1 []
-                      val (m2', r2) = reduction d m2 []
-                   in
-                      (T.Pair (m1', m2'),
-                       R.trans (List.rev (R.within [1] r2 :: R.within [0] r1 :: R.betas :: acc)))
-                   end
-
-              | _ => 
-                   (m', R.trans (List.rev (R.betas :: acc))))
-         end
+                [
+                (Prim.natcase, [R.user2 Prim.natcase_succ, R.user2 Prim.natcase_zero]),
+                (Prim.sumcase, [R.user2 Prim.sumcase_inr, R.user2 Prim.sumcase_inl]),
+                (Susp.force constListRec, [R.user2 (Susp.force list_rec_cons)]),
+                (Susp.force constCon, [R.trans [Susp.force con_unroll, R.user2 Prim.natcase_succ], 
+                                       R.trans [Susp.force con_unroll, R.user2 Prim.natcase_zero]])
+                ])
 
 
          
@@ -2755,7 +2683,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             val reductions' =
                List.foldl
-                  (fns (const, _) d => CD.insert d const [R.unfold])
+                  (fns (const, _) d => (const, [R.unfold]) :: d)
                   (Susp.force reductions)
                   iterInfoList
 
@@ -2766,25 +2694,13 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                          val (iterConst, constName) = Array.sub iterInfo i
                          val (_, _, _, _, _, numberOfIndexArgs) = Array.sub typeInfo i
                          val (conConst, _, _) = Array.sub conInfo j
-                         val diu = Susp.force dt_iter_unroll
 
                          val iterParams = numberOfVisibleArgs + numberOfTypes + numberOfConstructors + numberOfIndexArgs
                          val conParams = numberOfVisibleArgs + numberOfConargs
 
-                         val d = CD.insert reductions' conConst [R.unfold]
+                         val dp = (conConst, [R.unfold]) :: reductions'
+                         val dl = [(Susp.force constIter, Susp.force dt_iter_unroll)]
                          
-                         val before =                           
-                            T.Elim (T.Const iterConst,
-                                    natrecr iterParams (fns i l => T.App (T.Var (i + conParams)) :: l)
-                                       [T.App (T.Elim (T.Const conConst,
-                                                       natrecr conParams (fns i l => T.App (T.Var i) :: l) []))])
-
-                         val (mid, r11) = reduction d before []
-
-                         val (_, r12) = reduction d (R.reduce diu mid) []
-
-                         val r1 = R.trans [r11, diu, r12]
-
                          val (_, _, caseargs) =
                             List.foldl
                                (fns conarg (pos, s, caseargs) =>
@@ -2817,10 +2733,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                             T.Elim (T.Var (numberOfConstructors - 1 - j + numberOfIndexArgs + conParams),
                                     List.rev caseargs)
 
-                         val (_, r2) = reduction d after []
-
-                         val r =
-                            Reduction.new2 iterConst iterParams 0 conConst conParams after r1 r2
+                         val r = AR.new2 false dp dl iterConst iterParams 0 conConst conParams after
                       in
                          RR.register r;
                          

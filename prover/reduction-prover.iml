@@ -15,7 +15,7 @@ signature REDUCTION_PROVER =
       val betas : unit -> unit
       val user1 : Reduction.ureduction1 -> unit
       val user2 : Reduction.ureduction2 -> unit
-      val unroll : Constant.constant -> unit
+      val unroll : unit -> unit
 
       val enter : int list -> unit
       val leave : unit -> unit
@@ -136,11 +136,15 @@ structure ReductionProver :> REDUCTION_PROVER =
       fun user1 red = apply (R.user1 red)
       fun user2 red = apply (R.user2 red)
 
-      fun unroll const =
-         (case Database.findUnroll const of
-             SOME red => apply red
+      fun unroll () =
+         (case N.simplify (C.deref curr) of
+             T.Elim (T.Const const, _) =>
+                (case Database.findUnroll const of
+                    SOME red => apply red
 
-           | NONE => signal "cannot unroll constant")
+                  | NONE => signal "cannot unroll")
+
+           | _ => signal "cannot unroll")
 
 
       exception BadSubterm
