@@ -1,0 +1,289 @@
+
+Ctrl.use "list-aux.iml";
+
+Ctrl.use "acc-load.iml";
+Ctrl.use "nat-load.iml";
+Ctrl.use "datatype-load.iml";
+
+
+structure AR = AutoReduce;
+structure R = Reduction;
+structure RR = Registry;
+
+
+Namespace.beginModule "List";
+
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    forall (a : U i) .
+    U i
+  of
+    list : type =
+    | nil : list
+    | cons : a -> list -> list
+/;
+
+
+
+Database.setImplicits (parseConstant /nil/) 1;
+Database.setImplicits (parseConstant /cons/) 1;
+val list_iter_nil = RR.toUreduction2 $ RR.read (parseLongident /List.list_iter_nil/);
+val list_iter_cons = RR.toUreduction2 $ RR.read (parseLongident /List.list_iter_cons/);
+
+
+
+structure Nothing = AfterList ();
+
+
+
+define /list_case {a b} l mnil mcons/
+/
+  list_iter a (fn _ . a) mnil (fn h t _ . mcons h t) l
+/;
+
+
+
+val nl = parseConstant /nil/;
+val cons = parseConstant /cons/;
+val list_iter = parseConstant /list_iter/;
+val list_case = parseConstant /list_case/;
+
+val dp = [(list_iter, [R.user2 list_iter_cons, R.user2 list_iter_nil]), 
+          (list_case, [R.unfold])];
+
+val list_case_nil =
+  AR.new2 false dp []
+    list_case 2 2 nl 1
+    (parseLTerm /1/);
+
+val list_case_cons =
+  AR.new2 false dp []
+    list_case 2 2 cons 3
+    (parseLTerm /0 3 2/);
+
+RR.write (parseIdent /list_case_nil/) (RR.fromUreduction2 list_case_nil);
+RR.write (parseIdent /list_case_cons/) (RR.fromUreduction2 list_case_cons);
+RR.register list_case_nil;
+RR.register list_case_cons;
+
+
+
+lemma "list_case_type"
+/
+  ` list_case :
+  intersect (i : level) .
+  forall (a b : U i) .
+     list a 
+     -> b 
+     -> (a -> list a -> b)
+     -> b
+/;
+
+introOf /i a b l mnil mcons/.
+destruct /l/ /| h t/.
+
+(* nil *)
+{
+reduce //.
+hypof.
+}
+
+(* cons *)
+{
+reduce //.
+typecheck.
+}
+qed ();
+recordTyping "list_case_type";
+
+
+
+define /append {a} l1 l2/
+/
+  list_iter a (fn _ . list a) l2 (fn h _ t . ` cons a h t) l1
+/;
+
+
+
+lemma "append_type"
+/
+  ` append :
+  intersect (i : level) .
+  forall (a : U i) .
+     list a -> list a -> list a
+/;
+
+unfoldHead /append/.
+typecheck.
+qed ();
+recordTyping "append_type";
+
+
+
+val append = parseConstant /append/;
+
+val dp = [(list_iter, [R.user2 list_iter_cons, R.user2 list_iter_nil]),
+          (append, [R.unfold])];
+
+val append_nil =
+  AR.new2 false dp []
+    append 1 1 nl 1
+    Term.zero;
+
+val append_cons =
+  AR.new2 false dp []
+    append 1 1 cons 3
+    (parseLTerm /cons 4 2 (append 4 1 0)/);
+
+RR.write (parseIdent /append_nil/) (RR.fromUreduction2 append_nil);
+RR.write (parseIdent /append_cons/) (RR.fromUreduction2 append_cons);
+RR.register append_nil;
+RR.register append_cons;
+
+
+
+(* For illustrative purposes. *)
+definerec /appendrec {a} l1 l2/
+/
+  ` list_case a a l1 l2 (fn h t . ` cons a h (appendrec a t l2))
+/;
+
+
+
+val appendrec = parseConstant /appendrec/;
+val appendrec_unroll = Option.valOf $ Database.findUnroll appendrec;
+
+val dp = [(list_case, [R.user2 list_case_cons, R.user2 list_case_nil])];
+val dl = [(appendrec, appendrec_unroll)];
+
+val appendrec_nil =
+  AR.new2 false dp dl
+    appendrec 1 1 nl 1
+    Term.zero;
+
+val appendrec_cons =
+  AR.new2 false dp dl
+    appendrec 1 1 cons 3
+    (parseLTerm /cons 4 2 (appendrec 4 1 0)/);
+
+RR.register appendrec_nil;
+RR.register appendrec_cons;
+
+
+
+lemma "appendrec_type"
+/
+  ` appendrec :
+  intersect (i : level) .
+  forall (a : U i) .
+     list a -> list a -> list a
+/;
+
+inference.
+introOf /i a l1 l2/.
+assert /list_strip l1 = list_strip l1 : list_skel a/ /Heq/.
+  {
+  reflexivity.
+  }
+revert /Heq/.
+generalizeAt /list_strip l1/ /_/ /1/ /sk/.
+revert /l1/.
+so /list_subterm_well_founded _ _ sk/ /Hacc/.
+induct /Hacc/.
+reintro /IH/.
+intro /l1 Heq/.
+destruct /l1/ /| h t/.
+
+(* nil *)
+{
+reduce //.
+hypof.
+}
+
+(* cons *)
+{
+reduce //.
+typecheck.
+apply /IH (list_strip t)/.
+  {
+  moveBefore /h t/ /sk/.
+  subst /sk/.
+  apply /cons_subterm/.
+  }
+
+  {
+  reflexivity.
+  }
+}
+qed ();
+recordTyping "appendrec_type";
+
+
+
+lemma "append_id_l"
+/
+  forall (i : level) (a : U i) (l : list a) .
+    ` append a (` nil a) l = l : list a
+/;
+
+intro /i a l/.
+reflexivity.
+qed ();
+
+
+
+lemma "append_id_r"
+/
+  forall (i : level) (a : U i) (l : list a) .
+    append l nil = l : list a
+/;
+
+inference.
+intro /i a l/.
+iterate /l/.
+
+(* nil *)
+{
+reflexivity.
+}
+
+(* cons *)
+{
+intro /h t IH/.
+compat.
+hyp /IH/.
+}
+qed ();
+
+
+
+lemma "append_assoc"
+/
+  forall (i : level) (a : U i) (l1 l2 l3 : list a) .
+    append (append l1 l2) l3 = append l1 (append l2 l3) : list a
+/;
+
+inference.
+intro /i a l1 l2 l3/.
+iterate /l1/.
+
+(* nil *)
+{
+reduce //.
+reflexivity.
+}
+
+(* cons *)
+{
+intro /h t IH/.
+compat.
+hyp /IH/.
+}
+qed ();
+
+
+
+File.save "list.isto";

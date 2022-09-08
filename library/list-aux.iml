@@ -1,0 +1,44 @@
+
+
+structure ParseList =
+   struct
+
+      val cons = Susp.delay (fn () => parseConstant /List.cons/)
+
+      fun parseCons em en = ETerm.apply3 (Susp.force cons) ETerm.evar em en
+
+   end
+
+
+grammardef List
+
+   rule Term(40)  ::= Term(41) "::" Term(40) => ParseList.parseCons
+
+end
+
+
+grammaron List
+
+
+functor AfterList () :> sig end
+   =
+   struct
+
+      val cons = parseConstant /List.cons/
+
+      structure U = Show.Unparsing
+
+      val () =
+         ConstantTable.insert U.unparsingTable cons
+            (3, 40,
+             (U.wrap
+                 (U.apply3 cons U.wild U.show U.show)
+                 (fn ((), h, t) =>
+                     U.append [
+                              h 41,
+                              U.break 1,
+                              U.string ":: ",
+                              t 40
+                              ])))
+
+   end
