@@ -48,7 +48,14 @@ signature PROVER_INTERNAL =
       include PROVER
 
 
+      datatype problem = NotGround | Open | Marker
+
+      (* returns NONE if the term is ground, closed, and contains no markers *)
+      val clean : Term.term -> problem option
+
+
       val setGoals : Tactic.judgement list -> (Refine.validation list -> unit) -> unit
+
 
       (* sets a persistent checkpoint if not within a lemma *)
       val checkpoint : unit -> unit
@@ -73,6 +80,7 @@ structure ProverInternal :> PROVER_INTERNAL =
 
       val ? = C.?
       val blank = Message.blank
+      val withHandler = Message.withHandler
 
       exception Prover
 
@@ -85,17 +93,6 @@ structure ProverInternal :> PROVER_INTERNAL =
                                   ".\n"
                                   ]))
 
-
-
-      fun withHandler f =
-         try
-            f ()
-         with
-            exn as (Message.Error (_, msg)) =>
-               (
-               print msg;
-               raise exn
-               )
 
 
 
@@ -343,55 +340,84 @@ structure ProverInternal :> PROVER_INTERNAL =
 
 
 
-      fun sanitize depth m =
-         sanitizeWhnf depth (Normalize.whnf m)
+      datatype problem = NotGround | Open | Marker
 
-      and sanitizeWhnf depth m =
+      exception Unclean of problem
+
+      (* checks that m[s] is ground, its highest free variable is < k, and contains no markers *)
+      fun cleanLoop k m s =
          (case m of
-             T.Elim (T.Var i, spine) =>
-                if i < depth then
-                   sanitizeSpine depth spine
-                else
-                   signalProver "lemma statement is not closed"
+             T.Var i =>
+                (case T.substVar i s of
+                    T.Idx j =>
+                       if j < k then
+                          ()
+                       else
+                          raise (Unclean Open)
 
-           | T.Elim (T.Const _, spine) =>
-                sanitizeSpine depth spine
+                  | T.Term m' =>
+                       cleanLoop k m' T.id)
 
-           | T.Elim (T.Sub _, _) =>
-                signalProver "lemma statement contains unresolved evars"
+           | T.Const _ => ()
 
-           | T.Elim (m1, spine) =>
+           | T.Elim (h, spine) =>
                 (
-                sanitizeWhnf depth m1;
-                sanitizeSpine depth spine
+                cleanLoop k h s;
+                List.app
+                   (fn T.App n => cleanLoop k n s
+                     | _ => ())
+                   spine
                 )
 
            | T.Lam (_, m1) =>
-                sanitize (depth+1) m1
+                cleanLoop (k+1) m1 (T.under 1 s)
 
            | T.Pair (m1, m2) =>
                 (
-                sanitize depth m1;
-                sanitize depth m2
+                cleanLoop k m1 s;
+                cleanLoop k m2 s
                 )
 
            | T.Next m1 =>
-                sanitize depth m1
+                cleanLoop k m1 s
 
            | T.Triv => ()
 
+           | T.Sub (m1, s') =>
+                cleanLoop k m1 (T.compose s' s)
+
+           | T.Evar eb =>
+                (case T.readEbind eb of
+                    NONE =>
+                       raise (Unclean NotGround)
+
+                  | SOME m' =>
+                       cleanLoop k m' s)
+
            | T.Marker _ =>
-                signalProver "lemma statement contains markers"
+                raise (Unclean Marker))
 
-           | _ =>
-                (* m is in whnf *)
-                raise (Fail "precondition"))
 
-      and sanitizeSpine depth spine =
-         List.app
-            (fn T.App m => sanitize depth m
-              | _ => ())
-            spine
+      fun clean m =
+         (try
+             (cleanLoop 0 m T.id; NONE)
+          with Unclean problem => SOME problem)
+
+
+      fun checkClean m =
+         (try
+             cleanLoop 0 m T.id
+          with
+             Unclean NotGround =>
+                signalProver "lemma statement contains unresolved evars"
+
+           | Unclean Open =>
+                signalProver "lemma statement contains free variables"
+
+           | Unclean Marker =>
+                signalProver "lemma statement contains a marker")
+
+
 
       fun lemma name ea =
          withHandler
@@ -418,7 +444,7 @@ structure ProverInternal :> PROVER_INTERNAL =
                           (case vs of
                               [v] =>
                                  let
-                                    val () = sanitize 0 a
+                                    val () = checkClean a
                                     val (const, jud', v') = NamespaceInternal.reify sym jud v
                                  in
                                     R.assign theState NONE;
