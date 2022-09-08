@@ -41,7 +41,7 @@ structure Nothing = AfterList ();
 
 define /list_case {a b} l mnil mcons/
 /
-  list_iter a (fn _ . a) mnil (fn h t _ . mcons h t) l
+  list_iter a (fn _ . b) mnil (fn h t _ . mcons h t) l
 /;
 
 
@@ -148,7 +148,7 @@ RR.register append_cons;
 (* For illustrative purposes. *)
 definerec /appendrec {a} l1 l2/
 /
-  ` list_case a a l1 l2 (fn h t . ` cons a h (appendrec a t l2))
+  ` list_case a (list a) l1 l2 (fn h t . ` cons a h (appendrec a t l2))
 /;
 
 
@@ -177,7 +177,7 @@ RR.register appendrec_cons;
 lemma "appendrec_type"
 /
   ` appendrec :
-  intersect (i : level) .
+  intersect i .
   forall (a : U i) .
      list a -> list a -> list a
 /;
@@ -284,6 +284,73 @@ hyp /IH/.
 }
 qed ();
 
+
+
+define /length {a} l/
+/
+  list_iter a (fn _ . nat) 0 (fn _ _ n . succ n) l
+/;
+
+
+
+val length = parseConstant /length/;
+
+val dp = [(list_iter, [R.user2 list_iter_cons, R.user2 list_iter_nil]),
+          (length, [R.unfold])];
+
+val length_nil =
+  AR.new2 false dp []
+    length 1 0 nl 1
+    (parseLTerm /zero/);
+
+val length_cons =
+  AR.new2 false dp []
+    length 1 0 cons 3
+    (parseLTerm /succ (length 3 0)/);
+
+RR.register length_nil;
+RR.register length_cons;
+
+
+lemma "length_type"
+/
+  ` length :
+  intersect i .
+  forall (a : U i) .
+    list a -> nat
+/;
+
+inference.
+introOf /i a l/.
+unfold /length/.
+typecheck.
+qed ();
+recordTyping "length_type";
+
+
+
+lemma "length_append"
+/
+  forall i (a : U i) (l1 l2 : list a) .
+    length (append l1 l2) = length l1 + length l2 : nat
+/;
+
+inference.
+intro /i a l1 l2/.
+iterate /l1/.
+
+(* nil *)
+{
+auto.
+}
+
+(* cons *)
+{
+intro /h t IH/.
+compat.
+hyp /IH/.
+}
+qed ();
 
 
 File.save "list.isto";
