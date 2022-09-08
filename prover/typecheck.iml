@@ -38,6 +38,9 @@ signature TYPECHECK_INTERNAL =
       include TYPECHECK
 
 
+      val isTypecheckGoal : Judgement.djudgement -> bool
+
+
       (* Tactics can add hypotheses, but must not alter existing hypotheses. *)
 
       val introTactics : tactic ConstantTable.table
@@ -774,7 +777,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       datatype 'a tri = YES of 'a | NO | BAD
 
-      fun isTypecheckingGoal jud =
+      fun isTypecheckGoalTri jud =
          termCaseX (J.concl jud)
          /[
              \Prim.ov\ @
@@ -824,6 +827,12 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             \fnc => NO\
          /
                      
+      
+      fun isTypecheckGoal jud =
+         (case isTypecheckGoalTri jud of
+             YES _ => true
+
+           | _ => false)
 
       
       fun wf (jud, dir) =
@@ -847,7 +856,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    val table' = extendTable oldsz jud table
 
                    val (obs', tac) =
-                      (case isTypecheckingGoal jud of
+                      (case isTypecheckGoalTri jud of
                           NO =>
                              (case assumption jud of
                                  SOME i =>
@@ -1156,7 +1165,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                             val table' = extendTable oldsz subjud table
                          
                             val (obs, tac) =
-                               (case isTypecheckingGoal subjud of
+                               (case isTypecheckGoalTri subjud of
                                    NO =>
                                       (case assumption subjud of
                                           SOME i =>
@@ -1763,7 +1772,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                             val table' = extendTable oldsz subjud table
 
                             val (obs, tac) =
-                               (case isTypecheckingGoal subjud of
+                               (case isTypecheckGoalTri subjud of
                                    NO =>
                                       (case assumption subjud of
                                           SOME i =>
@@ -2182,7 +2191,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                           val table = buildTable jud
                           
                           val (obs', tac) =
-                             (case isTypecheckingGoal jud of
+                             (case isTypecheckGoalTri jud of
                                  NO =>
                                     ([(Istp, table, wf goal, dest, [])],
                                      nonerror [goal] goal)
@@ -2251,7 +2260,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
 
       fun typecheck1 (goal as (jud, dir)) fk sk =
-         (case isTypecheckingGoal jud of
+         (case isTypecheckGoalTri jud of
              YES prob =>
                 let
                    val dest = newdest ()
@@ -2689,5 +2698,6 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
    end
 
 
-structure Typecheck :> TYPECHECK = TypecheckInternal
+structure Typecheck :> TYPECHECK where type priority = TypecheckInternal.priority =
+    TypecheckInternal
 

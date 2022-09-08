@@ -1,0 +1,146 @@
+
+signature AUTOTACTIC =
+   sig
+
+      type tactic = Tactic.tactic
+
+      datatype tool =
+         Lemma of Constant.constant
+
+      val auto : tactic
+      val nauto : int -> tactic
+      
+      val autoWith : tool list -> tactic
+      val nautoWith : int -> tool list -> tactic
+
+   end
+
+
+
+structure Autotactic :> AUTOTACTIC =
+   struct
+
+      structure TC = TypecheckInternal
+
+      open Case
+      open Tactic
+
+      val defaultDepth = 5
+
+
+      datatype tool =
+         Lemma of Constant.constant
+
+      
+
+      fun tryTools tools =
+         (case tools of
+             [] => fail ""
+
+           | Lemma const :: rest =>
+                first
+                   [
+                   BackchainInternal.applyPriority (ETerm.literal (Term.Const const)),
+                   tryTools rest
+                   ])
+
+
+      fun autoLoop n symok tools =
+         first
+            [
+            HypTactic.hypof >> done,
+            HypTactic.assumption >> done,
+            EqualityTacticInternal.reflexivityPriority,
+
+            tryTools tools
+            >>= autoCont n true tools,
+   
+            goalContextCase
+            / $anyhyp $tm 
+              ((\Prim.forall\ _ _ | \Prim.arrow\ _ _) =>
+               \(fnc => fn i =>
+                    BackchainInternal.applyPriority (ETerm.literal (Term.Var i))
+                    >>= autoCont n true tools)\)
+            /,
+
+            IntroTactic.split >> autoCont n true tools TC.Primary,
+            IntroTacticInternal.introPriority [IntroPattern.Ident NONE] >>= autoCont n true tools,
+            IntroTactic.left >> autoCont n true tools TC.Primary,
+            IntroTactic.right >> autoCont n true tools TC.Primary,
+
+            let
+               do (jud, _) = withgoal
+            in
+               if TC.isTypecheckGoal jud then
+                  idtacM TC.Secondary
+               else
+                  fail ""
+            end,
+
+            EqualityTacticInternal.compatPriority
+            >>= autoCont n true tools,
+
+            if symok then
+               EqualityTacticInternal.symmetryPriority
+               >>= autoCont n false tools
+            else
+               fail ""
+            ]
+
+      and autoCont n symok tools pri =
+         (case pri of
+             TC.Primary =>
+                if n = 0 then
+                   fail ""
+                else
+                   autoLoop (n-1) symok tools
+
+           | TC.Secondary =>
+                idtacM pri)
+
+
+      fun nautoWith n tools =
+         if n < 0 then
+            fail "negative autotactic depth"
+         else
+            first
+               [
+               TC.withTypecheckSnd (autoLoop n true tools) >> done,
+   
+               idtac
+               ]
+
+
+      val auto = nautoWith defaultDepth []
+
+      fun nauto n = nautoWith n []
+
+      fun autoWith tools = nautoWith defaultDepth tools
+
+   end
+
+
+structure ParseAutoTool =
+   struct
+
+      val null = []
+      fun cons x y = x :: y
+
+      fun lemma id = Autotactic.Lemma (Namespace.resolve id)
+
+   end
+
+
+grammardef AutoTool
+
+   open ParseAutoTool
+
+   rule AutoTool ::= Longident => lemma
+
+   rule AutoTools ::= => null
+   rule AutoTools ::= AutoTool AutoTools => cons
+
+end
+
+
+grammaron AutoTool

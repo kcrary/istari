@@ -78,7 +78,9 @@ signature EQUALITY_TACTIC_INTERNAL =
       include EQUALITY_TACTIC
 
       
+      val compatPriority : priority Tactic.tacticm
       val reflexivityPriority : priority Tactic.tacticm
+      val symmetryPriority : priority Tactic.tacticm
 
       val injectionSum : int -> tactic
       val injectionExists : int -> tactic
@@ -322,7 +324,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       fun seqOption l = List.findmap (fn z => z) l
              
 
-      fun compatPriority () =
+      fun compatPriorityLoop () =
          let
             do (jud, dir) = withgoal
          in
@@ -467,18 +469,20 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                     refine (Rule.univForgetEq a b (T.evar ()))
                     >>
                     (* G |- A = B : U i *)
-                    compatPriority ())\
+                    compatPriorityLoop ())\
 
              | _ =>
                \(fnc => fail "not a compatibility goal")\
             /
          end
 
-      val compatRaw = lift compatPriority >> idtac
+      val compatPriority = lift compatPriorityLoop
+
+      val compatRaw = compatPriority >> idtac
 
       val compat =
          TC.withTypecheckSnd $
-         lift compatPriority
+         compatPriority
          >>=
          (fn tc => first [reflexivityPriority, idtacM tc])
 
