@@ -39,17 +39,28 @@
 (define-key istari-mode-map (kbd "C-c C-.") 'istari-goto-marker)
 (define-key istari-mode-map "\C-c\C-c" 'istari-interrupt)
 (define-key istari-mode-map "\C-c\C-r" 'istari-read-only)
-(define-key istari-mode-map "\C-cs" 'istari-show)
-(define-key istari-mode-map "\C-cS" 'istari-show-full)
-(define-key istari-mode-map "\C-ct" 'istari-terminate)
-(define-key istari-mode-map "\C-c\C-d" 'istari-detail)
 (define-key istari-mode-map [f9] 'istari-step)
 (define-key istari-mode-map [f10] 'istari-run)
 
+(define-key istari-mode-map "\C-cpa" 'istari-adjust)
+(define-key istari-mode-map "\C-cpt" 'istari-terminate)
+(define-key istari-mode-map "\C-cpl" 'istari-toggle-load-libraries)
+
+(define-key istari-mode-map "\C-c\C-d" 'istari-detail)
+(define-key istari-mode-map "\C-cs" 'istari-show)
+(define-key istari-mode-map "\C-cS" 'istari-show-full)
+(define-key istari-mode-map "\C-cra" 'istari-report-all)
+(define-key istari-mode-map "\C-crm" 'istari-report-module)
+(define-key istari-mode-map "\C-crs" 'istari-report-show)
+(define-key istari-mode-map "\C-crt" 'istari-report-type)
+(define-key istari-mode-map "\C-cci" 'istari-show-implicits)
+(define-key istari-mode-map "\C-ccs" 'istari-show-substitutions)
 
 
 (defun istari-mode ()
-  "Major mode for Istari proof editing."
+  "Major mode for Istari proof editing.
+
+\\{istari-mode-map}"
   (interactive)
   (kill-all-local-variables)
   (use-local-map istari-mode-map)
@@ -259,13 +270,14 @@
   "Terminate Istari process."
   (interactive)
   (unless ist-running
-    (error "Istari not running."))
+    (error "Istari not running"))
   (delete-overlay ist-cursor)
   (delete-overlay ist-overlay)
   (let ((buf (process-buffer ist-ml-proc)))
     (delete-process ist-ml-proc)
     (kill-buffer buf))
-  (setq ist-running nil))
+  (setq ist-running nil)
+  (message "Istari terminated"))
 
 (defun ist-send-string (str)
   (process-send-string ist-ml-proc str))
@@ -361,7 +373,7 @@
     (error "Istari running in another buffer.")))
 
 (defun istari-adjust (pos)
-  "Adjust UI position."
+  "Set the UI's position."
   (interactive "d")
   (unless ist-running
     (error "Istari not running."))
@@ -421,16 +433,6 @@
       (ist-overlay-read-write)
     (ist-overlay-read-only)))
 
-(defun istari-show ()
-  "Show the current prover state."
-  (interactive)
-  (istari-interject "Prover.show ();"))
-
-(defun istari-show-full ()
-  "Show the current full prover state."
-  (interactive)
-  (istari-interject "Prover.showFull ();"))
-
 (defun istari-step ()
   "Single-step the prover."
   (interactive)
@@ -441,7 +443,58 @@
   (interactive)
   (istari-interject "Debugger.run ();"))
 
+(defun istari-toggle-load-libraries ()
+  "Toggle loading the Istari library."
+  (interactive)
+  (setq istari-load-libraries (not istari-load-libraries))
+  (if istari-load-libraries
+      (message "Loading libraries enabled")
+    (message "Loading libraries disabled")))
+
+
+;; Utilities
+
 (defun istari-detail ()
   "Request detail from the prover."
   (interactive)
   (istari-interject "Prover.detail ();"))
+
+(defun istari-show ()
+  "Show the current prover state."
+  (interactive)
+  (istari-interject "Prover.show ();"))
+
+(defun istari-show-full ()
+  "Show the current full prover state."
+  (interactive)
+  (istari-interject "Prover.showFull ();"))
+
+(defun istari-report-all ()
+  "List the entire proof environment."
+  (interactive)
+  (istari-interject "Report.showAll ();"))
+
+(defun istari-report-module (str)
+  "List the contents of a module."
+  (interactive "MModule: ")
+  (istari-interject (concat "Report.showModule (parseLongident /" str "/);")))
+
+(defun istari-report-show (str)
+  "Report the definition and type of a constant."
+  (interactive "MConstant: ")
+  (istari-interject (concat "Report.show (parseLongident /" str "/);")))
+  
+(defun istari-report-type (str)
+  "Report the type of a constant."
+  (interactive "MConstant: ")
+  (istari-interject (concat "Report.showType (parseLongident /" str "/);")))
+
+(defun istari-show-implicits ()
+  "Toggle showing implicit arguments."
+  (interactive)
+  (istari-interject "Show.showImplicits := not (!Show.showImplicits); if !Show.showImplicits then print \"Display of implicit arguments enabled.\\n\" else print \"Display of implicit arguments disabled.\\n\";"))
+
+(defun istari-show-substitutions ()
+  "Toggle showing substitutions."
+  (interactive)
+  (istari-interject "Show.showSubstitutions := not (!Show.showSubstitutions); if !Show.showSubstitutions then print \"Display of evar substitutions enabled.\\n\" else print \"Display of evar substitutions disabled.\\n\";"))
