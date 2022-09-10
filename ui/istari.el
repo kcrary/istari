@@ -135,7 +135,7 @@
                    (propertize
                     "x" 'display '(left-fringe filled-square default)))
     (overlay-put ist-cursor
-                 'before-string "[working]")))
+                 'before-string "[working]\n")))
     
 (defun ist-cursor-ready ()
   (if (display-graphic-p)
@@ -144,7 +144,7 @@
                    (propertize
                     "x" 'display '(left-fringe right-triangle default)))
     (overlay-put ist-cursor
-                 'before-string "[ready]")))
+                 'before-string "[ready]\n")))
 
 (defun ist-cursor-partial ()
   (if (display-graphic-p)
@@ -153,7 +153,7 @@
                    (propertize
                     "x" 'display '(left-fringe left-triangle default)))
     (overlay-put ist-cursor
-                 'before-string "[partial]")))
+                 'before-string "[partial]\n")))
     
 (defvar ist-partial)
 
