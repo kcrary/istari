@@ -144,6 +144,19 @@
                (propertize
                 "x" 'display '(left-fringe left-triangle default))))
 
+;; Use these if on a restricted console
+;; (defun ist-cursor-working ()
+;;   (overlay-put ist-cursor
+;;                'before-string "[working]"))
+
+;; (defun ist-cursor-ready ()
+;;   (overlay-put ist-cursor
+;;                'before-string "[ready]"))
+
+;; (defun ist-cursor-partial ()
+;;   (overlay-put ist-cursor
+;;                'before-string "[partial]"))
+
 (defvar ist-partial)
 
 (defun ist-cursor-ready-or-partial ()
@@ -324,7 +337,7 @@
           (setq ist-sending nil)
           (move-overlay ist-cursor pos pos)
           (ist-cursor-ready-or-partial)
-          (ist-send-string "\^D\n"))
+          (ist-send-string "\^E\n"))
       (ist-advance))))
 
 (defun ist-send (pos)

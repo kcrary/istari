@@ -38,7 +38,7 @@ signature UI =
    ----------
    ^A <number> \n    : rewind to line <number>
    ^B <code> \n      : interject with code
-   ^D \n             : show state
+   ^E \n             : show state
 
    (The reason UI -> REPL uses special codes, rather than just function calls,
    is to arrange not to screw up the REPL's idea of what line we're on.)
@@ -116,7 +116,7 @@ structure UI :> UI =
                   | #"\^B" =>
                        Interject (String.extract (str, 1, NONE))
 
-                  | #"\^D" =>
+                  | #"\^E" =>
                        ShowState
 
                   | _ => Line str))
