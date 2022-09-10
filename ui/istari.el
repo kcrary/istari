@@ -93,8 +93,10 @@
     (save-excursion
       (goto-char (point-max))
       (insert str))
-    (if (not (and ist-output-window (window-valid-p ist-output-window)))
-        (setq ist-output-window (get-buffer-window ist-output-buffer t)))
+    (if (not (and ist-output-window (window-live-p ist-output-window)))
+        (progn
+          (ist-frame)
+          (setq ist-output-window (get-buffer-window ist-output-buffer t))))
     (set-window-point ist-output-window (point-max))))
 
 (defvar ist-overlay)
@@ -127,36 +129,32 @@
   (move-overlay ist-overlay (point-min) pos))
 
 (defun ist-cursor-working ()
-  (overlay-put ist-cursor
-               'before-string
-               (propertize
-                "x" 'display '(left-fringe filled-square default))))
-
+  (if (display-graphic-p)
+      (overlay-put ist-cursor
+                   'before-string
+                   (propertize
+                    "x" 'display '(left-fringe filled-square default)))
+    (overlay-put ist-cursor
+                 'before-string "[working]")))
+    
 (defun ist-cursor-ready ()
-  (overlay-put ist-cursor
-               'before-string
-               (propertize
-                "x" 'display '(left-fringe right-triangle default))))
+  (if (display-graphic-p)
+      (overlay-put ist-cursor
+                   'before-string
+                   (propertize
+                    "x" 'display '(left-fringe right-triangle default)))
+    (overlay-put ist-cursor
+                 'before-string "[ready]")))
 
 (defun ist-cursor-partial ()
-  (overlay-put ist-cursor
-               'before-string
-               (propertize
-                "x" 'display '(left-fringe left-triangle default))))
-
-;; Use these if on a restricted console
-;; (defun ist-cursor-working ()
-;;   (overlay-put ist-cursor
-;;                'before-string "[working]"))
-
-;; (defun ist-cursor-ready ()
-;;   (overlay-put ist-cursor
-;;                'before-string "[ready]"))
-
-;; (defun ist-cursor-partial ()
-;;   (overlay-put ist-cursor
-;;                'before-string "[partial]"))
-
+  (if (display-graphic-p)
+      (overlay-put ist-cursor
+                   'before-string
+                   (propertize
+                    "x" 'display '(left-fringe left-triangle default)))
+    (overlay-put ist-cursor
+                 'before-string "[partial]")))
+    
 (defvar ist-partial)
 
 (defun ist-cursor-ready-or-partial ()
@@ -235,25 +233,27 @@
 (defvar ist-source-buffer)
 (defvar ist-ml-proc)
 
-(defun istari-frame ()
+(defun ist-frame ()
   "Create Istari frame."
   (interactive)
-  (if (and
-       (frame-live-p ist-output-frame)
-       (eq (window-buffer (frame-root-window ist-output-frame)) ist-output-buffer))
-      ()
-    (let
-        ((current-frame (selected-frame)))
-      (setq ist-output-frame (make-frame))
-      (set-frame-parameter ist-output-frame 'top ist-output-frame-top)
-      (set-frame-parameter ist-output-frame 'left ist-output-frame-left)
-      (set-frame-parameter ist-output-frame 'height ist-output-frame-height)
-      (set-frame-parameter ist-output-frame 'width ist-output-frame-width)
-      (select-frame ist-output-frame)
-      (switch-to-buffer ist-output-buffer)
-      (goto-char (point-max))
-      (setq-local scroll-conservatively 101)
-      (select-frame-set-input-focus current-frame))))
+  (if (display-graphic-p)
+      (if (and
+           (frame-live-p ist-output-frame)
+           (eq (window-buffer (frame-root-window ist-output-frame)) ist-output-buffer))
+          ()
+        (let
+            ((current-frame (selected-frame)))
+          (setq ist-output-frame (make-frame))
+          (set-frame-parameter ist-output-frame 'top ist-output-frame-top)
+          (set-frame-parameter ist-output-frame 'left ist-output-frame-left)
+          (set-frame-parameter ist-output-frame 'height ist-output-frame-height)
+          (set-frame-parameter ist-output-frame 'width ist-output-frame-width)
+          (select-frame ist-output-frame)
+          (switch-to-buffer ist-output-buffer)
+          (goto-char (point-max))
+          (setq-local scroll-conservatively 101)
+          (select-frame-set-input-focus current-frame)))
+    (selected-frame)))
     
 (defun istari-start ()
   "Start Istari process."
@@ -270,7 +270,7 @@
     (setq ist-sending nil)
     (setq ist-output-buffer (get-buffer-create "*istari*"))
     (setq ist-output-window nil)
-    (istari-frame)
+    (ist-frame)
     (setq ist-ml-proc 
           (start-process "ist-ml" "*subordinate istari process*" "sml" 
                          (concat "@SMLload=" 
