@@ -24,13 +24,7 @@ Repl.rewindHook :=
                 false
        end);
 
-Repl.resetHook :=
-   (fn () => (
-             Checkpoint.restore Genesis.genesis;
-             (* Ignore failure here, as per checkpoint spec. *)
-
-             Prover.show ()
-             ));
+(* Repl.resetHook is set below. *)
 
 ProverInternal.beforeLemmaHook := 
    (fn () => 
@@ -85,7 +79,19 @@ fun export prelude =
                )
          else
             exportPathNolib
-   
+
+      val st = Checkpoint.checkpoint ()
+
+      val () =
+         Repl.resetHook :=
+            (fn () => (
+                      Checkpoint.restore st;
+                      (* Ignore failure here, as per checkpoint spec. *)
+         
+                      Prover.show ()
+                      ));
+
+
       val {system, version_id, date} = Compiler.version
       val replDate = Date.toString (Date.fromTimeUniv (Time.now ()))
    in
