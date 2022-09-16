@@ -8,6 +8,7 @@ signature REWRITE =
 
       type rewrite
       type eterm = ETerm.eterm
+      type ehead = Directory.idirectory -> Directory.head
 
 
       type captures = symbol option list
@@ -23,7 +24,8 @@ signature REWRITE =
       val convertHeadRew   : captures -> constant -> eterm -> rewrite
       val foldRew          : captures -> eterm -> rewrite
       val convertFoldRew   : captures -> eterm -> rewrite
-      val unfoldRew        : constant -> int -> rewrite
+      val unfoldRew        : ehead -> rewrite
+      val unfoldHeadRew    : ehead -> rewrite
       val rollRew          : captures -> eterm -> rewrite
       val convertRollRew   : captures -> eterm -> rewrite
       val unrollRew        : constant -> rewrite
@@ -55,8 +57,8 @@ signature REWRITE =
       val convertHead      : ((captures * constant * eterm) * targets) list -> tactic
       val fold             : ((captures * eterm) * targets) list -> tactic
       val convertFold      : ((captures * eterm) * targets) list -> tactic
-      val unfold           : (constant * targets) list -> tactic
-      val unfoldHead       : (constant * targets) list -> tactic
+      val unfold           : (ehead * targets) list -> tactic
+      val unfoldHead       : (ehead * targets) list -> tactic
       val roll             : ((captures * eterm) * targets) list -> tactic
       val convertRoll      : ((captures * eterm) * targets) list -> tactic
       val unroll           : (constant * targets) list -> tactic
@@ -88,10 +90,20 @@ signature REWRITE_TYPES =
        | Beta
 
        | Reduce of Reduction.reduction
-         (* Reduce red: M --> N  where  M reduces to N by red  *)
+         (* Reduce red : M --> N  where  M reduces to N by red  *)
 
        | Unreduce of Reduction.reduction
-         (* Unreduce red: N --> M  where  M reduces to N by red *)
+         (* Unreduce red : N --> M  where  M reduces to N by red *)
+
+       | LetFold of int * term
+         (* LetFold (i, M) : M[N[^k] . id] --> M[i+k . id] 
+            where i unfolds to N and rewriting is taking place under k bindings
+         *)
+
+       | LetUnfold of int * term
+         (* LetFold (i, M) : M[i+k . id] --> M[N[^k] . id] 
+            where i unfolds to N and rewriting is taking place under k bindings
+         *)
 
 
       type equality_rewrite = term * term * term * Term.elim list * priority tacticm
@@ -168,6 +180,8 @@ structure RewriteTypes :> REWRITE_TYPES =
        | Beta
        | Reduce of Reduction.reduction
        | Unreduce of Reduction.reduction
+       | LetFold of int * term
+       | LetUnfold of int * term
 
       type equality_rewrite = term * term * term * Term.elim list * priority tacticm
 
@@ -246,6 +260,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
       type symbol = Symbol.symbol
       type constant = Constant.constant
       type eterm = ETerm.eterm
+      type ehead = Directory.idirectory -> Directory.head
 
       exception InsufficientHits of string
 
@@ -543,7 +558,20 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                      | Unreduce red =>
                           refine (Rule.unreduce 
                                      (instantiate c n) 
-                                     (R.within (contextToPath c []) red)))
+                                     (R.within (contextToPath c []) red))
+
+                     | LetFold (j, p) =>
+                          (* suppose j unfolds to Q, and C binds k variables
+                             then  M = P[Q[^k] . id]  and  N = P[j+k . id]
+
+                             let instantiateShift C P = R
+                             then  R[Q . id] = C{ P[Q[^k] . id] } = C{ M }
+                                   R[j . id] = C{ P[j[^k] . id] } = C{ P[j+k . id] } = C{ N }
+                          *)
+                          refine (Rule.letFold j (instantiateShift c p))
+
+                     | LetUnfold (j, p) =>
+                          refine (Rule.letUnfold j (instantiateShift c p)))
                 end
 
            | SOME hyp =>
@@ -555,6 +583,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                         | SOME (J.Tml p) => (p, J.Tml)
 
                         | SOME (J.Tmh p) => (p, J.Tmh)
+
+                        | SOME (J.Let p) => (p, J.Let)
 
                         | NONE =>
                              (* this shouldn't happen with a good directory *)
@@ -578,7 +608,19 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                      | Unreduce red =>
                           refine (Rule.unreduceHyp hyp 
                                      (instantiate c n) 
-                                     (R.within (contextToPath c []) red)))
+                                     (R.within (contextToPath c []) red))
+
+                     | LetFold (j, p) =>
+                          if hyp < j then
+                             refine (Rule.letFoldHyp j hyp (f (instantiateShift c p)))
+                          else
+                             raise (RewriteFailure "hypothesis is out of scope of let binding")
+
+                     | LetUnfold (j, p) =>
+                          if hyp < j then
+                             refine (Rule.letUnfoldHyp j hyp (f (instantiateShift c p)))
+                          else
+                             raise (RewriteFailure "hypothesis is out of scope of let binding"))
                 end)
 
 
@@ -2904,15 +2946,148 @@ structure RewriteInternal :> REWRITE_INTERNAL =
          end
          
             
-
-      fun foldMain main capture em hyp (_, dir) =
+      fun letFoldMain added varglobal varlocal n spine =
          let
-            val dir' =
+            val m = T.Elim (T.Var varlocal, spine)
+            val p = N.whnf (T.Elim (n, spine))
+
+            val ps = pseudohead p
+
+            fun test bvs n =
+               let
+                  val bvs' = bvs - added
+               in
+                  bvs' >= 0
+                  andalso
+                  pseudoheadEq ps added bvs' (pseudohead n)
+                  andalso
+                  let
+                     val mark = Trail.mark ()
+
+                     val p' =
+                        if bvs' = 0 then
+                           p
+                        else
+                           (* underShift does not disturb weak-head normal form, modulo simplification *)
+                           N.simplify (T.Sub (p, T.underShift added bvs'))
+
+                     val b = Option.isSome (I.unifyPrefix p' n)
+                  in
+                     Trail.rewind mark;
+                     b
+                  end
+               end
+
+            fun act bvs n =
+               let
+                  val bvs' = bvs - added
+               in
+                  if
+                     bvs' >= 0
+                     andalso
+                     pseudoheadEq ps added bvs' (pseudohead n)
+                  then
+                     let
+                        val mark = Trail.mark ()
+
+                        val s = T.underShift added bvs'
+                     in
+                        (case I.unifyPrefix (N.simplify (T.Sub (p, s))) n of
+                            NONE =>
+                               (
+                               Trail.rewind mark;
+                               NONE
+                               )
+   
+                          | SOME spine' =>
+                               SOME (T.Elim (T.Sub (m, s), spine'),
+                                     LetFold (varglobal, T.Elim (T.zero, 
+                                                                 T.ssubst spine (T.compose s T.shift1)
+                                                                 @ T.ssubst spine' T.shift1))))
+                     end
+                  else
+                     NONE
+               end
+         in
+            Computational (test, act)
+         end
+
+         
+      fun convertLetFoldMain added varglobal varlocal n spine =
+         let
+            val m = T.Elim (T.Var varlocal, spine)
+            val p = N.whnf (T.Elim (n, spine))
+
+            fun test bvs n =
+               let
+                  val bvs' = bvs - added
+               in
+                  if
+                     bvs' >= 0
+                  then
+                     let
+                        val mark = Trail.mark ()
+
+                        val s = T.underShift added bvs'
+                     in
+                        (case I.unifyPrefix (N.simplify (T.Sub (p, s))) n of
+                            NONE =>
+                               (
+                               Trail.rewind mark;
+                               false
+                               )
+   
+                          | SOME _ => true)
+                     end
+                  else
+                     false
+               end
+
+            fun act bvs n =
+               let
+                  val bvs' = bvs - added
+               in
+                  if
+                     bvs' >= 0
+                  then
+                     let
+                        val mark = Trail.mark ()
+
+                        val s = T.underShift added bvs'
+                     in
+                        (case I.unifyPrefix (N.simplify (T.Sub (p, s))) n of
+                            NONE =>
+                               (
+                               Trail.rewind mark;
+                               NONE
+                               )
+   
+                          | SOME spine' =>
+                               SOME (T.Elim (T.Sub (m, s), spine'),
+                                     LetFold (varglobal, T.Elim (T.zero,
+                                                                 T.ssubst spine (T.compose s T.shift1)
+                                                                 @ T.ssubst spine' T.shift1))))
+                     end
+                  else
+                     NONE
+               end
+         in
+            Computational (test, act)
+         end
+         
+            
+      fun foldMain main letmain capture em hyp (jud, dir) =
+         let
+            val sh =
                (case hyp of
-                   NONE => dir
-                 | SOME i => D.shift dir (i+1))
+                   NONE => 0
+
+                 | SOME i => i+1)
+               
+            val dir' = D.shift dir sh
 
             val m = N.simplify (ETerm.additional capture em (D.idir dir'))
+            val added = List.length capture
          in
             (case m of
                 T.Elim (T.Const const, _) =>
@@ -2921,13 +3096,21 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                           raise (RewriteFailure "head constant is opaque")
 
                      | SOME _ =>
-                          main (List.length capture) m R.unfold)
+                          main added m R.unfold)
 
-              | _ => raise (RewriteFailure "term has no head constant"))
+              | T.Elim (T.Var j, spine) =>
+                   (case J.hyp jud (j+sh-added) of
+                       J.Let n =>
+                          letmain added (j+sh-added) j (T.Sub (n, T.Shift (j+1))) spine
+
+                     | _ =>
+                          raise (RewriteFailure "head variable is not let bound"))
+
+              | _ => raise (RewriteFailure "term is not rigid"))
          end
 
-      val foldRew : symbol option list -> eterm -> rewrite = foldMain unreduceMain
-      val convertFoldRew : symbol option list -> eterm -> rewrite = foldMain convertUnreduceMain
+      val foldRew : symbol option list -> eterm -> rewrite = foldMain unreduceMain letFoldMain
+      val convertFoldRew : symbol option list -> eterm -> rewrite = foldMain convertUnreduceMain convertLetFoldMain
 
       fun fold aims =
          rewriteRaw
@@ -2971,50 +3154,103 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                 aims)
 
 
-      fun unfoldRew const arity _ _ =
-         (case Constant.definition const of
-             NONE =>
-                raise (RewriteFailure "constant is opaque")
 
-           | SOME m =>
+      fun unfoldMain usearity head hyp (jud, dir) =
+         (case head (D.idir dir) of
+             D.Hvar varglobal =>
                 let
-                   fun test _ n =
-                      (case n of
-                          T.Elim (T.Const const', _) =>
-                             Constant.eq (const, const')
-
-                        | _ => false)
-
-                   fun act _ n =
-                      (case n of
-                          T.Elim (T.Const const', spine) =>
-                             if Constant.eq (const, const') then
-                                (try
-                                    let
-                                       val n' = R.reduce (R.beta arity) (T.Elim (m, spine))
-                                    in
-                                       SOME (n', Reduce (R.trans [R.unfold, R.beta arity]))
-                                    end
-                                 with
-                                    R.Reduce => NONE)
+                   val varlocal =
+                      (case hyp of
+                          NONE => varglobal
+       
+                        | SOME i =>
+                             if i < varglobal then
+                                varglobal - i - 1
                              else
-                                NONE
-
-                        | _ => NONE)
+                                raise (RewriteFailure "hypothesis is out of scope of let binding"))
                 in
-                   Computational (test, act)
-                end)
+                   (case J.hyp jud varglobal of
+                       J.Let m =>
+                          let
+                             fun test bvs n =
+                                (case n of
+                                    T.Elim (T.Var v, _) => v = varlocal+bvs
+          
+                                  | _ => false)
+          
+                             fun act bvs n =
+                                (case n of
+                                    T.Elim (T.Var v, spine) =>
+                                       if v = varlocal+bvs then
+                                          let
+                                             val n' = T.Elim (T.Sub (m, T.Shift (varlocal+bvs+1)), spine)
+                                          in
+                                             SOME (n', LetUnfold (varglobal, T.Elim (T.zero, T.ssubst spine T.shift1)))
+                                          end
+                                       else
+                                          NONE
+          
+                                  | _ => NONE)
+                          in
+                             Computational (test, act)
+                          end
+
+                     | _ => raise (RewriteFailure "variable is not let bound"))
+                end
+
+           | D.Hconst const =>
+                (case Constant.definition const of
+                    NONE =>
+                       raise (RewriteFailure "constant is opaque")
+       
+                  | SOME m =>
+                       let
+                          val arity =
+                             if usearity then
+                                Database.findArity const
+                             else
+                                0
+
+                          fun test _ n =
+                             (case n of
+                                 T.Elim (T.Const const', _) =>
+                                    Constant.eq (const, const')
+       
+                               | _ => false)
+       
+                          fun act _ n =
+                             (case n of
+                                 T.Elim (T.Const const', spine) =>
+                                    if Constant.eq (const, const') then
+                                       (try
+                                           let
+                                              val n' = R.reduce (R.beta arity) (T.Elim (m, spine))
+                                           in
+                                              SOME (n', Reduce (R.trans [R.unfold, R.beta arity]))
+                                           end
+                                        with
+                                           R.Reduce => NONE)
+                                    else
+                                       NONE
+       
+                               | _ => NONE)
+                       in
+                          Computational (test, act)
+                       end))
+
+      val unfoldRew = unfoldMain true
+      val unfoldHeadRew = unfoldMain false
 
       fun unfold aims =
          rewriteRaw
             (List.map
-                (fn (const, targets) => (unfoldRew const (Database.findArity const), targets))
+                (fn (head, targets) => (unfoldRew head, targets))
                 aims)
 
       fun unfoldHead aims =
          rewriteRaw
             (List.map
-                (fn (const, targets) => (unfoldRew const 0, targets))
+                (fn (head, targets) => (unfoldHeadRew head, targets))
                 aims)
 
 
@@ -3884,9 +4120,12 @@ structure ParseRewrite =
       fun rewriteBackward m capture = Rewrite.usingRew true capture m
       fun rewriteRepl m n a capture = Rewrite.replaceRew capture m n a
 
+      fun head longid dir = Directory.lookupLong dir longid
+
       fun rewriteAim rew targets = (rew, targets)
       fun termAim m capture targets = ((capture, m), targets)
       fun constantAim const targets = (const, targets)
+      fun headAim head targets = (head, targets)
       fun constantTermAim const m capture targets = ((capture, const, m), targets)
       fun reductionAim r targets = (r, targets)
       fun reductionTermAim r m capture targets = ((capture, m, r), targets)
@@ -3929,9 +4168,12 @@ grammardef Rewrite
    rule Rewrite          ::= "<-" Term Within => rewriteBackward
    rule Rewrite          ::= Term(31) "=" Term(31) ":" Term(31) Within => rewriteRepl
 
+   rule Head             ::= Longident => head
+
    rule RewriteAim       ::= Rewrite Targets => rewriteAim
    rule TermAim          ::= Term Within Targets => termAim
    rule ConstantAim      ::= Constant Targets => constantAim
+   rule HeadAim          ::= Head Targets => headAim
    rule ConstantTermAim  ::= Constant "with" Term Within Targets => constantTermAim
    rule ReductionAim     ::= EMBED Targets => reductionAim
    rule ReductionTermAim ::= EMBED "with" Term Within Targets => reductionTermAim
@@ -3944,6 +4186,9 @@ grammardef Rewrite
 
    rule ConstantAims     ::= ConstantAim => sing
    rule ConstantAims     ::= ConstantAim "," ConstantAims => cons
+
+   rule HeadAims         ::= HeadAim => sing
+   rule HeadAims         ::= HeadAim "," HeadAims => cons
 
    rule ConstantTermAims ::= ConstantTermAim => sing
    rule ConstantTermAims ::= ConstantTermAim "," ConstantTermAims => cons

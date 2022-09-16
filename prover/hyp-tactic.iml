@@ -36,6 +36,8 @@ signature HYP_TACTIC =
       val revert0 : tactic
       val revert : symbol list -> tactic
 
+      val set : symbol -> ETerm.eterm -> tactic
+
       val assumption : tactic
 
       val trustme : tactic
@@ -50,6 +52,7 @@ structure HypTactic :> HYP_TACTIC =
       structure N = Normalize
       structure D = Directory
       structure J = Judgement
+      structure R = Reduction
 
       open Tactic
       open CasePervasive
@@ -430,6 +433,25 @@ structure HypTactic :> HYP_TACTIC =
                        >> refine (Rule.hypothesis 0)                             
                        ]
 
+              | SOME (J.Let m) =>
+                   (* =M |- C *)
+                   refine (Rule.unreduce 
+                              (T.apply2 Prim.lett 
+                                  T.zero 
+                                  (T.Lam (SOME name, T.Sub (c, T.Idot (0, T.Shift 2)))))
+                              (R.trans [R.unfold, R.beta 3]))
+                   >>
+                   (* =M |- let 0 (fn . C[0 . ^2]) *)
+                   refine (Rule.letUnfold 0 
+                              (T.apply2 Prim.lett
+                                  T.zero
+                                  (T.Lam (SOME name, T.Sub (c, T.Idot (0, T.Shift 3))))))
+                   >>
+                   (* =M |- let M[^] (fn . C[0 . ^2]) *)
+                   refine (Rule.weaken 0 1)
+                   >> chdir dir'
+                   (* |- let M (fn . C) *)
+                   
               | SOME _ =>
                    fail "hypothesis not revertable"
 
@@ -456,6 +478,16 @@ structure HypTactic :> HYP_TACTIC =
                 revertone hyp >> revertLoop rest)
 
       fun revert hyps = revertLoop (List.rev hyps)
+
+
+      fun set sym em =
+         let
+            do (_, dir) = withgoal
+         in
+            refine (Rule.letIntro 0 (ETerm.withdir dir em))
+            >> chdir (D.bind dir sym)
+         end
+
 
       val assumption =
          setFailure "no matching assumption" $

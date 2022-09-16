@@ -101,9 +101,13 @@ signature TYPECHECK_INTERNAL =
 
    6. If A is known, use any applicable intro or formation rule.
 
-   7. If M is letnext, use the nondependent letnext rule.
-      (The special typing aspects of letnext mean that we cannot handle
-      it the same way as other open-scope elim forms.)
+   7a. If M is let, use the let rule.
+       (We don't treat this as a normal constant because we don't want to
+       require that the bound term's type belongs to a universe.)
+
+   7b. If M is letnext, use the nondependent letnext rule.
+       (The special typing aspects of letnext mean that we cannot handle
+       it the same way as other open-scope elim forms.)
 
    8. If M is a path then:
 
@@ -1102,54 +1106,94 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                      | NONE => raise Backtrack)\
 
-               (* 7. Letnext *)
-             | _ ; \Prim.letnext\ ? (fn ? . ?) =>
-               \fnc m1 binder m2 =>
-                   let
-                      val e = T.evar ()
+               (* 7a. Let *)
+             | _ ; \Prim.lett\ ? (fn ? . ?) =>
+               \(fnc m1 binder m2 =>
+                    let
+                       val e = T.evar ()
 
-                      val goal1 =
-                         (* G |- M1 : future E *)
-                         (J.make ctx (T.apply2 Prim.ov (T.apply1 Prim.future e) m1), dir)
+                       val goal1 =
+                          (* G |- M1 : E *)
+                          (J.make ctx (T.apply2 Prim.ov e m1), dir)
 
-                      val goal2 =
-                         (* G, later E |- M2 : A[^] *)
-                         (J.make 
-                             (Seq.cons (J.Tml e) ctx)
-                             (T.apply2 Prim.ov (T.Sub (a, T.shift1)) m2),
-                          D.bindVary dir binder)
+                       val goal2 =
+                          (* G, E |- M2 : A[^] *)
+                          (J.make
+                              (Seq.cons (J.Tm e) ctx)
+                              (T.apply2 Prim.ov (T.Sub (a, T.shift1)) m2),
+                           D.bindVary dir binder)
 
-                      val goal3 =
-                         (* promote G |- E : type *)
-                         (J.make (Seq.map J.promote ctx) (T.apply1 Prim.istp e), dir)
+                       val dest1 = newdest ()
+                       val dest2 = newdest ()
+                    in
+                       progress := true;
 
-                      val dest1 = newdest ()
-                      val dest2 = newdest ()
-                      val dest3 = newdest ()
-                   in
-                      progress := true;
+                       dest :=
+                          (
+                          (* G |- let M1 (fn . M2) : A *)
+                          refine (Rule.letForm e a m1 m2)
+                          >>> [
+                              (* G |- M1 : E *)
+                              play dest1,
 
-                      dest :=
-                         (
-                         (* G |- letnext M1 (fn . M2) : A *)
-                         refine (Rule.futureElimOfLetnextNondep e a m1 m2)
-                         >>> [
-                             (* promote G |- E : type *)
-                             play dest3,
-
-                             (* G |- M : future E *)
-                             play dest1,
-
-                             (* G, later E |- M2 : A[^] *)
-                             play dest2
-                             ]
-                         );
-
+                              (* G, E |- M2 : A[^] *)
+                              play dest2
+                              ]
+                          );
+                          
                       enqueue
                          [(Of, table, goal1, dest1, history),
-                          (Of, table, goal2, dest2, history),
-                          (Istp, table, goal3, dest3, history)]
-                   end\
+                          (Of, table, goal2, dest2, history)]
+                   end)\
+
+               (* 7b. Letnext *)
+             | _ ; \Prim.letnext\ ? (fn ? . ?) =>
+               \(fnc m1 binder m2 =>
+                    let
+                       val e = T.evar ()
+ 
+                       val goal1 =
+                          (* G |- M1 : future E *)
+                          (J.make ctx (T.apply2 Prim.ov (T.apply1 Prim.future e) m1), dir)
+ 
+                       val goal2 =
+                          (* G, later E |- M2 : A[^] *)
+                          (J.make 
+                              (Seq.cons (J.Tml e) ctx)
+                              (T.apply2 Prim.ov (T.Sub (a, T.shift1)) m2),
+                           D.bindVary dir binder)
+ 
+                       val goal3 =
+                          (* promote G |- E : type *)
+                          (J.make (Seq.map J.promote ctx) (T.apply1 Prim.istp e), dir)
+ 
+                       val dest1 = newdest ()
+                       val dest2 = newdest ()
+                       val dest3 = newdest ()
+                    in
+                       progress := true;
+ 
+                       dest :=
+                          (
+                          (* G |- letnext M1 (fn . M2) : A *)
+                          refine (Rule.futureElimOfLetnextNondep e a m1 m2)
+                          >>> [
+                              (* promote G |- E : type *)
+                              play dest3,
+ 
+                              (* G |- M : future E *)
+                              play dest1,
+ 
+                              (* G, later E |- M2 : A[^] *)
+                              play dest2
+                              ]
+                          );
+ 
+                       enqueue
+                          [(Of, table, goal1, dest1, history),
+                           (Of, table, goal2, dest2, history),
+                           (Istp, table, goal3, dest3, history)]
+                    end)\
 
                (* 8. Infer. *)
              | _ =>
@@ -2661,21 +2705,21 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
          end
 
 
-      fun enterTypingAxiom const a rule =
+      fun enterTypingAxiom const a tac =
          let
             val jud =
                J.make Seq.empty (T.apply2 Prim.ov a (T.Const const))
 
             val v =
                Sum.outL $
-               Tactic.execute (jud, D.empty) (refine rule)
+               Tactic.execute (jud, D.empty) tac
          in
             DatabaseInternal.primType const jud v
          end
 
       val () =
          List.app
-            (fn (const, ea, rule) => enterTypingAxiom const (ETerm.closed ea) rule)
+            (fn (const, ea, rule) => enterTypingAxiom const (ETerm.closed ea) (refine rule))
             [
             (Prim.abort, /intersect (i : level) (a : U i) . void -> a/, Rule.abortType),
 

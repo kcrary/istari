@@ -70,12 +70,37 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
       val evar = Term.evar
 
       open Tactic
+      open CasePervasive
 
 
       val introTactics : (TC.priority tacticm * (T.term -> T.binder)) H.table = H.table ()
       val splitTactics : tactic H.table = H.table ()
       val existsTactics : (term -> TC.priority tacticm) H.table = H.table ()
 
+
+
+      fun findIntroTactic a =
+         let
+            val a' = N.whnf a
+         in
+            (case
+                (case a' of
+                    T.Elim (T.Const const, _) => H.find introTactics const
+                  | _ => NONE)
+             of
+                SOME (tac, binder) => SOME (tac, binder, a')
+
+              | NONE =>
+                   (case N.whnfHard a' of
+                       a'' as T.Elim (T.Const const, _) =>
+                          (case H.find introTactics const of
+                              SOME (tac, binder) => SOME (tac, binder, a'')
+
+                            | NONE => NONE)
+
+                     | _ => NONE))
+         end
+             
       
       fun introPriority pats =
          (case pats of
@@ -86,37 +111,51 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                    do (jud, _) = withgoal
                    val a = Judgement.concl jud
                 in
-                   (case Normalize.whnfHard a of
-                       T.Elim (T.Const const, spine) =>
-                          (case H.find introTactics const of
-                              SOME (tac, binder) =>
-                                 let
-                                    val pat' =
-                                       (case pat of
-                                           IntroPattern.Ident NONE =>
-                                              IntroPattern.Ident (binder a)
-
-                                         | _ => pat)
-
-                                    do tc = andthenM tac
-                                 in
-                                    (case tc of
-                                        TC.Secondary =>
-                                           idtacM TC.Secondary
-       
-                                      | TC.Primary =>
-                                           D.destruct0 pat' (introPriority rest))
-                                 end
-       
-                            | NONE => fail "conclusion not introable")
-
-                     | _ =>
-                          fail "conclusion not introable")
+                   (case findIntroTactic a of
+                       SOME (tac, binder, a') =>
+                          let
+                             val pat' =
+                                (case pat of
+                                    IntroPattern.Ident NONE =>
+                                       IntroPattern.Ident (binder a')
+          
+                                  | _ => pat)
+          
+                             do tc = andthenM tac
+                          in
+                             (case tc of
+                                 TC.Secondary =>
+                                    idtacM TC.Secondary
+          
+                               | TC.Primary =>
+                                    D.destruct0 pat' (introPriority rest))
+                          end
+          
+                     | NONE => fail "conclusion not introable")
                 end)
 
       fun introRaw pats = introPriority pats >> idtac
 
       fun intro pats = Typecheck.withTypecheckSnd $ introPriority pats
+
+
+      val introLet =
+         goalCase
+         / \Prim.lett\ ? (fn . ?) =>
+           \(fnc m c =>
+                (* let M (fn . C) *)
+                refine (Rule.letIntro 0 m)
+                >>
+                (* =M |- let M[^] (fn . C[0 . ^2]) *)
+                refine (Rule.letFold 0 (T.apply2 Prim.lett T.zero (T.Sub (T.Lam (NONE, c), T.Shift 2))))
+                >>
+                (* =M |- let 0 (fn . C[0 . ^2]) *)
+                refine (Rule.reduce (R.trans [R.unfold, R.beta 3]))
+                >>
+                (* =M |- C *)
+                idtacM TC.Primary)\
+         /
+
 
       val () =
          let
@@ -157,7 +196,10 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
 
             insert Prim.subtype 
                (RT.refine2 Rule.subtypeIntro >>> [idtacM TC.Secondary, idtacM TC.Secondary, idtacM TC.Primary],
-                nobinder)
+                nobinder);
+
+            insert Prim.lett
+               (introLet, RT.binder [1])
          end
 
       val split =

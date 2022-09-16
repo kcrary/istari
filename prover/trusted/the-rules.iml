@@ -458,6 +458,7 @@ signature THE_RULES =
       val eeqtpSymm : term -> term -> rule
       val weakenEqtpEeqtp : term -> term -> rule
       val accInd : term -> term -> term -> term -> term -> term -> rule
+      val letForm : term -> term -> term -> term -> rule
 
    end
 
@@ -474,6 +475,7 @@ structure J = Judgement
 val const_of = Const Prim.ov
 val const_true = Const Prim.tru
 val const_false = Const Prim.fals
+val const_let = Const Prim.lett
 val const_abort = Const Prim.abort
 val const_acc = Const Prim.acc
 val const_arrow = Const Prim.arrow
@@ -940,5 +942,6 @@ fun squashLeft gsize a c = Arg.lmake "squashLeft" [] gsize [J.Tm (Elim (const_sq
 fun eeqtpSymm a b = Arg.make "eeqtpSymm" [] (Elim (const_eeqtp, [App (a), App (b), ])) [(Arg.Unhide, [], Elim (const_eeqtp, [App (b), App (a), ])), ] (fn [_, ] => Pair (Triv, Triv) | _ => raise Arg.ExtractFailure)
 fun weakenEqtpEeqtp a b = Arg.make "weakenEqtpEeqtp" [] (Elim (const_eeqtp, [App (a), App (b), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (b), ])), ] (fn [_, ] => Pair (Triv, Triv) | _ => raise Arg.ExtractFailure)
 fun accInd a b i m n r = Arg.make "accInd" [m, ] (Sub (b, Dot (m, Shift 0))) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_arrow, [App (a), App (Elim (const_arrow, [App (a), App (Elim (const_univ, [App (i), ])), ])), ])), App (r), ])), (Arg.Nothing, [J.Tm (Elim (const_forall, [App (Sub (a, Shift 1)), App (Lam (NONE, Elim (const_arrow, [App (Elim (Sub (r, Shift 2), [App (Var 0), App (Var 1), ])), App (Sub (b, Idot (0, Shift 2))), ]))), ])), J.Tm (a), ], Sub (b, Shift 1)), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_acc, [App (a), App (r), App (m), ])), App (n), ])), ] (fn [_, _, p, _, _, ] => Elim (const_fix, [App (Lam (NONE, Lam (NONE, Sub (p, Dot (Lam (NONE, Lam (NONE, Elim (Var 3, [App (Var 1), ]))), Idot (0, Shift 2)))))), App (m), ]) | _ => raise Arg.ExtractFailure)
+fun letForm a b m n = Arg.make "letForm" [] (Elim (const_of, [App (b), App (Elim (const_let, [App (m), App (Lam (NONE, n)), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Sub (b, Shift 1)), App (n), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 
 end

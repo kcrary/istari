@@ -22,6 +22,7 @@ signature RULE =
       *)
       val exchange : int -> int -> int -> rule
 
+
       (* if    C reduces to D by red
          then  reduce red            turns C into D
                unreduce C red        turns D into C
@@ -44,13 +45,41 @@ signature RULE =
       val reduceHypAt : int -> int -> Judgement.hyp -> term -> Reduction.reduction -> rule
       val unreduceHypAt : int -> int -> Judgement.hyp -> term -> Reduction.reduction -> rule
 
+
       val checkPositive : rule
       val checkNegative : rule
+
+
+      (* G1, G2 |- J
+         >>
+         G1, = M, G2[^] |- J[under_i ^]
+      *)
+      val letIntro : int -> term -> rule
+
+      (* G1, = M, G2 |- J
+         >>
+         G1, G2[M . id] |- J[under_i (M . id)]
+      *)
+      val letSubst : int -> rule
+
+      (* if    i unfolds to M
+         then  letFold i C         turns C[M . id] into C[i . id]
+               letUnfold i C       turns C[i . id] into C[M . id]
+               letFoldHyp i j H    turns Hj = H[M . id] into H[i . id]
+               letUnfoldHyp i j H  turns Hj = H[i . id] into H[M . id]
+      *)
+      val letFold : int -> term -> rule
+      val letUnfold : int -> term -> rule
+      val letFoldHyp : int -> int -> Judgement.hyp -> rule
+      val letUnfoldHyp : int -> int -> Judgement.hyp -> rule
+
 
       (* sumLeft i a b c
          case analyzes i:(sum a b) with right-hand-side c
       *)
       val sumLeft : int -> term -> term -> term -> rule
+
+
 
       exception Failure         (* raised when a rule does not apply *)
       exception ExtractFailure  (* raised when extract function doesn't see what it expects *)
@@ -346,7 +375,8 @@ structure Rule :> RULE =
            | J.Tmh _ => J.Tmh (T.evar ())
            | J.Tp => J.Tp
            | J.Tpl => J.Tpl
-           | J.Tph => J.Tph)
+           | J.Tph => J.Tph
+           | J.Let _ => J.Let (T.evar ()))
 
 
       fun identity str =
@@ -533,6 +563,9 @@ structure Rule :> RULE =
 
               | J.Tmh a =>
                    (a, (fn a' => f (J.Tmh a')))
+
+              | J.Let m =>
+                   (m, (fn m' => f (J.Let m')))
 
               | _ => raise Failure)
          end
@@ -851,6 +884,134 @@ structure Rule :> RULE =
       val checkPositive = ("checkPositive", checkPosNeg true)
 
       val checkNegative = ("checkNegative", checkPosNeg false)
+
+
+      
+      fun letIntro i m =
+         ("letIntro",
+          fn jud =>
+             let
+                val (g2, g1) =
+                   (case S.splitOpt (J.context jud) i of
+                       SOME (g2, g1) => (g2, g1)
+
+                     | NONE => raise Failure)
+
+                val ctx =
+                   S.append
+                      (J.subContext g2 T.shift1)
+                      (S.cons (J.Let m) g1)
+             in
+                ([J.make ctx (T.Sub (J.concl jud, T.underShift i 1))],
+                 fn1 (fn n => T.Sub (n, T.under i (T.Dot (m, T.id)))))
+             end)
+
+      fun letSubst i =
+         ("letSubst",
+          fn jud =>
+             (case S.splitOpt (J.context jud) i of
+                 SOME (g3, g12) =>
+                    (case S.expose g12 of
+                        S.Cons (J.Let m, g1) =>
+                           let
+                              val ctx =
+                                 S.append
+                                    (J.subContext g3 (T.Dot (m, T.id)))
+                                    g1
+
+                              val c = T.Sub (J.concl jud, T.under i (T.Dot (m, T.id)))
+                           in
+                              ([J.make ctx c],
+                               fn1 (fn n => T.Sub (n, T.underShift i 1)))
+                           end
+    
+                      | _ => raise Failure)
+
+               | NONE =>
+                    raise Failure))
+
+      fun letFold i c =
+         ("letFold",
+          fn jud =>
+             (case J.hypOpt jud i of
+                 SOME (J.Let m) =>
+                    let
+                       val m' = T.Sub (m, T.Shift (i+1))
+                    in
+                       if U.unify1 (J.concl jud) (T.Sub (c, T.Dot (m', T.id))) then
+                          ([J.make (J.context jud) (T.Sub (c, T.Idot (i, T.id)))],
+                           fn1 (fn n => n))
+                       else
+                          raise Failure
+                    end
+
+               | _ => raise Failure))
+
+      fun letUnfold i c =
+         ("letUnfold",
+          fn jud =>
+             (case J.hypOpt jud i of
+                 SOME (J.Let m) =>
+                    let
+                       val m' = T.Sub (m, T.Shift (i+1))
+                    in
+                       if U.unify1 (J.concl jud) (T.Sub (c, T.Idot (i, T.id))) then
+                          ([J.make (J.context jud) (T.Sub (c, T.Dot (m', T.id)))],
+                           fn1 (fn n => n))
+                       else
+                          raise Failure
+                    end
+
+               | _ => raise Failure))
+
+      fun letFoldHyp i j h =
+         ("letFoldHyp",
+          fn jud =>
+             if j < i then
+                (case J.hypOpt jud i of
+                    SOME (J.Let m) =>
+                       let
+                          val (h', f) = onhyp jud j
+
+                          val m' = T.Sub (m, T.Shift (i-j))
+                       in
+                          J.unifyHyp h' (J.subHyp h (T.Dot (m', T.id)));
+
+                          if U.solve () then
+                             ([f (J.subHyp h (T.Idot (i-j-1, T.id)))],
+                              fn1 (fn n => n))
+                          else
+                             raise Failure
+                       end
+   
+                  | _ => raise Failure)
+             else
+                raise Failure)
+
+      fun letUnfoldHyp i j h =
+         ("letUnfoldHyp",
+          fn jud =>
+             if j < i then
+                (case J.hypOpt jud i of
+                    SOME (J.Let m) =>
+                       let
+                          val (h', f) = onhyp jud j
+
+                          val m' = T.Sub (m, T.Shift (i-j))
+                       in
+                          J.unifyHyp h' (J.subHyp h (T.Idot (i-j-1, T.id)));
+
+                          if U.solve () then
+                             ([f (J.subHyp h (T.Dot (m', T.id)))],
+                              fn1 (fn n => n))
+                          else
+                             raise Failure
+                       end
+   
+                  | _ => raise Failure)
+             else
+                raise Failure)
+
 
 
 

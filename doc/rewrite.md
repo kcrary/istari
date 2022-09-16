@@ -89,17 +89,19 @@ to be empty.
     (Finding hit numbers may be slow.)
 
 
-- `unfold [constant] [targets]`
+- `unfold [constant/variable] [targets]`
 
-    Unfolds a target term with the specified head constant.
+    Unfolds a target term with the specified head constant or
+    variable.
 
 
-- `unfoldHead [constant] [targets]`
+- `unfoldHead [constant/variable] [targets]`
 
-    Unfolds the specified constant.  Ignores the constant's arity so
-    it can be used on an incomplete application.  However, if the
-    arity is nonzero the constant will unfold to a lambda, so it may
-    leave beta redices if it is given any arguments.
+    Unfolds the specified constant or variable.  If it is a constant,
+    it ignores the constant's arity so it can be used on an incomplete
+    application.  However, if the arity is nonzero the constant will
+    unfold to a lambda, so it may leave beta redices if the constant
+    is given any arguments.
 
 
 - `roll [term] within [captures] [targets]`

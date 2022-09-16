@@ -81,7 +81,7 @@ structure Rulegen :> RULEGEN =
          (fn (str, s) =>
              S.insert s (Symbol.fromValue str))
          S.empty
-         ["of", "true", "false"]
+         ["of", "true", "false", "let"]
 
       fun lower str = String.map Char.toLower str
 
@@ -390,7 +390,8 @@ structure Rulegen :> RULEGEN =
 \structure J = Judgement\n\n\
 \val const_of = Const Prim.ov\n\
 \val const_true = Const Prim.tru\n\
-\val const_false = Const Prim.fals\n";
+\val const_false = Const Prim.fals\n\
+\val const_let = Const Prim.lett\n";
 
             S.app
                (fn k =>

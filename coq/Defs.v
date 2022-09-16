@@ -71,6 +71,7 @@ Definition ite : fterm := lam (lam (lam (bite (var 2) (var 1) (var 0)))).
 Definition karrow : fterm := lam (lam (karrow (var 1) (var 0))).
 Definition kind : fterm := lam (kuniv (var 0)).
 Definition letnext : fterm := lam (lam (app (var 0) (prev (var 1)))).
+Definition lett : fterm := lam (lam (app (var 0) (var 1))).
 Definition level : fterm := nattp.
 Definition lleq : fterm := leqtp.
 Definition lmax : fterm :=

@@ -19,7 +19,7 @@ structure Lemmagen :> LEMMAGEN =
          (fn ((from, to), d) =>
              D.insert d (Symbol.fromValue from) to)
          D.empty
-         [("forall", "pi"), ("exists", "sigma"), ("fix", "theta")]
+         [("forall", "pi"), ("exists", "sigma"), ("fix", "theta"), ("let", "lett")]
 
       fun writeTerm write m =
          (case m of

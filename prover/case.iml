@@ -82,6 +82,7 @@ signature CASE =
       val tmh : (term, 'a, 'b) matcher -> (hyp, 'a, 'b) matcher
       val tp : (hyp, 'a, 'a) matcher
       val tpl : (hyp, 'a, 'a) matcher
+      val lett : (term, 'a, 'b) matcher -> (hyp, 'a, 'b) matcher
 
 
       (* contexts
@@ -523,6 +524,16 @@ structure Case :> CASE =
            | _ => fk ())
 
 
+      fun lett f hyp x fk sk =
+         (case hyp of
+             J.Let m =>
+                f (N.simplify m) x fk sk
+
+           | _ =>
+                fk ())
+
+
+
       fun hyp i f ctx x fk sk =
          (case Seq.nthOpt ctx i of
              NONE =>
@@ -771,6 +782,7 @@ grammardef Case
    rule Match(3)      ::= "$tmh" Match(3) => tmh
    rule Match(3)      ::= "$tp" => tp
    rule Match(3)      ::= "$tpl" => tpl
+   rule Match(3)      ::= "$let" Match(3) => lett
 
    (* contexts *)
    rule Match(3)      ::= "$hyp" NUMBER Match(3) => hyp

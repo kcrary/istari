@@ -246,6 +246,7 @@ structure ParseTerm =
       val karrow = T.apply2 Prim.karrow
       val guard = T.apply2 Prim.guard
 
+      fun lett x m n = T.apply2 Prim.lett m (T.lam (SOME x) n)
       fun letnext x m n = T.apply2 Prim.letnext m (T.lam (SOME x) n)
 
       fun sumcase m x n y p = T.apply3 Prim.sumcase m (T.lam x n) (T.lam y p)
@@ -346,15 +347,15 @@ structure ParseTerm =
             cod 0,
             ]
 
-      fun registerBinder k str =
-         register k 2 0
+      fun registerBinder const str =
+         register const 2 0
          (U.wrap
              (U.fix
                  (fn unp =>
                      U.alt
                         [
                         U.wrap
-                           (U.apply2 k U.show (U.lam unp))
+                           (U.apply2 const U.show (U.lam unp))
                            (fn (dom, (arg, (doms, cod))) => ((arg, dom) :: doms, cod)),
 
                         U.wrap
@@ -363,15 +364,15 @@ structure ParseTerm =
                         ]))
              (binderContent str))
 
-      fun registerIBinder k str =
-         register k 3 0
+      fun registerIBinder const str =
+         register const 3 0
          (U.wrap
              (U.fix
                  (fn unp =>
                      U.alt
                         [
                         U.wrap
-                           (U.apply3 k U.wild U.show (U.lam unp))
+                           (U.apply3 const U.wild U.show (U.lam unp))
                            (fn ((), dom, (arg, (doms, cod))) => ((arg, dom) :: doms, cod)),
 
                         U.wrap
@@ -381,15 +382,15 @@ structure ParseTerm =
              (binderContent str))
 
       (* right associative *)
-      fun registerBinary k str prec =
-         register k 2 prec
+      fun registerBinary const str prec =
+         register const 2 prec
          (U.wrap
              (U.fix
                  (fn unp =>
                      U.alt
                         [
                         U.wrap
-                           (U.apply2 k U.show unp)
+                           (U.apply2 const U.show unp)
                            (fn (dom, (doms, cod)) => (dom :: doms, cod)),
 
                         U.wrap
@@ -510,13 +511,13 @@ structure ParseTerm =
       val () = registerBinary Prim.karrow "-k>" 0
       val () = registerBinary Prim.guard "-g>" 0
 
-      val () =
-         register Prim.letnext 2 0
+      fun registerLet const str =
+         register const 2 0
          (U.wrap
-             (U.apply2 Prim.letnext U.show (U.lam U.show))
+             (U.apply2 const U.show (U.lam U.show))
              (fn (m, (x, n)) =>
                  U.append [
-                          U.string "let next ",
+                          U.string str,
                           U.string x,
                           U.string " =",
                           U.break 1,
@@ -525,6 +526,9 @@ structure ParseTerm =
                           U.break 1,
                           n 0
                           ]))
+
+      val () = registerLet Prim.lett "let "
+      val () = registerLet Prim.letnext "let next "
 
       val () =
          register Prim.sumcase 3 100
@@ -870,6 +874,7 @@ grammardef Term
    rule Term(0)   ::= Term(1) "-k>" Term(0) => karrow
    rule Term(0)   ::= Term(1) "-g>" Term(0) => guard
 
+   rule Term(0)   ::= "let" Ident "=" Term(1) "in" Term(0) => lett
    rule Term(0)   ::= "let" "next" Ident "=" Term(1) "in" Term(0) => letnext
 
    rule Term(0)   ::= "case" Term(1) "of" "|" "inl" OIdent "." Term(0) "|" "inr" OIdent "." Term(0) => sumcase

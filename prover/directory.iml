@@ -52,6 +52,8 @@ signature DIRECTORY =
       val lookupVarOpt        : idirectory -> symbol -> int option
       val lookup              : idirectory -> symbol -> head
       val lookupOpt           : idirectory -> symbol -> head option
+      val lookupLong          : idirectory -> symbol list -> head
+      val lookupLongOpt       : idirectory -> symbol list -> head option
 
       (* raises Invalid or returns NONE if the index is out of range *)
       val name                : directory -> int -> symbol
@@ -397,6 +399,26 @@ structure Directory :> DIRECTORY =
              SOME h => h
 
            | NONE => signalUnbound x)
+
+      fun lookupLongOpt dir longid =
+         (case longid of
+             [x] => lookupOpt dir x
+
+           | _ :: _ =>
+                (case Namespace.resolveOpt longid of
+                    NONE => NONE
+
+                  | SOME const => SOME (Hconst const))
+
+           | [] => raise (Invalid "empty longid"))
+
+      fun lookupLong dir longid =
+         (case longid of
+             [x] => lookup dir x
+
+           | _ :: _ => Hconst (Namespace.resolve longid)
+
+           | [] => raise (Invalid "empty longid"))
 
       fun name (_, _, bv, _) i =
          (case Seq.nthOpt bv i of
