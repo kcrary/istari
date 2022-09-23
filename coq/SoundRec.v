@@ -420,25 +420,36 @@ apply sound_rec_formation_main; auto.
 Qed.
 
 
-Lemma sound_rec_formation_univ :
-  forall G lv a b,
-    pseq (cons (hyp_tml (univ lv)) G) (deq a b (univ (subst sh1 lv)))
-    -> pseq G (deq lv lv pagetp)
-    -> pseq G (deq (rec a) (rec b) (univ lv)).
+Lemma sound_rec_formation_univ_main :
+  forall G a b lv,
+    hygiene (permit (ctxpred G)) a
+    -> hygiene (permit (ctxpred G)) b
+    -> hygiene (ctxpred G) lv
+    -> (forall i s s',
+          pwctx i s s' (cons (hyp_tml (univ lv)) G)
+          -> exists pg R,
+               pginterp (subst s (subst sh1 lv)) pg
+               /\ pginterp (subst s' (subst sh1 lv)) pg
+               /\ interp pg true i (subst s a) R
+               /\ interp pg false i (subst s' a) R
+               /\ interp pg true i (subst s b) R
+               /\ interp pg false i (subst s' b) R)
+    -> (forall i s s',
+          pwctx i s s' G
+          -> exists pg,
+               pginterp (subst s lv) pg
+               /\ pginterp (subst s' lv) pg)
+    -> forall i s s',
+         pwctx i s s' G
+         -> exists pg R,
+              pginterp (subst s lv) pg
+              /\ pginterp (subst s' lv) pg
+              /\ interp pg true i (subst s (rec a)) R
+              /\ interp pg false i (subst s' (rec a)) R
+              /\ interp pg true i (subst s (rec b)) R
+              /\ interp pg false i (subst s' (rec b)) R.
 Proof.
-intros G lv a b.
-revert G.
-refine (seq_pseq 3 [hyp_emp] a [hyp_emp] b [] lv 2 [_] _ [] _ _ _); cbn.
-intros G Hcla Hclb Hcllv Hseq Hseqlv.
-rewrite -> seq_univ in Hseq |- *.
-rewrite -> seq_deq in Hseqlv.
-eassert _ as Hlv; [refine (seq_pagetp_invert G lv _) |].
-  {
-  intros i t t' Ht.
-  so (Hseqlv _#3 Ht) as (R & Hl & _ & Hlv & _).
-  eauto.
-  }
-clear Hseqlv.
+intros G a b lv Hcla Hclb Hcllv Hseq Hlv.
 intros i.
 induct i.
 
@@ -600,6 +611,29 @@ apply interp_eval_refl; apply interp_rec; simpsub; auto.
 Qed.
 
 
+Lemma sound_rec_formation_univ :
+  forall G lv a b,
+    pseq (cons (hyp_tml (univ lv)) G) (deq a b (univ (subst sh1 lv)))
+    -> pseq G (deq lv lv pagetp)
+    -> pseq G (deq (rec a) (rec b) (univ lv)).
+Proof.
+intros G lv a b.
+revert G.
+refine (seq_pseq 3 [hyp_emp] a [hyp_emp] b [] lv 2 [_] _ [] _ _ _); cbn.
+intros G Hcla Hclb Hcllv Hseq Hseqlv.
+rewrite -> seq_univ in Hseq |- *.
+rewrite -> seq_deq in Hseqlv.
+eassert _ as Hlv; [refine (seq_pagetp_invert G lv _) |].
+  {
+  intros i t t' Ht.
+  so (Hseqlv _#3 Ht) as (R & Hl & _ & Hlv & _).
+  eauto.
+  }
+clear Hseqlv.
+apply sound_rec_formation_univ_main; auto.
+Qed.
+
+
 Lemma sound_rec_unroll :
   forall G a,
     pseq (cons hyp_tpl G) (deqtype a a)
@@ -617,6 +651,48 @@ simpsubin Har.
 exists R.
 simpsub.
 do2 3 split; auto.
+  {
+  invert (basic_value_inv _#6 value_rec Hal).
+  intros Hunroll.
+  simpsubin Hunroll.
+  exact Hunroll.
+  }
+
+  {
+  invert (basic_value_inv _#6 value_rec Har).
+  intros Hunroll.
+  simpsubin Hunroll.
+  exact Hunroll.
+  }
+Qed.
+
+
+Lemma sound_rec_unroll_univ :
+  forall G lv a,
+    pseq (cons (hyp_tml (univ lv)) G) (deq a a (univ (subst sh1 lv)))
+    -> pseq G (deq lv lv pagetp)
+    -> pseq G (deq (rec a) (subst1 (rec a) a) (univ lv)).
+Proof.
+intros G lv a.
+revert G.
+refine (seq_pseq 2 [hyp_emp] a [] lv 2 [_] _ [] _ _ _); cbn.
+intros G Hcla Hcllv Hseq Hseqlv.
+rewrite -> seq_univ in Hseq |- *.
+rewrite -> seq_deq in Hseqlv.
+eassert _ as Hlv; [refine (seq_pagetp_invert G lv _) |].
+  {
+  intros i t t' Ht.
+  so (Hseqlv _#3 Ht) as (R & Hl & _ & Hlv & _).
+  eauto.
+  }
+clear Hseqlv.
+intros i s s' Hs.
+so (sound_rec_formation_univ_main _#4 Hcla Hcla Hcllv Hseq Hlv _#3 Hs) as (pg & R & Hlvl & Hlvr & Hal & Har & _).
+simpsubin Hal.
+simpsubin Har.
+exists pg, R.
+simpsub.
+do2 5 split; auto.
   {
   invert (basic_value_inv _#6 value_rec Hal).
   intros Hunroll.

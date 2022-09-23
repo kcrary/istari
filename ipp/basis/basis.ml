@@ -160,6 +160,19 @@ module Word : WORD with type word = Word62.word =
 module String : STRING with type string = string =
    struct
 
+      let fields b str =
+         let k = String.length str
+         in
+         let rec loop i j acc =
+            if j >= k then
+               String.sub str i (j-i) :: acc
+            else if b (String.get str j) then
+               loop (j+1) (j+1) (String.sub str i (j-i) :: acc)
+            else
+               loop i (j+1) acc
+         in
+            List.rev (loop 0 0 [])
+      
       type nonrec string = string
 
       let length = String.length
@@ -186,7 +199,7 @@ module String : STRING with type string = string =
       let s__Le x y = String.compare x y <= 0
       let (>=) x y = String.compare x y >= 0
       let compare = Order.stringCompare
-      
+
    end
 
 

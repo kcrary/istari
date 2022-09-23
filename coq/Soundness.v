@@ -98,6 +98,7 @@ intros; eapply sound_rec_kind_formation; eauto; done.
 intros; eapply sound_rec_formation; eauto; done.
 intros; eapply sound_rec_formation_univ; eauto; done.
 intros; eapply sound_rec_unroll; eauto; done.
+intros; eapply sound_rec_unroll_univ; eauto; done.
 intros; eapply sound_rec_bisim; eauto; done.
 intros; eapply sound_voidtp_formation; eauto; done.
 intros; eapply sound_voidtp_elim; eauto; done.

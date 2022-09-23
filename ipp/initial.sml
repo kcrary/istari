@@ -147,7 +147,6 @@ structure Initial :> INITIAL =
          ("-", "Int"),
          ("*", "Int"),
          ("div", "Int"),
-         ("<>", "Int"),
          ("<", "Int"),
          (">", "Int"),
          ("<=", "Int"),
@@ -184,6 +183,7 @@ structure Initial :> INITIAL =
             ([
              ("rem", "Int"),
              ("=", "Int"),
+             ("<>", "Int"),
              ("$", "General")
              ] @ commonModulePervasives)
          @ 
@@ -206,7 +206,8 @@ structure Initial :> INITIAL =
              ("rev", "List"),
              ("isSome", "Option"),
              ("valOf", "Option"),
-             ("o", "General")
+             ("o", "General"),
+             ("Subscript", "General")
              ] @ commonModulePervasives)
          @ commonPervasives
       

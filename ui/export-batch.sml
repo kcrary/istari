@@ -18,44 +18,43 @@ val {system, version_id, date} = Compiler.version
 val replDate = Date.toString (Date.fromTimeUniv (Time.now ()))
 
 
+
+structure C = BatchCommandLine
+
 fun go prelude (_, args) =
-   (case args of
-       [filename] =>
-          (
-          print "Istari proof assistant [";
-          print replDate;
-          print "]\nRunning on ";
-          print system;
-          print " v";
-          print (Int.toString (hd version_id));
-          app (fn i => (print "."; print (Int.toString i))) (tl version_id);
-          print " [";
-          print date;
-          print "]\n";
-       
-          if prelude then
-             print "Libraries loaded.\n"
-          else
-             ();
+   (
+   C.process args;
+   print "Istari proof assistant [";
+   print replDate;
+   print "]\nRunning on ";
+   print system;
+   print " v";
+   print (Int.toString (hd version_id));
+   app (fn i => (print "."; print (Int.toString i))) (tl version_id);
+   print " [";
+   print date;
+   print "]\n";
 
-          (* Make the startup splash cleaner. *)
-          Control.Print.out := {say = (fn _ => ()), flush = (fn () => ())};
-          
-          if Repl.batch filename then
-             OS.Process.success
-          else
-             OS.Process.failure
-          )
+   if prelude then
+      print "Libraries loaded.\n"
+   else
+      ();
 
-     | _ =>
-          (
-          if prelude then
-             print "istari usage:\n   istari <filename>\n"
-          else
-             print "istari usage:\n   istari-nolib <filename>\n";
+   (* Make the startup splash cleaner. *)
+   Control.Print.out := {say = (fn _ => ()), flush = (fn () => ())};
+   
+   if Repl.batch (C.inputFile ()) then
+      (
+      (case C.outputFile () of
+          NONE => ()
 
-          OS.Process.success
-          ))
+        | SOME name => FileInternal.save name);
+
+      OS.Process.success
+      )
+   else
+      OS.Process.failure
+   )
 
 
 (*

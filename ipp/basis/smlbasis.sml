@@ -109,6 +109,7 @@ signature Smlbasis__STRING =
       val size : string -> int
       val sub : string * int -> char
       val substring : string * int * int -> string
+      val extract : string * int * int option -> string
       val ^ : string * string -> string
       val concat : string list -> string
       val concatWith : string -> string list -> string
@@ -124,6 +125,8 @@ signature Smlbasis__STRING =
       val > : string * string -> bool
       val >= : string * string -> bool
       val compare : string * string -> order
+
+      val fields : (char -> bool) -> string -> string list
 
    end
 
@@ -332,6 +335,7 @@ signature Smlbasis__GENERAL =
    
       exception Div
       exception Fail of string
+      exception Subscript
 
       val ! : 'a ref -> 'a
       val := : 'a ref * 'a -> unit

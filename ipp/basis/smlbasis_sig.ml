@@ -112,6 +112,7 @@ module type STRING =
       val size : string -> int
       val sub : string * int -> char
       val substring : string * int * int -> string
+      val extract : string * int * int option -> string
       val (^) : string * string -> string
       val concat : string list -> string
       val concatWith : string -> string list -> string
@@ -127,6 +128,8 @@ module type STRING =
       val s__Le : string * string -> bool
       val (>=) : string * string -> bool
       val compare : string * string -> Order.order
+
+      val fields : (char -> bool) -> string -> string list
 
    end
 

@@ -1,7 +1,7 @@
 
 include ../Makefile.inc
 
-all : server batch server-nolib batch-nolib
+all : batch-nolib server-nolib batch server
 
 .PHONY : generated
 generated : lexrepl-nj.cmlex.sml

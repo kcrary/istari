@@ -1,0 +1,272 @@
+
+Ctrl.use "bar-aux.iml";
+
+
+structure R = Reduction;
+
+
+Namespace.beginModule "Bar";
+
+
+lemma "pause_type"
+/
+  pause :
+  intersect i (a : U i) .
+    a -> a
+/;
+
+introOf /i a/.
+unfoldHead /pause/.
+typecheck.
+qed ();
+recordTyping "pause_type";
+
+
+
+define /ffix a f/
+/
+  pause
+    (fn x . f (let next x' = x in next (pause x' x)))
+    (next
+       (fn x . f (let next x' = x in next (pause x' x))))
+/;
+
+
+
+lemma "ffix_type"
+/
+  ffix :
+  intersect (i : level) .
+  forall (a : U i) .
+    (future a -> a) -> a
+/;
+
+introOf /i a f/.
+unfold /ffix/.
+goalCase /of _ (pause ? _) => \(fnc m => set /g/ /\m\/)\ /.
+assert /g : rec t . (future t -> a)/ /Hof/.
+  {
+  unfold /g/.
+  unrollType /rec/.
+  typecheck.
+  reintro /x x'/.
+  unroll /pause/.
+  unrollType /rec in x'/.
+  typecheck.
+  }
+fold /g , g/.
+convert /pause ap _ ap (future (rec t . (future t -> a)) -> a)/.
+typecheck.
+unrollType /rec in Hof/.
+auto.
+qed ();
+recordTyping "ffix_type";
+
+
+
+val ffix = parseConstant /ffix/
+
+val dp = [(ffix, [R.unfold]), (Prim.letnext, [R.unfold])];
+val dl = [(Prim.pause, R.user1 Prim.unroll_pause)];
+
+val unroll_ffix =
+  AutoReduce.new1 false dp dl
+    ffix 2
+    (parseLTerm /0 (next (ffix 1 0))/);
+
+Database.setUnroll ffix (R.user1 unroll_ffix);
+Registry.write (parseIdent /unroll_ffix/) (Registry.fromUreduction1 unroll_ffix);
+
+
+
+define /bar a/
+/
+  rec t . a % future t
+/;
+
+
+
+lemma "bar_type"
+/
+  bar :
+  intersect i . U i -> U i
+/;
+
+inference.
+introOf /i/.
+unfoldHead /bar/.
+typecheck.
+qed ();
+recordTyping "bar_type";
+
+
+
+lemma "bar_unroll" 
+/
+  forall (i : level) (a : U i) . bar a = (a % future (bar a)) : type
+/;
+
+intro /i a/.
+unrollType /bar/.
+qed ();
+
+
+
+define /now {a} x/
+/
+  inl x
+/;
+
+
+
+lemma "now_type"
+/
+  ` now :
+  intersect i .
+  forall (a : U i) .
+    a -> bar a
+/;
+
+inference.
+introOf /i a x/.
+unfold /now/.
+rewrite /-> bar_unroll/.
+typecheck.
+qed ();
+recordTyping "now_type";
+
+
+
+define /later {a} x/
+/
+  inr (next x)
+/;
+
+
+
+lemma "later_type"
+/
+  ` later :
+  intersect i .
+  forall (a : U i) .
+    bar a -> bar a
+/;
+
+inference.
+introOf /i a x/.
+unfold /later/.
+rewrite /-> bar_unroll/.
+typecheck.
+qed ();
+recordTyping "later_type";
+
+
+
+define /bindbar {a b} x f/
+/
+  ffix (bar a -> bar b)
+    (fn g x .
+       (case x of
+        | inl y . f y
+        | inr y .
+            let next g' = g
+            in
+            let next y' = y
+            in
+              inr (next (g' y'))))
+    x
+/;
+
+
+
+grammaron Bar;
+structure Nothing = AfterBindbar ();
+
+
+
+lemma "bindbar_type"
+/
+  ` bindbar :
+  intersect i .
+  forall (a b : U i) .
+    bar a
+    -> (a -> bar b)
+    -> bar b
+/;
+
+inference.
+introOf /i a b x f/.
+unfold /bindbar/.
+so /bar_unroll i a/ /Heq/.
+typecheck.
+unrollType /bar/.
+typecheck.
+qed ();
+recordTyping "bindbar_type";
+
+
+
+val now = parseConstant /now/;
+val later = parseConstant /later/;
+val bindbar = parseConstant /bindbar/;
+
+val dp = [(Prim.letnext, [R.unfold]), 
+          (bindbar, [R.unfold]), 
+          (now, [R.unfold]),
+          (later, [R.unfold]),
+          (Prim.sumcase, [R.user2 Prim.sumcase_inl, R.user2 Prim.sumcase_inr])];
+val dl = [(ffix, R.user1 unroll_ffix)];
+
+val bindbar_now =
+  AutoReduce.new2 false dp dl
+    bindbar 2 1 now 2
+    (parseLTerm /0 1/);
+
+val bindbar_later =
+  AutoReduce.new2 true dp dl
+    bindbar 2 1 later 2
+    (parseLTerm /later 3 (` bindbar 4 3 1 0)/);
+
+Registry.register bindbar_now;
+Registry.register bindbar_later;
+Registry.write (parseIdent /bindbar_now/) (Registry.fromUreduction2 bindbar_now);
+Registry.write (parseIdent /bindbar_later/) (Registry.fromUreduction2 bindbar_later);
+
+
+
+define /bfix {a} f/
+/
+  ffix (bar a) (fn x . f (inr x))
+/;
+
+
+
+lemma "bfix_type"
+/
+  ` bfix :
+  intersect i .
+  forall (a : U i) .
+    (bar a -> bar a) -> bar a
+/;
+
+inference.
+introOf /i a f/.
+unfold /bfix/.
+typecheck.
+unrollType /bar/.
+typecheck.
+qed ();
+recordTyping "bfix_type";
+
+
+
+(* At this point we'd like to follow the development in Smith [1988]
+   and define a termination predicate.  Alas, we cannot.  Istari's
+   step-indexed semantics is unable to express liveness properties
+   such as that.  If it could express termination, we would be able to
+   draw a contradiction, because the fixed-point typing rule above
+   (bfix_type) does not have Smith's admissibility requirement.  (See
+   Smith [1988], theorem 60.)
+*)
+
+Namespace.endModule ();

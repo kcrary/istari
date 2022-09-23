@@ -911,9 +911,16 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             queue := obs @ !queue
             )
 
-      fun defer (prob, table, goal, dest, history) =
+      fun defer (prob, table, goal as (jud, dir), dest, history) =
          (* avoid duplicating the history's head *)
+         (
+         if !trace then
+            showPrefixed "deferring " dir (J.concl jud)
+         else
+            ();
+
          deferred := (prob, table, goal, dest, List.tl history) :: !deferred
+         )
 
       (* NB!  When we put a tactic into the destination that accompanies a goal,
          we know that that the tactic will be applied to an equivalent goal.
@@ -1116,12 +1123,14 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                           (* G |- M1 : E *)
                           (J.make ctx (T.apply2 Prim.ov e m1), dir)
 
+                       val dir' = D.bindVary dir binder
+
                        val goal2 =
                           (* G, E |- M2 : A[^] *)
                           (J.make
                               (Seq.cons (J.Tm e) ctx)
                               (T.apply2 Prim.ov (T.Sub (a, T.shift1)) m2),
-                           D.bindVary dir binder)
+                           dir')
 
                        val dest1 = newdest ()
                        val dest2 = newdest ()
@@ -1137,7 +1146,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                               play dest1,
 
                               (* G, E |- M2 : A[^] *)
-                              play dest2
+                              chdir dir'
+                              >> play dest2
                               ]
                           );
                           
@@ -1156,12 +1166,14 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                           (* G |- M1 : future E *)
                           (J.make ctx (T.apply2 Prim.ov (T.apply1 Prim.future e) m1), dir)
  
+                       val dir' = D.bindVary dir binder
+
                        val goal2 =
                           (* G, later E |- M2 : A[^] *)
                           (J.make 
                               (Seq.cons (J.Tml e) ctx)
                               (T.apply2 Prim.ov (T.Sub (a, T.shift1)) m2),
-                           D.bindVary dir binder)
+                           dir')
  
                        val goal3 =
                           (* promote G |- E : type *)
@@ -1185,7 +1197,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                               play dest1,
  
                               (* G, later E |- M2 : A[^] *)
-                              play dest2
+                              chdir dir'
+                              >> play dest2
                               ]
                           );
  

@@ -20,7 +20,7 @@ basis.cma : $(IMPLS)
 basis_sig.cmo basis_sig.cmi : basis_sig.ml
 	ocamlc -c -I $(ZARITH) $<
 
-smlbasis_sig.cmo smlbasis_sig.cmi : smlbasis_sig.ml
+smlbasis_sig.cmo smlbasis_sig.cmi : smlbasis_sig.ml basis.cmo
 	ocamlc -c -I $(ZARITH) $<
 
 %.cmi : %.mli

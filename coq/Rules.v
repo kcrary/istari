@@ -372,6 +372,12 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr (cons hyp_tpl G) (deqtype a a)
       -> tr G (deqtype (rec a) (subst1 (rec a) a))
 
+| tr_rec_unroll_univ :
+    forall G lv a,
+      tr (cons (hyp_tml (univ lv)) G) (deq a a (univ (subst sh1 lv)))
+      -> tr G (deq lv lv pagetp)
+      -> tr G (deq (rec a) (subst1 (rec a) a) (univ lv))
+
 | tr_rec_bisim :
     forall G a b,
       tr (cons hyp_tpl G) (deqtype a a)

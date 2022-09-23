@@ -1,0 +1,47 @@
+
+structure ParseBar =
+   struct
+
+      structure T = ETerm
+
+      val bindbar = Susp.delay (fn () => parseConstant /Bar.bindbar/)
+
+      fun parseBind x m n = T.apply4 (Susp.force bindbar) T.evar T.evar m (T.lam (SOME x) n)
+
+   end
+
+
+grammardef Bar
+
+   rule Term(0) ::= "bindbar" Ident "=" Term(1) "in" Term(0) => ParseBar.parseBind
+
+   reserved "bindbar" : Ident
+
+end
+
+
+functor AfterBindbar () :> sig end =
+   struct
+
+      val bindbar = parseConstant /Bar.bindbar/
+
+      structure U = Show.Unparsing
+
+      val () =
+         ConstantTable.insert U.unparsingTable bindbar
+         (4, 0,
+          U.wrap
+             (U.apply4 bindbar U.wild U.wild U.show (U.lam U.show))
+             (fn ((), (), m, (x, n)) =>
+                 U.append [
+                          U.string "bindbar ",
+                          U.string x,
+                          U.string " =",
+                          U.break 1,
+                          m 1,
+                          U.string " in",
+                          U.break 1,
+                          n 0
+                          ]))
+
+   end

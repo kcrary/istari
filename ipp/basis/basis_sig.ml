@@ -133,6 +133,8 @@ module type STRING =
       val (>=) : string -> string -> bool
       val compare : string -> string -> Order.order
 
+      val fields : (char -> bool) -> string -> string list
+
    end
 
 

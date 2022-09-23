@@ -130,6 +130,8 @@ signature Basis__STRING =
       val >= : string -> string -> bool
       val compare : string -> string -> order
 
+      val fields : (char -> bool) -> string -> string list
+
    end
 
 
@@ -560,6 +562,8 @@ structure Basis :> IML__BASIS =
             fun op <= x y = String.<= (x, y)
             fun op >= x y = String.>= (x, y)
             fun compare x y = String.compare (x, y)
+
+            val fields = String.fields
       
          end
 

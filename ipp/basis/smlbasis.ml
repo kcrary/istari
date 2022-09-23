@@ -258,12 +258,22 @@ module String : STRING with type string = string =
             substring x y z
          with Invalid_argument _ -> raise Subscript
 
+      let extract (str, i, lenopt) =
+         try
+            (match lenopt with
+                Some len -> String.sub str i len
+   
+              | None -> String.sub str i (String.length str - i))
+         with Invalid_argument _ -> raise Subscript
+
       let (^) (x, y) = x ^ y
       let s__L (x, y) = (<) x y
       let s__G (x, y) = (>) x y
       let s__Le (x, y) = (<=) x y
       let (>=) (x, y) = (>=) x y
       let compare (x, y) = compare x y
+
+      let fields = Basis.String.fields
 
    end
 

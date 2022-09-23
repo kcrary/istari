@@ -126,7 +126,8 @@ functor TheBasis (datatype data =
           ("<=", E 0),
           (">", E 0),
           (">=", E 0),
-          ("compare", E 0)]
+          ("compare", E 0),
+          ("fields", E 0)]
       
       val sig1_CHAR =
          [("char", T),
@@ -382,6 +383,7 @@ functor TheBasis (datatype data =
           ("size", E 0),
           ("sub", E 0),
           ("substring", E 0),
+          ("extract", E 0),
           ("^", E 0),
           ("concat", E 0),
           ("concatWith", E 0),
@@ -393,7 +395,8 @@ functor TheBasis (datatype data =
           ("<=", E 0),
           (">", E 0),
           (">=", E 0),
-          ("compare", E 0)]
+          ("compare", E 0),
+          ("fields", E 0)]
       
       val sig2_CHAR =
          [("char", T),

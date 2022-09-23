@@ -7,7 +7,7 @@ structure Main =
       exception Exit
 
 
-      structure C = CommandLine
+      structure C = ParseCommandLine
 
       fun usage () =
          (

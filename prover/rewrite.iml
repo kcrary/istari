@@ -3393,11 +3393,11 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                  | SOME (capture, elev) => 
                       SOME (ETerm.additional capture elev (D.idir dir)))
 
-            val (arity, red) =
+            val (arity, red, root) =
                if Constant.eq (const, Prim.mu) then
-                  (1, R.refl)
+                  (1, R.refl, Prim.mu)
                else if Constant.eq (const, Prim.rec) then
-                  (1, R.refl)
+                  (1, R.refl, Prim.rec)
                else
                   (case Constant.definition const of
                       NONE =>
@@ -3412,16 +3412,10 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                   C.termCaseXAlt a
                                      [
                                      C.path Prim.mu (C.app (C.lam C.wild) C.null) ?
-                                     (fn _ => ()),
+                                     (fn _ => Prim.mu),
 
                                      C.path Prim.rec (C.app (C.lam C.wild) C.null) ?
-                                     (fn _ =>
-                                         (case levopt of
-                                             NONE => ()
-
-                                           | SOME _ =>
-                                                (* don't currently have unrolling rule for rec that takes a universe *)
-                                                raise (RewriteFailure "type is not unrollable with a universe"))),
+                                     (fn _ => Prim.rec),
 
                                      C.wild ?
                                      (fn () =>
@@ -3434,9 +3428,9 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                     | _ =>
                                          raise (RewriteFailure "type is not unrollable"))
 
-                            val () = loop arity a
+                            val root = loop arity a
                          in
-                            (arity, R.trans [R.unfold, R.beta arity])
+                            (arity, R.trans [R.unfold, R.beta arity], root)
                          end)
 
             fun arityMatch i spine =
@@ -3456,108 +3450,188 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                       arityMatch arity spine
 
                  | _ => false)
-
-            fun act _ m =
-               (case m of
-                   T.Elim (T.Const const', spine) =>
-                      if 
-                         Constant.eq (const', const)
-                         andalso
-                         arityMatch arity spine
-                      then
-                         C.termCaseXAlt (R.reduce red m)
-                            [
-                            C.path Prim.mu (C.app (C.lamb C.what) C.null) ?
-                            (fn ((binder, body), ()) =>
-                                let
-                                   val ftac =
-                                      (* M <:> Body[M . id] *)
-                                      replaceConcl 
-                                         (T.apply2 Prim.eeqtp m (T.app (T.Lam (NONE, body)) m))
-                                      >>
-                                      (* M <:> (fn . Body) M *)
-                                      refine (Rule.reduce (R.compat [red, R.trans [R.compat [red], R.beta 1]]))
-                                      >>
-                                      (* mu (fn . Body) <:> Body[mu (fn . Body) . id] *)
-                                      (case levopt of
-                                          NONE =>
-                                             refine (Rule.muUnroll body)
-                                             >>> [
-                                                 (* Type |- Body : Type *)
-                                                 chdir (D.bindVary dir binder) >> idtacM TC.Secondary,
-                 
-                                                 (* positive (fn . Body) *)
-                                                 chdir dir
-                                                 >>
-                                                 idtacM TC.Secondary
-                                                 ]
-
-                                        | SOME lev =>
-                                             refine (Rule.muUnrollUniv body lev)
-                                             >>> [
-                                                 (* univ : level *)
-                                                 chdir dir
-                                                 >>
-                                                 idtacM TC.Secondary,
-
-                                                 (* U lev |- Body : U lev *)
-                                                 chdir (D.bindVary dir binder) >> idtacM TC.Secondary,
-
-                                                 (* positive (fn . Body) *)
-                                                 chdir dir
-                                                 >>
-                                                 idtacM TC.Secondary
-                                                 ])
-          
-                                   val rtac =
-                                      (* Body[M . id] <:> M *)
-                                      refine (Rule.eeqtpSymm (T.evar ()) (T.evar ()))
-                                      >>
-                                      (* M <:> Body[M . id] *)
-                                      ftac
-                                in
-                                   SOME (T.Sub (body, T.Dot (m, T.id)),
-                                         (Prim.eeqtp, SOME ftac, SOME rtac))
-                                end),
-          
-                            C.path Prim.rec (C.app (C.lamb C.what) C.null) ?
-                            (fn ((binder, body), ()) =>
-                                let
-                                   val ftac =
-                                      (* M = Body[M . id] : type *)
-                                      replaceConcl 
-                                         (T.apply2 Prim.eqtp m (T.app (T.Lam (NONE, body)) m))
-                                      >>
-                                      (* M = (fn . Body) M : type *)
-                                      refine (Rule.reduce (R.compat [red, R.trans [R.compat [red], R.beta 1]]))
-                                      >>
-                                      (* rec (fn . Body) = Body[rec (fn . Body) . id] : type *)
-                                      refine (Rule.recUnroll body)
-                                      >>
-                                      (* later Type |- Body : Type *)
-                                      chdir (D.bindVary dir binder) >> idtacM TC.Secondary
-          
-                                   val rtac =
-                                      (* Body[M . id] = M : type *)
-                                      refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))
-                                      >>
-                                      (* M = Body[M . id] : type *)
-                                      ftac
-                                in
-                                   SOME (T.Sub (body, T.Dot (m, T.id)),
-                                         (Prim.eqtp, SOME ftac, SOME rtac))
-                                end),
-          
-                            C.wild ?
-                            (fn () => raise (Fail "impossible"))
-                            ]
-                      else
-                         NONE
-
-                 | _ => NONE)
          in
-            Relation (test, act)
+            if Constant.eq (root, Prim.mu) then
+               let            
+                  fun act _ m =
+                     (case m of
+                         T.Elim (T.Const const', spine) =>
+                            if 
+                               Constant.eq (const', const)
+                               andalso
+                               arityMatch arity spine
+                            then
+                               C.termCaseXAlt (R.reduce red m)
+                                  [
+                                  C.path Prim.mu (C.app (C.lamb C.what) C.null) ?
+                                  (fn ((binder, body), ()) =>
+                                      let
+                                         val ftac =
+                                            (* M <:> Body[M . id] *)
+                                            replaceConcl 
+                                               (T.apply2 Prim.eeqtp m (T.app (T.Lam (NONE, body)) m))
+                                            >>
+                                            (* M <:> (fn . Body) M *)
+                                            refine (Rule.reduce (R.compat [red, R.trans [R.compat [red], R.beta 1]]))
+                                            >>
+                                            (* mu (fn . Body) <:> Body[mu (fn . Body) . id] *)
+                                            (case levopt of
+                                                NONE =>
+                                                   refine (Rule.muUnroll body)
+                                                   >>> [
+                                                       (* Type |- Body : Type *)
+                                                       chdir (D.bindVary dir binder) >> idtacM TC.Secondary,
+                       
+                                                       (* positive (fn . Body) *)
+                                                       chdir dir
+                                                       >>
+                                                       idtacM TC.Secondary
+                                                       ]
+      
+                                              | SOME lev =>
+                                                   refine (Rule.muUnrollUniv body lev)
+                                                   >>> [
+                                                       (* lev : level *)
+                                                       chdir dir
+                                                       >>
+                                                       idtacM TC.Secondary,
+      
+                                                       (* U lev |- Body : U lev *)
+                                                       chdir (D.bindVary dir binder) >> idtacM TC.Secondary,
+      
+                                                       (* positive (fn . Body) *)
+                                                       chdir dir
+                                                       >>
+                                                       idtacM TC.Secondary
+                                                       ])
+                
+                                         val rtac =
+                                            (* Body[M . id] <:> M *)
+                                            refine (Rule.eeqtpSymm (T.evar ()) (T.evar ()))
+                                            >>
+                                            (* M <:> Body[M . id] *)
+                                            ftac
+                                      in
+                                         SOME (T.Sub (body, T.Dot (m, T.id)),
+                                               (Prim.eeqtp, SOME ftac, SOME rtac))
+                                      end),
+                
+                                  C.wild ?
+                                  (fn () => raise (Fail "impossible"))
+                                  ]
+                            else
+                               NONE
+      
+                       | _ => NONE)
+               in
+                  Relation (test, act)
+               end
+
+            else
+               (* by construction, root is Prim.rec *)
+               (case levopt of
+                   NONE =>
+                      let
+                         fun act _ m =
+                            (case m of
+                                T.Elim (T.Const const', spine) =>
+                                   if 
+                                      Constant.eq (const', const)
+                                      andalso
+                                      arityMatch arity spine
+                                   then
+                                      C.termCaseXAlt (R.reduce red m)
+                                         [
+                                         C.path Prim.rec (C.app (C.lamb C.what) C.null) ?
+                                         (fn ((binder, body), ()) =>
+                                             let
+                                                val ftac =
+                                                   (* M = Body[M . id] : type *)
+                                                   replaceConcl 
+                                                      (T.apply2 Prim.eqtp m (T.app (T.Lam (NONE, body)) m))
+                                                   >>
+                                                   (* M = (fn . Body) M : type *)
+                                                   refine (Rule.reduce (R.compat [red, R.trans [R.compat [red], R.beta 1]]))
+                                                   >>
+                                                   (* rec (fn . Body) = Body[rec (fn . Body) . id] : type *)
+                                                   refine (Rule.recUnroll body)
+                                                   >>
+                                                   (* later Type |- Body : Type *)
+                                                   chdir (D.bindVary dir binder) >> idtacM TC.Secondary
+                       
+                                                val rtac =
+                                                   (* Body[M . id] = M : type *)
+                                                   refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))
+                                                   >>
+                                                   (* M = Body[M . id] : type *)
+                                                   ftac
+                                             in
+                                                SOME (T.Sub (body, T.Dot (m, T.id)),
+                                                      (Prim.eqtp, SOME ftac, SOME rtac))
+                                             end),
+                       
+                                         C.wild ?
+                                         (fn () => raise (Fail "impossible"))
+                                         ]
+                                   else
+                                      NONE
+             
+                              | _ => NONE)
+                      in
+                         Relation (test, act)
+                      end
+
+                 | SOME lev =>
+                      let
+                         fun act _ m =
+                            (case m of
+                                T.Elim (T.Const const', spine) =>
+                                   if 
+                                      Constant.eq (const', const)
+                                      andalso
+                                      arityMatch arity spine
+                                   then
+                                      C.termCaseXAlt (R.reduce red m)
+                                         [
+                                         C.path Prim.rec (C.app (C.lamb C.what) C.null) ?
+                                         (fn ((binder, body), ()) =>
+                                             let
+                                                val tac =
+                                                   (* M = Body[M . id] : U lev *)
+                                                   replaceConcl 
+                                                      (T.apply3 Prim.eq (T.apply1 Prim.univ lev) m (T.app (T.Lam (NONE, body)) m))
+                                                   >>
+                                                   (* M = (fn . Body) M : U lev *)
+                                                   refine (Rule.reduce (R.compat [R.refl, red, R.trans [R.compat [red], R.beta 1]]))
+                                                   >>
+                                                   (* rec (fn . Body) = Body[rec (fn . Body) . id] : U lev *)
+                                                   refine (Rule.recUnrollUniv body lev)
+                                                   >>> [
+                                                       (* lev : level *)
+                                                       chdir dir
+                                                       >>
+                                                       idtacM TC.Secondary,
+      
+                                                       (* later (U lev) |- Body : U lev *)
+                                                       chdir (D.bindVary dir binder) >> idtacM TC.Secondary
+                                                       ]
+                                             in
+                                                SOME (T.Sub (body, T.Dot (m, T.id)),
+                                                      (T.apply1 Prim.univ lev, m, T.app (T.Lam (NONE, body)) m, [], tac))
+                                             end),
+                       
+                                         C.wild ?
+                                         (fn () => raise (Fail "impossible"))
+                                         ]
+                                   else
+                                      NONE
+             
+                              | _ => NONE)
+                      in
+                         Equality (test, act)
+                      end)
          end
+
 
       fun unrollTypeRew const hyp goal = unrollTypeMain const NONE hyp goal
 
@@ -4021,6 +4095,117 @@ structure RewriteInternal :> REWRITE_INTERNAL =
          
 
 
+      fun compatEqtpEqtp0 tac =
+         (* tac proves A = A' : type *)
+         (* (A = B : type) = (A' = B : type) : type *)
+         refine (Rule.eqtpEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A = A' : type *)
+             tac,
+      
+             (* B = B : type *)
+             refine (Rule.eqtpRefl (T.evar ()))
+             >>
+             (* B : type *)
+             idtacM TC.Secondary
+             ]
+      
+      fun compatEqtpEqtp1 tac =
+         (* tac proves B = B' : type *)
+         (* (A = B : type) = (A = B' : type) : type *)
+         refine (Rule.eqtpEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A = A : type *)
+             refine (Rule.eqtpRefl (T.evar ()))
+             >>
+             (* B : type *)
+             idtacM TC.Secondary,
+             
+             (* B = B' : type *)
+             tac
+             ]
+
+      fun compatEqUnivEqtp1 tac =
+         (* tac proves A = A' : type *)
+         (* (A = B : Ui) = (A' = B : U i) : type *)
+         refine (Rule.eqEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* Ui = Ui : type *)
+             refine (Rule.eqtpRefl (T.evar ()))
+             >>
+             (* Ui : type *)
+             refine (Rule.univForm (T.evar ()))
+             >>
+             (* I : level *)
+             idtacM TC.Secondary,
+
+             (* A = A' : Ui *)
+             refine (Rule.univIntroEqtype (T.evar ()) (T.evar ()) (T.evar ()))
+             >>> [
+                 (* A = A' : type *)
+                 tac,
+
+                 (* A : Ui *)
+                 idtacM TC.Secondary,
+
+                 (* A' : Ui *)
+                 idtacM TC.Secondary
+                 ],
+
+             (* B = B : Ui *)
+             refine (Rule.eqRefl (T.evar ()) (T.evar ()))
+             >>
+             (* B : Ui *)
+             idtacM TC.Secondary
+             ]
+
+      fun compatEqUnivEqtp2 tac =
+         (* tac proves B = B' : type *)
+         (* (A = B : Ui) = (A = B' : U i) : type *)
+         refine (Rule.eqEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* Ui = Ui : type *)
+             refine (Rule.eqtpRefl (T.evar ()))
+             >>
+             (* Ui : type *)
+             refine (Rule.univForm (T.evar ()))
+             >>
+             (* I : level *)
+             idtacM TC.Secondary,
+
+             (* A = A : Ui *)
+             refine (Rule.eqRefl (T.evar ()) (T.evar ()))
+             >>
+             (* A : Ui *)
+             idtacM TC.Secondary,
+
+             (* B = B' : Ui *)
+             refine (Rule.univIntroEqtype (T.evar ()) (T.evar ()) (T.evar ()))
+             >>> [
+                 (* B = B' : type *)
+                 tac,
+
+                 (* B : Ui *)
+                 idtacM TC.Secondary,
+
+                 (* B' : Ui *)
+                 idtacM TC.Secondary
+                 ],
+             ]
+
+      val () = 
+         List.app
+            (fn (hconst, i, const1, const2, cov, tac) =>
+                CICTable.insert compatibilityTable (hconst, i, const1) (const2, cov, tac))
+            [
+            (Prim.eqtp, 0, Prim.eqtp, Prim.eqtp, true, compatEqtpEqtp0),
+            (Prim.eqtp, 1, Prim.eqtp, Prim.eqtp, true, compatEqtpEqtp1),
+            (Prim.eq, 1, Prim.eqtp, Prim.eqtp, true, compatEqUnivEqtp1),
+            (Prim.eq, 2, Prim.eqtp, Prim.eqtp, true, compatEqUnivEqtp2),
+            ]
+
+
+
       fun weakenSubtypeArrow tac =
          C.goalCase
             (C.apply2 Prim.arrow C.what C.what ?
@@ -4073,7 +4258,6 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                  >>
                  (* A = B : type *)
                  tac))
-
 
       val () = 
          List.app
