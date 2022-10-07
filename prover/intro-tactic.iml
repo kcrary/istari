@@ -56,9 +56,11 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
 
       structure C = Oldcase
       structure D = DestructInternal
+      structure J = Judgement
       structure N = Normalize
       structure R = Reduction
       structure RT = RuleTactic
+      structure S = Seq
       structure T = Term
       structure TC = Typecheck
       
@@ -331,49 +333,67 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
          if    lamtac proves G |- lam . N : A (for arbitrary G, N)
          then  tactic attempts to prove M : A, possibly unfolding constants
       *)
-      fun proveLambdaLoop m arrtac =
-         C.termCaseXAlt (N.whnf m)
-            [
-            C.lam C.wild ?
-            (fn () => arrtac),
+      fun proveLambdaLoop ctx m arrtac =
+         termCaseX (N.whnf m)
+         /| fn . _ =>
+            \(fnc => arrtac)\
 
-            C.path Prim.pause C.swild ?
-            (fn () =>
-                (* Don't unfold pause, to avoid looping. *)
-                fail "not a lambda"),
+          | \Prim.pause\ _ =>
+            \(fnc => 
+                 (* Don't unfold pause, to avoid looping. *)
+                 fail "not a lambda")\
 
-            C.path Prim.fix (C.app C.what C.swild) ?
-            (fn (f, ()) =>
-                let
-                   val tac = proveLambdaLoop (T.app f m) arrtac
-                in
-                   (* Unroll fix explicitly, since we aren't unfolding pause. *)
-                   Tactic.replaceConcl (T.apply2 Prim.ov (T.evar ()) m)
-                   >> refine (Rule.reduce (R.within [2] (R.user1 Prim.unroll_fix)))
-                   >> tac
-                end),
+          | \Prim.fix\ @ $ap ? _ =>
+            \(fnc f =>
+                 (* Unroll fix explicitly, since we aren't unfolding pause. *)
+                 let
+                    val tac = proveLambdaLoop ctx (T.app f m) arrtac
+                 in
+                    Tactic.replaceConcl (T.apply2 Prim.ov (T.evar ()) m)
+                    >> refine (Rule.reduce (R.within [2] (R.user1 Prim.unroll_fix)))
+                    >> tac
+                 end)\
 
-            C.whatPath C.swhat ?
-            (fn (const, spine) =>
-                (case Constant.definition const of
-                    NONE =>
-                       fail "not a lambda"
+          | const? @ ? =>
+            \(fnc const spine =>
+                 (case Constant.definition const of
+                     NONE =>
+                        fail "not a lambda"
+ 
+                   | SOME n =>
+                        let
+                           val tac = proveLambdaLoop ctx (T.Elim (n, spine)) arrtac
+                        in
+                           Tactic.replaceConcl (T.apply2 Prim.ov (T.evar ()) m)
+                           >> refine (Rule.reduce (R.within [2] R.unfold))
+                           >> tac
+                        end))\
 
-                  | SOME n =>
-                       let
-                          val tac = proveLambdaLoop (T.Elim (n, spine)) arrtac
-                       in
-                          Tactic.replaceConcl (T.apply2 Prim.ov (T.evar ()) m)
-                          >> refine (Rule.reduce (R.within [2] R.unfold))
-                          >> tac
-                       end)),
+          | var? @ ? =>
+            \(fnc var spine =>
+                 (case S.nthOpt ctx var of
+                     SOME (J.Let n) =>
+                        let
+                           val tac = proveLambdaLoop ctx (T.Elim (n, spine)) arrtac
+                        in
+                           refine (Rule.letUnfold var 
+                                      (T.apply2 Prim.ov 
+                                          (T.Sub (T.evar (), T.shift1))
+                                          (T.Elim (T.Var 0, T.ssubst spine T.shift1))))
+                           >> tac
+                        end
 
-            C.wild ?
-            (fn () => fail "not a lambda")
-            ]
+                   | _ =>
+                        fail "not a lambda"))\
 
-      fun proveLambdaArrow m =
-         proveLambdaLoop m
+          | _ =>
+            \(fnc =>
+                 fail "not a lambda")\
+         /
+              
+
+      fun proveLambdaArrow ctx m =
+         proveLambdaLoop ctx m
             (lift 
                 (fn () => 
                     (* G |- lam . N : void -> whatever *)
@@ -389,8 +409,8 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                         refine (Rule.hypothesis 0)
                         ]))
 
-      fun proveLambdaPi m =
-         proveLambdaLoop m
+      fun proveLambdaPi ctx m =
+         proveLambdaLoop ctx m
             (lift 
                 (fn () => 
                     (* G |- lam . N : forall void . whatever *)
@@ -408,18 +428,23 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
 
 
       val proveLambda =
-         C.goalCaseAlt
-            [
-            C.apply2 Prim.ov (C.apply2 Prim.arrow (C.constant Prim.void) C.wild) C.what ?
-            (fn (_, m) => proveLambdaArrow m),
-
-            C.apply2 Prim.ov (C.apply2 Prim.forall (C.constant Prim.void) (C.lam C.wild)) C.what ?
-            (fn (_, m) => proveLambdaPi m),
-
-            C.wild ?
-            (fn () =>
-                fail "not a proveLambda goal")
-            ]
+         let
+            do (jud, _) = withgoal
+            val ctx = J.context jud
+         in
+            C.goalCaseAlt
+               [
+               C.apply2 Prim.ov (C.apply2 Prim.arrow (C.constant Prim.void) C.wild) C.what ?
+               (fn (_, m) => proveLambdaArrow ctx m),
+   
+               C.apply2 Prim.ov (C.apply2 Prim.forall (C.constant Prim.void) (C.lam C.wild)) C.what ?
+               (fn (_, m) => proveLambdaPi ctx m),
+   
+               C.wild ?
+               (fn () =>
+                   fail "not a proveLambda goal")
+               ]
+         end
 
 
 

@@ -32,7 +32,7 @@ signature PREFIX =
 structure Prefix :> PREFIX =
    struct
 
-      structure N = Normalize
+      structure N = NormalizeInternal
 
       open Term
 
@@ -241,9 +241,16 @@ structure Prefix :> PREFIX =
                    NONE
 
            | _ => NONE)
-                
 
 
+      fun onNone x k =
+         (case x of
+             NONE => k ()
+
+           | SOME _ => x)
+
+
+      (* Arguments must pairwise unify, but spine' may be longer. *)
       fun unifyPrefixSpine spine spine' =
          (case (spine, spine') of
              ([], _) =>
@@ -267,6 +274,23 @@ structure Prefix :> PREFIX =
            | _ => NONE)
 
 
+      (* Unify m with a prefix of head @ spine. *)
+      fun unifyPrefixElim m head spine mark =
+         if Unify.unify1 m head then
+            SOME spine
+         else
+            (
+            Trail.rewind mark;
+
+            (case spine of
+                [] =>
+                   NONE
+   
+              | elim :: rest =>
+                   unifyPrefixElim m (Elim (head, [elim])) rest mark)
+            )
+                
+         
       fun unifyPrefixMain m n mark =
          (case (m, n) of
              (Elim (Sub _, _), _) => NONE
@@ -279,21 +303,50 @@ structure Prefix :> PREFIX =
                 else
                    NONE
 
-           | (Elim (Const const, spine), Elim (Const const', spine')) =>
-                if Constant.eq (const, const') then
-                   unifyPrefixSpine spine spine'
-                else if isSoft (Constant.opacity const) then
-                   unifyPrefixMain (N.whnfHard m) n mark
-                else if isSoft (Constant.opacity const') then
-                   (case Constant.definition const' of
-                       SOME p =>
-                          unifyPrefixMain m (N.simplify (Elim (p, spine'))) mark
+           | (Elim (Const const, spine), Elim (head as Const const', spine')) =>
+                let
+                   fun try3 () =
+                      if isSoft (Constant.opacity const) then
+                         unifyPrefixMain (N.whnfHard m) n mark
+                      else if isSoft (Constant.opacity const') then
+                         (case Constant.definition const' of
+                             SOME p =>
+                                unifyPrefixMain m (N.simplify (Elim (p, spine'))) mark
+      
+                           | _ =>
+                                (* soft constants always have definitions *)
+                                raise (Fail "impossible"))
+                      else
+                         NONE                   
 
-                     | _ =>
-                          (* soft constants always have definitions *)
-                          raise (Fail "impossible"))
-                else
-                   NONE
+                   fun try2 () =
+                      (* If there are reductions associated with const', then n might not be
+                         weak-head normal, despite beginning with a constant.
+                      *)
+                      if N.registered const' then
+                         (case unifyPrefixElim m head spine' mark of
+                             NONE =>
+                                (
+                                Trail.rewind mark;
+                                try3 ()
+                                )
+
+                           | res => res)
+                      else
+                         try3 ()
+                in
+                   if Constant.eq (const, const') then
+                      (case unifyPrefixSpine spine spine' of
+                          NONE =>
+                             (
+                             Trail.rewind mark;
+                             try2 ()
+                             )
+
+                        | res => res)
+                   else
+                      try2 ()
+                end
 
            | (_, Elim (Const const', spine')) =>
                 if isSoft (Constant.opacity const') then

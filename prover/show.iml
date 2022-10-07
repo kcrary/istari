@@ -953,26 +953,64 @@ structure Show :> SHOW =
                 PP.newline pp
                 ))
 
+
+      fun letrecOf hyp =
+         (case hyp of
+             J.Let m =>
+                (case N.simplify m of
+                    T.Elim (T.Const const, [T.App n]) =>
+                       if Constant.eq (const, Prim.fix) then
+                          (case N.simplify n of
+                              T.Lam (_, body) => SOME body
+
+                            | _ => NONE)
+                       else
+                          NONE
+
+                  | _ => NONE)
+
+           | _ => NONE)
+                       
+
       fun showHyps pp hyps dir =
          (case S.expose hyps of
              S.Nil => ()
 
            | S.Cons (hyp, rest) =>
-                (case D.exposeOpt dir of
-                    SOME (x, dir') =>
-                       (
-                       showHyps pp rest dir';
-                       PP.print pp (Symbol.toValue x);
-                       PP.print pp (hypCategory hyp);
-                       PP.openBox pp PP.Consistent indent;
-                       showHyp pp hyp 0 dir';
-                       PP.closeBox pp;
-                       PP.newline pp
-                       )
+                (* special case for letrec *)
+                let
+                   val letrec = letrecOf hyp
+                in
+                   (case D.exposeOpt dir of
+                       SOME (x, dir') =>
+                          (
+                          showHyps pp rest dir';
+                          PP.print pp (Symbol.toValue x);
 
-                  | NONE =>
-                       (* This can't happen unless someone has mucked up the directory. *)
-                       showHypsMargin pp hyps 0))
+                          (case letrec of
+                              NONE =>
+                                 (
+                                 PP.print pp (hypCategory hyp);
+                                 PP.openBox pp PP.Consistent indent;
+                                 showHyp pp hyp 0 dir'
+                                 )
+
+                            | SOME body =>
+                                 (
+                                 PP.print pp " =rec= ";
+                                 PP.openBox pp PP.Consistent indent;
+                                 showPP pp dir body
+                                 ));
+
+                          PP.closeBox pp;
+                          PP.newline pp
+                          )
+   
+                     | NONE =>
+                          (* This can't happen unless someone has mucked up the directory. *)
+                          showHypsMargin pp hyps 0)
+                end)
+
 
                
 

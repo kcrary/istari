@@ -17,25 +17,25 @@ signature REWRITE =
          the innermost |l| bindings, and uses l for their names.
       *)
 
-      val identityRew      : rewrite
-      val usingRew         : bool -> captures -> eterm -> rewrite  (* bool: reverse the direction *)
-      val replaceRew       : captures -> eterm -> eterm -> eterm -> rewrite
-      val convertRew       : captures -> eterm -> rewrite
-      val convertHeadRew   : captures -> constant -> eterm -> rewrite
-      val foldRew          : captures -> eterm -> rewrite
-      val convertFoldRew   : captures -> eterm -> rewrite
-      val unfoldRew        : ehead -> rewrite
-      val unfoldHeadRew    : ehead -> rewrite
-      val rollRew          : captures -> eterm -> rewrite
-      val convertRollRew   : captures -> eterm -> rewrite
-      val unrollRew        : constant -> rewrite
-      val unrollTypeRew    : constant -> rewrite
+      val identityRew       : rewrite
+      val usingRew          : bool -> captures -> eterm -> rewrite  (* bool: reverse the direction *)
+      val replaceRew        : captures -> eterm -> eterm -> eterm -> rewrite
+      val convertRew        : captures -> eterm -> rewrite
+      val convertHeadRew    : captures -> constant -> eterm -> rewrite
+      val foldRew           : captures -> eterm -> rewrite
+      val convertFoldRew    : captures -> eterm -> rewrite
+      val unfoldRew         : ehead -> rewrite
+      val unfoldHeadRew     : ehead -> rewrite
+      val rollRew           : captures -> eterm -> rewrite
+      val convertRollRew    : captures -> eterm -> rewrite
+      val unrollRew         : ehead -> rewrite
+      val unrollTypeRew     : constant -> rewrite
       val unrollTypeUnivRew : captures -> constant -> eterm -> rewrite
-      val reduceUsingRew   : Reduction.reduction -> rewrite
-      val unreduceUsingRew : captures -> eterm -> Reduction.reduction -> rewrite
+      val reduceUsingRew    : Reduction.reduction -> rewrite
+      val unreduceUsingRew  : captures -> eterm -> Reduction.reduction -> rewrite
       val convertUnreduceUsingRew : captures -> eterm -> Reduction.reduction -> rewrite
-      val reduceRew        : rewrite
-      val whreduceRew      : rewrite
+      val reduceRew         : rewrite
+      val whreduceRew       : rewrite
 
 
       (* target: hypothesis and occurrences, where
@@ -47,28 +47,28 @@ signature REWRITE =
       *)
       type targets = (symbol * (bool * int list) option) list
 
-      val rewrite          : (rewrite * targets) list -> tactic
-      val rewriteRaw       : (rewrite * targets) list -> tactic
+      val rewrite           : (rewrite * targets) list -> tactic
+      val rewriteRaw        : (rewrite * targets) list -> tactic
 
-      val testRewrite      : (rewrite * targets) list -> unit
-      val showPosition     : targets -> unit
+      val testRewrite       : (rewrite * targets) list -> unit
+      val showPosition      : targets -> unit
 
-      val convert          : ((captures * eterm) * targets) list -> tactic
-      val convertHead      : ((captures * constant * eterm) * targets) list -> tactic
-      val fold             : ((captures * eterm) * targets) list -> tactic
-      val convertFold      : ((captures * eterm) * targets) list -> tactic
-      val unfold           : (ehead * targets) list -> tactic
-      val unfoldHead       : (ehead * targets) list -> tactic
-      val roll             : ((captures * eterm) * targets) list -> tactic
-      val convertRoll      : ((captures * eterm) * targets) list -> tactic
-      val unroll           : (constant * targets) list -> tactic
-      val unrollType       : (constant * targets) list -> tactic
-      val unrollTypeUniv   : ((captures * constant * eterm) * targets) list -> tactic
-      val reduceUsing      : (Reduction.reduction * targets) list -> tactic
-      val unreduceUsing    : ((captures * eterm * Reduction.reduction) * targets) list -> tactic
+      val convert           : ((captures * eterm) * targets) list -> tactic
+      val convertHead       : ((captures * constant * eterm) * targets) list -> tactic
+      val fold              : ((captures * eterm) * targets) list -> tactic
+      val convertFold       : ((captures * eterm) * targets) list -> tactic
+      val unfold            : (ehead * targets) list -> tactic
+      val unfoldHead        : (ehead * targets) list -> tactic
+      val roll              : ((captures * eterm) * targets) list -> tactic
+      val convertRoll       : ((captures * eterm) * targets) list -> tactic
+      val unroll            : (ehead * targets) list -> tactic
+      val unrollType        : (constant * targets) list -> tactic
+      val unrollTypeUniv    : ((captures * constant * eterm) * targets) list -> tactic
+      val reduceUsing       : (Reduction.reduction * targets) list -> tactic
+      val unreduceUsing     : ((captures * eterm * Reduction.reduction) * targets) list -> tactic
       val convertUnreduceUsing : ((captures * eterm * Reduction.reduction) * targets) list -> tactic
-      val reduce           : targets -> tactic
-      val whreduce         : targets -> tactic
+      val reduce            : targets -> tactic
+      val whreduce          : targets -> tactic
 
    end
 
@@ -104,6 +104,8 @@ signature REWRITE_TYPES =
          (* LetFold (i, M) : M[i+k . id] --> M[N[^k] . id] 
             where i unfolds to N and rewriting is taking place under k bindings
          *)
+
+       | Seq of computational_rewrite * term * computational_rewrite
 
 
       type equality_rewrite = term * term * term * Term.elim list * priority tacticm
@@ -182,6 +184,7 @@ structure RewriteTypes :> REWRITE_TYPES =
        | Unreduce of Reduction.reduction
        | LetFold of int * term
        | LetUnfold of int * term
+       | Seq of computational_rewrite * term * computational_rewrite
 
       type equality_rewrite = term * term * term * Term.elim list * priority tacticm
 
@@ -256,6 +259,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
       open RewriteTypes
       open Tactic
+      open CasePervasive
 
       type symbol = Symbol.symbol
       type constant = Constant.constant
@@ -536,7 +540,72 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
 
 
-      fun rewriteComputational i core hypopt (jud, _) =
+      fun computationalRewrite m n c cr =
+         (case cr of
+             Identity =>
+                idtac
+          
+           | Beta =>
+                replaceConcl (instantiate c n)
+
+           | Reduce red =>
+                refine (Rule.reduce (R.within (contextToPath c []) red))
+
+           | Unreduce red =>
+                refine (Rule.unreduce 
+                           (instantiate c n) 
+                           (R.within (contextToPath c []) red))
+
+           | LetFold (j, p) =>
+                (* suppose j unfolds to Q, and C binds k variables
+                   then  M = P[Q[^k] . id]  and  N = P[j+k . id]
+
+                   let instantiateShift C P = R
+                   then  R[Q . id] = C{ P[Q[^k] . id] } = C{ M }
+                         R[j . id] = C{ P[j[^k] . id] } = C{ P[j+k . id] } = C{ N }
+                *)
+                refine (Rule.letFold j (instantiateShift c p))
+
+           | LetUnfold (j, p) =>
+                refine (Rule.letUnfold j (instantiateShift c p))
+
+           | Seq (cr1, p, cr2) =>
+                computationalRewrite m p c cr1 >>> [computationalRewrite p n c cr2])
+
+
+      fun computationalRewriteHyp hyp f m n c cr =
+         (case cr of
+             Identity =>
+                idtac
+          
+           | Beta =>
+                replaceHyp hyp (f (instantiate c n))
+
+           | Reduce red =>
+                refine (Rule.reduceHyp hyp (R.within (contextToPath c []) red))
+
+           | Unreduce red =>
+                refine (Rule.unreduceHyp hyp 
+                           (instantiate c n) 
+                           (R.within (contextToPath c []) red))
+
+           | LetFold (j, p) =>
+                if hyp < j then
+                   refine (Rule.letFoldHyp j hyp (f (instantiateShift c p)))
+                else
+                   raise (RewriteFailure "hypothesis is out of scope of let binding")
+
+           | LetUnfold (j, p) =>
+                if hyp < j then
+                   refine (Rule.letUnfoldHyp j hyp (f (instantiateShift c p)))
+                else
+                   raise (RewriteFailure "hypothesis is out of scope of let binding")
+
+           | Seq (cr1, p, cr2) =>
+                computationalRewriteHyp hyp f m p c cr1 >>> [computationalRewriteHyp hyp f p n c cr2])
+
+
+      fun rewriteComputational i core hypopt (goal as (jud, _)) =
          (case hypopt of
              NONE =>
                 (* concl *)
@@ -545,33 +614,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
                    val (m, n, _, _, c, cr) = find i p core
                 in
-                   (case cr of
-                       Identity =>
-                          idtac
-                    
-                     | Beta =>
-                          replaceConcl (instantiate c n)
-
-                     | Reduce red =>
-                          refine (Rule.reduce (R.within (contextToPath c []) red))
-
-                     | Unreduce red =>
-                          refine (Rule.unreduce 
-                                     (instantiate c n) 
-                                     (R.within (contextToPath c []) red))
-
-                     | LetFold (j, p) =>
-                          (* suppose j unfolds to Q, and C binds k variables
-                             then  M = P[Q[^k] . id]  and  N = P[j+k . id]
-
-                             let instantiateShift C P = R
-                             then  R[Q . id] = C{ P[Q[^k] . id] } = C{ M }
-                                   R[j . id] = C{ P[j[^k] . id] } = C{ P[j+k . id] } = C{ N }
-                          *)
-                          refine (Rule.letFold j (instantiateShift c p))
-
-                     | LetUnfold (j, p) =>
-                          refine (Rule.letUnfold j (instantiateShift c p)))
+                   computationalRewrite m n c cr
                 end
 
            | SOME hyp =>
@@ -595,32 +638,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                 
                    val (m, n, _, _, c, cr) = find i p core
                 in
-                   (case cr of
-                       Identity =>
-                          idtac
-                    
-                     | Beta =>
-                          replaceHyp hyp (f (instantiate c n))
-
-                     | Reduce red =>
-                          refine (Rule.reduceHyp hyp (R.within (contextToPath c []) red))
-
-                     | Unreduce red =>
-                          refine (Rule.unreduceHyp hyp 
-                                     (instantiate c n) 
-                                     (R.within (contextToPath c []) red))
-
-                     | LetFold (j, p) =>
-                          if hyp < j then
-                             refine (Rule.letFoldHyp j hyp (f (instantiateShift c p)))
-                          else
-                             raise (RewriteFailure "hypothesis is out of scope of let binding")
-
-                     | LetUnfold (j, p) =>
-                          if hyp < j then
-                             refine (Rule.letUnfoldHyp j hyp (f (instantiateShift c p)))
-                          else
-                             raise (RewriteFailure "hypothesis is out of scope of let binding"))
+                   computationalRewriteHyp hyp f m n c cr
                 end)
 
 
@@ -2814,102 +2832,35 @@ structure RewriteInternal :> REWRITE_INTERNAL =
       type targets = (symbol * (bool * int list) option) list
 
 
-      fun unreduceMain added m red =
-         let
-            val p =
-               (try
-                   N.whnf (R.reduce red m)
-                with
-                   R.Reduce => raise (RewriteFailure "reduction fails on term"))
 
-            val ps = pseudohead p
+      (* p in whnf *)
+      fun replaceComputational cond added m p crew =
+         let
+            val cond' = cond p
 
             fun test bvs n =
-               let
-                  val bvs' = bvs - added
-               in
-                  bvs' >= 0
-                  andalso
-                  pseudoheadEq ps added bvs' (pseudohead n)
-                  andalso
-                  let
-                     val mark = Trail.mark ()
-
-                     val p' =
-                        if bvs' = 0 then
-                           p
-                        else
-                           (* underShift does not disturb weak-head normal form, modulo simplification *)
-                           N.simplify (T.Sub (p, T.underShift added bvs'))
-
-                     val b = Option.isSome (P.unifyPrefix p' n)
-                  in
-                     Trail.rewind mark;
-                     b
-                  end
-               end
-
-            fun act bvs n =
                let
                   val bvs' = bvs - added
                in
                   if
                      bvs' >= 0
                      andalso
-                     pseudoheadEq ps added bvs' (pseudohead n)
+                     cond' added bvs' n
                   then
                      let
                         val mark = Trail.mark ()
 
-                        val s = T.underShift added bvs'
+                        val p' =
+                           if bvs' = 0 then
+                              p
+                           else
+                              (* underShift does not disturb weak-head normal form, modulo simplification *)
+                              N.simplify (T.Sub (p, T.underShift added bvs'))
+
+                        val b = Option.isSome (P.unifyPrefix p' n)
                      in
-                        (case P.unifyPrefix (N.simplify (T.Sub (p, s))) n of
-                            NONE =>
-                               (
-                               Trail.rewind mark;
-                               NONE
-                               )
-   
-                          | SOME spine' =>
-                               SOME (T.Elim (T.Sub (m, s), spine'),
-                                     Unreduce red))
-                     end
-                  else
-                     NONE
-               end
-         in
-            Computational (test, act)
-         end
-
-         
-      fun convertUnreduceMain added m red =
-         let
-            val p =
-               (try
-                   N.whnf (R.reduce red m)
-                with
-                   R.Reduce => raise (RewriteFailure "reduction fails on term"))
-
-            fun test bvs n =
-               let
-                  val bvs' = bvs - added
-               in
-                  if
-                     bvs' >= 0
-                  then
-                     let
-                        val mark = Trail.mark ()
-
-                        val s = T.underShift added bvs'
-                     in
-                        (case P.unifyPrefix (N.simplify (T.Sub (p, s))) n of
-                            NONE =>
-                               (
-                               Trail.rewind mark;
-                               false
-                               )
-   
-                          | SOME _ => true)
+                        Trail.rewind mark;
+                        b
                      end
                   else
                      false
@@ -2921,78 +2872,22 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                in
                   if
                      bvs' >= 0
-                  then
-                     let
-                        val mark = Trail.mark ()
-
-                        val s = T.underShift added bvs'
-                     in
-                        (case P.unifyPrefix (N.simplify (T.Sub (p, s))) n of
-                            NONE =>
-                               (
-                               Trail.rewind mark;
-                               NONE
-                               )
-   
-                          | SOME spine' =>
-                               SOME (T.Elim (T.Sub (m, s), spine'),
-                                     Unreduce red))
-                     end
-                  else
-                     NONE
-               end
-         in
-            Computational (test, act)
-         end
-         
-            
-      fun letFoldMain added varglobal varlocal n spine =
-         let
-            val m = T.Elim (T.Var varlocal, spine)
-            val p = N.whnf (T.Elim (n, spine))
-
-            val ps = pseudohead p
-
-            fun test bvs n =
-               let
-                  val bvs' = bvs - added
-               in
-                  bvs' >= 0
-                  andalso
-                  pseudoheadEq ps added bvs' (pseudohead n)
-                  andalso
-                  let
-                     val mark = Trail.mark ()
-
-                     val p' =
-                        if bvs' = 0 then
-                           p
-                        else
-                           (* underShift does not disturb weak-head normal form, modulo simplification *)
-                           N.simplify (T.Sub (p, T.underShift added bvs'))
-
-                     val b = Option.isSome (P.unifyPrefix p' n)
-                  in
-                     Trail.rewind mark;
-                     b
-                  end
-               end
-
-            fun act bvs n =
-               let
-                  val bvs' = bvs - added
-               in
-                  if
-                     bvs' >= 0
                      andalso
-                     pseudoheadEq ps added bvs' (pseudohead n)
+                     cond' added bvs' n
                   then
                      let
                         val mark = Trail.mark ()
 
                         val s = T.underShift added bvs'
+
+                        val p' =
+                           if bvs' = 0 then
+                              p
+                           else
+                              (* underShift does not disturb weak-head normal form, modulo simplification *)
+                              N.simplify (T.Sub (p, s))
                      in
-                        (case P.unifyPrefix (N.simplify (T.Sub (p, s))) n of
+                        (case P.unifyPrefix p' n of
                             NONE =>
                                (
                                Trail.rewind mark;
@@ -3000,10 +2895,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                )
    
                           | SOME spine' =>
-                               SOME (T.Elim (T.Sub (m, s), spine'),
-                                     LetFold (varglobal, T.Elim (T.zero, 
-                                                                 T.ssubst spine (T.compose s T.shift1)
-                                                                 @ T.ssubst spine' T.shift1))))
+                               SOME (T.Elim (T.Sub (m, s), spine'), 
+                                     crew s spine'))
                      end
                   else
                      NONE
@@ -3012,70 +2905,75 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             Computational (test, act)
          end
 
-         
-      fun convertLetFoldMain added varglobal varlocal n spine =
+
+      (* always proceed, for "xConv" rewrites *)
+      fun condYes _ _ _ _ = true
+
+      (* proceed only if pseudoheads match *)
+      fun condMaybe p =
          let
-            val m = T.Elim (T.Var varlocal, spine)
-            val p = N.whnf (T.Elim (n, spine))
-
-            fun test bvs n =
-               let
-                  val bvs' = bvs - added
-               in
-                  if
-                     bvs' >= 0
-                  then
-                     let
-                        val mark = Trail.mark ()
-
-                        val s = T.underShift added bvs'
-                     in
-                        (case P.unifyPrefix (N.simplify (T.Sub (p, s))) n of
-                            NONE =>
-                               (
-                               Trail.rewind mark;
-                               false
-                               )
-   
-                          | SOME _ => true)
-                     end
-                  else
-                     false
-               end
-
-            fun act bvs n =
-               let
-                  val bvs' = bvs - added
-               in
-                  if
-                     bvs' >= 0
-                  then
-                     let
-                        val mark = Trail.mark ()
-
-                        val s = T.underShift added bvs'
-                     in
-                        (case P.unifyPrefix (N.simplify (T.Sub (p, s))) n of
-                            NONE =>
-                               (
-                               Trail.rewind mark;
-                               NONE
-                               )
-   
-                          | SOME spine' =>
-                               SOME (T.Elim (T.Sub (m, s), spine'),
-                                     LetFold (varglobal, T.Elim (T.zero,
-                                                                 T.ssubst spine (T.compose s T.shift1)
-                                                                 @ T.ssubst spine' T.shift1))))
-                     end
-                  else
-                     NONE
-               end
+            val ps = pseudohead p
          in
-            Computational (test, act)
+            fns added bvs' n => pseudoheadEq ps added bvs' (pseudohead n)
          end
+
+
+
+      fun unreduceMain cond added m red =
+         replaceComputational cond added m 
+            (try 
+                N.whnf (R.reduce red m)
+             with
+                R.Reduce => raise (RewriteFailure "reduction fails on term"))
+            (fns _ _ => Unreduce red)
+             
+      val unreduceMainNoconv = unreduceMain condMaybe
+      val unreduceMainConv = unreduceMain condYes
+
+            
+
+      fun letFoldMain cond added varglobal varlocal n spine =
+         replaceComputational cond added 
+            (T.Elim (T.Var varlocal, spine))
+            (N.whnf (T.Elim (n, spine)))
+            (fns s spine' =>
+                LetFold (varglobal, T.Elim (T.zero,
+                                            T.ssubst spine (T.compose s T.shift1)
+                                            @ T.ssubst spine' T.shift1)))
+
+      val letFoldMainNoconv = letFoldMain condMaybe
+      val letFoldMainConv = letFoldMain condYes
          
             
+
+      fun letrecRollMain cond added varglobal varlocal body spine =
+         replaceComputational cond added
+            (T.Elim (T.Var varlocal, spine))
+            (N.whnf (T.Elim (T.Sub (body, T.Idot (varlocal, T.id)), spine)))
+            (fns s spine' =>
+                let
+                   val spine_s = T.ssubst spine s
+                   val spines = spine_s @ spine'
+                   val spines_sh = T.ssubst spines T.shift1
+                in
+                   Seq (LetUnfold (varglobal,
+                                   T.Elim (T.Sub (body, T.Idot (0, T.compose s T.shift1)), spines_sh)),
+                        T.Elim (T.Sub (body,
+                                       T.Dot (T.apply1 Prim.fix (T.Lam (NONE, T.Sub (body, T.under 1 s))), 
+                                              s)),
+                                spines),
+                        Seq (Unreduce (R.user1 Prim.unroll_fix),
+                             T.Elim (T.Const Prim.fix,
+                                     T.App (T.Lam (NONE, T.Sub (body, T.under 1 s))) :: spines),
+                             LetFold (varglobal,
+                                      T.Elim (T.Var 0, spines_sh))))
+                end)
+
+      val letrecRollMainNoconv = letrecRollMain condMaybe
+      val letrecRollMainConv = letrecRollMain condYes
+
+
+
       fun foldMain main letmain capture em hyp (jud, dir) =
          let
             val sh =
@@ -3109,8 +3007,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
               | _ => raise (RewriteFailure "term is not rigid"))
          end
 
-      val foldRew : symbol option list -> eterm -> rewrite = foldMain unreduceMain letFoldMain
-      val convertFoldRew : symbol option list -> eterm -> rewrite = foldMain convertUnreduceMain convertLetFoldMain
+      val foldRew : symbol option list -> eterm -> rewrite = foldMain unreduceMainNoconv letFoldMainNoconv
+      val convertFoldRew : symbol option list -> eterm -> rewrite = foldMain unreduceMainConv letFoldMainConv
 
       fun fold aims =
          rewriteRaw
@@ -3138,8 +3036,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             main (List.length capture) m red
          end
 
-      val unreduceUsingRew : symbol option list -> eterm -> Reduction.reduction -> rewrite = unreduceUsingMain unreduceMain
-      val convertUnreduceUsingRew : symbol option list -> eterm -> Reduction.reduction -> rewrite = unreduceUsingMain convertUnreduceMain
+      val unreduceUsingRew : symbol option list -> eterm -> Reduction.reduction -> rewrite = unreduceUsingMain unreduceMainNoconv
+      val convertUnreduceUsingRew : symbol option list -> eterm -> Reduction.reduction -> rewrite = unreduceUsingMain unreduceMainConv
 
       fun unreduceUsing aims =
          rewriteRaw
@@ -3155,7 +3053,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
 
 
-      fun unfoldMain usearity head hyp (jud, dir) =
+      fun unfoldMain reduce head hyp (jud, dir) =
          (case head (D.idir dir) of
              D.Hvar varglobal =>
                 let
@@ -3184,8 +3082,12 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                        if v = varlocal+bvs then
                                           let
                                              val n' = T.Elim (T.Sub (m, T.Shift (varlocal+bvs+1)), spine)
+                                             val cr = LetUnfold (varglobal, T.Elim (T.zero, T.ssubst spine T.shift1))
                                           in
-                                             SOME (n', LetUnfold (varglobal, T.Elim (T.zero, T.ssubst spine T.shift1)))
+                                             if reduce then
+                                                SOME (N.whnf n', Seq (cr, n', Beta))
+                                             else
+                                                SOME (n', cr)
                                           end
                                        else
                                           NONE
@@ -3205,12 +3107,6 @@ structure RewriteInternal :> REWRITE_INTERNAL =
        
                   | SOME m =>
                        let
-                          val arity =
-                             if usearity then
-                                Database.findArity const
-                             else
-                                0
-
                           fun test _ n =
                              (case n of
                                  T.Elim (T.Const const', _) =>
@@ -3222,14 +3118,14 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                              (case n of
                                  T.Elim (T.Const const', spine) =>
                                     if Constant.eq (const, const') then
-                                       (try
-                                           let
-                                              val n' = R.reduce (R.beta arity) (T.Elim (m, spine))
-                                           in
-                                              SOME (n', Reduce (R.trans [R.unfold, R.beta arity]))
-                                           end
-                                        with
-                                           R.Reduce => NONE)
+                                       let
+                                          val n' = T.Elim (m, spine)
+                                       in
+                                          if reduce then
+                                             SOME (N.whnf n', Seq (Reduce R.unfold, n', Beta))
+                                          else
+                                             SOME (n', Reduce R.unfold)
+                                       end
                                     else
                                        NONE
        
@@ -3288,7 +3184,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
 
 
-      fun rollMain main capture em hyp (_, dir) =
+      fun rollMain main letrecMain capture em hyp (jud, dir) =
          let
             val dir' =
                (case hyp of
@@ -3306,11 +3202,35 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                      | SOME red =>
                           main (List.length capture) m red)
 
-              | _ => raise (RewriteFailure "term has no head constant"))
+              | T.Elim (T.Var varlocal, spine) =>
+                   let
+                      val added = List.length capture
+
+                      val varglobal =
+                         (case hyp of
+                             NONE => varlocal - added
+
+                           | SOME i => varlocal - added + i + 1)
+                   in
+                      (case J.hypOpt jud varglobal of
+                          SOME (J.Let n) =>
+                             termCaseX n
+                             /| \Prim.fix\ (fn . ?) =>
+                                \(fnc body =>
+                                     letrecMain added varglobal varlocal (T.Sub (body, T.underShift 1 (varlocal+1))) spine)\
+
+                              | _ =>
+                                \(fnc => raise (RewriteFailure "term is not unrollable"))\
+                             /
+
+                        | _ => raise (RewriteFailure "term is not unrollable"))
+                   end
+
+              | _ => raise (RewriteFailure "term has no head constant/variable"))
          end
 
-      val rollRew : symbol option list -> eterm -> rewrite = rollMain unreduceMain
-      val convertRollRew : symbol option list -> eterm -> rewrite = rollMain convertUnreduceMain
+      val rollRew : symbol option list -> eterm -> rewrite = rollMain unreduceMainNoconv letrecRollMainNoconv
+      val convertRollRew : symbol option list -> eterm -> rewrite = rollMain unreduceMainConv letrecRollMainConv
 
       fun roll aims =
          rewriteRaw
@@ -3326,53 +3246,116 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
 
 
-      fun unrollRew const hyp _ =
-         let
-            val red =
-               (case Database.findUnroll const of
-                   NONE =>
-                      raise (RewriteFailure "constant is not unrollable")
+      fun unrollRew head hyp (jud, dir) =
+         (case head (D.idir dir) of
+             D.Hvar varglobal =>
+                let
+                   val varlocal =
+                      (case hyp of
+                          NONE => varglobal
 
-                 | SOME red => red)
+                        | SOME i =>
+                             if i < varglobal then
+                                varglobal - i - 1
+                             else
+                                raise (RewriteFailure "hypothesis is out of scope of letrec binding"))
+                in
+                   (case J.hypOpt jud varglobal of
+                       SOME (J.Let m) =>
+                          termCaseX m
+                          /| \Prim.fix\ (fn . ?) =>
+                             \(fnc body =>
+                                  let
+                                     fun test bvs n =
+                                        (case n of
+                                            T.Elim (T.Var v, _) => v = varlocal+bvs
+    
+                                          | _ => false)
+    
+                                     fun act bvs n =
+                                        (case n of
+                                            T.Elim (T.Var v, spine) =>
+                                               if v = varlocal+bvs then
+                                                  let
+                                                     val m' = T.Sub (m, T.Shift (varlocal+bvs+1))
+                                                     val n' = T.Elim (T.Sub (body, T.Idot (varlocal+bvs, T.Shift (varlocal+bvs+1))), spine)
+   
+                                                     val cr =
+                                                        Seq (LetUnfold (varglobal, T.Elim (T.zero, T.ssubst spine T.shift1)),
+                                                             T.Elim (m', spine),
+                                                             Seq (Reduce (R.user1 Prim.unroll_fix),
+                                                                  T.Elim (T.Sub (body, T.Dot (m', T.Shift (varlocal+bvs+1))), spine),
+                                                                  Seq (LetFold (varglobal, 
+                                                                                T.Elim (T.Sub (body, T.Idot (0, T.Shift (varlocal+bvs+2))),
+                                                                                        T.ssubst spine T.shift1)),
+                                                                       n',
+                                                                       Beta)))
+                                                  in
+                                                     SOME (N.whnf n', cr)
+                                                  end
+                                               else
+                                                  NONE
+    
+                                          | _ => NONE)
+                                  in
+                                     Computational (test, act)
+                                  end)\
+    
+                           | _ =>
+                             \(fnc => raise (RewriteFailure "variable is not unrollable"))\
+                          /
+   
+                     | _ =>
+                          raise (RewriteFailure "variable is not unrollable"))
+                end
 
-            fun test _ m =
-               (case m of
-                   T.Elim (T.Const const', _) =>
-                      if Constant.eq (const, const') then
-                         (try
-                             (
-                             R.reduce red m;
-                             true
-                             )
-                          with R.Reduce => false)
-                      else
-                         false
-
-                 | _ => false)
-
-            fun act _ m =
-               (case m of
-                   T.Elim (T.Const const', _) =>
-                      if Constant.eq (const, const') then
-                         (try
-                             let
-                                val n = R.reduce red m
-                             in
-                                SOME (n, Reduce red)
-                             end
-                          with R.Reduce => NONE)
-                      else
-                         NONE
-
-                 | _ => NONE)
-         in
-            Computational (test, act)
-         end
+           | D.Hconst const =>
+                let
+                   val red =
+                      (case Database.findUnroll const of
+                          NONE =>
+                             raise (RewriteFailure "constant is not unrollable")
+       
+                        | SOME red => red)
+       
+                   fun test _ m =
+                      (case m of
+                          T.Elim (T.Const const', _) =>
+                             if Constant.eq (const, const') then
+                                (try
+                                    (
+                                    R.reduce red m;
+                                    true
+                                    )
+                                 with R.Reduce => false)
+                             else
+                                false
+       
+                        | _ => false)
+       
+                   fun act _ m =
+                      (case m of
+                          T.Elim (T.Const const', _) =>
+                             if Constant.eq (const, const') then
+                                (try
+                                    let
+                                       val n = R.reduce red m
+                                    in
+                                       SOME (n, Reduce red)
+                                    end
+                                 with R.Reduce => NONE)
+                             else
+                                NONE
+       
+                        | _ => NONE)
+                in
+                   Computational (test, act)
+                end)
 
       fun unroll aims =
          rewriteRaw
             (List.map
-                (fn (const, targets) => (unrollRew const, targets))
+                (fn (head, targets) => (unrollRew head, targets))
                 aims)
 
 
@@ -3405,30 +3388,22 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
                     | SOME a =>
                          let
-                            val arity = Database.findArity const
-                         
-                            fun loop i a =
-                               if i = 0 then
-                                  C.termCaseXAlt a
-                                     [
-                                     C.path Prim.mu (C.app (C.lam C.wild) C.null) ?
-                                     (fn _ => Prim.mu),
+                            fun loop n a =
+                               termCaseX a
+                               /| fn . ? =>
+                                  \(fnc b => loop (n+1) b)\
 
-                                     C.path Prim.rec (C.app (C.lam C.wild) C.null) ?
-                                     (fn _ => Prim.rec),
+                                | \Prim.mu\ (fn . _) =>
+                                  \(fnc => (n, Prim.mu))\
 
-                                     C.wild ?
-                                     (fn () =>
-                                         raise (RewriteFailure "type is not unrollable"))
-                                     ]
-                               else
-                                  (case N.simplify a of
-                                      T.Lam (_, b) => loop (i-1) b
+                                | \Prim.rec\ (fn . _) =>
+                                  \(fnc => (n, Prim.rec))\
 
-                                    | _ =>
-                                         raise (RewriteFailure "type is not unrollable"))
+                                | _ =>
+                                  \(fnc => raise (RewriteFailure "type is not unrollable"))\
+                               /
 
-                            val root = loop arity a
+                            val (arity, root) = loop 0 a
                          in
                             (arity, R.trans [R.unfold, R.beta arity], root)
                          end)

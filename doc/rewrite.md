@@ -79,8 +79,8 @@ to be empty.
 - `fold [term] within [captures] [targets]`
 
     Folds the target term to become the specified term.  The outermost
-    form of the target term must match the unfolding of the specified
-    term precisely.
+    form of the target term must match precisely the outermost form of
+    the normal form of the unfolding of the specified term.
 
 
 - `convertFold within [captures] [targets]`
@@ -92,24 +92,23 @@ to be empty.
 - `unfold [constant/variable] [targets]`
 
     Unfolds a target term with the specified head constant or
-    variable.
+    variable, and then weak-head-normalizes the result.
 
 
 - `unfoldHead [constant/variable] [targets]`
 
-    Unfolds the specified constant or variable.  If it is a constant,
-    it ignores the constant's arity so it can be used on an incomplete
-    application.  However, if the arity is nonzero the constant will
-    unfold to a lambda, so it may leave beta redices if the constant
-    is given any arguments.
+    Unfolds a target term with the specified head constant or
+    variable, but does not weak-head-normalizes the result.  Thus, if
+    the head takes arguments, unfoldHead will leave a beta redex.
 
 
 - `roll [term] within [captures] [targets]`
 
     Rolls the target term to become the specified term, using (in
     reverse) the unrolling reduction given for the term's head
-    constant.  The outermost form of the target term must match the
-    unrolling of the specified term precisely.
+    constant.  The outermost form of the target term must match
+    precisely the outermost form of the normal form of the unrolling
+    of the specified term.
 
 
 - `convertRoll [term] within [captures] [targets]`
@@ -146,15 +145,17 @@ to be empty.
 - `unreduceUsing [reduction] with [term] within [captures] [targets]`
 
     Applies the reduction to the specified term to obtain a goal term.
-    Replaces the goal term with the specified term.  The outermost
-    form of the target term must match the goal term precisely.
+    Replaces a target term that is equivalent to the goal term with
+    the specified term.  The outermost form of the target term must
+    match precisely the outermost form of the normal form of the goal
+    term.
 
 
 - `convertUnreduceUsing [reduction] with [term] within [captures] [targets]`
 
     Applies the reduction to the specified term to obtain a goal term.
-    Replaces the goal term with the specified term.  (Finding hit
-    numbers may be slow.)
+    Replaces a target term that is equivalent to the goal term with
+    the specified term.  (Finding hit numbers may be slow.)
 
 
 - `reduce [short-targets]`
@@ -174,7 +175,7 @@ to be empty.
 
     As `rewrite`, but shows what is to be done without doing it.  Note
     that since the rewrite is not actually performed, a target like
-    `at 0 0` will show the same rewrite twice.
+    `at 0 0` will always show the same rewrite twice.
 
 - `showPosition [short-targets]`
 

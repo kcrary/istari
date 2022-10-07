@@ -3,11 +3,16 @@ signature DEFINE =
    sig
 
       type symbol = Symbol.symbol
+      type eterm = ETerm.eterm
 
       exception Define
 
-      val define : (symbol * symbol option list * symbol option list) -> ETerm.eterm -> unit
-      val definerec : (symbol * symbol option list * symbol option list) -> ETerm.eterm -> unit
+      val defineRaw : (symbol * symbol option list * symbol option list) -> eterm -> unit
+      val define : (symbol * symbol option list * symbol option list) -> eterm -> eterm -> unit
+
+      val definerecRaw : (symbol * symbol option list * symbol option list) -> eterm -> unit
+      val definerec : (symbol * symbol option list * symbol option list) -> eterm -> eterm -> unit
+
       val recordTyping : string -> unit
 
    end
@@ -27,20 +32,32 @@ signature DEFINE_INTERNAL =
 structure DefineInternal :> DEFINE_INTERNAL =
    struct
 
+      structure D = Directory
       structure T = Term
       structure P = ProverInternal
       structure R = Reduction
+      structure S = Seq
       structure J = Judgement
 
       type symbol = Symbol.symbol
+      type eterm = ETerm.eterm
 
       open CasePervasive
+      open Tactic
 
       val withHandler = Message.withHandler
       exception Error = Message.Error
 
       exception Define
 
+      fun signalDefine msg =
+         raise (Message.Error (Prover.Prover,
+                               String.concat
+                                  [
+                                  "Error: ",
+                                  msg,
+                                  ".\n"
+                                  ]))
 
 
       fun checkClean m =
@@ -58,28 +75,105 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
 
 
-      fun define (name, impargs, expargs) em =
-         withHandler
-         (fn () =>
-             let
-                val () = ProverInternal.checkpoint ()
+      fun defineRaw (name, impargs, expargs) em =
+         let
+            do () = withHandler
 
-                val args = impargs @ expargs
+            val () = P.checkpoint ()
 
-                val m = ETerm.closed (List.foldr ETerm.lam em args)
-             
-                val () = checkClean m
+            val args = impargs @ expargs
 
-                val const = Namespace.declare name (SOME m)
-             in
-                Database.setArity const (List.length args);
-                Database.setImplicits const (List.length impargs);
+            val m = ETerm.closed (List.foldr ETerm.lam em args)
+         
+            val () = checkClean m
 
-                print "Constant ";
-                print (Symbol.toValue name);
-                print " defined.\n"
-             end)
+            val const = Namespace.declare name (SOME m)
+         in
+            Database.setImplicits const (List.length impargs);
 
+            print "Constant ";
+            print (Symbol.toValue name);
+            print " defined.\n"
+         end
+
+
+
+      fun define (name, impargs, expargs) em ea =
+         let
+            do () = withHandler
+
+            val () = P.checkpoint ()
+
+            val args = impargs @ expargs
+
+            val dir =
+               List.foldl
+                  (fns arg dir => D.bindh dir arg)
+                  D.empty
+                  args
+
+            val body = em (D.idir dir)
+            val a = ea D.iempty
+
+            val m =
+               List.foldr
+                  (fns arg m => T.Lam (arg, m))
+                  body
+                  args
+                      
+            val jud =
+               J.make
+                  (S.cons (J.Let m) S.empty)
+                  (* The shift should be unnecessary, since a should be closed, but do it anyway. *)
+                  (T.apply2 Prim.ov (T.Sub (a, T.shift1)) (T.Var 0))
+
+            val goal = (jud, D.literal [name])
+
+            fun cont vs =
+               withHandler
+               (fn () =>
+                   (case vs of
+                       [v] =>
+                          (* v validates =M |- 0 : A[^] *)
+                          let
+                             val const = Namespace.declare name (SOME m)
+
+                             val jud' = J.make S.empty (T.apply2 Prim.ov a (T.Const const))
+
+                             val tac =
+                                (* |- const : A *)
+                                refine (Rule.reduce (R.within [2] R.unfold))
+                                >>
+                                (* |- M : A *)
+                                refine (Rule.letIntro 0 m)
+                                >>
+                                (* =M |- M[^] : A[^] *)
+                                refine (Rule.letFold 0
+                                           (T.apply2 Prim.ov (T.Sub (a, T.Shift 2)) T.zero))
+                                >>
+                                (* =M |- 0 : A[^] *)
+                                cast jud v
+                          in
+                             (case execute (jud', D.empty) tac of
+                                 Sum.INL v' =>
+                                    (
+                                    Database.enterType const jud' v';
+                                    Database.setImplicits const (List.length impargs);
+   
+                                    print "Constant ";
+                                    print (Symbol.toValue name);
+                                    print " defined.\n"
+                                    )
+
+                               | Sum.INR _ =>
+                                    (* This shouldn't happen. *)
+                                    raise (Fail "internal definition error"))
+                          end
+
+                     | _ => raise Refine.ValidationFailure))
+         in
+            P.setGoals [goal] cont
+         end
          
 
 
@@ -136,34 +230,118 @@ structure DefineInternal :> DEFINE_INTERNAL =
                 /)
 
 
-      fun definerec (name, impargs, expargs) em =
-         withHandler
-         (fn () =>
-             let
-                val () = ProverInternal.checkpoint ()
+      fun definerecRaw (name, impargs, expargs) em =
+         let
+            do () = withHandler
 
-                val args = impargs @ expargs
+            val () = P.checkpoint ()
 
-                val m = 
-                   T.apply1 Prim.fix
-                      (ETerm.closed
-                          (List.foldr ETerm.lam em (SOME name :: args)))
+            val args = impargs @ expargs
 
-                val () = checkClean m
+            val m = 
+               T.apply1 Prim.fix
+                  (ETerm.closed
+                      (List.foldr ETerm.lam em (SOME name :: args)))
 
-                val const = Namespace.declare name (SOME m)
+            val () = checkClean m
 
-                val arity = List.length args
-             in
-                Database.setArity const arity;
-                Database.setImplicits const (List.length impargs);
-                Database.setUnroll const
-                   (R.trans [recUnroller const, R.beta arity]);
+            val const = Namespace.declare name (SOME m)
 
-                print "Constant ";
-                print (Symbol.toValue name);
-                print " defined.\n"
-             end)
+            val arity = List.length args
+         in
+            Database.setImplicits const (List.length impargs);
+            Database.setUnroll const
+               (R.trans [recUnroller const, R.beta arity]);
+
+            print "Constant ";
+            print (Symbol.toValue name);
+            print " defined.\n"
+         end
+
+
+      fun definerec (name, impargs, expargs) em ea =
+         let
+            do () = withHandler
+
+            val () = P.checkpoint ()
+
+            val args = impargs @ expargs
+
+            val dir =
+               List.foldl
+                  (fns arg dir => D.bindh dir arg)
+                  (D.literal [name])
+                  args
+
+            val body = em (D.idir dir)
+            val a = ea D.iempty
+
+            val m =
+               List.foldr
+                  (fns arg m => T.Lam (arg, m))
+                  body
+                  args
+
+            val m' = T.apply1 Prim.fix (T.Lam (SOME name, m))
+                      
+            val jud =
+               J.make
+                  (S.cons (J.Let m') S.empty)
+                  (* The shift should be unnecessary, since a should be closed, but do it anyway. *)
+                  (T.apply2 Prim.ov (T.Sub (a, T.shift1)) (T.Var 0))
+
+            val goal = (jud, D.literal [name])
+
+            val arity = List.length args
+
+            fun cont vs =
+               withHandler
+               (fn () =>
+                   (case vs of
+                       [v] =>
+                          (* v validates =M' |- 0 : A[^] *)
+                          let
+                             val const = Namespace.declare name (SOME m')
+
+                             val jud' = J.make S.empty (T.apply2 Prim.ov a (T.Const const))
+
+                             val tac =
+                                (* |- const : A *)
+                                refine (Rule.reduce (R.within [2] R.unfold))
+                                >>
+                                (* |- M' : A *)
+                                refine (Rule.letIntro 0 m')
+                                >>
+                                (* =M' |- M'[^] : A[^] *)
+                                refine (Rule.letFold 0
+                                           (T.apply2 Prim.ov (T.Sub (a, T.Shift 2)) T.zero))
+                                >>
+                                (* =M' |- 0 : A[^] *)
+                                cast jud v
+                          in
+                             (case execute (jud', D.empty) tac of
+                                 Sum.INL v' =>
+                                    (
+                                    Database.enterType const jud' v';
+                                    Database.setImplicits const (List.length impargs);
+                                    Database.setUnroll const
+                                       (R.trans [recUnroller const, R.beta arity]);
+   
+                                    print "Constant ";
+                                    print (Symbol.toValue name);
+                                    print " defined.\n"
+                                    )
+
+                               | Sum.INR _ =>
+                                    (* This shouldn't happen. *)
+                                    raise (Fail "internal definition error"))
+                          end
+
+                     | _ => raise Refine.ValidationFailure))
+         in
+            P.setGoals [goal] cont
+         end
+             
 
 
       fun recordTyping name =

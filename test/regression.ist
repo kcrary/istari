@@ -6,6 +6,147 @@ Ctrl.use "../library/acc-load.iml";
 Ctrl.use "../library/nat-load.iml";
 
 
+lemma "unroll_letrec"
+/
+  let f = fix (fn f x . natcase x 0 (fn x' . succ (f x'))) in f : nat -> nat
+/;
+
+intro /f/.
+assert /f : nat -> nat/ /H/.
+  {
+  introOf /n/.
+  induct /n/.
+  reintro /IH/.
+  unroll /f/.
+  destruct /n/ /| n/.
+    {
+    reduce //.
+    typecheck.
+    }
+  reduce //.
+  typecheck1.
+  apply /IH/.
+  apply /Nat.lt_succ/.
+  }
+unroll /f/.
+roll /f/.
+unroll /f in H/.
+roll /f in H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "unroll_letrec_under"
+/
+  let f = fix (fn f x . natcase x 0 (fn x' . succ (f x'))) in (fn y z . f z) : nat -> nat -> nat
+/;
+
+intro /f/.
+unroll /f/.
+roll /f z within y z/.
+goalCase /? => \fnc c => assert /\c\/ /H/\/.
+  {
+  introOf /_ n/.
+  reduce //.
+  so /unroll_letrec/ /H/.
+  fold /f in H/.
+  generalize /f/ /nat -> nat/ /f'/.
+  typecheck.
+  }
+unroll /f in H/.
+roll /f z within y z in H/.
+hyp /H/.
+qed ();
+
+
+
+definerec /countdown x/
+/
+  natcase x 0 (fn x' . succ (countdown x'))
+//
+  nat -> nat
+/;
+
+introOf /n/.
+induct /n/.
+reintro /IH/.
+unroll /countdown/.
+roll /countdown n/.
+unroll /countdown/.
+destruct /n/ /| n/.
+  {
+  reduce //.
+  typecheck.
+  }
+reduce //.
+typecheck1.
+apply /IH/.
+apply /Nat.lt_succ/.
+qed ();
+
+
+
+lemma "countdown_identity"
+/
+  forall n . countdown n = n : nat
+/;
+
+inference.
+intro /n/.
+iterate /n/.
+  {
+  unroll /countdown/.
+  reduce //.
+  auto.
+  }
+intro /n IH/.
+unroll /countdown/.
+convertRoll /countdown (succ n)/.
+unroll /countdown/.
+reduce //.
+compat.
+auto.
+qed ();
+    
+
+
+
+defineRaw /mypair x y/ /(x , y)/;
+
+
+lemma "unroll_whnf"
+/
+  mypair 1 : nat -> nat & nat
+/;
+
+unfoldHead /mypair/.
+fold /mypair 1/.
+unfold /mypair/.
+fold /mypair 1/.
+introOf /x/.
+unfold /mypair/.
+typecheck.
+qed ();
+
+
+lemma "unroll_let_whnf"
+/
+  let f = (fn x y . (x , y)) in f 1 : nat -> nat & nat
+/;
+
+intro /f/.
+unfoldHead /f/.
+fold /f 1/.
+unfold /f/.
+fold /f 1/.
+introOf /x/.
+unfold /f/.
+typecheck.
+qed ();
+
+
+
 lemma "unroll_rec_univ"
 /
   forall i (a : U i -> U i) (b : U i -> U i) .
@@ -592,7 +733,7 @@ qed ();
 
 
 
-define /identity/ /fn x . x/;
+defineRaw /identity/ /fn x . x/;
 
 lemma "identity_type"
 /
@@ -673,7 +814,7 @@ qed ();
 
 
 
-define /badnat/ /rec t . unit % future t/;
+defineRaw /badnat/ /rec t . unit % future t/;
 
 lemma "badnat_type" /badnat : U 0/;
 
@@ -757,7 +898,7 @@ qed ();
 
 
 
-define /myunit/ /unit/;
+defineRaw /myunit/ /unit/;
 Constant.setOpacity (parseConstant /myunit/) Constant.SOFT;
 
 
@@ -773,7 +914,7 @@ qed ();
 
 
 
-define /myarrow a b/ /a -> b/;
+defineRaw /myarrow a b/ /a -> b/;
 Constant.setOpacity (parseConstant /myarrow/) Constant.SOFT;
 
 lemma "soft_constant_2" /
@@ -934,7 +1075,7 @@ qed ();
 
 
 
-define /myfix/
+defineRaw /myfix/
   / fn f . pause (fn x . f (pause x x)) (fn x . f (pause x x)) /;
 val myfix = Namespace.resolve [`"myfix"];
 
@@ -992,7 +1133,7 @@ qed ();
 
 
 
-define /natind/
+defineRaw /natind/
 /
   fix (fn f n hz hs .
          natcase n hz (fn n' . hs n' (f n' hz hs)))
@@ -1056,7 +1197,7 @@ qed ();
 
 
 
-define /mynatind/ / natind /;
+defineRaw /mynatind/ / natind /;
 val mynatind = Namespace.resolve [`"mynatind"];
 
 val t1 = parseLTerm /mynatind (succ 2) 1 0/;
@@ -1135,7 +1276,7 @@ split.
 qed ();
 
 
-define /mypause/ / fn x . x /;
+defineRaw /mypause/ / fn x . x /;
 val mypause = Namespace.resolve [`"mypause"];
 
 val t1 = parseLTerm /mypause 0/;

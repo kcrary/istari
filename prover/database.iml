@@ -14,9 +14,6 @@ signature DATABASE =
       val findType : constant -> (Judgement.djudgement * Refine.validation) option
       val enterType : constant -> Judgement.djudgement -> Refine.validation -> unit
 
-      val findArity : constant -> int
-      val setArity : constant -> int -> unit
-
       val findImplicits : constant -> int
       val setImplicits : constant -> int -> unit
 
@@ -34,10 +31,10 @@ signature DATABASE_INTERNAL =
 
       exception Database
 
-      val appLocal : (constant * (Judgement.djudgement * Refine.validation) option * int * int * Reduction.reduction option -> unit) -> unit
+      val appLocal : (constant * (Judgement.djudgement * Refine.validation) option * int * Reduction.reduction option -> unit) -> unit
 
       (* doesn't set the dirty bit, so it won't be exported *)
-      val import : constant * (Judgement.djudgement * Refine.validation) option * int * int * Reduction.reduction option -> unit
+      val import : constant * (Judgement.djudgement * Refine.validation) option * int * Reduction.reduction option -> unit
 
       (* like enterType, but doesn't set the dirty bit *)
       val primType : constant -> Judgement.djudgement -> Refine.validation -> unit
@@ -55,27 +52,27 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
       type constant = Constant.constant
 
 
-      (* database entry: (type, arity, implicits, unroller, imported?) *)
+      (* database entry: (type, implicits, unroller) *)
 
       (* the value and a dirty bit
          (The dirty bit is not set for primitives and imported entries.)
       *)
       type 'a entry = 'a * bool  
 
-      val theDatabase : ((Judgement.djudgement * Refine.validation) option entry * int entry * int entry * Reduction.reduction option entry) H.table = H.table ()
+      val theDatabase : ((Judgement.djudgement * Refine.validation) option entry * int entry * Reduction.reduction option entry) H.table = H.table ()
 
       fun findType const =
          Option.mapPartial
-            (fn ((t, _), _, _, _) => t)
+            (fn ((t, _), _, _) => t)
             (H.find theDatabase const)
 
       fun enterType const j v =
          (
          H.operate theDatabase const
             (fn () => 
-                ((SOME (j, v), true), (0, false), (0, false), (NONE, false)))
-            (fn (_, arity, implicits, unroll,) => 
-                ((SOME (j, v), true), arity, implicits, unroll));
+                ((SOME (j, v), true), (0, false), (NONE, false)))
+            (fn (_, implicits, unroll,) => 
+                ((SOME (j, v), true), implicits, unroll));
          ()
          )
 
@@ -83,43 +80,16 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
          (
          H.operate theDatabase const
             (fn () => 
-                ((SOME (j, v), false), (0, false), (0, false), (NONE, false)))
-            (fn (_, arity, implicits, unroll) =>
-                ((SOME (j, v), false), arity, implicits, unroll));
-         ()
-         )
-
-
-      fun findArity const =
-         (case H.find theDatabase const of
-             SOME (_, (arity, _), _, _) => arity
-
-           | NONE => 0)
-
-      fun setArity const arity =
-         (
-         H.operate theDatabase const
-            (fn () => 
-                ((NONE, false), (arity, true), (0, false), (NONE, false)))
-            (fn (t, _, implicits, unroll) =>
-                (t, (arity, true), implicits, unroll));
-         ()
-         )
-
-      fun primArity const arity =
-         (
-         H.operate theDatabase const
-            (fn () => 
-                ((NONE, false), (arity, false), (0, false), (NONE, false)))
-            (fn (t, _, implicits, unroll) =>
-                (t, (arity, false), implicits, unroll));
+                ((SOME (j, v), false), (0, false), (NONE, false)))
+            (fn (_, implicits, unroll) =>
+                ((SOME (j, v), false), implicits, unroll));
          ()
          )
 
 
       fun findImplicits const =
          (case H.find theDatabase const of
-             SOME (_, _, (implicits, _), _) => implicits
+             SOME (_, (implicits, _), _) => implicits
 
            | NONE => 0)
 
@@ -127,16 +97,16 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
          (
          H.operate theDatabase const
             (fn () =>
-                ((NONE, false), (0, false), (implicits, true), (NONE, false)))
-            (fn (t, arity, _, unroll) =>
-                (t, arity, (implicits, true), unroll));
+                ((NONE, false), (implicits, true), (NONE, false)))
+            (fn (t, _, unroll) =>
+                (t, (implicits, true), unroll));
          ()
          )
 
 
       fun findUnroll const =
          (case H.find theDatabase const of
-             SOME (_, _, _, (unroll, _)) => unroll
+             SOME (_, _, (unroll, _)) => unroll
 
            | NONE => NONE)
 
@@ -144,9 +114,9 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
          (
          H.operate theDatabase const
             (fn () => 
-                ((NONE, false), (0, false), (0, false), (SOME r, true)))
-            (fn (t, arity, implicits, _) =>
-                (t, arity, implicits, (SOME r, true)));
+                ((NONE, false), (0, false), (SOME r, true)))
+            (fn (t, implicits, _) =>
+                (t, implicits, (SOME r, true)));
          ()
          )
 
@@ -154,17 +124,12 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
          (
          H.operate theDatabase const
             (fn () =>
-                ((NONE, false), (0, false), (0, false), (SOME r, false)))
-            (fn (t, arity, implicits, _) =>
-                (t, arity, implicits, (SOME r, false)));
+                ((NONE, false), (0, false), (SOME r, false)))
+            (fn (t, implicits, _) =>
+                (t, implicits, (SOME r, false)));
          ()
          )
 
-
-      val () =
-         List.app
-            (fn (const, arity) => primArity const arity)
-            Prim.arities
 
       val () =
          List.app
@@ -178,11 +143,10 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
 
       fun appLocal f =
          H.app
-            (fn (const, ((t, td), (arity, arityd), (implicits, implicitsd), (unroll, unrolld))) =>
-                if td orelse arityd orelse implicitsd orelse unrolld then
+            (fn (const, ((t, td), (implicits, implicitsd), (unroll, unrolld))) =>
+                if td orelse implicitsd orelse unrolld then
                    f (const,
                       if td then t else NONE,
-                      if arityd then arity else 0,
                       if implicitsd then implicits else 0,
                       if unrolld then unroll else NONE)
                 else
@@ -211,20 +175,19 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
          else
             raise Merge
 
-      fun merge ((t, td), (arity, arityd), (implicits, implicitsd), (unroll, unrolld)) (t', arity', implicits', unroll') =
+      fun merge ((t, td), (implicits, implicitsd), (unroll, unrolld)) (t', implicits', unroll') =
          (if td then (mergeOpt t t', true) else (t', false),
-          if arityd then (mergeInt arity arity', true) else (arity', false),
           if implicitsd then (mergeInt implicits implicits', true) else (implicits', false),
           if unrolld then (mergeOpt unroll unroll', true) else (unroll', false))
 
-      fun import (const, t, arity, implicits, unroll) =
+      fun import (const, t, implicits, unroll) =
          (
          H.operate theDatabase const
             (fn () => 
-                ((t, false), (arity, false), (implicits, false), (unroll, false)))
+                ((t, false), (implicits, false), (unroll, false)))
             (fn entry => 
                 (try
-                    merge entry (t, arity, implicits, unroll)
+                    merge entry (t, implicits, unroll)
                  with
                     Merge =>
                        raise (Message.Error (Database,
