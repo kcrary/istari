@@ -6,8 +6,7 @@ signature ETERM =
       type symbol = Symbol.symbol
       type binder = symbol option
 
-      exception Unbound of symbol
-      exception UnknownConstant of symbol list
+      exception UnknownConstant
 
       val var    : symbol -> eterm        (* always a variable *)
       val short  : symbol -> eterm
@@ -52,7 +51,6 @@ structure ETerm :> ETERM =
       type symbol = Symbol.symbol
       type binder = symbol option
 
-      exception Unbound = D.Unbound
 
       fun var x dir = T.Var (D.lookupVar dir x)
 
@@ -89,12 +87,25 @@ structure ETerm :> ETERM =
                 implicits (Database.findImplicits k) (T.Const k))
          
 
-      exception UnknownConstant of symbol list
+      exception UnknownConstant
+
+      fun signalUnknownConstant syms =
+         raise (Message.Error 
+                   (UnknownConstant,
+                    String.concat 
+                       [
+                       "Error: unknown constant ",
+                       String.concatWith "." (List.map Symbol.toValue syms),
+                       ".\n"
+                       ]))
+
+
+
 
       fun longExplicit syms _ =
          (case Namespace.resolveOpt syms of
              NONE =>
-                raise (UnknownConstant syms)
+                signalUnknownConstant syms
 
            | SOME const =>
                 T.Const const)
@@ -102,7 +113,7 @@ structure ETerm :> ETERM =
       fun long syms _ =
          (case Namespace.resolveOpt syms of
              NONE =>
-                raise (UnknownConstant syms)
+                signalUnknownConstant syms
 
            | SOME const =>
                 implicits (Database.findImplicits const) (T.Const const))
@@ -253,6 +264,8 @@ structure ParseTerm =
       fun letnext x m n = T.apply2 Prim.letnext m (T.lam (SOME x) n)
 
       fun sumcase m x n y p = T.apply3 Prim.sumcase m (T.lam x n) (T.lam y p)
+
+      fun ite b x y = T.apply3 Prim.ite b x y
 
       val prod = T.apply2 Prim.prod
       val sum = T.apply2 Prim.sum
@@ -578,6 +591,24 @@ structure ParseTerm =
                     ]))
 
       val () =
+         register Prim.ite 3 2
+         (U.wrap
+             (U.apply3 Prim.ite U.show U.show U.show)
+             (fn (m, n, p) =>
+                 U.boxi 0 $
+                 U.append
+                    [
+                    U.string "if ",
+                    U.box (m 2),
+                    U.break 1,
+                    U.string "then ",
+                    U.box (n 2),
+                    U.break 1,
+                    U.string "else ",
+                    U.box (p 3)
+                    ]))
+
+      val () =
          register Prim.inl 1 90
          (U.wrap
              (U.apply1 Prim.inl U.show)
@@ -886,6 +917,8 @@ grammardef Term
    rule Term(0)   ::= Term(1) ":" Term(0) => ov
    rule Term(0)   ::= Term(1) ":" "type" => istp
 
+   rule Term(2)   ::= "if" Term(2) "then" Term(2) "else" Term(2) => ite
+
    rule Term(15)  ::= Term(16) "%" Term(15) => sum
 
    rule Term(20)  ::= Term(21) "&" Term(20) => prod
@@ -936,7 +969,7 @@ grammardef Term
 
    rule Constant  ::= Longident => longConstant
 
-   reserved "U" "additional" "ap" "case" "exists" "fn" "forall" "iexists" "iforall" "in" "inl" "inl" "inr" "let" "letrec" "mu" "next" "pi1" "pi2" "prev" "quotient" "rec" "wtype" : Ident
+   reserved "U" "additional" "ap" "case" "exists" "fn" "forall" "iexists" "iforall" "if" "in" "inl" "inl" "inr" "let" "mu" "next" "pi1" "pi2" "prev" "quotient" "rec" "then" "else" "wtype" : Ident
 
    default Term
 

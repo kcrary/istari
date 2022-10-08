@@ -229,10 +229,11 @@ signature REWRITE_INTERNAL =
       *)
 
 
-      val weakeningTable : (constant * (priority tacticm -> priority tacticm)) list ConstantTable.table
+      val weakeningTable : (constant * bool * (priority tacticm -> priority tacticm)) list ConstantTable.table
 
-      (* if    weakeningTable on const1 = (const2, tacfn)
-               tac partially proves R1 M N
+      (* if    weakeningTable on const1 = (const2, cov, tacfn)
+               tac partially proves R1 M N, if cov=true
+               tac partially proves R1 N M, if cov=false
                the head of R1 is const1
          then  tacfn tac partially proves R2 M N
                the head of R2 is const2
@@ -2176,7 +2177,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
               structure Z = Constant.Hashable))
 
       val compatibilityTable : (constant * bool * (priority tacticm -> priority tacticm)) CICTable.table = CICTable.table ()
-      val weakeningTable : (constant * (priority tacticm -> priority tacticm)) list H.table = H.table ()
+      val weakeningTable : (constant * bool * (priority tacticm -> priority tacticm)) list H.table = H.table ()
 
 
       fun rewriteRelation i core hypopt (jud, dir) sequel =
@@ -2334,12 +2335,20 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                          (* nothing left to try; backtrack *)
                                          fk ()
    
-                                    | (const', tacfn) :: rest =>
-                                         propagate [] const' m n
-                                            (Option.map tacfn ftac)
-                                            (Option.map tacfn rtac)
-                                            (fn () => loopWeakenings rest)
-                                            sequel)
+                                    | (const', cov, tacfn) :: rest =>
+                                         let
+                                            val (ftac', rtac') =
+                                               if cov then
+                                                  (ftac, rtac)
+                                               else
+                                                  (rtac, ftac)
+                                         in
+                                            propagate [] const' m n
+                                               (Option.map tacfn ftac')
+                                               (Option.map tacfn rtac')
+                                               (fn () => loopWeakenings rest)
+                                               sequel
+                                         end)
                             in
                                (case H.find weakeningTable const of
                                    NONE => fk ()
@@ -2468,12 +2477,20 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                          (* nothing left to try; backtrack *)
                                          fk ()
    
-                                    | (const', tacfn) :: rest =>
-                                         propagate c const' m n
-                                            (Option.map tacfn ftac)
-                                            (Option.map tacfn rtac)
-                                            (fn () => loopWeakenings rest)
-                                            sequel)
+                                    | (const', cov, tacfn) :: rest =>
+                                         let
+                                            val (ftac', rtac') =
+                                               if cov then
+                                                  (ftac, rtac)
+                                               else
+                                                  (rtac, ftac)
+                                         in
+                                            propagate c const' m n
+                                               (Option.map tacfn ftac')
+                                               (Option.map tacfn rtac')
+                                               (fn () => loopWeakenings rest)
+                                               sequel
+                                         end)
    
                                fun tryWeakenings () =
                                   (case H.find weakeningTable const of
@@ -4236,14 +4253,14 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
       val () = 
          List.app
-            (fn (const, const', f) =>
+            (fn (const, const', cov, f) =>
                 H.insertMerge weakeningTable const 
-                   [(const', f)]
-                   (fn l => (const', f) :: l))
+                   [(const', cov, f)]
+                   (fn l => (const', cov, f) :: l))
             [
-            (Prim.subtype, Prim.arrow, weakenSubtypeArrow),
-            (Prim.eeqtp, Prim.subtype, weakenEeqtpSubtype),
-            (Prim.eqtp, Prim.eeqtp, weakenEqtpEeqtp),
+            (Prim.subtype, Prim.arrow, true, weakenSubtypeArrow),
+            (Prim.eeqtp, Prim.subtype, true, weakenEeqtpSubtype),
+            (Prim.eqtp, Prim.eeqtp, true, weakenEqtpEeqtp),
             ]
       
    end

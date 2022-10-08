@@ -267,17 +267,13 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       fun transitivityPriority em =
          let
-            do (jud, dir) = withgoal
-            val m = em (Directory.idir dir)
+            do m = withterm em
+            do const = withHeadConst "not a transitivity goal"
          in
-            (case N.simplify (J.concl jud) of
-                T.Elim (T.Const const, _) =>
-                   (case H.find transitivityTactics const of
-                       SOME tac => tac m
-       
-                     | NONE => fail "not a transitivity goal")
+            (case H.find transitivityTactics const of
+                SOME tac => tac m
 
-              | _ => fail "not a transitivity goal")
+              | NONE => fail "not a transitivity goal")
          end
 
       fun transitivityRaw em = transitivityPriority em >> idtac
@@ -1191,6 +1187,76 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
 
 
+      (* i : M = N : bool *)
+      fun injectionBool i =
+         goalContextCase
+         / $hyp \i\ $tm \Prim.eq\ @ $ap \Prim.bool\
+           (
+              $ap \Prim.tru\ $ap \Prim.fals\ $nil =>
+              \(fnc =>
+                   refine (Rule.voidElim (T.evar ()))
+                   >>
+                   (* void *)
+                   refine (Rule.equivalence (T.Const Prim.unit) (T.Const Prim.void))
+                   >>> [
+                       (* unit = void : type *)
+                       refine (Rule.boolElimEqtype
+                                  (T.Const Prim.unit) (T.Const Prim.unit)
+                                  (T.Const Prim.void) (T.Const Prim.void)
+                                  (T.Const Prim.tru) (T.Const Prim.fals))
+                       >>> [
+                           (* true = false : bool *)
+                           refine (Rule.hypothesis i),
+
+                           (* A |- unit = unit : type *)
+                           refine Rule.unitEq,
+  
+                           (* A |- void = void : type *)
+                           refine Rule.voidEq 
+                           ],
+
+                       (* unit *)
+                       refine Rule.unitIntro
+                       ])\
+
+            | $ap \Prim.fals\ $ap \Prim.tru\ $nil =>
+              \(fnc =>
+                   refine (Rule.voidElim (T.evar ()))
+                   >>
+                   (* void *)
+                   refine (Rule.equivalence (T.Const Prim.unit) (T.Const Prim.void))
+                   >>> [
+                       (* unit = void : type *)
+                       refine (Rule.boolElimEqtype
+                                  (T.Const Prim.void) (T.Const Prim.void)
+                                  (T.Const Prim.unit) (T.Const Prim.unit)
+                                  (T.Const Prim.fals) (T.Const Prim.tru))
+                       >>> [
+                           (* false = true : bool *)
+                           refine (Rule.hypothesis i),
+
+                           (* A |- void = void : type *)
+                           refine Rule.voidEq,
+
+                           (* A |- unit = unit : type *)
+                           refine Rule.unitEq
+                           ],
+
+                       (* unit *)
+                       refine Rule.unitIntro
+                       ])\
+
+            | $ap \Prim.tru\ $ap \Prim.tru\ $nil =>
+              \(fnc => idtac)\
+
+            | $ap \Prim.tru\ $ap \Prim.tru\ $nil =>
+              \(fnc => idtac)\
+           )
+
+          | _ => \(fnc => fail "not an injection expression")\
+         /
+
+
       (* i : M = N : nat *)
       fun injectionNat i =
          goalContextCase
@@ -1443,6 +1509,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       val () =
          List.app (fn (const, tac) => H.insert injectionTactics const tac)
          [
+         (Prim.bool, injectionBool),
          (Prim.nat, injectionNat),
          (Prim.sum, injectionSum),
          (Prim.exists, injectionExists)

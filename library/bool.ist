@@ -1,0 +1,501 @@
+
+Ctrl.use "logic-load.iml";
+
+
+Namespace.beginModule "Bool";
+
+
+lemma "bool_type"
+/
+  bool : U 0
+/;
+
+typecheck.
+qed ();
+recordTyping "bool_type";
+
+
+
+(* istrue *)
+
+define /istrue b/
+/
+  if b then unit else void
+//
+  bool -> U 0
+/;
+
+introOf /b/.
+unfold /istrue/.
+destruct /b/ /|/ >> typecheck.
+qed ();
+
+
+
+lemma "istrue_true"
+/
+  istrue true
+/;
+
+unfold /istrue/.
+split.
+qed ();
+
+
+
+lemma "not_istrue_false"
+/
+  not (istrue false)
+/;
+
+unfold /istrue/.
+intro /0/.
+qed ();
+
+
+
+lemma "istrue_iff_eq_true"
+/
+  forall b .
+    istrue b <-> b = true : bool
+/;
+
+inference.
+intro /b/.
+unfold /iff/.
+split.
+  {
+  intro /H/.
+  destruct /b/ /|/.
+    {
+    reflexivity.
+    }
+
+    {
+    unfold /istrue in H/.
+    destruct /H/ /0/.
+    }
+  }
+
+  {
+  intro /H/.
+  subst /b/.
+  unfold /istrue/.
+  split.
+  }
+qed ();
+
+
+
+lemma "not_istrue_iff_eq_false"
+/
+  forall b .
+    not (istrue b) <-> b = false : bool
+/;
+
+inference.
+intro /b/.
+unfold /iff/.
+split.
+  {
+  intro /H/.
+  destruct /b/ /|/.
+    {
+    unfold /istrue in H/.
+    so /H ()/ /0/.
+    }
+    
+    {
+    reflexivity.
+    }
+  }
+
+  {
+  intro /H/.
+  destruct /b/ /|/.
+    {
+    injection /H/.
+    }
+
+    {
+    unfold /istrue/.
+    intro /0/.
+    }
+  }
+qed ();
+
+
+
+lemma "iff_eq_bool"
+/
+  forall b c .
+    (istrue b <-> istrue c) <-> b = c : bool
+/;
+
+inference.
+intro /b c/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> reduce // >> split >> auto.
+  {
+  intro /H/.
+  so /not_istrue_false (H #1 istrue_true)/ /0/.
+  }
+
+  {
+  intro /H/.
+  injection /H/.
+  }
+
+  {
+  intro /H/.
+  so /not_istrue_false (H #2 istrue_true)/ /0/.
+  }
+
+  {
+  intro /H/.
+  injection /H/.
+  }
+qed ();
+
+
+
+(* boolean operations *)
+
+define /notb b/
+/
+  if b then false else true
+//
+  bool -> bool
+/;
+
+introOf /b/.
+unfold /notb/.
+typecheck.
+qed ();
+
+
+
+define /andb b c/
+/
+  if b then c else false
+//
+  bool -> bool -> bool
+/;
+
+introOf /b c/.
+unfold /andb/.
+typecheck.
+qed ();
+
+
+
+define /orb b c/
+/
+  if b then true else c
+//
+  bool -> bool -> bool
+/;
+
+introOf /b c/.
+unfold /orb/.
+typecheck.
+qed ();
+
+
+
+lemma "notb_invol"
+/
+  forall b . notb (notb b) = b : bool
+/;
+
+inference.
+intro /b/.
+unfold /notb at all/.
+destruct /b/ /|/ >> reduce // >> auto.
+qed ();
+
+
+
+lemma "notb_andb"
+/
+  forall b c . notb (andb b c) = orb (notb b) (notb c) : bool
+/;
+
+inference.
+intro /b c/.
+unfold /notb at all , andb , orb/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> reduce // >> reflexivity.
+qed ();
+
+
+
+lemma "notb_orb"
+/
+  forall b c . notb (orb b c) = andb (notb b) (notb c) : bool
+/;
+
+inference.
+intro /b c/.
+unfold /notb at all , andb , orb/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> reduce // >> reflexivity.
+qed ();
+
+
+
+lemma "andb_commute"
+/
+  forall b c .
+    andb b c = andb c b : bool
+/;
+
+inference.
+intro /b c/.
+unfold /andb at all/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> reduce // >> reflexivity.
+qed ();
+
+
+    
+lemma "orb_commute"
+/
+  forall b c .
+    orb b c = orb c b : bool
+/;
+
+inference.
+intro /b c/.
+unfold /orb at all/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> reduce // >> reflexivity.
+qed ();
+
+
+
+lemma "andb_assoc"
+/
+  forall b c d .
+    andb (andb b c) d = andb b (andb c d) : bool
+/;
+
+inference.
+intro /b c d/.
+unfold /andb at all/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> destruct /d/ /|/ >> reduce // >> auto.
+qed ();
+
+
+
+lemma "orb_assoc"
+/
+  forall b c d .
+    orb (orb b c) d = orb b (orb c d) : bool
+/;
+
+inference.
+intro /b c d/.
+unfold /orb at all/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> destruct /d/ /|/ >> reduce // >> auto.
+qed ();
+
+
+
+lemma "andb_id_l"
+/
+  forall b .
+    andb true b = b : bool
+/;
+
+inference.
+intro /b/.
+unfold /andb/.
+reflexivity.
+qed ();
+
+
+
+lemma "andb_id_r"
+/
+  forall b .
+    andb b true = b : bool
+/;
+
+inference.
+intro /b/.
+rewrite /-> andb_commute/.
+apply /andb_id_l/.
+qed ();
+
+
+
+lemma "orb_id_l"
+/
+  forall b .
+    orb false b = b : bool
+/;
+
+inference.
+intro /b/.
+unfold /orb/.
+reflexivity.
+qed ();
+
+
+
+lemma "orb_id_r"
+/
+  forall b .
+    orb b false = b : bool
+/;
+
+inference.
+intro /b/.
+rewrite /-> orb_commute/.
+apply /orb_id_l/.
+qed ();
+
+
+
+lemma "andb_ann_l"
+/
+  forall b .
+    andb false b = false : bool
+/;
+
+inference.
+intro /b/.
+unfold /andb/.
+reflexivity.
+qed ();
+
+
+
+lemma "andb_ann_r"
+/
+  forall b .
+    andb b false = false : bool
+/;
+
+inference.
+intro /b/.
+rewrite /-> andb_commute/.
+apply /andb_ann_l/.
+qed ();
+
+
+
+lemma "orb_ann_l"
+/
+  forall b .
+    orb true b = true : bool
+/;
+
+inference.
+intro /b/.
+unfold /orb/.
+reflexivity.
+qed ();
+
+
+
+lemma "orb_ann_r"
+/
+  forall b .
+    orb b true = true : bool
+/;
+
+inference.
+intro /b/.
+rewrite /-> orb_commute/.
+apply /orb_ann_l/.
+qed ();
+
+
+
+lemma "ite_notb"
+/
+  forall i (a : U i) (b : bool) (x y : a) .
+    (if notb b then x else y) = (if b then y else x) : a
+/;
+
+inference.
+intro /i a b x y/.
+unfold /notb/.
+destruct /b/ /|/ >> reduce // >> auto.
+qed ();
+
+
+
+(* interaction *)
+
+lemma "istrue_notb"
+/
+  forall b .
+    istrue (notb b) <-> not (istrue b)
+/;
+
+inference.
+intro /b/.
+unfold /istrue at all , notb/.
+destruct /b/ /|/ >> reduce //.
+  {
+  split.
+    {
+    intro /0/.
+    }
+
+    {
+    intro /H/.
+    so /H ()/ /0/.
+    }
+  }
+
+  {
+  split.
+    {
+    intro /_ 0/.
+    }
+
+    {
+    intro /_/.
+    split.
+    }
+  }
+qed ();
+
+
+
+lemma "istrue_andb"
+/
+  forall b c .
+    istrue (andb b c) <-> istrue b & istrue c
+/;
+
+inference.
+intro /b c/.
+unfold /istrue at all , andb/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> reduce // >> split >> auto.
+  {
+  intro /(_ 0)/.
+  }
+
+  {
+  intro /(0 _)/.
+  }
+
+  {
+  intro /(0 _)/.
+  }
+qed ();
+
+
+
+lemma "istrue_orb"
+/
+  forall b c .
+    istrue (orb b c) <-> istrue b % istrue c
+/;
+
+inference.
+intro /b c/.
+unfold /istrue at all , orb/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> reduce // >> split >> auto.
+intro /(0 | 0)/.
+qed ();

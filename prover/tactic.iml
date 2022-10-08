@@ -107,6 +107,7 @@ structure TacticInternal :> TACTIC_INTERNAL =
    struct
 
       structure J = Judgement
+      structure T = Term
 
       type judgement = Judgement.djudgement * Directory.directory
       type validation = Refine.validation
@@ -423,14 +424,38 @@ structure TacticInternal :> TACTIC_INTERNAL =
 
       fun withterm m tac (goal as (_, dir)) fk sk = tac (m (Directory.idir dir)) goal fk sk
 
+
+      fun isSoft opac =
+         (case opac of
+             Constant.SOFT => true
+           | Constant.FIRM => true
+           | Constant.HARD => false
+           | Constant.OPAQUE => false)
+
       fun withHeadConst msg tac (goal as (jud, _)) fk sk =
-         (case Normalize.whnfHard (Judgement.concl jud) of
-             Term.Elim (Term.Const const, _) =>
-                tac const goal fk sk
+         (case Normalize.whnf (Judgement.concl jud) of
+             T.Elim (T.Const const, spine) =>
+                if isSoft (Constant.opacity const) then
+                   tac const goal
+                      (fn msg' =>
+                          (case Constant.definition const of
+                              SOME m =>
+                                 (case Normalize.whnfHard (T.Elim (m, spine)) of
+                                     T.Elim (T.Const const', _) =>
+                                        tac const' goal fk sk
+
+                                   | _ =>
+                                        fk msg')
+
+                            | NONE =>
+                                 (* soft constants always have definitions *)
+                                 raise (Fail "impossible")))
+                      sk
+                else
+                   tac const goal fk sk
 
            | _ =>
                 fk msg)
-
 
 
       fun setFailure msg tac goal fk sk = tac goal (fn _ => fk msg) sk
