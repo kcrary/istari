@@ -23,6 +23,16 @@ signature AUTO_REDUCE =
          -> term * reduction
 
 
+      structure Dict : DICT where type key = constant
+
+      val autoreduce' : 
+         bool
+         -> reduction list Dict.dict
+         -> reduction Dict.dict
+         -> term
+         -> term * reduction
+      
+
       (* new1 underlam dp dl const n P
 
          underlam, dp, dl as in autoreduce
@@ -64,9 +74,12 @@ structure AutoReduce :> AUTO_REDUCE =
       structure R = Reduction
       structure T = Term
 
-      structure D = RedBlackDict (structure Key = Constant.Ordered)
+      structure Dict = RedBlackDict (structure Key = Constant.Ordered)
+      structure D = Dict
 
-      
+
+      (* This could be made more efficient, but it seems fine for now. *)
+
       fun reductionNorm underlam dp dl m acc =
          (case N.simplify m of
              T.Elim (T.Const const, _) =>
@@ -180,7 +193,10 @@ structure AutoReduce :> AUTO_REDUCE =
             reduction underlam dp' dl' m [] 
          end
 
+      fun autoreduce' underlam dp dl m = reduction underlam dp dl m []
+
       
+
       (* natrec f x i = f (i-1) (f (i-2) (... (f 0 x) ...)) *)
       fun natrec f x i =
          if i = 0 then
@@ -217,33 +233,6 @@ structure AutoReduce :> AUTO_REDUCE =
             raise R.Reduce
 
       
-      fun new1' underlam dp dl const n =
-         if n >= 0 then
-            let
-               val before =
-                  T.Elim (T.Const const,
-                          natrec (fns i sp => T.App (T.Var i) :: sp) [] n)
-
-               val dp' =
-                  List.foldl
-                     (fns (const, l) dp' => D.insert dp' const l)
-                     D.empty
-                     dp
-   
-               val dl' =
-                  List.foldl
-                     (fns (const, r) dl' => D.insert dl' const r)
-                     D.empty
-                     dl
-
-               val (p, r1) = reduction underlam dp' dl' before []
-            in
-               R.new1 const n p r1 R.refl
-            end
-         else
-            raise R.Reduce
-
-      
       fun new2 underlam dp dl const l m const' n q =
          if l >= 0 andalso m >= 0 andalso n >= 0 then
             let
@@ -272,38 +261,6 @@ structure AutoReduce :> AUTO_REDUCE =
                val (_, r2) = reduction underlam dp' D.empty q []
             in
                R.new2 const l m const' n q r1 r2
-            end
-         else
-            raise R.Reduce
-
-
-      fun new2' underlam dp dl const l m const' n =
-         if l >= 0 andalso m >= 0 andalso n >= 0 then
-            let
-               val before =
-                  T.Elim (T.Const const,
-                          natrec 
-                             (fns i sp => T.App (T.Var (m+n+i)) :: sp)
-                             (T.App (T.Elim (T.Const const',
-                                             natrec (fns i sp => T.App (T.Var (m+i)) :: sp) [] n))
-                              :: natrec (fns i sp => T.App (T.Var i) :: sp) [] m)
-                             l)
-
-               val dp' =
-                  List.foldl
-                     (fns (const, l) dp' => D.insert dp' const l)
-                     D.empty
-                     dp
-   
-               val dl' =
-                  List.foldl
-                     (fns (const, r) dl' => D.insert dl' const r)
-                     D.empty
-                     dl
-
-               val (q, r1) = reduction underlam dp' dl' before []
-            in
-               R.new2 const l m const' n q r1 R.refl
             end
          else
             raise R.Reduce

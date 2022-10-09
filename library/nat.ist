@@ -12,10 +12,6 @@ Namespace.alias (parseIdent /zero/) Prim.zero;
 Namespace.alias (parseIdent /succ/) Prim.succ;
 Namespace.alias (parseIdent /natcase/) Prim.natcase;
 
-structure P = ReductionProver;
-structure R = Reduction;
-structure RR = Registry;
-
 
 lemma "nat_type"
 /
@@ -62,29 +58,15 @@ definerecRaw /nat_iter P hz hs n/
 /;
 
 
-structure R = Reduction;
-structure AR = AutoReduce;
 
-val nat_iter = parseConstant /Nat.nat_iter/;
-val nat_iter_unroll = Option.valOf (Database.findUnroll nat_iter);
+reductions
+/
+nat_iter _ z _ (zero) --> z ;
+nat_iter a z s (succ n) --> s n (nat_iter a z s n) ;
+unrolling nat_iter
+/;
 
-val nat_iter_zero =
-  AR.new2 false
-    [(Prim.natcase, [R.user2 Prim.natcase_succ, R.user2 Prim.natcase_zero])]
-    [(nat_iter, nat_iter_unroll)]
-    nat_iter 3 0 Prim.zero 0 (Term.Var 1);
 
-val nat_iter_succ =
-  AR.new2 false
-    [(Prim.natcase, [R.user2 Prim.natcase_succ, R.user2 Prim.natcase_zero])]
-    [(nat_iter, nat_iter_unroll)]
-    nat_iter 3 0 Prim.succ 1
-    (parseLTerm / 1 0 (nat_iter 3 2 1 0) /);
-
-Registry.write (parseIdent /nat_iter_zero/) (Registry.fromUreduction2 nat_iter_zero);
-Registry.write (parseIdent /nat_iter_succ/) (Registry.fromUreduction2 nat_iter_succ);
-Registry.register nat_iter_zero;
-Registry.register nat_iter_succ;
 
 structure NatTactic = AfterNat ();
 open NatTactic;
@@ -744,41 +726,14 @@ definerecRaw /minus m n/
 /;
 
 
-val plus = parseConstant /plus/;
-val minus = parseConstant /minus/;
-val plus_unroll = Option.valOf $ Database.findUnroll plus;
-val minus_unroll = Option.valOf $ Database.findUnroll minus;
-
-val dp = [(Prim.natcase, [R.user2 Prim.natcase_succ, R.user2 Prim.natcase_zero])];
-val dl = [(plus, plus_unroll), (minus, minus_unroll)];
-
-val plus_zero =
-  AR.new2 false dp dl
-    plus 0 1 Prim.zero 0 Term.zero;
-
-val plus_succ =
-  AR.new2 false dp dl
-    plus 0 1 Prim.succ 1
-    (parseLTerm /succ (plus 1 0)/);
-
-RR.write (parseIdent /plus_zero/) (RR.fromUreduction2 plus_zero);
-RR.write (parseIdent /plus_succ/) (RR.fromUreduction2 plus_succ);
-RR.register plus_zero;
-RR.register plus_succ;
-
-val minus_zero =
-  AR.new2 false dp dl
-    minus 1 0 Prim.zero 0 Term.zero;
-
-val minus_succ =
-  AR.new2 false dp dl
-    minus 1 0 Prim.succ 1
-    (parseLTerm /natcase 1 zero (fn . minus 0 1)/);
-
-RR.write (parseIdent /minus_zero/) (RR.fromUreduction2 minus_zero);
-RR.write (parseIdent /minus_succ/) (RR.fromUreduction2 minus_succ);
-RR.register minus_zero;
-RR.register minus_succ;
+reductions
+/
+  plus (zero) n --> n ;
+  plus (succ m) n --> succ (plus m n) ;
+  minus m (zero) --> m ;
+  minus m (succ n) --> natcase m 0 (fn m' . minus m' n) ;
+  unrolling plus minus
+/;
 
 
 

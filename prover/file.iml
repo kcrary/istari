@@ -197,13 +197,11 @@ structure FileInternal :> FILE_INTERNAL =
          RR.appLocal
             (fn entry => P.pickle (BinIO.output1 outs) puRegistryEntry (SOME entry));
 
-         P.pickle (BinIO.output1 outs) puRegistryEntry NONE;
-
-         P.pickle (BinIO.output1 outs) (P.list R.puUreduction2) (RR.registered ())
+         P.pickle (BinIO.output1 outs) puRegistryEntry NONE
          )
 
 
-      fun readRegistryItems ins =
+      fun readRegistry ins =
          (case
              P.unpickle
                 (fn () => input1 ins)
@@ -214,10 +212,18 @@ structure FileInternal :> FILE_INTERNAL =
            | SOME (name, item) =>
                 (
                 RR.import name item;
-                readRegistryItems ins
+                readRegistry ins
                 ))
 
-      fun readRegistryReductions ins =
+
+
+
+      (* Define *)
+
+      fun writeReductions outs =
+         P.pickle (BinIO.output1 outs) (P.list R.puUreduction2) (DefineInternal.registered ())
+
+      fun readReductions ins =
          (case
              P.unpickle
                 (fn () => input1 ins)
@@ -227,17 +233,12 @@ structure FileInternal :> FILE_INTERNAL =
 
            | SOME r =>
                 (
-                NormalizeInternal.register r;
-                readRegistryReductions ins
+                DefineInternal.importReduction r;
+                readReductions ins
                 ))
+         
 
-      fun readRegistry ins =
-         (
-         readRegistryItems ins;
-         readRegistryReductions ins
-         )
 
-      
 
       (* All together *)
 
@@ -254,6 +255,7 @@ structure FileInternal :> FILE_INTERNAL =
                    writeNamespace outs;
                    writeDatabase outs;
                    writeRegistry outs;
+                   writeReductions outs;
                    DatatypeInternal.write (BinIO.output1 outs);
                    print "[";
                    print filename;
@@ -334,6 +336,7 @@ structure FileInternal :> FILE_INTERNAL =
                                   readNamespace ins;
                                   readDatabase ins;
                                   readRegistry ins;
+                                  readReductions ins;
                                   DatatypeInternal.read (fn () => input1 ins);
                                   print "[";
                                   print filename;

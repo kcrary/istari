@@ -6,11 +6,6 @@ Ctrl.use "nat-load.iml";
 Ctrl.use "datatype-load.iml";
 
 
-structure AR = AutoReduce;
-structure R = Reduction;
-structure RR = Registry;
-
-
 Namespace.beginModule "List";
 
 
@@ -30,8 +25,6 @@ typedef
 
 Database.setImplicits (parseConstant /nil/) 1;
 Database.setImplicits (parseConstant /cons/) 1;
-val list_iter_nil = RR.toUreduction2 $ RR.read (parseLongident /List.list_iter_nil/);
-val list_iter_cons = RR.toUreduction2 $ RR.read (parseLongident /List.list_iter_cons/);
 
 
 
@@ -46,28 +39,12 @@ defineRaw /list_case {a b} l mnil mcons/
 
 
 
-val nl = parseConstant /nil/;
-val cons = parseConstant /cons/;
-val list_iter = parseConstant /list_iter/;
-val list_case = parseConstant /list_case/;
-
-val dp = [(list_iter, [R.user2 list_iter_cons, R.user2 list_iter_nil]), 
-          (list_case, [R.unfold])];
-
-val list_case_nil =
-  AR.new2 false dp []
-    list_case 2 2 nl 1
-    (parseLTerm /1/);
-
-val list_case_cons =
-  AR.new2 false dp []
-    list_case 2 2 cons 3
-    (parseLTerm /0 3 2/);
-
-RR.write (parseIdent /list_case_nil/) (RR.fromUreduction2 list_case_nil);
-RR.write (parseIdent /list_case_cons/) (RR.fromUreduction2 list_case_cons);
-RR.register list_case_nil;
-RR.register list_case_cons;
+reductions
+/
+  list_case _ _ (nil _) z _ --> z ;
+  list_case _ _ (cons _ h t) _ s --> s h t ;
+  unfolding list_case
+/;
 
 
 
@@ -123,25 +100,12 @@ recordTyping "append_type";
 
 
 
-val append = parseConstant /append/;
-
-val dp = [(list_iter, [R.user2 list_iter_cons, R.user2 list_iter_nil]),
-          (append, [R.unfold])];
-
-val append_nil =
-  AR.new2 false dp []
-    append 1 1 nl 1
-    Term.zero;
-
-val append_cons =
-  AR.new2 false dp []
-    append 1 1 cons 3
-    (parseLTerm /cons 4 2 (append 4 1 0)/);
-
-RR.write (parseIdent /append_nil/) (RR.fromUreduction2 append_nil);
-RR.write (parseIdent /append_cons/) (RR.fromUreduction2 append_cons);
-RR.register append_nil;
-RR.register append_cons;
+reductions
+/
+  append _ (nil _) l --> l ;
+  append a (cons _ h t) l --> ` cons a h (` append a t l) ;
+  unfolding append
+/;
 
 
 
@@ -153,24 +117,12 @@ definerecRaw /appendrec {a} l1 l2/
 
 
 
-val appendrec = parseConstant /appendrec/;
-val appendrec_unroll = Option.valOf $ Database.findUnroll appendrec;
-
-val dp = [(list_case, [R.user2 list_case_cons, R.user2 list_case_nil])];
-val dl = [(appendrec, appendrec_unroll)];
-
-val appendrec_nil =
-  AR.new2 false dp dl
-    appendrec 1 1 nl 1
-    Term.zero;
-
-val appendrec_cons =
-  AR.new2 false dp dl
-    appendrec 1 1 cons 3
-    (parseLTerm /cons 4 2 (appendrec 4 1 0)/);
-
-RR.register appendrec_nil;
-RR.register appendrec_cons;
+reductions
+/
+  appendrec _ (nil _) l --> l ;
+  appendrec a (cons _ h t) l --> ` cons a h (` appendrec a t l) ;
+  unrolling appendrec
+/;
 
 
 
@@ -293,23 +245,13 @@ defineRaw /length {a} l/
 
 
 
-val length = parseConstant /length/;
+reductions
+/
+  length _ (nil _) --> 0 ;
+  length a (cons _ _ t) --> succ (` length a t) ;
+  unfolding length
+/;
 
-val dp = [(list_iter, [R.user2 list_iter_cons, R.user2 list_iter_nil]),
-          (length, [R.unfold])];
-
-val length_nil =
-  AR.new2 false dp []
-    length 1 0 nl 1
-    (parseLTerm /zero/);
-
-val length_cons =
-  AR.new2 false dp []
-    length 1 0 cons 3
-    (parseLTerm /succ (length 3 0)/);
-
-RR.register length_nil;
-RR.register length_cons;
 
 
 lemma "length_type"

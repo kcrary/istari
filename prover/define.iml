@@ -4,6 +4,7 @@ signature DEFINE =
 
       type symbol = Symbol.symbol
       type eterm = ETerm.eterm
+      type constant = Constant.constant
 
       exception Define
 
@@ -14,6 +15,24 @@ signature DEFINE =
       val definerec : (symbol * symbol option list * symbol option list) -> eterm -> eterm -> unit
 
       val recordTyping : string -> unit
+
+
+      val reductions : 
+         ((constant * symbol option list * constant * symbol option list * symbol option list * eterm) list
+          * constant list * constant list)
+         -> unit
+
+      val makeReduction1 : 
+         ((constant * symbol option list * eterm)
+          * constant list * constant list)
+         -> Reduction.ureduction1
+
+      val makeReduction2 : 
+         ((constant * symbol option list * constant * symbol option list * symbol option list * eterm)
+          * constant list * constant list)
+         -> Reduction.ureduction2
+
+      val register : Reduction.ureduction2 -> unit
 
    end
 
@@ -26,21 +45,31 @@ signature DEFINE_INTERNAL =
 
       val recUnroller : Constant.constant -> Reduction.reduction
 
+      (* Returns all reductions registered for normalization (except primitive or imported ones). *)
+      val registered : unit -> Reduction.ureduction2 list
+
+      val importReduction : Reduction.ureduction2 -> unit
+
    end
 
 
 structure DefineInternal :> DEFINE_INTERNAL =
    struct
 
+      structure AR = AutoReduce
+      structure C = CheckpointedRef
       structure D = Directory
       structure T = Term
       structure P = ProverInternal
-      structure R = Reduction
+      structure R = ReductionInternal
       structure S = Seq
       structure J = Judgement
 
+      structure Dict = AR.Dict
+
       type symbol = Symbol.symbol
       type eterm = ETerm.eterm
+      type constant = Constant.constant
 
       open CasePervasive
       open Tactic
@@ -50,8 +79,8 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
       exception Define
 
-      fun signalDefine msg =
-         raise (Message.Error (Prover.Prover,
+      fun signalError msg =
+         raise (Message.Error (Define,
                                String.concat
                                   [
                                   "Error: ",
@@ -399,6 +428,260 @@ structure DefineInternal :> DEFINE_INTERNAL =
          end
 
 
+         
+      (* natrec f x i = f (i-1) (f (i-2) (... (f 0 x) ...)) *)
+      fun natrec f x i =
+         if i = 0 then
+            x
+         else
+            f (i-1) (natrec f x (i-1))
+
+
+
+      (* All the registered reductions except primitive or imported ones. *)
+      val theRegistered : R.ureduction2 list C.cref = C.new []
+                          
+      (* All the registered reductions, in a format for autoreduce. *)
+      val theStrat : R.reduction list Dict.dict C.cref =
+         C.new
+            (List.foldl
+                (fns r d =>
+                    let
+                       val (const, _, _) = R.triggers r
+                    in
+                       Dict.insertMerge d const
+                          [R.user2 r]
+                          (fn l => R.user2 r :: l)
+                    end)
+                Dict.empty
+                Prim.redices)
+
+
+      fun register r =
+         let
+            val (const, _, _) = R.triggers r
+         in
+            C.assign theRegistered (r :: C.deref theRegistered);
+
+            C.assign theStrat
+               (Dict.insertMerge (C.deref theStrat) const
+                   [R.user2 r]
+                   (fn l => R.user2 r :: l));
+
+            NormalizeInternal.register r
+         end
+
+      fun importReduction r =
+         let
+            val (const, _, _) = R.triggers r
+         in
+            (* Don't put it into theRegistered, so it doesn't get written into the current file. *)
+
+            C.assign theStrat
+               (Dict.insertMerge (C.deref theStrat) const
+                   [R.user2 r]
+                   (fn l => R.user2 r :: l));
+
+            NormalizeInternal.register r
+         end
+
+      fun registered () = C.deref theRegistered
+
+
+      fun makeReduction1 ((const, args, erhs), unf, unr) =
+         let
+            val (n, dir) =
+               List.foldl
+                  (fns osym (n, dir) => (n+1, D.bindh dir osym))
+                  (0, D.empty)
+                  args
+
+            val lhs =
+               T.Elim (T.Const const,
+                       natrec (fns i sp => T.App (T.Var i) :: sp) [] n)
+
+            val rhs = ETerm.withdir dir erhs
+
+            val dp =
+               List.foldl
+                  (fns const dp =>
+                      Dict.insertMerge dp const
+                         [R.unfold]
+                         (fn l => R.unfold :: l))
+                  (C.deref theStrat)
+                  unf
+
+            val dl =
+               List.foldl
+                  (fns const dl =>
+                      (case Database.findUnroll const of
+                          SOME red =>
+                             Dict.insert dl const red
+
+                        | NONE =>
+                             (
+                             Message.message 20 0
+                                (fn () =>
+                                    (
+                                    print (Namespace.toString const);
+                                    print " is not unrollable"
+                                    ));
+
+                             signalError "constant is not unrollable"
+                             )))
+                  Dict.empty
+                  unr
+
+            val (m1, r1) = AR.autoreduce' true dp dl lhs
+            val (m2, r2) = AR.autoreduce' true dp Dict.empty rhs
+         in
+            try
+               Reduction.new1 const n rhs r1 r2
+            with
+            Reduction.Reduce =>
+               (
+               Message.message 20 0
+                  (fn () =>
+                      let
+                         val b = !Show.showImplicits
+                      in
+                         Show.showImplicits := true;
+
+                         print "Terms have no common reduct:\n";
+                         Show.show dir lhs;
+                         print "-->\n";
+                         Show.show dir m1;
+                         print "\n";
+                         Show.show dir rhs;
+                         print "-->\n";
+                         Show.show dir m2;
+
+                         Show.showImplicits := b
+                      end);
+
+               signalError "terms have no common reduct"
+               )
+         end
+
+      
+      fun makeReduction2 ((const1, args1, const2, args2, args3, erhs), unf, unr) =
+         let
+            val (n1, dir1) =
+               List.foldl
+                  (fns osym (n, dir) => (n+1, D.bindh dir osym))
+                  (0, D.empty)
+                  args1
+
+            val (n2, dir2) =
+               List.foldl
+                  (fns osym (n, dir) => (n+1, D.bindh dir osym))
+                  (0, dir1)
+                  args2
+
+            val (n3, dir) =
+               List.foldl
+                  (fns osym (n, dir) => (n+1, D.bindh dir osym))
+                  (0, dir2)
+                  args3
+                  
+            val lhs =
+               T.Elim (T.Const const1,
+                       natrec 
+                          (fns i sp => T.App (T.Var (n2+n3+i)) :: sp)
+                          (T.App (T.Elim (T.Const const2,
+                                          natrec (fns i sp => T.App (T.Var (n3+i)) :: sp) [] n2))
+                           :: natrec (fns i sp => T.App (T.Var i) :: sp) [] n3)
+                          n1)
+
+            val rhs = ETerm.withdir dir erhs
+
+            val dp =
+               List.foldl
+                  (fns const dp =>
+                      Dict.insertMerge dp const
+                         [R.unfold]
+                         (fn l => R.unfold :: l))
+                  (C.deref theStrat)
+                  unf
+
+            val dl =
+               List.foldl
+                  (fns const dl =>
+                      (case Database.findUnroll const of
+                          SOME red =>
+                             Dict.insert dl const red
+
+                        | NONE =>
+                             (
+                             Message.message 20 0
+                                (fn () =>
+                                    (
+                                    print (Namespace.toString const);
+                                    print " is not unrollable"
+                                    ));
+
+                             signalError "constant is not unrollable"
+                             )))
+                  Dict.empty
+                  unr
+
+            val (m1, r1) = AR.autoreduce' true dp dl lhs
+            val (m2, r2) = AR.autoreduce' true dp Dict.empty rhs
+         in
+            try
+               Reduction.new2 const1 n1 n3 const2 n2 rhs r1 r2
+            with
+            Reduction.Reduce =>
+               (
+               Message.message 20 0
+                  (fn () =>
+                      let
+                         val b = !Show.showImplicits
+                      in
+                         Show.showImplicits := true;
+
+                         print "Terms have no common reduct:\n";
+                         Show.show dir lhs;
+                         print "-->\n";
+                         Show.show dir m1;
+                         print "\n";
+                         Show.show dir rhs;
+                         print "-->\n";
+                         Show.show dir m2;
+
+                         Show.showImplicits := b
+                      end);
+
+               signalError "terms have no common reduct"
+               )
+         end
+
+      
+      fun reductions (pats, unf, unr) =
+         let
+            do () = withHandler
+
+            val () = P.checkpoint ()
+         in
+            List.app
+               (fn (pat as (const1, _, const2, _, _, _)) =>
+                   let
+                      val red = makeReduction2 (pat, unf, unr)
+   
+                      val name1 = Symbol.toValue (List.last (Namespace.fullname const1))
+                      val name2 = Symbol.toValue (List.last (Namespace.fullname const2))
+                   in
+                      register red;
+                      
+                      Registry.write 
+                         (Symbol.fromValue (String.concat [name1, "_", name2]))
+                         (Registry.fromUreduction2 red)
+                   end)
+               pats;
+   
+            Message.message 0 0 (fn () => print "Reductions registered.\n")
+         end
+
    end
 
 
@@ -408,16 +691,50 @@ structure Define :> DEFINE = DefineInternal
 structure ParseDefine =
    struct
 
+      val null = []
+      fun sing x = [x]
+      fun cons x y = x :: y
+
       fun definePattern name expargs = (name, [], expargs)
       fun definePatternImplicits name impargs expargs = (name, impargs, expargs)
+
+      fun reduce1Pattern head args rhs = (head, args, rhs)
+      fun reduce2Pattern head1 args1 head2 args2 args3 rhs = (head1, args1, head2, args2, args3, rhs)
+
+      fun actionsSimple x = (x, [], [])
+      fun actionsUnfold unf x = (x, unf, [])
+      fun actionsUnroll unr x = (x, [], unr)
+      fun actionsUnfoldUnroll unf unr x = (x, unf, unr)
+      fun actionsUnrollUnfold unr unf x = (x, unf, unr)
+
+      fun app x f = f x
 
    end
 
 
 grammardef Define
 
-   rule DefinePattern ::= Ident OIdents => ParseDefine.definePattern
-   rule DefinePattern ::= Ident "{" OIdents "}" OIdents => ParseDefine.definePatternImplicits
+   open ParseDefine
+
+   rule DefinePattern    ::= Ident OIdents => definePattern
+   rule DefinePattern    ::= Ident "{" OIdents "}" OIdents => definePatternImplicits
+
+   rule Reduce1Pattern   ::= Constant OIdents "-->" Term => reduce1Pattern
+   rule Reduce2Pattern   ::= Constant OIdents "(" Constant OIdents ")" OIdents "-->" Term => reduce2Pattern
+   
+   rule ReducePatterns   ::= Reduce2Pattern => sing
+   rule ReducePatterns   ::= Reduce2Pattern ";" ReducePatterns => cons
+
+   rule ReduceActions    ::= => actionsSimple
+   rule ReduceActions    ::= ";" => actionsSimple
+   rule ReduceActions    ::= ";" "unfolding" Constants => actionsUnfold
+   rule ReduceActions    ::= ";" "unrolling" Constants => actionsUnroll
+   rule ReduceActions    ::= ";" "unfolding" Constants "unrolling" Constants => actionsUnfoldUnroll
+   rule ReduceActions    ::= ";" "unrolling" Constants "unfolding" Constants => actionsUnrollUnfold
+   
+   rule Reduce1Directive ::= Reduce1Pattern ReduceActions => app
+   rule Reduce2Directive ::= Reduce2Pattern ReduceActions => app
+   rule ReduceDirective  ::= ReducePatterns ReduceActions => app
 
 end
 

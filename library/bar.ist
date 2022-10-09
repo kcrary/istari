@@ -2,9 +2,6 @@
 Ctrl.use "bar-aux.iml";
 
 
-structure R = Reduction;
-
-
 Namespace.beginModule "Bar";
 
 
@@ -23,19 +20,13 @@ recordTyping "pause_type";
 
 
 
-defineRaw /ffix a f/
+define /ffix a f/
 /
   pause
     (fn x . f (let next x' = x in next (pause x' x)))
     (next
        (fn x . f (let next x' = x in next (pause x' x))))
-/;
-
-
-
-lemma "ffix_type"
-/
-  ffix :
+//
   intersect (i : level) .
   forall (a : U i) .
     (future a -> a) -> a
@@ -60,35 +51,25 @@ typecheck.
 unrollType /rec in Hof/.
 auto.
 qed ();
-recordTyping "ffix_type";
 
 
 
-val ffix = parseConstant /ffix/
+val unroll_ffix = makeReduction1
+/
+ffix a f --> f (next (ffix a f)) ;
+unfolding ffix letnext
+unrolling pause
+/;
 
-val dp = [(ffix, [R.unfold]), (Prim.letnext, [R.unfold])];
-val dl = [(Prim.pause, R.user1 Prim.unroll_pause)];
-
-val unroll_ffix =
-  AutoReduce.new1 false dp dl
-    ffix 2
-    (parseLTerm /0 (next (ffix 1 0))/);
-
-Database.setUnroll ffix (R.user1 unroll_ffix);
+Database.setUnroll (parseConstant /ffix/) (Reduction.user1 unroll_ffix);
 Registry.write (parseIdent /unroll_ffix/) (Registry.fromUreduction1 unroll_ffix);
 
 
 
-defineRaw /bar a/
+define /bar a/
 /
   rec t . a % future t
-/;
-
-
-
-lemma "bar_type"
-/
-  bar :
+//
   intersect i . U i -> U i
 /;
 
@@ -97,7 +78,6 @@ introOf /i/.
 unfoldHead /bar/.
 typecheck.
 qed ();
-recordTyping "bar_type";
 
 
 
@@ -112,16 +92,10 @@ qed ();
 
 
 
-defineRaw /now {a} x/
+define /now {a} x/
 /
   inl x
-/;
-
-
-
-lemma "now_type"
-/
-  ` now :
+//
   intersect i .
   forall (a : U i) .
     a -> bar a
@@ -133,20 +107,13 @@ unfold /now/.
 rewrite /-> bar_unroll/.
 typecheck.
 qed ();
-recordTyping "now_type";
 
 
 
-defineRaw /later {a} x/
+define /later {a} x/
 /
   inr (next x)
-/;
-
-
-
-lemma "later_type"
-/
-  ` later :
+//
   intersect i .
   forall (a : U i) .
     bar a -> bar a
@@ -158,7 +125,6 @@ unfold /later/.
 rewrite /-> bar_unroll/.
 typecheck.
 qed ();
-recordTyping "later_type";
 
 
 
@@ -206,44 +172,20 @@ recordTyping "bindbar_type";
 
 
 
-val now = parseConstant /now/;
-val later = parseConstant /later/;
-val bindbar = parseConstant /bindbar/;
-
-val dp = [(Prim.letnext, [R.unfold]), 
-          (bindbar, [R.unfold]), 
-          (now, [R.unfold]),
-          (later, [R.unfold]),
-          (Prim.sumcase, [R.user2 Prim.sumcase_inl, R.user2 Prim.sumcase_inr])];
-val dl = [(ffix, R.user1 unroll_ffix)];
-
-val bindbar_now =
-  AutoReduce.new2 false dp dl
-    bindbar 2 1 now 2
-    (parseLTerm /0 1/);
-
-val bindbar_later =
-  AutoReduce.new2 true dp dl
-    bindbar 2 1 later 2
-    (parseLTerm /later 3 (` bindbar 4 3 1 0)/);
-
-Registry.register bindbar_now;
-Registry.register bindbar_later;
-Registry.write (parseIdent /bindbar_now/) (Registry.fromUreduction2 bindbar_now);
-Registry.write (parseIdent /bindbar_later/) (Registry.fromUreduction2 bindbar_later);
-
-
-
-defineRaw /bfix {a} f/
+reductions 
 /
-  ffix (bar a) (fn x . f (inr x))
+bindbar _ _ (now _ x) f --> f x ;
+bindbar a b (later _ x) f --> ` later b (` bindbar a b x f) ;
+unfolding letnext bindbar now later
+unrolling ffix
 /;
 
 
 
-lemma "bfix_type"
+define /bfix {a} f/
 /
-  ` bfix :
+  ffix (bar a) (fn x . f (inr x))
+//
   intersect i .
   forall (a : U i) .
     (bar a -> bar a) -> bar a
@@ -256,7 +198,6 @@ typecheck.
 unrollType /bar/.
 typecheck.
 qed ();
-recordTyping "bfix_type";
 
 
 
