@@ -109,72 +109,6 @@ reductions
 
 
 
-(* For illustrative purposes. *)
-definerecRaw /appendrec {a} l1 l2/
-/
-  ` list_case a (list a) l1 l2 (fn h t . ` cons a h (appendrec a t l2))
-/;
-
-
-
-reductions
-/
-  appendrec _ (nil _) l --> l ;
-  appendrec a (cons _ h t) l --> ` cons a h (` appendrec a t l) ;
-  unrolling appendrec
-/;
-
-
-
-lemma "appendrec_type"
-/
-  ` appendrec :
-  intersect i .
-  forall (a : U i) .
-     list a -> list a -> list a
-/;
-
-inference.
-introOf /i a l1 l2/.
-assert /list_strip l1 = list_strip l1 : list_skel a/ /Heq/.
-  {
-  reflexivity.
-  }
-revert /Heq/.
-generalizeAt /list_strip l1/ /_/ /1/ /sk/.
-revert /l1/.
-so /list_subterm_well_founded _ _ sk/ /Hacc/.
-induct /Hacc/.
-reintro /IH/.
-intro /l1 Heq/.
-destruct /l1/ /| h t/.
-
-(* nil *)
-{
-reduce //.
-hypof.
-}
-
-(* cons *)
-{
-reduce //.
-typecheck.
-apply /IH (list_strip t)/.
-  {
-  moveBefore /h t/ /sk/.
-  subst /sk/.
-  apply /cons_subterm/.
-  }
-
-  {
-  reflexivity.
-  }
-}
-qed ();
-recordTyping "appendrec_type";
-
-
-
 lemma "append_id_l"
 /
   forall (i : level) (a : U i) (l : list a) .
@@ -238,10 +172,47 @@ qed ();
 
 
 
-defineRaw /length {a} l/
+definerec /length {a} l/
 /
-  list_iter a (fn _ . nat) 0 (fn _ _ n . succ n) l
+  list_case l 0 (fn _ t . succ (length a t))
+//
+  intersect (i : level) .
+  forall (a : U i) . list a -> nat
 /;
+
+inference.
+introOf /i a l/.
+revert /l/.
+assert /
+  forall (s : list_skel a) (l : list a) .
+    list_strip l = s : list_skel a
+    -> length a l : nat
+/ /H/.
+1:{
+  intro /l/.
+  apply /H (list_strip l)/.
+  auto.
+  }
+intro /s/.
+so /list_subterm_well_founded _ a s/ /Hwf/.
+induct /Hwf/.
+reintro /IH/.
+intro /l Heq/.
+destruct /l/ /| h t/.
+  {
+  unroll /length/.
+  typecheck.
+  }
+
+  {
+  unroll /length/.
+  typecheck1.
+  apply /IH (list_strip t)/ >> auto.
+  moveBefore /h t/ /s/.
+  subst /s/.
+  apply /cons_subterm/.
+  }
+qed ();
 
 
 
@@ -249,25 +220,8 @@ reductions
 /
   length _ (nil _) --> 0 ;
   length a (cons _ _ t) --> succ (` length a t) ;
-  unfolding length
+  unrolling length
 /;
-
-
-
-lemma "length_type"
-/
-  ` length :
-  intersect i .
-  forall (a : U i) .
-    list a -> nat
-/;
-
-inference.
-introOf /i a l/.
-unfold /length/.
-typecheck.
-qed ();
-recordTyping "length_type";
 
 
 

@@ -464,7 +464,11 @@ structure TacticInternal :> TACTIC_INTERNAL =
       
 
 
-      fun replaceJudgement jud (jud', dir) fk sk =
+      val interrupt : (Rule.rule -> judgement -> unit) ref = ref (fns _ _ => ())
+
+      fun replaceJudgement jud (goal as (jud', dir)) fk sk =
+         (
+         !interrupt (Rule.identity "replaceJudgement") goal;
          (case Refine.cast jud jud' of
              NONE =>
                 fk "replacement is not equivalent"
@@ -479,6 +483,7 @@ structure TacticInternal :> TACTIC_INTERNAL =
                 in
                    sk ([(blank, (jud, dir))], validate, fk)
                 end)
+         )
 
       fun replaceHyp i h (goal as (jud, _)) fk sk =
          (case Seq.updateOpt (J.context jud) i h of
@@ -493,8 +498,6 @@ structure TacticInternal :> TACTIC_INTERNAL =
             (J.make (J.context jud) a)
             goal fk sk
 
-
-      val interrupt : (Rule.rule -> judgement -> unit) ref = ref (fns _ _ => ())
 
       fun refine rule (goal as (jud, dir)) fk sk =
          (
