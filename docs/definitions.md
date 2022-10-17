@@ -278,7 +278,7 @@ To perform strong induction over the subterm order with these tools:
    to show that a subterm's skeleton is smaller than the current
    term's skeleton.
 
-A worked example appears in `datatype-induction.ist`.
+A worked example appears [here](datatype-induction.ist).
 
 
 
