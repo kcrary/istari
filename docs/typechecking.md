@@ -104,7 +104,7 @@ A typecheckable proposition has one of the following forms:
 
 - `C = C' : K i`
 
-The typecheck seeks to prove typecheckable propositions.  In addition,
+The typechecker seeks to prove typecheckable propositions.  In addition,
 the typechecker will attempt to discharge level constraints (`i <l=
 j`), and positivity requirements for inductive types (`positive (fn t
 . M)`).
