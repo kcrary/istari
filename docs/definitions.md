@@ -298,10 +298,10 @@ To establish that the specified reductions are correct, the prover
 places the left- and right-hand-side into normal form and compares
 them.  The `unrolling` clause indicates that, while normalizing, the
 prover should unroll `length`.  One can also employ an `unfolding`
-clause to indicate that the prover should unfold identifiers.  An
-`unrolling` clause will be applied only once (to avoid looping), and
-only on the left-hand-side.  In contrast, an `unfolding` clause will
-be applied at every opportunity.
+clause to indicate that the prover should unfold certain identifiers.
+An `unrolling` clause will be applied only once (to avoid looping),
+and only on the left-hand-side.  In contrast, an `unfolding` clause
+will be applied at every opportunity.
 
 The left-hand-sides of reductions take a special syntax: they must
 consist of a constant followed by a list of arguments.  Amidst the
