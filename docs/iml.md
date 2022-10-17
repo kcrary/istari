@@ -236,5 +236,5 @@ Some other features of SML are unsupported:
 
 ### The basis
 
-IML has its own [standard basis](basis.html) (inspired by the SML
-basis, but different from it).
+IML has its own [standard basis](basis.html) (inspired by the [SML
+basis](https://smlfamily.github.io/Basis/), but different from it).

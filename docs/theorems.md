@@ -54,7 +54,7 @@ This splits the conjunction in the conclusion into two disjuncts:
     2 goals (depth 0)
 
 Now there are two goals.  The first goal (goal 0) is given in its
-entirety, any remaining goals (goal 1, in this case) are abbreviated.
+entirety; any remaining goals (goal 1, in this case) are abbreviated.
 (One can get the all the goals unabbreviated by entering `C-c S`.)
 
 With two goals active, we cannot apply a tactic.  First we must enter
@@ -134,10 +134,10 @@ However, it makes proof maintenance more difficult:
 
 Suppose something changes, and as a result a tactic fails to discharge
 all the obligations it used to discharge.  Thus, the tactic generates
-an extra subgoal.  At some later point, a tactic is applied to that
-goal that was intended for some different goal, and presumably fails.
-Worse, if the extra goal is not first, the tactic failure is much
-later than the problem that caused it.
+an extra subgoal.  At some later point in the proof script, a tactic
+is applied to that goal that was intended for some different goal, and
+presumably fails.  Worse, if the extra goal is not first, the tactic
+failure is much later than the problem that caused it.
 
 Istari's goal management keeps tactic code better correlated with the
 subgoals.  A tactic that generates two goals where it should generate

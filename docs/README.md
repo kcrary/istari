@@ -72,7 +72,7 @@ yet to be validated, but all of the "delicate" rules are validated.)
 
 - [Tactics](tactics.html)
 
-- Typechecking
+- [Typechecking](typechecking.html)
 
 - [Rewriting](rewriting.html)
 
@@ -87,6 +87,8 @@ yet to be validated, but all of the "delicate" rules are validated.)
 - Tactic primitives
 
 - Library
+
+- [IML basis](basis.html)
 
 - [Copyright](copyright.html)
 

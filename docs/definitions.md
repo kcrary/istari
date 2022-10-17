@@ -33,7 +33,7 @@ A definition can also take **implicit arguments**, such as:
 
 Here `a` is an implicit argument.  Whenever `double_list` is used, the
 parser will insert evars for each implicit argument.  One can suppress
-the insertion of implicit arguments using the tick symbol (<code>`</code>).
+the insertion of implicit arguments using the tick symbol (`` ` ``).
 
 In the example, tick is used to suppress the implicit argument of
 `append`, allowing us to specify it explicitly.
@@ -77,7 +77,7 @@ the definition.
 
 A recursive definition not only creates the constant, it also creates
 an unrolling rewrite.  If one uses the `unfold` rewrite on (say)
-<code>` length a l</code>, one gets the underlying fixpoint term:
+`` ` length a l``, one gets the underlying fixpoint term:
 
     fix (fn length1 a l . list_case l 0 (fn h t . succ (length1 a t))) a l
 
