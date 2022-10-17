@@ -54,33 +54,33 @@ yet to be validated, but all of the "delicate" rules are validated.)
 
 ### Table of contents:
 
-- Installation
+- [Installation](install.html)
 
 - Type theory
 
-- IML
+- [IML](iml.html)
 
-- UI
+- [UI](ui.html)
 
-- Batch mode
+- [Batch mode](batch.html)
 
 - Term syntax
 
-- Definitions
+- [Definitions](definitions.html)
 
-- Theorems
+- [Theorems](theorems.html)
 
-- Tactics
+- [Tactics](tactics.html)
 
 - Typechecking
 
-- Rewriting
+- [Rewriting](rewriting.html)
 
 - Reordering
 
-- Modules
+- [Modules](modules.html)
 
-- Files
+- [Files](files.html)
 
 - Case analysis
 
@@ -88,7 +88,7 @@ yet to be validated, but all of the "delicate" rules are validated.)
 
 - Library
 
-- Copyright
+- [Copyright](copyright.html)
 
 
 This documentation is a work in progress.  If you can't find a page,
