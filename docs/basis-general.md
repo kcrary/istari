@@ -29,7 +29,7 @@
     
 - `val ($) : ('a -> 'b) -> 'a -> 'b`
 
-  A low-precedence infix operator for function application.
+  Function application.
 
 - `exception Invalid`
 
@@ -41,3 +41,4 @@
 
   This is used only for interfacing with code using the SML basis.
   The IML basis does not raise `Subscript`.
+

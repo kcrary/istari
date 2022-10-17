@@ -107,7 +107,7 @@ A typecheckable proposition has one of the following forms:
 The typechecker seeks to prove typecheckable propositions.  In addition,
 the typechecker will attempt to discharge level constraints (`i <l=
 j`), and positivity requirements for inductive types (`positive (fn t
-. M)`).
+. A)`).
 
 The algorithm proceeds as follows:
 

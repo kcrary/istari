@@ -19,7 +19,7 @@
           val splitOpt : 'a list -> int -> ('a list * 'a list) option
           val last : 'a list -> 'a
     
-          val @ : 'a list -> 'a list -> 'a list
+          val (@) : 'a list -> 'a list -> 'a list
           val rev : 'a list -> 'a list
           val revAppend : 'a list -> 'a list -> 'a list
           val foldl : ('a -> 'b -> 'b) -> 'b -> 'a list -> 'b

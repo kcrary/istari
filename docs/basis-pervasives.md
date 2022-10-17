@@ -31,7 +31,8 @@
     val foldl : ('a -> 'b -> 'b) -> 'b -> 'a list -> 'b
     val foldr : ('a -> 'b -> 'b) -> 'b -> 'a list -> 'b
     val map : ('a -> 'b) -> 'a list -> 'b list
-    val app : ('a -> unit) -> 'a list -> unitval map : ('a -> 'b) -> 'a list -> 'b list
+    val app : ('a -> unit) -> 'a list -> unit
+    val map : ('a -> 'b) -> 'a list -> 'b list
     val ref : 'a -> 'a ref
     val (!) : 'a ref -> 'a
     val (:=) : 'a ref -> 'a -> unit
@@ -47,6 +48,10 @@
     exception Fail of string
     exception Invalid of string
 
+- `val ($) : ('a -> 'b) -> 'a -> 'b`
+
+  A low-precedence infix operator for function application.
+
 - `val (=) : int -> int -> bool`
 
   Equivalent to `Int.=`.
@@ -58,3 +63,18 @@
 - `val (=#) : char -> char -> bool`
 
   Equivalent to `Char.=`.
+
+
+
+#### Operator precedence
+
+| operators                            | precedence | associativity | mode    |
+| ------------------------------------ | ---------- | ------------- | ------- |
+| `$`                                  | 0          | right         | curried |
+| `:=`                                 | 3          | left          | curried |
+| `=` `<>` `<=` `<` `>=` `>` `=$` `=#` | 4          | left          | curried |
+| `@`                                  | 5          | right         | curried |
+| `::`                                 | 5          | right         | tupled  |
+| `+` `-` `^`                          | 6          | left          | curried |
+| `*` `div` `rem`                      | 7          | left          | curried |
+
