@@ -198,7 +198,7 @@ goal, generating zero or more subgoals.
 
   + `renamen [n] /[name]/`
 
-    Renames hypothesis number `n` (counting backwards from 0) to
+    Renames hypothesis number `n` (counting backward from 0) to
     use the indicated name.
 
 
@@ -511,7 +511,7 @@ The destruction tactics are:
 
   + `destructn [n] /[ipattern]/`
 
-    As `destruct` but destructs hypothesis `n` (counting backwards
+    As `destruct` but destructs hypothesis `n` (counting backward
     from 0).
 
   + `destructnRaw [n] /[ipattern]/`
@@ -738,7 +738,7 @@ The destruction tactics are:
 
 
 
-### Other tactics
+### Miscellaneous tactics
 
 Rewriting, reordering, and case analysis are documented on their own
 pages.
@@ -793,5 +793,87 @@ the monad's unit and various flavors of bind:
     andthenlPadM : 'a tacticm -> ('a -> 'b tacticm) list -> ('a -> 'b tacticm) -> 'b tacticm
     andthenOnM   : int -> 'a tacticm -> ('a -> 'a tacticm) -> 'a tacticm
 
-The monad operations `andthenM` and `andthenlM` have the infix
+The monadic operations `andthenM` and `andthenlM` have the infix
 operators `>>=` and `>>>=` as synonyms.
+
+The most general flavor of bind is:
+
+    andthenFoldM :
+       'a tacticm 
+       -> ('a -> 'b -> 'c tacticm * 'b)
+       -> ('b -> string option)
+       -> 'b
+       -> 'c tacticm
+
+The tactic `andthenFoldM tac1 tacfn finish x` first runs `tac1`.  It
+then folds `tacfn` left-to-right over the subgoals.  Each invocation
+is passed (1) the monadic argument of type `'a` that was passed to
+that subgoal, and (2) a current value of type `'b`; and returns a `'c
+tacticm` (which is used on that subgoal) and a new value of type `'b`
+that will be used with the next subgoal.  The initial `'b` value is
+`x`.  Suppose the final `'b` value is `y`.  Then `finish y` is
+evaluated and if the result is `SOME msg`, the entire tactic fails
+using error message `msg`.
+
+
+
+
+### Low-level tactics
+
+These tactics are primarily used to implement other tactics:
+
+- `Tactic.replaceJudgement : Judgement.djudgement -> tactic`
+
+  Replaces the `djudgement` portion of the current goal, leaving the
+  directory unchanged.
+
+  + `Tactic.replaceHyp : int -> Judgement.hyp -> tactic`
+
+    Replaces a particular hypothesis (counting backward from 0).
+
+  + `Tactic.replaceConcl : Term.term -> tactic`
+
+    Replaces the conclusion.
+
+- `Tactic.withgoal : (Judgement.judgement -> 'a tacticm) -> 'a tacticm`
+
+  Invokes its argument tactic, passing the current goal to that
+  tactic.
+
+  + `Tactic.withidir : (Directory.idirectory -> 'a tacticm) -> 'a tacticm`
+
+    Invokes its argument tactic, passing the current `idirectory` (the
+    part of the goal used to turn external terms into internal
+    terms) to that tactic.
+
+  + `Tactic.withterm : ETerm.eterm -> (Term.term -> 'a tacticm) -> 'a tacticm`
+
+    Invokes its argument tactic, passing the internal version of its
+    first argument to that tactic.
+
+    * Available as `withterm /[term]/ [tactic function]`.
+
+  + `Tactic.withHeadConst : string -> (Constant.constant -> 'a tacticm) -> 'a tacticm`
+
+    Invokes its argument tactic, passing it the head constant of the
+    current conclusion as its argument.  If the conclusion does not
+    have a head constant, it fails using the string argument as the
+    error message.  If the head constant is soft and the argument
+    tactic fails, it tries again with the head constant of the
+    conclusion's unfolding.
+
+- `Tactic.transformFailure : (string -> string) -> 'a tacticm -> 'a tacticm`
+
+  Invokes its argument tactic.  In the event that tactic fails, it
+  alters the error message using the supplied function.
+
+  + `Tactic.setFailure : string -> 'a tacticm -> 'a tacticm`
+
+    As `transformFailure` but it simply replaces the error message.
+
+- These primitive operations are discussed as part of primitive tactics:
+
+      val refine : Rule.rule -> tactic
+      val chdir : Directory.directory -> tactic
+      val cast : Judgement.djudgement -> Refine.validation -> tactic
+      val execute : judgement -> tactic -> (Refine.validation, string) Sum.sum

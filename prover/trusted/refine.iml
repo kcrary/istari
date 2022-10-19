@@ -2,14 +2,15 @@
 signature REFINE =
    sig
 
-      type djudgement = Judgement.djudgement
+      type judgement = Judgement.judgement
       type rule = Rule.rule
       type validation
 
-      val refine : rule -> djudgement -> djudgement list * (validation list -> validation * validation list)
+      val refine : rule -> judgement -> judgement list * (validation list -> validation * validation list)
       val id : validation -> Judgement.id
+      val valid : validation -> bool
 
-      val cast : djudgement -> djudgement -> (validation -> validation) option
+      val cast : judgement -> judgement -> (validation -> validation) option
 
       (* Raised when the validation function is applied to the wrong validations,
          or when a validation has been invalidated by a trail rewind.
@@ -27,12 +28,12 @@ signature REFINE =
          and    returns (const, J', v')
          where  J' is |- const : A  and  v' validates J'
       *)
-      val reify : djudgement -> validation -> Symbol.symbol list -> Term.constant * djudgement * validation
+      val reify : judgement -> validation -> Symbol.symbol list -> Term.constant * judgement * validation
 
 
       exception NoExtracts
 
-      val pu : (djudgement * validation) Pickle.pu
+      val pu : (judgement * validation) Pickle.pu
 
    end
 
@@ -43,7 +44,7 @@ structure RefineExt :> REFINE =
       structure J = Judgement
       structure T = Term
 
-      type djudgement = J.djudgement
+      type judgement = J.judgement
       type rule = Rule.rule
 
       type validation = T.term * J.id * Trail.token
@@ -82,6 +83,8 @@ structure RefineExt :> REFINE =
          end
 
       fun id (_, x, _) = x
+
+      fun valid (_, _, tok) = Trail.valid tok
 
       fun cast j j' =
          if J.eq (J.id j, J.id j') then
@@ -176,7 +179,7 @@ structure RefineMin :> REFINE =
       structure J = Judgement
       structure T = Term
 
-      type djudgement = J.djudgement
+      type judgement = J.judgement
       type rule = Rule.rule
 
       type validation = J.id * Trail.token
@@ -215,6 +218,8 @@ structure RefineMin :> REFINE =
          end
 
       fun id (x, _) = x
+
+      fun valid (_, tok) = Trail.valid tok
 
       fun cast j j' =
          if J.eq (J.id j, J.id j') then

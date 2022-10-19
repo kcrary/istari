@@ -2,7 +2,7 @@
 signature TACTIC =
    sig
       
-      type judgement = Judgement.djudgement * Directory.directory
+      type goal = Judgement.judgement * Directory.directory
       type validation = Refine.validation
       type validator = validation list -> validation * validation list
       type answer = exn
@@ -12,9 +12,9 @@ signature TACTIC =
       *)
 
       type 'a tacticm = 
-         judgement
+         goal
          -> (string -> answer)                                                   (* failure continuation *)
-         -> (('a * judgement) list * validator * (string -> answer) -> answer)   (* success continuation *)
+         -> (('a * goal) list * validator * (string -> answer) -> answer)   (* success continuation *)
          -> answer
 
       type tactic = Message.label tacticm
@@ -59,14 +59,14 @@ signature TACTIC =
 
       (* direct computation *)
 
-      val replaceJudgement : Judgement.djudgement -> tactic
+      val replaceJudgement : Judgement.judgement -> tactic
       val replaceHyp : int -> Judgement.hyp -> tactic
       val replaceConcl : Term.term -> tactic
 
 
       (* miscellaneous *)
 
-      val withgoal : (judgement -> 'a tacticm) -> 'a tacticm
+      val withgoal : (goal -> 'a tacticm) -> 'a tacticm
       val withidir : (Directory.idirectory -> 'a tacticm) -> 'a tacticm
       val withterm : ETerm.eterm -> (Term.term -> 'a tacticm) -> 'a tacticm
       val withHeadConst : string -> (Constant.constant -> 'a tacticm) -> 'a tacticm
@@ -79,8 +79,8 @@ signature TACTIC =
 
       val refine : Rule.rule -> tactic
       val chdir : Directory.directory -> tactic
-      val cast : Judgement.djudgement -> Refine.validation -> tactic
-      val execute : judgement -> tactic -> (Refine.validation, string) Sum.sum
+      val cast : Judgement.judgement -> Refine.validation -> tactic
+      val execute : goal -> tactic -> (Refine.validation, string) Sum.sum
 
 
       val >> : 'a tacticm -> 'b tacticm -> 'b tacticm                 (* andthen *)
@@ -97,7 +97,7 @@ signature TACTIC_INTERNAL =
       include TACTIC
 
 
-      val interrupt : (Rule.rule -> judgement -> unit) ref
+      val interrupt : (Rule.rule -> goal -> unit) ref
 
    end
 
@@ -109,7 +109,7 @@ structure TacticInternal :> TACTIC_INTERNAL =
       structure J = Judgement
       structure T = Term
 
-      type judgement = Judgement.djudgement * Directory.directory
+      type goal = Judgement.judgement * Directory.directory
       type validation = Refine.validation
       
       type validator = validation list -> validation * validation list
@@ -117,9 +117,9 @@ structure TacticInternal :> TACTIC_INTERNAL =
       type answer = exn
 
       type 'a tacticm = 
-         judgement
+         goal
          -> (string -> answer)                                            (* failure continuation *)
-         -> (('a * judgement) list * validator * (string -> answer) -> answer)   (* success continuation *)
+         -> (('a * goal) list * validator * (string -> answer) -> answer)   (* success continuation *)
          -> answer
 
       type tactic = Message.label tacticm
@@ -464,11 +464,11 @@ structure TacticInternal :> TACTIC_INTERNAL =
       
 
 
-      val interrupt : (Rule.rule -> judgement -> unit) ref = ref (fns _ _ => ())
+      val interrupt : (Rule.rule -> goal -> unit) ref = ref (fns _ _ => ())
 
       fun replaceJudgement jud (goal as (jud', dir)) fk sk =
          (
-         !interrupt (Rule.identity "replaceJudgement") goal;
+         !interrupt (Rule.identity "replaceGoal") goal;
          (case Refine.cast jud jud' of
              NONE =>
                 fk "replacement is not equivalent"
@@ -494,7 +494,7 @@ structure TacticInternal :> TACTIC_INTERNAL =
                 replaceJudgement (J.make ctx (J.concl jud)) goal fk sk)
 
       fun replaceConcl a (goal as (jud, _)) fk sk =
-         replaceJudgement 
+         replaceJudgement
             (J.make (J.context jud) a)
             goal fk sk
 

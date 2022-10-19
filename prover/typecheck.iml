@@ -38,7 +38,7 @@ signature TYPECHECK_INTERNAL =
       include TYPECHECK
 
 
-      val isTypecheckGoal : Judgement.djudgement -> bool
+      val isTypecheckGoal : Judgement.judgement -> bool
 
 
       (* Tactics can add hypotheses, but must not alter existing hypotheses. *)
@@ -55,8 +55,8 @@ signature TYPECHECK_INTERNAL =
 
 
       val multigoalTypecheck :
-         Tactic.judgement list
-         -> Tactic.judgement list * (Refine.validation list -> Refine.validation list)
+         Tactic.goal list
+         -> Tactic.goal list * (Refine.validation list -> Refine.validation list)
 
    end
 
@@ -271,7 +271,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                 raise (Fail "precondition1"))
 
 
-      extension ExecuteSuccess of (Message.label * judgement) list
+      extension ExecuteSuccess of (Message.label * goal) list
       extension ExecuteFailure
 
       fun execute tac goal fk sk =
@@ -302,7 +302,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Error reporting ***)
 
-      type history = judgement list
+      type history = goal list
 
       fun bracketNumberString i =
          if i < 10 then
@@ -511,33 +511,43 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       (* matcher returns the classifier (e.g., tabOv) and the key term *)
       val tabledConstants : (T.elim list, unit, int * T.term) Case.matcher H'.table = H'.table 23
 
-      val zilch = T.Marker (Symbol.fromValue "")
+      val zilch = T.Const Prim.bogus
 
       val () =
          List.app
             (fn (const, x) => H'.insert tabledConstants const x)
-            (parseMatchClauses
-             /
-                \Prim.ov\ _ ? => \fnc m => (tabOv, m)\
+            [
+            (Prim.ov,
+             parseMatch /$ap _ $ap ? $nil => \(fnc m => (tabOv, m))\/),
 
-              | \Prim.istp\ ? => \fnc a => (tabIstp, a)\
+            (Prim.istp,
+             parseMatch /$ap ? $nil => \(fnc a => (tabIstp, a))\/),
 
-              | \Prim.subtype\ ? _ => \fnc a => (tabSubtype, a)\
+            (Prim.subtype,
+             parseMatch /$ap ? $ap _ $nil => \(fnc a => (tabSubtype, a))\/),
 
-              | \Prim.eqtp\ ? _ => \fnc a => (tabEqtp, a)\
+            (Prim.eqtp,
+             parseMatch /$ap ? $ap _ $nil => \(fnc a => (tabEqtp, a))\/),
 
-              | \Prim.eq\ @
-                   ($ap (\Prim.univ\ _) $ap ? $ap _ $nil => \fnc a => (tabEquniv, a)\
-                    |
-                    $ap (\Prim.kind\ _) $ap ? $ap _ $nil => \fnc a => (tabEqkind, a)\ )
+            (Prim.eq,
+             parseMatch
+             /| $ap (\Prim.univ\ _) $ap ? $ap _ $nil => \(fnc a => (tabEquniv, a))\
+              | $ap (\Prim.kind\ _) $ap ? $ap _ $nil => \(fnc a => (tabEqkind, a))\
+             /),
 
-              | \Prim.lleq\ ? _ => \fnc i => (tabLleq, i)\
+            (Prim.lleq,
+             parseMatch /$ap ? $ap _ $nil => \(fnc i => (tabLleq, i))\/),
 
-              | \Prim.positive\ (fn . ?) =>
-                \fnc a =>
-                    (* a is under a binder, so we have to unshift it *)
-                    (tabPositive, T.Sub (a, T.Dot (zilch, T.id)))\
-             /)
+            (Prim.positive,
+             parseMatch /$ap (fn . ?) $nil =>
+                         \(fnc a =>
+                              (* a is under a binder, so we have to unshift it.
+                                 We only need this for the head variable/constant, so any
+                                 zilches in the term are not a problem.
+                              *)
+                              (tabPositive, T.Sub (a, T.Dot (zilch, T.id))))\
+                        /)
+            ]
                         
 
       type entry = int * T.term * T.term list * T.term
@@ -776,61 +786,53 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
        | Positive
        | Lleq
 
-      type obligation = problem * table * judgement * destination * history
+      type obligation = problem * table * goal * destination * history
 
 
       datatype 'a tri = YES of 'a | NO | BAD
 
       fun isTypecheckGoalTri jud =
          termCaseX (J.concl jud)
-         /[
-             \Prim.ov\ @
-                ($ap _ $ap _ $nil => \fnc => YES Of\
-                 | _ => \fnc => BAD\ )
+         /
+          | \Prim.ov\ @
+               ($ap _ $ap _ $nil => \(fnc => YES Of)\
+                | _ => \(fnc => BAD)\)
 
-           | \Prim.istp\ @
-                ($ap _ $nil => \fnc => YES Istp\
-                 | _ => \fnc => BAD\ )
+          | \Prim.istp\ @
+               ($ap _ $nil => \(fnc => YES Istp)\
+                | _ => \(fnc => BAD)\)
 
-           | \Prim.subtype\ @
-                ($ap _ $ap _ $nil => \fnc => YES Subtype\
-                 | _ => \fnc => BAD\ )
+          | \Prim.subtype\ @
+               ($ap _ $ap _ $nil => \(fnc => YES Subtype)\
+                | _ => \(fnc => BAD)\)
 
-           | \Prim.eqtp\ @
-                ($ap _ $ap _ $nil => \fnc => YES Eqtp\
-                 | _ => \fnc => BAD\ )
+          | \Prim.eqtp\ @
+               ($ap _ $ap _ $nil => \(fnc => YES Eqtp)\
+                | _ => \(fnc => BAD)\)
 
-           | \Prim.eq\ @
-                ($ap (\Prim.univ\ _)
-                    ($ap _ $ap _ $nil => \fnc => YES Equniv\
-                     | _ => \fnc => BAD\ )
-                 |
-                 $ap (\Prim.kind\ _)
-                    ($ap _ $ap _ $nil => \fnc => YES Eqkind\
-                     | _ => \fnc => BAD\ )
-                 |
-                 $ap _ $ap ? $ap ? $nil =>
+          | \Prim.eq\ @
+               (  
+                 $ap (\Prim.univ\ _) $ap _ $ap _ $nil => \(fnc => YES Equniv)\
+               | $ap (\Prim.kind\ _) $ap _ $ap _ $nil => \(fnc => YES Eqkind)\
+               | $ap _ $ap ? $ap ? $nil =>
                  \(fnc m n =>
                       if Unify.unify1 m n then
                          YES Eqrefl
                       else
                          NO)\
-                 |
-                 _ => \fnc => BAD\ )
+               | _ => \(fnc => BAD)\
+               )
 
-           | \Prim.lleq\ @
-                ($ap _ $ap _ $nil => \fnc => YES Lleq\
-                 | _ => \fnc => BAD\ )
+          | \Prim.lleq\ @
+               ($ap _ $ap _ $nil => \(fnc => YES Lleq)\
+                | _ => \(fnc => BAD)\)
 
-           | \Prim.positive\ @
-                ($ap (fn . _) $nil => \fnc => YES Positive\
-                 | _ => \fnc => BAD\ )
-          ]
-         
-          | _ =>
-            \fnc => NO\
+          | \Prim.positive\ @
+               ($ap (fn . _) $nil => \(fnc => YES Positive)\
+                | _ => \(fnc => BAD)\)
+
+          | _ => \(fnc => NO)\
          /
-                     
       
       fun isTypecheckGoal jud =
          (case isTypecheckGoalTri jud of
@@ -891,7 +893,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       val deferred : obligation list ref = ref []
 
       (* level constraints, solve these last *)
-      val constraints : (table * judgement * destination * history) list ref = ref []
+      val constraints : (table * goal * destination * history) list ref = ref []
 
       val noqueue = ref false
 
@@ -2337,7 +2339,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                 fk "not a typechecking goal")
 
 
-      extension Answer of (Message.label * Tactic.judgement) list * (Refine.validation list -> Refine.validation list)
+      extension Answer of (Message.label * Tactic.goal) list * (Refine.validation list -> Refine.validation list)
 
       fun multigoalTypecheck goals =
          let

@@ -56,7 +56,7 @@ yet to be validated, but all of the "delicate" rules are validated.)
 
 - [Installation](install.html)
 
-- Type theory
+- Type theory (coming soon)
 
 - [IML](iml.html)
 
@@ -84,14 +84,10 @@ yet to be validated, but all of the "delicate" rules are validated.)
 
 - [Case analysis](case.html)
 
-- Tactic primitives
+- [Primitive tactics](primitive-tactics.html)
 
-- Library
+- Library (coming soon)
 
 - [IML basis](basis.html)
 
 - [Copyright](copyright.html)
-
-
-This documentation is a work in progress.  If you can't find a page,
-it's probably because it hasn't been written yet.

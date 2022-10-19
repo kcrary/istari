@@ -17,8 +17,6 @@ signature HYP_TACTIC =
       val hypofIstp : Term.term -> tactic
       val hypofEqtp : Term.term -> tactic
 
-      val change : symbol -> ETerm.eterm -> tactic
-
       val renamen : int -> symbol -> tactic
       val rename : symbol -> symbol -> tactic
       val reintro : symbol option list -> tactic
@@ -39,8 +37,6 @@ signature HYP_TACTIC =
       val set : symbol -> ETerm.eterm -> tactic
 
       val assumption : tactic
-
-      val trustme : tactic
 
    end
 
@@ -195,23 +191,6 @@ structure HypTactic :> HYP_TACTIC =
                   \fnc => fail "conclusion cannot follow from binding"\
             /
          end
-
-
-      fun change sym a =
-         if Symbol.eq (sym, conclSym) then
-            let
-               do (_, dir) = withgoal
-            in
-               Tactic.replaceConcl (a (D.idir dir))
-            end
-         else
-            let
-               do i = findhyp sym
-               do (_, dir) = withgoal
-               val dir' = D.shift dir (i+1)
-            in
-               Tactic.replaceHyp i (Judgement.Tm (a (D.idir dir')))
-            end
 
 
       fun renamen i to =
@@ -495,7 +474,5 @@ structure HypTactic :> HYP_TACTIC =
          /
             $anyhyp ($tm _ => \fnc => fn i => refine (Rule.hypothesis i)\)
          /
-
-      val trustme = refine Rule.trustme
 
    end

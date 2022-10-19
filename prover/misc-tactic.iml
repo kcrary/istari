@@ -1,0 +1,44 @@
+
+signature MISC_TACTIC =
+   sig
+      
+      type tactic = Tactic.tactic
+      type symbol = Symbol.symbol
+
+      val change : symbol -> ETerm.eterm -> tactic
+
+      val trustme : tactic
+
+   end
+
+
+structure MiscTactic :> MISC_TACTIC =
+   struct
+
+      structure D = Directory
+
+      open Tactic
+
+      type symbol = Symbol.symbol
+
+      val conclSym = Symbol.fromValue "concl"
+
+      fun change sym a =
+         if Symbol.eq (sym, conclSym) then
+            let
+               do (_, dir) = withgoal
+            in
+               replaceConcl (a (D.idir dir))
+            end
+         else
+            let
+               do i = HypTactic.findhyp sym
+               do (_, dir) = withgoal
+               val dir' = D.shift dir (i+1)
+            in
+               replaceHyp i (Judgement.Tm (a (D.idir dir')))
+            end
+
+      val trustme = refine Rule.trustme
+
+   end

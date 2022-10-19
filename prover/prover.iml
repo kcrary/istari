@@ -23,8 +23,8 @@ signature PROVER =
       val showLiteral : unit -> unit
       val alwaysShowFull : bool ref
 
-      val goals : unit -> Tactic.judgement list
-      val currentGoal : unit -> Tactic.judgement
+      val goals : unit -> Tactic.goal list
+      val currentGoal : unit -> Tactic.goal
       val currentConcl : unit -> Term.term
       val goalCaseX : 'a Oldcase.matcher -> 'a
       val goalCaseXAlt : 'a Oldcase.matcher list -> 'a
@@ -34,9 +34,9 @@ signature PROVER =
 
       val detail : unit -> unit
 
-      val openGoal : Tactic.judgement -> unit
+      val openGoal : Tactic.goal -> unit
 
-      val originalGoals : unit -> Tactic.judgement list
+      val originalGoals : unit -> Tactic.goal list
       val showOriginalGoals : unit -> unit
 
    end
@@ -54,7 +54,7 @@ signature PROVER_INTERNAL =
       val clean : Term.term -> problem option
 
 
-      val setGoals : Tactic.judgement list -> (Refine.validation list -> unit) -> unit
+      val setGoals : Tactic.goal list -> (Refine.validation list -> unit) -> unit
 
 
       (* sets a persistent checkpoint if not within a lemma *)
@@ -75,7 +75,7 @@ structure ProverInternal :> PROVER_INTERNAL =
       structure C = Oldcase
 
       type validation = Refine.validation
-      type judgement = Tactic.judgement
+      type goal = Tactic.goal
       type label = Message.label
 
       val ? = C.?
@@ -107,7 +107,7 @@ structure ProverInternal :> PROVER_INTERNAL =
          (The unit in the type of goals is to match up with the tactic type.)
       *)
 
-      type state = int * (label * judgement) list * (Refine.validation list -> unit)
+      type state = int * (label * goal) list * (Refine.validation list -> unit)
 
       val theState : state option R.cref = R.new NONE
 
@@ -185,9 +185,9 @@ structure ProverInternal :> PROVER_INTERNAL =
 
       fun showerShort (jud, dir) = Show.show dir (J.concl jud)
 
-      fun showerLong goal = Show.showJudgement goal
+      fun showerLong goal = Show.showGoal goal
 
-      fun showerLiteral (jud, _) = Show.showLiteralJudgement jud;
+      fun showerLiteral (jud, _) = Show.showLiteralGoal jud;
 
       fun showGoals () =
          if !alwaysShowFull then
@@ -224,7 +224,7 @@ structure ProverInternal :> PROVER_INTERNAL =
              ))
 
 
-      extension Answer of (label * judgement) list * Tactic.validator
+      extension Answer of (label * goal) list * Tactic.validator
 
       fun apply tac =
          action
@@ -336,7 +336,7 @@ structure ProverInternal :> PROVER_INTERNAL =
          
       val beforeLemmaHook : (unit -> unit) ref = ref (fn () => ())
 
-      val theOriginalGoals : (label * judgement) list option R.cref = R.new NONE
+      val theOriginalGoals : (label * goal) list option R.cref = R.new NONE
 
 
 

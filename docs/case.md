@@ -205,9 +205,10 @@ The most important combinators are:
     val marker : Symbol.symbol -> (term, 'a, 'a) matcher
     val nat    : (term, 'a, 'a * int) matcher
 
-- `elim m1 m2` matches an elim form; `m1` matches against the head and
-  `m2` matches against the spine.  In the parser it is written `m1 @
-  m2`.
+- `elim m1 m2` matches an elimination form; `m1` matches against the
+  head and `m2` matches against the
+  [spine](primitive-tactics.md#spinal-form).  In the parser it is
+  written `m1 @ m2`.
 
 - `lam m` matches a lambda; `m` matches against the body.  In the
   parser it is written `fn . m`.
@@ -437,24 +438,26 @@ The full collection of entry points is:
 ##### The matcher grammar
 
 The grammar for matchers is as follows.  Capitalized words are
-nonterminals; lower case words are keywords.  Forms are listed in
-increasing order of precedence. Grouped forms have the same
-precedence.  Associativity, when appropriate, is given by an L or R.
+nonterminals; lower case words are keywords.  The `alt` productions
+have lowest precedence, then `seq`, then `wrap` and `wrapk`.  The
+remaining productions are at equal precedence.  All productions are
+right associative where relevant.
 
     Match ::=
       Match | ... | Match                                (alt, length at least 2)
       | Match | ... | Match                              (alt, length at least 2)
-
-      Match ; Match                                      (seq) R
-
+      Match ; Match                                      (seq)
       Match => \ ... antiquoted function ... \           (wrap)
       Match =!> \ ... antiquoted function ... \          (wrapk)
-
       $lit \ ... antiquoted matcher ... \
       $as Match                                          (az)
       $az Match                                          (az)
       $use \ ... antiquoted rmatcher ... \               (use)
-      ---------------- term matchers ----------------
+      ( Match )
+      _                                                  (wild)
+      ?                                                  (what)
+      ()                                                 (triv)
+
       Match @ Match                                      (elim)
       Constant Spine                                     (elim/constant, length at least 1)
       \ ... antiquoted constant ... \ Spine              (elim/constant, length at least 1)
@@ -466,36 +469,30 @@ precedence.  Associativity, when appropriate, is given by an L or R.
       $unify \ ... antiquoted term ... \                 (unify)
       $whnf Match                                        (whnf)
       $whnfHard Match                                    (whnfHard)
-      ---------------- spine matchers ----------------
-      $nil                                               (null)
-      $ap Match Match                                    (app)
-      #1 Match                                           (pi1)
-      #2 Match                                           (pi2)
-      #prev Match                                        (prev)
-      ---------------- hyp matchers ----------------
-      $tm Match                                          (tm)
-      $tml Match                                         (tml)
-      $tmh Match                                         (tmh)
-      $tp Match                                          (tp)
-      $tpl Match                                         (tpl)
-      $let Match                                         (lett)
-      ---------------- context matchers ----------------
-      $hyp Number Match                                  (hyp)      
-      $hyp \ ... antiquoted number ... \ Match           (hyp)
-      $anyhyp Match                                      (anyhyp)
-
-      ( Match )
-      _                                                  (wild)
-      ?                                                  (what)
-      ()                                                 (triv)
-      ---------------- term matchers ----------------
       \ ... antiquoted constant ... \                    (constant)
       const?                                             (whatConstant)
       var?                                               (whatVar)
       evar?                                              (whatEvar)
       nat?                                               (nat)
       ( Match , ... , Match )                            (pair, length at least 2)
-      
+
+      $nil                                               (null)
+      $ap Match Match                                    (app)
+      #1 Match                                           (pi1)
+      #2 Match                                           (pi2)
+      #prev Match                                        (prev)
+
+      $tm Match                                          (tm)
+      $tml Match                                         (tml)
+      $tmh Match                                         (tmh)
+      $tp Match                                          (tp)
+      $tpl Match                                         (tpl)
+      $let Match                                         (lett)
+
+      $hyp Number Match                                  (hyp)      
+      $hyp \ ... antiquoted number ... \ Match           (hyp)
+      $anyhyp Match                                      (anyhyp)
+
     Spine ::=
                                                          (null)
       Match Spine                                        (app)

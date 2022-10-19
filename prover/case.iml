@@ -38,16 +38,18 @@ signature CASE =
 
       val seq : ('a, 'c, 'd) matcher -> ('b, 'd, 'e) matcher -> ('a * 'b, 'c, 'e) matcher
 
+      val discrim : ('b -> ('a, 'b, 'c) matcher) -> ('a, 'b, 'c) matcher
+
 
       (* terms *)
 
       val constant : constant -> (term, 'a, 'a) matcher
       val variable : int -> (term, 'a, 'a) matcher
-      val elim : (term, 'a, 'b) matcher -> (spine, 'b, 'c) matcher -> (term, 'a, 'c) matcher
       val whatConstant : (term, 'a, 'a * constant) matcher
       val whatVar : (term, 'a, 'a * int) matcher
       val whatEvar : (term, 'a, 'a * (Term.ebind * Term.sub)) matcher
 
+      val elim : (term, 'a, 'b) matcher -> (spine, 'b, 'c) matcher -> (term, 'a, 'c) matcher
       val lam : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
       val lamb : (term, 'a * Term.binder, 'b) matcher -> (term, 'a, 'b) matcher
       val pair : (term, 'a, 'b) matcher -> (term, 'b, 'c) matcher -> (term, 'a, 'c) matcher
@@ -61,9 +63,6 @@ signature CASE =
       val whnfHard : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
 
       val nat : (term, 'a, 'a * int) matcher
-
-      (* a little faster than using alt, elim, and constant *)
-      val paths : (constant * (spine, 'a, 'b) matcher) list -> (term, 'a, 'b) matcher
 
 
       (* spines *)
@@ -257,6 +256,9 @@ structure Case :> CASE =
          end
 
 
+      fun discrim f m x fk sk = f x m x fk sk
+
+
       fun constant const m x fk sk =
          (case m of
              T.Elim (T.Const const', []) =>
@@ -417,28 +419,6 @@ structure Case :> CASE =
             sk ((x, n), fk)
          end
          
-
-      fun pathsLoop const spine l x fk sk =
-         (case l of
-             [] => fk ()
-             
-           | (const', f) :: rest =>
-                let
-                   fun fk' () = pathsLoop const spine rest x fk sk
-                in
-                   if Constant.eq (const, const') then
-                      f spine x fk' sk
-                   else
-                      fk' ()
-                end)
-
-      fun paths l m x fk sk =
-         (case m of
-             T.Elim (T.Const const, spine) =>
-                pathsLoop const spine l x fk sk
-
-           | _ => fk ())
-
 
       fun null spine x fk sk =
          (case spine of
@@ -647,7 +627,6 @@ structure Case :> CASE =
 
 
       fun parseMatch x = x
-      fun parseMatchClauses x = x
 
    end
 
@@ -682,7 +661,6 @@ structure CasePervasive =
       val goalContextCaseB = Case.goalContextCaseB
 
       fun parseMatch x = x
-      fun parseMatchClauses x = x
 
    end
 
@@ -699,8 +677,6 @@ structure ParseCase =
       fun sing x = [x]
       fun duo x y = [x, y]
       fun cons h t = h :: t
-
-      fun clause x y = (x, y)
 
       fun constpath const spine = elim (constant const) spine
       fun varpath i spine = elim (variable i) spine
@@ -725,6 +701,7 @@ grammardef Case
    rule Match(3)      ::= "$lit" EMBED => id
    rule Match(3)      ::= "$as" Match(3) => az
    rule Match(3)      ::= "$az" Match(3) => az
+   rule Match(3)      ::= "$use" EMBED => use
 
    rule Match(2)      ::= Match(3) "=>" EMBED => wrap
    rule Match(2)      ::= Match(3) "=!>" EMBED => wrapk
@@ -755,7 +732,6 @@ grammardef Case
    rule Match(3)      ::= MatchConstant NonemptySpine => constpath
    rule Match(3)      ::= "$var" EMBED Spine => varpath
 
-   rule Match(3)      ::= "$use" EMBED => use
    rule Match(3)      ::= "next" Match(3) => next
    rule Match(3)      ::= "$marker" EMBED => marker
    rule Match(3)      ::= "$unify" EMBED => unify
@@ -764,17 +740,12 @@ grammardef Case
    rule Match(3)      ::= "fn" "." Match(3) => lam
    rule Match(3)      ::= "fn" "?" "." Match(3) => lamb
 
-   (* term clauses *)
-   rule Match(4)      ::= "[" MatchClauses "]" => paths
-   rule SpineWrap     ::= Spine => id
-   rule SpineWrap     ::= Spine "=>" EMBED => wrap
-   rule SpineWrap     ::= Spine "=!>" EMBED => wrapk
-   rule MatchClause   ::= EMBED "@" Match(2) => clause
-   rule MatchClause   ::= MatchConstant "@" Match(2) => clause
-   rule MatchClause   ::= EMBED SpineWrap => clause
-   rule MatchClause   ::= MatchConstant SpineWrap => clause
-   rule MatchClauses  ::= MatchClause => sing
-   rule MatchClauses  ::= MatchClause "|" MatchClauses => cons
+   (* general spines *)
+   rule Match(3)      ::= "$nil" => null
+   rule Match(3)      ::= "$ap" Match(4) Match(3) => app
+   rule Match(3)      ::= "#1" Match(3) => pi1
+   rule Match(3)      ::= "#2" Match(3) => pi2
+   rule Match(3)      ::= "#prev" Match(3) => prev
 
    (* hyps *)
    rule Match(3)      ::= "$tm" Match(3) => tm
@@ -788,13 +759,6 @@ grammardef Case
    rule Match(3)      ::= "$hyp" NUMBER Match(3) => hyp
    rule Match(3)      ::= "$hyp" EMBED Match(3) => hyp
    rule Match(3)      ::= "$anyhyp" Match(3) => anyhyp
-
-   (* general spines *)
-   rule Match(3)      ::= "$nil" => null
-   rule Match(3)      ::= "$ap" Match(4) Match(3) => app
-   rule Match(3)      ::= "#1" Match(3) => pi1
-   rule Match(3)      ::= "#2" Match(3) => pi2
-   rule Match(3)      ::= "#prev" Match(3) => prev
 
    (* special spines *)
    rule Spine         ::= => null
@@ -839,7 +803,6 @@ grammardef Case
    start goalContextCaseB Match
 
    start parseMatch Match
-   start parseMatchClauses MatchClauses
 
 end
 
@@ -848,7 +811,7 @@ grammardef CasePervasive
 
    open ParseCase
 
-   (* Don't want to use this rule while building the refiner. *)
+   (* Don't want to use this rule while building the prover. *)
    rule MatchConstant ::= IDENT => shortConstant
 
 end
