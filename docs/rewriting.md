@@ -51,39 +51,36 @@ to be empty.
 
 - `-> [equation] within [captures]`
 
-    The equation is a term (usually a hypothesis or lemma name) which,
-    after exploitation (see eexploit), has type `R M N` where R is a
-    relation.  (Often R is equality.)  Replaces M with N.
+  The equation is a term (usually a hypothesis or lemma name) which,
+  after exploitation (see eexploit), has type `R M N` where R is a
+  relation.  (Often R is equality.)  Replaces M with N.
 
 - `<- [equation] within [captures]`
 
-    As above but replaces N with M.
+  As above but replaces N with M.
 
 - `[term M] = [term N] : [term A] within [captures]`
 
-    Replaces M with N.  Generates a subgoal to establish that `M = N : A`.
-
+  Replaces M with N.  Generates a subgoal to establish that `M = N : A`.
 
 
 ## Rewriting tactics
 
 - `rewrite /[rewrite] [targets]/`
 
-    Applies the rewrite to the indicated targets.
+  Applies the rewrite to the indicated targets.
 
-
-- `rewriteRaw /[rewrite] [targets]/`
+  + `rewriteRaw /[rewrite] [targets]/`
 
     As `rewrite` but do not run the type checker.
 
 
 - `convert /[term M] within [captures] [targets]/`
 
-    Replaces the target term with `M`, if they are beta-equivalent.
-    (Finding hit numbers may be slow.)
+  Replaces the target term with `M`, if they are beta-equivalent.
+  (Finding hit numbers may be slow.)
 
-
-- `convertHead /[constant c] -> [term M] within [captures] [targets]/`
+  + `convertHead /[constant c] -> [term M] within [captures] [targets]/`
 
     Replaces the target term (having head constant `c`) with `M`, if
     they are beta-equivalent.  (Cheaper than convert.)
@@ -91,12 +88,11 @@ to be empty.
 
 - `fold /[term M] within [captures] [targets]/`
 
-    Folds the target term to become `M`.  The outermost form of the
-    target term must match precisely the outermost form of the normal
-    form of the unfolding of `M`.
+  Folds the target term to become `M`.  The outermost form of the
+  target term must match precisely the outermost form of the normal
+  form of the unfolding of `M`.
 
-
-- `convertFold /[term M] within [captures] [targets]/`
+  + `convertFold /[term M] within [captures] [targets]/`
 
     Folds the target term to become `M`.  (Finding hit numbers may be
     slow.)
@@ -104,11 +100,10 @@ to be empty.
 
 - `unfold /[constant/variable] [targets]/`
 
-    Unfolds a target term with the specified head constant or
-    variable, and then weak-head-normalizes the result.
+  Unfolds a target term with the specified head constant or variable,
+  and then weak-head-normalizes the result.
 
-
-- `unfoldHead /[constant/variable] [targets]/`
+  + `unfoldHead /[constant/variable] [targets]/`
 
     Unfolds a target term with the specified head constant or
     variable, but does not weak-head-normalizes the result.  Thus, if
@@ -117,19 +112,18 @@ to be empty.
 
 - `roll /[term M] within [captures] [targets]/`
 
-    Rolls the target term to become `M`, using (in reverse) the
-    unrolling reduction given for the term's head constant.  The
-    outermost form of the target term must match precisely the
-    outermost form of the normal form of the unrolling of the
-    specified term.
+  Rolls the target term to become `M`, using (in reverse) the
+  unrolling reduction given for the term's head constant.  The
+  outermost form of the target term must match precisely the outermost
+  form of the normal form of the unrolling of the specified term.
 
-    Unrolling reductions are defined automatically for recursive
-    functions defined by `definerec`.  One can establish unrolling
-    reductions for other constants using:
+  Unrolling reductions are defined automatically for recursive
+  functions defined by `definerec`.  One can establish unrolling
+  reductions for other constants using:
 
-        setUnroll : constant -> Reduction.reduction -> unit
+      Database.setUnroll : constant -> Reduction.reduction -> unit
 
-- `convertRoll /[term M] within [captures] [targets]/`
+  + `convertRoll /[term M] within [captures] [targets]/`
 
     Rolls the target term to become `M`, using (in reverse) the
     unrolling reduction given for the term's head constant.  (Finding
@@ -138,17 +132,16 @@ to be empty.
 
 - `unroll /[constant c] [targets]/`
 
-    Unrolls a target term with head constant `c`, using the unrolling
-    reduction given for `c`.
+  Unrolls a target term with head constant `c`, using the unrolling
+  reduction given for `c`.
 
 
 - `unrollType /[constant c] [targets]/`
 
-    Unrolls a type with head constant `c`, where `c` is `mu` or `rec`,
-    or is defined using `mu` or `rec`.
+  Unrolls a type with head constant `c`, where `c` is `mu` or `rec`,
+  or is defined using `mu` or `rec`.
 
-
-- `unrollTypeUniv /[constant c] with [term i] within [captures] [targets]/`
+  + `unrollTypeUniv /[constant c] with [term i] within [captures] [targets]/`
 
     Unrolls a type with head constant `c`, where `c` is `mu` or `rec`
     or is defined using `mu` or `rec`.  Uses `i` as the level for the
@@ -157,20 +150,19 @@ to be empty.
 
 - `reduceUsing /[reduction] [targets]/`
 
-    Applies the specified reduction.  There is no syntax for
-    reductions; they must be embedded using antiquotes.  (Finding hit
-    numbers may be slow.)
+  Applies the specified reduction.  There is no syntax for reductions;
+  they must be embedded using antiquotes.  (Finding hit numbers may be
+  slow.)
 
 
 - `unreduceUsing /[reduction] with [term M] within [captures] [targets]/`
 
-    Applies the reduction to `M` to obtain a goal term.  Replaces a
-    target term that is equivalent to the goal term with `M`.  The
-    outermost form of the target term must match precisely the
-    outermost form of the normal form of the goal term.
+  Applies the reduction to `M` to obtain a goal term.  Replaces a
+  target term that is equivalent to the goal term with `M`.  The
+  outermost form of the target term must match precisely the outermost
+  form of the normal form of the goal term.
 
-
-- `convertUnreduceUsing /[reduction] with [term M] within [captures] [targets]/`
+  + `convertUnreduceUsing /[reduction] with [term M] within [captures] [targets]/`
 
     Applies the reduction to `M` to obtain a goal term.  Replaces a
     target term that is equivalent to the goal term with `M`.
@@ -179,12 +171,12 @@ to be empty.
 
 - `reduce /[short-targets]/`
 
-    Puts the target term into normal form.
+  Puts the target term into normal form.
 
 
 - `whreduce /[short-targets]/`
 
-    Puts the target term into weak-head-normal form.
+  Puts the target term into weak-head-normal form.
 
 
 
@@ -192,10 +184,10 @@ to be empty.
 
 - `testRewrite /[rewrite] [targets]/`
 
-    As `rewrite`, but shows what is to be done without doing it.  Note
-    that since the rewrite is not actually performed, a target like
-    `at 0 0` will always show the same rewrite twice.
+  As `rewrite`, but shows what is to be done without doing it.  Note
+  that since the rewrite is not actually performed, a target like `at
+  0 0` will always show the same rewrite twice.
 
 - `showPosition /[short-targets]/`
 
-    Displays the indicated term positions.
+  Displays the indicated term positions.

@@ -49,7 +49,7 @@ employed.
 - If a fact needed for typechecking is available in a current
   hypothesis, it will similarly be used.
 
-- Another way to deal with a recalcitrant subterm is to make it for
+- Another way to deal with a recalcitrant subterm is to mark it for
   manual typechecking.  The constant `manual` is the identity (*i.e.,*
   `manual M` = `M`), but the typechecker sets aside any typechecking
   obligation for a manual term.  Thus, if one wishes to leave `M` out
@@ -126,7 +126,7 @@ hard whnf.  (See below.)  Then:
 
 5. If `M` is a variable, attempt to unify its type with `A`, unless
    its type is a universe.  (This is not quite a special case of 8,
-   since `A` might be intersect, etc.)
+   since `A` might be `intersect`, etc.)
 
 6. If `A` is known, use any applicable intro or formation rule.
 
@@ -244,6 +244,65 @@ Three strategies are used for normalization, depending on the context:
    - Never unfolds firm constants.
 
    In other words, basic reduction unfolds soft head constants, but
-   otherwise does only the minimum to put a term into whnf.  To do
-   more might remove vital type annotations expressed using firm
+   otherwise does only the minimum necessary to put a term into whnf.
+   To do more might remove vital type annotations expressed using firm
    constants.
+
+
+### Typechecker interface
+
+There are four main entry points to the typechecker:
+
+- `typecheck : tactic`
+
+  Runs the typechecker on the current goal.
+
+- `withTypecheck : tactic -> tactic`
+
+  Runs the given tactic, then runs the typechecker its subgoals.
+
+- `typecheck1 : tactic`
+
+  Runs the typechecker on the current goal, but one layer deep only.
+
+- `inference : tactic`
+
+  Runs the typechecker for its side-effects (to instantiate evars).
+  Does not solve any goals.
+
+When typechecking fails to discharge a goal, it attaches a short
+message (*e.g.,* `undischarged typing obligation`).  One can obtain
+further information on what went wrong by asking for detail (by
+calling `Prover.detail : unit -> unit` or just entering `C-c C-d` in
+the UI.)
+
+For example, if typechecker is invoked on the goal `true + 1 : nat`,
+one gets back the subgoal:
+
+    [undischarged typing obligation]
+    |-
+    bool = nat : U E6
+
+    1 goal (depth 0)
+
+Additional detail provides:
+
+    Type error: incompatible type paths
+     first: bool
+    second: nat
+    
+    
+    with history:
+    [  0]  bool = nat : U E6
+    [  1]  bool = nat : type
+    [  2]  bool <: nat
+    [  3]  true : nat
+    [  4]  true + 1 : nat
+
+First it explains where it got stuck (`bool` and `nat` don't seem to
+be equal).  Then it gives a trace of the typechecker's efforts that
+led to that point.  At the end of the trace (goal 4 in this case) is
+the initial goal.
+
+One can get a detailed trace of everything the typechecker does by
+setting `Typecheck.trace : bool ref` to true.

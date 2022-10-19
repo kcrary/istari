@@ -64,7 +64,7 @@ yet to be validated, but all of the "delicate" rules are validated.)
 
 - [Batch mode](batch.html)
 
-- Term syntax
+- [Term syntax](terms.html)
 
 - [Definitions](definitions.html)
 
@@ -76,13 +76,13 @@ yet to be validated, but all of the "delicate" rules are validated.)
 
 - [Rewriting](rewriting.html)
 
-- Reordering
+- [Reordering](reordering.html)
 
 - [Modules](modules.html)
 
 - [Files](files.html)
 
-- Case analysis
+- [Case analysis](case.html)
 
 - Tactic primitives
 
