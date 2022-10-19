@@ -11,8 +11,8 @@ exposed so one can implement a new tactic natively:
 
     type 'a tacticm = 
        goal
-       -> (string -> answer)                                                   (* failure continuation *)
-       -> (('a * judgement) list * validator * (string -> answer) -> answer)   (* success continuation *)
+       -> (string -> answer)                                              (* failure continuation *)
+       -> (('a * goal) list * validator * (string -> answer) -> answer)   (* success continuation *)
        -> answer
 
     type tactic = Message.label tacticm
