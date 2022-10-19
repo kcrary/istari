@@ -356,7 +356,7 @@ goal, generating zero or more subgoals.
 
 
 
-### Substitution ###
+### Substitution
 
 - `substitution /[hyp x]/ /[term M]/`
 
