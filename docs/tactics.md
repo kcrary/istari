@@ -370,8 +370,8 @@ goal, generating zero or more subgoals.
 
 - `subst /[hyp x]/`
 
-  When there exists another hypothesis with type `x = M : A` or `M = x
-  : A`, replaces occurrences of `x` with `M`.  Note that `M` must not
+  When there exists another hypothesis with type `x = M : A` or 
+  `M = x : A`, replaces occurrences of `x` with `M`.  Note that `M` must not
   refer to hypotheses after `x`.
   
 
