@@ -19,4 +19,4 @@
     
        end
     
-    structure BinIO = BIN_IO
+    structure BinIO : BIN_IO

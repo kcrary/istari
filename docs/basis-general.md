@@ -1,6 +1,6 @@
 # General
 
-    signature Basis__GENERAL =
+    signature GENERAL =
        sig
     
           datatype order = LESS | EQUAL | GREATER = Pervasive.order
@@ -35,7 +35,7 @@
 
   The SML Basis's exceptions `Chr`, `Size`, and `Subscript` all are replaced by`Invalid`.
     
-  The SML Basis's exception `Bind`, `Match`, and `Overflow` are still used, but cannot be handled.
+  The SML Basis's exceptions `Bind`, `Match`, and `Overflow` are still used, but cannot be handled.
 
 - `exception Subscript`
 

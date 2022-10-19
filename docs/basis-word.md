@@ -1,6 +1,6 @@
 # Word
 
-    signature Basis__WORD =
+    signature WORD =
        sig
     
           type word

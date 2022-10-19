@@ -1,6 +1,6 @@
 # TextIO
 
-    signature Basis__TEXT_IO =
+    signature TEXT_IO =
        sig
     
           type instream
