@@ -107,6 +107,8 @@ found in `prover/rule-tactic.iml`.
 The internal term representation appears in the `Term` module and is
 given by:
 
+    type binder = Symbol.symbol option
+
     datatype term =
        Var    of int
      | Const  of constant
@@ -130,6 +132,9 @@ given by:
        Shift  of int
      | Dot    of term * sub
      | Idot   of int * sub
+
+The `binder` in `Lam` is not significant to the type theory.  The
+implementation uses it to suggest a name for the bound variable.
 
 
 ##### Spinal form
@@ -172,8 +177,8 @@ variables," or as "unification variables"), using the abstract type
     readEbind : ebind -> term option
 
 The primitive operation to write to an ebind is not exposed to the
-user because it is not always sound.  (An occurs check must be peformed.)
-The user may use:
+user because it is not always sound.  (An occurs check must be
+performed.)  The user may use:
 
     Unify.setEbindSub : ebind -> sub -> term -> bool
 
@@ -252,7 +257,7 @@ recursively and obtain a fully normal form.
   been made irreversible), `rewind` raises `Rewind`.
 
 - [`Directory`](directory-sig.html) defines the `directory` type, for maintaining a
-  correspondence between deBruijn indices and names, and gives a
+  correspondence between de Bruijn indices and names, and gives a
   variety of operations on directories.  It also defines the
   `idirectory` type, a lighter-weight directory that is used only in
   one direction, to convert external terms into internal terms.
