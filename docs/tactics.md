@@ -867,6 +867,10 @@ These tactics are primarily used to implement other tactics:
   Invokes its argument tactic.  In the event that tactic fails, it
   alters the error message using the supplied function.
 
+  It is generally a good idea to combine this with a cut.  Otherwise
+  when a subsequent tactic fails it will backtrack through the
+  `transformFailure` and get its error message altered.
+
   + `Tactic.setFailure : string -> 'a tacticm -> 'a tacticm`
 
     As `transformFailure` but it simply replaces the error message.
