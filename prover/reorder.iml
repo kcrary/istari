@@ -42,7 +42,7 @@ signature REORDER =
       (* Contract the first n+1 goals, which must be identical. *)
       val contract : int -> 'a reordering
 
-      val sort : ('a -> 'a -> bool) -> 'a reordering
+      val sort : ('a * goal -> 'a * goal -> bool) -> 'a reordering
 
       val reorder : 'a Tactic.tacticm -> 'a reordering -> 'a Tactic.tacticm
 
@@ -154,46 +154,62 @@ structure Reorder :> REORDER =
                    end)
 
 
-      fun insert comp (goal as (x, _)) goals =
-         (case goals of
-             [] =>
-                ([goal], (fn vs => vs))
 
-           | (goal' as (y, _)) :: rest =>
-                if comp x y then
-                   (goal :: goals,
-                    (fn vs => vs))
-                else
-                   let
-                      val (rest', f) = insert comp goal rest
-                   in
-                      (goal' :: rest',
-                       (fn [] => raise ValidationFailure
-                         | v2 :: vs =>
-                              (case f vs of
-                                  [] => raise ValidationFailure
-                                | v1 :: vrest =>
-                                     v1 :: v2 :: vrest)))
-                   end)
+      (* just getting a value of type validation *)
+      val bogusValidation =
+         let
+            val (_, validate) =
+               Refine.refine
+                  Rule.unitForm
+                  (Judgement.make 
+                      Seq.empty 
+                      (Term.apply1 Prim.istp (Term.Const Prim.unit)))
+
+            val (v, _) = validate []
+         in
+            v
+         end
+                  
 
       fun sort comp goals =
-         (case goals of
-             [] =>
-                ([], (fn vs => vs))
+         let
+            val sorted =
+               Juliasort.sort' 
+                  (fn ((x, _), (y, _)) => comp x y)
+                  (List.mapi (fns i goal => (goal, i)) goals)
 
-           | goal :: rest =>
-                let
-                   val (rest', f) = sort comp rest
-                   val (goals', g) = insert comp goal rest'
-                in
-                   (goals',
-                    (fn vs =>
-                        (case g vs of
-                            [] => raise ValidationFailure
+            val len = List.length goals
 
-                          | v1 :: vrest =>
-                               v1 :: f vrest)))
-                end)
+            fun validate vs =
+               let
+                  val a = Array.tabulate len (fn _ => bogusValidation)
+
+                  fun invert l vs =
+                     (case (l, vs) of
+                         ([], _) => vs
+
+                       | ((_, i) :: l', v :: vs') =>
+                            (
+                            Array.update a i v;
+                            invert l' vs'
+                            )
+
+                       | _ =>
+                            raise (Fail "precondition"))
+
+                  val vrest = invert sorted vs
+
+                  fun build i acc =
+                     if i = 0 then
+                        acc
+                     else
+                        build (i-1) (Array.sub a (i-1) :: acc)
+               in
+                  build len vrest
+               end
+         in
+            (List.map fst sorted, validate)
+         end
 
 
 
