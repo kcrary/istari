@@ -28,6 +28,16 @@ signature GENERALIZE =
       val generalizeRaw : eterm -> eterm -> symbol option -> tactic
       val generalize : eterm -> eterm -> symbol option -> tactic
 
+
+      val rememberGenRaw : eterm -> eterm -> int list option -> symbol option -> symbol option -> tactic
+      val rememberGen : eterm -> eterm -> int list option -> symbol option -> symbol option -> tactic
+
+      val rememberAtRaw : eterm -> eterm -> int list -> symbol option -> symbol option -> tactic
+      val rememberAt : eterm -> eterm -> int list -> symbol option -> symbol option -> tactic
+
+      val rememberRaw : eterm -> eterm -> symbol option -> symbol option -> tactic
+      val remember : eterm -> eterm -> symbol option -> symbol option -> tactic
+
    end
 
 
@@ -265,6 +275,7 @@ structure GeneralizeInternal :> GENERALIZE_INTERNAL =
                    fail (String.concat ["only ", Int.toString i, " occurrences found"]))
          end
 
+
       fun generalizeGenRaw em ea occ name = generalizeGenPriority em ea occ name >> idtac
 
       fun generalizeGen em ea occ name = Typecheck.withTypecheckSnd $ generalizeGenPriority em ea occ name
@@ -280,6 +291,127 @@ structure GeneralizeInternal :> GENERALIZE_INTERNAL =
 
       fun generalize em ea name =
          generalizeGen em ea NONE name
+
+
+
+      fun rememberGenPriority em ea occ name eqname =
+         let
+            do (jud, dir) = withgoal
+            val idir = D.idir dir
+
+            val m = em idir
+            val a = ea idir
+
+            val c = J.concl jud
+
+            val eq = 
+               T.apply3 Prim.eq
+                  (T.Sub (a, T.Shift 2))
+                  T.zero
+                  (T.Sub (m, T.Shift 2))
+         in
+            (case pattern m c occ of
+                Sum.INL b =>
+                   (* |- C *)
+                   refine (Rule.assert (T.apply2 Prim.ov a m) (J.concl jud))
+                   >>> [
+                       (* |- M : A *)
+                       idtacM TC.Secondary,
+
+                       (* M : A |- C[^] *)
+                       refine (Rule.arrowElim
+                                  (T.apply3 Prim.eq
+                                      (T.Sub (a, T.shift1))
+                                      (T.Sub (m, T.shift1))
+                                      (T.Sub (m, T.shift1)))
+                                  (T.Sub (c, T.shift1)))
+                       >>> [
+                           (* M : A |- M[^] = M[^] : A[^] -> C[^]
+                                     = M[^] = M[^] : A[^] -> B[M . id][^]
+                                     = M[^] = M[^] : A[^] -> B[M[^] . ^]
+                                     = (0 = M[^2] : A[^2] -> B[0 . ^2])[M[^] . id]
+                           *)
+                           refine (Rule.forallElim
+                                      (T.Sub (a, T.shift1))
+                                      (T.apply2 Prim.arrow
+                                          eq
+                                          (T.Sub (b, T.Idot (0, T.Shift 2))))
+                                      (T.Sub (m, T.shift1)))
+                           >>> [
+                               (* M : A |- forall A[^] . 0 = M[^2] : A[^2] -> B[0 . ^2] *)
+                               refine (Rule.forallIntro
+                                          (T.Sub (a, T.shift1))
+                                          (T.apply2 Prim.arrow
+                                              eq
+                                              (T.Sub (b, T.Idot (0, T.Shift 2)))))
+                               >>> [
+                                   (* M : A |- A[^] : type *)
+                                   refine (Rule.inhabitedForm (T.evar ()))
+                                   >>
+                                   (* M : A |- A[^] *)
+                                   refine (Rule.inhabitant (T.evar ()) (T.Sub (m, T.shift1)))
+                                   >>
+                                   (* M : A |- M[^] : A[^] *)
+                                   refine (Rule.hypothesis 0) >> done,
+
+                                   (* M : A, A[^] |- 0 = M[^2] : A[^2] -> B[0 . ^2] *)
+                                   refine (Rule.arrowIntro
+                                              eq
+                                              (T.Sub (b, T.Idot (0, T.Shift 2))))
+                                   >>> [
+                                       (* M : A, A[^] |- (0 = M[^2] : A[^2]) : type *)
+                                       refine (Rule.eqForm (T.evar ()) (T.evar ()) (T.evar ()))
+                                       >>> [
+                                           (* M : A, A[^] |- 0 : A[^2] *)
+                                           refine (Rule.hypothesisOf 0) >> done,
+                                          
+                                           (* M : A, A[^] |- M[^2] : A[^2] *)
+                                           refine (Rule.hypothesis 1) >> done
+                                           ],
+
+                                       (* M : A, A[^], 0 = M[^2] : A[^2] |- B[1 . ^3] *)
+                                       refine (Rule.weaken 2 1)
+                                       >>
+                                       (* A, 0 = M[^] : A[^] |- B[1 . ^2] *)
+                                       chdir (D.bindh (D.bindh dir name) eqname)
+                                       >> idtacM TC.Primary
+                                       ]
+                                   ],
+        
+                               (* M : A |- M[^] : A[^] *)
+                               refine (Rule.hypothesis 0) >> done
+                               ],
+
+                           (* M : A |- M[^] = M[^] : A[^] *)
+                           refine (Rule.eqRefl
+                                      (T.Sub (a, T.shift1))
+                                      (T.Sub (m, T.shift1)))
+                           >>
+                           (* M : A |- M[^] : A[^] *)
+                           refine (Rule.hypothesis 0) >> done
+                           ]
+                       ]
+
+              | Sum.INR i =>
+                   fail (String.concat ["only ", Int.toString i, " occurrences found"]))
+         end
+
+                       
+      fun rememberGenRaw em ea occ name eqname = rememberGenPriority em ea occ name eqname >> idtac
+
+      fun rememberGen em ea occ name eqname = Typecheck.withTypecheckSnd $ rememberGenPriority em ea occ name eqname
+
+      fun rememberAtRaw em ea occ name eqname =
+         rememberGenRaw em ea (SOME occ) name eqname
+
+      fun rememberAt em ea occ name eqname =
+         rememberGen em ea (SOME occ) name eqname
+
+      fun rememberRaw em ea name eqname =
+         rememberGenRaw em ea NONE name eqname
+
+      fun remember em ea name eqname =
+         rememberGen em ea NONE name eqname
 
    end
 

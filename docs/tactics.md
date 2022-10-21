@@ -611,13 +611,35 @@ The destruction tactics are:
 
   + `generalizeAt /[term M]/ /[term A]/ /[numbers]/ /[name option]/`
 
-    As `generalize`, but only generalizes the indicated appearances of
+    As `generalize`, but only replaces the indicated appearances of
     `M`.  For example, if `[numbers]` is `0 2` then the first and
-    third appearances of `M` are generalized.
+    third appearances of `M` are replaced.
 
   + `generalizeAtRaw /[term M]/ /[term A]/ /[numbers]/ /[name option]/`
 
     As `generalizeAt` but does not invoke the typechecker.
+
+
+- `remember /[term M]/ /[term A]/ /[name option]/ /[eq name option]/`
+
+  If `M : A`, replaces all occurrences of `M` in the conclusion with a
+  new hypothesis (say `x`) with the given name.  Also creates a
+  hypothesis that equates `x` with `M`.  (Names are invented if not
+  supplied.)
+
+  + `rememberRaw /[term M]/ /[term A]/ /[name option]/ /[eq name option]/`
+
+    As `remember` but does not invoke the typechecker.
+
+  + `rememberAt /[term M]/ /[term A]/ /[numbers]/ /[name option]/ /[eq name option]/`
+
+    As `remember`, but only replaces the indicated appearances of
+    `M`.  For example, if `[numbers]` is `0 2` then the first and
+    third appearances of `M` are replaced.
+
+  + `rememberAtRaw /[term M]/ /[term A]/ /[numbers]/ /[name option]/ /[eq name option]/`
+
+    As `rememberAt` but does not invoke the typechecker.
 
 
 
