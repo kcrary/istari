@@ -251,7 +251,7 @@ Three strategies are used for normalization, depending on the context:
 
 ### Typechecker interface
 
-There are four main entry points to the typechecker:
+There are five main entry points to the typechecker:
 
 - `typecheck : tactic`
 
@@ -269,6 +269,11 @@ There are four main entry points to the typechecker:
 
   Runs the typechecker for its side-effects (to instantiate evars).
   Does not solve any goals.
+
+- `typechecker : unit -> unit`
+
+  Runs the typechecker on all of the current goals.
+
 
 When typechecking fails to discharge a goal, it attaches a short
 message (*e.g.,* `undischarged typing obligation`).  One can obtain

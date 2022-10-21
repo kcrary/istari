@@ -194,6 +194,18 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
            | Sum.INR msg => fk msg)
          
 
+
+      fun priorityOrder pri1 pri2 =
+         (case pri1 of
+             TC.Primary => true
+
+           | _ =>
+                (case pri2 of
+                    TC.Secondary => true
+
+                  | _ => false))
+
+
       fun soPriority em pat =
          let
             do (jud, dir) = withgoal
@@ -202,11 +214,13 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
             do (a, tac) =
                soMain (J.context jud) m fail
          in
-            refine (Rule.assert a (J.concl jud)) >>>
-               [
-               tac,
-               DE.destruct0 pat (idtacM TC.Primary)
-               ]
+            Reorder.reorder
+               (refine (Rule.assert a (J.concl jud)) >>>
+                   [
+                   tac,
+                   DE.destruct0 pat (idtacM TC.Primary)
+                   ])
+               (Reorder.sort priorityOrder)
          end
 
       fun soRaw em pat = soPriority em pat >> idtac
@@ -299,12 +313,14 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
 
             val c = J.concl jud
          in
-            (* applyMain has to return answer *)
-            fns goal fk sk =>
-            applyMain a c
-               atac
-               (fn () => fk "lemma does not match goal")
-               (fn ctac => ctac goal fk sk)
+            Reorder.reorder
+               (* applyMain has to return answer *)
+               (fns goal fk sk =>
+                   applyMain a c
+                      atac
+                      (fn () => fk "lemma does not match goal")
+                      (fn ctac => ctac goal fk sk))
+               (Reorder.sort priorityOrder)
          end
 
       fun applyRaw em = applyPriority em >> idtac
@@ -357,11 +373,13 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
 
             (* btac partially proves G |- B *)
          in
-            refine (Rule.assert b (J.concl jud)) >>>
-               [
-               btac,
-               DE.destruct0 pat (idtacM TC.Primary)
-               ]
+            Reorder.reorder
+               (refine (Rule.assert b (J.concl jud)) >>>
+                   [
+                   btac,
+                   DE.destruct0 pat (idtacM TC.Primary)
+                   ])
+               (Reorder.sort priorityOrder)
          end
 
       fun exploitRaw em pat = exploitGen false em pat >> idtac
@@ -389,7 +407,9 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
          in
             (* checking the match ourselves allows us to produce a better error message *)
             if Unify.unify1 a (J.concl jud) then
-               atac
+               Reorder.reorder
+                  atac
+                  (Reorder.sort priorityOrder)
             else
                fail "witness does not match goal"
          end

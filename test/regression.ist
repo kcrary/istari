@@ -6,6 +6,100 @@ Ctrl.use "../library/acc-load.iml";
 Ctrl.use "../library/nat-load.iml";
 
 
+lemma "apply_subgoals"
+/
+  forall (a : U 0) (b : a -> U 0) (c : U 0) (a1 a2 : a) .
+    (forall (x y : a) . b x -> b y -> c)
+    -> b a1
+    -> b a2
+    -> c
+/;
+
+intro /a b c a1 a2 H H1 H2/.
+apply /H/.
+  {
+  hyp /H1/.
+  }
+
+  {
+  hyp /H2/.
+  }
+typechecker ();
+qed ();
+
+
+
+lemma "so_subgoals"
+/
+  forall (a : U 0) (b : a -> U 0) (c : U 0) (a1 a2 : a) .
+    (forall (x y : a) . b x -> b y -> c)
+    -> b a1
+    -> b a2
+    -> c
+/;
+
+intro /a b c a1 a2 H H1 H2/.
+so /H _ _ __ __/ /H'/.
+  {
+  hyp /H1/.
+  }
+
+  {
+  hyp /H2/.
+  }
+typechecker ();
+hyp /H'/.
+qed ();
+
+
+
+lemma "exploit_subgoals"
+/
+  forall (a : U 0) (b : a -> U 0) (c : U 0) (a1 a2 : a) .
+    (forall (x y : a) . b x -> b y -> c)
+    -> b a1
+    -> b a2
+    -> c
+/;
+
+intro /a b c a1 a2 H H1 H2/.
+eexploit /H/ /H'/.
+  {
+  hyp /H1/.
+  }
+
+  {
+  hyp /H2/.
+  }
+typechecker ();
+hyp /H'/.
+qed ();
+
+
+
+lemma "witness_subgoals"
+/
+  forall (a : U 0) (b : a -> U 0) (c : U 0) (a1 a2 : a) .
+    (forall (x y : a) . b x -> b y -> c)
+    -> b a1
+    -> b a2
+    -> c
+/;
+
+intro /a b c a1 a2 H H1 H2/.
+witness /H _ _ __ __/.
+  {
+  hyp /H1/.
+  }
+
+  {
+  hyp /H2/.
+  }
+typechecker ();
+qed ();
+
+
+
 lemma "unroll_letrec"
 /
   let f = fix (fn f x . natcase x 0 (fn x' . succ (f x'))) in f : nat -> nat
@@ -1726,13 +1820,13 @@ H.insert EqualityTacticInternal.reflexivityTactics (parseConstant /Nat.leq/)
 (B.witnessPriority /Nat.leq_refl _/);
 
 H.insert EqualityTacticInternal.symmetryTactics eqnat
-(andthenOn 2 (B.witnessPriority /eqnat_symm _ _ __/));
+(andthenOn 0 (B.witnessPriority /eqnat_symm _ _ __/));
 
 H.insert EqualityTacticInternal.transitivityTactics (parseConstant /Nat.leq/)
 (fn n => B.witnessPriority /Nat.leq_trans _ `l \n\ _ __ __/);
 
 H.insert RewriteInternal.weakeningTable eqnat 
-[(leq, true, andthenOn 2 (B.witnessPriority /eqnat_impl_leq _ _ __/))];
+[(leq, true, andthenOn 0 (B.witnessPriority /eqnat_impl_leq _ _ __/))];
 
 
 
@@ -1795,22 +1889,22 @@ List.app
      RewriteInternal.CICTable.insert RewriteInternal.compatibilityTable (hconst, i, const1) (const2, cov, tacfn))
   [
   (Prim.succ, 0, leq, leq, true,
-   andthenOn 2 (B.witnessPriority /succ_compat_leq _ _ __/)),
+   andthenOn 0 (B.witnessPriority /succ_compat_leq _ _ __/)),
 
   (natop, 0, eqnat, Prim.eq, true,
-   andthenOn 2 (B.witnessPriority /natop_compat_eqnat _ _ __/)),
+   andthenOn 0 (B.witnessPriority /natop_compat_eqnat _ _ __/)),
 
   (add, 0, leq, leq, true,
-   andthenOn 4 (B.witnessPriority /add_compat_leq _ _ _ _ __ __/)),
+   andthenOn 0 (B.witnessPriority /add_compat_leq _ _ _ _ __ __/)),
 
   (add, 1, leq, leq, true,
-   andthenOn 5 (B.witnessPriority /add_compat_leq _ _ _ _ __ __/)),
+   andthenOn 1 (B.witnessPriority /add_compat_leq _ _ _ _ __ __/)),
 
   (leq, 0, leq, Prim.arrow, false,
-   andthenOn 4 (B.witnessPriority /leq_implication _ _ _ _ __ __/)),
+   andthenOn 0 (B.witnessPriority /leq_implication _ _ _ _ __ __/)),
 
   (leq, 1, leq, Prim.arrow, true,
-   andthenOn 5 (B.witnessPriority /leq_implication _ _ _ _ __ __/)),
+   andthenOn 1 (B.witnessPriority /leq_implication _ _ _ _ __ __/)),
   ];
 
 
@@ -1855,7 +1949,7 @@ intro /i a b m n n' p H Hleq x Ha/.
 moveBefore /Hleq/ /H/.
 testRewrite /-> Hleq in H , <- Hleq/;
 rewrite /-> Hleq in H/.
-apply /H/ >>> [idtac, hyp /Ha/].
+apply /H/ >>> [hyp /Ha/, idtac].
 Message.display ();
 hypof.
 qed ();
@@ -2256,7 +2350,6 @@ lemma "eexploit"
 intro /i a b c d e f w x y z/.
 eexploit /f/ /H/.
 Message.display ();
-Prover.reorder (Reorder.rotateForward 1);
   {
   hyp /x/.
   }
@@ -2302,9 +2395,12 @@ Message.display ();
   }
 
   {
+  hyp /H/.
+  }
+
+  {
   Tactic.refine (Rule.hypothesisOf 0).
   }
-hyp /H/.
 Prover.qed ();
 
 

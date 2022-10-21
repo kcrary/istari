@@ -18,6 +18,8 @@ signature PROVER =
       val abandon : unit -> unit
       val qed : unit -> unit
 
+      val typechecker : unit -> unit
+
       val show : unit -> unit
       val showFull : unit -> unit
       val showLiteral : unit -> unit
@@ -496,6 +498,24 @@ structure ProverInternal :> PROVER_INTERNAL =
       fun openGoal goal =
          setGoals [goal] (fn _ => print "Goal complete.\n")
       
+
+
+      fun typechecker () =
+         action
+         (fn (d, goals, k) =>
+             let
+                val (subgoals, validate) =
+                   TypecheckInternal.multigoalTypecheck (List.map snd goals)
+             in
+                R.assign theState
+                (SOME
+                    (d,
+                     List.map (fn goal => (Message.blank, goal)) subgoals,
+
+                     (fn vs => k (validate vs))))
+             end)
+
+
 
       fun originalGoals () =
          (case R.deref theOriginalGoals of

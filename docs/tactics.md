@@ -699,14 +699,21 @@ The destruction tactics are:
 
 - `infer /[term M]/ /[name option]/`
 
-  If `M` is path, proves `M : A` and creates a new hypothesis of that
-  type with the given name.  (A name is invented if no name is
+  If `M` is a path, proves `M : A` and creates a new hypothesis of
+  that type with the given name.  (A name is invented if no name is
   supplied.)
 
   + `inferRaw /[term M]/ /[name option]/`
 
     As `infer` but does not invoke the typechecker on the path's
     arguments.
+
+
+- `typechecker : unit -> unit`
+
+  Runs the typechecker on all of the current goals.
+
+  Note this this is not a tactic, so it is invoked `typechecker ();`, not `typechecker.`
 
 
 - `Typecheck.trace : bool ref`
