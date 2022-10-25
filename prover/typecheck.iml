@@ -56,7 +56,7 @@ signature TYPECHECK_INTERNAL =
 
       val multigoalTypecheck :
          Tactic.goal list
-         -> Tactic.goal list * (Refine.validation list -> Refine.validation list)
+         -> (Message.label * Tactic.goal) list * (Refine.validation list -> Refine.validation list)
 
    end
 
@@ -2253,7 +2253,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                              (case isTypecheckGoalTri jud of
                                  NO =>
                                     ([(Istp, table, wf goal, dest, [])],
-                                     nonerror [goal] goal)
+                                     idtac)
 
                                | YES prob =>
                                     ([(prob, table, goal, dest, [])],
@@ -2358,7 +2358,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                 (fn msg => raise (Fail ("internal typechecking tactic failure:" ^ msg)))
                 (fn (subgoals, validate, _) => Answer (subgoals, validate))
              of
-                Answer (subgoals, validate) => (map (fn (_, goal) => goal) subgoals, validate)
+                Answer (subgoals, validate) => (subgoals, validate)
 
               | _ => raise (Fail "impossible"))
          end

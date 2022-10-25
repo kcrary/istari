@@ -93,7 +93,8 @@ goal, generating zero or more subgoals.
 
   The tactic `orthen tac1 thunk2` applies `tac1`.  If it fails, it
   calls `thunk2` to obtain a second tactic that it then applies.
-  Equivalent to `first [tac1, lift thunk2]`.
+  Equivalent to `first [tac1, lift thunk2]`.  Designed to work in
+  conjunction with [`do` notation](iml.html#do-bindings).
 
 
 
@@ -623,7 +624,7 @@ The destruction tactics are:
 - `remember /[term M]/ /[term A]/ /[name option]/ /[eq name option]/`
 
   If `M : A`, replaces all occurrences of `M` in the conclusion with a
-  new hypothesis (say `x`) with the given name.  Also creates a
+  new hypothesis with the given name (say `x`).  Also creates a
   hypothesis that equates `x` with `M`.  (Names are invented if not
   supplied.)
 

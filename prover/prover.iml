@@ -56,7 +56,7 @@ signature PROVER_INTERNAL =
       val clean : Term.term -> problem option
 
 
-      val setGoals : Tactic.goal list -> (Refine.validation list -> unit) -> unit
+      val setGoals : (Message.label * Tactic.goal) list -> (Refine.validation list -> unit) -> unit
 
 
       (* sets a persistent checkpoint if not within a lemma *)
@@ -476,8 +476,6 @@ structure ProverInternal :> PROVER_INTERNAL =
              (case R.deref theState of
                  NONE =>
                     let
-                       val goals' = map (fn goal => (blank, goal)) goals
-
                        fun k' vs =
                           (
                           R.assign theState NONE;
@@ -486,8 +484,8 @@ structure ProverInternal :> PROVER_INTERNAL =
                           )
                     in
                        !beforeLemmaHook ();
-                       R.assign theState (SOME (0, goals', k'));
-                       R.assign theOriginalGoals (SOME goals');
+                       R.assign theState (SOME (0, goals, k'));
+                       R.assign theOriginalGoals (SOME goals);
                        Message.message 10 0 showGoals
                     end
           
@@ -496,7 +494,7 @@ structure ProverInternal :> PROVER_INTERNAL =
 
 
       fun openGoal goal =
-         setGoals [goal] (fn _ => print "Goal complete.\n")
+         setGoals [(Message.blank, goal)] (fn _ => print "Goal complete.\n")
       
 
 
@@ -509,8 +507,7 @@ structure ProverInternal :> PROVER_INTERNAL =
              in
                 R.assign theState
                 (SOME
-                    (d,
-                     List.map (fn goal => (Message.blank, goal)) subgoals,
+                    (d, subgoals,
 
                      (fn vs => k (validate vs))))
              end)
