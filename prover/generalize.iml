@@ -38,6 +38,10 @@ signature GENERALIZE =
       val rememberRaw : eterm -> eterm -> symbol option -> symbol option -> tactic
       val remember : eterm -> eterm -> symbol option -> symbol option -> tactic
 
+
+      val setEqRaw : symbol -> ETerm.eterm -> ETerm.eterm -> symbol option -> tactic
+      val setEq : symbol -> ETerm.eterm -> ETerm.eterm -> symbol option -> tactic
+
    end
 
 
@@ -413,6 +417,84 @@ structure GeneralizeInternal :> GENERALIZE_INTERNAL =
       fun remember em ea name eqname =
          rememberGen em ea NONE name eqname
 
+
+      fun setEqPriority sym em ea symEq =
+         let
+            do (jud, dir) = withgoal
+
+            val m = ETerm.withdir dir em
+            val a = ETerm.withdir dir ea
+            val c = J.concl jud
+
+            val dir' =
+               D.bindh (D.bind dir sym) symEq
+         in
+            (* C *)
+            refine (Rule.assert (T.apply2 Prim.ov a m) c)
+            >>> [
+                (* M : A *)
+                idtacM TC.Secondary,
+
+                (* M : A |- C[^] *)
+                refine (Rule.arrowElim
+                           (T.apply3 Prim.eq 
+                               (T.Sub (a, T.shift1))
+                               (T.Sub (m, T.shift1))
+                               (T.Sub (m, T.shift1)))
+                           (T.evar ()))
+                >>> [
+                    (* M : A |- M[^] = M[^] : A[^] -> C[^]
+                              = (0 = M[^2] : A[^2] -> C[^2])[M[^] . id]
+                    *)
+                    refine (Rule.generalize 
+                               (T.Sub (a, T.shift1))
+                               (T.apply2 Prim.arrow
+                                   (T.apply3 Prim.eq
+                                       (T.Sub (a, T.Shift 2))
+                                       T.zero
+                                       (T.Sub (m, T.Shift 2)))
+                                   (T.Sub (c, T.Shift 2)))
+                               (T.Sub (m, T.shift1)))
+                    >>> [
+                        (* M : A |- M[^] : A[^] *)
+                        refine (Rule.hypothesis 0) >> done,
+
+                        (* M : A, A[^] |- 0 = M[^2] : A[^2] -> C[^2] *)
+                        refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                        >>> [
+                            (* M : A, A[^] |- (0 = M[^2] : A[^2]) : type *)
+                            refine (Rule.eqForm (T.evar ()) (T.evar ()) (T.evar ()))
+                            >>> [
+                                (* M : A, A[^] |- 0 : A[^2] *)
+                                refine (Rule.hypothesisOf 0) >> done,
+
+                                (* M : A, A[^] |- M[^2] : A[^2] *)
+                                refine (Rule.hypothesis 1) >> done
+                                ],
+
+                            (* M : A, A[^], 0 = M[^2] : A[^2] |- C[^3] *)
+                            refine (Rule.weaken 2 1)
+                            >>
+                            (* A, 0 = M[^] : A[^] |- C[^2] *)
+                            chdir dir' >> idtacM TC.Primary
+                            ]
+                        ],
+
+                    (* M : A |- M[^] = M[^] : A[^] *)
+                    refine (Rule.eqRefl (T.evar ()) (T.evar ()))
+                    >>
+                    (* M : A |- M[^] : A[^] *)
+                    refine (Rule.hypothesis 0) >> done
+                    ]
+                ]
+         end
+
+      fun setEqRaw sym em ea symEq =
+         setEqPriority sym em ea symEq >> idtac
+
+      fun setEq sym em ea symEq =
+         TC.withTypecheckSnd $ setEqPriority sym em ea symEq
+ 
    end
 
 

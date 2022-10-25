@@ -643,6 +643,16 @@ The destruction tactics are:
     As `rememberAt` but does not invoke the typechecker.
 
 
+- `setEq /[name x]/ /[term M]/ /[term A]/ /[name option H]/`
+
+  If `M : A`, creates new hypotheses `x : A` and `H : (x = M : A)`.
+  (The name H is invented if not supplied.)
+
+  + `setEqRaw /[name x]/ /[term M]/ /[term A]/ /[name option H]/`
+
+    As `setEq` but does not invoke the typechecker.
+
+
 
 ### Induction
 
