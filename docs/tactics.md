@@ -668,7 +668,7 @@ The destruction tactics are:
   conclusion is not already known to be a well-formed type.  For
   natural numbers and for datatypes it also provides strong induction.
   (The strong induction on datatypes employs the [subterm
-  order](definitions.md#strong-induction).)
+  order](definitions.html#strong-induction).)
 
   + `inductRaw /[hyp x]/`
 
