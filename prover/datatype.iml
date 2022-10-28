@@ -233,6 +233,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             T.apply1 Prim.succ (natTerm (i-1))
 
 
+
+      (* Turns the external syntax for datatypes into internal, resolving names. *)
       fun resolve ((invis, pers, univ, dts) : typedef) : rtypedef =
          try
             let
@@ -743,6 +745,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       val constSubtermCon = loadSymbol datatypeSym "subterm_con"
       val constIter = loadSymbol datatypeSym "dt_iter"
 
+
+
+      (* Xterm definitions *)
+
       fun xvar i ctx = X.var i (List.nth ctx i)
 
       fun xconstant const = X.constant (Susp.force const)
@@ -800,14 +806,11 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          end
          
 
-
       fun xadjust depth (depth', m) = X.weaken m (depth - depth')
 
 
 
-      fun unshift m = T.Sub (m, T.Dot (T.Const Prim.bogus, T.id))
-
-
+      (* Defining constants *)
 
       fun define sym ((def, deft, deftac):X.xterm) t =
          let
@@ -839,19 +842,21 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             const
          end
 
+      fun close const = Constant.abstract const
+
+
+      
+      (* Miscellaneous facilities *)
 
       val xsym = Symbol.fromValue "x"
       val ysym = Symbol.fromValue "y"
       val zsym = Symbol.fromValue "z"
 
 
-
-      fun close const = Constant.abstract const
-
+      fun unshift m = T.Sub (m, T.Dot (T.Const Prim.bogus, T.id))
 
       (* for unpackConstr *)
       datatype entry = Item of (int * term) | Subst of T.sub
-
 
 
       val list_rec_cons = Susp.delay (fn () => RR.toUreduction2 $ RR.read $ List.map Symbol.fromValue ["Datatype", "list_rec_cons"])
@@ -871,8 +876,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
          
+      (* I/O and record-keeping *)
+
       (* the stuff destructor needs *)
-      type environment =
+      type destructor_environment =
          (symbol * mxterm) list        (* invis *)
          * (symbol * mxterm) list      (* pers *)
          * mxterm                      (* univ *)
@@ -900,15 +907,15 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          (* for each datatype *)
          (Constant.constant            (* the datatype *)
            * Constant.constant         (* its iterator *)
-           * int                       (* number of invisible pervasive arguments *)
-           * int                       (* number of visible pervasive arguments *)
            * int                       (* the number of index arguments *)
            * Constant.constant         (* the strip constant *)
          ) list
-         * environment
+         * int                         (* number of invisible pervasive arguments *)
+         * int                         (* number of visible pervasive arguments *)
          * Constant.constant           (* the skeleton constant *)
          * Constant.constant           (* the subterm constant *)
          * Constant.constant           (* the subterm-well-founded constant *)
+         * destructor_environment      (* the environment for destructor *)
 
 
       val pumx : mxterm P.pu =
@@ -934,7 +941,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                (P.pair P.int (P.list pumx))
             ]
 
-      val puEnvironment : environment P.pu =
+      val puDestructorEnvironment : destructor_environment P.pu =
          P.tuple7
             (P.list (P.pair PP.puSymbol pumx))
             (P.list (P.pair PP.puSymbol pumx))
@@ -958,26 +965,29 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                     (P.list pumx)))
 
       val puDatatypeRecord : datatype_record P.pu =
-         P.tuple5
+         P.tuple7
             (P.list 
-                (P.tuple6
+                (P.tuple4
                     PP.puConstant
                     PP.puConstant
-                    P.int
-                    P.int
                     P.int
                     PP.puConstant))
-            puEnvironment
+            P.int
+            P.int
             PP.puConstant
             PP.puConstant
             PP.puConstant
+            puDestructorEnvironment
 
       val theDatatypes : datatype_record list CR.cref = CR.new []
-         
 
-      (* We manually closure-convert the destructor function so we can pickle its environment. *)
 
-      fun destructor ((invis, pers, univ_mobile, a_mobile, dcons_mobile, tplist, conlist):environment) =
+
+      (* The destruction function.
+         We manually closure-convert it so we can pickle its environment.
+      *)
+
+      fun destructor ((invis, pers, univ_mobile, a_mobile, dcons_mobile, tplist, conlist):destructor_environment) =
          let
             val a = X.use a_mobile
             val dcons = X.use dcons_mobile
@@ -1500,7 +1510,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-      (* For the merged iterator. *)
+      (* For merging iterators into the joint iterator. *)
 
       fun mergeLoop n ctx a mergees =
          if n = 0 then
@@ -1581,6 +1591,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
+      (* Does the main work of building the datatypes. *)
       fun makeDatatype (typedef as (invis, pers, univ_mobile, dts) : itypedef) =
          let
             val mut = List.length dts
@@ -2977,13 +2988,13 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-            (* 10. Populate the destructor, induction, and iterator tables.
+            (* 10. Populate the tables.
 
                (Note that we can't just use the iterator for destruct.  We want to destruct datatype
                hypotheses in-place, which the iterator cannot do.)
             *)
 
-            val environment =
+            val destEnv =
                (invis,
                 pers,
                 univ_mobile,
@@ -2998,9 +3009,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                 map2 
                    (fns (const, red, _) (i, j, _, args, numargs, indices) =>
                        (const, red, i, j, args, numargs, indices))
-                   conInfoList allcons):environment
+                   conInfoList allcons)
+               : destructor_environment
 
-            val destructor' = destructor environment
+            val destructor' = destructor destEnv
 
             val () =
                CR.assign theDatatypes
@@ -3021,16 +3033,20 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                            ConstantTable.insert InductionInternal.iterators const 
                               (iter, numberOfVisibleArgs, numberOfIndexArgs);
 
-                           (const, iter, numberOfInvisibleArgs, numberOfVisibleArgs, numberOfIndexArgs, stripConst)
+                           (const, iter, numberOfIndexArgs, stripConst)
                            ))
                        typeInfoList
                        iterInfoList,
-                    environment,
+                    numberOfInvisibleArgs,
+                    numberOfVisibleArgs,
                     skeletonConst,
                     subtermConst,
-                    subtermWellFoundedConst)
+                    subtermWellFoundedConst,
+                    destEnv)
                    :: CR.deref theDatatypes)
          in
+            (* Make all the contants opaque. *)
+
             close skeletonConst;
             close subtermConst;
             close subtermTransConst;
@@ -3072,19 +3088,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             ]
 
 
-      fun withHandler f =
-         try
-            f ()
-         with
-            exn as (Message.Error (_, msg)) =>
-               (
-               print msg;
-               raise exn
-               )
-
-
       fun typedefRaw typedef = 
-         withHandler
+         Message.withHandler
          (fn () =>
              let
                 val () = ProverInternal.checkpoint ()
@@ -3096,12 +3101,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
     
                 do vs = ProverInternal.setGoals goals'
              in
-                withHandler (fn () => makeDatatype (f vs))
+                Message.withHandler (fn () => makeDatatype (f vs))
              end)
 
 
       fun typedef typedef = 
-         withHandler
+         Message.withHandler
          (fn () =>
              let
                 val () = ProverInternal.checkpoint ()
@@ -3120,7 +3125,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                        let
                           do vs = ProverInternal.setGoals goals'
                        in
-                          withHandler (fn () => makeDatatype (f (g vs)))
+                          Message.withHandler (fn () => makeDatatype (f (g vs)))
                        end)
              end)
 
@@ -3138,12 +3143,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
           of
              NONE => ()
 
-           | SOME (l, env, skel, subterm, subtermWf) =>
+           | SOME (l, ninvis, nvis, skel, subterm, subtermWf, destEnv) =>
                 let
-                   val destructor' = destructor env
+                   val destructor' = destructor destEnv
                 in
                    List.app
-                      (fn (const, iter, ninvis, nvis, nind, strip) => 
+                      (fn (const, iter, nind, strip) => 
                           (
                           ConstantTable.insert DE.destructTactics const destructor';
 

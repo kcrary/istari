@@ -704,7 +704,10 @@ lemma "strict_cycle"
 
 reduce //.
 inference.
-Message.display ();
+(*
+Should see:
+Level error: constraints have no solution: strict cycle
+*)
 Prover.abandon ();
 
 
@@ -715,7 +718,10 @@ lemma "inexpressible_constraint1"
 
 reduce //.
 inference.
-Message.display ();
+(*
+Should see:
+Level error: constraints have no solution: scope violation
+*)
 Prover.abandon ();
 
 
@@ -726,7 +732,9 @@ lemma "inexpressible_constraint2"
 
 reduce //.
 inference.
-Message.display ();
+(* Should see:
+Level error: constraints have no solution: scope violation
+*)
 Prover.abandon ();
 
 
@@ -738,7 +746,9 @@ lemma "exotic_cycle"
 
 reduce //.
 inference.
-Message.display ();
+(* Should see:
+Warning: not solving exotic constraints: unrecognized level operator
+*)
 Prover.abandon ();
 
 
@@ -2010,7 +2020,21 @@ moveBefore /Hleq/ /H/.
 testRewrite /-> Hleq in H , <- Hleq/;
 rewrite /-> Hleq in H/.
 apply /H/ >>> [hyp /Ha/, idtac].
-Message.display ();
+(* Should see:
+i : level
+a : U i
+b : a -> U i
+m : nat
+n : nat
+n' : nat
+p : nat
+Hleq : n <= n'
+H : forall (x : a) . b x -> m <= add n' p
+x : a
+Ha : b x
+|-
+x : a
+*)
 hypof.
 qed ();
 
@@ -2373,7 +2397,35 @@ lemma "backchain"
 
 intro /i a b c d f y g/.
 apply /g #2/.
-Message.display ();
+(* Should see:
+[goal 4]
+[ambiguous typing obligation]
+E6842 : a
+
+[goal 3]
+c (f (f y))
+
+[goal 2]
+d E6842
+
+[goal 1]
+d (g #1)
+
+[goal 0]
+i : level
+a : U i
+b : U i
+c : a -> U i
+d : a -> U i
+f : a -> a
+y : a
+g : exists (z : a) .
+      unit
+      & (forall (x : a) (x' : a) .
+           b -t> d z -k> d x' -> unit & (c (f x) -> d x))
+|-
+b
+*)
 Prover.abandon ();
 
 
@@ -2409,7 +2461,32 @@ lemma "eexploit"
 
 intro /i a b c d e f w x y z/.
 eexploit /f/ /H/.
-Message.display ();
+(* Should see:
+[goal 3]
+[ambiguous typing obligation]
+E6984 : a
+
+[goal 2]
+e
+
+[goal 1]
+c
+
+[goal 0]
+i : level
+a : U i
+b : a -> U i
+c : U i
+d : U i
+e : U i
+f : forall (y : a) . b y -> c -> (d -> e) & a
+w : a
+x : b w
+y : c
+z : d
+|-
+b E6984
+*)
   {
   hyp /x/.
   }
@@ -2449,7 +2526,28 @@ lemma "so"
 
 intro /i a b c d e f x y z/.
 so /f #2 x __ #1 _/ /H/.
-Message.display ();
+(* Should see:
+[goal 2]
+[ambiguous typing obligation]
+E7123 : d
+
+[goal 1]
+e
+
+[goal 0]
+i : level
+a : U i
+b : a -> U i
+c : U i
+d : U i
+e : U i
+f : exists (y : a) . b y -> c -> (d -> e) & a
+x : b (f #1)
+y : c
+z : d
+|-
+c
+*)
   {
   hyp /y/.
   }
