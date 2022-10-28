@@ -2,7 +2,7 @@
 signature ETERM =
    sig
 
-      type eterm = Directory.idirectory -> Term.term
+      type eterm
       type symbol = Symbol.symbol
       type binder = symbol option
 
@@ -25,6 +25,8 @@ signature ETERM =
       val prev   : eterm -> eterm
       val triv   : eterm
       val evar   : eterm
+
+      val hole   : eterm
       val marker : symbol -> eterm
 
       val apply1 : Constant.constant -> eterm -> eterm
@@ -32,11 +34,24 @@ signature ETERM =
       val apply3 : Constant.constant -> eterm -> eterm -> eterm -> eterm
       val apply4 : Constant.constant -> eterm -> eterm -> eterm -> eterm -> eterm
 
+      val appn : eterm -> eterm list -> eterm
+      val applyn : Constant.constant -> eterm list -> eterm
+
       val additional : symbol option list -> eterm -> eterm
 
-      val literal : Term.term -> eterm
-      val closed  : eterm -> Term.term
-      val withdir : Directory.directory -> eterm -> Term.term
+      val literal  : Term.term -> eterm
+      val closed   : eterm -> Term.term
+      val withidir : Directory.idirectory -> eterm -> Term.term
+      val withdir  : Directory.directory -> eterm -> Term.term
+
+      val absolute : Directory.directory -> Term.term -> eterm
+
+      (* subst M x N = [M/x] N *)
+      val subst    : eterm -> symbol -> eterm -> eterm
+
+      val suppressImplicit : eterm -> eterm
+      val withidirExplicit : Directory.idirectory -> eterm -> Term.term
+      val withdirExplicit  : Directory.directory -> eterm -> Term.term
 
    end
 
@@ -47,12 +62,12 @@ structure ETerm :> ETERM =
       structure D = Directory
       structure T = Term
 
-      type eterm = D.idirectory -> Term.term
+      type eterm = bool -> D.idirectory -> Term.term
       type symbol = Symbol.symbol
       type binder = symbol option
 
 
-      fun var x dir = T.Var (D.lookupVar dir x)
+      fun var x _ dir = T.Var (D.lookupVar dir x)
 
       fun implicits n m =
          (case Int.compare n 0 of
@@ -73,18 +88,21 @@ structure ETerm :> ETERM =
                    T.Elim (m, loop n [])
                 end)
 
-      fun shortExplicit x dir =
+      fun shortExplicit x _ dir =
          (case D.lookup dir x of
              D.Hvar i => T.Var i
            | D.Hconst k => T.Const k)
 
-      fun short x dir =
+      fun short x imps dir =
          (case D.lookup dir x of
              D.Hvar i =>
                 T.Var i
 
-           | D.Hconst k =>
-                implicits (Database.findImplicits k) (T.Const k))
+           | D.Hconst const =>
+                if imps then
+                   implicits (Database.findImplicits const) (T.Const const)
+                else
+                   T.Const const)
          
 
       exception UnknownConstant
@@ -102,7 +120,7 @@ structure ETerm :> ETERM =
 
 
 
-      fun longExplicit syms _ =
+      fun longExplicit syms _ _ =
          (case Namespace.resolveOpt syms of
              NONE =>
                 signalUnknownConstant syms
@@ -110,66 +128,178 @@ structure ETerm :> ETERM =
            | SOME const =>
                 T.Const const)
 
-      fun long syms _ =
+      fun long syms imps _ =
          (case Namespace.resolveOpt syms of
              NONE =>
                 signalUnknownConstant syms
 
            | SOME const =>
-                implicits (Database.findImplicits const) (T.Const const))
+                if imps then
+                   implicits (Database.findImplicits const) (T.Const const)
+                else
+                   T.Const const)
          
-      fun const k _ = T.Const k
+      fun const const _ _ = T.Const const
 
-      fun lam b m dir = 
+      fun lam b m imps dir = 
          (case b of
              NONE =>
-                T.Lam (NONE, m (D.ibind0 dir))
+                T.Lam (NONE, m imps (D.ibind0 dir))
 
            | SOME x =>
-                T.Lam (SOME x, m (D.ibind dir x)))
+                T.Lam (SOME x, m imps (D.ibind dir x)))
 
-      fun app m1 m2 dir = T.Elim (m1 dir, [T.App (m2 dir)])
+      fun app m1 m2 imps dir = T.Elim (m1 imps dir, [T.App (m2 imps dir)])
 
-      fun pair m1 m2 dir = T.Pair (m1 dir, m2 dir)
+      fun pair m1 m2 imps dir = T.Pair (m1 imps dir, m2 imps dir)
 
-      fun pi1 m dir = T.Elim (m dir, [T.Pi1])
+      fun pi1 m imps dir = T.Elim (m imps dir, [T.Pi1])
 
-      fun pi2 m dir = T.Elim (m dir, [T.Pi2])
+      fun pi2 m imps dir = T.Elim (m imps dir, [T.Pi2])
 
-      fun next m dir = T.Next (m dir)
+      fun next m imps dir = T.Next (m imps dir)
 
-      fun prev m dir = T.Elim (m dir, [T.Prev])
+      fun prev m imps dir = T.Elim (m imps dir, [T.Prev])
 
-      fun triv _ = T.Triv
+      fun triv _ _ = T.Triv
 
-      fun evar _ = T.Evar (T.newEbind ())
+      fun evar _ _ = T.Evar (T.newEbind ())
 
-      fun marker sym _ = T.Marker sym
+      val zilch = Symbol.fromValue ""
 
-      fun apply1 const m1 dir = T.Elim (T.Const const, [T.App (m1 dir)])
+      fun hole _ _ = T.Marker zilch
 
-      fun apply2 const m1 m2 dir = T.Elim (T.Const const, [T.App (m1 dir), T.App (m2 dir)])
+      fun marker sym _ _ = T.Marker sym
 
-      fun apply3 const m1 m2 m3 dir = T.Elim (T.Const const, [T.App (m1 dir), T.App (m2 dir), T.App (m3 dir)])
+      fun apply1 const m1 imps dir = T.Elim (T.Const const, [T.App (m1 imps dir)])
 
-      fun apply4 const m1 m2 m3 m4 dir = T.Elim (T.Const const, [T.App (m1 dir), T.App (m2 dir), T.App (m3 dir), T.App (m4 dir)])
+      fun apply2 const m1 m2 imps dir = T.Elim (T.Const const, [T.App (m1 imps dir), T.App (m2 imps dir)])
 
-      fun additional xs m dir =
+      fun apply3 const m1 m2 m3 imps dir = T.Elim (T.Const const, [T.App (m1 imps dir), T.App (m2 imps dir), T.App (m3 imps dir)])
+
+      fun apply4 const m1 m2 m3 m4 imps dir = T.Elim (T.Const const, [T.App (m1 imps dir), T.App (m2 imps dir), T.App (m3 imps dir), T.App (m4 imps dir)])
+
+      fun appn m l imps dir =
+         T.Elim (m imps dir,
+                 List.map (fn mi => T.App (mi imps dir)) l)
+
+      fun applyn const l imps dir =
+         T.Elim (T.Const const,
+                 List.map (fn mi => T.App (mi imps dir)) l)
+
+
+      fun additional xs m imps dir =
          (case xs of
              [] =>
-                m dir
+                m imps dir
 
            | NONE :: rest =>
-                additional rest m (D.ibind0 dir)
+                additional rest m imps (D.ibind0 dir)
 
            | SOME x :: rest =>
-                additional rest m (D.ibind dir x))
+                additional rest m imps (D.ibind dir x))
 
-      fun closed m = m Directory.iempty
+      fun closed m = m true Directory.iempty
 
-      fun literal m _ = m
+      fun literal m _ _ = m
 
-      fun withdir dir m = m (Directory.idir dir)
+      fun withidir idir m = m true idir
+
+      fun withdir dir m = m true (Directory.idir dir)
+
+      fun suppressImplicit m _ dir = m false dir
+      
+      fun withidirExplicit idir m = m false idir
+
+      fun withdirExplicit dir m = m false (Directory.idir dir)
+
+
+      fun absoluteMain from to depth m =
+         (case Normalize.simplify m of
+             T.Elim (T.Var i, spine) =>
+                if i < depth then
+                   T.Elim (T.Var i,
+                           absoluteSpine from to depth spine)
+                else
+                   T.Elim (T.Var (D.lookupVar to (D.name from (i-depth)) + depth),
+                           absoluteSpine from to depth spine)
+
+           | T.Elim (T.Const const, spine) =>
+                T.Elim (T.Const const,
+                        absoluteSpine from to depth spine)
+
+           | T.Elim (T.Sub (evar, s), spine) =>
+                T.Elim (T.Sub (evar, absoluteSub from to depth s),
+                        absoluteSpine from to depth spine)
+
+           | T.Lam (binder, m1) =>
+                T.Lam (binder,
+                       absoluteMain from to (depth+1) m1)
+
+           | T.Pair (m1, m2) =>
+                T.Pair (absoluteMain from to depth m1, absoluteMain from to depth m2)
+
+           | T.Next m1 =>
+                T.Next (absoluteMain from to depth m1)
+
+           | T.Triv => T.Triv
+
+           | m' as T.Marker _ => m'
+
+           | _ =>
+                (* impossible in simple form *)
+                raise (Fail "impossible"))
+
+      and absoluteSpine from to depth l =
+         (case l of
+             [] => []
+
+           | T.App m :: rest =>
+                T.App (absoluteMain from to depth m) :: absoluteSpine from to depth rest
+
+           | elim :: rest =>
+                elim :: absoluteSpine from to depth rest)
+
+      and absoluteSub from to depth s =
+         (case s of
+             T.Dot (m, s') =>
+                T.Dot (absoluteMain from to depth m, absoluteSub from to depth s')
+
+           | T.Idot (i, s') =>
+                let
+                   val i' = 
+                      if i < depth then
+                         i
+                      else
+                         D.lookupVar to (D.name from (i-depth)) + depth
+                in
+                   (case absoluteSub from to depth s' of
+                       s'' as T.Shift k =>
+                          if i' = k-1 then
+                             T.Shift i'
+                          else
+                             T.Idot (i', s'')
+                             
+                     | s'' => 
+                          T.Idot (i', s''))
+                end
+
+           | T.Shift k =>
+                let
+                   val sz = D.size from
+                in
+                   if k >= sz + depth then
+                      T.Shift (k - sz + D.isize to)
+                   else
+                      absoluteSub from to depth (T.Idot (k, T.Shift (k+1)))
+                end)
+
+      fun absolute from m _ to = absoluteMain from to 0 m
+
+
+      fun subst em sym en imps dir =
+         T.Sub (en imps (D.ibind dir sym),
+                T.Dot (em imps dir, T.id))
 
    end
 

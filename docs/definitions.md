@@ -218,7 +218,7 @@ The iteration constants are useful only when the proposition being
 proved is already known to be well-typed (specifically, to have type
 `U i`).  Also, they provide the induction hypothesis only on immediate
 subterms.  For more general induction, datatype definitions also
-creates a subterm ordering.
+create a subterm orderings.
 
 We want to have a single subterm ordering for the whole datatype
 bundle, and not have n^2 orderings for n datatypes (*e.g.,* trees in
@@ -265,7 +265,7 @@ arguments shown.  In fact, the subterm predicate takes all pervasive
 arguments (`a`, in the example) implicitly, and the strip functions
 take all but the last argument implicitly.
 
-To perform strong induction over the subterm order with these tools:
+To perform strong induction over the subterm order using these tools:
 
 1. strip the induction variable, obtaining a skeleton,
 
@@ -278,7 +278,14 @@ To perform strong induction over the subterm order with these tools:
    to show that a subterm's skeleton is smaller than the current
    term's skeleton.
 
-A worked example appears [here](datatype-induction.ist).
+A worked example appears [here](datatype-induction.ist).  Note that
+this process is usually not necessary.  In the common case in which
+the conclusion is known *a priori* to be well-typed, and strong
+induction is not needed, the `iterate` tactic is sufficient and much
+simpler.  When the datatype definition is not mutually dependent, the
+`induct` tactic automates this process.  Thus, the long form is
+necessary only for mutually dependent datatypes when the conclusion is
+not yet known to be well-typed or strong induction is required.
 
 
 
@@ -290,7 +297,7 @@ engine, one may use the `reductions` command:
     reductions
     /
       length _ (nil _) --> 0 ;
-      length a (cons _ h t) --> succ (` length a t) ;
+      length a (cons _ h t) --> succ (length a t) ;
       unrolling length
     /;
 
@@ -309,12 +316,12 @@ arguments is exactly one *principal* argument (`nil _` and `cons _ h
 t` in the example).  The principal argument must be parenthesized,
 even if it takes no arguments.
 
-The right-hand-side uses the ordinary term syntax.  A consequence of
-this is a tick must be used if any constant on the right-hand-side
-takes an implicit argument.
+The right-hand-side uses the ordinary term syntax, except that
+implicit arguments are not inserted.  (An evar on the right-hand-side
+would never be correct.)
 
 Note that the process of verifying reductions is purely syntactic, so
 it can be sensitive to subtle changes.  For example, this variation on
 the second reduction, though deceptively similar, is incorrect:
 
-      length _ (cons a h t) --> succ (` length a t) ;  (* incorrect *)
+      length _ (cons a h t) --> succ (length a t) ;  (* incorrect *)

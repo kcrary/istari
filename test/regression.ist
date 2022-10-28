@@ -6,6 +6,27 @@ Ctrl.use "../library/acc-load.iml";
 Ctrl.use "../library/nat-load.iml";
 
 
+lemma "absolute"
+/
+  forall (i : level) (a b : U i) (f : a -> b) (x y z : a) . _ -> f x : b
+/;
+
+intro /i a b f x y z/.
+val (_, dir) = Prover.currentGoal ();
+val ec = ETerm.absolute dir (Prover.currentConcl ());
+moveBefore /x/ /f/.
+moveBefore /b/ /a/.
+clear /z/.
+assert ec /H/.
+1:{
+  hyp /H/.
+  }
+change /concl/ /unit -> _/.
+auto.
+qed ();
+
+
+
 lemma "setEq"
 /
   forall (i : level) (a : U i) (P : a -> U i) (f : a -> a) (x : a) .
@@ -998,9 +1019,9 @@ introRaw /n/.
 let do dir = Tactic.withidir
 in
   Tactic.refine (Rule.muInd
-                   (/additional t . unit % t/ dir)
-                   (/additional x . x = x : nat/ dir)
-                   (/n/ dir))
+                   (ETerm.withidir dir /additional t . unit % t/)
+                   (ETerm.withidir dir /additional x . x = x : nat/)
+                   (ETerm.withidir dir /n/))
 end.
 Prover.pull 2;
   {

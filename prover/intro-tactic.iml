@@ -2,28 +2,36 @@
 signature INTRO_TACTIC =
    sig
 
-      type tactic = Tactic.tactic
       type symbol = Symbol.symbol
+      type tactic = Tactic.tactic
+      type 'a tacticm = 'a Tactic.tacticm
+      type priority = Tactic.priority
 
+      val introPriority : IntroPattern.ipattern list -> priority tacticm
       val introRaw : IntroPattern.ipattern list -> tactic
       val intro : IntroPattern.ipattern list -> tactic
 
       val split : tactic
 
+      val leftPriority : priority tacticm
       val leftRaw : tactic
       val left : tactic
 
+      val rightPriority : priority tacticm
       val rightRaw : tactic
       val right : tactic
 
+      val existsPriority : ETerm.eterm -> priority tacticm
       val existsRaw : ETerm.eterm -> tactic
       val exists : ETerm.eterm -> tactic
 
+      val exactPriority : ETerm.eterm -> priority tacticm
       val exactRaw : ETerm.eterm -> tactic
       val exact : ETerm.eterm -> tactic
 
       val unhide : tactic
 
+      val introOfPriority : IntroPattern.ipattern list -> priority tacticm
       val introOfRaw : IntroPattern.ipattern list -> tactic
       val introOf : IntroPattern.ipattern list -> tactic
 
@@ -38,15 +46,12 @@ signature INTRO_TACTIC_INTERNAL =
       include INTRO_TACTIC
 
 
-      val introPriority : IntroPattern.ipattern list -> Typecheck.priority Tactic.tacticm
-
-
       (* A tactic to introduce the type, and a function to find the identifier to use (if any). *)
-      val introTactics : (Typecheck.priority Tactic.tacticm * (Term.term -> Term.binder)) ConstantTable.table
+      val introTactics : (Tactic.priority Tactic.tacticm * (Term.term -> Term.binder)) ConstantTable.table
 
       val splitTactics : tactic ConstantTable.table
 
-      val existsTactics : (Term.term -> Typecheck.priority Tactic.tacticm) ConstantTable.table
+      val existsTactics : (Term.term -> Tactic.priority Tactic.tacticm) ConstantTable.table
 
    end
 
@@ -75,9 +80,9 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
       open CasePervasive
 
 
-      val introTactics : (TC.priority tacticm * (T.term -> T.binder)) H.table = H.table ()
+      val introTactics : (priority tacticm * (T.term -> T.binder)) H.table = H.table ()
       val splitTactics : tactic H.table = H.table ()
-      val existsTactics : (term -> TC.priority tacticm) H.table = H.table ()
+      val existsTactics : (term -> priority tacticm) H.table = H.table ()
 
 
 
@@ -106,7 +111,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
       
       fun introPriority pats =
          (case pats of
-             nil => idtacM TC.Primary
+             nil => idtacM Primary
 
            | pat :: rest =>
                 let
@@ -126,10 +131,10 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                              do tc = andthenM tac
                           in
                              (case tc of
-                                 TC.Secondary =>
-                                    idtacM TC.Secondary
+                                 Secondary =>
+                                    idtacM Secondary
           
-                               | TC.Primary =>
+                               | Primary =>
                                     D.destruct0 pat' (introPriority rest))
                           end
           
@@ -155,7 +160,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                 refine (Rule.reduce (R.trans [R.unfold, R.beta 3]))
                 >>
                 (* =M |- C *)
-                idtacM TC.Primary)\
+                idtacM Primary)\
          /
 
 
@@ -165,39 +170,39 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
             fun nobinder _ = NONE
          in
             insert Prim.forall 
-               (RT.refine2 Rule.forallIntro >>> [idtacM TC.Secondary, idtacM TC.Primary],
+               (RT.refine2 Rule.forallIntro >>> [idtacM Secondary, idtacM Primary],
                 RT.binder [2]);
 
             insert Prim.arrow 
-               (RT.refine2 Rule.arrowIntro >>> [idtacM TC.Secondary, idtacM TC.Primary],
+               (RT.refine2 Rule.arrowIntro >>> [idtacM Secondary, idtacM Primary],
                 nobinder);
 
             insert Prim.tarrow 
-               (RT.refine2 Rule.tarrowIntro >>> [idtacM TC.Secondary, idtacM TC.Secondary, idtacM TC.Primary],
+               (RT.refine2 Rule.tarrowIntro >>> [idtacM Secondary, idtacM Secondary, idtacM Primary],
                 nobinder);
 
             insert Prim.karrow 
-               (RT.refine2 Rule.karrowIntro >>> [idtacM TC.Secondary, idtacM TC.Secondary, idtacM TC.Primary],
+               (RT.refine2 Rule.karrowIntro >>> [idtacM Secondary, idtacM Secondary, idtacM Primary],
                 nobinder);
 
             insert Prim.intersect
-               (RT.refine2 Rule.intersectIntro >>> [idtacM TC.Secondary, idtacM TC.Primary],
+               (RT.refine2 Rule.intersectIntro >>> [idtacM Secondary, idtacM Primary],
                 RT.binder [2]);
 
             insert Prim.guard
-               (RT.refine2 Rule.guardIntro >>> [idtacM TC.Secondary, idtacM TC.Primary],
+               (RT.refine2 Rule.guardIntro >>> [idtacM Secondary, idtacM Primary],
                 nobinder);
 
             insert Prim.foralltp
-               (RT.refine1 Rule.foralltpIntro >>> [idtacM TC.Primary],
+               (RT.refine1 Rule.foralltpIntro >>> [idtacM Primary],
                 RT.binder [1]);
 
             insert Prim.iforall 
-               (RT.refine3 Rule.iforallIntro >>> [idtacM TC.Secondary, idtacM TC.Primary],
+               (RT.refine3 Rule.iforallIntro >>> [idtacM Secondary, idtacM Primary],
                 RT.binder [3]);
 
             insert Prim.subtype 
-               (RT.refine2 Rule.subtypeIntro >>> [idtacM TC.Secondary, idtacM TC.Secondary, idtacM TC.Primary],
+               (RT.refine2 Rule.subtypeIntro >>> [idtacM Secondary, idtacM Secondary, idtacM Primary],
                 nobinder);
 
             insert Prim.lett
@@ -220,7 +225,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
          in
             if Constant.eq (const, Prim.sum) then
                RuleTactic.sumIntro1
-               >>> [idtacM TC.Secondary, idtacM TC.Primary]
+               >>> [idtacM Secondary, idtacM Primary]
             else
                fail "conclusion not leftable"
          end
@@ -235,7 +240,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
          in
             if Constant.eq (const, Prim.sum) then
                RuleTactic.sumIntro2
-               >>> [idtacM TC.Secondary, idtacM TC.Primary]
+               >>> [idtacM Secondary, idtacM Primary]
             else
                fail "conclusion not rightable"
          end
@@ -244,13 +249,13 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
 
       val right = Typecheck.withTypecheckSnd rightPriority
 
-      fun existsPriority m =
+      fun existsPriority em =
          let
             do const = withHeadConst "conclusion not existsable"
-            do dir = withidir
+            do m = withterm em
          in
             (case H.find existsTactics const of
-                SOME tac => tac (m dir)
+                SOME tac => tac m
 
               | NONE => fail "conclusion not existsable")
          end
@@ -283,32 +288,34 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
             insert Prim.exists 
                (fn m =>
                    refine (Rule.existsIntro (evar ()) (evar ()) m)
-                   >>> [addbind >> idtacM TC.Secondary, idtacM TC.Secondary, idtacM TC.Primary]);
+                   >>> [addbind >> idtacM Secondary, idtacM Secondary, idtacM Primary]);
 
             insert Prim.set 
                (fn m => 
                    refine (Rule.setIntro (evar ()) (evar ()) m)
-                   >>> [addbind >> idtacM TC.Secondary, idtacM TC.Secondary, idtacM TC.Primary]);
+                   >>> [addbind >> idtacM Secondary, idtacM Secondary, idtacM Primary]);
 
             insert Prim.iexists 
                (fn b =>
                    refine (Rule.iexistsIntro (evar ()) b (evar ()) (evar ()))
                    >>> [
-                       idtacM TC.Secondary, 
-                       addbind >> idtacM TC.Secondary, 
-                       idtacM TC.Secondary,
-                       idtacM TC.Primary
+                       idtacM Secondary, 
+                       addbind >> idtacM Secondary, 
+                       idtacM Secondary,
+                       idtacM Primary
                        ])
          end
 
-      fun exactRaw m =
+      fun exactRaw em =
          let
-            do idir = withidir
+            do m = withterm em
          in
-            refine $ Rule.inhabitant (T.evar ()) (m idir)
+            refine $ Rule.inhabitant (T.evar ()) m
          end
 
-      fun exact m = Typecheck.withTypecheckSnd $ (exactRaw m >> idtacM TC.Secondary)
+      fun exactPriority em = exactRaw em >> idtacM Secondary
+
+      fun exact em = Typecheck.withTypecheckSnd $ (exactRaw em >> idtacM Secondary)
 
       val unhide =
          let
@@ -451,7 +458,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
 
       fun introOfPriority pats =
          (case pats of
-             nil => idtacM TC.Primary
+             nil => idtacM Primary
 
            | pat :: rest =>
                 (C.goalCaseAlt
@@ -470,7 +477,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                         in
                            refine (Rule.intersectIntroOf (T.evar ()) (T.evar ()) (T.evar ()))
                            >>> [
-                               idtacM TC.Secondary,
+                               idtacM Secondary,
 
                                D.destruct0 pat' (introOfPriority rest)
                                ]
@@ -482,7 +489,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                     (fn _ =>
                         refine (Rule.guardIntroOf (T.evar ()) (T.evar ()) (T.evar ()))
                         >>> [
-                            idtacM TC.Secondary,
+                            idtacM Secondary,
 
                             D.destruct0 pat (introOfPriority rest)
                             ]),
@@ -501,8 +508,8 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                         in
                            refine (Rule.forallOfExt (T.evar ()) (T.Const Prim.void) (T.evar ()) (T.evar ()) (T.evar ()))
                            >>> [
-                               idtacM TC.Secondary,
-                               attempt proveLambda >> idtacM TC.Secondary,
+                               idtacM Secondary,
+                               attempt proveLambda >> idtacM Secondary,
    
                                D.destruct0 pat' (introOfPriority rest)
                                ]
@@ -514,8 +521,8 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                     (fn (((), ()), ()) =>
                         refine (Rule.arrowOfExt (T.evar ()) (T.Const Prim.void) (T.evar ()) (T.evar ()) (T.evar ()))
                         >>> [
-                            idtacM TC.Secondary,
-                            attempt proveLambda >> idtacM TC.Secondary,
+                            idtacM Secondary,
+                            attempt proveLambda >> idtacM Secondary,
 
                             D.destruct0 pat (introOfPriority rest)
                             ]),

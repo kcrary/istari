@@ -6,7 +6,7 @@ signature DIRECTORY =
 
       type directory   (* for input & output *)
       type idirectory  (* for input only *)
-      type set
+      type set         (* for tracking sets of variables in use and generating fresh ones *)
 
       exception Unbound of symbol
       exception Shadow of symbol
@@ -34,7 +34,7 @@ signature DIRECTORY =
       val literal             : symbol list -> directory
       val literalStr          : string list -> directory
       
-      (* If the binding would shadow an identifier, produces an alternate. *)
+      (* If the binding would shadow an identifier, produces an alternate instead. *)
       val fresh               : directory -> symbol
       val vary                : directory -> symbol -> symbol
       val varyAndBind         : directory -> symbol option -> symbol * directory
@@ -45,7 +45,7 @@ signature DIRECTORY =
 
 
       (* Signals Unbound if identifier is not in the directory
-         (and not a constant either, if appropriate)
+         (and not a constant either, when appropriate).
       *)
       datatype head = Hvar of int | Hconst of Constant.constant
       val lookupVar           : idirectory -> symbol -> int
@@ -59,6 +59,7 @@ signature DIRECTORY =
       val name                : directory -> int -> symbol
       val nameOpt             : directory -> int -> symbol option
 
+      val isize               : idirectory -> int
       val size                : directory -> int
 
 
@@ -432,7 +433,10 @@ structure Directory :> DIRECTORY =
 
            | SOME (sym, _, _) => SOME sym)
 
-      fun size (_, _, bv, _) = S.length bv
+      fun isize (_, k) = k
+
+      (* XX does this work? *)
+      fun size (_, k, _, _) = k
 
       fun exposeOpt (_, i, bv, _) =
          (case S.expose bv of

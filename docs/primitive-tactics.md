@@ -71,6 +71,43 @@ Let us unpack this:
   to the top-level are displayed to the user.
 
 
+### Priority
+
+Many tactics generate typing subgoals.  When implementing a tactic, it
+is good not to solve those goals eagerly, but to save them all so that
+they can all be addressed at once.  (It is not uncommon for one goal
+to help in the solution of another.)  However, the proliferation of
+typing goals can complicate the assembly of tactics into larger
+tactics.
+
+To help manage this, the tactic library defines **priorities**:
+
+    datatype priority = Primary | Secondary
+
+The main goals of interest are considered `Primary`, while typing
+obligations are considered `Secondary`.  Every tactic that supports a
+`Raw` variant also supports a `Priority` variant, intended for
+building larger tactics.  For example, `intro` has an `introRaw`
+variant, so it also has an `introPriority` variant:
+
+    val introRaw      : IntroPattern.ipattern list -> tactic
+    val introPriority : IntroPattern.ipattern list -> priority tacticm
+
+The priority variant attaches a priority to each subgoal.  This is
+available using the monadic bind as usual, but for convenience, the
+tactic library also supplies:
+
+    val andthenPri  : priority tacticm -> priority tacticm -> priority tacticm
+    val andthenlPri : priority tacticm -> priority tacticm list -> priority tacticm
+
+Running `andthenPri tac1 tac2` runs `tac1`, then runs `tac2` on all
+its subgoals marked `Primary`.  Running `andthenlPri tac [tac1, ...,
+tacn]` runs `tac`, then runs `tac1` on its first primary subgoal,
+`tac2` on its second, etc.  These have the infix synonyms `>>!` and
+`>>>!`.
+
+
+
 ### Primitives
 
 The `Tactic` module provides some primitive actions:

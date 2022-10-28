@@ -245,6 +245,11 @@ goal, generating zero or more subgoals.
     Moves hypothesis number `m` to position `n` (counting backward
     from 0).
 
+  + `movePos /[hyp] ... [hyp]/ [n]`
+
+    Moves the indicated hypotheses to position `n` (counting backward
+    from 0).
+
 
 - `moveAfter /[hyp] ... [hyp]/ /[target hyp]/`
 
@@ -658,9 +663,12 @@ The destruction tactics are:
 
 - `induct /[hyp x]/`
 
-  Invokes induction on `x`.  The form of the subgoals generated depends on
-  `x`'s type.  This induction tactic is suitable when the conclusion
-  is not already known to be a well-formed type.
+  Invokes induction on `x`.  The form of the subgoals generated
+  depends on `x`'s type.  This induction tactic is suitable when the
+  conclusion is not already known to be a well-formed type.  For
+  natural numbers and for datatypes it also provides strong induction.
+  (The strong induction on datatypes employs the [subterm
+  order](definitions.md#strong-induction).)
 
   + `inductRaw /[hyp x]/`
 
@@ -882,9 +890,9 @@ These tactics are primarily used to implement other tactics:
 
   + `Tactic.withidir : (Directory.idirectory -> 'a tacticm) -> 'a tacticm`
 
-    Invokes its argument tactic, passing the current `idirectory` (the
-    part of the goal used to turn external terms into internal
-    terms) to that tactic.
+    Invokes its argument tactic, passing the current
+    [`idirectory`](directory-sig.html) (the part of the goal used to
+    turn external terms into internal terms) to that tactic.
 
   + `Tactic.withterm : ETerm.eterm -> (Term.term -> 'a tacticm) -> 'a tacticm`
 
@@ -915,7 +923,8 @@ These tactics are primarily used to implement other tactics:
 
     As `transformFailure` but it simply replaces the error message.
 
-- These primitive operations are discussed as part of primitive tactics:
+- These primitive operations are discussed as part of [primitive
+  tactics](primitive-tactics.html):
 
       val refine : Rule.rule -> tactic
       val chdir : Directory.directory -> tactic

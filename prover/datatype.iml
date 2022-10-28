@@ -56,6 +56,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       structure CR = CheckpointedRef
       structure D = Directory
       structure DE = DestructInternal
+      structure ET = ETerm
       structure I = Invert
       structure IP = IntroPattern
       structure J = Judgement
@@ -66,17 +67,19 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       structure RR = RegistryInternal
       structure S = Seq
       structure T = Term
+      structure TC = TypecheckInternal
       structure U = Unify
       structure X = XTerm
 
       type symbol = Symbol.symbol
       type term = Term.term
-      type eterm = ETerm.eterm
+      type eterm = ET.eterm
 
       open Tactic
       open CasePervasive
 
       val ? = C.?
+      val supp = ET.suppressImplicit
 
 
       exception Datatype
@@ -90,10 +93,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                   ".\n"
                                   ]))
 
-      
 
       structure ID = RedBlackDict (structure Key = IntOrdered)
       structure CD = RedBlackDict (structure Key = Constant.Ordered)
+
 
 
 
@@ -236,7 +239,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                val (revinvis', invisdir) =
                   List.foldl
                      (fns (sym, em) (l, dir) =>
-                         ((sym, em dir) :: l,
+                         ((sym, ET.withidir dir em) :: l,
                           D.ibind dir sym))
                      ([], D.iempty)
                      invis
@@ -248,13 +251,13 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                val (revpers', visdir, fulldir) =
                   List.foldl
                      (fns (sym, em) (l, dir, fulldir) =>
-                         ((sym, em fulldir) :: l,
+                         ((sym, ET.withidir fulldir em) :: l,
                           D.ibind dir sym,
                           D.ibind fulldir sym))
                      ([], D.iempty, invisdir)
                      pers
    
-               val univ' = univ fulldir
+               val univ' = ET.withidir fulldir univ
    
                val (bodydir, num, arities) =
                   List.foldl
@@ -373,11 +376,11 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                   (fns (symopt, em) (l, dir) =>
                                       (case symopt of
                                           SOME sym =>
-                                             ((symopt, em dir) :: l,
+                                             ((symopt, ET.withidir dir em) :: l,
                                               D.ibind dir sym)
    
                                         | NONE =>
-                                             ((NONE, em dir) :: l, 
+                                             ((NONE, ET.withidir dir em) :: l, 
                                               D.ibind0 dir)))
                                   (* NB: visdir not bodydir. The datatypes aren't in scope here. *)
                                   ([], visdir)
@@ -386,7 +389,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                             val dcons' =
                                List.map
                                   (fns (dconsym, em) =>
-                                      cleanup dconsym i (em bodydir) 0 T.id [])
+                                      cleanup dconsym i (ET.withidir bodydir em) 0 T.id [])
                                   dcons
                          in
                             (dtsym, List.rev revargs', dcons')
@@ -897,10 +900,15 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          (* for each datatype *)
          (Constant.constant            (* the datatype *)
            * Constant.constant         (* its iterator *)
+           * int                       (* number of invisible pervasive arguments *)
            * int                       (* number of visible pervasive arguments *)
            * int                       (* the number of index arguments *)
+           * Constant.constant         (* the strip constant *)
          ) list
          * environment
+         * Constant.constant           (* the skeleton constant *)
+         * Constant.constant           (* the subterm constant *)
+         * Constant.constant           (* the subterm-well-founded constant *)
 
 
       val pumx : mxterm P.pu =
@@ -950,7 +958,19 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                     (P.list pumx)))
 
       val puDatatypeRecord : datatype_record P.pu =
-         P.pair (P.list (P.tuple4 PP.puConstant PP.puConstant P.int P.int)) puEnvironment
+         P.tuple5
+            (P.list 
+                (P.tuple6
+                    PP.puConstant
+                    PP.puConstant
+                    P.int
+                    P.int
+                    P.int
+                    PP.puConstant))
+            puEnvironment
+            PP.puConstant
+            PP.puConstant
+            PP.puConstant
 
       val theDatatypes : datatype_record list CR.cref = CR.new []
          
@@ -1287,6 +1307,201 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
+      (* A more convenient induction tactic for datatypes without mutual induction. *)
+
+      exception Induct of string
+
+      fun tryf f sk =
+         (case
+             (try
+                 Sum.INL (f ())
+              with Induct msg => Sum.INR msg)
+          of
+             Sum.INL x => sk x
+
+           | Sum.INR msg => fail msg)
+
+
+      val sym_s = Symbol.fromValue "s"
+
+      fun inductor const ninvis nvis nind skeletonConst stripConst subtermConst subtermWfConst =
+         let
+            do (jud, dir) = withgoal
+         in
+            contextCase (J.context jud)
+            / $hyp 0 $tm $az $whnfHard \const\ @ ? =>
+              \(fnc indtp spine =>
+                   let
+                      val indvar = D.name dir 0
+
+                      val eindtp = ET.absolute dir indtp
+                      val concl = ET.absolute dir (J.concl jud)
+
+                      do (visSpine, indVars, indTypes) =
+                         tryf
+                         (fn () =>
+                             let
+                                val (visSpine, indSpine) =
+                                   (case List.splitOpt spine nvis of
+                                       NONE =>
+                                          raise (Induct "type error in hypothesis for induction")
+
+                                     | SOME spines => spines)
+
+                                val visSpine' =
+                                   List.map
+                                      (fn elim =>
+                                          (case elim of
+                                              T.App m =>
+                                                 ET.absolute dir m
+
+                                            | _ =>
+                                                 raise (Induct "type error in hypothesis for induction")))
+                                      visSpine
+
+                                val (nind', indVars, indTypes) =
+                                   List.foldr
+                                      (fns elim (n, indVars, indTypes) =>
+                                          (case elim of
+                                              T.App m =>
+                                                 (case N.simplify m of
+                                                     T.Elim (T.Var v, []) =>
+                                                        let
+                                                           val var = D.name dir v
+                                                           val tp = 
+                                                              (case J.hyp jud v of
+                                                                  J.Tm a =>
+                                                                     ET.absolute dir (T.Sub (a, T.Shift (v+1)))
+                              
+                                                                | _ =>
+                                                                     raise (Induct "index argument has the wrong sort"))
+                                                        in
+                                                           (n+1, var :: indVars, tp :: indTypes)
+                                                        end
+     
+                                                   | _ => 
+                                                        raise (Induct "index arguments must be variables"))
+   
+                                            | _ => 
+                                                 raise (Induct "type error in hypothesis for induction")))
+                                      (0, [], [])
+                                      indSpine
+                             in
+                                if nind' = nind then
+                                   (visSpine', indVars, indTypes)
+                                else
+                                   raise (Induct "type error in hypothesis for induction")
+                             end)
+
+                      val invisSpine =
+                         natrecl ninvis (fns _ l => ET.evar :: l) []
+
+                      val pervSpine = invisSpine @ visSpine
+
+                      val skelTp = ET.applyn skeletonConst visSpine
+
+                      val set = D.set dir
+                      val (ih, set) = D.freshAndBindSet set
+                      val (skel, set) = D.varyAndBindSet set (SOME sym_s)
+                      val (skelEq, set) = D.freshAndBindSet set
+                      val (h, set) = D.freshAndBindSet set  (* used for wf hypothesis, and for internal IH *)
+
+                      val (indVars'_rev, set) =
+                         List.foldl
+                            (fns var (l, set) =>
+                                let
+                                   val (var', set') = D.varyAndBindSet set (SOME var)
+                                in
+                                   (var' :: l, set')
+                                end)
+                            ([], set)
+                            indVars
+
+                      val indVars' = List.rev indVars'_rev
+                      val (indvar', set) = D.varyAndBindSet set (SOME indvar)
+                      val (alt, set) = D.freshAndBindSet set
+                      val (subterm, set) = D.freshAndBindSet set
+
+                      val espine = visSpine @ List.map ET.var indVars
+                      val espine' = visSpine @ List.map ET.var indVars'
+
+                      val newIH =
+                         ET.subst (ET.app (ET.applyn stripConst espine) (ET.var indvar)) alt $
+                         foldr2
+                            (fns sym a b => 
+                                ET.apply2 Prim.forall a (ET.lam (SOME sym) b))
+                            (ET.apply2 Prim.forall eindtp 
+                                (ET.lam (SOME indvar)
+                                    (ET.apply2 Prim.arrow
+                                        (ET.appn
+                                            (ET.applyn subtermConst visSpine)
+                                            [ET.app (ET.applyn stripConst espine) (ET.var indvar),
+                                             ET.var alt])
+                                        concl)))
+                            indVars
+                            indTypes
+                   in
+                      Generalize.setEqPriority
+                         skel
+                         (ET.literal (T.app (T.Elim (T.Const stripConst, spine)) T.zero))  (* nothing has moved yet *)
+                         skelTp
+                         (SOME skelEq)
+                      >>!
+                      HypTactic.revert [indvar, skelEq]
+                      >>
+                      HypTactic.revert indVars
+                      >>
+                      Backchain.soPriority
+                         (ET.app (ET.applyn subtermWfConst pervSpine) (ET.var skel))
+                         (IP.Ident (SOME h))
+                      >>!
+                      InductionInternal.accInduction
+                      >>!
+                      HypTactic.renamen 0 h
+                      >>
+                      IntroTactic.introPriority (List.map (fn name => IP.Ident (SOME name)) indVars)
+                      >>!
+                      IntroTactic.introPriority [IP.Ident (SOME indvar), IP.Ident (SOME skelEq)]
+                      >>!
+                      Destruct.assertRaw newIH (IP.Ident (SOME ih))
+                      >>> [
+                          IntroTactic.introPriority (List.map (fn var => IP.Ident (SOME var)) indVars')
+                          >>!
+                          IntroTactic.introPriority [IP.Ident (SOME indvar'), IP.Ident (SOME subterm)]
+                          >>!
+                          Backchain.witnessPriority 
+                             (ET.appn (ET.var h) $
+                              ET.app (ET.applyn stripConst espine') (ET.var indvar')
+                              :: ET.hole
+                              :: List.map ET.var indVars'
+                              @ [ET.var indvar', ET.hole])
+                          >>>! [
+                               HypTactic.clear [h]
+                               >> 
+                               HypTactic.movePos [skel, skelEq] 0
+                               >> 
+                               EqualityTactic.substitutionPriority skel ET.evar
+                               >>>! [
+                                    HypTactic.hyp skelEq >> done,
+
+                                    HypTactic.hyp subterm >> done
+                                    ],
+
+                               EqualityTactic.reflexivityPriority
+                               ],
+                          
+                          HypTactic.clear [skel, h, skelEq]
+                          >>
+                          idtacM Primary
+                          ]
+                   end)\
+            /
+         end
+
+
+
+      (* For the merged iterator. *)
+
       fun mergeLoop n ctx a mergees =
          if n = 0 then
             X.tuple mergees
@@ -1617,8 +1832,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   (0, [])
                   (invis @ pers)
 
+            val numberOfInvisibleArgs = List.length invis
             val numberOfVisibleArgs = List.length pers
-            val numberOfPervasiveArgs = numberOfVisibleArgs + List.length invis
+            val numberOfPervasiveArgs = numberOfInvisibleArgs + numberOfVisibleArgs
 
             val topvisargsSpine =
                natrecr numberOfVisibleArgs
@@ -2761,7 +2977,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-            (* 10. Populator the destructor and iterator tables.
+            (* 10. Populate the destructor, induction, and iterator tables.
 
                (Note that we can't just use the iterator for destruct.  We want to destruct datatype
                hypotheses in-place, which the iterator cannot do.)
@@ -2789,15 +3005,30 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             val () =
                CR.assign theDatatypes
                   ((map2
-                       (fns (const, _, _, _, _, numberOfIndexArgs) (iter, _) =>
+                       (fns (const, _, stripConst, _, _, numberOfIndexArgs) (iter, _) =>
                            (
                            ConstantTable.insert DE.destructTactics const destructor';
-                           ConstantTable.insert InductionInternal.iterators const (iter, numberOfVisibleArgs, numberOfIndexArgs);
-                           (const, iter, numberOfVisibleArgs, numberOfIndexArgs)
+
+                           ConstantTable.insert InductionInternal.inductionTactics const
+                              (inductor
+                                  const
+                                  numberOfInvisibleArgs numberOfVisibleArgs numberOfIndexArgs
+                                  skeletonConst
+                                  stripConst
+                                  subtermConst
+                                  subtermWellFoundedConst);
+
+                           ConstantTable.insert InductionInternal.iterators const 
+                              (iter, numberOfVisibleArgs, numberOfIndexArgs);
+
+                           (const, iter, numberOfInvisibleArgs, numberOfVisibleArgs, numberOfIndexArgs, stripConst)
                            ))
                        typeInfoList
                        iterInfoList,
-                    environment)
+                    environment,
+                    skeletonConst,
+                    subtermConst,
+                    subtermWellFoundedConst)
                    :: CR.deref theDatatypes)
          in
             close skeletonConst;
@@ -2907,14 +3138,18 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
           of
              NONE => ()
 
-           | SOME (l, env) =>
+           | SOME (l, env, skel, subterm, subtermWf) =>
                 let
                    val destructor' = destructor env
                 in
                    List.app
-                      (fn (const, iter, nvis, nind) => 
+                      (fn (const, iter, ninvis, nvis, nind, strip) => 
                           (
                           ConstantTable.insert DE.destructTactics const destructor';
+
+                          ConstantTable.insert InductionInternal.inductionTactics const
+                             (inductor const ninvis nvis nind skel strip subterm subtermWf);
+                          
                           ConstantTable.insert InductionInternal.iterators const (iter, nvis, nind)
                           ))
                       l;

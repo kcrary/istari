@@ -19,6 +19,9 @@ signature TACTIC =
 
       type tactic = Message.label tacticm
 
+      datatype priority = Primary | Secondary
+
+
 
       (* control flow *)
 
@@ -48,6 +51,9 @@ signature TACTIC =
          -> ('b -> string option)
          -> 'b
          -> 'c tacticm
+
+      val andthenPri : priority tacticm -> priority tacticm -> priority tacticm
+      val andthenlPri : priority tacticm -> priority tacticm list -> priority tacticm
 
       val attempt : tactic -> tactic
       val first : 'a tacticm list -> 'a tacticm
@@ -83,10 +89,12 @@ signature TACTIC =
       val execute : goal -> tactic -> (Refine.validation, string) Sum.sum
 
 
-      val >> : 'a tacticm -> 'b tacticm -> 'b tacticm                 (* andthen *)
-      val >>> : 'a tacticm -> 'b tacticm list -> 'b tacticm           (* andthenl *)
-      val >>= : 'a tacticm -> ('a -> 'b tacticm) -> 'b tacticm        (* andthenM *)
-      val >>>= : 'a tacticm -> ('a -> 'b tacticm) list -> 'b tacticm  (* andthenlM *)
+      val >> : 'a tacticm -> 'b tacticm -> 'b tacticm                           (* andthen *)
+      val >>> : 'a tacticm -> 'b tacticm list -> 'b tacticm                     (* andthenl *)
+      val >>= : 'a tacticm -> ('a -> 'b tacticm) -> 'b tacticm                  (* andthenM *)
+      val >>>= : 'a tacticm -> ('a -> 'b tacticm) list -> 'b tacticm            (* andthenlM *)
+      val >>! : priority tacticm -> priority tacticm -> priority tacticm        (* andthenPri *)
+      val >>>! : priority tacticm -> priority tacticm list -> priority tacticm  (* andthenlPri *)
 
    end
 
@@ -123,6 +131,8 @@ structure TacticInternal :> TACTIC_INTERNAL =
          -> answer
 
       type tactic = Message.label tacticm
+
+      datatype priority = Primary | Secondary
 
 
       fun valhd vs =
@@ -379,6 +389,32 @@ structure TacticInternal :> TACTIC_INTERNAL =
          end
                    
 
+      fun andthenPri tac1 tac2 =
+         andthenM tac1 (fn Primary => tac2 | pri => idtacM pri)
+
+
+      fun andthenlPri tac1 tacs =
+         andthenFoldM tac1
+            (fns pri l =>
+                (case pri of
+                    Primary =>
+                       (case l of
+                           [] =>
+                              (fail "too few tactics in andthenlPri", [])
+
+                         | tac :: rest =>
+                              (tac, rest))
+
+                  | _ => 
+                       (idtacM pri, l)))
+            (fn l =>
+                (case l of
+                    [] => NONE
+
+                  | _ :: _ => SOME "too many tactics in andthenlPri"))
+            tacs
+
+
       
       fun attempt tac goal fk sk =
          tac goal (fn _ => sk ([(blank, goal)], valhd, fk)) sk
@@ -422,7 +458,7 @@ structure TacticInternal :> TACTIC_INTERNAL =
 
       fun withidir tac (goal as (_, dir)) fk sk = tac (Directory.idir dir) goal fk sk
 
-      fun withterm m tac (goal as (_, dir)) fk sk = tac (m (Directory.idir dir)) goal fk sk
+      fun withterm em tac (goal as (_, dir)) fk sk = tac (ETerm.withdir dir em) goal fk sk
 
 
       fun isSoft opac =
@@ -572,6 +608,8 @@ structure TacticInternal :> TACTIC_INTERNAL =
       val >>> = andthenl
       val >>= = andthenM
       val >>>= = andthenlM
+      val >>! = andthenPri
+      val >>>! = andthenlPri
 
    end
 
@@ -592,7 +630,7 @@ structure TacticMonad :> MONAD where type 'a m = 'a Tactic.tacticm =
 
 grammardef Tactic
 
-   infix right curried 1 >> >>> >>= >>>=
+   infix right curried 1 >> >>> >>= >>>= >>! >>>!
 
 end
 

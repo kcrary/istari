@@ -49,6 +49,7 @@ signature REWRITE =
 
       val rewrite           : (rewrite * targets) list -> tactic
       val rewriteRaw        : (rewrite * targets) list -> tactic
+      val rewritePriority   : (rewrite * targets) list -> Tactic.priority Tactic.tacticm
 
       val testRewrite       : (rewrite * targets) list -> unit
       val showPosition      : targets -> unit
@@ -80,7 +81,7 @@ signature REWRITE_TYPES =
       type term = Term.term
       type tactic = Tactic.tactic
       type 'a tacticm = 'a Tactic.tacticm
-      type priority = Typecheck.priority
+      type priority = Tactic.priority
 
 
       (* All the type definitions are given here in case the user wants to craft a rewrite. *)
@@ -172,7 +173,7 @@ structure RewriteTypes :> REWRITE_TYPES =
       type term = Term.term
       type tactic = Tactic.tactic
       type 'a tacticm = 'a Tactic.tacticm
-      type priority = Typecheck.priority
+      type priority = Tactic.priority
 
       type 'a rewrite_core =
          (int -> term -> bool) * (int -> term -> (term * 'a) option)
@@ -213,7 +214,7 @@ signature REWRITE_INTERNAL =
 
 
       type 'a tacticm = 'a Tactic.tacticm
-      type priority = Typecheck.priority
+      type priority = Tactic.priority
 
       structure CICTable : CHECKPOINTED_TABLE where type key = constant * int * constant
 
@@ -248,6 +249,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
       structure B = BackchainInternal
       structure C = Oldcase
       structure D = Directory
+      structure ET = ETerm
       structure H = ConstantTable
       structure P = Prefix
       structure J = Judgement
@@ -264,7 +266,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
       type symbol = Symbol.symbol
       type constant = Constant.constant
-      type eterm = ETerm.eterm
+      type eterm = ET.eterm
       type ehead = Directory.idirectory -> Directory.head
 
       exception InsufficientHits of string
@@ -693,7 +695,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                     refine (Rule.forallIntroEq e a' m' n')
                     >>> [
                         (* typechecking goal: E : type *)
-                        chdir dir' >> idtacM TC.Secondary,
+                        chdir dir' >> idtacM Secondary,
 
                         (* E |- M' = N' : A' *)
                         tac'
@@ -769,7 +771,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                            refine (Rule.eqtpFunct a' b p' q')
                            >>> [
                                (* typechecking goal: A' |- B : type *)
-                               chdir dira >> idtacM TC.Secondary,
+                               chdir dira >> idtacM Secondary,
                                 
                                (* P' = Q' : A' *)
                                tac'
@@ -793,7 +795,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                            refine (Rule.eqtpFunct a' b p' q')
                            >>> [
                                (* typechecking goal: A' |- B : type *)
-                               chdir dira >> idtacM TC.Secondary,
+                               chdir dira >> idtacM Secondary,
 
                                (* P' = Q' : A' *)
                                tac'
@@ -876,7 +878,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                              refine (Rule.forallIntro dom (T.apply2 Prim.arrow cod cod'))
                              >>> [
                                  (* G |- dom : type *)
-                                 chdir dir' >> idtacM TC.Secondary,
+                                 chdir dir' >> idtacM Secondary,
 
                                  (* G, dom |- cod -> cod' *)
                                  tac
@@ -1011,7 +1013,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                              refine (Rule.forallIntro d1 (T.apply2 Prim.arrow d2 d2'))
                              >>> [
                                  (* G |- d1 : type *)
-                                 chdir dir' >> idtacM TC.Secondary,
+                                 chdir dir' >> idtacM Secondary,
 
                                  (* G, d1 |- d2 -> d2' *)
                                  tac
@@ -1072,7 +1074,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                      refine (Rule.weaken 1 2)
                                      >>
                                      (* G, d1 |- d2' : type *)
-                                     chdir dir >> idtacM TC.Secondary,
+                                     chdir dir >> idtacM Secondary,
 
                                      (* G, (forall d1 . d2 -> d2'), (exists d1[^] . d2[0 . ^2]) |- 0 #1 : d1[^2] *)
                                      refine (Rule.existsElim1Of
@@ -1164,13 +1166,13 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                              d)
                                   >>
                                   (* G |- D : U univ *)
-                                  chdir dir' >> idtacM TC.Secondary,
+                                  chdir dir' >> idtacM Secondary,
 
                                   (* G, D |- A : U univ *)
-                                  chdir dir >> idtacM TC.Secondary,
+                                  chdir dir >> idtacM Secondary,
 
                                   (* G, D |- B : U univ *)
-                                  chdir dir >> idtacM TC.Secondary,
+                                  chdir dir >> idtacM Secondary,
 
                                   (* G, D, A |- B[^] *)
                                   refine (Rule.arrowElim
@@ -1238,13 +1240,13 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                             refine (Rule.weaken 0 1)
                                             >>
                                             (* G |- dom : type *)
-                                            chdir dir >> idtacM TC.Secondary,
+                                            chdir dir >> idtacM Secondary,
 
                                             (* G, dom' -> dom, dom[^] |- cod[^2] : type *)
                                             refine (Rule.weaken 0 2)
                                             >>
                                             (* G |- cod : type *)
-                                            chdir dir >> idtacM TC.Secondary
+                                            chdir dir >> idtacM Secondary
                                             ],
                                         
                                         (* G, dom' -> dom, dom[^] -> cod[^] |- dom'[^2] -> cod[^2] *)
@@ -1297,7 +1299,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                 refine (Rule.assert (T.apply1 Prim.istp dom) (T.evar ()))
                                 >>> [
                                     (* G |- dom : type *)
-                                    chdir dir >> idtacM TC.Secondary,
+                                    chdir dir >> idtacM Secondary,
 
                                     (* G, dom : type |- (dom[^] -> cod[^]) -> (dom[^] -> cod'[^]) *)
                                     refine (Rule.assert (T.Sub (T.apply2 Prim.arrow cod cod', T.shift1)) (T.evar ()))
@@ -1378,7 +1380,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                 refine (Rule.assert (T.apply1 Prim.istp d2) (T.evar ()))
                                 >>> [
                                     (* G |- d2 : type *)
-                                    chdir dir >> idtacM TC.Secondary,
+                                    chdir dir >> idtacM Secondary,
 
                                     (* G, d2 : type |- (d1[^] & d2[^]) -> (d1'[^] & d2[^]) *)
                                     refine (Rule.assert (T.Sub (T.apply2 Prim.arrow d1 d1', T.shift1)) (T.evar ()))
@@ -1452,7 +1454,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                 refine (Rule.assert (T.apply1 Prim.istp d1) (T.evar ()))
                                 >>> [
                                     (* G |- d1 : type *)
-                                    chdir dir >> idtacM TC.Secondary,
+                                    chdir dir >> idtacM Secondary,
 
                                     (* G, d1 : type |- (d1[^] & d2[^]) -> (d1[^] & d2'[^]) *)
                                     refine (Rule.assert (T.Sub (T.apply2 Prim.arrow d2 d2', T.shift1)) (T.evar ()))
@@ -1532,7 +1534,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                 refine (Rule.assert (T.apply1 Prim.istp d2) (T.evar ()))
                                 >>> [
                                     (* G |- d2 : type *)
-                                    chdir dir >> idtacM TC.Secondary,
+                                    chdir dir >> idtacM Secondary,
 
                                     (* G, d2 : type |- (d1[^] % d2[^]) -> (d1'[^] % d2[^]) *)
                                     refine (Rule.assert (T.Sub (T.apply2 Prim.arrow d1 d1', T.shift1)) (T.evar ()))
@@ -1602,7 +1604,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                                     refine (Rule.weaken 0 4)
                                                     >>
                                                     (* G |- d1' : type *)
-                                                    chdir dir >> idtacM TC.Secondary,
+                                                    chdir dir >> idtacM Secondary,
 
                                                     (* G, d2 : type, d1[^] -> d1'[^], d1[^2] % d2[^2], d2[^3] |- d2[^4] *)
                                                     refine (Rule.hypothesis 0) >> done
@@ -1630,7 +1632,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                 refine (Rule.assert (T.apply1 Prim.istp d1) (T.evar ()))
                                 >>> [
                                     (* G |- d1 : type *)
-                                    chdir dir >> idtacM TC.Secondary,
+                                    chdir dir >> idtacM Secondary,
 
                                     (* G, d1 : type |- (d1[^] % d2[^]) -> (d1[^] % d2'[^]) *)
                                     refine (Rule.assert (T.Sub (T.apply2 Prim.arrow d2 d2', T.shift1)) (T.evar ()))
@@ -1681,7 +1683,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                                     refine (Rule.weaken 0 4)
                                                     >>
                                                     (* G |- d2' : type *)
-                                                    chdir dir >> idtacM TC.Secondary,
+                                                    chdir dir >> idtacM Secondary,
 
                                                     (* G, d1 : type, d2[^] -> d2'[^], d1[^2] % d2[^2], d1[^3] |- d1[^4] *)
                                                     refine (Rule.hypothesis 0) >> done
@@ -2638,7 +2640,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
       fun rewritePriority aims =
          (case aims of
              [] =>
-                idtacM TC.Primary
+                idtacM Primary
 
            | (rew, targets) :: rest =>
                 rewriteLoop rew targets
@@ -3001,7 +3003,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                
             val dir' = D.shift dir sh
 
-            val m = N.simplify (ETerm.additional capture em (D.idir dir'))
+            val m = N.simplify (ET.withdir dir' (ET.additional capture em))
             val added = List.length capture
          in
             (case m of
@@ -3048,7 +3050,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                    NONE => dir
                  | SOME i => D.shift dir (i+1))
 
-            val m = N.simplify (ETerm.additional capture em (D.idir dir'))
+            val m = N.simplify (ET.withdir dir' (ET.additional capture em))
          in
             main (List.length capture) m red
          end
@@ -3208,7 +3210,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                    NONE => dir
                  | SOME i => D.shift dir (i+1))
 
-            val m = N.simplify (ETerm.additional capture em (D.idir dir'))
+            val m = N.simplify (ET.withdir dir' (ET.additional capture em))
          in
             (case m of
                 T.Elim (T.Const const, _) =>
@@ -3391,7 +3393,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                    NONE => NONE
 
                  | SOME (capture, elev) => 
-                      SOME (ETerm.additional capture elev (D.idir dir)))
+                      SOME (ET.withdir dir (ET.additional capture elev)))
 
             val (arity, red, root) =
                if Constant.eq (const, Prim.mu) then
@@ -3472,12 +3474,12 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                                    refine (Rule.muUnroll body)
                                                    >>> [
                                                        (* Type |- Body : Type *)
-                                                       chdir (D.bindVary dir binder) >> idtacM TC.Secondary,
+                                                       chdir (D.bindVary dir binder) >> idtacM Secondary,
                        
                                                        (* positive (fn . Body) *)
                                                        chdir dir
                                                        >>
-                                                       idtacM TC.Secondary
+                                                       idtacM Secondary
                                                        ]
       
                                               | SOME lev =>
@@ -3486,15 +3488,15 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                                        (* lev : level *)
                                                        chdir dir
                                                        >>
-                                                       idtacM TC.Secondary,
+                                                       idtacM Secondary,
       
                                                        (* U lev |- Body : U lev *)
-                                                       chdir (D.bindVary dir binder) >> idtacM TC.Secondary,
+                                                       chdir (D.bindVary dir binder) >> idtacM Secondary,
       
                                                        (* positive (fn . Body) *)
                                                        chdir dir
                                                        >>
-                                                       idtacM TC.Secondary
+                                                       idtacM Secondary
                                                        ])
                 
                                          val rtac =
@@ -3549,7 +3551,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                                    refine (Rule.recUnroll body)
                                                    >>
                                                    (* later Type |- Body : Type *)
-                                                   chdir (D.bindVary dir binder) >> idtacM TC.Secondary
+                                                   chdir (D.bindVary dir binder) >> idtacM Secondary
                        
                                                 val rtac =
                                                    (* Body[M . id] = M : type *)
@@ -3602,10 +3604,10 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                                        (* lev : level *)
                                                        chdir dir
                                                        >>
-                                                       idtacM TC.Secondary,
+                                                       idtacM Secondary,
       
                                                        (* later (U lev) |- Body : U lev *)
-                                                       chdir (D.bindVary dir binder) >> idtacM TC.Secondary
+                                                       chdir (D.bindVary dir binder) >> idtacM Secondary
                                                        ]
                                              in
                                                 SOME (T.Sub (body, T.Dot (m, T.id)),
@@ -3650,7 +3652,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                    NONE => dir
                  | SOME i => D.shift dir (i+1))
 
-            val m = ETerm.additional capture em (D.idir dir')
+            val m = ET.withdir dir' (ET.additional capture em)
             val m' = N.whnf m
 
             val added = List.length capture
@@ -3706,7 +3708,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                    NONE => dir
                  | SOME i => D.shift dir (i+1))
 
-            val m = ETerm.additional capture em (D.idir dir')
+            val m = ET.withdir dir' (ET.additional capture em)
             val m' = N.whnf m
 
             val added = List.length capture
@@ -3812,9 +3814,9 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                   (idir, 0)
                   capture
 
-            val m = N.simplify (em idir')
-            val n = en idir'
-            val a = ea idir'
+            val m = N.simplify (ET.withidir idir' em)
+            val n = ET.withidir idir' en
+            val a = ET.withidir idir' ea
 
             fun test bvs p =
                let
@@ -3861,7 +3863,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                 (T.Sub (a, s), T.Sub (m, s), T.Sub (n, s), spine,
       
                                  (* M[s] = N[s] : A[s] *)
-                                 idtacM TC.Primary)))
+                                 idtacM Primary)))
                      end
                   else
                      NONE
@@ -3898,7 +3900,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                (ctx, dir, 0)
                capture
 
-            val lem = elem (D.idir dir)
+            val lem = ET.withdir dir elem
 
             do (c, ctac) =
                B.soMain ctx lem
@@ -4099,7 +4101,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
              refine (Rule.eqtpRefl (T.evar ()))
              >>
              (* B : type *)
-             idtacM TC.Secondary
+             idtacM Secondary
              ]
       
       fun compatEqtpEqtp1 tac =
@@ -4111,7 +4113,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
              refine (Rule.eqtpRefl (T.evar ()))
              >>
              (* B : type *)
-             idtacM TC.Secondary,
+             idtacM Secondary,
              
              (* B = B' : type *)
              tac
@@ -4129,7 +4131,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
              refine (Rule.univForm (T.evar ()))
              >>
              (* I : level *)
-             idtacM TC.Secondary,
+             idtacM Secondary,
 
              (* A = A' : Ui *)
              refine (Rule.univIntroEqtype (T.evar ()) (T.evar ()) (T.evar ()))
@@ -4138,17 +4140,17 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                  tac,
 
                  (* A : Ui *)
-                 idtacM TC.Secondary,
+                 idtacM Secondary,
 
                  (* A' : Ui *)
-                 idtacM TC.Secondary
+                 idtacM Secondary
                  ],
 
              (* B = B : Ui *)
              refine (Rule.eqRefl (T.evar ()) (T.evar ()))
              >>
              (* B : Ui *)
-             idtacM TC.Secondary
+             idtacM Secondary
              ]
 
       fun compatEqUnivEqtp2 tac =
@@ -4163,13 +4165,13 @@ structure RewriteInternal :> REWRITE_INTERNAL =
              refine (Rule.univForm (T.evar ()))
              >>
              (* I : level *)
-             idtacM TC.Secondary,
+             idtacM Secondary,
 
              (* A = A : Ui *)
              refine (Rule.eqRefl (T.evar ()) (T.evar ()))
              >>
              (* A : Ui *)
-             idtacM TC.Secondary,
+             idtacM Secondary,
 
              (* B = B' : Ui *)
              refine (Rule.univIntroEqtype (T.evar ()) (T.evar ()) (T.evar ()))
@@ -4178,10 +4180,10 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                  tac,
 
                  (* B : Ui *)
-                 idtacM TC.Secondary,
+                 idtacM Secondary,
 
                  (* B' : Ui *)
-                 idtacM TC.Secondary
+                 idtacM Secondary
                  ],
              ]
 

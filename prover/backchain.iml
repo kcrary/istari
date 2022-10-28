@@ -3,19 +3,26 @@ signature BACKCHAIN =
    sig
 
       type tactic = Tactic.tactic
+      type 'a tacticm = 'a Tactic.tacticm
+      type priority = Tactic.priority
 
+      val soPriority : ETerm.eterm -> IntroPattern.ipattern -> priority tacticm
       val soRaw : ETerm.eterm -> IntroPattern.ipattern -> tactic
       val so : ETerm.eterm -> IntroPattern.ipattern -> tactic
 
+      val applyPriority : ETerm.eterm -> priority tacticm
       val applyRaw : ETerm.eterm -> tactic
       val apply : ETerm.eterm -> tactic
 
+      val exploitPriority : ETerm.eterm -> IntroPattern.ipattern -> priority tacticm
       val exploitRaw : ETerm.eterm -> IntroPattern.ipattern -> tactic
       val exploit : ETerm.eterm -> IntroPattern.ipattern -> tactic
 
+      val eexploitPriority : ETerm.eterm -> IntroPattern.ipattern -> priority tacticm
       val eexploitRaw : ETerm.eterm -> IntroPattern.ipattern -> tactic
       val eexploit : ETerm.eterm -> IntroPattern.ipattern -> tactic
 
+      val witnessPriority : ETerm.eterm -> priority tacticm
       val witnessRaw : ETerm.eterm -> tactic
       val witness : ETerm.eterm -> tactic
 
@@ -28,8 +35,6 @@ signature BACKCHAIN_INTERNAL =
       include BACKCHAIN
 
 
-      type 'a tacticm = 'a Tactic.tacticm
-      type priority = Typecheck.priority
 
       (* soMain G M fk sk
 
@@ -50,8 +55,6 @@ signature BACKCHAIN_INTERNAL =
       *)
       val exploitMain : bool -> Term.term -> priority tacticm -> (Term.term * priority tacticm -> 'a) -> 'a
 
-      val applyPriority : ETerm.eterm -> priority tacticm
-      val witnessPriority : ETerm.eterm -> priority tacticm
 
    end
 
@@ -65,8 +68,6 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
       structure D = Directory
       structure DE = DestructInternal
       structure TC = Typecheck
-
-      type priority = TC.priority
 
       open Tactic
       open CasePervasive
@@ -94,7 +95,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                        else if Constant.eq (const, Prim.arrow) then
                           soSpine cod rest
                              (refine (Rule.arrowElim dom cod) >>>
-                              [tac, idtacM TC.Primary])
+                              [tac, idtacM Primary])
                              fk sk
 
                       else
@@ -112,7 +113,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                                     (T.Sub (cod', T.Dot (n, T.id)))
                                     rest
                                     (refine (Rule.forallElim dom cod' n) >>>
-                                     [tac, idtacM TC.Secondary])
+                                     [tac, idtacM Secondary])
                                     fk sk
 
                             | _ => fk "type error in application")
@@ -122,7 +123,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                              (refine (Rule.arrowElim dom cod) >>>
                                  [
                                  tac,
-                                 refine (Rule.inhabitant dom n) >> idtacM TC.Secondary
+                                 refine (Rule.inhabitant dom n) >> idtacM Secondary
                                  ])
                              fk sk
 
@@ -184,11 +185,11 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                 (case remainder of
                     [] =>
                        sk (a,
-                           refine (Rule.inhabitant a m) >> tac >> idtacM TC.Secondary)
+                           refine (Rule.inhabitant a m) >> tac >> idtacM Secondary)
 
                   | spine =>
                        soSpine a spine
-                          (refine (Rule.inhabitant a m') >> tac >> idtacM TC.Secondary)
+                          (refine (Rule.inhabitant a m') >> tac >> idtacM Secondary)
                           fk sk)
 
            | Sum.INR msg => fk msg)
@@ -197,11 +198,11 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
 
       fun priorityOrder (pri1, _) (pri2, _) =
          (case pri1 of
-             TC.Primary => true
+             Primary => true
 
            | _ =>
                 (case pri2 of
-                    TC.Secondary => true
+                    Secondary => true
 
                   | _ => false))
 
@@ -209,7 +210,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
       fun soPriority em pat =
          let
             do (jud, dir) = withgoal
-            val m = em (Directory.idir dir)
+            val m = ETerm.withdir dir em
 
             do (a, tac) =
                soMain (J.context jud) m fail
@@ -218,7 +219,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                (refine (Rule.assert a (J.concl jud)) >>>
                    [
                    tac,
-                   DE.destruct0 pat (idtacM TC.Primary)
+                   DE.destruct0 pat (idtacM Primary)
                    ])
                (Reorder.sort priorityOrder)
          end
@@ -251,7 +252,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                    in
                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
                       (refine (Rule.forallElim dom cod e) 
-                       >>> [tac, idtacM TC.Secondary])
+                       >>> [tac, idtacM Secondary])
                       fk sk
                    end\
  
@@ -259,7 +260,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                \fnc dom cod =>
                    applyMain cod c
                    (refine (Rule.arrowElim dom cod) 
-                    >>> [tac, idtacM TC.Primary])
+                    >>> [tac, idtacM Primary])
                    fk sk\
  
              | \Prim.intersect\ ? (fn . ?) =>
@@ -269,7 +270,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                    in
                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
                       (refine (Rule.intersectElim dom cod e) 
-                       >>> [tac, idtacM TC.Secondary])
+                       >>> [tac, idtacM Secondary])
                       fk sk
                    end\
  
@@ -277,14 +278,14 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                \fnc dom cod =>
                    applyMain cod c
                    (refine (Rule.tarrowElim dom cod)
-                    >>> [tac, idtacM TC.Primary])
+                    >>> [tac, idtacM Primary])
                    fk sk\
  
              | \Prim.karrow\ ? ? =>
                \fnc dom cod =>
                    applyMain cod c
                    (refine (Rule.karrowElim dom cod)
-                    >>> [tac, idtacM TC.Primary])
+                    >>> [tac, idtacM Primary])
                    fk sk\
  
              | \Prim.prod\ ? ? =>
@@ -303,7 +304,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
       fun applyPriority em =
          let
             do (jud, dir) = withgoal
-            val m = em (Directory.idir dir)
+            val m = ETerm.withdir dir em
 
             do (a, atac) =
                soMain (J.context jud) m
@@ -336,7 +337,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                 if Constant.eq (const, Prim.arrow) then
                    exploitMain dep cod
                    (refine (Rule.arrowElim dom cod)
-                    >>> [tac, idtacM TC.Primary])
+                    >>> [tac, idtacM Primary])
                    sk
                 else if dep andalso Constant.eq (const, Prim.forall) then
                    (case N.whnf cod of
@@ -346,7 +347,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                           in
                              exploitMain dep (T.Sub (cod', T.Dot (e, T.id)))
                              (refine (Rule.forallElim dom cod' e)
-                              >>> [tac, idtacM TC.Secondary])
+                              >>> [tac, idtacM Secondary])
                              sk
                           end
 
@@ -360,7 +361,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
       fun exploitGen dep em pat =
          let
             do (jud, dir) = withgoal
-            val m = em (Directory.idir dir)
+            val m = ETerm.withdir dir em
 
             do (a, atac) =
                soMain (J.context jud) m
@@ -377,10 +378,14 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                (refine (Rule.assert b (J.concl jud)) >>>
                    [
                    btac,
-                   DE.destruct0 pat (idtacM TC.Primary)
+                   DE.destruct0 pat (idtacM Primary)
                    ])
                (Reorder.sort priorityOrder)
          end
+
+      fun exploitPriority em pat = exploitGen false em pat
+         
+      fun eexploitPriority em pat = exploitGen true em pat
 
       fun exploitRaw em pat = exploitGen false em pat >> idtac
 
@@ -396,7 +401,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
       fun witnessPriority em =
          let
             do (jud, dir) = withgoal
-            val m = em (Directory.idir dir)
+            val m = ETerm.withdir dir em
             
             do (a, atac) =
                soMain (J.context jud) m

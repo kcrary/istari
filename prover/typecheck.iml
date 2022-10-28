@@ -2,10 +2,9 @@
 signature TYPECHECK =
    sig
 
-      type 'a tacticm = 'a Tactic.tacticm
       type tactic = Tactic.tactic
-
-      datatype priority = Primary | Secondary
+      type 'a tacticm = 'a Tactic.tacticm
+      type priority = Tactic.priority
 
 
       (* run typechecker on current goal *)
@@ -15,7 +14,7 @@ signature TYPECHECK =
       val withTypecheck : tactic -> tactic               
 
       (* run typechecker on all secondary subgoals *)
-      val withTypecheckSnd : priority tacticm -> tactic
+      val withTypecheckSnd : Tactic.priority tacticm -> tactic
 
       (* run typechecker for side-effects only *)
       val inference : tactic
@@ -24,6 +23,7 @@ signature TYPECHECK =
       val typecheck1 : tactic
 
       (* infer the type of the indicated term *)
+      val inferPriority : ETerm.eterm -> Symbol.symbol option -> priority tacticm
       val inferRaw : ETerm.eterm -> Symbol.symbol option -> tactic
       val infer : ETerm.eterm -> Symbol.symbol option -> tactic
 
@@ -40,6 +40,10 @@ signature TYPECHECK_INTERNAL =
 
       val isTypecheckGoal : Judgement.judgement -> bool
 
+      val multigoalTypecheck :
+         Tactic.goal list
+         -> (Message.label * Tactic.goal) list * (Refine.validation list -> Refine.validation list)
+
 
       (* Tactics can add hypotheses, but must not alter existing hypotheses. *)
 
@@ -52,11 +56,6 @@ signature TYPECHECK_INTERNAL =
       val eqkindTactics : tactic Constant2Table.table
       val subtypeTactics : tactic Constant2Table.table
       val subtypeLeftTactics : tactic ConstantTable.table
-
-
-      val multigoalTypecheck :
-         Tactic.goal list
-         -> (Message.label * Tactic.goal) list * (Refine.validation list -> Refine.validation list)
 
    end
 
@@ -216,8 +215,6 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       open Tactic
       open CasePervasive
       exception Backtrack = Case.Backtrack
-
-      datatype priority = Primary | Secondary
 
       val showPrefixed = Show.showPrefixed
 
@@ -2368,11 +2365,11 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       
       (*** Inference entry points ***)
 
-      fun inferMain em symopt =
+      fun inferPriority em symopt =
          let
             do (goal as (jud, dir)) = withgoal
 
-            val m = em (D.idir dir)
+            val m = ETerm.withdir dir em
          in
             (case
                 (try
@@ -2403,9 +2400,9 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    ))
          end
 
-      fun inferRaw em symopt = inferMain em symopt >> idtac
+      fun inferRaw em symopt = inferPriority em symopt >> idtac
 
-      fun infer em symopt = withTypecheckSnd $ inferMain em symopt
+      fun infer em symopt = withTypecheckSnd $ inferPriority em symopt
 
 
 
@@ -2757,6 +2754,4 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
    end
 
 
-structure Typecheck :> TYPECHECK where type priority = TypecheckInternal.priority =
-    TypecheckInternal
-
+structure Typecheck :> TYPECHECK = TypecheckInternal

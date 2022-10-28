@@ -2,9 +2,11 @@
 signature GENERALIZE =
    sig
 
-      type eterm = ETerm.eterm
       type symbol = Symbol.symbol
+      type eterm = ETerm.eterm
       type tactic = Tactic.tactic
+      type 'a tacticm = 'a Tactic.tacticm
+      type priority = Tactic.priority
 
       (* pattern m n occ
 
@@ -19,44 +21,40 @@ signature GENERALIZE =
       *)
       val pattern : Term.term -> Term.term -> int list option -> (Term.term, int) Sum.sum
 
+      val generalizeGenPriority : eterm -> eterm -> int list option -> symbol option -> priority tacticm
       val generalizeGenRaw : eterm -> eterm -> int list option -> symbol option -> tactic
       val generalizeGen : eterm -> eterm -> int list option -> symbol option -> tactic
 
+      val generalizeAtPriority : eterm -> eterm -> int list -> symbol option -> priority tacticm
       val generalizeAtRaw : eterm -> eterm -> int list -> symbol option -> tactic
       val generalizeAt : eterm -> eterm -> int list -> symbol option -> tactic
 
+      val generalizePriority : eterm -> eterm -> symbol option -> priority tacticm
       val generalizeRaw : eterm -> eterm -> symbol option -> tactic
       val generalize : eterm -> eterm -> symbol option -> tactic
 
 
+      val rememberGenPriority : eterm -> eterm -> int list option -> symbol option -> symbol option -> priority tacticm
       val rememberGenRaw : eterm -> eterm -> int list option -> symbol option -> symbol option -> tactic
       val rememberGen : eterm -> eterm -> int list option -> symbol option -> symbol option -> tactic
 
+      val rememberAtPriority : eterm -> eterm -> int list -> symbol option -> symbol option -> priority tacticm
       val rememberAtRaw : eterm -> eterm -> int list -> symbol option -> symbol option -> tactic
       val rememberAt : eterm -> eterm -> int list -> symbol option -> symbol option -> tactic
 
+      val rememberPriority : eterm -> eterm -> symbol option -> symbol option -> priority tacticm
       val rememberRaw : eterm -> eterm -> symbol option -> symbol option -> tactic
       val remember : eterm -> eterm -> symbol option -> symbol option -> tactic
 
 
+      val setEqPriority : symbol -> ETerm.eterm -> ETerm.eterm -> symbol option -> priority tacticm
       val setEqRaw : symbol -> ETerm.eterm -> ETerm.eterm -> symbol option -> tactic
       val setEq : symbol -> ETerm.eterm -> ETerm.eterm -> symbol option -> tactic
 
    end
 
 
-signature GENERALIZE_INTERNAL =
-   sig
-
-      include GENERALIZE
-
-
-      val generalizeGenPriority : eterm -> eterm -> int list option -> symbol option -> Typecheck.priority Tactic.tacticm
-
-   end
-
-
-structure GeneralizeInternal :> GENERALIZE_INTERNAL =
+structure Generalize :> GENERALIZE =
    struct
 
       structure T = Term
@@ -244,14 +242,14 @@ structure GeneralizeInternal :> GENERALIZE_INTERNAL =
             do (jud, dir) = withgoal
             val idir = D.idir dir
 
-            val m = em idir
-            val a = ea idir
+            val m = ETerm.withidir idir em
+            val a = ETerm.withidir idir ea
          in
             (case pattern m (J.concl jud) occ of
                 Sum.INL b =>
                    refine (Rule.assert (T.apply2 Prim.ov a m) (J.concl jud))
                    >>> [
-                       idtacM TC.Secondary,
+                       idtacM Secondary,
 
                        refine (Rule.forallElim 
                                   (T.Sub (a, T.shift1)) 
@@ -268,7 +266,7 @@ structure GeneralizeInternal :> GENERALIZE_INTERNAL =
 
                                refine (Rule.weaken 1 1)
                                >> chdir (D.bindh dir name)
-                               >> idtacM TC.Primary
+                               >> idtacM Primary
                                ],
 
                            refine (Rule.hypothesis 0) >> done
@@ -284,11 +282,17 @@ structure GeneralizeInternal :> GENERALIZE_INTERNAL =
 
       fun generalizeGen em ea occ name = Typecheck.withTypecheckSnd $ generalizeGenPriority em ea occ name
 
+      fun generalizeAtPriority em ea occ name =
+         generalizeGenPriority em ea (SOME occ) name
+
       fun generalizeAtRaw em ea occ name =
          generalizeGenRaw em ea (SOME occ) name
 
       fun generalizeAt em ea occ name =
          generalizeGen em ea (SOME occ) name
+
+      fun generalizePriority em ea name =
+         generalizeGenPriority em ea NONE name
 
       fun generalizeRaw em ea name =
          generalizeGenRaw em ea NONE name
@@ -303,8 +307,8 @@ structure GeneralizeInternal :> GENERALIZE_INTERNAL =
             do (jud, dir) = withgoal
             val idir = D.idir dir
 
-            val m = em idir
-            val a = ea idir
+            val m = ETerm.withidir idir em
+            val a = ETerm.withidir idir ea
 
             val c = J.concl jud
 
@@ -320,7 +324,7 @@ structure GeneralizeInternal :> GENERALIZE_INTERNAL =
                    refine (Rule.assert (T.apply2 Prim.ov a m) (J.concl jud))
                    >>> [
                        (* |- M : A *)
-                       idtacM TC.Secondary,
+                       idtacM Secondary,
 
                        (* M : A |- C[^] *)
                        refine (Rule.arrowElim
@@ -378,7 +382,7 @@ structure GeneralizeInternal :> GENERALIZE_INTERNAL =
                                        >>
                                        (* A, 0 = M[^] : A[^] |- B[1 . ^2] *)
                                        chdir (D.bindh (D.bindh dir name) eqname)
-                                       >> idtacM TC.Primary
+                                       >> idtacM Primary
                                        ]
                                    ],
         
@@ -405,11 +409,17 @@ structure GeneralizeInternal :> GENERALIZE_INTERNAL =
 
       fun rememberGen em ea occ name eqname = Typecheck.withTypecheckSnd $ rememberGenPriority em ea occ name eqname
 
+      fun rememberAtPriority em ea occ name eqname =
+         rememberGenPriority em ea (SOME occ) name eqname
+
       fun rememberAtRaw em ea occ name eqname =
          rememberGenRaw em ea (SOME occ) name eqname
 
       fun rememberAt em ea occ name eqname =
          rememberGen em ea (SOME occ) name eqname
+
+      fun rememberPriority em ea name eqname =
+         rememberGenPriority em ea NONE name eqname
 
       fun rememberRaw em ea name eqname =
          rememberGenRaw em ea NONE name eqname
@@ -433,7 +443,7 @@ structure GeneralizeInternal :> GENERALIZE_INTERNAL =
             refine (Rule.assert (T.apply2 Prim.ov a m) c)
             >>> [
                 (* M : A *)
-                idtacM TC.Secondary,
+                idtacM Secondary,
 
                 (* M : A |- C[^] *)
                 refine (Rule.arrowElim
@@ -476,7 +486,7 @@ structure GeneralizeInternal :> GENERALIZE_INTERNAL =
                             refine (Rule.weaken 2 1)
                             >>
                             (* A, 0 = M[^] : A[^] |- C[^2] *)
-                            chdir dir' >> idtacM TC.Primary
+                            chdir dir' >> idtacM Primary
                             ]
                         ],
 
@@ -496,6 +506,3 @@ structure GeneralizeInternal :> GENERALIZE_INTERNAL =
          TC.withTypecheckSnd $ setEqPriority sym em ea symEq
  
    end
-
-
-structure Generalize :> GENERALIZE = GeneralizeInternal

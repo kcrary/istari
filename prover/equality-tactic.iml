@@ -3,34 +3,47 @@ signature EQUALITY_TACTIC =
    sig
 
       type tactic = Tactic.tactic
+      type 'a tacticm = 'a Tactic.tacticm
+      type priority = Tactic.priority
 
+      val reflexivityPriority : priority tacticm
       val reflexivityRaw : tactic
       val reflexivity : tactic
 
+      val symmetryPriority : priority tacticm
       val symmetryRaw : tactic
       val symmetry : tactic
 
+      val symmetryInPriority : Symbol.symbol -> priority tacticm
       val symmetryInRaw : Symbol.symbol -> tactic
       val symmetryIn : Symbol.symbol -> tactic
 
+      val transitivityPriority : ETerm.eterm -> priority tacticm
       val transitivityRaw : ETerm.eterm -> tactic
       val transitivity : ETerm.eterm -> tactic
       val etransitivity : tactic
 
+      val compatPriority : priority tacticm
       val compatRaw : tactic
       val compat : tactic
 
       val decompEq : int -> ETerm.eterm -> tactic
 
+      val extensionalityPriority : Symbol.symbol option list -> priority tacticm
       val extensionalityRaw : Symbol.symbol option list -> tactic
       val extensionality : Symbol.symbol option list -> tactic
 
+      val setExtensionalityPriority : priority tacticm
       val setExtensionalityRaw : tactic
       val setExtensionality : tactic
 
       val substitutionLiteral : int -> Term.term -> tactic
+
+      val substitutionPriority : Symbol.symbol -> ETerm.eterm -> priority tacticm
       val substitutionRaw : Symbol.symbol -> ETerm.eterm -> tactic
       val substitution : Symbol.symbol -> ETerm.eterm -> tactic
+
+      val substPriority : Symbol.symbol -> priority tacticm
       val substRaw : Symbol.symbol -> tactic
       val subst : Symbol.symbol -> tactic
 
@@ -38,9 +51,6 @@ signature EQUALITY_TACTIC =
 
 
       (* Tables *)
-
-      type 'a tacticm = 'a Tactic.tacticm
-      type priority = Typecheck.priority
 
       val reflexivityTactics : priority tacticm ConstantTable.table
 
@@ -78,10 +88,6 @@ signature EQUALITY_TACTIC_INTERNAL =
       include EQUALITY_TACTIC
 
       
-      val compatPriority : priority Tactic.tacticm
-      val reflexivityPriority : priority Tactic.tacticm
-      val symmetryPriority : priority Tactic.tacticm
-
       val injectionSum : int -> tactic
       val injectionExists : int -> tactic
 
@@ -103,7 +109,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       open Tactic
       open CasePervasive
 
-      type priority = TC.priority
+      type priority = priority
       val ? = C.?
       val ??? = C.???
 
@@ -128,13 +134,13 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       val () =
          (
          H.insert reflexivityTactics Prim.eq 
-            (setFailure "terms do not unify" RuleTactic.eqRefl >> idtacM TC.Secondary);
+            (setFailure "terms do not unify" RuleTactic.eqRefl >> idtacM Secondary);
 
          H.insert reflexivityTactics Prim.eqtp 
-            (setFailure "types do not unify" RuleTactic.eqtpRefl >> idtacM TC.Secondary);
+            (setFailure "types do not unify" RuleTactic.eqtpRefl >> idtacM Secondary);
 
          H.insert reflexivityTactics Prim.subtype
-            (setFailure "types do not unify" RuleTactic.subtypeRefl >> idtacM TC.Secondary)
+            (setFailure "types do not unify" RuleTactic.subtypeRefl >> idtacM Secondary)
          )
          
 
@@ -146,7 +152,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             do const = withHeadConst "not a symmetry goal"
          in
             (case H.find symmetryTactics const of
-                SOME tacfn => tacfn (idtacM TC.Primary)
+                SOME tacfn => tacfn (idtacM Primary)
 
               | NONE => fail "not a symmetry goal")
          end
@@ -186,7 +192,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
                                                refine (Rule.weaken (i+1) 1)
                                                >> refine (Rule.exchange 0 1 i)
-                                               >> idtacM TC.Primary
+                                               >> idtacM Primary
                                                ]
                                         end
               
@@ -291,17 +297,17 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          H.insert transitivityTactics Prim.eq
             (fn m =>
                 refine (Rule.eqTrans (T.evar ()) (T.evar ()) m (T.evar ()))
-                >> idtacM TC.Primary);
+                >> idtacM Primary);
 
          H.insert transitivityTactics Prim.eqtp
             (fn m => 
                 refine (Rule.eqtpTrans (T.evar ()) m (T.evar ()))
-                >> idtacM TC.Primary);
+                >> idtacM Primary);
 
          H.insert transitivityTactics Prim.subtype
             (fn m => 
                 refine (Rule.subtypeTrans (T.evar ()) m (T.evar ()))
-                >> idtacM TC.Primary)
+                >> idtacM Primary)
          )
 
 
@@ -311,10 +317,10 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       val idtacPri =
          goalCase
          /| \Prim.ov\ _ _ =>
-            \(fnc => idtacM TC.Secondary)\
+            \(fnc => idtacM Secondary)\
 
           | _ =>
-            \(fnc => idtacM TC.Primary)\
+            \(fnc => idtacM Primary)\
          /
            
       fun seqOption l = List.findmap (fn z => z) l
@@ -333,8 +339,8 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                              \(fnc b1 b2 =>
                                   refine (Rule.sumIntro1Eq b1 b2 m n)
                                   >>> [
-                                      idtacM TC.Secondary,
-                                      idtacM TC.Primary
+                                      idtacM Secondary,
+                                      idtacM Primary
                                       ])\
 
                            | _ =>
@@ -353,8 +359,8 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                              \(fnc b1 b2 =>
                                   refine (Rule.sumIntro2Eq b1 b2 m n)
                                   >>> [
-                                      idtacM TC.Secondary,
-                                      idtacM TC.Primary
+                                      idtacM Secondary,
+                                      idtacM Primary
                                       ])\
 
                            | _ =>
@@ -388,7 +394,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                               refine (Rule.subsumptionEq a b m n)
                               >>> [
                                   (* G |- A <: B *)
-                                  idtacM TC.Secondary,
+                                  idtacM Secondary,
  
                                   (* G |- M = N : A *)
                                   tac >> idtacPri
@@ -402,15 +408,15 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                     /| \Prim.prod\ ? ? =>
                        \(fnc b1 b2 =>
                             refine (Rule.prodIntroEq b1 b2 m1 n1 m2 n2)
-                            >> idtacM TC.Primary)\
+                            >> idtacM Primary)\
 
                      | \Prim.exists\ ? (fn ? . ?) =>
                        \(fnc b1 binder b2 =>
                             refine (Rule.existsIntroEq b1 b2 m1 n1 m2 n2)
                             >>> [
-                                chdir (D.bindVary dir binder) >> idtacM TC.Secondary,
-                                idtacM TC.Primary,
-                                idtacM TC.Primary
+                                chdir (D.bindVary dir binder) >> idtacM Secondary,
+                                idtacM Primary,
+                                idtacM Primary
                                 ])\
 
                      | _ =>
@@ -424,20 +430,20 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                        \(fnc dom cod =>
                             refine (Rule.arrowIntroEq dom cod m n)
                             >>> [
-                                idtacM TC.Secondary,
+                                idtacM Secondary,
 
                                 chdir (D.bindVary dir (seqOption [binder1, binder2]))
-                                >> idtacM TC.Primary
+                                >> idtacM Primary
                                 ])\
 
                      | \Prim.forall\ ? (fn ? . ?) =>
                        \(fnc dom binder cod =>
                             refine (Rule.forallIntroEq dom cod m n)
                             >>> [
-                                idtacM TC.Secondary,
+                                idtacM Secondary,
 
                                 chdir (D.bindVary dir (seqOption [binder, binder1, binder2]))
-                                >> idtacM TC.Primary
+                                >> idtacM Primary
                                 ])\
 
                      | _ =>
@@ -450,7 +456,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                     /| \Prim.future\ ? =>
                        \(fnc b1 =>
                             refine (Rule.futureIntroEq b1 (T.evar ()) (T.evar ()))
-                            >> idtacM TC.Primary)\
+                            >> idtacM Primary)\
 
                      | _ =>
                        \(fnc => fail "result type mismatch")\
@@ -626,7 +632,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       fun extensionalityLoop l =
          (case l of
              [] =>
-                refine (Rule.weaken 0 2) >> idtacM TC.Primary
+                refine (Rule.weaken 0 2) >> idtacM Primary
 
            | ident :: rest =>
                 C.goalCaseAlt
@@ -654,8 +660,8 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                    (T.apply2 Prim.ov a m)
                    (T.apply2 Prim.ov a n)
                 >>> [
-                    idtacM TC.Secondary,
-                    idtacM TC.Secondary,
+                    idtacM Secondary,
+                    idtacM Secondary,
                     extensionalityLoop l
                     ]),
 
@@ -743,7 +749,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       fun tkarrowExt extrule elimrule ident tac =
          refine (extrule (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
          >>> [
-             refine (Rule.weaken 0 2) >> idtacM TC.Secondary,
+             refine (Rule.weaken 0 2) >> idtacM Secondary,
 
              refine (Rule.hypothesis 1) >> done,
              refine (Rule.hypothesis 0) >> done,
@@ -777,7 +783,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          (fn ((a, b), m, n) =>
              assert (T.apply3 Prim.eq a (T.pi1 m) (T.pi1 n))
              >>> [
-                 refine (Rule.weaken 0 2) >> idtacM TC.Primary,
+                 refine (Rule.weaken 0 2) >> idtacM Primary,
     
                  refine (Rule.existsExt 
                             (T.Sub (a, T.shift1))
@@ -878,7 +884,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                          >>
                          refine (Rule.weaken 1 2)
                          >>
-                         idtacM TC.Secondary),
+                         idtacM Secondary),
                      ],
 
                  (* ... forall a . (b : type) |- m[^] = n[^] : set a[^] . b[0 . ^2] *)
@@ -967,11 +973,11 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                 refine (Rule.setIntroEq a b m n)
                 >>> [
                     withgoal
-                    (fn (_, dir) => chdir (D.bind0 dir) >> idtacM TC.Secondary),
+                    (fn (_, dir) => chdir (D.bind0 dir) >> idtacM Secondary),
 
-                    idtacM TC.Primary,
+                    idtacM Primary,
 
-                    idtacM TC.Primary
+                    idtacM Primary
                     ]),
 
             C.wild ?
@@ -989,7 +995,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
              refine (Rule.hypothesis 1) >> done,
              refine (Rule.hypothesis 0) >> done,
              
-             refine (Rule.weaken 0 2) >> idtacM TC.Primary,
+             refine (Rule.weaken 0 2) >> idtacM Primary,
 
              eassert2 ()
              >>> [
@@ -1012,7 +1018,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
              refine (Rule.hypothesis 0) >> done,
 
              (* cannot reestablish the invariant, so stop here *)
-             refine (Rule.weaken 0 2) >> idtacM TC.Primary
+             refine (Rule.weaken 0 2) >> idtacM Primary
              ]
 
 
@@ -1077,7 +1083,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             do m = withterm em
          in
             substitutionLiteral i m
-            >>> [idtacM TC.Secondary, idtacM TC.Primary, idtacM TC.Primary]
+            >>> [idtacM Secondary, idtacM Primary, idtacM Primary]
          end
 
       fun substitutionRaw hyp em = substitutionPriority hyp em >> idtac
@@ -1094,7 +1100,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             if Unify.unify1 m (T.Sub (m', T.Shift (i+1))) then
                refine (Rule.substitution i (T.evar ()) (T.evar ()) m')
                >>> [
-                   idtacM TC.Secondary,
+                   idtacM Secondary,
                    
                    if reverse then
                       refine (Rule.eqSymm (T.evar ()) (T.evar ()) (T.evar ()))
@@ -1124,7 +1130,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                    in
                       refine (Rule.weaken j 1)
                       >> chdir dir'
-                      >> idtacM TC.Primary
+                      >> idtacM Primary
                    end
                    ]
             else
@@ -1144,7 +1150,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                     in
                        refine (Rule.letSubst i)
                        >> chdir (D.binds (D.tl d12) d3)
-                       >> idtacM TC.Primary
+                       >> idtacM Primary
                     end)\
 
              | $anyhyp $tm

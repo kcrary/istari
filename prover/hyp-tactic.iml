@@ -28,6 +28,7 @@ signature HYP_TACTIC =
 
       val exchange : int -> int -> int -> tactic
       val moven : int -> int -> tactic
+      val movePos : symbol list -> int -> tactic
       val moveBefore : symbol list -> symbol -> tactic
       val moveAfter : symbol list -> symbol -> tactic
 
@@ -339,43 +340,54 @@ structure HypTactic :> HYP_TACTIC =
            | GREATER =>
                 exchange j (i - j) 1)
 
-      fun moveBefore froms to =
+
+      fun movePosLoop froms j =
          (case froms of
-             [] => idtac
+             [] => idtacM j
 
            | from :: rest =>
                 let
                    do i = findhyp from
-                   do jo = findhypOrConcl to
                 in
-                   (case jo of
-                       SOME j =>
-                          if i <= j then
-                             moven i j
-                          else
-                             moven i (j+1)
-       
-                     | NONE =>
-                          moven i 0)
-                end
-                >> moveBefore rest to)
+                   if i > j then
+                      let
+                         do j' = andthenM $ movePosLoop rest j
+                         do i' = findhyp from
+                      in
+                         moven i' j'
+                         >> idtacM (j'+1)
+                      end
+                   else (* j >= i *)
+                      moven i (j-1)
+                      >>
+                      let
+                         do j' = andthenM $ movePosLoop rest (j-1)
+                      in
+                         idtacM (j'+1)
+                      end
+                end)
+
+      fun movePos froms j = movePosLoop froms j >> idtac
+
+
+      fun moveBefore froms to =
+         let
+            do jo = findhypOrConcl to
+         in
+            (case jo of
+                NONE => movePos froms 0
+
+              | SOME j => movePos froms (j+1))
+         end
+
 
       fun moveAfter froms to =
-         (case froms of
-             [] => idtac
+         let
+            do j = findhyp to
+         in
+            movePos froms j
+         end
 
-           | from :: rest =>
-                moveAfter rest to
-                >>
-                let
-                   do i = findhyp from
-                   do j = findhyp to
-                in
-                   if i < j then
-                      moven i (j-1)
-                   else
-                      moven i j
-                end)
 
       val revert0 =
          let
