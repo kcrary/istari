@@ -360,6 +360,9 @@ goal, generating zero or more subgoals.
   impossible (*e.g.,* `inl M = inr N : A % B`) then it discharges the
   goal.
 
+  + `injectionRaw /[hyp x]/`
+
+    As `injection` but does not invoke the typechecker.
 
 
 ### Substitution

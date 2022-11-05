@@ -47,6 +47,8 @@ signature EQUALITY_TACTIC =
       val substRaw : Symbol.symbol -> tactic
       val subst : Symbol.symbol -> tactic
 
+      val injectionPriority : Symbol.symbol -> priority tacticm
+      val injectionRaw : Symbol.symbol -> tactic
       val injection : Symbol.symbol -> tactic
 
 
@@ -61,7 +63,7 @@ signature EQUALITY_TACTIC =
       val transitivityTactics : (Term.term -> priority tacticm) ConstantTable.table
 
       (* take the hypothesis number to inject as its argument *)
-      val injectionTactics : (int -> tactic) ConstantTable.table
+      val injectionTactics : (int -> priority tacticm) ConstantTable.table
 
       (* for each (const, tacfn) in the table
 
@@ -90,6 +92,8 @@ signature EQUALITY_TACTIC_INTERNAL =
       
       val injectionSum : int -> tactic
       val injectionExists : int -> tactic
+      val injectionProd : int -> tactic
+      val injectionSet : int -> priority tacticm
 
    end
 
@@ -1172,9 +1176,9 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
 
 
-      val injectionTactics : (int -> tactic) H.table = H.table ()
+      val injectionTactics : (int -> priority tacticm) H.table = H.table ()
 
-      fun injection hyp =
+      fun injectionPriority hyp =
          let
             do i = HypTactic.findhyp hyp
          in
@@ -1190,6 +1194,10 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                \(fnc => fail "not an injectible hypothesis")\
             /
          end
+
+      fun injectionRaw hyp = injectionPriority hyp >> idtac
+
+      fun injection hyp = TC.withTypecheckSnd $ injectionPriority hyp
 
 
 
@@ -1512,13 +1520,152 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          /
 
 
+      (* i : M = N : A & B *)
+      fun injectionProd i =
+         goalContextCase
+         /| $hyp \i\ $tm \Prim.eq\ (\Prim.prod\ ? ?) ($as (? , ?)) ($as (? , ?)) =>
+            \(fnc a b m m1 m2 n n1 n2 =>
+                 refine (Rule.assert (T.apply3 Prim.eq a m1 n1) (T.evar ()))
+                 >>> [
+                     (* M1 = N1 : A *)
+                     refine (Rule.prodElim1Eq a b m n)
+                     >>
+                     (* M = N : A & B *)
+                     refine (Rule.hypothesis i),
+
+                     (* M1 = N1 : A |- C *)
+                     refine (Rule.assert 
+                                (T.apply3 Prim.eq 
+                                    (T.Sub (b, T.shift1))
+                                    (T.Sub (m2, T.shift1))
+                                    (T.Sub (n2, T.shift1)))
+                                (T.evar ()))
+                     >>> [
+                         (* blah |- M2[^] = N2[^] : B[^] *)
+                         refine (Rule.prodElim2Eq
+                                    (T.Sub (a, T.shift1))
+                                    (T.Sub (b, T.shift1))
+                                    (T.Sub (m, T.shift1))
+                                    (T.Sub (n, T.shift1)))
+                         >>
+                         (* blah |- M[^] = N[^] : (A & B)[^] *)
+                         refine (Rule.hypothesis (i+1)),
+
+                         withgoal (fn (_, dir) => chdir (D.bind0 (D.bind0 dir)))
+                         ]
+                     ])\
+
+          | _ => \(fnc => fail "not an injection expression")\
+         /
+
+
+      (* i : M = N : { A | B } *)
+      fun injectionSet i =
+         let
+            do (_, dir) = withgoal
+         in
+            goalContextCase
+            /| $hyp \i\ $tm \Prim.eq\ (\Prim.set\ ? (fn . ?)) ? ? =>
+               \(fnc a b m n =>
+                    (* |- C *)
+                    refine (Rule.assert (T.apply2 Prim.forall a (T.Lam (NONE, T.apply1 Prim.istp b))) (T.evar ()))
+                    >>> [
+                        (* |- forall A . (B : type) *)
+                        refine (Rule.forallIntro (T.evar ()) (T.evar ()))
+                        >>> [
+                            (* |- A : type *)
+                            refine (Rule.setFormInv a b)
+                            >>
+                            (* |- set A . B : type *)
+                            refine (Rule.inhabitedForm (T.evar ()))
+                            >>
+                            (* |- set A . B *)
+                            refine (Rule.inhabitant (T.evar ()) m)
+                            >>
+                            (* |- M : set A . B *)
+                            refine (Rule.ofEquand1 (T.evar ()) m n)
+                            >>
+                            (* |- M = N : set A . B *)
+                            refine (Rule.hypothesis i) >> done,
+
+                            (* A |- B : type *)
+                            chdir (D.bind0 dir) >> idtacM Secondary
+                            ],
+
+                        (* forall A . (B : type) |- C[^] *)
+                        refine (Rule.assert (T.Sub (T.apply3 Prim.eq a m n, T.shift1)) (T.evar ()))
+                        >>> [
+                            (* forall A . (B : type) |- M[^] = N[^] : A[^] *)
+                            refine (Rule.setWeakenEq (T.Sub (a, T.shift1)) (T.Sub (b, T.under 1 T.shift1)) (T.Sub (m, T.shift1)) (T.Sub (n, T.shift1)))
+                            >>
+                            refine (Rule.hypothesis (i+1)) >> done,
+
+                            (* forall A . (B : type), M[^] = N[^] : A[^] |- C[^2] *)
+                            refine (Rule.setElim (T.Sub (a, T.Shift 2)) (T.Sub (b, T.under 1 (T.Shift 2))) (T.evar ()) (T.Sub (m, T.Shift 2)))
+                            >>> [
+                                (* forall A . (B : type), M[^] = N[^] : A[^], A[^2] |- B[0 . ^3] : type
+                                                                                     = (B[0 . ^ 4] : type)[0 . id]
+                                *)
+                                refine (Rule.forallElim (T.Sub (a, T.Shift 3)) (T.apply1 Prim.istp (T.Sub (b, T.under 1 (T.Shift 3)))) T.zero)
+                                >>> [
+                                    refine (Rule.hypothesis 2) >> done,
+
+                                    refine (Rule.hypothesisOf 0) >> done
+                                    ],
+                                
+                                (* forall A . (B : type), M[^] = N[^] : A[^] |- M[^2] : set A[^2] . B[0 . ^3] *)
+                                refine (Rule.ofEquand1 (T.evar ()) (T.evar ()) (T.Sub (n, T.Shift 2)))
+                                >>
+                                (* forall A . (B : type), M[^] = N[^] : A[^] |- M[^2] = N[^2] : set A[^2] . B[0 . ^3] *)
+                                refine (Rule.hypothesis (i+2)) >> done,
+                                
+                                (* forall A . (B : type), M[^] = N[^] : A[^], B[M[^2] . ^2] |- C[^3] *)
+                                refine (Rule.setElim (T.Sub (a, T.Shift 3)) (T.Sub (b, T.under 1 (T.Shift 3))) (T.evar ()) (T.Sub (n, T.Shift 3)))
+                                >>> [
+                                    (* forall A . (B : type), M[^] = N[^] : A[^], B[M[^2] . ^2], A[^3] |- B[0 . ^4] : type
+                                                                                                        = (B[0 . ^ 5] : type)[0 . id]
+                                    *)
+                                    refine (Rule.forallElim (T.Sub (a, T.Shift 4)) (T.apply1 Prim.istp (T.Sub (b, T.under 1 (T.Shift 4)))) T.zero)
+                                    >>> [
+                                        refine (Rule.hypothesis 3) >> done,
+    
+                                        refine (Rule.hypothesisOf 0) >> done
+                                        ],
+                                    
+                                    (* forall A . (B : type), M[^] = N[^] : A[^], B[M[^2] . ^2] |- M[^3] : set A[^3] . B[0 . ^4] *)
+                                    refine (Rule.ofEquand2 (T.evar ()) (T.Sub (m, T.Shift 3)) (T.evar ()))
+                                    >>
+                                    (* forall A . (B : type), M[^] = N[^] : A[^], B[M[^2] . ^2] |- M[^3] = N[^3] : set A[^3] . B[0 . ^4] *)
+                                    refine (Rule.hypothesis (i+3)) >> done,
+                                    
+                                    (* forall A . (B : type), M[^] = N[^] : A[^], B[M[^2] . ^2], B[N[^3] . ^3] |- C[^4] *)
+                                    refine (Rule.weaken 3 1)
+                                    >>
+                                    (* M = N : A, B[M[^] . ^], B[N[^2] . ^2] |- C[^3] *)
+                                    chdir (D.bind0s dir 3) >> idtacM Primary
+                                    ]
+                                ]
+                            ]
+                        ])\
+             | _ => \(fnc => fail "not an injection expression")\
+            /
+         end
+
+
       val () =
-         List.app (fn (const, tac) => H.insert injectionTactics const tac)
+         List.app (fn (const, tac) => H.insert injectionTactics const (fn hyp => tac hyp >> idtacM Primary))
          [
          (Prim.bool, injectionBool),
          (Prim.nat, injectionNat),
          (Prim.sum, injectionSum),
-         (Prim.exists, injectionExists)
+         (Prim.exists, injectionExists),
+         (Prim.prod, injectionProd)
+         ]
+
+      val () =
+         List.app (fn (const, tac) => H.insert injectionTactics const tac)
+         [
+         (Prim.set, injectionSet)
          ]
 
    end

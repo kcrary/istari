@@ -25,6 +25,7 @@
           (* Signals Shadow or returns NONE if an identifier is shadowed. *)
           val empty               : directory
           val bind0               : directory -> directory
+          val bind0s              : directory -> int -> directory
           val bind                : directory -> symbol -> directory
           val bindOpt             : directory -> symbol -> directory option
           val bindh               : directory -> symbol option -> directory
