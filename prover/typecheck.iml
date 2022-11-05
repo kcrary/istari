@@ -145,8 +145,12 @@ signature TYPECHECK_INTERNAL =
    1. If B is Ui, then:
 
       a. Attempt to unify A with Uj, for fresh j.
-      
-      b. Prove j <l= i and i, j : level.
+         If successful, prove j <l= i and i, j : level.
+
+      b. Attempt to unify A with Kj, for fresh j.
+         If successful, prove lsucc(j) <l= i and i, j : level.
+
+      c. Reject
 
    2. Unify A and B if possible.  If successful, prove A : type.
 
@@ -1481,90 +1485,134 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             /
                (* 1. If B is Ui... *)
              | _ ; \Prim.univ\ ? =>
-               \fnc u =>
-                   let
-                      val e = T.evar ()
-                   in
-                      (* 1a. Unify a with U e *)
-                      if U.unify1 a (T.apply1 Prim.univ e) then
-                         let
-                            val goal1 =
-                               (J.make ctx (T.apply2 Prim.ov (T.Const Prim.level) e),
-                                dir)
-
-                            val goal2 =
-                               (J.make ctx (T.apply2 Prim.ov (T.Const Prim.level) u),
-                                dir)
-
-                            val goal3 =
-                               (J.make ctx (T.apply2 Prim.lleq e u),
-                                dir)
-
-                            val dest1 = ref $ lift (fn () => raise (Fail "dest1"))
-                            val dest2 = ref $ lift (fn () => raise (Fail "dest2"))
-                            val dest3 = ref $ lift (fn () => raise (Fail "dest3"))
-                         in
-                            progress := true;
-
-                            dest :=
-                               (
-                               (* G |- Ue <: Uu *)
-                               refine (Rule.univSub e u)
-                               >>> [
-                                   (* G |- e : level *)
-                                   play dest1,
-   
-                                   (* G |- u : level *)
-                                   play dest2,
-   
-                                   (* G |- lleq e u *)
-                                   play dest3
-                                   ]
-                               );
-
-                            (* 1b. Prove e <= u, and e, u : level. *)
-                            constraints :=
-                               (table, goal1, dest1, history) ::
-                               (table, goal2, dest2, history) ::
-                               (table, goal3, dest3, history) ::
-                               !constraints
-                         end
-                      else
-                         dest :=
-                            error history "cannot establish subtype"
-                            (fn () =>
+               \(fnc u =>
+                    let
+                       val e = T.evar ()
+                    in
+                       (* 1a. Unify A with U e *)
+                       if U.unify1 a (T.apply1 Prim.univ e) then
+                          let
+                             val goal1 =
+                                (J.make ctx (T.apply2 Prim.ov (T.Const Prim.level) e),
+                                 dir)
+ 
+                             val goal2 =
+                                (J.make ctx (T.apply2 Prim.ov (T.Const Prim.level) u),
+                                 dir)
+ 
+                             val goal3 =
+                                (J.make ctx (T.apply2 Prim.lleq e u),
+                                 dir)
+ 
+                             val dest1 = ref $ lift (fn () => raise (Fail "dest1"))
+                             val dest2 = ref $ lift (fn () => raise (Fail "dest2"))
+                             val dest3 = ref $ lift (fn () => raise (Fail "dest3"))
+                          in
+                             progress := true;
+ 
+                             dest :=
                                 (
-                                print "expected: universe\n  actual: ";
-                                Show.showIndent 10 dir a;
-                                print "\n"
-                                ))
-                   end\
+                                (* G |- Ue <: Uu *)
+                                refine (Rule.univSub e u)
+                                >>> [
+                                    (* G |- e : level *)
+                                    play dest1,
+    
+                                    (* G |- u : level *)
+                                    play dest2,
+    
+                                    (* G |- lleq e u *)
+                                    play dest3
+                                    ]
+                                );
+ 
+                             (* Prove e <= u, and e, u : level. *)
+                             constraints :=
+                                (table, goal1, dest1, history) ::
+                                (table, goal2, dest2, history) ::
+                                (table, goal3, dest3, history) ::
+                                !constraints
+                          end
+                       (* 1b Unify A with Ki... *)   
+                       else if U.unify1 a (T.apply1 Prim.kind e) then
+                          let
+                             val goal1 =
+                                (J.make ctx (T.apply2 Prim.ov (T.Const Prim.level) e),
+                                 dir)
+ 
+                             val goal2 =
+                                (J.make ctx (T.apply2 Prim.ov (T.Const Prim.level) u),
+                                 dir)
+ 
+                             val goal3 =
+                                (J.make ctx (T.apply2 Prim.lleq (T.apply1 Prim.lsucc e) u),
+                                 dir)
+ 
+                             val dest1 = ref $ lift (fn () => raise (Fail "dest1"))
+                             val dest2 = ref $ lift (fn () => raise (Fail "dest2"))
+                             val dest3 = ref $ lift (fn () => raise (Fail "dest3"))
+                          in
+                             progress := true;
+ 
+                             dest :=
+                                (
+                                (* G |- Ue <: Uu *)
+                                refine (Rule.kindUnivSub e u)
+                                >>> [
+                                    (* G |- e : level *)
+                                    play dest1,
+    
+                                    (* G |- u : level *)
+                                    play dest2,
+    
+                                    (* G |- lleq (lsucc e) u *)
+                                    play dest3
+                                    ]
+                                );
+ 
+                             (* Prove lsucc e <l= u, and e, u : level. *)
+                             constraints :=
+                                (table, goal1, dest1, history) ::
+                                (table, goal2, dest2, history) ::
+                                (table, goal3, dest3, history) ::
+                                !constraints
+                          end
+                       else
+                          dest :=
+                             error history "cannot establish subtype"
+                             (fn () =>
+                                 (
+                                 print "expected: universe\n  actual: ";
+                                 Show.showIndent 10 dir a;
+                                 print "\n"
+                                 ))
+                    end)\
                              
                (* 2. Unify A and B. *)
              | _ =!>
-               \fnc =>
-                   if U.unify1 a b then
-                      let
-                         val goal' =
-                            (J.make ctx (T.apply1 Prim.istp a), dir)
-                         
-                         val dest' = newdest ()
-                      in
-                         progress := true;
-
-                         dest :=
-                            (
-                            (* G |- A <: A *)
-                            refine (Rule.subtypeRefl (T.evar ()))
-                            >>
-                            (* G |- A : type *)
-                            play dest'
-                            );
-
-                         enqueue [(Istp, table, goal', dest', history)]
-                      end
-                   else
-                      raise Backtrack\
+               \(fnc =>
+                    if U.unify1 a b then
+                       let
+                          val goal' =
+                             (J.make ctx (T.apply1 Prim.istp a), dir)
+                          
+                          val dest' = newdest ()
+                       in
+                          progress := true;
+ 
+                          dest :=
+                             (
+                             (* G |- A <: A *)
+                             refine (Rule.subtypeRefl (T.evar ()))
+                             >>
+                             (* G |- A : type *)
+                             play dest'
+                             );
+ 
+                          enqueue [(Istp, table, goal', dest', history)]
+                       end
+                    else
+                       raise Backtrack)\
 
                (* 3. Look in the table. *)
              | _ =!>
@@ -1594,21 +1642,21 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                (* 4b. Use a left-indexed subtyping rule. *)
              | const? @ _ ; _ =!>
-               \fnc const =>
-                   (case H.find subtypeLeftTactics const of
-                       SOME tac =>
-                          tryRule table history tac goal dest
-                          (fn () =>
-                              dest :=
-                                 error history "unexpected subtyping failure"
-                                 (fn () =>
-                                     (
-                                     showPrefixed " first: " dir a;
-                                     showPrefixed "second: " dir b;
-                                     print "\n"
-                                     )))
-
-                     | NONE => raise Backtrack)\
+               \(fnc const =>
+                    (case H.find subtypeLeftTactics const of
+                        SOME tac =>
+                           tryRule table history tac goal dest
+                           (fn () =>
+                               dest :=
+                                  error history "unexpected subtyping failure"
+                                  (fn () =>
+                                      (
+                                      showPrefixed " first: " dir a;
+                                      showPrefixed "second: " dir b;
+                                      print "\n"
+                                      )))
+ 
+                      | NONE => raise Backtrack))\
 
                (* 5. Try A = B : type *)
              | _ =>

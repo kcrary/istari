@@ -148,6 +148,9 @@ hard whnf.  (See below.)  Then:
    c. If `B` is not of the form `U i`, attempt to unify `A` and `B`.
       (Special case of d, but avoids extra subgoals.)
 
+      **Note:** This comports with the use of the "greedy algorithm"
+      to resolve subtyping.
+
    d. Prove `B` <: `A`.
 
 9. Reject
@@ -176,9 +179,13 @@ For goals of the form `A <: B`, put `A` and `B` in hard whnf.  Then:
 
 1. If `B` is `U i`, then:
 
-   a. Attempt to unify `A` with `U j`, for fresh `j`.
-      
-   b. Prove `j <l= i` and `i, j : level`.
+   a. Attempt to unify `A` with `U j`, for fresh `j`.  If successful,
+      prove `j <l= i` and `i, j : level`.
+
+   b. Attempt to unify `A` with `K j`, for fresh `j`.  If successful,
+      prove `1 + j <l= i` and `i, j : level`.
+
+   c. Reject
 
 2. Unify `A` and `B` if possible.  If successful, prove `A : type`.
 
