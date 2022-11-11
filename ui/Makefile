@@ -29,6 +29,11 @@ batch-nolib : generated
 	echo "export false;" | sml export-batch.sml
 	../ipp/bin/$(MKNJEXEC) $(SMLNJ) `pwd`/bin istari-nolib-heapimg istari-nolib
 
+procdoc :
+	cd ../prover; make smlnj
+	echo "export ();" | sml export-procdoc.sml
+	../ipp/bin/$(MKNJEXEC) $(SMLNJ) `pwd`/bin procdoc-heapimg procdoc
+
 .PHONY : install
 install :
 	cp bin/istari bin/istari-nolib $(INSTALLDIR)

@@ -1,0 +1,81 @@
+# `Bool`
+
+The `bool` type is primitive, but aliased in the `Bool` module:
+
+    bool : U 0
+
+
+### The `istrue` predicate
+
+    istrue : bool -> U 0
+           = fn b . if b then unit else void
+
+    istrue_true : istrue true
+
+    not_istrue_false : not (istrue false)
+
+    istrue_iff_eq_true : forall (b : bool) . istrue b <-> b = true : bool
+
+    not_istrue_iff_eq_false : forall (b : bool) .
+                                 not (istrue b) <-> b = false : bool
+
+    iff_eq_bool : forall (b : bool) (c : bool) .
+                     (istrue b <-> istrue c) <-> b = c : bool
+
+
+ ### Boolean operations
+
+    notb : bool -> bool
+         = fn b . if b then false else true
+
+    andb : bool -> bool -> bool
+         = fn b c . if b then c else false
+
+    orb : bool -> bool -> bool
+        = fn b c . if b then true else c
+
+    notb_invol : forall (b : bool) . notb (notb b) = b : bool
+
+    notb_andb : forall (b : bool) (c : bool) .
+                   notb (andb b c) = orb (notb b) (notb c) : bool
+
+    notb_orb : forall (b : bool) (c : bool) .
+                  notb (orb b c) = andb (notb b) (notb c) : bool
+
+    andb_commute : forall (b : bool) (c : bool) . andb b c = andb c b : bool
+
+    orb_commute : forall (b : bool) (c : bool) . orb b c = orb c b : bool
+
+    andb_assoc : forall (b : bool) (c : bool) (d : bool) .
+                    andb (andb b c) d = andb b (andb c d) : bool
+
+    orb_assoc : forall (b : bool) (c : bool) (d : bool) .
+                   orb (orb b c) d = orb b (orb c d) : bool
+
+    andb_id_l : forall (b : bool) . andb true b = b : bool
+
+    andb_id_r : forall (b : bool) . andb b true = b : bool
+
+    orb_id_l : forall (b : bool) . orb false b = b : bool
+
+    orb_id_r : forall (b : bool) . orb b false = b : bool
+
+    andb_ann_l : forall (b : bool) . andb false b = false : bool
+
+    andb_ann_r : forall (b : bool) . andb b false = false : bool
+
+    orb_ann_l : forall (b : bool) . orb true b = true : bool
+
+    orb_ann_r : forall (b : bool) . orb b true = true : bool
+
+    ite_notb : forall (i : level) (a : U i) (b : bool) (x : a) (y : a) .
+                  (if notb b then x else y) = (if b then y else x) : a
+
+    istrue_notb : forall (b : bool) . istrue (notb b) <-> not (istrue b)
+
+    istrue_andb : forall (b : bool) (c : bool) .
+                     istrue (andb b c) <-> istrue b & istrue c
+
+    istrue_orb : forall (b : bool) (c : bool) .
+                    istrue (orb b c) <-> istrue b % istrue c
+

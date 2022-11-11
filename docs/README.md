@@ -86,7 +86,7 @@ yet to be validated, but all of the "delicate" rules are validated.)
 
 - [Primitive tactics](primitive-tactics.html)
 
-- Library (coming soon)
+- [Library](library.html)
 
 - [IML basis](basis.html)
 

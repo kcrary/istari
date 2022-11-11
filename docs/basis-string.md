@@ -3,7 +3,7 @@
     signature STRING =
        sig
     
-          type string = Pervasive.string
+          type string
     
           val length : string -> int
           val sub : string -> int -> char

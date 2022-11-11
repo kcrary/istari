@@ -1,0 +1,246 @@
+
+structure Procdoc
+   :>
+   sig
+
+      (* input file, output file *)
+      val go : string -> string -> unit
+
+   end
+   =  
+   struct
+
+      structure PP = PrettyPrint
+
+      structure Strm =
+         struct
+
+            type elem = char
+            type t = int * string
+
+            datatype front = Nil | Cons of elem * t
+            
+            fun front (i, str) =
+               try
+                  Cons (String.sub str i, (i+1, str))
+               with
+                  Invalid _ => Nil
+
+         end
+         
+      structure R = RegexpFun (structure Streamable = Strm)
+                       
+      open CasePervasive
+
+      exception ProcDoc
+
+      val indent = 2
+      val width = 80
+
+      val theInstream = ref TextIO.stdIn
+      val theOutstream = ref TextIO.stdOut
+      val pos = ref 0
+      val col = ref 0
+
+
+      fun signalError p msg =
+         raise (Message.Error (ProcDoc,
+                               String.concat 
+                                  ["Error: ", msg, " at position ", Int.toString p, "\n"]))
+
+
+      fun input () =
+         (case TextIO.input1 (!theInstream) of
+             NONE => NONE
+
+           | cho as SOME ch =>
+                (
+                pos := !pos + 1;
+
+                if ch =# #"\n" then
+                   col := 0
+                else if ch =# #"\x09" then
+                   col := !col + (!col rem 8) + 8
+                else
+                   col := !col + 1;
+
+                cho
+                ))
+                
+
+      fun inputLine () =
+         (case TextIO.inputLine (!theInstream) of
+             NONE => NONE
+
+           | stro as SOME str =>
+                (
+                pos := !pos + String.length str;
+                col := 0;
+                stro
+                ))
+
+
+      fun toAddr longid =
+         List.map Symbol.fromValue 
+            (String.fields (fn ch => ch =# #".") longid)
+
+      fun toConst p longid =
+         (case Namespace.resolveOpt (toAddr longid) of
+             NONE =>
+                signalError p ("unknown constant " ^ longid)
+
+           | SOME const => const)
+         
+
+      fun findType const =
+         (case Database.findType const of
+             NONE => NONE
+
+           | SOME (jud, _) =>
+                if Seq.null (Judgement.context jud) then
+                   termCaseX (Judgement.concl jud)
+                   /| \Prim.ov\ ? \const\ =>
+                      \(fnc a => SOME a)\
+
+                    | _ =>
+                      \(fnc => NONE)\
+                   /
+                else
+                   NONE)
+
+
+      fun letter ch =
+         let
+            val n = Char.ord ch
+         in
+            (n >= 65 andalso n <= 90)
+            orelse
+            (n >= 97 andalso n <= 122)
+         end
+
+      fun number ch =
+         let
+            val n = Char.ord ch
+         in
+            n >= 48 andalso n <= 57
+         end
+
+      fun alphanumeric ch =
+         letter ch orelse number ch orelse ch =# #"_" orelse ch =# #"'"
+
+      fun space ch =
+         let
+            val n = Char.ord ch
+         in
+            n = 32 orelse n = 9
+         end
+
+      val ident = R.seq [R.set letter, R.star' (R.set alphanumeric)]
+
+      val longid = R.seq [ident, R.star' (R.seq [R.string ".", ident])]
+
+      val regexp =
+         R.seq
+            [
+            R.alt
+               [
+               R.seq [R.string "type:", R.capture longid],
+               R.seq [R.string "def:", R.capture longid],
+               R.seq [R.string "open:", R.capture longid]
+               ],
+            R.star' (R.set space),
+            R.string "\n"
+            ]
+
+
+      fun showTerm c m =
+         let
+            val pp = PP.makeStreamIndent (!theOutstream) width c
+         in
+            PP.openBox pp PP.Consistent indent;
+            Show.showPP pp Directory.empty m;
+            PP.closeBox pp;
+            PP.flush pp;
+            TextIO.output1 (!theOutstream) #"\n"
+         end
+
+
+      fun scan () =
+         (case input () of
+             NONE => ()
+
+           | SOME ch =>
+                if ch =# #"\x1b" then
+                   let
+                      val p = !pos
+                      val c = !col
+
+                      val str =
+                         (case inputLine () of
+                             SOME str => str
+                           | NONE => "")
+                   in
+                      (case R.match regexp (0, str) of
+                          NONE =>
+                             signalError p "unknown escape code"
+
+                        | SOME [R.Alt (0, [R.One longid])] =>
+                             (* type *)
+                             (case findType (toConst p longid) of
+                                 NONE => 
+                                    signalError p ("constant " ^ longid ^ " has unknown type")
+
+                               | SOME m =>
+                                    showTerm c m)
+
+                        | SOME [R.Alt (1, [R.One longid])] =>
+                             (* def *)
+                             (case Constant.definition (toConst p longid) of
+                                 NONE =>
+                                    signalError p ("constant " ^ longid ^ " has no definition")
+
+                               | SOME m =>
+                                    showTerm c m)
+
+                        | SOME [R.Alt (2, [R.One longid])] =>
+                             (* open *)
+                             Namespace.openModule (toAddr longid)
+
+                        | _ => 
+                             raise (Fail "impossible"));
+
+                      scan ()
+                   end
+
+                else
+                   (
+                   TextIO.output1 (!theOutstream) ch;
+                   scan ()
+                   ))
+
+
+      fun go infile outfile =
+         let
+            do () = Message.withHandler
+
+            val ins = TextIO.openIn infile
+            val outs = TextIO.openOut outfile
+         in
+            Finally.finally
+               (fn () =>
+                   (
+                   theInstream := ins;
+                   theOutstream := outs;
+                   pos := 0;
+                   col := 0;
+
+                   scan ()
+                   ))
+               (fn () =>
+                   (
+                   TextIO.closeIn ins;
+                   TextIO.closeOut outs
+                   ))
+         end
+
+   end

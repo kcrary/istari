@@ -1,31 +1,27 @@
 
 ISTARI=../ui/bin/istari-nolib
+PROCDOC=../ui/bin/procdoc
 
-all : acc.isto bar.isto bool.isto datatype.isto list.isto logic.isto nat.isto nat-eff.isto
+DOCUNITS = acc bar bool logic list nat nat-eff
+UNITS = $(DOCUNITS) datatype
 
-acc.isto : acc.ist
-	$(ISTARI) acc.ist
+all : $(foreach i, $(UNITS), $(i).isto)
 
-bar.isto : bar.ist bar-aux.iml
-	$(ISTARI) bar.ist
+docs : $(foreach i, $(DOCUNITS), ../docs/lib-$(i).md)
 
-bool.isto : bool.ist logic.isto
-	$(ISTARI) bool.ist
+%.isto : %.ist
+	$(ISTARI) $<
 
-datatype.isto : datatype.ist datatype-aux.iml acc.isto nat.isto nat-aux.iml
-	$(ISTARI) datatype.ist
+../docs/lib-%.md : %.md
+	$(PROCDOC) $< $@
 
-list.isto : list.ist list-aux.iml acc.isto nat.isto nat-aux.iml datatype.isto
-	$(ISTARI) list.ist
-
-logic.isto : logic.ist logic-aux.iml
-	$(ISTARI) logic.ist
-
-nat.isto : nat.ist nat-aux.iml acc.isto
-	$(ISTARI) nat.ist
-
-nat-eff.isto : nat-eff.ist acc.isto bool.isto nat.isto
-	$(ISTARI) nat-eff.ist
+bar.isto : bar-aux.iml
+bool.isto : logic.isto
+datatype.isto : datatype-aux.iml acc.isto nat.isto nat-aux.iml
+list.isto : list-aux.iml acc.isto nat.isto nat-aux.iml datatype.isto
+logic.isto : logic-aux.iml
+nat.isto : nat-aux.iml acc.isto
+nat-eff.isto : acc.isto bool.isto nat.isto
 
 clean :
 	rm -f *.isto
