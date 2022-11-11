@@ -22,7 +22,7 @@ The `bool` type is primitive, but aliased in the `Bool` module:
     iff_eq_bool : type:iff_eq_bool
 
 
- ### Boolean operations
+### Boolean operations
 
     notb : type:notb
          = def:notb
