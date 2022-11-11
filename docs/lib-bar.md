@@ -4,8 +4,9 @@ Inspired by the partial types ("bar types") of Constable and Smith
 (*Partial objects in constructive type theory*, 1987), but weaker,
 because we cannot implement the termination predicate.
 
-Pause is just the identity, but we insert it to break up redices so
-that we don't accidentally get runaway reduction:
+Pause is just the identity, but we insert it in various places to
+break up redices so that accidental ill-typed terms don't result in
+runaway reduction:
 
     pause : intersect (i : level) (a : U i) . a -> a
           = fn v0 . v0
@@ -20,6 +21,8 @@ the future modality:
                 (fn x . f (let next x' = x in next (pause x' x)))
                 (next (fn x . f (let next x' = x in next (pause x' x))))
 
+    ffix A f --> f (next (ffix A f))
+
 The partial type `bar A` provides an `A` now, or sometime later:
 
     bar : intersect (i : level) . U i -> U i
@@ -32,11 +35,13 @@ The partial type acts as a monad.  Its unit is `now`:
 
     now : intersect (i : level) . forall (a : U i) . a -> bar a
         = fn a x . inl x
+        (1 implicit argument)
 
 Another intro form is `later`:
 
     later : intersect (i : level) . forall (a : U i) . bar a -> bar a
           = fn a x . inr (next x)
+          (1 implicit argument)
 
 The monadic bind is `bindbar`:
 
@@ -53,12 +58,22 @@ The monadic bind is `bindbar`:
                             g in
                             let next y' = y in inr (next (g' y'))))
                    x
+            (2 implicit arguments)
 
-We can define a fixpoint operator on partial objects:
+    bindbar _ _ (now _ x) f --> f x
+    bindbar A B (later _ x) f --> later B (` bindbar A B x f)
+
+The syntactic sugar `bindbar x = m in n` is accepted for 
+`` ` bindbar _ _ m (fn x . n)``.
+
+   
+
+Finally we can define a fixpoint operator on partial objects:
 
     bfix : intersect (i : level) .
               forall (a : U i) . (bar a -> bar a) -> bar a
          = fn a f . ffix (bar a) (fn x . f (inr x))
+         (1 implicit argument)
 
 
 At this point we'd like to follow the development in Smith (*Partial

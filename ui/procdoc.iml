@@ -146,6 +146,8 @@ structure Procdoc
                [
                R.seq [R.string "type:", R.capture longid],
                R.seq [R.string "def:", R.capture longid],
+               R.seq [R.string "defrec:", R.capture longid],
+               R.seq [R.string "imp:", R.capture longid],
                R.seq [R.string "open:", R.capture longid]
                ],
             R.star' (R.set space),
@@ -203,6 +205,40 @@ structure Procdoc
                                     showTerm c m)
 
                         | SOME [R.Alt (2, [R.One longid])] =>
+                             (* defrec *)
+                             let
+                                val const = toConst p longid
+                             in
+                                (case Constant.definition (toConst p longid) of
+                                    NONE =>
+                                       signalError p ("constant " ^ longid ^ " has no definition")
+   
+                                  | SOME m =>
+                                       termCaseX m
+                                       / \Prim.fix\ (fn . ?) =>
+                                         \(fnc m' =>
+                                              showTerm c (Term.Sub (m', Term.Dot (Term.Const const, Term.id))))\
+                                       /)
+                             end
+
+                        | SOME [R.Alt (3, [R.One longid])] =>
+                             (* imp *)
+                             let
+                                val n = Database.findImplicits (toConst p longid)
+                             in
+                                TextIO.output (!theOutstream) "(";
+                                TextIO.output (!theOutstream) (Int.toString n);
+                                TextIO.output (!theOutstream) " implicit argument";
+
+                                if n <> 1 then
+                                   TextIO.output (!theOutstream) "s"
+                                else
+                                   ();
+                                   
+                                TextIO.output (!theOutstream) ")\n"
+                             end
+
+                        | SOME [R.Alt (4, [R.One longid])] =>
                              (* open *)
                              Namespace.openModule (toAddr longid)
 

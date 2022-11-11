@@ -14,8 +14,18 @@ The iterator for natural numbers:
                     -> (forall (n : nat) . P n -> P (succ n))
                     -> forall (n : nat) . P n
 
+    nat_iter _ z _ (zero) --> z
+    nat_iter a z s (succ n) --> s n (nat_iter a z s n)
 
-### Equality lemmas
+A simpler case-analysis operation:
+
+    natcase : intersect (i : level) (a : U i) . nat -> a -> (nat -> a) -> a
+
+    natcase (zero) z s --> z
+    natcase (succ n) z s --> s n
+
+
+### Equality
 
     eq_0_succ_not : forall (n : nat) . 0 = succ n : nat -> void
 
@@ -83,7 +93,13 @@ Strong induction for natural numbers:
 
     plus : nat -> nat -> nat
 
+    plus (zero) n --> n
+    plus (succ m) n --> succ (plus m n)
+
     minus : nat -> nat -> nat
+
+    minus m (zero) --> m
+    minus m (succ n) --> natcase m zero (fn m' . minus m' n)
 
     plus_0_l : forall (n : nat) . 0 + n = n : nat
 

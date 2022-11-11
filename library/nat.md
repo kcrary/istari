@@ -11,8 +11,18 @@ The iterator for natural numbers:
 
     nat_iter : type:nat_iter
 
+    nat_iter _ z _ (zero) --> z
+    nat_iter a z s (succ n) --> s n (nat_iter a z s n)
 
-### Equality lemmas
+A simpler case-analysis operation:
+
+    natcase : type:natcase
+
+    natcase (zero) z s --> z
+    natcase (succ n) z s --> s n
+
+
+### Equality
 
     eq_0_succ_not : type:eq_0_succ_not
 
@@ -74,7 +84,13 @@ Strong induction for natural numbers:
 
     plus : type:plus
 
+    plus (zero) n --> n
+    plus (succ m) n --> succ (plus m n)
+
     minus : type:minus
+
+    minus m (zero) --> m
+    minus m (succ n) --> natcase m zero (fn m' . minus m' n)
 
     plus_0_l : type:plus_0_l
 
