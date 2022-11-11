@@ -1,7 +1,7 @@
 # The Istari Library
 
 - [`Acc`](lib-acc.html) (accessibility)
-- [`Bar`](lib-bool.html) (partial types)
+- [`Bar`](lib-bar.html) (partial types)
 - [`Bool`](lib-bool.html)
 - [`Logic`](lib-logic.html)
 - [`List`](lib-list.html)
