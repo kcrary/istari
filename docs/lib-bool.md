@@ -3,6 +3,8 @@
 The `bool` type is primitive, but aliased in the `Bool` module:
 
     bool : U 0
+    true : bool
+    false : bool
 
 
 ### The `istrue` predicate
@@ -23,7 +25,7 @@ The `bool` type is primitive, but aliased in the `Bool` module:
                      (istrue b <-> istrue c) <-> b = c : bool
 
 
- ### Boolean operations
+### Boolean operations
 
     notb : bool -> bool
          = fn b . if b then false else true

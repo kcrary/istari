@@ -4,6 +4,8 @@
 The `bool` type is primitive, but aliased in the `Bool` module:
 
     bool : type:bool
+    true : type:true
+    false : type:false
 
 
 ### The `istrue` predicate
