@@ -74,6 +74,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       type symbol = Symbol.symbol
       type term = Term.term
       type eterm = ET.eterm
+      type constant = Constant.constant
 
       open Tactic
       open CasePervasive
@@ -172,6 +173,17 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
            | _ => raise (Fail "precondition"))
 
 
+      (* precondition: l1, l2, and l3 have equal lengths *)
+      fun foldl3 f x l1 l2 l3 =
+         (case (l1, l2, l3) of
+             ([], [], []) => x
+
+           | (x1 :: rest1, x2 :: rest2, x3 :: rest3) =>
+                foldl3 f (f x1 x2 x3 x) rest1 rest2 rest3
+
+           | _ => raise (Fail "precondition"))
+
+
       (* precondition: l1 and l2 have equal lengths *)
       fun foldr2 f x l1 l2 =
          (case (l1, l2) of
@@ -191,6 +203,19 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   (fns x1 x2 l => f x1 x2 :: l)
                   []
                   l1 l2
+         in
+            List.rev l
+         end
+
+
+      (* precondition: l1, l2, and l3 have equal lengths *)
+      fun map3 f l1 l2 l3 =
+         let
+            val l =
+               foldl3
+                  (fns x1 x2 x3 l => f x1 x2 x3 :: l)
+                  []
+                  l1 l2 l3
          in
             List.rev l
          end
@@ -237,6 +262,23 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
       (* precondition: l1 and l2 have equal lengths *)         
       fun bifold2 f g z l1 l2 = bifold2Loop f g z (fn y => y) l1 l2
+
+
+
+      (* Converting exceptions to CPS. *)
+
+      exception Tryf of string
+
+      fun tryf f sk =
+         (case
+             (try
+                 Sum.INL (f ())
+              with Tryf msg => Sum.INR msg)
+          of
+             Sum.INL x => sk x
+
+           | Sum.INR msg => fail msg)
+
 
 
       fun natTerm i =
@@ -891,45 +933,51 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          
       (* I/O and record-keeping *)
 
-      (* the stuff destructor needs *)
-      type environment =
-         (symbol * mxterm) list        (* invis *)
-         * (symbol * mxterm) list      (* pers *)
-         * mxterm                      (* univ *)
-         * mxterm                      (* a *)
-         * mxterm                      (* dcons *)
-         *
-         (* for each datatype, in order *)
-         (Constant.constant
-           * R.reduction               (* unfolds the constant *)
-           * (T.binder * mxterm) list  (* the datatype's arguments *)
-           * mxterm                    (* the disjunct of "a" corresponding to this datatype *)
-         ) list
-         *
-         (* for each constructor, in order *)
-         (Constant.constant
-           * R.reduction               (* unfolds the constant *)
-           * int                       (* belongs to this datatype # *)
-           * int                       (* is constructor # *)
-           * mxterm conarg list        (* the constructor's arguments *)
-           * int                       (* the constructor's # of arguments *)
-           * mxterm list               (* the constructor's indices *)
-         ) list
+      (* datatype information in a pickleable form *)
 
-      datatype datatype_record =
-         (* for each datatype *)
-         (Constant.constant            (* the datatype *)
-           * Constant.constant         (* its iterator *)
-           * int                       (* the number of index arguments *)
-           * Constant.constant         (* the strip constant *)
-         ) list
-         * int                         (* number of invisible pervasive arguments *)
-         * int                         (* number of visible pervasive arguments *)
-         * Constant.constant           (* the skeleton constant *)
-         * Constant.constant           (* the subterm constant *)
-         * Constant.constant           (* the subterm-well-founded constant *)
-         * environment                 (* the environment for destructor/injector *)
-         * R.ureduction2 list          (* the iterator reductions *)
+      datatype type_environment =
+         TENV of
+         {
+         const : constant,                 (* the type constant *)
+         red : R.reduction,                (* unfolds the constant *)
+         args : (T.binder * mxterm) list,  (* the index arguments *)
+         numargs : int,                    (* the number of index arguments *)
+         adisj : mxterm,                   (* the disjunct of "a" corresponding to this datatype *)
+         iterator : constant,              (* the iterator constant *)
+         strip : constant,                 (* the strip constant *)
+         }
+
+      datatype con_environment =
+         CENV of
+         {
+         const : constant,                 (* the constructor constant *)
+         red : R.reduction,                (* unfolds the constant *)
+         tpnum : int,                      (* belongs to this datatype # *)
+         connum : int,                     (* is constructor # *)
+         args : mxterm conarg list,        (* the constructor's argument *)
+         numargs : int,                    (* the constructor's number of arguments *)
+         indices : mxterm list,            (* the constructor's indices *)
+         }
+
+      datatype environment =
+         ENV of
+         {
+         invis : (symbol * mxterm) list,   (* invisible pervasives *)
+         invisnum : int,                   (* number of invisible pervasives *)
+         pers : (symbol * mxterm) list,    (* visible pervasives *)
+         persnum : int,                    (* number of visible pervasives *)
+         univ : mxterm,                    (* the universe *)
+         a : mxterm,                       (* the "a" when the datatype is written as "dt a dcons" *)
+         dcons : mxterm,                   (* the "dcons" when the datatype is written as "dt a dcons" *)
+         tplist : type_environment list,   (* for each datatype, in order *)
+         conlist : con_environment list,   (* for each constructor, in order *)
+         skeleton : constant,              (* the skeleton constant *)
+         subterm : constant,               (* the subterm constant *)
+         subtermWf : constant,             (* the subterm-well-founded constant *)
+         iterReds : R.ureduction2 list     (* the iterator reductions *)
+         }
+         
+      val theDatatypes : environment list CR.cref = CR.new []
 
       val pumx : mxterm P.pu =
          P.wrap
@@ -954,54 +1002,68 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                (P.pair P.int (P.list pumx))
             ]
 
+      val puTenv : type_environment P.pu =
+         P.wrap
+            (fn TENV {const, red, args, numargs, adisj, iterator, strip} =>
+                (const, red, args, numargs, adisj, iterator, strip))
+            (fn (const, red, args, numargs, adisj, iterator, strip) =>
+                TENV {const=const, red=red, args=args, numargs=numargs, adisj=adisj, iterator=iterator, strip=strip})
+            (P.tuple7
+                PP.puConstant
+                R.puReduction
+                (P.list (P.pair (P.option PP.puSymbol) pumx))
+                P.int
+                pumx
+                PP.puConstant
+                PP.puConstant)
+
+      val puCenv : con_environment P.pu =
+         P.wrap
+            (fn CENV {const, red, tpnum, connum, args, numargs, indices} =>
+                (const, red, tpnum, connum, args, numargs, indices))
+            (fn (const, red, tpnum, connum, args, numargs, indices) =>
+                CENV {const=const, red=red, tpnum=tpnum, connum=connum, args=args, numargs=numargs, indices=indices})
+            (P.tuple7
+                PP.puConstant
+                R.puReduction
+                P.int
+                P.int
+                (P.list puConarg)
+                P.int
+                (P.list pumx))
+               
       val puEnv : environment P.pu =
-         P.tuple7
-            (P.list (P.pair PP.puSymbol pumx))
-            (P.list (P.pair PP.puSymbol pumx))
-            pumx
-            pumx
-            pumx
-            (P.list
-                (P.tuple4
-                    PP.puConstant
-                    R.puReduction
-                    (P.list (P.pair (P.option PP.puSymbol) pumx))
-                    pumx))
-            (P.list
-                (P.tuple7
-                    PP.puConstant
-                    R.puReduction
-                    P.int
-                    P.int
-                    (P.list puConarg)
-                    P.int
-                    (P.list pumx)))
-
-      val puDatatypeRecord : datatype_record P.pu =
-         P.tuple8
-            (P.list 
+         P.wrap
+            (fn ENV {invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, skeleton, subterm, subtermWf, iterReds} =>
+                (invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, (skeleton, subterm, subtermWf, iterReds)))
+            (fn (invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, (skeleton, subterm, subtermWf, iterReds)) =>
+                ENV {invis=invis, invisnum=invisnum, pers=pers, persnum=persnum, univ=univ, a=a, dcons=dcons, tplist=tplist, conlist=conlist, skeleton=skeleton, subterm=subterm, subtermWf=subtermWf, iterReds=iterReds})
+            (P.tuple10
+                (P.list (P.pair PP.puSymbol pumx))
+                P.int
+                (P.list (P.pair PP.puSymbol pumx))
+                P.int
+                pumx
+                pumx
+                pumx
+                (P.list puTenv)
+                (P.list puCenv)
                 (P.tuple4
                     PP.puConstant
                     PP.puConstant
-                    P.int
-                    PP.puConstant))
-            P.int
-            P.int
-            PP.puConstant
-            PP.puConstant
-            PP.puConstant
-            puEnv
-            (P.list R.puUreduction2)
-
-      val theDatatypes : datatype_record list CR.cref = CR.new []
+                    PP.puConstant
+                    (P.list R.puUreduction2)))
 
 
 
       (* The destruction function.
          We manually closure-convert it so we can pickle its environment.
+
+         (Note that we can't just use the iterator for destruct.  We want to destruct datatype
+         hypotheses in-place, which the iterator cannot do.)
       *)
 
-      fun destructor ((invis, pers, univ_mobile, a_mobile, dcons_mobile, tplist, conlist):environment) =
+      fun destructor (ENV {invis, pers, univ=univ_mobile, a=a_mobile, dcons=dcons_mobile, tplist, conlist}) =
          let
             val a = X.use a_mobile
             val dcons = X.use dcons_mobile
@@ -1012,7 +1074,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             
             val (_, typeConstantsInvert) =
                List.foldl
-                  (fns (const, _, _, _) (i, d) =>
+                  (fns (TENV {const}) (i, d) =>
                       (i+1, CD.insert d const i))
                   (0, CD.empty)
                   tplist
@@ -1103,7 +1165,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       refine (Rule.exchange (hyp+1) 1 1)
                       >>
                       let
-                         val (const, red, _, _) = Array.sub typeInfo i
+                         val TENV {const, red} = Array.sub typeInfo i
                       in
                          refine (Rule.unreduceHyp (hyp+2)
                                     (T.Elim 
@@ -1142,7 +1204,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   end
 
 
-            fun destOne hyp persact jud pat (_, _, i, j, args, numargs, indices) set =
+            fun destOne hyp persact jud pat (CENV {tpnum=i, connum=j, args, numargs, indices}) set =
                (case pat of
                    IP.And pats =>
                       let
@@ -1204,7 +1266,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                      >>
                                      (* G, <arguments>, <equalities>, ... |- ... *)
                                      let
-                                        val (conConst, red, _, _, _, _, _) = Array.sub conInfo j
+                                        val CENV {const=conConst, red} = Array.sub conInfo j
                                      in
                                         DE.refold jud hyp (numargs+eqs)
                                            (T.Elim
@@ -1250,7 +1312,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                         | _ =>
                              fail "datatype pattern has superfluous arms")
 
-                 | (con as (_, _, tpnum', _, _, _, _)) :: rest =>
+                 | (con as CENV {tpnum=tpnum'}) :: rest =>
                       let
                          do (pat, pats') =
                             (fn k =>
@@ -1283,11 +1345,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                 (try
                                     let
                                        val i = CD.lookup typeConstantsInvert const
-                                       val (_, red, _, _) = Array.sub typeInfo i
+                                       val TENV {red, args, adisj} = Array.sub typeInfo i
                                        val sinvis = collectInvis invis X.id
                                        val (s, persact, spine') = collectPers pers spine sinvis []
                                        val a_s = X.sub a s
-                                       val (_, _, args, adisj) = Array.sub typeInfo i
                                     in
                                        (* G, const @ spine, G' |- C *)
                                        refine (Rule.reduceHyp hyp red)
@@ -1331,27 +1392,14 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-      (* Converting exceptions to CPS. *)
-
-      exception Tryf of string
-
-      fun tryf f sk =
-         (case
-             (try
-                 Sum.INL (f ())
-              with Tryf msg => Sum.INR msg)
-          of
-             Sum.INL x => sk x
-
-           | Sum.INR msg => fail msg)
-
-
-
       (* A more convenient induction tactic for datatypes without mutual induction. *)
 
       val sym_s = Symbol.fromValue "s"
 
-      fun inductor const ninvis nvis nind skeletonConst stripConst subtermConst subtermWfConst =
+      fun inductor 
+         (ENV {invisnum=ninvis, persnum=nvis, skeleton=skeletonConst, subterm=subtermConst, subtermWf=subtermWfConst, tplist})
+         const nind stripConst
+         =
          let
             do (jud, dir) = withgoal
          in
@@ -1612,16 +1660,19 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
       fun lams num m = natrecl num (fns _ p => T.Lam (NONE, p)) m
 
-      fun injector tpconst ninvis nvis nind iterConst tpnum tplist conlist redlist univ =
+      fun injector
+         (ENV {invisnum=ninvis, persnum=nvis, tplist, conlist, iterReds=redlist, univ})
+         tpconst nind iterConst tpnum 
+         =
          let
             val ninds =
                List.map
-                  (fn (_, _, args, _) => List.length args)
+                  (fn TENV {args} => List.length args)
                   tplist
 
             val ncaseargs =
                List.map
-                  (fn (_, _, _, _, args, _, _) =>
+                  (fn CENV {args} =>
                       List.foldl
                          (fns arg n =>
                              (case arg of
@@ -1637,7 +1688,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             (* maps constructor constants to their constructor # *)
             val (_, constructorInvert) =
                List.foldl
-                  (fns (const, _, _, _, _, _, _) (i, d) =>
+                  (fns (CENV {const}) (i, d) =>
                       (i+1, CD.insert d const i))
                   (0, CD.empty)
                   conlist
@@ -1645,7 +1696,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             val constants =
                Array.fromList $
                List.map
-                  (fn (const, _, _, _) => const)
+                  (fn TENV {const} => const)
                   tplist
 
             (* for each constructor:
@@ -1655,7 +1706,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             val payloads =
                Array.fromList $
                List.map
-                  (fn (_, _, _, _, conargs, _, _) =>
+                  (fn CENV {args=conargs} =>
                       Susp.delay
                       (fn () =>
                           let
@@ -1703,7 +1754,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             val dtnumbers =
                Array.fromList $
                List.map
-                  (fn (_, _, dtnum, _, _, _, _) => dtnum)
+                  (fn CENV {tpnum} => tpnum)
                   conlist
 
             fun injectYes ihyp visSpine indSpine pos m n =
@@ -1964,6 +2015,27 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                /
          in
             inject
+         end
+
+
+
+      fun populate (env as ENV {persnum=numberOfVisibleArgs, tplist}) =
+         let
+            val destructor' = destructor env
+            val insert = ConstantTable.insert
+         in
+            List.appi
+               (fns i (TENV {const, iterator, numargs=numberOfIndexArgs, strip}) =>
+                   (
+                   insert DE.destructTactics const destructor';
+
+                   insert InductionInternal.inductionTactics const (inductor env const numberOfIndexArgs strip);
+
+                   insert InductionInternal.iterators const (iterator, numberOfVisibleArgs, numberOfIndexArgs);
+
+                   insert EqualityTactic.injectionTactics const (injector env const numberOfIndexArgs iterator i)
+                   ))
+               tplist
          end
 
 
@@ -3366,85 +3438,45 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
+            (* 10. Populate the tables *)
 
-            (* 10. Populate the tables.
+            val tplist =
+               map3
+                  (fns (const, red, stripConst, _, args, numberOfIndexArgs) afield (iterator, _) => 
+                      TENV {const=const, red=red, args=args, numargs=numberOfIndexArgs, adisj=afield, iterator=iterator, strip=stripConst})
+                  typeInfoList indextpsList iterInfoList
 
-               (Note that we can't just use the iterator for destruct.  We want to destruct datatype
-               hypotheses in-place, which the iterator cannot do.)
-            *)
-
-            val destEnvTplist =
-               map2
-                  (fns (const, red, _, _, args, _) afield => 
-                      (const, red, args, afield))
-                  typeInfoList indextpsList
-
-            val destEnvConlist =
+            val conlist =
                map2 
                   (fns (const, red, _) (i, j, _, args, numargs, indices) =>
-                      (const, red, i, j, args, numargs, indices))
+                      CENV {const=const, red=red, tpnum=i, connum=j, args=args, numargs=numargs, indices=indices})
                   conInfoList allcons
 
-            val destEnv =
-               (invis,
-                pers,
-                univ_mobile,
-                a_mobile,
-                dcons_mobile,
-                destEnvTplist,
-                destEnvConlist)
-               : environment
-
-            val destructor' = destructor destEnv
-
-            val () =
-               CR.assign theDatatypes
-                  ((map2i
-                       (fns i (const, _, stripConst, _, _, numberOfIndexArgs) (iter, _) =>
-                           (
-                           ConstantTable.insert DE.destructTactics const destructor';
-
-                           ConstantTable.insert InductionInternal.inductionTactics const
-                              (inductor
-                                  const
-                                  numberOfInvisibleArgs
-                                  numberOfVisibleArgs
-                                  numberOfIndexArgs
-                                  skeletonConst
-                                  stripConst
-                                  subtermConst
-                                  subtermWellFoundedConst);
-
-                           ConstantTable.insert InductionInternal.iterators const 
-                              (iter, numberOfVisibleArgs, numberOfIndexArgs);
-
-                           ConstantTable.insert EqualityTactic.injectionTactics const
-                              (injector 
-                                  const
-                                  numberOfInvisibleArgs
-                                  numberOfVisibleArgs
-                                  numberOfIndexArgs
-                                  iter
-                                  i
-                                  destEnvTplist
-                                  destEnvConlist
-                                  iterReductions
-                                  univ_mobile);
-
-                           (const, iter, numberOfIndexArgs, stripConst)
-                           ))
-                       typeInfoList
-                       iterInfoList,
-                    numberOfInvisibleArgs,
-                    numberOfVisibleArgs,
-                    skeletonConst,
-                    subtermConst,
-                    subtermWellFoundedConst,
-                    destEnv,
-                    iterReductions)
-                   :: CR.deref theDatatypes)
+            val env =
+               ENV
+               {
+               invis = invis,
+               invisnum = numberOfInvisibleArgs,
+               pers = pers,
+               persnum = numberOfVisibleArgs,
+               univ = univ_mobile,
+               a = a_mobile,
+               dcons = dcons_mobile,
+               tplist = tplist,
+               conlist = conlist,
+               skeleton = skeletonConst,
+               subterm = subtermConst,
+               subtermWf = subtermWellFoundedConst,
+               iterReds = iterReductions,
+               }
          in
-            (* Make all the contants opaque. *)
+            populate env;
+
+            CR.assign theDatatypes (env :: CR.deref theDatatypes);
+
+
+
+            (* 11. Make all the contants opaque. *)
 
             close skeletonConst;
             close subtermConst;
@@ -3532,56 +3564,21 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       fun write outf =
          P.pickle 
             outf
-            (P.list puDatatypeRecord)
+            (P.list puEnv)
             (CR.deref theDatatypes)
 
 
       fun read inf =
          (case
-             P.unpickle inf (P.option puDatatypeRecord)
+             P.unpickle inf (P.option puEnv)
           of
              NONE => ()
 
-           | SOME (l, ninvis, nvis, skel, subterm, subtermWf, destEnv, iterReductions) =>
-                let
-                   val destructor' = destructor destEnv
-                   val (_, _, univ_mobile, _, _, tplist, conlist) = destEnv
-                in
-                   List.appi
-                      (fns i (const, iter, nind, strip) => 
-                          (
-                          ConstantTable.insert DE.destructTactics const destructor';
-
-                          ConstantTable.insert InductionInternal.inductionTactics const
-                             (inductor 
-                                 const
-                                 ninvis
-                                 nvis
-                                 nind
-                                 skel
-                                 strip
-                                 subterm
-                                 subtermWf);
-                          
-                          ConstantTable.insert InductionInternal.iterators const (iter, nvis, nind);
-
-                          ConstantTable.insert EqualityTactic.injectionTactics const
-                             (injector 
-                                 const
-                                 ninvis
-                                 nvis
-                                 nind
-                                 iter
-                                 i
-                                 tplist
-                                 conlist
-                                 iterReductions
-                                 univ_mobile)
-                          ))
-                      l;
-
-                   read inf
-                end)
+           | SOME env => 
+                (
+                populate env;
+                read inf
+                ))
 
    end
 
