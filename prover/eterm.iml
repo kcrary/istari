@@ -494,6 +494,54 @@ structure ParseTerm =
             cod 0,
             ]
 
+      fun idents args =
+         U.box $
+         U.append $
+         (case args of
+             [] =>
+                (* shouldn't happen *)
+                []
+
+           | arg :: rest =>
+                U.string arg
+                ::
+                List.foldr
+                   (fns argi l => U.string " " :: U.string argi :: l)
+                   []
+                   rest)
+
+      fun binderContent str (doms, cod) =
+         U.box $
+         U.append
+            [
+            U.box $
+            U.append
+               [
+               U.string str,
+               U.append
+                  (map 
+                      (fn (args, dom, _) => 
+                         U.append
+                            [
+                            U.break 1,
+                            U.string "(",
+                            U.box $ 
+                               U.append
+                               [
+                               idents args,
+                               U.break 1,
+                               U.string ": ",
+                               U.box $ dom 0
+                               ],
+                            U.string ")"
+                            ])
+                      doms),
+               U.string " ."
+               ],
+            U.break 1,
+            cod 0,
+            ]
+
       fun registerBinder const str =
          register const 2 0
          (U.wrap
@@ -502,8 +550,17 @@ structure ParseTerm =
                      U.alt
                         [
                         U.wrap
-                           (U.apply2 const U.show (U.lam unp))
-                           (fn (dom, (arg, (doms, cod))) => ((arg, dom) :: doms, cod)),
+                           (U.apply2 const U.showterm (U.lam unp))
+                           (fn ((dom1, domt1), (arg, (doms, cod))) =>
+                               (case doms of
+                                   (args, dom2, domt2) :: rest =>
+                                      if Simplify.same domt1 domt2 then
+                                         ((arg :: args, dom2, domt2) :: rest, cod)
+                                      else
+                                         (([arg], dom1, domt1) :: doms, cod)
+
+                                 | _ =>
+                                      (([arg], dom1, domt1) :: doms, cod))),
 
                         U.wrap
                            U.show
@@ -519,8 +576,17 @@ structure ParseTerm =
                      U.alt
                         [
                         U.wrap
-                           (U.apply3 const U.wild U.show (U.lam unp))
-                           (fn ((), dom, (arg, (doms, cod))) => ((arg, dom) :: doms, cod)),
+                           (U.apply3 const U.wild U.showterm (U.lam unp))
+                           (fn ((), (dom1, domt1), (arg, (doms, cod))) =>
+                               (case doms of
+                                   (args, dom2, domt2) :: rest =>
+                                      if Simplify.same domt1 domt2 then
+                                         ((arg :: args, dom2, domt2) :: rest, cod)
+                                      else
+                                         (([arg], dom1, domt1) :: doms, cod)
+
+                                 | _ =>
+                                      (([arg], dom1, domt1) :: doms, cod))),
 
                         U.wrap
                            U.show

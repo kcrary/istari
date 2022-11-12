@@ -57,6 +57,8 @@ A simpler case-analysis operation:
 
     leq_antisymm : type:leq_antisymm
 
+This one gives transitivity in the form needed for rewriting:
+
     leq_implication : type:leq_implication
 
     lt_impl_leq : type:lt_impl_leq

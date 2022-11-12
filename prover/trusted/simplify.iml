@@ -1,0 +1,237 @@
+
+signature SIMPLIFY =
+   sig
+
+      type term
+      type sub
+      type elim
+
+      (* specification in NORMALIZE *)
+      val simplify : term -> term
+
+      (* simp m s spine
+
+         if    m[s] @ spine simplifies to h @ spine'
+         then  returns (h, spine')
+      *)
+      val simp : term -> sub -> elim list -> term * elim list
+
+      val same : term -> term -> bool
+
+   end
+
+
+functor SimplifyFun (structure Term : TERM
+                     structure Constant : CONSTANT
+                                          where type constant = Term.constant)
+   :>
+   SIMPLIFY
+   where type term = Term.term
+   where type sub = Term.sub
+   where type elim = Term.elim
+   =
+   struct
+
+      open Term
+
+
+      (* ssubstAppend spine1 s spine2 = ssubst spine1 s @ spine2 *)
+      fun ssubstAppend spine1 s spine2 =
+         (case s of
+             Shift 0 =>
+                spine1 @ spine2
+
+           | _ =>
+                List.revAppend
+                   (List.foldl
+                       (fns e l =>
+                           (case e of
+                               App m => App (Sub (m, s)) :: l
+
+                             | _ => e :: l))
+                       []
+                       spine1)
+                   spine2)
+
+
+      (* simp m s spine
+
+         if    m[s] @ spine simplifies to h @ spine'
+               (where simple form is defined in NORMALIZE)
+         then  returns (h, spine')
+
+         (Need to collect the spines so we aren't repeatedly appending on the right.)
+      *)
+      fun simp m s spine =
+         (case m of
+             Var i =>
+                (case substVar i s of
+                    Idx j =>
+                       (Var j, spine)
+
+                  | Term n =>
+                       simp n id spine)
+
+           | Const const =>
+                (m, spine)
+
+           | Elim (m1, spine') =>
+                simp m1 s (ssubst spine' s @ spine)
+
+           | Lam (binder, m1) =>
+                (Lam (binder, Sub (m1, under 1 s)), spine)
+
+           | Pair (m1, m2) =>
+                (Pair (Sub (m1, s), Sub (m2, s)), spine)
+
+           | Next m1 =>
+                (Next (Sub (m1, s)), spine)
+
+           | Triv =>
+                (m, spine)
+
+           | Sub (m', s') =>
+                simp m' (compose s' s) spine
+
+           | Evar eb =>
+                (case readEbind eb of
+                    NONE =>
+                       (Sub (m, s), spine)
+
+                  | SOME m' =>
+                       simp m' s spine)
+
+           | Marker _ =>
+                (m, spine))
+
+
+      fun elim m spine =
+         (case spine of
+             [] => m
+
+           | _ => Elim (m, spine))
+
+
+      fun simplify m =
+         (case simp m id [] of
+             (h as Var _, spine) =>
+                Elim (h, spine)
+
+           | (h as Const _, spine) =>
+                Elim (h, spine)
+
+           | (h as Sub _, spine) =>
+                Elim (h, spine)
+
+           | (h, []) => h
+
+           | (h, spine) =>
+                Elim (h, spine))
+
+
+      fun same m1 m2 =
+         let
+            val (h1, spine1) = simp m1 id []
+            val (h2, spine2) = simp m2 id []
+         in
+            (case (h1, h2) of
+                (Var i, Var j) => 
+                   i = j
+
+              | (Const const, Const const') => 
+                   Constant.eq (const, const')
+
+              | (Lam (_, m1'), Lam (_, m2')) =>
+                   same m1' m2'
+
+              | (Pair (m1a, m1b), Pair (m2a, m2b)) =>
+                   same m1a m2a
+                   andalso
+                   same m1b m2b
+
+              | (Next m1', Next m2') =>
+                   same m1' m2'
+
+              | (Triv, Triv) =>
+                   true
+
+              | (Marker sym, Marker sym') =>
+                   Symbol.eq (sym, sym')
+
+              | (Sub (Evar e1, s1), Sub (Evar e2, s2)) =>
+                   eqEbind e1 e2
+                   andalso
+                   sameSub s1 s2
+
+              | _ =>
+                   false)
+            andalso
+            sameSpine spine1 spine2
+         end
+
+      and sameSpine spine1 spine2 =
+         (case (spine1, spine2) of
+             ([], []) => true
+
+           | (App m :: rest1, App n :: rest2) =>
+                same m n
+                andalso
+                sameSpine rest1 rest2
+
+           | (Pi1 :: rest1, Pi1 :: rest2) =>
+                sameSpine rest1 rest2
+
+           | (Pi2 :: rest1, Pi2 :: rest2) =>
+                sameSpine rest1 rest2
+
+           | (Prev :: rest1, Prev :: rest2) =>
+                sameSpine rest1 rest2
+
+           | _ => false)
+
+      and sameSub s1 s2 =
+         (case (s1, s2) of
+             (Dot (m1, s1'), Dot (m2, s2')) =>
+                same m1 m2
+                andalso
+                sameSub s1' s2'
+
+           | (Idot (i1, s1'), Idot (i2, s2')) =>
+                i1 = i2
+                andalso
+                sameSub s1' s2'
+
+           | (Dot (m1, s1'), Idot (i2, s2')) =>
+                same m1 (Var i2)
+                andalso 
+                sameSub s1' s2'
+
+           | (Idot (i1, s1'), Dot (m2, s2')) =>
+                same (Var i1) m2
+                andalso
+                sameSub s1' s2'
+
+           | (Shift k1, Shift k2) =>
+                k1 = k2
+
+           | (Dot (m1, s1'), Shift k2) =>
+                same m1 (Var k2)
+                andalso
+                sameSub s1' (Shift (k2+1))
+
+           | (Idot (i1, s1'), Shift k2) =>
+                i1 = k2
+                andalso
+                sameSub s1' (Shift (k2+1))
+
+           | (Shift k1, Dot (m2, s2')) =>
+                same (Var k1) m2
+                andalso
+                sameSub (Shift (k1+1)) s2'
+
+           | (Shift k1, Idot (i2, s2')) =>
+                k1 = i2
+                andalso
+                sameSub (Shift (k1+1)) s2')
+
+   end

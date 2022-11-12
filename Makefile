@@ -23,3 +23,5 @@ clean :
 	cd cmlibi; make clean
 	cd prover; make clean
 	cd ui; make clean
+	cd library; make clean
+

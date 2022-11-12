@@ -113,6 +113,10 @@ functor NormalizeFun (structure Term : TERM
                       structure Constant : CONSTANT
                                            where type constant = Term.constant
                                            where type term = Term.term
+                      structure Simplify : SIMPLIFY
+                                           where type term = Term.term
+                                           where type sub = Term.sub
+                                           where type elim = Term.elim
                       structure Reduction : REDUCTION_INTERNAL
                                             where type constant = Term.constant
                                             where type term = Term.term
@@ -143,7 +147,7 @@ functor NormalizeFun (structure Term : TERM
            | _ => Elim (m, spine))
 
 
-      (* ssubstAppend spine1 s spine2 = ssubst spine1 s @ spine2 but optimized *)
+      (* ssubstAppend spine1 s spine2 = ssubst spine1 s @ spine2 *)
       fun ssubstAppend spine1 s spine2 =
          (case s of
              Shift 0 =>
@@ -162,52 +166,7 @@ functor NormalizeFun (structure Term : TERM
                    spine2)
 
 
-
-      (* Need to collect the spines so we aren't repeatedly appending on the right. *)
-
-      fun simplifyMain m s spine =
-         (case m of
-             Var i =>
-                (case substVar i s of
-                    Idx j =>
-                       Elim (Var j, spine)
-
-                  | Term m' =>
-                       simplifyMain m' id spine)
-
-           | Const _ => 
-                Elim (m, spine)
-
-           | Elim (m1, spine') =>
-                (* should optimize this *)
-                simplifyMain m1 s (ssubstAppend spine' s spine)
-
-           | Lam (b, m1) =>
-                elim (Lam (b, Sub (m1, under 1 s))) spine
-
-           | Pair (m1, m2) =>
-                elim (Pair (Sub (m1, s), Sub (m2, s))) spine
-
-           | Next m1 =>
-                elim (Next (Sub (m1, s))) spine
-
-           | Triv => elim m spine
-
-           | Sub (m1, s') =>
-                simplifyMain m1 (compose s' s) spine
-
-           | Evar eb =>
-                (case readEbind eb of
-                    NONE =>
-                       Elim (Sub (m, s), spine)
-
-                  | SOME m' =>
-                       simplifyMain m' s spine)
-
-           | Marker _ => elim m spine)
-
-      fun simplify m = simplifyMain m id []
-
+      val simplify = Simplify.simplify
 
 
       fun simplifyAll m =
