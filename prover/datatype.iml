@@ -265,22 +265,6 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-      (* Converting exceptions to CPS. *)
-
-      exception Tryf of string
-
-      fun tryf f sk =
-         (case
-             (try
-                 Sum.INL (f ())
-              with Tryf msg => Sum.INR msg)
-          of
-             Sum.INL x => sk x
-
-           | Sum.INR msg => fail msg)
-
-
-
       fun natTerm i =
          if i = 0 then
             T.Const Prim.zero
@@ -1314,15 +1298,14 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                  | (con as CENV {tpnum=tpnum'}) :: rest =>
                       let
-                         do (pat, pats') =
-                            (fn k =>
-                                if tpnum = tpnum' then
-                                   (case pats of
-                                       pat :: pats' => k (pat, pats')
+                         val (pat, pats') =
+                            if tpnum = tpnum' then
+                               (case pats of
+                                   pat :: pats' => (pat, pats')
 
-                                     | _ => fail "datatype pattern has insufficient arms")
-                                else
-                                   k (IP.And [], pats))
+                                 | [] => (IP.And [], []))
+                            else
+                               (IP.And [], [])
                       in
                          refine (Rule.sumLeft hyp (T.evar ()) (T.evar ()) (T.evar ()))
                          >>> [

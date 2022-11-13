@@ -54,6 +54,7 @@ signature TACTIC =
 
       val andthenPri : priority tacticm -> priority tacticm -> priority tacticm
       val andthenlPri : priority tacticm -> priority tacticm list -> priority tacticm
+      val andthenlPadPri : priority tacticm -> priority tacticm list -> priority tacticm -> priority tacticm
 
       val attempt : tactic -> tactic
       val first : 'a tacticm list -> 'a tacticm
@@ -61,6 +62,9 @@ signature TACTIC =
       val repeatCount : tactic -> int tacticm
       val repeatn : int -> tactic -> tactic
       val orthen : 'a tacticm -> (unit -> 'a tacticm) -> 'a tacticm
+
+      val ifthen : 'a tacticm -> 'b tacticm -> 'b tacticm -> 'b tacticm
+      val ifthenM : 'a tacticm -> ('a -> 'b tacticm) -> 'b tacticm -> 'b tacticm
 
 
       (* direct computation *)
@@ -79,6 +83,9 @@ signature TACTIC =
 
       val setFailure : string -> 'a tacticm -> 'a tacticm
       val transformFailure : (string -> string) -> 'a tacticm -> 'a tacticm
+
+      exception Tryf of string
+      val tryf : (unit -> 'a) -> ('a -> 'b tacticm) -> 'b tacticm
 
 
       (* primitive actions *)
@@ -414,6 +421,27 @@ structure TacticInternal :> TACTIC_INTERNAL =
                   | _ :: _ => SOME "too many tactics in andthenlPri"))
             tacs
 
+      fun andthenlPadPri tac1 tacs padtac =
+         andthenFoldM tac1
+            (fns pri l =>
+                (case pri of
+                    Primary =>
+                       (case l of
+                           [] =>
+                              (padtac, [])
+
+                         | tac :: rest =>
+                              (tac, rest))
+
+                  | _ => 
+                       (idtacM pri, l)))
+            (fn l =>
+                (case l of
+                    [] => NONE
+
+                  | _ :: _ => SOME "too many tactics in andthenlPadPri"))
+            tacs
+
 
       
       fun attempt tac goal fk sk =
@@ -427,6 +455,7 @@ structure TacticInternal :> TACTIC_INTERNAL =
 
            | tac :: rest =>
                 tac goal (fn _ => first rest goal fk sk) sk)
+
 
       fun repeat tac goal = attempt (andthen tac (repeat tac)) goal
 
@@ -452,6 +481,26 @@ structure TacticInternal :> TACTIC_INTERNAL =
          tac1 goal
             (fn _ => tac2 () goal fk sk)
             sk
+
+
+      fun ifthen iftac thentac elsetac goal fk sk =
+         let
+            do (subgoals, validate, _) = iftac goal (fn _ => elsetac goal fk sk)
+
+            do (allgoals, subvalidate, fk'') = andthenloopM [] (fn _ => thentac) subgoals [] fk
+         in
+            sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
+         end
+
+
+      fun ifthenM iftac thentac elsetac goal fk sk =
+         let
+            do (subgoals, validate, _) = iftac goal (fn _ => elsetac goal fk sk)
+
+            do (allgoals, subvalidate, fk'') = andthenloopM [] thentac subgoals [] fk
+         in
+            sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
+         end
 
 
       fun withgoal tac goal fk sk = tac goal goal fk sk
@@ -533,6 +582,22 @@ structure TacticInternal :> TACTIC_INTERNAL =
          replaceJudgement
             (J.make (J.context jud) a)
             goal fk sk
+
+
+      (* Converting exceptions to CPS. *)
+
+      exception Tryf of string
+
+      fun tryf f sk =
+         (case
+             (try
+                 Sum.INL (f ())
+              with Tryf msg => Sum.INR msg)
+          of
+             Sum.INL x => sk x
+
+           | Sum.INR msg => fail msg)
+
 
 
       fun refine rule (goal as (jud, dir)) fk sk =

@@ -1,0 +1,158 @@
+
+signature INVERSION =
+   sig
+
+      val inversionPriority : Symbol.symbol -> IntroPattern.ipattern -> Tactic.priority Tactic.tacticm
+      val inversionRaw : Symbol.symbol -> IntroPattern.ipattern -> Tactic.tactic
+      val inversion : Symbol.symbol -> IntroPattern.ipattern -> Tactic.tactic
+
+   end
+
+
+structure Inversion :> INVERSION =
+   struct
+
+      structure D = Directory
+      structure IP = IntroPattern
+      structure J = Judgement
+      structure N = Normalize
+      structure S = Seq
+      structure T = Term
+
+      open Tactic
+      open CasePervasive
+
+
+      fun withsize tac (goal as (jud, _)) fk sk =
+         tac (Seq.length (J.context jud)) goal fk sk
+
+
+      fun injections num n =
+         if num = 0 then
+            idtacM Primary
+         else
+            goalContextCase
+            /| $hyp \n\ $tm
+                  (| \Prim.eq\ _ var? var? =>
+                     \(fnc i j =>
+                          if i = j then
+                             HypTactic.clearn n
+                             >>
+                             injections (num-1) n
+                          else
+                             EqualityTacticInternal.substMain false i n (T.Var j)
+                             >>!
+                             injections (num-2) n)\
+   
+                   | \Prim.eq\ _ var? ? =>
+                     \(fnc i m =>
+                          EqualityTacticInternal.substMain false i n m
+                          >>!
+                          injections (num-2) n)\
+   
+                   | \Prim.eq\ _ _ _ =>
+                     \(fnc =>
+                          let
+                             do sz = withsize
+                          in
+                             ifthenM
+                                (EqualityTacticInternal.injectionMain n)
+                                (fn pri =>
+                                    (case pri of
+                                        Primary =>
+                                           let
+                                              do sz' = withsize
+                                              val new = sz' - sz
+                                           in
+                                              HypTactic.clearn (n + new)
+                                              >>
+                                              HypTactic.exchange 0 new n
+                                              >>
+                                              injections (num - 1 + new) n
+                                           end
+      
+                                      | _ => idtacM pri))
+                                (injections (num-1) (n+1))
+                          end)\
+                  )
+
+             | _ =>
+               \(fnc =>
+                    injections (num-1) (n+1))\
+            /
+         
+
+      exception BadPattern
+
+      fun names set pats num acc =
+         if num = 0 then
+            List.rev acc
+         else
+            let
+               val (symopt, pats') =
+                  (case pats of
+                      IP.Ident symopt :: pats' => (symopt, pats')
+
+                    | _ :: pats' => raise (Tryf "inversion pattern expected")
+
+                    | [] => (NONE, []))
+
+               val (sym, set') = D.insistAndBindSet set symopt
+            in
+               names set' pats' (num-1) (sym :: acc)
+            end
+
+
+      fun inversionPriority hyp pat =
+         (case pat of
+             IP.Or pats =>
+                let
+                   do n = HypTactic.findhyp hyp
+                   do sz = withsize
+                   do (_, dir) = withgoal
+
+                   val set = D.removeSet (D.set dir) hyp
+
+                   (* This part is just fixing up the variable names. *)
+                   fun post pat =
+                      (case pat of
+                          IP.And pats' =>
+                             let
+                                do sz' = withsize
+                                val num = sz' - sz + 1
+                                do (_, dir) = withgoal
+
+                                val (front, back) = D.split dir n
+                                val back' = D.shift back num
+    
+                                do vs =
+                                   tryf (fn () => names set pats' num [])
+                             in
+                                chdir (D.binds (D.binds back' vs) front)
+                                >> 
+                                idtacM Primary
+                             end
+
+                        | _ => fail "inversion pattern expected")
+                in
+                   andthenlPadPri
+                      (Destruct.destructnPriority n (IP.Or [])
+                       >>!
+                       let
+                          do sz' = withsize
+                       in
+                          injections (sz' - sz + 1) n
+                       end)
+                      (List.map post pats)
+                      (post (IP.And []))
+                end
+
+           | _ =>
+                fail "inversion pattern expected")
+
+
+      fun inversionRaw hyp pat = inversionPriority hyp pat >> idtac
+
+      fun inversion hyp pat = Typecheck.withTypecheckSnd $ inversionPriority hyp pat
+
+   end

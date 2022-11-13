@@ -7,12 +7,12 @@ UNITS = $(DOCUNITS) datatype
 
 all : $(foreach i, $(UNITS), $(i).isto)
 
-docs : $(foreach i, $(DOCUNITS), ../docs/lib-$(i).md)
+docs : $(foreach i, $(DOCUNITS), ../docs/lib/$(i).md)
 
 %.isto : %.ist
 	$(ISTARI) $<
 
-../docs/lib-%.md : %.md
+../docs/lib/%.md : %.md
 	$(PROCDOC) $< $@
 
 bar.isto : bar-aux.iml

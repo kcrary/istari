@@ -89,6 +89,16 @@ signature EQUALITY_TACTIC_INTERNAL =
 
       include EQUALITY_TACTIC
 
+      (* substMain reverse i j m
+
+         hypothesis j has type (i = m : A), or the reverse
+      *)
+      val substMain : bool -> int -> int -> Term.term -> priority tacticm
+
+
+      (* takes a hypothesis number *)
+      val injectionMain : int -> priority tacticm
+
       
       val injectionSum : int -> tactic
       val injectionExists : int -> tactic
@@ -1178,21 +1188,24 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       val injectionTactics : (int -> priority tacticm) H.table = H.table ()
 
+      fun injectionMain i =
+         goalContextCase
+         /| $hyp \i\ $tm \Prim.eq\ (const? @ _) _ _ =>
+            \(fnc const =>
+                 (case H.find injectionTactics const of
+                     SOME tac => tac i
+
+                   | NONE => fail "not an injectible hypothesis"))\
+
+          | _ =>
+            \(fnc => fail "not an injectible hypothesis")\
+         /
+
       fun injectionPriority hyp =
          let
             do i = HypTactic.findhyp hyp
          in
-            goalContextCase
-            /| $hyp \i\ $tm \Prim.eq\ (const? @ _) _ _ =>
-               \(fnc const =>
-                    (case H.find injectionTactics const of
-                        SOME tac => tac i
- 
-                      | NONE => fail "not an injectible hypothesis"))\
-
-             | _ =>
-               \(fnc => fail "not an injectible hypothesis")\
-            /
+            injectionMain i
          end
 
       fun injectionRaw hyp = injectionPriority hyp >> idtac

@@ -22,7 +22,8 @@ goal, generating zero or more subgoals.
 - `cut : tactic -> tactic`
 
   Runs the argument tactic, then prunes any backtracking points it
-  creates.
+  creates so subsequent tactics will not backtrack into the argument
+  tactic.
 
 
 - `lift : (unit -> tactic) -> tactic`
@@ -52,18 +53,16 @@ goal, generating zero or more subgoals.
 
   A synonym is the infix operator `>>>`.
 
+  + `andthenlPad : tactic -> tactic list -> tactic -> tactic`
 
-- `andthenlPad : tactic -> tactic list -> tactic -> tactic`
+    Like `andthenl` except the final tactic argument is run on all
+    subgoals beyond the nth.  The initial tactic must produce at least
+    n subgoals.
 
-  Like `andthenl` except the final tactic argument is run on all
-  subgoals beyond the nth.  The initial tactic must produce at least n
-  subgoals.
+  + `andThenOn : int -> tactic -> tactic -> tactic`
 
-
-- `andThenOn : int -> tactic -> tactic -> tactic`
-
-  The tactic `andthenOn n tac1 tac2` runs `tac1`, then runs `tac2` on
-  the nth subgoal.
+    The tactic `andthenOn n tac1 tac2` runs `tac1`, then runs `tac2` on
+    the nth subgoal.
 
 
 - `attempt : tactic -> tactic`
@@ -97,6 +96,14 @@ goal, generating zero or more subgoals.
   conjunction with [`do` notation](iml.html#do-bindings).
 
 
+- `ifthen : tactic -> tactic -> tactic -> tactic`
+
+  The tactic `ifthen tac1 tac2 tac3` applies `tac1`.  If it succeeds,
+  it calls `tac2` on its subgoals.  If it fails, it calls `tac3`.  The
+  combininator commits to its choice: `tac2` will not backtrack into
+  `tac1` or `tac3`, and `tac3` will not backtrack into `tac1`.
+
+
 
 ### Introduction tactics
 
@@ -110,7 +117,7 @@ goal, generating zero or more subgoals.
 
   + `introRaw /[ipattern] ... [ipattern]/`
   
-     As `intro` but does not invoke the typechecker.
+    As `intro` but does not invoke the typechecker.
 
 
 - `split`
@@ -255,6 +262,11 @@ goal, generating zero or more subgoals.
 
   Moves the indicated hypotheses immediately after the target
   hypothesis.
+
+
+- `copy /[hyp]/ /[name]/`
+
+  Creates a copy of `hyp` using the indicated name.
 
 
 - `revert /[hyp] ... [hyp]/`
@@ -548,6 +560,13 @@ The destruction tactics are:
     As `destructSet` but does not invoke the typechecker.
 
 
+- `inversion /[hyp x]/ /[ipattern]/`
+
+  Destructs `x`, discharging impossible cases and simplifying the
+  resulting equations.  The pattern must be a sum of products (*i.e.,*
+  `{ ... | ... }`) containing identifers and `?`.  May work poorly if
+  `x` is mentioned in the conclusion.
+
 
 ### Chaining
 
@@ -834,6 +853,7 @@ given above, using the tactic monad:
     andthenOn   : int -> 'a tacticm -> 'a tacticm -> 'a tacticm
     first       : 'a tacticm list -> 'a tacticm
     orthen      : 'a tacticm -> (unit -> 'a tacticm) -> 'a tacticm
+    ifthen      : 'a tacticm -> 'b tacticm -> 'b tacticm -> 'b tacticm
 
 Several of the combinators also have monadic versions that serve as
 the monad's unit and various flavors of bind:
@@ -843,6 +863,7 @@ the monad's unit and various flavors of bind:
     andthenlM    : 'a tacticm -> ('a -> 'b tacticm) list -> 'b tacticm
     andthenlPadM : 'a tacticm -> ('a -> 'b tacticm) list -> ('a -> 'b tacticm) -> 'b tacticm
     andthenOnM   : int -> 'a tacticm -> ('a -> 'a tacticm) -> 'a tacticm
+    ifthenM      : 'a tacticm -> ('a -> 'b tacticm) -> 'b tacticm -> 'b tacticm
 
 The monadic operations `andthenM` and `andthenlM` have the infix
 operators `>>=` and `>>>=` as synonyms.
@@ -866,6 +887,19 @@ that will be used with the next subgoal.  The initial `'b` value is
 evaluated and if the result is `SOME msg`, the entire tactic fails
 using error message `msg`.
 
+
+
+### Exceptions
+
+Exceptions tend to work clumsily with continuation-passing style.  The
+`tryf` function mediates the interface between them:
+
+    exception Tryf of string
+    tryf : (unit -> 'a) -> ('a -> 'b tacticm) -> 'b tacticm
+
+The tactic `tryf f tac` will call `f ()` to obtain `x : 'a`, and then
+execute `tac x`.  But if `f ()` raises `Tryf msg`, the combinator
+calls `fail msg` instead.
 
 
 
@@ -894,7 +928,7 @@ These tactics are primarily used to implement other tactics:
   + `Tactic.withidir : (Directory.idirectory -> 'a tacticm) -> 'a tacticm`
 
     Invokes its argument tactic, passing the current
-    [`idirectory`](directory-sig.html) (the part of the goal used to
+    [`idirectory`](sig/directory.html) (the part of the goal used to
     turn external terms into internal terms) to that tactic.
 
   + `Tactic.withterm : ETerm.eterm -> (Term.term -> 'a tacticm) -> 'a tacticm`

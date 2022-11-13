@@ -97,14 +97,17 @@ The priority variant attaches a priority to each subgoal.  This is
 available using the monadic bind as usual, but for convenience, the
 tactic library also supplies:
 
-    val andthenPri  : priority tacticm -> priority tacticm -> priority tacticm
-    val andthenlPri : priority tacticm -> priority tacticm list -> priority tacticm
+    val andthenPri     : priority tacticm -> priority tacticm -> priority tacticm
+    val andthenlPri    : priority tacticm -> priority tacticm list -> priority tacticm
+    val andthenlPadPri : priority tacticm -> priority tacticm list -> priority tacticm -> priority tacticm
 
 Running `andthenPri tac1 tac2` runs `tac1`, then runs `tac2` on all
 its subgoals marked `Primary`.  Running `andthenlPri tac [tac1, ...,
 tacn]` runs `tac`, then runs `tac1` on its first primary subgoal,
 `tac2` on its second, etc.  These have the infix synonyms `>>!` and
-`>>>!`.
+`>>>!`.  The `andthenlPadPri` variant is like `andthenlPri` but it
+pads out the list with its third argument if there are too many
+primary subgoals.
 
 
 
@@ -280,7 +283,7 @@ recursively and obtain a fully normal form.
 
 ### Utilities
 
-- [`Trail`](trail-sig.html) establishes a trail of evar bindings that
+- [`Trail`](sig/trail.html) establishes a trail of evar bindings that
   can be unwound when necessary.  Its most important operations are:
 
       type mark
@@ -293,13 +296,13 @@ recursively and obtain a fully normal form.
   a rewind is unsuccessful (for example, if a more recent binding has
   been made irreversible), `rewind` raises `Rewind`.
 
-- [`Directory`](directory-sig.html) defines the `directory` type, for maintaining a
+- [`Directory`](sig/directory.html) defines the `directory` type, for maintaining a
   correspondence between de Bruijn indices and names, and gives a
   variety of operations on directories.  It also defines the
   `idirectory` type, a lighter-weight directory that is used only in
   one direction, to convert external terms into internal terms.
 
-- [`Unify`](unify-sig.html) is the unification engine.  Its most
+- [`Unify`](sig/unify.html) is the unification engine.  Its most
   important operations are:
 
       val unify : term -> term -> unit

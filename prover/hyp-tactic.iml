@@ -32,6 +32,8 @@ signature HYP_TACTIC =
       val moveBefore : symbol list -> symbol -> tactic
       val moveAfter : symbol list -> symbol -> tactic
 
+      val copy : symbol -> symbol option -> tactic
+
       val revert0 : tactic
       val revert : symbol list -> tactic
 
@@ -386,6 +388,26 @@ structure HypTactic :> HYP_TACTIC =
             do j = findhyp to
          in
             movePos froms j
+         end
+
+
+      fun copy from to =
+         let
+            do i = findhyp from
+            do (jud, dir) = withgoal
+         in
+            (case J.hyp jud i of
+                J.Tm a =>
+                   refine (Rule.assert (T.Sub (a, T.Shift (i+1))) (T.evar ()))
+                   >>> [
+                       refine (Rule.hypothesis i),
+       
+                       chdir (D.bindh dir to)
+                       ]
+
+              | _ =>
+                   (* we could be more flexible *)
+                   fail "hypothesis is the wrong sort to copy")
          end
 
 

@@ -93,5 +93,6 @@
           val varyAndBindSet      : set -> symbol option -> symbol * set
           val insistAndBindSet    : set -> symbol option -> symbol * set
           val insistAndBindSetOpt : set -> symbol option -> (symbol * set) option
+          val removeSet           : set -> symbol -> set 
 
        end
