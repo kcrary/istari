@@ -40,8 +40,7 @@ A simpler case-analysis operation:
 
     list_case : intersect (i : level) .
                    forall (a b : U i) . list a -> b -> (a -> list a -> b) -> b
-              = fn a b l mnil mcons .
-                   list_iter a (fn v0 . b) mnil (fn h t v0 . mcons h t) l
+              = fn a b l mnil mcons . list_iter a (fn v0 . b) mnil (fn h t v0 . mcons h t) l
               (2 implicit arguments)
 
     list_case _ _ (nil _) z _ --> z
@@ -50,30 +49,20 @@ A simpler case-analysis operation:
 
 ### Append
 
-    append : intersect (i : level) .
-                forall (a : U i) . list a -> list a -> list a
-           = fn a l1 l2 .
-                list_iter a (fn v0 . list a) l2 (fn h v0 t . h :: t) l1
+    append : intersect (i : level) . forall (a : U i) . list a -> list a -> list a
+           = fn a l1 l2 . list_iter a (fn v0 . list a) l2 (fn h v0 t . h :: t) l1
            (1 implicit argument)
 
     append _ (nil _) l --> l
     append A (cons _ h t) l --> cons A h (append A t l)
 
 
-    append_id_l : forall (i : level) (a : U i) (l : list a) .
-                     append nil l = l : list a
+    append_id_l : forall (i : level) (a : U i) (l : list a) . append nil l = l : list a
 
-    append_id_r : forall (i : level) (a : U i) (l : list a) .
-                     append l nil = l : list a
+    append_id_r : forall (i : level) (a : U i) (l : list a) . append l nil = l : list a
 
-    append_assoc : forall
-                      (i : level)
-                      (a : U i)
-                      (l1 : list a)
-                      (l2 l3 : list a) .
-                      append (append l1 l2) l3
-                        = append l1 (append l2 l3)
-                        : list a
+    append_assoc : forall (i : level) (a : U i) (l1 l2 l3 : list a) .
+                      append (append l1 l2) l3 = append l1 (append l2 l3) : list a
 
 
 ### Length

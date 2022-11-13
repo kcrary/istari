@@ -6,8 +6,7 @@ using that relation.
 
 The `Acc` predicate is primitive, but aliased in the `Acc` module:
 
-    Acc : intersect (i : level) .
-             forall (A : U i) (R : A -> A -> U i) . A -> U i
+    Acc : intersect (i : level) . forall (A : U i) (R : A -> A -> U i) . A -> U i
 
 So if `A` is a type, and `R` is a relation on `A`, then `Acc A R x`
 means that properties of `x` can be proven by induction.  (Ignoring

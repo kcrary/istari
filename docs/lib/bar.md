@@ -28,8 +28,7 @@ The partial type `bar A` provides an `A` now, or sometime later:
     bar : intersect (i : level) . U i -> U i
         = fn a . rec t . a % future t
 
-    bar_unroll : forall (i : level) (a : U i) .
-                    bar a = (a % future (bar a)) : type
+    bar_unroll : forall (i : level) (a : U i) . bar a = (a % future (bar a)) : type
 
 The partial type acts as a monad.  Its unit is `now`:
 
@@ -45,18 +44,14 @@ Another intro form is `later`:
 
 The monadic bind is `bindbar`:
 
-    bindbar : intersect (i : level) .
-                 forall (a b : U i) . bar a -> (a -> bar b) -> bar b
+    bindbar : intersect (i : level) . forall (a b : U i) . bar a -> (a -> bar b) -> bar b
             = fn a b x f .
                  ffix
                    (bar a -> bar b)
                    (fn g x1 .
                      (case x1 of
                       | inl y . f y
-                      | inr y .
-                          let next g' =
-                            g in
-                            let next y' = y in inr (next (g' y'))))
+                      | inr y . let next g' = g in let next y' = y in inr (next (g' y'))))
                    x
             (2 implicit arguments)
 
@@ -70,8 +65,7 @@ The syntactic sugar `bindbar x = m in n` is accepted for
 
 Finally we can define a fixpoint operator on partial objects:
 
-    bfix : intersect (i : level) .
-              forall (a : U i) . (bar a -> bar a) -> bar a
+    bfix : intersect (i : level) . forall (a : U i) . (bar a -> bar a) -> bar a
          = fn a f . ffix (bar a) (fn x . f (inr x))
          (1 implicit argument)
 

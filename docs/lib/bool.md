@@ -18,11 +18,9 @@ The `bool` type is primitive, but aliased in the `Bool` module:
 
     istrue_iff_eq_true : forall (b : bool) . istrue b <-> b = true : bool
 
-    not_istrue_iff_eq_false : forall (b : bool) .
-                                 not (istrue b) <-> b = false : bool
+    not_istrue_iff_eq_false : forall (b : bool) . not (istrue b) <-> b = false : bool
 
-    iff_eq_bool : forall (b c : bool) .
-                     (istrue b <-> istrue c) <-> b = c : bool
+    iff_eq_bool : forall (b c : bool) . (istrue b <-> istrue c) <-> b = c : bool
 
 
 ### Boolean operations
@@ -38,21 +36,17 @@ The `bool` type is primitive, but aliased in the `Bool` module:
 
     notb_invol : forall (b : bool) . notb (notb b) = b : bool
 
-    notb_andb : forall (b c : bool) .
-                   notb (andb b c) = orb (notb b) (notb c) : bool
+    notb_andb : forall (b c : bool) . notb (andb b c) = orb (notb b) (notb c) : bool
 
-    notb_orb : forall (b c : bool) .
-                  notb (orb b c) = andb (notb b) (notb c) : bool
+    notb_orb : forall (b c : bool) . notb (orb b c) = andb (notb b) (notb c) : bool
 
     andb_commute : forall (b c : bool) . andb b c = andb c b : bool
 
     orb_commute : forall (b c : bool) . orb b c = orb c b : bool
 
-    andb_assoc : forall (b c d : bool) .
-                    andb (andb b c) d = andb b (andb c d) : bool
+    andb_assoc : forall (b c d : bool) . andb (andb b c) d = andb b (andb c d) : bool
 
-    orb_assoc : forall (b c d : bool) .
-                   orb (orb b c) d = orb b (orb c d) : bool
+    orb_assoc : forall (b c d : bool) . orb (orb b c) d = orb b (orb c d) : bool
 
     andb_id_l : forall (b : bool) . andb true b = b : bool
 
@@ -75,9 +69,7 @@ The `bool` type is primitive, but aliased in the `Bool` module:
 
     istrue_notb : forall (b : bool) . istrue (notb b) <-> not (istrue b)
 
-    istrue_andb : forall (b c : bool) .
-                     istrue (andb b c) <-> istrue b & istrue c
+    istrue_andb : forall (b c : bool) . istrue (andb b c) <-> istrue b & istrue c
 
-    istrue_orb : forall (b c : bool) .
-                    istrue (orb b c) <-> istrue b % istrue c
+    istrue_orb : forall (b c : bool) . istrue (orb b c) <-> istrue b % istrue c
 

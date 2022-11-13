@@ -10,9 +10,7 @@ The iterator for natural numbers:
 
     nat_iter : intersect (i : level) .
                   forall (P : nat -> U i) .
-                    P 0
-                    -> (forall (n : nat) . P n -> P (succ n))
-                    -> forall (n : nat) . P n
+                    P 0 -> (forall (n : nat) . P n -> P (succ n)) -> forall (n : nat) . P n
 
     nat_iter _ z _ (zero) --> z
     nat_iter a z s (succ n) --> s n (nat_iter a z s n)
@@ -62,8 +60,7 @@ A simpler case-analysis operation:
 
 This one gives transitivity in the form needed for rewriting:
 
-    leq_implication : forall (m m' n n' : nat) .
-                         m' <= m -> n <= n' -> m <= n -> m' <= n'
+    leq_implication : forall (m m' n n' : nat) . m' <= m -> n <= n' -> m <= n -> m' <= n'
 
     lt_impl_leq : forall (m n : nat) . m < n -> m <= n
 
@@ -112,8 +109,7 @@ Strong induction for natural numbers:
 
     plus_leq_r : forall (m n : nat) . n <= m + n
 
-    plus_leq : forall (m m' n n' : nat) .
-                  m <= m' -> n <= n' -> m + n <= m' + n'
+    plus_leq : forall (m m' n n' : nat) . m <= m' -> n <= n' -> m + n <= m' + n'
 
     plus_lt_r : forall (m n : nat) . 0 < n -> m < m + n
 
@@ -135,15 +131,13 @@ Strong induction for natural numbers:
 
     minus_leq_l : forall (m n : nat) . m - n <= m
 
-    minus_leq : forall (m m' n n' : nat) .
-                   m <= m' -> n' <= n -> m - n <= m' - n'
+    minus_leq : forall (m m' n n' : nat) . m <= m' -> n' <= n -> m - n <= m' - n'
 
     minus_self : forall (n : nat) . n - n = 0 : nat
 
     minus_succ_l_leq : forall (m n : nat) . succ m - n <= succ (m - n)
 
-    minus_succ_l_eq : forall (m n : nat) .
-                         n <= m -> succ m - n = succ (m - n) : nat
+    minus_succ_l_eq : forall (m n : nat) . n <= m -> succ m - n = succ (m - n) : nat
 
 
 ### Maximum
@@ -154,8 +148,7 @@ Strong induction for natural numbers:
 
     max_id_r : forall (n : nat) . max n 0 = n : nat
 
-    max_succ : forall (m n : nat) .
-                  max (succ m) (succ n) = succ (max m n) : nat
+    max_succ : forall (m n : nat) . max (succ m) (succ n) = succ (max m n) : nat
 
     max_leq_l : forall (m n : nat) . m <= max m n
 

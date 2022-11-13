@@ -10,5 +10,4 @@
 
     iff_symm : forall (i : level) (P Q : U i) . P <-> Q -> Q <-> P
 
-    iff_trans : forall (i : level) (P : U i) (Q R : U i) .
-                   P <-> Q -> Q <-> R -> P <-> R
+    iff_trans : forall (i : level) (P Q R : U i) . P <-> Q -> Q <-> R -> P <-> R
