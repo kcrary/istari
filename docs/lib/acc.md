@@ -26,11 +26,6 @@ It can also be used directly:
     Acc_intro : forall (i : level) (A : U i) (R : A -> A -> U i) (x : A) .
                    (forall (y : A) . R y x -> Acc A R y) -> Acc A R x
 
-    Acc_elim : forall
-                  (i : level)
-                  (A : U i)
-                  (R : A -> A -> U i)
-                  (x : A)
-                  (y : A) .
+    Acc_elim : forall (i : level) (A : U i) (R : A -> A -> U i) (x y : A) .
                   Acc A R x -> R y x -> Acc A R y
 

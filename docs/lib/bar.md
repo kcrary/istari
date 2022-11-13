@@ -46,7 +46,7 @@ Another intro form is `later`:
 The monadic bind is `bindbar`:
 
     bindbar : intersect (i : level) .
-                 forall (a : U i) (b : U i) . bar a -> (a -> bar b) -> bar b
+                 forall (a b : U i) . bar a -> (a -> bar b) -> bar b
             = fn a b x f .
                  ffix
                    (bar a -> bar b)

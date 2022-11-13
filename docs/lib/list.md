@@ -39,8 +39,7 @@ The iterator for lists:
 A simpler case-analysis operation:
 
     list_case : intersect (i : level) .
-                   forall (a : U i) (b : U i) .
-                     list a -> b -> (a -> list a -> b) -> b
+                   forall (a b : U i) . list a -> b -> (a -> list a -> b) -> b
               = fn a b l mnil mcons .
                    list_iter a (fn v0 . b) mnil (fn h t v0 . mcons h t) l
               (2 implicit arguments)
@@ -71,8 +70,7 @@ A simpler case-analysis operation:
                       (i : level)
                       (a : U i)
                       (l1 : list a)
-                      (l2 : list a)
-                      (l3 : list a) .
+                      (l2 l3 : list a) .
                       append (append l1 l2) l3
                         = append l1 (append l2 l3)
                         : list a
@@ -87,6 +85,6 @@ A simpler case-analysis operation:
     length _ (nil _) --> 0
     length A (cons _ _ t) --> succ (length A t)
 
-    length_append : forall (i : level) (a : U i) (l1 : list a) (l2 : list a) .
+    length_append : forall (i : level) (a : U i) (l1 l2 : list a) .
                        length (append l1 l2) = length l1 + length l2 : nat
 

@@ -70,7 +70,7 @@ The `bool` type is primitive, but aliased in the `Bool` module:
 
     orb_ann_r : forall (b : bool) . orb b true = true : bool
 
-    ite_notb : forall (i : level) (a : U i) (b : bool) (x : a) (y : a) .
+    ite_notb : forall (i : level) (a : U i) (b : bool) (x y : a) .
                   (if notb b then x else y) = (if b then y else x) : a
 
     istrue_notb : forall (b : bool) . istrue (notb b) <-> not (istrue b)
