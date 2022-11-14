@@ -560,12 +560,20 @@ The destruction tactics are:
     As `destructSet` but does not invoke the typechecker.
 
 
-- `inversion /[hyp x]/ /[ipattern]/`
+- `destructThin /[hyp x]/ /[ipattern]/`
 
   Destructs `x`, discharging impossible cases and simplifying the
   resulting equations.  The pattern must be a sum of products (*i.e.,*
-  `{ ... | ... }`) containing identifers and `?`.  May work poorly if
-  `x` is mentioned in the conclusion.
+  `{ ... | ... }`) containing only identifers and `?`.  May work
+  poorly if `x` is mentioned in the conclusion.
+
+
+- `inversion /[hyp x]/`
+
+  As `destructThin` but it copies `x` and destructs the copy.  The new
+  hypothesis being destructed will not appear in the conclusion, no
+  hypotheses will be disturbed, and any resulting hypotheses will
+  appear at the bottom.
 
 
 ### Chaining

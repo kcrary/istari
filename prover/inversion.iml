@@ -2,9 +2,17 @@
 signature INVERSION =
    sig
 
-      val inversionPriority : Symbol.symbol -> IntroPattern.ipattern -> Tactic.priority Tactic.tacticm
-      val inversionRaw : Symbol.symbol -> IntroPattern.ipattern -> Tactic.tactic
-      val inversion : Symbol.symbol -> IntroPattern.ipattern -> Tactic.tactic
+      type tactic = Tactic.tactic
+      type 'a tacticm = 'a Tactic.tacticm
+      type priority = Tactic.priority
+
+      val destructThinPriority : Symbol.symbol -> IntroPattern.ipattern -> priority tacticm
+      val destructThinRaw : Symbol.symbol -> IntroPattern.ipattern -> tactic
+      val destructThin : Symbol.symbol -> IntroPattern.ipattern -> tactic
+
+      val inversionPriority : Symbol.symbol -> priority tacticm
+      val inversionRaw : Symbol.symbol -> tactic
+      val inversion : Symbol.symbol -> tactic
 
    end
 
@@ -82,8 +90,6 @@ structure Inversion :> INVERSION =
             /
          
 
-      exception BadPattern
-
       fun names set pats num acc =
          if num = 0 then
             List.rev acc
@@ -103,15 +109,12 @@ structure Inversion :> INVERSION =
             end
 
 
-      fun inversionPriority hyp pat =
+      fun destructThinMain n pat set =
          (case pat of
              IP.Or pats =>
                 let
-                   do n = HypTactic.findhyp hyp
                    do sz = withsize
                    do (_, dir) = withgoal
-
-                   val set = D.removeSet (D.set dir) hyp
 
                    (* This part is just fixing up the variable names. *)
                    fun post pat =
@@ -151,8 +154,31 @@ structure Inversion :> INVERSION =
                 fail "inversion pattern expected")
 
 
-      fun inversionRaw hyp pat = inversionPriority hyp pat >> idtac
+      fun destructThinPriority hyp pat =
+         let
+            do n = HypTactic.findhyp hyp
+            do (_, dir) = withgoal
+            val set = D.removeSet (D.set dir) hyp
+         in
+            destructThinMain n pat set
+         end
 
-      fun inversion hyp pat = Typecheck.withTypecheckSnd $ inversionPriority hyp pat
+      fun destructThinRaw hyp pat = destructThinPriority hyp pat >> idtac
+
+      fun destructThin hyp pat = Typecheck.withTypecheckSnd $ destructThinPriority hyp pat
+
+
+      fun inversionPriority hyp =
+         let
+            do (_, dir) = withgoal
+         in
+            HypTactic.copy hyp NONE
+            >>
+            destructThinMain 0 (IP.Or []) (D.set dir)
+         end
+         
+      fun inversionRaw hyp = inversionPriority hyp >> idtac
+
+      fun inversion hyp = Typecheck.withTypecheckSnd $ inversionPriority hyp
 
    end
