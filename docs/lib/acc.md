@@ -4,7 +4,8 @@ Accessibility is used for expressing strong induction.  A relation is
 *well-founded* if every element of the underlying type is accessible
 using that relation.
 
-The `Acc` predicate is primitive, but aliased in the `Acc` module:
+The `Acc` predicate is defined among the primitives, but aliased in
+the `Acc` module:
 
     Acc : intersect (i : level) . forall (A : U i) (R : A -> A -> U i) . A -> U i
 
@@ -20,7 +21,10 @@ by the lemma:
 
 The main use of accessibility is to invoke induction on an
 accessibility hypothesis, often obtained from a well-foundness lemma.
-It can also be used directly:
+
+Accessibility can also be used directly.  The definition is
+complicated (given below); it is easier to think about in terms of its
+intro and elim operations:
 
     Acc_intro : forall (i : level) (A : U i) (R : A -> A -> U i) (x : A) .
                    (forall (y : A) . R y x -> Acc A R y) -> Acc A R x
@@ -28,3 +32,12 @@ It can also be used directly:
     Acc_elim : forall (i : level) (A : U i) (R : A -> A -> U i) (x y : A) .
                   Acc A R x -> R y x -> Acc A R y
 
+---
+
+    Acc = fn A R x .
+             exists (a : mu t . (exists (y : A) . forall (z : A) . R z y -> t)) .
+               fix
+                 (fn W b y .
+                   exists (v : y = b #1 : A) . forall (z : A) (r : R z y) . W (b #2 z r) z)
+                 a
+                 x
