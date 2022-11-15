@@ -1068,36 +1068,54 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             ]
 
 
-      fun substitutionLiteral i m =
+      fun substitutionLiteralPriority i m =
          let
             val m' = T.evar ()
+
+            val maingoal =
+               let
+                  do (_, dir) = withgoal
+  
+                  (* We just used hypothesis i, so it has to be in the directory unless it is corrupt. *)
+                  val (d3, d12) = D.split dir i
+               in
+                  chdir (List.foldl (fns sym d => D.bind d sym) (D.tl d12) d3)
+                  >> idtacM Primary
+               end
          in
             if Unify.unify1 m (T.Sub (m', T.Shift (i+1))) then
-               refine (Rule.substitution i (T.evar ()) (T.evar ()) m')
-               >>> [
-                   idtac,
-                   idtac,
-      
-                   let
-                      do (_, dir) = withgoal
-      
-                      (* We just used hypothesis i, so it has to be in the directory unless it is corrupt. *)
-                      val (d3, d12) = D.split dir i
-                   in
-                      chdir (List.foldl (fns sym d => D.bind d sym) (D.tl d12) d3)
-                   end
+               cut $
+               first
+                  [
+                  (* If the substitute variable doesn't appear in the conclusion,
+                     use the better rule.
+                  *)
+                  cut $
+                  refine (Rule.substitutionSimple i (T.evar ()) (T.evar ()) m')
+                  >>> [
+                      idtacM Primary,
+                      maingoal
+                      ],
+
+                  refine (Rule.substitution i (T.evar ()) (T.evar ()) m')
+                  >>> [
+                      idtacM Secondary,
+                      idtacM Primary,
+                      maingoal
+                      ]
                    ]
             else
                fail "substitutend depends on later hypotheses"
          end
+                
+      fun substitutionLiteral i m = substitutionLiteralPriority i m >> idtac
                 
       fun substitutionPriority hyp em =
          let
             do i = HypTactic.findhyp hyp
             do m = withterm em
          in
-            substitutionLiteral i m
-            >>> [idtacM Secondary, idtacM Primary, idtacM Primary]
+            substitutionLiteralPriority i m
          end
 
       fun substitutionRaw hyp em = substitutionPriority hyp em >> idtac
@@ -1110,43 +1128,61 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       fun substMain reverse i j m =
          let
             val m' = T.evar ()
+
+            val eqgoal =
+               if reverse then
+                  refine (Rule.eqSymm (T.evar ()) (T.evar ()) (T.evar ()))
+                  >> refine (Rule.hypothesis j) >> done
+               else
+                  refine (Rule.hypothesis j) >> done
+
+            val maingoal =
+               let
+                  do (_, dir) = withgoal
+  
+                  (* We just used hypotheses i and j, so they have to be there.
+                     They also have to be in the directory unless it is corrupt.
+                     Moreover, j depends on i, so j < i
+                  *)
+                  val (d5, d1234) = D.split dir j
+                  val (d3, d12) = D.split (D.tl d1234) (i - j - 1)
+                  val d1 = D.tl d12
+  
+                  val dir' =
+                     List.foldl
+                        (fns sym d => D.bind d sym)
+                        (List.foldl 
+                            (fns sym d => D.bind d sym)
+                            d1
+                            d3)
+                        d5
+               in
+                  refine (Rule.weaken j 1)
+                  >> chdir dir'
+                  >> idtacM Primary
+               end
          in
             if Unify.unify1 m (T.Sub (m', T.Shift (i+1))) then
-               refine (Rule.substitution i (T.evar ()) (T.evar ()) m')
-               >>> [
-                   idtacM Secondary,
-                   
-                   if reverse then
-                      refine (Rule.eqSymm (T.evar ()) (T.evar ()) (T.evar ()))
-                      >> refine (Rule.hypothesis j) >> done
-                   else
-                      refine (Rule.hypothesis j) >> done,
-      
-                   let
-                      do (_, dir) = withgoal
-      
-                      (* We just used hypotheses i and j, so they have to be there.
-                         They also have to be in the directory unless it is corrupt.
-                         Moreover, j depends on i, so j < i
-                      *)
-                      val (d5, d1234) = D.split dir j
-                      val (d3, d12) = D.split (D.tl d1234) (i - j - 1)
-                      val d1 = D.tl d12
-      
-                      val dir' =
-                         List.foldl
-                            (fns sym d => D.bind d sym)
-                            (List.foldl 
-                                (fns sym d => D.bind d sym)
-                                d1
-                                d3)
-                            d5
-                   in
-                      refine (Rule.weaken j 1)
-                      >> chdir dir'
-                      >> idtacM Primary
-                   end
-                   ]
+               cut $
+               first
+                  [
+                  (* If the substitution variable doesn't appear in the conclusion,
+                     use the better rule.
+                  *)
+                  cut $
+                  refine (Rule.substitutionSimple i (T.evar ()) (T.evar ()) m')
+                  >>> [
+                      eqgoal,
+                      maingoal
+                      ],
+   
+                  refine (Rule.substitution i (T.evar ()) (T.evar ()) m')
+                  >>> [
+                      idtacM Secondary,
+                      eqgoal,
+                      maingoal
+                      ]
+                  ]
             else
                fail "substitutend depends on later hypotheses"
          end

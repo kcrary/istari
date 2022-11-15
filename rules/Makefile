@@ -3,7 +3,7 @@ all : dvi
 
 dvi : refiner.dvi refiner-db.dvi
 
-pdf : refiner-db.pdf
+pdf : refiner.pdf refiner-db.pdf
 
 refiner.dvi : refiner.tex the-rules.tex
 	latex refiner.tex

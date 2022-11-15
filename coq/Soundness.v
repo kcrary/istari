@@ -206,6 +206,7 @@ intros; eapply sound_subtype_convert_hyp; eauto; done.
 intros; eapply sound_subtype_formation_invert1; eauto; done.
 intros; eapply sound_subtype_formation_invert2; eauto; done.
 intros; eapply sound_substitution; eauto; done.
+intros; eapply sound_substitution_simple; eauto; done.
 intros; eapply sound_strengthen_context; eauto; done.
 intros; eapply sound_generalize; eauto; done.
 intros; eapply sound_generalize_tp; eauto; done.

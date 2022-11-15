@@ -377,6 +377,7 @@ goal, generating zero or more subgoals.
     As `injection` but does not invoke the typechecker.
 
 
+
 ### Substitution
 
 - `substitution /[hyp x]/ /[term M]/`
@@ -384,7 +385,7 @@ goal, generating zero or more subgoals.
   Replaces occurrences of `x` with `M`.  Note that `M` must not refer
   to hypotheses after `x`.
 
-  + `substitution /[hyp x]/ /[term M]/`
+  + `substitutionRaw /[hyp x]/ /[term M]/`
 
     As `substitution` but does not invoke the typechecker.
 
@@ -394,6 +395,21 @@ goal, generating zero or more subgoals.
   When there exists another hypothesis with type `x = M : A` or 
   `M = x : A`, replaces occurrences of `x` with `M`.  Note that `M` must not
   refer to hypotheses after `x`.
+
+  + `substRaw /[hyp x]/`
+
+    As `subst` but does not invoke the typechecker.
+
+
+The substitution tactics above first attempt to use a substitution
+rule that does not allow the substitution variable (*i.e.,* the
+variable being substituted for) to appear in the conclusion.  If that
+fails, they use a more general rule that allows it.  The former rule
+is preferable, because it does not generate a proof obligation that
+the conclusion is well-formed.  However, in unusual circumstances this
+can result in a surprising behavior: if the conclusion mentions an
+evar that might or might not depend on the substitution variable, that
+possible dependency is pruned out.
   
 
 

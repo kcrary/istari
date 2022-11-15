@@ -692,6 +692,58 @@ Qed.
 
 
 
+(* If the variable doesn't appear in the conclusion, we can drop the type formation premise. *)
+Lemma sound_substitution_simple_pre :
+  forall G1 G2 a m n n' b,
+    seq (G2 ++ cons (hyp_tm a) G1) (deq (var (length G2)) (subst (sh (S (length G2))) m) (subst (sh (S (length G2))) a))
+    -> seq (substctx (dot m id) G2 ++ G1) (deq n n' b)
+    -> seq (G2 ++ cons (hyp_tm a) G1) (deq (subst (under (length G2) sh1) n) (subst (under (length G2) sh1) n') (subst (under (length G2) sh1) b)).
+Proof.
+intros G1 G2 a m r1 r2 b Hseqvm Hseqr.
+apply seq_i.
+invertc Hseqvm; intro Hseqvm.
+invertc Hseqr; intro Hseqr.
+intros i s s' Hs.
+so (Hseqvm _#3 Hs) as (A & Hal & Har & Hvar & Hm & Hvm).
+simpsubin Hal.
+simpsubin Har.
+simpsubin Hvar.
+simpsubin Hm.
+simpsubin Hvm.
+exploit (subst_pwctx G1 G2 a m i s s' A) as Ht; auto.
+  {
+  intros j t t' Ht.
+  so (Hseqvm _#3 Ht) as (R & Hl & Hr & _ & H & _).
+  exists R.
+  simpsubin Hl.
+  simpsubin Hr.
+  simpsubin H.
+  do2 2 split; auto.
+  }
+set (t := compose (under (length G2) sh1) s) in Ht.
+set (t' := compose (under (length G2) sh1) s') in Ht.
+so (Hseqr _#3 Ht) as (B & Hbl & Hbr & Hr1 & Hr2 & Hr12).
+exists B.
+simpsub.
+do2 4 split; eauto using interp_increase, toppg_max.
+Qed.
+
+
+Lemma sound_substitution_simple :
+  forall G1 G2 a m n n' b,
+    pseq (G2 ++ cons (hyp_tm a) G1) (deq (var (length G2)) (subst (sh (S (length G2))) m) (subst (sh (S (length G2))) a))
+    -> pseq (substctx (dot m id) G2 ++ G1) (deq n n' b)
+    -> pseq (G2 ++ cons (hyp_tm a) G1) (deq (subst (under (length G2) sh1) n) (subst (under (length G2) sh1) n') (subst (under (length G2) sh1) b)).
+Proof.
+intros G1 G2 a m n n' b.
+revert G1.
+refine (seq_pseq_hyp 0 2 _ [_] _ _ [] _ _ [_] _ _).
+cbn.
+intros G H1 H2 _.
+eapply sound_substitution_simple_pre; eauto.
+Qed.
+
+
 Lemma sound_strengthen_context_pre :
   forall G1 G2 a b J,
     seq G1 (deqtype a a)

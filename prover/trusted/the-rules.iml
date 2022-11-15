@@ -395,6 +395,7 @@ signature THE_RULES =
       val subtypeIstp1 : term -> term -> rule
       val subtypeIstp2 : term -> term -> rule
       val substitution : int -> term -> term -> term -> rule
+      val substitutionSimple : int -> term -> term -> term -> rule
       val generalize : term -> term -> term -> rule
       val assert : term -> term -> rule
       val inhabitant : term -> term -> rule
@@ -886,6 +887,7 @@ fun subtypeTrans a b c = Arg.make "subtypeTrans" [] (Elim (const_subtype, [App (
 fun subtypeIstp1 a b = Arg.make "subtypeIstp1" [] (Elim (const_istp, [App (a), ])) [(Arg.Unhide, [], Elim (const_subtype, [App (a), App (b), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun subtypeIstp2 a b = Arg.make "subtypeIstp2" [] (Elim (const_istp, [App (b), ])) [(Arg.Unhide, [], Elim (const_subtype, [App (a), App (b), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun substitution gsize a b m = Arg.lmake "substitution" [] gsize [J.Tm (a), ] (b) [(Arg.Unhide, [J.Tm (a), ], SOME (Shift 0), Elim (const_istp, [App (b), ])), (Arg.Unhide, [J.Tm (a), ], SOME (Shift 0), Elim (const_eq, [App (Sub (a, Shift (gsize + 1))), App (Var gsize ), App (Sub (m, Shift (gsize + 1))), ])), (Arg.Nothing, [], SOME (Dot (m, Shift 0)), Sub (b, under gsize (Dot (m, Shift 0)))), ] (fn [_, _, n, ] => Sub (n, under gsize (Shift 1)) | _ => raise Arg.ExtractFailure)
+fun substitutionSimple gsize a b m = Arg.lmake "substitutionSimple" [] gsize [J.Tm (a), ] (Sub (b, under gsize (Shift 1))) [(Arg.Unhide, [J.Tm (a), ], SOME (Shift 0), Elim (const_eq, [App (Sub (a, Shift (gsize + 1))), App (Var gsize ), App (Sub (m, Shift (gsize + 1))), ])), (Arg.Nothing, [], SOME (Dot (m, Shift 0)), b), ] (fn [_, n, ] => Sub (n, under gsize (Shift 1)) | _ => raise Arg.ExtractFailure)
 fun generalize a b m = Arg.make "generalize" [m, ] (Sub (b, Dot (m, Shift 0))) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Nothing, [J.Tm (a), ], b), ] (fn [_, n, ] => Sub (n, Dot (m, Shift 0)) | _ => raise Arg.ExtractFailure)
 fun assert a b = Arg.make "assert" [] (b) [(Arg.Nothing, [], a), (Arg.Nothing, [J.Tm (a), ], Sub (b, Shift 1)), ] (fn [m, n, ] => Sub (n, Dot (m, Shift 0)) | _ => raise Arg.ExtractFailure)
 fun inhabitant a m = Arg.make "inhabitant" [m, ] (a) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), ] (fn [_, ] => m | _ => raise Arg.ExtractFailure)
