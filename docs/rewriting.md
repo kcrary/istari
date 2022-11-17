@@ -63,6 +63,11 @@ to be empty.
 
   Replaces M with N.  Generates a subgoal to establish that `M = N : A`.
 
+In the above rewrites, the term being replaced cannot have an evar
+head.  That is, it must not be an evar, nor an elim starting from an
+evar.
+
+
 
 ## Rewriting tactics
 
