@@ -195,6 +195,8 @@ The most important combinators are:
 - `whatEvar` matches any evar, producing a binding to its `ebind` and
   substitution.  In the parser it is written `evar?`.
 
+
+
     val elim   : (term, 'a, 'b) matcher -> (spine, 'b, 'c) matcher -> (term, 'a, 'c) matcher
     val lam    : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
     val lamb   : (term, 'a * Term.binder, 'b) matcher -> (term, 'a, 'b) matcher
