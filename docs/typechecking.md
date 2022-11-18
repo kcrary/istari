@@ -64,9 +64,9 @@ employed.
   make its arguments explicit.
 
   If the argument is not just implicit but **invisible** (*i.e.,*
-  arising from `intersect`, `foralltp`, or `guard`), it cannot be made
-  explicit using a tick.  In such cases, one can supply the argument
-  using *visibilized application*.  For example, if:
+  arising from `intersect`, `iforall`, `foralltp`, or `guard`), it
+  cannot be made explicit using a tick.  In such cases, one can supply
+  the argument using *visibilized application*.  For example, if:
 
       f : intersect (i : level) . A
 

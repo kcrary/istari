@@ -112,8 +112,8 @@ goal, generating zero or more subgoals.
   Introduces the conclusion type, generating hypotheses.  Typically a
   pattern will be a simple name, but more expressive patterns are
   possible.  (See Destruction.)  Can introduce function-like types
-  (`forall`, `->`, `-t>`, `-k>`, `intersect`, `-g>`, `foralltp`,
-  `iforall`), subtypes, and let bindings.
+  (`forall`, `->`, `-t>`, `-k>`, `intersect`, `iforall`, `-g>`,
+  `foralltp`), subtypes, and let bindings.
 
   + `introRaw /[ipattern] ... [ipattern]/`
   
