@@ -195,16 +195,14 @@ The most important combinators are:
 - `whatEvar` matches any evar, producing a binding to its `ebind` and
   substitution.  In the parser it is written `evar?`.
 
-
-
-    val elim   : (term, 'a, 'b) matcher -> (spine, 'b, 'c) matcher -> (term, 'a, 'c) matcher
-    val lam    : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
-    val lamb   : (term, 'a * Term.binder, 'b) matcher -> (term, 'a, 'b) matcher
-    val pair   : (term, 'a, 'b) matcher -> (term, 'b, 'c) matcher -> (term, 'a, 'c) matcher
-    val next   : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
-    val triv   : (term, 'a, 'a) matcher
-    val marker : Symbol.symbol -> (term, 'a, 'a) matcher
-    val nat    : (term, 'a, 'a * int) matcher
+      val elim   : (term, 'a, 'b) matcher -> (spine, 'b, 'c) matcher -> (term, 'a, 'c) matcher
+      val lam    : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+      val lamb   : (term, 'a * Term.binder, 'b) matcher -> (term, 'a, 'b) matcher
+      val pair   : (term, 'a, 'b) matcher -> (term, 'b, 'c) matcher -> (term, 'a, 'c) matcher
+      val next   : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+      val triv   : (term, 'a, 'a) matcher
+      val marker : Symbol.symbol -> (term, 'a, 'a) matcher
+      val nat    : (term, 'a, 'a * int) matcher
 
 - `elim m1 m2` matches an elimination form; `m1` matches against the
   head and `m2` matches against the
@@ -236,10 +234,9 @@ The most important combinators are:
 - `nat` matches against natural number literals, producing a binding
   of the corresponding int.  In the parser it is written `nat?`.
 
-
-    val unify : term -> (term, 'a, 'a) matcher
-    val whnf : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
-    val whnfHard : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+      val unify : term -> (term, 'a, 'a) matcher
+      val whnf : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+      val whnfHard : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
 
 - `unify t` matches against any term that unifies with `t`, producing
   no bindings.  In the parser it is written `$unify \ ... antiquoted
