@@ -52,7 +52,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
    struct
 
       structure AR = AutoReduce
-      structure C = Oldcase
+      structure C = Case
       structure CR = CheckpointedRef
       structure D = Directory
       structure DE = DestructInternal
@@ -79,7 +79,6 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       open Tactic
       open CasePervasive
 
-      val ? = C.?
       val supp = ET.suppressImplicit
 
 
@@ -315,8 +314,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                
                fun recmatcher sym depth p =
                   C.wrapk
-                     (C.elim C.whatVar C.swhat)
-                     (fn (i, spine) =>
+                     (C.elim C.whatVar C.what)
+                     (fnc i spine =>
                          if i - depth < 0 orelse i - depth >= num then
                             raise C.Backtrack
                          else
@@ -362,50 +361,48 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
    
                      (* p = 0 .. depth-1 . UNDEF_1 .. UNDEF_num . ^depth *)
                   in
-                     C.termCaseXAlt m
-                        [
-                        C.apply2 Prim.forall C.what (C.lamb C.what) ?
-                        (fn (a, (binder, b)) =>
-                            (case U.prune a p of
-                                SOME a' =>
-                                   cleanup sym i b (depth+1) (T.under 1 s) (External (SOME binder, T.Sub (a', s)) :: acc)
-   
-                              | NONE =>
-                                   signalDatatype ("misplaced recursive reference in " ^ Symbol.toValue sym))),
-      
-                        C.apply2 Prim.arrow C.what C.what ?
-                        (fn (a, b) =>
-                            C.termCaseXAlt a
-                               [
-                               recmatcher sym depth p ?
-                               (fn (j, args) =>
-                                   cleanup sym i b depth s (Internal (j, map (fn t => T.Sub (t, s)) args) :: acc)),
-                                  
-                               C.wild ?
-                               (fn () =>
-                                   (case U.prune a p of
-                                       SOME a' => cleanup sym i b depth (T.compose s T.shift1) (External (NONE, T.Sub (a', s)) :: acc)
-   
-                                     | NONE =>
-                                          signalDatatype ("misplaced recursive reference in " ^ Symbol.toValue sym)))
-                               ]),
-   
-                        recmatcher sym depth p ?
-                        (fn (j, args) =>
-                            if i = j then
-                               (sym, List.rev acc, map (fn t => T.Sub (t, s)) args)
-                            else
-                               signalDatatype (String.concat
-                                                  [
-                                                  "right-hand-side of ",
-                                                  Symbol.toValue sym,
-                                                  " is the wrong datatype"
-                                                  ])),
-      
-                        C.wild ?
-                        (fn () =>
-                            signalDatatype "illegal constructor type")
-                        ]
+                     termCaseX m
+                     /| \Prim.forall\ ? (fn ? . ?) =>
+                        \(fnc a binder b =>
+                             (case U.prune a p of
+                                 SOME a' =>
+                                    cleanup sym i b (depth+1) (T.under 1 s) (External (SOME binder, T.Sub (a', s)) :: acc)
+    
+                               | NONE =>
+                                    signalDatatype ("misplaced recursive reference in " ^ Symbol.toValue sym)))\
+
+                      | \Prim.arrow\ ? ? =>
+                        \(fnc a b =>
+                             termCaseX a
+                             /| $lit \recmatcher sym depth p\ =>
+                                \(fn (j, args) =>
+                                     cleanup sym i b depth s (Internal (j, map (fn t => T.Sub (t, s)) args) :: acc))\
+                                   
+                              | _ =>
+                                \(fnc =>
+                                     (case U.prune a p of
+                                         SOME a' => cleanup sym i b depth (T.compose s T.shift1) (External (NONE, T.Sub (a', s)) :: acc)
+     
+                                       | NONE =>
+                                            signalDatatype ("misplaced recursive reference in " ^ Symbol.toValue sym)))\
+                             /)\
+
+                      | $lit \recmatcher sym depth p\ =>
+                        \(fn (j, args) =>
+                             if i = j then
+                                (sym, List.rev acc, map (fn t => T.Sub (t, s)) args)
+                             else
+                                signalDatatype (String.concat
+                                                   [
+                                                   "right-hand-side of ",
+                                                   Symbol.toValue sym,
+                                                   " is the wrong datatype"
+                                                   ]))\
+
+                      | _ =>
+                        \(fnc =>
+                             signalDatatype "illegal constructor type")\
+                     /
                   end
    
                val dts' =

@@ -232,7 +232,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
 
       (* applyMain A C tac fk sk
 
-         if    tac partially proves G |- A (marking typing subgoals with true)
+         if    tac partially proves G |- A (marking typing subgoals secondary)
          then  if    C can backchain through A
                then  calls sk tac'
                where tac' partially proves G |- C (marking typing subgoals with true)
@@ -246,59 +246,103 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
          else
             termCaseX (N.whnf a)
             /| \Prim.forall\ ? (fn . ?) =>
-               \fnc dom cod =>
-                   let
-                      val e = T.evar ()
-                   in
-                      applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                      (refine (Rule.forallElim dom cod e) 
-                       >>> [tac, idtacM Secondary])
-                      fk sk
-                   end\
+               \(fnc dom cod =>
+                    let
+                       val e = T.evar ()
+                    in
+                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
+                       (refine (Rule.forallElim dom cod e) 
+                        >>> [tac, idtacM Secondary])
+                       fk sk
+                    end)\
  
              | \Prim.arrow\ ? ? =>
-               \fnc dom cod =>
-                   applyMain cod c
-                   (refine (Rule.arrowElim dom cod) 
-                    >>> [tac, idtacM Primary])
-                   fk sk\
+               \(fnc dom cod =>
+                    applyMain cod c
+                    (refine (Rule.arrowElim dom cod) 
+                     >>> [tac, idtacM Primary])
+                    fk sk)\
  
              | \Prim.intersect\ ? (fn . ?) =>
-               \fnc dom cod =>
-                   let
-                      val e = T.evar ()
-                   in
-                      applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                      (refine (Rule.intersectElim dom cod e) 
-                       >>> [tac, idtacM Secondary])
-                      fk sk
-                   end\
+               \(fnc dom cod =>
+                    let
+                       val e = T.evar ()
+                    in
+                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
+                       (refine (Rule.intersectElim dom cod e) 
+                        >>> [tac, idtacM Secondary])
+                       fk sk
+                    end)\
  
+             | \Prim.iforall\ ? ? (fn ? . ?) =>
+               \(fnc lev dom binder cod =>
+                    let
+                       val e = T.evar ()
+                    in
+                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
+                       (refine (Rule.iforallElim cod lev dom e)
+                        >>> [
+                            let
+                               do (_, dir) = withgoal
+                            in
+                               chdir (D.bindVary dir binder)
+                               >> idtacM Secondary
+                            end,
+
+                            tac,
+
+                            idtacM Secondary
+                            ])
+                       fk sk
+                    end)\
+
+             | \Prim.foralltp\ (fn ? . ?) =>
+               \(fnc binder cod =>
+                    let
+                       val e = T.evar ()
+                    in
+                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
+                       (refine (Rule.foralltpElim cod e)
+                        >>> [
+                            let
+                               do (_, dir) = withgoal
+                            in
+                               chdir (D.bindVary dir binder)
+                               >> idtacM Secondary
+                            end,
+
+                            tac,
+
+                            idtacM Secondary
+                            ])
+                       fk sk
+                    end)\
+
              | \Prim.tarrow\ ? ? =>
-               \fnc dom cod =>
-                   applyMain cod c
-                   (refine (Rule.tarrowElim dom cod)
-                    >>> [tac, idtacM Primary])
-                   fk sk\
+               \(fnc dom cod =>
+                    applyMain cod c
+                    (refine (Rule.tarrowElim dom cod)
+                     >>> [tac, idtacM Primary])
+                    fk sk)\
  
              | \Prim.karrow\ ? ? =>
-               \fnc dom cod =>
-                   applyMain cod c
-                   (refine (Rule.karrowElim dom cod)
-                    >>> [tac, idtacM Primary])
-                   fk sk\
+               \(fnc dom cod =>
+                    applyMain cod c
+                    (refine (Rule.karrowElim dom cod)
+                     >>> [tac, idtacM Primary])
+                    fk sk)\
  
              | \Prim.prod\ ? ? =>
-               \fnc a1 a2 =>
-                   applyMain a1 c
-                      (refine (Rule.prodElim1 a1 a2) >> tac)
-                      (fn () =>
-                          applyMain a2 c
-                          (refine (Rule.prodElim2 a1 a2) >> tac)
-                          fk sk)
-                      sk\
+               \(fnc a1 a2 =>
+                    applyMain a1 c
+                       (refine (Rule.prodElim1 a1 a2) >> tac)
+                       (fn () =>
+                           applyMain a2 c
+                           (refine (Rule.prodElim2 a1 a2) >> tac)
+                           fk sk)
+                       sk)\
  
-             | _ => \fnc => fk ()\
+             | _ => \(fnc => fk ())\
             /
 
       fun applyPriority em =
@@ -332,30 +376,105 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
 
       (* comment in signature *)
       fun exploitMain dep a tac sk =
-         (case N.whnf a of
-             T.Elim (T.Const const, [T.App dom, T.App cod]) =>
-                if Constant.eq (const, Prim.arrow) then
-                   exploitMain dep cod
-                   (refine (Rule.arrowElim dom cod)
-                    >>> [tac, idtacM Primary])
-                   sk
-                else if dep andalso Constant.eq (const, Prim.forall) then
-                   (case N.whnf cod of
-                       T.Lam (_, cod') =>
-                          let
-                             val e = T.evar ()
-                          in
-                             exploitMain dep (T.Sub (cod', T.Dot (e, T.id)))
-                             (refine (Rule.forallElim dom cod' e)
-                              >>> [tac, idtacM Secondary])
-                             sk
-                          end
+         termCaseX a
+         /| \Prim.arrow\ ? ? =>
+            \(fnc dom cod =>
+                 exploitMain dep cod
+                 (refine (Rule.arrowElim dom cod)
+                  >>> [tac, idtacM Primary])
+                 sk)\
 
-                     | _ => sk (a, tac))
-                else
-                   sk (a, tac)
+          | \Prim.tarrow\ ? ? =>
+            \(fnc dom cod =>
+                 exploitMain dep cod
+                 (refine (Rule.tarrowElim dom cod)
+                  >>> [tac, idtacM Primary])
+                 sk)\
 
-           | _ => sk (a, tac))
+          | \Prim.karrow\ ? ? =>
+            \(fnc dom cod =>
+                 exploitMain dep cod
+                 (refine (Rule.karrowElim dom cod)
+                  >>> [tac, idtacM Primary])
+                 sk)\
+
+          | _ =!>
+            \(fnc =>
+                 if dep then
+                    raise Case.Backtrack
+                 else
+                    sk (a, tac))\
+
+          | \Prim.forall\ ? (fn . ?) =>
+            \(fnc dom cod =>
+                 let
+                    val e = T.evar ()
+                 in
+                    exploitMain dep (T.Sub (cod, T.Dot (e, T.id)))
+                    (refine (Rule.forallElim dom cod e)
+                     >>> [tac, idtacM Secondary])
+                    sk
+                 end)\
+
+          | \Prim.intersect\ ? (fn . ?) =>
+            \(fnc dom cod =>
+                 let
+                    val e = T.evar ()
+                 in
+                    exploitMain dep (T.Sub (cod, T.Dot (e, T.id)))
+                    (refine (Rule.intersectElim dom cod e)
+                     >>> [tac, idtacM Secondary])
+                    sk
+                 end)\
+
+          | \Prim.iforall\ ? ? (fn ? . ?) =>
+            \(fnc lev dom binder cod =>
+                 let
+                    val e = T.evar ()
+                 in
+                    exploitMain dep (T.Sub (cod, T.Dot (e, T.id)))
+                    (refine (Rule.iforallElim cod lev dom e)
+                     >>> [
+                         let
+                            do (_, dir) = withgoal
+                         in
+                            chdir (D.bindVary dir binder)
+                            >> idtacM Secondary
+                         end,
+
+                         tac,
+
+                         idtacM Secondary
+                         ])
+                    sk
+                 end)\
+
+          | \Prim.foralltp\ (fn ? . ?) =>
+            \(fnc binder cod =>
+                 let
+                    val e = T.evar ()
+                 in
+                    exploitMain dep (T.Sub (cod, T.Dot (e, T.id)))
+                    (refine (Rule.foralltpElim cod e)
+                     >>> [
+                         let
+                            do (_, dir) = withgoal
+                         in
+                            chdir (D.bindVary dir binder)
+                            >> idtacM Secondary
+                         end,
+
+                         tac,
+
+                         idtacM Secondary
+                         ])
+                    sk
+                 end)\
+
+          | _ =>
+            \(fnc =>
+                 sk (a, tac))\
+         /
 
 
       fun exploitGen dep em pat =
