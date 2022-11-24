@@ -15,6 +15,7 @@ Require Import Morphism.
 Require Import Equivalence.
 Require Import Defined.
 Require Import PageType.
+Require Import Dots.
 
 
 (* equivalences *)
@@ -92,13 +93,6 @@ apply tr_hyp_tm; auto.
 Qed.
 
 
-Fixpoint unlift i : @sub obj :=
-  match i with
-  | 0 => id
-  | S i' => dot arb (unlift i')
-  end.
-
-
 Lemma weakening :
   forall G1 G2 G3 J,
     G3 = substctx (compose (unlift (length G2)) (sh (length G2))) G3
@@ -151,6 +145,407 @@ rewrite -> length_substctx.
 apply IH; auto.
 }
 Qed.
+
+
+Lemma exchange_1_1 :
+  forall G1 h1 h2 G2 J,
+    h2 = substh (dot arb sh1) h2
+    -> tr 
+         (substctx (dot (var 1) (dot (var 0) (sh 2))) G2 ++ substh sh1 h1 :: substh (dot arb id) h2 :: G1)
+         (substj (under (length G2) (dot (var 1) (dot (var 0) (sh 2)))) J)
+    -> tr (G2 ++ h2 :: h1 :: G1) J.
+Proof.
+intros G1 h1 h2 G2 J Heq Htr.
+replace h2 with (substh sh1 (substh (dot arb id) h2)).
+2:{
+  rewrite -> Heq at 2.
+  simpsub.
+  reflexivity.
+  }
+destruct J as [m n a].
+assert (forall (x : @term obj), subst (under (length G2) (dot (var 1) (dot (var 0) (sh 2)))) (subst (under (length G2) (dot (var 1) (dot (var 0) (sh 2)))) x) = x) as Heqsub.
+  {
+  intro x.
+  rewrite <- subst_compose.
+  rewrite <- compose_under.
+  simpsub.
+  setoid_rewrite <- (subst_id _ x) at 2.
+  apply subst_eqsub.
+  eapply eqsub_trans.
+  2:{
+    apply (eqsub_under_id _ (length G2)).
+    }
+  apply eqsub_under.
+  eapply eqsub_trans.
+  2:{
+    apply (eqsub_under_id _ 2).
+    }
+  simpsub.
+  apply eqsub_refl.
+  }
+rewrite <- (Heqsub m).
+rewrite <- (Heqsub n).
+clear Heqsub.
+apply tr_exchange.
+simpsubin Htr.
+exact Htr.
+Qed.
+
+
+Lemma exchange_1_n :
+  forall G1 G2 h G3 J,
+    h = substh (compose (unlift (length G2)) (sh (length G2))) h
+    -> tr 
+         (substctx (dot (var (length G2)) (dots 0 (length G2) (sh (S (length G2))))) G3
+            ++ substctx sh1 G2
+            ++ substh (unlift (length G2)) h
+            :: G1)
+         (substj
+            (under (length G3) (dot (var (length G2)) (dots 0 (length G2) (sh (S (length G2))))))
+            J)
+    -> tr (G3 ++ h :: G2 ++ G1) J.
+Proof.
+intros G1 G2 h G3 J Heq Htr.
+revert G3 h J Heq Htr.
+induct G2.
+
+(* nil *)
+{
+intros G3 h J Heq Htr.
+cbn [List.app].
+cbn [length dots unlift] in Htr.
+rewrite -> substctx_nil in Htr.
+cbn [List.app] in Htr.
+rewrite -> substh_id in Htr.
+force_exact Htr.
+f_equal.
+  {
+  f_equal.
+  setoid_rewrite <- substctx_id at 3.
+  apply substctx_eqsub.
+  apply eqsub_symm.
+  apply eqsub_expand_id.
+  }
+
+  {
+  setoid_rewrite <- substj_id at 3.
+  apply substj_eqsub.
+  rewrite <- (eqsub_under_id _ (length G3)).
+  apply eqsub_under.
+  apply eqsub_symm.
+  apply eqsub_expand_id.
+  }
+}
+
+(* cons *)
+{
+intros h2 G2 IH G3 h J Heq Htr.
+cbn [length unlift dots Nat.add] in Htr.
+simpsubin Htr.
+rewrite <- app_comm_cons.
+apply exchange_1_1.
+  {
+  rewrite -> Heq.
+  cbn [length unlift].
+  simpsub.
+  rewrite -> Nat.add_comm.
+  reflexivity.
+  }
+cut (tr ((substctx (dot (var 1) (dot (var 0) (sh 2))) G3 ++ substh sh1 h2 :: nil) ++ substh (dot arb id) h :: G2 ++ G1) (substj (under (length G3) (dot (var 1) (dot (var 0) (sh 2)))) J)).
+  {
+  intro H.
+  autorewrite with canonlist in H.
+  exact H.
+  }
+cbn [length unlift] in Heq.
+apply IH.
+  {
+  rewrite -> Heq.
+  simpsub.
+  setoid_rewrite <- compose_assoc at 2.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  reflexivity.
+  }
+rewrite -> substctx_append.
+cbn [length].
+simpsub.
+autorewrite with canonlist in Htr |- *.
+rewrite -> app_length.
+rewrite -> length_substctx.
+cbn [length Nat.add].
+rewrite <- under_sum.
+rewrite <- compose_under.
+simpsub.
+unfold sh1.
+rewrite -> compose_dots_sh_sh.
+cbn [Nat.add].
+rewrite <- dots_succ.
+cbn [dots].
+rewrite -> under_dots in Htr.
+simpsubin Htr.
+exact Htr.
+}
+Qed.
+
+
+Lemma exchange :
+  forall G1 G2 G3 G4 J,
+    G3 = substctx (compose (unlift (length G2)) (sh (length G2))) G3
+    -> tr
+         (substctx (dots (length G2) (length G3) (dots 0 (length G2) (sh (length G2 + length G3)))) G4
+            ++ substctx (sh (length G3)) G2
+            ++ substctx (unlift (length G2)) G3
+            ++ G1)
+         (substj
+            (under (length G4) (dots (length G2) (length G3) (dots 0 (length G2) (sh (length G2 + length G3)))))
+            J)
+    -> tr (G4 ++ G3 ++ G2 ++ G1) J.
+Proof.
+intros G1 G2 G3 G4 J HeqG3 Htr.
+revert G2 G4 J HeqG3 Htr.
+induct G3.
+
+(* nil *)
+{
+intros G2 G4 J _ Htr.
+rewrite -> substctx_nil in Htr.
+autorewrite with canonlist in Htr |- *.
+rewrite -> Nat.add_comm in Htr.
+cbn [Nat.add dots length] in Htr.
+simpsubin Htr.
+rewrite -> (substctx_eqsub _#4 (eqsub_dots_id _ (length G2))) in Htr.
+rewrite -> (substj_eqsub _#4 (eqsub_under _ (length G4) _ _ (eqsub_dots_id _ (length G2)))) in Htr.
+simpsubin Htr.
+exact Htr.
+}
+
+(* cons *)
+{
+intros h G3 IH G2 G4 J Heq Htr.
+simpsubin Heq.
+injectionc Heq.
+intros Heq Heqh.
+rewrite <- compose_under in Heqh.
+replace (G4 ++ (h :: G3) ++ G2 ++ G1) with ((G4 ++ h :: nil) ++ G3 ++ G2 ++ G1).
+2:{
+  autorewrite with canonlist.
+  reflexivity.
+  }
+apply IH; auto.
+rewrite -> app_length.
+cbn [length].
+replace (length G4 + 1) with (S (length G4)).
+2:{
+  rewrite -> Nat.add_comm.
+  reflexivity.
+  }
+simpsub.
+rewrite -> substctx_append.
+cbn [length].
+simpsub.
+autorewrite with canonlist.
+apply exchange_1_n.
+  {
+  rewrite -> length_substctx.
+  rewrite -> Heqh at 1.
+  rewrite <- !substh_compose.
+  f_equal.
+  rewrite -> under_dots.
+  rewrite -> compose_dots_0_eq.
+  rewrite -> compose_assoc.
+  rewrite -> compose_sh_dots_eq.
+  rewrite -> compose_assoc.
+  rewrite -> compose_sh_dots_eq.
+  rewrite -> compose_dots_stable.
+  2:{
+    intros i Hi.
+    simpsub.
+    rewrite -> project_unlift_ge; [| omega].
+    simpsub.
+    f_equal.
+    omega.
+    }
+  f_equal.
+  set (j := length G2).
+  set (k := length G3).
+  clearbody j k.
+  clear G1 h G3 IH G2 G4 J Htr Heq Heqh.
+  induct j.
+    {
+    cbn [unlift Nat.add dots].
+    simpsub.
+    f_equal.
+    omega.
+    }
+    
+    {
+    intros j IH.
+    cbn [unlift Nat.add].
+    rewrite -> dots_succ.
+    simpsub.
+    f_equal.
+    replace (S (j + k)) with ((j + k) + 1) by omega.
+    rewrite <- compose_sh_sh.
+    rewrite <- compose_assoc.
+    rewrite -> IH.
+    rewrite <- (compose_dots_sh _ 0 j _ 1).
+    simpsub.
+    do 3 f_equal.
+    omega.
+    }
+  }
+rewrite -> !length_substctx.
+cbn [length] in Htr.
+cbn [substctx] in Htr.
+set (n2 := length G2) in Htr |- *.
+set (n3 := length G3) in Htr |- *.
+set (n4 := length G4) in Htr |- *.
+rewrite <- under_succ.
+replace (S n4) with (n4 + 1) by omega.
+rewrite <- under_sum.
+simpsub.
+rewrite <- compose_under.
+simpsub.
+simpsubin Htr.
+replace (n3 + 1) with (S n3) by omega.
+autorewrite with canonlist in Htr.
+force_exact Htr.
+assert (@dots obj (S n2) n3 (dots 0 n2 (sh (n2 + S n3)))
+        = compose (dots n2 n3 (dots 0 n2 (sh (n2 + n3)))) (dots 0 n2 (sh (S n2)))) as Heqsub.
+  {
+  rewrite -> compose_dots_ge; [| auto].
+  replace (n2 - n2 + S n2) with (S n2) by omega.
+  f_equal.
+  rewrite -> compose_dots_le; [| auto].
+  cbn [Nat.add].
+  f_equal.
+  rewrite -> compose_sh_dots_ge; [| omega].
+  rewrite -> compose_sh_sh.
+  f_equal.
+  omega.
+  }
+f_equal.
+  {
+  f_equal.
+    {
+    rewrite -> dots_succ.
+    f_equal.
+    f_equal.
+    auto.
+    }
+
+    {
+    f_equal.
+    f_equal.
+    f_equal.
+    rewrite -> compose_dots_unlift_ge; [| auto].
+    replace (n2 - n2) with 0 by omega.
+    rewrite -> compose_dots_unlift_exact; [| omega].
+    replace (n2 + n3 - n2) with n3 by omega.
+    rewrite -> under_dots.
+    reflexivity.
+    }
+  }
+
+  {
+  rewrite -> dots_succ.
+  f_equal.
+  f_equal.
+  f_equal.
+  auto.
+  }
+}
+Qed.
+
+
+Lemma exchange_n_1 :
+  forall G1 G2 h G3 J,
+    G2 = substctx (dot arb sh1) G2
+    -> tr 
+         (substctx (dots 1 (length G2) (dot (var 0) (sh (S (length G2))))) G3
+            ++ substh (sh (length G2)) h
+            :: substctx (dot arb id) G2
+            ++ G1)
+         (substj
+            (under (length G3) (dots 1 (length G2) (dot (var 0) (sh (S (length G2))))))
+            J)
+    -> tr (G3 ++ G2 ++ h :: G1) J.
+Proof.
+intros G1 G2 h G3 J Heq Htr.
+change (h :: G1) with ((h :: nil) ++ G1).
+apply exchange.
+  {
+  cbn [length unlift].
+  simpsub.
+  exact Heq.
+  }
+cbn [length substctx List.app].
+exact Htr.
+Qed.
+
+
+Lemma revert :
+  forall G a b m n,
+    tr G (deq (lam m) (lam n) (pi a b))
+    -> tr (hyp_tm a :: G) (deq m n b).
+Proof.
+intros G a b m n Htr.
+apply (tr_compute _ _ (subst1 (var 0) (subst (under 1 sh1) b)) _ (app (lam (subst (under 1 sh1) m)) (var 0)) _ (app (lam (subst (under 1 sh1) n)) (var 0))).
+  {
+  simpsub.
+  rewrite -> subst_var0_sh1.
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  rewrite -> subst_var0_sh1.
+  apply star_refl.
+  }
+
+  {
+  apply equiv_symm.
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  rewrite -> subst_var0_sh1.
+  apply star_refl.
+  }
+apply (tr_pi_elim _ (subst sh1 a)).
+  {
+  apply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    cbn [Nat.add].
+    reflexivity.
+    }
+  cbn [length unlift List.app substctx].
+  simpsub.
+  rewrite -> !subst_var0_sh1.
+  auto.
+  }
+
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+Qed.    
 
 
 Lemma tr_pi_elim' :

@@ -173,6 +173,9 @@ apply (sound_descent G a b c m n p); auto.
 intros; eapply sound_quotient_hyp; eauto; done.
 intros; eapply sound_quotient_hyp_with_refl; eauto; done.
 intros; eapply sound_quotient_hyp_eqtype; eauto; done.
+intros; eapply sound_quotient_hyp_eq; eauto; done.
+intros; eapply sound_quotient_hyp_eq_dep; eauto; done.
+intros; eapply sound_quotient_formation_invert; eauto; done.
 intros; eapply sound_guard_formation; eauto; done.
 intros; eapply sound_guard_formation_univ; eauto; done.
 intros; eapply sound_guard_sat_eq; eauto; done.

@@ -481,3 +481,8 @@ apply Forall_forall.
 intros x _ y H.
 apply Hf; auto.
 Qed.
+
+
+Hint Rewrite <- app_assoc : canonlist.
+Hint Rewrite <- app_comm_cons : canonlist.
+Hint Rewrite app_nil_l : canonlist.

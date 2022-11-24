@@ -925,10 +925,42 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr (G2 ++ hyp_tm (quotient a b) :: G1) (deq (subst (under (length G2) sh1) m) (subst (under (length G2) sh1) n) c)
 
 | tr_quotient_hyp_eqtype :
-    forall G1 G2 a b c,
+    forall G1 G2 a b c d,
       tr (hyp_tm (subst sh1 a) :: hyp_tm a :: G1) (deqtype b b)
-      -> tr (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1) (deqtype (subst (under (length G2) (sh 2)) c) (subst (under (length G2) (dot (var 1) (sh 3))) c))
-      -> tr (G2 ++ hyp_tm (quotient a b) :: G1) (deqtype c c)
+      -> tr (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1) (deqtype (subst (under (length G2) (sh 2)) c) (subst (under (length G2) (dot (var 1) (sh 3))) d))
+      -> tr (G2 ++ hyp_tm (quotient a b) :: G1) (deqtype c d)
+
+| tr_quotient_hyp_eq :
+    forall G1 G2 a b c m n,
+      tr (hyp_tm (subst sh1 a) :: hyp_tm a :: G1) (deqtype b b)
+      -> tr 
+           (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1)
+           (deq
+              (subst (under (length G2) (sh 2)) m)
+              (subst (under (length G2) (dot (var 1) (sh 3))) n)
+              (subst (under (length G2) (sh 3)) c))
+      -> tr (G2 ++ hyp_tm (quotient a b) :: G1) (deq m n (subst (under (length G2) sh1) c))
+
+| tr_quotient_hyp_eq_dep :
+    forall G1 G2 a b c m n,
+      tr (hyp_tm (subst sh1 a) :: hyp_tm a :: G1) (deqtype b b)
+      -> tr 
+           (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1) 
+           (deqtype
+              (subst (under (length G2) (sh 2)) c)
+              (subst (under (length G2) (dot (var 1) (sh 3))) c))
+      -> tr 
+           (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1)
+           (deq
+              (subst (under (length G2) (sh 2)) m)
+              (subst (under (length G2) (dot (var 1) (sh 3))) n)
+              (subst (under (length G2) (sh 2)) c))
+      -> tr (G2 ++ hyp_tm (quotient a b) :: G1) (deq m n c)
+
+| tr_quotient_formation_invert :
+    forall G a a' b b',
+      tr G (deqtype (quotient a b) (quotient a' b'))
+      -> tr G (deqtype a a')
 
 (* Guarded types *)
 

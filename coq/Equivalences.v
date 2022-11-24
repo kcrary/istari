@@ -213,6 +213,16 @@ prove_equiv_compat.
 Qed.
 
 
+Lemma equiv_quotient :
+  forall (a a' b b' : term object),
+    equiv a a'
+    -> equiv b b'
+    -> equiv (quotient a b) (quotient a' b').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
 Lemma equiv_sigma :
   forall (a a' b b' : term object),
     equiv a a'

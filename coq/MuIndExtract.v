@@ -16,6 +16,7 @@ Require Import Equivalences.
 Require Import Rules.
 Require Import Defined.
 Require Import DerivedRules.
+Require Import Dots.
 
 
 Definition sterm := term obj.

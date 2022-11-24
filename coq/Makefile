@@ -13,6 +13,7 @@ UNITS = \
 	DefsEquiv \
 	DeprecatedTactics \
 	DerivedRules \
+	Dots \
 	Dynamic \
 	Equality \
 	Equivalence \
@@ -116,6 +117,7 @@ UNITS = \
 	ValidationLevel \
 	ValidationMu \
 	ValidationNat \
+	ValidationQuotient \
 	ValidationSigma \
 	ValidationSimple \
 	ValidationSum \

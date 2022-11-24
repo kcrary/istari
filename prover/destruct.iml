@@ -55,17 +55,20 @@ signature DESTRUCT_INTERNAL =
 
          When the category is (Principal set), that indicates a primary premise
          (in the sense of typechecking).  Destruction should continue if there
-         is more to do.  The variables that have been bound thus far are set.
+         is more to do.  The variables that have been bound thus far are "set".
 
          When the category is Auxiliary, that indicates a secondary premise.
-         Destruction ceases for that goal, and the righthand portion of the context
-         (after the variable being destructed) is truncated.  (A variable set
-         is not provided because none is needed.)
+         Destruction ceases for that goal.  (A variable set is not provided because
+         none is needed.)
+
+         When the category is Tertiary, that is like Auxiliary, except the
+         righthand portion of the context (after the variable being destructed)
+         is truncated.
 
          If the type variable is not filled with just Directory.set, additional
          information is also passed to Principal goals.
       *)
-      datatype 'a category = Principal of 'a | Auxiliary
+      datatype 'a category = Principal of 'a | Auxiliary | Tertiary
 
       (* Passes on the sequence of variables being bound, and a category. *)
       type 'a destruct_tactic =
@@ -150,7 +153,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
       open CasePervasive
 
 
-      datatype 'a category = Principal of 'a | Auxiliary
+      datatype 'a category = Principal of 'a | Auxiliary | Tertiary
 
       type 'a destruct_tactic = (symbol S.seq * 'a category) tacticm
 
@@ -201,13 +204,16 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
 
       fun andthenp vars1 tac1 tac2 =
          andthenM tac1
-         (fn (vars, pri) =>
-             (case pri of
+         (fn (vars, cat) =>
+             (case cat of
                  Principal x =>
                     tac2 (vars, x)
 
                | Auxiliary =>
-                    idtacM (S.append vars1 vars, Auxiliary)))
+                    idtacM (S.append vars1 vars, Auxiliary)
+
+               | Tertiary =>
+                    idtacM (S.append vars1 vars, Tertiary)))
 
       fun destExists i pat set =
          (case pat of
@@ -247,7 +253,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                 (refine $ Rule.futureLeft i (evar ()) (evar ()))
                 >>>
                    [
-                   idtacM (S.empty, Auxiliary),
+                   idtacM (S.empty, Tertiary),
 
                    dest i p set
                    ]
@@ -292,7 +298,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                    let
                       val v = D.freshSet set
                    in
-                      idtacM (S.cons v S.empty, Auxiliary)
+                      idtacM (S.cons v S.empty, Tertiary)
                    end,
 
                    let
@@ -307,6 +313,34 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                 fail "set pattern expected")
 
 
+
+      fun varyAndBindSetPat set p =
+         (case p of
+             Ident symopt =>
+                D.varyAndBindSet set symopt
+
+           | _ =>
+                D.freshAndBindSet set)
+
+      fun quotientGoalTert set =
+         let
+            val (v, set') = D.freshAndBindSet set
+            val v' = D.freshSet set'
+         in
+            idtacM (S.cons v (S.cons v' S.empty), Tertiary)
+         end
+
+      fun quotientGoalPrin i p1 p2 p3 set =
+         let
+            do (vars1, set1) = andthenp S.empty $ dest (i+2) p1 set
+            do (vars2, set2) = andthenp vars1 $ dest (i+1) p2 set1
+            val vars12 = S.append vars1 vars2
+            do (vars3, set3) = andthenp vars12 $ dest i p3 set2
+         in
+            idtacM (S.append vars12 vars3, Principal set3)
+         end
+
+
       fun destQuotient i pat set =
          (case pat of
              And [p] =>
@@ -317,14 +351,13 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                 (refine $ Rule.quotientLeftRefl i (evar ()) (evar ()) (evar ()))
                 >>>
                    [
-                   let
-                      val (v, set') = D.freshAndBindSet set
-                      val v' = D.freshSet set'
-                   in
-                      idtacM (S.cons v (S.cons v' S.empty), Auxiliary)
-                   end,
+                   quotientGoalTert set,
 
-                   dest i p1 set,
+                   let
+                      val (v, _) = varyAndBindSetPat set p1
+                   in
+                      idtacM (S.cons v S.empty, Auxiliary)
+                   end,
 
                    let
                       do (vars1, set1) = andthenp S.empty $ dest (i+1) p1 set
@@ -335,32 +368,73 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                    ]
 
            | And [p1, p2, p3] =>
-                (refine $ Rule.quotientLeft i (evar ()) (evar ()) (evar ()))
-                >>>
-                   [
-                   (refine $ Rule.quotientLeftIstype i (evar ()) (evar ()) (evar ()))
-                   >>>
-                      [
-                      let
-                         val (v, set') = D.freshAndBindSet set
-                         val v' = D.freshSet set'
-                      in
-                         idtacM (S.cons v (S.cons v' S.empty), Auxiliary)
-                      end,
+                goalCase
+                /| \Prim.istp\ _ =>
+                   \(fnc =>
+                        refine (Rule.quotientLeftIstype i (evar ()) (evar ()) (evar ()))
+                        >>>
+                           [
+                           quotientGoalTert set,
+                           quotientGoalPrin i p1 p2 p3 set
+                           ])\
 
-                      let
-                         do (vars1, set1) = andthenp S.empty $ dest (i+2) p1 set
-                         do (vars2, set2) = andthenp vars1 $ dest (i+1) p2 set1
-                         val vars12 = S.append vars1 vars2
-                         do (vars3, set3) = andthenp vars12 $ dest i p3 set2
-                      in
-                         idtacM (S.append vars12 vars3, Principal set3)
-                      end
-                      ],
-                   
-                   dest i p1 set
-                   ]
-                   
+                 | \Prim.eqtp\ _ _ =>
+                   \(fnc =>
+                        refine (Rule.quotientLeftEqtype i (evar ()) (evar ()) (evar ()) (evar ()))
+                        >>>
+                           [
+                           quotientGoalTert set,
+                           quotientGoalPrin i p1 p2 p3 set
+                           ])\
+
+                 | \Prim.ov\ _ _ =>
+                   \(fnc =>
+                        cut $
+                        first
+                           [
+                           cut $
+                           refine (Rule.quotientLeftOf i (evar ()) (evar ()) (evar ()) (evar ()))
+                           >>>
+                              [
+                              quotientGoalTert set,
+                              quotientGoalPrin i p1 p2 p3 set
+                              ],
+
+                           refine (Rule.quotientLeftOfDep i (evar ()) (evar ()) (evar ()) (evar ()))
+                           >>>
+                              [
+                              quotientGoalTert set,
+                              quotientGoalPrin i p1 p2 p3 set,
+                              quotientGoalPrin i p1 p2 p3 set
+                              ]
+                           ])\
+
+                 | \Prim.eq\ _ _ _ =>
+                   \(fnc =>
+                        cut $
+                        first
+                           [
+                           cut $
+                           refine (Rule.quotientLeftEq i (evar ()) (evar ()) (evar ()) (evar ()) (evar ()))
+                           >>>
+                              [
+                              quotientGoalTert set,
+                              quotientGoalPrin i p1 p2 p3 set
+                              ],
+
+                           refine (Rule.quotientLeftEqDep i (evar ()) (evar ()) (evar ()) (evar ()) (evar ()))
+                           >>>
+                              [
+                              quotientGoalTert set,
+                              quotientGoalPrin i p1 p2 p3 set
+                              ]
+                           ])\
+                           
+                 | _ =>
+                   \(fnc =>
+                        fail "conclusion has improper form for functional quotient elimination")\
+                /
+
            | _ =>
                 fail "quotient pattern expected")
 
@@ -385,7 +459,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                 (refine $ Rule.squashLeft i (evar ()) (evar ()))
                 >>>
                    [
-                   idtacM (S.empty, Auxiliary),
+                   idtacM (S.empty, Tertiary),
 
                    dest i p set
                    ]
@@ -578,7 +652,9 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                                     val dir' = Seq.foldl addvar dirleft vars
                                     val (dir'', pri') =
                                        (case pri of
-                                           Auxiliary => (dir', Secondary)
+                                           Tertiary => (dir', Secondary)
+
+                                         | Auxiliary => (D.binds dir' dirright, Secondary)
 
                                          | Principal _ => (D.binds dir' dirright, Primary))
                                  in
@@ -626,7 +702,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                            Principal _ => tac
 
                          | _ =>
-                              (* No difference between secondary and tertiary since the
+                              (* No difference between auxiliary and tertiary since the
                                  hypothesis being destructed is last.
                               *)
                               idtacM Secondary)))

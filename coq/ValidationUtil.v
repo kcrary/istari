@@ -16,6 +16,7 @@ Require Import Morphism.
 Require Import DefsEquiv.
 Require Import Equivalence.
 Require Import Defined.
+Require Import Dots.
 
 
 Definition ctx := @context Rules.obj.
@@ -43,78 +44,6 @@ apply (tr_transitivity _ _ p).
   }
 Qed.
 
-
-
-Lemma subst1_dots :
-  forall i s m,
-    compose (Defs.dots 1 i s) (dot m id) = Defs.dots 0 i (compose s (dot m id)).
-Proof.
-intros i s m.
-revert s.
-induct i; auto.
-(* S *)
-{
-intros i IH s.
-cbn.
-rewrite -> IH.
-f_equal.
-simpsub.
-auto.
-}
-Qed.
-
-
-Lemma dots_under :
-  forall i s,
-    Defs.dots 0 i (compose s (sh i)) = under i s.
-Proof.
-intros i.
-induct i.
-
-(* 0 *)
-{
-intros s.
-cbn.
-simpsub.
-auto.
-}
-
-(* S *)
-{
-intros i IH s.
-cbn.
-replace (dot (var i) (compose s (sh (S i)))) with (compose (dot (var 0) (compose s sh1)) (sh i)).
-2:{
-  simpsub.
-  rewrite -> Nat.add_0_r.
-  auto.
-  }
-rewrite -> IH.
-rewrite <- under_succ.
-replace (S i) with (i + 1) by omega.
-rewrite <- under_sum.
-auto.
-}
-Qed.
-
-
-Lemma subst1_dots_under :
-  forall i j m n,
-    subst1
-      (subst (sh i) m)
-      (subst (Defs.dots 1 i (dot (var 0) (sh (S (j + i))))) n)
-    =
-    subst (under i (dot m (sh j))) n.
-Proof.
-intros i j m n.
-unfold subst1.
-rewrite <- subst_compose.
-rewrite -> subst1_dots.
-simpsub.
-replace (dot (subst (sh i) m) (sh (j + i))) with (compose (dot m (sh j)) (sh i)) by (simpsub; auto).
-rewrite -> dots_under.
-reflexivity.
-Qed.
 
 
 Hint Rewrite def_istp def_of def_eqtp def_eq def_level def_subtype def_univ def_kind : prepare.

@@ -113,7 +113,7 @@ destruct G as [| h G].
 Qed.
 
 
-Lemma seqctx_tail :
+Lemma seqctx_tail' :
   forall i s s' G j,
     seqctx i s s' G
     -> seqctx i (compose (sh j) s) (compose (sh j) s') (skipn j G).
@@ -338,7 +338,7 @@ do2 4 split.
     simpsub.
     apply Hleft; auto.
     rewrite -> qpromote_skipn.
-    eapply seqctx_tail; eauto.
+    eapply seqctx_tail'; eauto.
     }
 
     {
@@ -347,7 +347,7 @@ do2 4 split.
     simpsub.
     apply Hright; auto.
     rewrite -> qpromote_skipn.
-    eapply seqctx_tail; eauto.
+    eapply seqctx_tail'; eauto.
     }
   }
 

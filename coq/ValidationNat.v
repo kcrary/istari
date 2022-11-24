@@ -17,6 +17,7 @@ Require Import Obligations.
 Require Import Morphism.
 Require Import DefsEquiv.
 Require Import Equivalence.
+Require Import Dots.
 
 Require Import ValidationUtil.
 Require Import Defined.

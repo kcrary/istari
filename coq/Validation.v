@@ -17,6 +17,7 @@ Require Import Morphism.
 Require Import DefsEquiv.
 Require Import Dynamic.
 Require Import Equivalence.
+Require Import Dots.
 
 Require Import ValidationUtil.
 Require Import ValidationAll.
@@ -274,16 +275,16 @@ Lemma sumLeft_valid :
                   (app
                      Defs.sumcase 
                      (var (length G2)))
-                  (lam (subst (Defs.dots 1 (length G2) (dot (var 0) (sh (S (S (length G2)))))) M)))
-               (lam (subst (Defs.dots 1 (length G2) (dot (var 0) (sh (S (S (length G2)))))) N)))
+                  (lam (subst (dots 1 (length G2) (dot (var 0) (sh (S (S (length G2)))))) M)))
+               (lam (subst (dots 1 (length G2) (dot (var 0) (sh (S (S (length G2)))))) N)))
             C).
 Proof.
 prepare.
 intros G1 G2 a b c m n Hl Hr.
 set (i := length G2).
 assert (forall m,
-          equiv
-            (app (lam (subst (Defs.dots 1 i (dot (var 0) (sh (S (S i))))) m)) (ppi2 (var i)))
+          @equiv obj
+            (app (lam (subst (dots 1 i (dot (var 0) (sh (S (S i))))) m)) (ppi2 (var i)))
             (subst (under i (dot (ppi2 (var 0)) sh1)) m)) as Hequiv.
   {
   clear_all.

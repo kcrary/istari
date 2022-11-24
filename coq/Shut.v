@@ -3,6 +3,7 @@ Require Import Coq.Lists.List.
 Import ListNotations.
 
 Require Import Tactics.
+Require Import Sequence.
 Require Import Syntax.
 Require Import Subst.
 Require Import SimpSub.
@@ -344,11 +345,6 @@ End object.
 Arguments shut {object}.
 
 
-Hint Rewrite <- app_assoc : canonlist.
-Hint Rewrite <- app_comm_cons : canonlist.
-Hint Rewrite app_nil_l : canonlist.
-
-
 Definition pseq (G : scontext) (J : judgement) : Prop :=
   exists i,
     forall j,
@@ -561,8 +557,8 @@ Qed.
      -> hygienej (ctxpred (Ga ++ Gb ++ G)) J
      -> seq (Ga ++ Gb ++ G) J
 
-   Note that one can fill in all the Jis and Gias with _, and all the
-   Gibs with [_, ..., _].
+   Note that one can fill in all the Jis with _, and all the
+   Gias and Gibs with [_; ...; _].
 *)
 Lemma seq_pseq_hyp :
   forall m,

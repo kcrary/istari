@@ -589,6 +589,18 @@ cases J; intros; simpsub; reflexivity.
 Qed.
 
 
+Lemma substj_eqsub :
+  forall s s' (J : @judgement object),
+    eqsub s s'
+    -> substj s J = substj s' J.
+Proof.
+intros s s' J H.
+destruct J as [m n a].
+cbn.
+rewrite -> !(subst_eqsub _ s s'); auto.
+Qed.
+
+
 Hint Rewrite <- substj_compose : subst.
 Hint Rewrite -> substj_id substj_under_id : subst.
 

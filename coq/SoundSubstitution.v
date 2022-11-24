@@ -951,7 +951,7 @@ Qed.
 
 
 (* Alas, the more general rule that generalizes in the context as well
-   appears to be unsound.  For each hypothesis y:Bh[m] that we want to
+   appears to be unsound.  For each hypothesis y:B[m] that we want to
    generalize to y:B[x], we would need to know that x:A |- B[x] : Type.
 
    Note that there's no need for a version that places the binding earlier

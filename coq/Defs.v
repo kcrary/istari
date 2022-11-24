@@ -6,19 +6,13 @@ Require Export Subst.
 Require Export SimpSub.
 Require Export Promote.
 Require Import Defined.
+Require Import Dots.
 Require Export Rules.
 Require Export Hygiene.
 
 Definition fterm := @term Rules.obj.
 
 Definition dof (m a : fterm) : judgement := deq m m a.
-
-Fixpoint dots (i : nat) (n : nat) (s : sub) : @sub Rules.obj :=
-  match n with
-  | 0 => s
-  | S n' =>
-      dots i n' (dot (var (i + n')) s)
-  end.
 
 Definition inl : fterm := lam (ppair btrue (var 0)).
 Definition inr : fterm := lam (ppair bfalse (var 0)).

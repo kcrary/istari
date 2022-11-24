@@ -25,6 +25,7 @@ Require Import ProperClosed.
 Require Import ProperFun.
 Require Import Shut.
 
+Require Import Dots.
 Require Import Urelsp.
 Require Import Equivalence.
 Require Import Ceiling.
@@ -186,6 +187,7 @@ assert (forall j m1 m2 p1 p2,
     split; auto.
     }
   }
+(* This code was lifted out as extract_functional_dual, but it's slightly different there. *)
 assert (forall e,
           hygiene (permit (permit (ctxpred G))) e
           -> (forall i s s',
@@ -2120,500 +2122,1491 @@ exact Hseq.
 Qed.
 
 
-Lemma quotient_context_shorten :
- forall G1 G2 a b i s s' so so',
-   pwctx i so so' (G2 ++ hyp_tm (quotient a b) :: G1)
-   -> (compose (sh (3 + length G2)) s = compose (sh (S (length G2))) so \/ compose (sh (3 + length G2)) s' = compose (sh (S (length G2))) so')
-   -> seqctx i s s' (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1)
-   -> seqctx i (compose (under (length G2) (sh 2)) s) (compose (under (length G2) (sh 2)) s') (G2 ++ hyp_tm (quotient a b) :: G1).
+
+(* The key lemma for proving the functionality left rules (i.e., sound_quotient_hyp_eqtype,
+   sound_quotient_hyp_eq, and sound_quotient_hyp_eq_dep) is split_quotient_context,
+   called through its corollary split_quotient_context_triple.  We need to build up a bunch
+   of machinery first.
+*)
+
+
+Lemma seqctx_thin :
+  forall G1 h G2 i s s',
+    seqctx i s s' (substctx sh1 G2 ++ h :: G1)
+    -> seqctx i (compose (under (length G2) sh1) s) (compose (under (length G2) sh1) s') (G2 ++ G1).
 Proof.
-intros G1 G2 a b i.
+intros G1 h G2 i s s' Hs.
+revert s s' Hs.
 induct G2.
 
 (* nil *)
 {
-intros ss ss' sso sso' Hsso Heq Hseq.
-cbn [List.app length].
+intros ss ss' Hss.
+cbn in Hss.
+invertc Hss.
+intros m n s s' Hs _ <- <-.
+cbn [length under List.app].
 simpsub.
-cbn [substctx List.app] in Hseq.
-invertc Hseq.
-intros x y ss1 ss1' Hss1 Hxy <- <-.
-invertc Hss1.
-intros m n ss2 ss2' Hss2 Hmn <- <-.
-invertc Hss2.
-intros p q s s' Hs Hpq <- <-.
-simpsub.
-cbn [List.app] in Hsso.
-invertc Hsso.
-intros mo no so so' _ Hmno Hleft Hright <- <-.
-cbn [length] in Heq.
-rewrite -> Nat.add_0_r in Heq.
-simpsubin Heq.
-apply seqctx_cons; auto.
-simpsub.
-simpsubin Hmno.
-invertc Hmno.
-intros R Hl Hr _.
-clear mo no.
-apply (seqhyp_tm _#5 R); auto.
-  {
-  destruct Heq as [<- | <-]; auto.
-  so (Hright i false _ (smaller_refl _) Hs) as H.
-  cbn [qpromote_hyp] in H.
-  simpsubin H.
-  invertc H.
-  intros R' Hl' H.
-  so (interp_fun _#7 Hl Hl'); subst R'.
-  auto.
-  }
-
-  {
-  destruct Heq as [<- | <-]; auto.
-  so (Hleft i false _ (smaller_refl _) Hs) as H.
-  cbn [qpromote_hyp] in H.
-  simpsubin H.
-  invertc H.
-  intros R' Hr' H.
-  so (interp_fun _#7 Hr Hr'); subst R'.
-  auto.
-  }
-invertc Hpq.
-intros A Hal Har Hpq.
-invertc Hmn.
-intros A' Hal' _ Hmn.
-simpsubin Hal'.
-so (basic_fun _#7 Hal Hal'); subst A'; clear Hal'.
-invertc Hxy.
-intros Bpm Hbpm Hbqn Hxy.
-invert (basic_value_inv _#6 value_quotient Hl).
-intros Ao Bl hsl htl Halo Hbl HeqR.
-invert (basic_value_inv _#6 value_quotient Hr).
-intros Ao' Br hsr htr Haro Hbr HeqR'.
-clear Hl Hr.
-so (iuquotient_inj _#9 (eqtrans HeqR (eqsymm HeqR'))); subst Ao'.
-assert (A = Ao).
-  {
-  destruct Heq as [<- | <-].
-    {
-    exact (basic_fun _#7 Hal Halo).
-    }
-
-    {
-    exact (basic_fun _#7 Har Haro).
-    }
-  }
-subst Ao.
-clear Halo Haro.
-assert (exists B hs ht, 
-          ((B = Bl /\ s = so) \/ (B = Br /\ s' = so'))
-          /\ (R = iuquotient stop A B hs ht)) as (B & hs & ht & HeqB & ->).
-  {
-  destruct Heq as [<- | <-].
-    {
-    exists Bl, hsl, htl.
-    split; auto.
-    }
-
-    {
-    exists Br, hsr, htr.
-    split; auto.
-    }
-  }
-clear HeqR HeqR'.
-simpsubin Hbl.
-simpsubin Hbr.
-cbn.
-set (Hpair := prod_action_ppair _ (den A) (den A) _#5 Hpq Hpq).
-assert (exists v w,
-          rel (den (pi1 B (urelspinj (prod_urel _ (den A) (den A)) i (ppair p p) (ppair q q) Hpair))) i v w) as (v & w & Hvw).
-  {
-  assert (Bpm = pi1 B (urelspinj (prod_urel _ (den A) (den A)) _#3 (prod_action_ppair _#8 Hpq Hmn))).
-    {
-    destruct HeqB as [(<- & <-) | (<- & <-)].
-      {
-      invert Hbl.
-      intros _ _ Hact.
-      so (Hact _#3 (le_refl _) (prod_action_ppair _ (den A) (den A) _#5 Hpq Hmn)) as H.
-      simpsubin H.
-      refine (basic_fun _#7 Hbpm _).
-      refine (basic_equiv _#7 _ _ H).
-        {
-        exact (basic_closed _#6 Hbpm).
-        }
-
-        {
-        apply equiv_funct; auto using equiv_refl.
-        apply equivsub_dot.
-          {
-          apply steps_equiv.
-          apply star_one.
-          apply step_ppi22.
-          }
-        apply equivsub_dot.
-          {
-          apply steps_equiv.
-          apply star_one.
-          apply step_ppi12.
-          }
-        apply equivsub_refl.
-        }
-      }
-
-      {
-      invert Hbr.
-      intros _ _ Hact.
-      so (Hact _#3 (le_refl _) (prod_action_ppair _ (den A) (den A) _#5 Hpq Hmn)) as H.
-      simpsubin H.
-      refine (basic_fun _#7 Hbqn _).
-      refine (basic_equiv _#7 _ _ H).
-        {
-        exact (basic_closed _#6 Hbqn).
-        }
-
-        {
-        apply equiv_funct; auto using equiv_refl.
-        apply equivsub_dot.
-          {
-          apply steps_equiv.
-          apply star_one.
-          apply step_ppi22.
-          }
-        apply equivsub_dot.
-          {
-          apply steps_equiv.
-          apply star_one.
-          apply step_ppi12.
-          }
-        apply equivsub_refl.
-        }
-      }
-    }
-  subst Bpm.
-  so (reflexiveish _ _ (fun C => den (pi1 B C)) _#7 Hpq Hmn hs ht Hxy) as (v & w & Hvw).
-  exists v, w.
-  auto.
-  }
-exists p, q, v, w, Hpq, Hpq.
 auto.
 }
 
 (* cons *)
 {
-intros h G2 IH ss ss' sso sso' Hsso Heq Hseq.
-cbn [substctx List.app] in Hseq, Hsso.
-invertc Hseq.
+intros h' G2 IH ss ss' Hss.
+cbn in Hss.
+invertc Hss.
 intros m n s s' Hs Hmn <- <-.
-invertc Hsso.
-intros mo no so so' Hso _ _ _ <- <-.
-exploit (IH s s' so so') as Hs'; auto.
-cbn [List.app length].
+cbn [length].
+rewrite -> under_succ.
 simpsub.
-apply seqctx_cons; auto.
+rewrite <- app_comm_cons.
 simpsubin Hmn.
-auto.
+apply seqctx_cons; auto.
+}
+Qed.    
+  
+
+
+(* Not true for pwctx. *)
+Lemma seqctx_alter :
+  forall G1 h1 h2 G2 i s s',
+    seqctx i s s' (G2 ++ h1 :: G1)
+    -> seqhyp i (project s (length G2)) (project s' (length G2)) (substh (compose (sh (S (length G2))) s) h2) (substh (compose (sh (S (length G2))) s') h2)
+    -> seqctx i s s' (G2 ++ h2 :: G1).
+Proof.
+intros G1 h1 h2 G2 i s s' Hs Hhyp.
+revert s s' Hs Hhyp.
+induct G2.
+
+(* nil *)
+{
+intros ss ss' Hss Hhyp.
+cbn [length List.app length] in Hss, Hhyp |- *.
+invertc Hss.
+intros m n s s' Hs Hmn <- <-.
+simpsubin Hhyp.
+apply seqctx_cons; auto.
+}
+
+(* cons *)
+{
+intros h G2 IH ss ss' Hss Hhyp.
+rewrite <- app_comm_cons in Hss.
+invertc Hss.
+intros m n s s' Hs Hmn <- <-.
+cbn [length] in Hhyp.
+rewrite <- app_comm_cons.
+simpsubin Hhyp.
+so (IH _ _ Hs Hhyp) as H.
+apply seqctx_cons; auto.
 }
 Qed.
 
 
-(* We might be able to write a nicer proof by using dequotient_context, adding the two extra
-   bindings to the bottom, and then exchanging them upward (in a similar fashion to 
-   sound_quotient_hyp_with_refl).  But this is already done, so we'll leave it alone.
-*)
-Lemma sound_quotient_hyp_eqtype :
-  forall G1 G2 a b c,
-    pseq (hyp_tm (subst sh1 a) :: hyp_tm a :: G1) (deqtype b b)
-    -> pseq (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1) (deqtype (subst (under (length G2) (sh 2)) c) (subst (under (length G2) (dot (var 1) (sh 3))) c))
-    -> pseq (G2 ++ hyp_tm (quotient a b) :: G1) (deqtype c c).
+
+Lemma seqhyp_into_quotient_1 :
+  forall i m n p a a' b b',
+    seqhyp i m n (hyp_tm a) (hyp_tm a')
+    -> seqhyp i m p (hyp_tm (quotient a b)) (hyp_tm (quotient a' b'))
+    -> seqhyp i m n (hyp_tm (quotient a b)) (hyp_tm (quotient a' b')).
 Proof.
-intros G1 G2 a b c.
-revert G1.
-refine (seq_pseq_hyp 2 [] a [hyp_emp; hyp_emp] b 2 [] [_; _] _ _ [_; _; _] _ _ [_] _ _); cbn.
-intros G1 Hlca Hclb Hseqb Hseq _.
-rewrite -> seq_eqtype in Hseqb, Hseq |- *.
-intros i s s' Hs.
-assert (exists sr sr',
-          pwctx i sr sr' (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1)
-          /\ compose (under (length G2) (sh 2)) sr = s
-          /\ compose (under (length G2) (dot (var 1) (sh 3))) sr' = s') as (sr & sr' & Hsr & Heq & Heq').
+intros i m n p a a' b b' Hmn Hmp.
+invertc Hmn.
+intros A Hal Har Hmn.
+invertc Hmp.
+intros R Hl Hr Hmp.
+invert (basic_value_inv _#6 value_quotient Hl).
+intros A' B hs ht Hal' Hbl Heq1.
+so (interp_fun _#7 Hal Hal'); subst A'.
+invert (basic_value_inv _#6 value_quotient Hr).
+intros A' B' hs' ht' Har' Hbr Heq2.
+so (interp_fun _#7 Har Har'); subst A'.
+so (eqtrans Heq1 (eqsymm Heq2)) as Heq.
+clear Heq2.
+subst R.
+apply (seqhyp_tm _#5 (iuquotient stop A B hs ht)); auto.
+destruct Hmp as (q & r & t & u & Hmr & Hqp & Htu).
+assert (rel (den (pi1 B (urelspinj (prod_urel stop (den A) (den A)) i _ _ (prod_action_ppair stop (den A) (den A) i m q n p Hmn Hqp)))) i t u) as Htu'.
   {
-  clear Hseq c.
-  revert i s s' Hs.
-  induct G2.
-    (* nil *)
+  force_exact Htu.
+  f_equal.
+  cbn.
+  f_equal.
+  f_equal.
+  apply urelspinj_equal.
+  exists m, n, q, p.
+  so (urel_closed _#5 Hmn) as (Hclm & Hcln).
+  so (urel_closed _#5 Hqp) as (Hclq & Hclp).
+  do2 5 split; auto using star_refl; try prove_hygiene.
+  }
+so (reflexiveish _ (den A) (fun x => den (pi1 B x)) _#5 t u Hmn Hqp hs ht Htu') as (v & w & Hvw).
+exists m, n, v, w, Hmn, Hmn.
+exact Hvw.
+Qed.
+
+
+
+Lemma seqhyp_into_quotient_2 :
+  forall i m n p a a' b b',
+    seqhyp i m n (hyp_tm a) (hyp_tm a')
+    -> seqhyp i p n (hyp_tm (quotient a b)) (hyp_tm (quotient a' b'))
+    -> seqhyp i m n (hyp_tm (quotient a b)) (hyp_tm (quotient a' b')).
+Proof.
+intros i n m p a a' b b' Hnm Hpm.
+invertc Hnm.
+intros A Hal Har Hnm.
+invertc Hpm.
+intros R Hl Hr Hpm.
+invert (basic_value_inv _#6 value_quotient Hl).
+intros A' B hs ht Hal' Hbl Heq1.
+so (interp_fun _#7 Hal Hal'); subst A'.
+invert (basic_value_inv _#6 value_quotient Hr).
+intros A' B' hs' ht' Har' Hbr Heq2.
+so (interp_fun _#7 Har Har'); subst A'.
+so (eqtrans Heq1 (eqsymm Heq2)) as Heq.
+clear Heq2.
+subst R.
+apply (seqhyp_tm _#5 (iuquotient stop A B hs ht)); auto.
+destruct Hpm as (r & q & t & u & Hpq & Hrm & Htu).
+assert (rel (den (pi1 B (urelspinj (prod_urel stop (den A) (den A)) i _ _ (prod_action_ppair stop (den A) (den A) i p n q m Hpq Hnm)))) i t u) as Htu'.
+  {
+  force_exact Htu.
+  f_equal.
+  cbn.
+  f_equal.
+  f_equal.
+  apply urelspinj_equal.
+  exists p, q, r, m.
+  so (urel_closed _#5 Hpq) as (Hclp & Hclq).
+  so (urel_closed _#5 Hrm) as (Hclr & Hclm).
+  do2 5 split; auto using star_refl; try prove_hygiene.
+  }
+so (hs _#7 Hpq Hnm Htu') as (v & w & Hvw).
+so (reflexiveish _ (den A) (fun x => den (pi1 B x)) _#5 v w Hnm Hpq hs ht Hvw) as (x & y & Hxy).
+exists n, m, x, y, Hnm, Hnm.
+exact Hxy.
+Qed.
+
+
+
+Lemma skipn_append_ge :
+  forall (A : Type) n (l1 l2 : list A),
+    n >= length l1
+    -> skipn n (l1 ++ l2) = skipn (n - length l1) l2.
+Proof.
+intros A n l1 l2 Hn.
+revert n Hn.
+induct l1.
+
+(* nil *)
+{
+intros n _.
+cbn [length].
+rewrite -> Nat.sub_0_r.
+auto.
+}
+
+(* cons *)
+{
+intros x l1 IH n Hn.
+cbn in Hn.
+destruct n as [| n]; [omega |].
+rewrite <- app_comm_cons.
+cbn.
+apply IH.
+omega.
+}
+Qed.
+
+
+
+Lemma pwctx_extend_dual :
+  forall G i s s' a A m1 m2 p1 p2,
+    pwctx i s s' G
+    -> interp toppg true i (subst s a) A
+    -> interp toppg false i (subst s' a) A
+    -> rel (den A) i m1 p1
+    -> rel (den A) i m2 p2
+    -> (forall j s'',
+          j <= i
+          -> pwctx j s s'' G
+          -> relhyp j false (hyp_tm (subst s' a)) (hyp_tm (subst s'' a)))
+    -> (forall j s'',
+          j <= i
+          -> pwctx j s'' s' G
+          -> relhyp j true (hyp_tm (subst s a)) (hyp_tm (subst s'' a)))
+    -> pwctx i (dot m2 (dot m1 s)) (dot p2 (dot p1 s')) (hyp_tm (subst sh1 a) :: hyp_tm a :: G).
+intros G i s s' a R m1 m2 p1 p2 Hs Hal Har Hmp1 Hmp2 Hleft Hright.
+apply pwctx_cons_tm.
+  {
+  apply pwctx_cons_tm; auto.
     {
-    intros i ss ss' Hss.
-    cbn in Hss.
-    invertc Hss.
-    intros m n s s' Hs Hmn Hleft Hright <- <-.
-    so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
-    simpsubin Hmn.
-    invertc Hmn.
-    intros R Hl Hr Hmn.
-    invert (basic_value_inv _#6 value_quotient Hl).
-    intros A B hs ht Hal Hbl Heq.
-    invert (basic_value_inv _#6 value_quotient Hr).
-    intros A' B' hs' ht' Har Hbr Heq'.
-    so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))); subst A'.
-    clear Heq'; subst R.
-    destruct Hmn as (p & q & x & y & Hmq & Hpn & Hxy).
-    so (urel_closed _#5 Hmq) as (Hclm & Hclq).
-    so (urel_closed _#5 Hpn) as (Hclp & Hcln).
-    exists (dot x (dot p (dot m s))).
-    exists (dot y (dot n (dot q s'))).
-    cbn [substctx length List.app].
-    rewrite -> !under_zero.
-    simpsub.
-    do2 2 split; auto.
-    assert (pwctx i (dot p (dot m s)) (dot n (dot q s')) (hyp_tm (subst sh1 a) :: hyp_tm a :: G1)) as Hsext.
-      {
-      apply pwctx_cons_tm.
-        {
-        apply pwctx_cons_tm; auto.
-          {
-          simpsub.
-          eapply seqhyp_tm; eauto.
-          }
+    apply (seqhyp_tm _#5 R); eauto.
+    }
+  }
 
-          {
-          intros j s'' Hj Hs''.
-          exploit (Hleft j false s'') as H; auto using smaller_le, pwctx_impl_seqctx.
-          rewrite -> qpromote_hyp_tm in H.
-          simpsubin H.
-          invertc H.
-          intros R Hr' Ho.
-          invert (basic_value_inv _#6 value_quotient Hr').
-          intros A' B'' hs'' ht'' Har' _ Heq.
-          invert (basic_value_inv _#6 value_quotient Ho).
-          intros A'' B''' hs''' ht''' Hao _ Heq'.
-          so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))); subst A''.
-          apply (relhyp_tm _#4 A'); auto.
-          }
+  {
+  simpsub.
+  apply (seqhyp_tm _#5 R); eauto.
+  }
 
-          {
-          intros j s'' Hj Hs''.
-          exploit (Hright j false s'') as H; auto using smaller_le, pwctx_impl_seqctx.
-          rewrite -> qpromote_hyp_tm in H.
-          simpsubin H.
-          invertc H.
-          intros R Hl' Ho.
-          invert (basic_value_inv _#6 value_quotient Hl').
-          intros A' B'' hs'' ht'' Hal' _ Heq.
-          invert (basic_value_inv _#6 value_quotient Ho).
-          intros A'' B''' hs''' ht''' Hao _ Heq'.
-          so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))); subst A''.
-          apply (relhyp_tm _#4 A'); auto.
-          }
-        }
+  {
+  intros j ss'' Hj Hss'.
+  invertc Hss'.
+  intros m s'' Hs'' _ _ _ <-.
+  simpsub.
+  apply Hleft; auto.
+  }
 
-        {
-        simpsub.
-        eapply seqhyp_tm; eauto.
-        }
+  {
+  intros j ss'' Hj Hss'.
+  invertc Hss'.
+  intros m s'' Hs'' _ _ _ <-.
+  simpsub.
+  apply Hright; auto.
+  }
+Qed.
 
-        {
-        intros j ss'' Hj Hss''.
-        invertc Hss''.
-        intros r s'' Hs'' _ _ _ <-.
-        simpsub.
-        exploit (Hleft j false s'') as H; auto using smaller_le, pwctx_impl_seqctx.
-        rewrite -> qpromote_hyp_tm in H.
-        simpsubin H.
-        invertc H.
-        intros R Hr' Ho.
-        invert (basic_value_inv _#6 value_quotient Hr').
-        intros A' B'' hs'' ht'' Har' _ Heq.
-        invert (basic_value_inv _#6 value_quotient Ho).
-        intros A'' B''' hs''' ht''' Hao _ Heq'.
-        so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))); subst A''.
-        apply (relhyp_tm _#4 A'); auto.
-        }
 
-        {
-        intros j ss'' Hj Hss''.
-        invertc Hss''.
-        intros r s'' Hs'' _ _ _ <-.
-        simpsub.
-        exploit (Hright j false s'') as H; auto using smaller_le, pwctx_impl_seqctx.
-        rewrite -> qpromote_hyp_tm in H.
-        simpsubin H.
-        invertc H.
-        intros R Hl' Ho.
-        invert (basic_value_inv _#6 value_quotient Hl').
-        intros A' B'' hs'' ht'' Hal' _ Heq.
-        invert (basic_value_inv _#6 value_quotient Ho).
-        intros A'' B''' hs''' ht''' Hao _ Heq'.
-        so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))); subst A''.
-        apply (relhyp_tm _#4 A'); auto.
-        }
-      }
-    apply pwctx_cons_tm_seq; auto.
-    2:{
-      intros j t t' Ht.
-      so (Hseqb _#3 Ht) as (R & Hlf & Hrt & _).
-      eauto.
-      }
-    set (Hpair := ((prod_action_ppair stop (den A) (den A) i m p q n Hmq Hpn)
-                   : (rel (prod_urel stop (den A) (den A)) i (ppair m p) (ppair q n)))) in Hxy.
-    assert (interp toppg true i (subst (dot p (dot m s)) b) 
-              (pi1 B (urelspinj (prod_urel _ (den A) (den A)) i (ppair m p) (ppair q n) Hpair))) as Hbpairl.
-      {
-      invertc Hbl.
-      intros _ _ Hbl.
-      so (Hbl _ _ _ (le_refl _) Hpair) as H.
-      simpsubin H.
-      eapply basic_equiv; eauto.
-        {
-        apply (subst_closub _ (permit (permit (ctxpred G1)))); auto using closub_dot.
-        }
-      apply equiv_funct; [| apply equiv_refl].
-      apply equivsub_dot.
-        {
-        apply steps_equiv.
-        apply star_one.
-        apply step_ppi22.
-        }
-      apply equivsub_dot.
-        {
-        apply steps_equiv.
-        apply star_one.
-        apply step_ppi12.
-        }
-      apply equivsub_refl.
-      }
-    so (Hseqb _#3 Hsext) as (R & Hbpairl' & Hbpairr & _).
-    so (interp_fun _#7 Hbpairl Hbpairl'); subst R.
-    apply (seqhyp_tm _#5 (pi1 B (urelspinj _#4 Hpair))); auto.
+
+Lemma extract_functional_dual :
+  forall pg A G a b i s s',
+    hygiene (permit (permit (ctxpred G))) b
+    -> pwctx i s s' G
+    -> interp pg true i (subst s a) A
+    -> interp pg false i (subst s' a) A
+    -> (forall j s'',
+          j <= i
+          -> pwctx j s s'' G
+          -> relhyp j false (hyp_tm (subst s' a)) (hyp_tm (subst s'' a)))
+    -> (forall j s'',
+          j <= i
+          -> pwctx j s'' s' G
+          -> relhyp j true (hyp_tm (subst s a)) (hyp_tm (subst s'' a)))
+    -> (forall i s s',
+          pwctx i s s' (hyp_tm (subst sh1 a) :: hyp_tm a :: G)
+          -> exists R,
+               interp pg true i (subst s b) R
+               /\ interp pg false i (subst s' b) R)
+    -> exists (B : urelsp (prod_urel stop (den A) (den A)) -n> siurel_ofe),
+         functional the_system pg true i (prod_urel stop (den A) (den A)) (subst (dot (ppi2 (var 0)) (dot (ppi1 (var 0)) (compose s sh1))) b) B
+         /\ functional the_system pg false i (prod_urel stop (den A) (den A)) (subst (dot (ppi2 (var 0)) (dot (ppi1 (var 0)) (compose s' sh1))) b) B.
+Proof.
+intros pg A G a b i s s' Hclb Hs Hal Har Hleft Hright Hseq.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+assert (forall j m1 m2 p1 p2,
+          rel (den A) j m1 p1
+          -> rel (den A) j m2 p2
+          -> pwctx j (dot m2 (dot m1 s)) (dot p2 (dot p1 s')) (hyp_tm (subst sh1 a) :: hyp_tm a :: G)) as Hsext.
+  {
+  intros j m1 m2 p1 p2 Hmp1 Hmp2.
+  so (basic_member_index _#9 Hal Hmp1) as Hj.  
+  eapply (pwctx_extend_dual _#5 (iutruncate (S j) A)); eauto using pwctx_downward.
+    {
+    apply (interp_increase pg); auto using toppg_max.
+    eapply basic_downward; eauto.
     }
 
-    (* cons *)
     {
-    intros h G2 IH i ss ss' Hss.
-    cbn [List.app] in Hss.
-    invertc Hss.
-    intros m n s s' Hs Hmn Hleft Hright <- <-.
-    so (IH _#3 Hs) as (sr & sr' & Hsr & Heq & Heq'); clear IH.
-    eassert _ as Hsr'; [refine (quotient_context_shorten _#9 Hs _ (pwctx_impl_seqctx _#4 Hsr)) |]; eauto.
+    apply (interp_increase pg); auto using toppg_max.
+    eapply basic_downward; eauto.
+    }
+
+    {
+    split; auto.
+    }
+
+    {
+    split; auto.
+    }
+
+    {
+    intros k s'' Hk Hs''.
+    apply Hleft; auto.
+    omega.
+    }
+
+    {
+    intros k s'' Hk Hs''.
+    apply Hright; auto.
+    omega.
+    }
+  }
+exploit (extract_functional pg i (prod_urel stop (den A) (den A)) (subst (dot (ppi2 (var 0)) (dot (ppi1 (var 0)) (compose s sh1))) b) (subst (dot (ppi2 (var 0)) (dot (ppi1 (var 0)) (compose s' sh1))) b)) as H; auto.
+  {
+  so (f_equal den (basic_impl_iutruncate _#6 Hal)) as HeqA.
+  cbn in HeqA.
+  rewrite -> HeqA at 1 2.
+  symmetry.
+  apply ceiling_prod.
+  }
+
+  {
+  eapply hygiene_subst; eauto.
+  intros j Hj.
+  destruct j as [|[|j]]; simpsub; prove_hygiene.
+  }
+
+  {
+  eapply hygiene_subst; eauto.
+  intros j Hj.
+  destruct j as [|[|j]]; simpsub; prove_hygiene.
+  }
+intros j m p Hmp.
+simpsub.
+cbn in Hmp.
+decompose Hmp.
+intros m1 p1 m2 p2 Hclm Hclp Hstepsm Hstepsp Hmp1 Hmp2.
+so (Hseq _#3 (Hsext _#5 Hmp1 Hmp2)) as (R & Hl & Hr).
+exists R.
+split; eapply basic_equiv; eauto; try prove_hygiene.
+  {
+  apply equiv_funct; auto using equiv_refl.
+  apply equivsub_dot.
+    {
+    apply equiv_symm.
+    apply steps_equiv.
+    eapply star_trans.
       {
-      left.
-      rewrite <- Heq.
-      rewrite <- compose_assoc.
-      rewrite -> compose_sh_under_geq; [| omega].
-      replace (S (length G2) - length G2) with 1 by omega.
-      simpsub.
-      auto.
+      apply (star_map' _ _ ppi2); auto using step_ppi21.
+      eauto.
       }
-    exists (dot m sr), (dot n sr').
-    do2 2 split.
+    apply star_one; apply step_ppi22.
+    }
+
+    {
+    apply equivsub_dot; auto using equivsub_refl.
+    apply equiv_symm.
+    apply steps_equiv.
+    eapply star_trans.
       {
-      cbn [substctx List.app].
-      apply pwctx_cons; auto.
+      apply (star_map' _ _ ppi1); auto using step_ppi11.
+      eauto.
+      }
+    apply star_one; apply step_ppi12.
+    }
+  }
+
+  {
+  apply equiv_funct; auto using equiv_refl.
+  apply equivsub_dot.
+    {
+    apply equiv_symm.
+    apply steps_equiv.
+    eapply star_trans.
+      {
+      apply (star_map' _ _ ppi2); auto using step_ppi21.
+      eauto.
+      }
+    apply star_one; apply step_ppi22.
+    }
+
+    {
+    apply equivsub_dot; auto using equivsub_refl.
+    apply equiv_symm.
+    apply steps_equiv.
+    eapply star_trans.
+      {
+      apply (star_map' _ _ ppi1); auto using step_ppi11.
+      eauto.
+      }
+    apply star_one; apply step_ppi12.
+    }
+  }
+Qed.
+
+
+
+Lemma split_quotient_context :
+  forall G1 a b G2 i s s' A B m p n q r t v w,
+    pwctx i s s' (G2 ++ hyp_tm (quotient a b) :: G1)
+    -> seq (hyp_tm (subst sh1 a) :: hyp_tm a :: G1) (deqtype b b)
+    -> project s (length G2) = r
+    -> project s' (length G2) = t
+    -> hygiene (permit (permit (ctxpred G1))) b
+    -> interp toppg true i (subst (compose (sh (S (length G2))) s) a) A
+    -> functional the_system toppg true i 
+         (prod_urel stop (den A) (den A))
+         (subst (dot (ppi2 (var 0)) (dot (ppi1 (var 0)) (compose (compose (sh (S (length G2))) s) sh1))) b)
+         B
+    -> forall
+         (Hmp : rel (den A) i m p)
+         (Hnq : rel (den A) i n q)
+         (hs : symmish stop (den A) (fun x => den (pi1 B x)))
+         (ht : transish stop (den A) (fun x => den (pi1 B x))),
+       rel (den (iuquotient stop A B hs ht)) i m t
+    -> rel (den (iuquotient stop A B hs ht)) i r p
+    -> rel (den (pi1 B (urelspinj (prod_urel stop (den A) (den A)) i (ppair m n) (ppair p q) (prod_action_ppair _#8 Hmp Hnq)))) i v w
+    -> pwctx i
+         (compose (under (length G2) (dot v (dot n (dot m sh1)))) s)
+         (compose (under (length G2) (dot w (dot q (dot p sh1)))) s')
+         (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1).
+Proof.
+intros G1 a b G2 i s s' A B m p n q r t v w Hs Hb Heqr Heqt Hclb Hal Hbl Hmp Hnq hs ht Hmt Hrp Hvw.
+cut (pwctx i
+       (compose (under (length G2) (dot v (dot n (dot m sh1)))) s)
+       (compose (under (length G2) (dot w (dot q (dot p sh1)))) s')
+       (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1)
+     /\
+     seqctx i (compose (under (length G2) (dot m sh1)) s) s' (G2 ++ hyp_tm (quotient a b) :: G1)
+     /\
+     seqctx i s (compose (under (length G2) (dot p sh1)) s') (G2 ++ hyp_tm (quotient a b) :: G1)
+     /\ 
+     interp toppg false i (subst (compose (sh (S (length G2))) s') a) A
+     /\
+     functional the_system toppg false i 
+       (prod_urel stop (den A) (den A))
+       (subst (dot (ppi2 (var 0)) (dot (ppi1 (var 0)) (compose (compose (sh (S (length G2))) s') sh1))) b)
+       B).
+  {
+  intros (H & _).
+  exact H.
+  }
+revert s s' Hs Heqr Heqt Hal Hbl.
+induct G2.
+
+(* nil *)
+{
+intros ss ss' Hss Heqr Heqt Hal Hbl.
+cbn [List.app] in Hss.
+cbn [length] in Heqr.
+invertc Hss.
+intros r' t' s s' Hs Hrt Hleft Hright <- <-.
+simpsubin Heqr.
+subst r'.
+simpsubin Heqt.
+subst t'.
+simpsubin Hrt.
+cbn [Nat.add] in Hrt.
+invert Hrt.
+intros R Hquotl Hquotr Hru.
+simpsubin Hquotl.
+invert (basic_value_inv _#6 value_quotient Hquotl).
+intros A' B' hs' ht' Hal' Hbl' Heq1.
+cbn [length] in Hal, Hbl.
+simpsubin Hal.
+so (interp_fun _#7 Hal Hal'); subst A'.
+clear Hal'.
+simpsubin Hbl.
+simpsubin Hbl'.
+so (functional_fun _#8 Hbl Hbl'); subst B'.
+clear Hbl'.
+invert (basic_value_inv _#6 value_quotient Hquotr).
+intros A' B' hs'' ht'' Har Hbr Heq2.
+so (iuquotient_inj _#9 (eqtrans Heq1 (eqsymm Heq2))) as Heq.
+clear Heq2.
+subst A' R.
+clear B' hs'' ht'' Hbr.
+so (proof_irrelevance _ hs hs'); subst hs'.
+so (proof_irrelevance _ ht ht'); subst ht'.
+cbn [length under substctx List.app].
+simpsub.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (urel_closed _#5 Hmp) as (Hclm & Hclp).
+so (urel_closed _#5 Hnq) as (Hcln & Hclq).
+so (urel_closed _#5 Hvw) as (Hclv & Hclw).
+rewrite -> (subst_into_closed _ _ m); auto.
+rewrite -> (subst_into_closed _ _ p); auto.
+rewrite -> (subst_into_closed _ _ n); auto.
+rewrite -> (subst_into_closed _ _ q); auto.
+rewrite -> (subst_into_closed _ _ v); auto.
+rewrite -> (subst_into_closed _ _ w); auto.
+assert (pwctx i (dot n (dot m s)) (dot q (dot p s')) (hyp_tm (subst sh1 a) :: hyp_tm a :: G1)) as Hsx.
+  {
+  apply pwctx_cons_tm.
+    {
+    apply pwctx_cons_tm; auto.
+      {
+      apply (seqhyp_tm _#5 A); auto.
+      }
+
+      {
+      intros j s'' Hj Hs''.
+      exploit (Hleft j false s'') as H; auto using smaller_le, pwctx_impl_seqctx.
+      rewrite -> qpromote_hyp_tm in H.
+      simpsubin H.
+      invertc H.
+      intros R Hr' Ho.
+      invert (basic_value_inv _#6 value_quotient Hr').
+      intros A' B'' hs'' ht'' Har' _ Heq.
+      invert (basic_value_inv _#6 value_quotient Ho).
+      intros A'' B''' hs''' ht''' Hao _ Heq'.
+      so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))); subst A''.
+      apply (relhyp_tm _#4 A'); auto.
+      }
+
+      {
+      intros j s'' Hj Hs''.
+      exploit (Hright j false s'') as H; auto using smaller_le, pwctx_impl_seqctx.
+      rewrite -> qpromote_hyp_tm in H.
+      simpsubin H.
+      invertc H.
+      intros R Hl' Ho.
+      invert (basic_value_inv _#6 value_quotient Hl').
+      intros A' B'' hs'' ht'' Hal' _ Heq.
+      invert (basic_value_inv _#6 value_quotient Ho).
+      intros A'' B''' hs''' ht''' Hao _ Heq'.
+      so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))); subst A''.
+      apply (relhyp_tm _#4 A'); auto.
+      }
+    }
+
+    {
+    apply (seqhyp_tm _#5 A); simpsub; auto.
+    }
+
+    {
+    intros j ss'' Hj Hss''.
+    invertc Hss''.
+    intros z s'' Hs'' _ _ _ <-.
+    simpsub.
+    exploit (Hleft j false s'') as H; auto using smaller_le, pwctx_impl_seqctx.
+    rewrite -> qpromote_hyp_tm in H.
+    simpsubin H.
+    invertc H.
+    intros R Hr' Ho.
+    invert (basic_value_inv _#6 value_quotient Hr').
+    intros A' B'' hs'' ht'' Har' _ Heq.
+    invert (basic_value_inv _#6 value_quotient Ho).
+    intros A'' B''' hs''' ht''' Hao _ Heq'.
+    so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))); subst A''.
+    apply (relhyp_tm _#4 A'); auto.
+    }
+
+    {
+    intros j ss'' Hj Hss''.
+    invertc Hss''.
+    intros z s'' Hs'' _ _ _ <-.
+    simpsub.
+    exploit (Hright j false s'') as H; auto using smaller_le, pwctx_impl_seqctx.
+    rewrite -> qpromote_hyp_tm in H.
+    simpsubin H.
+    invertc H.
+    intros R Hl' Ho.
+    invert (basic_value_inv _#6 value_quotient Hl').
+    intros A' B'' hs'' ht'' Hal' _ Heq.
+    invert (basic_value_inv _#6 value_quotient Ho).
+    intros A'' B''' hs''' ht''' Hao _ Heq'.
+    so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))); subst A''.
+    apply (relhyp_tm _#4 A'); auto.
+    }
+  }
+do2 4 split; auto.
+  {
+  apply pwctx_cons_tm_seq; auto.
+  2:{
+    intros j z z' Hz.
+    rewrite -> seq_eqtype in Hb.
+    so (Hb j z z' Hz) as (R & Hl & Hr & _).
+    eauto.
+    }
+  set (Hpair := ((prod_action_ppair stop (den A) (den A) i m n p q Hmp Hnq)
+                 : (rel (prod_urel stop (den A) (den A)) i (ppair m n) (ppair p q)))) in Hvw.
+  assert (interp toppg true i (subst (dot n (dot m s)) b) 
+            (pi1 B (urelspinj (prod_urel _ (den A) (den A)) i (ppair m n) (ppair p q) Hpair))) as Hbpairl.
+    {
+    invertc Hbl.
+    intros _ _ Hbl.
+    so (Hbl _ _ _ (le_refl _) Hpair) as H.
+    simpsubin H.
+    eapply basic_equiv; eauto.
+      {
+      apply (subst_closub _ (permit (permit (ctxpred G1)))); auto using closub_dot.
+      }
+    apply equiv_funct; [| apply equiv_refl].
+    apply equivsub_dot.
+      {
+      apply steps_equiv.
+      apply star_one.
+      apply step_ppi22.
+      }
+    apply equivsub_dot.
+      {
+      apply steps_equiv.
+      apply star_one.
+      apply step_ppi12.
+      }
+    apply equivsub_refl.
+    }
+  rewrite -> seq_eqtype in Hb.
+  so (Hb _#3 Hsx) as (R & Hbpairl' & Hbpairr & _).
+  so (interp_fun _#7 Hbpairl Hbpairl'); subst R.
+  apply (seqhyp_tm _#5 (pi1 B (urelspinj _#4 Hpair))); auto.
+  }
+
+  {
+  apply seqctx_cons; auto using pwctx_impl_seqctx.
+  simpsub.
+  cbn [Nat.add].
+  apply (seqhyp_tm _#5 (iuquotient stop A B hs ht)); auto.
+  }
+
+  {
+  apply seqctx_cons; auto using pwctx_impl_seqctx.
+  simpsub.
+  cbn [Nat.add].
+  apply (seqhyp_tm _#5 (iuquotient stop A B hs ht)); auto.
+  }
+
+  {
+  exploit (extract_functional_dual toppg A G1 a b i s s') as (B' & Hbl' & Hbr); auto.
+    {
+    intros j s'' Hj Hs''.
+    so (Hleft _ false _ (smaller_le _ _ Hj) (pwctx_impl_seqctx _#4 Hs'')) as H.
+    cbn [qpromote_hyp] in H.
+    simpsubin H.
+    invertc H.
+    intros R Hl Hr.
+    invert (basic_value_inv _#6 value_quotient Hl).
+    intros A' B' hs' ht' Hal' _ Heq1.
+    invert (basic_value_inv _#6 value_quotient Hr).
+    intros A'' B'' hs'' ht'' Hal'' _ Heq2.
+    so (iuquotient_inj _#9 (eqtrans Heq1 (eqsymm Heq2))); subst A''.
+    apply (relhyp_tm _#4 A'); auto.
+    }
+
+    {
+    intros j s'' Hj Hs''.
+    so (Hright _ false _ (smaller_le _ _ Hj) (pwctx_impl_seqctx _#4 Hs'')) as H.
+    cbn [qpromote_hyp] in H.
+    simpsubin H.
+    invertc H.
+    intros R Hl Hr.
+    invert (basic_value_inv _#6 value_quotient Hl).
+    intros A' B' hs' ht' Hal' _ Heq1.
+    invert (basic_value_inv _#6 value_quotient Hr).
+    intros A'' B'' hs'' ht'' Hal'' _ Heq2.
+    so (iuquotient_inj _#9 (eqtrans Heq1 (eqsymm Heq2))); subst A''.
+    apply (relhyp_tm _#4 A'); auto.
+    }
+
+    {
+    intros j u u' Hu.
+    rewrite -> seq_eqtype in Hb.
+    so (Hb _#3 Hu) as (R & Hl & Hr & _).
+    eauto.
+    }
+  so (functional_fun _#8 Hbl Hbl'); subst B'.
+  auto.
+  }
+}
+
+(* cons *)
+{
+intros h G2 IH ss ss' Hss Heqr Heqt Hal Hbl.
+rewrite <- app_comm_cons in Hss.
+invertc Hss.
+intros c d s s' Hs Hcd Hleft Hright <- <-.
+cbn [length] in Heqr.
+simpsubin Heqr.
+exploit (IH s s') as (Hsx & Hs_sp & Hsm_s & Har & Hbr); auto.
+clear IH Heqr Heqt.
+cbn [length].
+set (k := length G2) in Hsx |- *.
+do2 4 split.
+  {
+  simpsub.
+  rewrite <- app_comm_cons.
+  fold k.
+  apply pwctx_cons; auto.
+    {
+    rewrite <- !substh_compose.
+    rewrite <- !compose_assoc.
+    rewrite <- !compose_under.
+    simpsub.
+    refine (seqhyp_relhyp _#7 _ _ Hcd).
+      {
+      apply (Hright i false); auto using smaller_le.
+      }
+  
+      {
+      apply (Hleft i false); auto using smaller_le.
+      }
+    }
+  
+    {
+    intros j e s'' Hsmaller Hs''.
+    rewrite <- substh_qpromote_hyp.
+    rewrite <- substh_compose.
+    rewrite <- compose_assoc.
+    rewrite <- compose_under.
+    simpsub.
+    apply (relhyp_trans _#3 (substh s' (qpromote_hyp e h))).
+      {
+      apply relhyp_symm.
+      apply Hleft; auto.
+      eapply seqctx_smaller; eauto.
+      }
+  
+      {
+      apply Hleft; auto.
+      apply (seqctx_zigzag _ _ s' (compose (under k (dot m sh1)) s)); eauto using seqctx_smaller, pwctx_impl_seqctx.
+      rewrite -> qpromote_app in Hs'' |- *.
+      rewrite -> !qpromote_cons in Hs''.
+      rewrite -> !qpromote_cons.
+      rewrite -> !qpromote_hyp_tm in Hs''.
+      rewrite -> !qpromote_hyp_tm.
+      rewrite -> qpromote_substctx in Hs''.
+      rewrite <- (compose_sh_sh _ 1 1) in Hs''.
+      rewrite -> substctx_compose in Hs''.
+      so (seqctx_thin _#6 Hs'') as H1.
+      rewrite -> length_substctx in H1.
+      rewrite -> length_qpromote in H1.
+      fold k in H1.
+      rewrite <- compose_assoc in H1.
+      rewrite <- compose_under in H1.
+      simpsubin H1.
+      so (seqctx_thin _#6 H1) as H2; clear H1.
+      rewrite -> length_qpromote in H2.
+      fold k in H2.
+      rewrite <- !compose_assoc in H2.
+      rewrite <- !compose_under in H2.
+      simpsubin H2.
+      cbn [Nat.add] in H2.
+      refine (seqctx_alter _#7 H2 _).
+      rewrite -> length_qpromote.
+      fold k.
+      rewrite <- !compose_assoc.
+      rewrite -> !compose_sh_under_geq; [| omega ..].
+      replace (S k - k) with 1 by omega.
+      simpsub.
+      cbn [Nat.add].
+      rewrite -> !project_under_eq.
+      simpsub.
+      replace (k + (2 + 0)) with (S (S k)) by omega.
+      so (urel_closed _#5 Hmt) as (Hclm & _).
+      rewrite -> (subst_into_closed _ _ m); auto.
+      eassert _ as H; [refine (SoundHyp.seqctx_index _#4 k (hyp_tm a) H2 _) |]; clear H2.
         {
+        replace k with (0 + length (qpromote e G2)).
+        2:{
+          rewrite -> length_qpromote.
+          auto.
+          }
+        apply index_app_right.
+        apply index_0.
+        }
+      rewrite -> !project_compose in H.
+      rewrite -> !project_under_eq in H.
+      simpsubin H.
+      replace (k + (2 + 0)) with (S (S k)) in H by omega.
+      rewrite -> (subst_into_closed _ _ m) in H; auto.
+      rewrite <- !compose_assoc in H.
+      rewrite -> !compose_sh_under_geq in H; [| omega ..].
+      replace (S k - k) with 1 in H by omega.
+      simpsubin H.
+      apply (seqhyp_into_quotient_1 _ _ _ t); auto.
+      so (smaller_impl_le _#3 Hsmaller) as Hji.
+      apply (seqhyp_relhyp_2 _#4 (hyp_tm (subst (compose (sh (S k)) s') (quotient a b)))).
+        {
+        clear H.
+        eassert _ as H; [refine (pwctx_index _#4 k (hyp_tm (quotient a b)) Hs _) |].
+          {
+          replace k with (0 + k) by auto.
+          apply index_app_right.
+          apply index_0.
+          }
+        destruct H as (Hleft' & _).
+        exploit (Hleft' j e (compose (sh (3 + k)) s'')) as H; auto.
+          {
+          clear Hleft Hright Hleft'.
+          rewrite -> skipn_append_ge; [| omega].
+          replace (S k - length G2) with 1 by omega.
+          cbn [skipn].
+          so (seqctx_tail' _#4 (3 + k) Hs'') as H.
+          rewrite <- compose_assoc in H.
+          rewrite -> compose_sh_under_geq in H; [| omega].
+          replace (3 + k - k) with 3 in H by omega.
+          simpsubin H.
+          rewrite -> skipn_append_ge in H.
+          2:{
+            rewrite -> length_substctx, -> length_qpromote.
+            omega.
+            }
+          rewrite -> length_substctx, -> length_qpromote in H.
+          replace (3 + k - length G2) with 3 in H by omega.
+          cbn [skipn] in H.
+          exact H.
+          }
+        rewrite -> qpromote_hyp_tm in H.
         simpsub.
-        rewrite -> Heq.
-        rewrite -> Heq in Hsr'.
-        so (Hleft i false _ (smaller_refl _) Hsr') as Hrelhyp.
-        eapply seqhyp_relhyp_2; eauto.
+        simpsubin H.
+        exact H.
+        }
+      apply (seqhyp_downward i); auto.
+      apply (seqhyp_tm _#5 (iuquotient stop A B hs ht)); auto.
+        {
+        apply interp_eval_refl.
+        apply interp_quotient; auto.
+        cbn [length] in Hbl.
+        simpsubin Hbl.
+        simpsub.
+        auto.
         }
 
         {
-        intros j pr sr'' Hsmaller Hs''.
-        rewrite <- !substh_qpromote_hyp.
         simpsub.
-        so (pwctx_smaller _#6 Hsmaller Hs) as Hs_small.
-        rewrite -> qpromote_app in Hs'', Hs_small.
-        rewrite -> !qpromote_cons in Hs''.
-        rewrite -> !qpromote_cons in Hs_small.
-        rewrite -> !qpromote_hyp_tm in Hs''.
-        rewrite -> !qpromote_hyp_tm in Hs_small.
-        rewrite -> qpromote_substctx in Hs''.
-        eassert _ as Hs''_short; [refine (quotient_context_shorten _#9 Hs_small _ Hs'') |].
-          {
-          left.
-          rewrite -> length_qpromote.
-          rewrite <- Heq.
-          rewrite <- compose_assoc.
-          rewrite -> compose_sh_under_geq; [| omega].
-          replace (S (length G2) - length G2) with 1 by omega.
-          simpsub.
-          auto.
-          }
-        so (seqctx_smaller _#6 Hsmaller Hsr') as Hsr'_small.
-        rewrite -> qpromote_app in Hsr'_small.
-        rewrite -> qpromote_cons in Hsr'_small.
-        rewrite -> qpromote_hyp_tm in Hsr'_small.
-        rewrite -> length_qpromote in Hs''_short.
-        rewrite -> Heq in Hs''_short, Hsr'_small.
-        exploit (Hleft j pr (compose (under (length G2) (sh 2)) sr')) as Hrel; auto.
-          {
-          rewrite -> qpromote_app.
-          rewrite -> !qpromote_cons.
-          rewrite -> !qpromote_hyp_tm.
-          auto.
-          }
-        exploit (Hleft j pr (compose (under (length G2) (sh 2)) sr'')) as Hrel'; auto.
-          {
-          rewrite -> qpromote_app.
-          rewrite -> !qpromote_cons.
-          rewrite -> !qpromote_hyp_tm.
-          auto.
-          }
-        exact (relhyp_trans _#5 (relhyp_symm _#4 Hrel) Hrel').
+        cbn [Nat.add].
+        apply interp_eval_refl.
+        apply interp_quotient; auto.
+        cbn [length] in Hbr.
+        simpsubin Hbr.
+        simpsub.
+        auto.
         }
-        
+      }
+    }
+  
+    {
+    intros j e s'' Hsmaller Hs''.
+    rewrite <- substh_qpromote_hyp.
+    rewrite <- substh_compose.
+    rewrite <- compose_assoc.
+    rewrite <- compose_under.
+    simpsub.
+    apply (relhyp_trans _#3 (substh s (qpromote_hyp e h))).
+      {
+      apply relhyp_symm.
+      apply Hright; auto.
+      eapply seqctx_smaller; eauto.
+      }
+  
+      {
+      apply Hright; auto.
+      apply (seqctx_zigzag _ _ (compose (under k (dot p sh1)) s') s); eauto using seqctx_smaller, pwctx_impl_seqctx.
+      rewrite -> qpromote_app in Hs'' |- *.
+      rewrite -> !qpromote_cons in Hs''.
+      rewrite -> !qpromote_cons.
+      rewrite -> !qpromote_hyp_tm in Hs''.
+      rewrite -> !qpromote_hyp_tm.
+      rewrite -> qpromote_substctx in Hs''.
+      rewrite <- (compose_sh_sh _ 1 1) in Hs''.
+      rewrite -> substctx_compose in Hs''.
+      so (seqctx_thin _#6 Hs'') as H1.
+      rewrite -> length_substctx in H1.
+      rewrite -> length_qpromote in H1.
+      fold k in H1.
+      rewrite <- compose_assoc in H1.
+      rewrite <- compose_under in H1.
+      simpsubin H1.
+      so (seqctx_thin _#6 H1) as H2; clear H1.
+      rewrite -> length_qpromote in H2.
+      fold k in H2.
+      rewrite <- !compose_assoc in H2.
+      rewrite <- !compose_under in H2.
+      simpsubin H2.
+      cbn [Nat.add] in H2.
+      refine (seqctx_alter _#7 H2 _).
+      rewrite -> length_qpromote.
+      fold k.
+      rewrite <- !compose_assoc.
+      rewrite -> !compose_sh_under_geq; [| omega ..].
+      replace (S k - k) with 1 by omega.
+      simpsub.
+      cbn [Nat.add].
+      rewrite -> !project_under_eq.
+      simpsub.
+      replace (k + (2 + 0)) with (S (S k)) by omega.
+      so (urel_closed _#5 Hrp) as (_ & Hclp).
+      rewrite -> (subst_into_closed _ _ p); auto.
+      eassert _ as H; [refine (SoundHyp.seqctx_index _#4 k (hyp_tm a) H2 _) |]; clear H2.
         {
-        intros j pr sr'' Hsmaller Hs''.
-        rewrite -> !substh_qpromote_hyp.
-        simpsub.
-        rewrite -> Heq.
-        rewrite <- !substh_qpromote_hyp.
-        apply Hright; auto.
-        so (pwctx_smaller _#6 Hsmaller Hs) as Hs_small.
-        rewrite -> qpromote_app in Hs'', Hs_small.
-        rewrite -> !qpromote_cons in Hs''.
-        rewrite -> !qpromote_cons in Hs_small.
-        rewrite -> !qpromote_hyp_tm in Hs''.
-        rewrite -> !qpromote_hyp_tm in Hs_small.
-        rewrite -> qpromote_substctx in Hs''.
-        eassert _ as Hs''_short; [refine (quotient_context_shorten _#9 Hs_small _ Hs'') |].
-          {
-          right.
+        replace k with (0 + length (qpromote e G2)).
+        2:{
           rewrite -> length_qpromote.
-          rewrite <- Heq'.
-          rewrite <- compose_assoc.
-          rewrite -> compose_sh_under_geq; [| omega].
-          replace (S (length G2) - length G2) with 1 by omega.
-          simpsub.
           auto.
           }
-        rewrite -> length_qpromote in Hs''_short.
-        so (seqctx_smaller _#6 Hsmaller Hsr') as Hsr'_small.
-        rewrite -> Heq in Hsr'_small.
-        rewrite -> qpromote_app in Hsr'_small |- *.
-        rewrite -> !qpromote_cons in Hsr'_small |- *.
-        rewrite -> !qpromote_hyp_tm in Hsr'_small |- *.
-        so (pwctx_impl_seqctx _#4 Hs_small).
-        eapply seqctx_zigzag; eauto.
+        apply index_app_right.
+        apply index_0.
         }
-      }
+      rewrite -> !project_compose in H.
+      rewrite -> !project_under_eq in H.
+      simpsubin H.
+      replace (k + (2 + 0)) with (S (S k)) in H by omega.
+      rewrite -> (subst_into_closed _ _ p) in H; auto.
+      rewrite <- !compose_assoc in H.
+      rewrite -> !compose_sh_under_geq in H; [| omega ..].
+      replace (S k - k) with 1 in H by omega.
+      simpsubin H.
+      apply (seqhyp_into_quotient_2 _ _ _ r); auto.
+      so (smaller_impl_le _#3 Hsmaller) as Hji.
+      apply (seqhyp_relhyp_1 _#3 (hyp_tm (subst (compose (sh (S k)) s) (quotient a b)))).
+        {
+        clear H.
+        eassert _ as H; [refine (pwctx_index _#4 k (hyp_tm (quotient a b)) Hs _) |].
+          {
+          replace k with (0 + k) by auto.
+          apply index_app_right.
+          apply index_0.
+          }
+        destruct H as (_ & Hright').
+        exploit (Hright' j e (compose (sh (3 + k)) s'')) as H; auto.
+          {
+          clear Hleft Hright Hright'.
+          rewrite -> skipn_append_ge; [| omega].
+          replace (S k - length G2) with 1 by omega.
+          cbn [skipn].
+          so (seqctx_tail' _#4 (3 + k) Hs'') as H.
+          rewrite <- compose_assoc in H.
+          rewrite -> compose_sh_under_geq in H; [| omega].
+          replace (3 + k - k) with 3 in H by omega.
+          simpsubin H.
+          rewrite -> skipn_append_ge in H.
+          2:{
+            rewrite -> length_substctx, -> length_qpromote.
+            omega.
+            }
+          rewrite -> length_substctx, -> length_qpromote in H.
+          replace (3 + k - length G2) with 3 in H by omega.
+          cbn [skipn] in H.
+          exact H.
+          }
+        rewrite -> qpromote_hyp_tm in H.
+        simpsub.
+        simpsubin H.
+        exact H.
+        }
+      apply (seqhyp_downward i); auto.
+      apply (seqhyp_tm _#5 (iuquotient stop A B hs ht)); auto.
+        {
+        simpsub.
+        apply interp_eval_refl.
+        apply interp_quotient; auto.
+        cbn [length] in Hbl.
+        simpsubin Hbl.
+        simpsub.
+        auto.
+        }
 
-      {
-      cbn [length].
-      simpsub.
-      f_equal; auto.
-      }
-      
-      {
-      cbn [length].
-      simpsub.
-      f_equal; auto.
+        {
+        simpsub.
+        cbn [Nat.add].
+        apply interp_eval_refl.
+        apply interp_quotient; auto.
+        cbn [length] in Hbr.
+        simpsubin Hbr.
+        simpsub.
+        auto.
+        }
       }
     }
   }
-so (Hseq _#3 Hsr) as (C & Hl & _ & _ & Hr).
-exists C.
-simpsubin Hl.
-simpsubin Hr.
-rewrite -> Heq in Hl.
-rewrite -> Heq' in Hr.
+
+  {
+  rewrite <- app_comm_cons.
+  simpsub.
+  apply seqctx_cons; auto.
+  refine (seqhyp_relhyp_1 _#6 _ Hcd).
+  apply (Hright i false); auto using smaller_le.
+  }
+
+  {
+  rewrite <- app_comm_cons.
+  simpsub.
+  apply seqctx_cons; auto.
+  refine (seqhyp_relhyp_2 _#6 _ Hcd).
+  apply (Hleft i false); auto using smaller_le.
+  }
+
+  {
+  simpsub.
+  auto.
+  }
+  
+  {
+  simpsub.
+  simpsubin Hbr.
+  auto.
+  }
+}
+Qed.
+
+
+
+Lemma seqctx_substitution_form :
+  forall G i s s' k,
+    seqctx i s s' G
+    -> k <= length G
+    -> s = compose (under k id) s
+       /\ s' = compose (under k id) s'.
+Proof.
+intros G i s s' k Hs Hk.
+revert G s s' Hs Hk.
+induct k.
+
+(* 0 *)
+{
+intros G s s' _ _.
+cbn.
 auto.
+}
+
+(* S *)
+{
+intros k IH G ss ss' Hss Hk.
+destruct G as [| h G].
+  {
+  cbn in Hk.
+  omega.
+  }
+invert Hss.
+intros m n s s' Hs _ <- <-.
+simpsub.
+cbn in Hk.
+so (IH _ _ _ Hs) as (Heq & Heq'); [omega |].
+split; f_equal; auto.
+}
+Qed.
+
+
+
+Lemma split_quotient_context_triple :
+  forall G1 a b G2 i s s',
+    pwctx i s s' (G2 ++ hyp_tm (quotient a b) :: G1)
+    -> seq (hyp_tm (subst sh1 a) :: hyp_tm a :: G1) (deqtype b b)
+    -> hygiene (permit (permit (ctxpred G1))) b
+    -> exists t t' t1 t1' t2 t2',
+         pwctx i t t' (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1)
+         /\ pwctx i t1 t1' (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1)
+         /\ pwctx i t2 t2' (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1)
+         /\ compose (under (length G2) (sh 2)) t = s
+         /\ compose (under (length G2) (dot (var 1) (sh 3))) t' = s'
+         /\ compose (under (length G2) (dot (var 1) (sh 3))) t1 = s
+         /\ compose (under (length G2) (sh 2)) t1' = compose (under (length G2) (sh 2)) t'
+         /\ compose (under (length G2) (dot (var 1) (sh 3))) t2 = compose (under (length G2) (dot (var 1) (sh 3))) t
+         /\ compose (under (length G2) (sh 2)) t2' = s'.
+Proof.
+intros G1 a b G2 i s s' Hs Hseqb Hclb.
+set (k := length G2).
+set (m := project s k).
+set (q := project s' k).
+exploit (SoundHyp.seqctx_index _#4 k (hyp_tm (quotient a b)) (pwctx_impl_seqctx _#4 Hs)) as H.
+  {
+  replace k with (0 + k) by omega.
+  apply index_app_right.
+  apply index_0.
+  }
+simpsubin H.
+match type of H with
+| seqhyp _ _ _ (hyp_tm ?X') (hyp_tm ?Y') => set (X := X') in H; set (Y := Y') in H
+end.
+invertc H.
+subst X Y.
+intros R Hl Hr Hmq.
+fold m in Hmq.
+fold q in Hmq.
+cbn [Nat.add] in Hl, Hr.
+set (X := compose (sh (S k)) s) in Hl.
+set (Y := dot (var 0) (dot (var 1) (compose (sh (S k)) (compose s (sh 2))))) in Hl.
+invert (basic_value_inv _#6 value_quotient Hl).
+subst X Y.
+intros A B hs ht Hal Hbl Heq1.
+set (X := compose (sh (S k)) s') in Hr.
+set (Y := dot (var 0) (dot (var 1) (compose (sh (S k)) (compose s' (sh 2))))) in Hr.
+invert (basic_value_inv _#6 value_quotient Hr).
+subst X Y.
+intros A' B' hs' ht' _ _ _.
+subst R.
+clear hs' ht'.
+simpsubin Hbl.
+so Hmq as (n & p & v & w & Hmp & Hnq & Hvw).
+so (reflexiveish _#10 Hmp Hnq hs ht Hvw) as (v1 & w1 & Hvw1).
+so (hs _#7 Hmp Hnq Hvw) as (x & y & Hxy).
+so (reflexiveish _#10 Hnq Hmp hs ht Hxy) as (v2 & w2 & Hvw2).
+assert (rel (den (iuquotient stop A B hs ht)) i m p) as Hmp'.
+  {
+  exists m, p, v1, w1, Hmp, Hmp.
+  auto.
+  }
+assert (rel (den (iuquotient stop A B hs ht)) i n q) as Hnq'.
+  {
+  exists n, q, v2, w2, Hnq, Hnq.
+  auto.
+  }
+rewrite <- compose_assoc in Hbl.
+so (split_quotient_context _#17 Hs Hseqb (eq_refl _) (eq_refl _) Hclb Hal Hbl Hmp Hnq hs ht Hmq Hmp' Hvw) as Ht.
+so (split_quotient_context _#17 Hs Hseqb (eq_refl _) (eq_refl _) Hclb Hal Hbl Hmp Hmp hs ht Hmq Hmp' Hvw1) as Ht1.
+so (split_quotient_context _#17 Hs Hseqb (eq_refl _) (eq_refl _) Hclb Hal Hbl Hnq Hnq hs ht Hnq' Hmq Hvw2) as Ht2.
+exists (compose (under (length G2) (dot v (dot n (dot m sh1)))) s).
+exists (compose (under (length G2) (dot w (dot q (dot p sh1)))) s').
+exists (compose (under (length G2) (dot v1 (dot m (dot m sh1)))) s).
+exists (compose (under (length G2) (dot w1 (dot p (dot p sh1)))) s').
+exists (compose (under (length G2) (dot v2 (dot n (dot n sh1)))) s).
+exists (compose (under (length G2) (dot w2 (dot q (dot q sh1)))) s').
+fold k.
+so (urel_closed _#5 Hmp) as (Hclm & _).
+so (urel_closed _#5 Hnq) as (_ & Hclq).
+clear Hl Hr Hal Hbl Hmp Hnq Hvw Hmp' Hnq' Hvw1 Hvw2 Hxy.
+do2 8 split; auto.
+  {
+  rewrite <- compose_assoc.
+  rewrite <- compose_under.
+  simpsub.
+  exploit (seqctx_substitution_form _#4 (k + 1) (pwctx_impl_seqctx _#4 Hs)) as (Heq & _).
+    {
+    rewrite -> app_length.
+    cbn [length].
+    omega.
+    }
+  rewrite -> Heq at 2.
+  rewrite <- under_sum.
+  simpsub.
+  rewrite -> !under_dotsgen.
+  rewrite -> !compose_dotsgen.
+  apply dotsgen_equal; auto.
+  simpsub.
+  rewrite -> Nat.add_0_r.
+  rewrite <- compose_assoc.
+  simpsub.
+  rewrite -> (subst_into_closed _ _ m); auto.
+  }
+
+  {
+  rewrite <- compose_assoc.
+  rewrite <- compose_under.
+  simpsub.
+  exploit (seqctx_substitution_form _#4 (k + 1) (pwctx_impl_seqctx _#4 Hs)) as (_ & Heq).
+    {
+    rewrite -> app_length.
+    cbn [length].
+    omega.
+    }
+  rewrite -> Heq at 2.
+  rewrite <- under_sum.
+  simpsub.
+  rewrite -> !under_dotsgen.
+  rewrite -> !compose_dotsgen.
+  apply dotsgen_equal; auto.
+  simpsub.
+  rewrite -> Nat.add_0_r.
+  rewrite <- compose_assoc.
+  simpsub.
+  rewrite -> (subst_into_closed _ _ q); auto.
+  }
+
+  {
+  rewrite <- compose_assoc.
+  rewrite <- compose_under.
+  simpsub.
+  exploit (seqctx_substitution_form _#4 (k + 1) (pwctx_impl_seqctx _#4 Hs)) as (Heq & _).
+    {
+    rewrite -> app_length.
+    cbn [length].
+    omega.
+    }
+  rewrite -> Heq at 2.
+  rewrite <- under_sum.
+  simpsub.
+  rewrite -> !under_dotsgen.
+  rewrite -> !compose_dotsgen.
+  apply dotsgen_equal; auto.
+  simpsub.
+  rewrite -> Nat.add_0_r.
+  rewrite <- compose_assoc.
+  simpsub.
+  rewrite -> (subst_into_closed _ _ m); auto.
+  }
+
+  {
+  rewrite <- !compose_assoc.
+  rewrite <- !compose_under.
+  simpsub.
+  auto.
+  }
+
+  {
+  rewrite <- !compose_assoc.
+  rewrite <- !compose_under.
+  simpsub.
+  auto.
+  }
+
+  {
+  rewrite <- compose_assoc.
+  rewrite <- compose_under.
+  simpsub.
+  exploit (seqctx_substitution_form _#4 (k + 1) (pwctx_impl_seqctx _#4 Hs)) as (_ & Heq).
+    {
+    rewrite -> app_length.
+    cbn [length].
+    omega.
+    }
+  rewrite -> Heq at 2.
+  rewrite <- under_sum.
+  simpsub.
+  rewrite -> !under_dotsgen.
+  rewrite -> !compose_dotsgen.
+  apply dotsgen_equal; auto.
+  simpsub.
+  rewrite -> Nat.add_0_r.
+  rewrite <- compose_assoc.
+  simpsub.
+  rewrite -> (subst_into_closed _ _ q); auto.
+  }
+Qed.
+
+
+
+Lemma sound_quotient_hyp_eqtype :
+  forall G1 G2 a b c d,
+    pseq (hyp_tm (subst sh1 a) :: hyp_tm a :: G1) (deqtype b b)
+    -> pseq (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1) (deqtype (subst (under (length G2) (sh 2)) c) (subst (under (length G2) (dot (var 1) (sh 3))) d))
+    -> pseq (G2 ++ hyp_tm (quotient a b) :: G1) (deqtype c d).
+Proof.
+intros G1 G2 a b c d.
+revert G1.
+refine (seq_pseq_hyp 2 [] a [hyp_emp; hyp_emp] b 2 [] [_; _] _ _ [_; _; _] _ _ [_] _ _); cbn.
+intros G1 Hlca Hclb Hseqb Hseq _.
+rewrite -> seq_eqtype in Hseq |- *.
+intros i s s' Hs.
+so (split_quotient_context_triple _#7 Hs Hseqb Hclb) as (t & t' & t1 & t1' & t2 & t2' & Ht & Ht1 & Ht2 & Heqt & Heqt' & Heqt1 & Heqt1' & Heqt2 & Heqt2').
+so (Hseq _#3 Ht) as (C & Hcl & Hcr & Hdl & Hdr).
+exists C.
+simpsubin Hcl.
+simpsubin Hcr.
+simpsubin Hdl.
+simpsubin Hdr.
+rewrite -> Heqt in Hcl.
+rewrite -> Heqt' in Hdr.
+do2 3 split; auto.
+  {
+  rewrite <- Heqt2 in Hdl.
+  so (Hseq _#3 Ht2) as (C' & _ & Hcr' & Hdl' & _).
+  simpsubin Hcr'.
+  simpsubin Hdl'.
+  so (interp_fun _#7 Hdl Hdl'); subst C'.
+  rewrite -> Heqt2' in Hcr'.
+  auto.
+  }
+
+  {
+  rewrite <- Heqt1' in Hcr.
+  so (Hseq _#3 Ht1) as (C' & _ & Hcr' & Hdl' & _).
+  simpsubin Hdl'.
+  simpsubin Hcr'.
+  so (interp_fun _#7 Hcr Hcr'); subst C'.
+  rewrite -> Heqt1 in Hdl'.
+  auto.
+  }
+Qed.
+
+
+Lemma sound_quotient_hyp_eq :
+  forall G1 G2 a b c m n,
+    pseq (hyp_tm (subst sh1 a) :: hyp_tm a :: G1) (deqtype b b)
+    -> pseq 
+         (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1)
+         (deq
+            (subst (under (length G2) (sh 2)) m)
+            (subst (under (length G2) (dot (var 1) (sh 3))) n)
+            (subst (under (length G2) (sh 3)) c))
+    -> pseq (G2 ++ hyp_tm (quotient a b) :: G1) (deq m n (subst (under (length G2) sh1) c)).
+Proof.
+intros G1 G2 a b c m n.
+revert G1.
+refine (seq_pseq_hyp 2 [] a [hyp_emp; hyp_emp] b 2 [] [_; _] _ _ [_; _; _] _ _ [_] _ _); cbn.
+intros G1 Hlca Hclb Hseqb Hseq _.
+rewrite -> seq_deq in Hseq |- *.
+intros i s s' Hs.
+so (split_quotient_context_triple _#7 Hs Hseqb Hclb) as (t & t' & t1 & t1' & t2 & t2' & Ht & Ht1 & Ht2 & Heqt & Heqt' & Heqt1 & Heqt1' & Heqt2 & Heqt2').
+so (Hseq _#3 Ht) as (C & Hcl & Hcr & Hm & Hn & Hmn).
+simpsubin Hcl.
+simpsubin Hcr.
+so (Hseq _#3 Ht1) as (C' & _ & Hcr' & Hm1 & Hn1 & Hmn1).
+simpsubin Hcr'.
+rewrite <- (compose_sh_sh _ 1 2) in Hcr'.
+rewrite -> compose_under in Hcr'.
+rewrite -> compose_assoc in Hcr'.
+rewrite -> Heqt1' in Hcr'.
+rewrite <- compose_assoc in Hcr'.
+rewrite <- compose_under in Hcr'.
+simpsubin Hcr'.
+so (interp_fun _#7 Hcr Hcr'); subst C'.
+clear Hcr'.
+so (Hseq _#3 Ht2) as (C' & Hcl' & _ & Hm2 & Hn2 & Hmn2).
+simpsubin Hcl'.
+replace (sh 3) with (@compose (Candidate.obj stop) sh1 (dot (var 1) (sh 3))) in Hcl' by (simpsub; auto).
+rewrite -> compose_under in Hcl'.
+rewrite -> compose_assoc in Hcl'.
+rewrite -> Heqt2 in Hcl'.
+rewrite <- compose_assoc in Hcl'.
+rewrite <- compose_under in Hcl'.
+simpsubin Hcl'.
+so (interp_fun _#7 Hcl Hcl'); subst C'.
+clear Hcl'.
+exists C.
+simpsubin Hm.
+simpsubin Hm1.
+simpsubin Hm2.
+simpsubin Hn.
+simpsubin Hn1.
+simpsubin Hn2.
+simpsubin Hmn.
+simpsubin Hmn1.
+simpsubin Hmn2.
+do2 4 split; auto.
+  {
+  rewrite <- Heqt.
+  simpsub.
+  rewrite <- compose_assoc.
+  rewrite <- compose_under.
+  simpsub.
+  auto.
+  }
+
+  {
+  rewrite <- Heqt'.
+  simpsub.
+  rewrite <- compose_assoc.
+  rewrite <- compose_under.
+  simpsub.
+  auto.
+  }
+
+  {
+  rewrite -> Heqt in Hmn.
+  rewrite -> Heqt2' in Hm2.
+  rewrite <- Heqt2 in Hn.
+  exact (urel_zigzag _#7 (urel_zigzag _#7 Hmn Hn Hn2) Hmn2 Hm2).
+  }
+
+  {
+  rewrite -> Heqt1 in Hn1.
+  rewrite -> Heqt' in Hmn.
+  rewrite <- Heqt1' in Hm.
+  exact (urel_zigzag _#7 (urel_zigzag _#7 Hn1 Hmn1 Hm1) Hm Hmn).
+  }
+
+  {
+  rewrite -> Heqt, -> Heqt' in Hmn.
+  exact Hmn.
+  }
+Qed.
+
+
+Lemma sound_quotient_hyp_eq_dep :
+  forall G1 G2 a b c m n,
+    pseq (hyp_tm (subst sh1 a) :: hyp_tm a :: G1) (deqtype b b)
+    -> pseq 
+         (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1) 
+         (deqtype
+            (subst (under (length G2) (sh 2)) c)
+            (subst (under (length G2) (dot (var 1) (sh 3))) c))
+    -> pseq 
+         (substctx (sh 2) G2 ++ hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G1)
+         (deq
+            (subst (under (length G2) (sh 2)) m)
+            (subst (under (length G2) (dot (var 1) (sh 3))) n)
+            (subst (under (length G2) (sh 2)) c))
+    -> pseq (G2 ++ hyp_tm (quotient a b) :: G1) (deq m n c).
+Proof.
+intros G1 G2 a b c m n.
+revert G1.
+refine (seq_pseq_hyp 2 [] a [hyp_emp; hyp_emp] b 3 [] [_; _] _ _ [_; _; _] _ _ [_; _; _] _ _ [_] _ _); cbn.
+intros G1 Hlca Hclb Hseqb Hseqc Hseq _.
+rewrite -> seq_deq in Hseq |- *.
+rewrite -> seq_eqtype in Hseqc.
+intros i s s' Hs.
+so (split_quotient_context_triple _#7 Hs Hseqb Hclb) as (t & t' & t1 & t1' & t2 & t2' & Ht & Ht1 & Ht2 & Heqt & Heqt' & Heqt1 & Heqt1' & Heqt2 & Heqt2').
+so (Hseq _#3 Ht) as (C & Hcl & Hcr & Hm & Hn & Hmn).
+simpsubin Hcl.
+simpsubin Hcr.
+so (Hseq _#3 Ht1) as (C' & _ & Hcr' & Hm1 & Hn1 & Hmn1).
+simpsubin Hcr'.
+so (Hseqc _#3 Ht) as (C'' & Hcl' & Hcr'' & Hdl & Hdr).
+simpsubin Hcl'.
+simpsubin Hcr''.
+simpsubin Hdl.
+simpsubin Hdr.
+so (interp_fun _#7 Hcl Hcl'); subst C''.
+rewrite <- Heqt1' in Hcr''.
+so (interp_fun _#7 Hcr' Hcr''); subst C'.
+clear Hcl' Hcr' Hcr''.
+so (Hseq _#3 Ht2) as (C' & Hcl' & _ & Hm2 & Hn2 & Hmn2).
+simpsubin Hcl'.
+rewrite <- Heqt2 in Hdl.
+so (Hseqc _#3 Ht2) as (C'' & Hcl'' & _ & Hdl' & _).
+simpsubin Hcl''.
+simpsubin Hdl'.
+so (interp_fun _#7 Hcl' Hcl''); subst C''.
+so (interp_fun _#7 Hdl Hdl'); subst C'.
+clear Hdl Hdl' Hcl' Hcl''.
+exists C.
+simpsubin Hm.
+simpsubin Hm1.
+simpsubin Hm2.
+simpsubin Hn.
+simpsubin Hn1.
+simpsubin Hn2.
+simpsubin Hmn.
+simpsubin Hmn1.
+simpsubin Hmn2.
+do2 4 split; auto.
+  {
+  rewrite <- Heqt.
+  auto.
+  }
+
+  {
+  rewrite <- Heqt'.
+  auto.
+  }
+
+  {
+  rewrite -> Heqt in Hmn.
+  rewrite -> Heqt2' in Hm2.
+  rewrite <- Heqt2 in Hn.
+  exact (urel_zigzag _#7 (urel_zigzag _#7 Hmn Hn Hn2) Hmn2 Hm2).
+  }
+
+  {
+  rewrite -> Heqt1 in Hn1.
+  rewrite -> Heqt' in Hmn.
+  rewrite <- Heqt1' in Hm.
+  exact (urel_zigzag _#7 (urel_zigzag _#7 Hn1 Hmn1 Hm1) Hm Hmn).
+  }
+
+  {
+  rewrite -> Heqt, -> Heqt' in Hmn.
+  exact Hmn.
+  }
+Qed.
+
+
+Lemma sound_quotient_formation_invert :
+  forall G a a' b b',
+    pseq G (deqtype (quotient a b) (quotient a' b'))
+    -> pseq G (deqtype a a').
+Proof.
+intros G a a' b b'.
+revert G.
+refine (seq_pseq 0 1 [] _ _ _); cbn.
+intros G Hseq.
+rewrite -> seq_eqtype in Hseq |- *.
+intros i s s' Hs.
+so (Hseq _#3 Hs) as (R & Hl1 & Hr1 & Hl2 & Hr2).
+simpsubin Hl1.
+simpsubin Hr1.
+simpsubin Hl2.
+simpsubin Hr2.
+cbn [Nat.add] in Hl1, Hr1, Hl2, Hr2.
+invert (basic_value_inv _#6 value_quotient Hl1).
+intros A B hs ht Hal1 _ Heq.
+invert (basic_value_inv _#6 value_quotient Hr1).
+intros A' B' hs' ht' Har1 _ Heq'.
+so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))).
+subst A'.
+clear B' hs' ht' Heq'.
+invert (basic_value_inv _#6 value_quotient Hl2).
+intros A' B' hs' ht' Hal2 _ Heq'.
+so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))).
+subst A'.
+clear B' hs' ht' Heq'.
+invert (basic_value_inv _#6 value_quotient Hr2).
+intros A' B' hs' ht' Har2 _ Heq'.
+so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))).
+subst A'.
+clear B' hs' ht' Heq'.
+exists A.
+do2 3 split; auto.
 Qed.
