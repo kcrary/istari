@@ -1704,6 +1704,41 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          end
 
 
+      (* i : M = N : quotient A (fn . fn . B) *)
+      fun injectionQuotient i =
+         let
+            do (_, dir) = withgoal
+         in
+            goalContextCase
+            /| $hyp \i\ $tm \Prim.eq\ (\Prim.quotient\ ? (fn . fn . ?)) ? ? =>
+               \(fnc a b m n =>
+                    (* |- C *)
+                    refine (Rule.quotientDescent a b (T.evar ()) m n)
+                    >>> [
+                        (* A, A[^] |- B : type *)
+                        chdir (D.bind0s dir 2) >> idtacM Secondary,
+
+                        (* C : type *)
+                        idtacM Secondary,
+
+                        (* M : A *)
+                        idtacM Secondary,
+
+                        (* N : A *)
+                        idtacM Secondary,
+
+                        (* M = N : quotient A (fn . fn . B) *)
+                        refine (Rule.hypothesis i) >> done,
+
+                        (* B [N . M . id]  |- C[^] *)
+                        chdir (D.bind0 dir) >> idtacM Primary
+                        ])\
+
+             | _ => \(fnc => fail "not an injection expression")\
+            /
+         end
+
+
       val () =
          List.app (fn (const, tac) => H.insert injectionTactics const (fn hyp => tac hyp >> idtacM Primary))
          [
@@ -1717,7 +1752,8 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       val () =
          List.app (fn (const, tac) => H.insert injectionTactics const tac)
          [
-         (Prim.set, injectionSet)
+         (Prim.set, injectionSet),
+         (Prim.quotient, injectionQuotient)
          ]
 
    end
