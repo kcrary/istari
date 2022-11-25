@@ -245,7 +245,8 @@ order over skeletons:
     tree_subterm_well_founded
       : forall (i : level) (a : U i) (x : tree_skel a) . Acc (tree_skel a) (tree_subterm a) x
 
-(See the `Acc` library module for a discussion of the `Acc` type.)
+(See the [`Acc` library module](lib/acc.html) for a discussion of the
+`Acc` type.)
 
 For each datatype there is a *strip* function that strips a datatype
 down to its skeleton, such as:

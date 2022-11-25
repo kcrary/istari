@@ -33,9 +33,9 @@ signature EQUALITY_TACTIC =
       val extensionalityRaw : Symbol.symbol option list -> tactic
       val extensionality : Symbol.symbol option list -> tactic
 
-      val setExtensionalityPriority : priority tacticm
-      val setExtensionalityRaw : tactic
-      val setExtensionality : tactic
+      val extensionalityOfPriority : priority tacticm
+      val extensionalityOfRaw : tactic
+      val extensionalityOf : tactic
 
       val substitutionLiteral : int -> Term.term -> tactic
 
@@ -80,6 +80,8 @@ signature EQUALITY_TACTIC =
                leaving the directory matching the new subgoals
       *)
       val extensionalityTactics : (Symbol.symbol option -> priority tacticm -> priority tacticm) ConstantTable.table
+
+      val extensionalityOfTactics : priority tacticm ConstantTable.table
 
    end
 
@@ -625,8 +627,6 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
 
 
-      val extensionalityTactics : (Symbol.symbol option -> priority tacticm -> priority tacticm) H.table = H.table ()
-         
 
       fun assert a = refine (Rule.assert a (T.evar ()))
 
@@ -646,50 +646,74 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
 
 
+      val extensionalityTactics : (Symbol.symbol option -> priority tacticm -> priority tacticm) H.table = H.table ()
+         
       fun extensionalityLoop l =
          (case l of
              [] =>
                 refine (Rule.weaken 0 2) >> idtacM Primary
 
            | ident :: rest =>
-                C.goalCaseAlt
-                   [
-                   C.apply3 Prim.eq (C.whatPath C.swild) C.wild C.wild ?
-                   (fn ((const, ()), (), ()) =>
-                       (case H.find extensionalityTactics const of
-                           SOME tacfn =>
-                              tacfn ident (extensionalityLoop rest)
-                              
-                         | NONE =>
-                              fail "not an extensionality goal")),
-    
-                   C.wild ?
-                   (fn () => fail "not an extensionality goal")
-                   ])
+                goalCase
+                /| \Prim.eq\ (const? @ _) _ _ =>
+                   \(fnc const =>
+                        (case H.find extensionalityTactics const of
+                            SOME tacfn =>
+                               tacfn ident (extensionalityLoop rest)
+                               
+                          | NONE =>
+                               fail "not an extensionality goal"))\
 
+                 | _ =>
+                   \(fnc =>
+                        fail "not an extensionality goal")\
+                /)
 
       fun extensionalityPriority l =
-         C.goalCaseAlt
-            [
-            C.apply3 Prim.eq C.what C.what C.what ?
-            (fn (a, m, n) =>
-                assert2
-                   (T.apply2 Prim.ov a m)
-                   (T.apply2 Prim.ov a n)
-                >>> [
-                    idtacM Secondary,
-                    idtacM Secondary,
-                    extensionalityLoop l
-                    ]),
+         goalCase
+         /| \Prim.eq\ ? ? ? =>
+            \(fnc a m n =>
+                 assert2
+                    (T.apply2 Prim.ov a m)
+                    (T.apply2 Prim.ov a n)
+                 >>> [
+                     idtacM Secondary,
+                     idtacM Secondary,
+                     extensionalityLoop l
+                     ])\
 
-            C.wild ?
-            (fn () => fail "not an extensionality goal")
-            ]
-
+          | _ =>
+            \(fnc =>
+                 fail "not an extensionality goal")\
+         /
 
       fun extensionalityRaw l = extensionalityPriority l >> idtac
 
       fun extensionality l = TC.withTypecheckSnd $ extensionalityPriority l
+
+
+
+      val extensionalityOfTactics : priority tacticm H.table = H.table ()
+         
+      val extensionalityOfPriority =
+         goalCase
+         /| \Prim.eq\ (const? @ _) _ _ =>
+            \(fnc const =>
+                 (case H.find extensionalityOfTactics const of
+                     SOME tac =>
+                        tac
+                        
+                   | NONE =>
+                        fail "not an extensionalityOf goal"))\
+
+          | _ =>
+            \(fnc =>
+                 fail "not an extensionalityOf goal")\
+         /
+
+      val extensionalityOfRaw = extensionalityOfPriority >> idtac
+
+      val extensionalityOf = TC.withTypecheckSnd $ extensionalityOfPriority
 
 
 
@@ -982,28 +1006,36 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                  ])
 
 
-      val setExtensionalityPriority =
-         C.goalCaseAlt
-            [
-            C.apply3 Prim.eq (C.apply2 Prim.set C.what (C.lam C.what)) C.what C.what ?
-            (fn ((a, b), m, n) =>
+      val setExtOf =
+         goalCase
+         / \Prim.eq\ (\Prim.set\ ? (fn ? . ?)) ? ? =>
+           \(fnc a binder b m n =>
                 refine (Rule.setIntroEq a b m n)
                 >>> [
                     withgoal
-                    (fn (_, dir) => chdir (D.bind0 dir) >> idtacM Secondary),
+                    (fn (_, dir) => chdir (D.bindVary dir binder) >> idtacM Secondary),
 
                     idtacM Primary,
 
                     idtacM Primary
-                    ]),
+                    ])\
+         /
 
-            C.wild ?
-            (fn () => fail "not a set extensionality goal")
-            ]
 
-      val setExtensionalityRaw = setExtensionalityPriority >> idtac
-      val setExtensionality = TC.withTypecheckSnd setExtensionalityPriority
-            
+      val quotientExtOf =
+         goalCase
+         / \Prim.eq\ ($as (\Prim.quotient\ ? (fn . fn . ?))) ? ? =>
+           \(fnc q a b m n =>
+                refine (Rule.quotientIntroEq a b m n)
+                >>> [
+                    replaceConcl (T.apply1 Prim.istp q)
+                    >> idtacM Secondary,
+
+                    idtacM Secondary,
+                    idtacM Secondary,
+                    idtacM Primary
+                    ])\
+         /
 
          
       fun prodExt _ tac =
@@ -1025,7 +1057,6 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                  refine (Rule.weaken 2 2) >> tac
                  ]
              ]
-
 
 
       fun futureExt _ _ =
@@ -1068,6 +1099,14 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             (Prim.istp, unitExt RT.istpExt),
             (Prim.subtype, unitExt RT.subtypeExt),
             (Prim.squash, unitExt RT.squashExt),
+            ]
+
+      val () =
+         List.app
+            (fn (const, tac) => H.insert extensionalityOfTactics const tac)
+            [
+            (Prim.set, setExtOf),
+            (Prim.quotient, quotientExtOf)
             ]
 
 

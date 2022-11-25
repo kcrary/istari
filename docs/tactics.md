@@ -111,9 +111,9 @@ goal, generating zero or more subgoals.
 
   Introduces the conclusion type, generating hypotheses.  Typically a
   pattern will be a simple name, but more expressive patterns are
-  possible.  (See Destruction.)  Can introduce function-like types
-  (`forall`, `->`, `-t>`, `-k>`, `intersect`, `iforall`, `-g>`,
-  `foralltp`), subtypes, and let bindings.
+  possible.  (See [Destruction](#destruction).)  Can introduce
+  function-like types (`forall`, `->`, `-t>`, `-k>`, `intersect`,
+  `iforall`, `-g>`, `foralltp`), subtypes, and let bindings.
 
   + `introRaw /[ipattern] ... [ipattern]/`
   
@@ -175,7 +175,7 @@ goal, generating zero or more subgoals.
   Proves a goal of the form `M : A`, where `A` is a function type
   taking at least the given number of arguments.  Typically a pattern
   will be a simple name, but more expressive patterns are possible.
-  (See Destruction.)
+  (See [Destruction](#destruction).)
 
   - `introOfRaw /[ipattern] ... [ipattern]/`
 
@@ -329,8 +329,14 @@ goal, generating zero or more subgoals.
 
 - `compat`
 
-  Proves a goal of the form `c M1 ... Mn = c N1 ... Nn : A`,
-  generating subgoals of the form `Mi = Ni : Bi`.
+  Proves a goal of the form `h M1 ... Mn = h N1 ... Nn : A`, where `h`
+  is a constant or variable, generating subgoals of the form 
+  `Mi = Ni : Bi`.
+
+  If the head `h` takes [invisible
+  arguments](typechecking.html#coping-strategies), they can be
+  supplied using `ap` just as in typechecking, but only in the first
+  equand.
 
   + `compatRaw`
 
@@ -346,23 +352,30 @@ goal, generating zero or more subgoals.
 
 - `extensionality /[name option] ... [name option]/`
 
-  Proves a goal of the form `M = N : A`, decomposing one layer of `A`
-  for each argument given.  The name is used if decomposing `A`
-  generates a hypothesis; otherwise the name is ignored.
+  Proves a goal of the form `M = N : A`, for most types `A`,
+  decomposing one layer of `A` for each argument given.  The name is
+  used if decomposing `A` generates a hypothesis; otherwise the name
+  is ignored.
+
+  This tactic establishes `M : A` and `N : A` first, before proceeding
+  to extensionality.  It does not work with quotient types; for
+  quotients use `extensionalityOf`.
 
   + `extensionalityRaw /[name option] ... [name option]/`
 
     As `extensionality` but does not invoke the typechecker.
 
 
-- `setExtensionality`
+- `extensionalityOf`
 
-  Proves a goal of the form `M = N : { x : A | B }`.
+   Proves a goal of the form `M = N : A`, for certain types `A` (sets
+   and quotients).  Unlike `extensionality`, it does not establish `M
+   : A` and `N : A` first, which may result in fewer or better
+   subgoals if those typings are not already known.
 
-  + `setExtensionalityRaw`
+   + `extensionalityOfRaw`
 
-    As `setExtensionality` but does not invoke the typechecker.
-
+     As `extensionalityOf` but does not invoke the typechecker.
 
 - `injection /[hyp x]/`
 
@@ -531,10 +544,18 @@ The effect of the pattern match depends on the type being matched:
   equalities that result from matching the datatype's index terms
   against its type.
 
-- Matching against a quotient using `[p1 p2 p3]` will match `p1` and
-  `p2` against two terms of the underlying type, and match `p3`
-  against an hypothesis that they are equivalent.  One can also omit
-  `p2`, or omit both `p2` and `p3`.
+- Matching against a quotient using `[p1]` or `[p1 p2]` (*i.e.,* `And
+  [p1]` or `And [p1, p2]`) will match `p1` against a term of the
+  underlying type, and match `p2` (if supplied) against a hypothesis
+  stating that term is equivalent to itself.
+
+- Matching against a quotient using `[p1 p2 p3]` (*i.e.,* 
+  `And [p1, p2, p3]`) will match `p1` and `p2` against two terms of
+  the underlying type, and match `p3` against a hypothesis stating
+  that they are equivalent.  The conclusion must have the form 
+  `M : A`, `M = N : A`, `A : type`, or `A = B : type`.  The resulting
+  conclusion will be an equality in which the two equands refer to the
+  respective equivalent terms.
 
 The destruction tactics are:
 
@@ -597,7 +618,7 @@ The destruction tactics are:
 - `so /[term M]/ /[ipattern]/`
 
   If `M` has type `A`, creates a hypothesis of type `A`, and matches
-  it against the indicated pattern.  (See Destruction.)
+  it against the indicated pattern.  (See [Destruction](#destruction).)
 
   The term `M` can contain placeholders, written with two underscores
   (`__`).  Placeholder subterms result in additional subgoals.
