@@ -75,6 +75,7 @@ when appropriate, is given by an L or R.
       K Level                                                        (kind)
       Term :> Term                                                   (type annotation) L
       Term ap Term                                                   (visibilized application) L
+      Term _# Number                                                 (application to multiple evars)
 
       ( Term )
       ()                                                             (unit)

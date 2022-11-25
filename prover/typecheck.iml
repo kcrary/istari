@@ -950,20 +950,18 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
          end
 
 
-      (* immediate table history tab key goal pretac
+      (* immediate table history tab key ctx concl dir pretac
 
          table: the table
          history: the current history
          tab: the classifier for the portion of the table we need (e.g., tabOv)
          key: a key to look up in the table
-         goal: what we're trying to prove
+         ctx, concl, dir: what we're trying to prove
          dest: a destination into which to place the proof
          pretac: a tactic to run before the table's tactic (e.g., for symmetry)
       *)
-      fun immediate table history tab key (jud, dir) dest pretac =
+      fun immediate table history tab key ctx concl dir dest pretac =
          let
-            val ctx = J.context jud
-            
             val r = ref []
 
             fun prove a m =
@@ -979,7 +977,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                   play subdest
                end
          in
-            (case lookup table tab key ctx (J.concl jud) prove of
+            (case lookup table tab key ctx concl prove of
                 NONE => false
 
               | SOME tac =>
@@ -999,9 +997,10 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       fun typecheckOf table (goal as (jud, dir)) dest history =
          let
             val ctx = J.context jud
+            val concl = J.concl jud
 
             val (a, m) =
-               (case N.simplify (J.concl jud) of
+               (case N.simplify concl of
                    T.Elim (_, [T.App a, T.App m]) => (N.whnfHard a, N.whnfBasic m)
 
                  | _ => raise (Fail "precondition4"))
@@ -1037,7 +1036,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                (* 4. Look in the table. *)
              | _ =!>
                \fnc =>
-                   if immediate table history tabOv m goal dest idtac then
+                   if immediate table history tabOv m ctx concl dir dest idtac then
                       ()
                    else
                       raise Backtrack\
@@ -1325,9 +1324,10 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       fun typecheckIstp table (goal as (jud, dir)) dest history =
          let
             val ctx = J.context jud
+            val concl = J.concl jud
 
             val a =
-               (case N.simplify (J.concl jud) of
+               (case N.simplify concl of
                    T.Elim (_, [T.App a]) => N.whnfBasic a
 
                  | _ => raise (Fail "precondition5"))
@@ -1354,7 +1354,14 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                (* 3. Look in the table. *)
              | _ =!>
                \fnc =>
-                   if immediate table history tabIstp a goal dest idtac then
+                   if 
+                      immediate table history tabIstp a ctx concl dir dest idtac
+                      orelse
+                      immediate table history tabOv a ctx 
+                         (T.apply2 Prim.ov (T.apply1 Prim.univ (T.evar ())) a)
+                         dir dest
+                         (lift (fn () => refine (Rule.univForgetOf (T.evar ()) (T.evar ()))))
+                   then
                       ()
                    else
                       raise Backtrack\
@@ -1474,9 +1481,10 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       fun typecheckSubtype table (goal as (jud, dir)) dest history =
          let
             val ctx = J.context jud
+            val concl = J.concl jud
 
             val (a, b) =
-               (case N.simplify (J.concl jud) of
+               (case N.simplify concl of
                    T.Elim (_, [T.App a, T.App b]) => (N.whnfHard a, N.whnfHard b)
 
                  | _ => raise (Fail "precondition6"))
@@ -1617,7 +1625,36 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                (* 3. Look in the table. *)
              | _ =!>
                \fnc =>
-                   if immediate table history tabSubtype a goal dest idtac then
+                   if 
+                      immediate table history tabSubtype a ctx concl dir dest idtac
+                      orelse
+                      immediate table history tabEqtp a ctx (T.apply2 Prim.eqtp a b) dir dest 
+                         (lift (fn () => refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))))
+                      orelse
+                      immediate table history tabEqtp b ctx (T.apply2 Prim.eqtp b a) dir dest
+                         (lift (fn () =>
+                                   refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))
+                                   >>
+                                   refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))))
+                      orelse
+                      immediate table history tabEquniv a ctx
+                         (T.apply3 Prim.eq (T.apply1 Prim.univ (T.evar ())) a b)
+                         dir dest
+                         (lift (fn () => 
+                                   refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))
+                                   >>
+                                   refine (Rule.univForgetEq (T.evar ()) (T.evar ()) (T.evar ()))))
+                      orelse
+                      immediate table history tabEquniv b ctx
+                         (T.apply3 Prim.eq (T.apply1 Prim.univ (T.evar ())) b a)
+                         dir dest
+                         (lift (fn () => 
+                                   refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))
+                                   >>
+                                   refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))
+                                   >>
+                                   refine (Rule.univForgetEq (T.evar ()) (T.evar ()) (T.evar ()))))
+                   then
                       ()
                    else
                       raise Backtrack\
@@ -1689,9 +1726,10 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       fun typecheckEqtp table (goal as (jud, dir)) dest history =
          let
             val ctx = J.context jud
+            val concl = J.concl jud
 
             val (a, b) =
-               (case N.simplify (J.concl jud) of
+               (case N.simplify concl of
                    T.Elim (_, [T.App a, T.App b]) => (N.whnfHard a, N.whnfHard b)
 
                  | _ => raise (Fail "precondition7"))
@@ -1728,12 +1766,23 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
              | _ =!>
                \fnc =>
                    if
-                      immediate table history tabEqtp a goal dest idtac
-                   then
-                      ()
-                   else if
-                      immediate table history tabEqtp b goal dest
+                      immediate table history tabEqtp a ctx concl dir dest idtac
+                      orelse
+                      immediate table history tabEqtp b ctx (T.apply2 Prim.eqtp b a) dir dest
                          (lift (fn () => refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))))
+                      orelse
+                      immediate table history tabEquniv a ctx
+                         (T.apply3 Prim.eq (T.apply1 Prim.univ (T.evar ())) a b)
+                         dir dest
+                         (lift (fn () => refine (Rule.univForgetEq (T.evar ()) (T.evar ()) (T.evar ()))))
+                      orelse
+                      immediate table history tabEquniv b ctx
+                         (T.apply3 Prim.eq (T.apply1 Prim.univ (T.evar ())) b a)
+                         dir dest
+                         (lift (fn () => 
+                                   refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))
+                                   >>
+                                   refine (Rule.univForgetEq (T.evar ()) (T.evar ()) (T.evar ()))))
                    then
                       ()
                    else
@@ -1792,6 +1841,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       fun typecheckEqX tactics tab table (goal as (jud, dir)) dest history =
          let
             val ctx = J.context jud
+            val concl = J.concl jud
  
             val (class, a, b) =
                (case N.simplify (J.concl jud) of
@@ -1832,11 +1882,9 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
              | _ =!>
                \fnc =>
                    if
-                      immediate table history tab a goal dest idtac
-                   then
-                      ()
-                   else if
-                      immediate table history tab b goal dest
+                      immediate table history tab a ctx concl dir dest idtac
+                      orelse
+                      immediate table history tab b ctx (T.apply3 Prim.eq class b a) dir dest
                          (lift (fn () => refine (Rule.eqSymm (T.evar ()) (T.evar ()) (T.evar ()))))
                    then
                       ()
@@ -2016,14 +2064,15 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       fun typecheckPositive table (goal as (jud, dir)) dest history =
          let
             val ctx = J.context jud
+            val concl = J.concl jud
          in
-            termCaseX (J.concl jud)
+            termCaseX concl
             /
                \Prim.positive\ (fn . ?) =>
                \fnc a =>
                    if
                       (* a is under a binder so unshift it *)
-                      immediate table history tabPositive (T.Sub (a, T.Dot (T.Triv, T.id))) goal dest idtac
+                      immediate table history tabPositive (T.Sub (a, T.Dot (T.Triv, T.id))) ctx concl dir dest idtac
                    then
                       ()
                    else

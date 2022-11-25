@@ -377,6 +377,7 @@ goal, generating zero or more subgoals.
 
      As `extensionalityOf` but does not invoke the typechecker.
 
+
 - `injection /[hyp x]/`
 
   Uses injectivity on an equality in the type of `x`.  For
