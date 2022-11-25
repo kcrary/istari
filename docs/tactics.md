@@ -369,8 +369,8 @@ goal, generating zero or more subgoals.
 - `extensionalityOf`
 
    Proves a goal of the form `M = N : A`, for certain types `A` (sets
-   and quotients).  Unlike `extensionality`, it does not establish `M
-   : A` and `N : A` first, which may result in fewer or better
+   and quotients).  Unlike `extensionality`, it does not establish 
+   `M : A` and `N : A` first, which may result in fewer or better
    subgoals if those typings are not already known.
 
    + `extensionalityOfRaw`
