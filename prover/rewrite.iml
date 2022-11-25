@@ -36,6 +36,8 @@ signature REWRITE =
       val convertUnreduceUsingRew : captures -> eterm -> Reduction.reduction -> rewrite
       val reduceRew         : rewrite
       val whreduceRew       : rewrite
+      val reduceHardRew     : rewrite
+      val whreduceHardRew   : rewrite
 
 
       (* target: hypothesis and occurrences, where
@@ -70,6 +72,10 @@ signature REWRITE =
       val convertUnreduceUsing : ((captures * eterm * Reduction.reduction) * targets) list -> tactic
       val reduce            : targets -> tactic
       val whreduce          : targets -> tactic
+      val reduceHard        : targets -> tactic
+      val whreduceHard      : targets -> tactic
+
+      val trace : bool ref
 
    end
 
@@ -2182,6 +2188,10 @@ structure RewriteInternal :> REWRITE_INTERNAL =
       val weakeningTable : (constant * bool * (priority tacticm -> priority tacticm)) list H.table = H.table ()
 
 
+      val trace = ref false
+      val hole = Symbol.fromValue "hole"
+
+
       fun rewriteRelation i core hypopt (jud, dir) sequel =
          let
             val (d, dir) =
@@ -2217,7 +2227,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
                if    ftac partially proves R M N
                      rtac partially proves R N M
-                     ftac/rtac are not both NONE
+                     ftac or rtac are not both NONE
                      R has head const
                then  tac partially proves the goal
                         with a subgoal obtained by replacing C{M} with C{N} in the appropriate place
@@ -2227,6 +2237,24 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                or    calls fk () if impossible
             *)
             fun propagate c const m n ftac rtac fk sequel =
+               (
+               if
+                  !trace
+               then
+                  (
+                  print
+                     (case (ftac, rtac) of
+                         (SOME _, NONE) => "-> "
+                       | (NONE, SOME _) => "<- "
+                       | (SOME _, SOME _) => "<-> "
+                       | (NONE, NONE) => raise (Fail "impossible"));
+                  print (Namespace.toString const);
+                  print " through:\n  ";
+                  Show.showIndent 2 dir (instantiate c (T.Marker hole))
+                  )
+               else
+                  ();
+            
                (* We have special cases for eq, arrow, eeqtp, and subtype.
                   - eq and arrow can be used anywhere
                   - eeqtp can be used at the top-level
@@ -2275,7 +2303,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                          if Constant.eq (const, Prim.eeqtp) then
                             (* ftac partially proves M <:> N
                                rtac partially proves N <:> M
-                               ftac/rtac are not both NONE
+                               ftac or rtac are not both NONE
                             *)
                             (case hypopt of
                                 NONE =>
@@ -2540,6 +2568,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                             but it's possible another choice could have gotten us to equality.
                          *)
                          fk ())
+               )
 
             val tac =
                propagate c const m n ftac rtac
@@ -3790,10 +3819,29 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             Computational ((fns _ _ => true), act)
          end
 
-      fun reduce targets =
-         rewriteRaw [(reduceRew, targets)]
+      fun reduceHardRew _ _ =
+         let
+            fun act _ n =
+               SOME (N.normalizeHard n, Beta)
+         in
+            Computational ((fns _ _ => true), act)
+         end
+
+      fun whreduceHardRew _ _ =
+         let
+            fun act _ n =
+               SOME (N.whnfHard n, Beta)
+         in
+            Computational ((fns _ _ => true), act)
+         end
+
+      fun reduce targets = rewriteRaw [(reduceRew, targets)]
 
       fun whreduce targets = rewriteRaw [(whreduceRew, targets)]
+
+      fun reduceHard targets = rewriteRaw [(reduceHardRew, targets)]
+
+      fun whreduceHard targets = rewriteRaw [(whreduceHardRew, targets)]
 
 
       fun replaceRew capture em en ea hyp (_, dir) =

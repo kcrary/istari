@@ -184,6 +184,16 @@ evar.
   Puts the target term into weak-head-normal form.
 
 
+- `reduceHard /[short-targets]/`
+
+  Puts the target term into normal form, unfolding soft and firm constants.
+
+
+- `whreduceHard /[short-targets]/`
+
+  Puts the target term into weak-head-normal form, unfolding soft and firm constants.
+
+
 
 ### Rewriting tools
 

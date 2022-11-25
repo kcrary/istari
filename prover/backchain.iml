@@ -87,7 +87,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                 sk (a, tac)
 
            | T.App (T.Marker _) :: rest =>
-                (case N.whnf a of
+                (case N.whnfHard a of
                     T.Elim (T.Const const, [T.App dom, T.App cod]) =>
                        if Constant.eq (const, Prim.forall) then
                           fk "marker used for dependent argument"
@@ -107,7 +107,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                 (case N.whnf a of
                     T.Elim (T.Const const, [T.App dom, T.App cod]) =>
                        if Constant.eq (const, Prim.forall) then
-                          (case N.whnf cod of
+                          (case N.whnfHard cod of
                               T.Lam (_, cod') =>
                                  soSpine
                                     (T.Sub (cod', T.Dot (n, T.id)))
@@ -133,7 +133,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                   | _ => fk "type error in application")
 
            | T.Pi1 :: rest =>
-                (case N.whnf a of
+                (case N.whnfHard a of
                     T.Elim (T.Const const, [T.App a1, T.App a2]) =>
                        if Constant.eq (const, Prim.exists) then
                           fk "projection from exists after marker"
@@ -149,7 +149,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                   | _ => fk "type error in #1")
 
            | T.Pi2 :: rest =>
-                (case N.whnf a of
+                (case N.whnfHard a of
                     T.Elim (T.Const const, [T.App a1, T.App a2]) =>
                        if Constant.eq (const, Prim.exists) then
                           fk "projection from exists after marker"
@@ -244,7 +244,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
          if Unify.unify1 a c then
             sk tac
          else
-            termCaseX (N.whnf a)
+            termCaseX (N.whnfHard a)
             /| \Prim.forall\ ? (fn . ?) =>
                \(fnc dom cod =>
                     let
@@ -376,7 +376,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
 
       (* comment in signature *)
       fun exploitMain dep a tac sk =
-         termCaseX a
+         termCaseX (N.whnfHard a)
          /| \Prim.arrow\ ? ? =>
             \(fnc dom cod =>
                  exploitMain dep cod

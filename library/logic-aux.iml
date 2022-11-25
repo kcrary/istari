@@ -55,11 +55,23 @@ functor AfterIff () :> sig end =
       
       val () =
          H.insert EqualityTacticInternal.symmetryTactics iff
-         (andthenOn 3 (B.witnessPriority /Logic.iff_symm _ _ _ __/))
+         (andthenOn 0 (B.witnessPriority /Logic.iff_symm _ _ _ __/))
 
       val () =
          H.insert EqualityTacticInternal.transitivityTactics iff
          (fn n => B.witnessPriority /Logic.iff_trans _ _ \n\ _ __ __/)
+
+      val () =
+         RewriteInternal.CICTable.insert 
+            RewriteInternal.compatibilityTable
+            (iff, 0, iff)
+            (iff, true, andthenOn 0 (B.witnessPriority /Logic.iff_compat_1 _ _ _ _ __/))
+
+      val () =
+         RewriteInternal.CICTable.insert 
+            RewriteInternal.compatibilityTable
+            (iff, 1, iff)
+            (iff, true, andthenOn 0 (B.witnessPriority /Logic.iff_compat_2 _ _ _ _ __/))
          
 
       fun weakenIffArrow tac =
@@ -70,7 +82,7 @@ functor AfterIff () :> sig end =
                 refine (Rule.prodElim1 (T.evar ()) (T.apply2 Prim.arrow b a))
                 >>
                 (* (A -> B) & (B -> A) *)
-                replaceConcl (T.apply2 iff a b)
+                refine (Rule.unreduce (T.apply2 iff a b) Reduction.unfold)
                 >>
                 tac)\
          /
@@ -83,7 +95,7 @@ functor AfterIff () :> sig end =
                 refine (Rule.prodElim2 (T.apply2 Prim.arrow a b) (T.evar ()))
                 >>
                 (* (A -> B) & (B -> A) *)
-                replaceConcl (T.apply2 iff a b)
+                refine (Rule.unreduce (T.apply2 iff a b) Reduction.unfold)
                 >>
                 tac)\
          /
