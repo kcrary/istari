@@ -27,6 +27,11 @@ signature TYPECHECK =
       val inferRaw : ETerm.eterm -> Symbol.symbol option -> tactic
       val infer : ETerm.eterm -> Symbol.symbol option -> tactic
 
+      (* prove the goal using () for its extract, subgoals will have the same context *)
+      val trivializePriority : priority tacticm
+      val trivializeRaw : tactic
+      val trivialize : tactic
+
       val trace : bool ref
 
    end
@@ -45,7 +50,7 @@ signature TYPECHECK_INTERNAL =
          -> (Message.label * Tactic.goal) list * (Refine.validation list -> Refine.validation list)
 
 
-      (* Tactics can add hypotheses, but must not alter existing hypotheses. *)
+      (* Can add hypotheses, but must not alter existing hypotheses. *)
 
       val introTactics : tactic ConstantTable.table
       val istpTactics : tactic ConstantTable.table
@@ -56,6 +61,9 @@ signature TYPECHECK_INTERNAL =
       val eqkindTactics : tactic Constant2Table.table
       val subtypeTactics : tactic Constant2Table.table
       val subtypeLeftTactics : tactic ConstantTable.table
+
+      (* Should not alter the context. *)
+      val trivialIntroTactics : priority tacticm ConstantTable.table
 
    end
 
@@ -230,6 +238,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       structure H2 = Constant2Table
 
       val introTactics : tactic H.table = H.table ()
+      val trivialIntroTactics : priority tacticm H.table = H.table ()
       val istpTactics : tactic H.table = H.table ()
       val eqtpTactics : tactic H2.table = H2.table ()
       val ofunivTactics : tactic H.table = H.table ()
@@ -1113,7 +1122,19 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                           tryRule table history tac goal dest
                           (fn () => raise Backtrack)
 
-                     | NONE => raise Backtrack)\
+                     | NONE => 
+                          raise Backtrack)\
+
+               (* 6d. Use a trivial intro rule. *)
+             | const? @ _ ; () =!>
+               \fnc const =>
+                   (case H.find trivialIntroTactics const of
+                       SOME tac =>
+                          tryRule table history (tac >> idtac) goal dest
+                          (fn () => raise Backtrack)
+
+                     | NONE => 
+                          raise Backtrack)\
 
                (* 7a. Let *)
              | _ ; \Prim.lett\ ? (fn ? . ?) =>
@@ -2543,17 +2564,26 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.future (nextOnly >> RT.futureIntroOf);
             insert Prim.iforall RT.iforallIntroOf;
             insert Prim.iexists RT.iexistsIntroOf;
-            insert Prim.eq (trivOnly >> RT.eqIntro);
-            insert Prim.ov (trivOnly >> RT.ofIntro);
             insert Prim.set RT.setIntroOfSquash;
-            insert Prim.squash (trivOnly >> RT.squashIntroOfSquash);
             insert Prim.quotient RT.quotientIntroOf;
-            insert Prim.eqtp (trivOnly >> RT.eqtpIntro);
-            insert Prim.istp (trivOnly >> RT.istpIntro);
-            insert Prim.unit (trivOnly >> RT.unitIntroOf);
             insert Prim.bool (first [only Prim.tru >> RT.boolIntro1Of, only Prim.fals >> RT.boolIntro2Of]);
             insert Prim.sum (first [only Prim.inl >> RT.sumIntro1Of, only Prim.inr >> RT.sumIntro2Of])
          end
+
+
+      val () =
+         let
+            val insert = H.insert trivialIntroTactics
+         in
+            insert Prim.unit (RT.unitIntroOf >> done);
+            insert Prim.void (RT.voidElim >> idtacM Primary);
+            insert Prim.squash (RT.squashIntroOfSquash >>> [idtacM Secondary, idtacM Primary]);
+            insert Prim.ov (RT.ofIntro >> idtacM Primary);
+            insert Prim.eq (RT.eqIntro >> idtacM Primary);
+            insert Prim.istp (RT.istpIntro >> idtacM Primary);
+            insert Prim.eqtp (RT.eqtpIntro >> idtacM Primary)
+         end
+
 
       val eeqtpForm =
          goalCase
@@ -2847,6 +2877,29 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
              /intersect (i : level) (a b c : U i) . sum a b -> (a -> c) -> (b -> c) -> c/,
              Rule.sumcaseType)
             ]
+
+
+      val trivializePriority =
+         goalCase
+         /| const? @ _ =>
+            \(fnc const =>
+                 (case H.find trivialIntroTactics const of
+                     SOME tac =>
+                        refine (Rule.inhabitant (T.evar ()) T.Triv)
+                        >>
+                        tac
+ 
+                   | NONE =>
+                        fail "conclusion is not known to be computationally trivial"))\
+
+          | _ =>
+            \(fnc =>
+                 fail "conclusion is not known to be computationally trivial")\
+         /
+
+      val trivializeRaw = trivializePriority >> idtac
+
+      val trivialize = withTypecheckSnd trivializePriority
 
    end
 

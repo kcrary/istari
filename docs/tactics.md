@@ -166,8 +166,12 @@ goal, generating zero or more subgoals.
 
 - `unhide`
 
-  Unhides hidden hypotheses, when the conclusion is provable by the
-  term `()`.
+  Unhides hidden hypotheses, when the conclusion or any hypotheses are
+  computationally trivial.
+
+  + `unhideRaw`
+
+    As `unhide` but does not invoke the typechecker.
 
 
 - `introOf /[ipattern] ... [ipattern]/`
@@ -825,6 +829,16 @@ The destruction tactics are:
   Note this this is not a tactic, so it is invoked `typechecker ();`, not `typechecker.`
 
 
+- `trivialize`
+
+  When the conclusion is computationally trivial, sets the extract to
+  `()`.  Leaves the goal unchanged except hidden hypotheses are unhidden.
+
+  + `trivializeRaw`
+
+    As `trivialize` but does not invoke the typechecker.
+
+
 - `Typecheck.trace : bool ref`
 
   When set to true, the typechecker traces its process.
@@ -868,10 +882,16 @@ pages.
     As above but replaces the conclusion.
 
 
+- `exfalso`
+
+  Replaces the current goal with `void`.  Also unhides any hidden hypotheses.
+
+
 - `trustme`
 
   Discharges the current goal.  Can only be used if unsafe mode has
   been activated by running `Unsafe.allow ();`.
+
 
 
 

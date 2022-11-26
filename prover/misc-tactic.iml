@@ -7,6 +7,8 @@ signature MISC_TACTIC =
 
       val change : symbol -> ETerm.eterm -> tactic
 
+      val exfalso : tactic
+
       val trustme : tactic
 
    end
@@ -16,6 +18,7 @@ structure MiscTactic :> MISC_TACTIC =
    struct
 
       structure D = Directory
+      structure T = Term
 
       open Tactic
 
@@ -38,6 +41,16 @@ structure MiscTactic :> MISC_TACTIC =
             in
                replaceHyp i (Judgement.Tm (ETerm.withdir dir' a))
             end
+
+
+      val exfalso =
+         lift
+         (fn () =>
+             (* unhide any hidden hypotheses *)
+             refine (Rule.inhabitant (T.evar ()) T.Triv)
+             >>
+             refine (Rule.voidElim (T.evar ())))
+
 
       val trustme = refine Rule.trustme
 

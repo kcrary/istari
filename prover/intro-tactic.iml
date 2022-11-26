@@ -29,8 +29,6 @@ signature INTRO_TACTIC =
       val exactRaw : ETerm.eterm -> tactic
       val exact : ETerm.eterm -> tactic
 
-      val unhide : tactic
-
       val introOfPriority : IntroPattern.ipattern list -> priority tacticm
       val introOfRaw : IntroPattern.ipattern list -> tactic
       val introOf : IntroPattern.ipattern list -> tactic
@@ -61,6 +59,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
 
       structure C = Oldcase
       structure D = DestructInternal
+      structure H = ConstantTable
       structure J = Judgement
       structure N = Normalize
       structure R = Reduction
@@ -68,8 +67,6 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
       structure S = Seq
       structure T = Term
       structure TC = Typecheck
-      
-      structure H = ConstantTable
 
       type term = Term.term
       type symbol = Symbol.symbol
@@ -316,22 +313,6 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
       fun exactPriority em = exactRaw em >> idtacM Secondary
 
       fun exact em = Typecheck.withTypecheckSnd $ (exactRaw em >> idtacM Secondary)
-
-      val unhide =
-         let
-            do const = withHeadConst "cannot unhide"
-         in
-            (case H.find TypecheckInternal.introTactics const of
-                SOME tac =>
-                   cut $ setFailure "cannot unhide" $
-                   Tactic.refine (Rule.inhabitant (T.evar ()) T.Triv)
-                   >> tac 
-                   (* only allow unhide when it works with no extra goals *)
-                   >>> [idtac]
-
-              | NONE =>
-                   fail "cannot unhide")
-         end
 
 
 

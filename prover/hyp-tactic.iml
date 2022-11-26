@@ -41,17 +41,23 @@ signature HYP_TACTIC =
 
       val assumption : tactic
 
+      val unhidePriority : Tactic.priority tacticm
+      val unhideRaw : tactic
+      val unhide : tactic
+
    end
 
 
 structure HypTactic :> HYP_TACTIC =
    struct
 
+      structure H = ConstantTable
       structure T = Term
       structure N = Normalize
       structure D = Directory
       structure J = Judgement
       structure R = Reduction
+      structure S = Seq
 
       open Tactic
       open CasePervasive
@@ -509,4 +515,73 @@ structure HypTactic :> HYP_TACTIC =
             $anyhyp ($tm _ => \fnc => fn i => refine (Rule.hypothesis i)\)
          /
 
+
+
+      fun ifthenPri iftac thentac elsetac =
+         ifthenM
+            iftac
+            (fn Primary => thentac
+              | Secondary => idtacM Secondary)
+            elsetac
+            
+
+      fun unhideHypMain a i =
+         refine (Rule.assert (T.Sub (a, T.Shift (i+1))) (T.evar ()))
+         >>> [
+             Typecheck.trivializePriority
+             >>!
+             refine (Rule.hypothesis i) >> done,
+
+             (* if anyone depends on this hypothesis, the weaken will fail *)
+             refine (Rule.weaken (i+1) 1)
+             >>
+             refine (Rule.exchange 0 1 i)
+             >>
+             idtacM Primary
+             ]
+
+      fun unhideLoop success ctx i =
+         (case S.expose ctx of
+             S.Nil =>
+                if success then
+                   idtacM Primary
+                else
+                   fail "cannot unhide anything"
+
+           | S.Cons (h, rest) =>
+                hypCase h
+                /| $tmh $as (const? @ _) =>
+                   \(fnc a const =>
+                        if H.member TypecheckInternal.trivialIntroTactics const then
+                           ifthenPri
+                              (unhideHypMain a i)
+                              (unhideLoop true rest (i+1))
+                              (unhideLoop success rest (i+1))
+                        else
+                           unhideLoop success rest (i+1))\
+
+                 | _ =>
+                   \(fnc =>
+                        unhideLoop success rest (i+1))\
+                /)
+
+      val unhidePriority =
+         cut $
+         first
+            [
+            Typecheck.trivializePriority,
+
+            let
+               do (jud, _) = withgoal
+               val ctx = J.context jud
+            in
+               unhideLoop false ctx 0
+            end
+            ]
+
+      val unhideRaw = unhidePriority >> idtac
+
+      val unhide = Typecheck.withTypecheckSnd unhidePriority
+
    end
+

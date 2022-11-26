@@ -199,6 +199,27 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
 
                             | _ => fail "undestructable type")
 
+                     | SOME (J.Tmh a) =>
+                          termCase a
+                          /| \Prim.void\ =>
+                             \(fnc =>
+                                  (* unhides *)
+                                  refine (Rule.inhabitant (T.evar ()) T.Triv)
+                                  >>
+                                  refine (Rule.voidElim (T.evar ()))
+                                  >>
+                                  refine (Rule.hypothesis i) >> done)\
+
+                           | _ =>
+                             \(fnc =>
+                                  ifthenM
+                                     Typecheck.trivializePriority
+                                     (fn Primary => dest i pat set
+                                       | Secondary => 
+                                            idtacM (S.cons (D.freshSet set) S.empty, Auxiliary))
+                                     (fail "cannot unhide hypothesis"))\
+                          /
+
                      | SOME _ =>
                           fail "this sort of hypothesis cannot be destructed")
                 end)
