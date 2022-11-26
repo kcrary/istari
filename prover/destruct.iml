@@ -129,6 +129,9 @@ signature DESTRUCT_INTERNAL =
 
       *)
       val refold : Judgement.judgement -> int -> int -> Term.term -> Reduction.reduction -> Tactic.tactic
+
+
+      val destUserQuotient : int -> ipattern -> Directory.set -> Directory.set destruct_tactic
       
    end
 
@@ -344,11 +347,20 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
       fun destQuotient i pat set =
          (case pat of
              And [p] =>
-                (refine $ Rule.quotientLeft i (evar ()) (evar ()) (evar ()))
-                >> dest i p set
+                refine (Rule.quotientLeft i (evar ()) (evar ()) (evar ()))
+                >>>
+                   [
+                   let
+                      val (v, _) = varyAndBindSetPat set p
+                   in
+                      idtacM (S.cons v S.empty, Auxiliary)
+                   end,
+
+                   dest i p set
+                   ]
 
            | And [p1, p2] =>
-                (refine $ Rule.quotientLeftRefl i (evar ()) (evar ()) (evar ()))
+                refine (Rule.quotientLeftRefl i (evar ()) (evar ()) (evar ()))
                 >>>
                    [
                    quotientGoalTert set,
@@ -392,7 +404,6 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                         cut $
                         first
                            [
-                           cut $
                            refine (Rule.quotientLeftOf i (evar ()) (evar ()) (evar ()) (evar ()))
                            >>>
                               [
@@ -414,7 +425,6 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                         cut $
                         first
                            [
-                           cut $
                            refine (Rule.quotientLeftEq i (evar ()) (evar ()) (evar ()) (evar ()) (evar ()))
                            >>>
                               [
@@ -437,6 +447,63 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
 
            | _ =>
                 fail "quotient pattern expected")
+
+
+      fun destUserQuotient i pat set =
+         let
+            do (jud, _) = withgoal
+         in
+            (case Judgement.hyp jud i of
+                Judgement.Tm a =>
+                   (case pat of
+                       IntroPattern.And [p] =>
+                          refine (Rule.reduceHyp i Reduction.unfold)
+                          >>
+                          refine (Rule.quotientLeft i (T.evar ()) (T.evar ()) (T.evar ()))
+                          >>>
+                             [
+                             let
+                                val (v, _) = varyAndBindSetPat set p
+                             in
+                                refine (Rule.unreduceHyp i a Reduction.unfold)
+                                >>
+                                idtacM (S.cons v S.empty, Auxiliary)
+                             end,
+                
+                             dest i p set
+                             ]
+                
+                     | IntroPattern.And [p1, p2] =>
+                          refine (Rule.reduceHyp i Reduction.unfold)
+                          >>
+                          refine (Rule.quotientLeftRefl i (T.evar ()) (T.evar ()) (T.evar ()))
+                          >>>
+                             [
+                             quotientGoalTert set,
+                
+                             let
+                                val (v, _) = varyAndBindSetPat set p1
+                             in
+                                refine (Rule.unreduceHyp i a Reduction.unfold)
+                                >>
+                                idtacM (S.cons v S.empty, Auxiliary)
+                             end,
+                
+                             let
+                                do (vars1, set1) = andthenp S.empty $ dest (i+1) p1 set
+                                do (vars2, set2) = andthenp vars1 $ dest i p2 set1
+                             in
+                                idtacM (S.append vars1 vars2, Principal set2)
+                             end
+                             ]
+                
+                     | _ =>
+                          refine (Rule.reduceHyp i Reduction.unfold)
+                          >> destQuotient i pat set)
+      
+              | _ =>
+                   fail "this sort of hypothesis cannot be destructed")
+         end
 
 
       fun destSum i pat set =

@@ -117,6 +117,10 @@ Strong induction for natural numbers:
 
     plus_minus_cancel_r : forall (m n : nat) . m + n - n = m : nat
 
+    plus_cancel_l : forall (m n p : nat) . p + m = p + n : nat -> m = n : nat
+
+    plus_cancel_r : forall (m n p : nat) . m + p = n + p : nat -> m = n : nat
+
     minus_plus_cancel : forall (m n : nat) . n <= m -> m - n + n = m : nat
 
     minus_0_l : forall (n : nat) . 0 - n = 0 : nat
@@ -138,6 +142,11 @@ Strong induction for natural numbers:
     minus_succ_l_leq : forall (m n : nat) . succ m - n <= succ (m - n)
 
     minus_succ_l_eq : forall (m n : nat) . n <= m -> succ m - n = succ (m - n) : nat
+
+    plus_compat : forall (m m' n n' : nat) . m = m' : nat -> n = n' : nat -> m + n = m' + n' : nat
+
+    minus_compat : forall (m m' n n' : nat) .
+                      m = m' : nat -> n = n' : nat -> m - n = m' - n' : nat
 
 
 ### Maximum

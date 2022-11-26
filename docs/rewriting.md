@@ -203,6 +203,13 @@ evar.
   that since the rewrite is not actually performed, a target like `at
   0 0` will always show the same rewrite twice.
 
+
 - `showPosition /[short-targets]/`
 
   Displays the indicated term positions.
+
+
+- `Rewrite.trace : bool ref`
+
+  When set to true, the rewriter traces the process of propagating a
+  relation through the goal.

@@ -116,6 +116,10 @@ Strong induction for natural numbers:
 
     plus_minus_cancel_r : type:plus_minus_cancel_r
 
+    plus_cancel_l : type:plus_cancel_l
+
+    plus_cancel_r : type:plus_cancel_r
+
     minus_plus_cancel : type:minus_plus_cancel
 
     minus_0_l : type:minus_0_l
@@ -137,6 +141,10 @@ Strong induction for natural numbers:
     minus_succ_l_leq : type:minus_succ_l_leq
 
     minus_succ_l_eq : type:minus_succ_l_eq
+
+    plus_compat : type:plus_compat
+
+    minus_compat : type:minus_compat
 
 
 ### Maximum
