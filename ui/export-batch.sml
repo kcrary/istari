@@ -21,6 +21,16 @@ val replDate = Date.toString (Date.fromTimeUniv (Time.now ()))
 
 structure C = BatchCommandLine
 
+
+fun endAllModules () =
+   if
+      ((Namespace.endModule (); false) handle _ => true)
+   then
+      ()
+   else
+      endAllModules ()
+
+
 fun go prelude (_, args) =
    (
    C.process args;
@@ -48,7 +58,11 @@ fun go prelude (_, args) =
       (case C.outputFile () of
           NONE => ()
 
-        | SOME name => FileInternal.save name);
+        | SOME name => 
+             (
+             endAllModules ();
+             FileInternal.save name
+             ));
 
       OS.Process.success
       )
@@ -76,7 +90,7 @@ fun export prelude =
    if prelude then
       (
       if Repl.batch "../library/prelude.iml" then
-         exportPath
+         ()
       else
          (
          print "Error loading prelude.";
