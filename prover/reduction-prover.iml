@@ -2,7 +2,7 @@
 signature REDUCTION_PROVER =
    sig
 
-      exception ReductionProver
+      exception ReductionProver of string
 
       val start : Term.term -> unit
       val done : unit -> Term.term * Reduction.reduction
@@ -32,21 +32,25 @@ structure ReductionProver :> REDUCTION_PROVER =
       structure C = CheckpointedRef
 
 
-      exception Error = Message.Error
+      exception ReductionProver of string
 
-      exception ReductionProver
+      fun signalError msg =
+         raise (ReductionProver
+                   (String.concat
+                       [
+                       "Error: ",
+                       msg,
+                       ".\n"
+                       ]))
 
-      fun signal msg =
-         raise (Error (ReductionProver,
-                       String.concat
-                          [
-                          "Error: ",
-                          msg,
-                          ".\n"
-                          ]))
+      val () =
+         Handler.customHandler
+         (fn ReductionProver msg => (print msg; true)
+           | _ => false)
 
 
-      fun nocont _ _ = signal "top frame"
+
+      fun nocont _ _ = signalError "top frame"
 
       val underway = C.new false
       val depth = C.new 0
@@ -68,7 +72,7 @@ structure ReductionProver :> REDUCTION_PROVER =
 
       fun start m =
          if C.deref underway then
-            signal "proof underway"
+            signalError "proof underway"
          else
             (
             Message.clear ();
@@ -85,15 +89,10 @@ structure ReductionProver :> REDUCTION_PROVER =
             (
             Message.clear ();
 
-            try f () with
-               exn as (Error (_, msg)) =>
-                  (
-                  print msg;
-                  raise exn
-                  )
+            Handler.withHandler f
             )
          else
-            signal "Error: no proof underway"
+            signalError "Error: no proof underway"
 
       fun done () =
          if C.deref underway then
@@ -110,9 +109,9 @@ structure ReductionProver :> REDUCTION_PROVER =
                   (m, r)
                end
             else
-               signal "not top frame"
+               signalError "not top frame"
          else
-            signal "no proof underway"
+            signalError "no proof underway"
          
             
       fun show () = action (fn () => showMain ())
@@ -128,7 +127,7 @@ structure ReductionProver :> REDUCTION_PROVER =
                     C.assign reductions (red :: C.deref reductions);
                     showMain ()
                  end
-              with R.Reduce => signal "reduction error"))
+              with R.Reduce => signalError "reduction error"))
          
       fun unfold () = apply R.unfold
       fun beta n = apply (R.beta n)
@@ -142,9 +141,9 @@ structure ReductionProver :> REDUCTION_PROVER =
                 (case Database.findUnroll const of
                     SOME red => apply red
 
-                  | NONE => signal "cannot unroll")
+                  | NONE => signalError "cannot unroll")
 
-           | _ => signal "cannot unroll")
+           | _ => signalError "cannot unroll")
 
 
       exception BadSubterm
@@ -229,7 +228,7 @@ structure ReductionProver :> REDUCTION_PROVER =
                     C.assign curr m;
                     showMain ()
                  end
-              with BadSubterm => signal "invalid subterm"))
+              with BadSubterm => signalError "invalid subterm"))
 
 
       fun leave () =

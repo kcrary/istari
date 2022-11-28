@@ -2,7 +2,7 @@
 signature FILE =
    sig
 
-      exception LoadError
+      exception LoadError of string
 
       (* file name *)
       val load : string -> unit
@@ -39,18 +39,21 @@ structure FileInternal :> FILE_INTERNAL =
 
 
 
-      exception Error = Message.Error
+      exception LoadError of string
 
-      exception LoadError
+      fun signalError msg = raise (LoadError
+                                      (String.concat
+                                          [
+                                          "Error: ",
+                                          msg,
+                                          ".\n"
+                                          ]))
 
-      fun signalError msg =
-         raise (Error (LoadError,
-                       String.concat
-                          [
-                          "Error: ",
-                          msg,
-                          ".\n"
-                          ]))
+      val () =
+         Handler.customHandler
+         (fn LoadError msg => (print msg; true)
+           | _ => false)
+
 
 
       fun iterup f x i j =
@@ -280,93 +283,84 @@ structure FileInternal :> FILE_INTERNAL =
       val loaded = CR.new NS.empty
 
       fun load filename =
-         try
-            if Unsafe.getParanoid () then
-               signalError "paranoid is set"
-            else if not (List.null (N.currentModule ())) then
-               (* We aren't at top level.  Object. *)
-               signalError "load initiated within a module"
-            else
-               let
-                  val ins = BinIO.openIn filename
-               in
-                  try
-                     Finally.finally
-                        (fn () => 
-                            let
-                               val magicNumber' =
-                                  Bytestring.implode
-                                     (List.rev
-                                         (iterup
-                                             (fns _ l =>
-                                                 (case BinIO.input1 ins of
-                                                     NONE =>
-                                                        signalError "imported database was written by an incompatible version of Istari"
-                              
-                                                   | SOME b => b :: l))
-                                             []
-                                             0 8))
-
-                               val () =
-                                  if Bytestring.eq (magicNumber, magicNumber') then
-                                     ()
-                                  else
-                                     signalError "imported database was written by an incompatible version of Istari"
-   
-                               val nonce = P.unpickle (fn () => input1 ins) P.word32
-                            in
-                               if NS.member (CR.deref loaded) nonce then
-                                  (* already loaded; ignore *)
-                                  (
-                                  print "[";
-                                  print filename;
-                                  print " already loaded]\n"
-                                  )
-                               else
-                                  (
-                                  CR.assign loaded (NS.insert (CR.deref loaded) nonce);
-
-                                  if
-                                     P.unpickle (fn () => input1 ins) P.bool
-                                  then
-                                     Unsafe.allow ()
-                                  else
-                                     () ;
-   
-                                  readNamespace ins;
-                                  readDatabase ins;
-                                  readRegistry ins;
-                                  readReductions ins;
-                                  DatatypeInternal.read (fn () => input1 ins);
-                                  print "[";
-                                  print filename;
-                                  print " loaded]\n"
-                                  )
-                            end)
-                     (fn () => BinIO.closeIn ins)
-                  with
-                     Pickle.Error =>
-                        raise (Error (LoadError,
-                                      "Error: imported file is corrupted.\n"))
-
-                   | Pickling.UnknownConstant =>
-                        raise (Error (LoadError,
-                                      "Error: imported file uses an unknown constant.\n(Probably a dependency is not loaded or has changed.)\n"))
-         
-                   | Pickling.Paranoid =>
-                        raise (Error (LoadError,
-                                      "Error: paranoid is set.\n"))
-         
-                   | Refine.NoExtracts =>
-                        raise (Error (LoadError,
-                                      "Error: imported file does not support extracts.\n"))
-               end
-            with
-               exn as (Error (_, msg)) =>
-                  (
-                  print msg;
-                  raise exn
-                  )
+         Handler.withHandler
+         (fn () =>
+             if Unsafe.getParanoid () then
+                signalError "paranoid is set"
+             else if not (List.null (N.currentModule ())) then
+                (* We aren't at top level.  Object. *)
+                signalError "load initiated within a module"
+             else
+                let
+                   val ins = BinIO.openIn filename
+                in
+                   try
+                      Finally.finally
+                         (fn () => 
+                             let
+                                val magicNumber' =
+                                   Bytestring.implode
+                                      (List.rev
+                                          (iterup
+                                              (fns _ l =>
+                                                  (case BinIO.input1 ins of
+                                                      NONE =>
+                                                         signalError "imported database was written by an incompatible version of Istari"
+                               
+                                                    | SOME b => b :: l))
+                                              []
+                                              0 8))
+ 
+                                val () =
+                                   if Bytestring.eq (magicNumber, magicNumber') then
+                                      ()
+                                   else
+                                      signalError "imported database was written by an incompatible version of Istari"
+    
+                                val nonce = P.unpickle (fn () => input1 ins) P.word32
+                             in
+                                if NS.member (CR.deref loaded) nonce then
+                                   (* already loaded; ignore *)
+                                   (
+                                   print "[";
+                                   print filename;
+                                   print " already loaded]\n"
+                                   )
+                                else
+                                   (
+                                   CR.assign loaded (NS.insert (CR.deref loaded) nonce);
+ 
+                                   if
+                                      P.unpickle (fn () => input1 ins) P.bool
+                                   then
+                                      Unsafe.allow ()
+                                   else
+                                      () ;
+    
+                                   readNamespace ins;
+                                   readDatabase ins;
+                                   readRegistry ins;
+                                   readReductions ins;
+                                   DatatypeInternal.read (fn () => input1 ins);
+                                   print "[";
+                                   print filename;
+                                   print " loaded]\n"
+                                   )
+                             end)
+                      (fn () => BinIO.closeIn ins)
+                   with
+                      Pickle.Error =>
+                         signalError "imported file is corrupted"
+ 
+                    | Pickling.UnknownConstant =>
+                         raise (LoadError "Error: imported file uses an unknown constant.\n(Probably a dependency is not loaded or has changed.)\n")
+          
+                    | Pickling.Paranoid =>
+                         signalError "paranoid is set"
+          
+                    | Refine.NoExtracts =>
+                         signalError "imported file does not support extracts"
+                end)
 
    end
 

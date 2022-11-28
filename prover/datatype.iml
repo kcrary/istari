@@ -28,7 +28,7 @@ signature DATATYPE =
                ) list
             ) list
 
-      exception Datatype
+      exception Datatype of string
 
       val typedefRaw : typedef -> unit
       val typedef : typedef -> unit
@@ -82,16 +82,21 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       val supp = ET.suppressImplicit
 
 
-      exception Datatype
+      exception Datatype of string
 
-      fun signalDatatype msg =
-         raise (Message.Error (Datatype,
-                               String.concat
-                                  [
-                                  "Error: ",
-                                  msg,
-                                  ".\n"
-                                  ]))
+      fun signalError msg = raise (Datatype
+                                      (String.concat
+                                          [
+                                          "Error: ",
+                                          msg,
+                                          ".\n"
+                                          ]))
+
+      val () =
+         Handler.customHandler
+         (fn Datatype msg => (print msg; true)
+           | _ => false)
+
 
 
       structure ID = RedBlackDict (structure Key = IntOrdered)
@@ -329,24 +334,24 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                              SOME c' => c'
    
                                            | NONE =>
-                                                signalDatatype ("misplaced recursive reference in " ^ Symbol.toValue sym))
+                                                signalError ("misplaced recursive reference in " ^ Symbol.toValue sym))
    
-                                       | _ => signalDatatype (String.concat
-                                                                 [
-                                                                 "recursive reference in ",
-                                                                 Symbol.toValue sym,
-                                                                 " contains a type error"
-                                                                 ]))
+                                       | _ => signalError (String.concat
+                                                              [
+                                                              "recursive reference in ",
+                                                              Symbol.toValue sym,
+                                                              " contains a type error"
+                                                              ]))
                                      spine
                             in
                                if ID.lookup arities j = List.length args then
                                   (j, args)
                                else
-                                  signalDatatype (String.concat [
-                                                                "recursive reference in ",
-                                                                Symbol.toValue sym,
-                                                                " has the wrong arity"
-                                                                ])
+                                  signalError (String.concat [
+                                                             "recursive reference in ",
+                                                             Symbol.toValue sym,
+                                                             " has the wrong arity"
+                                                             ])
                             end)
    
                (* in datatype i, under depth binders (syntactically), and under substitution s (to adjust to the typing context) *)
@@ -369,7 +374,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                     cleanup sym i b (depth+1) (T.under 1 s) (External (SOME binder, T.Sub (a', s)) :: acc)
     
                                | NONE =>
-                                    signalDatatype ("misplaced recursive reference in " ^ Symbol.toValue sym)))\
+                                    signalError ("misplaced recursive reference in " ^ Symbol.toValue sym)))\
 
                       | \Prim.arrow\ ? ? =>
                         \(fnc a b =>
@@ -384,7 +389,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                          SOME a' => cleanup sym i b depth (T.compose s T.shift1) (External (NONE, T.Sub (a', s)) :: acc)
      
                                        | NONE =>
-                                            signalDatatype ("misplaced recursive reference in " ^ Symbol.toValue sym)))\
+                                            signalError ("misplaced recursive reference in " ^ Symbol.toValue sym)))\
                              /)\
 
                       | $lit \recmatcher sym depth p\ =>
@@ -392,16 +397,16 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                              if i = j then
                                 (sym, List.rev acc, map (fn t => T.Sub (t, s)) args)
                              else
-                                signalDatatype (String.concat
-                                                   [
-                                                   "right-hand-side of ",
-                                                   Symbol.toValue sym,
-                                                   " is the wrong datatype"
-                                                   ]))\
+                                signalError (String.concat
+                                                [
+                                                "right-hand-side of ",
+                                                Symbol.toValue sym,
+                                                " is the wrong datatype"
+                                                ]))\
 
                       | _ =>
                         \(fnc =>
-                             signalDatatype "illegal constructor type")\
+                             signalError "illegal constructor type")\
                      /
                   end
    
@@ -438,7 +443,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             end
          with
             D.Unbound sym =>
-               signalDatatype ("unbound identifier " ^ Symbol.toValue sym)
+               signalError ("unbound identifier " ^ Symbol.toValue sym)
 
 
 
@@ -2027,7 +2032,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             val () =
                if mut = 0 then
-                  signalDatatype "empty datatype specification"
+                  signalError "empty datatype specification"
                else
                   ()
 
@@ -3491,7 +3496,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                     SOME _ => ()
        
                   | NONE =>
-                       signalDatatype (module ^ " library not loaded")))
+                       signalError (module ^ " library not loaded")))
             (* doesn't really matter which element from the module we pick *)
             [
             ("Nat", "leq"),
@@ -3500,7 +3505,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
       fun typedefRaw typedef = 
-         Message.withHandler
+         Handler.withHandler
          (fn () =>
              let
                 val () = ProverInternal.checkpoint ()
@@ -3512,12 +3517,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
     
                 do vs = ProverInternal.setGoals goals'
              in
-                Message.withHandler (fn () => makeDatatype (f vs))
+                Handler.withHandler (fn () => makeDatatype (f vs))
              end)
 
 
       fun typedef typedef = 
-         Message.withHandler
+         Handler.withHandler
          (fn () =>
              let
                 val () = ProverInternal.checkpoint ()
@@ -3536,7 +3541,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                        let
                           do vs = ProverInternal.setGoals goals'
                        in
-                          Message.withHandler (fn () => makeDatatype (f (g vs)))
+                          Handler.withHandler (fn () => makeDatatype (f (g vs)))
                        end)
              end)
 

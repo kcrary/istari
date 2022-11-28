@@ -107,29 +107,35 @@ structure Directory :> DIRECTORY =
       structure S = Seq
 
 
-      exception Error = Message.Error
-
       exception Unbound of Symbol.symbol
       exception Shadow of Symbol.symbol
 
-      fun signalUnbound sym =
-         raise (Error (Unbound sym, 
-                       String.concat 
-                          [
-                          "Error: unbound identifier ",
-                          Symbol.toValue sym,
-                          ".\n"
-                          ]))
+      fun signalUnbound sym = raise (Unbound sym)
+      fun signalShadow sym = raise (Shadow sym)
 
-      fun signalShadow sym =
-         raise (Error (Shadow sym, 
-                       String.concat 
-                          [
-                          "Error: identifier ",
-                          Symbol.toValue sym,
-                          " is already bound.\n"
-                          ]))
-      
+      val () =
+         Handler.customHandler
+         (fn Unbound sym =>
+                (
+                print "Error: unbound identifier ";
+                print (Symbol.toValue sym);
+                print ".\n";
+                true
+                )
+           | _ => false)
+
+      val () =
+         Handler.customHandler
+         (fn Shadow sym =>
+                (
+                print "Error: identifier ";
+                print (Symbol.toValue sym);
+                print " is already bound.\n";
+                true
+                )
+           | _ => false)
+                
+             
 
 
       (* a directory is (d, i, bv, n)

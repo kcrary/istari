@@ -29,7 +29,7 @@ signature DATABASE_INTERNAL =
       include DATABASE
 
 
-      exception Database
+      exception Database of string
 
       val appLocal : (constant * (Judgement.judgement * Refine.validation) option * int * Reduction.reduction option -> unit) -> unit
 
@@ -154,7 +154,14 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
             theDatabase
 
 
-      exception Database
+      exception Database of string
+
+      val () =
+         Handler.customHandler
+         (fn Database str => (print str; true)
+           | _ => false)
+      
+
       exception Merge
 
       fun mergeOpt opt opt' =
@@ -190,11 +197,11 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
                     merge entry (t, implicits, unroll)
                  with
                     Merge =>
-                       raise (Message.Error (Database,
-                                             String.concat
-                                                ["Error: constant ",
-                                                 Namespace.toString const,
-                                                 " conflicts with an existing database entry.\n"]))));
+                       raise (Database
+                                 (String.concat
+                                     ["Error: constant ",
+                                      Namespace.toString const,
+                                      " conflicts with an existing database entry.\n"]))));
          ()
          )
 

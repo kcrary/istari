@@ -2,7 +2,7 @@
 signature PROVER =
    sig
 
-      exception Prover
+      exception Prover of string
 
       val apply : Tactic.tactic -> unit
       val enter : unit -> unit
@@ -78,20 +78,23 @@ structure ProverInternal :> PROVER_INTERNAL =
       type label = Message.label
 
       val blank = Message.blank
-      val withHandler = Message.withHandler
+      val withHandler = Handler.withHandler
 
-      exception Prover
+      exception Prover of string
 
-      fun signalProver msg =
-         raise (Message.Error (Prover,
-                               String.concat
-                                  [
-                                  "Error: ",
-                                  msg,
-                                  ".\n"
-                                  ]))
+      fun signalError msg = raise (Prover
+                                      (String.concat
+                                          [
+                                          "Error: ",
+                                          msg,
+                                          ".\n"
+                                          ]))
 
-
+      val () =
+         Handler.customHandler
+         (fn Prover msg => (print msg; true)
+           | _ => false)
+      
 
 
       (* The state of a proof underway is (d, juds, k)
@@ -112,7 +115,7 @@ structure ProverInternal :> PROVER_INTERNAL =
       fun state () =
          (case R.deref theState of
              NONE =>
-                signalProver "no proof underway"
+                signalError "no proof underway"
 
            | SOME st => st)
 
@@ -201,7 +204,7 @@ structure ProverInternal :> PROVER_INTERNAL =
 
       fun detail () =
          (case R.deref theState of
-             NONE => signalProver "no proof underway"
+             NONE => signalError "no proof underway"
 
            | SOME (_, [], _) => raise (Fail "no current goal")
          
@@ -226,12 +229,12 @@ structure ProverInternal :> PROVER_INTERNAL =
 
       fun apply tac =
          action
-         (fn (_, [], _) => signalProver "no current goal"
+         (fn (_, [], _) => signalError "no current goal"
 
            | (d, [(_, goal)], k) =>
                 (case
                     tac goal
-                       (fn msg => signalProver msg)
+                       (fn msg => signalError msg)
                        (fn (subgoals, validate, _) =>
                            Answer (subgoals, validate))
                  of
@@ -247,12 +250,12 @@ structure ProverInternal :> PROVER_INTERNAL =
 
                   | _ => raise (Fail "impossible"))
 
-           | (_, _ :: _, _) => signalProver "multiple current goals")
+           | (_, _ :: _, _) => signalError "multiple current goals")
 
 
       fun enter () =
          action
-         (fn (_, [], _) => signalProver "no current goals"
+         (fn (_, [], _) => signalError "no current goals"
 
            | (d, goal :: rest, k) =>
                 let
@@ -274,11 +277,11 @@ structure ProverInternal :> PROVER_INTERNAL =
          (fn (d, [], k) =>
                 if d = 0 then
                    (* To end the proof, we want to use qed instead of leave. *)
-                   signalProver "top frame"
+                   signalError "top frame"
                 else
                    k []
 
-           | _ => signalProver "current goals exist")
+           | _ => signalError "current goals exist")
 
 
       fun reorder reord =
@@ -292,7 +295,7 @@ structure ProverInternal :> PROVER_INTERNAL =
                     (SOME (d, goals', (fn vs => k (perm vs))))
                  end
               with
-                 Reorder.Reorder msg => signalProver msg))
+                 Reorder.Reorder msg => signalError msg))
                 
       fun pull i = reorder (Reorder.pull i)
       fun push i = reorder (Reorder.push i)
@@ -313,7 +316,7 @@ structure ProverInternal :> PROVER_INTERNAL =
              (case state () of
                  (0, [], k) => k []
 
-               | _ => signalProver "proof incomplete"))
+               | _ => signalError "proof incomplete"))
          )
 
 
@@ -327,7 +330,7 @@ structure ProverInternal :> PROVER_INTERNAL =
                     R.assign theState NONE
 
                | NONE =>
-                    signalProver "no proof underway"))
+                    signalError "no proof underway"))
          )
 
 
@@ -407,13 +410,13 @@ structure ProverInternal :> PROVER_INTERNAL =
              cleanLoop 0 m T.id
           with
              Unclean NotGround =>
-                signalProver "lemma statement contains unresolved evars"
+                signalError "lemma statement contains unresolved evars"
 
            | Unclean Open =>
-                signalProver "lemma statement contains free variables"
+                signalError "lemma statement contains free variables"
 
            | Unclean Marker =>
-                signalProver "lemma statement contains a marker")
+                signalError "lemma statement contains a marker")
 
 
 
@@ -430,7 +433,7 @@ structure ProverInternal :> PROVER_INTERNAL =
                               NONE => ()
 
                             | SOME _ =>
-                                 signalProver (String.concat
+                                 signalError (String.concat
                                                    ["lemma name ", name, " already in use"]))
                        
                        val a = ETerm.closed ea
@@ -463,7 +466,7 @@ structure ProverInternal :> PROVER_INTERNAL =
                     end
           
                | SOME _ =>
-                    signalProver "proof underway"))
+                    signalError "proof underway"))
 
 
       fun setGoals goals k =
@@ -486,7 +489,7 @@ structure ProverInternal :> PROVER_INTERNAL =
                     end
           
                | SOME _ =>
-                    signalProver "proof underway"))
+                    signalError "proof underway"))
 
 
       fun openGoal goal =
@@ -515,7 +518,7 @@ structure ProverInternal :> PROVER_INTERNAL =
              SOME goals =>
                 map (fn (_, jud) => jud) goals
 
-           | NONE => signalProver "no proof underway")
+           | NONE => signalError "no proof underway")
 
       fun showOriginalGoals () =
          withHandler
@@ -525,22 +528,22 @@ structure ProverInternal :> PROVER_INTERNAL =
                     showGoalsGen 0 goals showerLong showerLong
 
                | NONE =>
-                    signalProver "no proof underway"))
+                    signalError "no proof underway"))
 
 
 
 
       fun goals () =
          (case R.deref theState of
-             NONE => signalProver "no proof underway"
+             NONE => signalError "no proof underway"
 
            | SOME (_, l, _) => map (fn (_, jud) => jud) l)
 
       fun currentGoal () =
          (case R.deref theState of
-             NONE => signalProver "no proof underway"
+             NONE => signalError "no proof underway"
 
-           | SOME (_, [], _) => signalProver "no current goal"
+           | SOME (_, [], _) => signalError "no current goal"
          
            | SOME (_, (_, jud) :: _, _) => jud)
 

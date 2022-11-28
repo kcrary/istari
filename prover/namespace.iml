@@ -6,7 +6,7 @@ signature NAMESPACE =
       type symbol = Symbol.symbol
       type address = symbol list  (* nonempty *)
 
-      exception Namespace  (* signalled for any error *)
+      exception Namespace of string  (* signalled for any error *)
       
       val declare : symbol -> Term.term option -> constant
 
@@ -72,19 +72,14 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
 
 
 
-      exception Error = Message.Error
+      exception Namespace of string
 
-      exception Namespace
+      fun signalError str = raise (Namespace (String.concat ["Error: ", str, ".\n"]))
 
-      fun signalError str =
-         raise (Error (Namespace,
-                       String.concat 
-                          [
-                          "Error: ",
-                          str,
-                          ".\n"
-                          ]))
-
+      val () = 
+         Handler.customHandler
+         (fn Namespace str => (print str; true)
+           | _ => false)
 
 
       (* In C (defs, mods):
@@ -344,13 +339,12 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
             val C (currDefs, currMods) = R.deref theModule
          in
             if D.member currMods sym then
-               raise (Error (Namespace,
-                             String.concat 
-                                [
-                                "Error: name ",
-                                Symbol.toValue sym,
-                                " is already declared.\n"
-                                ]))
+               signalError (String.concat
+                               [
+                               "Error: name ",
+                               Symbol.toValue sym,
+                               " is already declared"
+                               ])
             else
                let
                   val C (oldDefs, oldMods) = R.deref theContext

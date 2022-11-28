@@ -6,7 +6,7 @@ signature ETERM =
       type symbol = Symbol.symbol
       type binder = symbol option
 
-      exception UnknownConstant
+      exception UnknownConstant of symbol list
 
       val var    : symbol -> eterm        (* always a variable *)
       val short  : symbol -> eterm
@@ -105,18 +105,21 @@ structure ETerm :> ETERM =
                    T.Const const)
          
 
-      exception UnknownConstant
+      exception UnknownConstant of symbol list
 
-      fun signalUnknownConstant syms =
-         raise (Message.Error 
-                   (UnknownConstant,
-                    String.concat 
-                       [
-                       "Error: unknown constant ",
-                       String.concatWith "." (List.map Symbol.toValue syms),
-                       ".\n"
-                       ]))
+      val () =
+         Handler.customHandler
+         (fn UnknownConstant syms =>
+                (
+                print "Error: unknown constant ";
+                print (String.concatWith "." (List.map Symbol.toValue syms));
+                print ".\n";
+                true
+                )
+           | _ => false)
+                
 
+      fun signalUnknownConstant syms = raise (UnknownConstant syms)
 
 
 

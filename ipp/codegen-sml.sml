@@ -522,7 +522,7 @@ functor CodegenSmlFun (Output : OUTPUT) :> CODEGEN =
            | Elet (ds, e) =>
                 (
                 write "let ";
-                app writeDec ds;
+                app (writeDec false) ds;
                 write "in ";
                 writeExp e;
                 write "end "
@@ -680,7 +680,7 @@ functor CodegenSmlFun (Output : OUTPUT) :> CODEGEN =
       and writeMatch clauses =
          writes "| " writeClause clauses
 
-      and writeDec (dec, span) =
+      and writeDec top (dec, span) =
          (
          enter span;
 
@@ -843,7 +843,7 @@ functor CodegenSmlFun (Output : OUTPUT) :> CODEGEN =
            | Mstruct ds =>
                 (
                 write "struct ";
-                app writeDec ds;
+                app (writeDec true) ds;
                 write "end "
                 )
 
@@ -860,7 +860,7 @@ functor CodegenSmlFun (Output : OUTPUT) :> CODEGEN =
                 writeIdentifier funct;
                 enter dspan;
                 write "(";
-                app writeDec ds;
+                app (writeDec true) ds;
                 write ")";
                 leave ()
                 )
@@ -882,7 +882,7 @@ functor CodegenSmlFun (Output : OUTPUT) :> CODEGEN =
          enter span;
 
          (case dir of
-             Vdec d => writeDec d
+             Vdec d => writeDec true d
 
            | Vnull => ()
 

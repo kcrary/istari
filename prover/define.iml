@@ -6,7 +6,7 @@ signature DEFINE =
       type eterm = ETerm.eterm
       type constant = Constant.constant
 
-      exception Define
+      exception Define of string
 
       val defineRaw : (symbol * symbol option list * symbol option list) -> eterm -> unit
       val define : (symbol * symbol option list * symbol option list) -> eterm -> eterm -> unit
@@ -74,19 +74,23 @@ structure DefineInternal :> DEFINE_INTERNAL =
       open CasePervasive
       open Tactic
 
-      val withHandler = Message.withHandler
-      exception Error = Message.Error
+      val withHandler = Handler.withHandler
 
-      exception Define
+      exception Define of string
 
-      fun signalError msg =
-         raise (Message.Error (Define,
-                               String.concat
-                                  [
-                                  "Error: ",
-                                  msg,
-                                  ".\n"
-                                  ]))
+      fun signalError msg = raise (Define
+                                      (String.concat
+                                          [
+                                          "Error: ",
+                                          msg,
+                                          ".\n"
+                                          ]))
+
+      val () =
+         Handler.customHandler
+         (fn Define msg => (print msg; true)
+           | _ => false)
+
 
 
       fun checkClean m =
@@ -94,13 +98,13 @@ structure DefineInternal :> DEFINE_INTERNAL =
              NONE => ()
 
            | SOME P.NotGround =>
-                raise (Error (Define, "Error: definition contains unresolved evars.\n"))
+                signalError "definition contains unresolved evars"
 
            | SOME P.Open =>
-                raise (Error (Define, "Error: definition contains free variables.\n"))
+                signalError "definition contains free variables"
 
            | SOME P.Marker =>
-                raise (Error (Define, "Error: definition contains a marker.\n")))
+                signalError "definition contains a marker")
 
 
 

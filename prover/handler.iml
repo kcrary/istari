@@ -1,0 +1,28 @@
+
+signature HANDLER =
+   sig
+
+      val withHandler : (unit -> 'a) -> 'a
+
+      val customHandler : (exn -> bool) -> unit
+
+   end
+
+
+structure Handler :> HANDLER =
+   struct
+
+      val handlers : (exn -> bool) list ref = ref []
+
+      fun withHandler f =
+         try
+            f ()
+         with exn =>
+            (
+            List.exists (fn f => f exn) (!handlers);
+            raise exn
+            )
+
+      fun customHandler f = handlers := f :: !handlers
+
+   end
