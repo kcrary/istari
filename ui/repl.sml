@@ -43,6 +43,7 @@ signature REPL =
       val rewindHook : (unit -> unit -> bool) ref        (* obtain a checkpoint *)
       val resetHook : (unit -> unit) ref                 (* reset to initial state *)
       val persistentCheckpoint : (unit -> unit) -> unit  (* save a checkpoint *)
+      val exceptionHandler : (exn -> bool) ref           (* call on uncaught exceptions *)
 
    end
 
@@ -97,18 +98,37 @@ functor ReplFun (structure Platform : PLATFORM
       
       exception Exit
 
+      val exceptionHandler : (exn -> bool) ref = ref (fn _ => false)
+
       fun withHandler x f =
          f ()
          handle
             Exit => raise Exit
-          | exn =>
+
+          | Error.Error (msg, _) =>
                (
-               print "Uncaught exception ";
-               print (exnMessage exn);
+               print "IPP error: ";
+               print msg;
                print "\n\n";
                SR.errorDetected := true;
                x
                )
+
+          | exn =>
+               if !exceptionHandler exn then
+                  (
+                  print "\n";
+                  SR.errorDetected := true;
+                  x
+                  )
+               else
+                  (
+                  print "Uncaught exception ";
+                  print (exnMessage exn);
+                  print "\n\n";
+                  SR.errorDetected := true;
+                  x
+                  )
 
       fun onException f g =
          f ()
@@ -130,6 +150,7 @@ functor ReplFun (structure Platform : PLATFORM
       
             val proverShow = ref (fn () => ())
             val uiOn = UI.on
+            val exceptionHandler = exceptionHandler
       
             val localTempFilename = "iml-temp-buffer.sml"
             val theTempFilename = ref ""

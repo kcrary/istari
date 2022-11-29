@@ -2,7 +2,7 @@
 signature HANDLER =
    sig
 
-      val withHandler : (unit -> 'a) -> 'a
+      val handler : exn -> bool
 
       val customHandler : (exn -> bool) -> unit
 
@@ -14,14 +14,7 @@ structure Handler :> HANDLER =
 
       val handlers : (exn -> bool) list ref = ref []
 
-      fun withHandler f =
-         try
-            f ()
-         with exn =>
-            (
-            List.exists (fn f => f exn) (!handlers);
-            raise exn
-            )
+      fun handler exn = List.exists (fn f => f exn) (!handlers)
 
       fun customHandler f = handlers := f :: !handlers
 

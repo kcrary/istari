@@ -3,6 +3,8 @@ structure Procdoc
    :>
    sig
 
+      exception Error of string
+
       (* input file, output file *)
       val go : string -> string -> unit
 
@@ -43,10 +45,17 @@ structure Procdoc
       val col = ref 0
 
 
+      exception Error of string
+
       fun signalError p msg =
-         raise (Message.Error (ProcDoc,
-                               String.concat 
-                                  ["Error: ", msg, " at position ", Int.toString p, "\n"]))
+         raise (Error
+                   (String.concat 
+                       ["Error: ", msg, " at position ", Int.toString p, "\n"]))
+
+      val () =
+         Handler.customHandler
+         (fn Error msg => (print msg; true)
+           | _ => false)
 
 
       fun input () =
@@ -256,27 +265,31 @@ structure Procdoc
 
 
       fun go infile outfile =
-         let
-            do () = Message.withHandler
-
-            val ins = TextIO.openIn infile
-            val outs = TextIO.openOut outfile
-         in
-            Finally.finally
-               (fn () =>
-                   (
-                   theInstream := ins;
-                   theOutstream := outs;
-                   pos := 0;
-                   col := 0;
-
-                   scan ()
-                   ))
-               (fn () =>
-                   (
-                   TextIO.closeIn ins;
-                   TextIO.closeOut outs
-                   ))
-         end
+         try
+            let
+               val ins = TextIO.openIn infile
+               val outs = TextIO.openOut outfile
+            in
+               Finally.finally
+                  (fn () =>
+                      (
+                      theInstream := ins;
+                      theOutstream := outs;
+                      pos := 0;
+                      col := 0;
+   
+                      scan ()
+                      ))
+                  (fn () =>
+                      (
+                      TextIO.closeIn ins;
+                      TextIO.closeOut outs
+                      ))
+            end
+         with exn =>
+            (
+            Handler.handler exn;
+            raise exn
+            )
 
    end

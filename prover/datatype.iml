@@ -3505,45 +3505,41 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
       fun typedefRaw typedef = 
-         Handler.withHandler
-         (fn () =>
-             let
-                val () = ProverInternal.checkpoint ()
-    
-                val () = checkLibrariesLoaded ()
-             
-                val (goals, f) = reprocess (resolve typedef)
-                val goals' = List.map (fn goal => (Message.blank, goal)) goals
-    
-                do vs = ProverInternal.setGoals goals'
-             in
-                Handler.withHandler (fn () => makeDatatype (f vs))
-             end)
+         let
+            val () = ProverInternal.checkpoint ()
+
+            val () = checkLibrariesLoaded ()
+         
+            val (goals, f) = reprocess (resolve typedef)
+            val goals' = List.map (fn goal => (Message.blank, goal)) goals
+
+            do vs = ProverInternal.setGoals goals'
+         in
+            makeDatatype (f vs)
+         end
 
 
       fun typedef typedef = 
-         Handler.withHandler
-         (fn () =>
-             let
-                val () = ProverInternal.checkpoint ()
-    
-                val () = checkLibrariesLoaded ()
-    
-                val (goals, f) = reprocess (resolve typedef)
-    
-                val (goals', g) = TypecheckInternal.multigoalTypecheck goals
-             in
-                (case goals' of
-                    [] =>
-                       makeDatatype (f (g []))
-    
-                  | _ =>
-                       let
-                          do vs = ProverInternal.setGoals goals'
-                       in
-                          Handler.withHandler (fn () => makeDatatype (f (g vs)))
-                       end)
-             end)
+         let
+            val () = ProverInternal.checkpoint ()
+
+            val () = checkLibrariesLoaded ()
+
+            val (goals, f) = reprocess (resolve typedef)
+
+            val (goals', g) = TypecheckInternal.multigoalTypecheck goals
+         in
+            (case goals' of
+                [] =>
+                   makeDatatype (f (g []))
+
+              | _ =>
+                   let
+                      do vs = ProverInternal.setGoals goals'
+                   in
+                      makeDatatype (f (g vs))
+                   end)
+         end
 
 
       fun write outf =

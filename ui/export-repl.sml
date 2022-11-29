@@ -12,6 +12,8 @@ Repl.uiOn := true;
 
 Repl.proverShow := Message.display;
 
+Repl.exceptionHandler := Handler.handler;
+
 Repl.rewindHook :=
    (fn () =>
        let

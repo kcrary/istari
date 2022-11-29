@@ -74,8 +74,6 @@ structure DefineInternal :> DEFINE_INTERNAL =
       open CasePervasive
       open Tactic
 
-      val withHandler = Handler.withHandler
-
       exception Define of string
 
       fun signalError msg = raise (Define
@@ -110,8 +108,6 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
       fun defineRaw (name, impargs, expargs) em =
          let
-            do () = withHandler
-
             val () = P.checkpoint ()
 
             val args = impargs @ expargs
@@ -133,8 +129,6 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
       fun define (name, impargs, expargs) em ea =
          let
-            do () = withHandler
-
             val () = P.checkpoint ()
 
             val args = impargs @ expargs
@@ -163,47 +157,45 @@ structure DefineInternal :> DEFINE_INTERNAL =
             val goal = (jud, D.literal [name])
 
             fun cont vs =
-               withHandler
-               (fn () =>
-                   (case vs of
-                       [v] =>
-                          (* v validates =M |- 0 : A[^] *)
-                          let
-                             val const = Namespace.declare name (SOME m)
+               (case vs of
+                   [v] =>
+                      (* v validates =M |- 0 : A[^] *)
+                      let
+                         val const = Namespace.declare name (SOME m)
 
-                             val jud' = J.make S.empty (T.apply2 Prim.ov a (T.Const const))
+                         val jud' = J.make S.empty (T.apply2 Prim.ov a (T.Const const))
 
-                             val tac =
-                                (* |- const : A *)
-                                refine (Rule.reduce (R.within [2] R.unfold))
-                                >>
-                                (* |- M : A *)
-                                refine (Rule.letIntro 0 m)
-                                >>
-                                (* =M |- M[^] : A[^] *)
-                                refine (Rule.letFold 0
-                                           (T.apply2 Prim.ov (T.Sub (a, T.Shift 2)) T.zero))
-                                >>
-                                (* =M |- 0 : A[^] *)
-                                cast jud v
-                          in
-                             (case execute (jud', D.empty) tac of
-                                 Sum.INL v' =>
-                                    (
-                                    Database.enterType const jud' v';
-                                    Database.setImplicits const (List.length impargs);
-   
-                                    print "Constant ";
-                                    print (Symbol.toValue name);
-                                    print " defined.\n"
-                                    )
+                         val tac =
+                            (* |- const : A *)
+                            refine (Rule.reduce (R.within [2] R.unfold))
+                            >>
+                            (* |- M : A *)
+                            refine (Rule.letIntro 0 m)
+                            >>
+                            (* =M |- M[^] : A[^] *)
+                            refine (Rule.letFold 0
+                                       (T.apply2 Prim.ov (T.Sub (a, T.Shift 2)) T.zero))
+                            >>
+                            (* =M |- 0 : A[^] *)
+                            cast jud v
+                      in
+                         (case execute (jud', D.empty) tac of
+                             Sum.INL v' =>
+                                (
+                                Database.enterType const jud' v';
+                                Database.setImplicits const (List.length impargs);
 
-                               | Sum.INR _ =>
-                                    (* This shouldn't happen. *)
-                                    raise (Fail "internal definition error"))
-                          end
+                                print "Constant ";
+                                print (Symbol.toValue name);
+                                print " defined.\n"
+                                )
 
-                     | _ => raise Refine.ValidationFailure))
+                           | Sum.INR _ =>
+                                (* This shouldn't happen. *)
+                                raise (Fail "internal definition error"))
+                      end
+
+                 | _ => raise Refine.ValidationFailure)
          in
             P.setGoals [(Message.blank, goal)] cont
          end
@@ -265,8 +257,6 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
       fun definerecRaw (name, impargs, expargs) em =
          let
-            do () = withHandler
-
             val () = P.checkpoint ()
 
             val args = impargs @ expargs
@@ -294,8 +284,6 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
       fun definerec (name, impargs, expargs) em ea =
          let
-            do () = withHandler
-
             val () = P.checkpoint ()
 
             val args = impargs @ expargs
@@ -328,49 +316,47 @@ structure DefineInternal :> DEFINE_INTERNAL =
             val arity = List.length args
 
             fun cont vs =
-               withHandler
-               (fn () =>
-                   (case vs of
-                       [v] =>
-                          (* v validates =M' |- 0 : A[^] *)
-                          let
-                             val const = Namespace.declare name (SOME m')
+               (case vs of
+                   [v] =>
+                      (* v validates =M' |- 0 : A[^] *)
+                      let
+                         val const = Namespace.declare name (SOME m')
 
-                             val jud' = J.make S.empty (T.apply2 Prim.ov a (T.Const const))
+                         val jud' = J.make S.empty (T.apply2 Prim.ov a (T.Const const))
 
-                             val tac =
-                                (* |- const : A *)
-                                refine (Rule.reduce (R.within [2] R.unfold))
-                                >>
-                                (* |- M' : A *)
-                                refine (Rule.letIntro 0 m')
-                                >>
-                                (* =M' |- M'[^] : A[^] *)
-                                refine (Rule.letFold 0
-                                           (T.apply2 Prim.ov (T.Sub (a, T.Shift 2)) T.zero))
-                                >>
-                                (* =M' |- 0 : A[^] *)
-                                cast jud v
-                          in
-                             (case execute (jud', D.empty) tac of
-                                 Sum.INL v' =>
-                                    (
-                                    Database.enterType const jud' v';
-                                    Database.setImplicits const (List.length impargs);
-                                    Database.setUnroll const
-                                       (R.trans [recUnroller const, R.beta arity]);
-   
-                                    print "Constant ";
-                                    print (Symbol.toValue name);
-                                    print " defined.\n"
-                                    )
+                         val tac =
+                            (* |- const : A *)
+                            refine (Rule.reduce (R.within [2] R.unfold))
+                            >>
+                            (* |- M' : A *)
+                            refine (Rule.letIntro 0 m')
+                            >>
+                            (* =M' |- M'[^] : A[^] *)
+                            refine (Rule.letFold 0
+                                       (T.apply2 Prim.ov (T.Sub (a, T.Shift 2)) T.zero))
+                            >>
+                            (* =M' |- 0 : A[^] *)
+                            cast jud v
+                      in
+                         (case execute (jud', D.empty) tac of
+                             Sum.INL v' =>
+                                (
+                                Database.enterType const jud' v';
+                                Database.setImplicits const (List.length impargs);
+                                Database.setUnroll const
+                                   (R.trans [recUnroller const, R.beta arity]);
 
-                               | Sum.INR _ =>
-                                    (* This shouldn't happen. *)
-                                    raise (Fail "internal definition error"))
-                          end
+                                print "Constant ";
+                                print (Symbol.toValue name);
+                                print " defined.\n"
+                                )
 
-                     | _ => raise Refine.ValidationFailure))
+                           | Sum.INR _ =>
+                                (* This shouldn't happen. *)
+                                raise (Fail "internal definition error"))
+                      end
+
+                 | _ => raise Refine.ValidationFailure)
          in
             P.setGoals [(Message.blank, goal)] cont
          end
@@ -663,8 +649,6 @@ structure DefineInternal :> DEFINE_INTERNAL =
       
       fun reductions (pats, unf, unr) =
          let
-            do () = withHandler
-
             val () = P.checkpoint ()
          in
             List.app

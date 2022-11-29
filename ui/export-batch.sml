@@ -4,6 +4,7 @@ Incremental.load "../prover/prover.proj";
 CM.make "../prover/prover.cm";
 
 Repl.uiOn := false;
+Repl.exceptionHandler := Handler.handler;
 
 
 (* Begin *)

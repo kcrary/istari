@@ -78,7 +78,6 @@ structure ProverInternal :> PROVER_INTERNAL =
       type label = Message.label
 
       val blank = Message.blank
-      val withHandler = Handler.withHandler
 
       exception Prover of string
 
@@ -196,11 +195,11 @@ structure ProverInternal :> PROVER_INTERNAL =
          else
             showGoalsMain showerLong showerShort
 
-      fun show () = withHandler showGoals
+      val show = showGoals
 
-      fun showFull () = withHandler (fn () => showGoalsMain showerLong showerLong)
+      fun showFull () = showGoalsMain showerLong showerLong
 
-      fun showLiteral () = withHandler (fn () => showGoalsMain showerLiteral showerLiteral)
+      fun showLiteral () = showGoalsMain showerLiteral showerLiteral
 
       fun detail () =
          (case R.deref theState of
@@ -214,15 +213,13 @@ structure ProverInternal :> PROVER_INTERNAL =
 
 
       fun action f =
-         withHandler
-         (fn () =>
-             (
-             Message.clear ();
+         (
+         Message.clear ();
 
-             f (state ());
+         f (state ());
 
-             Message.message 10 0 showGoals
-             ))
+         Message.message 10 0 showGoals
+         )
 
 
       extension Answer of (label * goal) list * Tactic.validator
@@ -311,26 +308,24 @@ structure ProverInternal :> PROVER_INTERNAL =
       fun qed () =
          (
          Message.clear ();
-         withHandler
-         (fn () =>
-             (case state () of
-                 (0, [], k) => k []
 
-               | _ => signalError "proof incomplete"))
+         (case state () of
+             (0, [], k) => k []
+
+           | _ => signalError "proof incomplete")
          )
 
 
       fun abandon () =
          (
          Message.clear ();
-         withHandler
-         (fn () =>
-             (case R.deref theState of
-                 SOME _ =>
-                    R.assign theState NONE
 
-               | NONE =>
-                    signalError "no proof underway"))
+         (case R.deref theState of
+             SOME _ =>
+                R.assign theState NONE
+
+           | NONE =>
+                signalError "no proof underway")
          )
 
 
@@ -421,75 +416,71 @@ structure ProverInternal :> PROVER_INTERNAL =
 
 
       fun lemma name ea =
-         withHandler
-         (fn () =>
-             (case R.deref theState of
-                 NONE =>
-                    let
-                       val sym = Symbol.fromValue name
+         (case R.deref theState of
+             NONE =>
+                let
+                   val sym = Symbol.fromValue name
 
-                       val () =
-                          (case Namespace.resolveOpt [sym] of
-                              NONE => ()
+                   val () =
+                      (case Namespace.resolveOpt [sym] of
+                          NONE => ()
 
-                            | SOME _ =>
-                                 signalError (String.concat
-                                                   ["lemma name ", name, " already in use"]))
-                       
-                       val a = ETerm.closed ea
-                       val jud = J.make Seq.empty a
+                        | SOME _ =>
+                             signalError (String.concat
+                                               ["lemma name ", name, " already in use"]))
+                   
+                   val a = ETerm.closed ea
+                   val jud = J.make Seq.empty a
 
-                       val goals = [(blank, (jud, Directory.empty))]
+                   val goals = [(blank, (jud, Directory.empty))]
 
-                       fun k vs =
-                          (case vs of
-                              [v] =>
-                                 let
-                                    val () = checkClean a
-                                    val (const, jud', v') = NamespaceInternal.reify sym jud v
-                                 in
-                                    R.assign theState NONE;
-                                    R.assign theOriginalGoals NONE;
-                                    Database.enterType const jud' v';
-                                    print "Lemma ";
-                                    print name;
-                                    print " defined.\n"
-                                 end
+                   fun k vs =
+                      (case vs of
+                          [v] =>
+                             let
+                                val () = checkClean a
+                                val (const, jud', v') = NamespaceInternal.reify sym jud v
+                             in
+                                R.assign theState NONE;
+                                R.assign theOriginalGoals NONE;
+                                Database.enterType const jud' v';
+                                print "Lemma ";
+                                print name;
+                                print " defined.\n"
+                             end
 
-                            | _ => raise (Fail "convention violated"))
-                    in
-                       !beforeLemmaHook ();
-                       R.assign theState (SOME (0, goals, k));
-                       R.assign theOriginalGoals (SOME goals);
+                        | _ => raise (Fail "convention violated"))
+                in
+                   !beforeLemmaHook ();
+                   R.assign theState (SOME (0, goals, k));
+                   R.assign theOriginalGoals (SOME goals);
 
-                       Message.message 10 0 showGoals
-                    end
-          
-               | SOME _ =>
-                    signalError "proof underway"))
+                   Message.message 10 0 showGoals
+                end
+      
+           | SOME _ =>
+                signalError "proof underway")
 
 
       fun setGoals goals k =
-         withHandler
-         (fn () =>
-             (case R.deref theState of
-                 NONE =>
-                    let
-                       fun k' vs =
-                          (
-                          R.assign theState NONE;
-                          R.assign theOriginalGoals NONE;
-                          k vs
-                          )
-                    in
-                       !beforeLemmaHook ();
-                       R.assign theState (SOME (0, goals, k'));
-                       R.assign theOriginalGoals (SOME goals);
-                       Message.message 10 0 showGoals
-                    end
-          
-               | SOME _ =>
-                    signalError "proof underway"))
+         (case R.deref theState of
+             NONE =>
+                let
+                   fun k' vs =
+                      (
+                      R.assign theState NONE;
+                      R.assign theOriginalGoals NONE;
+                      k vs
+                      )
+                in
+                   !beforeLemmaHook ();
+                   R.assign theState (SOME (0, goals, k'));
+                   R.assign theOriginalGoals (SOME goals);
+                   Message.message 10 0 showGoals
+                end
+      
+           | SOME _ =>
+                signalError "proof underway")
 
 
       fun openGoal goal =
@@ -521,14 +512,12 @@ structure ProverInternal :> PROVER_INTERNAL =
            | NONE => signalError "no proof underway")
 
       fun showOriginalGoals () =
-         withHandler
-         (fn () =>
-             (case R.deref theOriginalGoals of
-                 SOME goals =>
-                    showGoalsGen 0 goals showerLong showerLong
+         (case R.deref theOriginalGoals of
+             SOME goals =>
+                showGoalsGen 0 goals showerLong showerLong
 
-               | NONE =>
-                    signalError "no proof underway"))
+           | NONE =>
+                signalError "no proof underway")
 
 
 
