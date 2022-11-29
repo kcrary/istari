@@ -5,7 +5,7 @@ signature PICKLING =
       type constant
       type term
 
-      exception UnknownConstant
+      exception UnknownConstant of string
       exception Paranoid
 
       val puSymbol : Symbol.symbol Pickle.pu
@@ -62,7 +62,7 @@ functor PicklingFun (structure Term : TERM
       type constant = C.constant
       type term = T.term
 
-      exception UnknownConstant
+      exception UnknownConstant of string
       exception Paranoid  (* Not actually raised here, but it's convenient to have it live here. *)
 
 
@@ -81,7 +81,14 @@ functor PicklingFun (structure Term : TERM
 
       (* NB!  These tables are intentionally not rewindable, like the constant table. *)
       
-      val constantToLuidTable : luid CT.table = CT.table 199
+      (* The bool ref is true if this constant has ever been written before.
+         The first time we write a constant, we include its name so that the importer
+         can produce a better error message for unknown constants.  We'll signal
+         an error the first time we see an unknown constant, so subsequent appearances
+         don't need the name.
+      *)
+      val constantToLuidTable : (luid * bool ref) CT.table = CT.table 199
+
       val luidToConstantTable : C.constant LT.table = LT.table 199
       val theCounter = ref 0
 
@@ -108,11 +115,15 @@ functor PicklingFun (structure Term : TERM
             Constant.puOpacity
 
 
+      fun pathToName path =
+         String.concatWith "." 
+            (List.foldl (fns sym l => Symbol.toValue sym :: l) [] path)
+
       val puConstant =
          P.wrap 
             (fn const =>
                 let
-                   val (luid, old) =
+                   val ((luid, written), old) =
                       CT.lookupOrInsert' constantToLuidTable const
                          (fn () =>
                              let
@@ -124,27 +135,37 @@ functor PicklingFun (structure Term : TERM
 
                                 LT.insert luidToConstantTable luid const;
 
-                                luid
+                                (luid, ref true)
                              end)
                 in
                    if old then
-                      (luid, NONE)
+                      if !written then
+                         (luid, Sum.INL "")
+                      else
+                         (
+                         written := true;
+                         (luid, Sum.INL (pathToName (Constant.path const)))
+                         )
                    else
                       (luid,
-                       SOME (C.definitionTrue const, C.path const, C.opacity const))
+                       Sum.INR (C.definitionTrue const, C.path const, C.opacity const))
                 end)
 
             (fn (luid, info) =>
                 (case info of
-                    NONE =>
+                    Sum.INL name =>
                        (case LT.find luidToConstantTable luid of
                            NONE => 
-                              (* The luid isn't meaningful yet, and no info. *)
-                              raise UnknownConstant
+                              (* The luid isn't meaningful yet, and no info other than
+                                 the name.  The name should not be empty, because it's
+                                 only empty on subsequent instances of the constant, but
+                                 we are generating this error the first time we see it.
+                              *)
+                              raise (UnknownConstant name)
        
                          | SOME const => const)
 
-                  | SOME (def, path, opac) =>
+                  | Sum.INR (def, path, opac) =>
                        (* It's the first time we've seen this constant while loading this file,
                           and by uniqueness of nonces, we haven't seen it in any other files.
                           So this is the first time we've seen this constant, unless we're reloading
@@ -163,12 +184,12 @@ functor PicklingFun (structure Term : TERM
                               in
                                  C.setOpacity const opac;
        
-                                 CT.insert constantToLuidTable const luid;
+                                 CT.insert constantToLuidTable const (luid, ref false);
 
                                  const
                               end)))
 
-            (P.pair puLuid (P.option puInfo))
+            (P.pair puLuid (P.sum P.string puInfo))
 
 
       val zero = Word32.fromInt 0
@@ -177,7 +198,9 @@ functor PicklingFun (structure Term : TERM
       fun primitive const i =
          (
          LT.insert luidToConstantTable (zero, i) const;
-         CT.insert constantToLuidTable const (zero, i)
+
+         (* Don't need to supply names for primitives. *)
+         CT.insert constantToLuidTable const ((zero, i), ref true)
          )
 
 

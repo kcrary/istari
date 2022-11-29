@@ -1,0 +1,498 @@
+
+Ctrl.use "nat-load.iml";
+Ctrl.use "logic-load.iml";
+Ctrl.use "bool-load.iml";
+Ctrl.use "nat-eff-load.iml";
+
+Namespace.beginModule "Integer";
+
+
+lemma "diff_trans"
+/
+  forall (a a' b b' c c' : nat) .
+    a + b' = a' + b : nat
+    -> b + c' = b' + c : nat
+    -> a + c' = a' + c : nat
+/;
+
+intro /a a' b b' c c' Hab Hbc/.
+apply /Nat.plus_cancel_r _ _ (b + b')/.
+rewrite /-> Nat.plus_commute b b'/.
+rewrite /-> Nat.plus_assoc/.
+rewrite /-> Nat.plus_commute at 1/.
+rewrite /-> Nat.plus_assoc at 1/.
+rewrite /-> Nat.plus_commute c (b + b')/.
+rewrite /<- Nat.plus_assoc at all/.
+rewrite /-> Nat.plus_assoc/.
+rewrite /-> Nat.plus_assoc at 1/.
+compat >> auto.
+qed ();
+
+
+
+define /integer/
+/
+  quotient (a b : nat & nat) . a #1 + b #2 = a #2 + b #1 : nat
+//
+  U 0
+/;
+
+unfold /integer/.
+typecheck.
+  {
+  reintro /H/.
+  symmetry.
+  rewrite /-> Nat.plus_commute at 0 1/.
+  hyp /H/.
+  }
+
+  {
+  reintro /p q r Hpq Hqr/.
+  apply /diff_trans/ >> auto.
+  }
+qed ();
+
+
+
+lemma "integer_of"
+/
+  forall (a b : nat) .
+    (a , b) : integer
+/;
+
+inference.
+intro /a b/.
+infer /integer/ /Htype/.
+unfold /integer in Htype/.
+unfold /integer/.
+typecheck.
+reduce //.
+rewrite /-> Nat.plus_commute/.
+reflexivity.
+qed ();
+
+
+
+lemma "integer_subtype"
+/
+  (nat & nat) <: integer
+/;
+
+intro /(a b)/.
+apply /integer_of/.
+qed ();
+
+
+
+lemma "integer_eq"
+/
+  forall a b c d .
+    a + d = b + c : nat
+    -> (a , b) = (c , d) : integer
+/;
+
+inference.
+intro /a b c d Heq/.
+infer /integer/ /Htype/.
+unfold /integer in Htype/.
+unfold /integer/.
+extensionalityOf.
+reduce //.
+auto.
+qed ();
+
+
+
+define /zeroz/
+/
+  (0 , 0)
+//
+  integer
+/;
+
+unfold /zeroz/.
+apply /integer_of/.
+qed ();
+
+
+
+define /onez/
+/
+  (1 , 0)
+//
+  integer
+/;
+
+unfold /onez/.
+apply /integer_of/.
+qed ();
+
+
+
+define /plusz a b/
+/
+  (a #1 + b #1 , a #2 + b #2)
+//
+  integer -> integer -> integer
+/;
+
+introOf /p q/.
+unfold /plusz/.
+reduce //.
+unfold /integer in p , integer in q/.
+destruct /p/ /[(p1 p2) (p1' p2') Hp]/.
+reduce /Hp/.
+destruct /q/ /[(q1 q2) (q1' q2') Hq]/.
+reduce /Hq/.
+reduce //.
+apply /integer_eq/.
+so /Nat.plus_compat _# 4 Hp Hq/ /H/.
+clear /Hp Hq/.
+rewrite /<- Nat.plus_assoc in H at all/.
+rewrite /<- Nat.plus_assoc at all/.
+rewrite /-> Nat.plus_assoc at 1/.
+rewrite /-> Nat.plus_commute at 2/.
+rewrite /<- Nat.plus_assoc/.
+rewrite /-> Nat.plus_assoc at 3/.
+rewrite /-> Nat.plus_commute at 5/.
+rewrite /<- Nat.plus_assoc/.
+hyp /H/.
+qed ();
+
+
+
+define /negz a/
+/
+  (a #2 , a #1)
+//
+  integer -> integer
+/;
+
+introOf /p/.
+unfold /negz/.
+reduce //.
+unfold /integer in p/.
+destruct /p/ /[(p1 p2) (p1' p2') Hp]/.
+reduce /Hp concl/.
+apply /integer_eq/.
+symmetry.
+hyp /Hp/.
+qed ();
+
+
+
+define /leqzb a b/
+/
+  NatEff.leqb (a #1 + b #2) (b #1 + a #2)
+//
+  integer -> integer -> bool
+/;
+
+introOf /p q/.
+unfold /leqzb/.
+unfold /integer in p , integer in q/.
+destruct /p/ /[(p1 p2) (p1' p2') Hp]/.
+reduce /Hp/.
+destruct /q/ /[(q1 q2) (q1' q2') Hq]/.
+reduce /Hq/.
+reduce //.
+rewrite /<- Bool.iff_eq_bool/.
+rewrite /-> NatEff.istrue_leqb at all/.
+symmetryIn /Hp/.
+so /Nat.plus_compat _# 4 Hp Hq/ /H/.  
+rewrite /-> Nat.plus_commute in H at 1 2/.
+rewrite /<- Nat.plus_assoc in H/.
+rewrite /-> Nat.plus_assoc in H at 1/.
+rewrite /-> Nat.plus_commute in H at 2/.
+rewrite /<- Nat.plus_assoc in H/.
+rewrite /-> Nat.plus_commute in H at 4 5/.
+rewrite /-> Nat.plus_commute in H at 3/.
+rewrite /<- Nat.plus_assoc in H/.
+rewrite /-> Nat.plus_assoc in H at 3/.
+rewrite /-> Nat.plus_commute in H at 5/.
+rewrite /<- Nat.plus_assoc in H/.
+rewrite /-> Nat.plus_assoc in H at 0 1/.
+split.
+  {
+  intro /Hleq/.
+  apply /Nat.plus_cancel_leq_leq_r _ _ (p2 + q1) (q2 + p1)/.
+    {
+    apply /Nat.leq_refl_eq/ >> auto.
+    }
+
+    {
+    rewrite /-> Nat.plus_commute at 0 1/.
+    auto.
+    }
+  }
+
+  {
+  intro /Hleq/.
+  rewrite /-> Nat.plus_commute in H at 2 5/.
+  symmetryIn /H/.
+  apply /Nat.plus_cancel_leq_leq_l (q1' + p2') (p1' + q2')/.
+    {
+    apply /Nat.leq_refl_eq/ >> auto.
+    }
+
+    {
+    auto.
+    }
+  }
+qed ();
+
+
+
+define /leqz a b/
+/
+  Bool.istrue (leqzb a b)
+//
+  integer -> integer -> U 0
+/;
+
+unfold /leqz/.
+typecheck.
+qed ();
+
+
+
+define /minusz a b/
+/
+  plusz a (negz b)
+//
+  integer -> integer -> integer
+/;
+
+unfold /minusz/.
+typecheck.
+qed ();
+
+
+
+define /ltzb a b/
+/
+  leqzb (plusz onez a) b
+//
+  integer -> integer -> bool
+/;
+
+unfold /ltzb/.
+typecheck.
+qed ();
+
+
+
+define /ltz a b/
+/
+  leqz (plusz onez a) b
+//
+  integer -> integer -> U 0
+/;
+
+unfold /ltz/.
+typecheck.
+qed ();
+
+
+ConstantTable.insert DestructInternal.destructTactics (parseConstant /integer/)
+  DestructInternal.destUserQuotient;
+
+
+lemma "leqz_inhabitant"
+/
+  forall (a b : integer) . leqz a b -> () : leqz a b
+/;
+
+intro /p q H/.
+unfold /leqz in H in concl/.
+apply /Bool.istrue_inhabitant/ >> auto.
+qed ();
+
+
+
+ConstantTable.insert TypecheckInternal.trivialIntroTactics (parseConstant /leqz/)
+  (Backchain.applyPriority /leqz_inhabitant/);
+
+
+
+lemma "leqz_refl"
+/
+  forall a . leqz a a
+/;
+
+inference.
+intro /p/.
+destruct /p/ /[p]/.
+so /integer_subtype/ /?/.
+unhide.
+unfold /leqz/.
+unfold /leqzb/.
+
+(* XX why isn't testRewrite unifying variables *)
+testRewrite /-> NatEff.istrue_leqb/;
+
+rewrite /-> NatEff.istrue_leqb/.
+qed ();
+
+
+
+lemma "leqz_trans"
+/
+  forall a b c . leqz a b -> leqz b c -> leqz a c
+/;
+
+inference.
+intro /p q r Hpq Hqr/.
+infer /p/ /Hofp/.
+infer /r/ /Hofr/.
+destruct /p/ /[(p1 p2)]/.
+destruct /q/ /[(q1 q2)]/.
+destruct /r/ /[(r1 r2)]/.
+unfold /leqz in Hpq in Hqr in concl/.
+unfold /leqzb in Hpq in Hqr in concl/.
+reduce /Hpq Hqr concl/.
+rewrite /-> NatEff.istrue_leqb in Hpq in Hqr in concl/.
+clear /Hofp Hofr/.
+so /Nat.plus_leq _# 4 Hpq Hqr/ /H/.
+apply /Nat.plus_cancel_leq_r _ _ (q1 + q2)/.
+rewrite /-> Nat.plus_commute at 2/.
+rewrite /-> Nat.plus_assoc/.
+rewrite /-> Nat.plus_commute at 1/.
+rewrite /-> Nat.plus_commute in H at 4/.
+rewrite /-> Nat.plus_commute at 4/.
+rewrite /<- Nat.plus_assoc in H at all in concl at all/.
+rewrite /-> Nat.plus_assoc in H at 3 in concl at 3/.
+rewrite /-> Nat.plus_commute at 5/.
+exact /H/.
+qed ();
+
+
+
+lemma "leqz_antisymm"
+/
+  forall a b . leqz a b -> leqz b a -> a = b : integer
+/;
+
+inference.
+intro /p q Hpq Hqp/.
+so /integer_of/ /Hof/.
+destruct /p/ /[(p1 p2)]/.
+destruct /q/ /[(q1 q2)]/.
+apply /integer_eq/.
+unfold /leqz in Hpq in Hqp/.
+unfold /leqzb in Hpq in Hqp/.
+rewrite /-> NatEff.istrue_leqb in Hpq in Hqp/.
+rewrite /-> Nat.plus_commute in Hpq at 1 in Hqp at 0/.
+apply /Nat.leq_antisymm/ >> auto.
+qed ();
+
+
+
+lemma "plusz_id_l"
+/
+  forall a . plusz zeroz a = a : integer
+/;
+
+inference.
+intro /p/.
+so /integer_of/ /Hof/.
+destruct /p/ /[(p1 p2)]/.
+unfold /zeroz , plusz/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_id_r"
+/
+  forall a . plusz a zeroz = a : integer
+/;
+
+inference.
+intro /p/.
+so /integer_of/ /Hof/.
+destruct /p/ /[(p1 p2)]/.
+unfold /zeroz , plusz/.
+reduce //.
+rewrite /-> Nat.plus_0_r at all/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_commute"
+/
+  forall a b . plusz a b = plusz b a : integer
+/;
+
+inference.
+intro /a b/.
+so /integer_of/ /Hof/.
+destruct /a/ /[(a a')]/.
+destruct /b/ /[(b b')]/.
+unfold /plusz at all/.
+reduce //.
+apply /integer_eq/.
+rewrite /-> Nat.plus_commute at 0 1 2/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_assoc"
+/
+  forall a b c . plusz (plusz a b) c = plusz a (plusz b c) : integer
+/;
+
+inference.
+intro /a b c/.
+so /integer_of/ /Hof/.
+destruct /a/ /[(a a')]/.
+destruct /b/ /[(b b')]/.
+destruct /c/ /[(c c')]/.
+unfold /plusz at all/.
+reduce //.
+apply /integer_eq/.
+rewrite /-> Nat.plus_commute/.
+rewrite /<- Nat.plus_assoc at all/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_inverse_l"
+/
+  forall a . plusz (negz a) a = zeroz : integer
+/;
+
+inference.
+intro /a/.
+so /integer_of/ /Hof/.
+destruct /a/ /[(a a')]/.
+unfold /zeroz at all , negz at all , plusz at all/.
+reduce //.
+apply /integer_eq/.
+rewrite /-> Nat.plus_0_r at all/.
+rewrite /-> Nat.plus_commute/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_inverse_r"
+/
+  forall a . plusz a (negz a) = zeroz : integer
+/;
+
+inference.
+intro /a/.
+so /integer_of/ /Hof/.
+destruct /a/ /[(a a')]/.
+unfold /zeroz at all , negz at all , plusz at all/.
+reduce //.
+apply /integer_eq/.
+rewrite /-> Nat.plus_0_r at all/.
+rewrite /-> Nat.plus_commute/.
+reflexivity.
+qed ();

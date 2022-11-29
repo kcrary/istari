@@ -25,7 +25,7 @@ signature FILE_INTERNAL =
 structure FileInternal :> FILE_INTERNAL =
    struct
 
-      val magicNumber = Bytestring.fromString "Ist00006"
+      val magicNumber = Bytestring.fromString "Ist00007"
 
       structure C = ConstantInternal
       structure CR = CheckpointedRef
@@ -348,16 +348,42 @@ structure FileInternal :> FILE_INTERNAL =
                   (fn () => BinIO.closeIn ins)
                with
                   Pickle.Error =>
-                     signalError "imported file is corrupted"
+                     signalError
+                        (String.concat
+                            [
+                            "imported file ",
+                            filename,
+                            " is corrupted"
+                            ])
 
-                | Pickling.UnknownConstant =>
-                     raise (LoadError "Error: imported file uses an unknown constant.\n(Probably a dependency is not loaded or has changed.)\n")
+                | Pickling.UnknownConstant name =>
+                     raise (LoadError 
+                               (String.concat
+                                   [
+                                   "Error: imported file ",
+                                   filename,
+                                   " uses an unknown constant named ",
+                                   name,
+                                   ".\n(Probably a dependency is not loaded or has changed.)\n"
+                                   ]))
       
                 | Pickling.Paranoid =>
-                     signalError "paranoid is set"
+                     signalError 
+                        (String.concat
+                            [
+                            "cannot import file ",
+                            filename,
+                            ": paranoid is set"
+                            ])
       
                 | Refine.NoExtracts =>
-                     signalError "imported file does not support extracts"
+                     signalError 
+                        (String.concat
+                            [
+                            "imported file ",
+                            filename,
+                            " does not support extracts"
+                            ])
             end
 
    end
