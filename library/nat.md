@@ -53,6 +53,8 @@ A simpler case-analysis operation:
 
     leq_refl : type:leq_refl
 
+    leq_refl_eq : type:leq_refl_eq
+
     leq_trans : type:leq_trans
 
     leq_antisymm : type:leq_antisymm
@@ -109,6 +111,14 @@ Strong induction for natural numbers:
     plus_leq_r : type:plus_leq_r
 
     plus_leq : type:plus_leq
+
+    plus_cancel_leq_r : type:plus_cancel_leq_r
+
+    plus_cancel_leq_l : type:plus_cancel_leq_l
+
+    plus_cancel_leq_leq_l : type:plus_cancel_leq_leq_l
+
+    plus_cancel_leq_leq_r : type:plus_cancel_leq_leq_r
 
     plus_lt_r : type:plus_lt_r
 

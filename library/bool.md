@@ -13,6 +13,8 @@ The `bool` type is primitive, but aliased in the `Bool` module:
     istrue : type:istrue
            = def:istrue
 
+    istrue_inhabitant : type:istrue_inhabitant
+
     istrue_true : type:istrue_true
 
     not_istrue_false : type:not_istrue_false

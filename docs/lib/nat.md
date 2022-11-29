@@ -54,6 +54,8 @@ A simpler case-analysis operation:
 
     leq_refl : forall (n : nat) . n <= n
 
+    leq_refl_eq : forall (m n : nat) . m = n : nat -> m <= n
+
     leq_trans : forall (m n p : nat) . m <= n -> n <= p -> m <= p
 
     leq_antisymm : forall (m n : nat) . m <= n -> n <= m -> m = n : nat
@@ -110,6 +112,14 @@ Strong induction for natural numbers:
     plus_leq_r : forall (m n : nat) . n <= m + n
 
     plus_leq : forall (m m' n n' : nat) . m <= m' -> n <= n' -> m + n <= m' + n'
+
+    plus_cancel_leq_r : forall (m n p : nat) . m + p <= n + p -> m <= n
+
+    plus_cancel_leq_l : forall (m n p : nat) . p + m <= p + n -> m <= n
+
+    plus_cancel_leq_leq_l : forall (m m' n n' : nat) . m + n <= m' + n' -> m' <= m -> n <= n'
+
+    plus_cancel_leq_leq_r : forall (m m' n n' : nat) . m + n <= m' + n' -> n' <= n -> m <= m'
 
     plus_lt_r : forall (m n : nat) . 0 < n -> m < m + n
 

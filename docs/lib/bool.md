@@ -12,6 +12,8 @@ The `bool` type is primitive, but aliased in the `Bool` module:
     istrue : bool -> U 0
            = fn b . if b then unit else void
 
+    istrue_inhabitant : forall (b : bool) . istrue b -> () : istrue b
+
     istrue_true : istrue true
 
     not_istrue_false : not (istrue false)
