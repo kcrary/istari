@@ -4,13 +4,16 @@ signature RULE =
 
       include THE_RULES
 
+
       val hypothesis : int -> rule
       val hypothesisOf : int -> rule
       val hypothesisEq : int -> rule
       val hypothesisOfTp : int -> rule
       val hypothesisEqTp : int -> rule
 
+
       val identity : string -> rule
+
 
       (* weaken i j, if |G2| = j, and |G3| = i,
          turns G1, G2, G3 into G1, G3
@@ -81,6 +84,14 @@ signature RULE =
 
 
 
+      (* <x> : integer *)
+      val integerIntroOf : rule
+
+      (* <x> = <x> : integer *)
+      val integerIntroEq : rule
+
+
+
       exception Failure         (* raised when a rule does not apply *)
       exception ExtractFailure  (* raised when extract function doesn't see what it expects *)
 
@@ -97,6 +108,7 @@ structure Rule :> RULE =
 
       structure T = Term
       structure J = Judgement
+      structure N = Normalize
       structure S = Seq
       structure I = Invert
       structure U = Unify
@@ -1060,5 +1072,65 @@ structure Rule :> RULE =
                    (Lam (NONE, Sub (n, substAt zero 0 1 gsize)))
 
            | _ => raise ExtractFailure)
+
+
+      (* The rule generator doesn't know about native terms, so it can't generate the 
+         rules to talk about them.
+      *)
+
+      val integerIntroOf =
+         ("integerIntroOf",
+          fn jud =>
+             (case N.whnf (J.concl jud) of
+                 Elim (Const const, [App a, App m]) =>
+                    if Constant.eq (const, Prim.ov) then
+                       (case N.whnf a of
+                           Elim (Const const', []) =>
+                              if Constant.eq (const', Prim.integer) then
+                                 (case N.whnf m of
+                                     Native (Integer _) =>
+                                        ([], fn0 T.Triv)
+
+                                   | _ =>
+                                        raise Failure)
+                              else
+                                 raise Failure
+
+                         | _ =>
+                              raise Failure)
+                    else
+                       raise Failure
+
+               | _ =>
+                    raise Failure))
+
+      val integerIntroEq =
+         ("integerIntroEq",
+          fn jud =>
+             (case N.whnf (J.concl jud) of
+                 Elim (Const const, [App a, App m, App n]) =>
+                    if Constant.eq (const, Prim.eq) then
+                       (case N.whnf a of
+                           Elim (Const const', []) =>
+                              if Constant.eq (const', Prim.integer) then
+                                 (case (N.whnf m, N.whnf n) of
+                                     (Native (Integer x), Native (Integer y)) =>
+                                        if IntInf.= x y then
+                                           ([], fn0 T.Triv)
+                                        else
+                                           raise Failure
+
+                                   | _ =>
+                                        raise Failure)
+                              else
+                                 raise Failure
+
+                         | _ =>
+                              raise Failure)
+                    else
+                       raise Failure
+
+               | _ =>
+                    raise Failure))
 
    end

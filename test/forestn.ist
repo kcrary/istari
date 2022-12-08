@@ -1,4 +1,7 @@
 
+Namespace.openModule (parseLongident /Nat/);
+
+
 (*
 
 datatype tree a : nat -> type = 
@@ -10,19 +13,6 @@ and forest a : nat -> type =
 | Cons : forall m n . tree a m -> forest a n -> forest a (m + n)
 
 *)
-
-
-val plusConst = Namespace.declare (`"plus") NONE;
-
-
-Unsafe.allow ();
-
-lemma "plus_type"
-  / plus : nat -> nat -> nat /;
-
-trustme.
-qed ();
-recordTyping "plus_type";
 
 
 
@@ -726,10 +716,10 @@ val r1a =
     R.unfold,
     R.beta 8,
     R.within [2] R.unfold,
-    R.user1 Prim.unroll_wind,
+    R.user1 PrimReduction.unroll_wind,
     R.beta 3,
     R.within [1] (R.beta 2),
-    R.user2 Prim.sumcase_inl,
+    R.user2 PrimReduction.sumcase_inl,
     R.beta 1
     ];
 
@@ -755,12 +745,12 @@ val r2a =
     R.unfold,
     R.beta 8,
     R.within [2] (R.trans [R.unfold, R.beta 4]),
-    R.user1 Prim.unroll_wind,
+    R.user1 PrimReduction.unroll_wind,
     R.beta 3,
     R.within [1] (R.beta 1),
-    R.user2 Prim.sumcase_inr,
+    R.user2 PrimReduction.sumcase_inr,
     R.beta 1,
-    R.user2 Prim.sumcase_inl,
+    R.user2 PrimReduction.sumcase_inl,
     R.beta 1,
     R.compat
       [
@@ -800,14 +790,14 @@ val r3a =
     R.unfold,
     R.beta 8,
     R.within [2] R.unfold,
-    R.user1 Prim.unroll_wind,
+    R.user1 PrimReduction.unroll_wind,
     R.beta 3,
     R.within [1] (R.beta 2),
-    R.user2 Prim.sumcase_inr,
+    R.user2 PrimReduction.sumcase_inr,
     R.beta 1,
-    R.user2 Prim.sumcase_inr,
+    R.user2 PrimReduction.sumcase_inr,
     R.beta 1,
-    R.user2 Prim.sumcase_inl,
+    R.user2 PrimReduction.sumcase_inl,
     R.beta 1,
     ];
 
@@ -833,23 +823,23 @@ val r4a =
     R.unfold,
     R.beta 8,
     R.within [2] (R.trans [R.unfold, R.beta 5]),
-    R.user1 Prim.unroll_wind,
+    R.user1 PrimReduction.unroll_wind,
     R.beta 3,
     R.within [1] (R.beta 1),
-    R.user2 Prim.sumcase_inr,
+    R.user2 PrimReduction.sumcase_inr,
     R.beta 1,
-    R.user2 Prim.sumcase_inr,
+    R.user2 PrimReduction.sumcase_inr,
     R.beta 1,
-    R.user2 Prim.sumcase_inr,
+    R.user2 PrimReduction.sumcase_inr,
     R.beta 1,
     R.compat
       [
       R.beta 1,
       R.beta 1,
-      R.trans [R.beta 2, R.user2 Prim.ite_tru],
-      R.trans [R.beta 2, R.user2 Prim.ite_fals],
-      R.trans [R.beta 1, R.within [2] (R.trans [R.beta 2, R.user2 Prim.ite_tru])],
-      R.trans [R.beta 1, R.within [2] (R.trans [R.beta 2, R.user2 Prim.ite_fals])]
+      R.trans [R.beta 2, R.user2 PrimReduction.ite_tru],
+      R.trans [R.beta 2, R.user2 PrimReduction.ite_fals],
+      R.trans [R.beta 1, R.within [2] (R.trans [R.beta 2, R.user2 PrimReduction.ite_tru])],
+      R.trans [R.beta 1, R.within [2] (R.trans [R.beta 2, R.user2 PrimReduction.ite_fals])]
       ]
     ];
 
@@ -884,20 +874,6 @@ val () = Define.register r4;
 
 
 
-lemma "plus_id" / forall (n : nat) . plus 0 n = n : nat /;
-
-trustme.
-qed ();
-
-
-
-lemma "plus_comm" / forall (m n : nat) . plus m n = plus n m : nat /;
-
-trustme.
-qed ();
-
-
-
 lemma "type_tree"
   / forall i (a : U i) (x : a) .
       Node _ (plus 0 (plus 1 0)) x (Cons _ 0 (plus 1 0) (Empty _) (Cons _ 1 0 (Node a 0 x (Nil _)) (Nil _))) : tree a (succ (plus 0 (plus 1 0))) /;
@@ -913,8 +889,6 @@ lemma "type_tree2"
 
 intro /i a x/.
 typecheck.
-rewrite /-> plus_id , -> plus_comm , -> plus_id/.
-reflexivity.
 qed ();
 
 

@@ -31,15 +31,24 @@ signature PRIVILEGED =
          where type sub = Term.sub
          where type elim = Term.elim
 
+      structure Prim : 
+         PRIM_INTERNAL
+         where type constant = Term.constant
+
+      structure Native :
+         NATIVE
+         where type constant = Term.constant
+         where type term = Term.term
+         where type native = Term.native
+
       structure Reduction : 
          REDUCTION_INTERNAL
          where type constant = Term.constant
          where type term = Term.term
          where type elim = Term.elim
 
-      structure Prim : 
-         PRIM
-         where type constant = Term.constant
+      structure PrimReduction :
+         PRIM_REDUCTION_INTERNAL
          where type ureduction1 = Reduction.ureduction1
          where type ureduction2 = Reduction.ureduction2
 
@@ -100,20 +109,31 @@ structure Privileged :> PRIVILEGED =
          SimplifyFun (structure Term = Term
                       structure Constant = Constant)
 
+      structure Prim =
+         PrimFun 
+         (structure Term = Term
+          structure Constant = Constant
+          structure Pickling = Pickling)
+
+      structure Native =
+         NativeFun
+         (structure Term = Term
+          structure Prim = Prim)
+
       structure Reduction =
          ReductionFun
          (structure Term = Term
           structure Constant = Constant
           structure Simplify = Simplify
+          structure Native = Native
           structure Trail = Trail
           structure Pickling = Pickling
           structure Unsafe = Unsafe)
 
-      structure Prim =
-         PrimFun 
+      structure PrimReduction =
+         PrimReductionFun
          (structure Term = Term
-          structure Constant = Constant
-          structure Pickling = Pickling
+          structure Prim = Prim
           structure Reduction = Reduction)
 
       structure Normalize =
@@ -121,8 +141,10 @@ structure Privileged :> PRIVILEGED =
          (structure Term = Term
           structure Constant = Constant
           structure Simplify = Simplify
+          structure Native = Native
           structure Reduction = Reduction
-          structure Prim = Prim)
+          structure Prim = Prim
+          structure PrimReduction = PrimReduction)
 
       structure Invert =
          InvertFun
@@ -146,8 +168,10 @@ structure ConstantInternal = Privileged.Constant
 structure Pickling = Privileged.Pickling
 structure Unsafe = Privileged.Unsafe
 structure Simplify = Privileged.Simplify
+structure PrimInternal = Privileged.Prim
+structure Native = Privileged.Native
 structure ReductionInternal = Privileged.Reduction
-structure Prim = Privileged.Prim
+structure PrimReductionInternal = Privileged.PrimReduction
 structure NormalizeInternal = Privileged.Normalize
 structure Invert = Privileged.Invert
 structure Unify = Privileged.Unify
@@ -160,6 +184,11 @@ structure Constant :>
    where type opacity = ConstantInternal.opacity
    = ConstantInternal
 
+structure Prim :>
+   PRIM
+   where type constant = Term.constant
+   = PrimInternal
+
 structure Reduction :>
    REDUCTION
    where type constant = Term.constant
@@ -169,6 +198,12 @@ structure Reduction :>
    where type ureduction1 = ReductionInternal.ureduction1
    where type ureduction2 = ReductionInternal.ureduction2
    = ReductionInternal
+
+structure PrimReduction :>
+   PRIM_REDUCTION
+   where type ureduction1 = ReductionInternal.ureduction1
+   where type ureduction2 = ReductionInternal.ureduction2
+   = PrimReductionInternal
 
 structure Normalize :>
    NORMALIZE

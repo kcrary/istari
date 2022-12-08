@@ -14,6 +14,7 @@ structure Token =
        | TYVAR of symbol * span
 
        | NUMBER of int * span
+       | BIGNUM of IntInf.int * span
        | WORD of int * span
        | STRING of string * span
        | CHAR of char * span

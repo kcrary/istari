@@ -197,14 +197,15 @@ The most important combinators are:
 
 ##### Matching terms
 
-    val elim   : (term, 'a, 'b) matcher -> (spine, 'b, 'c) matcher -> (term, 'a, 'c) matcher
-    val lam    : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
-    val lamb   : (term, 'a * Term.binder, 'b) matcher -> (term, 'a, 'b) matcher
-    val pair   : (term, 'a, 'b) matcher -> (term, 'b, 'c) matcher -> (term, 'a, 'c) matcher
-    val next   : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
-    val triv   : (term, 'a, 'a) matcher
-    val marker : Symbol.symbol -> (term, 'a, 'a) matcher
-    val nat    : (term, 'a, 'a * int) matcher
+    val elim    : (term, 'a, 'b) matcher -> (spine, 'b, 'c) matcher -> (term, 'a, 'c) matcher
+    val lam     : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+    val lamb    : (term, 'a * Term.binder, 'b) matcher -> (term, 'a, 'b) matcher
+    val pair    : (term, 'a, 'b) matcher -> (term, 'b, 'c) matcher -> (term, 'a, 'c) matcher
+    val next    : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+    val triv    : (term, 'a, 'a) matcher
+    val marker  : Symbol.symbol -> (term, 'a, 'a) matcher
+    val nat     : (term, 'a, 'a * int) matcher
+    val integer : (term, 'a, 'a * IntInf.int) matcher
 
 - `elim m1 m2` matches an elimination form; `m1` matches against the
   head and `m2` matches against the
@@ -236,10 +237,13 @@ The most important combinators are:
 - `nat` matches against natural number literals, producing a binding
   of the corresponding int.  In the parser it is written `nat?`.
 
+- `integer` matches against integer literals, producing a binding of
+  the corresponding integer.  In the parser it is written `integer?`.
+
 ##### Other term combinators
 
-    val unify : term -> (term, 'a, 'a) matcher
-    val whnf : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+    val unify    : term -> (term, 'a, 'a) matcher
+    val whnf     : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
     val whnfHard : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
 
 - `unify t` matches against any term that unifies with `t`, producing
@@ -476,6 +480,7 @@ right associative where relevant.
       var?                                               (whatVar)
       evar?                                              (whatEvar)
       nat?                                               (nat)
+      integer?                                           (integer)
       ( Match , ... , Match )                            (pair, length at least 2)
 
       $nil                                               (null)

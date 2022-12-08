@@ -88,8 +88,9 @@ when appropriate, is given by an L or R.
       __                                                             (marker)
       \ ... antiquoted internal term ... \
       ` Longident
-      `l LTerm
-      `level Level                                                 
+      l` LTerm                                                       (literal term)
+      level` Level                                                   (level expression)
+      z` Number                                                      (integer literal)
 
     OIdent ::=
       Ident
@@ -138,9 +139,6 @@ Notes:
 - A marker (`__`) is not a valid term in the logic.  It is a
   placeholder used by some tactics (*e.g.,* `so`).
 
-- The grammar also allows *long markers*, where additional text is
-  placed between the underscores.  Currently no tactics use this form.
-
 - One can bind additional de Bruijn positions using the syntax
   `additional OIdents . Term`.  For example, `additional x y . y`
   resolves to index 0; and if `z` resolves to index 3, then
@@ -175,6 +173,7 @@ substitution.
       Number                                                         (de Bruijn index)
       \ ... antiquoted internal term ... \
       ` Longident
+      z` Number                                                      (integer literal)
 
     Sub ::=
       Sub o Sub                                                      (composition) L

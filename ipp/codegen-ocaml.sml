@@ -538,6 +538,27 @@ functor CodegenOcamlFun (Output : OUTPUT) :> CODEGEN =
 
            | Enumber n => writeInt n
 
+           | Ebignum n =>
+                (* could be more aggressive, but why bother *)
+                if IntInf.<= (~32767, n) andalso IntInf.<= (n, 32767) then
+                   (
+                   write "(Z.of_int ";
+                   writeInt (IntInf.toInt n);
+                   write ")"
+                   )
+                else if IntInf.< (n, 0) then
+                   (
+                   write "(Z.ofString \"-";
+                   write (IntInf.toString (~ n));
+                   write "\")"
+                   )
+                else
+                   (
+                   write "(Z.ofString \"";
+                   write (IntInf.toString n);
+                   write "\")"
+                   )
+
            | Eword n =>
                 (
                 write "(Basis.Word.fromInt ";

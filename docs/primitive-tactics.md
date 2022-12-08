@@ -149,6 +149,9 @@ given by:
 
     type binder = Symbol.symbol option
 
+    datatype native =
+       Integer of IntInf.int
+
     datatype term =
        Var    of int
      | Const  of constant
@@ -159,6 +162,7 @@ given by:
      | Triv
      | Sub    of term * sub
      | Evar   of ebind
+     | Native of native
 
      | Marker of Symbol.symbol
 
@@ -174,7 +178,12 @@ given by:
      | Idot   of int * sub
 
 The `binder` in `Lam` is not significant to the type theory.  The
-implementation uses it to suggest a name for the bound variable.
+implementation uses it to suggest a name for the bound variable.  A
+`Marker` taking the empty symbol is the internal representation of the
+[marker psuedo-term](terms.html#the-term-grammar) (`__`).  (The
+datatype also allows distinguished markers in which a nonempty symbol
+is used.  Currently no tactics use this form.)
+
 
 
 ##### Spinal form
@@ -230,8 +239,18 @@ To unwind an evar assignment, one may use the trail mechanism (see
 below).
 
 
+##### Native terms
 
-##### Simplification and normalization
+Integers are implemented "natively" (meaning: using the language's
+built-in bignum implementation) for better performance.  In contrast,
+natural numbers are represented in unary, so extremely bad performance
+is to be expected on all but the smallest calculations.  The `native`
+type is defined to allow room for future expansion to support other
+native data types.
+
+
+
+### Simplification and normalization
 
 The same term can be represented in multiple ways because of spinal
 form, explicit substitutions, and evars.  To obtain the term in a
@@ -246,6 +265,7 @@ form*, which is given by the grammar:
          | (M, M)
          | next M
          | ()
+         | native-term
          | marker
 
     (simple form)
@@ -270,8 +290,8 @@ In weak-head-normal form, the term normally is either an `Elim`
 
 It is also possible for a weak-head-normal term to be an intro form
 applied to a nonempty spine whose first elim does not match the intro.
-(For example `(fn . M) #1`).  Such terms are ill-typed, so this case
-can usually be neglected.
+(For example `(fn . M) #1`).  Such terms are normally ill-typed, so
+this case can usually be neglected.
 
 To obtain a weak-head-normal form, one calls `Normalize.whnf`, or,
 less commonly, `Normalize.whnfHard` or `Normalize.whnfBasic`.  These

@@ -17,6 +17,23 @@ module FromString : FROM_STRING =
          in
             int_of_string_opt str'
          
+      let toIntInfM str = 
+         try
+            Some (Z.of_string str)
+         with
+            Invalid_argument _ -> None
+
+      let toIntInf str =
+         let str' =
+            if String.length str = 0 then
+               ""
+            else if String.get str 0 = '~' then
+               "-" ^ String.sub str 1 (String.length str - 1)
+            else
+               str
+         in
+            toIntInfM str'
+         
       let toWord8 str =
          (match int_of_string_opt str with
              None -> None

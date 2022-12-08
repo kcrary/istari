@@ -2,7 +2,7 @@
 
 The Istari UI is implemented as an Emacs extension.  Istari mode
 should start automatically whenever a file with an `.ist` extension is
-opened.  The Istari server itself will starts when the user begins
+opened.  The Istari server itself will start when the user begins
 processing the file, by calling `istari-start` or just by beginning to
 navigate the file.
 
@@ -44,7 +44,7 @@ cannot rewind the IML environment.  Thus, if one executes:
 and then rewinds one line, `x` will still be `2`, not `1`.
 
 (A few of Istari's internal data structures are not rewound because
-doing so would cause unsoundness, but they should never be noticed by
+doing so could cause unsoundness, but they should never be noticed by
 the user.)
 
 
@@ -55,7 +55,7 @@ One can re-show the current goals using `C-c s`.  This abbreviates all
 the goals except the first.  To obtain a full listing of all current
 goals use `C-c S`.
 
-Some tactics (notable the typechecker) may generate more detailed
+Some tactics (notably the typechecker) may generate more detailed
 information on subgoals than what is displayed by default.  That
 detail can be displayed using `C-c C-d`.
 

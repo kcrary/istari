@@ -153,6 +153,8 @@ functor UnifyFun (structure Term : TERM
 
            | Triv => m
 
+           | Native _ => m
+
            | Marker _ => m
 
            | _ =>
@@ -343,6 +345,8 @@ functor UnifyFun (structure Term : TERM
            | Sub _ =>
                 raise (Fail "should be whnf or head")
 
+           | Native _ => ()
+
            | Marker _ => ())
 
 
@@ -440,6 +444,12 @@ functor UnifyFun (structure Term : TERM
                 sameMain m' n'
 
            | (Triv, Triv) => ()
+
+           | (Native x, Native y) =>
+                if sameNative x y then
+                   ()
+                else
+                   raise Different
 
            | (Marker sym, Marker sym') =>
                 if Symbol.eq (sym, sym') then
@@ -1048,6 +1058,15 @@ functor UnifyFun (structure Term : TERM
 
            | (Triv, Triv) =>
                 progress := true
+
+           | (Native x, Native y) =>
+                if sameNative x y then
+                   progress := true
+                else
+                   (
+                   errorMessage := "clash";
+                   raise Unify
+                   )
 
            | (Marker sym, Marker sym') =>
                 if Symbol.eq (sym, sym') then

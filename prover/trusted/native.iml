@@ -1,0 +1,70 @@
+
+signature NATIVE =
+   sig
+
+      type constant
+      type term
+      type native
+
+      datatype operator =
+         Unary of native -> term
+       | Binary of native -> native -> term
+
+      val operators : (constant * operator) list
+
+   end
+
+
+functor NativeFun (structure Term : TERM
+                   structure Prim : PRIM 
+                                    where type constant = Term.constant)
+   :> 
+   NATIVE
+   where type constant = Term.constant
+   where type term = Term.term
+   where type native = Term.native
+   =
+   struct
+
+      open Term
+
+
+      fun eqzb (Integer p) (Integer q) =
+         if IntInf.= p q then
+            Const Prim.tru
+         else
+            Const Prim.fals
+
+      (* When there are natives other than Integer, need a catch-all returning:
+         apply2 Prim.eqzb (Native x) (Native y))
+      *)
+
+
+      fun leqzb (Integer p) (Integer q) =
+         if IntInf.<= p q then
+            Const Prim.tru
+         else
+            Const Prim.fals
+
+
+      fun negz (Integer p) = Native (Integer (IntInf.~ p))
+
+
+      fun plusz (Integer p) (Integer q) = Native (Integer (IntInf.+ p q))
+
+
+      datatype operator =
+         Unary of native -> term
+       | Binary of native -> native -> term
+
+      val operators =
+         [
+         (Prim.eqzb, Binary eqzb),
+         (Prim.leqzb, Binary leqzb),
+         (Prim.negz, Unary negz),
+         (Prim.plusz, Binary plusz)
+         ]
+
+   end
+
+

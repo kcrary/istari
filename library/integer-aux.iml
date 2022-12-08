@@ -1,0 +1,221 @@
+
+structure ParseInteger =
+   struct
+
+      structure T = ETerm
+
+      val plusz = Susp.delay (fn () => parseConstant /Integer.plusz/)
+      val negz = Susp.delay (fn () => parseConstant /Integer.negz/)
+      val minusz = Susp.delay (fn () => parseConstant /Integer.minusz/)
+      val leqz = Susp.delay (fn () => parseConstant /Integer.leqz/)
+      val ltz = Susp.delay (fn () => parseConstant /Integer.ltz/)
+
+      fun parsePlus m n = T.apply2 (Susp.force plusz) m n
+      fun parseMinus m n = T.apply2 (Susp.force minusz) m n
+      fun parseNeg m = T.apply1 (Susp.force negz) m
+      fun parseLeq m n = T.apply2 (Susp.force leqz) m n
+      fun parseLt m n = T.apply2 (Susp.force ltz) m n
+
+   end
+
+
+grammardef Integer 
+
+   open ParseInteger
+
+   rule Term(30)  ::= Term(31) "<z=" Term(31) => parseLeq
+   rule Term(30)  ::= Term(31) "<z" Term(31) => parseLt
+   rule Term(50)  ::= Term(50) "+z" Term(51) => parsePlus
+   rule Term(50)  ::= Term(50) "-z" Term(51) => parseMinus
+   rule Term(90)  ::= "~z" Term(91) => parseNeg
+
+end
+
+
+grammaron Integer
+
+
+functor AfterLtz () :> sig end =
+   struct
+
+      val () = ConstantInternal.setPath Prim.plusz [`"plusz", `"Integer"]
+      val () = ConstantInternal.setPath Prim.negz [`"negz", `"Integer"]
+      val () = ConstantInternal.setPath Prim.eqzb [`"eqzb", `"Integer"]
+      val () = ConstantInternal.setPath Prim.leqzb [`"leqzb", `"Integer"]
+      val () = ConstantInternal.setPath Prim.nat_to_integer [`"nat_to_integer", `"Integer"]
+      val () = ConstantInternal.setPath Prim.integer_to_nat [`"integer_to_nat", `"Integer"];
+
+
+      structure U = Show.Unparsing
+
+      fun register k arity prec unp =
+         ConstantTable.insert U.unparsingTable k (arity, prec, unp)
+
+
+      val plusz = parseConstant /Integer.plusz/
+      val minusz = parseConstant /Integer.minusz/
+      val negz = parseConstant /Integer.negz/
+      val leqz = parseConstant /Integer.leqz/
+      val ltz = parseConstant /Integer.ltz/
+
+
+      structure U = Show.Unparsing
+
+      fun register k arity prec unp =
+         ConstantTable.insert U.unparsingTable k (arity, prec, unp)
+
+
+      val () =
+         register leqz 2 30
+         (U.wrap
+             (U.apply2 leqz U.show U.show)
+             (fn (a, b) => U.append [a 31, 
+                                     U.break 1, U.string "<z= ", b 31]))
+
+      val () =
+         register ltz 2 30
+         (U.wrap
+             (U.apply2 ltz U.show U.show)
+             (fn (a, b) => U.append [a 31, 
+                                     U.break 1, U.string "<z ", b 31]))
+
+      val () =
+         register plusz 2 50
+         (U.wrap
+             (U.apply2 plusz U.show U.show)
+             (fn (a, b) => U.append [a 50, 
+                                     U.break 1, U.string "+z ", b 51]))
+
+      val () =
+         register minusz 2 50
+         (U.wrap
+             (U.apply2 minusz U.show U.show)
+             (fn (a, b) => U.append [a 50, 
+                                     U.break 1, U.string "-z ", b 51]))
+
+      val () =
+         register negz 1 90
+         (U.wrap
+             (U.apply1 negz U.show)
+             (fn a => U.append [U.string "~z ", a 91]))
+
+   end
+
+
+functor AfterLeqzbDef () :> sig end =
+   struct
+
+      val () = ConstantInternal.setPath Prim.integer_def [`"Integer", `"Def", `"Integer"]
+      val () = ConstantInternal.setPath Prim.plusz_def [`"Plusz", `"Def", `"Integer"]
+      val () = ConstantInternal.setPath Prim.negz_def [`"Negz", `"Def", `"Integer"]
+      val () = ConstantInternal.setPath Prim.eqzb_def [`"Eqzb", `"Def", `"Integer"]
+      val () = ConstantInternal.setPath Prim.leqzb_def [`"Leqzb", `"Def", `"Integer"]
+
+   end
+
+
+functor AfterIntegerToDef () :> sig end =
+   struct
+
+      val () = ConstantInternal.setPath Prim.integer_from_def [`"integer_from_def", `"Iso", `"Integer"];
+      val () = ConstantInternal.setPath Prim.integer_to_def [`"integer_to_def", `"Iso", `"Integer"];
+
+   end
+
+
+functor AfterLeqzInhabitant () :> sig end =
+   struct
+
+      val leqz = parseConstant /Integer.leqz/
+      val ltz = parseConstant /Integer.ltz/
+
+      val () =
+         ConstantTable.insert TypecheckInternal.trivialIntroTactics leqz
+            (Backchain.applyPriority /Integer.leqz_inhabitant/)
+
+      val () =
+         ConstantTable.insert TypecheckInternal.trivialIntroTactics ltz
+            (Backchain.applyPriority /Integer.ltz_inhabitant/)
+   
+   end
+
+
+functor AfterIntegerIter () :> sig end =
+   struct
+
+      structure J = Judgement
+      structure T = Term
+      
+      open Tactic
+
+      val smaller_well_founded = parseConstant /Integer.smaller_well_founded/
+
+      val integerInduction =
+         let
+            do (jud, dir) = withgoal
+
+            do (b, tac) =
+               BackchainInternal.soMain
+                  (J.context jud)
+                  (T.apply1 smaller_well_founded T.zero)
+                  (fn msg => fail msg)
+         in
+            refine (Rule.assert b (T.evar ()))
+            >>> [
+                tac,
+
+                chdir (Directory.bind0 dir)
+                >>
+                InductionInternal.accInduction
+                ]
+         end
+
+      val () = ConstantTable.insert InductionInternal.inductionTactics Prim.integer integerInduction
+
+      val () =
+         ConstantTable.insert InductionInternal.iterators Prim.integer
+            (parseConstant /Integer.integer_iter/, 0, 0)
+
+   end
+
+
+functor AfterIntegerAll () :> sig end =
+   struct
+
+      structure B = BackchainInternal
+      structure H = ConstantTable
+      
+      val leqz = parseConstant /Integer.leqz/
+      val plusz = parseConstant /Integer.plusz/
+      val negz = parseConstant /Integer.negz/
+      
+      val () =
+         H.insert EqualityTacticInternal.reflexivityTactics leqz
+         (B.witnessPriority /Integer.leqz_refl _/)
+      
+      val () =
+         H.insert EqualityTacticInternal.transitivityTactics leqz
+         (fn n => B.witnessPriority /Integer.leqz_trans _ \n\ _ __ __/)
+
+      val () =
+         List.app 
+            (fn (hconst, i, const1, const2, cov, tacfn) => 
+               RewriteInternal.CICTable.insert RewriteInternal.compatibilityTable (hconst, i, const1) (const2, cov, tacfn))
+            [
+            (plusz, 0, leqz, leqz, true,
+             andthenOn 0 (B.witnessPriority /Integer.plusz_leqz _ _ _ _ __ __/)),
+          
+            (plusz, 1, leqz, leqz, true,
+             andthenOn 1 (B.witnessPriority /Integer.plusz_leqz _ _ _ _ __ __/)),
+          
+            (negz, 0, leqz, leqz, false,
+             andthenOn 0 (B.witnessPriority /Integer.negz_leqz _ _ __/)),
+
+            (leqz, 0, leqz, Prim.arrow, false,
+             andthenOn 0 (B.witnessPriority /Integer.leqz_implication _ _ _ _ __ __/)),
+          
+            (leqz, 1, leqz, Prim.arrow, true,
+             andthenOn 1 (B.witnessPriority /Integer.leqz_implication _ _ _ _ __ __/)),
+            ]
+
+   end

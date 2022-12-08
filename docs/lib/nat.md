@@ -66,6 +66,10 @@ This one gives transitivity in the form needed for rewriting:
 
     lt_impl_leq : forall (m n : nat) . m < n -> m <= n
 
+    lt_succ_succ : forall (m n : nat) . m < n -> succ m < succ n
+
+    lt_succ_invert : forall (m n : nat) . succ m < succ n -> m < n
+
     lt_succ : forall (n : nat) . n < succ n
 
     lt_irrefl : forall (n : nat) . n < n -> void
@@ -78,7 +82,11 @@ This one gives transitivity in the form needed for rewriting:
 
     lt_0_succ : forall (n : nat) . 0 < succ n
 
-    lt_succ_succ : forall (m n : nat) . m < n -> succ m < succ n
+    lt_0_not : forall (n : nat) . n < 0 -> void
+
+    not_leq : forall (m n : nat) . not (m <= n) <-> n < m
+
+    not_lt : forall (m n : nat) . not (m < n) <-> n <= m
 
 Strong induction for natural numbers:
 
@@ -113,9 +121,9 @@ Strong induction for natural numbers:
 
     plus_leq : forall (m m' n n' : nat) . m <= m' -> n <= n' -> m + n <= m' + n'
 
-    plus_cancel_leq_r : forall (m n p : nat) . m + p <= n + p -> m <= n
-
     plus_cancel_leq_l : forall (m n p : nat) . p + m <= p + n -> m <= n
+
+    plus_cancel_leq_r : forall (m n p : nat) . m + p <= n + p -> m <= n
 
     plus_cancel_leq_leq_l : forall (m m' n n' : nat) . m + n <= m' + n' -> m' <= m -> n <= n'
 
@@ -152,6 +160,10 @@ Strong induction for natural numbers:
     minus_succ_l_leq : forall (m n : nat) . succ m - n <= succ (m - n)
 
     minus_succ_l_eq : forall (m n : nat) . n <= m -> succ m - n = succ (m - n) : nat
+
+    plus_minus_swap : forall (m n p : nat) . p <= m -> m + n - p = m - p + n : nat
+
+    plus_minus_assoc : forall (m n p : nat) . p <= n -> m + n - p = m + (n - p) : nat
 
     plus_compat : forall (m m' n n' : nat) . m = m' : nat -> n = n' : nat -> m + n = m' + n' : nat
 

@@ -8,34 +8,35 @@ signature ETERM =
 
       exception UnknownConstant of symbol list
 
-      val var    : symbol -> eterm        (* always a variable *)
-      val short  : symbol -> eterm
-      val long   : symbol list -> eterm   (* always a constant *)
+      val var     : symbol -> eterm        (* always a variable *)
+      val short   : symbol -> eterm
+      val long    : symbol list -> eterm   (* always a constant *)
 
       val shortExplicit : symbol -> eterm
       val longExplicit : symbol list -> eterm
 
-      val const  : Constant.constant -> eterm
-      val lam    : binder -> eterm -> eterm
-      val app    : eterm -> eterm -> eterm
-      val pair   : eterm -> eterm -> eterm
-      val pi1    : eterm -> eterm
-      val pi2    : eterm -> eterm
-      val next   : eterm -> eterm
-      val prev   : eterm -> eterm
-      val triv   : eterm
-      val evar   : eterm
+      val const   : Constant.constant -> eterm
+      val lam     : binder -> eterm -> eterm
+      val app     : eterm -> eterm -> eterm
+      val pair    : eterm -> eterm -> eterm
+      val pi1     : eterm -> eterm
+      val pi2     : eterm -> eterm
+      val next    : eterm -> eterm
+      val prev    : eterm -> eterm
+      val triv    : eterm
+      val evar    : eterm
+      val integer : IntInf.int -> eterm
 
-      val hole   : eterm
-      val marker : symbol -> eterm
+      val hole    : eterm
+      val marker  : symbol -> eterm
 
-      val apply1 : Constant.constant -> eterm -> eterm
-      val apply2 : Constant.constant -> eterm -> eterm -> eterm
-      val apply3 : Constant.constant -> eterm -> eterm -> eterm -> eterm
-      val apply4 : Constant.constant -> eterm -> eterm -> eterm -> eterm -> eterm
+      val apply1  : Constant.constant -> eterm -> eterm
+      val apply2  : Constant.constant -> eterm -> eterm -> eterm
+      val apply3  : Constant.constant -> eterm -> eterm -> eterm -> eterm
+      val apply4  : Constant.constant -> eterm -> eterm -> eterm -> eterm -> eterm
 
-      val appn : eterm -> eterm list -> eterm
-      val applyn : Constant.constant -> eterm list -> eterm
+      val appn    : eterm -> eterm list -> eterm
+      val applyn  : Constant.constant -> eterm list -> eterm
 
       val additional : symbol option list -> eterm -> eterm
 
@@ -167,6 +168,8 @@ structure ETerm :> ETERM =
       fun triv _ _ = T.Triv
 
       fun evar _ _ = T.Evar (T.newEbind ())
+
+      fun integer x _ _ = T.Native (T.Integer x)
 
       val zilch = Symbol.fromValue ""
 
@@ -445,6 +448,17 @@ structure ParseTerm =
             T.const Prim.zero
          else
             T.apply1 Prim.succ (number (n-1))
+
+      fun integer n =
+         T.integer (IntInf.fromInt n)
+
+      fun integerLexeme str =
+         (case FromString.toIntInf str of
+             SOME x => T.integer x
+
+           | NONE => raise (Fail ("invalid integer literal " ^ str)))
+
+      val integerEmbed = T.integer
 
       val evar = T.evar
 
@@ -1164,17 +1178,19 @@ grammardef Term
    rule Term(100) ::= "{" Term "}" => squash
 
    rule Term(100) ::= EMBED => literal
-   rule Term(100) ::= "`l" LTerm => literal
-   rule Term(100) ::= "`i" Ident => short
+   rule Term(100) ::= "l`" LTerm => literal
    rule Term(100) ::= Ident => short
    rule Term(100) ::= "`" AnyIdent => shortExplicit
    rule Term(100) ::= LONGID => long
    rule Term(100) ::= "`" LONGID => longExplicit
    rule Term(100) ::= NUMBER => number
+   rule Term(100) ::= "z`" NUMBER => integer
+   rule Term(100) ::= "z`" LEXEME => integerLexeme
+   rule Term(100) ::= "z`" EMBED => integerEmbed
    rule Term(100) ::= "_" => evar
    rule Term(100) ::= "__" => hole
    rule Term(100) ::= "(" ")" => triv
-   rule Term(100) ::= "`level" Level(1) => id
+   rule Term(100) ::= "level`" Level(1) => id
 
    rule Term(0)   ::= "additional" OIdents "." Term(0) => additional
 

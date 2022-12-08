@@ -22,7 +22,7 @@ Producing:
     cons : type:cons
          imp:cons
 
-The syntactic sugar `h :: t` is accepted for `` `cons _ h t``, as usual.
+The syntactic sugar `h :: t` is accepted for `` ` cons _ h t``, as usual.
 
 
 The iterator for lists:

@@ -59,6 +59,12 @@ signature CONSTANT_INTERNAL =
       val path : constant -> Symbol.symbol list
 
 
+      (* Replaces the symbol list that was supplied when the constant was declared.
+         Unlikely to do what you want unless you understand the inner workings.
+      *)
+      val setPath : constant -> Symbol.symbol list -> unit
+
+
       (* gives the definition if it exists, even if the constant is OPAQUE *)
       val definitionTrue : constant -> term option
 
@@ -143,6 +149,14 @@ functor ConstantFun (structure Term : TERM
             val (_, p, _) = ArrayInf.sub (theConstants, const)
          in
             p
+         end
+
+
+      fun setPath const p =
+         let
+            val (def, _, opac) = ArrayInf.sub (theConstants, const)
+         in
+            ArrayInf.update (theConstants, const, (def, p, opac))
          end
 
 
@@ -241,6 +255,8 @@ functor ConstantFun (structure Term : TERM
 
                   | SOME m' =>
                        freevars m' s)
+
+           | T.Native _ => 0
 
            | T.Marker _ =>
                 raise (Invalid "definition contains marker"))

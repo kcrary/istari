@@ -160,7 +160,7 @@ error almost immediately.
 
   Make the first goal into goal n.
 
-- `Prover.reorder : Message.label Reorder.reordering -> unit
+- `Prover.reorder : Message.label Reorder.reordering -> unit`
 
   [Reorder](reordering.html) the goals.
 

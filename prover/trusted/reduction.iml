@@ -28,6 +28,9 @@ signature REDUCTION =
       (* reduces all top-level beta redices *)
       val betas : reduction
 
+      (* reduces native operations *)
+      val native : reduction
+
       val user1 : ureduction1 -> reduction
       val user2 : ureduction2 -> reduction
 
@@ -144,6 +147,10 @@ functor ReductionFun (structure Term : TERM
                                            where type term = Term.term
                                            where type sub = Term.sub
                                            where type elim = Term.elim
+                      structure Native : NATIVE
+                                         where type constant = Term.constant
+                                         where type term = Term.term
+                                         where type native = Term.native
                       structure Trail : TRAIL
                       structure Pickling : PICKLING
                                            where type constant = Term.constant
@@ -168,6 +175,7 @@ functor ReductionFun (structure Term : TERM
        | Beta of int option  (* nonnegative *)
        | Within of int list * reduction
        | Compat of reduction list
+       | Nativered
        | User1 of ureduction1
        | User2 of ureduction2
 
@@ -180,6 +188,7 @@ functor ReductionFun (structure Term : TERM
       val betas = Beta NONE
       fun within p r = Within (p, r)
       fun compat l = Compat l
+      val native = Nativered
       val user1 = User1
       val user2 = User2
 
@@ -362,6 +371,40 @@ functor ReductionFun (structure Term : TERM
                        else
                           raise Reduce
 
+                  | _ => raise Reduce)
+
+           | Nativered =>
+                (case h of
+                    Const const =>
+                       (case
+                           List.find 
+                              (fn (const', _) => Constant.eq (const, const'))
+                              Native.operators
+                        of
+                           NONE => raise Reduce
+
+                         | SOME (_, Native.Unary f) =>
+                              (case spine of
+                                  App arg :: spine' =>
+                                     (case Simplify.simp arg id [] of
+                                         (Native x, []) =>
+                                            Elim (f x, spine')
+    
+                                       | _ => raise Reduce)
+    
+                                | _ => raise Reduce)
+
+                         | SOME (_, Native.Binary f) =>
+                              (case spine of
+                                  App arg1 :: App arg2 :: spine' =>
+                                     (case (Simplify.simp arg1 id [], Simplify.simp arg2 id []) of
+                                         ((Native x, []), (Native y, [])) =>
+                                            Elim (f x y, spine')
+    
+                                       | _ => raise Reduce)
+    
+                                | _ => raise Reduce))
+
                   | _ => raise Reduce))
 
 
@@ -461,7 +504,7 @@ functor ReductionFun (structure Term : TERM
 
       fun backdoor1 ured = ured
       fun backdoor2 ured = ured
-         
+
       structure P = Pickle
       structure PP = Pickling
 
@@ -483,8 +526,9 @@ functor ReductionFun (structure Term : TERM
                      | Beta _ => 2
                      | Within _ => 3
                      | Compat _ => 4
-                     | User1 _ => 5
-                     | User2 _ => 6)
+                     | Nativered => 5
+                     | User1 _ => 6
+                     | User2 _ => 7)
                    [
                    P.wrap
                       (fn Trans l => l
@@ -511,6 +555,8 @@ functor ReductionFun (structure Term : TERM
                         | _ => raise impossible)
                       Compat
                       (P.list puRed),
+
+                   P.const Nativered,
 
                    P.wrap
                       (fn User1 r => r

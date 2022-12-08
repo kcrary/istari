@@ -832,7 +832,8 @@ The destruction tactics are:
 - `trivialize`
 
   When the conclusion is computationally trivial, sets the extract to
-  `()`.  Leaves the goal unchanged except hidden hypotheses are unhidden.
+  some standard, closed term, usually `()`.  Leaves the goal unchanged
+  except hidden hypotheses are unhidden.
 
   + `trivializeRaw`
 
@@ -973,9 +974,9 @@ calls `fail msg` instead.
 
 These tactics are primarily used to implement other tactics:
 
-- `Tactic.replaceJudgement : Judgement.djudgement -> tactic`
+- `Tactic.replaceJudgement : Judgement.judgement -> tactic`
 
-  Replaces the `djudgement` portion of the current goal, leaving the
+  Replaces the `judgement` portion of the current goal, leaving the
   directory unchanged.
 
   + `Tactic.replaceHyp : int -> Judgement.hyp -> tactic`
@@ -986,7 +987,7 @@ These tactics are primarily used to implement other tactics:
 
     Replaces the conclusion.
 
-- `Tactic.withgoal : (Judgement.judgement -> 'a tacticm) -> 'a tacticm`
+- `Tactic.withgoal : (goal -> 'a tacticm) -> 'a tacticm`
 
   Invokes its argument tactic, passing the current goal to that
   tactic.

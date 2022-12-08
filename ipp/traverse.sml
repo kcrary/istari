@@ -553,6 +553,8 @@ structure Traverse :> TRAVERSE =
 
            | Enumber _ => exp
 
+           | Ebignum _ => exp
+
            | Eword _ => exp
 
            | Estring _ => exp

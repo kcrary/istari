@@ -4,6 +4,69 @@ Message.squelch := 1;
 
 Ctrl.use "../library/acc-load.iml";
 Ctrl.use "../library/nat-load.iml";
+Ctrl.use "../library/integer-load.iml";
+
+
+defineRaw /silly x/ /Integer.plusz z`1 z`1/;
+
+
+reductions
+/
+  silly (zero) --> z` 2 ;
+  unfolding silly
+/;
+
+
+lemma "integer_negation"
+/
+  Integer.negz z`1 : integer
+/;
+
+reduce //.
+typecheck.
+qed ();
+
+
+
+lemma "integer_addition"
+/
+  Integer.plusz z`12 z`-12 : integer
+/;
+
+reduce //.
+typecheck.
+qed ();
+
+
+
+lemma "integer_comparison"
+/
+  Integer.leqzb z`12 z`0 : bool
+/;
+
+reduce //.
+typecheck.
+qed ();
+
+
+
+lemma "twelve_of"
+/
+  z`12 : integer
+/;
+
+typecheck.
+qed ();
+
+
+
+lemma "twelve_eq"
+/
+  z`12 = z`12 : integer
+/;
+
+reflexivity.
+qed ();
 
 
 
@@ -1666,7 +1729,7 @@ val r1 =
     [
     R.unfold,
     R.beta 1,
-    R.user1 Prim.unroll_pause,
+    R.user1 PrimReduction.unroll_pause,
     R.beta 1
     ];
 
@@ -1688,11 +1751,11 @@ val r = R.new1 myfix 1 t2 r1 r2;
 lemma "paused"
   / pause (fn x . void -> pause x x) (fn x . void -> pause x x) /;
 
-reduceUsing /\Reduction.user1 Prim.unroll_pause\/.
+reduceUsing /\Reduction.user1 PrimReduction.unroll_pause\/.
 whreduce /concl/.
-unreduceUsing /\Reduction.user1 Prim.unroll_pause\ with pause (fn x . void -> pause x x) (fn x . void -> pause x x)/.
-reduceUsing /\Reduction.user1 Prim.unroll_pause\/.
-convertUnreduceUsing /\Reduction.user1 Prim.unroll_pause\ with pause (fn x . void -> pause x x) (fn x . void -> pause x x)/.
+unreduceUsing /\Reduction.user1 PrimReduction.unroll_pause\ with pause (fn x . void -> pause x x) (fn x . void -> pause x x)/.
+reduceUsing /\Reduction.user1 PrimReduction.unroll_pause\/.
+convertUnreduceUsing /\Reduction.user1 PrimReduction.unroll_pause\ with pause (fn x . void -> pause x x) (fn x . void -> pause x x)/.
 unroll /pause/.
 whreduce /concl/.
 roll /pause (fn x . void -> pause x x) (fn x . void -> pause x x)/.
@@ -1725,9 +1788,9 @@ val r1 =
   R.trans
     [
     R.unfold,
-    R.user1 Prim.unroll_fix,
+    R.user1 PrimReduction.unroll_fix,
     R.beta 4,
-    R.user2 Prim.natcase_zero
+    R.user2 PrimReduction.natcase_zero
     ];
 
 val natind_zero = R.new2 (parseConstant /natind/) 0 2 (parseConstant /zero/) 0 (Term.Var 1) r1 R.refl;
@@ -1740,9 +1803,9 @@ val r2a =
   R.trans
     [
     R.unfold,
-    R.user1 Prim.unroll_fix,
+    R.user1 PrimReduction.unroll_fix,
     R.beta 4,
-    R.user2 Prim.natcase_succ,
+    R.user2 PrimReduction.natcase_succ,
     R.beta 1
     ];
 
@@ -2306,7 +2369,7 @@ H.insert EqualityTacticInternal.symmetryTactics eqnat
 (andthenOn 0 (B.witnessPriority /eqnat_symm _ _ __/));
 
 H.insert EqualityTacticInternal.transitivityTactics (parseConstant /Nat.leq/)
-(fn n => B.witnessPriority /Nat.leq_trans _ `l \n\ _ __ __/);
+(fn n => B.witnessPriority /Nat.leq_trans _ l` \n\ _ __ __/);
 
 H.insert RewriteInternal.weakeningTable eqnat 
 [(leq, true, andthenOn 0 (B.witnessPriority /eqnat_impl_leq _ _ __/))];

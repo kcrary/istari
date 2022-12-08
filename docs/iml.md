@@ -51,9 +51,10 @@ three exceptions:
 
 - A parenthesis is a complete token, even when adjacent to other text.
 
-- A left delimiter other than a parenthesis (*i.e.,* `[` and `{`)
-  always appears at the end of a token, even when adjacent to other
-  text.
+- A left delimiter other than a parenthesis (*i.e.,* `[` and `{`) or a
+  tick (`` ` ``) always appears at the end of a token, even when
+  adjacent to other text.  The tick form is normally used for parsing
+  directives.
 
 - A right delimiter other than a parenthesis (*i.e.,* `]` and `}`)
   always appears at the beginning of a token, even when adjacent to
@@ -212,6 +213,12 @@ arguments with a single wildcard (`_`).
 SML's record and tuple projection syntax (*e.g.,* `#1`) is not
 supported.  But for pairs and triples there are substitutes: `fst`,
 `snd`, `n1of3`, `n2of3`, `n3of3`.
+
+
+### Unbounded integer literals
+
+An unbounded integer literal (of type `IntInf.int`) can be written
+using an `I` suffix, such as `0I`, `12I`, or `~12I`.
 
 
 

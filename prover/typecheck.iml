@@ -50,7 +50,7 @@ signature TYPECHECK_INTERNAL =
          -> (Message.label * Tactic.goal) list * (Refine.validation list -> Refine.validation list)
 
 
-      (* Can add hypotheses, but must not alter existing hypotheses. *)
+      (* Can add hypotheses to the end, but must not alter existing hypotheses. *)
 
       val introTactics : tactic ConstantTable.table
       val istpTactics : tactic ConstantTable.table
@@ -62,8 +62,18 @@ signature TYPECHECK_INTERNAL =
       val subtypeTactics : tactic Constant2Table.table
       val subtypeLeftTactics : tactic ConstantTable.table
 
-      (* Should not alter the context. *)
+      (* Should not alter the context.
+
+         If trivialIntroTactics maps const to tac,
+         then tac proves () : (const @ ...)
+
+         If semitrivialIntroTactics maps const to (m, tac)
+         then tac proves m : (const @ ...)
+         and m is closed.
+      *)
+
       val trivialIntroTactics : priority tacticm ConstantTable.table
+      val semitrivialIntroTactics : (Term.term * priority tacticm) ConstantTable.table
 
    end
 
@@ -239,6 +249,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       val introTactics : tactic H.table = H.table ()
       val trivialIntroTactics : priority tacticm H.table = H.table ()
+      val semitrivialIntroTactics : (T.term * priority tacticm) H.table = H.table ()
       val istpTactics : tactic H.table = H.table ()
       val eqtpTactics : tactic H2.table = H2.table ()
       val ofunivTactics : tactic H.table = H.table ()
@@ -2567,7 +2578,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.set RT.setIntroOfSquash;
             insert Prim.quotient RT.quotientIntroOf;
             insert Prim.bool (first [only Prim.tru >> RT.boolIntro1Of, only Prim.fals >> RT.boolIntro2Of]);
-            insert Prim.sum (first [only Prim.inl >> RT.sumIntro1Of, only Prim.inr >> RT.sumIntro2Of])
+            insert Prim.sum (first [only Prim.inl >> RT.sumIntro1Of, only Prim.inr >> RT.sumIntro2Of]);
+            insert Prim.integer RT.integerIntroOf
          end
 
 
@@ -2654,7 +2666,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.level RT.levelForm;
             insert Prim.lleq RT.lleqForm;
             insert Prim.squash RT.squashForm;
-            insert Prim.eeqtp eeqtpForm
+            insert Prim.eeqtp eeqtpForm;
+            insert Prim.integer RT.integerForm
          end
 
       val () =
@@ -2688,7 +2701,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.nat RT.natEq;
             insert Prim.level RT.levelEq;
             insert Prim.lleq RT.lleqEq;
-            insert Prim.squash RT.squashEq
+            insert Prim.squash RT.squashEq;
+            insert Prim.integer RT.integerEq
          end
 
       val () =
@@ -2739,7 +2753,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.nat RT.natFormUniv;
             insert Prim.level RT.levelFormUniv;
             insert Prim.lleq RT.lleqFormUniv;
-            insert Prim.squash RT.squashFormUniv
+            insert Prim.squash RT.squashFormUniv;
+            insert Prim.integer RT.integerFormUniv
          end
 
       val () =
@@ -2776,7 +2791,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.nat RT.natEqUniv;
             insert Prim.level RT.levelEqUniv;
             insert Prim.lleq RT.lleqEqUniv;
-            insert Prim.squash RT.squashEqUniv
+            insert Prim.squash RT.squashEqUniv;
+            insert Prim.integer RT.integerEqUniv
          end
 
       val () =
@@ -2890,7 +2906,13 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                         tac
  
                    | NONE =>
-                        fail "conclusion is not known to be computationally trivial"))\
+                        (case H.find semitrivialIntroTactics const of
+                            SOME (m, tac) =>
+                               refine (Rule.inhabitant (T.evar ()) m)
+                               >> tac
+
+                          | NONE =>
+                               fail "conclusion is not known to be computationally trivial")))\
 
           | _ =>
             \(fnc =>

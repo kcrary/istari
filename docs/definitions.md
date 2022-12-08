@@ -112,11 +112,12 @@ One defines datatypes with the `typedef` command.  For example:
 
 A datatype definition begins with "invisible" pervasive arguments
 preceded by the `intersect` keyword.  They are `intersect`-bound in
-the types of the datatypes and constructors.  Next are the visible
-pervasive arguments, preceded by the `forall` keyword.  They are
-arguments to all the datatypes and constructors.  Next is the universe
-to which the datatypes belong.  In the example, the datatypes belong
-to the same universe (`U i`) to which the type argument `a` belongs.
+the types of the datatypes and constructors.  (This is typically used
+for level variables.)  Next are the visible pervasive arguments,
+preceded by the `forall` keyword.  They are arguments to all the
+datatypes and constructors.  Next is the universe to which the
+datatypes belong.  In the example, the datatypes belong to the same
+universe (`U i`) to which the type argument `a` belongs.
 
 Next are the datatype and their constructors.  Each datatype can take
 additional "index" arguments.  In the example, both datatypes take
@@ -168,7 +169,7 @@ prepended to `_iter`.  For example, `tree_iter` has the type:
               -> Q (m + n) (Cons a m n t f))
         -> forall (n : nat) (t : tree a n) . P n t
 
-Iterators such as this are used by the `iterate` tactic.
+Iterators such as this are used by the [`iterate` tactic](tactics.html#induction).
 
 It also creates a joint iterator who names is the first datatype's
 name prepended to `_iter_joint`.  For example, `tree_iter_joint` has a

@@ -94,7 +94,7 @@ structure Check :> CHECK =
 
       fun check rule =
          (case rule of
-             Rule (_, (premises, concl, ext)) =>
+             Rule (_, (premises, concl, ext), _) =>
                 let
                    (* Set of variables occuring outside extracts *)
                    val oset =

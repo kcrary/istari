@@ -604,7 +604,7 @@ structure Make :> MAKE =
                           else
                              l
                        end)
-                   [" -I ", basisdir]
+                   [" -I ", basisdir, " -I +zarith "]
                    project)
          in
             withOutstream outfile

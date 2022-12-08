@@ -48,6 +48,7 @@ structure Syntax =
        | Eident of longid
        | Econstr of longid
        | Enumber of int
+       | Ebignum of IntInf.int
        | Eword of int
        | Estring of string
        | Echar of char

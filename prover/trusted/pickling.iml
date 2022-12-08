@@ -248,6 +248,8 @@ functor PicklingFun (structure Term : TERM
                   | SOME m1 =>
                        clean m1 s)
 
+           | T.Native _ => m
+
            | T.Marker _ => m)
       
       and cleanElim elim s =
@@ -260,6 +262,14 @@ functor PicklingFun (structure Term : TERM
       val impossible = Fail "impossible"
 
  
+
+      val puNative =
+         P.wrap
+            (fn T.Integer x => x)
+            T.Integer
+            P.intInf
+
+
       fun ppuElim puTerm =
          P.alt
             (fn T.App _ => 0
@@ -297,7 +307,8 @@ functor PicklingFun (structure Term : TERM
                             | T.Pair _ => 4
                             | T.Next _ => 5
                             | T.Triv => 6
-                            | T.Marker _ => 7
+                            | T.Native _ => 7
+                            | T.Marker _ => 8
           
                             (* can't happen in cleaned terms *)
                             | T.Sub _ => raise impossible
@@ -342,6 +353,12 @@ functor PicklingFun (structure Term : TERM
           
                           P.const T.Triv,
           
+                          P.wrap
+                             (fn T.Native x => x
+                               | _ => raise impossible)
+                             T.Native
+                             puNative,
+
                           P.wrap
                              (fn T.Marker sym => sym
                                | _ => raise impossible)

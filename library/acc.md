@@ -20,8 +20,10 @@ by the lemma:
 
     Nat.lt_well_founded : type:Nat.lt_well_founded
 
-The main use of accessibility is to invoke induction on an
-accessibility hypothesis, often obtained from a well-foundness lemma.
+The main use of accessibility is to invoke
+[induction](../tactics.html#induction) on an accessibility hypothesis,
+often obtained from a [well-foundness
+lemma](../definitions.html#strong-induction).
 
 Accessibility can also be used directly.  The definition is
 complicated (given below); it is easier to think about in terms of its

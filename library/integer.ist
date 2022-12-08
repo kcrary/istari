@@ -4,7 +4,154 @@ Ctrl.use "logic-load.iml";
 Ctrl.use "bool-load.iml";
 Ctrl.use "nat-eff-load.iml";
 
+Ctrl.use "integer-aux.iml";
+
 Namespace.beginModule "Integer";
+
+
+Namespace.alias (parseIdent /eqzb/) Prim.eqzb;
+Namespace.alias (parseIdent /leqzb/) Prim.leqzb;
+Namespace.alias (parseIdent /negz/) Prim.negz;
+Namespace.alias (parseIdent /plusz/) Prim.plusz;
+
+
+(* Built-in:
+
+definerecRaw /nat_to_integer n/
+/
+  natcase n
+    z`0
+    (fn n' . plusz (`z 1) (nat_to_integer n'))
+/;
+
+definerecRaw /integer_to_nat x/
+/
+  if leqzb x z`0 then
+    zero
+  else
+    succ (integer_to_nat (plusz x z`-1))
+/;
+
+
+*)
+
+Namespace.alias (parseIdent /nat_to_integer/) Prim.nat_to_integer;
+Namespace.alias (parseIdent /integer_to_nat/) Prim.integer_to_nat;
+
+
+
+lemma "integer_type"
+/
+  integer : U 0
+/;
+
+typecheck.
+qed ();
+Define.recordTyping "integer_type";
+
+
+
+defineRaw /leqz x y/
+/
+  Bool.istrue (leqzb x y)
+/;
+
+
+defineRaw /ltz x y/
+/
+  leqz (plusz z`1 x) y
+/;
+
+
+defineRaw /minusz x y/
+/
+  plusz x (negz y)
+/;
+
+
+
+structure Nothing = AfterLtz ();
+
+
+
+(* Integers defined as a quotient over products of natural numbers *)
+
+Namespace.beginModule "Def";
+
+
+
+(* Built in:
+
+define /Integer/
+/
+  quotient (a b : nat & nat) . a #1 + b #2 = a #2 + b #1 : nat
+//
+  U 0
+/;
+*)
+
+Namespace.alias (parseIdent /Integer/) Prim.integer_def;
+
+
+
+(* Built-in:
+
+define /Plusz a b/
+/
+  (a #1 + b #1 , a #2 + b #2)
+//
+  Integer -> Integer -> Integer
+/;
+*)
+
+Namespace.alias (parseIdent /Plusz/) Prim.plusz_def;
+
+
+
+(* Built-in:
+
+define /Negz a/
+/
+  (a #2 , a #1)
+//
+  Integer -> Integer
+/;
+*)
+
+Namespace.alias (parseIdent /Negz/) Prim.negz_def;
+
+
+
+(* Built-in:
+
+define /Eqzb a b/
+/
+  NatEff.eqb (a #1 + b #2) (a #2 + b #1)
+//
+  Integer -> Integer -> bool
+/;
+*)
+
+Namespace.alias (parseIdent /Eqzb/) Prim.eqzb_def;
+
+
+
+(* Built-in:
+
+define /Leqzb a b/
+/
+  NatEff.leqb (a #1 + b #2) (a #2 + b #1)
+//
+  Integer -> Integer -> bool
+/;
+*)
+
+Namespace.alias (parseIdent /Leqzb/) Prim.leqzb_def;
+
+
+
+structure Nothing = AfterLeqzbDef ();
+
 
 
 lemma "diff_trans"
@@ -30,14 +177,12 @@ qed ();
 
 
 
-define /integer/
+lemma "Integer_type"
 /
-  quotient (a b : nat & nat) . a #1 + b #2 = a #2 + b #1 : nat
-//
-  U 0
+  Integer : U 0
 /;
 
-unfold /integer/.
+unfold /Integer/.
 typecheck.
   {
   reintro /H/.
@@ -51,20 +196,26 @@ typecheck.
   apply /diff_trans/ >> auto.
   }
 qed ();
+Define.recordTyping "Integer_type";
 
 
 
-lemma "integer_of"
+ConstantTable.insert DestructInternal.destructTactics (parseConstant /Integer/)
+  DestructInternal.destUserQuotient;
+
+
+
+lemma "Integer_of"
 /
   forall (a b : nat) .
-    (a , b) : integer
+    (a , b) : Integer
 /;
 
 inference.
 intro /a b/.
-infer /integer/ /Htype/.
-unfold /integer in Htype/.
-unfold /integer/.
+infer /Integer/ /Htype/.
+unfold /Integer in Htype/.
+unfold /Integer/.
 typecheck.
 reduce //.
 rewrite /-> Nat.plus_commute/.
@@ -73,29 +224,29 @@ qed ();
 
 
 
-lemma "integer_subtype"
+lemma "Integer_subtype"
 /
-  (nat & nat) <: integer
+  (nat & nat) <: Integer
 /;
 
 intro /(a b)/.
-apply /integer_of/.
+apply /Integer_of/.
 qed ();
 
 
 
-lemma "integer_eq"
+lemma "Integer_eq"
 /
   forall a b c d .
     a + d = b + c : nat
-    -> (a , b) = (c , d) : integer
+    -> (a , b) = (c , d) : Integer
 /;
 
 inference.
 intro /a b c d Heq/.
-infer /integer/ /Htype/.
-unfold /integer in Htype/.
-unfold /integer/.
+infer /Integer/ /Htype/.
+unfold /Integer in Htype/.
+unfold /Integer/.
 extensionalityOf.
 reduce //.
 auto.
@@ -103,49 +254,64 @@ qed ();
 
 
 
-define /zeroz/
+define /Zeroz/
 /
   (0 , 0)
 //
-  integer
+  Integer
 /;
 
-unfold /zeroz/.
-apply /integer_of/.
+unfold /Zeroz/.
+apply /Integer_of/.
 qed ();
 
 
 
-define /onez/
+define /Onez/
 /
   (1 , 0)
 //
-  integer
+  Integer
 /;
 
-unfold /onez/.
-apply /integer_of/.
+unfold /Onez/.
+apply /Integer_of/.
 qed ();
 
 
 
-define /plusz a b/
+lemma "neq_Zeroz_Onez"
 /
-  (a #1 + b #1 , a #2 + b #2)
-//
-  integer -> integer -> integer
+  Zeroz = Onez : Integer -> void
+/;
+
+intro /Heq/.
+unfold /Integer in Heq/.
+unfold /Zeroz in Heq , Onez in Heq/.
+injection /Heq/.
+reintro /Heq'/.
+unhide.
+reduce /Heq'/.
+exact /Nat.eq_0_succ_not _ Heq'/.
+qed ();
+
+
+
+lemma "Plusz_type"
+/
+  Plusz : Integer -> Integer -> Integer
 /;
 
 introOf /p q/.
-unfold /plusz/.
+unfold /Plusz/.
 reduce //.
-unfold /integer in p , integer in q/.
+unfold /Integer in p , Integer in q/.
 destruct /p/ /[(p1 p2) (p1' p2') Hp]/.
 reduce /Hp/.
 destruct /q/ /[(q1 q2) (q1' q2') Hq]/.
 reduce /Hq/.
 reduce //.
-apply /integer_eq/.
+apply /Integer_eq/.
 so /Nat.plus_compat _# 4 Hp Hq/ /H/.
 clear /Hp Hq/.
 rewrite /<- Nat.plus_assoc in H at all/.
@@ -158,39 +324,114 @@ rewrite /-> Nat.plus_commute at 5/.
 rewrite /<- Nat.plus_assoc/.
 hyp /H/.
 qed ();
+Define.recordTyping "Plusz_type";
 
 
 
-define /negz a/
+lemma "Negz_type"
 /
-  (a #2 , a #1)
-//
-  integer -> integer
+  Negz : Integer -> Integer
 /;
 
 introOf /p/.
-unfold /negz/.
+unfold /Negz/.
 reduce //.
-unfold /integer in p/.
+unfold /Integer in p/.
 destruct /p/ /[(p1 p2) (p1' p2') Hp]/.
 reduce /Hp concl/.
-apply /integer_eq/.
+apply /Integer_eq/.
 symmetry.
 hyp /Hp/.
+qed ();
+Define.recordTyping "Negz_type";
+
+
+
+lemma "Eqzb_type"
+/
+  Eqzb : Integer -> Integer -> bool
+/;
+
+introOf /p q/.
+unfold /Eqzb/.
+unfold /Integer in p , Integer in q/.
+destruct /p/ /[(p1 p2) (p1' p2') Hp]/.
+reduce /Hp/.
+destruct /q/ /[(q1 q2) (q1' q2') Hq]/.
+reduce /Hq/.
+reduce //.
+rewrite /<- Bool.iff_eq_bool/.
+rewrite /-> NatEff.istrue_eqb at all/.
+symmetryIn /Hp/.
+so /Nat.plus_compat _# 4 Hp Hq/ /H/.  
+rewrite /-> Nat.plus_commute in H at 1 2 4 5/.
+rewrite /<- Nat.plus_assoc in H at all/.
+rewrite /-> Nat.plus_assoc in H at 1 2/.
+rewrite /-> Nat.plus_commute in H at 2 5/.
+rewrite /<- Nat.plus_assoc in H at all/.
+rewrite /-> Nat.plus_assoc in H at 0 1/.
+split.
+  {
+  intro /Heq/.
+  moveBefore /Heq/ /H/.
+  rewrite /<- Heq in H/.
+  apply /Nat.plus_cancel_r _ _ (p1 + q2)/.
+  hyp /H/.
+  }
+  
+  {
+  intro /Heq/.
+  moveBefore /Heq/ /H/.
+  rewrite /<- Heq in H/.
+  apply /Nat.plus_cancel_l _ _ (p1' + q2')/.
+  symmetry.
+  hyp /H/.
+  }
+qed ();
+Define.recordTyping "Eqzb_type";
+
+
+
+lemma "istrue_Eqzb"
+/
+  forall a b . Bool.istrue (Eqzb a b) <-> a = b : Integer
+/;
+
+inference.
+intro /a b/.
+split.
+  {
+  intro /Heq/.
+  infer /a/ /Hofa/.
+  destruct /a/ /[(a a') Ha]/.
+  destruct /b/ /[(b b') Hb]/.
+  unfold /Eqzb in Heq/.
+  rewrite /-> NatEff.istrue_eqb in Heq/.
+  apply /Integer_eq/.
+  hyp /Heq/.
+  }
+
+  {
+  intro /Heq/.
+  subst /b/.
+  destruct /a/ /[a Heq]/.
+  unfold /Eqzb/.
+  unhide.
+  rewrite /-> NatEff.istrue_eqb/.
+  hyp /Heq/.
+  }
 qed ();
 
 
 
-define /leqzb a b/
+lemma "Leqzb_type"
 /
-  NatEff.leqb (a #1 + b #2) (b #1 + a #2)
-//
-  integer -> integer -> bool
+  Leqzb : Integer -> Integer -> bool
 /;
 
 introOf /p q/.
-unfold /leqzb/.
-unfold /integer in p , integer in q/.
+unfold /Leqzb/.
+unfold /Integer in p , Integer in q/.
 destruct /p/ /[(p1 p2) (p1' p2') Hp]/.
 reduce /Hp/.
 destruct /q/ /[(q1 q2) (q1' q2') Hq]/.
@@ -200,78 +441,1516 @@ rewrite /<- Bool.iff_eq_bool/.
 rewrite /-> NatEff.istrue_leqb at all/.
 symmetryIn /Hp/.
 so /Nat.plus_compat _# 4 Hp Hq/ /H/.  
-rewrite /-> Nat.plus_commute in H at 1 2/.
-rewrite /<- Nat.plus_assoc in H/.
-rewrite /-> Nat.plus_assoc in H at 1/.
-rewrite /-> Nat.plus_commute in H at 2/.
-rewrite /<- Nat.plus_assoc in H/.
-rewrite /-> Nat.plus_commute in H at 4 5/.
-rewrite /-> Nat.plus_commute in H at 3/.
-rewrite /<- Nat.plus_assoc in H/.
-rewrite /-> Nat.plus_assoc in H at 3/.
-rewrite /-> Nat.plus_commute in H at 5/.
-rewrite /<- Nat.plus_assoc in H/.
-rewrite /-> Nat.plus_assoc in H at 0 1/.
+rewrite /-> Nat.plus_commute in H at 1 2 4 5/.
+rewrite /<- Nat.plus_assoc in H at all/.
+rewrite /-> Nat.plus_assoc in H at 1 2/.
+rewrite /-> Nat.plus_commute in H at 2 5/.
+rewrite /<- Nat.plus_assoc in H at all/.
 split.
   {
   intro /Hleq/.
-  apply /Nat.plus_cancel_leq_leq_r _ _ (p2 + q1) (q2 + p1)/.
-    {
-    apply /Nat.leq_refl_eq/ >> auto.
-    }
-
-    {
-    rewrite /-> Nat.plus_commute at 0 1/.
-    auto.
-    }
+  apply /Nat.plus_cancel_leq_leq_r _ _ (p2 + q1) (p1 + q2)/ >> auto.
+  apply /Nat.leq_refl_eq/.
+  rewrite /<- Nat.plus_assoc at all/.
+  hyp /H/.
   }
 
   {
   intro /Hleq/.
-  rewrite /-> Nat.plus_commute in H at 2 5/.
-  symmetryIn /H/.
-  apply /Nat.plus_cancel_leq_leq_l (q1' + p2') (p1' + q2')/.
-    {
-    apply /Nat.leq_refl_eq/ >> auto.
-    }
-
-    {
-    auto.
-    }
+  apply /Nat.plus_cancel_leq_leq_l (p2' + q1') (p1' + q2')/ >> auto.
+  apply /Nat.leq_refl_eq/.
+  rewrite /<- Nat.plus_assoc at all/.
+  symmetry.
+  hyp /H/.
   }
+qed ();
+Define.recordTyping "Leqzb_type";
+
+
+
+define /Leqz a b/
+/
+  Bool.istrue (Leqzb a b)
+//
+  Integer -> Integer -> U 0
+/;
+
+unfold /Leqz/.
+typecheck.
 qed ();
 
 
 
-define /leqz a b/
+define /Ltz a b/
 /
-  Bool.istrue (leqzb a b)
+  Leqz (Plusz Onez a) b
 //
-  integer -> integer -> U 0
+  Integer -> Integer -> U 0
+/;
+
+unfold /Ltz/.
+typecheck.
+qed ();
+
+
+
+lemma "Leqz_inhabitant"
+/
+  forall (a b : Integer) . Leqz a b -> () : Leqz a b
+/;
+
+intro /p q H/.
+unfold /Leqz in H in concl/.
+apply /Bool.istrue_inhabitant/ >> auto.
+qed ();
+
+
+
+ConstantTable.insert TypecheckInternal.trivialIntroTactics (parseConstant /Leqz/)
+  (Backchain.applyPriority /Leqz_inhabitant/);
+
+
+
+lemma "Leqz_Zeroz_Onez"
+/
+  Leqz Zeroz Onez
+/;
+
+unfold /Zeroz , Onez , Leqz , Leqzb/.
+reduce //.
+unroll /NatEff.leqb/.
+reduce //.
+apply /Bool.istrue_true/.
+qed ();
+
+
+
+lemma "Leqz_refl"
+/
+  forall a . Leqz a a
+/;
+
+inference.
+intro /p/.
+destruct /p/ /[p]/.
+so /Integer_subtype/ /?/.
+unhide.
+unfold /Leqz/.
+unfold /Leqzb/.
+
+(* XX why isn't testRewrite unifying variables *)
+testRewrite /-> NatEff.istrue_leqb/;
+
+rewrite /-> NatEff.istrue_leqb/.
+rewrite /-> Nat.plus_commute/.
+reflexivity.
+qed ();
+
+
+
+lemma "Leqz_trans"
+/
+  forall a b c . Leqz a b -> Leqz b c -> Leqz a c
+/;
+
+inference.
+intro /p q r Hpq Hqr/.
+infer /p/ /Hofp/.
+infer /r/ /Hofr/.
+destruct /p/ /[(p1 p2)]/.
+destruct /q/ /[(q1 q2)]/.
+destruct /r/ /[(r1 r2)]/.
+unfold /Leqz in Hpq in Hqr in concl/.
+unfold /Leqzb in Hpq in Hqr in concl/.
+reduce /Hpq Hqr concl/.
+rewrite /-> NatEff.istrue_leqb in Hpq in Hqr in concl/.
+clear /Hofp Hofr/.
+so /Nat.plus_leq _# 4 Hpq Hqr/ /H/.
+apply /Nat.plus_cancel_leq_r _ _ (q1 + q2)/.
+rewrite /<- Nat.plus_assoc at all/.
+rewrite /-> Nat.plus_assoc at 0 0 0 0/.
+rewrite /-> Nat.plus_commute at 1 2 4/.
+rewrite /<- Nat.plus_assoc in concl at all in H at all/.
+hyp /H/.
+qed ();
+
+
+
+lemma "Leqz_antisymm"
+/
+  forall a b . Leqz a b -> Leqz b a -> a = b : Integer
+/;
+
+inference.
+intro /p q Hpq Hqp/.
+so /Integer_of/ /Hof/.
+destruct /p/ /[(p1 p2)]/.
+destruct /q/ /[(q1 q2)]/.
+apply /Integer_eq/.
+unfold /Leqz in Hpq in Hqp/.
+unfold /Leqzb in Hpq in Hqp/.
+rewrite /-> NatEff.istrue_leqb in Hpq in Hqp/.
+rewrite /-> Nat.plus_commute in Hqp at 0 1/.
+apply /Nat.leq_antisymm/ >> auto.
+qed ();
+
+
+
+lemma "Plusz_id_l"
+/
+  forall a . Plusz Zeroz a = a : Integer
+/;
+
+inference.
+intro /p/.
+so /Integer_of/ /Hof/.
+destruct /p/ /[(p1 p2)]/.
+unfold /Zeroz , Plusz/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "Plusz_commute"
+/
+  forall a b . Plusz a b = Plusz b a : Integer
+/;
+
+inference.
+intro /a b/.
+so /Integer_of/ /Hof/.
+destruct /a/ /[(a a')]/.
+destruct /b/ /[(b b')]/.
+unfold /Plusz at all/.
+reduce //.
+apply /Integer_eq/.
+rewrite /-> Nat.plus_commute at 0 1 2/.
+reflexivity.
+qed ();
+
+
+
+lemma "Plusz_assoc"
+/
+  forall a b c . Plusz (Plusz a b) c = Plusz a (Plusz b c) : Integer
+/;
+
+inference.
+intro /a b c/.
+so /Integer_of/ /Hof/.
+destruct /a/ /[(a a')]/.
+destruct /b/ /[(b b')]/.
+destruct /c/ /[(c c')]/.
+unfold /Plusz at all/.
+reduce //.
+apply /Integer_eq/.
+rewrite /-> Nat.plus_commute/.
+rewrite /<- Nat.plus_assoc at all/.
+reflexivity.
+qed ();
+
+
+
+lemma "Plusz_inverse_l"
+/
+  forall a . Plusz (Negz a) a = Zeroz : Integer
+/;
+
+inference.
+intro /a/.
+so /Integer_of/ /Hof/.
+destruct /a/ /[(a a')]/.
+unfold /Zeroz at all , Negz at all , Plusz at all/.
+reduce //.
+apply /Integer_eq/.
+rewrite /-> Nat.plus_0_r at all/.
+rewrite /-> Nat.plus_commute/.
+reflexivity.
+qed ();
+
+
+
+lemma "Negz_invol"
+/
+  forall a . Negz (Negz a) = a : Integer
+/;
+
+inference.
+intro /a/.
+infer /a/ /Hofa/.
+destruct /a/ /[(a a')]/.
+unfold /Negz at all/.
+reflexivity.
+qed ();
+
+
+
+lemma "Negz_Plusz"
+/
+  forall a b . Negz (Plusz a b) = Plusz (Negz a) (Negz b) : Integer
+/;
+
+inference.
+intro /a b/.
+infer /a/ /Hofa/.
+infer /b/ /Hofb/.
+destruct /a/ /[(a a')]/.
+destruct /b/ /[(b b')]/.
+unfold /Plusz at all , Negz at all/.
+reduce //.
+reflexivityRaw.
+apply /Integer_of/.
+qed ();
+
+
+
+lemma "Plusz_Leqz"
+/
+  forall (a a' b b' : Integer) . Leqz a a' -> Leqz b b' -> Leqz (Plusz a b) (Plusz a' b')
+/;
+
+intro /a a' b b' Ha Hb/.
+infer /a/ /Hofa/.
+infer /a'/ /Hofa'/.
+infer /b/ /Hofb/.
+infer /b'/ /Hofb'/.
+destruct /a/ /[(a1 a2)]/.
+destruct /a'/ /[(a1' a2')]/.
+destruct /b/ /[(b1 b2)]/.
+destruct /b'/ /[(b1' b2')]/.
+unfold /Plusz at all/.
+reduce //.
+unfold /Leqz in Ha in Hb in concl/.
+unfold /Leqzb in Ha in Hb in concl/.
+rewrite /-> NatEff.istrue_leqb in Ha in Hb in concl/.
+clear /Hofa Hofa' Hofb Hofb'/.
+so /Nat.plus_leq _# 4 Ha Hb/ /H/.
+rewrite /<- Nat.plus_assoc in H at all in concl at all/.
+rewrite /-> Nat.plus_assoc at 1 2/.
+rewrite /-> Nat.plus_commute at 2 5/.
+rewrite /<- Nat.plus_assoc at all/.
+hyp /H/.
+qed ();
+
+
+
+lemma "Negz_Leqz"
+/
+  forall a b . Leqz a b -> Leqz (Negz b) (Negz a)
+/;
+
+inference.
+intro /a b H/.
+infer /a/ /Hofa/.
+infer /b/ /Hofb/.
+destruct /a/ /[(a a')]/.
+destruct /b/ /[(b b')]/.
+unfold /Negz at all , Leqz in H in concl , Leqzb in H in concl/.
+reduce /H concl/.
+rewrite /-> NatEff.istrue_leqb in H in concl/.
+rewrite /-> Nat.plus_commute at 0 1/.
+hyp /H/.
+qed ();
+
+
+
+lemma "not_Leqz"
+/
+  forall a b . not (Leqz a b) <-> Ltz b a
+/;
+
+inference.
+intro /a b/.
+unfold /Ltz/.
+unfold /Leqz at all/.
+infer /a/ /Hofa/.
+infer /b/ /Hofb/.
+split.
+  {
+  intro /H/.
+  destruct /a/ /[(a a')]/.
+  destruct /b/ /[(b b')]/.
+  unfold /Leqzb in H in concl/.
+  unfold /Onez at all , Plusz at all/.
+  reduce /H concl/.
+  rewrite /-> NatEff.istrue_leqb in H in concl/.
+  fold /_ < _/.
+  apply /Nat.not_leq/.
+  rewrite /-> Nat.plus_commute at 0 1/.
+  hyp /H/.
+  }
+
+  {
+  intro /H/.
+  destruct /a/ /[(a a')]/.
+  destruct /b/ /[(b b')]/.
+  unfold /Leqzb in H in concl/.
+  unfold /Onez in H at all , Plusz in H at all/.
+  reduce /H concl/.
+  rewrite /-> NatEff.istrue_leqb in H in concl/.
+  fold /_ < _ in H/.
+  rewrite /-> Nat.not_leq/.
+  rewrite /-> Nat.plus_commute at 0 1/.
+  hyp /H/.
+  }
+qed ();
+  
+
+
+define /Integer_to_nat a/
+/
+  a #1 - a #2
+//
+  Integer -> nat
+/;
+
+introOf /a/.
+unfold /Integer_to_nat/.
+destruct /a/ /[(a a') (b b') Hab]/.
+reduce /in Hab in concl/.
+so /Nat.minus_compat _ _ (a' + b') (a' + b') Hab ()/ /H/.
+rewrite /-> Nat.plus_commute in H at 1 2/.
+rewrite /<- Nat.minus_assoc in H at all/.
+rewrite /-> Nat.plus_minus_cancel_r in H at all/.
+hyp /H/.
+qed ();
+
+
+
+lemma "Integer_to_nat_plus"
+/
+  forall a b .
+    Leqz Zeroz a
+    -> Leqz Zeroz b
+    -> Integer_to_nat (Plusz a b) = Integer_to_nat a + Integer_to_nat b : nat
+/;
+
+inference.
+intro /a b Hposa Hposb/.
+infer /a/ /Hofa/.
+infer /b/ /Hofb/.
+destruct /a/ /[(a a')]/.
+destruct /b/ /[(b b')]/.
+unfold /Plusz at all/.
+reduce //.
+unfold /Integer_to_nat at all/.
+reduce //.
+unfold /Leqz in Hposa in Hposb/.
+unfold /Leqzb in Hposa in Hposb/.
+unfold /Zeroz in Hposa at all in Hposb at all/.
+reduce /in Hposa in Hposb/.
+rewrite /-> NatEff.istrue_leqb in Hposa in Hposb/.
+clear /Hofa Hofb/.
+rewrite /<- Nat.minus_assoc/.
+rewrite /-> Nat.plus_minus_swap/ >> auto.
+rewrite /<- Nat.plus_minus_assoc/ >> auto.
+qed ();
+
+
+
+lemma "Integer_to_nat_mono"
+/
+  forall a b .
+    Leqz Zeroz a
+    -> Leqz a b
+    -> Integer_to_nat a <= Integer_to_nat b
+/;
+
+inference.
+intro /a b Hpos Hab/.
+infer /a/ /Hofa/.
+infer /b/ /Hofb/.
+destruct /a/ /[(a a')]/.
+destruct /b/ /[(b b')]/.
+unfold /Integer_to_nat at all/.
+reduce //.
+unfold /Leqz in Hab , Leqzb in Hab/.
+reduce /Hab/.
+rewrite /-> NatEff.istrue_leqb in Hab/.
+so /Nat.minus_leq _ _ (a' + b') (a' + b') Hab ()/ /H/ >> auto.
+rewrite /-> Nat.plus_commute in H at 1 2/.
+rewrite /<- Nat.minus_assoc in H at all/.
+rewrite /-> Nat.plus_minus_cancel_r in H at all/.
+hyp /H/.
+qed ();
+
+
+
+lemma "Integer_to_nat_mono_lt"
+/
+  forall a b .
+    Leqz Zeroz a
+    -> Ltz a b
+    -> Integer_to_nat a < Integer_to_nat b
+/;
+
+inference.
+intro /a b Hpos Hab/.
+unfold /Ltz in Hab/.
+unfold /Nat.lt/.
+rewrite /succ (Integer_to_nat a) = Integer_to_nat (Plusz Onez a) : nat/.
+  {
+  rewrite /-> Integer_to_nat_plus/ >> auto.
+    {
+    unfold /Onez , Zeroz/.
+    unfold /Leqz , Leqzb/.
+    reduce //.
+    unroll /NatEff.leqb/.
+    reduce //.
+    apply /Bool.istrue_true/.
+    }
+  unfold /Onez , Integer_to_nat at 1/.
+  reflexivity.
+  }
+apply /Integer_to_nat_mono/ >> auto.
+apply /Leqz_trans/ >> auto.
+rewrite /<- Plusz_id_l a/.
+apply /Plusz_Leqz/ >> autoWith /Leqz_refl Leqz_Zeroz_Onez/.
+qed ();
+
+
+
+Namespace.endModule ();
+
+Namespace.openModule (parseLongident /Def/);
+
+Namespace.beginModule "Iso";
+
+
+
+(* Built-in:
+
+defineRaw /defToInteger x/
+/
+  plusz (nat_to_integer (x #1)) (negz (nat_to_integer (x #2)))
+/;
+
+
+defineRaw /integerToDef x/
+/
+  if leqzb z`0 x then
+    (integer_to_nat x , 0)
+  else
+    (0 , integer_to_nat (negz x))
+/;
+
+*)
+
+
+
+Namespace.alias (parseIdent /integer_from_def/) Prim.integer_from_def;
+Namespace.alias (parseIdent /integer_to_def/) Prim.integer_to_def;
+
+
+structure Nothing = AfterIntegerToDef ();
+
+
+Database.setUnroll Prim.nat_to_integer
+  (Reduction.trans
+     [DefineInternal.recUnroller Prim.nat_to_integer,
+      Reduction.beta 1]);
+
+Database.setUnroll Prim.integer_to_nat
+  (Reduction.trans
+     [DefineInternal.recUnroller Prim.integer_to_nat,
+      Reduction.beta 1]);
+
+
+
+reductions
+/
+  nat_to_integer (zero) --> z`0 ;
+  nat_to_integer (succ n) --> plusz z`1 (nat_to_integer n) ;
+  unrolling nat_to_integer
+/;
+
+
+
+(* Now we read off the axioms that relate native integers to defined integers. *)
+
+lemma "integer_to_def_type"
+/
+  integer_to_def : integer -> Integer
+/;
+
+Tactic.refine Rule.integerToDefType.
+qed ();
+Define.recordTyping "integer_to_def_type";
+
+
+
+lemma "integer_from_def_type"
+/
+  integer_from_def : Integer -> integer
+/;
+
+Tactic.refine Rule.integerFromDefType.
+qed ();
+Define.recordTyping "integer_from_def_type";
+
+
+
+lemma "integer_isomorphism_prim"
+/
+  (fn x . integer_from_def (integer_to_def x)) = (fn x . x) : (integer -> integer)
+/;
+
+Tactic.refine Rule.integerIsomorphism1.
+qed ();
+
+
+
+lemma "Integer_isomorphism_prim"
+/
+  (fn x . integer_to_def (integer_from_def x)) = (fn x . x) : (Integer -> Integer)
+/;
+
+Tactic.refine Rule.integerIsomorphism2.
+qed ();
+
+
+
+lemma "plusz_spec_prim"
+/
+  plusz = (fn x y . integer_from_def (Plusz (integer_to_def x) (integer_to_def y)))
+  : (integer -> integer -> integer)
+/;
+
+Tactic.refine Rule.pluszSpec.
+qed ();
+
+
+
+lemma "negz_spec_prim"
+/
+  negz = (fn x . integer_from_def (Negz (integer_to_def x)))
+  : (integer -> integer)
+/;
+
+Tactic.refine Rule.negzSpec.
+qed ();
+
+
+
+lemma "eqzb_spec_prim"
+/
+  eqzb = (fn x y . Eqzb (integer_to_def x) (integer_to_def y))
+  : (integer -> integer -> bool)
+/;
+
+Tactic.refine Rule.eqzbSpec.
+qed ();
+
+
+
+lemma "leqzb_spec_prim"
+/
+  leqzb = (fn x y . Leqzb (integer_to_def x) (integer_to_def y))
+  : (integer -> integer -> bool)
+/;
+
+Tactic.refine Rule.leqzbSpec.
+qed ();
+
+
+
+lemma "integer_isomorphism"
+/
+  forall x . integer_from_def (integer_to_def x) = x : integer
+/;
+
+inference.
+intro /x/.
+change /concl/ /(fn x . integer_from_def (integer_to_def x)) x = (fn x . x) x : _/.
+decompEq 1 /integer -> integer/ >> attempt reflexivity.
+apply /integer_isomorphism_prim/.
+qed ();
+
+
+
+lemma "Integer_isomorphism"
+/
+  forall x . integer_to_def (integer_from_def x) = x : Integer
+/;
+
+inference.
+intro /x/.
+change /concl/ /(fn x . integer_to_def (integer_from_def x)) x = (fn x . x) x : _/.
+decompEq 1 /Integer -> Integer/ >> attempt reflexivity.
+apply /Integer_isomorphism_prim/.
+qed ();
+
+
+
+val of_from_eq =
+  goalCase
+  / of ? ? =>
+    \(fnc a m =>
+        let
+          val n = Term.evar ()
+        in
+          assert /\m\ = \n\ : \a\/ /?/
+          >>> [
+              idtac,
+
+              unfold /of/
+              >>
+              transitivity (ETerm.literal (Term.Sub (n, Term.shift1)))
+              >>> [
+                  Tactic.refine (Rule.hypothesis 0),
+
+                  symmetry >>
+                  Tactic.refine (Rule.hypothesis 0)
+                  ]
+              ]
+        end)\
+  /;
+
+
+
+lemma "plusz_type"
+/
+  plusz : integer -> integer -> integer
+/;
+
+of_from_eq.
+exact /plusz_spec_prim/.
+qed ();
+Define.recordTyping "plusz_type";
+
+
+
+lemma "negz_type"
+/
+  negz : integer -> integer
+/;
+
+of_from_eq.
+exact /negz_spec_prim/.
+qed ();
+Define.recordTyping "negz_type";
+
+
+
+lemma "minusz_type"
+/
+  minusz : integer -> integer -> integer
+/;
+
+introOf /a b/.
+unfold /minusz/.
+typecheck.
+qed ();
+Define.recordTyping "minusz_type";
+
+
+
+lemma "eqzb_type"
+/
+  eqzb : integer -> integer -> bool
+/;
+
+of_from_eq.
+exact /eqzb_spec_prim/.
+qed ();
+Define.recordTyping "eqzb_type";
+
+
+
+lemma "leqzb_type"
+/
+  leqzb : integer -> integer -> bool
+/;
+
+of_from_eq.
+exact /leqzb_spec_prim/.
+qed ();
+Define.recordTyping "leqzb_type";
+
+
+
+lemma "leqz_type"
+/
+  leqz : integer -> integer -> U 0
 /;
 
 unfold /leqz/.
 typecheck.
 qed ();
+Define.recordTyping "leqz_type";
 
 
 
-define /minusz a b/
+lemma "ltz_type"
 /
-  plusz a (negz b)
-//
-  integer -> integer -> integer
+  ltz : integer -> integer -> U 0
 /;
 
-unfold /minusz/.
+unfold /ltz/.
 typecheck.
+qed ();
+Define.recordTyping "ltz_type";
+
+
+
+lemma "plusz_spec"
+/
+  forall x y .
+    plusz x y = integer_from_def (Plusz (integer_to_def x) (integer_to_def y))
+    : integer
+/;
+
+inference.
+intro /x y/.
+change /concl/ /_ = (fn x y . integer_from_def (Plusz (integer_to_def x) (integer_to_def y))) x y : _/.
+decompEq 2 /integer -> integer -> integer/ >> attempt reflexivity.
+apply /plusz_spec_prim/.
+qed ();
+
+
+
+lemma "negz_spec"
+/
+  forall x .
+    negz x = integer_from_def (Negz (integer_to_def x)) : integer
+/;
+
+inference.
+intro /x/.
+change /concl/ /_ = (fn x . integer_from_def (Negz (integer_to_def x))) x : _/.
+decompEq 1 /integer -> integer/ >> attempt reflexivity.
+apply /negz_spec_prim/.
+qed ();
+
+
+
+lemma "eqzb_spec"
+/
+  forall x y .
+    eqzb x y = Eqzb (integer_to_def x) (integer_to_def y) : bool
+/;
+
+inference.
+intro /x y/.
+change /concl/ /_ = (fn x y . Eqzb (integer_to_def x) (integer_to_def y)) x y : _/.
+decompEq 2 /integer -> integer -> bool/ >> attempt reflexivity.
+apply /eqzb_spec_prim/.
+qed ();
+
+
+
+lemma "leqzb_spec"
+/
+  forall x y .
+    leqzb x y = Leqzb (integer_to_def x) (integer_to_def y) : bool
+/;
+
+inference.
+intro /x y/.
+change /concl/ /_ = (fn x y . Leqzb (integer_to_def x) (integer_to_def y)) x y : _/.
+decompEq 2 /integer -> integer -> bool/ >> attempt reflexivity.
+apply /leqzb_spec_prim/.
+qed ();
+
+
+
+lemma "integer_to_def_zero"
+/
+  integer_to_def z`0 = Zeroz : Integer
+/;
+
+unfold /Zeroz/.
+unfold /integer_to_def/.
+unroll /integer_to_nat/.
+reduce //.
+apply /Integer_eq/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "integer_to_def_one"
+/
+  integer_to_def z`1 = Onez : Integer
+/;
+
+unfold /Onez/.
+unfold /integer_to_def/.
+unroll /integer_to_nat at 0 0/.
+reduce //.
+apply /Integer_eq/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "leqz_spec"
+/
+  forall a b . leqz a b <-> Leqz (integer_to_def a) (integer_to_def b)
+/;
+
+inference.
+intro /a b/.
+unfold /leqz , Leqz/.
+rewrite /-> Bool.iff_eq_bool/.
+rewrite /-> leqzb_spec/.
+reflexivity.
+qed ();
+
+
+
+lemma "ltz_spec"
+/
+  forall a b . ltz a b <-> Ltz (integer_to_def a) (integer_to_def b)
+/;
+
+inference.
+intro /a b/.
+unfold /ltz , Ltz/.
+rewrite /-> plusz_spec , -> leqz_spec/.
+rewrite /-> Integer_isomorphism/.
+rewrite /-> integer_to_def_one/.
+reflexivity.
+qed ();
+
+
+
+lemma "integer_from_def_zero"
+/
+  integer_from_def Zeroz = z`0 : integer
+/;
+
+unfold /Zeroz , integer_from_def/.
+reflexivity.
+qed ();
+
+
+
+lemma "integer_from_def_one"
+/
+  integer_from_def Onez = z`1 : integer
+/;
+
+unfold /Onez , integer_from_def/.
+reflexivity.
+qed ();
+
+
+
+Namespace.endModule ();
+
+Namespace.openModule (parseLongident /Iso/);
+
+
+
+lemma "neq_0_1"
+/
+  z`0 = z`1 : integer -> void
+/;
+
+intro /H/.
+apply /neq_Zeroz_Onez/.
+rewrite /<- Integer_isomorphism Zeroz/.
+rewrite /<- Integer_isomorphism Onez/.
+compat.
+rewrite /<- integer_isomorphism z`0 in H/.
+rewrite /<- integer_isomorphism z`1 in H/.
+rewrite /<- integer_from_def_zero in H/.
+rewrite /<- integer_from_def_one in H/.
+rewrite /-> Integer_isomorphism in H at all/.
+hyp /H/.
+qed ();
+
+
+
+(* Plus and Negation *)
+
+lemma "plusz_commute"
+/
+  forall a b . a +z b = b +z a : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> plusz_spec at all/.
+rewrite /-> Plusz_commute/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_assoc"
+/
+  forall a b c . (a +z b) +z c = a +z (b +z c) : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusz_spec at all/.
+rewrite /-> Integer_isomorphism at all/.
+rewrite /-> Plusz_assoc at all/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_id_l"
+/
+  forall a . z`0 +z a = a : integer
+/;
+
+inference.
+intro /a/.
+rewrite /-> plusz_spec/.
+rewrite /-> integer_to_def_zero/.
+rewrite /-> Plusz_id_l/.
+rewrite /-> integer_isomorphism/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_id_r"
+/
+  forall a . a +z z`0 = a : integer
+/;
+
+inference.
+intro /a/.
+rewrite /-> plusz_commute/.
+apply /plusz_id_l/.
+qed ();
+
+
+
+lemma "plusz_inverse_l"
+/
+  forall a . ~z a +z a = z`0 : integer
+/;
+
+inference.
+intro /a/.
+rewrite /-> plusz_spec/.
+rewrite /-> negz_spec/.
+rewrite /-> Integer_isomorphism/.
+rewrite /-> Plusz_inverse_l/.
+rewrite /-> integer_from_def_zero/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_inverse_r"
+/
+  forall a . a +z ~z a = z`0 : integer
+/;
+
+inference.
+intro /a/.
+rewrite /-> plusz_commute/.
+apply /plusz_inverse_l/.
+qed ();
+
+
+
+lemma "negz_invol"
+/
+  forall a . ~z (~z a) = a : integer
+/;
+
+inference.
+intro /a/.
+rewrite /-> negz_spec at all/.
+rewrite /-> Integer_isomorphism/.
+rewrite /-> Negz_invol/.
+apply /integer_isomorphism/.
+qed ();
+
+
+
+lemma "negz_plusz"
+/
+  forall a b . ~z (a +z b) = ~z a +z ~z b : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> negz_spec at all/.
+rewrite /-> plusz_spec at all/.
+rewrite /-> Integer_isomorphism at all/.
+rewrite /-> Negz_Plusz/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_compat"
+/
+  forall a a' b b' .
+    a = a' : integer
+    -> b = b' : integer
+    -> a +z b = a' +z b' : integer
+/;
+
+inference.
+intro /a a' b b' Ha Hb/.
+subst /a'/.
+subst /b'/.
+reflexivity.
+qed ();
+
+
+
+lemma "negz_compat"
+/
+  forall a a' . a = a' : integer -> negz a = negz a' : integer
+/;
+
+inference.
+intro /a a' Ha/.
+subst /a'/.
+reflexivity.
+qed ();
+
+
+
+(* Inequalities *)
+
+lemma "leqz_inhabitant"
+/
+  forall a b . a <z= b -> () : a <z= b
+/;
+
+inference.
+unfold /leqz at all/.
+intro /a b Hle/.
+typecheck.
+qed ();
+
+
+
+lemma "ltz_inhabitant"
+/
+  forall a b . a <z b -> () : a <z b
+/;
+
+inference.
+unfold /ltz at all/.
+intro /a b Hlt/.
+apply /leqz_inhabitant/ >> auto.
+qed ();
+
+
+
+structure Nothing = AfterLeqzInhabitant ();
+
+
+
+lemma "leqz_0_1"
+/
+  z`0 <z= z`1
+/;
+
+unfold /leqz/.
+reduce //.
+apply /Bool.istrue_true/.
+qed ();
+
+
+
+lemma "leqz_refl"
+/
+  forall a . a <z= a
+/;
+
+inference.
+intro /a/.
+rewrite /-> leqz_spec/.
+apply /Leqz_refl/.
+qed ();
+
+
+
+lemma "leqz_refl_eq"
+/
+  forall a b . a = b : integer -> a <z= a
+/;
+
+inference.
+intro /a b Heq/.
+subst /b/.
+apply /leqz_refl/.
+qed ();
+
+
+
+lemma "leqz_trans"
+/
+  forall a b c . a <z= b -> b <z= c -> a <z= c
+/;
+
+inference.
+intro /a b c Hab Hbc/.
+rewrite /-> leqz_spec in Hab in Hbc in concl/.
+apply /Leqz_trans/ >> auto.
+qed ();
+
+
+
+lemma "leqz_antisymm"
+/
+  forall a b . a <z= b -> b <z= a -> a = b : integer
+/;
+
+inference.
+intro /a b Hab Hba/.
+rewrite /-> leqz_spec in Hab in Hba/.
+rewrite /<- integer_isomorphism a , <- integer_isomorphism b/.
+compat.
+apply /Leqz_antisymm/ >> auto.
+qed ();
+
+
+
+lemma "plusz_leqz"
+/
+  forall a a' b b' . a <z= a' -> b <z= b' -> a +z b <z= a' +z b'
+/;
+
+inference.
+intro /a a' b b' Ha Hb/.
+rewrite /-> leqz_spec in Ha in Hb in concl/.
+rewrite /-> plusz_spec at all/.
+rewrite /-> Integer_isomorphism at all/.
+apply /Plusz_Leqz/ >> auto.
+qed ();
+
+
+
+lemma "plusz_cancel_leqz_l"
+/
+  forall a b c . c +z a <z= c +z b -> a <z= b
+/;
+
+inference.
+intro /a b c Hle/.
+so /plusz_leqz _# 4 (leqz_refl (~z c)) Hle/ /H/.
+rewrite /<- plusz_assoc in H at all/.
+rewrite /-> plusz_inverse_l in H at all/.
+rewrite /-> plusz_id_l in H at all/.
+hyp /H/.
+qed ();
+
+
+
+lemma "plusz_cancel_leqz_r"
+/
+  forall a b c . a +z c <z= b +z c -> a <z= b
+/;
+
+inference.
+intro /a b c Hle/.
+rewrite /-> plusz_commute in Hle at 0 1/.
+apply /plusz_cancel_leqz_l/ >> auto.
+qed ();
+
+
+
+lemma "leqz_implication"
+/
+  forall a a' b b' . a' <z= a -> b <z= b' -> a <z= b -> a' <z= b'
+/;
+
+inference.
+intro /a a' b b' Ha Hb Hab/.
+apply /leqz_trans/ >> auto.
+apply /leqz_trans/ >> auto.
+qed ();
+
+
+
+lemma "ltz_impl_leqz"
+/
+  forall a b . a <z b -> a <z= b
+/;
+
+inference.
+intro /a b H/.
+unfold /ltz in H/.
+rewrite /<- plusz_id_l a/.
+apply /leqz_trans/ >> auto.
+apply /plusz_leqz/.
+  {
+  apply /leqz_0_1/.
+  }
+
+  {
+  apply /leqz_refl/.
+  }
+qed ();
+
+
+
+lemma "ltz_irrefl"
+/
+  forall a . a <z a -> void
+/;
+
+inference.
+intro /a H/.
+unfold /ltz in H/.
+apply /neq_0_1/.
+apply /leqz_antisymm/.
+  {
+  unfold /leqz/.
+  reduce //.
+  apply /Bool.istrue_true/.
+  }
+
+  {
+  apply /plusz_cancel_leqz_r _ _ a/.
+  rewrite /-> plusz_id_l/.
+  hyp /H/.
+  }
+qed ();
+
+
+
+lemma "ltz_trans"
+/
+  forall a b c . a <z b -> b <z c -> a <z c
+/;
+
+inference.
+intro /a b c Hab Hbc/.
+unfold /ltz in Hab in Hbc in concl/.
+apply /leqz_trans/ >> auto.
+apply /leqz_trans/ >> auto.
+rewrite /<- plusz_id_l b/.
+apply /plusz_leqz/.
+  {
+  apply /leqz_0_1/.
+  }
+
+  {
+  apply /leqz_refl/.
+  }
+qed ();
+
+
+
+lemma "leqz_ltz_trans"
+/
+  forall a b c . a <z= b -> b <z c -> a <z c
+/;
+
+inference.
+intro /a b c Hab Hbc/.
+unfold /ltz in Hbc in concl/.
+apply /leqz_trans/ >> auto.
+apply /plusz_leqz/ >> auto.
+apply /leqz_refl/.
+qed ();
+
+
+
+lemma "ltz_leqz_trans"
+/
+  forall a b c . a <z b -> b <z= c -> a <z c
+/;
+
+inference.
+intro /a b c Hab Hbc/.
+unfold /ltz in Hab in concl/.
+apply /leqz_trans/ >> auto.
+qed ();
+
+
+
+lemma "plus_cancel_leq_leq_l"
+/
+  forall a a' b b' .
+    a +z b <z= a' +z b'
+    -> a' <z= a
+    -> b <z= b'
+/;
+
+inference.
+intro /a a' b b' Hle Hlea/.
+so /leqz_trans _# 3 Hle (plusz_leqz _# 4 Hlea (leqz_refl _))/ /H/.
+apply /plusz_cancel_leqz_l/ >> auto.
+qed ();
+
+
+
+lemma "plus_cancel_leq_leq_r"
+/
+  forall a a' b b' .
+    a +z b <z= a' +z b'
+    -> b' <z= b
+    -> a <z= a'
+/;
+
+inference.
+intro /a a' b b' Hle Hleb/.
+rewrite /-> plusz_commute in Hle at 0 1/.
+apply /plus_cancel_leq_leq_l/ >> auto.
+qed ();
+
+
+
+lemma "negz_leqz"
+/
+  forall a b . a <z= b -> ~z b <z= ~z a
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> negz_spec at 0 0/.
+rewrite /-> leqz_spec/.
+rewrite /-> Integer_isomorphism at all/.
+apply /Negz_Leqz/.
+rewrite /<- leqz_spec/.
+hyp /H/.
+qed ();
+
+
+
+lemma "negz_leqz'"
+/
+  forall a b . ~z b <z= ~z a -> a <z= b
+/;
+
+inference.
+intro /a b H/.
+so /negz_leqz _ _ H/ /H'/.
+rewrite /-> negz_invol in H' at all/.
+hyp /H'/.
+qed ();
+
+
+
+lemma "negz_ltz"
+/
+  forall a b . a <z b -> ~z b <z ~z a
+/;
+
+inference.
+intro /a b Hab/.
+unfold /ltz in Hab in concl/.
+rewrite /<- plusz_id_l (~z a)/.
+rewrite /<- plusz_inverse_r (z`1)/.
+rewrite /-> plusz_assoc/.
+apply /plusz_leqz/.
+  {
+  apply /leqz_refl/.
+  }
+change /concl/ /_ <z= ~z z`1 +z _/.
+rewrite /<- negz_plusz/.
+apply /negz_leqz/.
+hyp /Hab/.
+qed ();
+
+
+
+lemma "negz_ltz'"
+/
+  forall a b . ~z b <z ~z a -> a <z b
+/;
+
+inference.
+intro /a b H/.
+so /negz_ltz _ _ H/ /H'/.
+rewrite /-> negz_invol in H' at all/.
+hyp /H'/.
+qed ();
+
+
+lemma "not_leqz"
+/
+  forall a b . not (a <z= b) <-> b <z a
+/;
+
+inference.
+intro /a b/.
+rewrite /-> leqz_spec , -> ltz_spec/.
+apply /not_Leqz/.
+qed ();
+
+
+
+lemma "not_ltz"
+/
+  forall a b . not (a <z b) <-> b <z= a
+/;
+
+inference.
+intro /a b/.
+unfold /ltz/.
+rewrite /-> not_leqz/.
+unfold /ltz/.
+split.
+  {
+  intro /H/.
+  apply /plusz_cancel_leqz_l/ >> auto.
+  }
+
+  {
+  intro /H/.
+  apply /plusz_leqz/ >> auto.
+  apply /leqz_refl/.
+  }
+qed ();
+
+
+
+(* Effective comparisons *)
+
+lemma "istrue_eqzb"
+/
+  forall a b . Bool.istrue (eqzb a b) <-> a = b : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> eqzb_spec/.
+rewrite /-> istrue_Eqzb/.
+split.
+  {
+  intro /Heq/.
+  rewrite /<- integer_isomorphism a , <- integer_isomorphism b/.
+  compat.
+  auto.
+  }
+
+  {
+  intro /Heq/.
+  subst /b/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "istrue_leqzb"
+/
+  forall a b . Bool.istrue (leqzb a b) <-> a <z= b
+/;
+
+inference.
+intro /a b/.
+unfold /leqz/.
+reflexivity.
 qed ();
 
 
 
 define /ltzb a b/
 /
-  leqzb (plusz onez a) b
+  leqzb (z`1 +z a) b
 //
   integer -> integer -> bool
 /;
@@ -282,217 +1961,693 @@ qed ();
 
 
 
-define /ltz a b/
+lemma "istrue_ltzb"
 /
-  leqz (plusz onez a) b
-//
-  integer -> integer -> U 0
-/;
-
-unfold /ltz/.
-typecheck.
-qed ();
-
-
-ConstantTable.insert DestructInternal.destructTactics (parseConstant /integer/)
-  DestructInternal.destUserQuotient;
-
-
-lemma "leqz_inhabitant"
-/
-  forall (a b : integer) . leqz a b -> () : leqz a b
-/;
-
-intro /p q H/.
-unfold /leqz in H in concl/.
-apply /Bool.istrue_inhabitant/ >> auto.
-qed ();
-
-
-
-ConstantTable.insert TypecheckInternal.trivialIntroTactics (parseConstant /leqz/)
-  (Backchain.applyPriority /leqz_inhabitant/);
-
-
-
-lemma "leqz_refl"
-/
-  forall a . leqz a a
-/;
-
-inference.
-intro /p/.
-destruct /p/ /[p]/.
-so /integer_subtype/ /?/.
-unhide.
-unfold /leqz/.
-unfold /leqzb/.
-
-(* XX why isn't testRewrite unifying variables *)
-testRewrite /-> NatEff.istrue_leqb/;
-
-rewrite /-> NatEff.istrue_leqb/.
-qed ();
-
-
-
-lemma "leqz_trans"
-/
-  forall a b c . leqz a b -> leqz b c -> leqz a c
-/;
-
-inference.
-intro /p q r Hpq Hqr/.
-infer /p/ /Hofp/.
-infer /r/ /Hofr/.
-destruct /p/ /[(p1 p2)]/.
-destruct /q/ /[(q1 q2)]/.
-destruct /r/ /[(r1 r2)]/.
-unfold /leqz in Hpq in Hqr in concl/.
-unfold /leqzb in Hpq in Hqr in concl/.
-reduce /Hpq Hqr concl/.
-rewrite /-> NatEff.istrue_leqb in Hpq in Hqr in concl/.
-clear /Hofp Hofr/.
-so /Nat.plus_leq _# 4 Hpq Hqr/ /H/.
-apply /Nat.plus_cancel_leq_r _ _ (q1 + q2)/.
-rewrite /-> Nat.plus_commute at 2/.
-rewrite /-> Nat.plus_assoc/.
-rewrite /-> Nat.plus_commute at 1/.
-rewrite /-> Nat.plus_commute in H at 4/.
-rewrite /-> Nat.plus_commute at 4/.
-rewrite /<- Nat.plus_assoc in H at all in concl at all/.
-rewrite /-> Nat.plus_assoc in H at 3 in concl at 3/.
-rewrite /-> Nat.plus_commute at 5/.
-exact /H/.
-qed ();
-
-
-
-lemma "leqz_antisymm"
-/
-  forall a b . leqz a b -> leqz b a -> a = b : integer
-/;
-
-inference.
-intro /p q Hpq Hqp/.
-so /integer_of/ /Hof/.
-destruct /p/ /[(p1 p2)]/.
-destruct /q/ /[(q1 q2)]/.
-apply /integer_eq/.
-unfold /leqz in Hpq in Hqp/.
-unfold /leqzb in Hpq in Hqp/.
-rewrite /-> NatEff.istrue_leqb in Hpq in Hqp/.
-rewrite /-> Nat.plus_commute in Hpq at 1 in Hqp at 0/.
-apply /Nat.leq_antisymm/ >> auto.
-qed ();
-
-
-
-lemma "plusz_id_l"
-/
-  forall a . plusz zeroz a = a : integer
-/;
-
-inference.
-intro /p/.
-so /integer_of/ /Hof/.
-destruct /p/ /[(p1 p2)]/.
-unfold /zeroz , plusz/.
-reduce //.
-reflexivity.
-qed ();
-
-
-
-lemma "plusz_id_r"
-/
-  forall a . plusz a zeroz = a : integer
-/;
-
-inference.
-intro /p/.
-so /integer_of/ /Hof/.
-destruct /p/ /[(p1 p2)]/.
-unfold /zeroz , plusz/.
-reduce //.
-rewrite /-> Nat.plus_0_r at all/.
-reflexivity.
-qed ();
-
-
-
-lemma "plusz_commute"
-/
-  forall a b . plusz a b = plusz b a : integer
+  forall a b . Bool.istrue (ltzb a b) <-> a <z b
 /;
 
 inference.
 intro /a b/.
-so /integer_of/ /Hof/.
-destruct /a/ /[(a a')]/.
-destruct /b/ /[(b b')]/.
-unfold /plusz at all/.
-reduce //.
-apply /integer_eq/.
-rewrite /-> Nat.plus_commute at 0 1 2/.
-reflexivity.
+unfold /ltzb , ltz/.
+rewrite /-> istrue_leqzb/.
 qed ();
 
 
 
-lemma "plusz_assoc"
+(* Induction *)
+
+define /smaller a b/
 /
-  forall a b c . plusz (plusz a b) c = plusz a (plusz b c) : integer
+  (b <z a & a <z= z`0) % (a <z b & z`0 <z= a)
+//
+  integer -> integer -> U 0
+/;
+
+unfold /smaller/.
+typecheck.
+qed ();
+
+
+
+lemma "smaller_well_founded"
+/
+  forall a . Acc integer smaller a
 /;
 
 inference.
-intro /a b c/.
-so /integer_of/ /Hof/.
-destruct /a/ /[(a a')]/.
-destruct /b/ /[(b b')]/.
-destruct /c/ /[(c c')]/.
-unfold /plusz at all/.
-reduce //.
-apply /integer_eq/.
-rewrite /-> Nat.plus_commute/.
-rewrite /<- Nat.plus_assoc at all/.
-reflexivity.
+set /f/ /fn x . 
+           if leqzb z`0 x then 
+             Integer_to_nat (integer_to_def x)
+           else
+             Integer_to_nat (integer_to_def (negz x))/.
+assert /forall (x : integer) . f x : nat/ /Hof/.
+  {
+  intro /x/.
+  unfold /f/.
+  typecheck.
+  }
+assert /forall (n : nat) (a : integer) . 
+          f a = n : nat
+          -> Acc integer smaller a/ /H/.
+1:{
+  intro /a/.
+  apply /H/.
+    {
+    reflexivity.
+    }
+  typecheck.
+  }
+assert /forall x y . 
+          z`0 <z= x 
+          -> x <z y
+          -> Integer_to_nat (integer_to_def x) < Integer_to_nat (integer_to_def y)/ /Hprop/.
+  {
+  inference.
+  clear /f Hof/.
+  intro /a b Hb Hab/.
+  apply /Integer_to_nat_mono_lt/.
+    {
+    rewrite /-> leqz_spec in Hb/.
+    unfold /integer_to_def in Hb at 0/.
+    unroll /integer_to_nat in Hb/.
+    reduce /Hb/.
+    fold /Zeroz in Hb/.
+    hyp /Hb/.
+    }
+  rewrite /-> ltz_spec in Hab/.
+  exact /Hab/.
+  }
+intro /n/.
+induct /n/.
+reintro /IH/.
+intro /a Heq/.
+moveBefore /a/ /n/.
+subst /n/.
+apply /Acc.Acc_intro/.
+intro /b Hba/.
+apply /IH/.
+1:{
+  reflexivity.
+  }
+typechecker ();
+clear /IH/.
+unfold /smaller in Hba/.
+destruct /Hba/ /Hab Hneg | Hba Hpos/.
+  {
+  subst /f/.
+  reduce //.
+  remember /leqzb z`0 a/ /bool/ /p/ /Heq/.
+  symmetryIn /Heq/.
+  destruct /p/ /|/.
+    {
+    rewrite /<- Bool.istrue_iff_eq_true in Heq/.
+    rewrite /-> istrue_leqzb in Heq/.
+    so /ltz_leqz_trans _# 3 Hab (leqz_trans _# 3 Hneg Heq)/ /H/.
+    so /ltz_irrefl _ H/ /0/.
+    }
+  reduce //.
+  clear /Heq/.
+  remember /leqzb z`0 b/ /bool/ /p/ /Heq/.
+  symmetryIn /Heq/.
+  destruct /p/ /|/.
+    {
+    rewrite /<- Bool.istrue_iff_eq_true in Heq/.
+    rewrite /-> istrue_leqzb in Heq/.
+    so /leqz_antisymm _ _ Hneg Heq/ /H/.
+    subst /b/.
+    apply /Hprop/ >> auto.
+    apply /negz_ltz'/.
+    reduce //.
+    rewrite /-> negz_invol/.
+    hyp /Hab/.
+    }
+  reduce //.
+  apply /Hprop/.
+    {
+    apply /negz_leqz'/.
+    rewrite /-> negz_invol/.
+    reduce //.
+    auto.
+    }
+  apply /negz_ltz/.
+  auto.
+  }
+
+  {
+  subst /f/.
+  reduce //.
+  remember /leqzb z`0 a/ /bool/ /p/ /Heq/.
+  symmetryIn /Heq/.
+  destruct /p/ /|/.
+  1:{
+    rewrite /<- Bool.not_istrue_iff_eq_false in Heq/.
+    rewrite /-> istrue_leqzb in Heq/.
+    rewrite /-> not_leqz in Heq/.
+    so /leqz_ltz_trans _# 3 Hpos (ltz_trans _# 3 Hba Heq)/ /H/.
+    so /ltz_irrefl _ H/ /0/.
+    }
+  reduce //.
+  clear /Heq/.
+  remember /leqzb z`0 b/ /bool/ /p/ /Heq/.
+  symmetryIn /Heq/.
+  destruct /p/ /|/.
+  1:{
+    rewrite /<- Bool.not_istrue_iff_eq_false in Heq/.
+    rewrite /-> istrue_leqzb in Heq/.
+    rewrite /-> not_leqz in Heq/.
+    so /leqz_ltz_trans _# 3 Hpos Heq/ /H/.
+    so /ltz_irrefl _ H/ /0/.
+    }
+  reduce //.
+  apply /Hprop/ >> auto.
+  }
 qed ();
 
 
 
-lemma "plusz_inverse_l"
+Constant.setOpacity (parseConstant /Integer.smaller/) Constant.FIRM;
+
+
+
+definerec /integer_iter P hz hm hp a/
 /
-  forall a . plusz (negz a) a = zeroz : integer
+  if eqzb z`0 a then
+    hz
+  else if leqzb z`0 a then
+    hp (z`-1 +z a) () (integer_iter P hz hm hp (z`-1 +z a))
+  else
+    hm (z`1 +z a) () (integer_iter P hz hm hp (z`1 +z a))
+//
+  intersect i .
+    forall (P : integer -> U i) .
+      P z`0
+      -> (forall (a : integer) . leqz a z`0 -> P a -> P (z`-1 +z a))
+      -> (forall (a : integer) . leqz z`0 a -> P a -> P (z`1 +z a))
+      -> forall (a : integer) . P a
+/;
+
+inference.
+introOf /i P hz hm hp a/.
+so /smaller_well_founded a/ /Hacc/.
+induct /Hacc/.
+reintro /IH/.
+unroll /integer_iter/.
+remember /eqzb z`0 a/ /bool/ /p/ /Heq/.
+destruct /p/ /|/.
+  {
+  symmetryIn /Heq/.
+  rewrite /<- Bool.istrue_iff_eq_true in Heq/.
+  rewrite /-> istrue_eqzb in Heq/.
+  subst /a/.
+  hypof.
+  }
+symmetryIn /Heq/.
+rewrite /<- Bool.not_istrue_iff_eq_false in Heq/.
+rewrite /-> istrue_eqzb in Heq/.
+rename /Heq/ /Hneq/.
+remember /leqzb z`0 a/ /bool/ /p/ /Heq/.
+destruct /p/ /|/.
+  {
+  symmetryIn /Heq/.
+  rewrite /<- Bool.istrue_iff_eq_true in Heq/.
+  rewrite /-> istrue_leqzb in Heq/.
+  rename /Heq/ /Hpos/.
+  reduce //.
+  assert /z`0 <z= z`-1 +z a/ /Hleq/.
+    {
+    rewrite /<- not_ltz/.
+    intro /H/.
+    apply /Hneq/.
+    apply /leqz_antisymm/ >> auto.
+    unfold /ltz in H/.
+    rewrite /<- plusz_assoc in H/.
+    reduce /H/.
+    rewrite /-> plusz_id_l in H/.
+    hyp /H/.
+    }
+  typecheck.
+    {
+    rewrite /<- plusz_assoc/.
+    reduce //.
+    rewrite /-> plusz_id_l/.
+    reflexivity.
+    }
+  apply /IH/.
+  right >> split >> auto.
+  unfold /ltz/.
+  rewrite /<- plusz_assoc/.
+  reduce //.
+  rewrite /-> plusz_id_l/.
+  apply /leqz_refl/.
+  }
+
+  {
+  symmetryIn /Heq/.
+  rewrite /<- Bool.not_istrue_iff_eq_false in Heq/.
+  rewrite /-> istrue_leqzb in Heq/.
+  rewrite /-> not_leqz in Heq/.
+  rename /Heq/ /Hlt/.
+  assert /z`1 +z a <z= z`0/ /Hleq/.
+    {
+    rewrite /<- not_ltz/.
+    intro /H/.
+    apply /Hneq/.
+    apply /leqz_antisymm/.
+      {
+      unfold /ltz in H/.
+      apply /plusz_cancel_leqz_l _ _ z`1/ >> auto.
+      }
+
+      {
+      apply /ltz_impl_leqz/ >> auto.
+      }
+    }
+  typecheck.
+    {
+    rewrite /<- plusz_assoc/.
+    reduce //.
+    rewrite /-> plusz_id_l/.
+    reflexivity.
+    }
+  apply /IH/.
+  left >> split >> auto.
+  unfold /ltz/.
+  apply /plusz_leqz/ >> autoWith /leqz_refl/.
+  }
+qed ();
+
+
+
+structure Nothing = AfterIntegerIter ();
+
+
+
+(* Relation to natural numbers *)
+
+lemma "nat_to_integer_type"
+/
+  nat_to_integer : nat -> integer
+/;
+
+introOf /n/.
+induct /n/.
+reintro /IH/.
+destruct /n/ /| n/.
+  {
+  reduce //.
+  typecheck.
+  }
+
+  {
+  reduce //.
+  typecheck.
+  apply /IH/.
+  apply /Nat.lt_succ/.
+  }
+qed ();
+Define.recordTyping "nat_to_integer_type";
+
+
+
+lemma "integer_to_nat_type"
+/
+  integer_to_nat : integer -> nat
+/;
+
+introOf /a/.
+induct /a/.
+reintro /IH/.
+unroll /integer_to_nat/.
+remember /leqzb a z`0/ /bool/ /p/ /Heq/.
+destruct /p/ /|/.
+  {
+  reduce //.
+  typecheck.
+  }
+reduce //.
+typecheck1.
+apply /IH/.
+symmetryIn /Heq/.
+rewrite /<- Bool.not_istrue_iff_eq_false in Heq/.
+rewrite /-> istrue_leqzb in Heq/.
+rewrite /-> not_leqz in Heq/.
+right >> split.
+  {
+  unfold /ltz/.
+  rewrite /<- plusz_assoc/.
+  reduce //.
+  rewrite /-> plusz_id_l/.
+  apply /leqz_refl/.
+  }
+
+  {
+  unfold /ltz in Heq/.
+  reduce /Heq/.
+  so /plusz_leqz _# 4 Heq (leqz_refl z`-1)/ /H/.
+  reduce /H/.
+  rewrite /-> plusz_commute/.
+  hyp /H/.
+  }
+qed ();
+Define.recordTyping "integer_to_nat_type";
+
+
+
+lemma "nat_to_integer_nonneg"
+/
+  forall n . z`0 <z= nat_to_integer n
+/;
+
+inference.
+intro /n/.
+iterate /n/.
+
+(* 0 *)
+{
+apply /leqz_refl/.
+}
+
+(* succ *)
+{
+intro /n IH/.
+so /plusz_leqz _# 4 leqz_0_1 IH/ /H/.
+reduce /H/.
+hyp /H/.
+}
+qed ();
+
+
+
+lemma "nat_to_integer_mono"
+/
+  forall m n . m <= n -> nat_to_integer m <z= nat_to_integer n
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+
+(* 0 *)
+{
+intro /n _/.
+apply /nat_to_integer_nonneg/.
+}
+
+(* succ *)
+{
+intro /m IH n Hmn/.
+destruct /n/ /| n/.
+  {
+  so /Nat.leq_succ_0_not _ Hmn/ /0/.
+  }
+reduce //.
+apply /plusz_leqz/.
+  {
+  apply /leqz_refl/.
+  }
+apply /IH/.
+apply /Nat.leq_succ_invert/.
+hyp /Hmn/.
+}
+qed ();
+
+
+
+lemma "nat_to_integer_inv"
+/
+  forall n . integer_to_nat (nat_to_integer n) = n : nat
+/;
+
+inference.
+intro /n/.
+iterate /n/.
+
+(* 0 *)
+{
+unroll /integer_to_nat/.
+reduce //.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /n IH/.
+unroll /integer_to_nat/.
+remember /leqzb _ _/ /bool/ /b/ /Heq/.
+destruct /b/ /|/.
+  {
+  symmetryIn /Heq/.
+  rewrite /<- Bool.istrue_iff_eq_true in Heq/.
+  rewrite /-> istrue_leqzb in Heq/.
+  fold /ltz _ _ in Heq/.
+  rewrite /<- not_leqz in Heq/.
+  exfalso.
+  apply /Heq/.
+  apply /nat_to_integer_nonneg/.
+  }
+reduce //.
+rewrite /<- plusz_assoc/.
+reduce //.
+rewrite /-> plusz_id_l/.
+compat.
+exact /IH/.
+}
+qed ();
+
+
+
+lemma "integer_to_nat_inv"
+/
+  forall a . z`0 <z= a -> nat_to_integer (integer_to_nat a) = a : integer
 /;
 
 inference.
 intro /a/.
-so /integer_of/ /Hof/.
-destruct /a/ /[(a a')]/.
-unfold /zeroz at all , negz at all , plusz at all/.
+iterate /a/.
+
+(* 0 *)
+{
+intro /_/.
+unroll /integer_to_nat/.
 reduce //.
-apply /integer_eq/.
-rewrite /-> Nat.plus_0_r at all/.
-rewrite /-> Nat.plus_commute/.
+reflexivity.
+}
+
+(* neg *)
+{
+intro /a Hneg _ Hpos/.
+so /plusz_leqz _# 4 (leqz_refl z`1) (leqz_trans _# 3 Hneg Hpos)/ /H/.
+rewrite /<- plusz_assoc in H/.
+reduce /H/.
+rewrite /-> plusz_id_l in H/.
+fold /ltz _ _ in H/.
+so /ltz_irrefl _ H/ /0/.
+}
+
+(* pos *)
+{
+intro /a Hpos IH _/.
+unroll /integer_to_nat/.
+fold /ltzb a z`0/.
+remember /ltzb a z`0/ /bool/ /b/ /Heq/.
+destruct /b/ /|/.
+  {
+  symmetryIn /Heq/.
+  rewrite /<- Bool.istrue_iff_eq_true in Heq/.
+  rewrite /-> istrue_ltzb in Heq/.
+  rewrite /<- not_leqz in Heq/.
+  so /Heq Hpos/ /0/.
+  }
+reduce //.
+compat.
+rewrite /<- plusz_assoc/.
+reduce //.
+rewrite /-> plusz_id_l/.
+apply /IH/.
+hyp /Hpos/.
+}
+qed ();
+
+
+
+lemma "plus_to_integer"
+/
+  forall m n . nat_to_integer (m + n) = nat_to_integer m +z nat_to_integer n : integer
+/;
+
+inference.
+intro /a b/.
+iterate /a/.
+
+(* 0 *)
+{
+rewrite /-> plusz_id_l/.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /a IH/.
+rewrite /-> plusz_assoc/.
+compat.
+hyp /IH/.
+}
+qed ();
+
+
+
+lemma "plusz_to_nat"
+/
+  forall a b . 
+    z`0 <z= a 
+    -> z`0 <z= b
+    -> integer_to_nat (a +z b) = integer_to_nat a + integer_to_nat b : nat
+/;
+
+inference.
+intro /a b Ha Hb/.
+rewrite /<- integer_to_nat_inv a/ >> auto.
+rewrite /<- integer_to_nat_inv b/ >> auto.
+rewrite /<- plus_to_integer/.
+rewrite /-> nat_to_integer_inv/.
 reflexivity.
 qed ();
 
 
 
-lemma "plusz_inverse_r"
+lemma "integer_to_nat_succ"
 /
-  forall a . plusz a (negz a) = zeroz : integer
+  forall a . z`0 <z= a -> integer_to_nat (z`1 +z a) = succ (integer_to_nat a) : nat
+/;
+
+inference.
+intro /a Ha/.
+rewrite /-> plusz_to_nat/ >> autoWith /leqz_0_1/.
+unroll /integer_to_nat at 0 0/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "integer_to_nat_mono"
+/
+  forall a b .
+    z`0 <z= a
+    -> a <z= b
+    -> integer_to_nat a <= integer_to_nat b
 /;
 
 inference.
 intro /a/.
-so /integer_of/ /Hof/.
-destruct /a/ /[(a a')]/.
-unfold /zeroz at all , negz at all , plusz at all/.
+iterate /a/.
+
+(* 0 *)
+{
+intro /b _ _/.
+unroll /integer_to_nat/.
 reduce //.
-apply /integer_eq/.
-rewrite /-> Nat.plus_0_r at all/.
-rewrite /-> Nat.plus_commute/.
+apply /Nat.leq_0_min/.
+}
+
+(* neg *)
+{
+intro /a Hneg IH b Hpos _/.
+so /plusz_leqz _# 4 (leqz_refl z`1) (leqz_trans _# 3 Hneg Hpos)/ /H/.
+rewrite /<- plusz_assoc in H/.
+reduce /H/.
+rewrite /-> plusz_id_l in H/.
+fold /ltz _ _ in H/.
+so /ltz_irrefl _ H/ /0/.
+}
+
+(* pos *)
+{
+intro /a Hpos IH b _ Hab/.
+rewrite /-> integer_to_nat_succ/ >> auto.
+rewrite /<- plusz_id_l b/.
+convert /(z`1 +z z`-1) +z b/.
+rewrite /-> plusz_assoc/.
+assert /a <z= z`-1 +z b/ /Hab'/.
+  {
+  rewrite /<- plusz_id_l a/.
+  convert /z`-1 +z z`1/.
+  rewrite /-> plusz_assoc/.
+  apply /plusz_leqz/ >> autoWith /leqz_refl/.
+  }
+rewrite /-> integer_to_nat_succ/.
+  {
+  apply /leqz_trans/ >> auto.
+  }
+apply /Nat.leq_succ_succ/.
+apply /IH/ >> auto.
+}
+qed ();
+
+
+
+lemma "minus_to_integer"
+/
+  forall m n . 
+    n <= m
+    -> nat_to_integer (m - n) = nat_to_integer m -z nat_to_integer n : integer
+/;
+
+inference.
+unfold /minusz/.
+intro /m n/.
+revert /m/.
+iterate /n/.
+
+(* 0 *)
+{
+intro /m _/.
+rewrite /-> plusz_id_r/.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /m IH n Hleq/.
+destruct /n/ /| n/.
+  {
+  so /Nat.leq_succ_0_not _ Hleq/ /0/.
+  }
+reduce //.
+rewrite /-> negz_plusz/.
+reduce //.
+rewrite /<- plusz_assoc/.
+rewrite /-> plusz_commute at 1/.
+rewrite /<- plusz_assoc/.
+reduce //.
+rewrite /-> plusz_id_l/.
+apply /IH/.
+apply /Nat.leq_succ_invert/.
+hyp /Hleq/.
+}
+qed ();
+
+
+
+lemma "minusz_to_nat"
+/
+  forall a b .
+    z`0 <z= b
+    -> b <z= a
+    -> integer_to_nat (a -z b) = integer_to_nat a - integer_to_nat b : nat
+/;
+
+inference.
+intro /a b Hb Hba/.
+rewrite /<- integer_to_nat_inv a/.
+  {
+  apply /leqz_trans/ >> auto.
+  }
+rewrite /<- integer_to_nat_inv b/ >> auto.
+rewrite /<- minus_to_integer/.
+  {
+  apply /integer_to_nat_mono/ >> auto.
+  }
+rewrite /-> nat_to_integer_inv/.
 reflexivity.
 qed ();

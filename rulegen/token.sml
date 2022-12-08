@@ -27,6 +27,7 @@ structure Token =
        | SEMICOLON of pos
        | SLASH of pos
        | TURNSTILE of pos
+       | AXIOM of pos
        | DEMOTE of pos
        | EXT of pos
        | FN of pos

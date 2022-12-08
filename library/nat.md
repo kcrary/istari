@@ -65,6 +65,10 @@ This one gives transitivity in the form needed for rewriting:
 
     lt_impl_leq : type:lt_impl_leq
 
+    lt_succ_succ : type:lt_succ_succ
+
+    lt_succ_invert : type:lt_succ_invert
+
     lt_succ : type:lt_succ
 
     lt_irrefl : type:lt_irrefl
@@ -77,7 +81,11 @@ This one gives transitivity in the form needed for rewriting:
 
     lt_0_succ : type:lt_0_succ
 
-    lt_succ_succ : type:lt_succ_succ
+    lt_0_not : type:lt_0_not
+
+    not_leq : type:not_leq
+
+    not_lt : type:not_lt
 
 Strong induction for natural numbers:
 
@@ -112,9 +120,9 @@ Strong induction for natural numbers:
 
     plus_leq : type:plus_leq
 
-    plus_cancel_leq_r : type:plus_cancel_leq_r
-
     plus_cancel_leq_l : type:plus_cancel_leq_l
+
+    plus_cancel_leq_r : type:plus_cancel_leq_r
 
     plus_cancel_leq_leq_l : type:plus_cancel_leq_leq_l
 
@@ -151,6 +159,10 @@ Strong induction for natural numbers:
     minus_succ_l_leq : type:minus_succ_l_leq
 
     minus_succ_l_eq : type:minus_succ_l_eq
+
+    plus_minus_swap : type:plus_minus_swap
+
+    plus_minus_assoc : type:plus_minus_assoc
 
     plus_compat : type:plus_compat
 

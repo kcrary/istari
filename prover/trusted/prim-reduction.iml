@@ -1,0 +1,151 @@
+
+signature PRIM_REDUCTION =
+   sig
+
+      type ureduction1
+      type ureduction2
+
+      val unroll_fix : ureduction1
+      val unroll_pause : ureduction1
+      val unroll_wind : ureduction1
+      val reduce_lett : ureduction1
+
+      val ite_tru : ureduction2
+      val ite_fals : ureduction2
+      val sumcase_inl : ureduction2
+      val sumcase_inr : ureduction2
+      val natcase_zero : ureduction2
+      val natcase_succ : ureduction2
+      
+   end
+
+
+
+signature PRIM_REDUCTION_INTERNAL =
+   sig
+
+      include PRIM_REDUCTION
+
+      val redices : ureduction2 list
+
+   end
+
+
+functor PrimReductionFun (structure Term : TERM
+                          structure Prim : PRIM
+                                           where type constant = Term.constant
+                          structure Reduction : REDUCTION_PRIV
+                                                where type constant = Term.constant
+                                                where type term = Term.term
+                                                where type elim = Term.elim)
+   :> 
+   PRIM_REDUCTION_INTERNAL
+   where type ureduction1 = Reduction.ureduction1
+   where type ureduction2 = Reduction.ureduction2
+   =
+   struct
+
+      structure R = Reduction
+      structure T = Term
+
+      open Prim
+
+      type ureduction1 = Reduction.ureduction1
+      type ureduction2 = Reduction.ureduction2
+
+
+      val theRedices : ureduction2 list ref = ref []
+
+      fun redex r =
+         let
+            val red = R.backdoor2 r
+         in
+            theRedices := red :: !theRedices;
+            red
+         end
+
+
+      val unroll_pause =
+         R.new1 pause 1 T.zero (R.trans [R.unfold, R.beta 1]) R.refl
+
+      val unroll_fix =
+         R.new1 fix 1
+            (T.app T.zero (T.apply1 fix T.zero))
+            (R.trans
+                [
+                R.unfold,
+                R.user1 unroll_pause,
+                R.beta 2,
+                ])
+            (R.within [1] R.unfold)
+
+      val unroll_wind =
+         (* wind F M --> F (M #1) (M #2) (\z. wind F (M #2 z)) *)
+         R.backdoor1
+         (wind, 2,
+          T.app3
+             (T.Var 1)
+             (T.pi1 T.zero)
+             (T.pi2 T.zero)
+             (T.Lam (NONE,
+                     T.apply2 wind
+                        (T.Var 2)
+                        (T.Elim (T.Var 1, [T.Pi2, T.App T.zero])))))
+
+      val reduce_lett =
+         R.new1 lett 2 
+            (T.app T.zero (T.Var 1))
+            (R.trans [R.unfold, R.beta 2])
+            R.refl
+
+      val ite_tru =
+         (* ite true M1 M0 --> M1 *)
+         redex (ite, 0, 2, tru, 0, T.Var 1)
+   
+      val ite_fals =
+         (* ite fals M1 M0 --> M0 *)
+         redex (ite, 0, 2, fals, 0, T.Var 0)
+   
+      val sumcase_inl =
+         (* sumcase (inl M2) M1 M0 --> M1 M2 *)
+         redex (sumcase, 0, 2, inl, 1, T.Elim (T.Var 1, [T.App (T.Var 2)]))
+   
+      val sumcase_inr =
+         (* sumcase (inr M2) M1 M0 --> M0 M2 *)
+         redex (sumcase, 0, 2, inr, 1, T.Elim (T.Var 0, [T.App (T.Var 2)]))
+   
+      val natcase_zero =
+         (* natcase zero M1 M0 --> M1 *)
+         R.new2 natcase 0 2 zero 0 
+            (T.Var 1) 
+            (R.trans
+                [
+                R.unfold,
+                R.beta 3,
+                R.within [1] R.unfold,
+                R.user2 sumcase_inl,
+                R.beta 1
+                ])
+            R.refl
+
+      val natcase_succ =
+         (* natcase (succ M2) M1 M0 --> M0 M2 *)
+         R.new2 natcase 0 2 succ 1
+            (T.app (T.Var 0) (T.Var 2))
+            (R.trans
+                [
+                R.unfold,
+                R.beta 3,
+                R.within [1] (R.trans [R.unfold, R.beta 1]),
+                R.user2 sumcase_inr,
+                R.beta 1
+                ])
+            R.refl
+
+      val () = theRedices := natcase_zero :: natcase_succ :: !theRedices
+   
+
+      val redices = !theRedices
+      val () = theRedices := []
+
+   end

@@ -32,6 +32,7 @@ functor AfterIff () :> sig end =
       structure H = ConstantTable
       structure T = Term
 
+      val not = parseConstant /Logic.not/
       val iff = parseConstant /Logic.iff/
 
       structure U = Show.Unparsing
@@ -47,7 +48,9 @@ functor AfterIff () :> sig end =
              (fn (p, q) => U.append [p 6, U.break 1, U.string "<-> ", q 6]))
 
 
-      open Tactic
+      val () =
+         ConstantTable.insert TypecheckInternal.semitrivialIntroTactics not
+            (Term.Lam (NONE, Term.Triv), Backchain.applyPriority /Logic.not_inhabitant/);
 
       val () =
          H.insert EqualityTacticInternal.reflexivityTactics iff
@@ -72,7 +75,23 @@ functor AfterIff () :> sig end =
             RewriteInternal.compatibilityTable
             (iff, 1, iff)
             (iff, true, andthenOn 0 (B.witnessPriority /Logic.iff_compat_2 _ _ _ _ __/))
+
+      val () =
+         RewriteInternal.CICTable.insert 
+            RewriteInternal.compatibilityTable
+            (not, 0, Prim.arrow)
+            (Prim.arrow, false, andthenOn 0 (B.witnessPriority /Logic.not_compat_arrow _ _ _ __/))
+
+      val () =
+         RewriteInternal.CICTable.insert 
+            RewriteInternal.compatibilityTable
+            (not, 0, iff)
+            (iff, true, andthenOn 0 (B.witnessPriority /Logic.not_compat_iff _ _ _ __/))
+
+            
          
+      open Tactic
+
 
       fun weakenIffArrow tac =
          goalCase

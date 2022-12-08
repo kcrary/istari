@@ -35,6 +35,18 @@ structure ParseLTerm =
 
       fun var i = T.Var i
 
+      fun integer n =
+         T.Native (T.Integer (IntInf.fromInt n))
+
+      fun integerLexeme str =
+         (case FromString.toIntInf str of
+             SOME x => T.Native (T.Integer x)
+
+           | NONE => raise (Fail ("invalid integer literal " ^ str)))
+
+      fun integerEmbed x =
+         T.Native (T.Integer x)
+
       fun shortConst sym = T.Const (Namespace.resolve [sym])
       fun longConst strs = T.Const (Namespace.resolve (map Symbol.fromValue strs))
 
@@ -74,6 +86,10 @@ grammardef LTerm
    rule LTerm(100) ::= "U" => univ
 
    rule LTerm(100) ::= NUMBER => var
+
+   rule LTerm(100) ::= "z`" NUMBER => integer
+   rule LTerm(100) ::= "z`" LEXEME => integerLexeme
+   rule LTerm(100) ::= "z`" EMBED => integerEmbed
 
    rule LTerm(100) ::= EMBED => id
    rule LTerm(100) ::= Ident => shortConst

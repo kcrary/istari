@@ -29,6 +29,7 @@ functor ParseMainFun
 
           val cons_clauses : clause * clauses -> clauses
           val nil_clauses : unit -> clauses
+          val axiom_clause : symbol_pos * rule -> clause
           val lrule_clause : symbol_pos * lrule -> clause
           val rule_clause : symbol_pos * rule -> clause
           val make_lrule : lconcl * lpremises -> lrule
@@ -112,6 +113,7 @@ functor ParseMainFun
            | SLASH of pos
            | SUBTYPE of pos
            | TURNSTILE of pos
+           | AXIOM of pos
            | DEMOTE of pos
            | EXT of pos
            | FN of pos
@@ -143,15 +145,17 @@ State 0:
 start -> . Clauses  / 0
 59 : Clause -> . RULE LIDENT Rule  / 1
 60 : Clause -> . LRULE LIDENT LRule  / 1
-61 : Clauses -> .  / 0
-62 : Clauses -> . Clause Clauses  / 0
+61 : Clause -> . AXIOM LIDENT Rule  / 1
+62 : Clauses -> .  / 0
+63 : Clauses -> . Clause Clauses  / 0
 
-$ => reduce 61
-LRULE => shift 3
-RULE => shift 2
-EOF => reduce 61
+$ => reduce 62
+AXIOM => shift 2
+LRULE => shift 4
+RULE => shift 3
+EOF => reduce 62
 Clause => goto 1
-Clauses => goto 4
+Clauses => goto 5
 
 -----
 
@@ -159,36 +163,46 @@ State 1:
 
 59 : Clause -> . RULE LIDENT Rule  / 1
 60 : Clause -> . LRULE LIDENT LRule  / 1
-61 : Clauses -> .  / 0
-62 : Clauses -> . Clause Clauses  / 0
-62 : Clauses -> Clause . Clauses  / 0
+61 : Clause -> . AXIOM LIDENT Rule  / 1
+62 : Clauses -> .  / 0
+63 : Clauses -> . Clause Clauses  / 0
+63 : Clauses -> Clause . Clauses  / 0
 
-$ => reduce 61
-LRULE => shift 3
-RULE => shift 2
-EOF => reduce 61
+$ => reduce 62
+AXIOM => shift 2
+LRULE => shift 4
+RULE => shift 3
+EOF => reduce 62
 Clause => goto 1
-Clauses => goto 5
+Clauses => goto 6
 
 -----
 
 State 2:
 
-59 : Clause -> RULE . LIDENT Rule  / 1
-
-LIDENT => shift 6
-
------
-
-State 3:
-
-60 : Clause -> LRULE . LIDENT LRule  / 1
+61 : Clause -> AXIOM . LIDENT Rule  / 1
 
 LIDENT => shift 7
 
 -----
 
+State 3:
+
+59 : Clause -> RULE . LIDENT Rule  / 1
+
+LIDENT => shift 8
+
+-----
+
 State 4:
+
+60 : Clause -> LRULE . LIDENT LRule  / 1
+
+LIDENT => shift 9
+
+-----
+
+State 5:
 
 start -> Clauses .  / 0
 
@@ -197,16 +211,62 @@ EOF => accept
 
 -----
 
-State 5:
+State 6:
 
-62 : Clauses -> Clause Clauses .  / 0
+63 : Clauses -> Clause Clauses .  / 0
 
-$ => reduce 62
-EOF => reduce 62
+$ => reduce 63
+EOF => reduce 63
 
 -----
 
-State 6:
+State 7:
+
+5 : TermAtom -> . LPAREN Term RPAREN  / 2
+6 : TermAtom -> . LIDENT  / 2
+7 : TermAtom -> . DOLLAR LIDENT  / 2
+8 : TermAtom -> . UIDENT  / 2
+9 : TermAtom -> . UIDENT LBRACKET Subs RBRACKET  / 2
+10 : TermAtom -> . LPAREN Term COMMA Term RPAREN  / 2
+11 : TermAtom -> . LPAREN RPAREN  / 2
+12 : TermAtom -> . KI  / 2
+13 : TermAtom -> . UI  / 2
+14 : TermApp -> . TermAtom  / 2
+15 : TermApp -> . TermApp TermAtom  / 2
+16 : TermApp -> . TermApp PI1  / 2
+17 : TermApp -> . TermApp PI2  / 2
+18 : TermApp -> . TermApp PREV  / 2
+19 : TermApp -> . NEXT TermAtom  / 2
+20 : TermApp -> . LIDENT LBRACE LIDENT COLON TermAtom RBRACE TermAtom  / 2
+21 : Term -> . TermApp  / 3
+22 : Term -> . FN Idents DOT TermApp  / 3
+23 : Term -> . TermApp EQUAL TermApp COLON TermApp  / 3
+24 : Term -> . TermApp COLON TermApp  / 3
+25 : Term -> . TermApp EQUAL TermApp COLON TYPE  / 3
+26 : Term -> . TermApp COLON TYPE  / 3
+27 : Term -> . TermApp SUBTYPE TermApp  / 3
+53 : Concl -> . Term EXT Term  / 4
+54 : Concl -> . Term  / 4
+57 : Rule -> . Concl IF Premises  / 1
+61 : Clause -> AXIOM LIDENT . Rule  / 1
+
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+FN => shift 15
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+Term => goto 13
+TermAtom => goto 22
+TermApp => goto 12
+Concl => goto 11
+Rule => goto 10
+
+-----
+
+State 8:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 2
 6 : TermAtom -> . LIDENT  / 2
@@ -236,23 +296,23 @@ State 6:
 57 : Rule -> . Concl IF Premises  / 1
 59 : Clause -> RULE LIDENT . Rule  / 1
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-FN => shift 13
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-Term => goto 11
-TermAtom => goto 20
-TermApp => goto 10
-Concl => goto 9
-Rule => goto 8
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+FN => shift 15
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+Term => goto 13
+TermAtom => goto 22
+TermApp => goto 12
+Concl => goto 11
+Rule => goto 23
 
 -----
 
-State 7:
+State 9:
 
 34 : Hyp -> . LIDENT COLON Class  / 5
 35 : HypsNonempty -> . Hyp  / 5
@@ -265,38 +325,39 @@ State 7:
 58 : LRule -> . LConcl IF LPremises  / 1
 60 : Clause -> LRULE LIDENT . LRule  / 1
 
-LIDENT => shift 27
+LIDENT => shift 30
 COMMA => reduce 37
 ELLIPSIS => reduce 37
-Hyp => goto 26
-HypsNonempty => goto 25
-Hyps => goto 24
-CContext => goto 23
-LConcl => goto 22
-LRule => goto 21
-
------
-
-State 8:
-
-59 : Clause -> RULE LIDENT Rule .  / 1
-
-$ => reduce 59
-LRULE => reduce 59
-RULE => reduce 59
-EOF => reduce 59
-
------
-
-State 9:
-
-57 : Rule -> Concl . IF Premises  / 1
-
-IF => shift 28
+Hyp => goto 29
+HypsNonempty => goto 28
+Hyps => goto 27
+CContext => goto 26
+LConcl => goto 25
+LRule => goto 24
 
 -----
 
 State 10:
+
+61 : Clause -> AXIOM LIDENT Rule .  / 1
+
+$ => reduce 61
+AXIOM => reduce 61
+LRULE => reduce 61
+RULE => reduce 61
+EOF => reduce 61
+
+-----
+
+State 11:
+
+57 : Rule -> Concl . IF Premises  / 1
+
+IF => shift 31
+
+-----
+
+State 12:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 7
 6 : TermAtom -> . LIDENT  / 7
@@ -318,39 +379,39 @@ State 10:
 26 : Term -> TermApp . COLON TYPE  / 8
 27 : Term -> TermApp . SUBTYPE TermApp  / 8
 
-UIDENT => shift 16
-LIDENT => shift 35
-PI1 => shift 34
-PI2 => shift 33
-PREV => shift 32
-LPAREN => shift 17
+UIDENT => shift 18
+LIDENT => shift 38
+PI1 => shift 37
+PI2 => shift 36
+PREV => shift 35
+LPAREN => shift 19
 RPAREN => reduce 21
-COLON => shift 31
+COLON => shift 34
 COMMA => reduce 21
-DOLLAR => shift 14
-EQUAL => shift 30
+DOLLAR => shift 16
+EQUAL => shift 33
 IF => reduce 21
 SEMICOLON => reduce 21
 SLASH => reduce 21
-SUBTYPE => shift 29
+SUBTYPE => shift 32
 EXT => reduce 21
-KI => shift 18
-UI => shift 12
-TermAtom => goto 36
+KI => shift 20
+UI => shift 14
+TermAtom => goto 39
 
 -----
 
-State 11:
+State 13:
 
 53 : Concl -> Term . EXT Term  / 4
 54 : Concl -> Term .  / 4
 
 IF => reduce 54
-EXT => shift 37
+EXT => shift 40
 
 -----
 
-State 12:
+State 14:
 
 13 : TermAtom -> UI .  / 9
 
@@ -378,26 +439,26 @@ UI => reduce 13
 
 -----
 
-State 13:
+State 15:
 
 0 : Idents -> . LIDENT  / 10
 1 : Idents -> . LIDENT Idents  / 10
 22 : Term -> FN . Idents DOT TermApp  / 8
 
-LIDENT => shift 39
-Idents => goto 38
+LIDENT => shift 42
+Idents => goto 41
 
 -----
 
-State 14:
+State 16:
 
 7 : TermAtom -> DOLLAR . LIDENT  / 9
 
-LIDENT => shift 40
+LIDENT => shift 43
 
 -----
 
-State 15:
+State 17:
 
 6 : TermAtom -> LIDENT .  / 7
 20 : TermApp -> LIDENT . LBRACE LIDENT COLON TermAtom RBRACE TermAtom  / 7
@@ -409,7 +470,7 @@ PI2 => reduce 6
 PREV => reduce 6
 LPAREN => reduce 6
 RPAREN => reduce 6
-LBRACE => shift 41
+LBRACE => shift 44
 COLON => reduce 6
 COMMA => reduce 6
 DOLLAR => reduce 6
@@ -424,7 +485,7 @@ UI => reduce 6
 
 -----
 
-State 16:
+State 18:
 
 8 : TermAtom -> UIDENT .  / 9
 9 : TermAtom -> UIDENT . LBRACKET Subs RBRACKET  / 9
@@ -436,7 +497,7 @@ PI2 => reduce 8
 PREV => reduce 8
 LPAREN => reduce 8
 RPAREN => reduce 8
-LBRACKET => shift 42
+LBRACKET => shift 45
 RBRACE => reduce 8
 COLON => reduce 8
 COMMA => reduce 8
@@ -454,7 +515,7 @@ UI => reduce 8
 
 -----
 
-State 17:
+State 19:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 11
 5 : TermAtom -> LPAREN . Term RPAREN  / 9
@@ -483,22 +544,22 @@ State 17:
 26 : Term -> . TermApp COLON TYPE  / 12
 27 : Term -> . TermApp SUBTYPE TermApp  / 12
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-RPAREN => shift 43
-DOLLAR => shift 14
-FN => shift 13
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-Term => goto 44
-TermAtom => goto 20
-TermApp => goto 10
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+RPAREN => shift 46
+DOLLAR => shift 16
+FN => shift 15
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+Term => goto 47
+TermAtom => goto 22
+TermApp => goto 12
 
 -----
 
-State 18:
+State 20:
 
 12 : TermAtom -> KI .  / 9
 
@@ -526,7 +587,7 @@ UI => reduce 12
 
 -----
 
-State 19:
+State 21:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 7
 6 : TermAtom -> . LIDENT  / 7
@@ -539,17 +600,17 @@ State 19:
 13 : TermAtom -> . UI  / 7
 19 : TermApp -> NEXT . TermAtom  / 7
 
-UIDENT => shift 16
-LIDENT => shift 35
-LPAREN => shift 17
-DOLLAR => shift 14
-KI => shift 18
-UI => shift 12
-TermAtom => goto 45
+UIDENT => shift 18
+LIDENT => shift 38
+LPAREN => shift 19
+DOLLAR => shift 16
+KI => shift 20
+UI => shift 14
+TermAtom => goto 48
 
 -----
 
-State 20:
+State 22:
 
 14 : TermApp -> TermAtom .  / 7
 
@@ -574,45 +635,58 @@ UI => reduce 14
 
 -----
 
-State 21:
+State 23:
+
+59 : Clause -> RULE LIDENT Rule .  / 1
+
+$ => reduce 59
+AXIOM => reduce 59
+LRULE => reduce 59
+RULE => reduce 59
+EOF => reduce 59
+
+-----
+
+State 24:
 
 60 : Clause -> LRULE LIDENT LRule .  / 1
 
 $ => reduce 60
+AXIOM => reduce 60
 LRULE => reduce 60
 RULE => reduce 60
 EOF => reduce 60
 
 -----
 
-State 22:
+State 25:
 
 58 : LRule -> LConcl . IF LPremises  / 1
 
-IF => shift 46
+IF => shift 49
 
 -----
 
-State 23:
+State 26:
 
 55 : LConcl -> CContext . TURNSTILE Term EXT Term  / 4
 56 : LConcl -> CContext . TURNSTILE Term  / 4
 
-TURNSTILE => shift 47
+TURNSTILE => shift 50
 
 -----
 
-State 24:
+State 27:
 
 36 : HypsNonempty -> Hyps . COMMA Hyp  / 5
 41 : CContext -> Hyps . ELLIPSIS  / 6
 
-COMMA => shift 49
-ELLIPSIS => shift 48
+COMMA => shift 52
+ELLIPSIS => shift 51
 
 -----
 
-State 25:
+State 28:
 
 38 : Hyps -> HypsNonempty .  / 13
 
@@ -622,7 +696,7 @@ TURNSTILE => reduce 38
 
 -----
 
-State 26:
+State 29:
 
 35 : HypsNonempty -> Hyp .  / 13
 
@@ -632,15 +706,15 @@ TURNSTILE => reduce 35
 
 -----
 
-State 27:
+State 30:
 
 34 : Hyp -> LIDENT . COLON Class  / 13
 
-COLON => shift 50
+COLON => shift 53
 
 -----
 
-State 28:
+State 31:
 
 34 : Hyp -> . LIDENT COLON Class  / 14
 35 : HypsNonempty -> . Hyp  / 14
@@ -655,23 +729,24 @@ State 28:
 57 : Rule -> Concl IF . Premises  / 1
 
 $ => reduce 49
-LIDENT => shift 27
+LIDENT => shift 30
 COMMA => reduce 37
 TURNSTILE => reduce 37
+AXIOM => reduce 49
 LRULE => reduce 49
-PROMOTE => shift 55
+PROMOTE => shift 58
 RULE => reduce 49
 EOF => reduce 49
-Hyp => goto 26
-HypsNonempty => goto 25
-Hyps => goto 54
-Context => goto 53
-Premise => goto 52
-Premises => goto 51
+Hyp => goto 29
+HypsNonempty => goto 28
+Hyps => goto 57
+Context => goto 56
+Premise => goto 55
+Premises => goto 54
 
 -----
 
-State 29:
+State 32:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 16
 6 : TermAtom -> . LIDENT  / 16
@@ -691,19 +766,19 @@ State 29:
 20 : TermApp -> . LIDENT LBRACE LIDENT COLON TermAtom RBRACE TermAtom  / 16
 27 : Term -> TermApp SUBTYPE . TermApp  / 8
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-TermAtom => goto 20
-TermApp => goto 56
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+TermAtom => goto 22
+TermApp => goto 59
 
 -----
 
-State 30:
+State 33:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 17
 6 : TermAtom -> . LIDENT  / 17
@@ -724,19 +799,19 @@ State 30:
 23 : Term -> TermApp EQUAL . TermApp COLON TermApp  / 8
 25 : Term -> TermApp EQUAL . TermApp COLON TYPE  / 8
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-TermAtom => goto 20
-TermApp => goto 57
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+TermAtom => goto 22
+TermApp => goto 60
 
 -----
 
-State 31:
+State 34:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 16
 6 : TermAtom -> . LIDENT  / 16
@@ -757,20 +832,20 @@ State 31:
 24 : Term -> TermApp COLON . TermApp  / 8
 26 : Term -> TermApp COLON . TYPE  / 8
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-NEXT => shift 19
-TYPE => shift 58
-KI => shift 18
-UI => shift 12
-TermAtom => goto 20
-TermApp => goto 59
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+NEXT => shift 21
+TYPE => shift 61
+KI => shift 20
+UI => shift 14
+TermAtom => goto 22
+TermApp => goto 62
 
 -----
 
-State 32:
+State 35:
 
 18 : TermApp -> TermApp PREV .  / 7
 
@@ -795,7 +870,7 @@ UI => reduce 18
 
 -----
 
-State 33:
+State 36:
 
 17 : TermApp -> TermApp PI2 .  / 7
 
@@ -820,7 +895,7 @@ UI => reduce 17
 
 -----
 
-State 34:
+State 37:
 
 16 : TermApp -> TermApp PI1 .  / 7
 
@@ -845,7 +920,7 @@ UI => reduce 16
 
 -----
 
-State 35:
+State 38:
 
 6 : TermAtom -> LIDENT .  / 9
 
@@ -873,7 +948,7 @@ UI => reduce 6
 
 -----
 
-State 36:
+State 39:
 
 15 : TermApp -> TermApp TermAtom .  / 7
 
@@ -898,7 +973,7 @@ UI => reduce 15
 
 -----
 
-State 37:
+State 40:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 18
 6 : TermAtom -> . LIDENT  / 18
@@ -925,42 +1000,42 @@ State 37:
 27 : Term -> . TermApp SUBTYPE TermApp  / 4
 53 : Concl -> Term EXT . Term  / 4
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-FN => shift 13
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-Term => goto 60
-TermAtom => goto 20
-TermApp => goto 10
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+FN => shift 15
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+Term => goto 63
+TermAtom => goto 22
+TermApp => goto 12
 
 -----
 
-State 38:
+State 41:
 
 22 : Term -> FN Idents . DOT TermApp  / 8
 
-DOT => shift 61
+DOT => shift 64
 
 -----
 
-State 39:
+State 42:
 
 0 : Idents -> . LIDENT  / 10
 0 : Idents -> LIDENT .  / 10
 1 : Idents -> . LIDENT Idents  / 10
 1 : Idents -> LIDENT . Idents  / 10
 
-LIDENT => shift 39
+LIDENT => shift 42
 DOT => reduce 0
-Idents => goto 62
+Idents => goto 65
 
 -----
 
-State 40:
+State 43:
 
 7 : TermAtom -> DOLLAR LIDENT .  / 9
 
@@ -988,15 +1063,15 @@ UI => reduce 7
 
 -----
 
-State 41:
+State 44:
 
 20 : TermApp -> LIDENT LBRACE . LIDENT COLON TermAtom RBRACE TermAtom  / 7
 
-LIDENT => shift 63
+LIDENT => shift 66
 
 -----
 
-State 42:
+State 45:
 
 2 : Sub -> . Term SLASH LIDENT  / 19
 3 : Subs -> . Sub  / 20
@@ -1026,23 +1101,23 @@ State 42:
 26 : Term -> . TermApp COLON TYPE  / 22
 27 : Term -> . TermApp SUBTYPE TermApp  / 22
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-FN => shift 13
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-Sub => goto 64
-Term => goto 66
-Subs => goto 65
-TermAtom => goto 20
-TermApp => goto 10
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+FN => shift 15
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+Sub => goto 67
+Term => goto 69
+Subs => goto 68
+TermAtom => goto 22
+TermApp => goto 12
 
 -----
 
-State 43:
+State 46:
 
 11 : TermAtom -> LPAREN RPAREN .  / 9
 
@@ -1070,17 +1145,17 @@ UI => reduce 11
 
 -----
 
-State 44:
+State 47:
 
 5 : TermAtom -> LPAREN Term . RPAREN  / 9
 10 : TermAtom -> LPAREN Term . COMMA Term RPAREN  / 9
 
-RPAREN => shift 68
-COMMA => shift 67
+RPAREN => shift 71
+COMMA => shift 70
 
 -----
 
-State 45:
+State 48:
 
 19 : TermApp -> NEXT TermAtom .  / 7
 
@@ -1105,7 +1180,7 @@ UI => reduce 19
 
 -----
 
-State 46:
+State 49:
 
 34 : Hyp -> . LIDENT COLON Class  / 13
 35 : HypsNonempty -> . Hyp  / 13
@@ -1123,25 +1198,26 @@ State 46:
 58 : LRule -> LConcl IF . LPremises  / 1
 
 $ => reduce 51
-LIDENT => shift 27
+LIDENT => shift 30
 COMMA => reduce 37
 ELLIPSIS => reduce 37
 TURNSTILE => reduce 37
+AXIOM => reduce 51
 LRULE => reduce 51
-PROMOTE => shift 55
+PROMOTE => shift 58
 RULE => reduce 51
 EOF => reduce 51
-Hyp => goto 26
-HypsNonempty => goto 25
-Hyps => goto 54
-Context => goto 72
-PContext => goto 71
-LPremise => goto 70
-LPremises => goto 69
+Hyp => goto 29
+HypsNonempty => goto 28
+Hyps => goto 57
+Context => goto 75
+PContext => goto 74
+LPremise => goto 73
+LPremises => goto 72
 
 -----
 
-State 47:
+State 50:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 2
 6 : TermAtom -> . LIDENT  / 2
@@ -1169,21 +1245,21 @@ State 47:
 55 : LConcl -> CContext TURNSTILE . Term EXT Term  / 4
 56 : LConcl -> CContext TURNSTILE . Term  / 4
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-FN => shift 13
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-Term => goto 73
-TermAtom => goto 20
-TermApp => goto 10
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+FN => shift 15
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+Term => goto 76
+TermAtom => goto 22
+TermApp => goto 12
 
 -----
 
-State 48:
+State 51:
 
 41 : CContext -> Hyps ELLIPSIS .  / 6
 
@@ -1191,17 +1267,17 @@ TURNSTILE => reduce 41
 
 -----
 
-State 49:
+State 52:
 
 34 : Hyp -> . LIDENT COLON Class  / 13
 36 : HypsNonempty -> Hyps COMMA . Hyp  / 13
 
-LIDENT => shift 27
-Hyp => goto 74
+LIDENT => shift 30
+Hyp => goto 77
 
 -----
 
-State 50:
+State 53:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 13
 6 : TermAtom -> . LIDENT  / 13
@@ -1220,59 +1296,60 @@ State 50:
 33 : Class -> . HIDE TYPE  / 13
 34 : Hyp -> LIDENT COLON . Class  / 13
 
-UIDENT => shift 16
-LIDENT => shift 35
-LPAREN => shift 17
-DOLLAR => shift 14
-DEMOTE => shift 78
-HIDE => shift 77
-TYPE => shift 79
-KI => shift 18
-UI => shift 12
-TermAtom => goto 76
-Class => goto 75
+UIDENT => shift 18
+LIDENT => shift 38
+LPAREN => shift 19
+DOLLAR => shift 16
+DEMOTE => shift 81
+HIDE => shift 80
+TYPE => shift 82
+KI => shift 20
+UI => shift 14
+TermAtom => goto 79
+Class => goto 78
 
 -----
 
-State 51:
+State 54:
 
 57 : Rule -> Concl IF Premises .  / 1
 
 $ => reduce 57
+AXIOM => reduce 57
 LRULE => reduce 57
 RULE => reduce 57
 EOF => reduce 57
 
 -----
 
-State 52:
+State 55:
 
 50 : Premises -> Premise . SEMICOLON Premises  / 1
 
-SEMICOLON => shift 80
+SEMICOLON => shift 83
 
 -----
 
-State 53:
+State 56:
 
 47 : Premise -> Context . TURNSTILE Rhs  / 15
 
-TURNSTILE => shift 81
+TURNSTILE => shift 84
 
 -----
 
-State 54:
+State 57:
 
 36 : HypsNonempty -> Hyps . COMMA Hyp  / 13
 40 : Context -> Hyps .  / 23
 
-COMMA => shift 49
+COMMA => shift 52
 ELLIPSIS => reduce 40
 TURNSTILE => reduce 40
 
 -----
 
-State 55:
+State 58:
 
 34 : Hyp -> . LIDENT COLON Class  / 13
 35 : HypsNonempty -> . Hyp  / 13
@@ -1281,94 +1358,13 @@ State 55:
 38 : Hyps -> . HypsNonempty  / 13
 39 : Context -> PROMOTE . Hyps  / 23
 
-LIDENT => shift 27
+LIDENT => shift 30
 COMMA => reduce 37
 ELLIPSIS => reduce 37
 TURNSTILE => reduce 37
-Hyp => goto 26
-HypsNonempty => goto 25
-Hyps => goto 82
-
------
-
-State 56:
-
-5 : TermAtom -> . LPAREN Term RPAREN  / 16
-6 : TermAtom -> . LIDENT  / 16
-7 : TermAtom -> . DOLLAR LIDENT  / 16
-8 : TermAtom -> . UIDENT  / 16
-9 : TermAtom -> . UIDENT LBRACKET Subs RBRACKET  / 16
-10 : TermAtom -> . LPAREN Term COMMA Term RPAREN  / 16
-11 : TermAtom -> . LPAREN RPAREN  / 16
-12 : TermAtom -> . KI  / 16
-13 : TermAtom -> . UI  / 16
-15 : TermApp -> TermApp . TermAtom  / 16
-16 : TermApp -> TermApp . PI1  / 16
-17 : TermApp -> TermApp . PI2  / 16
-18 : TermApp -> TermApp . PREV  / 16
-27 : Term -> TermApp SUBTYPE TermApp .  / 8
-
-UIDENT => shift 16
-LIDENT => shift 35
-PI1 => shift 34
-PI2 => shift 33
-PREV => shift 32
-LPAREN => shift 17
-RPAREN => reduce 27
-COMMA => reduce 27
-DOLLAR => shift 14
-IF => reduce 27
-SEMICOLON => reduce 27
-SLASH => reduce 27
-EXT => reduce 27
-KI => shift 18
-UI => shift 12
-TermAtom => goto 36
-
------
-
-State 57:
-
-5 : TermAtom -> . LPAREN Term RPAREN  / 17
-6 : TermAtom -> . LIDENT  / 17
-7 : TermAtom -> . DOLLAR LIDENT  / 17
-8 : TermAtom -> . UIDENT  / 17
-9 : TermAtom -> . UIDENT LBRACKET Subs RBRACKET  / 17
-10 : TermAtom -> . LPAREN Term COMMA Term RPAREN  / 17
-11 : TermAtom -> . LPAREN RPAREN  / 17
-12 : TermAtom -> . KI  / 17
-13 : TermAtom -> . UI  / 17
-15 : TermApp -> TermApp . TermAtom  / 17
-16 : TermApp -> TermApp . PI1  / 17
-17 : TermApp -> TermApp . PI2  / 17
-18 : TermApp -> TermApp . PREV  / 17
-23 : Term -> TermApp EQUAL TermApp . COLON TermApp  / 8
-25 : Term -> TermApp EQUAL TermApp . COLON TYPE  / 8
-
-UIDENT => shift 16
-LIDENT => shift 35
-PI1 => shift 34
-PI2 => shift 33
-PREV => shift 32
-LPAREN => shift 17
-COLON => shift 83
-DOLLAR => shift 14
-KI => shift 18
-UI => shift 12
-TermAtom => goto 36
-
------
-
-State 58:
-
-26 : Term -> TermApp COLON TYPE .  / 8
-
-RPAREN => reduce 26
-COMMA => reduce 26
-IF => reduce 26
-SEMICOLON => reduce 26
-SLASH => reduce 26
-EXT => reduce 26
+Hyp => goto 29
+HypsNonempty => goto 28
+Hyps => goto 85
 
 -----
 
@@ -1387,28 +1383,109 @@ State 59:
 16 : TermApp -> TermApp . PI1  / 16
 17 : TermApp -> TermApp . PI2  / 16
 18 : TermApp -> TermApp . PREV  / 16
-24 : Term -> TermApp COLON TermApp .  / 8
+27 : Term -> TermApp SUBTYPE TermApp .  / 8
 
-UIDENT => shift 16
-LIDENT => shift 35
-PI1 => shift 34
-PI2 => shift 33
-PREV => shift 32
-LPAREN => shift 17
-RPAREN => reduce 24
-COMMA => reduce 24
-DOLLAR => shift 14
-IF => reduce 24
-SEMICOLON => reduce 24
-SLASH => reduce 24
-EXT => reduce 24
-KI => shift 18
-UI => shift 12
-TermAtom => goto 36
+UIDENT => shift 18
+LIDENT => shift 38
+PI1 => shift 37
+PI2 => shift 36
+PREV => shift 35
+LPAREN => shift 19
+RPAREN => reduce 27
+COMMA => reduce 27
+DOLLAR => shift 16
+IF => reduce 27
+SEMICOLON => reduce 27
+SLASH => reduce 27
+EXT => reduce 27
+KI => shift 20
+UI => shift 14
+TermAtom => goto 39
 
 -----
 
 State 60:
+
+5 : TermAtom -> . LPAREN Term RPAREN  / 17
+6 : TermAtom -> . LIDENT  / 17
+7 : TermAtom -> . DOLLAR LIDENT  / 17
+8 : TermAtom -> . UIDENT  / 17
+9 : TermAtom -> . UIDENT LBRACKET Subs RBRACKET  / 17
+10 : TermAtom -> . LPAREN Term COMMA Term RPAREN  / 17
+11 : TermAtom -> . LPAREN RPAREN  / 17
+12 : TermAtom -> . KI  / 17
+13 : TermAtom -> . UI  / 17
+15 : TermApp -> TermApp . TermAtom  / 17
+16 : TermApp -> TermApp . PI1  / 17
+17 : TermApp -> TermApp . PI2  / 17
+18 : TermApp -> TermApp . PREV  / 17
+23 : Term -> TermApp EQUAL TermApp . COLON TermApp  / 8
+25 : Term -> TermApp EQUAL TermApp . COLON TYPE  / 8
+
+UIDENT => shift 18
+LIDENT => shift 38
+PI1 => shift 37
+PI2 => shift 36
+PREV => shift 35
+LPAREN => shift 19
+COLON => shift 86
+DOLLAR => shift 16
+KI => shift 20
+UI => shift 14
+TermAtom => goto 39
+
+-----
+
+State 61:
+
+26 : Term -> TermApp COLON TYPE .  / 8
+
+RPAREN => reduce 26
+COMMA => reduce 26
+IF => reduce 26
+SEMICOLON => reduce 26
+SLASH => reduce 26
+EXT => reduce 26
+
+-----
+
+State 62:
+
+5 : TermAtom -> . LPAREN Term RPAREN  / 16
+6 : TermAtom -> . LIDENT  / 16
+7 : TermAtom -> . DOLLAR LIDENT  / 16
+8 : TermAtom -> . UIDENT  / 16
+9 : TermAtom -> . UIDENT LBRACKET Subs RBRACKET  / 16
+10 : TermAtom -> . LPAREN Term COMMA Term RPAREN  / 16
+11 : TermAtom -> . LPAREN RPAREN  / 16
+12 : TermAtom -> . KI  / 16
+13 : TermAtom -> . UI  / 16
+15 : TermApp -> TermApp . TermAtom  / 16
+16 : TermApp -> TermApp . PI1  / 16
+17 : TermApp -> TermApp . PI2  / 16
+18 : TermApp -> TermApp . PREV  / 16
+24 : Term -> TermApp COLON TermApp .  / 8
+
+UIDENT => shift 18
+LIDENT => shift 38
+PI1 => shift 37
+PI2 => shift 36
+PREV => shift 35
+LPAREN => shift 19
+RPAREN => reduce 24
+COMMA => reduce 24
+DOLLAR => shift 16
+IF => reduce 24
+SEMICOLON => reduce 24
+SLASH => reduce 24
+EXT => reduce 24
+KI => shift 20
+UI => shift 14
+TermAtom => goto 39
+
+-----
+
+State 63:
 
 53 : Concl -> Term EXT Term .  / 4
 
@@ -1416,7 +1493,7 @@ IF => reduce 53
 
 -----
 
-State 61:
+State 64:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 16
 6 : TermAtom -> . LIDENT  / 16
@@ -1436,19 +1513,19 @@ State 61:
 20 : TermApp -> . LIDENT LBRACE LIDENT COLON TermAtom RBRACE TermAtom  / 16
 22 : Term -> FN Idents DOT . TermApp  / 8
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-TermAtom => goto 20
-TermApp => goto 84
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+TermAtom => goto 22
+TermApp => goto 87
 
 -----
 
-State 62:
+State 65:
 
 1 : Idents -> LIDENT Idents .  / 10
 
@@ -1456,41 +1533,41 @@ DOT => reduce 1
 
 -----
 
-State 63:
+State 66:
 
 20 : TermApp -> LIDENT LBRACE LIDENT . COLON TermAtom RBRACE TermAtom  / 7
 
-COLON => shift 85
+COLON => shift 88
 
 -----
 
-State 64:
+State 67:
 
 3 : Subs -> Sub .  / 20
 4 : Subs -> Sub . COMMA Subs  / 20
 
 RBRACKET => reduce 3
-COMMA => shift 86
+COMMA => shift 89
 
 -----
 
-State 65:
+State 68:
 
 9 : TermAtom -> UIDENT LBRACKET Subs . RBRACKET  / 9
 
-RBRACKET => shift 87
+RBRACKET => shift 90
 
 -----
 
-State 66:
+State 69:
 
 2 : Sub -> Term . SLASH LIDENT  / 19
 
-SLASH => shift 88
+SLASH => shift 91
 
 -----
 
-State 67:
+State 70:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 24
 6 : TermAtom -> . LIDENT  / 24
@@ -1517,21 +1594,21 @@ State 67:
 26 : Term -> . TermApp COLON TYPE  / 25
 27 : Term -> . TermApp SUBTYPE TermApp  / 25
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-FN => shift 13
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-Term => goto 89
-TermAtom => goto 20
-TermApp => goto 10
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+FN => shift 15
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+Term => goto 92
+TermAtom => goto 22
+TermApp => goto 12
 
 -----
 
-State 68:
+State 71:
 
 5 : TermAtom -> LPAREN Term RPAREN .  / 9
 
@@ -1559,55 +1636,56 @@ UI => reduce 5
 
 -----
 
-State 69:
+State 72:
 
 58 : LRule -> LConcl IF LPremises .  / 1
 
 $ => reduce 58
+AXIOM => reduce 58
 LRULE => reduce 58
 RULE => reduce 58
 EOF => reduce 58
 
 -----
 
-State 70:
+State 73:
 
 52 : LPremises -> LPremise . SEMICOLON LPremises  / 1
 
-SEMICOLON => shift 90
+SEMICOLON => shift 93
 
 -----
 
-State 71:
+State 74:
 
 48 : LPremise -> PContext . TURNSTILE Rhs  / 15
 
-TURNSTILE => shift 91
+TURNSTILE => shift 94
 
 -----
 
-State 72:
+State 75:
 
 42 : PContext -> Context . ELLIPSIS  / 6
 43 : PContext -> Context . ELLIPSIS LBRACKET Subs RBRACKET  / 6
 44 : PContext -> Context .  / 6
 
-ELLIPSIS => shift 92
+ELLIPSIS => shift 95
 TURNSTILE => reduce 44
 
 -----
 
-State 73:
+State 76:
 
 55 : LConcl -> CContext TURNSTILE Term . EXT Term  / 4
 56 : LConcl -> CContext TURNSTILE Term .  / 4
 
 IF => reduce 56
-EXT => shift 93
+EXT => shift 96
 
 -----
 
-State 74:
+State 77:
 
 36 : HypsNonempty -> Hyps COMMA Hyp .  / 13
 
@@ -1617,7 +1695,7 @@ TURNSTILE => reduce 36
 
 -----
 
-State 75:
+State 78:
 
 34 : Hyp -> LIDENT COLON Class .  / 13
 
@@ -1627,7 +1705,7 @@ TURNSTILE => reduce 34
 
 -----
 
-State 76:
+State 79:
 
 28 : Class -> TermAtom .  / 13
 
@@ -1637,7 +1715,7 @@ TURNSTILE => reduce 28
 
 -----
 
-State 77:
+State 80:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 13
 6 : TermAtom -> . LIDENT  / 13
@@ -1651,18 +1729,18 @@ State 77:
 30 : Class -> HIDE . TermAtom  / 13
 33 : Class -> HIDE . TYPE  / 13
 
-UIDENT => shift 16
-LIDENT => shift 35
-LPAREN => shift 17
-DOLLAR => shift 14
-TYPE => shift 94
-KI => shift 18
-UI => shift 12
-TermAtom => goto 95
+UIDENT => shift 18
+LIDENT => shift 38
+LPAREN => shift 19
+DOLLAR => shift 16
+TYPE => shift 97
+KI => shift 20
+UI => shift 14
+TermAtom => goto 98
 
 -----
 
-State 78:
+State 81:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 13
 6 : TermAtom -> . LIDENT  / 13
@@ -1676,18 +1754,18 @@ State 78:
 29 : Class -> DEMOTE . TermAtom  / 13
 32 : Class -> DEMOTE . TYPE  / 13
 
-UIDENT => shift 16
-LIDENT => shift 35
-LPAREN => shift 17
-DOLLAR => shift 14
-TYPE => shift 96
-KI => shift 18
-UI => shift 12
-TermAtom => goto 97
+UIDENT => shift 18
+LIDENT => shift 38
+LPAREN => shift 19
+DOLLAR => shift 16
+TYPE => shift 99
+KI => shift 20
+UI => shift 14
+TermAtom => goto 100
 
 -----
 
-State 79:
+State 82:
 
 31 : Class -> TYPE .  / 13
 
@@ -1697,7 +1775,7 @@ TURNSTILE => reduce 31
 
 -----
 
-State 80:
+State 83:
 
 34 : Hyp -> . LIDENT COLON Class  / 14
 35 : HypsNonempty -> . Hyp  / 14
@@ -1712,23 +1790,24 @@ State 80:
 50 : Premises -> Premise SEMICOLON . Premises  / 1
 
 $ => reduce 49
-LIDENT => shift 27
+LIDENT => shift 30
 COMMA => reduce 37
 TURNSTILE => reduce 37
+AXIOM => reduce 49
 LRULE => reduce 49
-PROMOTE => shift 55
+PROMOTE => shift 58
 RULE => reduce 49
 EOF => reduce 49
-Hyp => goto 26
-HypsNonempty => goto 25
-Hyps => goto 54
-Context => goto 53
-Premise => goto 52
-Premises => goto 98
+Hyp => goto 29
+HypsNonempty => goto 28
+Hyps => goto 57
+Context => goto 56
+Premise => goto 55
+Premises => goto 101
 
 -----
 
-State 81:
+State 84:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 26
 6 : TermAtom -> . LIDENT  / 26
@@ -1757,33 +1836,33 @@ State 81:
 46 : Rhs -> . Term  / 15
 47 : Premise -> Context TURNSTILE . Rhs  / 15
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-FN => shift 13
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-Term => goto 100
-TermAtom => goto 20
-TermApp => goto 10
-Rhs => goto 99
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+FN => shift 15
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+Term => goto 103
+TermAtom => goto 22
+TermApp => goto 12
+Rhs => goto 102
 
 -----
 
-State 82:
+State 85:
 
 36 : HypsNonempty -> Hyps . COMMA Hyp  / 13
 39 : Context -> PROMOTE Hyps .  / 23
 
-COMMA => shift 49
+COMMA => shift 52
 ELLIPSIS => reduce 39
 TURNSTILE => reduce 39
 
 -----
 
-State 83:
+State 86:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 16
 6 : TermAtom -> . LIDENT  / 16
@@ -1804,20 +1883,20 @@ State 83:
 23 : Term -> TermApp EQUAL TermApp COLON . TermApp  / 8
 25 : Term -> TermApp EQUAL TermApp COLON . TYPE  / 8
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-NEXT => shift 19
-TYPE => shift 101
-KI => shift 18
-UI => shift 12
-TermAtom => goto 20
-TermApp => goto 102
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+NEXT => shift 21
+TYPE => shift 104
+KI => shift 20
+UI => shift 14
+TermAtom => goto 22
+TermApp => goto 105
 
 -----
 
-State 84:
+State 87:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 16
 6 : TermAtom -> . LIDENT  / 16
@@ -1834,26 +1913,26 @@ State 84:
 18 : TermApp -> TermApp . PREV  / 16
 22 : Term -> FN Idents DOT TermApp .  / 8
 
-UIDENT => shift 16
-LIDENT => shift 35
-PI1 => shift 34
-PI2 => shift 33
-PREV => shift 32
-LPAREN => shift 17
+UIDENT => shift 18
+LIDENT => shift 38
+PI1 => shift 37
+PI2 => shift 36
+PREV => shift 35
+LPAREN => shift 19
 RPAREN => reduce 22
 COMMA => reduce 22
-DOLLAR => shift 14
+DOLLAR => shift 16
 IF => reduce 22
 SEMICOLON => reduce 22
 SLASH => reduce 22
 EXT => reduce 22
-KI => shift 18
-UI => shift 12
-TermAtom => goto 36
+KI => shift 20
+UI => shift 14
+TermAtom => goto 39
 
 -----
 
-State 85:
+State 88:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 28
 6 : TermAtom -> . LIDENT  / 28
@@ -1866,17 +1945,17 @@ State 85:
 13 : TermAtom -> . UI  / 28
 20 : TermApp -> LIDENT LBRACE LIDENT COLON . TermAtom RBRACE TermAtom  / 7
 
-UIDENT => shift 16
-LIDENT => shift 35
-LPAREN => shift 17
-DOLLAR => shift 14
-KI => shift 18
-UI => shift 12
-TermAtom => goto 103
+UIDENT => shift 18
+LIDENT => shift 38
+LPAREN => shift 19
+DOLLAR => shift 16
+KI => shift 20
+UI => shift 14
+TermAtom => goto 106
 
 -----
 
-State 86:
+State 89:
 
 2 : Sub -> . Term SLASH LIDENT  / 19
 3 : Subs -> . Sub  / 20
@@ -1906,23 +1985,23 @@ State 86:
 26 : Term -> . TermApp COLON TYPE  / 22
 27 : Term -> . TermApp SUBTYPE TermApp  / 22
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-FN => shift 13
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-Sub => goto 64
-Term => goto 66
-Subs => goto 104
-TermAtom => goto 20
-TermApp => goto 10
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+FN => shift 15
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+Sub => goto 67
+Term => goto 69
+Subs => goto 107
+TermAtom => goto 22
+TermApp => goto 12
 
 -----
 
-State 87:
+State 90:
 
 9 : TermAtom -> UIDENT LBRACKET Subs RBRACKET .  / 9
 
@@ -1950,23 +2029,23 @@ UI => reduce 9
 
 -----
 
-State 88:
+State 91:
 
 2 : Sub -> Term SLASH . LIDENT  / 19
 
-LIDENT => shift 105
+LIDENT => shift 108
 
 -----
 
-State 89:
+State 92:
 
 10 : TermAtom -> LPAREN Term COMMA Term . RPAREN  / 9
 
-RPAREN => shift 106
+RPAREN => shift 109
 
 -----
 
-State 90:
+State 93:
 
 34 : Hyp -> . LIDENT COLON Class  / 13
 35 : HypsNonempty -> . Hyp  / 13
@@ -1984,25 +2063,26 @@ State 90:
 52 : LPremises -> LPremise SEMICOLON . LPremises  / 1
 
 $ => reduce 51
-LIDENT => shift 27
+LIDENT => shift 30
 COMMA => reduce 37
 ELLIPSIS => reduce 37
 TURNSTILE => reduce 37
+AXIOM => reduce 51
 LRULE => reduce 51
-PROMOTE => shift 55
+PROMOTE => shift 58
 RULE => reduce 51
 EOF => reduce 51
-Hyp => goto 26
-HypsNonempty => goto 25
-Hyps => goto 54
-Context => goto 72
-PContext => goto 71
-LPremise => goto 70
-LPremises => goto 107
+Hyp => goto 29
+HypsNonempty => goto 28
+Hyps => goto 57
+Context => goto 75
+PContext => goto 74
+LPremise => goto 73
+LPremises => goto 110
 
 -----
 
-State 91:
+State 94:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 26
 6 : TermAtom -> . LIDENT  / 26
@@ -2031,32 +2111,32 @@ State 91:
 46 : Rhs -> . Term  / 15
 48 : LPremise -> PContext TURNSTILE . Rhs  / 15
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-FN => shift 13
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-Term => goto 100
-TermAtom => goto 20
-TermApp => goto 10
-Rhs => goto 108
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+FN => shift 15
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+Term => goto 103
+TermAtom => goto 22
+TermApp => goto 12
+Rhs => goto 111
 
 -----
 
-State 92:
+State 95:
 
 42 : PContext -> Context ELLIPSIS .  / 6
 43 : PContext -> Context ELLIPSIS . LBRACKET Subs RBRACKET  / 6
 
-LBRACKET => shift 109
+LBRACKET => shift 112
 TURNSTILE => reduce 42
 
 -----
 
-State 93:
+State 96:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 18
 6 : TermAtom -> . LIDENT  / 18
@@ -2083,21 +2163,21 @@ State 93:
 27 : Term -> . TermApp SUBTYPE TermApp  / 4
 55 : LConcl -> CContext TURNSTILE Term EXT . Term  / 4
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-FN => shift 13
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-Term => goto 110
-TermAtom => goto 20
-TermApp => goto 10
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+FN => shift 15
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+Term => goto 113
+TermAtom => goto 22
+TermApp => goto 12
 
 -----
 
-State 94:
+State 97:
 
 33 : Class -> HIDE TYPE .  / 13
 
@@ -2107,7 +2187,7 @@ TURNSTILE => reduce 33
 
 -----
 
-State 95:
+State 98:
 
 30 : Class -> HIDE TermAtom .  / 13
 
@@ -2117,7 +2197,7 @@ TURNSTILE => reduce 30
 
 -----
 
-State 96:
+State 99:
 
 32 : Class -> DEMOTE TYPE .  / 13
 
@@ -2127,7 +2207,7 @@ TURNSTILE => reduce 32
 
 -----
 
-State 97:
+State 100:
 
 29 : Class -> DEMOTE TermAtom .  / 13
 
@@ -2137,18 +2217,19 @@ TURNSTILE => reduce 29
 
 -----
 
-State 98:
+State 101:
 
 50 : Premises -> Premise SEMICOLON Premises .  / 1
 
 $ => reduce 50
+AXIOM => reduce 50
 LRULE => reduce 50
 RULE => reduce 50
 EOF => reduce 50
 
 -----
 
-State 99:
+State 102:
 
 47 : Premise -> Context TURNSTILE Rhs .  / 15
 
@@ -2156,17 +2237,17 @@ SEMICOLON => reduce 47
 
 -----
 
-State 100:
+State 103:
 
 45 : Rhs -> Term . EXT UIDENT  / 15
 46 : Rhs -> Term .  / 15
 
 SEMICOLON => reduce 46
-EXT => shift 111
+EXT => shift 114
 
 -----
 
-State 101:
+State 104:
 
 25 : Term -> TermApp EQUAL TermApp COLON TYPE .  / 8
 
@@ -2179,7 +2260,7 @@ EXT => reduce 25
 
 -----
 
-State 102:
+State 105:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 16
 6 : TermAtom -> . LIDENT  / 16
@@ -2196,34 +2277,34 @@ State 102:
 18 : TermApp -> TermApp . PREV  / 16
 23 : Term -> TermApp EQUAL TermApp COLON TermApp .  / 8
 
-UIDENT => shift 16
-LIDENT => shift 35
-PI1 => shift 34
-PI2 => shift 33
-PREV => shift 32
-LPAREN => shift 17
+UIDENT => shift 18
+LIDENT => shift 38
+PI1 => shift 37
+PI2 => shift 36
+PREV => shift 35
+LPAREN => shift 19
 RPAREN => reduce 23
 COMMA => reduce 23
-DOLLAR => shift 14
+DOLLAR => shift 16
 IF => reduce 23
 SEMICOLON => reduce 23
 SLASH => reduce 23
 EXT => reduce 23
-KI => shift 18
-UI => shift 12
-TermAtom => goto 36
+KI => shift 20
+UI => shift 14
+TermAtom => goto 39
 
 -----
 
-State 103:
+State 106:
 
 20 : TermApp -> LIDENT LBRACE LIDENT COLON TermAtom . RBRACE TermAtom  / 7
 
-RBRACE => shift 112
+RBRACE => shift 115
 
 -----
 
-State 104:
+State 107:
 
 4 : Subs -> Sub COMMA Subs .  / 20
 
@@ -2231,7 +2312,7 @@ RBRACKET => reduce 4
 
 -----
 
-State 105:
+State 108:
 
 2 : Sub -> Term SLASH LIDENT .  / 19
 
@@ -2240,7 +2321,7 @@ COMMA => reduce 2
 
 -----
 
-State 106:
+State 109:
 
 10 : TermAtom -> LPAREN Term COMMA Term RPAREN .  / 9
 
@@ -2268,18 +2349,19 @@ UI => reduce 10
 
 -----
 
-State 107:
+State 110:
 
 52 : LPremises -> LPremise SEMICOLON LPremises .  / 1
 
 $ => reduce 52
+AXIOM => reduce 52
 LRULE => reduce 52
 RULE => reduce 52
 EOF => reduce 52
 
 -----
 
-State 108:
+State 111:
 
 48 : LPremise -> PContext TURNSTILE Rhs .  / 15
 
@@ -2287,7 +2369,7 @@ SEMICOLON => reduce 48
 
 -----
 
-State 109:
+State 112:
 
 2 : Sub -> . Term SLASH LIDENT  / 19
 3 : Subs -> . Sub  / 20
@@ -2317,23 +2399,23 @@ State 109:
 27 : Term -> . TermApp SUBTYPE TermApp  / 22
 43 : PContext -> Context ELLIPSIS LBRACKET . Subs RBRACKET  / 6
 
-UIDENT => shift 16
-LIDENT => shift 15
-LPAREN => shift 17
-DOLLAR => shift 14
-FN => shift 13
-NEXT => shift 19
-KI => shift 18
-UI => shift 12
-Sub => goto 64
-Term => goto 66
-Subs => goto 113
-TermAtom => goto 20
-TermApp => goto 10
+UIDENT => shift 18
+LIDENT => shift 17
+LPAREN => shift 19
+DOLLAR => shift 16
+FN => shift 15
+NEXT => shift 21
+KI => shift 20
+UI => shift 14
+Sub => goto 67
+Term => goto 69
+Subs => goto 116
+TermAtom => goto 22
+TermApp => goto 12
 
 -----
 
-State 110:
+State 113:
 
 55 : LConcl -> CContext TURNSTILE Term EXT Term .  / 4
 
@@ -2341,15 +2423,15 @@ IF => reduce 55
 
 -----
 
-State 111:
+State 114:
 
 45 : Rhs -> Term EXT . UIDENT  / 15
 
-UIDENT => shift 114
+UIDENT => shift 117
 
 -----
 
-State 112:
+State 115:
 
 5 : TermAtom -> . LPAREN Term RPAREN  / 7
 6 : TermAtom -> . LIDENT  / 7
@@ -2362,25 +2444,25 @@ State 112:
 13 : TermAtom -> . UI  / 7
 20 : TermApp -> LIDENT LBRACE LIDENT COLON TermAtom RBRACE . TermAtom  / 7
 
-UIDENT => shift 16
-LIDENT => shift 35
-LPAREN => shift 17
-DOLLAR => shift 14
-KI => shift 18
-UI => shift 12
-TermAtom => goto 115
+UIDENT => shift 18
+LIDENT => shift 38
+LPAREN => shift 19
+DOLLAR => shift 16
+KI => shift 20
+UI => shift 14
+TermAtom => goto 118
 
 -----
 
-State 113:
+State 116:
 
 43 : PContext -> Context ELLIPSIS LBRACKET Subs . RBRACKET  / 6
 
-RBRACKET => shift 116
+RBRACKET => shift 119
 
 -----
 
-State 114:
+State 117:
 
 45 : Rhs -> Term EXT UIDENT .  / 15
 
@@ -2388,7 +2470,7 @@ SEMICOLON => reduce 45
 
 -----
 
-State 115:
+State 118:
 
 20 : TermApp -> LIDENT LBRACE LIDENT COLON TermAtom RBRACE TermAtom .  / 7
 
@@ -2413,7 +2495,7 @@ UI => reduce 20
 
 -----
 
-State 116:
+State 119:
 
 43 : PContext -> Context ELLIPSIS LBRACKET Subs RBRACKET .  / 6
 
@@ -2422,7 +2504,7 @@ TURNSTILE => reduce 43
 -----
 
 lookahead 0 = $ EOF 
-lookahead 1 = $ LRULE RULE EOF 
+lookahead 1 = $ AXIOM LRULE RULE EOF 
 lookahead 2 = UIDENT LIDENT PI1 PI2 PREV LPAREN COLON DOLLAR EQUAL IF SUBTYPE EXT KI UI 
 lookahead 3 = IF EXT 
 lookahead 4 = IF 
@@ -2509,24 +2591,25 @@ Arg.UIDENT x => (1, Value.symbol_pos x)
 | Arg.SLASH x => (20, Value.pos x)
 | Arg.SUBTYPE x => (21, Value.pos x)
 | Arg.TURNSTILE x => (22, Value.pos x)
-| Arg.DEMOTE x => (23, Value.pos x)
-| Arg.EXT x => (24, Value.pos x)
-| Arg.FN x => (25, Value.pos x)
-| Arg.HIDE x => (26, Value.pos x)
-| Arg.LRULE x => (27, Value.pos x)
-| Arg.NEXT x => (28, Value.pos x)
-| Arg.PROMOTE x => (29, Value.pos x)
-| Arg.RULE x => (30, Value.pos x)
-| Arg.TYPE x => (31, Value.pos x)
-| Arg.KI x => (32, Value.pos x)
-| Arg.UI x => (33, Value.pos x)
-| Arg.EOF x => (34, Value.pos x)
+| Arg.AXIOM x => (23, Value.pos x)
+| Arg.DEMOTE x => (24, Value.pos x)
+| Arg.EXT x => (25, Value.pos x)
+| Arg.FN x => (26, Value.pos x)
+| Arg.HIDE x => (27, Value.pos x)
+| Arg.LRULE x => (28, Value.pos x)
+| Arg.NEXT x => (29, Value.pos x)
+| Arg.PROMOTE x => (30, Value.pos x)
+| Arg.RULE x => (31, Value.pos x)
+| Arg.TYPE x => (32, Value.pos x)
+| Arg.KI x => (33, Value.pos x)
+| Arg.UI x => (34, Value.pos x)
+| Arg.EOF x => (35, Value.pos x)
 )
 )
 in
 val parse = ParseEngine.parse (
-ParseEngine.next6x1 "A\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\132\128\128\131\128\128\128A\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128A\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\132\128\128\131\128\128\128A\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\135\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\136\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\127\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\127\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128@\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128@\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\142\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\156\128\128\128\128\128\128\128\128\128\128Y\128\128Y\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128C\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128C\128\128C\128\128\128C\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\157\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\164\163\162\161\146i\128\128\128\128\160i\143\128\128\159iii\158\128\128i\128\128\128\128\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128H\128\128\128\128\128\166\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128qqqqqqq\128\128\128qqqq\128qqqqqqq\128q\128\128\128\128\128\128\128qq\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\168\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\169\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128xxxxxxx\128\128\170\128xxx\128\128xxxxx\128\128x\128\128\128\128\128\128\128xx\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128vvvvvvv\171\128\128vvvv\128vvvvvvv\128v\128\128\128\128\128\128\128vv\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\172\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\142\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128rrrrrrr\128\128\128rrrr\128rrrrrrr\128r\128\128\128\128\128\128\128rr\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\164\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128ppppppp\128\128\128\128ppp\128\128ppppp\128\128p\128\128\128\128\128\128\128pp\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128B\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128B\128\128B\128\128\128B\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\175\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\176\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\178\128\128\177\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128X\128\128X\128\128\128\128\128X\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128[\128\128[\128\128\128\128\128[\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\179\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128M\128\156\128\128\128\128\128\128\128\128\128\128Y\128\128\128\128\128\128\128\128Y\128\128\128\128M\128\184M\128\128\128M\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\128\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\128\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\128\128\128\148\128\128\187\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128lllllll\128\128\128\128lll\128\128lllll\128\128l\128\128\128\128\128\128\128ll\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128mmmmmmm\128\128\128\128mmm\128\128mmmmm\128\128m\128\128\128\128\128\128\128mm\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128nnnnnnn\128\128\128\128nnn\128\128nnnnn\128\128n\128\128\128\128\128\128\128nn\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128xxxxxxx\128\128\128xxxx\128xxxxxxx\128x\128\128\128\128\128\128\128xx\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128ooooooo\128\128\128\128ooo\128\128ooooo\128\128o\128\128\128\128\128\128\128oo\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\142\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\190\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\168\128\128\128\128\128\128\128\128\128\128\128\128~\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128wwwwwww\128\128\128wwww\128wwwwwww\128w\128\128\128\128\128\128\128ww\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\192\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\142\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128sssssss\128\128\128ssss\128sssssss\128s\128\128\128\128\128\128\128ss\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\197\128\128\128\128\128\196\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128kkkkkkk\128\128\128\128kkk\128\128kkkkk\128\128k\128\128\128\128\128\128\128kk\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128K\128\156\128\128\128\128\128\128\128\128\128\128Y\128\128Y\128\128\128\128\128Y\128\128\128\128K\128\184K\128\128\128K\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\142\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128U\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\156\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\164\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\207\128\128\206\128\128\128\128\208\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128E\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128E\128\128E\128\128\128E\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\209\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\210\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\178\128\128V\128\128\128\128\128V\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\156\128\128\128\128\128\128\128\128\128\128Y\128\128Y\128\128\128\128\128Y\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\164\163\162\161\146c\128\128\128\128\128c\143\128\128\128ccc\128\128\128c\128\128\128\128\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\164\163\162\161\146\128\128\128\128\128\212\128\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128d\128\128\128\128\128d\128\128\128\128ddd\128\128\128d\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\164\163\162\161\146f\128\128\128\128\128f\143\128\128\128fff\128\128\128f\128\128\128\128\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128I\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\128\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128}\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\214\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128{\128\128\128\215\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\216\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\217\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\142\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128yyyyyyy\128\128\128yyyy\128yyyyyyy\128y\128\128\128\128\128\128\128yy\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128D\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128D\128\128D\128\128\128D\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\219\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\220\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\221\128\128\128\128\128R\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128F\128\128\128\128\128\222\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128Z\128\128Z\128\128\128\128\128Z\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\\\128\128\\\128\128\128\128\128\\\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128b\128\128b\128\128\128\128\128b\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\164\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\223\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\164\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\225\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128_\128\128_\128\128\128\128\128_\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128M\128\156\128\128\128\128\128\128\128\128\128\128Y\128\128\128\128\128\128\128\128Y\128\128\128\128M\128\184M\128\128\128M\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\142\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\178\128\128W\128\128\128\128\128W\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\128\128\128\148\128\128\230\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\164\163\162\161\146h\128\128\128\128\128h\143\128\128\128hhh\128\128\128h\128\128\128\128\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\164\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\142\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128uuuuuuu\128\128\128uuuu\128uuuuuuu\128u\128\128\128\128\128\128\128uu\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\234\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\235\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128K\128\156\128\128\128\128\128\128\128\128\128\128Y\128\128Y\128\128\128\128\128Y\128\128\128\128K\128\184K\128\128\128K\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\142\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\238\128\128\128\128\128\128\128\128\128\128\128\128\128T\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\142\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128]\128\128]\128\128\128\128\128]\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128`\128\128`\128\128\128\128\128`\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128^\128\128^\128\128\128\128\128^\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128a\128\128a\128\128\128\128\128a\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128L\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128L\128\128L\128\128\128L\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128O\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128P\128\128\128\128\240\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128e\128\128\128\128\128e\128\128\128\128eee\128\128\128e\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\164\163\162\161\146g\128\128\128\128\128g\143\128\128\128ggg\128\128\128g\128\128\128\128\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\241\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128z\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128|\128\128\128|\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128ttttttt\128\128\128tttt\128ttttttt\128t\128\128\128\128\128\128\128tt\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128J\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128J\128\128J\128\128\128J\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128N\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\144\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\142\128\128\148\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128G\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\243\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\145\164\128\128\128\146\128\128\128\128\128\128\128\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\141\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\245\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128Q\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128jjjjjjj\128\128\128\128jjj\128\128jjjjj\128\128j\128\128\128\128\128\128\128jj\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128S\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128",
-ParseEngine.next6x1 "\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\129\132\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\129\133\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\139\128\148\138\128\128\128\128\128\128\128\128\128\128\128\128\137\128\136\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\154\153\152\128\151\128\128\128\128\128\128\128\150\128\149\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\164\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\166\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\172\128\148\138\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\173\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\154\153\182\181\128\128\128\180\128\179\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\148\184\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\148\185\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\148\187\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\188\128\148\138\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\190\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\192\194\193\148\138\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\154\153\182\200\128\199\128\128\198\128\197\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\201\128\148\138\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\202\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\204\128\203\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\154\153\210\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\164\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\164\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\164\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\148\212\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\217\128\148\138\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\223\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\225\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\154\153\182\181\128\128\128\180\128\226\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\228\128\148\138\128\128\128\128\128\128\128\227\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\148\230\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\164\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\231\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\192\194\232\148\138\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\154\153\182\200\128\199\128\128\198\128\235\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\228\128\148\138\128\128\128\128\128\128\128\236\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\238\128\148\138\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\164\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\192\194\241\148\138\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\243\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128",
+ParseEngine.next6x1 "@\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\131\128\128\128\128\133\128\128\132\128\128\128@\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128@\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\131\128\128\128\128\133\128\128\132\128\128\128@\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\136\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\137\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\138\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\127\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\127\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128?\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128?\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\144\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\144\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\159\128\128\128\128\128\128\128\128\128\128Y\128\128Y\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128A\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128A\128\128\128\128A\128\128A\128\128\128A\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\160\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\167\166\165\164\148i\128\128\128\128\163i\145\128\128\162iii\161\128\128\128i\128\128\128\128\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128H\128\128\128\128\128\128\169\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128qqqqqqq\128\128\128qqqq\128qqqqqqq\128\128q\128\128\128\128\128\128\128qq\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\171\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\172\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128xxxxxxx\128\128\173\128xxx\128\128xxxxx\128\128\128x\128\128\128\128\128\128\128xx\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128vvvvvvv\174\128\128vvvv\128vvvvvvv\128\128v\128\128\128\128\128\128\128vv\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\175\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\144\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128rrrrrrr\128\128\128rrrr\128rrrrrrr\128\128r\128\128\128\128\128\128\128rr\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\167\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128ppppppp\128\128\128\128ppp\128\128ppppp\128\128\128p\128\128\128\128\128\128\128pp\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128C\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128C\128\128\128\128C\128\128C\128\128\128C\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128B\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128B\128\128\128\128B\128\128B\128\128\128B\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\178\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\179\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\181\128\128\180\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128X\128\128X\128\128\128\128\128X\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128[\128\128[\128\128\128\128\128[\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\182\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128M\128\159\128\128\128\128\128\128\128\128\128\128Y\128\128\128\128\128\128\128\128YM\128\128\128\128M\128\187M\128\128\128M\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\128\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\128\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\128\128\128\150\128\128\190\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128lllllll\128\128\128\128lll\128\128lllll\128\128\128l\128\128\128\128\128\128\128ll\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128mmmmmmm\128\128\128\128mmm\128\128mmmmm\128\128\128m\128\128\128\128\128\128\128mm\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128nnnnnnn\128\128\128\128nnn\128\128nnnnn\128\128\128n\128\128\128\128\128\128\128nn\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128xxxxxxx\128\128\128xxxx\128xxxxxxx\128\128x\128\128\128\128\128\128\128xx\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128ooooooo\128\128\128\128ooo\128\128ooooo\128\128\128o\128\128\128\128\128\128\128oo\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\144\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\193\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\171\128\128\128\128\128\128\128\128\128\128\128\128~\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128wwwwwww\128\128\128wwww\128wwwwwww\128\128w\128\128\128\128\128\128\128ww\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\195\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\144\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128sssssss\128\128\128ssss\128sssssss\128\128s\128\128\128\128\128\128\128ss\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\200\128\128\128\128\128\199\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128kkkkkkk\128\128\128\128kkk\128\128kkkkk\128\128\128k\128\128\128\128\128\128\128kk\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128K\128\159\128\128\128\128\128\128\128\128\128\128Y\128\128Y\128\128\128\128\128YK\128\128\128\128K\128\187K\128\128\128K\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\144\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128U\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\159\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\167\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\210\128\128\209\128\128\128\128\211\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128E\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128E\128\128\128\128E\128\128E\128\128\128E\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\212\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\213\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\181\128\128V\128\128\128\128\128V\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\159\128\128\128\128\128\128\128\128\128\128Y\128\128Y\128\128\128\128\128Y\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\167\166\165\164\148c\128\128\128\128\128c\145\128\128\128ccc\128\128\128\128c\128\128\128\128\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\167\166\165\164\148\128\128\128\128\128\215\128\145\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128d\128\128\128\128\128d\128\128\128\128ddd\128\128\128\128d\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\167\166\165\164\148f\128\128\128\128\128f\145\128\128\128fff\128\128\128\128f\128\128\128\128\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128I\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\128\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128}\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\217\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128{\128\128\128\218\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\219\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\220\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\144\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128yyyyyyy\128\128\128yyyy\128yyyyyyy\128\128y\128\128\128\128\128\128\128yy\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128D\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128D\128\128\128\128D\128\128D\128\128\128D\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\222\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\223\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\224\128\128\128\128\128R\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128F\128\128\128\128\128\128\225\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128Z\128\128Z\128\128\128\128\128Z\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\\\128\128\\\128\128\128\128\128\\\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128b\128\128b\128\128\128\128\128b\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\167\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\226\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\167\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\228\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128_\128\128_\128\128\128\128\128_\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128M\128\159\128\128\128\128\128\128\128\128\128\128Y\128\128\128\128\128\128\128\128YM\128\128\128\128M\128\187M\128\128\128M\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\144\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\181\128\128W\128\128\128\128\128W\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\128\128\128\150\128\128\233\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\167\166\165\164\148h\128\128\128\128\128h\145\128\128\128hhh\128\128\128\128h\128\128\128\128\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\167\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\144\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128uuuuuuu\128\128\128uuuu\128uuuuuuu\128\128u\128\128\128\128\128\128\128uu\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\237\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\238\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128K\128\159\128\128\128\128\128\128\128\128\128\128Y\128\128Y\128\128\128\128\128YK\128\128\128\128K\128\187K\128\128\128K\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\144\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\241\128\128\128\128\128\128\128\128\128\128\128\128\128T\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\144\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128]\128\128]\128\128\128\128\128]\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128`\128\128`\128\128\128\128\128`\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128^\128\128^\128\128\128\128\128^\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128a\128\128a\128\128\128\128\128a\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128L\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128L\128\128\128\128L\128\128L\128\128\128L\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128O\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128P\128\128\128\128\128\243\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128e\128\128\128\128\128e\128\128\128\128eee\128\128\128\128e\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\167\166\165\164\148g\128\128\128\128\128g\145\128\128\128ggg\128\128\128\128g\128\128\128\128\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\244\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128z\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128|\128\128\128|\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128ttttttt\128\128\128tttt\128ttttttt\128\128t\128\128\128\128\128\128\128tt\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128J\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128J\128\128\128\128J\128\128J\128\128\128J\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128N\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\146\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\144\128\128\150\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128G\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\246\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\147\167\128\128\128\148\128\128\128\128\128\128\128\145\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\149\143\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\248\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128Q\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128jjjjjjj\128\128\128\128jjj\128\128jjjjj\128\128\128j\128\128\128\128\128\128\128jj\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128S\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128",
+ParseEngine.next6x1 "\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\129\133\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\129\134\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\141\128\150\140\128\128\128\128\128\128\128\128\128\128\128\128\139\128\138\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\141\128\150\140\128\128\128\128\128\128\128\128\128\128\128\128\139\128\151\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\157\156\155\128\154\128\128\128\128\128\128\128\153\128\152\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\167\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\169\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\175\128\150\140\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\176\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\157\156\185\184\128\128\128\183\128\182\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\150\187\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\150\188\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\150\190\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\191\128\150\140\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\193\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\195\197\196\150\140\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\157\156\185\203\128\202\128\128\201\128\200\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\204\128\150\140\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\205\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\207\128\206\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\157\156\213\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\167\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\167\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\167\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\150\215\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\220\128\150\140\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\226\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\228\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\157\156\185\184\128\128\128\183\128\229\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\231\128\150\140\128\128\128\128\128\128\128\230\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\150\233\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\167\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\234\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\195\197\235\150\140\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\157\156\185\203\128\202\128\128\201\128\238\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\231\128\150\140\128\128\128\128\128\128\128\239\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\241\128\150\140\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\167\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\195\197\244\150\140\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\246\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128\128",
 Vector.fromList [(0,1,(fn Value.symbol_pos(arg0)::rest => Value.idents(Arg.sing_idents arg0)::rest|_=>raise (Fail "bad parser"))),
 (0,2,(fn Value.idents(arg0)::Value.symbol_pos(arg1)::rest => Value.idents(Arg.cons_idents {2=arg0,1=arg1})::rest|_=>raise (Fail "bad parser"))),
 (1,3,(fn Value.symbol_pos(arg0)::_::Value.term(arg1)::rest => Value.sub(Arg.make_sub {2=arg0,1=arg1})::rest|_=>raise (Fail "bad parser"))),
@@ -2588,6 +2671,7 @@ Vector.fromList [(0,1,(fn Value.symbol_pos(arg0)::rest => Value.idents(Arg.sing_
 (21,3,(fn Value.lpremises(arg0)::_::Value.lconcl(arg1)::rest => Value.lrule(Arg.make_lrule {2=arg0,1=arg1})::rest|_=>raise (Fail "bad parser"))),
 (22,3,(fn Value.rule(arg0)::Value.symbol_pos(arg1)::_::rest => Value.clause(Arg.rule_clause {2=arg0,1=arg1})::rest|_=>raise (Fail "bad parser"))),
 (22,3,(fn Value.lrule(arg0)::Value.symbol_pos(arg1)::_::rest => Value.clause(Arg.lrule_clause {2=arg0,1=arg1})::rest|_=>raise (Fail "bad parser"))),
+(22,3,(fn Value.rule(arg0)::Value.symbol_pos(arg1)::_::rest => Value.clause(Arg.axiom_clause {2=arg0,1=arg1})::rest|_=>raise (Fail "bad parser"))),
 (23,0,(fn rest => Value.clauses(Arg.nil_clauses {})::rest)),
 (23,2,(fn Value.clauses(arg0)::Value.clause(arg1)::rest => Value.clauses(Arg.cons_clauses {2=arg0,1=arg1})::rest|_=>raise (Fail "bad parser")))],
 (fn Value.clauses x => x | _ => raise (Fail "bad parser")), Arg.error)

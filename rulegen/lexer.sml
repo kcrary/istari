@@ -23,6 +23,7 @@ structure Lexer :> LEXER =
          List.app
          (fn (str, token) => Table.insert keywords (tosym str) token)
          [
+         ("axiom", AXIOM),
          ("demote", DEMOTE),
          ("ext", EXT),
          ("fn", FN),

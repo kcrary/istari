@@ -22,6 +22,7 @@ signature NORMALIZE =
               | <M, M>
               | next M
               | <>
+              | native-term
               | marker
 
          (simple form)
@@ -117,13 +118,18 @@ functor NormalizeFun (structure Term : TERM
                                            where type term = Term.term
                                            where type sub = Term.sub
                                            where type elim = Term.elim
+                      structure Native : NATIVE
+                                         where type constant = Term.constant
+                                         where type term = Term.term
+                                         where type native = Term.native
                       structure Reduction : REDUCTION_INTERNAL
                                             where type constant = Term.constant
                                             where type term = Term.term
                                             where type elim = Term.elim
                       structure Prim : PRIM
                                        where type constant = Term.constant
-                                       where type ureduction2 = Reduction.ureduction2)
+                      structure PrimReduction : PRIM_REDUCTION_INTERNAL
+                                                where type ureduction2 = Reduction.ureduction2)
    :> 
    NORMALIZE_INTERNAL
    where type term = Term.term
@@ -240,19 +246,14 @@ functor NormalizeFun (structure Term : TERM
                       
 
 
-      (* Hash table indexed by first constant.
-         If const1 maps to d, then d maps const2 to (l, red),
-         where triggers red = (const1, l, const2)
-      *)
-      val redexTable : (int * Reduction.ureduction2 D.dict) H.table = H.table ()
-
-
-
       (* as above *)
       datatype strategy =
          HARD
        | BASIC
        | STANDARD
+
+      val redexTable : (strategy -> term -> elim list -> term) H.table = H.table ()
+
 
 
       fun whnfMain strategy m s spine =
@@ -322,59 +323,17 @@ functor NormalizeFun (structure Term : TERM
                   | SOME m' =>
                        whnfMain strategy m' s spine)
 
+           | Native _ => elim m spine
+
            | Marker _ => elim m spine)
 
          
       (* Contract a user redex, if one exists.  Otherwise return default. *)
       and reduceUser strategy const spine default =
          (case H.find redexTable const of
-             NONE =>
-                if Constant.eq (const, Prim.letnext) then
-                   (* We have to hardcode letnext, rather than using the ureduction
-                      mechanism, because its active argument expects an intro form
-                      (Next) rather than a constant.
-                   *)
-                   (case spine of
-                       App arg :: App body :: spine' =>
-                          (case whnfMain HARD arg id [] of
-                              Next n =>
-                                 whnfMain strategy body id (App n :: spine')
+             NONE => default
 
-                            | _ => default)
-
-                     | _ =>
-                          default)
-
-                else
-                   default
-
-           | SOME (l, d) =>
-                (* Registered reduction exists. *)
-                (case List.splitOpt spine l of
-                    SOME (spine1, App arg :: spine3) =>
-                       (case whnfMain HARD arg id [] of
-                           Elim (Const const', spine2) =>
-                              (case D.find d const' of
-                                  NONE =>
-                                     default
-
-                                | SOME red =>
-                                     (case
-                                         (try
-                                             SOME (Reduction.ureduce2 red spine1 spine2 spine3)
-                                          with
-                                             Reduction.Reduce => NONE)
-                                      of
-                                         SOME q => whnfMain strategy q id []
-
-                                       | NONE =>
-                                            default))
-
-                         | _ =>
-                              default)
-
-                  | _ =>
-                       default))
+           | SOME f => f strategy default spine)
 
 
       (* m is an intro *)
@@ -438,26 +397,129 @@ functor NormalizeFun (structure Term : TERM
 
 
 
+      (* Populating the redex table. *)
+
+      (* For user redices, we can have multiple reductions for a single constant.
+         We define an auxiliary hash table to track all of those.  It returns
+         a reference to a dictionary, and that reference it used in the reduction
+         function we put into the redex table.
+
+         If triggers red = (const1, l, const2), then:
+         - the redex table maps const1 to (reduceUser l d), where !d maps const2 to red
+         - the user table maps const1 to (l, d)
+      *)
+
+      val userTable : (int * Reduction.ureduction2 D.dict ref) H.table = H.table ()
+
+
+      fun reduceUser l d strategy default spine =
+         (case List.splitOpt spine l of
+             SOME (spine1, App arg :: spine3) =>
+                (case whnfMain HARD arg id [] of
+                    Elim (Const const', spine2) =>
+                       (case D.find (!d) const' of
+                           NONE =>
+                              default
+
+                         | SOME red =>
+                              (case
+                                  (try
+                                      SOME (Reduction.ureduce2 red spine1 spine2 spine3)
+                                   with
+                                      Reduction.Reduce => NONE)
+                               of
+                                  SOME q => whnfMain strategy q id []
+
+                                | NONE =>
+                                     default))
+
+                  | _ =>
+                       default)
+
+           | _ =>
+                default)
 
 
       fun register red =
          let
             val (const, l, const') = Reduction.triggers red
+
+            val ((l', d), old) =
+               H.lookupOrInsert' 
+                  userTable
+                  const
+                  (fn () => (l, ref (D.singleton const' red)))
          in
-            H.insertMerge
-               redexTable
-               const
-               (l, D.singleton const' red)
-               (fn (l', d) => 
-                   if l = l' then
-                      (l, D.insert d const' red)
-                   else
-                      raise (Fail "incompatible arities in registered reductions"))
+            if l <> l' then
+               raise (Fail "incompatible arities in registered reductions")
+            else if old then
+               d := D.insert (!d) const' red
+            else
+               H.insert redexTable const (reduceUser l d)
          end
 
+
       (* Constants with primitive reductions. *)
-      val () = List.app register Prim.redices
+      val () = List.app register PrimReduction.redices
 
       fun registered const = H.member redexTable const
+
+
+
+      (* We have to hardcode letnext, rather than using the ureduction
+         mechanism, because its active argument expects an intro form
+         (Next) rather than a constant.
+      *)
+
+      fun reduceLetnext strategy default spine =
+         (case spine of
+             App arg :: App body :: spine' =>
+                (case whnfMain HARD arg id [] of
+                    Next n =>
+                       whnfMain strategy body id (App n :: spine')
+
+                  | _ => default)
+
+           | _ =>
+                default)
+
+      val () = H.insert redexTable Prim.letnext reduceLetnext
+
+
+      
+      (* Natives *)
+
+      fun reduceNative1 f strategy default spine =
+         (case spine of
+             App arg :: spine' =>
+                (case whnfMain HARD arg id [] of
+                    Native x =>
+                       whnfMain strategy (f x) id spine'
+
+                  | _ => default)
+
+           | _ => default)
+
+
+      fun reduceNative2 f strategy default spine =
+         (case spine of
+             App arg1 :: App arg2 :: spine' =>
+                (case (whnfMain HARD arg1 id [], whnfMain HARD arg2 id []) of
+                    (Native x, Native y) =>
+                       whnfMain strategy (f x y) id spine'
+
+                  | _ => default)
+
+           | _ => default)
+
+      
+      val () =
+         List.app
+            (fn (const, Native.Unary f) =>
+                   H.insert redexTable const (reduceNative1 f)
+
+              | (const, Native.Binary f) =>
+                   H.insert redexTable const (reduceNative2 f))
+            Native.operators
 
    end

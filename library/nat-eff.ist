@@ -2,6 +2,7 @@
 Ctrl.use "logic-load.iml";
 Ctrl.use "bool-load.iml";
 Ctrl.use "nat-load.iml";
+Ctrl.use "nat-eff-aux.iml";
 
 
 Namespace.beginModule "NatEff";
@@ -12,6 +13,8 @@ Namespace.openModule (parseLongident /Nat/);
 
 
 
+(* Built-in:
+
 definerec /eqb m n/
 /
   natcase m
@@ -19,6 +22,46 @@ definerec /eqb m n/
     (fn m' . natcase n false (fn n' . eqb m' n'))
 //
   nat -> nat -> bool
+/;
+*)
+
+Namespace.alias (parseIdent /eqb/) Prim.eqb;
+
+Database.setUnroll Prim.eqb
+  (Reduction.trans
+     [DefineInternal.recUnroller Prim.eqb,
+      Reduction.beta 2]);
+
+
+
+(* Built-in:
+
+definerec /leqb m n/
+/
+  natcase m
+    true
+    (fn m' . natcase n false (fn n' . leqb m' n'))
+//
+  nat -> nat -> bool
+/;
+*)
+
+Namespace.alias (parseIdent /leqb/) Prim.leqb;
+
+Database.setUnroll Prim.leqb
+  (Reduction.trans
+     [DefineInternal.recUnroller Prim.leqb,
+      Reduction.beta 2]);
+
+
+
+structure Nothing = AfterLeqb ();
+
+
+
+lemma "eqb_type"
+/
+  eqb : nat -> nat -> bool
 /;
 
 introOf /m n/.
@@ -29,16 +72,19 @@ intro /n/.
 destruct /m/ /| m/.
   {
   unroll /eqb/.
+  reduce //.
   typecheck.
   }
 
   {
   unroll /eqb/.
+  reduce //.
   typecheck.
   apply /IH/.
   apply /lt_succ/.
   }
 qed ();
+Define.recordTyping "eqb_type";
 
 
 
@@ -124,13 +170,9 @@ qed ();
 
 
 
-definerec /leqb m n/
+lemma "leqb_type"
 /
-  natcase m
-    true
-    (fn m' . natcase n false (fn n' . leqb m' n'))
-//
-  nat -> nat -> bool
+  leqb : nat -> nat -> bool
 /;
 
 introOf /m n/.
@@ -141,16 +183,19 @@ intro /n/.
 destruct /m/ /| m/.
   {
   unroll /leqb/.
+  reduce //.
   typecheck.
   }
 
   {
   unroll /leqb/.
+  reduce //.
   typecheck.
   apply /IH/.
   apply /lt_succ/.
   }
 qed ();
+Define.recordTyping "leqb_type";
 
 
 

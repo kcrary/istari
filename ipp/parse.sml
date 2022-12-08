@@ -176,13 +176,19 @@ structure Parse :> PARSE =
 
               | _ => NONE)
 
+         fun lexeme _ elem =
+            (case elem of
+                S.Llexeme (sym, span) => SOME (S.Estring (Symbol.toValue sym), span)
+              | _ => NONE)
+
          val builtin =
             [
             ("STRING", string),
             ("NUMBER", number),
             ("EMBED", embed),
             ("IDENT",  ident),
-            ("LONGID", longid)
+            ("LONGID", longid),
+            ("LEXEME", lexeme)
             ]
 
       in

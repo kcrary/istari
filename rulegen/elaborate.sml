@@ -440,8 +440,8 @@ structure Elaborate :> ELABORATE =
 
       fun elaborate clause =
          (case clause of
-             S.Rule (name, rule) => 
-                (Rule (name, elabRule rule)
+             S.Rule (name, rule, axiom) => 
+                (Rule (name, elabRule rule, axiom)
                  handle (Incorrect msg) =>
                     (
                     print "Incorrect rule ";

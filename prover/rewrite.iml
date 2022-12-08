@@ -493,6 +493,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
            | T.Triv => fk i
 
+           | T.Native _ => fk i
+
            | T.Marker _ => fk i
 
            (* Other cases impossible for simple m. *)
@@ -2852,7 +2854,9 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                 (* this is always a type error, but might as well be uniform about it *)
                 Ptriv
 
+           | T.Native _ => Pweird
            | T.Marker _ => Pweird
+           | T.Elim (T.Native _, _) => Pweird
            | T.Elim (T.Marker _, _) => Pweird
 
            | _ =>
@@ -3010,7 +3014,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                        T.Dot (T.apply1 Prim.fix (T.Lam (NONE, T.Sub (body, T.under 1 s))), 
                                               s)),
                                 spines),
-                        Seq (Unreduce (R.user1 Prim.unroll_fix),
+                        Seq (Unreduce (R.user1 PrimReduction.unroll_fix),
                              T.Elim (T.Const Prim.fix,
                                      T.App (T.Lam (NONE, T.Sub (body, T.under 1 s))) :: spines),
                              LetFold (varglobal,
@@ -3331,7 +3335,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                                      val cr =
                                                         Seq (LetUnfold (varglobal, T.Elim (T.zero, T.ssubst spine T.shift1)),
                                                              T.Elim (m', spine),
-                                                             Seq (Reduce (R.user1 Prim.unroll_fix),
+                                                             Seq (Reduce (R.user1 PrimReduction.unroll_fix),
                                                                   T.Elim (T.Sub (body, T.Dot (m', T.Shift (varlocal+bvs+1))), spine),
                                                                   Seq (LetFold (varglobal, 
                                                                                 T.Elim (T.Sub (body, T.Idot (0, T.Shift (varlocal+bvs+2))),

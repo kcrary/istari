@@ -498,6 +498,13 @@ functor CodegenSmlFun (Output : OUTPUT) :> CODEGEN =
                 write " : int)"
                 )
 
+           | Ebignum n =>
+                (
+                write "(";
+                write (IntInf.toString n);
+                write " : IntInf.int)"
+                )
+
            | Eword n =>
                 (
                 write "(0w";

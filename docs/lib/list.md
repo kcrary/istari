@@ -21,7 +21,7 @@ Producing:
     cons : intersect (i : level) . forall (a : U i) . a -> list a -> list a
          (1 implicit argument)
 
-The syntactic sugar `h :: t` is accepted for `` `cons _ h t``, as usual.
+The syntactic sugar `h :: t` is accepted for `` ` cons _ h t``, as usual.
 
 
 The iterator for lists:

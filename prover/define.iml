@@ -225,7 +225,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
               
                                 (* fix (fn . M) *)
               
-                                R.user1 Prim.unroll_fix,
+                                R.user1 PrimReduction.unroll_fix,
               
                                 (* (fn . M) (fix (fn . M)) *)
                                 ]
@@ -435,16 +435,22 @@ structure DefineInternal :> DEFINE_INTERNAL =
       val theStrat : R.reduction list Dict.dict C.cref =
          C.new
             (List.foldl
-                (fns r d =>
-                    let
-                       val (const, _, _) = R.triggers r
-                    in
-                       Dict.insertMerge d const
-                          [R.user2 r]
-                          (fn l => R.user2 r :: l)
-                    end)
-                Dict.empty
-                Prim.redices)
+                (fns (const, _) d =>
+                    Dict.insertMerge d const
+                       [R.native]
+                       (fn l => R.native :: l))
+                (List.foldl
+                    (fns r d =>
+                        let
+                           val (const, _, _) = R.triggers r
+                        in
+                           Dict.insertMerge d const
+                              [R.user2 r]
+                              (fn l => R.user2 r :: l)
+                        end)
+                    Dict.empty
+                    PrimReductionInternal.redices)
+                Native.operators)
 
 
       fun register r =

@@ -2,7 +2,9 @@
 Ctrl.use "nat-aux.iml";
 
 Ctrl.use "acc-load.iml";
+Ctrl.use "logic-load.iml";
 Namespace.openModule (parseLongident /Acc/);
+Namespace.openModule (parseLongident /Logic/);
 
 Namespace.beginModule "Nat";
 
@@ -549,6 +551,37 @@ qed ();
 
 
 
+lemma "lt_succ_succ"
+/
+  forall m n . m < n -> succ m < succ n
+/;
+
+inference.
+unfold /lt at all/.
+intro /m n H/.
+apply /leq_succ_succ/.
+hyp /H/.
+qed ();
+
+
+
+lemma "lt_succ_invert"
+/
+  forall m n .
+    succ m < succ n
+    -> m < n
+/;
+
+inference.
+intro /m n H/.
+unfold /lt/.
+apply /leq_succ_invert/.
+fold /lt _ _/.
+hyp /H/.
+qed ();
+
+
+
 lemma "lt_succ"
 /
   forall n . lt n (succ n)
@@ -666,18 +699,99 @@ qed ();
 
 
 
-lemma "lt_succ_succ"
+lemma "lt_0_not"
 /
-  forall m n .
-    m < n
-    -> succ m < succ n
+  forall n . n < 0 -> void
 /;
 
 inference.
-intro /m n Hmn/.
-unfold /lt in Hmn in concl/.
-apply /leq_succ_succ/.
-hyp /Hmn/.
+intro /n H/.
+so /lt_leq_trans _# 3 H (leq_0_min n)/ /H'/.
+so /lt_irrefl _ H'/ /0/.
+qed ();
+
+
+
+lemma "not_leq"
+/
+  forall m n . not (m <= n) <-> n < m
+/;
+
+inference.
+intro /m n/.
+split.
+  {
+  revert /n/.
+  iterate /m/.
+    {
+    intro /n Hn/.
+    exfalso.
+    apply /Hn/.
+    apply /leq_0_min/.
+    }
+
+    {
+    intro /m IH n Hn/.
+    destruct /n/ /| n/.
+      {
+      apply /lt_0_succ/.
+      }
+    apply /lt_succ_succ/.
+    apply /IH/.
+    intro /H/.
+    apply /Hn/.
+    apply /leq_succ_succ/ >> auto.
+    }
+  }
+
+  {
+  revert /n/.
+  iterate /m/.
+    {
+    intro /n Hn/.
+    so /lt_0_not _ Hn/ /0/.
+    }
+    
+    {
+    intro /m IH n Hn/.
+    intro /H/.
+    destruct /n/ /| n/.
+      {
+      so /leq_succ_0_not _ H/ /0/.
+      }
+    so /leq_succ_invert _ _ H/ /H'/.
+    revert /H'/.
+    apply /IH/.
+    apply /lt_succ_invert/.
+    hyp /Hn/.
+    }
+  }
+qed ();
+
+
+
+lemma "not_lt"
+/
+  forall m n . not (m < n) <-> n <= m
+/;
+
+inference.
+intro /m n/.
+unfold /lt/.
+rewrite /-> not_leq/.
+unfold /lt/.
+split.
+  {
+  intro /H/.
+  apply /leq_succ_invert/.
+  hyp /H/.
+  }
+
+  {
+  intro /H/.
+  apply /leq_succ_succ/.
+  hyp /H/.
+  }
 qed ();
 
 
@@ -726,12 +840,25 @@ structure Nothing = AfterLtWellFounded ();
 
 (* Addition and Subtraction *)
 
+(*
+Built-in:
+
 definerecRaw /plus m n/
 /
   natcase m
     n
     (fn m' . succ (plus m' n))
 /;
+
+*)
+
+Namespace.alias (parseIdent /plus/) Prim.plus;
+
+Database.setUnroll Prim.plus
+  (Reduction.trans
+     [DefineInternal.recUnroller Prim.plus,
+      Reduction.beta 2]);
+
 
 
 definerecRaw /minus m n/
@@ -742,6 +869,9 @@ definerecRaw /minus m n/
 /;
 
 
+structure Nothing = AfterMinus ();
+
+
 reductions
 /
   plus (zero) n --> n ;
@@ -750,10 +880,6 @@ reductions
   minus m (succ n) --> natcase m 0 (fn m' . minus m' n) ;
   unrolling plus minus
 /;
-
-
-
-structure Nothing = AfterMinus ();
 
 
 
@@ -1415,6 +1541,57 @@ reduce //.
 apply /IH/.
 apply /leq_succ_invert/.
 hyp /Hleq/.
+qed ();
+
+
+
+lemma "plus_minus_swap"
+/
+  forall m n p .
+    p <= m
+    -> m + n - p = m - p + n : nat
+/;
+
+inference.
+intro /m n p Hpm/.
+revert /m n Hpm/.
+iterate /p/.
+
+(* 0 *)
+{
+intro /m n _/.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /p IH m n Hpm/.
+destruct /m/ /| m/.
+  {
+  so /leq_succ_0_not _ Hpm/ /0/.
+  }
+reduce //.
+apply /IH/.
+apply /leq_succ_invert/.
+auto.
+}
+qed ();
+
+
+
+lemma "plus_minus_assoc"
+/
+  forall m n p .
+    p <= n
+    -> m + n - p = m + (n - p) : nat
+/;
+
+inference.
+intro /m n p Hpn/.
+rewrite /-> plus_commute/.
+rewrite /-> plus_minus_swap/ >> auto.
+rewrite /-> plus_commute/.
+reflexivity.
 qed ();
 
 

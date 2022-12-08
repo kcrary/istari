@@ -334,6 +334,16 @@ structure Lexer :> LEXER =
                      | NONE =>
                           raise (SyntaxError ("illegal number", pos))))
 
+            val bignumber =
+               action
+               (fn (match, len, pos) =>
+                   (* the basis is happy to ignore the trailing 'I' *)
+                   (case IntInf.fromString (implode match) of
+                       SOME n => BIGNUM (n, (pos, pos+len))
+
+                     | NONE =>
+                          raise (SyntaxError ("illegal number", pos))))
+
             val nnumber =
                action
                (fn (match, len, pos) =>

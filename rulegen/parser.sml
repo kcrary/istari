@@ -140,7 +140,8 @@ structure Parser :> PARSER =
 
             fun make_lrule ((hs, m, ext), ps) = (ps, hs, m, ext)
 
-            fun rule_clause ((name, _), rule) = Rule (name, rule)
+            fun rule_clause ((name, _), rule) = Rule (name, rule, false)
+            fun axiom_clause ((name, _), rule) = Rule (name, rule, true)
             fun lrule_clause ((name, _), rule) = LRule (name, rule)
 
             val nil_clauses = null
@@ -170,6 +171,7 @@ structure Parser :> PARSER =
                  | SLASH pos => pos
                  | SUBTYPE pos => pos
                  | TURNSTILE pos => pos
+                 | AXIOM pos => pos
                  | DEMOTE pos => pos
                  | EXT pos => pos
                  | FN pos => pos

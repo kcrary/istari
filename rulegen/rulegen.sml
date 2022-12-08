@@ -296,7 +296,7 @@ structure Rulegen :> RULEGEN =
             val constants =
                S.difference
                   (List.foldl
-                      (fn (Rule (_, (premises, concl, ext)), set) =>
+                      (fn (Rule (_, (premises, concl, ext), _), set) =>
                              List.foldl
                                 (fn ((_, hyps, rhs, _), set) =>
                                     constantsHyps (constantsTerm set rhs) hyps)
@@ -361,7 +361,7 @@ structure Rulegen :> RULEGEN =
 \      type rule\n\n";
 
             List.app
-               (fn (Rule (name, _), (oset, _)) =>
+               (fn (Rule (name, _, _), (oset, _)) =>
                       (
                       write "      val ";
                       write (Symbol.toValue name);
@@ -407,7 +407,7 @@ structure Rulegen :> RULEGEN =
             write "\n";
 
             List.app
-               (fn (Rule (name, (premises, concl, ext)), (oset, easet)) =>
+               (fn (Rule (name, (premises, concl, ext), _), (oset, easet)) =>
                       (
                       (case oset of
                           [] => write "val "

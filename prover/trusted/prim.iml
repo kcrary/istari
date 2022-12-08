@@ -3,9 +3,8 @@ signature PRIM =
    sig
 
       type constant
-      type ureduction1
-      type ureduction2
 
+      (* primitive *)
       val bool : constant
       val bogus : constant
       val eq : constant
@@ -22,6 +21,7 @@ signature PRIM =
       val intersect : constant
       val ite : constant
       val guard : constant
+      val integer : constant
       val karrow : constant
       val kind : constant
       val level : constant
@@ -48,6 +48,13 @@ signature PRIM =
       val wind : constant
       val wtype : constant
 
+      (* primitive, invisible until placed into library *)
+      val eqzb : constant
+      val leqzb : constant
+      val negz : constant
+      val plusz : constant
+
+      (* defined *)
       val abort : constant
       val acc : constant      (* Acc *)
       val ann : constant
@@ -67,24 +74,29 @@ signature PRIM =
       val succ : constant
       val zero : constant
 
-      val unroll_fix : ureduction1
-      val unroll_pause : ureduction1
-      val unroll_wind : ureduction1
-      val reduce_lett : ureduction1
+      (* defined, invisible until placed into library *)
+      val eqb : constant
+      val eqzb_def : constant
+      val integer_def : constant
+      val integer_from_def : constant
+      val integer_to_def : constant
+      val integer_to_nat : constant
+      val leqb : constant
+      val leqzb_def : constant
+      val nat_to_integer : constant
+      val negz_def : constant
+      val plus : constant
+      val plusz_def : constant
 
-      val ite_tru : ureduction2
-      val ite_fals : ureduction2
-      val sumcase_inl : ureduction2
-      val sumcase_inr : ureduction2
-      val natcase_zero : ureduction2
-      val natcase_succ : ureduction2
+   end
 
 
+signature PRIM_INTERNAL =
+   sig
 
-      (* For internal use *)
+      include PRIM
 
       val primitives : (Symbol.symbol * constant) list
-      val redices : ureduction2 list
 
    end
 
@@ -94,44 +106,44 @@ functor PrimFun (structure Term : TERM
                                       where type term = Term.term
                                       where type constant = Term.constant
                  structure Pickling : PICKLING_PRIV
-                                      where type constant = Term.constant
-                 structure Reduction : REDUCTION_PRIV
-                                       where type constant = Term.constant
-                                       where type term = Term.term
-                                       where type elim = Term.elim)
+                                      where type constant = Term.constant)
    :> 
-   PRIM
+   PRIM_INTERNAL
    where type constant = Constant.constant
-   where type ureduction1 = Reduction.ureduction1
-   where type ureduction2 = Reduction.ureduction2
    =
    struct
 
       type constant = Constant.constant
-      type ureduction1 = Reduction.ureduction1
-      type ureduction2 = Reduction.ureduction2
 
       structure T = Term
-      structure R = Reduction
 
       val numPrimitives = ref 0
       val thePrimitives : (Symbol.symbol * constant) list ref = ref []
 
-      fun declare str def =
+      (* visible: whether to place the constant into primitives
+         and hence into the namespace.
+      *)
+      fun declare visible str def =
          let
             val i = !numPrimitives
             val sym = Symbol.fromValue str
             val const = Constant.declare def [sym]
          in
-            numPrimitives := 1 + !numPrimitives;
-            thePrimitives := (sym, const) :: !thePrimitives;
+            numPrimitives := 1 + i;
+
+            if visible then
+               thePrimitives := (sym, const) :: !thePrimitives
+            else
+               ();
+
             Pickling.primitive const i;
             const
          end
 
-      fun newconst str = declare str NONE
-
-      fun defconst str m = declare str (SOME m)
+      fun newconst str = declare true str NONE
+      fun newconstInvis str = declare false str NONE
+      fun defconst str m = declare true str (SOME m)
+      fun defconstInvis str m = declare false str (SOME m)
 
 
       val bool = newconst "bool"
@@ -150,6 +162,7 @@ functor PrimFun (structure Term : TERM
       val intersect = newconst "intersect"
       val ite = newconst "ite"
       val guard = newconst "guard"
+      val integer = newconst "integer"
       val karrow = newconst "karrow"
       val kind = newconst "kind"
       val level = newconst "level"
@@ -160,10 +173,10 @@ functor PrimFun (structure Term : TERM
       val magic = newconst "magic"
       val mu = newconst "mu"
       val negative = newconst "negative"
+      val positive = newconst "positive"
       val prod = newconst "prod"
       val quotient = newconst "quotient"
       val rec = newconst "rec"
-      val positive = newconst "positive"
       val set = newconst "set"
       val subtype = newconst "subtype"
       val sum = newconst "sum"
@@ -175,6 +188,11 @@ functor PrimFun (structure Term : TERM
       val void = newconst "void"
       val wind = newconst "wind"
       val wtype = newconst "wtype"
+
+      val eqzb = newconstInvis "eqzb"
+      val leqzb = newconstInvis "leqzb"
+      val negz = newconstInvis "negz"
+      val plusz = newconstInvis "plusz"
 
       val abort =
          defconst "abort"
@@ -313,103 +331,138 @@ functor PrimFun (structure Term : TERM
                                      
 
 
+      val integer_to_nat =
+         defconstInvis "integer_to_nat"
+         (T.apply1 fix
+             (T.Lam (NONE, 
+                     T.Lam (SOME (Symbol.fromValue "a"),
+                            T.apply3 ite
+                               (T.apply2 leqzb (T.Var 0) (T.Native (T.Integer 0I)))
+                               (T.Const zero)
+                               (T.apply1 succ 
+                                   (T.app (T.Var 1) 
+                                       (T.apply2 plusz (T.Native (T.Integer ~1I)) (T.Var 0))))))))
+
+      val nat_to_integer =
+         defconstInvis "nat_to_integer"
+         (T.apply1 fix
+             (T.Lam (NONE,
+                     T.Lam (SOME (Symbol.fromValue "n"),
+                            T.apply3 natcase
+                               (T.Var 0)
+                               (T.Native (T.Integer 0I))
+                               (T.Lam (SOME (Symbol.fromValue "n'"),
+                                       T.apply2 plusz
+                                          (T.Native (T.Integer 1I))
+                                          (T.app (T.Var 2) (T.Var 0))))))))
+
+      val plus =
+         defconstInvis "plus"
+         (T.apply1 fix
+             (T.Lam (NONE,
+                     T.Lam (NONE,
+                            T.Lam (NONE,
+                                   T.apply3 natcase
+                                   (T.Var 1)
+                                   (T.Var 0)
+                                   (T.Lam (NONE,
+                                           T.apply1 succ
+                                              (T.app2 (T.Var 3) (T.Var 0) (T.Var 1)))))))))
+
+      val eqb =
+         defconstInvis "eqb"
+         (T.apply1 fix
+             (T.Lam (NONE,
+                     T.Lam (NONE,
+                            T.Lam (NONE,
+                                   T.apply3 natcase 
+                                      (T.Var 1)
+                                      (T.apply3 natcase
+                                          (T.Var 0)
+                                          (T.Const tru)
+                                          (T.Lam (NONE, T.Const fals)))
+                                      (T.Lam (NONE,
+                                              T.apply3 natcase
+                                                 (T.Var 1)
+                                                 (T.Const fals)
+                                                 (T.Lam (NONE,
+                                                         T.app2 (T.Var 4) (T.Var 1) (T.Var 0))))))))))
+
+      val eqzb_def =
+         defconstInvis "eqzb_def"
+         (T.Lam (NONE,
+                 T.Lam (NONE,
+                        T.apply2 eqb
+                           (T.apply2 plus (T.Elim (T.Var 1, [T.Pi1])) (T.Elim (T.Var 0, [T.Pi2])))
+                           (T.apply2 plus (T.Elim (T.Var 1, [T.Pi2])) (T.Elim (T.Var 0, [T.Pi1]))))))
+         
+      val integer_def =
+         defconstInvis "integer_def"
+         (T.apply2 quotient
+              (T.apply2 prod (T.Const nat) (T.Const nat))
+              (T.Lam (NONE,
+                      T.Lam (NONE,
+                             T.apply3 eq
+                                (T.Const nat)
+                                (T.apply2 plus (T.Elim (T.Var 1, [T.Pi1])) (T.Elim (T.Var 0, [T.Pi2])))
+                                (T.apply2 plus (T.Elim (T.Var 1, [T.Pi2])) (T.Elim (T.Var 0, [T.Pi1])))))))
+ 
+      val integer_from_def =
+         defconstInvis "integer_from_def"
+         (T.Lam (NONE,
+                 T.apply2 plusz
+                     (T.apply1 nat_to_integer (T.pi1 (T.Var 0)))
+                     (T.apply1 negz (T.apply1 nat_to_integer (T.pi2 (T.Var 0))))))
+
+      val integer_to_def =
+         defconstInvis "integer_to_def"
+         (T.Lam (NONE,
+                 T.apply3 ite
+                     (T.apply2 leqzb (T.Native (T.Integer 0I)) (T.Var 0))
+                     (T.Pair (T.apply1 integer_to_nat (T.Var 0), T.Const zero))
+                     (T.Pair (T.Const zero, T.apply1 integer_to_nat (T.apply1 negz (T.Var 0))))))
+
+      val leqb =
+         defconstInvis "leqb"
+         (T.apply1 fix
+             (T.Lam (NONE,
+                     T.Lam (NONE,
+                            T.Lam (NONE,
+                                   T.apply3 natcase 
+                                      (T.Var 1)
+                                      (T.Const tru)
+                                      (T.Lam (NONE,
+                                              T.apply3 natcase
+                                                 (T.Var 1)
+                                                 (T.Const fals)
+                                                 (T.Lam (NONE,
+                                                         T.app2 (T.Var 4) (T.Var 1) (T.Var 0))))))))))
+
+      val leqzb_def =
+         defconstInvis "leqzb_def"
+         (T.Lam (NONE,
+                 T.Lam (NONE,
+                        T.apply2 leqb
+                           (T.apply2 plus (T.Elim (T.Var 1, [T.Pi1])) (T.Elim (T.Var 0, [T.Pi2])))
+                           (T.apply2 plus (T.Elim (T.Var 1, [T.Pi2])) (T.Elim (T.Var 0, [T.Pi1]))))))
+         
+      val negz_def =
+         defconstInvis "negz_def"
+         (T.Lam (NONE,
+                 T.Pair (T.pi2 (T.Var 0), T.pi1 (T.Var 0))))
+
+      val plusz_def =
+         defconstInvis "plusz_def"
+         (T.Lam (NONE,
+                 T.Lam (NONE,
+                        T.Pair (T.apply2 plus (T.pi1 (T.Var 1)) (T.pi1 (T.Var 0)),
+                                T.apply2 plus (T.pi2 (T.Var 1)) (T.pi2 (T.Var 0))))))
+
+
+
+
       val primitives = !thePrimitives
       val () = thePrimitives := []
-
-
-      val theRedices : ureduction2 list ref = ref []
-
-      fun redex r =
-         let
-            val red = R.backdoor2 r
-         in
-            theRedices := red :: !theRedices;
-            red
-         end
-
-
-      val unroll_pause =
-         R.new1 pause 1 T.zero (R.trans [R.unfold, R.beta 1]) R.refl
-
-      val unroll_fix =
-         R.new1 fix 1
-            (T.app T.zero (T.apply1 fix T.zero))
-            (R.trans
-                [
-                R.unfold,
-                R.user1 unroll_pause,
-                R.beta 2,
-                ])
-            (R.within [1] R.unfold)
-
-      val unroll_wind =
-         (* wind F M --> F (M #1) (M #2) (\z. wind F (M #2 z)) *)
-         R.backdoor1
-         (wind, 2,
-          T.app3
-             (T.Var 1)
-             (T.pi1 T.zero)
-             (T.pi2 T.zero)
-             (T.Lam (NONE,
-                     T.apply2 wind
-                        (T.Var 2)
-                        (T.Elim (T.Var 1, [T.Pi2, T.App T.zero])))))
-
-      val reduce_lett =
-         R.new1 lett 2 
-            (T.app T.zero (T.Var 1))
-            (R.trans [R.unfold, R.beta 2])
-            R.refl
-
-      val ite_tru =
-         (* ite true M1 M0 --> M1 *)
-         redex (ite, 0, 2, tru, 0, T.Var 1)
-   
-      val ite_fals =
-         (* ite fals M1 M0 --> M0 *)
-         redex (ite, 0, 2, fals, 0, T.Var 0)
-   
-      val sumcase_inl =
-         (* sumcase (inl M2) M1 M0 --> M1 M2 *)
-         redex (sumcase, 0, 2, inl, 1, T.Elim (T.Var 1, [T.App (T.Var 2)]))
-   
-      val sumcase_inr =
-         (* sumcase (inr M2) M1 M0 --> M0 M2 *)
-         redex (sumcase, 0, 2, inr, 1, T.Elim (T.Var 0, [T.App (T.Var 2)]))
-   
-      val natcase_zero =
-         (* natcase zero M1 M0 --> M1 *)
-         R.new2 natcase 0 2 zero 0 
-            (T.Var 1) 
-            (R.trans
-                [
-                R.unfold,
-                R.beta 3,
-                R.within [1] R.unfold,
-                R.user2 sumcase_inl,
-                R.beta 1
-                ])
-            R.refl
-
-      val natcase_succ =
-         (* natcase (succ M2) M1 M0 --> M0 M2 *)
-         R.new2 natcase 0 2 succ 1
-            (T.app (T.Var 0) (T.Var 2))
-            (R.trans
-                [
-                R.unfold,
-                R.beta 3,
-                R.within [1] (R.trans [R.unfold, R.beta 1]),
-                R.user2 sumcase_inr,
-                R.beta 1
-                ])
-            R.refl
-
-      val () = theRedices := natcase_zero :: natcase_succ :: !theRedices
-   
-
-      val redices = !theRedices
-      val () = theRedices := []
 
       val () =
          List.app (fn const => Constant.setOpacity const Constant.FIRM)

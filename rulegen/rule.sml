@@ -42,7 +42,7 @@ structure Rule =
          * hyp list * term * term
 
       datatype clause =
-         Rule of symbol * rule
+         Rule of symbol * rule * bool  (* true indicates axiom *)
        | LRule of symbol * lrule
 
    end
