@@ -61,7 +61,7 @@ example, zero is ``z`0``.
 
     leqz_refl : forall (a : integer) . a <z= a
 
-    leqz_refl_eq : forall (a b : integer) . a = b : integer -> a <z= a
+    leqz_refl_eq : forall (a b : integer) . a = b : integer -> a <z= b
 
     leqz_trans : forall (a b c : integer) . a <z= b -> b <z= c -> a <z= c
 
@@ -104,6 +104,8 @@ This one gives transitivity in the form needed for rewriting:
     not_leqz : forall (a b : integer) . not (a <z= b) <-> b <z a
 
     not_ltz : forall (a b : integer) . not (a <z b) <-> b <z= a
+
+    ltz_from_leqz_neq : forall (a b : integer) . a <z= b -> not (a = b : integer) -> a <z b
 
 
 ### Effective comparisons
@@ -198,3 +200,24 @@ positive case that works upwards.
                        z`0 <z= b
                        -> b <z= a
                        -> integer_to_nat (a -z b) = integer_to_nat a - integer_to_nat b : nat
+
+
+### Decidability
+
+    eq_integer_decide : forall (a b : integer) . Decidable.decidable (a = b : integer)
+
+    leqz_decide : forall (a b : integer) . Decidable.decidable (a <z= b)
+
+    ltz_decide : forall (a b : integer) . Decidable.decidable (a <z b)
+
+    eq_integer_stable : forall (a b : integer) . Stable.stable (a = b : integer)
+
+    leqz_stable : forall (a b : integer) . Stable.stable (a <z= b)
+
+    ltz_stable : forall (a b : integer) . Stable.stable (a <z b)
+
+    leqz_iff_ltz_or_eq : forall (a b : integer) . a <z= b <-> a <z b % a = b : integer
+
+    integer_trichotomy : forall (a b : integer) . a <z b % a = b : integer % b <z a
+
+    integer_dichotomy : forall (a b : integer) . a <z= b % b <z a

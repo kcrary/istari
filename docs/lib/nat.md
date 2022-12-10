@@ -88,6 +88,8 @@ This one gives transitivity in the form needed for rewriting:
 
     not_lt : forall (m n : nat) . not (m < n) <-> n <= m
 
+    lt_from_leq_neq : forall (m n : nat) . m <= n -> not (m = n : nat) -> m < n
+
 Strong induction for natural numbers:
 
     lt_well_founded : forall (n : nat) . Acc nat lt n
@@ -190,3 +192,40 @@ Strong induction for natural numbers:
     max_eq_l : forall (m n : nat) . n <= m -> max m n = m : nat
 
     max_eq_r : forall (m n : nat) . m <= n -> max m n = n : nat
+
+
+### Effective comparisons
+
+    eqb : nat -> nat -> bool
+
+    istrue_eqb : forall (m n : nat) . Bool.istrue (eqb m n) <-> m = n : nat
+
+    leqb : nat -> nat -> bool
+
+    istrue_leqb : forall (m n : nat) . Bool.istrue (leqb m n) <-> m <= n
+
+    ltb : nat -> nat -> bool
+        = fn m n . leqb (succ m) n
+
+    istrue_ltb : forall (m n : nat) . Bool.istrue (ltb m n) <-> m < n
+
+
+### Decidability
+
+    eq_nat_decide : forall (m n : nat) . Decidable.decidable (m = n : nat)
+
+    leq_decide : forall (m n : nat) . Decidable.decidable (m <= n)
+
+    lt_decide : forall (m n : nat) . Decidable.decidable (m < n)
+
+    eq_nat_stable : forall (m n : nat) . Stable.stable (m = n : nat)
+
+    leq_stable : forall (m n : nat) . Stable.stable (m <= n)
+
+    lt_stable : forall (m n : nat) . Stable.stable (m < n)
+
+    leq_iff_lt_or_eq : forall (m n : nat) . m <= n <-> m < n % m = n : nat
+
+    nat_trichotomy : forall (m n : nat) . m < n % m = n : nat % n < m
+
+    nat_dichotomy : forall (m n : nat) . m <= n % n < m

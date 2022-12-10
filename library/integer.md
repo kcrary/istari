@@ -103,6 +103,8 @@ This one gives transitivity in the form needed for rewriting:
 
     not_ltz : type:not_ltz
 
+    ltz_from_leqz_neq : type:ltz_from_leqz_neq
+
 
 ### Effective comparisons
 
@@ -172,3 +174,24 @@ positive case that works upwards.
     minus_to_integer : type:minus_to_integer
 
     minusz_to_nat : type:minusz_to_nat
+
+
+### Decidability
+
+    eq_integer_decide : type:eq_integer_decide
+
+    leqz_decide : type:leqz_decide
+
+    ltz_decide : type:ltz_decide
+
+    eq_integer_stable : type:eq_integer_stable
+
+    leqz_stable : type:leqz_stable
+
+    ltz_stable : type:ltz_stable
+
+    leqz_iff_ltz_or_eq : type:leqz_iff_ltz_or_eq
+
+    integer_trichotomy : type:integer_trichotomy
+
+    integer_dichotomy : type:integer_dichotomy

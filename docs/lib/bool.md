@@ -74,4 +74,3 @@ The `bool` type is primitive, but aliased in the `Bool` module:
     istrue_andb : forall (b c : bool) . istrue (andb b c) <-> istrue b & istrue c
 
     istrue_orb : forall (b c : bool) . istrue (orb b c) <-> istrue b % istrue c
-

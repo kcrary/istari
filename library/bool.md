@@ -74,4 +74,3 @@ The `bool` type is primitive, but aliased in the `Bool` module:
     istrue_andb : type:istrue_andb
 
     istrue_orb : type:istrue_orb
-

@@ -1,0 +1,202 @@
+
+Ctrl.use "logic-load.iml";
+Ctrl.use "bool-load.iml";
+Namespace.openModule (parseLongident /Logic/);
+
+Namespace.beginModule "Decidable";
+
+
+
+define /decidable P/
+/
+  P % not P
+//
+  intersect i . U i -> U i
+/;
+
+inference.
+introOf /i P/.
+unfold /decidable/.
+typecheck.
+qed ();
+Constant.setOpacity (parseConstant /decidable/) Constant.FIRM;
+
+
+
+lemma "decidable_and"
+/
+  forall i (P Q : U i) . decidable P -> decidable Q -> decidable (P & Q)
+/;
+
+inference.
+intro /a P Q Hp Hq/.
+destruct /Hp/ /Hp | Hnp/.
+1:{
+  right.
+  intro /(Hp _)/.
+  so /Hnp Hp/ /0/.
+  }
+destruct /Hq/ /Hq | Hnq/.
+1:{
+  right.
+  intro /(_ Hq)/.
+  so /Hnq Hq/ /0/.
+  }
+auto.
+qed ();
+
+
+
+lemma "decidable_or"
+/
+  forall i (P Q : U i) . decidable P -> decidable Q -> decidable (P % Q)
+/;
+
+inference.
+intro /a P Q Hp Hq/.
+destruct /Hp/ /Hp | Hnp/ >> auto.
+destruct /Hq/ /Hq | Hnq/ >> auto.
+right.
+intro /(Hp | Hq)/.
+  {
+  so /Hnp Hp/ /0/.
+  }
+
+  {
+  so /Hnq Hq/ /0/.
+  }
+qed ();
+
+
+
+lemma "decidable_implies"
+/
+  forall i (P Q : U i) . decidable P -> decidable Q -> decidable (P -> Q)
+/;
+
+inference.
+intro /a P Q Hp Hq/.
+destruct /Hp/ /Hp | Hnp/.
+1:{
+  left.
+  intro /Hp/.
+  so /Hnp Hp/ /0/.
+  }
+destruct /Hq/ /Hq | Hnq/.
+  {
+  auto.
+  }
+right.
+intro /H/.
+so /Hnq (H Hp)/ /0/.
+qed ();
+
+
+
+lemma "decidable_true"
+/
+  decidable unit
+/;
+
+left.
+split.
+qed ();
+
+
+
+lemma "decidable_false"
+/
+  decidable void
+/;
+
+right.
+intro /0/.
+qed ();
+
+
+
+lemma "decidable_not"
+/
+  forall i (P : U i) . decidable P -> decidable (not P)
+/;
+
+inference.
+intro /a P Hp/.
+apply /decidable_implies/ >> autoWith /decidable_false/.
+qed ();
+
+
+
+lemma "decidable_iff"
+/
+  forall i (P Q : U i) . decidable P -> decidable Q -> decidable (P <-> Q)
+/;
+
+inference.
+intro /i P Q Hp Hq/.
+apply /decidable_and/ >> autoWith /decidable_implies/.
+qed ();
+
+
+
+lemma "eq_bool_decide"
+/
+  forall b c . Decidable.decidable (b = c : bool)
+/;
+
+inference.
+intro /b c/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> attempt (left >> auto >> done).
+  {
+  right.
+  intro /H/.
+  injection /H/.
+  }
+
+  {
+  right.
+  intro /H/.
+  injection /H/.
+  }
+qed ();
+
+
+
+lemma "decidable_from_bool"
+/
+  forall i (P : U i) (b : bool) .
+    (Bool.istrue b <-> P)
+    -> decidable P
+/;
+
+inference.
+intro /i P b Hiff/.
+destruct /b/ /|/.
+  {
+  left.
+  apply /Hiff/.
+  apply /Bool.istrue_true/.
+  }
+
+  {
+  right.
+  intro /H/.
+  so /Bool.not_istrue_false (Hiff #2 H)/ /0/.
+  }
+qed ();
+
+
+
+lemma "istrue_decide"
+/
+  forall b . decidable (Bool.istrue b)
+/;
+
+inference.
+intro /b/.
+apply /decidable_from_bool/.
+  {
+  reflexivity.
+  }
+typecheck.
+qed ();

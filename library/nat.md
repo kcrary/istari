@@ -87,6 +87,8 @@ This one gives transitivity in the form needed for rewriting:
 
     not_lt : type:not_lt
 
+    lt_from_leq_neq : type:lt_from_leq_neq
+
 Strong induction for natural numbers:
 
     lt_well_founded : type:lt_well_founded
@@ -188,3 +190,40 @@ Strong induction for natural numbers:
     max_eq_l : type:max_eq_l
 
     max_eq_r : type:max_eq_r
+
+
+### Effective comparisons
+
+    eqb : type:eqb
+
+    istrue_eqb : type:istrue_eqb
+
+    leqb : type:leqb
+
+    istrue_leqb : type:istrue_leqb
+
+    ltb : type:ltb
+        = def:ltb
+
+    istrue_ltb : type:istrue_ltb
+
+
+### Decidability
+
+    eq_nat_decide : type:eq_nat_decide
+
+    leq_decide : type:leq_decide
+
+    lt_decide : type:lt_decide
+
+    eq_nat_stable : type:eq_nat_stable
+
+    leq_stable : type:leq_stable
+
+    lt_stable : type:lt_stable
+
+    leq_iff_lt_or_eq : type:leq_iff_lt_or_eq
+
+    nat_trichotomy : type:nat_trichotomy
+
+    nat_dichotomy : type:nat_dichotomy

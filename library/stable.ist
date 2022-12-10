@@ -1,0 +1,222 @@
+
+Ctrl.use "logic-load.iml";
+Ctrl.use "decidable-load.iml";
+Namespace.openModule (parseLongident /Logic/);
+
+Namespace.beginModule "Stable";
+
+
+define /stable P/
+/
+  not (not P) -> P
+//
+  intersect i . U i -> U i
+/;
+
+unfold /stable/.
+typecheck.
+qed ();
+Constant.setOpacity (parseConstant /stable/) Constant.FIRM;
+
+
+
+lemma "stable_and"
+/
+  forall i (P Q : U i) . stable P -> stable Q -> stable (P & Q)
+/;
+
+inference.
+intro /i P Q Hstp Hstq Hnpq/.
+split.
+  {
+  apply /Hstp/.
+  intro /Hnp/ >> witness /Hnpq __/.
+  intro /Hpq/ >> witness /Hnp __/.
+  destruct /Hpq/ /Hp Hq/.
+  auto.
+  }
+
+  {
+  apply /Hstq/.
+  intro /Hnp/ >> witness /Hnpq __/.
+  intro /Hpq/ >> witness /Hnp __/.
+  destruct /Hpq/ /Hp Hq/.
+  auto.
+  }
+qed ();
+
+
+
+lemma "stable_implies"
+/
+  forall i (P Q : U i) . stable Q -> stable (P -> Q)
+/;
+
+inference.
+intro /i P Q Hstq/.
+intro /Hnnpq Hp/.
+apply /Hstq/.
+intro /Hnq/ >> witness /Hnnpq __/.
+intro /Hpq/ >> witness /Hnq __/.
+apply /Hpq/ >> auto.
+qed ();
+
+
+
+lemma "stable_forall"
+/
+  forall i (A : U i) (P : A -> U i) .
+    (forall x . stable (P x))
+    -> stable (forall x . P x)
+/;
+
+inference.
+intro /i A P Hst Hnnall x/.
+apply /Hst/.
+intro /Hnp/ >> witness /Hnnall __/.
+intro /Hall/ >> witness /Hnp __/.
+apply /Hall/ >> auto.
+qed ();
+
+
+
+lemma "stable_true"
+/
+  stable unit
+/;
+
+intro /_/.
+split.
+qed ();
+
+
+
+lemma "stable_false"
+/
+  stable void
+/;
+
+intro /H/.
+witness /H __/.
+intro /0/.
+qed ();
+
+
+
+lemma "stable_not"
+/
+  forall i (P : U i) . stable (not P)
+/;
+
+inference.
+intro /i P Hnnnp/.
+apply /stable_implies/ >> autoWith /stable_false/.
+qed ();
+
+
+
+lemma "stable_iff"
+/
+  forall i (P Q : U i) . stable P -> stable Q -> stable (P <-> Q)
+/;
+
+inference.
+intro /i P Q Hp Hq/.
+apply /stable_and/ >> autoWith /stable_implies/.
+qed ();
+
+
+
+lemma "decidable_impl_stable"
+/
+  forall i (P : U i) . Decidable.decidable P -> stable P
+/;
+
+inference.
+intro /i P Hdec/.
+intro /Hnnp/.
+destruct /Hdec/ /Hp | Hnp/ >> auto.
+so /Hnnp Hnp/ /0/.
+qed ();
+
+
+
+lemma "eq_bool_stable"
+/
+  forall b c . stable (b = c : bool)
+/;
+
+inference.
+intro /b c/.
+apply /decidable_impl_stable/.
+apply /Decidable.eq_bool_decide/.
+qed ();
+
+
+
+lemma "istrue_stable"
+/
+  forall b . stable (Bool.istrue b)
+/;
+
+inference.
+intro /b/.
+apply /decidable_impl_stable/.
+apply /Decidable.istrue_decide/.
+qed ();
+
+
+
+lemma "dneg_elim_if_stable"
+/
+  forall i j (P : U i) (Q : U j) .
+    stable Q
+    -> not (not P)
+    -> (P -> Q)
+    -> Q
+/;
+
+inference.
+intro /i j P Q Hst Hnnp Hpq/.
+apply /Hst/.
+intro /Hnq/ >> witness /Hnnp __/.
+intro /Hp/ >> witness /Hnq __/.
+apply /Hpq/ >> auto.
+qed ();
+
+
+
+lemma "not_not_excluded_middle"
+/
+  forall i (P : U i) . not (not (Decidable.decidable P))
+/;
+
+inference.
+intro /i P Hprop/.
+witness /Hprop __/.
+right.
+intro /Hp/.
+witness /Hprop __/.
+left.
+hyp /Hp/.
+qed ();
+
+
+
+lemma "excluded_middle_if_stable"
+/
+  forall i j (P : U i) (Q : U j) .
+    stable Q
+    -> (Decidable.decidable P -> Q)
+    -> Q
+/;
+
+inference.
+intro /i j P Q Hst Hq/.
+apply /dneg_elim_if_stable _ _ (Decidable.decidable P)/ >> auto.
+apply /not_not_excluded_middle/.
+qed ();
+
+
+
+
