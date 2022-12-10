@@ -347,28 +347,23 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
 
       fun errorDetail history msg details () =
-         let
-            val (ctx, dir) =
-               (case history of
-                   (jud, dir) :: _ => (J.context jud, dir)
+         (
+         print msg;
+         print "\n";
 
-                 | [] =>
-                      (* This shouldn't happen, but in case something goes wrong,
-                         we don't want the error handling code to fail.
-                      *)
-                      (S.empty, D.empty))
+         details ();
 
-            val fullsize = S.length ctx
-         in
-            print msg;
-            print "\n";
+         (case history of
+             [] => ()
 
-            details ();
+           | (jud, dir) :: _ =>
+                (
+                print "\nwith history:\n";
+                printHistLoop 0 history (S.length (J.context jud)) dir
+                ));
 
-            print "\nwith history:\n";
-            printHistLoop 0 history fullsize dir;
-            print "\n"
-         end
+         print "\n"
+         )
 
 
       fun error history msg details =
@@ -2522,7 +2517,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
               | Sum.INR (m', aopt, msg) =>
                    (
                    Message.message 20 0
-                      (errorDetail [goal] ("Type error: inference failed: " ^ msg)
+                      (errorDetail [] ("Type error: inference failed: " ^ msg)
                           (inferDetail dir m' aopt));
 
                    fail "type error"

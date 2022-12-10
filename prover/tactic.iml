@@ -605,15 +605,18 @@ structure TacticInternal :> TACTIC_INTERNAL =
          !interrupt rule goal;
          (case
              try
-                SOME (Refine.refine rule jud)
+                Sum.INL (Refine.refine rule jud)
              with
-                Rule.Failure => NONE
+                Rule.Failure =>
+                   Sum.INR (String.concat ["rule ", Rule.name rule, " does not apply"])
+
+              | Rule.HiddenVariable =>
+                   Sum.INR "refinement fails due to hidden variables"
           of
-             SOME (subgoals, validate) =>
+             Sum.INL (subgoals, validate) =>
                 sk (map (fn s => (blank, (s, dir))) subgoals, validate, fk)
 
-           | NONE =>
-                fk (String.concat ["rule ", Rule.name rule, " does not apply"]))
+           | Sum.INR msg => fk msg)
          )
 
       fun chdir dir (ds, _) fk sk = sk ([(blank, (ds, dir))], valhd, fk)

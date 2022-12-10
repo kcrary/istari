@@ -118,7 +118,15 @@ when appropriate, is given by an L or R.
 
 Notes:
 
-- Note that the typing and type formation have lower precedence than equality and type equality.
+- Note that typing (`M : A`) has lower precedence than equality 
+  (`M = N : A`).  Thus, `M : A -> B` asserts that `M` has the type 
+  `A -> B`, while `M = N : A -> B` asserts that the equality 
+  `M = N : A` implies `B`.
+
+- Similarly, type formation (`A : type`) has lower precedence than type
+  equality (`A = B : type`).  Thus `A : type -> C` is an error (since
+  `type -> C` is illegal), while `A = B : type -> C` asserts that the
+  equality `A = B : type` implies `C`.
 
 - Note that `fn _ . M` and `fn . M` are two different terms.  The
   former is a lambda that ignores its argument, while the latter takes
@@ -134,7 +142,8 @@ Notes:
   implicit arguments.  It also allows the identifier to be any constant
   name, even if the name collides with a keyword.
 
-- An [antiquoted](iml.html#antiquote) internal term should have type `Term.term`.
+- An [antiquoted](iml.html#antiquote) internal term should have the
+  type `Term.term`.
 
 - A marker (`__`) is not a valid term in the logic.  It is a
   placeholder used by some tactics (*e.g.,* `so`).
