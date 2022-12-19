@@ -9,21 +9,21 @@ all : $(foreach i, $(UNITS), $(i).isto)
 
 docs : $(foreach i, $(DOCUNITS), ../docs/lib/$(i).md)
 
-%.isto : %.ist
+%.isto : %.ist %-aux.iml
 	$(ISTARI) $<
+
+%-load.iml : %.isto %-aux.iml
 
 ../docs/lib/%.md : %.md
 	$(PROCDOC) $< $@
 
-bar.isto : bar-aux.iml
-bool.isto : logic.isto
-datatype.isto : datatype-aux.iml acc.isto nat.isto nat-aux.iml
-decidable.isto : logic.isto bool.isto
-integer.isto : nat.isto acc.isto bool.isto decidable.isto stable.isto
-list.isto : list-aux.iml nat.isto nat-aux.iml datatype.isto
-logic.isto : logic-aux.iml
-nat.isto : nat-aux.iml acc.isto bool.isto decidable.isto stable.isto
-stable.isto : decidable.isto logic.isto
+bool.isto : logic.isto logic-aux.iml
+datatype.isto : acc.isto acc-aux.iml nat.isto nat-aux.iml
+decidable.isto : logic.isto logic-aux.iml bool.isto bool-aux.iml
+integer.isto : nat.isto nat-aux.iml acc.isto acc-aux.iml bool.isto bool-aux.iml decidable.isto decidable-aux.iml stable.isto stable-aux.iml
+list.isto : nat.isto nat-aux.iml datatype.isto
+nat.isto : acc.isto acc-aux.iml bool.isto bool-aux.iml decidable.isto decidable-aux.iml stable.isto stable-aux.iml
+stable.isto : decidable.isto decidable-aux.iml logic.isto logic-aux.iml
 
 clean :
 	rm -f *.isto

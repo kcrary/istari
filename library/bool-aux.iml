@@ -9,7 +9,99 @@ functor AfterIstrue () :> sig end =
    end
 
 
+signature BOOL_TACTIC =
+   sig
+
+      val boolCasePriority : ETerm.eterm -> Symbol.symbol option -> Tactic.priority Tactic.tacticm
+      val boolCaseRaw : ETerm.eterm -> Symbol.symbol option -> Tactic.tactic
+      val boolCase : ETerm.eterm -> Symbol.symbol option -> Tactic.tactic
+
+      (* for each (const, const') in the table
+
+         const is a boolean test
+         const' is a lemma whose result is: istrue (const ...) <-> A
+      *)
+      val booleanTests : Constant.constant ConstantTable.table
+
+   end
 
 
+functor BoolTacticFun () :> BOOL_TACTIC =
+   struct
+
+      structure D = Directory
+      structure H = ConstantTable
+      structure IP = IntroPattern
+      structure R = Rewrite
+      structure T = Term
+
+      open Tactic
+
+      val istrue_iff_eq_true = parseConstant /Bool.istrue_iff_eq_true/
+      val not_istrue_iff_eq_false = parseConstant /Bool.not_istrue_iff_eq_false/
+
+      val pat = IP.Or [IP.And [], IP.And []]
 
       
+      val booleanTests : Constant.constant H.table = H.table ()
+
+
+      fun rew dir const hyp =
+         R.rewritePriority
+            [(R.usingRew dir [] (ETerm.literal (T.Const const)),
+              [(hyp, SOME (false, [0]))])]
+
+
+      fun boolCasePriority em nameopt =
+         let
+            do (_, dir) = withgoal
+            val (varname, dir') = D.insistAndBind dir NONE
+            val (eqname, _) = D.insistAndBind dir' nameopt
+            val m = ETerm.withdir dir em
+
+            val rewtac =
+               (case Normalize.simplify m of
+                   T.Elim (T.Const const, _) =>
+                      (case H.find booleanTests const of
+                          SOME const' =>
+                             rew false const' eqname
+
+                        | NONE => idtacM Primary)
+
+                 | _ => idtacM Primary)
+         in
+            Generalize.rememberPriority 
+               (ETerm.literal m)
+               (ETerm.literal (T.Const Prim.bool))
+               (SOME varname) 
+               (SOME eqname)
+            >>!
+            EqualityTactic.symmetryInPriority eqname
+            >>!
+            Destruct.destructPriority varname pat
+            >>>!
+               [
+               rew true istrue_iff_eq_true eqname
+               >>!
+               rewtac,
+
+               rew true not_istrue_iff_eq_false eqname
+               >>!
+               rewtac
+               ]
+         end
+
+      
+      fun boolCaseRaw em nameopt = boolCasePriority em nameopt >> idtac
+
+      fun boolCase em nameopt = Typecheck.withTypecheckSnd (boolCasePriority em nameopt)
+
+   end
+
+
+grammardef BoolTactic
+
+   start boolCase Term OIdent
+   start boolCaseRaw Term OIdent
+
+end

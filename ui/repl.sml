@@ -2,8 +2,9 @@
 signature CTRL =
    sig
 
-      val load : string -> unit  (* load a compiled project *)
-      val use : string -> unit   (* load a file *)
+      val load : string -> unit     (* load a compiled project *)
+      val use : string -> unit      (* load a file *)
+      val import : string -> unit   (* load a file, but only once *)
       val escape : unit -> unit
       val exit : unit -> 'a
 
@@ -208,6 +209,7 @@ functor ReplFun (structure Platform : PLATFORM
             datatype command = 
                LOAD of string 
              | USE of string 
+             | IMPORT of string 
              | ESCAPE
       
             (* a stack of queues *)
@@ -219,6 +221,10 @@ functor ReplFun (structure Platform : PLATFORM
 
                  | q :: _ =>
                       IQueue.insert q command)
+
+            structure StringSet = RedBlackSet (structure Elem = StringOrdered)
+            
+            val imported : StringSet.set ref = ref StringSet.empty
 
 
             exception LoadError
@@ -334,8 +340,29 @@ functor ReplFun (structure Platform : PLATFORM
                          ))
                      (fn () => OS.FileSys.chDir olddir)
                end
-      
 
+
+            and import filename =
+               let
+                  val filename =
+                     Path.canonize filename
+                     handle Path.Path =>
+                        raise (Error.GeneralError ("bad path name " ^ filename))
+               in
+                  if StringSet.member (!imported) filename then
+                     ()
+                  else
+                     (
+                     imported := StringSet.insert (!imported) filename;
+
+                     (* This will end of canonizing filename again, but it doesn't seem like
+                        a big enough deal to do anything about it.
+                     *)
+                     ippuse filename
+                     )
+               end
+
+      
             and runCommands () =
                (case !commandQueues of
                    [] => raise (Fail "invariant")
@@ -365,6 +392,15 @@ functor ReplFun (structure Platform : PLATFORM
                                 commandQueues := IQueue.iqueue () :: !commandQueues;
 
                                 ippuse filename;
+                                runCommands ()
+                                )
+                
+                           | IMPORT filename =>
+                                (
+                                (* any commands here take precedence over those already in the queue *)
+                                commandQueues := IQueue.iqueue () :: !commandQueues;
+
+                                import filename;
                                 runCommands ()
                                 )
                 
@@ -552,7 +588,7 @@ functor ReplFun (structure Platform : PLATFORM
 
             val ctrlSig =
                makeStruct
-                  ["load", "use", "escape", "exit", "pwd", "cd",
+                  ["load", "use", "import", "escape", "exit", "pwd", "cd",
                    "printDepth", "printLength", "stringDepth",
                    "allowBeep", "primaryPrompt", "secondaryPrompt"]
       
@@ -659,6 +695,7 @@ functor ReplFun (structure Platform : PLATFORM
 
             fun load str = Repl.enqueue (Repl.LOAD str)
             fun use str = Repl.enqueue (Repl.USE str)
+            fun import str = Repl.enqueue (Repl.IMPORT str)
             fun escape () = Repl.enqueue Repl.ESCAPE
             fun exit () = OS.Process.exit OS.Process.success
       

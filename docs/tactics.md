@@ -677,45 +677,43 @@ The destruction tactics are:
 
 ### Generalization
 
-- `generalize /[term M]/ /[term A]/ /[name option]/`
+- `generalize /[term M]/ /[term A]/ /[name option x]/`
 
-  If `M : A`, replaces all occurrences of `M` in the conclusion with a
-  new hypothesis with the given name.  (A name is invented if no name
-  is supplied.)
+  If `M : A`, replaces all occurrences of `M` in the conclusion with
+  a new hypothesis`x`.  (A name is invented if no name is supplied.)
 
-  + `generalizeRaw /[term M]/ /[term A]/ /[name option]/`
+  + `generalizeRaw /[term M]/ /[term A]/ /[name option x]/`
 
     As `generalize` but does not invoke the typechecker.
 
-  + `generalizeAt /[term M]/ /[term A]/ /[numbers]/ /[name option]/`
+  + `generalizeAt /[term M]/ /[term A]/ /[numbers]/ /[name option x]/`
 
     As `generalize`, but only replaces the indicated appearances of
     `M`.  For example, if `[numbers]` is `0 2` then the first and
     third appearances of `M` are replaced.
 
-  + `generalizeAtRaw /[term M]/ /[term A]/ /[numbers]/ /[name option]/`
+  + `generalizeAtRaw /[term M]/ /[term A]/ /[numbers]/ /[name option x]/`
 
     As `generalizeAt` but does not invoke the typechecker.
 
 
-- `remember /[term M]/ /[term A]/ /[name option]/ /[eq name option]/`
+- `remember /[term M]/ /[term A]/ /[name option x]/ /[name option H]/`
 
   If `M : A`, replaces all occurrences of `M` in the conclusion with a
-  new hypothesis with the given name (say `x`).  Also creates a
-  hypothesis that equates `x` with `M`.  (Names are invented if not
-  supplied.)
+  new hypothesis with `x`.  Also creates `H : (x = M : A)`.  (Names are
+  invented if not supplied.)
 
-  + `rememberRaw /[term M]/ /[term A]/ /[name option]/ /[eq name option]/`
+  + `rememberRaw /[term M]/ /[term A]/ /[name option x]/ /[name option H]/`
 
     As `remember` but does not invoke the typechecker.
 
-  + `rememberAt /[term M]/ /[term A]/ /[numbers]/ /[name option]/ /[eq name option]/`
+  + `rememberAt /[term M]/ /[term A]/ /[numbers]/ /[name option x]/ /[name option H]/`
 
     As `remember`, but only replaces the indicated appearances of
     `M`.  For example, if `[numbers]` is `0 2` then the first and
     third appearances of `M` are replaced.
 
-  + `rememberAtRaw /[term M]/ /[term A]/ /[numbers]/ /[name option]/ /[eq name option]/`
+  + `rememberAtRaw /[term M]/ /[term A]/ /[numbers]/ /[name option x]/ /[name option H]/`
 
     As `rememberAt` but does not invoke the typechecker.
 
@@ -728,6 +726,19 @@ The destruction tactics are:
   + `setEqRaw /[name x]/ /[term M]/ /[term A]/ /[name option H]/`
 
     As `setEq` but does not invoke the typechecker.
+
+
+- `boolCase /[term M]/ /[name option H]/`
+
+  If `M : bool`, replaces all occurrences of `M` in the conclusion
+  with a new variable, then splits that variable into true and false
+  cases.  Also creates `H : istrue M` and `H : not (istrue M)` in the
+  branches and attempts to rewrite them into a useful form.  (The name
+  H is invented if not supplied.)
+
+  + `boolCaseRaw /[term M]/ /[name option H]/`
+
+    As `boolCase` but does not invoke the typechecker.
 
 
 
