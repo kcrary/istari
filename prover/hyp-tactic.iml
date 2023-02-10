@@ -25,6 +25,7 @@ signature HYP_TACTIC =
       val clearn : int -> tactic
       val clear : symbol list -> tactic
       val clearAll : tactic
+      val renameOver : symbol -> symbol -> tactic
 
       val exchange : int -> int -> int -> tactic
       val moven : int -> int -> tactic
@@ -313,6 +314,10 @@ structure HypTactic :> HYP_TACTIC =
          
       fun clear l = clearLoop (List.rev l)
 
+      fun renameOver from to = clear [to] >> rename from to
+         
+         
+
       val clearAll =
          let
             do (jud, _) = withgoal
@@ -404,7 +409,7 @@ structure HypTactic :> HYP_TACTIC =
          in
             (case J.hyp jud i of
                 J.Tm a =>
-                   refine (Rule.assert (T.Sub (a, T.Shift (i+1))) (T.evar ()))
+                   refine (Rule.assert' (T.Sub (a, T.Shift (i+1))) (T.evar ()))
                    >>> [
                        refine (Rule.hypothesis i),
        
@@ -526,7 +531,7 @@ structure HypTactic :> HYP_TACTIC =
             
 
       fun unhideHypMain a i =
-         refine (Rule.assert (T.Sub (a, T.Shift (i+1))) (T.evar ()))
+         refine (Rule.assert' (T.Sub (a, T.Shift (i+1))) (T.evar ()))
          >>> [
              Typecheck.trivializePriority
              >>!

@@ -327,3 +327,10 @@ it can be sensitive to subtle changes.  For example, this variation on
 the second reduction, though deceptively similar, is incorrect:
 
       length _ (cons a h t) --> succ (length a t) ;  (* incorrect *)
+
+The right-hand-side of a reduction should not contain an instance of
+the left-hand-side (even beneath a lambda).  Such a reduction (if
+valid) *will* be accepted, but it will result in normalization
+looping.  Since unification tries to avoid normalizing, the
+non-terminating behavior might not arise for some time, making its
+cause not obvious when it finally does.

@@ -30,7 +30,7 @@ structure Syntax =
        | Pnumber of int
        | Pstring of string
        | Pchar of char
-       | Pword of int
+       | Pword of IntInf.int
        | Ptuple of pat list  (* length >= 2 *)
        | Plist of pat list
        | Papp of longid * pat
@@ -49,7 +49,7 @@ structure Syntax =
        | Econstr of longid
        | Enumber of int
        | Ebignum of IntInf.int
-       | Eword of int
+       | Eword of IntInf.int
        | Estring of string
        | Echar of char
        | Elet of dec list * exp

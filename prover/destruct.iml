@@ -180,6 +180,8 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                        fail (String.concat ["identifier ", Symbol.toValue (Option.valOf vo), " is in use"]))
 
            | _ =>
+                refine (Rule.whnfHardHyp i)
+                >>+
                 let
                    do (jud, _) = withgoal
                 in
@@ -188,7 +190,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                           fail "nonexistent hypothesis"
 
                      | SOME (J.Tm a) =>
-                          (case N.whnfHard a of
+                          (case a of
                               T.Elim (T.Const const, _) =>
                                  (case H.find destructTactics const of
                                      SOME tac =>
@@ -900,6 +902,7 @@ grammardef IntroPattern
    rule IntroPatternAtom ::= "_" => wild
    rule IntroPatternAtom ::= "?" => auto
    rule IntroPatternAtom ::= Ident => ident
+   rule IntroPatternAtom ::= EMBED => ident
    rule IntroPatternAtom ::= "(" IntroPattern ")" => identity
    rule IntroPatternAtom ::= "[" IntroPatterns "]" => tuple
    rule IntroPatternAtom ::= "{" IntroPatternArms "}" => cotuple

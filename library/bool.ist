@@ -227,6 +227,20 @@ qed ();
 
 
 
+define /impb b c/
+/
+  if b then c else true
+//
+  bool -> bool -> bool
+/;
+
+introOf /b c/.
+unfold /impb/.
+typecheck.
+qed ();
+
+
+
 reductions
 /
   notb (true) --> false ;
@@ -235,8 +249,26 @@ reductions
   andb (false) _ --> false ;
   orb (true) _ --> true ;
   orb (false) b --> b ;
-  unfolding notb andb orb
+  impb (true) b --> b ;
+  impb (false) _ --> true ;
+  unfolding notb andb orb impb
 /;
+
+
+val notb_tru =
+  makeReduction2
+  / notb (true) --> false ;
+    unfolding notb
+  /;
+
+val notb_fals =
+  makeReduction2
+  / notb (false) --> true ;
+    unfolding notb
+  /;
+
+Registry.write (parseIdent /notb_tru/) (Registry.fromUreduction2 notb_tru);
+Registry.write (parseIdent /notb_fals/) (Registry.fromUreduction2 notb_fals);
 
 
 
@@ -267,6 +299,30 @@ qed ();
 lemma "notb_orb"
 /
   forall b c . notb (orb b c) = andb (notb b) (notb c) : bool
+/;
+
+inference.
+intro /b c/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> reduce // >> reflexivity.
+qed ();
+
+
+
+lemma "notb_impb"
+/
+  forall b c . notb (impb b c) = andb b (notb c) : bool
+/;
+
+inference.
+intro /b c/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> reduce // >> reflexivity.
+qed ();
+
+
+
+lemma "impb_as_orb"
+/
+  forall b c . impb b c = orb (notb b) c : bool
 /;
 
 inference.
@@ -319,6 +375,19 @@ lemma "orb_assoc"
 /
   forall b c d .
     orb (orb b c) d = orb b (orb c d) : bool
+/;
+
+inference.
+intro /b c d/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> destruct /d/ /|/ >> reduce // >> auto.
+qed ();
+
+
+
+lemma "impb_curry"
+/
+  forall b c d .
+    impb (andb b c) d = impb b (impb c d) : bool
 /;
 
 inference.
@@ -382,6 +451,19 @@ qed ();
 
 
 
+lemma "impb_id_l"
+/
+  forall b .
+    impb true b = b : bool
+/;
+
+inference.
+intro /b/.
+reflexivity.
+qed ();
+
+
+
 lemma "andb_ann_l"
 /
   forall (b : bool) .
@@ -430,6 +512,32 @@ inference.
 intro /b/.
 rewrite /-> orb_commute/.
 reflexivity.
+qed ();
+
+
+
+lemma "impb_ann_l"
+/
+  forall (b : bool) .
+    impb false b = true : bool
+/;
+
+inference.
+intro /b/.
+reflexivity.
+qed ();
+
+
+
+lemma "impb_ann_r"
+/
+  forall b .
+    impb b true = true : bool
+/;
+
+inference.
+intro /b/.
+destruct /b/ /|/ >> auto.
 qed ();
 
 
@@ -522,4 +630,40 @@ intro /b c/.
 unfold /istrue at all/.
 destruct /b/ /|/ >> destruct /c/ /|/ >> reduce // >> split >> auto.
 intro /(0 | 0)/.
+qed ();
+
+
+
+lemma "istrue_impb"
+/
+  forall b c .
+    istrue (impb b c) <-> (istrue b -> istrue c)
+/;
+
+inference.
+intro /b c/.
+unfold /istrue at all/.
+destruct /b/ /|/ >> destruct /c/ /|/ >> reduce // >> split >> auto.
+qed ();
+
+
+
+lemma "istrue_true_iff"
+/
+  istrue true <-> unit
+/;
+
+unfold /istrue/.
+reflexivity.
+qed ();
+
+
+
+lemma "istrue_false_iff"
+/
+  istrue false <-> void
+/;
+
+unfold /istrue/.
+reflexivity.
 qed ();

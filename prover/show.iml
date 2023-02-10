@@ -43,8 +43,8 @@ signature UNPARSING =
 
       (* Tables *)
 
-      (* arity, precedence, unparser *)
-      val unparsingTable : (int * int * content unparser) ConstantTable.table
+      (* arity, precedence, enabled, unparser *)
+      val unparsingTable : (int * int * bool ref * content unparser) ConstantTable.table
 
       (* quote these constants *)
       val reserved : SymbolSet.set ref
@@ -79,6 +79,8 @@ signature SHOW =
       val showImplicits : bool ref
       val showLiteralBinders : bool ref
       val showVeryLiteral : bool ref
+
+      val enable : Constant.constant -> bool -> unit
 
    end
 
@@ -424,8 +426,16 @@ structure Show :> SHOW =
 
       structure H = ConstantTable
 
-      (* arity, precedence, unparser *)
-      val unparsingTable : (int * int * content unparser) H.table = H.table ()
+      (* arity, precedence, unparser, enabled *)
+      val unparsingTable : (int * int * bool ref * content unparser) H.table = H.table ()
+
+      fun enable const enabled =
+         let
+            val (_, _, r, _) = H.lookup unparsingTable const
+         in
+            r := enabled
+         end
+                
 
       val showSubstitutions = ref false
       val showImplicits = ref false
@@ -481,28 +491,31 @@ structure Show :> SHOW =
 
            | T.Const const =>
                 (case H.find unparsingTable const of
-                    SOME (arity, kprec, unp) =>
-                       (case List.splitOpt spine arity of
-                           NONE =>
-                              showRootSpine pp margin dir prec m T.id spine
-
-                         | SOME (spine1, spine2) =>
-                              (try
-                                  let
-                                     val c = unp true margin dir (T.Elim (T.Const const, spine1))
-                                  in
-                                     showWithSpine pp margin dir prec spine2
-                                     (fn prec' =>
-                                         (
-                                         lparen pp prec' kprec;
-                                         PP.openBox pp PP.Consistent indent;
-                                         c pp;
-                                         PP.closeBox pp;
-                                         rparen pp prec' kprec
-                                         ))
-                                  end
-                               with
-                                  NoMatch => showRootSpine pp margin dir prec m T.id spine))
+                    SOME (arity, kprec, enabled, unp) =>
+                       if !enabled then
+                          (case List.splitOpt spine arity of
+                              NONE =>
+                                 showRootSpine pp margin dir prec m T.id spine
+   
+                            | SOME (spine1, spine2) =>
+                                 (try
+                                     let
+                                        val c = unp true margin dir (T.Elim (T.Const const, spine1))
+                                     in
+                                        showWithSpine pp margin dir prec spine2
+                                        (fn prec' =>
+                                            (
+                                            lparen pp prec' kprec;
+                                            PP.openBox pp PP.Consistent indent;
+                                            c pp;
+                                            PP.closeBox pp;
+                                            rparen pp prec' kprec
+                                            ))
+                                     end
+                                  with
+                                     NoMatch => showRootSpine pp margin dir prec m T.id spine))
+                       else
+                          showRootSpine pp margin dir prec m T.id spine
 
                   | NONE =>
                        showRootSpine pp margin dir prec m T.id spine)

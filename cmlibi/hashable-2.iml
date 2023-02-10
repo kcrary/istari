@@ -1,0 +1,26 @@
+
+structure IntInfHashable
+   :> HASHABLE where type t = IntInf.int
+   =
+   struct
+      type t = IntInf.int
+
+      fun eq (x, y) = IntInf.= x y
+
+      val mask = IntInf.- (IntInf.shl 1I Word.wordSize) 1I
+
+      fun hashloop n acc =
+         if IntInf.= n 0I then
+            acc
+         else
+            hashloop 
+               (IntInf.shr n Word.wordSize)
+               (JenkinsHash.hashInc acc (Word.fromLargeInt (IntInf.andb n mask)))
+
+      fun hash n =
+         if IntInf.>= n 0I then
+            hashloop n 0w1
+         else
+            hashloop (IntInf.~ n) 0w2
+
+   end

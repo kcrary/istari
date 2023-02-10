@@ -26,6 +26,19 @@ module Int : INTEGER with type int = int =
       let min x y = if x < y then x else y
       let max x y = if x > y then x else y
       let abs = Int.abs
+
+      let divmod x y =
+         let q = Int.div x y 
+         in
+         let r = Int.rem x y
+         in
+            if r >= 0 then
+               (q, r)
+            else if y >= 0 then
+               (q - 1, r + y)
+            else
+               (q + 1, r - y)
+
       let s__e = Int.equal
       let s__LG x y = not (Int.equal x y)
       let s__L = (<) 
@@ -34,7 +47,13 @@ module Int : INTEGER with type int = int =
       let (>=) = (>=) 
       let compare = Order.intCompare
 
-      let toString = Int.to_string
+      let toStringStd = Int.to_string
+
+      let toString x =
+         if x < 0 then
+            "~" ^ Int.to_string (- x)
+         else
+            Int.to_string x
 
       let fromInt x = x
       let toInt x = x
@@ -65,7 +84,15 @@ module IntInf : INT_INF with type int = Z.t =
       let (>=) = Z.geq
       let compare = Order.intInfCompare
 
-      let toString = Z.to_string
+      let toStringStd = Z.to_string
+
+      let toString x =
+         if Z.lt x Z.zero then
+            "~" ^ Z.to_string (Z.neg x)
+         else
+            Z.to_string x
+
+      let divmod = Z.ediv_rem
 
       let fromInt = Z.of_int
       let toInt = Z.to_int

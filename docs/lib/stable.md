@@ -20,9 +20,9 @@
 
     decidable_impl_stable : forall (i : level) (P : U i) . Decidable.decidable P -> stable P
 
-    eq_bool_stable : forall (b c : bool) . stable (b = c : bool)
+    stable_eq_bool : forall (b c : bool) . stable (b = c : bool)
 
-    istrue_stable : forall (b : bool) . stable (Bool.istrue b)
+    stable_istrue : forall (b : bool) . stable (Bool.istrue b)
 
     dneg_elim_if_stable : forall (i j : level) (P : U i) (Q : U j) .
                              stable Q -> not (not P) -> (P -> Q) -> Q

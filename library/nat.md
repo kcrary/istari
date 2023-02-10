@@ -94,17 +94,12 @@ Strong induction for natural numbers:
     lt_well_founded : type:lt_well_founded
 
 
-### Addition and Subtraction
+### Addition
 
     plus : type:plus
 
     plus (zero) n --> n
     plus (succ m) n --> succ (plus m n)
-
-    minus : type:minus
-
-    minus m (zero) --> m
-    minus m (succ n) --> natcase m zero (fn m' . minus m' n)
 
     plus_0_l : type:plus_0_l
 
@@ -132,13 +127,29 @@ Strong induction for natural numbers:
 
     plus_lt_r : type:plus_lt_r
 
+    plus_cancel_l : type:plus_cancel_l
+
+    plus_cancel_l_eq : type:plus_cancel_l_eq
+
+    plus_cancel_r : type:plus_cancel_r
+
+    plus_cancel_r_eq : type:plus_cancel_r_eq
+
+    plus_compat : type:plus_compat
+
+
+### Subtraction
+
+    minus : type:minus
+
+    minus m (zero) --> m
+    minus m (succ n) --> natcase m zero (fn m' . minus m' n)
+
     plus_minus_cancel_l : type:plus_minus_cancel_l
 
     plus_minus_cancel_r : type:plus_minus_cancel_r
 
-    plus_cancel_l : type:plus_cancel_l
-
-    plus_cancel_r : type:plus_cancel_r
+    minus_swap : type:minus_swap
 
     minus_plus_cancel : type:minus_plus_cancel
 
@@ -166,14 +177,81 @@ Strong induction for natural numbers:
 
     plus_minus_assoc : type:plus_minus_assoc
 
-    plus_compat : type:plus_compat
+    plus_minus_assoc_swap : type:plus_minus_assoc_swap
+
+    minus_plus_assoc : type:minus_plus_assoc
 
     minus_compat : type:minus_compat
+
+
+### Multiplication
+
+    times : type:times
+
+    times (zero) _ --> zero ;
+    times (succ m) n --> plus n (times m n) ;
+
+    times_0_l : type:times_0_l
+
+    times_0_r : type:times_0_r
+
+    times_1_l : type:times_1_l
+
+    times_1_r : type:times_1_r
+
+    times_commute : type:times_commute
+
+    times_assoc : type:times_assoc
+
+    times_dist_succ_r : type:times_dist_succ_r
+
+    times_dist_plus_l : type:times_dist_plus_l
+
+    times_dist_plus_r : type:times_dist_plus_r
+
+    times_leq : type:times_leq
+
+    times_dist_minus_l : type:times_dist_minus_l
+
+    times_dist_minus_r : type:times_dist_minus_r
+
+    nat_integral_domain : type:nat_integral_domain
+
+    times_compat : type:times_compat
+
+
+### Minimum
+
+    min : type:min
+
+    min_commute : type:min_commute
+
+    min_assoc : type:min_assoc
+
+    min_ann_l : type:min_ann_l
+
+    min_ann_r : type:min_ann_r
+
+    min_succ : type:min_succ
+
+    min_leq_l : type:min_leq_l
+
+    min_leq_r : type:min_leq_r
+
+    min_glb : type:min_glb
+
+    min_eq_l : type:min_eq_l
+
+    min_eq_r : type:min_eq_r
 
 
 ### Maximum
 
     max : type:max
+
+    max_commute : type:max_commute
+
+    max_assoc : type:max_assoc
 
     max_id_l : type:max_id_l
 
@@ -227,3 +305,5 @@ Strong induction for natural numbers:
     nat_trichotomy : type:nat_trichotomy
 
     nat_dichotomy : type:nat_dichotomy
+
+    nat_dichotomy_neq : type:nat_dichotomy_neq

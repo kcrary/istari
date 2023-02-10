@@ -1,0 +1,61 @@
+
+Ctrl.import "acc-load.iml";
+
+
+beginModule "Relations";
+
+
+define /lexrel {a b} Q R x y/
+/
+  Q (x #1) (y #1)
+  % x #1 = y #1 : a & R (x #2) (y #2)
+//
+  intersect i .
+  forall (a b : U i) (Q : a -> a -> U i) (R : b -> b -> U i) (x y : a & b) .
+  U i
+/;
+
+inference.
+unfold /lexrel/.
+typecheck.
+qed ();
+
+
+
+lemma "lexrel_well_founded"
+/
+  forall i (a b : U i) (Q : a -> a -> U i) (R : b -> b -> U i) .
+    (forall x . Acc a Q x)
+    -> (forall x . Acc b R x)
+    -> forall x . Acc (a & b) (lexrel Q R) x
+/;
+
+inference.
+intro /i a b Q R HwfQ HwfR/.
+assert /forall x y . Acc (a & b) (lexrel Q R) (x , y)/ /H/.
+1:{
+  intro /(x y)/.
+  apply /H/.
+  }
+intro /x/.
+so /HwfQ x/ /H/.
+induct /H/.
+reintro /IHa/.
+intro /y/.
+so /HwfR y/ /H/.
+induct /H/.
+reintro /IHb/.
+apply /Acc.Acc_intro/.
+intro /(v w) Hlt/.
+unfold /lexrel in Hlt/.
+reduce /Hlt/.
+destruct /Hlt/ /Hlt | (Heq Hlt)/.
+  {
+  apply /IHa/ >> auto.
+  }
+subst /v/.
+apply /IHb/ >> auto.
+qed ();
+
+
+endModule ();

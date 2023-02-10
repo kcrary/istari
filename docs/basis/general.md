@@ -7,7 +7,7 @@
           type exn = Pervasive.exn
           type unit = Pervasive.unit
        
-          val (!) : 'a ref -> 'a
+          val ! : 'a ref -> 'a
           val (:=) : 'a ref -> 'a -> unit 
           val ($) : ('a -> 'b) -> 'a -> 'b
     

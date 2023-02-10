@@ -207,7 +207,7 @@ functor CodegenSmlFun (Output : OUTPUT) :> CODEGEN =
            | Pword n =>
                 (
                 write "(0w";
-                write (Int.toString n);
+                write (IntInf.toString n);
                 write " : Basis.Word.word)"
                 )
 
@@ -508,7 +508,7 @@ functor CodegenSmlFun (Output : OUTPUT) :> CODEGEN =
            | Eword n =>
                 (
                 write "(0w";
-                write (Int.toString n);
+                write (IntInf.toString n);
                 write " : Basis.Word.word)"
                 )
 

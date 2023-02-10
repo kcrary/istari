@@ -49,6 +49,12 @@ signature RULE =
       val unreduceHypAt : int -> int -> Judgement.hyp -> term -> Reduction.reduction -> rule
 
 
+      val whnfHardHyp : int -> rule
+      val whnfHardConcl : rule
+      val normalizeHyp : int -> rule
+      val normalizeConcl : rule
+
+
       val checkPositive : rule
       val checkNegative : rule
 
@@ -723,6 +729,43 @@ structure Rule :> RULE =
              end)
                    
     
+
+      fun whnfHardHyp i =
+         ("whnfHardHyp",
+          fn jud =>
+             let
+                val (c, f) = onhypTm jud i
+             in
+                ([f (N.whnfHard c)],
+                 fn1 (fn m => m))
+             end)
+
+
+      val whnfHardConcl =
+         ("whnfHardConcl",
+          fn jud =>
+             ([J.make (J.context jud) (N.whnfHard (J.concl jud))],
+              fn1 (fn m => m)))
+
+
+      fun normalizeHyp i =
+         ("normalizeHyp",
+          fn jud =>
+             let
+                val (c, f) = onhypTm jud i
+             in
+                ([f (N.normalize c)],
+                  fn1 (fn m => m))
+             end)
+
+
+      val normalizeConcl =
+         ("normalizeConcl",
+          fn jud =>
+             ([J.make (J.context jud) (N.normalize (J.concl jud))],
+              fn1 (fn m => m)))
+
+
 
       (* true <=> positive; p = punder^i (undef . id);
          q = undef .. undef (i times) . id

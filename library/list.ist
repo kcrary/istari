@@ -1,4 +1,5 @@
 
+Ctrl.import "logic-load.iml";
 Ctrl.import "nat-load.iml";
 Ctrl.import "datatype-load.iml";
 Ctrl.import "list-aux.iml";
@@ -75,6 +76,9 @@ qed ();
 recordTyping "list_case_type";
 
 
+
+
+(* Append *)
 
 defineRaw /append {a} l1 l2/
 /
@@ -170,6 +174,8 @@ qed ();
 
 
 
+(* Length *)
+
 definerec /length {a} l/
 /
   list_case l 0 (fn _ t . succ (length a t))
@@ -244,6 +250,349 @@ intro /h t IH/.
 compat.
 hyp /IH/.
 }
+qed ();
+
+
+
+
+(* Fold *)
+
+define /foldr {a b} z f l/
+/
+  list_iter a (fn _ . b) z (fn x _ y . f x y) l
+//
+  intersect i .
+  forall (a b : U i) .
+    b
+    -> (a -> b -> b)
+    -> list a
+    -> b
+/;
+
+introOf /i a b z f l/.
+unfold /foldr/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  foldr _ _ z _ (nil _) --> z ;
+  foldr a b z f (cons _ h t) --> f h (foldr a b z f t) ;
+  unfolding foldr
+/;
+
+
+
+
+(* Map *)
+
+define /map {a b} f l/
+/
+  list_iter a (fn _ . list b) nil (fn h _ t . f h :: t) l
+//
+  intersect i .
+  forall (a b : U i) . (a -> b) -> list a -> list b
+/;
+
+introOf /i a b f l/.
+unfold /map/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  map _ b _ (nil _) --> nil b ;
+  map a b f (cons _ h t) --> cons b (f h) (map a b f t) ;
+  unfolding map
+/;
+
+
+
+lemma "map_compose"
+/
+  forall i (a b c : U i) (f : b -> c) (g : a -> b) l .
+    map f (map g l) = map (fn x . f (g x)) l : list c
+/;
+
+inference.
+intro /i a b c f g l/.
+iterate /l/ >> auto.
+qed ();
+
+
+
+(* Forall/Exists/In *)
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    forall (a : U i) (P : a -> U i) .
+    U i
+  of
+    Forall : list a -> type =
+    | Forall_nil : Forall nil
+    | Forall_cons : forall h t . P h -> Forall t -> Forall (h :: t)
+/;
+
+Database.setImplicits (parseConstant /Forall/) 1;
+Database.setImplicits (parseConstant /Forall_nil/) 1;
+Database.setImplicits (parseConstant /Forall_cons/) 1;
+
+
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    forall (a : U i) (P : a -> U i) .
+    U i
+  of
+    Exists : list a -> type =
+    | Exists_hit : forall h t . P h -> Exists (h :: t)
+    | Exists_miss : forall h t . Exists t -> Exists (h :: t)
+/;
+
+Database.setImplicits (parseConstant /Exists/) 1;
+Database.setImplicits (parseConstant /Exists_hit/) 1;
+Database.setImplicits (parseConstant /Exists_miss/) 1;
+
+
+
+lemma "Forall_as_foldr"
+/
+  forall i (a : U i) (P : a -> U i) l .
+    Forall P l 
+    <->
+    foldr unit (fn h Q . P h & Q) l
+/;
+
+inference.
+intro /i a P l/.
+split.
+  {
+  intro /H/.
+  iterate /H/ >> auto.
+  intro /h t IH Hh Ht/.
+  auto.
+  }
+
+  {
+  iterate /l/.
+    {
+    intro /_/.
+    apply /Forall_nil/.
+    }
+  
+    {
+    intro /h t IH (Hh Ht)/.
+    apply /Forall_cons/ >> auto.
+    }
+  }
+qed ();
+
+
+
+lemma "Exists_as_foldr"
+/
+  forall i (a : U i) (P : a -> U i) l .
+    Exists P l 
+    <->
+    foldr void (fn h Q . P h % Q) l
+/;
+
+inference.
+intro /i a P l/.
+split.
+  {
+  intro /H/.
+  iterate /H/ >> auto.
+  }
+
+  {
+  iterate /l/.
+    {
+    intro /0/.
+    }
+  
+    {
+    intro /h t IH (HP | H)/.
+      {
+      apply /Exists_hit/ >> auto.
+      }
+
+      {
+      apply /Exists_miss/ >> auto.
+      }
+    }
+  }
+qed ();
+
+
+
+
+definerec /In a x l/
+/
+  `list_case a bogus l void (fn h t . x = h : a % In a x t)
+//
+  intersect i . forall (a : U i) . a -> list a -> U i
+/;
+
+introOf /i a x l/.
+induct /l/.
+reintro /IH/.
+destruct /l/ /| h t/.
+  {
+  unroll /In/.
+  typecheck.
+  }
+unroll /In/.
+typecheck.
+apply /IH/.
+apply /cons_subterm/.
+qed ();
+
+
+
+reductions
+/
+  In _ _ (nil _) --> void ;
+  In a x (cons _ h t) --> x = h : a % In a x t ;
+  unrolling In
+/;
+
+
+
+lemma "In_as_exists"
+/
+  forall i (a : U i) x l .
+    In a x l
+    <->
+    Exists (fn y . x = y : a) l
+/;
+
+inference.
+intro /i a x l/.
+split.
+  {
+  iterate /l/.
+    {
+    intro /0/.
+    }
+  intro /h t IH Hin/.
+  destruct /Hin/ /Heq | Hin/ >> autoWith /Exists_hit Exists_miss/.
+  }
+
+  {
+  intro /H/.
+  iterate /H/.
+    {
+    intro /h t Heq/.
+    left >> auto.
+    }
+
+    {
+    intro /h t _ IH/.
+    right >> auto.
+    }
+  }
+qed ();
+
+
+
+lemma "Forall_forall"
+/
+  forall i (a : U i) (P : a -> U i) l .
+    Forall P l
+    <->
+    (forall x . In a x l -> P x)
+/;
+
+inference.
+intro /i a P l/.
+split.
+  {
+  intro /H/.
+  iterate /H/.
+    {
+    intro /? 0/.
+    }
+  intro /h t Hh _ IH x Hin/.
+  destruct /Hin/ /Heq | Hin/.
+    {
+    subst /x/.
+    auto.
+    }
+
+    {
+    apply /IH/ >> auto.
+    }
+  }
+
+  {
+  iterate /l/.
+    {
+    intro /_/.
+    apply /Forall_nil/.
+    }
+  intro /h t IH H/.
+  apply /Forall_cons/ >> auto.
+  }
+qed ();
+
+  
+
+lemma "Exists_exists"
+/
+  forall i (a : U i) (P : a -> U i) l .
+    Exists P l
+    <->
+    (exists x . In a x l & P x)
+/;
+
+inference.
+intro /i a P l/.
+split.
+  {
+  intro /H/.
+  iterate /H/.
+    {
+    intro /h t Hh/.
+    exists /h/.
+    auto.
+    }
+
+    {
+    intro /h t _ IH/.
+    destruct /IH/ /x Hin Hx/.
+    exists /x/.
+    split >> auto.
+    }
+  }
+
+  {
+  iterate /l/.
+    {
+    intro /(? 0 ?)/.
+    }
+  intro /h t IH (x Hin Hx)/.
+  destruct /Hin/ /Heq | Hin/.
+    {
+    subst /x/.
+    apply /Exists_hit/ >> auto.
+    }
+
+    {
+    apply /Exists_miss/.
+    apply /IH/.
+    exists /x/.
+    auto.
+    }
+  }
 qed ();
 
 

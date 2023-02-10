@@ -30,6 +30,8 @@ module type INTEGER =
       val max : int -> int -> int
       val abs : int -> int
 
+      val divmod : int -> int -> int * int
+
       val s__e : int -> int -> bool
       val s__LG : int -> int -> bool
       val s__L : int -> int -> bool
@@ -39,6 +41,7 @@ module type INTEGER =
       val compare : int -> int -> Order.order
 
       val toString : int -> string
+      val toStringStd : int -> string
       val toInt : int -> prim__int
       val fromInt : prim__int -> int
 

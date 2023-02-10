@@ -23,6 +23,8 @@ example, zero is ``z`0``.
 
     neq_0_1 : type:neq_0_1
 
+    neq_0_neg1 : type:neq_0_neg1
+
     plusz_commute : type:plusz_commute
 
     plusz_assoc : type:plusz_assoc
@@ -38,6 +40,18 @@ example, zero is ``z`0``.
     negz_invol : type:negz_invol
 
     negz_plusz : type:negz_plusz
+
+    plusz_cancel_l : type:plusz_cancel_l
+
+    plusz_cancel_r : type:plusz_cancel_r
+
+    plusz_shift_l : type:plusz_shift_l
+
+    plusz_shift_r : type:plusz_shift_r
+
+    plusz_shift_lr : type:plusz_shift_lr
+
+    plusz_shift_rl : type:plusz_shift_rl
 
     plusz_compat : type:plusz_compat
 
@@ -81,15 +95,45 @@ This one gives transitivity in the form needed for rewriting:
 
     ltz_leqz_trans : type:ltz_leqz_trans
 
+    ltz_succ : type:ltz_succ
+
+    leqz_succ : type:leqz_succ
+
     plusz_leqz : type:plusz_leqz
 
     plusz_cancel_leqz_l : type:plusz_cancel_leqz_l
 
     plusz_cancel_leqz_r : type:plusz_cancel_leqz_r
 
-    plus_cancel_leq_leq_l : type:plus_cancel_leq_leq_l
+    plusz_cancel_leqz_leqz_l : type:plusz_cancel_leqz_leqz_l
 
-    plus_cancel_leq_leq_r : type:plus_cancel_leq_leq_r
+    plusz_cancel_leqz_leqz_r : type:plusz_cancel_leqz_leqz_r
+
+    plusz_shift_leqz_l : type:plusz_shift_leqz_l
+
+    plusz_shift_leqz_r : type:plusz_shift_leqz_r
+
+    plusz_shift_leqz_lr : type:plusz_shift_leqz_lr
+
+    plusz_shift_leqz_rl : type:plusz_shift_leqz_rl
+
+    plusz_ltz_l : type:plusz_ltz_l
+
+    plusz_ltz_r : type:plusz_ltz_r
+
+    plusz_ltz : type:plusz_ltz
+
+    plusz_cancel_ltz_l : type:plusz_cancel_ltz_l
+
+    plusz_cancel_ltz_r : type:plusz_cancel_ltz_r
+
+    plusz_shift_ltz_l : type:plusz_shift_ltz_l
+
+    plusz_shift_ltz_r : type:plusz_shift_ltz_r
+
+    plusz_shift_ltz_lr : type:plusz_shift_ltz_lr
+
+    plusz_shift_ltz_rl : type:plusz_shift_ltz_rl
 
     negz_leqz : type:negz_leqz
 
@@ -104,6 +148,15 @@ This one gives transitivity in the form needed for rewriting:
     not_ltz : type:not_ltz
 
     ltz_from_leqz_neq : type:ltz_from_leqz_neq
+
+    ltz_as_leqz_l : type:ltz_as_leqz_l
+
+    ltz_as_leqz_r : type:ltz_as_leqz_r
+
+    leqz_as_ltz_l : type:leqz_as_ltz_l
+
+    leqz_as_ltz_r : type:leqz_as_ltz_r
+
 
 
 ### Effective comparisons
@@ -163,11 +216,15 @@ positive case that works upwards.
 
     nat_to_integer_mono : type:nat_to_integer_mono
 
+    nat_to_integer_mono_lt : type:nat_to_integer_mono_lt
+
     plus_to_integer : type:plus_to_integer
 
     integer_to_nat_succ : type:integer_to_nat_succ
 
     integer_to_nat_mono : type:integer_to_nat_mono
+
+    integer_to_nat_mono_lt : type:integer_to_nat_mono_lt
 
     plusz_to_nat : type:plusz_to_nat
 
@@ -195,3 +252,81 @@ positive case that works upwards.
     integer_trichotomy : type:integer_trichotomy
 
     integer_dichotomy : type:integer_dichotomy
+
+    integer_dichotomy_neq : type:integer_dichotomy_neq
+
+
+### Multiplication
+
+    (* *z *)
+    timesz : type:timesz
+
+    timesz_id_l : type:timesz_id_l
+
+    timesz_id_r : type:timesz_id_r
+
+    timesz_ann_l : type:timesz_ann_l
+
+    timesz_ann_r : type:timesz_ann_r
+
+    timesz_commute : type:timesz_commute
+
+    timesz_assoc : type:timesz_assoc
+
+    timesz_dist_plusz_l : type:timesz_dist_plusz_l
+
+    timesz_dist_plusz_r : type:timesz_dist_plusz_r
+
+    negz_dist_timesz_l : type:negz_dist_timesz_l
+
+    negz_dist_timesz_r : type:negz_dist_timesz_r
+
+    negz_as_timesz : type:negz_as_timesz
+
+    timesz_leqz : type:timesz_leqz
+
+    (* an alias for timesz_leqz *)
+    timesz_leqz_pos_pos : type:timesz_leqz_pos_pos
+
+    timesz_leqz_neg_neg : type:timesz_leqz_neg_neg
+
+    timesz_leqz_pos_neg : type:timesz_leqz_pos_neg
+
+    timesz_leqz_neg_pos : type:timesz_leqz_neg_pos
+
+    timesz_leqz_l : type:timesz_leqz_l
+
+    timesz_leqz_r : type:timesz_leqz_r
+
+    timesz_leqz_l_neg : type:timesz_leqz_l_neg
+
+    timesz_leqz_r_neg : type:timesz_leqz_r_neg
+
+    timesz_ltz_zero : type:timesz_ltz_zero
+
+    (* an alias for timesz_ltz_zero *)
+    timesz_ltz_zero_pos_pos : type:timesz_ltz_zero_pos_pos
+
+    timesz_ltz_zero_pos_neg : type:timesz_ltz_zero_pos_neg
+
+    timesz_ltz_zero_neg_pos : type:timesz_ltz_zero_neg_pos
+
+    timesz_ltz_zero_neg_neg : type:timesz_ltz_zero_neg_neg
+
+    integer_integral_domain : type:integer_integral_domain
+
+    timesz_ltz_zero_invert : type:timesz_ltz_zero_invert
+
+    times_to_integer : type:times_to_integer
+
+    timesz_ltz_l : type:timesz_ltz_l
+
+    timesz_ltz_r : type:timesz_ltz_r
+
+    timesz_cancel_leqz_l : type:timesz_cancel_leqz_l
+
+    timesz_cancel_leqz_r : type:timesz_cancel_leqz_r
+
+    timesz_cancel_leqz_l_remainder : type:timesz_cancel_leqz_l_remainder
+
+    timesz_cancel_leqz_r_remainder : type:timesz_cancel_leqz_r_remainder

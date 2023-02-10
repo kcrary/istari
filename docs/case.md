@@ -444,38 +444,65 @@ The full collection of entry points is:
 ##### The matcher grammar
 
 The grammar for matchers is as follows.  Capitalized words are
-nonterminals; lower case words are keywords.  The `alt` productions
-have lowest precedence, then `seq`, then `wrap` and `wrapk`.  The
-remaining productions are at equal precedence.  All productions are
-right associative where relevant.
+nonterminals; lower case words are keywords.
+
+Forms are listed in increasing order of precedence.  Grouped forms
+have the same precedence.  A subterm at the same level of precedence
+is given in brackets.  For example, `Match ; [Match]` indicates that
+`seq` is right associative.
 
     Match ::=
       Match | ... | Match                                (alt, length at least 2)
       | Match | ... | Match                              (alt, length at least 2)
-      Match ; Match                                      (seq)
+
+      Match ; [Match]                                    (seq)
+
       Match => \ ... antiquoted function ... \           (wrap)
       Match =!> \ ... antiquoted function ... \          (wrapk)
+
       $lit \ ... antiquoted matcher ... \
-      $as Match                                          (az)
-      $az Match                                          (az)
+      $as [Match]                                        (az)
+      $az [Match]                                        (az)
       $use \ ... antiquoted rmatcher ... \               (use)
+
+      ----------------   terms    ----------------
+      Match @ [Match]                                    (elim)
+      Constant Spine                                     (elim/constant, length at least 1)
+      \ ... antiquoted constant ... \ Spine              (elim/constant, length at least 1)
+      $var \ ... antiquoted index ... \ Spine            (elim/var, length at least 1)
+      fn . [Match]                                       (lam)
+      fn ? . [Match]                                     (lamb)
+      next [Match]                                       (next)
+      $marker \ ... antiquoted symbol ... \              (marker)
+      $unify \ ... antiquoted term ... \                 (unify)
+      $whnf [Match]                                      (whnf)
+      $whnfHard [Match]                                  (whnfHard)
+      ----------------   spines   ----------------
+      $nil                                               (null)
+      $ap Match [Match]                                  (app)
+      #1 [Match]                                         (pi1)
+      #2 [Match]                                         (pi2)
+      #prev [Match]                                      (prev)
+      ---------------- hypotheses ----------------
+      $tm [Match]                                        (tm)
+      $tml [Match]                                       (tml)
+      $tmh [Match]                                       (tmh)
+      $tp [Match]                                        (tp)
+      $tpl [Match]                                       (tpl)
+      $let [Match]                                       (lett)
+      ----------------  contexts  ----------------
+      $hyp Number [Match]                                (hyp)      
+      $hyp \ ... antiquoted number ... \ [Match]         (hyp)
+      $anyhyp [Match]                                    (anyhyp)
+
       ( Match )
       _                                                  (wild)
       ?                                                  (what)
       ()                                                 (triv)
-
-      Match @ Match                                      (elim)
-      Constant Spine                                     (elim/constant, length at least 1)
-      \ ... antiquoted constant ... \ Spine              (elim/constant, length at least 1)
-      $var \ ... antiquoted index ... \ Spine            (elim/var)
-      fn . Match                                         (lam)
-      fn ? . Match                                       (lamb)
-      next Match                                         (next)
-      $marker \ ... antiquoted symbol ... \              (marker)
-      $unify \ ... antiquoted term ... \                 (unify)
-      $whnf Match                                        (whnf)
-      $whnfHard Match                                    (whnfHard)
+      ----------------   terms    ----------------
+      Constant                                           (constant)
       \ ... antiquoted constant ... \                    (constant)
+      $var \ ... antiquoted index ... \                  (variable)
       const?                                             (whatConstant)
       var?                                               (whatVar)
       evar?                                              (whatEvar)
@@ -483,30 +510,21 @@ right associative where relevant.
       integer?                                           (integer)
       ( Match , ... , Match )                            (pair, length at least 2)
 
-      $nil                                               (null)
-      $ap Match Match                                    (app)
-      #1 Match                                           (pi1)
-      #2 Match                                           (pi2)
-      #prev Match                                        (prev)
-
-      $tm Match                                          (tm)
-      $tml Match                                         (tml)
-      $tmh Match                                         (tmh)
-      $tp Match                                          (tp)
-      $tpl Match                                         (tpl)
-      $let Match                                         (lett)
-
-      $hyp Number Match                                  (hyp)      
-      $hyp \ ... antiquoted number ... \ Match           (hyp)
-      $anyhyp Match                                      (anyhyp)
-
     Spine ::=
                                                          (null)
-      Match Spine                                        (app)
-      #1 Spine                                           (pi1)
-      #2 Spine                                           (pi2)
-      #prev Spine                                        (prev)
+      Match [Spine]                                      (app)
+      #1 [Spine]                                         (pi1)
+      #2 [Spine]                                         (pi2)
+      #prev [Spine]                                      (prev)
       
+Note that a path can be matched in two different ways: the simple form
+`Constant Spine`, or the general form `Constant @ Match` where `Match`
+matches the spine.  (Variable-headed paths are similar.)  The
+simple form is usually more convenient, but unlike the general form,
+it provides no facility to bind a variable to the spine itself (or a
+suffix of it); it can only bind to the applicands.  The simple form
+also provides no facility for matching an unknown head.
+
 One can parse a matcher using `parseMatch`, which is actually the
 identity function, but IML is instructed to parse its argument using
 the `Match` grammar.  For example, one might write a recursive

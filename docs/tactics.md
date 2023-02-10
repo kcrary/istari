@@ -44,6 +44,13 @@ goal, generating zero or more subgoals.
 
   A synonym is the infix operator `>>`.
 
+  + `andthen1 : tactic -> tactic -> tactic`
+
+    Like `andthen` but generates an error if the first tactic does not
+    return exactly one subgoal.
+
+    A synonym is the infix operator `>>+`.
+
 
 - `andthenl : tactic -> tactic list -> tactic`
 
@@ -125,6 +132,10 @@ goal, generating zero or more subgoals.
   Introduces the conclusion type, when doing so requires no choices
   and generates no hypotheses.  Can introduce products, unit, future,
   and squash.
+
+  + `splitn [n]`
+
+    Calls `split` `n` times, continuing into the right-hand subgoal each time.
 
 
 - `left`
@@ -235,6 +246,10 @@ goal, generating zero or more subgoals.
   + `clearAll`
 
     Deletes all hypotheses.
+
+  + `renameOver [hyp x] [hyp y]`
+
+    Deletes `y` and renames `x` to `y`.
 
 
 - `moveBefore /[hyp] ... [hyp]/ /[target hyp or concl]/`
@@ -877,6 +892,47 @@ The destruction tactics are:
   - `nautoWith [n] /[lemma name] ... [lemma name]/`
 
     Combines `nauto` and `autoWith`.
+
+
+
+### Arithmetic
+
+- `omega`
+
+  Solves arithmetic goals using the Omega decision procedure.
+  (William Pugh.  The Omega Test: a fast and practical integer
+  programming algorithm for dependence analysis.  *Communications of
+  the ACM,* August 1992.)
+
+  + `omegaRaw`
+
+    As `omega` but does not run the typechecker.
+
+- `Omega.counterexample : unit -> unit`
+
+  Prints a counterexample for the last invocation of Omega to fail.
+
+
+Istari's implementation of Omega understands the following constants
+in arithmetic expressions: nat and integer literals, nat
+and integer linear arithmetic (`succ`, `plus`, `minus`, `plusz`,
+`negz`, `minusz`), nat and integer multiplication (`times`,
+`timesz`) provided at least one operand is a literal,
+`nat_to_integer`, and `integer_to_nat`.  Other expressions are
+uninterpreted and taken as additional variables.
+
+In propositions it understands equality at `nat` or `integer`, nat and
+integer inequalities (`leq`, `lt`, `leqz`, `ltz`),
+and the propositional connectives (`prod`, `sum`, `arrow`, `unit`,
+`void`).  Other propositions are treated as `void` in positive
+positions, and as `unit` in negative positions.
+
+Note that quantified propositions are not understood.  For example,
+`forall x . x <= x` in a positive position (such as the conclusion) is
+treated as `void`.  Consequently it fails with an empty
+counterexample, which may be surprising.
+
+
 
 
 

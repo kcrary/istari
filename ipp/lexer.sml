@@ -53,7 +53,7 @@ structure Lexer :> LEXER =
              [] => acc
 
            | ch :: rest =>
-                hexStringToInt rest (acc * 16 + hexdigit ch))
+                hexStringToInt rest (acc * 16 + IntInf.fromInt (hexdigit ch)))
             
 
       fun mktok str f =
@@ -344,6 +344,16 @@ structure Lexer :> LEXER =
                      | NONE =>
                           raise (SyntaxError ("illegal number", pos))))
 
+            val bignumberhex =
+               action
+               (fn (match, len, pos) =>
+                   (* the basis is happy to ignore the trailing 'I' *)
+                   let
+                      val n = hexStringToInt (List.drop (match, 2)) 0
+                   in
+                      BIGNUM (n, (pos, pos+len))
+                   end)
+
             val nnumber =
                action
                (fn (match, len, pos) =>
@@ -357,7 +367,7 @@ structure Lexer :> LEXER =
                action
                (fn (match, len, pos) =>
                    let
-                      val n = hexStringToInt (List.drop (match, 2)) 0
+                      val n = IntInf.toInt (hexStringToInt (List.drop (match, 2)) 0)
                    in
                       NUMBER (n, (pos, pos+len))
                    end)
@@ -365,7 +375,7 @@ structure Lexer :> LEXER =
             val wordlit =
                action
                (fn (match, len, pos) =>
-                   (case Int.fromString (implode (List.drop (match, 2))) of
+                   (case IntInf.fromString (implode (List.drop (match, 2))) of
                        SOME n => WORD (n, (pos, pos+len))
 
                      | NONE =>

@@ -52,7 +52,6 @@ A simpler case-analysis operation:
     append _ (nil _) l --> l
     append A (cons _ h t) l --> cons A h (append A t l)
 
-
     append_id_l : type:append_id_l
 
     append_id_r : type:append_id_r
@@ -71,3 +70,57 @@ A simpler case-analysis operation:
 
     length_append : type:length_append
 
+
+### Fold
+
+    foldr : type:foldr
+
+    foldr _ _ z _ (nil _) --> z
+    foldr a b z f (cons _ h t) --> f h (foldr a b z f t)
+
+
+### Map
+
+    map : type:map
+
+    map _ b _ (nil _) --> nil b
+    map a b f (cons _ h t) --> cons b (f h) (map a b f t)
+
+    map_compose : type:map_compose
+
+    
+### Universal and existential predicates over lists
+
+    datatype
+      intersect (i : level) .
+      forall (a : U i) (P : a -> U i) .
+      U i
+    of
+      Forall : list a -> type =
+      | Forall_nil : Forall nil
+      | Forall_cons : forall h t . P h -> Forall t -> Forall (h :: t)
+
+
+    datatype
+      intersect (i : level) .
+      forall (a : U i) (P : a -> U i) .
+      U i
+    of
+      Exists : list a -> type =
+      | Exists_hit : forall h t . P h -> Exists (h :: t)
+      | Exists_miss : forall h t . Exists t -> Exists (h :: t)
+
+    Forall_as_foldr : type:Forall_as_foldr
+
+    Exists_as_foldr : type:Exists_as_foldr
+
+    In : type:In
+
+    In _ _ (nil _) --> void
+    In a x (cons _ h t) --> x = h : a % In a x t
+
+    In_as_exists : type:In_as_exists
+
+    Forall_forall : type:Forall_forall
+
+    Exists_exists : type:Exists_exists

@@ -227,7 +227,7 @@ functor ParseMainFun
           val let_exp : span * decs * exp * span -> exp
           val char_exp : char_span -> exp
           val string_exp : string_span -> exp
-          val word_exp : int_span -> exp
+          val word_exp : intinf_span -> exp
           val bignum_exp : intinf_span -> exp
           val number_exp : int_span -> exp
           val ident_cons_patfields : identifier * patfields -> patfields
@@ -249,7 +249,7 @@ functor ParseMainFun
           val atom_pjuxta : pat -> pjuxta
           val list_pat : span * pats * span -> pat
           val tuple_pat : span * pats * span -> pat
-          val word_pat : int_span -> pat
+          val word_pat : intinf_span -> pat
           val char_pat : char_span -> pat
           val string_pat : string_span -> pat
           val number_pat : int_span -> pat
@@ -293,7 +293,7 @@ functor ParseMainFun
            | TYVAR of identifier
            | NUMBER of int_span
            | BIGNUM of intinf_span
-           | WORD of int_span
+           | WORD of intinf_span
            | STRING of string_span
            | CHAR of char_span
            | LPAREN of span
@@ -16200,7 +16200,7 @@ Arg.UIDENT x => (1, Value.identifier x)
 | Arg.TYVAR x => (6, Value.identifier x)
 | Arg.NUMBER x => (7, Value.int_span x)
 | Arg.BIGNUM x => (8, Value.intinf_span x)
-| Arg.WORD x => (9, Value.int_span x)
+| Arg.WORD x => (9, Value.intinf_span x)
 | Arg.STRING x => (10, Value.string_span x)
 | Arg.CHAR x => (11, Value.char_span x)
 | Arg.LPAREN x => (12, Value.span x)
@@ -16358,7 +16358,7 @@ Vector.fromList [(0,1,(fn Value.span(arg0)::rest => Value.span(Arg.id_span arg0)
 (25,1,(fn Value.int_span(arg0)::rest => Value.pat(Arg.number_pat arg0)::rest|_=>raise (Fail "bad parser"))),
 (25,1,(fn Value.string_span(arg0)::rest => Value.pat(Arg.string_pat arg0)::rest|_=>raise (Fail "bad parser"))),
 (25,1,(fn Value.char_span(arg0)::rest => Value.pat(Arg.char_pat arg0)::rest|_=>raise (Fail "bad parser"))),
-(25,1,(fn Value.int_span(arg0)::rest => Value.pat(Arg.word_pat arg0)::rest|_=>raise (Fail "bad parser"))),
+(25,1,(fn Value.intinf_span(arg0)::rest => Value.pat(Arg.word_pat arg0)::rest|_=>raise (Fail "bad parser"))),
 (25,3,(fn Value.span(arg0)::Value.pats(arg1)::Value.span(arg2)::rest => Value.pat(Arg.tuple_pat {3=arg0,2=arg1,1=arg2})::rest|_=>raise (Fail "bad parser"))),
 (25,3,(fn Value.span(arg0)::Value.pats(arg1)::Value.span(arg2)::rest => Value.pat(Arg.list_pat {3=arg0,2=arg1,1=arg2})::rest|_=>raise (Fail "bad parser"))),
 (27,1,(fn Value.pat(arg0)::rest => Value.pjuxta(Arg.atom_pjuxta arg0)::rest|_=>raise (Fail "bad parser"))),
@@ -16383,7 +16383,7 @@ Vector.fromList [(0,1,(fn Value.span(arg0)::rest => Value.span(Arg.id_span arg0)
 (28,3,(fn Value.patfields(arg0)::_::Value.identifier(arg1)::rest => Value.patfields(Arg.ident_cons_patfields {2=arg0,1=arg1})::rest|_=>raise (Fail "bad parser"))),
 (32,1,(fn Value.int_span(arg0)::rest => Value.exp(Arg.number_exp arg0)::rest|_=>raise (Fail "bad parser"))),
 (32,1,(fn Value.intinf_span(arg0)::rest => Value.exp(Arg.bignum_exp arg0)::rest|_=>raise (Fail "bad parser"))),
-(32,1,(fn Value.int_span(arg0)::rest => Value.exp(Arg.word_exp arg0)::rest|_=>raise (Fail "bad parser"))),
+(32,1,(fn Value.intinf_span(arg0)::rest => Value.exp(Arg.word_exp arg0)::rest|_=>raise (Fail "bad parser"))),
 (32,1,(fn Value.string_span(arg0)::rest => Value.exp(Arg.string_exp arg0)::rest|_=>raise (Fail "bad parser"))),
 (32,1,(fn Value.char_span(arg0)::rest => Value.exp(Arg.char_exp arg0)::rest|_=>raise (Fail "bad parser"))),
 (32,5,(fn Value.span(arg0)::Value.exp(arg1)::_::Value.decs(arg2)::Value.span(arg3)::rest => Value.exp(Arg.let_exp {4=arg0,3=arg1,2=arg2,1=arg3})::rest|_=>raise (Fail "bad parser"))),

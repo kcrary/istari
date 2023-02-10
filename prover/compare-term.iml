@@ -1,0 +1,320 @@
+
+signature COMPARE_TERM =
+   sig
+
+      val compare : int -> Term.term -> int -> Term.term -> order
+
+   end
+
+
+structure CompareTerm :> COMPARE_TERM =
+   struct
+   
+      structure N = Normalize
+
+      open Term
+
+
+      fun compareNative (Integer x, Integer y) = IntInf.compare x y
+
+
+      fun compareVar sz sz' depth i j =
+         Int.compare
+            (* make older variables (smaller indices) be less *)
+            (if j < depth then j else j + sz)
+            (if i < depth then i else i + sz')
+
+
+      fun compareMain sz sz' depth (m, n) = 
+         (case (N.simplify m, N.simplify n) of
+             (Elim (Var i, spine), Elim (Var j, spine')) =>
+                (* make older variables be less *)
+                (case Int.compare j i of
+                    EQUAL =>
+                       compareSpine sz sz' depth (spine, spine')
+
+                  | ord => ord)
+
+           | (Elim (Var _, _), _) => LESS
+           | (_, Elim (Var _, _)) => GREATER
+
+           | (Elim (Const const, spine), Elim (Const const', spine')) =>
+                (case Constant.Ordered.compare (const, const') of
+                    EQUAL =>
+                       compareSpine sz sz' depth (spine, spine')
+
+                  | ord => ord)
+
+           | (Elim (Const _, _), _) => LESS
+           | (_, Elim (Const _, _)) => GREATER
+
+           | (Elim (Sub (Evar eb, s), spine), Elim (Sub (Evar eb', s'), spine')) =>
+                (case Int.compare (ebindToInt eb) (ebindToInt eb') of
+                    EQUAL =>
+                       (case compareSub sz sz' depth (s, s') of
+                           EQUAL =>
+                              compareSpine sz sz' depth (spine, spine')
+
+                         | ord => ord)
+
+                  | ord => ord)
+
+           | (Elim (Sub _, _), _) => LESS
+           | (_, Elim (Sub _, _)) => GREATER
+
+           | (Elim (m1, spine), Elim (n1, spine')) =>
+                (case compareMain sz sz' depth (m1, n1) of
+                    EQUAL =>
+                       compareSpine sz sz' depth (spine, spine')
+
+                  | ord => ord)
+
+           | (Elim _, _) => LESS
+           | (_, Elim _) => GREATER
+
+           | (Lam (_, m1), Lam (_, m2)) =>
+                compareMain sz sz' (depth+1) (m1, m2)
+
+           | (Lam _, _) => LESS
+           | (_, Lam _) => GREATER
+
+           | (Pair (m1, m2), Pair (n1, n2)) =>
+                (case compareMain sz sz' depth (m1, n1) of
+                    EQUAL =>
+                       compareMain sz sz' depth (m2, n2)
+
+                  | ord => ord)
+
+           | (Pair _, _) => LESS
+           | (_, Pair _) => GREATER
+
+           | (Next m1, Next m2) =>
+                compareMain sz sz' depth (m1, m2)
+
+           | (Next _, _) => LESS
+           | (_, Next _) => GREATER
+
+           | (Triv, Triv) => EQUAL
+
+           | (Triv, _) => LESS
+           | (_, Triv) => GREATER
+
+           | (Native m1, Native n1) =>
+                compareNative (m1, n1)
+
+           | (Native _, _) => LESS
+           | (_, Native _) => GREATER
+
+           | (Marker sym, Marker sym') =>
+                Symbol.compare (sym, sym')
+
+           | _ => raise (Fail "impossible"))
+
+
+      and compareSpine sz sz' depth (spine, spine') =
+         (case (spine, spine') of
+             ([], []) => EQUAL
+
+           | ([], _) => LESS
+           | (_, []) => GREATER
+
+           | (elim :: rest, elim' :: rest') =>
+                (case compareElim sz sz' depth (elim, elim') of
+                    EQUAL =>
+                       compareSpine sz sz' depth (rest, rest')
+
+                  | ord => ord))
+
+
+      and compareElim sz sz' depth (elim, elim') =
+         (case (elim, elim') of
+             (App m, App n) =>
+                compareMain sz sz' depth (m, n)
+
+           | (App _, _) => LESS
+           | (_, App _) => GREATER
+
+           | (Pi1, Pi1) => EQUAL
+           | (Pi1, _) => LESS
+           | (_, Pi1) => GREATER
+
+           | (Pi2, Pi2) => EQUAL
+           | (Pi2, _) => LESS
+           | (_, Pi2) => GREATER
+
+           | (Prev, Prev) => EQUAL)
+
+
+      and compareSub sz sz' depth (s, s') =
+         (case (s, s') of
+             (Shift i, Shift j) =>
+                (* has to agree with (i . ^i+1) vs (j . ^j+1) *)
+                compareVar sz sz' depth i j
+
+           | (Dot (m, t), Dot (m', t')) =>
+                (case compareMain sz sz' depth (m, m') of
+                    EQUAL =>
+                       compareSub sz sz' depth (t, t')
+
+                  | ord => ord)
+
+           | (Shift i, _) =>
+                compareSub sz sz' depth (Dot (Var i, Shift (i+1)), s')
+
+           | (_, Shift i) =>
+                compareSub sz sz' depth (s, Dot (Var i, Shift (i+1)))
+
+           | (Idot (i, t), _) =>
+                compareSub sz sz' depth (Dot (Var i, t), s')
+
+           | (_, Idot (i, t)) =>
+                compareSub sz sz' depth (s, Dot (Var i, t)))
+
+
+      fun compare sz m sz' n = compareMain sz sz' 0 (m, n)
+
+   end
+
+
+structure TermOrdered :> ORDERED where type t = Term.term =
+   struct
+
+      type t = Term.term
+
+      fun compare (m, n) = CompareTerm.compare 0 m 0 n
+
+      fun eq mn =
+         (case compare mn of
+             EQUAL => true
+           | _ => false)
+
+   end
+
+
+structure ContextualizedTermOrdered :> ORDERED where type t = int * Term.term =
+   struct
+
+      type t = int * Term.term
+
+      fun compare ((sz, m), (sz', n)) = CompareTerm.compare sz m sz' n
+
+      fun eq mn =
+         (case compare mn of
+             EQUAL => true
+           | _ => false)
+
+   end
+
+
+signature HASH_TERM =
+   sig
+
+      val hash : int -> Term.term -> Word.word
+
+   end
+
+
+structure HashTerm :> HASH_TERM =
+   struct
+
+      structure N = Normalize
+
+      val hashInc = MJHash.hashInc
+
+      open Term
+
+
+      fun hashNative (Integer x) = IntInfHashable.hash x
+
+      
+      fun hashVar shift depth i =
+         IntHashable.hash
+            (if i < depth then i else i+shift)
+
+
+      fun hashMain shift depth m =
+         (case N.simplify m of
+             Elim (Var i, spine) =>
+                hashInc 
+                   (hashInc 0w1 (hashVar shift depth i)) 
+                   (hashSpine shift depth spine)
+
+           | Elim (Const const, spine) =>
+                hashInc 
+                   (hashInc 0w2 (Constant.Hashable.hash const))
+                   (hashSpine shift depth spine)
+            
+           | Elim (Sub (Evar eb, _), spine) =>
+                (* We cannot easily hash the substitution, since we would want to identify
+                   equivalent substitutions (e.g., ^0 and 0 . ^1).  It's possible, but not
+                   without doing more work than we want to do in a hash function.  Instead,
+                   we'll tolerate a has collision on terms that differ only in the
+                   substitution applies to an evar.
+                *)
+                hashInc 
+                   (hashInc
+                       0w3
+                       (IntHashable.hash (ebindToInt eb)))
+                   (hashSpine shift depth spine)
+
+           | Lam (_, m1) =>
+                hashInc 0w4 (hashMain shift (depth+1) m1)
+
+           | Pair (m1, m2) =>
+                hashInc
+                   (hashInc 0w5 (hashMain shift depth m1))
+                   (hashMain shift depth m2)
+
+           | Next m1 =>
+                hashInc 0w6 (hashMain shift depth m1)
+
+           | Triv => 0w7
+
+           | Native x =>
+                hashInc 0w8 (hashNative x)
+
+           | Marker sym =>
+                hashInc 0w9 (SymbolHashable.hash sym)
+
+           | _ =>
+                raise (Fail "impossible"))
+             
+
+         
+      and hashSpine shift depth spine =
+         (case spine of
+             [] => 0w1
+
+           | elim :: rest =>
+                hashInc 
+                   (hashInc 0w2 (hashElim shift depth elim))
+                   (hashSpine shift depth rest))
+
+
+      and hashElim shift depth elim =
+         (case elim of
+             App m =>
+                hashInc 0w1 (hashMain shift depth m)
+
+           | Pi1 => 0w2
+
+           | Pi2 => 0w3
+
+           | Prev => 0w4)
+
+      
+      fun hash shift m = hashMain shift 0 m
+
+   end
+
+
+structure TermHashable :> HASHABLE where type t = Term.term =
+   struct
+
+      type t = Term.term
+
+      val eq = TermOrdered.eq
+
+      fun hash m = HashTerm.hash 0 m
+
+   end

@@ -31,8 +31,11 @@ signature JUDGEMENT =
       val hyp : judgement -> int -> hyp
       val hypOpt : judgement -> int -> hyp option
 
+      (* unifyWeaken allows the use of unhidden hypotheses for hidden ones *)
       val unifyHyp : hyp -> hyp -> unit
+      val unifyHypWeaken : hyp -> hyp -> unit
       val unify : judgement -> judgement -> unit
+      val unifyWeaken : judgement -> judgement -> unit
 
       type id
       val id : judgement -> id
@@ -160,6 +163,33 @@ structure Judgement :> JUDGEMENT =
 
            | _ => Unify.impossible ())
 
+      fun unifyHypWeaken h h' =
+         (case (h, h') of
+             (Tm a, Tm a') =>
+                Unify.unify a a'
+
+           | (Tml a, Tml a') =>
+                Unify.unify a a'
+
+           | (Tmh a, Tmh a') =>
+                Unify.unify a a'
+
+           | (Tmh a, Tm a') =>
+                Unify.unify a a'
+
+           | (Tp, Tp) => ()
+
+           | (Tpl, Tpl) => ()
+
+           | (Tph, Tph) => ()
+
+           | (Tph, Tp) => ()
+
+           | (Let m, Let m') =>
+                Unify.unify m m'
+
+           | _ => Unify.impossible ())
+
       fun unifyContext g g' =
          (case (S.expose g, S.expose g') of
              (S.Nil, S.Nil) => ()
@@ -172,9 +202,27 @@ structure Judgement :> JUDGEMENT =
 
            | _ => Unify.impossible ())
 
+      fun unifyContextWeaken g g' =
+         (case (S.expose g, S.expose g') of
+             (S.Nil, S.Nil) => ()
+
+           | (S.Cons (h, rest), S.Cons (h', rest')) =>
+                (
+                unifyHypWeaken h h';
+                unifyContextWeaken rest rest'
+                )
+
+           | _ => Unify.impossible ())
+
       fun unify (g, m, _) (g', m', _) =
          (
          unifyContext g g';
+         Unify.unify m m'
+         )
+
+      fun unifyWeaken (g, m, _) (g', m', _) =
+         (
+         unifyContextWeaken g g';
          Unify.unify m m'
          )
 

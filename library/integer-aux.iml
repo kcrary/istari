@@ -4,14 +4,16 @@ structure ParseInteger =
 
       structure T = ETerm
 
-      val plusz = Susp.delay (fn () => parseConstant /Integer.plusz/)
-      val negz = Susp.delay (fn () => parseConstant /Integer.negz/)
+      val plusz = Susp.delay (fn () => Prim.plusz)
+      val negz = Susp.delay (fn () => Prim.negz)
       val minusz = Susp.delay (fn () => parseConstant /Integer.minusz/)
+      val timesz = Susp.delay (fn () => Prim.timesz)
       val leqz = Susp.delay (fn () => parseConstant /Integer.leqz/)
       val ltz = Susp.delay (fn () => parseConstant /Integer.ltz/)
 
       fun parsePlus m n = T.apply2 (Susp.force plusz) m n
       fun parseMinus m n = T.apply2 (Susp.force minusz) m n
+      fun parseTimes m n = T.apply2 (Susp.force timesz) m n
       fun parseNeg m = T.apply1 (Susp.force negz) m
       fun parseLeq m n = T.apply2 (Susp.force leqz) m n
       fun parseLt m n = T.apply2 (Susp.force ltz) m n
@@ -27,6 +29,7 @@ grammardef Integer
    rule Term(30)  ::= Term(31) "<z" Term(31) => parseLt
    rule Term(50)  ::= Term(50) "+z" Term(51) => parsePlus
    rule Term(50)  ::= Term(50) "-z" Term(51) => parseMinus
+   rule Term(60)  ::= Term(60) "*z" Term(61) => parseTimes
    rule Term(90)  ::= "~z" Term(91) => parseNeg
 
 end
@@ -40,6 +43,7 @@ functor AfterLtz () :> sig end =
 
       val () = ConstantInternal.setPath Prim.plusz [`"plusz", `"Integer"]
       val () = ConstantInternal.setPath Prim.negz [`"negz", `"Integer"]
+      val () = ConstantInternal.setPath Prim.timesz [`"timesz", `"Integer"]
       val () = ConstantInternal.setPath Prim.eqzb [`"eqzb", `"Integer"]
       val () = ConstantInternal.setPath Prim.leqzb [`"leqzb", `"Integer"]
       val () = ConstantInternal.setPath Prim.nat_to_integer [`"nat_to_integer", `"Integer"]
@@ -49,21 +53,18 @@ functor AfterLtz () :> sig end =
       structure U = Show.Unparsing
 
       fun register k arity prec unp =
-         ConstantTable.insert U.unparsingTable k (arity, prec, unp)
+         ConstantTable.insert U.unparsingTable k (arity, prec, ref true, unp)
 
 
-      val plusz = parseConstant /Integer.plusz/
+      val plusz = Prim.plusz
       val minusz = parseConstant /Integer.minusz/
-      val negz = parseConstant /Integer.negz/
+      val timesz = Prim.timesz
+      val negz = Prim.negz
       val leqz = parseConstant /Integer.leqz/
       val ltz = parseConstant /Integer.ltz/
 
 
       structure U = Show.Unparsing
-
-      fun register k arity prec unp =
-         ConstantTable.insert U.unparsingTable k (arity, prec, unp)
-
 
       val () =
          register leqz 2 30
@@ -94,6 +95,13 @@ functor AfterLtz () :> sig end =
                                      U.break 1, U.string "-z ", b 51]))
 
       val () =
+         register timesz 2 60
+         (U.wrap
+             (U.apply2 timesz U.show U.show)
+             (fn (a, b) => U.append [a 60, 
+                                     U.break 1, U.string "*z ", b 61]))
+
+      val () =
          register negz 1 90
          (U.wrap
              (U.apply1 negz U.show)
@@ -108,6 +116,7 @@ functor AfterLeqzbDef () :> sig end =
       val () = ConstantInternal.setPath Prim.integer_def [`"Integer", `"Def", `"Integer"]
       val () = ConstantInternal.setPath Prim.plusz_def [`"Plusz", `"Def", `"Integer"]
       val () = ConstantInternal.setPath Prim.negz_def [`"Negz", `"Def", `"Integer"]
+      val () = ConstantInternal.setPath Prim.timesz_def [`"Timesz", `"Def", `"Integer"]
       val () = ConstantInternal.setPath Prim.eqzb_def [`"Eqzb", `"Def", `"Integer"]
       val () = ConstantInternal.setPath Prim.leqzb_def [`"Leqzb", `"Def", `"Integer"]
 

@@ -14,6 +14,7 @@ Namespace.alias (parseIdent /eqzb/) Prim.eqzb;
 Namespace.alias (parseIdent /leqzb/) Prim.leqzb;
 Namespace.alias (parseIdent /negz/) Prim.negz;
 Namespace.alias (parseIdent /plusz/) Prim.plusz;
+Namespace.alias (parseIdent /timesz/) Prim.timesz;
 
 
 (* Built-in:
@@ -81,7 +82,7 @@ Namespace.beginModule "Def";
 
 
 
-(* Built in:
+(* Built-in:
 
 define /Integer/
 /
@@ -120,6 +121,20 @@ define /Negz a/
 *)
 
 Namespace.alias (parseIdent /Negz/) Prim.negz_def;
+
+
+
+(* Built-in:
+
+define /Timesz a b/
+/
+  (a #1 * b #1 + a #2 * b #2 , a #1 * b #2 + a #2 * b #1)
+//
+  Integer -> Integer -> Integer
+/;
+*)
+
+Namespace.alias (parseIdent /Timesz/) Prim.timesz_def;
 
 
 
@@ -348,6 +363,102 @@ Define.recordTyping "Negz_type";
 
 
 
+lemma "plus_swap"
+/
+  forall (m n p : nat) .
+    m + n + p = m + p + n : nat
+/;
+
+intro /m n p/.
+rewrite /-> Nat.plus_assoc at 0 0/.
+rewrite /-> Nat.plus_commute at 1/.
+reflexivity.
+qed ();
+
+
+
+lemma "Timesz_type"
+/
+  Timesz : Integer -> Integer -> Integer
+/;
+
+introOf /p q/.
+unfold /Timesz/.
+unfold /Integer in p in q/.
+destruct /p/ /[(a b) (a' b') Hab]/.
+reduce /Hab/.
+destruct /q/ /[(c d) (c' d') Hcd]/.
+reduce /Hcd concl/.
+apply /Integer_eq/.
+rewrite /<- Nat.plus_assoc at all/.
+rewrite /-> Nat.plus_commute in Hab at 1/.
+rewrite /-> Nat.plus_commute in Hcd at 1/.
+so /Nat.times_compat _# 4 Hab Hcd/ /H1/.
+symmetryIn /Hcd/.
+so /Nat.times_compat _# 4 Hab Hcd/ /H2/.
+rewrite /-> Nat.times_dist_plus_l in H1 at all in H2 at all/.
+rewrite /-> Nat.times_dist_plus_r in H1 at all in H2 at all/.
+so /Nat.plus_compat _# 4 H1 H2/ /H/.
+clear /H1 H2/.
+rewrite /<- Nat.plus_assoc in H at all/.
+rewrite /-> plus_swap in H at 3 2 1 0/.
+rewrite /-> plus_swap in H at 5 4 3 2 1/.
+rewrite /-> plus_swap in H at 7/.
+rewrite /-> Nat.plus_assoc in H at 0 5/.
+so /Nat.plus_cancel_r_eq _# 4 H __/ /H'/.
+  {
+  rewrite /<- Nat.times_dist_plus_l at all/.
+  apply /Nat.times_compat/ >> auto.
+  }
+clear /H/ >> rename /H'/ /H/.
+rewrite /-> plus_swap in H at 1/.
+rewrite /-> plus_swap in H at 5 4/.
+rewrite /-> plus_swap in H at 7 6 5/.
+rewrite /-> Nat.plus_assoc in H at 0 3/.
+so /Nat.plus_cancel_r_eq _# 4 H __/ /H'/.
+  {
+  rewrite /<- Nat.times_dist_plus_l at all/.
+  apply /Nat.times_compat/ >> auto.
+  }
+clear /H/ >> rename /H'/ /H/.
+rewrite /-> plus_swap in H at 0 1/.
+rewrite /-> plus_swap at 0 1/.
+rewrite /-> plus_swap at 3/.
+rewrite /-> Nat.plus_commute at 5/.
+rewrite /-> plus_swap in H at 2 3/.
+rewrite /-> plus_swap at 3/.
+so /Nat.plus_compat _# 4 H (Logic.eq_refl _ _ (b * d + a' * d' + a * d + b' * d'))/ /H'/.
+clear /H/ >> rename /H'/ /H/.
+rewrite /<- Nat.plus_assoc in H at all/.
+rewrite /-> plus_swap in H at 3 4/.
+rewrite /-> plus_swap in H at 2 3/.
+rewrite /-> plus_swap in H at 7 8 9 10/.
+rewrite /-> plus_swap in H at 6 7 8 9/.
+rewrite /-> Nat.plus_assoc in H at 2 1 0/.
+rewrite /-> Nat.plus_assoc in H at 7 6 5/.
+witness /Nat.plus_cancel_r_eq _# 4 H __/.
+clear /H/.
+rewrite /-> Nat.plus_commute at 2/.
+rewrite /-> plus_swap at 1/.
+rewrite /<- Nat.times_dist_plus_r/.
+rewrite /-> Nat.plus_assoc at 0/.
+rewrite /<- Nat.times_dist_plus_r/.
+rewrite /-> Hcd/.
+rewrite /<- Nat.times_dist_plus_l/.
+rewrite /-> Nat.plus_commute at 4/.
+rewrite /<- plus_swap at 0 1/.
+rewrite /<- Nat.times_dist_plus_r/.
+rewrite /-> Nat.plus_assoc at 0/.
+rewrite /<- Nat.times_dist_plus_r/.
+rewrite /-> Hcd/.
+rewrite /<- Nat.times_dist_plus_l/.
+rewrite /<- Hab/.
+reflexivity.
+qed ();
+Define.recordTyping "Timesz_type";
+
+
+
 lemma "Eqzb_type"
 /
   Eqzb : Integer -> Integer -> bool
@@ -539,7 +650,7 @@ unhide.
 unfold /Leqz/.
 unfold /Leqzb/.
 
-(* XX why isn't testRewrite unifying variables *)
+(* XX why isn't testRewrite unifying variables? *)
 testRewrite /-> Nat.istrue_leqb/;
 
 rewrite /-> Nat.istrue_leqb/.
@@ -751,6 +862,235 @@ unfold /Negz at all , Leqz in H in concl , Leqzb in H in concl/.
 reduce /H concl/.
 rewrite /-> Nat.istrue_leqb in H in concl/.
 rewrite /-> Nat.plus_commute at 0 1/.
+hyp /H/.
+qed ();
+
+
+
+lemma "Timesz_id_l"
+/
+  forall a . Timesz Onez a = a : Integer
+/;
+
+inference.
+intro /p/.
+so /Integer_of/ /Hof/.
+destruct /p/ /[(p1 p2)]/.
+unfold /Onez , Timesz/.
+reduce //.
+rewrite /-> Nat.plus_0_r at all/.
+reflexivity.
+qed ();
+
+
+
+lemma "Timesz_ann_l"
+/
+  forall a . Timesz Zeroz a = Zeroz : Integer
+/;
+
+inference.
+intro /p/.
+so /Integer_of/ /Hof/.
+destruct /p/ /[(p1 p2)]/.
+unfold /Zeroz at all , Timesz/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "Timesz_commute"
+/
+  forall a b . Timesz a b = Timesz b a : Integer
+/;
+
+inference.
+intro /a b/.
+so /Integer_of/ /Hof/.
+destruct /a/ /[(a a')]/.
+destruct /b/ /[(b b')]/.
+unfold /Timesz at all/.
+reduce //.
+rewrite /-> Nat.times_commute at 0 1 2 3/.
+rewrite /-> Nat.plus_commute at 3/.
+reflexivity.
+qed ();
+
+
+
+lemma "Timesz_assoc"
+/
+  forall a b c . Timesz (Timesz a b) c = Timesz a (Timesz b c) : Integer
+/;
+
+inference.
+intro /a b c/.
+so /Integer_of/ /Hof/.
+destruct /a/ /[(a a')]/.
+destruct /b/ /[(b b')]/.
+destruct /c/ /[(c c')]/.
+unfold /Timesz at all/.
+reduce //.
+rewrite /-> Nat.times_dist_plus_l at all/.
+rewrite /-> Nat.times_dist_plus_r at all/.
+rewrite /<- Nat.times_assoc at all/.
+rewrite /<- Nat.plus_assoc at all/.
+rewrite /-> plus_swap at 1 0 3 2/.
+reflexivity.
+qed ();
+
+
+
+lemma "Timesz_dist_Plusz_r"
+/
+  forall a b c . Timesz a (Plusz b c) = Plusz (Timesz a b) (Timesz a c) : Integer
+/;
+
+inference.
+intro /a b c/.
+so /Integer_of/ /Hof/.
+destruct /a/ /[(a a')]/.
+destruct /b/ /[(b b')]/.
+destruct /c/ /[(c c')]/.
+unfold /Plusz at all , Timesz at all/.
+reduce //.
+rewrite /-> Nat.times_dist_plus_r at all/.
+rewrite /<- Nat.plus_assoc at all/.
+rewrite /-> plus_swap at 1 3/.
+reflexivity.
+qed ();
+
+
+
+lemma "Negz_dist_Timesz_l"
+/
+  forall a b . Negz (Timesz a b) = Timesz (Negz a) b : Integer
+/;
+
+inference.
+intro /a b/.
+so /Integer_of/ /Hof/.
+destruct /a/ /[(a a')]/.
+destruct /b/ /[(b b')]/.
+unfold /Negz at all , Timesz at all/.
+reduce //.
+rewrite /-> Nat.plus_commute at 0 1/.
+reflexivity.
+qed ();
+
+
+
+lemma "Timesz_Leqz"
+/
+  forall (a a' b b' : Integer) .
+    Leqz Zeroz a
+    -> Leqz Zeroz b
+    -> Leqz a a'
+    -> Leqz b b'
+    -> Leqz (Timesz a b) (Timesz a' b')
+/;
+
+intro /a c b d Ha Hb Hac Hbd/.
+infer /a/ /Hofa/.
+infer /b/ /Hofb/.
+infer /c/ /Hofc/.
+infer /d/ /Hofd/.
+destruct /a/ /[(a a')]/.
+destruct /b/ /[(b b')]/.
+destruct /c/ /[(c c')]/.
+destruct /d/ /[(d d')]/.
+unfold /Timesz at all/.
+unfold /Zeroz in Ha in Hb/.
+unfold /Leqz in Ha in Hb in Hac in Hbd in concl/.
+unfold /Leqzb in Ha in Hb in Hac in Hbd in concl/.
+reduce /Ha Hb Hac Hbd concl/.
+rewrite /-> Nat.istrue_leqb in Ha in Hb in Hac in Hbd in concl/.
+clear /Hofa Hofb Hofc Hofd/.
+rewrite /<- Nat.plus_assoc at all/.
+so /Nat.plus_cancel_leq_leq_l _# 4 Hac Ha/ /Hc/.
+so /Nat.plus_cancel_leq_leq_l _# 4 Hbd Hb/ /Hd/.
+so /Nat.minus_leq _# 4 Hac (Nat.leq_refl (a' + c'))/ /Hac'/.
+rewrite /-> Nat.plus_commute in Hac' at 1/.
+rewrite /<- Nat.minus_assoc in Hac' at all/.
+rewrite /-> Nat.plus_minus_swap in Hac' at 1/ >> auto.
+rewrite /-> Nat.plus_minus_cancel_r in Hac'/.
+rewrite /-> Nat.minus_self in Hac'/.
+reduce /Hac'/.
+so /Nat.minus_leq _# 4 Hbd (Nat.leq_refl (b' + d'))/ /Hbd'/.
+rewrite /-> Nat.plus_commute in Hbd' at 1/.
+rewrite /<- Nat.minus_assoc in Hbd' at all/.
+rewrite /-> Nat.plus_minus_swap in Hbd' at 1/ >> auto.
+rewrite /-> Nat.plus_minus_cancel_r in Hbd'/.
+rewrite /-> Nat.minus_self in Hbd'/.
+reduce /Hbd'/.
+so /Nat.times_leq _# 4 Hac' Hbd'/ /H/.
+rewrite /-> Nat.times_dist_minus_l in H at all/.
+rewrite /-> Nat.times_dist_minus_r in H at all/.
+so /Nat.plus_leq _# 4 H (Nat.leq_refl ((a' * b - a' * b') + (c' * d - c' * d')))/ /H'/.
+renameOver /H'/ /H/.
+rewrite /<- Nat.plus_assoc in H/.
+rewrite /-> Nat.minus_plus_cancel in H/.
+  {
+  rewrite /<- Nat.times_dist_minus_r at all/.
+  apply /Nat.times_leq/ >> auto.
+  }
+rewrite /-> Nat.plus_commute in H at 2/.
+rewrite /<- Nat.plus_assoc in H/.
+rewrite /-> Nat.minus_plus_cancel in H/.
+  {
+  rewrite /<- Nat.times_dist_minus_r at all/.
+  apply /Nat.times_leq/ >> auto.
+  }
+rewrite /<- Nat.plus_minus_assoc in H at all/.
+  {
+  rewrite /<- Nat.times_dist_minus_r at all/.
+  apply /Nat.times_leq/ >> auto.
+  }
+
+  {
+  rewrite /<- Nat.times_dist_minus_r at all/.
+  apply /Nat.times_leq/ >> auto.
+  }
+so /Nat.plus_leq _# 4 H (Nat.leq_refl (((c' * d') + (a * b')) + ((a' * b') + (c * d'))))/ /H'/.
+renameOver /H'/ /H/.
+rewrite /<- Nat.plus_assoc in H at 0 1/.
+rewrite /-> Nat.minus_plus_cancel in H/.
+  {
+  apply /Nat.leq_trans _ (c' * d)/.
+    {
+    rewrite /<- Nat.times_dist_minus_r at all/.
+    apply /Nat.times_leq/ >> auto.
+    }
+  apply /Nat.plus_leq_r/.
+  }
+rewrite /-> plus_swap in H at 1/.
+rewrite /-> Nat.minus_plus_cancel in H/.
+  {
+  rewrite /<- Nat.times_dist_minus_r at all/.
+  apply /Nat.times_leq/ >> auto.
+  }
+rewrite /-> Nat.plus_commute in H at 5/.
+rewrite /<- Nat.plus_assoc in H at 1 2/.
+rewrite /-> Nat.minus_plus_cancel in H/.
+  {
+  apply /Nat.leq_trans _ (a' * b)/.
+    {
+    rewrite /<- Nat.times_dist_minus_r at all/.
+    apply /Nat.times_leq/ >> auto.
+    }
+  apply /Nat.plus_leq_r/.
+  }
+rewrite /-> plus_swap in H at 2/.
+rewrite /-> Nat.minus_plus_cancel in H/.
+  {
+  rewrite /<- Nat.times_dist_minus_r at all/.
+  apply /Nat.times_leq/ >> auto.
+  }
+rewrite /<- Nat.plus_assoc in H at all/.
+rewrite /-> plus_swap in H at 1 0 2 3/.
+rewrite /-> Nat.plus_commute in H at 5/.
+rewrite /-> plus_swap in H at 3/.
 hyp /H/.
 qed ();
 
@@ -1034,6 +1374,17 @@ qed ();
 
 
 
+lemma "timesz_spec_prim"
+/
+  timesz = (fn x y . integer_from_def (Timesz (integer_to_def x) (integer_to_def y)))
+  : (integer -> integer -> integer)
+/;
+
+Tactic.refine Rule.timeszSpec.
+qed ();
+
+
+
 lemma "eqzb_spec_prim"
 /
   eqzb = (fn x y . Eqzb (integer_to_def x) (integer_to_def y))
@@ -1147,6 +1498,18 @@ Define.recordTyping "minusz_type";
 
 
 
+lemma "timesz_type"
+/
+  timesz : integer -> integer -> integer
+/;
+
+of_from_eq.
+exact /timesz_spec_prim/.
+qed ();
+Define.recordTyping "timesz_type";
+
+
+
 lemma "eqzb_type"
 /
   eqzb : integer -> integer -> bool
@@ -1222,6 +1585,22 @@ intro /x/.
 change /concl/ /_ = (fn x . integer_from_def (Negz (integer_to_def x))) x : _/.
 decompEq 1 /integer -> integer/ >> attempt reflexivity.
 apply /negz_spec_prim/.
+qed ();
+
+
+
+lemma "timesz_spec"
+/
+  forall x y .
+    timesz x y = integer_from_def (Timesz (integer_to_def x) (integer_to_def y))
+    : integer
+/;
+
+inference.
+intro /x y/.
+change /concl/ /_ = (fn x y . integer_from_def (Timesz (integer_to_def x) (integer_to_def y))) x y : _/.
+decompEq 2 /integer -> integer -> integer/ >> attempt reflexivity.
+apply /timesz_spec_prim/.
 qed ();
 
 
@@ -1488,6 +1867,117 @@ qed ();
 
 
 
+lemma "plusz_cancel_l"
+/
+  forall a b c .
+    c +z a = c +z b : integer
+    -> a = b : integer
+/;
+
+intro /a b c Heq/.
+rewrite /<- plusz_id_l a , <- plusz_id_l b/.
+rewrite /<- plusz_inverse_l c at all/.
+rewrite /-> plusz_assoc at all/.
+compat >> auto.
+qed ();
+
+
+
+lemma "plusz_cancel_r"
+/
+  forall a b c .
+    a +z c = b +z c : integer
+    -> a = b : integer
+/;
+
+intro /a b c Heq/.
+rewrite /-> plusz_commute in Heq at 0 1/.
+apply /plusz_cancel_l/ >> auto.
+qed ();
+
+
+
+lemma "plusz_shift_r"
+/
+  forall a b c .
+    a +z b = c : integer
+    <->
+    a = c +z ~z b : integer
+/;
+
+inference.
+intro /a b c/.
+split.
+  {
+  intro /H/.
+  apply /plusz_cancel_r _ _ b/.
+  rewrite /-> plusz_assoc/.
+  rewrite /-> plusz_inverse_l/.
+  rewrite /-> plusz_id_r/.
+  auto.
+  }
+
+  {
+  intro /H/.
+  apply /plusz_cancel_r _ _ (~z b)/.
+  rewrite /-> plusz_assoc/.
+  rewrite /-> plusz_inverse_r/.
+  rewrite /-> plusz_id_r/.
+  auto.
+  }
+qed ();
+
+
+
+lemma "plusz_shift_l"
+/
+  forall a b c .
+    a = b +z c : integer
+    <->
+    ~z b +z a = c : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusz_commute at 0 1/.
+rewrite /-> eq_symm_iff at 0 1/.
+apply /plusz_shift_r/.
+qed ();
+
+
+
+lemma "plusz_shift_lr"
+/
+  forall a b c .
+    a +z b = c : integer
+    <->
+    b = ~z a +z c : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusz_commute at 0 1/.
+apply /plusz_shift_r/.
+qed ();
+
+
+
+lemma "plusz_shift_rl"
+/
+  forall a b c .
+    a = b +z c : integer
+    <->
+    a +z ~z c = b : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusz_commute at 0 1/.
+apply /plusz_shift_l/.
+qed ();
+
+
+
 lemma "plusz_compat"
 /
   forall a a' b b' .
@@ -1514,6 +2004,19 @@ inference.
 intro /a a' Ha/.
 subst /a'/.
 reflexivity.
+qed ();
+
+
+
+lemma "neq_0_neg1"
+/
+  z`0 = z`-1 : integer -> void
+/;
+
+intro /H1/.
+so /negz_compat _ _ H1/ /H2/.
+reduce /H2/.
+apply /neq_0_1/ >> auto.
 qed ();
 
 
@@ -1556,6 +2059,18 @@ lemma "leqz_0_1"
 /;
 
 unfold /leqz/.
+reduce //.
+apply /Bool.istrue_true/.
+qed ();
+
+
+
+lemma "ltz_neg1_0"
+/
+  z`-1 <z z`0
+/;
+
+unfold /ltz , leqz/.
 reduce //.
 apply /Bool.istrue_true/.
 qed ();
@@ -1695,6 +2210,32 @@ qed ();
 
 
 
+lemma "ltz_succ"
+/
+  forall a . a <z z`1 +z a
+/;
+
+inference.
+intro /a/.
+unfold /ltz/.
+apply /leqz_refl/.
+qed ();
+
+
+
+lemma "leqz_succ"
+/
+  forall a . a <z= z`1 +z a
+/;
+
+inference.
+intro /a/.
+apply /ltz_impl_leqz/.
+apply /ltz_succ/.
+qed ();
+
+
+
 lemma "ltz_irrefl"
 /
   forall a . a <z a -> void
@@ -1771,7 +2312,7 @@ qed ();
 
 
 
-lemma "plus_cancel_leq_leq_l"
+lemma "plusz_cancel_leqz_leqz_l"
 /
   forall a a' b b' .
     a +z b <z= a' +z b'
@@ -1787,7 +2328,7 @@ qed ();
 
 
 
-lemma "plus_cancel_leq_leq_r"
+lemma "plusz_cancel_leqz_leqz_r"
 /
   forall a a' b b' .
     a +z b <z= a' +z b'
@@ -1798,7 +2339,225 @@ lemma "plus_cancel_leq_leq_r"
 inference.
 intro /a a' b b' Hle Hleb/.
 rewrite /-> plusz_commute in Hle at 0 1/.
-apply /plus_cancel_leq_leq_l/ >> auto.
+apply /plusz_cancel_leqz_leqz_l/ >> auto.
+qed ();
+
+
+
+lemma "plusz_shift_leqz_l"
+/
+  forall a b c .
+    a <z= b +z c
+    <->
+    ~z b +z a <z= c
+/;
+
+inference.
+intro /a b c/.
+split.
+  {
+  intro /H/.
+  apply /plusz_cancel_leqz_l _ _ b/.
+  rewrite /<- plusz_assoc/.
+  rewrite /-> plusz_inverse_r/.
+  rewrite /-> plusz_id_l/.
+  auto.
+  }
+
+  {
+  intro /H/.
+  apply /plusz_cancel_leqz_l _ _ (~z b)/.
+  rewrite /<- plusz_assoc/.
+  rewrite /-> plusz_inverse_l/.
+  rewrite /-> plusz_id_l/.
+  auto.
+  }
+qed ();
+
+
+
+lemma "plusz_shift_leqz_r"
+/
+  forall a b c .
+    a +z b <z= c
+    <->
+    a <z= c +z ~z b
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusz_commute at 0 1/.
+rewrite /-> plusz_shift_leqz_l/.
+rewrite /-> negz_invol/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_shift_leqz_lr"
+/
+  forall a b c .
+    a +z b <z= c
+    <->
+    b <z= ~z a +z c
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusz_commute at 0 1/.
+apply /plusz_shift_leqz_r/.
+qed ();
+
+
+
+lemma "plusz_shift_leqz_rl"
+/
+  forall a b c .
+    a <z= b +z c
+    <-> a +z ~z c <z= b
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusz_commute at 0 1/.
+apply /plusz_shift_leqz_l/.
+qed ();
+
+
+
+lemma "plusz_ltz_l"
+/
+  forall a a' b b' . a <z a' -> b <z= b' -> a +z b <z a' +z b'
+/;
+
+inference.
+intro /a a' b b' Ha Hb/.
+unfold /ltz in Ha in concl/.
+rewrite /<- plusz_assoc/.
+apply /plusz_leqz/ >> auto.
+qed ();
+
+
+
+lemma "plusz_ltz_r"
+/
+  forall a a' b b' . a <z= a' -> b <z b' -> a +z b <z a' +z b'
+/;
+
+inference.
+intro /a a' b b' Ha Hb/.
+rewrite /-> plusz_commute at 0 1/.
+apply /plusz_ltz_l/ >> auto.
+qed ();
+
+
+
+lemma "plusz_ltz"
+/
+  forall a a' b b' . a <z a' -> b <z b' -> a +z b <z a' +z b'
+/;
+
+inference.
+intro /a a' b b' Ha Hb/.
+apply /plusz_ltz_l/ >> auto.
+apply /ltz_impl_leqz/ >> auto.
+qed ();
+
+
+
+lemma "plusz_cancel_ltz_l"
+/
+  forall a b c . c +z a <z c +z b -> a <z b
+/;
+
+inference.
+intro /a b c Hlt/.
+so /plusz_ltz_r _# 4 (leqz_refl (~z c)) Hlt/ /H/.
+rewrite /<- plusz_assoc in H at all/.
+rewrite /-> plusz_inverse_l in H at all/.
+rewrite /-> plusz_id_l in H at all/.
+hyp /H/.
+qed ();
+
+
+
+lemma "plusz_cancel_ltz_r"
+/
+  forall a b c . a +z c <z b +z c -> a <z b
+/;
+
+inference.
+intro /a b c Hle/.
+rewrite /-> plusz_commute in Hle at 0 1/.
+apply /plusz_cancel_ltz_l/ >> auto.
+qed ();
+
+
+
+lemma "plusz_shift_ltz_l"
+/
+  forall a b c .
+    a <z b +z c
+    <->
+    ~z b +z a <z c
+/;
+
+inference.
+intro /a b c/.
+unfold /ltz at all/.
+rewrite /-> plusz_shift_leqz_l/.
+rewrite /<- plusz_assoc at all/.
+rewrite /-> plusz_commute at 1/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_shift_ltz_r"
+/
+  forall a b c .
+    a +z b <z c
+    <->
+    a <z c +z ~z b
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusz_commute at 0 1/.
+rewrite /-> plusz_shift_ltz_l/.
+rewrite /-> negz_invol/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_shift_ltz_lr"
+/
+  forall a b c .
+    a +z b <z c
+    <->
+    b <z ~z a +z c
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusz_commute at 0 1/.
+apply /plusz_shift_ltz_r/.
+qed ();
+
+
+
+lemma "plusz_shift_ltz_rl"
+/
+  forall a b c .
+    a <z b +z c
+    <-> a +z ~z c <z b
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusz_commute at 0 1/.
+apply /plusz_shift_ltz_l/.
 qed ();
 
 
@@ -1919,6 +2678,72 @@ rewrite /<- not_leqz/.
 intro /Hba/.
 witness /Hneq __/.
 apply /leqz_antisymm/ >> auto.
+qed ();
+
+
+
+lemma "ltz_as_leqz_l"
+/
+  forall a b .
+    a <z b <-> z`1 +z a <z= b
+/;
+
+inference.
+intro /a b/.
+unfold /ltz/.
+reflexivity.
+qed ();
+
+
+
+lemma "ltz_as_leqz_r"
+/
+  forall a b .
+    a <z b <-> a +z z`1 <z= b
+/;
+
+inference.
+intro /a b/.
+rewrite /-> plusz_commute/.
+apply /ltz_as_leqz_l/.
+qed ();
+
+
+
+lemma "leqz_as_ltz_l"
+/
+  forall a b .
+    a <z= b <-> a <z z`1 +z b
+/;
+
+inference.
+intro /a b/.
+unfold /ltz/.
+split.
+  {
+  intro /H/.
+  apply /plusz_leqz/ >> auto.
+  apply /leqz_refl/.
+  }
+
+  {
+  intro /H/.
+  apply /plusz_cancel_leqz_l/ >> auto.
+  }
+qed ();
+
+
+
+lemma "leqz_as_ltz_r"
+/
+  forall a b .
+    a <z= b <-> a <z b +z z`1
+/;
+
+inference.
+intro /a b/.
+rewrite /-> plusz_commute/.
+apply /leqz_as_ltz_l/.
 qed ();
 
 
@@ -2354,6 +3179,21 @@ qed ();
 
 
 
+lemma "nat_to_integer_mono_lt"
+/
+  forall m n . m < n -> nat_to_integer m <z nat_to_integer n
+/;
+
+inference.
+unfold /Nat.lt , ltz/.
+intro /m n Hmn/.
+so /nat_to_integer_mono _ _ Hmn/ /H/.
+reduce /H/.
+hyp /H/.
+qed ();
+
+
+
 lemma "nat_to_integer_inv"
 /
   forall n . integer_to_nat (nat_to_integer n) = n : nat
@@ -2439,6 +3279,37 @@ rewrite /-> plusz_id_l/.
 apply /IH/.
 hyp /Hpos/.
 }
+qed ();
+
+
+
+lemma "integer_to_nat_nonpos"
+/
+  forall a .
+    a <z= z`0
+    -> integer_to_nat a = 0 : nat
+/;
+
+inference.
+intro /a Ha/.
+unroll /integer_to_nat/.
+boolCase /leqzb a z`0/ /H/.
+so /H Ha/ /0/.
+qed ();
+
+
+
+lemma "integer_to_nat_neg"
+/
+  forall a .
+    a <z z`0
+    -> integer_to_nat a = 0 : nat
+/;
+
+inference.
+intro /a Ha/.
+apply /integer_to_nat_nonpos/.
+apply /ltz_impl_leqz/ >> auto.
 qed ();
 
 
@@ -2559,6 +3430,40 @@ qed ();
 
 
 
+lemma "integer_to_nat_mono_lt"
+/
+  forall a b .
+    z`0 <z= a
+    -> a <z b
+    -> integer_to_nat a < integer_to_nat b
+/;
+
+inference.
+unfold /Nat.lt , ltz/.
+intro /a b Ha Hab/.
+so /integer_to_nat_mono _ _ __ Hab/ /H/.
+  {
+  rewrite /<- plusz_id_l z`0/.
+  apply /plusz_leqz z`0 z`1 z`0 a/ >> auto.
+  apply /leqz_0_1/.
+  }
+unroll /integer_to_nat in H/.
+revert /H/.
+boolCase /leqzb (z`1 +z a) z`0/ /Hc/.
+  {
+  so /leqz_trans _# 3 Hc Ha/ /H/.
+  fold /a <z a in H/.
+  so /ltz_irrefl _ H/ /0/.
+  }
+intro /H/.
+rewrite /<- plusz_assoc in H/.
+reduce /H/.
+rewrite /-> plusz_id_l in H/.
+hyp /H/.
+qed ();
+
+
+
 lemma "minus_to_integer"
 /
   forall m n . 
@@ -2624,6 +3529,7 @@ rewrite /<- minus_to_integer/.
 rewrite /-> nat_to_integer_inv/.
 reflexivity.
 qed ();
+
 
 
 
@@ -2789,4 +3695,714 @@ so /integer_trichotomy m n/ /H | H | H/.
   right.
   auto.
   }
+qed ();
+
+
+
+lemma "integer_dichotomy_neq"
+/
+  forall (a b : integer) .
+    not (a = b : integer)
+    -> a <z b % b <z a
+/;
+
+intro /a b Hneq/.
+so /integer_trichotomy a b/ /H | H | H/ >> auto.
+so /Hneq __/ /0/.
+hyp /H/.
+qed ();
+
+
+
+(* Multiplication *)
+
+lemma "timesz_commute"
+/
+  forall a b . a *z b = b *z a : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> timesz_spec at all/.
+rewrite /-> Timesz_commute/.
+reflexivity.
+qed ();
+
+
+
+lemma "timesz_assoc"
+/
+  forall a b c . (a *z b) *z c = a *z (b *z c) : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> timesz_spec at all/.
+rewrite /-> Integer_isomorphism at all/.
+rewrite /-> Timesz_assoc at all/.
+reflexivity.
+qed ();
+
+
+
+lemma "timesz_id_l"
+/
+  forall a . z`1 *z a = a : integer
+/;
+
+inference.
+intro /a/.
+rewrite /-> timesz_spec/.
+rewrite /-> integer_to_def_one/.
+rewrite /-> Timesz_id_l/.
+rewrite /-> integer_isomorphism/.
+reflexivity.
+qed ();
+
+
+
+lemma "timesz_id_r"
+/
+  forall a . a *z z`1 = a : integer
+/;
+
+inference.
+intro /a/.
+rewrite /-> timesz_commute/.
+apply /timesz_id_l/.
+qed ();
+
+
+
+lemma "timesz_ann_l"
+/
+  forall a . z`0 *z a = z`0 : integer
+/;
+
+inference.
+intro /a/.
+rewrite /-> timesz_spec/.
+rewrite /-> integer_to_def_zero/.
+rewrite /-> Timesz_ann_l/.
+apply /integer_from_def_zero/.
+qed ();
+
+
+
+lemma "timesz_ann_r"
+/
+  forall a . a *z z`0 = z`0 : integer
+/;
+
+inference.
+intro /a/.
+rewrite /-> timesz_commute/.
+apply /timesz_ann_l/.
+qed ();
+
+
+
+lemma "timesz_dist_plusz_r"
+/
+  forall a b c . a *z (b +z c) = a *z b +z a *z c : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusz_spec at all/.
+rewrite /-> timesz_spec at all/.
+rewrite /-> Integer_isomorphism at all/.
+rewrite /-> Timesz_dist_Plusz_r/.
+reflexivity.
+qed ();
+
+
+
+lemma "timesz_dist_plusz_l"
+/
+  forall a b c . (a +z b) *z c = a *z c +z b *z c : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> timesz_commute at 0 1 2/.
+apply /timesz_dist_plusz_r/.
+qed ();
+
+
+
+lemma "negz_dist_timesz_l"
+/
+  forall a b . ~z (a *z b) = ~z a *z b : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> timesz_spec at all/.
+rewrite /-> negz_spec at all/.
+rewrite /-> Integer_isomorphism at all/.
+rewrite /-> Negz_dist_Timesz_l/.
+reflexivity.
+qed ();
+
+
+
+lemma "negz_dist_timesz_r"
+/
+  forall a b . ~z (a *z b) = a *z ~z b : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> timesz_commute at 0 1/.
+apply /negz_dist_timesz_l/.
+qed ();
+
+
+
+lemma "negz_as_timesz"
+/
+  forall a . ~z a = z`-1 *z a : integer
+/;
+
+inference.
+intro /a/.
+rewrite /<- timesz_id_l a/.
+rewrite /-> negz_dist_timesz_l/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "timesz_leqz"
+/
+  forall a a' b b' . 
+    z`0 <z= a
+    -> z`0 <z= b
+    -> a <z= a' 
+    -> b <z= b'
+    -> a *z b <z= a' *z b'
+/;
+
+inference.
+intro /a a' b b' Hposa Hposb Ha Hb/.
+rewrite /-> leqz_spec in Hposa in Hposb in Ha in Hb in concl/.
+rewrite /-> timesz_spec at all/.
+rewrite /-> Integer_isomorphism at all/.
+rewrite /-> integer_to_def_zero in Hposa in Hposb/.
+apply /Timesz_Leqz/ >> auto.
+qed ();
+
+
+
+Namespace.alias (parseIdent /timesz_leqz_pos_pos/) (parseConstant /timesz_leqz/);
+
+
+lemma "timesz_leqz_neg_neg"
+/
+  forall a a' b b' . 
+    a' <z= z`0
+    -> b' <z= z`0
+    -> a <z= a' 
+    -> b <z= b'
+    -> a' *z b' <z= a *z b
+/;
+
+inference.
+intro /a a' b b' Hnega Hnegb Ha Hb/.
+apply /negz_leqz'/.
+apply /negz_leqz'/.
+rewrite /-> negz_dist_timesz_l at 0 1/.
+rewrite /-> negz_dist_timesz_r at all/.
+apply /timesz_leqz/.
+  {
+  apply /negz_leqz'/.
+  rewrite /-> negz_invol/.
+  autoWith /leqz_trans/.
+  }
+
+  {
+  apply /negz_leqz'/.
+  rewrite /-> negz_invol/.
+  autoWith /leqz_trans/.
+  }
+
+  {
+  apply /negz_leqz/ >> auto.
+  }
+
+  {
+  apply /negz_leqz/ >> auto.
+  }
+qed ();
+
+
+
+lemma "timesz_leqz_pos_neg"
+/
+  forall a a' b b' . 
+    z`0 <z= a
+    -> b' <z= z`0
+    -> a <z= a' 
+    -> b <z= b'
+    -> a' *z b <z= a *z b'
+/;
+
+inference.
+intro /a a' b b' Hposa Hnegb Ha Hb/.
+apply /negz_leqz'/.
+rewrite /-> negz_dist_timesz_r at all/.
+apply /timesz_leqz/ >> auto.
+  {
+  apply /negz_leqz'/.
+  rewrite /-> negz_invol/.
+  autoWith /leqz_trans/.
+  }
+
+  {
+  apply /negz_leqz/ >> auto.
+  }
+qed ();
+
+
+
+lemma "timesz_leqz_neg_pos"
+/
+  forall a a' b b' . 
+    a' <z= z`0
+    -> z`0 <z= b
+    -> a <z= a' 
+    -> b <z= b'
+    -> a *z b' <z= a' *z b
+/;
+
+inference.
+intro /a a' b b' Hnega Hposb Ha Hb/.
+rewrite /-> timesz_commute at 0 1/.
+apply /timesz_leqz_pos_neg/ >> auto.
+qed ();
+
+
+
+lemma "timesz_leqz_l"
+/
+  forall a b b' .
+    z`0 <z= a
+    -> b <z= b'
+    -> a *z b <z= a *z b'
+/;
+
+intro /a b b' Hposa Hb/.
+so /integer_dichotomy z`0 b/ /Hposb | Hnpos/.
+  {
+  apply /timesz_leqz/ >> auto.
+  apply /leqz_refl/.
+  }
+so /ltz_impl_leqz _ _ Hnpos/ /Hnegb/ >> clear /Hnpos/.
+so /integer_dichotomy b' z`0/ /Hnegb' | Hnneg/.
+  {
+  apply /negz_leqz'/.
+  rewrite /-> negz_dist_timesz_r at all/.
+  apply /timesz_leqz/ >> autoWith /leqz_refl/.
+    {
+    apply /negz_leqz'/.
+    rewrite /-> negz_invol/.
+    auto.
+    }
+  apply /negz_leqz/ >> auto.
+  }
+so /ltz_impl_leqz _ _ Hnneg/ /Hposb'/ >> clear /Hnneg/.
+apply /leqz_trans _ z`0/.
+  {
+  rewrite /<- timesz_ann_r a/.
+  apply /negz_leqz'/.
+  rewrite /-> negz_dist_timesz_r at all/.
+  apply /timesz_leqz/ >> autoWith /leqz_refl/.
+  apply /negz_leqz'/.
+  rewrite /-> negz_invol/.
+  auto.
+  }
+
+  {
+  rewrite /<- timesz_ann_r a/.
+  apply /timesz_leqz/ >> autoWith /leqz_refl/.
+  }
+qed ();
+
+
+
+lemma "timesz_leqz_r"
+/
+  forall a a' b .
+    z`0 <z= b
+    -> a <z= a'
+    -> a *z b <z= a' *z b
+/;
+
+inference.
+intro /a a' b Hpos Ha/.
+rewrite /-> timesz_commute at 0 1/.
+apply /timesz_leqz_l/ >> auto.
+qed ();
+
+
+
+lemma "timesz_leqz_l_neg"
+/
+  forall a b b' .
+    a <z= z`0
+    -> b <z= b'
+    -> a *z b' <z= a *z b
+/;
+
+inference.
+intro /a b b' Hneg Hb/.
+apply /negz_leqz'/.
+rewrite /-> negz_dist_timesz_l at all/.
+apply /timesz_leqz_l/ >> auto.
+apply /negz_leqz'/.
+rewrite /-> negz_invol/.
+auto.
+qed ();
+
+
+
+lemma "timesz_leqz_r_neg"
+/
+  forall a a' b .
+    b <z= z`0
+    -> a <z= a'
+    -> a' *z b <z= a *z b
+/;
+
+inference.
+intro /a a' b Hneg Ha/.
+rewrite /-> timesz_commute at 0 1/.
+apply /timesz_leqz_l_neg/ >> auto.
+qed ();
+
+
+
+lemma "times_to_integer"
+/
+  forall m n . nat_to_integer (m * n) = nat_to_integer m *z nat_to_integer n : integer
+/;
+
+inference.
+intro /m n/.
+iterate /m/.
+
+(* 0 *)
+{
+rewrite /-> timesz_ann_l/.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /m IH/.
+rewrite /-> timesz_dist_plusz_l/.
+rewrite /-> timesz_id_l/.
+rewrite /-> plus_to_integer/.
+compat >> auto.
+}
+qed ();
+
+
+
+lemma "timesz_ltz_zero"
+/
+  forall a b .
+    z`0 <z a
+    -> z`0 <z b
+    -> z`0 <z a *z b
+/;
+
+inference.
+inference.
+unfold /ltz at all/.
+intro /a b Ha Hb/.
+so /timesz_leqz _# 4 __ __ Ha Hb/ /H/ >> autoWith /leqz_0_1/.
+qed ();
+
+
+
+Namespace.alias (parseIdent /timesz_ltz_zero_pos_pos/) (parseConstant /timesz_ltz_zero/);
+
+
+
+lemma "timesz_ltz_zero_pos_neg"
+/
+  forall a b .
+    z`0 <z a
+    -> b <z z`0
+    -> a *z b <z z`0
+/;
+
+inference.
+intro /a b Ha Hb/.
+apply /negz_ltz'/.
+reduce //.
+rewrite /-> negz_as_timesz/.
+rewrite /-> timesz_commute at 1/.
+rewrite /<- timesz_assoc/.
+rewrite /<- negz_as_timesz/.
+apply /timesz_ltz_zero/ >> auto.
+apply /negz_ltz'/.
+rewrite /-> negz_invol/.
+auto.
+qed ();
+
+
+
+lemma "timesz_ltz_zero_neg_pos"
+/
+  forall a b .
+    a <z z`0
+    -> z`0 <z b
+    -> a *z b <z z`0
+/;
+
+inference.
+intro /a b Ha Hb/.
+rewrite /-> timesz_commute/.
+apply /timesz_ltz_zero_pos_neg/ >> auto.
+qed ();
+
+
+
+lemma "timesz_ltz_zero_neg_neg"
+/
+  forall a b .
+    a <z z`0
+    -> b <z z`0
+    -> z`0 <z a *z b
+/;
+
+inference.
+intro /a b Ha Hb/.
+apply /negz_ltz'/.
+apply /negz_ltz'/.
+reduce //.
+rewrite /-> negz_as_timesz at all/.
+rewrite /<- timesz_assoc at 1/.
+rewrite /<- negz_as_timesz at 1/.
+rewrite /-> timesz_commute at 1/.
+rewrite /<- timesz_assoc/.
+rewrite /<- negz_as_timesz/.
+apply /timesz_ltz_zero/ >> apply /negz_ltz'/ >> rewrite /-> negz_invol/ >> auto.
+qed ();
+
+
+
+lemma "integer_integral_domain"
+/
+  forall a b .
+    a *z b = z`0 : integer
+    -> a = z`0 : integer % b = z`0 : integer
+/;
+
+inference.
+intro /a b Heq/.
+so /integer_trichotomy a z`0/ /Hnega | Hzero | Hposa/ >> auto.
+  {
+  so /integer_trichotomy b z`0/ /Hnegb | Hzero | Hposb/ >> auto.
+    {
+    exfalso.
+    apply /ltz_irrefl z`0/.
+    rewrite /<- Heq at 1/.
+    apply /timesz_ltz_zero_neg_neg/ >> auto.
+    }
+
+    {
+    exfalso.
+    apply /ltz_irrefl z`0/.
+    rewrite /<- Heq /.
+    apply /timesz_ltz_zero_neg_pos/ >> auto.
+    }
+  }
+
+  {
+  so /integer_trichotomy b z`0/ /Hnegb | Hzero | Hposb/ >> auto.
+    {
+    exfalso.
+    apply /ltz_irrefl z`0/.
+    rewrite /<- Heq/.
+    apply /timesz_ltz_zero_pos_neg/ >> auto.
+    }
+
+    {
+    exfalso.
+    apply /ltz_irrefl z`0/.
+    rewrite /<- Heq at 1/.
+    apply /timesz_ltz_zero/ >> auto.
+    }
+  }
+qed ();
+
+
+
+lemma "timesz_ltz_zero_invert"
+/
+  forall a b .
+    z`0 <z a *z b
+    -> (a <z z`0 & b <z z`0) % (z`0 <z a & z`0 <z b)
+/;
+
+inference.
+intro /a b Hab/.
+so /integer_trichotomy a z`0/ /Ha | Ha | Ha/.
+  {
+  left.
+  split >> auto.
+  so /integer_trichotomy b z`0/ /Hb | Hb | Hb/ >> auto.
+    {
+    subst /b/.
+    rewrite /-> timesz_ann_r in Hab/.
+    so /ltz_irrefl _ Hab/ /0/.
+    }
+
+    {
+    so /timesz_ltz_zero_neg_pos _ _ Ha Hb/ /H/.
+    so /ltz_irrefl _ (ltz_trans _# 3 Hab H)/ /0/.
+    }
+  }
+
+  {
+  subst /a/.
+  rewrite /-> timesz_ann_l in Hab/.
+  so /ltz_irrefl _ Hab/ /0/.
+  }
+
+  {
+  right.
+  split >> auto.
+  so /integer_trichotomy b z`0/ /Hb | Hb | Hb/ >> auto.
+    {
+    so /timesz_ltz_zero_pos_neg _ _ Ha Hb/ /H/.
+    so /ltz_irrefl _ (ltz_trans _# 3 Hab H)/ /0/.
+    }
+
+    {
+    subst /b/.
+    rewrite /-> timesz_ann_r in Hab/.
+    so /ltz_irrefl _ Hab/ /0/.
+    }
+  }
+qed ();
+
+
+
+lemma "timesz_ltz_l"
+/
+  forall a b b' .
+    z`0 <z a
+    -> b <z b'
+    -> a *z b <z a *z b'
+/;
+
+inference.
+intro /a b b' Ha Hb/.
+unfold /ltz in Hb in concl/.
+so /timesz_leqz_l _ _ _ (ltz_impl_leqz _ _ Ha) Hb/ /H/.
+rewrite /-> timesz_dist_plusz_r in H/.
+witness /leqz_trans _# 3 __ H/.
+apply /plusz_leqz/ >> autoWith /leqz_refl/.
+rewrite /-> timesz_id_r/.
+unfold /ltz in Ha/.
+hyp /Ha/.
+qed ();
+
+
+
+lemma "timesz_ltz_r"
+/
+  forall a a' b .
+    z`0 <z b
+    -> a <z a'
+    -> a *z b <z a' *z b
+/;
+
+inference.
+intro /a a' b Hb Ha/.
+rewrite /-> timesz_commute at 0 1/.
+apply /timesz_ltz_l/ >> auto.
+qed ();
+
+
+
+lemma "timesz_cancel_leqz_l"
+/
+  forall a b c .
+    z`0 <z c
+    -> c *z a <z= c *z b
+    -> a <z= b
+/;
+
+inference.
+intro /a b c Hpos Hleq/.
+so /integer_dichotomy a b/ /H | Hba/ >> auto.
+exfalso.
+so /timesz_ltz_l _# 3 Hpos Hba/ /H/.
+so /ltz_irrefl _ (ltz_leqz_trans _# 3 H Hleq)/ /0/.
+qed ();
+
+
+
+lemma "timesz_cancel_leqz_r"
+/
+  forall a b c .
+    z`0 <z c
+    -> a *z c <z= b *z c
+    -> a <z= b
+/;
+
+inference.
+intro /a b c Hc Hleq/.
+rewrite /-> timesz_commute in Hleq at 0 1/.
+apply /timesz_cancel_leqz_l/ >> auto.
+qed ();
+
+
+
+lemma "timesz_cancel_leqz_l_remainder"
+/
+  forall a b c r .
+    z`0 <z c
+    -> r <z c
+    -> c *z a <z= c *z b +z r
+    -> a <z= b
+/;
+
+inference.
+intro /a b c r Hpos Hr Hleq/.
+so /integer_dichotomy a b/ /H | Hba/ >> auto.
+exfalso.
+unfold /ltz in Hba/.
+so /timesz_leqz_l _# 3 (ltz_impl_leqz _ _ Hpos) Hba/ /Hbac/.
+rewrite /-> timesz_dist_plusz_r in Hbac/.
+rewrite /-> timesz_id_r in Hbac/.
+rewrite /-> plusz_commute in Hbac/.
+apply /ltz_irrefl (c *z a)/.
+apply /leqz_ltz_trans/ >> auto.
+apply /ltz_leqz_trans/ >> auto.
+apply /plusz_ltz_r/ >> autoWith /leqz_refl/.
+qed ();
+
+
+
+lemma "timesz_cancel_leqz_r_remainder"
+/
+  forall a b c r .
+    z`0 <z c
+    -> r <z c
+    -> a *z c <z= b *z c +z r
+    -> a <z= b
+/;
+
+inference.
+intro /a b c r Hpos Hr Hleq/.
+rewrite /-> timesz_commute in Hleq at 0 1/.
+apply /timesz_cancel_leqz_l_remainder/ >> auto.
 qed ();

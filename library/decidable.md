@@ -18,8 +18,8 @@
 
     decidable_iff : type:decidable_iff
 
-    eq_bool_decide : type:eq_bool_decide
+    decidable_eq_bool : type:decidable_eq_bool
 
-    istrue_decide : type:istrue_decide
+    decidable_istrue : type:decidable_istrue
 
     decidable_from_bool : type:decidable_from_bool

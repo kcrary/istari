@@ -1,0 +1,4511 @@
+
+Ctrl.import "logic-load.iml";
+Ctrl.import "bool-load.iml";
+Ctrl.import "nat-load.iml";
+Ctrl.import "integer-load.iml";
+Ctrl.import "datatype-load.iml";
+
+openModule /Logic/;
+openModule /Bool/;
+openModule /Nat/;
+openModule /Integer/;
+
+beginModule "Omega";
+
+
+
+(* Expressions *)
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    U i
+  of
+    expr : type =
+    | nil : expr
+
+      (* coefficient, variable number, tail *)
+    | cons : integer -> integer -> expr -> expr
+/;
+
+
+
+val constantVar = /z`-1/;  (* by convention *)
+
+fun varExpr m = /cons z`1 e`\m\ nil/;
+
+fun nzconstExpr m = 
+/
+  cons e`\m\ e`\constantVar\ nil
+/;
+
+fun constExpr m = 
+/
+  if eqzb e`\m\ z`0 then nil else e`\nzconstExpr m\
+/;
+
+
+grammardef OmegaTerm
+
+  rule Term(90) ::= "var" Term(91) => varExpr
+  rule Term(90) ::= "nzconst" Term(91) => nzconstExpr
+  rule Term(90) ::= "const" Term(91) => constExpr
+
+end;
+
+
+grammaron OmegaTerm;
+
+
+
+definerec /add l1 l2/
+/
+   expr_iter (fn _ . expr)
+      l2
+      (fn a1 x1 t1 _ .
+          expr_iter (fn _ . expr)
+             l1
+             (fn a2 x2 t2 _ .
+                 if leqzb x1 x2 then
+                    if eqzb x1 x2 then
+                       if eqzb (a1 +z a2) z`0 then
+                          add t1 t2
+                       else
+                          cons (a1 +z a2) x1 (add t1 t2)
+                    else
+                       cons a1 x1 (add t1 l2)
+                 else
+                    cons a2 x2 (add l1 t2))
+             l2)
+      l1
+//
+   expr -> expr -> expr
+/;
+
+introOf /l1 l2/.
+revert /l2/.
+induct /l1/.
+reintro /IH1/.
+destruct /l1/ /| [a1 x1 t1]/.
+
+(* nil *)
+{
+intro /l2/.
+unroll /add/.
+typecheck.
+}
+
+(* cons *)
+{
+intro /l2/.
+induct /l2/.
+reintro /IH2/.
+destruct /l2/ /| [a2 x2 t2]/.
+  {
+  unroll /add/.
+  typecheck.
+  }
+unroll /add/.
+boolCase /leqzb x1 x2/ /Hleq/.
+  {
+  boolCase /eqzb x1 x2/ /Heq/.
+    {
+    boolCase /eqzb (a1 +z a2) z`0/ /Heqz/.
+      {
+      autoWith /cons_subterm/.
+      }
+      
+      {
+      typecheck >> autoWith /cons_subterm/.
+      }
+    }
+  
+    {
+    typecheck >> autoWith /cons_subterm/.
+    }
+  }
+
+  {
+  typecheck >> autoWith /cons_subterm/.
+  }
+}
+qed ();
+
+
+
+(* Note: does not preserve canonical form if a=0, so don't multiply by 0. *)
+define /mult a l/
+/
+  expr_iter (fn _ . expr)
+    nil
+    (fn b x _ l' . cons (a *z b) x l')
+    l
+//
+  integer -> expr -> expr
+/;
+
+unfold /mult/ >> auto.
+qed ();
+
+
+
+define /bounded n/
+/
+  { x : integer | x <z n }
+//
+  integer -> U 0
+/;
+
+unfold /bounded/ >> typecheck.
+qed ();
+
+
+
+lemma "bounded_self"
+/
+  forall (n : integer) . n : bounded (z`1 +z n)
+/;
+
+intro /n/.
+unfold /bounded/.
+typecheck.
+split.
+apply /ltz_succ/.
+qed ();
+
+
+
+lemma "bounded_sub"
+/
+  forall m n .
+    m <z= n
+    -> bounded m <: bounded n
+/;
+
+inference.
+unfold /bounded at all/.
+intro /m n Hleq x/.
+destruct /x/ /[x Hx]/.
+typecheck.
+split.
+apply /ltz_leqz_trans/ >> auto.
+qed ();
+
+
+
+lemma "bounded_integer_sub"
+/
+  forall n . bounded n <: integer
+/;
+
+inference.
+unfold /bounded/.
+intro /n x/.
+destruct /x/ /[x _]/.
+auto.
+qed ();
+
+
+
+val bounded = parseConstant /bounded/;
+
+Constant2Table.insert TypecheckInternal.subtypeTactics (bounded, bounded)
+  (Backchain.witnessRaw /bounded_sub _ _ __/);
+
+Constant2Table.insert TypecheckInternal.subtypeTactics (bounded, Prim.integer)
+  (Backchain.witnessRaw /bounded_integer_sub _/);
+
+
+
+lemma "add_nil_r"
+/
+  forall a . add a nil = a : expr
+/;
+
+inference.
+intro /a/.
+destruct /a/ /{| a v b}/.
+
+{
+unroll /add/.
+reduce //.
+auto.
+}
+
+{
+unroll /add/.
+reduce //.
+auto.
+}
+qed ();
+
+
+
+define /eval n f e/
+/
+  expr_iter (fn _ . integer)
+    z`0
+    (fn a x _ c .
+       (if ltzb x z`0 then
+          a
+        else if ltzb x n then
+          a *z f x
+        else
+          z`0)
+       +z c)
+    e
+//
+  forall (n : integer) . (bounded n -> integer) -> expr -> integer
+/;
+
+unfold /eval/.
+fold /manual (if _ then _ else _) within _ _ _ _ _ _ _/.
+typecheck.
+reintro /a x t c/.
+boolCase /ltzb x z`0/ /Hneg/ >> auto.
+boolCase /ltzb x n/ /Hlt/ >> auto.
+typecheck1 >> auto.
+typecheck1 >> auto.
+unfold /bounded/.
+typecheck.
+split.
+auto.
+qed ();
+
+
+
+(* The eval_add lemma has too many cases, so we made some auxiliary defintions. *)
+
+define /eval_alt f e/
+/
+  expr_iter (fn _ . integer)
+    z`0
+    (fn a x _ c . a *z f x +z c)
+    e
+//
+  (integer -> integer) -> expr -> integer
+/;
+
+unfold /eval_alt/.
+typecheck.
+qed ();
+
+
+
+define /sanitize n f i/
+/
+  if ltzb i z`0 then z`1 else if ltzb i n then f i else z`0
+//
+  forall n . (bounded n -> integer) -> integer -> integer
+/;
+
+inference.
+introOf /n f i/.
+unfold /sanitize/.
+boolCase /ltzb i n/ /Hlt/ >> auto.
+fold /manual (f i)/.
+typecheck.
+typecheck1.
+unfold /bounded/.
+typecheck.
+auto.
+qed ();
+
+
+
+lemma "eval_as_alt"
+/
+  forall n (f : bounded n -> integer) e . eval n f e = eval_alt (sanitize n f) e : integer
+/;
+
+inference.
+intro /n f e/.
+iterate /e/.
+  {
+  unfold /eval , eval_alt/.
+  auto.
+  }
+intro /a x t IH/.
+unfold /eval , eval_alt/.
+fold /eval _ f _/.
+fold /eval_alt (sanitize n f) _/.
+unfold /sanitize/.
+boolCase /ltzb x z`0/ /Hneg/.
+  {
+  rewrite /-> timesz_id_r/.
+  auto.
+  }
+boolCase /ltzb x n/ /Hlt/.
+1:{
+  rewrite /-> timesz_ann_r/.
+  rewrite /-> plusz_id_l at all/.
+  auto.
+  }
+assert /f x : integer/ /Hfx/.
+  {
+  typecheck1.
+  unfold /bounded/.
+  typecheck.  
+  auto.
+  }
+compat.
+auto.
+qed ();
+
+        
+
+lemma "eval_add"
+/
+  forall n f e1 e2 .
+    eval n f (add e1 e2) = eval n f e1 +z eval n f e2 : integer
+/;
+
+inference.
+intro /n f e1 e2/.
+rewrite /-> eval_as_alt n f at all/.
+revert /e2/.
+induct /e1/.
+reintro /IH1/.
+intro /e2/.
+induct /e2/.
+reintro /IH2/.
+destruct /e1/ /| [a1 x1 t1]/.
+  {
+  unroll /add/.
+  reduce //.
+  unfold /eval_alt at 1/.
+  rewrite /-> plusz_id_l/.
+  reflexivity.
+  }
+destruct /e2/ /| [a2 x2 t2]/.
+  {
+  unroll /add/.
+  reduce //.
+  unfold /eval_alt at 2/.
+  rewrite /-> plusz_id_r/.
+  reflexivity.
+  }
+unroll /add/.
+reduce //.
+boolCase /leqzb x1 x2/ /Hleq/.
+  {
+  boolCase /eqzb x1 x2/ /Heq/.
+    {
+    subst /x2/.
+    boolCase /eqzb (a1 +z a2) z`0/ /Hzero/.
+      {
+      rewrite /-> IH1/.
+        {
+        autoWith /cons_subterm/.
+        }
+      unfold /eval_alt at 2 2/.
+      fold /eval_alt (sanitize n f) _ at all/.
+      rewrite /-> plusz_commute at 2/.
+      rewrite /<- plusz_assoc/.
+      rewrite /-> plusz_assoc at 1/.
+      rewrite /<- timesz_dist_plusz_l/.
+      rewrite /-> Hzero/.
+      rewrite /-> timesz_ann_l/.
+      rewrite /-> plusz_id_r/.
+      auto.
+      }
+
+      {
+      unfold /eval_alt at 0 0 0/.
+      fold /eval_alt (sanitize n f) _ at all/.
+      rewrite /-> IH1/.
+        {
+        autoWith /cons_subterm/.
+        }
+      rewrite /-> timesz_dist_plusz_l/.
+      rewrite /<- plusz_assoc at all/.
+      rewrite /-> plusz_assoc at 3/.
+      rewrite /-> plusz_commute at 5/.
+      rewrite /<- plusz_assoc/.
+      auto.
+      }
+    }
+
+    {
+    unfold /eval_alt at all/.
+    fold /eval_alt (sanitize n f) _ at all/.
+    rewrite /-> IH1/.
+      {
+      autoWith /cons_subterm/.
+      }
+    unfold /eval_alt at 1/.
+    fold /eval_alt (sanitize n f) _ at all/.
+    rewrite /<- plusz_assoc at all/.
+    auto.
+    }
+  }
+
+  {
+  unfold /eval_alt/.
+  fold /eval_alt (sanitize n f) (add (cons a1 x1 t1) t2)/.
+  rewrite /-> IH2/.
+    {
+    apply /cons_subterm/.
+    }
+  unfold /eval_alt at 0 1 1/.
+  fold /eval_alt (sanitize n f) _ at all/.
+  rewrite /<- plusz_assoc at all/.
+  rewrite /-> plusz_commute at 2/.
+  rewrite /-> plusz_assoc at 3/.
+  rewrite /-> plusz_commute at 5/.
+  rewrite /<- plusz_assoc at all/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "eval_mult"
+/
+  forall n f a e . eval n f (mult a e) = a *z eval n f e : integer
+/;
+
+inference.
+intro /n f a e/.
+iterate /e/.
+  {
+  unfold /mult/.
+  unfold /eval at 0 0/.
+  rewrite /-> timesz_ann_r/.
+  reflexivity.
+  }
+intro /b x t IH/.
+unfold /mult/.
+fold /mult _ _/.
+unfold /eval at 1 0/.
+fold /eval n f _ at all/.
+boolCase /ltzb x z`0/ /Hneg/.
+  {
+  rewrite /-> timesz_dist_plusz_r/.
+  compat.
+  auto.
+  }
+boolCase /ltzb x n/ /Hlt/.
+  {
+  assert /f x : integer/ /Hfx/.
+    {
+    typecheck1.
+    unfold /bounded/.
+    typecheck.
+    auto.
+    }
+  rewrite /-> timesz_dist_plusz_r/.
+  rewrite /<- timesz_assoc/.
+  compat.
+  auto.
+  }
+rewrite /-> plusz_id_l at all/.
+auto.
+qed ();
+
+
+
+lemma "eval_nzconst"
+/
+  forall n f a . eval n f (nzconst a) = a : integer
+/;
+
+inference.
+intro /n f a/.
+unfold /eval/.
+reduce //.
+boolCase /ltzb z`-1 z`0/ /Hneg/.
+  {
+  apply /plusz_id_r/.
+  }
+
+  {
+  so /Hneg ltz_neg1_0/ /0/.
+  }
+qed ();
+
+
+
+lemma "eval_const"
+/
+  forall n f a . eval n f (const a) = a : integer
+/;
+
+inference.
+intro /n f a/.
+unfold /eval/.
+reduce //.
+boolCase /eqzb a z`0/ /Hzero/.
+  {
+  symmetry.
+  auto.
+  }
+boolCase /ltzb z`-1 z`0/ /Hneg/.
+  {
+  apply /plusz_id_r/.
+  }
+
+  {
+  so /Hneg ltz_neg1_0/ /0/.
+  }
+qed ();
+
+
+
+lemma "eval_var"
+/
+  forall n f i .
+    z`0 <z= i
+    -> i <z n
+    -> eval n f (var i) = f i : integer
+/;
+
+inference.
+intro /n f i Hnonneg Hlt/.
+unfold /eval/.
+reduce //.
+assert /f i : integer/ /Hof/.
+  {
+  typecheck1 >> auto.
+  unfold /bounded/.
+  typecheck.
+  auto.
+  }
+boolCase /ltzb i z`0/ /Hneg/.
+  {
+  rewrite /<- not_leqz in Hneg/.
+  so /Hneg Hnonneg/ /0/.
+  }
+boolCase /ltzb i n/ /Hlt'/.
+  {
+  rewrite /-> timesz_id_l/.
+  rewrite /-> plusz_id_r/.
+  reflexivity.
+  }
+so /Hlt' Hlt/ /0/.
+qed ();
+
+
+
+lemma "eval_var_neg"
+/
+  forall n f i .
+    z`0 <z= i
+    -> i <z n
+    -> eval n f (cons z`-1 i nil) = ~z (f i) : integer
+/;
+
+inference.
+intro /n f i Hnonneg Hlt/.
+unfold /eval/.
+reduce //.
+assert /f i : integer/ /Hof/.
+  {
+  typecheck1 >> auto.
+  unfold /bounded/.
+  typecheck.
+  auto.
+  }
+boolCase /ltzb i z`0/ /Hneg/.
+  {
+  rewrite /<- not_leqz in Hneg/.
+  so /Hneg Hnonneg/ /0/.
+  }
+boolCase /ltzb i n/ /Hlt'/.
+  {
+  rewrite /<- negz_as_timesz/.
+  rewrite /-> plusz_id_r/.
+  reflexivity.
+  }
+so /Hlt' Hlt/ /0/.
+qed ();
+
+
+
+define /era n e/
+/
+  expr_iter (fn _ . U 0)
+    (z`0 <z= n)
+    (fn _ x _ P . x <z n & P)
+    e
+//
+  integer -> expr -> U 0
+/;
+
+unfold /era/ >> typecheck.
+qed ();
+
+
+
+lemma "era_impl_nonneg"
+/
+  forall n e . era n e -> z`0 <z= n
+/;
+
+inference.
+intro /n e/.
+iterate /e/.
+  {
+  intro /H/.
+  unfold /era in H/.
+  auto.
+  }
+
+  {
+  intro /a x e IH H/.
+  apply /IH/.
+  unfold /era in H/ >> fold /era _ _ in H/.
+  destruct /H/ /? ?/.
+  auto.
+  }
+qed ();
+
+
+
+lemma "era_add"
+/
+  forall n a b . era n a -> era n b -> era n (add a b)
+/;
+
+inference.
+intro /n a b Ha Hb/.
+revert /Ha b Hb/.
+induct /a/.
+reintro /IH1/.
+intro /Hera b/.
+destruct /a/ /| [a x t]/.
+  {
+  intro /Hb/.
+  unroll /add/.
+  reduce //.
+  auto.
+  }
+unfold /era in Hera/ >> fold /era _ _ in Hera/.
+destruct /Hera/ /Hx Ht/.
+induct /b/.
+reintro /IH2/.
+intro /Hera/.
+destruct /b/ /| [b y u]/.
+  {
+  unroll /add/.
+  reduce //.
+  unfold /era/.
+  fold /era _ _/.
+  auto.
+  }
+unfold /era in Hera/ >> fold /era _ _ in Hera/.
+destruct /Hera/ /Hy Hu/.
+unroll /add/.
+reduce //.
+boolCase /leqzb x y/ /Hleq/.
+  {
+  boolCase /eqzb x y/ /Heq/.
+    {
+    boolCase /eqzb (a +z b) z`0/ /Hzero/.
+      {
+      apply /IH1/ >> autoWith /cons_subterm/.
+      }
+    
+      {
+      unfold /era/ >> fold /era _ _/.
+      split >> auto.
+      apply /IH1/ >> autoWith /cons_subterm/.
+      }
+    }
+    
+    {
+    unfold /era/ >> fold /era _ _/.
+    split >> auto.
+    apply /IH1/ >> autoWith /cons_subterm/.
+    unfold /era/ >> fold /era _ _/.
+    auto.
+    }
+  }
+
+  {
+  unfold /era/ >> fold /era _ _/.
+  split >> auto.
+  apply /IH2/ >> autoWith /cons_subterm/.
+  }
+qed ();
+
+
+
+lemma "era_mult"
+/
+  forall n a b . era n b -> era n (mult a b)
+/;
+
+inference.
+intro /n a b/.
+iterate /b/.
+  {
+  intro /Hera/.
+  unfold /mult , era/.
+  unfold /era in Hera/.
+  auto.
+  }
+intro /b c t IH Hera/.
+unfold /era in Hera/ >> fold /era _ _ in Hera/.
+destruct /Hera/ /Hc Ht/.
+unfold /mult/ >> fold /mult _ _/.
+unfold /era/ >> fold /era _ _/.
+auto.
+qed ();
+
+
+
+lemma "era_nzconst"
+/
+  forall n a . z`0 <z= n -> era n (nzconst a)
+/;
+
+inference.
+intro /n a Hn/.
+unfold /era/.
+reduce //.
+split >> auto.
+apply /ltz_leqz_trans/ >> auto.
+apply /ltz_neg1_0/.
+qed ();
+
+
+
+lemma "era_const"
+/
+  forall n a . z`0 <z= n -> era n (const a)
+/;
+
+inference.
+intro /n a Hn/.
+boolCase /eqzb a z`0/ /Hzero/.
+  {
+  unfold /era/.
+  auto.
+  }
+unfold /era/.
+reduce //.
+split >> auto.
+apply /ltz_leqz_trans/ >> auto.
+apply /ltz_neg1_0/.
+qed ();
+
+
+
+lemma "era_var"
+/
+  forall n i .
+    z`0 <z= i
+    -> i <z n
+    -> era n (var i)
+/;
+
+inference.
+intro /n i Hi Hn/.
+unfold /era/.
+reduce //.
+split >> auto.
+apply /leqz_trans/ >> auto.
+apply /ltz_impl_leqz/ >> auto.
+qed ();
+
+
+
+define /equal n f e/
+/
+  (e : expr)
+  & z`0 = eval n f e : integer
+  & era n e
+//
+  forall (n : integer) . (bounded n -> integer) -> expr -> U 0
+/;
+
+introOf /n f e/.
+unfold /equal/.
+typecheck.
+qed ();
+
+
+
+define /inequal n f e/
+/
+  (e : expr)
+  & z`0 <z= eval n f e
+  & era n e
+//
+  forall (n : integer) . (bounded n -> integer) -> expr -> U 0
+/;
+
+introOf /n f e/.
+unfold /inequal/.
+typecheck.
+qed ();
+
+
+
+lemma "eval_advance"
+/
+  forall m n (f : bounded n -> integer) e .
+    era m e
+    -> m <z= n
+    -> eval m f e = eval n f e : integer
+/;
+
+inference.
+intro /m n f e Hera Hleq/.
+revert /Hera/.
+iterate /e/.
+
+(* nil *)
+{
+intro /_/.
+unfold /eval at all/ >> auto.
+}
+
+(* cons *)
+{
+intro /a x t IH Hera/.
+unfold /eval at all/.
+fold /eval m f t/.
+fold /eval n f t/.
+compat.
+1:{
+  apply /IH/.
+  unfold /era in Hera/.
+  fold /era m t in Hera/.
+  destruct /Hera/ /_ ?/ >> auto.
+  }
+unfold /bounded in f/.
+boolCase /ltzb x z`0/ /Hneg/.
+boolCase /ltzb x m/ /Hltm/ >> boolCase /ltzb x n/ /Hltn/.
+  {
+  split.
+  apply /ltz_leqz_trans/ >> auto.
+  }
+
+  {
+  so /Hltn __/ /0/.
+  apply /ltz_leqz_trans/ >> auto.
+  }
+
+  {
+  so /Hltm __/ /0/.
+  unfold /era in Hera/.
+  destruct /Hera/ /? _/ >> auto.
+  }
+}
+qed ();
+
+
+
+lemma "era_advance"
+/
+  forall m n e .
+    era m e
+    -> m <z= n
+    -> era n e
+/;
+
+inference.
+unfold /era at all/.
+intro /m n e Hera Hleq/.
+revert /Hera/.
+iterate /e/.
+  {
+  intro /Hmn/.
+  apply /leqz_trans/ >> auto.
+  }
+intro /a x t IH Hera/.
+destruct /Hera/ /Hx Hera/.
+split >> auto.
+apply /ltz_leqz_trans/ >> auto.
+qed ();
+
+
+
+lemma "equal_advance"
+/
+  forall m n (f : bounded n -> integer) e .
+    m <z= n
+    -> equal m f e
+    -> equal n f e
+/;
+
+inference.
+unfold /equal at all/.
+intro /m n f e Hleq (Hof H Hera)/.
+split >>> [idtac, split].
+  {
+  auto.
+  }
+
+  {
+  rewrite /<- eval_advance m n/ >> auto.
+  }
+
+  {
+  apply /era_advance/ >> auto.
+  }
+qed ();
+
+
+
+lemma "inequal_advance"
+/
+  forall m n (f : bounded n -> integer) e .
+    m <z= n
+    -> inequal m f e
+    -> inequal n f e
+/;
+
+inference.
+unfold /inequal at all/.
+intro /m n f e Hleq (Hof H Hera)/.
+split >>> [idtac, split].
+  {
+  auto.
+  }
+
+  {
+  rewrite /<- eval_advance m n/ >> auto.
+  }
+
+  {
+  apply /era_advance/ >> auto.
+  }
+qed ();
+
+
+
+define /ext n f x i/
+/
+  if eqzb i n then x else f i
+//
+  forall (n : integer) . (bounded n -> integer) -> integer -> bounded (z`1 +z n) -> integer
+/;
+
+introOf /n f x i/.
+unfold /ext/.
+boolCase /eqzb i n/ /Heq/ >> auto.
+typecheck1 >> auto.
+unfold /bounded in i in concl/.
+destruct /i/ /[i Hi]/.
+typecheck.
+split.
+apply /not_leqz/.
+intro /Hleq/.
+so /Heq __/ /0/.
+apply /leqz_antisymm/ >> auto.
+unfold /ltz in Hi/.
+apply /plusz_cancel_leqz_l/ >> auto.
+qed ();
+
+
+
+lemma "ext_eq"
+/
+  forall n f x . ext n f x n = x : integer
+/;
+
+inference.
+intro /n f x/.
+unfold /ext/.
+boolCase /eqzb n n/ /Heq/.
+so /Heq __/ /0/.
+reflexivity.
+qed ();
+
+
+
+lemma "ext_unchanged"
+/
+  forall n f (x : integer) . f = ext n f x : (bounded n -> integer)
+/;
+
+inference.
+intro /n f x/.
+extensionality /i/.
+  {
+  apply /leqz_succ/.
+  }
+
+  {
+  unfold /ext/.
+  infer /i/ /Hofi/.
+  unfold /bounded in i/.
+  destruct /i/ /[i Hi]/.
+  boolCase /eqzb i n/ /Heq/.
+  subst /i/.
+  exfalso.
+  so /ltz_irrefl _ Hi/ /0/.
+  }
+qed ();
+
+
+
+lemma "extend"
+/
+  forall n (f : bounded n -> integer) (x : integer) .
+    exists (g : bounded (z`1 +z n) -> integer) .
+      g n = x : integer
+      & f = g : (bounded n -> integer)
+/;
+
+inference.
+intro /n f x/.
+assert /n <z= z`1 +z n/ /Hleq/.
+  {
+  rewrite /<- plusz_id_l n/.
+  apply /plusz_leqz/ >> auto.
+  apply /leqz_0_1/.
+  }
+existsRaw /ext n f x/ >> auto.
+  {
+  reintro /g/.
+  fold /manual n/.
+  typecheck.
+  unfold /bounded/.
+  typecheck.
+  split.
+  apply /ltz_succ/.
+  }
+split >> autoWith /ext_eq ext_unchanged/.
+qed ();
+
+
+
+lemma "extend_expr"
+/
+  forall n (f : bounded n -> integer) (x : expr) .
+    exists (g : bounded (z`1 +z n) -> integer) .
+      g n = eval n f x : integer
+      & f = g : (bounded n -> integer)
+/;
+
+inference.
+intro /n f x/.
+apply /extend/.
+qed ();
+
+
+
+lemma "unsquash_era"
+/
+  forall n e . { era n e } -> era n e
+/;
+
+inference.
+intro /n e/.
+iterate /e/.
+  {
+  unfold /era at all/.
+  intro /[H]/.
+  unhide.
+  auto.
+  }
+
+  {
+  intro /a x t IH [H]/.
+  unfold /era in H in concl/ >> fold /era _ _ in H in concl/.
+  split.
+    {
+    unhide.
+    destruct /H/ /H _/.
+    auto.
+    }
+  apply /IH/.
+  split.
+  destruct /H/ /_ H/.
+  auto.
+  }
+qed ();
+
+
+
+lemma "unsquash_equal"
+/
+  forall n f e . { equal n f e } -> equal n f e
+/;
+
+inference.
+unfold /equal at all/.
+intro /n f e H/.
+destruct /H/ /[H]/.
+split >>> [idtac, split].
+  {
+  typecheck.
+  }
+
+  {
+  unhide.
+  destruct /H/ /_ H _/.
+  auto.
+  }
+
+  {
+  apply /unsquash_era/.
+  split.
+  destruct /H/ /_ _ H/.
+  auto.
+  }
+qed ();
+
+
+
+lemma "unsquash_inequal"
+/
+  forall n f e . { inequal n f e } -> inequal n f e
+/;
+
+inference.
+unfold /inequal at all/.
+intro /n f e H/.
+destruct /H/ /[H]/.
+split >>> [idtac, split].
+  {
+  typecheck.
+  }
+
+  {
+  unhide.
+  destruct /H/ /_ H _/.
+  auto.
+  }
+
+  {
+  apply /unsquash_era/.
+  split.
+  destruct /H/ /_ _ H/.
+  auto.
+  }
+qed ();
+
+
+
+
+(* Processing *)
+
+lemma "istrue_typing"
+/
+  forall b . istrue b : type
+/;
+
+inference.
+intro /b/.
+typecheck.
+qed ();
+
+
+
+lemma "notb_typing"
+/
+  forall b . notb b : bool
+/;
+
+inference.
+intro /b/.
+typecheck.
+qed ();
+
+
+
+lemma "andb_typing"
+/
+  forall b c . andb b c : bool
+/;
+
+inference.
+intro /b c/.
+typecheck.
+qed ();
+
+
+
+lemma "orb_typing"
+/
+  forall b c . orb b c : bool
+/;
+
+inference.
+intro /b c/.
+typecheck.
+qed ();
+
+
+
+lemma "impb_typing"
+/
+  forall b c . impb b c : bool
+/;
+
+inference.
+intro /b c/.
+typecheck.
+qed ();
+
+
+
+lemma "succ_typing"
+/
+  forall a . succ a : nat
+/;
+
+inference.
+intro /a/.
+typecheck.
+qed ();
+
+
+
+lemma "eqb_typing"
+/
+  forall a b . eqb a b : bool
+/;
+
+inference.
+intro /a b/.
+typecheck.
+qed ();
+
+
+
+lemma "leqb_typing"
+/
+  forall a b . leqb a b : bool
+/;
+
+inference.
+intro /a b/.
+typecheck.
+qed ();
+
+
+
+lemma "ltb_typing"
+/
+  forall a b . ltb a b : bool
+/;
+
+inference.
+intro /a b/.
+typecheck.
+qed ();
+
+
+
+lemma "plus_typing"
+/
+  forall a b . plus a b : nat
+/;
+
+inference.
+intro /a b/.
+typecheck.
+qed ();
+
+
+
+lemma "minus_typing"
+/
+  forall a b . minus a b : nat
+/;
+
+inference.
+intro /a b/.
+typecheck.
+qed ();
+
+
+
+lemma "times_typing"
+/
+  forall a b . times a b : nat
+/;
+
+inference.
+intro /a b/.
+typecheck.
+qed ();
+
+
+
+lemma "eqzb_typing"
+/
+  forall a b . eqzb a b : bool
+/;
+
+inference.
+intro /a b/.
+typecheck.
+qed ();
+
+
+
+lemma "leqzb_typing"
+/
+  forall a b . leqzb a b : bool
+/;
+
+inference.
+intro /a b/.
+typecheck.
+qed ();
+
+
+
+lemma "ltzb_typing"
+/
+  forall a b . ltzb a b : bool
+/;
+
+inference.
+intro /a b/.
+typecheck.
+qed ();
+
+
+
+lemma "plusz_typing"
+/
+  forall a b . plusz a b : integer
+/;
+
+inference.
+intro /a b/.
+typecheck.
+qed ();
+
+
+
+lemma "negz_typing"
+/
+  forall a . negz a : integer
+/;
+
+inference.
+intro /a/.
+typecheck.
+qed ();
+
+
+
+lemma "minusz_typing"
+/
+  forall a b . minusz a b : integer
+/;
+
+inference.
+intro /a b/.
+typecheck.
+qed ();
+
+
+
+lemma "timesz_typing"
+/
+  forall a b . timesz a b : integer
+/;
+
+inference.
+intro /a b/.
+typecheck.
+qed ();
+
+
+
+lemma "nat_to_integer_typing"
+/
+  forall a . nat_to_integer a : integer
+/;
+
+inference.
+intro /a/.
+typecheck.
+qed ();
+
+
+
+lemma "integer_to_nat_typing"
+/
+  forall a . integer_to_nat a : nat
+/;
+
+inference.
+intro /a/.
+typecheck.
+qed ();
+
+
+
+lemma "andb_intro"
+/
+  forall b c .
+    istrue b -> istrue c -> istrue (andb b c)
+/;
+
+inference.
+intro /b c Hb Hc/.
+rewrite /-> istrue_andb/.
+auto.
+qed ();
+
+
+
+lemma "orb_intro1"
+/
+  forall b c . istrue b -> istrue (orb b c)
+/;
+
+inference.
+intro /b c H/.
+rewrite /-> istrue_orb/.
+left >> auto.
+qed ();
+
+
+
+lemma "orb_intro2"
+/
+  forall b c . istrue c -> istrue (orb b c)
+/;
+
+inference.
+intro /b c H/.
+rewrite /-> istrue_orb/.
+right >> auto.
+qed ();
+
+
+
+lemma "impb_intro"
+/
+  forall b c . (istrue b -> istrue c) -> istrue (impb b c)
+/;
+
+inference.
+intro /b c H/.
+rewrite /-> istrue_impb/.
+hyp /H/.
+qed ();
+
+
+
+lemma "andb_elim1_inhabitant"
+/
+  forall b c .
+    istrue (andb b c)
+    -> () : istrue b
+/;
+
+inference.
+intro /b c H/.
+rewrite /-> istrue_andb in H/.
+typecheck.
+apply /H/.
+qed ();
+
+
+
+lemma "andb_elim2_inhabitant"
+/
+  forall b c .
+    istrue (andb b c)
+    -> () : istrue c
+/;
+
+inference.
+intro /b c H/.
+rewrite /-> istrue_andb in H/.
+typecheck.
+apply /H/.
+qed ();
+
+
+
+lemma "impb_elim_inhabitant"
+/
+  forall b c .
+    istrue (impb b c)
+    -> istrue b
+    -> () : istrue c
+/;
+
+inference.
+intro /b c Hbc Hb/.
+rewrite /-> istrue_impb in Hbc/.
+typecheck.
+auto.
+qed ();
+
+
+
+lemma "istrue_inhabitant_from_eq_true"
+/
+  forall b . b = true : bool -> () : istrue b
+/;
+
+inference.
+intro /b H/.
+rewrite /<- istrue_iff_eq_true in H/.
+typecheck.
+qed ();
+
+
+
+lemma "istrue_inhabitant_from_or_and_eq_false"
+/
+  forall b c . istrue (orb b c) -> b = false : bool -> () : istrue c
+/;
+
+inference.
+intro /b c Hbc Hnotb/.
+subst /b/.
+reduce /Hbc/.
+typecheck.
+qed ();
+
+
+
+lemma "eq_inhabitant_from_eqb"
+/
+  forall a b . istrue (eqb a b) -> () : a = b : nat
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> istrue_eqb in H/.
+typecheck.
+qed ();
+
+
+
+lemma "leq_inhabitant_from_leqb"
+/
+  forall a b . istrue (leqb a b) -> () : a <= b
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> istrue_leqb in H/.
+typecheck.
+qed ();
+
+
+
+lemma "lt_inhabitant_from_ltb"
+/
+  forall a b . istrue (ltb a b) -> () : a < b
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> istrue_ltb in H/.
+typecheck.
+qed ();
+
+
+
+lemma "eq_inhabitant_from_eqzb"
+/
+  forall a b . istrue (eqzb a b) -> () : a = b : integer
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> istrue_eqzb in H/.
+typecheck.
+qed ();
+
+
+
+lemma "leqz_inhabitant_from_leqzb"
+/
+  forall a b . istrue (leqzb a b) -> () : a <z= b
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> istrue_leqzb in H/.
+typecheck.
+qed ();
+
+
+
+lemma "ltz_inhabitant_from_ltzb"
+/
+  forall a b . istrue (ltzb a b) -> () : a <z b
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> istrue_ltzb in H/.
+typecheck.
+qed ();
+
+
+
+lemma "eqb_from_eq"
+/
+  forall a b . a = b : nat -> istrue (eqb a b)
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> istrue_eqb/.
+auto.
+qed ();
+
+
+
+lemma "leqb_from_leq"
+/
+  forall a b . a <= b -> istrue (leqb a b)
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> istrue_leqb/.
+auto.
+qed ();
+
+
+
+lemma "ltb_from_lt"
+/
+  forall a b . a < b -> istrue (ltb a b)
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> istrue_ltb/.
+auto.
+qed ();
+
+
+
+lemma "eq_from_eqzb"
+/
+  forall a b . Bool.istrue (eqzb a b) -> a = b : integer
+/;
+
+inference.
+intro /a b H/.
+apply /istrue_eqzb/ >> auto.
+qed ();
+
+
+
+lemma "eqzb_from_eq"
+/
+  forall a b . a = b : integer -> istrue (eqzb a b)
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> istrue_eqzb/.
+auto.
+qed ();
+
+
+
+lemma "leqzb_from_leqz"
+/
+  forall a b . a <z= b -> istrue (leqzb a b)
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> istrue_leqzb/.
+auto.
+qed ();
+
+
+
+lemma "ltzb_from_ltz"
+/
+  forall a b . a <z b -> istrue (ltzb a b)
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> istrue_ltzb/.
+auto.
+qed ();
+
+
+
+
+(* Standardization *)
+
+define /tequiv/
+/
+  { x : bool & U 0 | istrue (x #1) <-> x #2 }
+//
+  U 1
+/;
+
+unfold /tequiv/.
+typecheck.
+qed ();
+
+
+
+define /fequiv/
+/
+  { x : bool & U 0 | istrue (notb (x #1)) <-> x #2 }
+//
+  U 1
+/;
+
+unfold /fequiv/.
+typecheck.
+qed ();
+
+
+
+define /intequiv n f/
+/
+  { x : integer & expr | x #1 = eval n f (x #2) : integer & era n (x #2) }
+//
+  forall (n : integer) . (bounded n -> integer) -> U 0
+/;
+
+unfold /intequiv/.
+typecheck.
+qed ();
+
+
+
+define /natequiv n f/
+/
+  { x : nat & expr | nat_to_integer (x #1) = eval n f (x #2) : integer & era n (x #2) }
+//
+  forall (n : integer) . (bounded n -> integer) -> U 0
+/;
+
+unfold /natequiv/.
+typecheck.
+qed ();
+
+
+
+lemma "intequiv_to_expr"
+/
+  forall n f (x : intequiv n f) . x #2 : expr
+/;
+
+inference.
+intro /n f x/.
+unfold /intequiv in x/.
+destruct /x/ /[(a' a) _]/.
+hypof.
+qed ();
+
+
+
+lemma "natequiv_to_expr"
+/
+  forall n f (x : natequiv n f) . x #2 : expr
+/;
+
+inference.
+intro /n f x/.
+unfold /natequiv in x/.
+destruct /x/ /[(a' a) _]/.
+hypof.
+qed ();
+
+
+
+lemma "istrue_from_not_isfalse"
+/
+  forall b . (istrue (notb b) -> void) -> istrue b
+/;
+
+inference.
+intro /b H/.
+boolCase /b/ /Hb/.
+  {
+  apply /istrue_true/.
+  }
+
+  {
+  rewrite /-> istrue_notb in H/.
+  so /H Hb/ /0/.
+  }
+qed ();
+
+
+
+lemma "istrue_notb_type"
+/
+  forall b . istrue (notb b) : type
+/;
+
+inference.
+intro /b/.
+typecheck.
+qed ();
+
+
+
+lemma "istrue_fequiv_contra"
+/
+  forall (x : fequiv) .
+    (x #2 -> void)
+    -> istrue (notb (x #1))
+    -> void
+/;
+
+unfold /fequiv/.
+intro /[(a' a) Hiff] Hnot H/.
+unhide.
+reduce /Hiff/.
+rewrite /-> Hiff in H/.
+so /Hnot H/ /0/.
+qed ();
+
+
+
+lemma "initial_solution"
+/
+  bounded z`0 -> integer
+/;
+
+intro /_/.
+exact /z`0/.
+qed ();
+
+
+
+lemma "fequiv_to_type"
+/
+  forall (x : fequiv) .
+    x #2 : type
+/;
+
+unfold /fequiv/.
+intro /[(a a') _]/.
+typecheck.
+qed ();
+
+
+
+lemma "tequiv_true"
+/
+  (true , unit) : tequiv
+/;
+
+unfold /tequiv/.
+typecheck.
+split.
+rewrite /-> istrue_true_iff/.
+qed ();
+
+
+
+lemma "tequiv_false"
+/
+  (false , void) : tequiv
+/;
+
+unfold /tequiv/.
+typecheck.
+split.
+rewrite /-> istrue_false_iff/.
+qed ();
+
+
+
+lemma "tequiv_not"
+/
+  forall (x : fequiv) .
+    (notb (x #1) , x #2) : tequiv
+/;
+
+unfold /fequiv , tequiv/.
+intro /[(a a') Ha]/.
+typecheck.
+split.
+hyp /Ha/.
+qed ();
+
+
+
+lemma "tequiv_and"
+/
+  forall (x y : tequiv) .
+    (andb (x #1) (y #1) , x #2 & y #2) : tequiv
+/;
+
+unfold /tequiv at all/.
+intro /[(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+rewrite /-> istrue_andb/.
+rewrite /-> Ha , -> Hb/.
+qed ();
+
+
+
+lemma "tequiv_or"
+/
+  forall (x y : tequiv) .
+    (orb (x #1) (y #1) , x #2 % y #2) : tequiv
+/;
+
+unfold /tequiv at all/.
+intro /[(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+rewrite /-> istrue_orb/.
+rewrite /-> Ha , -> Hb/.
+qed ();
+
+
+
+lemma "tequiv_imp"
+/
+  forall (x : fequiv) (y : tequiv) .
+    (impb (x #1) (y #1) , x #2 % y #2) : tequiv
+/;
+
+unfold /tequiv at all , fequiv at all/.
+intro /[(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+rewrite /-> impb_as_orb/.
+rewrite /-> istrue_orb/.
+rewrite /-> Ha , -> Hb/.
+qed ();
+
+
+
+lemma "tequiv_other"
+/
+  forall (b : bool) .
+    (b , istrue b) : tequiv
+/;
+
+unfold /tequiv/.
+intro /b/.
+typecheck.
+split.
+reflexivity.
+qed ();
+
+
+
+lemma "fequiv_true"
+/
+  (true , void) : fequiv
+/;
+
+unfold /fequiv/.
+typecheck.
+split.
+rewrite /-> istrue_false_iff/.
+qed ();
+
+
+
+lemma "fequiv_false"
+/
+  (false , unit) : fequiv
+/;
+
+unfold /fequiv/.
+typecheck.
+split.
+rewrite /-> istrue_true_iff/.
+qed ();
+
+
+
+lemma "fequiv_not"
+/
+  forall (x : tequiv) .
+    (notb (x #1) , x #2) : fequiv
+/;
+
+unfold /fequiv , tequiv/.
+intro /[(a a') Ha]/.
+reduce /Ha concl/.
+typecheck.
+split.
+rewrite /-> notb_invol/.
+hyp /Ha/.
+qed ();
+
+
+
+lemma "fequiv_and"
+/
+  forall (x y : fequiv) .
+    (andb (x #1) (y #1) , x #2 % y #2) : fequiv
+/;
+
+unfold /fequiv at all/.
+intro /[(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+rewrite /-> notb_andb/.
+rewrite /-> istrue_orb/.
+rewrite /-> Ha , -> Hb/.
+qed ();
+
+
+
+lemma "fequiv_or"
+/
+  forall (x y : fequiv) .
+    (orb (x #1) (y #1) , x #2 & y #2) : fequiv
+/;
+
+unfold /fequiv at all/.
+intro /[(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+rewrite /-> notb_orb/.
+rewrite /-> istrue_andb/.
+rewrite /-> Ha , -> Hb/.
+qed ();
+
+
+
+lemma "fequiv_imp"
+/
+  forall (x : tequiv) (y : fequiv) .
+    (impb (x #1) (y #1) , x #2 & y #2) : fequiv
+/;
+
+unfold /tequiv at all , fequiv at all/.
+intro /[(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+rewrite /-> notb_impb/.
+rewrite /-> istrue_andb/.
+rewrite /-> Ha , -> Hb/.
+qed ();
+
+
+
+lemma "fequiv_other"
+/
+  forall (b : bool) .
+    (b , istrue (notb b)) : fequiv
+/;
+
+unfold /fequiv/.
+intro /b/.
+typecheck.
+split.
+reflexivity.
+qed ();
+
+
+
+lemma "of_iff_unit"
+/
+  forall i (a : U i) (x : a) . (x : a) <-> unit
+/;
+
+inference.
+intro /i a x/.
+apply /true_iff_unit/.
+auto.
+qed ();
+
+
+
+fun exprEq n f a b = /equal e`\n\ e`\f\ (add (mult z`-1 e`\a\) e`\b\)/;
+
+lemma "exprEq"
+/
+  forall n f a b .
+    era n a
+    -> era n b
+    -> eval n f a = eval n f b : integer
+       <->
+       e`\exprEq /n/ /f/ /a/ /b/\
+/;
+
+inference.
+intro /n f a b Ha Hb/.
+unfold /equal/.
+rewrite /-> of_iff_unit/.
+rewrite /-> prod_id_l/.
+rewrite /-> true_iff_unit _ (era n _)/.
+  {
+  autoWith /era_add era_mult/.
+  }
+rewrite /-> prod_id_r/.
+rewrite /-> eval_add/.
+rewrite /-> eval_mult/.
+rewrite /<- negz_as_timesz/.
+rewrite /-> plusz_shift_l/.
+rewrite /-> negz_invol/.
+rewrite /-> plusz_id_r/.
+reflexivity.
+qed ();
+
+
+
+fun exprLeq n f a b = /inequal e`\n\ e`\f\ (add (mult z`-1 e`\a\) e`\b\)/;
+
+lemma "exprLeq"
+/
+  forall n f a b .
+    era n a
+    -> era n b
+    -> eval n f a <z= eval n f b
+       <->
+       e`\exprLeq /n/ /f/ /a/ /b/\
+/;
+
+inference.
+intro /n f a b Ha Hb/.
+unfold /inequal/.
+rewrite /-> of_iff_unit/.
+rewrite /-> prod_id_l/.
+rewrite /-> true_iff_unit _ (era n _)/.
+  {
+  autoWith /era_add era_mult/.
+  }
+rewrite /-> prod_id_r/.
+rewrite /-> eval_add/.
+rewrite /-> eval_mult/.
+rewrite /<- negz_as_timesz/.
+rewrite /-> plusz_shift_leqz_l/.
+rewrite /-> negz_invol/.
+rewrite /-> plusz_id_r/.
+reflexivity.
+qed ();
+
+
+
+fun exprLt n f a b = /inequal e`\n\ e`\f\ (add (add (mult z`-1 e`\a\) e`\b\) (nzconst z`-1))/;
+
+lemma "exprLt"
+/
+  forall n f a b .
+    era n a
+    -> era n b
+    -> eval n f a <z eval n f b
+       <->
+       e`\exprLt /n/ /f/ /a/ /b/\
+/;
+
+inference.
+intro /n f a b Ha Hb/.
+unfold /inequal/.
+rewrite /-> of_iff_unit/.
+rewrite /-> prod_id_l/.
+rewrite /-> true_iff_unit _ (era n _)/.
+  {
+  so /era_impl_nonneg _ _ Ha/ /Hn/.
+  autoWith /era_add era_mult era_nzconst/.
+  }
+rewrite /-> prod_id_r/.
+rewrite /-> eval_add at all/.
+rewrite /-> eval_mult/.
+rewrite /-> eval_nzconst/.
+rewrite /<- negz_as_timesz/.
+rewrite /-> plusz_shift_leqz_rl/.
+rewrite /-> plusz_id_l/.
+rewrite /<- plusz_shift_leqz_lr/.
+unfold /ltz/.
+rewrite /-> plusz_commute/.
+reflexivity.
+qed ();
+
+
+
+fun exprNeq n f a b = /e`\exprLt n f a b\ % e`\exprLt n f b a\/;
+
+lemma "exprNeq"
+/
+  forall n f a b .
+    era n a
+    -> era n b
+    -> not (eval n f a = eval n f b : integer)
+       <->
+       e`\exprNeq /n/ /f/ /a/ /b/\
+/;
+
+inference.
+intro /n f a b Ha Hb/.
+rewrite /<- exprLt at all/ >> auto.
+split.
+  {
+  intro /Hneq/.
+  so /integer_dichotomy_neq _ _ Hneq/ /H | H/ >> auto.
+  }
+
+  {
+  intro /(H | H)/.
+    {
+    intro /Heq/.
+    moveBefore /Heq/ /H/.
+    rewrite /-> Heq in H/.
+    apply /ltz_irrefl (eval n f b)/ >> auto.
+    }
+
+    {
+    intro /Heq/.
+    moveBefore /Heq/ /H/.
+    rewrite /-> Heq in H/.
+    apply /ltz_irrefl (eval n f b)/ >> auto.
+    }
+  }
+qed ();
+
+
+
+fun expr0Eq n f a = /equal e`\n\ e`\f\ e`\a\/;
+
+lemma "expr0Eq"
+/
+  forall n f a .
+    era n a
+    -> z`0 = eval n f a : integer
+       <->
+       e`\expr0Eq /n/ /f/ /a/\
+/;
+
+inference.
+intro /n f a Ha/.
+unfold /equal/.
+rewrite /-> of_iff_unit/.
+rewrite /-> prod_id_l/.
+rewrite /-> true_iff_unit _ (era n _)/ >> auto.
+rewrite /-> prod_id_r/.
+qed ();
+
+
+
+fun expr0Leq n f a = /inequal e`\n\ e`\f\ e`\a\/;
+
+lemma "expr0Leq"
+/
+  forall n f a .
+    era n a
+    -> z`0 <z= eval n f a
+       <->
+       e`\expr0Leq /n/ /f/ /a/\
+/;
+
+inference.
+intro /n f a Ha/.
+unfold /inequal/.
+rewrite /-> of_iff_unit/.
+rewrite /-> prod_id_l/.
+rewrite /-> true_iff_unit _ (era n _)/ >> auto.
+rewrite /-> prod_id_r/.
+qed ();
+
+
+
+fun exprLt0 n f a = /inequal e`\n\ e`\f\ (add (mult z`-1 e`\a\) (nzconst z`-1))/;
+
+lemma "exprLt0"
+/
+  forall n f a .
+    era n a
+    -> eval n f a <z z`0
+       <->
+       e`\exprLt0 /n/ /f/ /a/\
+/;
+
+inference.
+intro /n f a Ha/.
+unfold /inequal/.
+rewrite /-> of_iff_unit/.
+rewrite /-> prod_id_l/.
+rewrite /-> true_iff_unit _ (era n _)/.
+  {
+  so /era_impl_nonneg _ _ Ha/ /Hn/.
+  autoWith /era_add era_mult era_nzconst/.
+  }
+rewrite /-> prod_id_r/.
+rewrite /-> eval_add/.
+rewrite /-> eval_mult/.
+rewrite /-> eval_nzconst/.
+rewrite /<- negz_as_timesz/.
+rewrite /<- plusz_shift_leqz_lr/.
+rewrite /-> plusz_id_r/.
+rewrite /<- plusz_id_r z`-1/.
+rewrite /-> plusz_shift_leqz_l/.
+reduce //.
+unfold /ltz/.
+reflexivity.
+qed ();
+
+
+
+fun exprSucc a = /add e`\a\ (nzconst z`1)/;
+
+lemma "exprSucc"
+/
+  forall n f a .
+    z`1 +z eval n f a = eval n f (e`\exprSucc /a/\) : integer
+/;
+
+inference.
+intro /n f a/.
+rewrite /-> eval_add , -> eval_nzconst/.
+rewrite /-> plusz_commute/.
+reflexivity.
+qed ();
+
+
+
+fun exprPlus a b = /add e`\a\ e`\b\/;
+
+lemma "exprPlus"
+/
+  forall n f a b .
+    eval n f a +z eval n f b = eval n f (e`\exprPlus /a/ /b/\) : integer
+/;
+
+inference.
+intro /n f a b/.
+rewrite /-> eval_add/.
+reflexivity.
+qed ();
+
+
+
+fun exprNeg a = /mult z`-1 e`\a\/;
+
+lemma "exprNeg"
+/
+  forall n f a .
+    ~z (eval n f a) = eval n f (e`\exprNeg /a/\) : integer
+/;
+
+inference.
+intro /n f a/.
+rewrite /-> eval_mult/.
+rewrite /<- negz_as_timesz/.
+reflexivity.
+qed ();
+
+
+
+fun exprMinus a b = exprPlus a (exprNeg b);
+
+lemma "exprMinus"
+/
+  forall n f a b .
+    eval n f a -z eval n f b = eval n f (e`\exprMinus /a/ /b/\) : integer
+/;
+
+inference.
+intro /n f a b/.
+rewrite /-> eval_add , -> eval_mult/.
+rewrite /<- negz_as_timesz/.
+unfold /minusz/.
+reflexivity.
+qed ();
+
+
+
+fun exprTimes a b = /mult e`\a\ e`\b\/;
+
+lemma "exprTimes"
+/
+  forall n f a b .
+    a *z eval n f b = eval n f (e`\exprTimes /a/ /b/\) : integer
+/;
+
+inference.
+intro /n f a b/.
+rewrite /-> eval_mult/.
+reflexivity.
+qed ();
+
+
+
+lemma "tequiv_eqz"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : intequiv n1 f) (y : intequiv n2 f) .
+         (eqzb (x #1) (y #1) , e`\exprEq /n2/ /f/ /x #2/ /y #2/\) : tequiv
+/;
+
+inference.
+unfold /intequiv at all , tequiv/.
+intro /n1 n2 f Hn [(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+moveBefore /a' b'/ /a/.
+subst /a/.
+subst /b/.
+rewrite /-> istrue_eqzb/.
+rewrite /<- exprEq/ >> autoWith /era_advance/.
+rewrite /-> eval_advance n1 n2/ >> autoWith /era_advance/.
+qed ();
+
+
+
+lemma "tequiv_leqz"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : intequiv n1 f) (y : intequiv n2 f) .
+         (leqzb (x #1) (y #1) , e`\exprLeq /n2/ /f/ /x #2/ /y #2/\) : tequiv
+/;
+
+inference.
+unfold /intequiv at all , tequiv/.
+intro /n1 n2 f Hn [(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+moveBefore /a' b'/ /a/.
+subst /a/.
+subst /b/.
+rewrite /-> istrue_leqzb/.
+rewrite /<- exprLeq/ >> autoWith /era_advance/.
+rewrite /-> eval_advance n1 n2/ >> autoWith /era_advance/.
+qed ();
+
+
+
+lemma "tequiv_ltz"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : intequiv n1 f) (y : intequiv n2 f) .
+    (ltzb (x #1) (y #1) , e`\exprLt /n2/ /f/ /x #2/ /y #2/\) : tequiv
+/;
+
+inference.
+unfold /intequiv at all , tequiv/.
+intro /n1 n2 f Hn [(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+moveBefore /a' b'/ /a/.
+subst /a/.
+subst /b/.
+rewrite /-> istrue_ltzb/.
+rewrite /<- exprLt/ >> autoWith /era_advance/.
+rewrite /-> eval_advance n1 n2/ >> autoWith /era_advance/.
+qed ();
+
+
+
+lemma "fequiv_eqz"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : intequiv n1 f) (y : intequiv n2 f) .
+         (eqzb (x #1) (y #1) , e`\exprNeq /n2/ /f/ /x #2/ /y #2/\) : fequiv
+/;
+
+inference.
+unfold /intequiv at all , fequiv/.
+intro /n1 n2 f Hn [(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+moveBefore /a' b'/ /a/.
+subst /a/.
+subst /b/.
+rewrite /-> istrue_notb/.
+rewrite /-> istrue_eqzb/.
+rewrite /<- exprNeq/ >> autoWith /era_advance/.
+rewrite /-> eval_advance n1 n2/ >> autoWith /era_advance/.
+qed ();
+
+
+
+lemma "fequiv_leqz"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : intequiv n1 f) (y : intequiv n2 f) .
+         (leqzb (x #1) (y #1) , e`\exprLt /n2/ /f/ /y #2/ /x #2/\) : fequiv
+/;
+
+inference.
+unfold /intequiv at all , fequiv/.
+intro /n1 n2 f Hn [(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+moveBefore /a' b'/ /a/.
+subst /a/.
+subst /b/.
+rewrite /-> istrue_notb/.
+rewrite /-> istrue_leqzb/.
+rewrite /-> not_leqz/.
+rewrite /<- exprLt/ >> autoWith /era_advance/.
+rewrite /-> eval_advance n1 n2/ >> autoWith /era_advance/.
+qed ();
+
+
+
+lemma "fequiv_ltz"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : intequiv n1 f) (y : intequiv n2 f) .
+         (ltzb (x #1) (y #1) , e`\exprLeq /n2/ /f/ /y #2/ /x #2/\) : fequiv
+/;
+
+inference.
+unfold /intequiv at all , fequiv/.
+intro /n1 n2 f Hn [(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+moveBefore /a' b'/ /a/.
+subst /a/.
+subst /b/.
+rewrite /-> istrue_notb/.
+rewrite /-> istrue_ltzb/.
+rewrite /-> not_ltz/.
+rewrite /<- exprLeq/ >> autoWith /era_advance/.
+rewrite /-> eval_advance n1 n2/ >> autoWith /era_advance/.
+qed ();
+
+
+
+lemma "tequiv_eq"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : natequiv n1 f) (y : natequiv n2 f) .
+         (eqb (x #1) (y #1) , e`\exprEq /n2/ /f/ /x #2/ /y #2/\) : tequiv
+/;
+
+inference.
+unfold /natequiv at all , tequiv/.
+intro /n1 n2 f Hn [(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+rewrite /-> istrue_eqb/.
+rewrite /<- exprEq/ >> autoWith /era_advance/.
+rewrite /<- eval_advance n1 n2/ >> autoWith /era_advance/.
+rewrite /<- Ha , <- Hb/.
+split.
+  {
+  intro /Heq/.
+  compat >> auto.
+  }
+
+  {
+  intro /Heq/.
+  rewrite /<- nat_to_integer_inv a , <- nat_to_integer_inv b/.
+  compat >> auto.
+  }
+qed ();
+
+
+
+lemma "tequiv_leq"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : natequiv n1 f) (y : natequiv n2 f) .
+         (leqb (x #1) (y #1) , e`\exprLeq /n2/ /f/ /x #2/ /y #2/\) : tequiv
+/;
+
+inference.
+unfold /natequiv at all , tequiv/.
+intro /n1 n2 f Hn [(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+rewrite /-> istrue_leqb/.
+rewrite /<- exprLeq/ >> autoWith /era_advance/.
+rewrite /<- eval_advance n1 n2/ >> autoWith /era_advance/.
+rewrite /<- Ha , <- Hb/.
+split.
+  {
+  intro /Hleq/.
+  apply /nat_to_integer_mono/ >> auto.
+  }
+
+  {
+  intro /Hleq/.
+  rewrite /<- nat_to_integer_inv a , <- nat_to_integer_inv b/.
+  apply /integer_to_nat_mono/ >> auto.
+  apply /nat_to_integer_nonneg/.
+  }
+qed ();
+
+
+
+lemma "tequiv_lt"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : natequiv n1 f) (y : natequiv n2 f) .
+         (ltb (x #1) (y #1) , e`\exprLt /n2/ /f/ /x #2/ /y #2/\) : tequiv
+/;
+
+inference.
+unfold /natequiv at all , tequiv/.
+intro /n1 n2 f Hn [(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+rewrite /-> istrue_ltb/.
+rewrite /<- exprLt/ >> autoWith /era_advance/.
+rewrite /<- eval_advance n1 n2/ >> autoWith /era_advance/.
+rewrite /<- Ha , <- Hb/.
+split.
+  {
+  intro /Hleq/.
+  apply /nat_to_integer_mono_lt/ >> auto.
+  }
+
+  {
+  intro /Hleq/.
+  rewrite /<- nat_to_integer_inv a , <- nat_to_integer_inv b/.
+  apply /integer_to_nat_mono_lt/ >> auto.
+  apply /nat_to_integer_nonneg/.
+  }
+qed ();
+
+
+
+lemma "fequiv_eq"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : natequiv n1 f) (y : natequiv n2 f) .
+         (eqb (x #1) (y #1) , e`\exprNeq /n2/ /f/ /x #2/ /y #2/\) : fequiv
+/;
+
+inference.
+unfold /natequiv at all , fequiv/.
+intro /n1 n2 f Hn [(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+rewrite /-> istrue_notb/.
+rewrite /-> istrue_eqb/.
+rewrite /<- exprNeq/ >> autoWith /era_advance/.
+rewrite /<- eval_advance n1 n2/ >> autoWith /era_advance/.
+rewrite /<- Ha at all , <- Hb at all/.
+split.
+  {
+  intro /H1 H2/.
+  apply /H1/.
+  rewrite /<- nat_to_integer_inv a , <- nat_to_integer_inv b/.
+  compat.
+  auto.
+  }
+
+  {
+  intro /H1 H2/.
+  apply /H1/.
+  compat.
+  auto.
+  }
+qed ();
+
+
+
+lemma "fequiv_leq"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : natequiv n1 f) (y : natequiv n2 f) .
+         (leqb (x #1) (y #1) , e`\exprLt /n2/ /f/ /y #2/ /x #2/\) : fequiv
+/;
+
+inference.
+unfold /natequiv at all , fequiv/.
+intro /n1 n2 f Hn [(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+rewrite /-> istrue_notb/.
+rewrite /-> istrue_leqb/.
+rewrite /-> not_leq/.
+rewrite /<- exprLt/ >> autoWith /era_advance/.
+rewrite /<- eval_advance n1 n2 at 1/ >> autoWith /era_advance/.
+rewrite /<- Ha , <- Hb/.
+split.
+  {
+  intro /H/.
+  apply /nat_to_integer_mono_lt/ >> auto.
+  }
+
+  {
+  intro /H/.
+  rewrite /<- nat_to_integer_inv a , <- nat_to_integer_inv b/.
+  apply /integer_to_nat_mono_lt/ >> auto.
+  apply /nat_to_integer_nonneg/.
+  }
+qed ();
+
+
+
+lemma "fequiv_lt"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : natequiv n1 f) (y : natequiv n2 f) .
+         (ltb (x #1) (y #1) , e`\exprLeq /n2/ /f/ /y #2/ /x #2/\) : fequiv
+/;
+
+inference.
+unfold /natequiv at all , fequiv/.
+intro /n1 n2 f Hn [(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+rewrite /-> istrue_notb/.
+rewrite /-> istrue_ltb/.
+rewrite /-> not_lt/.
+rewrite /<- exprLeq/ >> autoWith /era_advance/.
+rewrite /<- eval_advance n1 n2 at 1/ >> autoWith /era_advance/.
+rewrite /<- Ha , <- Hb/.
+split.
+  {
+  intro /H/.
+  apply /nat_to_integer_mono/ >> auto.
+  }
+
+  {
+  intro /H/.
+  rewrite /<- nat_to_integer_inv a , <- nat_to_integer_inv b/.
+  apply /integer_to_nat_mono/ >> auto.
+  apply /nat_to_integer_nonneg/.
+  }
+qed ();
+
+
+
+lemma "intequiv_advance"
+/
+  forall m n (f : bounded n -> integer) .
+    m <z= n
+    -> forall (x : intequiv m f) . x : intequiv n f
+/;
+
+inference.
+intro /m n f Hmn x/.
+unfold /intequiv in x in concl/.
+destruct /x/ /[(a a') Ha]/.
+reduce /Ha/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+split.
+  {
+  rewrite /-> Ha/.
+  apply /eval_advance/ >> auto.
+  }
+
+  {
+  apply /era_advance/ >> auto.
+  }
+qed ();
+
+
+
+lemma "intequiv_var"
+/
+  forall n f x .
+    z`0 <z= n
+    -> f n = x : integer
+    -> (x , var n) : intequiv (z`1 +z n) f
+/;
+
+inference.
+intro /n f x Hn/.
+assert /n : bounded (z`1 +z n)/ /Hof/.
+  {
+  unfold /bounded/.
+  typecheck.
+  split.
+  apply /ltz_succ/.
+  }
+intro /Heq/.
+unfold /intequiv/.
+typecheck.
+split.
+split.
+  {
+  rewrite /-> eval_var/ >> autoWith /ltz_succ/.
+  }
+
+  {
+  apply /era_var/ >> autoWith /ltz_succ/.
+  }
+qed ();
+
+
+  
+lemma "intequiv_const"
+/
+  forall n f (x : integer) .
+    z`0 <z= n
+    -> (x , const x) : intequiv n f
+/;
+
+inference.
+intro /n f x Hn/.
+unfold /intequiv/.
+typecheck.
+split.
+split >> autoWith /era_const/.
+rewrite /-> eval_const/.
+auto.
+qed ();
+
+
+
+lemma "intequiv_plusz"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : intequiv n1 f) (y : intequiv n2 f) .
+         (x #1 +z y #1 , e`\exprPlus /x #2/ /y #2/\) : intequiv n2 f
+/;
+
+inference.
+unfold /intequiv at all/.
+intro /n1 n f Hn1/.
+intro /[(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+rewrite /-> eval_add/.
+rewrite /-> Ha , -> Hb/.
+rewrite /-> eval_advance n1 n/ >> attempt assumption.
+split >> auto.
+apply /era_add/ >> auto.
+apply /era_advance/ >> auto.
+qed ();
+
+
+
+lemma "intequiv_negz"
+/
+  forall n f (x : intequiv n f) .
+    (~z (x #1) , e`\exprNeg /x #2/\) : intequiv n f
+/;
+
+inference.
+unfold /intequiv at all/.
+intro /n f [(a a') Ha]/.
+reduce /Ha concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+rewrite /<- exprNeg n f a'/.
+split >> autoWith /era_mult/.
+qed ();
+
+
+
+lemma "intequiv_minusz"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : intequiv n1 f) (y : intequiv n2 f) .
+         (x #1 -z y #1 , e`\exprMinus /x #2/ /y #2/\) : intequiv n2 f
+/;
+
+inference.
+unfold /intequiv at all/.
+intro /n1 n f Hn1/.
+intro /[(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+rewrite /<- exprMinus _ _ a' b'/.
+rewrite /-> Ha , -> Hb/.
+rewrite /-> eval_advance n1 n/ >> attempt assumption.
+split >> auto.
+autoWith /era_add era_advance era_mult/.
+qed ();
+
+
+
+lemma "intequiv_timesz_l"
+/
+  forall n f (a : integer) (x : intequiv n f) .
+    (a *z (x #1) , e`\exprTimes /a/ /x #2/\) : intequiv n f
+/;
+
+inference.
+unfold /intequiv at all/.
+intro /n f a [(b' b) Hb]/.
+reduce /Hb concl/.
+typecheck.
+split.
+destruct /Hb/ /Hb Hb'/.
+rewrite /<- exprTimes/.
+split >> autoWith /era_mult/.
+qed ();
+
+
+
+lemma "intequiv_timesz_r"
+/
+  forall n f (a : integer) (x : intequiv n f) .
+    (x #1 *z a , e`\exprTimes /a/ /x #2/\) : intequiv n f
+/;
+
+inference.
+unfold /intequiv at all/.
+intro /n f a [(b' b) Hb]/.
+reduce /Hb concl/.
+typecheck.
+split.
+destruct /Hb/ /Hb Hb'/.
+rewrite /<- exprTimes/.
+rewrite /-> timesz_commute/.
+split >> autoWith /era_mult/.
+qed ();
+
+
+
+lemma "intequiv_timesz_zero_l"
+/
+  forall n f (x : intequiv n f) .
+    (z`0 *z x #1 , nil) : intequiv n f
+/;
+
+inference.
+unfold /intequiv at all/.
+intro /n f [(b' b) Hb]/.
+reduce /Hb concl/.
+typecheck.
+split.
+destruct /Hb/ /_ Hb'/.
+rewrite /-> timesz_ann_l/.
+unfold /eval/.
+split >> auto.
+unfold /era/.
+apply /era_impl_nonneg/ >> auto.
+qed ();
+
+
+
+lemma "intequiv_timesz_zero_r"
+/
+  forall n f (x : intequiv n f) .
+    (x #1 *z z`0 , nil) : intequiv n f
+/;
+
+inference.
+unfold /intequiv at all/.
+intro /n f [(b' b) Hb]/.
+reduce /Hb concl/.
+typecheck.
+split.
+destruct /Hb/ /_ Hb'/.
+rewrite /-> timesz_ann_r/.
+unfold /eval/.
+split >> auto.
+unfold /era/.
+apply /era_impl_nonneg/ >> auto.
+qed ();
+
+
+
+lemma "intequiv_nat_to_integer"
+/
+  forall n f (x : natequiv n f) .
+    (nat_to_integer (x #1) , x #2) : intequiv n f
+/;
+
+inference.
+unfold /natequiv , intequiv/.
+intro /n f [(a a') Ha]/.
+reduce /Ha concl/.
+typecheck.
+split.
+hyp /Ha/.
+qed ();
+
+
+
+lemma "natequiv_advance"
+/
+  forall m n (f : bounded n -> integer) .
+    m <z= n
+    -> forall (x : natequiv m f) . x : natequiv n f
+/;
+
+inference.
+inference.
+intro /m n f Hmn x/.
+unfold /natequiv in x in concl/.
+destruct /x/ /[(a a') Ha]/.
+reduce /Ha/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+split.
+  {
+  rewrite /-> Ha/.
+  apply /eval_advance/ >> auto.
+  }
+
+  {
+  apply /era_advance/ >> auto.
+  }
+qed ();
+
+
+
+lemma "natequiv_var"
+/
+  forall n f x .
+    z`0 <z= n
+    -> f n = nat_to_integer x : integer
+    -> ((x , var n) : natequiv (z`1 +z n) f)
+       & e`\expr0Leq /(z`1 +z n)/ /f/ /cons z`1 n nil/\
+/;
+
+inference.
+intro /n f x Hn/.
+assert /n : bounded (z`1 +z n)/ /Hof/.
+  {
+  unfold /bounded/.
+  typecheck.
+  split.
+  apply /ltz_succ/.
+  }
+intro /Heq/.
+unfold /natequiv/.
+split.
+  {
+  typecheck.
+  split.
+  split.
+    {
+    rewrite /-> eval_var/ >> autoWith /ltz_succ/.
+    }
+  
+    {
+    apply /era_var/ >> autoWith /ltz_succ/.
+    }
+  }
+
+  {
+  unfold /inequal/.
+  split >>> [idtac, split].
+    {
+    typecheck.
+    }
+
+    {
+    rewrite /-> eval_var/ >> autoWith /ltz_succ/.
+    rewrite /-> Heq/.
+    apply /nat_to_integer_nonneg/.
+    }
+    
+    {
+    apply /era_var/ >> autoWith /ltz_succ/.
+    }
+  }
+qed ();
+
+
+
+lemma "natequiv_const"
+/
+  forall n f (x : nat) .
+    z`0 <z= n
+    -> (x , const (nat_to_integer x)) : natequiv n f
+/;
+
+inference.
+intro /n f x Hn/.
+unfold /natequiv/.
+typecheck.
+split.
+split >> autoWith /era_const/.
+rewrite /-> eval_const/.
+auto.
+qed ();
+
+
+
+lemma "natequiv_succ"
+/
+  forall n f (x : natequiv n f) .
+    (succ (x #1) , e`\exprSucc /x #2/\) : natequiv n f
+/;
+
+inference.
+unfold /natequiv at all/.
+intro /n f [(a a') Ha]/.
+reduce /Ha concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+rewrite /<- exprSucc/.
+so /era_impl_nonneg _ _ Ha'/ /Hn/.
+split >> autoWith /era_add era_nzconst/.
+qed ();
+
+
+
+lemma "natequiv_plus"
+/
+  forall n1 n2 (f : bounded n2 -> integer) .
+    n1 <z= n2
+    -> forall (x : natequiv n1 f) (y : natequiv n2 f) .
+         (x #1 + y #1 , e`\exprPlus /x #2/ /y #2/\) : natequiv n2 f
+/;
+
+inference.
+unfold /natequiv at all/.
+intro /n1 n f Hn1 [(a a') Ha] [(b b') Hb]/.
+reduce /Ha Hb concl/.
+typecheck.
+split.
+destruct /Ha/ /Ha Ha'/.
+destruct /Hb/ /Hb Hb'/.
+rewrite /<- exprPlus/.
+split >> autoWith /era_add era_advance/.
+rewrite /-> plus_to_integer/.
+rewrite /-> Ha , -> Hb/.
+rewrite /-> eval_advance n1 n/ >> auto.
+qed ();
+
+
+
+lemma "natequiv_times_l"
+/
+  forall n f (a : nat) (x : natequiv n f) .
+    (a * x #1 , e`\exprTimes /nat_to_integer a/ /x #2/\) : natequiv n f
+/;
+
+inference.
+unfold /natequiv at all/.
+intro /n f a [(b' b) Hb]/.
+reduce /Hb concl/.
+typecheck.
+split.
+destruct /Hb/ /Hb Hb'/.
+rewrite /-> times_to_integer/.
+rewrite /<- exprTimes/.
+split >> autoWith /era_mult/.
+qed ();
+
+
+
+lemma "natequiv_times_r"
+/
+  forall n f (a : nat) (x : natequiv n f) .
+    (x #1 * a , e`\exprTimes /nat_to_integer a/ /x #2/\) : natequiv n f
+/;
+
+inference.
+unfold /natequiv at all/.
+intro /n f a [(b' b) Hb]/.
+reduce /Hb concl/.
+typecheck.
+split.
+destruct /Hb/ /Hb Hb'/.
+rewrite /-> times_to_integer/.
+rewrite /<- exprTimes/.
+rewrite /-> timesz_commute/.
+split >> autoWith /era_mult/.
+qed ();
+
+
+
+lemma "natequiv_times_zero_l"
+/
+  forall n f (x : natequiv n f) .
+    (0 * x #1 , nil) : natequiv n f
+/;
+
+inference.
+unfold /natequiv at all/.
+intro /n f [(b' b) Hb]/.
+reduce /Hb concl/.
+typecheck.
+split.
+destruct /Hb/ /_ Hb'/.
+unfold /eval/.
+split >> auto.
+unfold /era/.
+apply /era_impl_nonneg/ >> auto.
+qed ();
+
+
+
+lemma "natequiv_times_zero_r"
+/
+  forall n f (x : natequiv n f) .
+    (x #1 * 0 , nil) : natequiv n f
+/;
+
+inference.
+unfold /natequiv at all/.
+intro /n f [(b' b) Hb]/.
+reduce /Hb concl/.
+typecheck.
+split.
+destruct /Hb/ /_ Hb'/.
+rewrite /-> times_0_r/.
+unfold /eval/.
+split >> auto.
+unfold /era/.
+apply /era_impl_nonneg/ >> auto.
+qed ();
+
+
+
+define /minus_prop n f a b/
+/
+  f n = (if leqzb (eval n f b) (eval n f a) then eval n f a -z eval n f b else z`0) : integer
+//
+  forall (n : integer) . (bounded (z`1 +z n) -> integer) -> expr -> expr -> U 0
+/;
+
+introOf /n/.
+so /bounded_self n/ /Hn/.
+so /leqz_succ n/ /Hleq/.
+unfold /minus_prop/.
+typecheck.
+qed ();
+
+
+
+lemma "minus_extend"
+/
+  forall n (f : bounded n -> integer) (a b : expr) .
+    exists (g : bounded (z`1 +z n) -> integer) .
+      minus_prop n g a b
+      & f = g : (bounded n -> integer)
+/;
+
+inference.
+intro /n f a b/.
+so /leqz_succ n/ /Hleq/.
+set /x/ /if leqzb (eval n f b) (eval n f a) then eval n f a -z eval n f b else z`0/.
+so /extend n f x/ /g Heq Hsame/.
+1:{
+  unfold /x/.
+  typecheck.
+  }
+exists /g/.
+moveBefore /g/ /f/.
+subst /f/.
+split >> auto.
+unfold /minus_prop/.
+fold /x/.
+hyp /Heq/.
+qed ();
+
+
+
+lemma "natequiv_minus_pre"
+/
+  forall n f (i : bounded n) (x : natequiv n f) (y : natequiv n f) .
+    z`0 <z= i
+    -> f i = (if leqzb (eval n f (y #2)) (eval n f (x #2)) then eval n f (x #2) -z eval n f (y #2) else z`0) : integer
+    -> prod
+         (sum
+            (prod
+               e`\exprEq /n/ /f/ /cons z`1 i nil/ (exprMinus /x #2/ /y #2/)\ 
+               e`\exprLeq /n/ /f/ /y #2/ /x #2/\)
+            (prod
+               e`\expr0Eq /n/ /f/ /cons z`1 i nil/\
+               e`\exprLt /n/ /f/ /x #2/ /y #2/\))
+         ((x #1 - y #1 , cons z`1 i nil) : natequiv n f)
+/;
+
+inference.
+intro /n f i x y Hzi/.
+assert /i <z n/ /Hi/.
+  {
+  unfold /bounded in i/.
+  destruct /i/ /[i Hi]/.
+  unhide.
+  auto.
+  }
+unfold /natequiv in x in y/.
+destruct /x/ /[(a' a) Ha]/.
+destruct /y/ /[(b' b) Hb]/.
+reduce /Ha Hb concl/.
+intro /Heq/.
+assert /nat_to_integer a' = eval n f a : integer/ /Heqa/.
+  {
+  unhide.
+  destruct /Ha/ /? ?/.
+  auto.
+  }
+assert /nat_to_integer b' = eval n f b : integer/ /Heqb/.
+  {
+  unhide.
+  destruct /Hb/ /? ?/.
+  auto.
+  }
+assert /era n a/ /Heraa/.
+  {
+  apply /unsquash_era/.
+  split.
+  destruct /Ha/ /? ?/.
+  auto.
+  }
+assert /era n b/ /Herab/.
+  {
+  apply /unsquash_era/.
+  split.
+  destruct /Hb/ /? ?/.
+  auto.
+  }
+clear /Ha Hb/.
+so /era_impl_nonneg _ _ Heraa/ /Hn/.
+split.
+  {
+  rewrite /<- exprEq/ >> autoWith /era_var era_add era_mult/.
+  rewrite /<- exprLeq/ >> autoWith /era_var era_add era_mult/.
+  rewrite /<- expr0Eq/ >> autoWith /era_var era_add era_mult era_nzconst/.
+  rewrite /<- exprLt/ >> autoWith /era_var era_add era_mult/.
+  rewrite /-> eval_add at all , -> eval_mult at all , -> eval_var at all/ >> auto.
+  rewrite /-> Heq at all/.
+  boolCase /leqzb (eval n f b) (eval n f a)/ /Hleq/.
+    {
+    left.
+    split >> auto.
+    rewrite /<- negz_as_timesz/.
+    unfold /minusz/.
+    auto.
+    }
+
+    {
+    right.
+    split >> auto.
+    apply /not_leqz/ >> auto.
+    }
+  }
+
+  {
+  unfold /natequiv/.
+  typecheck.
+  split.
+  split.
+  1:{
+    apply /era_var/ >> auto.
+    }
+  rewrite /-> eval_var/ >> auto.
+  rewrite /-> Heq/.
+  rewrite /<- Heqa at all/.
+  rewrite /<- Heqb at all/.
+  boolCase /leqzb (nat_to_integer b') (nat_to_integer a')/ /Hleq/.
+    {
+    rewrite /-> minus_to_integer/ >> auto.
+    rewrite /<- nat_to_integer_inv a' , <- nat_to_integer_inv b'/.
+    apply /integer_to_nat_mono/ >> auto.
+    apply /nat_to_integer_nonneg/.
+    }
+
+    {
+    rewrite /-> minus_proper/ >> auto.
+    rewrite /-> not_leqz in Hleq/.
+    rewrite /<- nat_to_integer_inv a' , <- nat_to_integer_inv b'/.
+    apply /integer_to_nat_mono/ >> autoWith /nat_to_integer_nonneg ltz_impl_leqz/.
+    }
+  }
+qed ();
+
+
+
+lemma "natequiv_minus"
+/
+  forall (n1 n2 : integer) (f : bounded (z`1 +z n2) -> integer) .
+    n1 <z= n2
+    -> forall (x : natequiv n1 f) (y : natequiv n2 f) .
+         minus_prop n2 f (x #2) (y #2)
+         -> prod
+              (sum
+                 (prod
+                    e`\exprEq /z`1 +z n2/ /f/ /cons z`1 n2 nil/ (exprMinus /x #2/ /y #2/)\ 
+                    e`\exprLeq /z`1 +z n2/ /f/ /y #2/ /x #2/\)
+                 (prod
+                    e`\expr0Eq /z`1 +z n2/ /f/ /cons z`1 n2 nil/\
+                    e`\exprLt /z`1 +z n2/ /f/ /x #2/ /y #2/\))
+              ((x #1 - y #1 , cons z`1 n2 nil) : natequiv (z`1 +z n2) f)
+/;
+
+intro /n1 n2 f Hn1/.
+assert /n1 <z= z`1 +z n2/ /Hn1'/.
+  {
+  autoWith /leqz_trans leqz_succ/.
+  }
+so /leqz_succ n2/ /Hn2'/.
+intro /x y/.
+assert /x #2 : expr/ /Hofx/.
+  {
+  unfold /natequiv in x/.
+  destruct /x/ /[x _]/.
+  typecheck.
+  }
+assert /y #2 : expr/ /Hofy/.
+  {
+  unfold /natequiv in y/.
+  destruct /y/ /[y _]/.
+  typecheck.
+  }
+intro /Heq/.
+applyRaw /natequiv_minus_pre (z`1 +z n2) f n2 x y/ >> auto.
+  {
+  unfold /natequiv in x/.
+  destruct /x/ /[x Ha]/.
+  unhide.
+  so /era_impl_nonneg _ _ (Ha #2)/ /H/.
+  apply /leqz_trans/ >> auto.
+  }
+
+1:{
+  apply /bounded_self/.
+  }
+
+1:{
+  apply /natequiv_advance/.
+  apply /leqz_trans/ >> autoWith /leqz_succ/.
+  }
+
+1:{
+  apply /natequiv_advance/.
+  apply /leqz_trans/ >> autoWith /leqz_succ/.
+  }
+unfold /minus_prop in Heq/.
+rewrite /-> Heq/.
+assert /era n2 (x #2)/ /Herax/.
+  {
+  apply /unsquash_era/.
+  unfold /natequiv in x/.
+  destruct /x/ /[(a' a) Ha]/.
+  split.
+  destruct /Ha/ /_ Ha/.
+  apply /era_advance/ >> auto.
+  }
+assert /era n2 (y #2)/ /Heray/.
+  {
+  apply /unsquash_era/.
+  unfold /natequiv in y/.
+  destruct /y/ /[(a' a) Ha]/.
+  split.
+  destruct /Ha/ /_ Ha/.
+  apply /era_advance/ >> auto.
+  }
+rewrite /-> eval_advance n2 (z`1 +z n2) at all/ >> auto.
+qed ();
+
+
+
+define /integer_to_nat_prop n f a/
+/
+  f n = (if leqzb z`0 (eval n f a) then eval n f a else z`0) : integer
+//
+  forall (n : integer) . (bounded (z`1 +z n) -> integer) -> expr -> U 0
+/;
+
+introOf /n/.
+so /bounded_self n/ /Hn/.
+so /leqz_succ n/ /Hsucc/.
+unfold /integer_to_nat_prop/.
+typecheck.
+qed ();
+
+
+
+lemma "integer_to_nat_extend"
+/
+  forall n (f : bounded n -> integer) (a : expr) .
+    exists (g : bounded (z`1 +z n) -> integer) .
+      integer_to_nat_prop n g a
+      & f = g : (bounded n -> integer)
+/;
+
+inference.
+intro /n f a/.
+so /leqz_succ n/ /Hleq/.
+set /x/ /if leqzb z`0 (eval n f a) then eval n f a else z`0/.
+so /extend n f x/ /g Heq Hsame/.
+1:{
+  unfold /x/.
+  typecheck.
+  }
+exists /g/.
+moveBefore /g/ /f/.
+subst /f/.
+split >> auto.
+unfold /integer_to_nat_prop/.
+fold /x/.
+hyp /Heq/.
+qed ();
+
+
+
+lemma "natequiv_integer_to_nat_pre"
+/
+  forall n f (i : bounded n) (x : intequiv n f) .
+    z`0 <z= i
+    -> f i = (if leqzb z`0 (eval n f (x #2)) then eval n f (x #2) else z`0) : integer
+    -> prod
+         (sum
+            (prod
+               e`\exprEq /n/ /f/ /cons z`1 i nil/ /x #2/\
+               e`\expr0Leq /n/ /f/ /x #2/\)
+            (prod
+               e`\expr0Eq /n/ /f/ /cons z`1 i nil/\ 
+               e`\exprLt0 /n/ /f/ /x #2/\))
+         ((integer_to_nat (x #1) , cons z`1 i nil) : natequiv n f)
+/;
+
+inference.
+intro /n f i x Hzi/.
+assert /i <z n/ /Hi/.
+  {
+  unfold /bounded in i/.
+  destruct /i/ /[i Hi]/.
+  unhide.
+  auto.
+  }
+unfold /intequiv in x/.
+destruct /x/ /[(a' a) Ha]/.
+reduce /Ha concl/.
+intro /Heq/.
+assert /a' = eval n f a : integer/ /Heqa/.
+  {
+  unhide.
+  destruct /Ha/ /? ?/.
+  auto.
+  }
+assert /era n a/ /Hera/.
+  {
+  apply /unsquash_era/.
+  split.
+  destruct /Ha/ /? ?/.
+  auto.
+  }
+clear /Ha/.
+so /era_impl_nonneg _ _ Hera/ /Hn/.
+split.
+  {
+  rewrite /<- exprEq/ >> autoWith /era_var era_add era_mult/.
+  rewrite /<- expr0Leq/ >> autoWith /era_var era_add era_mult/.
+  rewrite /<- expr0Eq/ >> autoWith /era_var era_add era_mult era_nzconst/.
+  rewrite /<- exprLt0/ >> autoWith /era_var era_add era_mult/.
+  rewrite /-> eval_add at all , -> eval_mult at all , -> eval_var at all/ >> auto.
+  rewrite /-> Heq at all/.
+  boolCase /leqzb z`0 (eval n f a)/ /Hleq/ >> auto.
+  right.
+  split >> auto.
+  apply /not_leqz/ >> auto.
+  }
+
+  {
+  unfold /natequiv/.
+  typecheck.
+  split.
+  split.
+  1:{
+    apply /era_var/ >> auto.
+    }
+  rewrite /-> eval_var/ >> auto.
+  rewrite /-> Heq/.
+  rewrite /<- Heqa at all/.
+  boolCase /leqzb z`0 a'/ /Hleq/.
+    {
+    apply /integer_to_nat_inv/ >> auto.
+    }
+
+    {
+    rewrite /-> not_leqz in Hleq/.
+    rewrite /-> integer_to_nat_neg/ >> auto.
+    }
+  }
+qed ();
+
+
+
+lemma "natequiv_integer_to_nat"
+/
+  forall (n : integer) (f : bounded (z`1 +z n) -> integer) (x : intequiv n f) .
+    integer_to_nat_prop n f (x #2)
+    -> prod
+         (sum
+            (prod
+               e`\exprEq /z`1 +z n/ /f/ /cons z`1 n nil/ /x #2/\
+               e`\expr0Leq /z`1 +z n/ /f/ /x #2/\)
+            (prod
+               e`\expr0Eq /z`1 +z n/ /f/ /cons z`1 n nil/\ 
+               e`\exprLt0 /z`1 +z n/ /f/ /x #2/\))
+         ((integer_to_nat (x #1) , cons z`1 n nil) : natequiv (z`1 +z n) f)
+/;
+
+intro /n f/.
+so /leqz_succ n/ /Hsucc/.
+intro /x/.
+assert /x #2 : expr/ /Hofx/.
+  {
+  unfold /intequiv in x/.
+  destruct /x/ /[x _]/.
+  typecheck.
+  }
+intro /Heq/.
+applyRaw /natequiv_integer_to_nat_pre (z`1 +z n) f n x/ >> auto.
+  {
+  unfold /intequiv in x/.
+  destruct /x/ /[x Ha]/.
+  unhide.
+  so /era_impl_nonneg _ _ (Ha #2)/ /H/.
+  apply /leqz_trans/ >> auto.
+  }
+
+1:{
+  apply /bounded_self/.
+  }
+
+1:{
+  apply /intequiv_advance/.
+  apply /leqz_trans/ >> autoWith /leqz_succ/.
+  }
+unfold /integer_to_nat_prop in Heq/.
+rewrite /-> Heq/.
+assert /era n (x #2)/ /Herax/.
+  {
+  apply /unsquash_era/.
+  unfold /intequiv in x/.
+  destruct /x/ /[(a' a) Ha]/.
+  split.
+  destruct /Ha/ /_ Ha/.
+  apply /era_advance/ >> auto.
+  }
+rewrite /-> eval_advance n (z`1 +z n) at all/ >> auto.
+qed ();
+
+
+
+
+(* Solving *)
+
+lemma "equal_nil"
+/
+  forall n f . z`0 <z= n -> equal n f nil
+/;
+
+inference.
+intro /n f Hn/.
+unfold /equal/.
+(split >>> [idtac, split]) >> auto.
+  {
+  unfold /eval/.
+  reflexivity.
+  }
+
+  {
+  unfold /era/.
+  auto.
+  }
+qed ();
+
+
+
+lemma "equal_impl_inequal"
+/
+  forall n (f : bounded n -> integer) (e : expr) .
+    equal n f e
+    -> inequal n f e
+/;
+
+inference.
+intro /n f e H/.
+unfold /equal in H , inequal/.
+destruct /H/ /_ Heq Hera/.
+splitn 2 >> auto.
+apply /leqz_refl_eq/ >> auto.
+qed ();
+
+
+
+lemma "combine_equal"
+/
+  forall n1 n2 (f : bounded n2 -> integer) (e1 e2 : expr) (a : integer) .
+    n1 <z= n2
+    -> equal n1 f e1
+    -> equal n2 f e2
+    -> equal n2 f (add (mult a e1) e2)
+/;
+
+inference.
+intro /n1 n2 f e1 e2 a Hn H1 H2/.
+so /equal_advance _# 4 Hn H1/ /H/.
+renameOver /H/ /H1/.
+unfold /equal in H1 in H2 in concl/.
+destruct /H1/ /_ H1 Hera1/.
+destruct /H2/ /_ H2 Hera2/.
+splitn 2 >> autoWith /era_add era_mult/.
+rewrite /-> eval_add , -> eval_mult/.
+rewrite /<- H1 , <- H2/.
+rewrite /-> timesz_ann_r/.
+rewrite /-> plusz_id_l/.
+auto.
+qed ();
+
+
+
+lemma "combine_inequal"
+/
+  forall n1 n2 (f : bounded n2 -> integer) (e1 e2 : expr) (a : integer) .
+    n1 <z= n2
+    -> z`0 <z= a
+    -> inequal n1 f e1
+    -> inequal n2 f e2
+    -> inequal n2 f (add (mult a e1) e2)
+/;
+
+inference.
+intro /n1 n2 f e1 e2 a Hn Ha H1 H2/.
+so /inequal_advance _# 4 Hn H1/ /H/.
+renameOver /H/ /H1/.
+unfold /inequal in H1 in H2 in concl/.
+destruct /H1/ /_ H1 Hera1/.
+destruct /H2/ /_ H2 Hera2/.
+splitn 2 >> autoWith /era_add era_mult/.
+rewrite /-> eval_add , -> eval_mult/.
+rewrite /<- H2/.
+rewrite /-> plusz_id_r/.
+apply /timesz_leqz z`0 a z`0 _/ >> auto.
+qed ();
+
+
+
+lemma "combine_inequal_equal"
+/
+  forall n1 n2 (f : bounded n2 -> integer) (e1 e2 : expr) (a : integer) .
+    n1 <z= n2
+    -> z`0 <z= a
+    -> inequal n1 f e1
+    -> equal n2 f e2
+    -> inequal n2 f (add (mult a e1) e2)
+/;
+
+inference.
+intro /n1 n2 f e1 e2 a Hn Ha H1 H2/.
+apply /combine_inequal n1 n2/ >> auto.
+apply /equal_impl_inequal/ >> auto.
+qed ();
+
+
+
+lemma "combine_equal_inequal"
+/
+  forall n1 n2 (f : bounded n2 -> integer) (e1 e2 : expr) (a : integer) .
+    n1 <z= n2
+    -> equal n1 f e1
+    -> inequal n2 f e2
+    -> inequal n2 f (add (mult a e1) e2)
+/;
+
+inference.
+intro /n1 n2 f e1 e2 a Hn H1 H2/.
+so /equal_advance _# 4 Hn H1/ /H/.
+renameOver /H/ /H1/.
+unfold /equal in H1 , inequal in H2 , inequal/.
+destruct /H1/ /_ H1 Hera1/.
+destruct /H2/ /_ H2 Hera2/.
+splitn 2 >> autoWith /era_add era_mult era_advance/.
+rewrite /-> eval_add , -> eval_mult/.
+rewrite /<- H1 , <- H2/.
+rewrite /-> plusz_id_r/.
+rewrite /-> timesz_ann_r/.
+auto.
+qed ();
+
+
+
+lemma "equal_contra"
+/
+  forall n1 n2 (f : bounded n2 -> integer) a .
+    n1 <z= n2
+    -> equal n1 f (nzconst a)
+    -> istrue (notb (eqzb a z`0))
+    -> void
+/;
+
+inference.
+unfold /equal/.
+intro /n1 h2 f a Hn H Ha/.
+destruct /H/ /_ H _/.
+unfold /eval in H/.
+reduce /H/.
+unfold /ltzb in H/.
+reduce /H/.
+rewrite /-> plusz_id_r in H/.
+subst /a/.
+so /not_istrue_false Ha/ /0/.
+qed ();
+
+
+
+lemma "inequal_contra"
+/
+  forall n1 n2 (f : bounded n2 -> integer) a .
+    n1 <z= n2
+    -> inequal n1 f (nzconst a)
+    -> a <z z`0
+    -> void
+/;
+
+inference.
+unfold /inequal/.
+intro /n1 n2 f a Hn H Ha/.
+destruct /H/ /_ H _/.
+unfold /eval in H/.
+reduce /H/.
+unfold /ltzb in H/.
+reduce /H/.
+rewrite /-> plusz_id_r in H/.
+so /ltz_irrefl _ (ltz_leqz_trans _# 3 Ha H)/ /0/.
+qed ();
+
+
+
+lemma "define"
+/
+  forall n (f : bounded n -> integer) e .
+    era n e
+    -> exists (g : bounded (z`1 +z n) -> integer) .
+         equal (z`1 +z n) g (add e (cons z`-1 n nil))
+         & f = g : (bounded n -> integer)
+/;
+
+inference.
+intro /n f e Hera/.
+so /extend_expr n f e/ /g Heval Heq/.
+exists /g/.
+  {
+  apply /leqz_succ/.
+  }
+moveBefore /g/ /f/.
+subst /f/ >> autoWith /leqz_succ/.
+so /era_impl_nonneg _ _ Hera/ /Hn/.
+assert /n : bounded (z`1 +z n)/ /Hofn/.
+  {
+  unfold /bounded/.
+  typecheck.
+  split.
+  apply /ltz_succ/.
+  }
+split.
+  {
+  unfold /equal/.
+  splitn 2 >> auto.
+    {
+    rewrite /-> eval_add/.
+    rewrite /-> eval_var_neg/ >> autoWith /ltz_succ/.
+    moveBefore /Heval/ /concl/.
+    rewrite /-> eval_advance n (z`1 +z n) in Heval/ >> autoWith /leqz_succ/.
+    rewrite /-> Heval/.
+    rewrite /-> plusz_inverse_r/.
+    reflexivity.
+    }
+
+    {
+    apply /era_add/.
+      {
+      apply /era_advance n _/ >> autoWith /leqz_succ/.
+      }
+    unfold /era/.
+    reduce //.
+    split >> autoWith /ltz_succ/.
+    apply /plusz_leqz z`0 _ z`0/ >> auto.
+    apply /leqz_0_1/.
+    }
+  }
+
+  {
+  typecheck.
+  apply /leqz_succ/.
+  }
+qed ();
+
+
+
+lemma "inequal_increment"
+/
+  forall n1 n2 (f : bounded n2 -> integer) e .
+    n1 <z= n2
+    -> inequal n1 f e
+    -> equal n2 f e % inequal n2 f (add e (nzconst z`-1))
+/;
+
+inference.
+intro /n1 n2 f e Hn H/.
+so /inequal_advance _# 4 Hn H/ /H'/.
+clear /H/.
+unfold /inequal in H'/.
+destruct /H'/ /_ H Hera/.
+so /era_impl_nonneg _ _ Hera/ /Hn2/.
+so /ltz_decide z`0 (eval n2 f e)/ /Hlt | Hnlt/.
+  {
+  right.
+  unfold /inequal/.
+  splitn 2 >> auto.
+    {
+    rewrite /-> eval_add , -> eval_nzconst/.
+    apply /plusz_shift_leqz_r _ z`1/.
+    reduce //.
+    unfold /ltz in Hlt/.
+    hyp /Hlt/.
+    }
+
+    {
+    autoWith /era_add era_nzconst/.
+    }
+  }
+
+  {
+  left.
+  rewrite /-> not_ltz in Hnlt/.
+  so /leqz_antisymm _ _ H Hnlt/ /Heq/.
+  unfold /equal/.
+  splitn 2 >> auto.
+  }
+qed ();
+
+
+
+(* The intention is:
+   -a is the coefficient of v in the upper bound e1
+   b is the coefficient of v in the lower bound e2
+
+   Let alpha = e1 + av.
+   Let beta = -(e2 - bv) = bv - e2.
+
+   For any upper bound av <= alpha and lower bound beta <= bv, either
+   1. the dark shadow is satisfied (i.e., b alpha - a beta >= (a-1) (b-1)), or
+   2. bv <= beta + q, where (ab - a - b) div a = q remainder r
+
+   Regarding the nzconst, (a - 1) * (b - 1) could be zero, but we never call it that way.
+   The proof doesn't care about zero coefficients; only the automation does.
+*)
+lemma "perimeter"
+/
+  forall n1 n2 n (f : bounded n -> integer) a b e1 e2 q r .
+    n1 <z= n
+    -> n2 <z= n
+    -> z`0 <z a
+    -> z`0 <z b
+    -> a *z q +z r = a *z b +z z`-1 *z a +z z`-1 *z b : integer
+    -> z`0 <z= r
+    -> r <z a
+    -> inequal n1 f e1
+    -> inequal n2 f e2
+    -> inequal n f (add (add (mult b e1) (mult a e2)) (nzconst (~z ((a +z z`-1) *z (b +z z`-1)))))
+       % inequal n f (add (mult z`-1 e2) (const q))
+/;
+
+inference.
+intro /n1 n2 n f a b e1 e2 q r Hn1 Hn2 Hposa Hposb Hdiv Hzr Hra Hhi Hlo/.
+so /inequal_advance _# 4 Hn1 Hhi/ /Hhi'/.
+so /inequal_advance _# 4 Hn2 Hlo/ /Hlo'/.
+clear /n1 n2 Hn1 Hn2 Hhi Hlo/.
+rename /Hhi'/ /Hhi/.
+rename /Hlo'/ /Hlo/.
+unfold /inequal in Hhi in Hlo/.
+destruct /Hhi/ /_ Hhi Hera1/.
+destruct /Hlo/ /_ Hlo Hera2/.
+assert /z`0 <z= eval n f (add (add (mult b e1) (mult a e2)) (nzconst (~z ((a +z z`-1) *z (b +z z`-1)))))
+        % z`0 <z= eval n f (add (mult z`-1 e2) (const q))/ /Hprop/.
+1:{
+  so /era_impl_nonneg _ _ Hera1/ /Hn/.
+  destruct /Hprop/ /Hprop | Hprop/.
+    {
+    left.
+    unfold /inequal/.
+    splitn 2 >> auto.
+    autoWith /era_add era_mult era_nzconst/. 
+    }
+
+    {
+    right.
+    unfold /inequal/.
+    splitn 2 >> auto.
+    autoWith /era_add era_mult era_const/.
+    }
+  }
+clear /Hera1 Hera2/.
+rewrite /-> eval_add at all , -> eval_mult at all , -> eval_nzconst at all , -> eval_const at all/.
+revert /Hhi Hlo/.
+generalize /eval n f e1/ /_/ /d1/.
+generalize /eval n f e2/ /_/ /d2/.
+intro /Hhi Hlo/.
+clear /n f e1 e2/.
+(* Interesting part starts here. *)
+goalCase /sum (leqz _ ?) _ => \(fnc x => so /integer_dichotomy z`0 \x\/ /H | Hdark/)\/.
+  {
+  left >> auto.
+  }
+right.
+rewrite /<- plusz_shift_ltz_rl in Hdark/.
+rewrite /-> plusz_id_l in Hdark/.
+rewrite /-> timesz_dist_plusz_l in Hdark , -> timesz_dist_plusz_r in Hdark at all/.
+reduce /Hdark/.
+rewrite /-> timesz_commute in Hdark at 3/.
+rewrite /<- plusz_assoc in Hdark at all/.
+rewrite /<- leqz_as_ltz_r in Hdark/.
+rewrite /<- negz_as_timesz in Hdark at all in Hdiv at all in concl at all/.
+rewrite /<- plusz_shift_leqz_lr/.
+rewrite /-> plusz_id_r/.
+apply /timesz_cancel_leqz_l_remainder _ _ a r/ >> auto.
+rewrite /-> Hdiv/.
+witness /leqz_trans _# 3 __ Hdark/.
+rewrite /<- plusz_id_l (a *z d2)/.
+apply /plusz_leqz/ >> auto.
+apply /timesz_leqz z`0 _ z`0/ >> auto.
+apply /ltz_impl_leqz/ >> auto.
+qed ();
+
+
+
+lemma "inequal_weaken"
+/
+  forall n1 n2 (f : bounded n2 -> integer) e a .
+    n1 <z= n2
+    -> z`0 <z= a
+    -> inequal n1 f e
+    -> inequal n2 f (add e (const a))
+/;
+
+inference.
+intro /n1 n2 f e a Hn Ha H/.
+so /inequal_advance _# 4 Hn H/ /H'/.
+renameOver /H'/ /H/.
+unfold /inequal in H in concl/.
+destruct /H/ /_ H Hera/.
+splitn 2 >> auto.
+  {
+  rewrite /-> eval_add , -> eval_const/.
+  apply /leqz_trans/ >> auto.
+  rewrite /<- plusz_id_r (eval n2 f e) at 0/.
+  apply /plusz_leqz/ >> auto.
+  }
+
+  {
+  so /era_impl_nonneg _ _ Hera/ /Hn2/.
+  apply /era_add/ >> auto.
+  apply /era_const/ >> auto.
+  }
+qed ();
+
+
+
+(* Reductions.  Put them last so they don't interfere with proofs.
+
+   Need to define add' to avoid a looping reduction for add.
+*)
+
+define /add' a1 x1 t1 l2/
+/
+  add (cons a1 x1 t1) l2
+//
+  integer -> integer -> expr -> expr -> expr
+/;
+
+unfold /add'/.
+typecheck.
+qed ();
+
+
+
+reductions 
+/
+  add (nil) l --> l ;
+
+  unrolling add
+  unfolding add'
+/;
+
+
+val r = makeReduction2
+/
+
+  add (cons a1 x1 t1) l2 -->
+     expr_iter (fn _ . expr)
+        (cons a1 x1 t1)
+        (fn a2 x2 t2 _ .
+            if leqzb x1 x2 then
+               if eqzb x1 x2 then
+                  if eqzb (a1 +z a2) z`0 then
+                     add t1 t2
+                  else
+                     cons (a1 +z a2) x1 (add t1 t2)
+               else
+                  cons a1 x1 (add t1 l2)
+            else
+               cons a2 x2 (add' a1 x1 t1 t2))
+        l2 ;
+
+  unrolling add
+  unfolding add'
+/;
+
+
+
+reductions
+/
+  add' a1 x1 t1 (nil) --> cons a1 x1 t1 ;
+
+  add' a1 x1 t1 (cons a2 x2 t2) -->
+     if leqzb x1 x2 then
+        if eqzb x1 x2 then
+           if eqzb (a1 +z a2) z`0 then
+              add t1 t2
+           else
+              cons (a1 +z a2) x1 (add t1 t2)
+        else
+           cons a1 x1 (add t1 (cons a2 x2 t2))
+     else
+        cons a2 x2 (add' a1 x1 t1 t2) ;
+
+  unfolding add' 
+  unrolling add
+/;
+
+
+val () = Define.register r;
+
+
+
+reductions
+/
+  mult a (nil) --> nil ;
+  mult a (cons b x t) --> cons (a *z b) x (mult a t) ;
+  unfolding mult
+/;
+
+
+
+reductions
+/
+  era n (nil) --> z`0 <z= n ;
+  era n (cons _ v e) --> v <z n & era n e ;
+  unfolding era
+/;
+
+
+
+lemma "era_mult_invert"
+/
+  forall n a b . era n (mult a b) -> era n b
+/;
+
+inference.
+intro /n a b/.
+iterate /b/ >> auto.
+intro /b v c IH (Hv Hera)/.
+split >> auto.
+qed ();
+
+
+
+lemma "era_add_nzconst_invert"
+/
+  forall n a b . era n (add a (nzconst b)) -> era n a
+/;
+
+inference.
+intro /n a c/.
+(* XX
+iterate /c/ >> auto
+generates a spurious error message
+*)
+iterate /a/.
+  {
+  intro /(_ H)/ >> auto.
+  }
+intro /a v b IH/.
+boolCase /leqzb v z`-1/ /Hneg/.
+1:{
+  intro /(Hn Hv Hera)/.
+  auto.
+  }
+boolCase /eqzb v z`-1/ /Heq/.
+1:{
+  intro /(Hv Hera)/.
+  split >> auto.
+  }
+subst /v/.
+boolCase /eqzb (a +z c) z`0/ /Hsum/.
+  {
+  intro /Hera/.
+  rewrite /-> add_nil_r in Hera/.
+  split >> auto.
+  so /era_impl_nonneg _ _ Hera/ /H/.
+  apply /ltz_leqz_trans/ >> auto.
+  apply /ltz_neg1_0/.
+  }
+intro /(H Hera)/.
+rewrite /-> add_nil_r in Hera/.
+split >> auto.
+qed ();
+
+
+
+lemma "era_add_const_invert"
+/
+  forall n a b . era n (add a (const b)) -> era n a
+/;
+
+inference.
+intro /n a b/.
+boolCase /eqzb b z`0/ /Hzero/.
+  {
+  intro /H/.
+  rewrite /-> add_nil_r in H/.
+  auto.
+  }
+
+  {
+  apply /era_add_nzconst_invert/.
+  }
+qed ();
+
+
+
+lemma "equal_divide"
+/
+  forall n1 n2 (f : bounded n2 -> integer) a e .
+    n1 <z= n2
+    -> istrue (notb (eqzb a z`0))
+    -> equal n1 f (mult a e)
+    -> equal n2 f e
+/;
+
+inference.
+intro /n1 n2 f a e Hn Hneq H/.
+unfold /equal in H in concl/.
+destruct /H/ /_ H Hera/.
+rewrite /-> istrue_notb in Hneq/.
+rewrite /-> istrue_eqzb in Hneq/.
+splitn 2 >> auto.
+  {
+  moveBefore /Hera/ /H/.
+  rewrite /-> eval_advance n1 n2 in H/ >> auto.
+  rewrite /-> eval_mult in H/.
+  symmetryIn /H/.
+  so /integer_integral_domain _ _ H/ /Hzero | Hzero/.
+    {
+    so /Hneq Hzero/ /0/.
+    }
+  symmetry >> auto.
+  }
+
+  {
+  apply /era_advance n1/ >> auto.
+  apply /era_mult_invert/ >> auto.
+  }
+qed ();
+
+
+
+lemma "equal_divide_contra"
+/
+  forall n1 n2 (f : bounded n2 -> integer) a e b .
+    n1 <z= n2
+    -> z`1 <z= b
+    -> b <z a
+    -> equal n1 f (add (mult a e) (nzconst b))
+    -> void
+/;
+
+inference.
+intro /n' n f a e b Hn Hlo Hhi H/.
+so /equal_advance _# 4 Hn H/ /H'/.
+renameOver /H'/ /H/.
+fold /ltz z`0 _ in Hlo/.
+unfold /equal in H/.
+destruct /H/ /_ H _/.
+rewrite /-> eval_add in H , -> eval_mult in H , -> eval_nzconst in H/.
+revert /H/.
+generalize /eval n f e/ /_/ /c/.
+intro /H/.
+clear /n n' Hn f e/.
+rename /H/ /Heq/.
+so /integer_dichotomy z`0 c/ /Hnonneg | Hneg/.
+  {
+  assert /z`0 <z a *z c +z b/ /H/.
+  1:{
+    rewrite /<- Heq in H/.
+    so /ltz_irrefl _ H/ /0/.
+    }
+  apply /plusz_ltz_r z`0 _ z`0/ >> auto.
+  rewrite /<- timesz_ann_r a/.
+  apply /timesz_leqz_l/ >> auto.
+  apply /ltz_impl_leqz/.
+  apply /ltz_trans/ >> auto.
+  }
+
+  {
+  assert /a *z c +z b <z z`0/ /H/.
+  1:{
+    rewrite /<- Heq in H/.
+    so /ltz_irrefl _ H/ /0/.
+    }
+  apply /leqz_ltz_trans _ (~z a +z b)/.
+  1:{
+    apply /plusz_cancel_ltz_l _ _ a/.
+    rewrite /<- plusz_assoc/.
+    rewrite /-> plusz_inverse_r/.
+    rewrite /-> plusz_id_l/.
+    rewrite /-> plusz_id_r/.
+    auto.
+    }
+  apply /plusz_leqz/ >> auto.
+  rewrite /-> negz_as_timesz/.
+  rewrite /-> timesz_commute at 1/.
+  apply /timesz_leqz_l/.
+    {
+    apply /ltz_impl_leqz/.
+    apply /ltz_trans/ >> auto.
+    }
+
+    {
+    apply /plusz_cancel_leqz_l _ _ z`1/.
+    fold /ltz _ _/.
+    hyp /Hneg/.
+    }
+  }
+qed ();
+
+
+
+lemma "inequal_divide"
+/
+  forall n1 n2 (f : bounded n2 -> integer) a b e .
+    n1 <z= n2
+    -> z`0 <z= b
+    -> b <z a
+    -> inequal n1 f (add (mult a e) (const b))
+    -> inequal n2 f e
+/;
+
+inference.
+intro /n1 n2 f a b e Hn Hb Hba H/.
+unfold /inequal in H in concl/.
+destruct /H/ /_ H Hera/.
+splitn 2 >> auto.
+  {
+  moveBefore /Hera/ /H/.
+  rewrite /-> eval_advance n1 n2 in H/ >> auto.
+  rewrite /-> eval_add in H , -> eval_mult in H , -> eval_const in H/.
+  revert /H/.
+  generalize /eval n2 f e/ /_/ /c/.
+  clear /n1 n2 f e Hn Hera/.
+  intro /Hleq/.
+  assert /a *z c +z b <z a *z (z`1 +z c)/ /Hlt/.
+    {
+    rewrite /-> timesz_dist_plusz_r/.
+    rewrite /-> timesz_id_r/.
+    rewrite /-> plusz_commute at 1/.
+    apply /plusz_ltz_r/ >> auto.
+    }
+  so /timesz_ltz_zero_invert _ _ (leqz_ltz_trans _# 3 Hleq Hlt)/ /Ha _ | _ Hc/.
+    {
+    so /ltz_irrefl _ (ltz_trans _# 3 (leqz_ltz_trans _# 3 Hb Hba) Ha)/ /0/.
+    }
+
+    {
+    unfold /ltz in Hc/.
+    apply /plusz_cancel_leqz_l _ _ z`1/ >> auto.
+    }
+  }
+
+  {
+  apply /era_advance n1 n2/ >> auto.
+  apply /era_mult_invert _ a/.
+  apply /era_add_const_invert/ >> auto.
+  }
+qed ();
+
+    
+
+lemma "antisymm"
+/
+  forall n1 n2 n (f : bounded n -> integer) e .
+    n1 <z= n
+    -> n2 <z= n
+    -> inequal n1 f e
+    -> inequal n2 f (mult z`-1 e)
+    -> equal n f e
+/;
+
+inference.
+intro /n1 n2 n f e Hn1 Hn2 H1 H2/.
+unfold /inequal in H1 in H2/.
+unfold /equal/.
+destruct /H1/ /_ Heval1 Hera1/.
+destruct /H2/ /_ Heval2 Hera2/.
+splitn 2 >> auto.
+  {
+  moveBefore /Hera1 Hera2/ /Heval1/.
+  rewrite /-> eval_advance n1 n in Heval1/ >> auto.
+  rewrite /-> eval_advance n2 n in Heval2/ >> auto.
+  rewrite /-> eval_mult in Heval2/.
+  rewrite /<- negz_as_timesz in Heval2/.
+  apply /leqz_antisymm/ >> auto.
+  apply /negz_leqz'/.
+  hyp /Heval2/.
+  }
+
+  {
+  apply /era_advance n1 n/ >> auto.
+  }
+qed ();
+
+
+
+grammaroff OmegaTerm;

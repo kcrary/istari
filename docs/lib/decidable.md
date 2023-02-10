@@ -21,9 +21,9 @@
     decidable_iff : forall (i : level) (P Q : U i) .
                        decidable P -> decidable Q -> decidable (P <-> Q)
 
-    eq_bool_decide : forall (b c : bool) . decidable (b = c : bool)
+    decidable_eq_bool : forall (b c : bool) . decidable (b = c : bool)
 
-    istrue_decide : forall (b : bool) . decidable (Bool.istrue b)
+    decidable_istrue : forall (b : bool) . decidable (Bool.istrue b)
 
     decidable_from_bool : forall (i : level) (P : U i) (b : bool) .
                              Bool.istrue b <-> P -> decidable P

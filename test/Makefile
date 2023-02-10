@@ -4,3 +4,4 @@ test :
 	istari-nolib -no forest.ist
 	istari -no forestn.ist
 	istari -no withlib.ist
+	istari -no omegatest.ist

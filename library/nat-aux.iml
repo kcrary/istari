@@ -8,11 +8,13 @@ structure ParseNat =
       val lt = Susp.delay (fn () => parseConstant /Nat.lt/)
       val plus = Susp.delay (fn () => parseConstant /Nat.plus/)
       val minus = Susp.delay (fn () => parseConstant /Nat.minus/)
+      val times = Susp.delay (fn () => parseConstant /Nat.times/)
 
       fun parseLeq m n = T.apply2 (Susp.force leq) m n
       fun parseLt m n = T.apply2 (Susp.force lt) m n
       fun parsePlus m n = T.apply2 (Susp.force plus) m n
       fun parseMinus m n = T.apply2 (Susp.force minus) m n
+      fun parseTimes m n = T.apply2 (Susp.force times) m n
 
    end
 
@@ -25,6 +27,7 @@ grammardef Nat
    rule Term(30)  ::= Term(31) "<" Term(31) => parseLt
    rule Term(50)  ::= Term(50) "+" Term(51) => parsePlus
    rule Term(50)  ::= Term(50) "-" Term(51) => parseMinus
+   rule Term(60)  ::= Term(60) "*" Term(61) => parseTimes
 
 end
 
@@ -164,7 +167,7 @@ functor AfterLeq () :> sig end =
       structure U = Show.Unparsing
 
       fun register k arity prec unp =
-         ConstantTable.insert U.unparsingTable k (arity, prec, unp)
+         ConstantTable.insert U.unparsingTable k (arity, prec, ref true, unp)
 
 
       val () =
@@ -240,20 +243,22 @@ functor AfterLtWellFounded () :> sig end =
 
 
 
-functor AfterMinus () :> sig end =
+functor AfterTimes () :> sig end =
    struct
 
       val () = ConstantInternal.setPath Prim.plus [`"plus", `"Nat"]
+      val () = ConstantInternal.setPath Prim.times [`"times", `"Nat"]
 
 
       val plus = Prim.plus
       val minus = parseConstant /Nat.minus/
+      val times = Prim.times
 
 
       structure U = Show.Unparsing
 
       fun register k arity prec unp =
-         ConstantTable.insert U.unparsingTable k (arity, prec, unp)
+         ConstantTable.insert U.unparsingTable k (arity, prec, ref true, unp)
 
 
       val () =
@@ -270,6 +275,13 @@ functor AfterMinus () :> sig end =
              (fn (a, b) => U.append [a 50, 
                                      U.break 1, U.string "- ", b 51]))
 
+      val () =
+         register times 2 60
+         (U.wrap
+             (U.apply2 times U.show U.show)
+             (fn (a, b) => U.append [a 60,
+                                     U.break 1, U.string "* ", b 61]))
+
    end
 
 
@@ -277,8 +289,8 @@ functor AfterMinus () :> sig end =
 functor AfterLeqb () :> sig end =
    struct
 
-      val () = ConstantInternal.setPath Prim.eqb [`"eqb", `"NatEff"]
-      val () = ConstantInternal.setPath Prim.leqb [`"leqb", `"NatEff"]
+      val () = ConstantInternal.setPath Prim.eqb [`"eqb", `"Nat"]
+      val () = ConstantInternal.setPath Prim.leqb [`"leqb", `"Nat"]
 
    end
 

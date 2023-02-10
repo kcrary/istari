@@ -551,6 +551,7 @@ module General : GENERAL =
       exception Div = Stdlib.Division_by_zero
       exception Fail = Failure
       exception Subscript = Subscript
+      exception Invalid = Stdlib.Invalid_argument
 
       let s__b = (!)
       let s__ce (x, y) = x := y

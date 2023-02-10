@@ -95,17 +95,12 @@ Strong induction for natural numbers:
     lt_well_founded : forall (n : nat) . Acc nat lt n
 
 
-### Addition and Subtraction
+### Addition
 
     plus : nat -> nat -> nat
 
     plus (zero) n --> n
     plus (succ m) n --> succ (plus m n)
-
-    minus : nat -> nat -> nat
-
-    minus m (zero) --> m
-    minus m (succ n) --> natcase m zero (fn m' . minus m' n)
 
     plus_0_l : forall (n : nat) . 0 + n = n : nat
 
@@ -133,13 +128,29 @@ Strong induction for natural numbers:
 
     plus_lt_r : forall (m n : nat) . 0 < n -> m < m + n
 
+    plus_cancel_l : forall (m n p : nat) . p + m = p + n : nat -> m = n : nat
+
+    plus_cancel_l_eq : forall (m n p q : nat) . m + n = p + q : nat -> m = p : nat -> n = q : nat
+
+    plus_cancel_r : forall (m n p : nat) . m + p = n + p : nat -> m = n : nat
+
+    plus_cancel_r_eq : forall (m n p q : nat) . m + n = p + q : nat -> n = q : nat -> m = p : nat
+
+    plus_compat : forall (m m' n n' : nat) . m = m' : nat -> n = n' : nat -> m + n = m' + n' : nat
+
+
+### Subtraction
+
+    minus : nat -> nat -> nat
+
+    minus m (zero) --> m
+    minus m (succ n) --> natcase m zero (fn m' . minus m' n)
+
     plus_minus_cancel_l : forall (m n : nat) . m + n - m = n : nat
 
     plus_minus_cancel_r : forall (m n : nat) . m + n - n = m : nat
 
-    plus_cancel_l : forall (m n p : nat) . p + m = p + n : nat -> m = n : nat
-
-    plus_cancel_r : forall (m n p : nat) . m + p = n + p : nat -> m = n : nat
+    minus_swap : forall (m n p : nat) . m - n - p = m - p - n : nat
 
     minus_plus_cancel : forall (m n : nat) . n <= m -> m - n + n = m : nat
 
@@ -167,15 +178,83 @@ Strong induction for natural numbers:
 
     plus_minus_assoc : forall (m n p : nat) . p <= n -> m + n - p = m + (n - p) : nat
 
-    plus_compat : forall (m m' n n' : nat) . m = m' : nat -> n = n' : nat -> m + n = m' + n' : nat
+    plus_minus_assoc_swap : forall (m n p : nat) . n <= p -> m + n - p = m - (p - n) : nat
+
+    minus_plus_assoc : forall (m n p : nat) . p <= n -> n <= m -> m - n + p = m - (n - p) : nat
 
     minus_compat : forall (m m' n n' : nat) .
                       m = m' : nat -> n = n' : nat -> m - n = m' - n' : nat
 
 
+### Multiplication
+
+    times : nat -> nat -> nat
+
+    times (zero) _ --> zero ;
+    times (succ m) n --> plus n (times m n) ;
+
+    times_0_l : forall (n : nat) . 0 * n = 0 : nat
+
+    times_0_r : forall (n : nat) . n * 0 = 0 : nat
+
+    times_1_l : forall (n : nat) . 1 * n = n : nat
+
+    times_1_r : forall (n : nat) . n * 1 = n : nat
+
+    times_commute : forall (m n : nat) . m * n = n * m : nat
+
+    times_assoc : forall (m n p : nat) . m * n * p = m * (n * p) : nat
+
+    times_dist_succ_r : forall (m n : nat) . m * succ n = m + m * n : nat
+
+    times_dist_plus_l : forall (m n p : nat) . (m + n) * p = m * p + n * p : nat
+
+    times_dist_plus_r : forall (m n p : nat) . m * (n + p) = m * n + m * p : nat
+
+    times_leq : forall (m m' n n' : nat) . m <= m' -> n <= n' -> m * n <= m' * n'
+
+    times_dist_minus_l : forall (m n p : nat) . (m - n) * p = m * p - n * p : nat
+
+    times_dist_minus_r : forall (m n p : nat) . m * (n - p) = m * n - m * p : nat
+
+    nat_integral_domain : forall (m n : nat) . m * n = 0 : nat -> m = 0 : nat % n = 0 : nat
+
+    times_compat : forall (m m' n n' : nat) .
+                      m = m' : nat -> n = n' : nat -> m * n = m' * n' : nat
+
+
+### Minimum
+
+    min : nat -> nat -> nat
+
+    min_commute : forall (m n : nat) . min m n = min n m : nat
+
+    min_assoc : forall (m n p : nat) . min (min m n) p = min m (min n p) : nat
+
+    min_ann_l : forall (n : nat) . min 0 n = 0 : nat
+
+    min_ann_r : forall (n : nat) . min n 0 = 0 : nat
+
+    min_succ : forall (m n : nat) . min (succ m) (succ n) = succ (min m n) : nat
+
+    min_leq_l : forall (m n : nat) . min m n <= m
+
+    min_leq_r : forall (m n : nat) . min m n <= n
+
+    min_glb : forall (m n p : nat) . p <= m -> p <= n -> p <= min m n
+
+    min_eq_l : forall (m n : nat) . m <= n -> min m n = m : nat
+
+    min_eq_r : forall (m n : nat) . n <= m -> min m n = n : nat
+
+
 ### Maximum
 
     max : nat -> nat -> nat
+
+    max_commute : forall (m n : nat) . max m n = max n m : nat
+
+    max_assoc : forall (m n p : nat) . max (max m n) p = max m (max n p) : nat
 
     max_id_l : forall (n : nat) . max 0 n = n : nat
 
@@ -229,3 +308,5 @@ Strong induction for natural numbers:
     nat_trichotomy : forall (m n : nat) . m < n % m = n : nat % n < m
 
     nat_dichotomy : forall (m n : nat) . m <= n % n < m
+
+    nat_dichotomy_neq : forall (m n : nat) . not (m = n : nat) -> m < n % n < m

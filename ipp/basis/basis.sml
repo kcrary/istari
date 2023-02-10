@@ -27,6 +27,8 @@ signature Basis__INTEGER =
       val max : int -> int -> int
       val abs : int -> int
 
+      val divmod : int -> int -> int * int
+
       val s__e : int -> int -> bool
       val <> : int -> int -> bool
       val < : int -> int -> bool
@@ -36,6 +38,7 @@ signature Basis__INTEGER =
       val compare : int -> int -> order
 
       val toString : int -> string
+      val toStringStd : int -> string
       val toInt : int -> Int.int
       val fromInt : Int.int -> int
 
@@ -418,6 +421,19 @@ structure Basis :> IML__BASIS =
             type int = IntInf.int
             val minInt = IntInf.minInt
             val maxInt = IntInf.maxInt
+
+            fun divmod x y =
+               let
+                  val qr as (q, r) = IntInf.quotRem (x, y)
+               in
+                  if r >= 0 then
+                     qr
+                  else if y >= 0 then
+                     (q - 1, r + y)
+                  else
+                     (q + 1, r - y)
+               end
+
             val ~ = IntInf.~
             fun op + x y = IntInf.+ (x, y)
             fun op - x y = IntInf.- (x, y)
@@ -437,6 +453,12 @@ structure Basis :> IML__BASIS =
             val toString = IntInf.toString
             val fromInt = IntInf.fromInt
             val toInt = IntInf.toInt
+
+            fun toStringStd x =
+               if IntInf.< (x, 0) then
+                  "-" ^ IntInf.toString (IntInf.~ x)
+               else
+                  IntInf.toString x
             
             fun pow x y = IntInf.pow (x, y)
             val log2 = IntInf.log2
@@ -465,6 +487,20 @@ structure Basis :> IML__BASIS =
             type int = Int.int
             val minInt = Int.minInt
             val maxInt = Int.maxInt
+
+            fun divmod x y =
+               let
+                  val q = Int.quot (x, y)
+                  val r = Int.rem (x, y)
+               in
+                  if r >= 0 then
+                     (q, r)
+                  else if y >= 0 then
+                     (q - 1, r + y)
+                  else
+                     (q + 1, r - y)
+               end
+            
             val ~ = Int.~
             fun op + x y = Int.+ (x, y)
             fun op - x y = Int.- (x, y)
@@ -482,6 +518,12 @@ structure Basis :> IML__BASIS =
             fun op >= (x : int) (y : int) = Int.>= (x, y)
             fun compare x y = Int.compare (x, y)
             val toString = Int.toString
+
+            fun toStringStd x =
+               if Int.< (x, 0) then
+                  "-" ^ Int.toString (~ x)
+               else
+                  Int.toString x
             
             fun fromInt x = x
             fun toInt x = x

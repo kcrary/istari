@@ -128,6 +128,7 @@ signature THE_RULES =
       val guardIntro : term -> term -> rule
       val guardElimOf : term -> term -> term -> rule
       val guardElimEq : term -> term -> term -> term -> rule
+      val guardElim : term -> term -> rule
       val guardSatEq : term -> term -> rule
       val existsForm : term -> term -> rule
       val existsEq : term -> term -> term -> term -> rule
@@ -298,6 +299,7 @@ signature THE_RULES =
       val ofEqUniv : term -> term -> term -> term -> term -> rule
       val ofIntro : term -> term -> rule
       val ofElim : term -> term -> term -> rule
+      val ofTrivialize : term -> term -> rule
       val ofExt : term -> term -> term -> term -> rule
       val ofLeft : int -> term -> term -> term -> rule
       val ofEquand1 : term -> term -> term -> rule
@@ -406,6 +408,7 @@ signature THE_RULES =
       val substitutionSimple : int -> term -> term -> term -> rule
       val generalize : term -> term -> term -> rule
       val assert : term -> term -> rule
+      val assert' : term -> term -> rule
       val inhabitant : term -> term -> rule
       val sumForm : term -> term -> rule
       val sumEq : term -> term -> term -> term -> rule
@@ -487,6 +490,7 @@ signature THE_RULES =
       val negzSpec : rule
       val eqzbSpec : rule
       val leqzbSpec : rule
+      val timeszSpec : rule
 
    end
 
@@ -558,6 +562,8 @@ val const_succ = Const Prim.succ
 val const_sum = Const Prim.sum
 val const_sumcase = Const Prim.sumcase
 val const_tarrow = Const Prim.tarrow
+val const_timesz = Const Prim.timesz
+val const_timesz_def = Const Prim.timesz_def
 val const_unit = Const Prim.unit
 val const_univ = Const Prim.univ
 val const_void = Const Prim.void
@@ -649,9 +655,10 @@ fun guardFormUniv a b i = Arg.make "guardFormUniv" [] (Elim (const_of, [App (Eli
 fun guardEqUniv a a' b b' i = Arg.make "guardEqUniv" [] (Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (Elim (const_guard, [App (a), App (b), ])), App (Elim (const_guard, [App (a'), App (b'), ])), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eq, [App (Elim (const_univ, [App (Sub (i, Shift 1)), ])), App (Sub (b, Shift 1)), App (Sub (b', Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun guardIntroOf a b m = Arg.make "guardIntroOf" [] (Elim (const_of, [App (Elim (const_guard, [App (a), App (b), ])), App (m), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Sub (b, Shift 1)), App (Sub (m, Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun guardIntroEq a b m n = Arg.make "guardIntroEq" [] (Elim (const_eq, [App (Elim (const_guard, [App (a), App (b), ])), App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eq, [App (Sub (b, Shift 1)), App (Sub (m, Shift 1)), App (Sub (n, Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
-fun guardIntro a b = Arg.make "guardIntro" [] (Elim (const_guard, [App (a), App (b), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Sub (b, Shift 1)), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun guardIntro a b = Arg.make "guardIntro" [] (Elim (const_guard, [App (a), App (b), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Nothing, [J.Tmh (a), ], Sub (b, Shift 1)), ] (fn [_, m, ] => Sub (m, Dot (Triv, Shift 0)) | _ => raise Arg.ExtractFailure)
 fun guardElimOf a b m = Arg.make "guardElimOf" [] (Elim (const_of, [App (b), App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_guard, [App (a), App (b), ])), App (m), ])), (Arg.Unhide, [], a), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun guardElimEq a b m n = Arg.make "guardElimEq" [] (Elim (const_eq, [App (b), App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_guard, [App (a), App (b), ])), App (m), App (n), ])), (Arg.Unhide, [], a), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun guardElim a b = Arg.make "guardElim" [] (b) [(Arg.Nothing, [], Elim (const_guard, [App (a), App (b), ])), (Arg.Unhide, [], a), ] (fn [m, _, ] => m | _ => raise Arg.ExtractFailure)
 fun guardSatEq a b = Arg.make "guardSatEq" [] (Elim (const_eqtp, [App (b), App (Elim (const_guard, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (b), ])), (Arg.Unhide, [], a), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun existsForm a b = Arg.make "existsForm" [] (Elim (const_istp, [App (Elim (const_exists, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun existsEq a a' b b' = Arg.make "existsEq" [] (Elim (const_eqtp, [App (Elim (const_exists, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_exists, [App (a'), App (Lam (NONE, b')), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eqtp, [App (b), App (b'), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
@@ -822,6 +829,7 @@ fun ofFormUniv a i m = Arg.make "ofFormUniv" [] (Elim (const_of, [App (Elim (con
 fun ofEqUniv a b i m n = Arg.make "ofEqUniv" [] (Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (Elim (const_of, [App (a), App (m), ])), App (Elim (const_of, [App (b), App (n), ])), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (a), App (b), ])), (Arg.Unhide, [], Elim (const_eq, [App (a), App (m), App (n), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun ofIntro a m = Arg.make "ofIntro" [] (Elim (const_of, [App (Elim (const_of, [App (a), App (m), ])), App (Triv), ])) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun ofElim a m p = Arg.make "ofElim" [] (Elim (const_of, [App (a), App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_of, [App (a), App (m), ])), App (p), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun ofTrivialize a m = Arg.make "ofTrivialize" [] (Elim (const_of, [App (a), App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun ofExt a m p q = Arg.make "ofExt" [] (Elim (const_eq, [App (Elim (const_of, [App (a), App (m), ])), App (p), App (q), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_of, [App (a), App (m), ])), App (p), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_of, [App (a), App (m), ])), App (q), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun ofLeft gsize a b p = Arg.lmake "ofLeft" [] gsize [J.Tm (Elim (const_of, [App (a), App (p), ])), ] (b) [(Arg.Nothing, [], SOME (Dot (Triv, Shift 0)), Sub (b, under gsize (Dot (Triv, Shift 0)))), ] (fn [m, ] => Sub (m, under gsize (Shift 1)) | _ => raise Arg.ExtractFailure)
 fun ofEquand1 a m n = Arg.make "ofEquand1" [] (Elim (const_of, [App (a), App (m), ])) [(Arg.Unhide, [], Elim (const_eq, [App (a), App (m), App (n), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
@@ -929,7 +937,8 @@ fun subtypeIstp2 a b = Arg.make "subtypeIstp2" [] (Elim (const_istp, [App (b), ]
 fun substitution gsize a b m = Arg.lmake "substitution" [] gsize [J.Tm (a), ] (b) [(Arg.Unhide, [J.Tm (a), ], SOME (Shift 0), Elim (const_istp, [App (b), ])), (Arg.Unhide, [J.Tm (a), ], SOME (Shift 0), Elim (const_eq, [App (Sub (a, Shift (gsize + 1))), App (Var gsize ), App (Sub (m, Shift (gsize + 1))), ])), (Arg.Nothing, [], SOME (Dot (m, Shift 0)), Sub (b, under gsize (Dot (m, Shift 0)))), ] (fn [_, _, n, ] => Sub (n, under gsize (Shift 1)) | _ => raise Arg.ExtractFailure)
 fun substitutionSimple gsize a b m = Arg.lmake "substitutionSimple" [] gsize [J.Tm (a), ] (Sub (b, under gsize (Shift 1))) [(Arg.Unhide, [J.Tm (a), ], SOME (Shift 0), Elim (const_eq, [App (Sub (a, Shift (gsize + 1))), App (Var gsize ), App (Sub (m, Shift (gsize + 1))), ])), (Arg.Nothing, [], SOME (Dot (m, Shift 0)), b), ] (fn [_, n, ] => Sub (n, under gsize (Shift 1)) | _ => raise Arg.ExtractFailure)
 fun generalize a b m = Arg.make "generalize" [m, ] (Sub (b, Dot (m, Shift 0))) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Nothing, [J.Tm (a), ], b), ] (fn [_, n, ] => Sub (n, Dot (m, Shift 0)) | _ => raise Arg.ExtractFailure)
-fun assert a b = Arg.make "assert" [] (b) [(Arg.Nothing, [], a), (Arg.Nothing, [J.Tm (a), ], Sub (b, Shift 1)), ] (fn [m, n, ] => Sub (n, Dot (m, Shift 0)) | _ => raise Arg.ExtractFailure)
+fun assert a b = Arg.make "assert" [] (b) [(Arg.Nothing, [], a), (Arg.Nothing, [J.Tm (a), ], Sub (b, Shift 1)), ] (fn [m, n, ] => Elim (const_let, [App (m), App (Lam (NONE, n)), ]) | _ => raise Arg.ExtractFailure)
+fun assert' a b = Arg.make "assert'" [] (b) [(Arg.Nothing, [], a), (Arg.Nothing, [J.Tm (a), ], Sub (b, Shift 1)), ] (fn [m, n, ] => Sub (n, Dot (m, Shift 0)) | _ => raise Arg.ExtractFailure)
 fun inhabitant a m = Arg.make "inhabitant" [m, ] (a) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), ] (fn [_, ] => m | _ => raise Arg.ExtractFailure)
 fun sumForm a b = Arg.make "sumForm" [] (Elim (const_istp, [App (Elim (const_sum, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun sumEq a a' b b' = Arg.make "sumEq" [] (Elim (const_eqtp, [App (Elim (const_sum, [App (a), App (b), ])), App (Elim (const_sum, [App (a'), App (b'), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (a'), ])), (Arg.Unhide, [], Elim (const_eqtp, [App (b), App (b'), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
@@ -1011,5 +1020,6 @@ val pluszSpec = Arg.make "pluszSpec" [] (Elim (const_eq, [App (Elim (const_arrow
 val negzSpec = Arg.make "negzSpec" [] (Elim (const_eq, [App (Elim (const_arrow, [App (const_integer), App (const_integer), ])), App (const_negz), App (Lam (NONE, Elim (const_integer_from_def, [App (Elim (const_negz_def, [App (Elim (const_integer_to_def, [App (Var 0), ])), ])), ]))), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 val eqzbSpec = Arg.make "eqzbSpec" [] (Elim (const_eq, [App (Elim (const_arrow, [App (const_integer), App (Elim (const_arrow, [App (const_integer), App (const_bool), ])), ])), App (const_eqzb), App (Lam (NONE, Lam (NONE, Elim (const_eqzb_def, [App (Elim (const_integer_to_def, [App (Var 1), ])), App (Elim (const_integer_to_def, [App (Var 0), ])), ])))), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 val leqzbSpec = Arg.make "leqzbSpec" [] (Elim (const_eq, [App (Elim (const_arrow, [App (const_integer), App (Elim (const_arrow, [App (const_integer), App (const_bool), ])), ])), App (const_leqzb), App (Lam (NONE, Lam (NONE, Elim (const_leqzb_def, [App (Elim (const_integer_to_def, [App (Var 1), ])), App (Elim (const_integer_to_def, [App (Var 0), ])), ])))), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+val timeszSpec = Arg.make "timeszSpec" [] (Elim (const_eq, [App (Elim (const_arrow, [App (const_integer), App (Elim (const_arrow, [App (const_integer), App (const_integer), ])), ])), App (const_timesz), App (Lam (NONE, Lam (NONE, Elim (const_integer_from_def, [App (Elim (const_timesz_def, [App (Elim (const_integer_to_def, [App (Var 1), ])), App (Elim (const_integer_to_def, [App (Var 0), ])), ])), ])))), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 
 end

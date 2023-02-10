@@ -335,6 +335,10 @@ module type GENERAL =
       exception Fail of string
       exception Subscript
 
+
+      (* For interfacing with IML code. Not part of the SML basis. *)
+      exception Invalid of string
+
       val s__b : 'a ref -> 'a
       val s__ce : 'a ref * 'a -> unit
       val o : ('b -> 'c) * ('a -> 'b) -> 'a -> 'c

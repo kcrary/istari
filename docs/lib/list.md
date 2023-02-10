@@ -56,7 +56,6 @@ A simpler case-analysis operation:
     append _ (nil _) l --> l
     append A (cons _ h t) l --> cons A h (append A t l)
 
-
     append_id_l : forall (i : level) (a : U i) (l : list a) . append nil l = l : list a
 
     append_id_r : forall (i : level) (a : U i) (l : list a) . append l nil = l : list a
@@ -77,3 +76,63 @@ A simpler case-analysis operation:
     length_append : forall (i : level) (a : U i) (l1 l2 : list a) .
                        length (append l1 l2) = length l1 + length l2 : nat
 
+
+### Fold
+
+    foldr : intersect (i : level) . forall (a b : U i) . b -> (a -> b -> b) -> list a -> b
+
+    foldr _ _ z _ (nil _) --> z
+    foldr a b z f (cons _ h t) --> f h (foldr a b z f t)
+
+
+### Map
+
+    map : intersect (i : level) . forall (a b : U i) . (a -> b) -> list a -> list b
+
+    map _ b _ (nil _) --> nil b
+    map a b f (cons _ h t) --> cons b (f h) (map a b f t)
+
+    map_compose : forall (i : level) (a b c : U i) (f : b -> c) (g : a -> b) (l : list a) .
+                     map f (map g l) = map (fn x . f (g x)) l : list c
+
+    
+### Universal and existential predicates over lists
+
+    datatype
+      intersect (i : level) .
+      forall (a : U i) (P : a -> U i) .
+      U i
+    of
+      Forall : list a -> type =
+      | Forall_nil : Forall nil
+      | Forall_cons : forall h t . P h -> Forall t -> Forall (h :: t)
+
+
+    datatype
+      intersect (i : level) .
+      forall (a : U i) (P : a -> U i) .
+      U i
+    of
+      Exists : list a -> type =
+      | Exists_hit : forall h t . P h -> Exists (h :: t)
+      | Exists_miss : forall h t . Exists t -> Exists (h :: t)
+
+    Forall_as_foldr : forall (i : level) (a : U i) (P : a -> U i) (l : list a) .
+                         Forall P l <-> foldr unit (fn h Q . P h & Q) l
+
+    Exists_as_foldr : forall (i : level) (a : U i) (P : a -> U i) (l : list a) .
+                         Exists P l <-> foldr void (fn h Q . P h % Q) l
+
+    In : intersect (i : level) . forall (a : U i) . a -> list a -> U i
+
+    In _ _ (nil _) --> void
+    In a x (cons _ h t) --> x = h : a % In a x t
+
+    In_as_exists : forall (i : level) (a : U i) (x : a) (l : list a) .
+                      In a x l <-> Exists (fn y . x = y : a) l
+
+    Forall_forall : forall (i : level) (a : U i) (P : a -> U i) (l : list a) .
+                       Forall P l <-> (forall (x : a) . In a x l -> P x)
+
+    Exists_exists : forall (i : level) (a : U i) (P : a -> U i) (l : list a) .
+                       Exists P l <-> (exists (x : a) . In a x l & P x)

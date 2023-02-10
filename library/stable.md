@@ -20,9 +20,9 @@
 
     decidable_impl_stable : type:decidable_impl_stable
 
-    eq_bool_stable : type:eq_bool_stable
+    stable_eq_bool : type:stable_eq_bool
 
-    istrue_stable : type:istrue_stable
+    stable_istrue : type:stable_istrue
 
     dneg_elim_if_stable : type:dneg_elim_if_stable
 

@@ -16,37 +16,43 @@ indices.
 
 The default grammar for terms is as follows.  Capitalized words are
 nonterminals; lower case words are keywords.  (**Exception:** `U` and
-`K` are keywords.)  Forms are listed in increasing order of
-precedence.  Grouped forms have the same precedence.  Associativity,
-when appropriate, is given by an L or R.
+`K` are keywords.)
+
+Forms are listed in increasing order of precedence.  Grouped forms
+have the same precedence.  A subterm at the same level of precedence
+is given in brackets.  For example, `[Term] + Term` indicates that
+addition is left associative, while `Term :: [Term]` indicates that
+cons is right associative.
 
     Term ::=
-      fn OIdents . Term                                              (lambda)
-      forall Bindings . Term                                         (dependent product)  
-      exists Bindings . Term                                         (strong dependent sum)
-      iforall Bindings . Term                                        (impredicative universal)
-      iexists Bindings . Term                                        (impredicative existential)
-      intersect Bindings . Term                                      (intersection type)
-      foralltp OIdents . Term                                        (impredicative polymorphism)
-      rec Ident . Term                                               (recursive type)
-      mu Ident . Term                                                (inductive type)
-      wtype ( Ident : Term ) . Term                                  (W type)
-      quotient ( Ident Ident : Term ) . Term                         (quotient type)
-      Term -> Term                                                   (ordinary arrow) R
-      Term -t> Term                                                  (tarrow kind) R 
-      Term -k> Term                                                  (karrow kind) R
-      Term -g> Term                                                  (guard) R
-      let Ident = Term in Term                                       (let)
-      let next Ident = Term in Term                                  (scoped future elim)
-      case Term of | inl OIdent . Term | inr OIdent . Term           (sum elim)
-      Term : Term                                                    (typing)
+      fn OIdents . [Term]                                            (lambda)
+      forall Bindings . [Term]                                       (dependent product)  
+      exists Bindings . [Term]                                       (strong dependent sum)
+      iforall Bindings . [Term]                                      (impredicative universal)
+      iexists Bindings . [Term]                                      (impredicative existential)
+      intersect Bindings . [Term]                                    (intersection type)
+      foralltp OIdents . [Term]                                      (impredicative polymorphism)
+      rec Ident . [Term]                                             (recursive type)
+      mu Ident . [Term]                                              (inductive type)
+      wtype ( Ident : [Term] ) . [Term]                              (W type)
+      quotient ( Ident Ident : [Term] ) . [Term]                     (quotient type)
+      Term -> [Term]                                                 (ordinary arrow)
+      Term -t> [Term]                                                (tarrow kind)
+      Term -k> [Term]                                                (karrow kind)
+      Term -g> [Term]                                                (guard)
+      let Ident = Term in [Term]                                     (let)
+      let next Ident = Term in [Term]                                (scoped future elim)
+      case Term of | inl OIdent . [Term] | inr OIdent . [Term]       (sum elim)
+      Term : [Term]                                                  (typing)
       Term : type                                                    (type formation)
 
-      if Term then Term else Term                                    (if-then-else)
+      if [Term] then [Term] else [Term]                              (if-then-else)
 
-      Term % Term                                                    (sum type) R
+      Term <-> Term                                                  (if-and-only-if)
 
-      Term & Term                                                    (product type) R
+      Term % [Term]                                                  (sum type)
+
+      Term & [Term]                                                  (product type)
 
       Term = Term : Term                                             (equality)
       Term = Term : type                                             (type equality)
@@ -55,27 +61,35 @@ when appropriate, is given by an L or R.
       Term <= Term                                                   (natural number inequality)
       Term < Term                                                    (natural number inequality)
       Term <l= Term                                                  (level inequality)
+      Term <z= Term                                                  (integer inequality)
+      Term <z Term                                                   (integer inequality)
 
-      Term :: Term                                                   (cons) R
+      Term :: [Term]                                                 (cons)
 
-      Term + Term                                                    (natural number plus) L
-      Term - Term                                                    (natural number minus) L
+      [Term] + Term                                                  (natural number plus)
+      [Term] - Term                                                  (natural number minus)
+      [Term] +z Term                                                 (integer plus)
+      [Term] -z Term                                                 (integer minus)
 
-      Term Term                                                      (application) L
-      Term #1                                                        (first projection)
-      Term #2                                                        (second projection)
-      Term #prev                                                     (unscoped future elim)
+      [Term] * Term                                                  (natural number times)
+      [Term] *z Term                                                 (integer times)
+
+      [Term] Term                                                    (application)
+      [Term] #1                                                      (first projection)
+      [Term] #2                                                      (second projection)
+      [Term] #prev                                                   (unscoped future elim)
       pi1 Term                                                       (first projection)
       pi2 Term                                                       (second projection)
       prev Term                                                      (unscoped future elim)
       next Term                                                      (future intro)
       inl Term                                                       (sum intro)
       inr Term                                                       (sum intro)
+      ~z Term                                                        (integer negation)
       U Level                                                        (universe)
       K Level                                                        (kind)
-      Term :> Term                                                   (type annotation) L
-      Term ap Term                                                   (visibilized application) L
-      Term _# Number                                                 (application to multiple evars)
+      [Term] :> Term                                                 (type annotation)
+      [Term] ap Term                                                 (visibilized application)
+      [Term] _# Number                                               (application to multiple evars)
 
       ( Term )
       ()                                                             (unit)
@@ -85,7 +99,7 @@ when appropriate, is given by an L or R.
       Longident                                                      (identifier)
       Number                                                         (natural number literal)
       _                                                              (evar)
-      __                                                             (marker)
+      __                                                             (hole)
       \ ... antiquoted internal term ... \
       ` Longident
       l` LTerm                                                       (literal term)
@@ -107,7 +121,7 @@ when appropriate, is given by an L or R.
       Binding ... Binding                                            (length can be zero)
 
     Level ::=
-      Number + Level                                                 (level plus)
+      Number + [Level]                                               (level plus)
 
       ( Level )
       Number                                                         (level literal)
@@ -145,7 +159,7 @@ Notes:
 - An [antiquoted](iml.html#antiquote) internal term should have the
   type `Term.term`.
 
-- A marker (`__`) is not a valid term in the logic.  It is a
+- A hole (`__`) is not a valid term in the logic.  It is a
   placeholder used by some tactics (*e.g.,* `so`).
 
 - One can bind additional de Bruijn positions using the syntax
@@ -162,18 +176,18 @@ few conveniences.  It also provides a notation for explicit
 substitution.
 
     LTerm ::=
-      fn . LTerm                                                     (lambda)
+      fn . [LTerm]                                                   (lambda)
 
       LTerm = LTerm : LTerm                                          (equality)
       LTerm = LTerm : type                                           (type equality)
 
-      LTerm LTerm                                                    (application) L
-      LTerm #1                                                       (first projection)
-      LTerm #2                                                       (second projection)
-      LTerm #prev                                                    (unscoped future elim)
+      [LTerm] LTerm                                                  (application)
+      [LTerm] #1                                                     (first projection)
+      [LTerm] #2                                                     (second projection)
+      [LTerm] #prev                                                  (unscoped future elim)
       next LTerm                                                     (future intro)
 
-      LTerm [ Sub ]                                                  (substitution)
+      [LTerm] [ Sub ]                                                (substitution)
 
       ( LTerm )
       ()                                                             (unit)
@@ -185,10 +199,10 @@ substitution.
       z` Number                                                      (integer literal)
 
     Sub ::=
-      Sub o Sub                                                      (composition) L
+      [Sub] o Sub                                                    (composition)
 
-      LTerm . Sub                                                    (substitution cons)
-      Number . Sub                                                   (special case of cons)
+      LTerm . [Sub]                                                  (substitution cons)
+      Number . [Sub]                                                 (special case of cons)
       ^ Number                                                       (shift)
       id                                                             (identity, same as ^0)
       ( Sub )

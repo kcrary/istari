@@ -39,6 +39,7 @@ signature TACTIC =
       val andthenl : 'a tacticm -> 'b tacticm list -> 'b tacticm
       val andthenlPad : 'a tacticm -> 'b tacticm list -> 'b tacticm -> 'b tacticm
       val andthenOn : int -> 'a tacticm -> 'a tacticm -> 'a tacticm
+      val andthen1 : 'a tacticm -> 'b tacticm -> 'b tacticm
 
       val andthenM : 'a tacticm -> ('a -> 'b tacticm) -> 'b tacticm
       val andthenlM : 'a tacticm -> ('a -> 'b tacticm) list -> 'b tacticm
@@ -98,6 +99,7 @@ signature TACTIC =
 
       val >> : 'a tacticm -> 'b tacticm -> 'b tacticm                           (* andthen *)
       val >>> : 'a tacticm -> 'b tacticm list -> 'b tacticm                     (* andthenl *)
+      val >>+ : 'a tacticm -> 'b tacticm -> 'b tacticm                          (* andthen1 *)
       val >>= : 'a tacticm -> ('a -> 'b tacticm) -> 'b tacticm                  (* andthenM *)
       val >>>= : 'a tacticm -> ('a -> 'b tacticm) list -> 'b tacticm            (* andthenlM *)
       val >>! : priority tacticm -> priority tacticm -> priority tacticm        (* andthenPri *)
@@ -268,6 +270,30 @@ structure TacticInternal :> TACTIC_INTERNAL =
             sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
          end
 
+      fun andthen1 tac1 tac2 goal fk sk =
+         let
+            do (subgoals, validate1, fk') = tac1 goal fk
+         in
+            (case subgoals of
+                [(_, subgoal)] =>
+                   let
+                      do (subgoals', validate2, fk'') = tac2 subgoal fk'
+
+                      fun validate vs =
+                         let
+                            val (v, vs') = validate2 vs
+                         in
+                            validate1 (v :: vs')
+                         end
+                   in
+                      sk (subgoals', validate, fk'')
+                   end
+
+              | [] => fk "no subgoals in andthen1"
+
+              | _ => fk "multiple subgoals in andthen1")
+         end
+
 
 
       (* almost the same *)
@@ -279,7 +305,7 @@ structure TacticInternal :> TACTIC_INTERNAL =
                        sk (List.rev acc, (fn vs => vs), fk)
 
                   | _ :: _ =>
-                       fk "too many tactics in andthen")
+                       fk "too many tactics in andthenM")
 
            | (x, subgoal) :: rest =>
                 let
@@ -674,6 +700,7 @@ structure TacticInternal :> TACTIC_INTERNAL =
 
       val >> = andthen
       val >>> = andthenl
+      val >>+ = andthen1
       val >>= = andthenM
       val >>>= = andthenlM
       val >>! = andthenPri
@@ -698,7 +725,8 @@ structure TacticMonad :> MONAD where type 'a m = 'a Tactic.tacticm =
 
 grammardef Tactic
 
-   infix right curried 1 >> >>> >>= >>>= >>! >>>!
+   infix right curried 1 >> >>+ >>= >>!
+   infix left curried 2 >>> >>>= >>>!
 
 end
 

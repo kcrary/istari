@@ -36,11 +36,18 @@ The `bool` type is primitive, but aliased in the `Bool` module:
     orb : bool -> bool -> bool
         = fn b c . if b then true else c
 
+    impb : bool -> bool -> bool
+         = fn b c . if b then c else true
+
     notb_invol : forall (b : bool) . notb (notb b) = b : bool
 
     notb_andb : forall (b c : bool) . notb (andb b c) = orb (notb b) (notb c) : bool
 
     notb_orb : forall (b c : bool) . notb (orb b c) = andb (notb b) (notb c) : bool
+
+    notb_impb : forall (b c : bool) . notb (impb b c) = andb b (notb c) : bool
+
+    impb_as_orb : forall (b c : bool) . impb b c = orb (notb b) c : bool
 
     andb_commute : forall (b c : bool) . andb b c = andb c b : bool
 
@@ -50,6 +57,8 @@ The `bool` type is primitive, but aliased in the `Bool` module:
 
     orb_assoc : forall (b c d : bool) . orb (orb b c) d = orb b (orb c d) : bool
 
+    impb_curry : forall (b c d : bool) . impb (andb b c) d = impb b (impb c d) : bool
+
     andb_id_l : forall (b : bool) . andb true b = b : bool
 
     andb_id_r : forall (b : bool) . andb b true = b : bool
@@ -57,6 +66,8 @@ The `bool` type is primitive, but aliased in the `Bool` module:
     orb_id_l : forall (b : bool) . orb false b = b : bool
 
     orb_id_r : forall (b : bool) . orb b false = b : bool
+
+    impb_id_l : forall (b : bool) . impb true b = b : bool
 
     andb_ann_l : forall (b : bool) . andb false b = false : bool
 
@@ -66,6 +77,10 @@ The `bool` type is primitive, but aliased in the `Bool` module:
 
     orb_ann_r : forall (b : bool) . orb b true = true : bool
 
+    impb_ann_l : forall (b : bool) . impb false b = true : bool
+
+    impb_ann_r : forall (b : bool) . impb b true = true : bool
+
     ite_notb : forall (i : level) (a : U i) (b : bool) (x y : a) .
                   (if notb b then x else y) = (if b then y else x) : a
 
@@ -74,3 +89,9 @@ The `bool` type is primitive, but aliased in the `Bool` module:
     istrue_andb : forall (b c : bool) . istrue (andb b c) <-> istrue b & istrue c
 
     istrue_orb : forall (b c : bool) . istrue (orb b c) <-> istrue b % istrue c
+
+    istrue_impb : forall (b c : bool) . istrue (impb b c) <-> (istrue b -> istrue c)
+
+    istrue_true_iff : istrue true <-> unit
+
+    istrue_false_iff : istrue false <-> void

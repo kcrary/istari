@@ -1,0 +1,4946 @@
+
+signature OMEGA =
+   sig
+
+      val omegaPriority : Tactic.priority Tactic.tacticm
+      val omegaRaw : Tactic.tactic
+      val omega : Tactic.tactic
+
+      val counterexample : unit -> unit
+
+   end
+
+
+grammardef IntInfOperators
+
+   infix left curried 4 == <# ># >== <==
+   infix left curried 6 ++ -- 
+   infix left curried 7 ** idiv
+
+end
+
+
+grammaron IntInfOperators
+
+
+functor OmegaFun () :> OMEGA =
+   struct
+
+      structure D = Directory
+      structure De = Destruct
+      structure I = IntInf
+      structure IP = IntroPattern
+      structure J = Judgement
+      structure N = Normalize
+      structure R = Reduction
+      structure S = Seq
+      structure T = Term
+      structure W = Word32
+
+      open Tactic
+      open CasePervasive
+
+      structure ID = SplayDict (structure Key = IntOrdered)
+      structure WD = SplayDict (structure Key = WordOrdered)
+      structure SD = SplayDict (structure Key = SymbolOrdered)
+
+      structure SS = SplaySet (structure Elem = SymbolOrdered)
+
+(* For development, don't drop anything:
+      structure SS =
+         struct
+            type set = unit
+
+            val empty = ()
+
+            fun insert _ _ = ()
+
+            fun remove _ _ = ()
+
+            fun union _ _ = ()
+
+            fun member _ _ = true
+         end
+*)
+
+      structure TD = HashDict (structure Key = TermHashable
+                               structure Dict = ListDict (structure Key = TermOrdered)
+                               structure WordDict = WD)
+
+
+      fun toListAppend d l =
+         SD.foldl (fn (name, e, l) => (name, e) :: l) l d
+
+      type symbol = Symbol.symbol
+      type integer = IntInf.int
+
+      datatype ('a, 'b) sum = INL of 'a | INR of 'b
+
+      (* shadowing Tactic's version *)
+      fun done goal fk sk =
+         (
+         print "Unexpected goal:\n";
+         Show.showGoal goal;
+         fk "no goals expected"
+         )
+
+      val gensym = Symbol.gensym
+      val mismatch = Tactic.Tryf "type mismatch in omega"
+      val typecheck : tactic = Typecheck.typecheck >> done
+      
+      fun assert () = refine (Rule.assert (T.evar ()) (T.evar ()))
+
+      fun literal i = T.Native (T.Integer i)
+      val zero = literal 0I
+      val one = literal 1I
+      val negone = literal ~1I
+
+      val ++ = I.+
+      val -- = I.-
+      val ** = I.*
+      val idiv = I.div
+      val == = I.=
+      val ># = I.>
+      val >== = I.>=
+      val <== = I.<=
+
+
+      structure C =
+         struct
+
+            fun find module item = Namespace.resolve [Symbol.fromValue module, Symbol.fromValue item]
+
+            val not = find "Logic" "not"
+
+            val findBool = find "Bool"
+            val andb = findBool "andb"
+            val impb = findBool "impb"
+            val istrue = findBool "istrue"
+            val istrue_inhabitant = findBool "istrue_inhabitant"
+            val istrue_true = findBool "istrue_true"
+            val notb = findBool "notb"
+            val orb = findBool "orb"
+
+            val findNat = find "Nat"
+            val eqb = findNat "eqb"
+            val leqb = findNat "leqb"
+            val leq = findNat "leq"
+            val lt = findNat "lt"
+            val ltb = findNat "ltb"
+            val plus = findNat "plus"
+            val minus = findNat "minus"
+            val times = findNat "times"
+
+            val findInt = find "Integer"
+            val eqzb = findInt "eqzb"
+            val leqz = findInt "leqz"
+            val leqzb = findInt "leqzb"
+            val ltz = findInt "ltz"
+            val ltzb = findInt "ltzb"
+            val plusz = findInt "plusz"
+            val negz = findInt "negz"
+            val nat_to_integer = findInt "nat_to_integer"
+            val integer_to_nat = findInt "integer_to_nat"
+            val minusz = findInt "minusz"
+            val nat_to_integer_inv = findInt "nat_to_integer_inv"
+            val plusz_compat = findInt "plusz_compat"
+            val timesz = findInt "timesz"
+
+            val findOmega = find "Omega"
+            val add = findOmega "add"
+            val andb_elim1_inhabitant = findOmega "andb_elim1_inhabitant"
+            val andb_elim2_inhabitant = findOmega "andb_elim2_inhabitant"
+            val andb_intro = findOmega "andb_intro"
+            val andb_typing = findOmega "andb_typing"
+            val antisymm = findOmega "antisymm"
+            val bounded = findOmega "bounded"
+            val combine_equal = findOmega "combine_equal"
+            val combine_equal_inequal = findOmega "combine_equal_inequal"
+            val combine_inequal = findOmega "combine_inequal"
+            val combine_inequal_equal = findOmega "combine_inequal_equal"
+            val cons = findOmega "cons"
+            val define = findOmega "define"
+            val eq_inhabitant_from_eqb = findOmega "eq_inhabitant_from_eqb"
+            val eq_inhabitant_from_eqzb = findOmega "eq_inhabitant_from_eqzb"
+            val eqb_from_eq = findOmega "eqb_from_eq"
+            val eqb_typing = findOmega "eqb_typing"
+            val equal = findOmega "equal"
+            val equal_contra = findOmega "equal_contra"
+            val equal_divide = findOmega "equal_divide"
+            val equal_divide_contra = findOmega "equal_divide_contra"
+            val equal_nil = findOmega "equal_nil"
+            val eq_from_eqzb = findOmega "eq_from_eqzb"
+            val eqzb_from_eq = findOmega "eqzb_from_eq"
+            val eqzb_typing = findOmega "eqzb_typing"
+            val expr = findOmega "expr"
+            val extend = findOmega "extend"
+            val fequiv = findOmega "fequiv"
+            val fequiv_and = findOmega "fequiv_and"
+            val fequiv_eq = findOmega "fequiv_eq"
+            val fequiv_eqz = findOmega "fequiv_eqz"
+            val fequiv_false = findOmega "fequiv_false"
+            val fequiv_imp = findOmega "fequiv_imp"
+            val fequiv_leq = findOmega "fequiv_leq"
+            val fequiv_leqz = findOmega "fequiv_leqz"
+            val fequiv_lt = findOmega "fequiv_lt"
+            val fequiv_ltz = findOmega "fequiv_ltz"
+            val fequiv_not = findOmega "fequiv_not"
+            val fequiv_or = findOmega "fequiv_or"
+            val fequiv_to_type = findOmega "fequiv_to_type"
+            val fequiv_true = findOmega "fequiv_true"
+            val impb_elim_inhabitant = findOmega "impb_elim_inhabitant"
+            val impb_intro = findOmega "impb_intro"
+            val impb_typing = findOmega "impb_typing"
+            val inequal = findOmega "inequal"
+            val inequal_contra = findOmega "inequal_contra"
+            val inequal_divide = findOmega "inequal_divide"
+            val inequal_increment = findOmega "inequal_increment"
+            val inequal_weaken = findOmega "inequal_weaken"
+            val initial_solution = findOmega "initial_solution"
+            val integer_to_nat_extend = findOmega "integer_to_nat_extend"
+            val integer_to_nat_typing = findOmega "integer_to_nat_typing"
+            val intequiv = findOmega "intequiv"
+            val intequiv_advance = findOmega "intequiv_advance"
+            val intequiv_const = findOmega "intequiv_const"
+            val intequiv_minusz = findOmega "intequiv_minusz"
+            val intequiv_nat_to_integer = findOmega "intequiv_nat_to_integer"
+            val intequiv_negz = findOmega "intequiv_negz"
+            val intequiv_plusz = findOmega "intequiv_plusz"
+            val intequiv_timesz_l = findOmega "intequiv_timesz_l"
+            val intequiv_timesz_r = findOmega "intequiv_timesz_r"
+            val intequiv_timesz_zero_l = findOmega "intequiv_timesz_zero_l"
+            val intequiv_timesz_zero_r = findOmega "intequiv_timesz_zero_r"
+            val intequiv_var = findOmega "intequiv_var"
+            val istrue_fequiv_contra = findOmega "istrue_fequiv_contra"
+            val istrue_from_not_isfalse = findOmega "istrue_from_not_isfalse"
+            val istrue_inhabitant_from_eq_true = findOmega "istrue_inhabitant_from_eq_true"
+            val istrue_inhabitant_from_or_and_eq_false = findOmega "istrue_inhabitant_from_or_and_eq_false"
+            val istrue_notb_type = findOmega "istrue_notb_type"
+            val istrue_typing = findOmega "istrue_typing"
+            val leq_inhabitant_from_leqb = findOmega "leq_inhabitant_from_leqb"
+            val leqb_from_leq = findOmega "leqb_from_leq"
+            val leqb_typing = findOmega "leqb_typing"
+            val leqz_inhabitant_from_leqzb = findOmega "leqz_inhabitant_from_leqzb"
+            val leqzb_from_leqz = findOmega "leqzb_from_leqz"
+            val leqzb_typing = findOmega "leqzb_typing"
+            val lt_inhabitant_from_ltb = findOmega "lt_inhabitant_from_ltb"
+            val ltb_from_lt = findOmega "ltb_from_lt"
+            val ltb_typing = findOmega "ltb_typing"
+            val ltz_inhabitant_from_ltzb = findOmega "ltz_inhabitant_from_ltzb"
+            val ltzb_from_ltz = findOmega "ltzb_from_ltz"
+            val ltzb_typing = findOmega "ltzb_typing"
+            val minus_extend = findOmega "minus_extend"
+            val minus_typing = findOmega "minus_typing"
+            val minusz_typing = findOmega "minusz_typing"
+            val mult = findOmega "mult"
+            val nat_to_integer_typing = findOmega "nat_to_integer_typing"
+            val natequiv = findOmega "natequiv"
+            val natequiv_advance = findOmega "natequiv_advance"
+            val natequiv_const = findOmega "natequiv_const"
+            val natequiv_integer_to_nat = findOmega "natequiv_integer_to_nat"
+            val natequiv_minus = findOmega "natequiv_minus"
+            val natequiv_plus = findOmega "natequiv_plus"
+            val natequiv_succ = findOmega "natequiv_succ"
+            val natequiv_times_l = findOmega "natequiv_times_l"
+            val natequiv_times_r = findOmega "natequiv_times_r"
+            val natequiv_times_zero_l = findOmega "natequiv_times_zero_l"
+            val natequiv_times_zero_r = findOmega "natequiv_times_zero_r"
+            val natequiv_var = findOmega "natequiv_var"
+            val negz_typing = findOmega "negz_typing"
+            val nl = findOmega "nil"
+            val notb_typing = findOmega "notb_typing"
+            val orb_intro1 = findOmega "orb_intro1"
+            val orb_intro2 = findOmega "orb_intro2"
+            val orb_typing = findOmega "orb_typing"
+            val perimeter = findOmega "perimeter"
+            val plus_typing = findOmega "plus_typing"
+            val plusz_typing = findOmega "plusz_typing"
+            val succ_typing = findOmega "succ_typing"
+            val tequiv = findOmega "tequiv"
+            val tequiv_and = findOmega "tequiv_and"
+            val tequiv_eq = findOmega "tequiv_eq"
+            val tequiv_eqz = findOmega "tequiv_eqz"
+            val tequiv_false = findOmega "tequiv_false"
+            val tequiv_imp = findOmega "tequiv_imp"
+            val tequiv_leq = findOmega "tequiv_leq"
+            val tequiv_leqz = findOmega "tequiv_leqz"
+            val tequiv_lt = findOmega "tequiv_lt"
+            val tequiv_ltz = findOmega "tequiv_ltz"
+            val tequiv_not = findOmega "tequiv_not"
+            val tequiv_or = findOmega "tequiv_or"
+            val tequiv_true = findOmega "tequiv_true"
+            val times_typing = findOmega "times_typing"
+            val timesz_typing = findOmega "timesz_typing"
+
+            val notb_fals = Registry.toUreduction2 $ Registry.read [Symbol.fromValue "Bool", Symbol.fromValue "notb_fals"]
+
+         end
+
+
+
+      (* Some derived rules *)
+
+      fun shift m k = T.Sub (m, T.Shift k)
+
+      val reduceIstrueFalse =
+         R.trans [R.unfold, R.beta 1, R.user2 PrimReduction.ite_fals]
+
+      val reduceIstrueTrue =
+         R.trans [R.unfold, R.beta 1, R.user2 PrimReduction.ite_tru]
+
+      fun voidElim i =
+         (* i : void |- C *)
+         refine (Rule.voidElim (T.evar ()))
+         >>
+         (* i : void |- void *)
+         refine (Rule.hypothesis i) >> done
+
+      val istrueTrueIntro =
+         (* |- istrue true *)
+         refine (Rule.reduce reduceIstrueTrue)
+         >>
+         refine Rule.unitIntro
+
+      val inhabitTriv =
+         lift
+         (fn () => refine (Rule.inhabitant (T.evar ()) T.Triv))
+
+      fun natIntroOf n =
+         if n = 0 then
+            refine Rule.zeroType
+         else
+            lift
+            (fn () =>
+                refine (Rule.arrowElimOf (T.Const Prim.nat) (T.Const Prim.nat) (T.Const Prim.succ) (T.evar ()))
+                >>> [
+                    refine Rule.succType,
+                    natIntroOf (n-1)
+                    ])
+            
+
+
+      (* invokeForall A atac args
+
+         atac proves G |- A
+         args = [... (Mi, mtaci) ...] where mtaci proves G |- Mi : Domi
+      *)
+      fun invokeForall a atac args =
+         (case args of
+             [] => (a, atac)
+
+           | (m, mtac) :: rest =>
+                let
+                   val (dom, cod) =
+                      termCaseX a
+                      / \Prim.forall\ ? (fn . ?) =>
+                        \(fnc dom cod => (dom, cod))\
+                      /
+
+                   val tac =
+                      (* Cod[M . id] *)
+                      refine (Rule.forallElim dom cod m)
+                      >>> [
+                          (* forall Dom . Cod *)
+                          atac,
+
+                          (* M : Dom *)
+                          mtac
+                          ]
+                in
+                   invokeForall (T.Sub (cod, T.Dot (m, T.id))) tac rest
+                end)
+
+
+      (* invokeArrow A atac
+
+         atac partially proves G |- A
+      *)
+      fun invokeArrow a atac n =
+         if n = 0 then
+            (a, atac)
+         else
+            let
+               val (dom, cod) =
+                  termCaseX a
+                  / \Prim.arrow\ ? ? =>
+                    \(fnc dom cod =>
+                         (dom, cod))\
+                  /
+
+               val tac =
+                  (* Cod *)
+                  refine (Rule.arrowElim dom cod)
+                  >>> [
+                      (* Dom -> Cod *)
+                      atac,
+
+                      (* Dom *)
+                      idtac
+                      ]
+            in
+               invokeArrow cod tac (n-1)
+            end
+
+
+      (* invokeGen A atac args n
+
+         atac proves G |- A
+         args = [... (Mi, mtaci) ...] where mtaci proves G |- Mi : Domi
+      *)
+      fun invokeGen a atac args n =
+         let
+            val (b, btac) = invokeForall a atac args
+         in
+            invokeArrow b btac n
+         end
+
+
+      fun invoke const args n =
+         let
+            val (a, atac) = Infer.inferConstant const
+
+            val atac' =
+               (* A *)
+               refine (Rule.inhabitant a (T.Const const))
+               >>
+               (* const : A *)
+               atac
+
+            val (_, tac) = invokeGen a atac' args n
+         in
+            tac
+         end
+
+
+      fun invoke2 const args1 m args2 n =
+         let
+            val (a, atac) = Infer.inferConstant const
+
+            val atac' =
+               (* A *)
+               refine (Rule.inhabitant a (T.Const const))
+               >>
+               (* const : A *)
+               atac
+
+            val (b, tac1) = invokeGen a atac' args1 m
+            val (_, tac2) = invokeGen b tac1 args2 n
+         in
+            tac2
+         end
+
+
+      fun invokeOther a atac args n =
+         let
+            val (_, tac) = invokeGen a atac args n
+         in
+            tac
+         end
+
+
+
+      fun varArg i = (T.Var i, refine (Rule.hypothesisOf i))
+
+      fun ofArg i = (T.evar (), refine (Rule.hypothesis i))
+
+      fun iliteralArg n =
+         (T.Native (T.Integer n), refine Rule.integerIntroOf)
+
+      fun literalArg n = iliteralArg (I.fromInt n)
+
+      fun waitArg () = (T.evar (), idtac)
+
+
+
+         
+      (* Part 1: process the goal into suitable form *)
+
+      datatype tp = Nat | Integer
+
+      fun tpEq t t' =
+         (case (t, t') of
+             (Nat, Nat) => true
+           | (Integer, Integer) => true
+           | _ => false)
+
+      fun tpToType t =
+         (case t of
+             Nat => T.Const Prim.nat
+
+           | Integer => T.Const Prim.integer)
+
+
+
+
+      type correspondence =
+         (int * tp) TD.dict
+         * (T.term * tp) list
+         * int
+
+      type mini_correspondence = (T.term * tp) list
+
+      (* A correspondence is corr = (d, l, n)
+         - i ranges from 0 .. n-1
+         - rev l = [ ... (Mi, Ti) ... ]
+         - d = [ ... Mi --> (i, Ti) ... ]
+         - length l = size d = n
+
+         We say that G, G' respects corr if for all i:
+         - Mi lives in G
+         - G, G' |- (k-i-1) :: (Mi[^k] : Ti)  where  k = |G'|
+
+         G |- j :: A  =def=  G(j)[^j+1] = Tm(A)
+         (That is, G |- j : A can be proven by the hypothesisOf rule.)
+
+         Note that if G, G' respects corr, then G, (G', A) respects corr.
+
+
+         Viewed as a substitution, corr = [M0 ... Mn-1 . id].
+
+
+         A mini-correspondence for (d, l, n) is l.
+      *)
+
+      val empty = (TD.empty, [], 0)
+
+      fun lookup (corr as (d, l, n)) m t =
+         let
+            val m = N.simplify m
+         in
+            (case TD.find d m of
+                SOME (i, t') =>
+                   if tpEq t t' then
+                      (corr, i)
+                   else
+                      raise mismatch
+   
+              | NONE =>
+                   ((TD.insert d m (n, t), (m, t) :: l, n+1), n))
+         end
+                   
+
+
+      (* processTerm corr M T
+
+         if    M lives in G
+               M might have the type T
+         then
+         -     corr' extends corr
+         -     N = M'[corr']
+         -     every variable in M' is less than the size of corr'
+         -     if    |G'| = k and G, G' respects corr'
+               then  tac k proves |- M[^k] : T
+         and
+         -     returns (corr', M', tac)
+       *)
+
+      fun processTerm corr m t =
+         termCaseX (N.whnf m)
+         /| integer? =>
+            \(fnc _ =>
+                 (case t of
+                     Integer =>
+                        (corr, m,
+                         (fn _ => refine Rule.integerIntroOf))
+
+                   | _ =>
+                        raise mismatch))\
+
+          | nat? =>
+            \(fnc n =>
+                 (case t of
+                     Nat =>
+                        (corr, m,
+                         (fn _ => natIntroOf n))
+
+                   | _ =>
+                        raise mismatch))\
+
+          | \Prim.succ\ ? =>
+            \(fnc m1 =>
+                 processTerm1 Nat Nat Prim.succ C.succ_typing corr m1 t)\
+
+          | \C.plus\ ? ? =>
+            \(fnc m1 m2 =>
+                 processTerm2 Nat Nat Nat C.plus C.plus_typing corr m1 m2 t)\
+
+          | \C.minus\ ? ? =>
+            \(fnc m1 m2 =>
+                 processTerm2 Nat Nat Nat C.minus C.minus_typing corr m1 m2 t)\
+
+            (* one or the other factor must be a constant *)
+          | (\C.times\ ($as (nat? => \fst\)) ? | \C.times\ ? ($as (nat? => \fst\))) =>
+            \(fnc m1 m2 =>
+                 processTerm2 Nat Nat Nat C.times C.times_typing corr m1 m2 t)\
+
+          | \C.plusz\ ? ? =>
+            \(fnc m1 m2 =>
+                 processTerm2 Integer Integer Integer C.plusz C.plusz_typing corr m1 m2 t)\
+
+          | \C.negz\ ? =>
+            \(fnc m1 =>
+                 processTerm1 Integer Integer C.negz C.negz_typing corr m1 t)\
+
+          | \C.minusz\ ? ? =>
+            \(fnc m1 m2 =>
+                 processTerm2 Integer Integer Integer C.minusz C.minusz_typing corr m1 m2 t)\
+
+            (* one or the other factor must be a constant *)
+          | (\C.timesz\ ($as (integer? => \fst\)) ? | \C.timesz\ ? ($as (integer? => \fst\))) =>
+            \(fnc m1 m2 =>
+                 processTerm2 Integer Integer Integer C.timesz C.timesz_typing corr m1 m2 t)\
+
+          | \C.nat_to_integer\ ? =>
+            \(fnc m1 =>
+                 processTerm1 Integer Nat C.nat_to_integer C.nat_to_integer_typing corr m1 t)\
+
+          | \C.integer_to_nat\ ? =>
+            \(fnc m1 =>
+                 processTerm1 Nat Integer C.integer_to_nat C.integer_to_nat_typing corr m1 t)\
+
+          | _ =>
+            \(fnc =>
+                 let
+                    val (corr, j) = lookup corr m t
+                 in
+                    (corr, T.Var j,
+                     (fn k => refine (Rule.hypothesis (k-j-1))))
+                 end)\
+         /
+
+
+      and processTerm1 t' t1 const typing corr m1 t =
+         if tpEq t t' then
+            let
+               val (corr, m1', tac1) = processTerm corr m1 t1
+            in
+               (corr, T.apply1 const m1',
+                (fn k =>
+                    invoke typing
+                       [(shift m1 k, tac1 k)]
+                       0))
+            end
+         else
+            raise mismatch
+         
+
+      and processTerm2 t' t1 t2 const typing corr m1 m2 t =
+         if tpEq t t' then
+            let
+               val (corr, m1', tac1) = processTerm corr m1 t1
+               val (corr, m2', tac2) = processTerm corr m2 t2
+            in
+               (corr, T.apply2 const m1' m2',
+                (fn k =>
+                    invoke typing
+                       [(shift m1 k, tac1 k), (shift m2 k, tac2 k)]
+                       0))
+            end
+         else
+            raise mismatch
+         
+
+
+      fun rightTrivial corr =
+         (corr,
+          T.Const Prim.fals,
+          T.Const Prim.fals,
+          (fn _ => refine Rule.boolIntro2Of),
+          (fn _ =>
+              inhabitTriv
+              >>
+              refine (Rule.voidElim (T.evar ()))
+              >>
+              (* G' |- void *)
+              refine (Rule.unreduce 
+                         (T.apply1 C.istrue (T.Const Prim.fals))
+                         reduceIstrueFalse)
+              >>
+              refine (Rule.hypothesis 0)),
+          true)
+
+      fun leftTrivial corr =
+         (corr,
+          T.Const Prim.tru,
+          T.Const Prim.tru,
+          (fn _ => refine Rule.boolIntro1Of),
+          (fns _ _ =>
+              invoke C.istrue_true [] 0),
+          true)
+
+
+      (* processRight corr C
+
+         if    C lives in G
+         then  
+         -     corr' extends corr
+         -     P = P'[corr']
+         -     every variable in P' is less than the size of corr'
+         -     if    |G'| = k and G, G' respects corr'
+               then  ptac k proves G, G' |- P[^k] : bool
+         -     if    |G'| = k >= 1 and G, G' respects corr'
+               and   G, G' |- 0 :: istrue P[^k]
+               then  tac k proves G, G' |- C[^k] (with a nice extract)
+         -     triv  iff  P=false
+         and
+         -     returns (corr, P, P', ptac, tac, triv)
+      *)
+
+      fun processRight corr c =
+         termCaseX c
+         /| \Prim.unit\ =>
+            \(fnc =>
+                 (corr,
+                  T.Const Prim.tru,
+                  T.Const Prim.tru,
+                  (fn _ => refine Rule.boolIntro1Of),
+                  (fn _ => refine Rule.unitIntro),
+                  false))\
+
+          | \Prim.eq\ \Prim.nat\ ? ? =>
+               \(fnc m n =>
+                    processRight2 Nat Nat C.eqb C.eqb_typing C.eq_inhabitant_from_eqb corr m n)\
+
+          | \C.leq\ ? ? =>
+               \(fnc m n =>
+                    processRight2 Nat Nat C.leqb C.leqb_typing C.leq_inhabitant_from_leqb corr m n)\
+
+          | \C.lt\ ? ? =>
+               \(fnc m n =>
+                    processRight2 Nat Nat C.ltb C.ltb_typing C.lt_inhabitant_from_ltb corr m n)\
+
+          | \Prim.eq\ \Prim.integer\ ? ? =>
+               \(fnc m n =>
+                    processRight2 Integer Integer C.eqzb C.eqzb_typing C.eq_inhabitant_from_eqzb corr m n)\
+
+          | \C.leqz\ ? ? =>
+               \(fnc m n =>
+                    processRight2 Integer Integer C.leqzb C.leqzb_typing C.leqz_inhabitant_from_leqzb corr m n)\
+
+          | \C.ltz\ ? ? =>
+               \(fnc m n =>
+                    processRight2 Integer Integer C.ltzb C.ltzb_typing C.ltz_inhabitant_from_ltzb corr m n)\
+
+          | \Prim.prod\ ? ? =>
+            \(fnc c1 c2 =>
+                 let
+                    val (corr', q, q', qtac, tac1, triv1) = processRight corr c1
+                    val (corr', r, r', rtac, tac2, triv2) = processRight corr' c2
+                 in
+                    if triv1 orelse triv2 then
+                       rightTrivial corr
+                    else
+                       let
+                          val p = T.apply2 C.andb q r
+                          val p' = T.apply2 C.andb q' r'
+      
+                          fun ptac k =
+                             invoke C.andb_typing [(shift q k, qtac k), (shift r k, rtac k)] 0
+      
+                          fun tac k =
+                             (* G, G' |- C1[^k] & C2[^k] *)
+                             refine (Rule.prodIntro (T.evar ()) (T.evar ()))
+                             >>> [
+                                 (* G, G' |- C1[^k] *)
+                                 refine (Rule.assert' (T.apply1 C.istrue (shift q k)) (T.evar ()))
+                                 >>> [
+                                     (* G, G' |- istrue Q[^k] *)
+                                     inhabitTriv
+                                     >>
+                                     (* G, G' |- () : istrue Q[^k] *)
+                                     invoke C.andb_elim1_inhabitant
+                                        [(shift q k, qtac k), (shift r k, rtac k)]
+                                        1
+                                     >>+
+                                     (* G, G' |- istrue (andb Q[^k] R[^k]) *)
+                                     refine (Rule.hypothesis 0),
+      
+                                     (* G, G', istrue Q[^k] |- C1[^k+1] *)
+                                     tac1 (k+1)
+                                     ],
+      
+                                 (* G, G' |- C2[^k] *)
+                                 refine (Rule.assert' (T.apply1 C.istrue (shift r k)) (T.evar ()))
+                                 >>> [
+                                     (* G, G' |- istrue R[^k] *)
+                                     inhabitTriv
+                                     >>
+                                     (* G, G' |- () : istrue R[^k] *)
+                                     invoke C.andb_elim2_inhabitant
+                                        [(shift q k, qtac k), (shift r k, rtac k)]
+                                        1
+                                     >>+
+                                     (* G, G' |- istrue (andb Q[^k] R[^k]) *)
+                                     refine (Rule.hypothesis 0),
+      
+                                     (* G, G', istrue R[^k] |- C2[^k+1] *)
+                                     tac2 (k+1)
+                                     ]
+                                 ]
+                       in
+                          (corr', p, p', ptac, tac, false)
+                       end
+                 end)\
+
+          | \Prim.sum\ ? ? =>
+            \(fnc c1 c2 =>
+                 let
+                    val (corr', q, q', qtac, tac1, triv1) = processRight corr c1
+                    val (corr', r, r', rtac, tac2, triv2) = processRight corr' c2
+                 in
+                    if triv1 andalso triv2 then
+                       rightTrivial corr
+                    else
+                       let
+                          val p = T.apply2 C.orb q r
+                          val p' = T.apply2 C.orb q' r'
+      
+                          fun ptac k =
+                             invoke C.orb_typing [(shift q k, qtac k), (shift r k, rtac k)] 0
+      
+                          (* Performance note:
+                             - We could avoid the replay of qtac (6 times!) by computing the validation and re-using it.
+                             - We could even memoize tactics.
+                             - And do similar things in the other cases.
+                             - But this doesn't seem to be where the work is going right now.
+                          *)
+      
+                          fun tac k =
+                             (* G, G' |- C1[^k] % C2[^k] *)
+                             refine (Rule.guardElim
+                                        (T.apply3 Prim.eq (T.Const Prim.bool) (shift q k) (shift q k))
+                                        (T.evar ()))
+                             >>> [
+                                 (* G, G' |- Q[^k] = Q[^k] : bool -g> C1[^k] % C2[^k]
+                                           = (Q[^k+1] = 0 : bool -g> C1[^k+1] % C2[^k+1])[Q[^k] . id]
+                                 *)
+                                 refine (Rule.boolElim
+                                            (T.apply2 Prim.guard
+                                                (T.apply3 Prim.eq (T.Const Prim.bool) (shift q (k+1)) (T.Var 0))
+                                                (shift (T.apply2 Prim.sum c1 c2) (k+1)))
+                                            (shift q k))
+                                 >>> [
+                                     (* G, G' |- Q[^k] : bool *)
+                                     qtac k,
+      
+                                     (* G, G' |- Q[^k] = true : bool -g> C1[^k] % C2[^k] *)
+                                     refine (Rule.guardIntro (T.evar ()) (T.evar ()))
+                                     >>> [
+                                         (* G, G' |- (Q[^k] = true : bool) : type *)
+                                         refine (Rule.eqForm (T.evar ()) (T.evar ()) (T.evar ()))
+                                         >>> [
+                                             (* G, G' |- Q[^k] : bool *)
+                                             qtac k,
+      
+                                             (* G, G' |- true : bool *)
+                                             refine Rule.boolIntro1Of
+                                             ],
+      
+                                         (* G, G', hide Q[^k] = true : bool |- C1[^k+1] % C2[^k+1] *)
+                                         refine (Rule.sumIntro1 (T.evar ()) (T.evar ()))
+                                         >>> [
+                                             (* G, G', hide Q[^k] = true : bool |- C2[^k+1] : type *)
+                                             refine (Rule.weaken 0 (k+1))
+                                             >>
+                                             (* G |- C2 : type *)
+                                             idtac,
+      
+                                             (* G, G', hide Q[^k] = true : bool |- C1[^k+1] *)
+                                             refine (Rule.assert' (T.apply1 C.istrue (shift q (k+1))) (T.evar ()))
+                                             >>> [
+                                                 (* G, G', hide Q[^k] = true : bool |- istrue Q[^k+1] *)
+                                                 inhabitTriv
+                                                 >>
+                                                 (* G, G', Q[^k] = true : bool |- () : istrue Q[^k+1] *)
+                                                 invoke C.istrue_inhabitant_from_eq_true
+                                                    [(shift q (k+1), qtac (k+1))] 1
+                                                 >>+
+                                                 (* G, G', Q[^k] = true : bool |- Q[^k+1] = true : bool *)
+                                                 refine (Rule.hypothesis 0),
+      
+                                                 (* G, G', hide Q[^k] = true : bool, istrue Q[^k+1] |- C1[^k+2] *)
+                                                 tac1 (k+2)
+                                                 ]
+                                             ]
+                                         ],
+      
+                                     (* G, G' |- Q[^k] = false : bool -g> C1[^k] % C2[^k] *)
+                                     refine (Rule.guardIntro (T.evar ()) (T.evar ()))
+                                     >>> [
+                                         (* G, G' |- (Q[^k] = false : bool) : type *)
+                                         refine (Rule.eqForm (T.evar ()) (T.evar ()) (T.evar ()))
+                                         >>> [
+                                             (* G, G' |- Q[^k] : bool *)
+                                             qtac k,
+      
+                                             (* G, G' |- false : bool *)
+                                             refine Rule.boolIntro2Of
+                                             ],
+      
+                                         (* G, G', hide Q[^k] = false : bool |- C1[^k+1] % C2[^k+1] *)
+                                         refine (Rule.sumIntro2 (T.evar ()) (T.evar ()))
+                                         >>> [
+                                             (* G, G', hide Q[^k] = false : bool |- C1[^k+1] : type *)
+                                             refine (Rule.weaken 0 (k+1))
+                                             >>
+                                             (* G |- C1 : type *)
+                                             idtac,
+      
+                                             (* G, G', hide Q[^k] = false : bool |- C2[^k+1] *)
+                                             refine (Rule.assert' (T.apply1 C.istrue (shift r (k+1))) (T.evar ()))
+                                             >>> [
+                                                 (* G, G', hide Q[^k] = false : bool |- istrue R[^k+1] *)
+                                                 inhabitTriv
+                                                 >>
+                                                 (* G, G', Q[^k] = false : bool |- () : istrue R[^k+1] *)
+                                                 invoke C.istrue_inhabitant_from_or_and_eq_false
+                                                    [(shift q (k+1), qtac (k+1)),
+                                                     (shift r (k+1), rtac (k+1))]
+                                                    2
+                                                 >>> [
+                                                     (* G, G', Q[^k] = false : bool |- istrue (orb Q[k+1] R[k+1]) *)
+                                                     refine (Rule.hypothesis 1),
+      
+                                                     (* G, G', Q[^k] = false : bool |- Q[^k+1] = false : bool *)
+                                                     refine (Rule.hypothesis 0)
+                                                     ],
+      
+                                                 (* G, G', hide Q[^k] = true : bool, istrue Q[^k+1] |- C1[^k+2] *)
+                                                 tac2 (k+2)
+                                                 ]
+                                             ]
+                                         ]
+                                     ],
+      
+                                 (* G, G' |- Q[^k] = Q[^k] : bool *)
+                                 refine (Rule.eqRefl (T.evar ()) (T.evar ()))
+                                 >>
+                                 (* G, G' |- Q[^k] : bool *)
+                                 qtac k
+                                 ]
+                       in
+                          (corr', p, p', ptac, tac, false)
+                       end
+                 end)\
+
+          | (\Prim.arrow\ ? ? 
+             | 
+             \C.not\ ? => \(fnc c1 => (((), c1), T.Const Prim.void))\) =>
+            \(fnc c1 c2 =>
+                 let
+                    val (corr', q, q', qtac, tac1, triv1) = processLeft corr c1
+                    val (corr', r, r', rtac, tac2, triv2) = processRight corr' c2
+                 in
+                    if triv1 andalso triv2 then
+                       rightTrivial corr
+                    else
+                       let
+                          val p = T.apply2 C.impb q r
+                          val p' = T.apply2 C.impb q' r'
+      
+                          fun ptac k =
+                             invoke C.impb_typing [(shift q k, qtac k), (shift r k, rtac k)] 0
+      
+                          fun tac k =
+                             (* G, G' |- C1[^k] -> C2[^k] *)
+                             refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                             >>> [
+                                 (* G, G' |- C1[^k] : type *)
+                                 refine (Rule.weaken 0 k)
+                                 >>
+                                 (* G |- C1 : type *)
+                                 idtac,
+      
+                                 (* G, G', C1[^k] |- C2[^k+1] *)
+                                 refine (Rule.assert' (T.apply1 C.istrue (shift r (k+1))) (T.evar ()))
+                                 >>> [
+                                     (* G, G', C1[^k] |- istrue R[^k+1] *)
+                                     inhabitTriv
+                                     >>
+                                     (* G, G', C1[^k] |- () : istrue R[^k+1] *)
+                                     invoke C.impb_elim_inhabitant
+                                        [(shift q (k+1), qtac (k+1)), (shift r (k+1), rtac (k+1))]
+                                        2
+                                     >>> [
+                                         (* G, G', C1[^k] |- istrue (impb Q[^k] R[^k]) *)
+                                         refine (Rule.hypothesis 1),
+                                         
+                                         (* G, G', C1[^k] |- istrue Q[^k] *)
+                                         tac1 (k+1) 0,
+                                         ],
+      
+                                     (* G, G', C1[^k], istrue R[^k+1] |- C2[^k+2] *)
+                                     tac2 (k+2)
+                                     ]
+                                 ]
+                       in
+                          (corr', p, p', ptac, tac, false)
+                       end
+                 end)\
+      
+          | _ =>
+            \(fnc => rightTrivial corr)\
+         /
+                  
+
+      and processRight2 t1 t2 const typing lemma corr m n =
+         let
+            val (corr, m', mtac) = processTerm corr m t1
+            val (corr, n', ntac) = processTerm corr n t2
+            
+            val p = T.apply2 const m n
+            val p' = T.apply2 const m' n'
+
+            fun ptac k =
+               invoke typing
+                  [(shift m k, mtac k), (shift n k, ntac k)]
+                  0
+
+            fun tac k =
+               (* G, G' |- M[^k] ?? N[^k] *)
+               inhabitTriv
+               >>
+               invoke lemma
+                  [(shift m k, mtac k), (shift n k, ntac k)]
+                  1
+               >>+
+               (* G, G' |- istrue (const M[^k] N[^k]) *)
+               refine (Rule.hypothesis 0)
+         in
+            (corr, p, p', ptac, tac, false)
+         end
+
+
+      (* processLeft corr C
+
+         if    C lives in G
+         then
+         -     corr' extends corr
+         -     P = P'[corr']
+         -     every variable in P' is less than the size of corr'
+         -     if    |G'| = k and G, G' respects corr'
+               then  ptac k proves G, G' |- P[^k] : bool
+         -     if    |G'| = k and G, G' respects corr'
+                     G, G' |- i :: C[^k]
+               then  tac k i proves G, G' |- istrue P[^k]
+         -     triv  iff  P=true
+         and
+         -     returns (corr, P, P', ptac, tac, triv)
+      *)
+      
+      and processLeft corr c =
+         termCaseX c
+         /| \Prim.void\ =>
+            \(fnc =>
+                 (corr,
+                  T.Const Prim.fals,
+                  T.Const Prim.fals,
+                  (fn _ => refine Rule.boolIntro2Of),
+                  (fns k i => voidElim i),
+                  false))\
+
+          | \Prim.eq\ \Prim.nat\ ? ? =>
+               \(fnc m n =>
+                    processLeft2 Nat Nat C.eqb C.eqb_typing C.eqb_from_eq corr m n)\
+
+          | \C.leq\ ? ? =>
+               \(fnc m n =>
+                    processLeft2 Nat Nat C.leqb C.leqb_typing C.leqb_from_leq corr m n)\
+
+          | \C.lt\ ? ? =>
+               \(fnc m n =>
+                    processLeft2 Nat Nat C.ltb C.ltb_typing C.ltb_from_lt corr m n)\
+
+          | \Prim.eq\ \Prim.integer\ ? ? =>
+               \(fnc m n =>
+                    processLeft2 Integer Integer C.eqzb C.eqzb_typing C.eqzb_from_eq corr m n)\
+
+          | \C.leqz\ ? ? =>
+               \(fnc m n =>
+                    processLeft2 Integer Integer C.leqzb C.leqzb_typing C.leqzb_from_leqz corr m n)\
+
+          | \C.ltz\ ? ? =>
+               \(fnc m n =>
+                    processLeft2 Integer Integer C.ltzb C.ltzb_typing C.ltzb_from_ltz corr m n)\
+
+          | \Prim.prod\ ? ? =>
+            \(fnc c1 c2 =>
+                 let
+                    val (corr', q, q', qtac, tac1, triv1) = processLeft corr c1
+                    val (corr', r, r', rtac, tac2, triv2) = processLeft corr' c2
+                 in
+                    if triv1 andalso triv2 then
+                       leftTrivial corr
+                    else
+                       let
+                          val p = T.apply2 C.andb q r
+                          val p' = T.apply2 C.andb q' r'
+      
+                          fun ptac k =
+                             invoke C.andb_typing [(shift q k, qtac k), (shift r k, rtac k)] 0
+      
+                          fun tac k i =
+                             (* G, G' |- istrue (andb Q[^k] R[^k]) *)
+                             invoke C.andb_intro
+                                [(shift q k, qtac k), (shift r k, rtac k)]
+                                2
+                             >>> [
+                                 (* G, G' |- istrue Q[^k] *)
+                                 refine (Rule.assert (shift c1 k) (T.evar ()))
+                                 >>> [
+                                     (* G, G' |- C1[^k] *)
+                                     refine (Rule.prodElim1 (T.evar ()) (T.evar ()))
+                                     >>
+                                     (* G, G' |- C1[^k] & _ *)
+                                     refine (Rule.hypothesis i),
+
+                                     (* G, G', C1[^k] |- istrue Q[^k+1] *)
+                                     tac1 (k+1) 0
+                                     ],
+
+                                 (* G, G' |- istrue R[^k] *)
+                                 refine (Rule.assert (shift c2 k) (T.evar ()))
+                                 >>> [
+                                     (* G, G' |- C2[^k] *)
+                                     refine (Rule.prodElim2 (T.evar ()) (T.evar ()))
+                                     >>
+                                     (* G, G' |- _ & C2[^k] *)
+                                     refine (Rule.hypothesis i),
+
+                                     (* G, G', C1[^k] |- istrue Q[^k+1] *)
+                                     tac2 (k+1) 0
+                                     ]
+                                 ]
+                       in
+                          (corr', p, p', ptac, tac, false)
+                       end
+                 end)\
+
+          | \Prim.sum\ ? ? =>
+            \(fnc c1 c2 =>
+                 let
+                    val (corr', q, q', qtac, tac1, triv1) = processLeft corr c1
+                    val (corr', r, r', rtac, tac2, triv2) = processLeft corr' c2
+                 in
+                    if triv1 orelse triv2 then
+                       leftTrivial corr
+                    else
+                       let
+                          val p = T.apply2 C.orb q r
+                          val p' = T.apply2 C.orb q' r'
+      
+                          fun ptac k =
+                             invoke C.orb_typing [(shift q k, qtac k), (shift r k, rtac k)] 0
+
+                          fun tac k i =
+                             (* G, G' |- istrue (orb Q[^k] R[^k]) *)
+                             refine (Rule.sumLeft i (T.evar ()) (T.evar ()) (T.evar ()))
+                             >>> [
+                                 (* G, G'' |- istrue (orb Q[^k] R[^k])
+                                    G'' is the same as G' except the C1[..] % C2[..] hypothesis is replaced by C1[..].
+                                    In particular, all the indices are unchanged.
+                                 *)
+                                 invoke C.orb_intro1
+                                    [(shift q k, qtac k), (shift r k, rtac k)]
+                                    1
+                                 >>+
+                                 (* G, G'' |- istrue Q[^k] *)
+                                 tac1 k i,
+
+                                 (* G, G'' |- istrue (orb Q[^k] R[^k]) *)
+                                 invoke C.orb_intro2
+                                    [(shift q k, qtac k), (shift r k, rtac k)]
+                                    1
+                                 >>+
+                                 (* G, G'' |- istrue R[^k] *)
+                                 tac2 k i
+                                 ]
+                       in
+                          (corr', p, p', ptac, tac, false)
+                       end
+                 end)\
+
+          | (\Prim.arrow\ ? ? 
+             | 
+             \C.not\ ? => \(fnc c1 => (((), c1), T.Const Prim.void))\) =>
+            \(fnc c1 c2 =>
+                 let
+                    val (corr', q, q', qtac, tac1, triv1) = processRight corr c1
+                    val (corr', r, r', rtac, tac2, triv2) = processLeft corr' c2
+                 in
+                    if triv1 orelse triv2 then
+                       leftTrivial corr
+                    else
+                       let
+                          val p = T.apply2 C.impb q r
+                          val p' = T.apply2 C.impb q' r'
+      
+                          fun ptac k =
+                             invoke C.impb_typing [(shift q k, qtac k), (shift r k, rtac k)] 0
+
+                          fun tac k i =
+                             (* G, G' |- istrue (impb Q[^k] R[^k]) *)
+                             invoke C.impb_intro
+                                [(shift q k, qtac k), (shift r k, rtac k)]
+                                1
+                             >>+
+                             (* G, G' |- istrue Q[^k] -> istrue R[^k] *)
+                             refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                             >>> [
+                                 (* G, G' |- istrue Q[^k] : type *)
+                                 invoke C.istrue_typing [(shift q k, qtac k)] 0,
+
+                                 (* G, G', istrue Q[^k] |- istrue R[^k+1] *)
+                                 refine (Rule.assert (shift c2 (k+1)) (T.evar ()))
+                                 >>> [
+                                     (* G, G', istrue Q[^k] |- C2[^k+1] *)
+                                     refine (Rule.arrowElim (T.evar ()) (T.evar ()))
+                                     >>> [
+                                         (* G, G', istrue Q[^k] |- C1^[k+1] -> C2[^k+1] *)
+                                         refine (Rule.hypothesis (i+1)),
+
+                                         (* G, G', istrue Q[^k] |- C1^[k+1] *)
+                                         tac1 (k+1)
+                                         ],
+
+                                     (* G, G', istrue Q[^k], C2[^k+1] |- istrue R[^k+2] *)
+                                     tac2 (k+2) 0
+                                     ]
+                                 ]
+                       in
+                          (corr', p, p', ptac, tac, false)
+                       end
+                 end)\
+
+          | _ =>
+            \(fnc => leftTrivial corr)\
+          /
+
+
+      and processLeft2 t1 t2 const typing lemma corr m n =
+         let
+            val (corr, m', mtac) = processTerm corr m t1
+            val (corr, n', ntac) = processTerm corr n t2
+            
+            val p = T.apply2 const m n
+            val p' = T.apply2 const m' n'
+
+            fun ptac k =
+               invoke typing
+                  [(shift m k, mtac k), (shift n k, ntac k)]
+                  0
+
+            fun tac k i =
+               (* G, G' |- istrue (const M[^k] N[^k]) *)
+               invoke lemma
+                  [(shift m k, mtac k), (shift n k, ntac k)]
+                  1
+               >>+
+               (* G, G' |- M[^k] ?? N[^k] *)
+               refine (Rule.hypothesis i)
+         in
+            (corr, p, p', ptac, tac, false)
+         end
+
+
+      (* processJudgement G C
+
+         if    C lives in G
+         then
+         -     P = P'[corr]
+         -     every variable in P' is less than the size of corr
+         -     if    |G'| = k and G, G' respects corr'
+               then  ptac k proves G, G' |- P[^k] : bool
+         -     if    |G'| = k and G, G' respects corr'
+               and   G, G' |- 0 :: istrue P[^k]
+               then  tac k proves G, G' |- C[^k] (with a nice extract)
+         and
+         -     returns (corr, P, P', ptac, tac)
+      *)
+      
+      fun processJudgement ctx c =
+         let
+            val (corr, p, p', ptac, tac, _) = processRight empty c
+
+            (* if    |G'| = k and G, G' respects corr'
+               then  ptac k proves G, G' |- P[^k] : bool
+
+               if    |G'| = k >= 1 and G, G' respects corr'
+               and   G, G' |- 0 :: istrue P[^k]
+               then  tac k proves G, G' |- C[^k]
+            *)
+
+            val (_, corr, p, p', ptac, tac) =
+               S.foldl
+                  (fns h (i, corr, p, p', ptac, tac) =>
+                      (* invariant as above *)
+                      (case h of
+                          J.Tm a =>
+                             let
+                                (* G(i) = A *)
+                                
+                                val (corr', q, q', qtac, tacl, triv) = processLeft corr (T.Sub (a, T.Shift (i+1)))
+                             in
+                                if triv then
+                                   (i+1, corr, p, p', ptac, tac)
+                                else
+                                   let
+                                      val r = T.apply2 C.impb q p
+                                      val r' = T.apply2 C.impb q' p'
+                                      
+                                      fun rtac k =
+                                         invoke C.impb_typing [(shift q k, qtac k), (shift p k, ptac k)] 0
+
+                                      fun tac' k =
+                                         (* have G, G' |- 0 :: istrue (impb Q[^k] P[^k]) *)
+                                         (* G, G' |- C[^k] *)
+                                         refine (Rule.assert'
+                                                    (T.apply1 C.istrue (T.Sub (p, T.Shift k)))
+                                                    (T.evar ()))
+                                         >>> [
+                                             (* G, G' |- istrue P[^k] *)
+                                             inhabitTriv
+                                             >>
+                                             (* G, G' |- () : istrue P[^k] *)
+                                             invoke C.impb_elim_inhabitant [(shift q k, qtac k), (shift p k, ptac k)] 2
+                                             >>> [
+                                                 (* G, G' |- istrue (impb Q[^k] P[^k]) *)
+                                                 refine (Rule.hypothesis 0),
+
+                                                 (* G, G' |- istrue Q[^k] *)
+                                                 tacl k (i+k)
+                                                 ],
+
+                                             (* G, G', istrue P[^k] |- C[^k+1] *)
+                                             tac (k+1)
+                                             ]
+                                   in
+                                      (i+1, corr', r, r', rtac, tac')
+                                   end
+                             end
+
+                        | _ =>
+                             (i+1, corr, p, p', ptac, tac)))
+                  (0, corr, p, p', ptac, tac)
+                  ctx
+         in
+            (corr, p, p', ptac, tac)
+         end
+
+
+      (* assertTypes k l tac
+
+         if    corr = (_, l, _)
+               |G'| = k
+               if G, G' respects corr then tac k proves G, G' |- C[^k]
+         then  assertTypes 0 (rev l) tac proves G |- C
+      *)
+         
+      fun assertTypes k l tac =
+         (case l of
+             [] =>
+                tac k
+
+           | (m, t) :: rest =>
+                refine (Rule.assert' 
+                           (T.apply2 Prim.ov (tpToType t) (T.Sub (m, T.Shift k)))
+                           (T.evar ()))
+                >>> [
+                    refine (Rule.weaken 0 k)
+                    >>
+                    refine (Rule.ofTrivialize (T.evar ()) (T.evar ())),
+
+                    assertTypes (k+1) rest tac
+                    ])
+
+
+      fun intros l =
+         goalCase
+         /| \Prim.forall\ \Prim.nat\ (fn . ?) =>
+            \(fnc cod =>
+                 refine (Rule.forallIntro (T.Const Prim.nat) (T.evar ()))
+                 >>> [
+                     (* nat : type *)
+                     refine Rule.natForm >> done,
+ 
+                     (* nat |- cod *)
+                     intros (gensym () :: l)
+                     ])\
+
+          | \Prim.forall\ \Prim.integer\ (fn . ?) =>
+            \(fnc cod =>
+                 refine (Rule.forallIntro (T.Const Prim.integer) (T.evar ()))
+                 >>> [
+                     (* nat : type *)
+                     refine Rule.integerForm >> done,
+ 
+                     (* nat |- cod *)
+                     intros (gensym () :: l)
+                     ])\
+
+          | _ =>
+            \(fnc => idtacM l)\
+         /
+
+
+      (* Rewrites the goal into a suitable form, and generates a good extract.
+         Runs cont on the main goal.
+      *)
+      fun process cont =
+         let
+            do (jud, _) = withgoal
+            val ctx = J.context jud
+
+            do (corr, p, p', ptac, tac) = tryf (fn () => processJudgement ctx (J.concl jud))
+
+            val (_, lcorr, sz) = corr
+            val lcorrRev = List.rev lcorr
+
+            val a =
+               List.foldl
+                  (fns (_, t) a => T.apply2 Prim.forall (tpToType t) (T.Lam (NONE, a)))
+                  (T.apply1 C.istrue p')
+                  lcorrRev
+
+            (* note A is closed *)
+
+            fun tac' k =
+               (* assume |G'| = k
+                  G, G' respects corr
+                  it follows that G, G', istrue P[^k] also respects corr
+               *)
+               (* G, G' |- C[^k] *)
+               refine (Rule.assert'
+                          (T.apply1 C.istrue (T.Sub (p, T.Shift k)))
+                          (T.evar ()))
+               >>> [
+                   (* G, G' |- istrue P[^k] *)
+                   inhabitTriv
+                   >>
+                   (* G, G' |- () : istrue P[^k] *)
+                   invoke C.istrue_inhabitant [(shift p k, ptac k)] 1
+                   >>+
+                   (* G, G' |- istrue P[^k] *)
+                   refine (Rule.assert a (T.evar ()))
+                   >>> [
+                       (* G, G' |- A *)
+                       HypTactic.clearAll
+                       >>
+                       (* |- A *)
+                       intros []
+                       >>=
+                       (fn l => 
+                           chdir (D.literal l)
+                           >>
+                           cont lcorr),
+
+                       (* G, G', A |- istrue P[^k+1] *)
+                       invokeOther a (refine (Rule.hypothesis 0))
+                          (List.mapi
+                              (fns i (m, _) =>
+                                  (shift m (k+1),
+                                   (* G, G', A |- M[^k+1] : T *)
+                                   refine (Rule.hypothesis (k-(sz-i-1)))))
+                              lcorr)
+                          0
+                       ],
+
+                   (* G, G', istrue P[^k] |- C[^k+1] *)
+                   tac (k+1)
+                   ]
+         in
+            assertTypes 0 lcorrRev tac'
+         end
+
+
+
+
+      (* Part 2: Standardizing *)
+
+      val constant = ~1  (* by convention *)
+
+      type expr = (int * integer) list   (* variable, coefficient (no zero coefficients) *)
+
+      fun lookupExpr expr v =
+         (case expr of
+             [] => 0I
+
+           | (v', a) :: rest =>
+                (case Int.compare v v' of
+                    EQUAL => 
+                       a
+
+                  | LESS =>
+                       0I
+
+                  | GREATER =>
+                       lookupExpr rest v))
+
+      fun removeExpr expr v =
+         (case expr of
+             [] => []
+
+           | (entry as (v', _)) :: rest =>
+                (case Int.compare v v' of
+                    EQUAL =>
+                       rest
+
+                  | GREATER =>
+                       entry :: removeExpr rest v
+
+                  | LESS =>
+                       expr))
+
+      fun equalExpr e1 e2 =
+         (case (e1, e2) of
+             (nil, nil) => true
+
+           | ((v1, a1) :: rest1, (v2, a2) :: rest2) =>
+                v1 = v2
+                andalso
+                a1 == a2
+                andalso
+                equalExpr rest1 rest2
+
+           | _ => false)
+
+
+
+      fun varExpr v = [(v, 1I)]
+
+      fun varNegExpr v = [(v, ~1I)]
+
+      fun constExpr a =
+         if a == 0I then
+            []
+         else
+            [(constant, a)]
+
+      fun addExpr e1 e2 =
+         (case (e1, e2) of
+             ([], _) => e2
+
+           | (_, []) => e1
+
+           | ((t1 as (v1, a1)) :: rest1, (t2 as (v2, a2)) :: rest2) =>
+                (case Int.compare v1 v2 of
+                    EQUAL =>
+                       let
+                          val a = a1 ++ a2
+                       in
+                          if a == 0I then
+                             addExpr rest1 rest2
+                          else
+                             (v1, a) :: addExpr rest1 rest2
+                       end
+
+                  | LESS =>
+                       t1 :: addExpr rest1 e2
+
+                  | GREATER =>
+                       t2 :: addExpr e1 rest2))
+
+      (* a <> 0 *)
+      fun multExpr a e = List.map (fn (v, b) => (v, a ** b)) e
+      
+      fun succExpr a = addExpr a [(constant, 1I)]
+
+      fun negExpr a = multExpr ~1I a
+
+      fun subtractExpr a b = addExpr a (negExpr b)
+
+
+
+      fun base26loop acc x =
+         if x = 0 then
+            String.implode acc
+         else
+            base26loop (Char.chr (x rem 26 + Char.ord #"a") :: acc) (x div 26)
+
+      fun base26 x = if x = 0 then "a" else base26loop [] x
+
+      fun printExpr exp =
+         (
+         print "[ ";
+         List.app
+            (fn (v, a) =>
+                (
+                print (I.toStringStd a);
+
+                if v = constant then
+                   ()
+                else
+                   print (base26 v);
+
+                print " "
+                ))
+            exp;
+
+         print "]"
+         )
+
+
+
+      datatype prop =
+         Equal of expr
+       | Inequal of expr
+       | And of prop * prop
+       | Or of prop * prop
+       | True
+       | False
+
+      fun eqProp a b = Equal (addExpr (multExpr ~1I a) b)
+
+      fun leqProp a b = Inequal (addExpr (multExpr ~1I a) b)
+
+      fun ltProp a b = Inequal (addExpr (addExpr (multExpr ~1I a) b) (constExpr ~1I))
+
+      fun neqProp a b = Or (ltProp a b, ltProp b a)
+
+      fun lt0Prop a = Inequal (addExpr (multExpr ~1I a) (constExpr ~1I))
+
+      fun andProp p q = And (p, q)
+      
+      fun orProp p q = Or (p, q)
+      
+
+
+      (* reserved name for the solution hypothesis *)
+      val solution = Symbol.fromValue "solution"
+
+
+      (* proves a = b : integer *)
+      val proveEq =
+         goalCase 
+         / _ @ $ap _ $ap integer? $ap integer? _ =>
+           \(fnc a b =>
+                invoke C.eq_from_eqzb [iliteralArg a, iliteralArg b] 1
+                >>+
+                refine (Rule.reduce (R.trans [R.compat [R.native],
+                                              R.unfold,
+                                              R.beta 1,
+                                              R.user2 PrimReduction.ite_tru]))
+                >>+
+                refine Rule.unitIntro)\
+         /
+
+
+      (* proves a <z= b *)
+      val proveLeq =
+         refine (Rule.reduce (R.trans [R.unfold, 
+                                       R.beta 2, 
+                                       R.compat [R.native],
+                                       R.unfold,
+                                       R.beta 1,
+                                       R.user2 PrimReduction.ite_tru]))
+         >>+
+         refine Rule.unitIntro
+
+
+      (* proves a <z b *)
+      val proveLt =
+         refine (Rule.reduce (R.trans [R.unfold,
+                                       R.beta 2,
+                                       R.compat [R.native],
+                                       R.unfold,
+                                       R.beta 2,
+                                       R.compat [R.native],
+                                       R.unfold,
+                                       R.beta 1,
+                                       R.user2 PrimReduction.ite_tru]))
+         >>+
+         refine Rule.unitIntro
+
+
+      val proveNeq =
+         (* proves istrue (notb (eqzb a b)) *)
+         refine (Rule.reduce (R.trans [R.compat [R.trans [R.compat [R.native],
+                                                          R.user2 C.notb_fals]],
+                                       R.unfold,
+                                       R.beta 1,
+                                       R.user2 PrimReduction.ite_tru]))
+         >>+
+         refine Rule.unitIntro
+
+
+      (* only use e for its length *)
+      fun proveEra e =
+         (case e of
+             [] =>
+                proveLeq
+
+           | _ :: rest =>
+                refine (Rule.prodIntro (T.evar ()) (T.evar ()))
+                >>> 
+                [proveLt, idtac]
+                >>+
+                proveEra rest)
+
+
+
+      fun ofExprFromOfXequiv i =
+         (* M2 : expr
+            = (M1 , M2) #2 : expr
+         *)
+         refine (Rule.prodElim2Of (T.evar ()) (T.evar ()) (T.Pair (T.evar (), T.evar ())))
+         >>+
+         (* (M1 , M2) : _ & expr *)
+         refine (Rule.setWeakenOf (T.evar ()) (T.evar ()) (T.evar ()))
+         >>+
+         (* (M1 , M2) : { _ & expr | _ }
+            have i : ((M1 , M2) : xequiv _ _)
+         *)
+         refine (Rule.reduceHyp i (R.within [1] (R.trans [R.unfold, R.beta 2])))
+         >>+
+         (* have i : ((M1 , M2) : { _ & expr | _ }) *)
+         refine (Rule.hypothesis i)
+
+                                       
+
+      type std_table = (int * int * symbol) TD.dict
+
+      (* Tabling convention:
+         if    d(M) = (v, n, sym)
+               |H| = k
+         then  v represents the term in expressions
+               sym is a hypothesis name
+               G, H |- sym : (M[^k] , M') : xequiv n solution
+      *)
+
+      fun tryTable lemma n d m fk =
+         (case TD.find d m of
+             SOME (v, vn, name) =>
+                if n = vn then
+                   (n, d, [], varExpr v, name, false, idtac)
+                else
+                   let
+                      val name' = gensym ()
+
+                      val d' = TD.insert d m (v, n, name')
+
+                      val tac =
+                         let
+                            do (_, dir) = withgoal
+                            val idir = D.idir dir
+                            val soln = D.lookupVar idir solution
+                            val i = D.lookupVar idir name
+                         in
+                            refine (Rule.assert (T.evar ()) (T.evar ()))
+                            >>> [
+                                (* xequiv (M[^k] , M') : xequiv n solution *)
+                                invoke2 lemma
+                                   [literalArg vn, literalArg n, varArg soln]
+                                   1
+                                   [ofArg i]
+                                   0
+                                >>+
+                                proveLeq,
+   
+                                (* xequiv (M[^k] , M') : xequiv n solution |- ... *)
+                                chdir (D.bind dir name')
+                                >>+
+                                HypTactic.clear [name]
+                                ]
+                         end
+                   in
+                      (n, d', [], varExpr v, name', false, tac)
+                   end
+
+           | NONE => fk ())
+
+
+      fun stdTerm1 e g lemma sz n d m1 =
+         let
+            val (n1, d1, props1, expr1, name1, eph1, tac1) = e sz n d m1
+
+            val name = gensym ()
+            
+            val tac =
+               (* G, H |- ... *)
+               tac1
+               >>+
+               (* G, H1 |- ...
+                  where
+                  G, H1 |- solution : bounded n1 -> integer 
+                  G, H1 |- name1 : (blah : xequiv n1 solution)
+               *)
+               let
+                  do (_, dir) = withgoal
+                  val idir = D.idir dir
+                  val soln = D.lookupVar idir solution
+                  val i1 = D.lookupVar idir name1
+               in
+                  refine (Rule.assert (T.evar ()) (T.evar ()))
+                  >>> [
+                      (* G, H2 |- _ *)
+                      invoke lemma
+                         [literalArg n1, varArg soln, ofArg i1]
+                         0
+                      >>
+                      done,
+
+                      (* G, H2, blah : xequiv n1 solution |- ... *)
+                      refine (Rule.normalizeHyp 0)
+                      >>+
+                      chdir (D.bind dir name)
+                      >>+
+                      (if eph1 then HypTactic.clear [name1] else idtac)
+                      ]
+               end
+         in
+            (n1, d1, props1, g expr1, name, true, tac)
+         end
+
+
+      fun stdTerm2 e f g lemma sz n d m1 m2 =
+         let
+            val (n1, d1, props1, expr1, name1, eph1, tac1) = e sz n d m1
+            val (n2, d2, props2, expr2, name2, eph2, tac2) = f sz n1 d1 m2
+
+            val name = gensym ()
+            
+            val tac =
+               (* G, H |- ... *)
+               tac1
+               >>+
+               (* G, H1 |- ... *)
+               tac2
+               >>+
+               (* G, H2 |- ...
+                  where
+                  G, H2 |- solution : bounded n2 -> integer 
+                  G, H2 |- name1 : (blah : xequiv n1 solution)
+                  G, H2 |- name2 : (blah : xequiv n2 solution)
+               *)
+               let
+                  do (_, dir) = withgoal
+                  val idir = D.idir dir
+                  val soln = D.lookupVar idir solution
+                  val i1 = D.lookupVar idir name1
+                  val i2 = D.lookupVar idir name2
+               in
+                  refine (Rule.assert (T.evar ()) (T.evar ()))
+                  >>> [
+                      (* G, H2 |- _ *)
+                      invoke2 lemma
+                         [literalArg n1, literalArg n2, varArg soln]
+                         1
+                         [ofArg i1, ofArg i2]
+                         0
+                      >>+
+                      proveLeq,
+
+                      (* G, H2, blah : xequiv n2 solution |- ... *)
+                      refine (Rule.normalizeHyp 0)
+                      >>+
+                      chdir (D.bind dir name)
+                      >>+
+                      HypTactic.clear ((if eph1 then [name1] else []) @ (if eph2 then [name2] else []))
+                      ]
+               end
+         in
+            (n2, d2, props1 @ props2, g expr1 expr2, name, true, tac)
+         end
+         
+
+      fun stdTermTimes e lemma lemma0 sz n d m0 a m1 =
+         let
+            val (n1, d1, props1, expr1, name1, eph1, tac1) = e sz n d m1
+            
+            val name = gensym ()
+
+            val tac =
+               (* G, H |- ... *)
+               tac1
+               >>+
+               (* G, H1 |- ...
+                  where
+                  G, H1 |- solution : bounded n1 -> integer 
+                  G, H1 |- name1 : (blah : xequiv n1 solution)
+               *)
+               let
+                  do (_, dir) = withgoal
+                  val idir = D.idir dir
+                  val soln = D.lookupVar idir solution
+                  val i1 = D.lookupVar idir name1
+               in
+                  refine (Rule.assert (T.evar ()) (T.evar ()))
+                  >>> [
+                      (* G, H2 |- _ *)
+                      if a == 0I then
+                         invoke lemma0
+                            [literalArg n1, varArg soln, ofArg i1]
+                            0
+                         >> 
+                         done
+                      else
+                         invoke lemma
+                            [literalArg n1, varArg soln, (m0, typecheck), ofArg i1]
+                            0
+                         >>
+                         done,
+
+                      (* G, H2, blah : natequiv n1 solution |- ... *)
+                      refine (Rule.normalizeHyp 0)
+                      >>+
+                      chdir (D.bind dir name)
+                      >>+
+                      (if eph1 then HypTactic.clear [name1] else idtac)
+                      ]
+               end
+         in
+            (n1, d1, props1, multExpr a expr1, name, true, tac)
+         end
+
+
+      fun stdProp0 prop lemma n d =
+         let
+            val name = gensym ()
+         
+            val tac =
+               let
+                  do (_, dir) = withgoal
+               in
+                  refine (Rule.assert (T.evar ()) (T.evar ()))
+                  >>> [
+                      invoke lemma [] 0 >> done,
+   
+                      chdir (D.bind dir name)
+                      ]
+               end
+         in
+            (n, d, [], prop, name, true, tac)
+         end
+
+
+      fun stdProp1 e g lemma sz n d m1 =
+         let
+            val (n1, d1, props1, prop1, name1, _, tac1) = e sz n d m1
+
+            val name = gensym ()
+            
+            val tac =
+               (* G, H |- ... *)
+               tac1
+               >>+
+               (* G, H1 |- ...
+                  where
+                  G, H1 |- name1 : (blah : xequiv n1 solution)
+               *)
+               let
+                  do (_, dir) = withgoal
+                  val i1 = D.lookupVar (D.idir dir) name1
+               in
+                  refine (Rule.assert (T.evar ()) (T.evar ()))
+                  >>> [
+                      (* G, H1 |- _ *)
+                      invoke lemma
+                         [ofArg i1]
+                         0
+                      >> done,
+
+                      (* G, H1, blah : xequiv |- ... *)
+                      refine (Rule.normalizeHyp 0)
+                      >>+
+                      chdir (D.bind dir name)
+                      >>+
+                      HypTactic.clear [name1]
+                      ]
+               end
+         in
+            (n1, d1, props1, g prop1, name, true, tac)
+         end
+
+
+      fun stdProp2 e f g lemma sz n d m1 m2 =
+         let
+            val (n1, d1, props1, prop1, name1, _, tac1) = e sz n d m1
+            val (n2, d2, props2, prop2, name2, _, tac2) = f sz n1 d1 m2
+
+            val name = gensym ()
+            
+            val tac =
+               (* G, H |- ... *)
+               tac1
+               >>+
+               (* G, H1 |- ... *)
+               tac2
+               >>+
+               (* G, H2 |- ...
+                  where
+                  G, H2 |- name1 : (blah : xequiv n1 solution)
+                  G, H2 |- name2 : (blah : xequiv n2 solution)
+               *)
+               let
+                  do (_, dir) = withgoal
+                  val idir = D.idir dir
+                  val i1 = D.lookupVar idir name1
+                  val i2 = D.lookupVar idir name2
+               in
+                  refine (Rule.assert (T.evar ()) (T.evar ()))
+                  >>> [
+                      (* G, H2 |- _ *)
+                      invoke lemma
+                         [ofArg i1, ofArg i2]
+                         0
+                      >> done,
+
+                      (* G, H2, blah : xequiv |- ... *)
+                      refine (Rule.normalizeHyp 0)
+                      >>+
+                      chdir (D.bind dir name)
+                      >>+
+                      HypTactic.clear [name1, name2]
+                      ]
+               end
+         in
+            (n2, d2, props1 @ props2, g prop1 prop2, name, true, tac)
+         end
+                 
+
+               
+      (* extend n args lemma
+       
+         if    the goal is  G |- ...
+               lemma has the type:
+                  forall n f (x1 : A1) ... (xl : Al) .
+                     exists (g : bounded 1+n -> integer) .
+                        <fact> & f = g : (bounded n -> integer)
+               args = [(m1, mtac1) ... (ml, mtacl)]
+               mtaci proves G |- Mi : Ai 
+               G contains a hypothesis named solution such that  G |- solution : bounded n -> integer 
+         then  generates the subgoal  G', <fact>, <junk> |- ...
+               where G' is obtained from G by replacing solution's type with  bounded 1+n -> integer
+               the directory is unchanged (specifically, has not added two names)
+      *)
+      fun extend lemma n args =
+         let
+            do (_, dir) = withgoal
+            val soln = D.lookupVar (D.idir dir) solution
+         in
+            (* G, H |- ... *)
+            assert ()
+            >>> [
+                invoke lemma
+                   (literalArg n :: varArg soln :: args)
+                   0 >> done,
+                   
+                (* G, H, exists (bounded 1+n -> integer) . <fact> & soln+1 = 0 : (bounded n -> integer) |- ... *)
+                refine (Rule.existsLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
+                >>+
+                (* G, H, bounded 1+n -> integer, <fact> & soln+1 = 0 : (bounded n -> integer) |- ... *)
+                refine (Rule.prodLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
+                >>+
+                (* G, H, bounded 1+n -> integer, <fact>, soln+2 = 1 : (bounded n -> integer) |- ...
+                   let H = H1, bounded n -> integer, H2  with |H2| = soln
+                   that is: G, H1, bounded n -> integer, H2, bounded 1+n -> integer, 0 n = M[^] : integer, soln+2 = 1 : (bounded n -> integer) |- ...
+                *)
+                refine (Rule.exchange 2 1 (soln+1))
+                >>+
+                (* G, H1, bounded 1+n -> integer, bounded n -> integer, H2[0 . ^2], <fact>, soln+1 = soln+2 : (bounded n -> integer) |- ... *)
+                refine (Rule.substitutionSimple (soln+2) (T.evar ()) (T.evar ()) (T.evar ()))
+                >>> [
+                    (* G, H1, bounded 1+n -> integer, bounded n -> integer, H2[0 . ^2], 
+                       <fact>, soln+1 = soln+2 : (bounded n -> integer) |- soln+2 = 0[^soln+3] : bounded n -> integer
+                    *)
+                    refine (Rule.hypothesis 0),
+                    
+                    (* G, H1, bounded 1+n -> integer, H2, <fact>, <now junk> |- ...
+                       let Hmod = H1, bounded 1+n -> integer, H2  (note H2[0 . ^2][0 . id] = H2)
+                       that is: G, Hmod, <fact>, <junk> |- ...
+                    *)
+                    idtac
+                    ]
+                ]
+         end
+
+
+      (* stdInt sz n d M
+
+         if    G |- M : integer
+               |G| = sz
+               n is the number of variables allocated already
+               H contains a hypothesis named solution such that  G, H |- solution : bounded n -> integer 
+         then  * expr represents M, props are additional propositions added in support
+               * n' is the number of variables allocated after standardizing M (so n' >= n)
+               * if    tac's starting context is G, H
+                       |H| = k = |G, H| - sz
+                 then  tac's ending context is G, H'
+                       |H'| = k'
+                       sym is the name of a hypothesis such that  G, H' |- sym : ((M[^k'] , M') : intequiv n' solution)
+                       tac operates on  G, H |- ...  leaving the subgoal  G, H' |- ...
+               * eph  iff  sym is an ephemeral hypothesis that should be deleted after use (i.e., one that is not tabled)
+               * H' contains a hypothesis named solution such that  G, H' |- solution : bounded n' -> integer 
+               and
+               returns (n', d', props, expr, sym, eph, tac)
+      *)
+      fun stdInt sz n d m =
+         termCaseX m
+         /| var? =>
+            \(fnc i =>
+                 let
+                    (* The tabling here is essential, to avoid turning each occurrence into a distinct expression variable. *)
+                    do () = tryTable C.intequiv_advance n d m
+
+                    val name = gensym ()
+
+                    val d' = TD.insert d m (n, 1+n, name)
+
+                    val tac =
+                       let
+                          do (jud, dir) = withgoal
+                          val k = S.length (J.context jud) - sz
+                          val soln = D.lookupVar (D.idir dir) solution
+                       in
+                          (* G, H |- ... *)
+                          extend C.extend n [varArg (i+k)]
+                          >>+
+                          (* G, Hmod, soln n = i+k : integer, <junk> |- ... *)
+                          assert ()
+                          >>> [
+                              (* G, Hmod, soln n = i+k : integer, <junk> |- _ *)
+                              invoke C.intequiv_var
+                                 [literalArg n,
+                                  varArg (soln+2),
+                                  varArg (i+k+2)]
+                                 2
+                              >>> [
+                                  (* 0 <= n *)
+                                  proveLeq,
+
+                                  (* G, Hmod, soln n = i+k : integer, <junk> |- soln+2 n = i+k+2 : integer *)
+                                  refine (Rule.hypothesis 1)
+                                  ],
+
+                              (* G, Hmod, soln n = i+k : integer, <junk>, (i+k+2 , cons 1 n nil) : intequiv 1+n soln+2 |- ... *)
+                              refine (Rule.weaken 1 2)
+                              >>+
+                              (* G, Hmod, (i+k , cons 1 n nil) : intequiv 1+n soln |- ... *)
+                              chdir (D.bind dir name)
+                              ]
+                       end
+                 in
+                    (n+1, d', [], varExpr n, name, false, tac)
+                 end)\
+
+          | integer? =>
+            \(fnc a =>
+                 let
+                    val name = gensym ()
+
+                    val tac =
+                       let
+                          do (_, dir) = withgoal
+                          val soln = D.lookupVar (D.idir dir) solution
+                       in
+                          (* G, H |- ... *)
+                          assert ()
+                          >>> [
+                              (* G, H |- _ *)
+                              invoke C.intequiv_const
+                                 [literalArg n, varArg soln, iliteralArg a]
+                                 1
+                              >>+
+                              proveLeq,
+
+                              (* G, H, (a , const a) : intequiv n soln |- ... *)
+                              chdir (D.bind dir name)
+                              ]
+                       end
+                 in
+                    (n, d, [], constExpr a, name, true, tac)
+                 end)\
+   
+          | \Prim.plusz\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdInt stdInt addExpr C.intequiv_plusz sz n d m1 m2)\
+
+          | \Prim.negz\ ? =>
+            \(fnc m1 =>
+                 stdTerm1 stdInt negExpr C.intequiv_negz sz n d m1)\
+
+          | \C.minusz\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdInt stdInt subtractExpr C.intequiv_minusz sz n d m1 m2)\
+
+          | \C.timesz\ ($as integer?) ? =>
+            \(fnc m0 a m1 =>
+                 stdTermTimes stdInt C.intequiv_timesz_l C.intequiv_timesz_zero_l sz n d m0 a m1)\
+
+          | \C.timesz\ ? ($as integer?) =>
+            \(fnc m1 m0 a =>
+                 stdTermTimes stdInt C.intequiv_timesz_r C.intequiv_timesz_zero_r sz n d m0 a m1)\
+
+          | \C.nat_to_integer\ ? =>
+            \(fnc m1 =>
+                 stdTerm1 stdNat (fn x => x) C.intequiv_nat_to_integer sz n d m1)\
+
+          | _ =>
+            \(fnc =>
+                 raise (Fail "unexpected integer form in omega"))\
+         /
+
+
+      (* stdNat sz n d M
+
+         if    G |- M : nat
+               |G| = sz
+               n is the number of variables allocated already
+               H contains a hypothesis named solution such that  G, H |- solution : bounded n -> integer 
+         then  * expr represents M, props are additional propositions added in support
+               * n' is the number of variables allocated after standardizing M (so n' >= n)
+               * if    tac's starting context is G, H
+                       |H| = k = |G, H| - sz
+                 then  tac's ending context is G, H'
+                       |H'| = k'
+                       sym is the name of a hypothesis such that  G, H' |- sym : ((M[^k'] , M') : natequiv n' solution)
+                       tac operates on  G, H |- ...  leaving the subgoal  G, H' |- ...
+               * eph  iff  sym is an ephemeral hypothesis that should be deleted after use (i.e., one that is not tabled)
+               * H' contains a hypothesis named solution such that  G, H' |- solution : bounded n' -> integer 
+               and
+               returns (n', d', props, expr, sym, eph, tac)
+      *)
+      and stdNat sz n d m =
+         termCaseX m
+         /| var? =>
+            \(fnc i =>
+                 let
+                    (* The tabling here is essential, to avoid turning each occurrence into a distinct expression variable. *)
+                    do () = tryTable C.natequiv_advance n d m
+
+                    val name = gensym ()
+                    val propname = gensym ()
+
+                    val d' = TD.insert d m (n, 1+n, name)
+
+                    val tac =
+                       let
+                          do (jud, dir) = withgoal
+                          val k = S.length (J.context jud) - sz
+                          val soln = D.lookupVar (D.idir dir) solution
+                       in
+                          (* G, H |- ... *)
+                          extend C.extend n [(T.apply1 C.nat_to_integer (T.Var (i+k)), typecheck)]
+                          >>+
+                          (* G, Hmod, soln n = nat_to_integer i+k : integer, <junk> |- ... *)
+                          assert ()
+                          >>> [
+                              (* G, Hmod, soln n = nat_to_integer i+k : integer, <junk> |- _ *)
+                              invoke C.natequiv_var
+                                 [literalArg n,
+                                  varArg (soln+2),
+                                  varArg (i+k+2)]
+                                 2
+                              >>> [
+                                  (* 0 <= n *)
+                                  proveLeq,
+
+                                  (* G, Hmod, soln n = nat_to_integer i+k : integer, <junk> |- soln+2 n = nat_to_integer i+k+2 : integer *)
+                                  refine (Rule.hypothesis 1)
+                                  ],
+
+                              (* G, Hmod, soln n = nat_to_integer i+k : integer, <junk>, (i+k+2 , cons 1 n nil) : natequiv 1+n soln+2 & <stuff> |- ... *)
+                              refine (Rule.weaken 1 2)
+                              >>+
+                              (* G, Hmod, (i+k , cons 1 n nil) : intequiv 1+n soln & stuff |- ... *)
+                              refine (Rule.prodLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
+                              >>+
+                              (* G, Hmod, (i+k , cons 1 n nil) : intequiv 1+n soln, stuff |- ... *)
+                              chdir (D.binds dir [name, propname])
+                              ]
+                       end
+                 in
+                    (n+1, d', [(propname, Inequal (varExpr n))], varExpr n, name, false, tac)
+                 end)\
+
+          | nat? =>
+            \(fnc a =>
+                 let
+                    val name = gensym ()
+
+                    val tac =
+                       let
+                          do (_, dir) = withgoal
+                          val soln = D.lookupVar (D.idir dir) solution
+                       in
+                          (* G, H |- ... *)
+                          assert ()
+                          >>> [
+                              (* G, H |- _
+                                 M is closed so I don't have to worry about shifting it.
+                              *)
+                              invoke C.natequiv_const
+                                 [literalArg n, varArg soln, (m, typecheck)]
+                                 1
+                              >>+
+                              proveLeq,
+
+                              (* G, H, (a , const (nat_to_integer m)) : intequiv n soln |- ... *)
+                              refine (Rule.normalizeHyp 0)
+                              >>+
+                              (* G, H, (a , const a) : intequiv n soln |- ... *)
+                              chdir (D.bind dir name)
+                              ]
+                       end
+                 in
+                    (n, d, [], constExpr (I.fromInt a), name, true, tac)
+                 end)\
+
+          | \Prim.succ\ ? =>
+            \(fnc m1 =>
+                 stdTerm1 stdNat succExpr C.natequiv_succ sz n d m1)\
+
+          | \C.plus\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdNat stdNat addExpr C.natequiv_plus sz n d m1 m2)\
+
+          | \C.times\ ($as nat?) ? =>
+            \(fnc m0 a m1 =>
+                 stdTermTimes stdNat C.natequiv_times_l C.natequiv_times_zero_l sz n d m0 (I.fromInt a) m1)\
+
+          | \C.times\ ? ($as nat?) =>
+            \(fnc m1 m0 a =>
+                 stdTermTimes stdNat C.natequiv_times_r C.natequiv_times_zero_r sz n d m0 (I.fromInt a) m1)\
+
+          | \C.minus\ ? ? =>
+            \(fnc m1 m2 =>
+                 let
+                    do () = tryTable C.natequiv_advance n d m
+
+                    val (n1, d1, props1, expr1, name1, eph1, tac1) = stdNat sz n d m1
+                    val (n2, d2, props2, expr2, name2, eph2, tac2) = stdNat sz n1 d1 m2
+
+                    val name = gensym ()
+                    val propname = gensym ()
+
+                    val d3 = TD.insert d2 m (n2, 1+n2, name)
+
+                    val expr = varExpr n2
+
+                    val props =
+                       (propname,
+                        Or (And (eqProp expr (subtractExpr expr1 expr2),
+                                 leqProp expr2 expr1),
+                            And (Equal expr,
+                                 ltProp expr1 expr2)))
+                       :: props1 @ props2
+
+                    val tac =
+                       (* G, H |- ... *)
+                       tac1
+                       >>+
+                       (* G, H1 |- ... *)
+                       tac2
+                       >>+
+                       (* G, H2 |- ...
+                          where
+                          G, H2 |- solution : bounded n2 -> integer 
+                          G, H2 |- name1 : (blah : natequiv n1 solution)
+                          G, H2 |- name2 : (blah : natequiv n2 solution)
+                       *)
+                       let
+                          do (_, dir) = withgoal
+                          val idir = D.idir dir
+                          val soln = D.lookupVar idir solution
+                          val i1 = D.lookupVar idir name1
+                          val i2 = D.lookupVar idir name2
+                       in
+                          (* G, H2 |- ... *)
+                          extend C.minus_extend n2
+                             [(T.evar (), ofExprFromOfXequiv i1),
+                              (T.evar (), ofExprFromOfXequiv i2)]
+                          >>+
+                          (* G, H2', minus_prop n2 solution blah blah, <junk> |- ... *)
+                          refine (Rule.normalizeHyp 1)
+                          >>+
+                          assert ()
+                          >>> [
+                              invoke2 C.natequiv_minus
+                                 [literalArg n1, literalArg n2, varArg (soln+2)]
+                                 1
+                                 [ofArg (i1+2), ofArg (i2+2)]
+                                 1
+                              >>> [
+                                  (* n1 <= n2 *)
+                                  proveLeq,
+
+                                  (* G, H2', minus_prop n2 solution blah blah, <junk> |- minus_prop n2 solution blah blah *)
+                                  refine (Rule.hypothesis 1)
+                                  ],
+
+                              (* G, H2', <now junk>, <junk>, <stuff> & ((blah , blah) : natequiv 1+n2 solution) |- ... *)
+                              refine (Rule.prodLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
+                              >>+
+                              (* G, H2', <junk>, <junk>, <stuff>, ((blah , blah) : natequiv 1+n2 solution) |- ... *)
+                              refine (Rule.weaken 2 2)
+                              >>+
+                              (* G, H2', <stuff>, ((blah , blah) : natequiv 1+n2 solution) |- ... *)
+                              chdir (D.binds dir [propname, name])
+                              ]
+                       end
+                 in
+                    (n2+1, d3, props, expr, name, false, tac)
+                 end)\
+
+          | \C.integer_to_nat\ ? =>
+            \(fnc m1 =>
+                 let
+                    do () = tryTable C.natequiv_advance n d m
+
+                    val (n1, d1, props1, expr1, name1, eph1, tac1) = stdInt sz n d m1
+
+                    val name = gensym ()
+                    val propname = gensym ()
+
+                    val d2 = TD.insert d1 m (n1, 1+n1, name)
+
+                    val expr = varExpr n1
+
+                    val props =
+                       (propname,
+                        Or (And (eqProp expr expr1,
+                                 Inequal expr1),
+                            And (Equal expr,
+                                 lt0Prop expr1)))
+                        :: props1
+
+                    val tac =
+                       (* G, H |- ... *)
+                       tac1
+                       >>+
+                       (* G, H1 |- ...
+                          where
+                          G, H1 |- solution : bounded n1 -> integer 
+                          G, H1 |- name1 : (blah : natequiv n1 solution)
+                       *)
+                       let
+                          do (_, dir) = withgoal
+                          val idir = D.idir dir
+                          val soln = D.lookupVar idir solution
+                          val i1 = D.lookupVar idir name1
+                       in
+                          (* G, H1 |- ... *)
+                          extend C.integer_to_nat_extend n1
+                             [(T.evar (), ofExprFromOfXequiv i1)]
+                          >>+
+                          (* G, H1' |- integer_to_nat_prop n1 solution blah, <junk> |- ... *)
+                          refine (Rule.normalizeHyp 1)
+                          >>+
+                          assert ()
+                          >>> [
+                              invoke C.natequiv_integer_to_nat
+                                 [literalArg n1, varArg (soln+2), ofArg (i1+2)]
+                                 1
+                              >>+
+                              (* G, H1', integer_to_nat_prop n1 solution blah, <junk> |- integer_to_nat_prop n1 solution blah *)
+                              refine (Rule.hypothesis 1),
+
+                              (* G, H1', <now junk>, <junk>, <stuff> & ((blah , blah) : natequiv 1+n1 solution) |- ... *)
+                              refine (Rule.prodLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
+                              >>+
+                              (* G, H1', <now junk>, <junk>, <stuff>, ((blah , blah) : natequiv 1+n1 solution) |- ... *)
+                              refine (Rule.weaken 2 2)
+                              >>+
+                              (* G, H1', <stuff>, ((blah , blah) : natequiv 1+n1 solution) |- ... *)
+                              chdir (D.binds dir [propname, name])
+                              ]
+                       end
+                 in
+                    (n1+1, d2, props, expr, name, false, tac)
+                 end)\
+
+          | _ =>
+            \(fnc =>
+                 (raise (Fail "unexpected nat form in omega")))\
+         /
+                         
+
+
+      (* stdTrue sz n d M
+
+         if    G |- M : bool
+               |G| = sz
+               n is the number of variables allocated already
+               H contains a hypothesis named solution such that  G, H |- solution : bounded n -> integer 
+         then  * prop represents M, props are additional propositions added in support
+               * n' is the number of variables allocated after standardizing M (so n' >= n)
+               * if    tac's starting context is G, H
+                       |H| = k = |G, H| - sz
+                 then  tac's ending context is G, H'
+                       |H'| = k'
+                       sym is the name of a hypothesis such that  G, H' |- sym : ((M[^k'] , M') : tequiv)
+                       tac operates on  G, H |- ...  leaving the subgoal  G, H' |- ...
+               * H' contains a hypothesis named solution such that  G, H' |- solution : bounded n' -> integer 
+               and
+               returns (n', d', props, prop, sym, true, tac)
+      *)
+      fun stdTrue sz n d m =
+         termCaseX m
+         /| \C.eqb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdNat stdNat eqProp C.tequiv_eq sz n d m1 m2)\
+
+          | \C.leqb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdNat stdNat leqProp C.tequiv_leq sz n d m1 m2)\
+
+          | \C.ltb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdNat stdNat ltProp C.tequiv_lt sz n d m1 m2)\
+
+          | \C.eqzb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdInt stdInt eqProp C.tequiv_eqz sz n d m1 m2)\
+
+          | \C.leqzb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdInt stdInt leqProp C.tequiv_leqz sz n d m1 m2)\
+
+          | \C.ltzb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdInt stdInt ltProp C.tequiv_ltz sz n d m1 m2)\
+
+          | \C.notb\ ? =>
+            \(fnc m1 =>
+                 stdProp1 stdFalse (fn p => p) C.tequiv_not sz n d m1)\
+
+          | \C.andb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdProp2 stdTrue stdTrue andProp C.tequiv_and sz n d m1 m2)\
+
+          | \C.orb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdProp2 stdTrue stdTrue orProp C.tequiv_or sz n d m1 m2)\
+
+          | \C.impb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdProp2 stdFalse stdTrue orProp C.tequiv_imp sz n d m1 m2)\
+
+          | \Prim.tru\ =>
+            \(fnc =>
+                 stdProp0 True C.tequiv_true n d)\
+
+          | \Prim.fals\ =>
+            \(fnc =>
+                 stdProp0 False C.tequiv_false n d)\
+
+          | _ =>
+            \(fnc =>
+                 raise (Fail "unexpected true test in omega"))\
+         /
+
+
+      (* stdFalse sz n d M
+
+         if    G |- M : bool
+               |G| = sz
+               n is the number of variables allocated already
+               H contains a hypothesis named solution such that  G, H |- solution : bounded n -> integer 
+         then  * prop represents M, props are additional propositions added in support
+               * n' is the number of variables allocated after standardizing M (so n' >= n)
+               * if    tac's starting context is G, H
+                       |H| = k = |G, H| - sz
+                 then  tac's ending context is G, H'
+                       |H'| = k'
+                       sym is the name of a hypothesis such that  G, H' |- sym : ((M[^k'] , M') : fequiv)
+                       tac operates on  G, H |- ...  leaving the subgoal  G, H' |- ...
+               * H' contains a hypothesis named solution such that  G, H' |- solution : bounded n' -> integer 
+               and
+               returns (n', d', props, prop, sym, true, tac)
+      *)
+      and stdFalse sz n d m =
+         termCaseX m
+         /| \C.eqb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdNat stdNat neqProp C.fequiv_eq sz n d m1 m2)\
+
+          | \C.leqb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdNat stdNat (fns a b => ltProp b a) C.fequiv_leq sz n d m1 m2)\
+
+          | \C.ltb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdNat stdNat (fns a b => leqProp b a) C.fequiv_lt sz n d m1 m2)\
+
+          | \C.eqzb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdInt stdInt neqProp C.fequiv_eqz sz n d m1 m2)\
+
+          | \C.leqzb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdInt stdInt (fns a b => ltProp b a) C.fequiv_leqz sz n d m1 m2)\
+
+          | \C.ltzb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdInt stdInt (fns a b => leqProp b a) C.fequiv_ltz sz n d m1 m2)\
+
+          | \C.notb\ ? =>
+            \(fnc m1 =>
+                 stdProp1 stdTrue (fn p => p) C.fequiv_not sz n d m1)\
+
+          | \C.andb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdProp2 stdFalse stdFalse orProp C.fequiv_and sz n d m1 m2)\
+
+          | \C.orb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdProp2 stdFalse stdFalse andProp C.fequiv_or sz n d m1 m2)\
+
+          | \C.impb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdProp2 stdTrue stdFalse andProp C.fequiv_imp sz n d m1 m2)\
+
+          | \Prim.tru\ =>
+            \(fnc =>
+                 stdProp0 False C.fequiv_true n d)\
+
+          | \Prim.fals\ =>
+            \(fnc =>
+                 stdProp0 True C.fequiv_false n d)\
+
+          | _ =>
+            \(fnc =>
+                 raise (Fail "unexpected false test in omega"))\
+         /
+
+
+
+      fun cleanup i ctx dir kept =
+         (case S.expose ctx of
+             S.Nil =>
+                chdir (D.literal kept)
+
+           | S.Cons (J.Tm a, rest) =>
+                (case N.simplify a of
+                    T.Elim (T.Const const, _) =>
+                       if 
+                          (* delete these *)
+                          Constant.eq (const, Prim.ov)
+                          orelse
+                          Constant.eq (const, Prim.nat)
+                          orelse
+                          Constant.eq (const, Prim.integer)
+                          orelse
+                          Constant.eq (const, C.istrue)
+                       then
+                          refine (Rule.weaken i 1)
+                          >>+
+                          cleanup i rest (D.tl dir) kept
+                       else
+                          let
+                             val (sym, dir') = D.expose dir
+                          in
+                             cleanup (i+1) rest dir' (sym :: kept)
+                          end
+
+                  | _ =>
+                       raise (Fail "precondition"))
+
+           | _ =>
+                raise (Fail "precondition"))
+
+
+
+      (* standardize goal
+
+         if    goal is  G |- istrue M
+         then  tac:
+                  allocates n variables
+                  generates a subgoal  G, H |- void
+                  in which  G, H |- solution : bounded n -> integer
+                            G, H |- name : type-corresponding-to-P  for each (name, P) in props
+               d matches terms with variable numbers
+               and
+               returns (n, props, tac, d)
+      *)
+      fun standardize (jud, dir) =
+         termCaseX (J.concl jud)
+         / \C.istrue\ ? =>
+           \(fnc m =>
+                (* G |- istrue M *)
+                let
+                   val (n, d, props, prop, stdname, _, tac) = stdFalse (S.length (J.context jud)) 0 TD.empty m
+
+                   val propname = gensym ()
+                   val contname = gensym ()
+
+                   val props = (propname, prop) :: props
+
+                   val tac' =
+                      (* G |- istrue M
+
+                         We're willing to incur the cost of a typecheck here, in order to get the istrue into the
+                         context so the conclusion can be simple before we standardize M.  That's because standardization
+                         is going to re-prune the conclusion every time a new variable is added, so it's worth having the
+                         conclusion be just void.
+
+                         (We could avoid the typecheck by standardizing first, but then we have M sitting in the conclusion
+                         the whole time.)
+                      *)
+                      refine (Rule.assert 
+                                 (T.apply2 Prim.ov (T.Const Prim.bool) m)
+                                 (T.evar ()))
+                      >>> [
+                          (* G |- M : bool *)
+                          typecheck,
+
+                          (* G, M : bool |- istrue M[^] *)
+                          invoke C.istrue_from_not_isfalse
+                             [(shift m 1, refine (Rule.hypothesis 0))]
+                             1
+                          >>+
+                          (* G, M : bool |- istrue (notb M[^]) -> void *)
+                          refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                          >>> [
+                              (* G, M : bool |- istrue (notb M[^]) : type *)
+                              invoke C.istrue_notb_type
+                                 [(shift m 1, refine (Rule.hypothesis 0))]
+                                 0,
+
+                              (* G, M : bool, istrue (notb M[^]) |- void *)
+                              refine (Rule.weaken 1 1)
+                              >>+
+                              (* G, istrue (notb M) |- void *)
+                              refine (Rule.assert
+                                         (T.apply2 Prim.arrow
+                                             (T.apply1 C.bounded zero)
+                                             (T.Const Prim.integer))
+                                         (T.evar ()))
+                              >>> [
+                                  (* bounded z`0 -> integer *)
+                                  invoke C.initial_solution [] 0,
+
+                                  (* G, istrue (notb M), bounded 0 -> integer |- void *)
+                                  chdir (D.binds dir [contname, solution])
+                                  >>+
+                                  (* let H = istrue (notb M), bounded 0 -> integer *)
+                                  tac
+                                  >>+
+                                  (* G, H' |- void *)
+                                  let
+                                     do (_, dir') = withgoal
+                                     val idir' = D.idir dir'
+                                     val i1 = D.lookupVar idir' stdname
+                                     val i2 = D.lookupVar idir' contname
+
+                                     (* G, H' |- i1 : ((M[..] , A) : fequiv)
+                                        G, H' |- i2 : istrue (notb M[..])
+                                     *)
+                                  in
+                                     invoke C.istrue_fequiv_contra
+                                        [ofArg i1]
+                                        2
+                                     >>> [
+                                         (* G, H' |- A -> void *)
+                                         refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                                         >>> [
+                                             (* G, H' |- A : type *)
+                                             assert ()
+                                             >>> [
+                                                 invoke C.fequiv_to_type
+                                                    [ofArg i1]
+                                                    0,
+
+                                                 refine (Rule.hypothesis 0)
+                                                 ],
+
+                                             (* G, H', A |- void *)
+                                             (* Continue here. *)
+                                             let
+                                                do (jud, _) = withgoal
+                                             in
+                                                cleanup 0 (J.context jud) (D.bind dir' propname) []
+                                             end
+                                             ],
+
+                                         (* G, H' |- istrue (notb M[..]) *)
+                                         refine (Rule.hypothesis i2)
+                                         ]
+                                  end
+                                  ]
+                              ]
+                          ]
+                in
+                   (n, props, tac', d)
+                end)\
+         /
+
+
+
+
+      (* Part 3: Solving *)
+
+      fun hashInc coef var hash =
+         JenkinsHash.hashInc
+            (IntHashable.hash var)
+            (JenkinsHash.hashInc
+                (IntInfHashable.hash coef)
+                hash)
+
+
+
+      datatype log_entry =
+         Split of symbol * symbol * symbol
+         (* Split (h1, h2, h)
+            from    h : P & Q
+            obtain  h1 : P, h2 : Q 
+         *)
+
+       | Cases of symbol * log_entry list * symbol * log_entry list * symbol
+         (* Cases (h1, log1, h2, log2, h)
+            from    h : P % Q
+                    log1 expects h1 : P and succeeds
+                    log2 expects h2 : Q and succeeds
+            succeed
+         *)
+
+       | Abort of symbol
+         (* Abort h
+            from  h : void
+            succeed
+         *)
+
+       | Combine of symbol * (integer * symbol) list
+         (* MultAdd (h, [... (ai, hi) ...])
+            from    for all i,  hi : Xequal expi   and  Xequal = Inequal implies ai > 0
+            obtain  h : equal (... + ai * expi + ...)    if all Xequal=Equal
+                    h : inequal (... + ai * expi + ...)  otherwise
+         *)
+
+       | EqualContra of symbol
+         (* EqualContra h
+            from    h : equal a*1  and  a <> 0
+            succeed
+         *)
+
+       | InequalContra of symbol
+         (* EqualContra h
+            from    h : inequal a*1  and  a < 0
+            succeed
+         *)
+
+       | EqualDivide of symbol * symbol * expr * integer
+         (* EqualDivide (h', h, e, a)
+            from    h : equal (a * e)
+            obtain  h' : equal e
+         *)
+
+       | EqualDivideContra of symbol * expr * integer * integer
+         (* EqualDivideContra (h, e, a, b)
+            from    h : equal (a * e + b)  and  0 < b < a
+            succeed
+         *)
+
+       | InequalDivide of symbol * symbol * expr * integer * integer
+         (* InequalDivide (h', h, e, a, b)
+            from    h : inequal (a * e + b) with 0 <= b < a
+            obtain  h' : inequal e
+         *)
+
+       | Define of symbol * expr
+         (* Define (h, e)
+            from    next variable is v
+            obtain  h : equal (e - v)
+                    next variable is v+1
+         *)
+
+       | Antisymm of symbol * symbol * symbol
+         (* Antisymm (h, h1, h2)
+            from    h1 : inequal e
+                    h2 : inequal -e
+            obtain  h : equal e
+         *)
+
+       | Perimeter of symbol * integer * integer * symbol * symbol
+         (* Perimeter (h, a, b, h1, h2)
+            from    h1 : inequal e1  (upper bound)
+                    h2 : inequal e2  (lower bound)
+                    0 < a, b
+            obtain  h : inequal (b * e1 + a * e2 - ((a - 1) (b - 1)))
+                        % inequal (q - e2)  where q = floor((a * b - a - b) div a)
+         *)
+
+       | InequalIncrement of symbol * symbol
+         (* Increment (h', h)
+            from    h : inequal e
+            obtain  h' : equal e % inequal (e - 1)
+         *)
+
+       | Negate of symbol * symbol * expr * log_entry list
+         (* Negate (h', h, e, log)
+            from    log expects h : inequal e and succeeds
+            obtain  h' : not (inequal e)
+         *)
+
+       | Apply of symbol * symbol
+         (* Apply (h1, h2)
+            from    h1 : not (inequal e)
+                    h2 : inequal e
+            succeed
+         *)
+
+       | InequalWeaken of symbol * symbol * integer 
+         (* Weaken (h', h, a)
+            from    h : inequal e
+                    a >= 0
+            obtain  h' : inequal (e + a)
+         *)
+
+       | Copy of symbol * symbol
+         (* Copy (h', h)
+            from    h : P
+            obtain  h' : P
+         *)
+
+       | Append of log_entry list
+
+
+
+      (* for each v --> (name, exp) in a substitution:
+         - name : Equal n f exp
+         - n <= the current number of variables
+         - f is the current solution
+         - the coefficient of v in exp is -1
+
+         A substitution contains no dependency cycles.
+      *)
+      type substitution = (symbol * expr) ID.dict
+
+      val emptySubst = ID.empty
+
+      
+      fun printSubst subst =
+         (
+         print "[\n";
+         ID.app
+            (fn (v, (_, exp)) =>
+                (
+                print (Int.toStringStd v);
+                print " -> ";
+                printExpr exp;
+                print "\n"
+                ))
+            subst;
+         print "]\n"
+         )
+
+
+      fun extendSubst subst var name exp =
+         ID.insert subst var (name, exp)
+
+
+      (* substituteExcept subst name exp except log
+
+         if    subst is a substitution
+               n is the current number of variables
+               name : xequal n' f exp
+               n' <= n
+               f is the current solution
+         then  exp' is the result of applying subst to exp, except does not substitute for "except"
+               name' : xequal n f exp'
+               subst' is an equivalent (but simpler) substitution
+               log' extends log with actions to make it happen
+               and
+               returns (name', exp', subst', log')
+      *)
+      fun substituteExcept subst name exp except log =
+         let
+            val (exp', comb, subst, log) =
+               List.foldl
+                  (fns (v, a) (exp', comb, subst, log) =>
+                      if v = except then
+                         (exp', comb, subst, log)
+                      else
+                         (case ID.find subst v of
+                             NONE =>
+                                (exp', comb, subst, log)
+   
+                           | SOME (substname, substexp) =>
+                                let
+                                   val (substname', substexp', subst, log) = substituteExcept subst substname substexp v log
+
+                                   val subst =
+                                      if Symbol.eq (substname, substname') then
+                                         subst
+                                      else
+                                         ID.insert subst v (substname', substexp')
+                                in
+                                   (addExpr (multExpr a substexp') exp',
+                                    (a, substname') :: comb,
+                                    subst,
+                                    log)
+                                end))
+                  (exp, [], subst, log)
+                  exp
+         in
+            (case comb of
+                [] =>
+                   (name, exp, subst, log)
+
+              | _ =>
+                   let
+                      val name' = gensym ()
+                   in
+                      (name', exp', subst,
+                       Combine (name', (1I, name) :: comb) :: log)
+                   end)
+         end
+                                
+
+                                
+      (* substitute subst name exp log
+
+         if    subst is a substitution
+               n is the current number of variables
+               name : xequal n' f exp
+               n' <= n
+               f is the current solution
+         then  exp' is the result of applying subst to exp
+               name' : xequal n f exp'
+               subst' is an equivalent (but simpler) substitution
+               log' extends log with actions to make it happen
+               and
+               returns (name', exp', subst', log')
+      *)
+      fun substitute subst name exp log = substituteExcept subst name exp ~2 log
+
+
+
+      (* b <= a *)
+      fun gcdLoop a b =
+         let
+            val c = I.rem a b
+         in
+            if c == 0I then
+               b
+            else
+               gcdLoop b c
+         end
+
+      fun gcd a b =
+         if a == 1I then
+            (* optimize *)
+            1I
+         else if I.< a b then
+            gcdLoop b a
+         else
+            gcdLoop a b
+
+
+
+      exception UnitCoefficient of int
+
+      (* solveEquality vars name exp subst log
+
+         if    (after log)
+               there are vars variables
+               name : Equal exp
+               subst is a substitution
+         then  (after log')
+               there are vars' variables
+               subst' is a substitution
+               there is one fewer active variable after subst' than after subst
+               done indicates we are donea
+               and
+               return (vars', subst', done, log')
+      *)
+      fun solveEquality vars name exp subst log =
+         (case
+             try
+                let
+                   (* minCoef is the minimum absolute value of the coefficients of non-constant terms,
+                      or 0 if there are no non-constant terms.
+
+                      divisor is the gcd of the non-constant terms, or 0 if there are none.
+                   *)
+                   val (minCoef, minVar, divisor) =
+                      List.foldl
+                         (fns (var, coef) (minCoef, minVar, divisor) =>
+                             (* the first term sees minCoef = divisor = 0 *)
+                             if var = constant then
+                                (minCoef, minVar, divisor)
+                             else
+                                let
+                                   val coef' = I.abs coef
+                                in
+                                   if coef' == 1I then
+                                      raise (UnitCoefficient var)
+                                   else if minCoef == 0I then
+                                      (coef', var, coef')
+                                   else if I.< coef' minCoef then
+                                      (coef', var, gcd divisor coef')
+                                   else
+                                      (minCoef, minVar, gcd divisor coef')
+                                end)
+                         (0I, ~1, 0I)
+                         exp
+                in
+                   INR (minCoef, minVar, divisor)
+                end
+             with
+                UnitCoefficient var => INL var
+          of
+             INL var =>
+                (* a variable has coefficient 1 or -1; solve for it *)
+                let
+                   val (name', exp', log) =
+                      if lookupExpr exp var == ~1I then
+                         (name, exp, log)
+                      else
+                         let
+                            val name' = gensym ()
+                         in
+                            (name', negExpr exp,
+                             Combine (name', [(~1I, name)]) :: log)
+                         end
+                         
+                   val subst = extendSubst subst var name' exp'
+                in
+                   (vars, subst, false, log)
+                end
+
+           | INR (minCoef, minVar, divisor) =>
+                if minCoef == 0I then
+                   (* the entire term is a constant *)
+
+                   if lookupExpr exp constant == 0I then
+                      (* discard useless constraint *)
+                      (vars, subst, false, log)
+                   else
+                      (* impossible constraint; we're done *)
+                      (vars, subst, true,
+                       EqualContra name :: log)
+
+                else if I.> divisor 1I then
+                   (* the non-constant terms are divisible by divisor *)
+
+                   let
+                      val a = lookupExpr exp constant
+                      val (quotient, remainder) = I.divmod a divisor
+                   in
+                      if remainder == 0I then
+                         (* constraint is a multiple of divisor; divide it out *)
+                         let
+                            val name' = gensym ()
+   
+                            val exp' =
+                               List.map
+                                  (fn (v, b) => (v, b idiv divisor))
+                                  exp
+   
+                            val log =
+                               EqualDivide (name', name, exp', divisor)
+                               :: log
+                         in
+                            solveEquality vars name' exp' subst log
+                         end
+                      else
+                         (* impossible constraint; we're done *)
+                         let
+                            val exp' =
+                               addExpr
+                                  (List.map
+                                      (fn (v, b) => (v, b idiv divisor))
+                                      (removeExpr exp constant))
+                                  (constExpr quotient)
+                         in
+                            (vars, subst, true,
+                             EqualDivideContra (name, exp', divisor, remainder) :: log)
+                         end
+                   end
+
+                else
+                   (* shift all terms to a multiple of m, where m = minCoef + 1 *)
+
+                   let
+                      val m = minCoef ++ 1I         (* always positive *)
+                      val mDiv2 = m idiv 2I
+
+                      (* make minVar's coefficient positive (i.e., make it minCoef) *)
+                      val (name', exp', log) = 
+                         if I.< (lookupExpr exp minVar) 0I then 
+                            let
+                               val name' = gensym ()
+                            in
+                               (name', negExpr exp,
+                                Combine (name', [(~1I, name)]) :: log)
+                            end
+                         else 
+                            (name, exp, log)
+
+                      val v = vars
+
+                      (* defexp gives each term the coefficient a, where a * m is the closest multiple of m
+                         to the old coefficient.
+
+                         Note that minVar's coefficient is -1.
+
+                         We will define v to be equal to defexp.
+                      *)
+                      val defexp =
+                         List.map
+                            (fn (v, b) =>
+                                let
+                                   val badj =
+                                      if b >== 0I then
+                                         b ++ mDiv2
+                                      else
+                                         b -- mDiv2
+                                in
+                                   (v, I.~ (badj idiv m))
+                                end)
+                            exp'
+
+                      val solvedExp = addExpr (multExpr m (addExpr defexp (varNegExpr v))) exp'
+
+                      (* 0 = solvedExp  is the equation  m var = SUM i . (ai modhat m) xi from the Omega paper.
+
+                         minVar's coefficient in solvedExp is -1
+                      *)
+
+                      val defname = gensym ()
+                      val solved = gensym ()    (* name for the solved equation *)
+
+                      val subst = extendSubst subst minVar solved solvedExp
+
+                      val log = 
+                         Combine (solved, [(m, defname), (1I, name')])
+                         :: Define (defname, defexp) 
+                         :: log
+
+                      (* We could just let things take their course with solvedExp, but since we know what will
+                         happen, it's much cheaper just to do it, and save the cost of figuring out what we already
+                         know.
+
+                         In a * solvedExp + exp', every term's coefficient is divisible by m.
+                         (This takes some math.)
+                      *)
+
+                      val newexp =
+                         List.map
+                            (fn (v, b) => (v, b idiv m))
+                            (addExpr (multExpr minCoef solvedExp) exp')
+
+                      val fresh = gensym ()     (* name for the new equation *)
+                      val aux = gensym ()       (* the new equation's name before the division *)
+                   in
+                      solveEquality (vars+1) fresh newexp subst
+                      (EqualDivide (fresh, aux, newexp, m)
+                         :: Combine (aux, [(minCoef, solved), (1I, name')]) 
+                         :: log)
+                   end)
+
+
+      (* y > 0 *)
+      fun idivFloor x y =
+         if x >== 0I then
+            x idiv y
+         else
+            (x -- y ++ 1I) idiv y
+
+
+      (* y > 0 *)
+      fun idivCeil x y =
+         if x >== 0I then
+            (x ++ y -- 1I) idiv y
+         else
+            x idiv y
+
+
+      fun singleSubst v a =
+         if a == 0I then
+            [(v, ~1I)]
+         else
+            [(constant, a), (v, ~1I)]
+
+
+      val dummy = Symbol.fromValue "dummy"
+
+
+      (* variables appearing in exp but not in subst are taken to be zero *)
+      fun resolve subst exp =
+         let
+            val (_, exp', subst, _) = substitute subst dummy exp []
+            val a = lookupExpr exp' constant
+         in
+            (a, subst)
+         end
+
+
+      (* bounds as below, no variable has an upper and lower bound.
+         Extends subst with a binding for every variable involved in a bound.
+      *)
+      fun findCounterexample subst bounds =
+         let
+            do () = Susp.delay
+         in
+            ID.foldl
+               (fn (v, (_, _, lowers, uppers, _, _, _), subst) =>
+                   let
+                      val a =
+                         (case lowers of
+                             _ :: _ =>
+                                (* v has lower bounds.
+                                   Pick a value that that makes all the constraints hold, assuming that all terms other
+                                   than the v term and the constant term are nonnegative and can therefore be neglected.
+
+                                   (If we considered the terms that are already determined, we could get smaller counterexamples.)
+                                *)
+                                List.foldl
+                                   (fns (_, exp, coef) a =>
+                                       (* coef is positive since this is a lower bound *)
+                                       let
+                                          val c = I.~ (lookupExpr exp constant)
+                                          val b = idivCeil c coef
+                                       in
+                                          I.max a b
+                                       end)
+                                   0I
+                                   lowers
+   
+                           | [] =>
+                                (* v has no lower bounds, so it has upper bounds *)
+                                List.foldl
+                                   (fns (_, exp, coef) a =>
+                                       (* coef is negative since this is an upper bound *)
+                                       let
+                                          val coef' = I.~ coef
+                                          val c = I.~ (lookupExpr exp constant)
+                                          val b = I.~ (idivCeil c coef')
+                                       in
+                                          I.min a b
+                                       end)
+                                   0I
+                                   uppers)
+                   in
+                      extendSubst subst v dummy (singleSubst v a)
+                   end)
+               subst
+               bounds
+         end
+
+
+      (* extends force(substs) with a binding for v *)
+      fun extendCounterexample substs v lowers uppers =
+         let
+            do () = Susp.delay
+
+            val subst = Susp.force substs
+
+            val (loOpt, subst) =
+               List.foldl
+                  (fns (_, loExp, b) (loOpt, subst) =>
+                      (* b is positive *)
+                      let
+                         val (betaneg, subst) = resolve subst (removeExpr loExp v)
+                         val beta = I.~ betaneg
+
+                         val lo' = idivCeil beta b
+                      in
+                         (case loOpt of
+                             SOME lo =>
+                                (SOME (I.max lo lo'), subst)
+
+                           | NONE =>
+                                (SOME lo', subst))
+                      end)
+                  (NONE, subst)
+                  lowers
+
+            val lo = Option.valOf loOpt
+
+            (* We can get smaller counterexamples if we calculate both sides.  Also we can check our work. *)
+
+            val (hiOpt, subst) =
+               List.foldl
+                  (fns (_, hiExp, aneg) (hiOpt, subst) =>
+                      (* aneg is negative *)
+                      let
+                         val a = I.~ aneg
+
+                         val (alpha, subst) = resolve subst (removeExpr hiExp v)
+
+                         val hi' = idivFloor alpha a
+                      in
+                         (case hiOpt of
+                             SOME hi =>
+                                (SOME (I.min hi hi'), subst)
+
+                           | NONE =>
+                                (SOME hi', subst))
+                      end)
+                  (NONE, subst)
+                  uppers
+
+            val hi = Option.valOf hiOpt
+            
+            val x =
+               if lo <== hi then
+                  (* Pick as close to 0 as possible. *)
+                  if lo <== 0I then
+                     if 0I <== hi then
+                        0I
+                     else
+                        hi
+                  else
+                     lo
+               else
+                  (* This shouldn't happen if we've computed shadows properly. *)
+                  raise (Fail "no room to extend counterexample")
+         in
+            extendSubst subst v dummy (singleSubst v x)
+         end
+         
+
+
+
+      val maxInt = Option.valOf Int.maxInt
+
+      (* solveInequalities vars subst constraints reducedConstraints table log fk sk 
+
+         contraints: remaining constraints
+         reducedConstraints: constraints already seen, reduced to have relatively prime coefficients, as a mapping from names
+         table: mapping from the hash the non-constant portion of each constraint to its name
+      *)
+      fun solveInequalities vars subst constraints reducedConstraints table log fk sk =
+         (case constraints of
+             [] =>
+                let
+                   (* bounds maps v to (lowerNum, upperNum, lowers, uppers, lowerExact, upperExact, minUp) 
+                      where:
+                      lowerNum = |lowers|
+                      upperNum = |uppers|
+                      lowers is a list of constraints providing a lower bound for v
+                         where each constraint is (name, exp, coef),
+                         with name : inequal exp  and  coef being v's coefficient in exp
+                      uppers is a list of constraints providing an upper bound for v
+                      lowerExact=true if all v's lower bounds are exact (i.e., the coefficient is +1 or -1)
+                      upperExact=true if all v's upper bounds are exact
+                      minUp the minimum (i.e., most negative) coefficient of any upper bound
+                   *)
+
+                   val bounds =
+                      SD.foldl
+                         (fn (name, exp, bounds) =>
+                             List.foldl
+                                (fns (v, a) bounds =>
+                                    if v = constant then
+                                       bounds
+                                    else if a >== 0I then
+                                       (* lower bound *)
+                                       ID.insertMerge bounds v
+                                          (1, 0, [(name, exp, a)], [], a == 1I, true, 0I)
+                                          (fn (lowerNum, upperNum, lowers, uppers, lowerExact, upperExact, minUp) =>
+                                              (lowerNum+1,
+                                               upperNum,
+                                               (name, exp, a) :: lowers,
+                                               uppers,
+                                               lowerExact andalso a == 1I,
+                                               upperExact,
+                                               minUp))
+                                    else
+                                       (* upper bound *)
+                                       ID.insertMerge bounds v
+                                          (0, 1, [], [(name, exp, a)], true, a == ~1I, a)
+                                          (fn (lowerNum, upperNum, lowers, uppers, lowerExact, upperExact, minUp) =>
+                                              (lowerNum,
+                                               upperNum+1,
+                                               lowers,
+                                               (name, exp, a) :: uppers,
+                                               lowerExact,
+                                               upperExact andalso a == ~1I,
+                                               I.min minUp a)))
+                                bounds
+                                exp)
+                         ID.empty
+                         reducedConstraints
+
+                   (* Find the variable to project on.  Prefer one with an exact bound, and the one with the fewest cases, in that order. *)
+
+                   val (v, cases, exact, lowers, uppers, minUp) =
+                      ID.foldl
+                         (fn (v, (lowerNum, upperNum, lowers, uppers, lowerExact, upperExact, minUp), best as (v', cases', exact', _, _, _)) =>
+                             if lowerNum > 0 andalso upperNum > 0 then
+                                let
+                                   val exact = lowerExact orelse upperExact
+                                   val cases = lowerNum * upperNum
+                                in
+                                   if
+                                      if exact then
+                                         not exact' orelse cases < cases'
+                                      else
+                                         not exact' andalso cases < cases'
+                                   then
+                                      (v, cases, exact, lowers, uppers, minUp)
+                                   else
+                                      best
+                                end
+                             else
+                                best)
+                         (~2, maxInt, false, [], [], 0I)
+                         bounds
+                in
+                   if cases = maxInt then
+                      (* There are no variables with a lower and upper bound.  Fail. *)
+                      fk (findCounterexample subst bounds)
+                   else
+                      let
+                         (* compute the real shadow *)
+                         val (newConstraints, oldConstraints, log') =
+                            List.foldl
+                               (fns (loName, loExp, b) (newConstraints, oldConstraints, log) =>
+                                   List.foldl
+                                      (fns (upName, upExp, aneg) (newConstraints, oldConstraints, log) =>
+                                          (* aneg is negative *)
+                                          let
+                                             val name = gensym ()
+                                             val a = I.~ aneg
+                                          in
+                                             ((name, addExpr (multExpr a loExp) (multExpr b upExp)) :: newConstraints,
+                                              SD.remove oldConstraints upName,
+                                              Combine (name, [(a, loName), (b, upName)]) :: log)
+                                          end)
+                                      (newConstraints, SD.remove oldConstraints loName, log)
+                                      uppers)
+                               ([], reducedConstraints, log)
+                               lowers
+
+                         fun fkExtendCounter example =
+                            fk (extendCounterexample example v lowers uppers)
+
+                         (* If the real shadow fails, try the dark shadow. *)
+                         val fk' =
+                            if exact then
+                               fkExtendCounter
+                            else
+                               (fn _ =>
+                                   let
+                                      (* compute the dark shadow *)
+                                      val (newConstraints, oldConstraints, shadowNames) =
+                                         List.foldl
+                                            (fns (loName, loExp, b) (newConstraints, oldConstraints, shadowNames) =>
+                                                let
+                                                   val (newConstraints, oldConstraints, shadowNamesRow) =
+                                                      List.foldl
+                                                         (fns (upName, upExp, aneg) (newConstraints, oldConstraints, shadowNamesRow) =>
+                                                             (* aneg is negative *)
+                                                             let
+                                                                val name = gensym ()
+                                                                val a = I.~ aneg
+                                                             in
+                                                                ((name, addExpr 
+                                                                           (addExpr (multExpr a loExp) (multExpr b upExp))
+                                                                           (constExpr (I.~ ((a -- 1I) ** (b -- 1I)))))
+                                                                    :: newConstraints,
+                                                                 SD.remove oldConstraints upName,
+                                                                 name :: shadowNamesRow)
+                                                             end)
+                                                         (newConstraints, SD.remove oldConstraints loName, [])
+                                                         uppers
+                                                in
+                                                   (newConstraints, oldConstraints, shadowNamesRow :: shadowNames)
+                                                end)
+                                            ([], reducedConstraints, [])
+                                            lowers
+
+                                      val constraints' = (List.rev (toListAppend oldConstraints newConstraints))
+
+                                      do darklog =
+                                         solveInequalities vars subst
+                                            constraints'
+                                            SD.empty WD.empty [] fkExtendCounter
+
+                                      (* If the real shadow fails, but the dark shadow succeeds, search the perimeter. *)
+
+                                      do perimLog = 
+                                         searchPerimeter vars subst (SD.toList reducedConstraints)
+                                            lowers uppers (I.~ minUp) (List.rev shadowNames) darklog fk
+                                   in
+                                      sk (Append perimLog :: log)
+                                   end)
+                      in
+                         solveInequalities vars subst
+                            (List.rev (toListAppend oldConstraints newConstraints))  (* reverse because I want to try the new ones first *)
+                            SD.empty WD.empty log' fk' sk
+                      end
+                end
+
+           | (name, exp) :: rest =>
+                let
+                   val (divisor, poshash, neghash) =
+                      List.foldl
+                         (fns (v, a) (divisor, poshash, neghash) =>
+                             if v = constant then
+                                (divisor, poshash, neghash)
+                             else
+                                (if divisor == 0I then I.abs a else gcd divisor (I.abs a),
+                                 hashInc a v poshash,
+                                 hashInc (I.~ a) v neghash))
+                         (0I, 0w1, 0w1)
+                         exp
+                in
+                   if divisor == 0I then
+
+                      (* This is a constant expression. *)
+                      if lookupExpr exp constant >== 0I then
+                         (* 0 <= a, with a nonnegative.  Useless constraint; discard. *)
+                         solveInequalities vars subst rest reducedConstraints table log fk sk
+                      else
+                         (* 0 <= a, with a negative.  Success. *)
+                         sk (InequalContra name :: log)
+
+                   else if I.> divisor 1I then
+
+                      (* The non-constant terms have a common factor. *)
+                      let
+                         val a = lookupExpr exp constant
+                         
+                         val (quotient, remainder) = I.divmod a divisor
+
+                         (* a = quotient * divisor + remainder, with 0 <= remainder < divisor *)
+
+                         val name' = gensym ()
+
+                         val exp' =
+                            List.foldr
+                               (fns (v, b) l =>
+                                   if v = constant then
+                                      if quotient == 0I then
+                                         l
+                                      else
+                                         (v, quotient) :: l
+                                   else
+                                      (v, b idiv divisor) :: l)
+                               []
+                               exp
+
+                         val log =
+                            InequalDivide (name', name, exp', divisor, remainder) :: log
+                      in
+                         solveInequalities 
+                            vars subst
+                            ((name', exp') :: rest)
+                            reducedConstraints table log fk sk
+                      end
+
+                   else
+
+                      (* We look to see if we've already seen another constraint whose non-constant portion is
+                         equal to, or the negation of, this one.
+                      *)
+
+                      (case 
+                          Option.mapPartial
+                             (fn name2 =>
+                                 let
+                                    val exp2 = SD.lookup reducedConstraints name2
+                                 in
+                                    if equalExpr (removeExpr exp constant) (removeExpr exp2 constant) then
+                                       SOME (name2, exp2)
+                                    else
+                                       NONE
+                                 end)
+                             (WD.find table poshash)
+                       of
+                          SOME (name2, exp2) =>
+                             (* positive match *)
+                             let
+                                val a = lookupExpr exp constant
+                                val b = lookupExpr exp2 constant
+                             in
+                                if a >== b then
+                                   (* new expression is looser, drop it *)
+                                   solveInequalities vars subst rest reducedConstraints table log fk sk
+                                else
+                                   (* old expression is looser, drop it *)
+                                   solveInequalities
+                                      vars subst rest
+                                      (SD.insert (SD.remove reducedConstraints name2) name exp)
+                                      (WD.insert table poshash name)
+                                      log fk sk
+                             end
+
+                        | NONE =>
+                             (case
+                                 Option.mapPartial
+                                    (fn name2 =>
+                                        let
+                                           val exp2 = SD.lookup reducedConstraints name2
+                                        in
+                                           if equalExpr (removeExpr exp constant) (multExpr ~1I (removeExpr exp2 constant)) then
+                                              SOME (name2, exp2)
+                                           else
+                                              NONE
+                                        end)
+                                    (WD.find table neghash)
+                              of
+                                 SOME (name2, exp2) =>
+                                    (* negative match *)
+                                    let
+                                       val a = lookupExpr exp constant
+                                       val b = I.~ (lookupExpr exp2 constant)
+                                    in
+                                       (case I.compare a b of
+                                           EQUAL =>
+                                              (* exp2 = -exp, so exp <= 0 <= exp, so 0 = exp *)
+                                              let
+                                                 val name' = gensym ()
+
+                                                 val log = Antisymm (name', name, name2) :: log
+                                              in
+                                                 solveLoop vars subst
+                                                    [(name', Equal exp)]
+                                                    (toListAppend (SD.remove reducedConstraints name2) rest)
+                                                    [] log fk sk
+                                              end
+
+                                         | LESS =>
+                                              (* 0 <= exp + exp2 < 0 *)
+                                              let
+                                                 val name' = gensym ()
+
+                                                 val log =
+                                                    InequalContra name'
+                                                    :: Combine (name', [(1I, name), (1I, name2)])
+                                                    :: log
+                                              in
+                                                 sk log
+                                              end
+
+                                         | GREATER =>
+                                              (* match isn't helpful *)
+                                              solveInequalities
+                                                 vars subst rest
+                                                 (SD.insert reducedConstraints name exp)
+                                                 (WD.insert table poshash name)
+                                                 log fk sk)
+                                    end
+
+                               | NONE =>
+                                    (* no match *)
+                                    solveInequalities
+                                       vars subst rest
+                                       (SD.insert reducedConstraints name exp)
+                                       (WD.insert table poshash name)
+                                       log fk sk))
+                end)
+
+
+      and searchPerimeter vars subst constraints lowers uppers aMax shadowNames darklog fk sk =
+         (case (lowers, shadowNames) of
+             ([], _) =>
+                sk darklog
+
+           | ((loName, loExp, b) :: lowersRest, shadowNamesRowRev :: shadowNamesRest) =>
+                let
+                   val q = idivFloor (aMax ** b -- aMax -- b) aMax
+
+                   do logs = 
+                      searchPerimeterEdge vars subst constraints loExp 0I q [] fk
+
+                   do restLog = 
+                      searchPerimeter vars subst constraints lowersRest uppers aMax shadowNamesRest darklog fk
+
+                   (* Succeed, but putting together the certification takes some doing. *)
+
+                   val negateName = gensym ()
+                   val limitName = gensym ()
+
+                   val limitExp = addExpr (multExpr ~1I loExp) (constExpr q)
+
+                   val (firstScanName, contraLog) =
+                      List.foldl
+                         (fns (name, thislog) (nextName, restlog) =>
+                             let
+                                val scanName = gensym ()
+                                val orName = gensym ()
+                             in
+                                (scanName,
+                                 [Cases (name, thislog, nextName, restlog, orName),
+                                  InequalIncrement (orName, scanName)])
+                             end)
+                         let
+                            val lastScanName = gensym ()
+                            val sumName = gensym ()
+                         in
+                            (lastScanName, [InequalContra sumName, Combine (sumName, [(1I, limitName), (1I, lastScanName)])])
+                         end
+                         logs
+
+                   fun buildCases uppers shadowNamesRow =
+                      (case (uppers, shadowNamesRow) of
+                          ([], _) =>
+                             restLog
+
+                        | ((upName, upExp, aneg) :: uppersRest, shadowName :: shadowNamesRowRest) =>
+                             let
+                                val a = I.~ aneg
+                                val q' = idivFloor (a ** b -- a -- b) a
+
+                                (* q' <= q, since a <= aMax *)
+
+                                val orName = gensym ()
+                                val thisLimitName = gensym ()
+
+                                val darkLog = buildCases uppersRest shadowNamesRowRest
+
+                                val thisLog =
+                                   if q == q' then
+                                      [Apply (negateName, thisLimitName)]
+                                   else
+                                      [
+                                      Apply (negateName, limitName),
+                                      InequalWeaken (limitName, thisLimitName, q -- q')
+                                      ]
+                             in
+                                [
+                                Cases (shadowName, darkLog, thisLimitName, thisLog, orName),
+                                Perimeter (orName, a, b, upName, loName)
+                                ]
+                             end
+
+                        | _ => raise (Fail "impossible"))
+                in
+                   sk
+                      [
+                      Append (buildCases uppers (List.rev shadowNamesRowRev)),
+                      Negate (negateName, limitName, limitExp, [Append contraLog, Copy (firstScanName, loName)])
+                      ]
+                end
+
+           | _ => raise (Fail "impossible"))
+
+
+         
+      and searchPerimeterEdge vars subst constraints exp i q acc fk sk =
+         if i ># q then
+            sk acc
+         else
+            let
+               val name = gensym ()
+
+               do log =
+                  solveLoop vars subst [(name, Equal (addExpr exp (constExpr (I.~ i))))] constraints [] [] fk
+            in
+               searchPerimeterEdge vars subst constraints exp (i ++ 1I) q ((name, log) :: acc) fk sk
+            end
+
+
+
+      and solveLoop vars subst props inequalities sums log fk sk =
+         (case props of
+             [] =>
+                (case sums of
+                    [] =>
+                       (* Solve the inequalities. *)
+                       let
+                          (* carry out substitutions *)
+                          val (inequalities', subst, log) =
+                             List.foldl
+                                (fns (name, exp) (inequalities', subst, log) =>
+                                    let
+                                       val (name', exp', subst, log) = substitute subst name exp log
+                                    in
+                                       ((name', exp') :: inequalities', subst, log)
+                                    end)
+                                ([], subst, log)
+                                inequalities
+                       in
+                          solveInequalities vars subst inequalities' SD.empty WD.empty log fk sk
+                       end
+
+                  | (name, p, q) :: sums' =>
+                       let
+                          val v1 = gensym ()
+                          val v2 = gensym ()
+       
+                          do log1 = solveLoop vars subst [(v1, p)] inequalities sums' [] fk
+                          do log2 = solveLoop vars subst [(v2, q)] inequalities sums' [] fk
+                       in
+                          sk (Cases (v1, log1, v2, log2, name) :: log)
+                       end)
+
+           | (name, Equal exp) :: rest =>
+                let
+                   val (name, exp, subst, log) = substitute subst name exp log
+
+                   val (vars, subst, done, log) = solveEquality vars name exp subst log
+                in
+                   if done then
+                      sk log
+                   else
+                      solveLoop vars subst rest inequalities sums log fk sk
+                end
+
+           | (name, Inequal exp) :: rest =>
+                solveLoop vars subst rest ((name, exp) :: inequalities) sums log fk sk
+
+           | (name, And (p, q)) :: rest =>
+                let
+                   val v1 = gensym ()
+                   val v2 = gensym ()
+                in
+                   solveLoop vars subst ((v1, p) :: (v2, q) :: rest) inequalities sums
+                      (Split (v1, v2, name) :: log)
+                      fk sk
+                end
+
+           | (name, Or (p, q)) :: rest =>
+                solveLoop vars subst rest inequalities ((name, p, q) :: sums) log fk sk
+
+           | (_, True) :: rest =>
+                solveLoop vars subst rest inequalities sums log fk sk
+
+           | (name, False) :: rest =>
+                sk (Abort name :: log))
+
+
+
+      fun ofExpFromXequal i =
+         (* M : expr *)
+         refine (Rule.prodElim1 (T.evar ()) (T.evar ()))
+         >>+
+         (* (M : expr) & _ *)
+         refine (Rule.reduceHyp i (R.trans [R.unfold, R.beta 3]))
+         >>+
+         refine (Rule.hypothesis i)
+
+
+
+      fun exprToTerm exp =
+         (case exp of
+             [] =>
+                T.Const C.nl
+
+           | (v, a) :: rest =>
+                T.apply3 C.cons (literal a) (literal (I.fromInt v)) (exprToTerm rest))
+
+
+
+      (* A reversed log *)
+      datatype plan =
+         SplitPlan of symbol option * symbol option * symbol * plan
+       | CasesPlan of symbol * plan * symbol * plan * symbol
+       | AbortPlan of symbol
+       | CombinePlan of symbol * (integer * symbol) list * plan
+       | EqualContraPlan of symbol
+       | InequalContraPlan of symbol
+       | EqualDividePlan of symbol * symbol * expr * integer * plan
+       | EqualDivideContraPlan of symbol * expr * integer * integer
+       | InequalDividePlan of symbol * symbol * expr * integer * integer * plan
+       | DefinePlan of symbol * expr * plan
+       | AntisymmPlan of symbol * symbol * symbol * plan
+       | PerimeterPlan of symbol * integer * integer * symbol * symbol * plan
+       | InequalIncrementPlan of symbol * symbol * plan
+       | NegatePlan of symbol * symbol * expr * plan * plan
+       | ApplyPlan of symbol * symbol
+       | InequalWeakenPlan of symbol * symbol * integer * plan
+       | CopyPlan of symbol * symbol * plan
+       | RenamePlan of symbol * symbol * plan
+       | NullPlan
+
+
+      fun printSym h = print (Symbol.toValue h)
+
+      fun printSymOpt ho =
+         (case ho of
+             NONE => print "_"
+
+           | SOME h => printSym h)
+
+      fun printPlanMain plan k ks =
+         (case plan of
+             SplitPlan (h1o, h2o, h, plan') =>
+                (
+                print "Split ";
+                printSymOpt h1o;
+                print ", ";
+                printSymOpt h2o;
+                print " = ";
+                printSym h;
+                print "\n";
+                k plan'
+                )
+
+           | CasesPlan (h1, plan1, h2, plan2, h) =>
+                (
+                print "Cases ";
+                printSym h1;
+                print ", ";
+                printSym h2;
+                print " = ";
+                printSym h;
+                print "\n";
+                ks plan1 plan2
+                )
+                
+           | AbortPlan h =>
+                (
+                print "Abort ";
+                printSym h;
+                print "\n"
+                )
+
+           | CombinePlan (h, comb, plan') =>
+                (
+                print "Combine ";
+                printSym h;
+                print " = ";
+                List.app
+                   (fn (a, name) =>
+                       (
+                       print (I.toStringStd a);
+                       print "*";
+                       print (Symbol.toValue name);
+                       print " "
+                       ))
+                   comb;
+                print "\n";
+                k plan'
+                )
+
+           | EqualContraPlan h =>
+                (
+                print "EqualContra ";
+                printSym h;
+                print "\n"
+                )
+
+           | InequalContraPlan h =>
+                (
+                print "InequalContra ";
+                printSym h;
+                print "\n"
+                )
+
+           | EqualDividePlan (h', h, e, a, plan') =>
+                (
+                print "EqualDivide ";
+                printSym h';
+                print " = ";
+                printSym h;
+                print " -> ";
+                printExpr e;
+                print " / ";
+                print (I.toStringStd a);
+                print "\n";
+                k plan'
+                )
+
+           | EqualDivideContraPlan (h, e, a, b) =>
+                (
+                print "EqualDivideContra ";
+                printSym h;
+                print " -> ";
+                printExpr e;
+                print " - ";
+                print (I.toStringStd b);
+                print " / ";
+                print (I.toStringStd a);
+                print "\n"
+                )
+
+           | InequalDividePlan (h', h, e, a, b, plan') =>
+                (
+                print "InequalDivide ";
+                printSym h';
+                print " = ";
+                printSym h;
+                print " -> ";
+                printExpr e;
+                print " - ";
+                print (I.toStringStd b);
+                print " / ";
+                print (I.toStringStd a);
+                print "\n";
+                k plan'
+                )
+
+           | DefinePlan (h, e, plan') =>
+                (
+                print "Define ";
+                printSym h;
+                print " = ";
+                printExpr e;
+                print "\n";
+                k plan'
+                )
+
+           | AntisymmPlan (h, h1, h2, plan') =>
+                (
+                print "Antisymm ";
+                printSym h;
+                print " = ";
+                printSym h1;
+                print ", ";
+                printSym h2;
+                print "\n";
+                k plan'
+                )
+
+           | PerimeterPlan (h, a, b, h1, h2, plan') =>
+                (
+                print "Perimeter ";
+                printSym h;
+                print " = ";
+                print (I.toStringStd a);
+                print ", ";
+                print (I.toStringStd b);
+                print ", ";
+                printSym h1;
+                print ", ";
+                printSym h2;
+                print "\n";
+                k plan'
+                )
+
+           | InequalIncrementPlan (h', h, plan') =>
+                (
+                print "InequalIncrement ";
+                printSym h';
+                print " = ";
+                printSym h;
+                print "\n";
+                k plan'
+                )
+
+           | NegatePlan (h', h, e, plan1, plan2) =>
+                (
+                print "Negate ";
+                printSym h';
+                print " = fn (";
+                printSym h;
+                print " : ";
+                printExpr e;
+                print ") =>\n";
+                ks plan1 plan2
+                )
+
+           | ApplyPlan (h1, h2) =>
+                (
+                print "Apply ";
+                printSym h1;
+                print " ";
+                printSym h2;
+                print "\n"
+                )
+
+           | InequalWeakenPlan (h', h, a, plan') =>
+                (
+                print "InequalWeaken ";
+                printSym h';
+                print " = ";
+                printSym h;
+                print ", ";
+                print (I.toStringStd a);
+                print "\n";
+                k plan'
+                )
+
+           | CopyPlan (h1, h2, plan') =>
+                (
+                print "Copy ";
+                printSym h1;
+                print " = ";
+                printSym h2;
+                print "\n";
+                k plan'
+                )
+
+           | RenamePlan (h1, h2, plan') =>
+                (
+                print "Rename ";
+                printSym h1;
+                print " = ";
+                printSym h2;
+                print "\n";
+                k plan'
+                )
+
+           | NullPlan =>
+                print "Null\n")
+
+
+      fun printPlan plan = printPlanMain plan (fn _ => ()) (fns _ _ => ())
+
+      fun printPlanFull plan =
+         printPlanMain plan 
+            printPlanFull
+            (fns plan1 plan2 =>
+                (
+                print "{\n";
+                printPlanFull plan1;
+                print "}{\n";
+                printPlanFull plan2;
+                print "}\n"
+                ))
+
+      
+
+      (* Performance note: Maybe it would speed things up to weed out variables that are no longer needed. *)
+      fun reverse req log acc =
+         (case log of
+             [] => (req, acc)
+
+           | Split (h1, h2, h) :: rest =>
+                let
+                   val need1 = SS.member req h1
+                   val need2 = SS.member req h2
+                in
+                   if need1 orelse need2 then
+                      reverse
+                         (SS.insert (SS.remove (SS.remove req h1) h2) h)
+                         rest
+                         (SplitPlan (if need1 then SOME h1 else NONE,
+                                     if need2 then SOME h2 else NONE,
+                                     h,
+                                     acc))
+                   else
+                      reverse req rest acc
+                end
+
+           | Cases (h1, log1, h2, log2, h) :: rest =>
+                let
+                   val (req1, plan1) = reverse SS.empty log1 NullPlan
+                in
+                   if SS.member req1 h1 then
+                      let
+                         val (req2, plan2) = reverse SS.empty log2 NullPlan
+                      in
+                         if SS.member req2 h2 then
+                            reverse
+                               (SS.insert
+                                   (SS.union
+                                       (SS.remove req1 h1)
+                                       (SS.remove req2 h2))
+                                   h)
+                               rest
+                               (CasesPlan (h1, plan1, h2, plan2, h))
+                         else
+                            reverse req2 rest plan2
+                      end
+                   else
+                      (* We don't need h1, so we don't need the case. *)
+                      reverse req1 rest plan1
+                end
+
+           | Abort h :: rest =>
+                reverse (SS.insert req h) rest (AbortPlan h)
+
+           | Combine (h, comb) :: rest =>
+                if SS.member req h then
+                   let
+                      val req' =
+                         List.foldl
+                            (fns (_, hi) req' => SS.insert req' hi)
+                            (SS.remove req h)
+                            comb
+                   in
+                      reverse req' rest (CombinePlan (h, comb, acc))
+                   end
+                else
+                   reverse req rest acc
+
+           | EqualContra h :: rest =>
+                reverse (SS.insert req h) rest (EqualContraPlan h)
+
+           | InequalContra h :: rest =>
+                reverse (SS.insert req h) rest (InequalContraPlan h)
+
+           | EqualDivide (h', h, e, a) :: rest =>
+                if SS.member req h' then
+                   reverse (SS.insert (SS.remove req h') h) rest (EqualDividePlan (h', h, e, a, acc))
+                else
+                   reverse req rest acc
+
+           | EqualDivideContra (h, e, a, b) :: rest =>
+                reverse (SS.insert req h) rest (EqualDivideContraPlan (h, e, a, b))
+
+           | InequalDivide (h', h, e, a, b) :: rest =>
+                if SS.member req h' then
+                   reverse (SS.insert (SS.remove req h') h) rest (InequalDividePlan (h', h, e, a, b, acc))
+                else
+                   reverse req rest acc
+
+           | Define (h, e) :: rest =>
+                (* Do this even if h isn't required, because we have to keep the variable numbers in sync. *)
+                reverse (SS.remove req h) rest (DefinePlan (h, e, acc))
+
+           | Antisymm (h, h1, h2) :: rest =>
+                if SS.member req h then
+                   reverse (SS.insert (SS.insert (SS.remove req h) h1) h2) rest (AntisymmPlan (h, h1, h2, acc))
+                else
+                   reverse req rest acc
+
+           | Perimeter (h, a, b, h1, h2) :: rest =>
+                if SS.member req h then
+                   reverse (SS.insert (SS.insert (SS.remove req h) h1) h2) rest (PerimeterPlan (h, a, b, h1, h2, acc))
+                else
+                   reverse req rest acc
+
+           | InequalIncrement (h', h) :: rest =>
+                if SS.member req h' then
+                   reverse (SS.insert (SS.remove req h') h) rest (InequalIncrementPlan (h', h, acc))
+                else
+                   reverse req rest acc
+
+           | Negate (h', h, e, neglog) :: rest =>
+                if SS.member req h' then
+                   let
+                      val (negreq, negplan) = reverse SS.empty neglog NullPlan
+                   in
+                      reverse (SS.union (SS.remove req h') (SS.remove negreq h)) rest (NegatePlan (h', h, e, negplan, acc))
+                   end
+                else
+                   reverse req rest acc
+
+           | Apply (h1, h2) :: rest =>
+                reverse (SS.insert (SS.insert req h1) h2) rest (ApplyPlan (h1, h2))
+
+           | InequalWeaken (h', h, a) :: rest =>
+                if SS.member req h' then
+                   reverse (SS.insert (SS.remove req h') h) rest (InequalWeakenPlan (h', h, a, acc))
+                else
+                   reverse req rest acc
+
+           | Copy (h', h) :: rest =>
+                if SS.member req h' then
+                   if SS.member req h then
+                      reverse (SS.remove req h') rest (CopyPlan (h', h, acc))
+                   else
+                      reverse (SS.insert (SS.remove req h') h) rest (RenamePlan (h', h, acc))
+                else
+                   reverse req rest acc
+
+           | Append log :: rest =>
+                let
+                   val (req', plan) = reverse req log acc
+                in
+                   reverse req' rest plan
+                end)
+
+
+
+      (* n is the current number of variables (at this point in the plan), not the eventual number *)
+      fun implement n plan =
+         (case plan of
+             SplitPlan (h1o, h2o, h, cont) =>
+                De.destructRaw h (IP.And [(case h1o of NONE => IP.Wild | SOME h1 => IP.Ident (SOME h1)),
+                                          (case h2o of NONE => IP.Wild | SOME h2 => IP.Ident (SOME h2))])
+                >>+
+                implement n cont
+
+           | CasesPlan (h1, cont1, h2, cont2, h) =>
+                De.destructRaw h (IP.Or [IP.Ident (SOME h1), IP.Ident (SOME h2)])
+                >>> [
+                    implement n cont1 >> done,
+                    implement n cont2 >> done
+                    ]
+
+           | AbortPlan h =>
+                De.destructRaw h (IP.Or [])
+                >>
+                done
+
+           | CombinePlan (h, comb, cont) =>
+                let
+                   do (jud, dir) = withgoal
+                   val ctx = J.context jud
+                   val idir = D.idir dir
+
+                   val soln = D.lookupVar idir solution
+
+                   (* combtac adds the desired hypothesis, removes old hypothesis, does not alter directory *)
+                   val (_, combtac) =
+                      List.foldl
+                         (fns (a, name) (eq, tac) =>
+                             let
+                                val i = D.lookupVar idir name
+
+                                val (thiseq, param) =
+                                   (case S.nth ctx i of
+                                       J.Tm a =>
+                                          (case N.simplify a of
+                                              T.Elim (T.Const const, T.App param :: _) =>
+                                                 (Constant.eq (const, C.equal), param)
+
+                                            | _ => raise (Fail "impossible"))
+
+                                     | _ => raise (Fail "impossible"))
+
+                                (* Performance note: should optimize when a=1. *)
+
+                                val tac' =
+                                   tac
+                                   >>+
+                                   (* xequal n f e |- ...
+                                      where ..., xequal n f e |- i+1 : xequal n' f e'
+                                   *)
+                                   assert ()
+                                   >>> [
+                                       if thiseq then
+                                          invoke (if eq then C.combine_equal else C.combine_equal_inequal)
+                                             [(param, refine Rule.integerIntroOf),
+                                              literalArg n, varArg (soln+1),
+                                              (T.evar (), ofExpFromXequal (i+1)),
+                                              (T.evar (), ofExpFromXequal 0),
+                                              iliteralArg a]
+                                             3
+                                          >>> [
+                                              (* n' <= n *)
+                                              proveLeq,
+   
+                                              (* equal n' f e' *)
+                                              refine (Rule.hypothesis (i+1)),
+   
+                                              (* xequal n f e *)
+                                              refine (Rule.hypothesis 0)
+                                              ]
+                                       else
+                                          invoke (if eq then C.combine_inequal_equal else C.combine_inequal)
+                                             [(param, refine Rule.integerIntroOf),
+                                              literalArg n, varArg (soln+1),
+                                              (T.evar (), ofExpFromXequal (i+1)),
+                                              (T.evar (), ofExpFromXequal 0),
+                                              iliteralArg a]
+                                             4
+                                          >>> [
+                                              (* n' <= n *)
+                                              proveLeq,
+
+                                              (* 0 <= a *)
+                                              proveLeq,
+
+                                              (* inequal n' f e' *)
+                                              refine (Rule.hypothesis (i+1)),
+   
+                                              (* xequal n f e *)
+                                              refine (Rule.hypothesis 0)
+                                              ],
+   
+                                       (* xequal n f e, inequal n f (a*e'+e) |- ... *)
+                                       refine (Rule.weaken 1 1)
+                                       (* inequal n f (a*e'+e) |- ... *)
+                                       ]
+                             in
+                                (eq andalso thiseq, tac')
+                             end)
+                         (true, idtac)
+                         comb
+                in
+                   assert ()
+                   >>> [
+                       invoke C.equal_nil [literalArg n, varArg soln] 1
+                       >>+
+                       proveLeq,
+
+                       (* equal n f nil |- ... *)
+                       combtac
+                       >>+
+                       chdir (D.bind dir h)
+                       ]
+                   >>+
+                   implement n cont
+                end
+
+           | EqualContraPlan h =>
+                let
+                   do (_, dir) = withgoal
+                   val idir = D.idir dir
+                   val soln = D.lookupVar idir solution
+                   val i = D.lookupVar idir h
+                in
+                   refine (Rule.voidElim (T.evar ()))
+                   >>+
+                   (* void *)
+                   Reorder.reorder
+                      (invoke C.equal_contra
+                          [waitArg (), literalArg n, varArg soln, waitArg ()]
+                          3)
+                      (Reorder.swap 3 2)
+                   >>> [
+                       refine (Rule.hypothesis i),
+
+                       proveNeq,
+
+                       refine Rule.integerIntroOf,
+
+                       refine Rule.integerIntroOf,
+
+                       proveLeq
+                       ]
+                end
+
+           | InequalContraPlan h =>
+                let
+                   do (_, dir) = withgoal
+                   val idir = D.idir dir
+                   val soln = D.lookupVar idir solution
+                   val i = D.lookupVar idir h
+                in
+                   refine (Rule.voidElim (T.evar ()))
+                   >>+
+                   (* void *)
+                   Reorder.reorder
+                      (invoke C.inequal_contra
+                          [waitArg (), literalArg n, varArg soln, waitArg ()]
+                          3)
+                      (Reorder.swap 3 2)
+                   >>> [
+                       refine (Rule.hypothesis i),
+
+                       proveLt,
+
+                       refine Rule.integerIntroOf,
+
+                       refine Rule.integerIntroOf,
+
+                       proveLeq
+                       ]
+                end
+
+           | EqualDividePlan (h', h, exp, a, cont) =>
+                let
+                   do (_, dir) = withgoal
+                   val idir = D.idir dir
+                   val soln = D.lookupVar idir solution
+                   val i = D.lookupVar idir h
+                in
+                   assert ()
+                   >>> [
+                       Reorder.reorder
+                          (invoke C.equal_divide
+                              [waitArg (), literalArg n, varArg soln, iliteralArg a,
+                               (exprToTerm exp, typecheck)]
+                              3)
+                          (Reorder.swap 2 2)
+                       >>> [
+                           proveNeq,
+
+                           refine (Rule.hypothesis i),
+
+                           refine Rule.integerIntroOf,
+
+                           proveLeq,
+                           ],
+                       
+                       chdir (D.bind dir h')
+                       ]
+                   >>+
+                   implement n cont
+                end
+
+           | EqualDivideContraPlan (h, exp, a, b) =>
+                let
+                   do (_, dir) = withgoal
+                   val idir = D.idir dir
+                   val soln = D.lookupVar idir solution
+                   val i = D.lookupVar idir h
+                in
+                   refine (Rule.voidElim (T.evar ()))
+                   >>+
+                   (* void *)
+                   Reorder.reorder
+                      (invoke C.equal_divide_contra
+                          [waitArg (), literalArg n, varArg soln, iliteralArg a,
+                           (exprToTerm exp, typecheck),
+                           iliteralArg b]
+                          4)
+                      (Reorder.swap 2 3)
+                   >>> [
+                       proveLeq,
+
+                       proveLt,
+
+                       refine (Rule.hypothesis i),
+
+                       refine Rule.integerIntroOf,
+
+                       proveLeq
+                       ]
+                end
+
+           | InequalDividePlan (h', h, exp, a, b, cont) =>
+                let
+                   do (_, dir) = withgoal
+                   val idir = D.idir dir
+                   val soln = D.lookupVar idir solution
+                   val i = D.lookupVar idir h
+                in
+                   assert ()
+                   >>> [
+                       Reorder.reorder
+                          (invoke C.inequal_divide
+                              [waitArg (), literalArg n, varArg soln, iliteralArg a, iliteralArg b,
+                               (exprToTerm exp, typecheck)]
+                              4)
+                          (Reorder.swap 2 3)
+                       >>> [
+                           proveLeq,
+
+                           proveLt,
+
+                           refine (Rule.hypothesis i),
+
+                           refine Rule.integerIntroOf,
+
+                           proveLeq,
+                           ],
+                       
+                       chdir (D.bind dir h')
+                       ]
+                   >>+
+                   implement n cont
+                end
+
+           | DefinePlan (h, exp, cont) =>
+                let
+                   do (_, dir) = withgoal
+                   val idir = D.idir dir
+                   val soln = D.lookupVar idir solution
+                in
+                   assert ()
+                   >>> [
+                       invoke C.define
+                          [literalArg n, varArg soln,
+                           (exprToTerm exp, typecheck)]
+                          1
+                       >>+
+                       proveEra exp,
+
+                       (* exists (bounded 1+n -> integer) . equal blah & soln+1 = 0 : (bounded n -> integer) |- ... *)
+                       refine (Rule.existsLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
+                       >>+
+                       (* bounded 1+n -> integer, equal blah & soln+1 = 0 : (bounded n -> integer) |- ... *)
+                       refine (Rule.prodLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
+                       >>+
+                       (* bounded 1+n -> integer, equal blah, soln+2 = 1 : (bounded n -> integer) |- ... *)
+                       refine (Rule.exchange 2 1 (soln+1))
+                       >>+
+                       (* G1, bounded 1+n, bounded n, G2[0 . ^2], <fact>, soln+1 = soln+2 : (bounded n -> integer) |- ... *)
+                       refine (Rule.substitutionSimple (soln+2) (T.evar ()) (T.evar ()) (T.evar ()))
+                       >>> [
+                           refine (Rule.hypothesis 0),
+
+                           (* G1, bounded 1+n, G2, equal blah, <junk> |- ... *)
+                           refine (Rule.weaken 0 1)
+                           >>+
+                           (* G1, bounded 1+n, G2, equal blah |- ... *)
+                           chdir (D.bind dir h)
+                           ]
+                       ]
+                   >>+
+                   implement (n+1) cont
+                end
+
+           | AntisymmPlan (h, h1, h2, cont) =>
+                let
+                   do (_, dir) = withgoal
+                   val idir = D.idir dir
+                   val soln = D.lookupVar idir solution
+                   val i1 = D.lookupVar idir h1
+                   val i2 = D.lookupVar idir h2
+                in
+                   assert ()
+                   >>> [
+                       Reorder.reorder
+                          (invoke C.antisymm
+                              [waitArg (), waitArg (), literalArg n, varArg soln,
+                               (T.evar (), ofExpFromXequal i1)]
+                              4)
+                          (Reorder.swap 4 2)
+                       >>> [
+                           refine (Rule.hypothesis i1),
+                           
+                           refine (Rule.hypothesis i2),
+
+                           refine Rule.integerIntroOf,
+
+                           refine Rule.integerIntroOf,
+
+                           proveLeq,
+
+                           proveLeq
+                           ],
+
+                       chdir (D.bind dir h)
+                       ]
+                   >>+
+                   implement n cont
+                end
+
+           | PerimeterPlan (h, a, b, h1, h2, cont) =>
+                let
+                   do (_, dir) = withgoal
+                   val idir = D.idir dir
+                   val soln = D.lookupVar idir solution
+                   val i1 = D.lookupVar idir h1
+                   val i2 = D.lookupVar idir h2
+
+                   val (q, r) = I.divmod (a ** b -- a -- b) a
+                in
+                   assert ()
+                   >>> [
+                       Reorder.reorder
+                          (invoke C.perimeter
+                              [waitArg (), waitArg (), literalArg n, varArg soln,
+                               iliteralArg a, iliteralArg b,
+                               (T.evar (), ofExpFromXequal i1),
+                               (T.evar (), ofExpFromXequal i2),
+                               iliteralArg q, iliteralArg r]
+                              9)
+                          (Reorder.swap 4 7)
+                       >>> [
+                           proveLt,
+                           proveLt,
+                           refine Rule.normalizeConcl >>+ proveEq,
+                           proveLeq,
+                           proveLt,
+
+                           refine (Rule.hypothesis i1),
+
+                           refine (Rule.hypothesis i2),
+
+                           refine Rule.integerIntroOf,
+                           
+                           refine Rule.integerIntroOf,
+
+                           proveLeq,
+
+                           proveLeq
+                           ],
+
+                       chdir (D.bind dir h)
+                       ]
+                   >>+
+                   implement n cont
+                end
+
+           | InequalIncrementPlan (h', h, cont) =>
+                let
+                   do (_, dir) = withgoal
+                   val idir = D.idir dir
+                   val soln = D.lookupVar idir solution
+                   val i = D.lookupVar idir h
+                in
+                   assert ()
+                   >>> [
+                       Reorder.reorder
+                          (invoke C.inequal_increment
+                              [waitArg (), literalArg n, varArg soln,
+                               (T.evar (), ofExpFromXequal i)]
+                              2)
+                          (Reorder.swap 2 1)
+                       >>> [
+                           refine (Rule.hypothesis i),
+    
+                           refine Rule.integerIntroOf,
+    
+                           proveLeq
+                           ],
+    
+                       chdir (D.bind dir h')
+                       ]
+                   >>+
+                   implement n cont
+                end
+
+           | NegatePlan (h', h, exp, body, cont) =>
+                let
+                   do (_, dir) = withgoal
+                   val idir = D.idir dir
+                   val soln = D.lookupVar idir solution
+                in
+                   refine (Rule.assert
+                              (T.apply2 Prim.arrow 
+                                  (T.apply3 C.inequal 
+                                      (T.Native (T.Integer (I.fromInt n)))
+                                      (T.Var soln)
+                                      (exprToTerm exp)) 
+                                  (T.Const Prim.void))
+                              (T.evar ()))
+                   >>> [
+                       (* inequal exp -> void *)
+                       refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                       >>> [
+                           (* inequal exp : type *)
+                           typecheck >> done,
+
+                           (* inequal exp |- void *)
+                           chdir (D.bind dir h)
+                           >>+
+                           implement n body
+                           >>
+                           done
+                           ],
+
+                       chdir (D.bind dir h')
+                       ]
+                   >>+
+                   implement n cont
+                end
+
+           | ApplyPlan (h1, h2) =>
+                let
+                   do (_, dir) = withgoal
+                   val idir = D.idir dir
+                   val i1 = D.lookupVar idir h1
+                   val i2 = D.lookupVar idir h2
+                in
+                   refine (Rule.arrowElim (T.evar ()) (T.evar ()))
+                   >>> [
+                       refine (Rule.hypothesis i1),
+
+                       refine (Rule.hypothesis i2)
+                       ]
+                end
+
+           | InequalWeakenPlan (h', h, a, cont) =>
+                let
+                   do (_, dir) = withgoal
+                   val idir = D.idir dir
+                   val soln = D.lookupVar idir solution
+                   val i = D.lookupVar idir h
+                in
+                   assert ()
+                   >>> [
+                       Reorder.reorder
+                          (invoke C.inequal_weaken
+                              [waitArg (), literalArg n, varArg soln,
+                               (T.evar (), ofExpFromXequal i),
+                               iliteralArg a]
+                              3)
+                          (Reorder.swap 2 2)
+                       >>> [
+                           proveLeq,
+
+                           refine (Rule.hypothesis i),
+    
+                           refine Rule.integerIntroOf,
+    
+                           proveLeq
+                           ],
+    
+                       chdir (D.bind dir h')
+                       ]
+                   >>+
+                   implement n cont
+                end
+
+           | CopyPlan (h', h, cont) =>
+                HypTactic.copy h (SOME h')
+                >>+
+                implement n cont
+
+           | RenamePlan (h', h, cont) =>
+                HypTactic.rename h h'
+                >>+
+                implement n cont
+
+           | NullPlan =>
+                raise (Fail "null plan"))
+   
+
+
+      (* Epilogue *)
+
+      val theCounterexample : (goal * mini_correspondence * std_table * integer ID.dict Susp.susp) option ref = ref NONE
+
+      
+      fun simplifyCounterexample substs =
+         let
+            do () = Susp.delay
+
+            val subst = Susp.force substs
+
+            val (_, solution) =
+               ID.foldl
+                  (fn (v, (_, exp), (subst, solution)) =>
+                      let
+                         val (a, subst) = resolve subst (removeExpr exp v)
+                      in
+                         (subst, ID.insert solution v a)
+                      end)
+                  (subst, ID.empty)
+                  subst
+         in
+            solution
+         end
+
+
+      fun counterexample () =
+         (case !theCounterexample of
+             NONE =>
+                print "Omega has not run yet.\n"
+
+           | SOME (goal as (_, dir), lcorr, stdTable, examplesusp) =>
+                let
+                   val example = Susp.force examplesusp
+                in
+                   print "The goal:\n";
+                   Show.showGoal goal;
+                   print "\nis contradicted by the assignment:\n";
+                   (case lcorr of
+                       [] =>
+                          print "empty\n"
+
+                     | _ =>
+                          List.appi
+                             (fns i (m, _) =>
+                                 let
+                                    val (v, _, _) = Option.valOf $ TD.find stdTable (T.Var i)
+
+                                    val a =
+                                       (case ID.find example v of
+                                           SOME a => a
+
+                                         | NONE =>
+                                              (* v does not appear in any non-trivial bound *)
+                                              0I)
+
+                                    val str = I.toStringStd a ^ " / "
+                                 in
+                                    print str;
+                                    Show.showIndent (String.length str) dir m
+                                 end)
+                             (List.rev lcorr))
+                end)
+
+
+      val omegaRaw =
+         let
+            do goalOrig = withgoal
+         in
+            process 
+               (fn lcorr =>
+                   let
+                      do goal = withgoal
+       
+                      do (vars, props, stdTac, stdTable) = tryf (fn () => standardize goal)
+                   in
+                      solveLoop vars emptySubst props [] [] []
+                         (fn example => 
+                             (
+                             theCounterexample := SOME (goalOrig, lcorr, stdTable, simplifyCounterexample example);
+
+                             fail "Omega test failed"
+                             ))
+                         (fn log =>
+                             stdTac
+                             >>+
+                             let
+                                val (_, plan) = reverse SS.empty log NullPlan
+                             in
+                                implement vars plan
+                             end)
+                   end)
+         end
+
+      val omegaPriority = omegaRaw >> idtacM Secondary
+
+      val omega = Typecheck.withTypecheck omegaRaw
+
+   end
+
+
+grammaroff IntInfOperators

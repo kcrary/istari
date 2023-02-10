@@ -37,11 +37,18 @@ The `bool` type is primitive, but aliased in the `Bool` module:
     orb : type:orb
         = def:orb
 
+    impb : type:impb
+         = def:impb
+
     notb_invol : type:notb_invol
 
     notb_andb : type:notb_andb
 
     notb_orb : type:notb_orb
+
+    notb_impb : type:notb_impb
+
+    impb_as_orb : type:impb_as_orb
 
     andb_commute : type:andb_commute
 
@@ -51,6 +58,8 @@ The `bool` type is primitive, but aliased in the `Bool` module:
 
     orb_assoc : type:orb_assoc
 
+    impb_curry : type:impb_curry
+
     andb_id_l : type:andb_id_l
 
     andb_id_r : type:andb_id_r
@@ -58,6 +67,8 @@ The `bool` type is primitive, but aliased in the `Bool` module:
     orb_id_l : type:orb_id_l
 
     orb_id_r : type:orb_id_r
+
+    impb_id_l : type:impb_id_l
 
     andb_ann_l : type:andb_ann_l
 
@@ -67,6 +78,10 @@ The `bool` type is primitive, but aliased in the `Bool` module:
 
     orb_ann_r : type:orb_ann_r
 
+    impb_ann_l : type:impb_ann_l
+
+    impb_ann_r : type:impb_ann_r
+
     ite_notb : type:ite_notb
 
     istrue_notb : type:istrue_notb
@@ -74,3 +89,9 @@ The `bool` type is primitive, but aliased in the `Bool` module:
     istrue_andb : type:istrue_andb
 
     istrue_orb : type:istrue_orb
+
+    istrue_impb : type:istrue_impb
+
+    istrue_true_iff : type:istrue_true_iff
+
+    istrue_false_iff : type:istrue_false_iff

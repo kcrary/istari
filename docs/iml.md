@@ -211,14 +211,26 @@ arguments with a single wildcard (`_`).
 ### Record/tuple projection
 
 SML's record and tuple projection syntax (*e.g.,* `#1`) is not
-supported.  But for pairs and triples there are substitutes: `fst`,
-`snd`, `n1of3`, `n2of3`, `n3of3`.
+supported.  But for pairs and triples the basis provides substitutes:
+`fst`, `snd`, `n1of3`, `n2of3`, `n3of3`.
+
 
 
 ### Unbounded integer literals
 
 An unbounded integer literal (of type `IntInf.int`) can be written
 using an `I` suffix, such as `0I`, `12I`, or `~12I`.
+
+
+
+### Suppressing infix
+
+An infix operator can be used as an ordinary function by placing it
+within parentheses.  For example, `(+) : int -> int -> int`.  (In SML
+this would be written `op +`.)  For operators beginning or ending with
+an asterisk, one must add extra space(s) to prevent the parser from
+interpreting it as a comment (*e.g.,* `( * )`).
+
 
 
 

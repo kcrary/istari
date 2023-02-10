@@ -239,7 +239,7 @@ functor CodegenOcamlFun (Output : OUTPUT) :> CODEGEN =
            | Pword n =>
                 (
                 write "(Basis.Word.fromInt ";
-                write (Int.toString n);
+                write (IntInf.toString n);
                 write ")"
                 )
 
@@ -548,13 +548,13 @@ functor CodegenOcamlFun (Output : OUTPUT) :> CODEGEN =
                    )
                 else if IntInf.< (n, 0) then
                    (
-                   write "(Z.ofString \"-";
+                   write "(Z.of_string \"-";
                    write (IntInf.toString (~ n));
                    write "\")"
                    )
                 else
                    (
-                   write "(Z.ofString \"";
+                   write "(Z.of_string \"";
                    write (IntInf.toString n);
                    write "\")"
                    )
@@ -562,7 +562,7 @@ functor CodegenOcamlFun (Output : OUTPUT) :> CODEGEN =
            | Eword n =>
                 (
                 write "(Basis.Word.fromInt ";
-                write (Int.toString n);
+                write (IntInf.toString n);
                 write ")"
                 )
 

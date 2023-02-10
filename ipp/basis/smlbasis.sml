@@ -337,6 +337,9 @@ signature Smlbasis__GENERAL =
       exception Fail of string
       exception Subscript
 
+      (* For interfacing with IML code. Not part of the SML basis. *)
+      exception Invalid of string
+
       val ! : 'a ref -> 'a
       val := : 'a ref * 'a -> unit
       val o : ('b -> 'c) * ('a -> 'b) -> 'a -> 'c
@@ -401,7 +404,14 @@ structure OriginalBasis =
       structure Array = Array
       structure Word8Array = Word8Array
       structure Word8ArraySlice = Word8ArraySlice
-      structure General = General
+
+      structure General =
+         struct
+            open General
+
+            exception Invalid = Basis.General.Invalid
+         end
+
       structure IO = IO
       structure TextIO = TextIO
       structure BinIO = BinIO

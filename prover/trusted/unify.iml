@@ -621,7 +621,7 @@ functor UnifyFun (structure Term : TERM
 
               | App m :: rest =>
                    (case whnf m of
-                       Var j =>
+                       Elim (Var j, []) =>
                           (case psubstVar j p of
                               NONE =>
                                  (i, sp)
@@ -1197,7 +1197,7 @@ functor UnifyFun (structure Term : TERM
                                  val h' = pruneHead (ebindToInt e) d 0 h p
                                  val nspine1' = pruneSpineLoop (ebindToInt e) d 0 nspine1rev p []
 
-                                 (* n[p]
+                                 (* N[p]
                                     = (h nspine)[p]
                                     = (h nspine1 nspine2)[p]
                                     = h[p] nspine1[p] b-1 ... 0
@@ -1215,7 +1215,7 @@ functor UnifyFun (structure Term : TERM
                                         defer m n
 
                                    | SOME c =>
-                                        (* n[p]
+                                        (* N[p]
                                           = h' nspine1' b-1 ... c c-1 ... 0
                                           and c-1 ... 0 do not appear in h' nspine1'
                                           (nor in b-1 ... c, obviously)
@@ -1227,16 +1227,32 @@ functor UnifyFun (structure Term : TERM
                                           E := fn ..a times.. fn . h' nspine1' b-1 ... 0
 
                                           We bind:
-                                          E := fn ..a-c times.. fn . h' nspine1' b-1 ... c
+                                          E := fn ..a-c times.. fn . (h' nspine1' b-1 ... c)[vc]  (where vc means unshift c)
+                                             = fn ..a-c times.. fn . h'[vc] nspine1'[vc] b-1-c ... 0
+
+                                          E[s] mspine
+                                          = (fn ..a-c times.. fn . h'[vc] nspine1'[vc] b-1-c ... 0)[s] mspine
+                                          = (fn ..a-c times.. fn . fn ..c times.. h' nspine1' b-1 ... c c-1 ... 0)[s] mspine
+                                            (can eta expand becaus there are enough arguments in mspine)
+                                          = (fn ..a times.. fn . h' nspine1' b-1 ... 0)[s] mspine
+                                          = (h' nspine1' b-1 ... 0)[s']
+                                          = N[p][s']
+                                            (as above)
+                                          = N
                                         *)
                                         let
+                                           val unsh =
+                                              iterateup c
+                                                 (fns _ unsh => Dot (Triv, unsh))
+                                                 Term.id
+
                                            val n'' =
                                               iterateup (a-c)
                                                  (fns _ l => Lam (NONE, l))
-                                                 (Elim (h',
-                                                        nspine1'
+                                                 (Elim (Sub (h', unsh),
+                                                        ssubst nspine1' unsh
                                                         @
-                                                        iterateup c
+                                                        iterateup (b-c)
                                                            (fns i l => App (Var i) :: l)
                                                            []))
                                         in
