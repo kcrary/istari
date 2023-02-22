@@ -71,6 +71,8 @@ intros; eapply sound_intersect_formation; eauto; done.
 intros; eapply sound_intersect_formation_univ; eauto; done.
 intros; eapply sound_intersect_intro; eauto; done.
 intros; eapply sound_intersect_elim; eauto; done.
+intros; eapply sound_intersect_formation_invert1; eauto; done.
+intros; eapply sound_intersect_formation_invert2; eauto; done.
 intros; eapply sound_sigma_formation; eauto; done.
 intros; eapply sound_sigma_formation_univ; eauto; done.
 intros; eapply sound_sigma_intro; eauto; done.
@@ -86,6 +88,10 @@ intros; eapply sound_prod_sigma_equal; eauto; done.
 intros; eapply sound_prod_sigma_equal_univ; eauto; done.
 intros; eapply sound_prod_elim1; eauto; done.
 intros; eapply sound_prod_elim2; eauto; done.
+intros; eapply sound_sigma_formation_invert1; eauto; done.
+intros; eapply sound_sigma_formation_invert2; eauto; done.
+intros; eapply sound_prod_formation_invert1; eauto; done.
+intros; eapply sound_prod_formation_invert2; eauto; done.
 intros; eapply sound_fut_kind_formation; eauto; done.
 intros; eapply sound_fut_formation; eauto; done.
 intros; eapply sound_fut_formation_univ; eauto; done.
@@ -94,6 +100,7 @@ intros; eapply sound_fut_elim; eauto; done.
 intros; eapply sound_fut_elim_eqtype; eauto; done.
 intros; eapply sound_fut_eta; eauto; done.
 intros; eapply sound_fut_eta_hyp; eauto; done.
+intros; eapply sound_fut_ext; eauto; done.
 intros; eapply sound_rec_kind_formation; eauto; done.
 intros; eapply sound_rec_formation; eauto; done.
 intros; eapply sound_rec_formation_univ; eauto; done.
@@ -199,6 +206,8 @@ intros; eapply sound_eqtype_symmetry; eauto; done.
 intros; eapply sound_eqtype_transitivity; eauto; done.
 intros; eapply sound_eqtype_eta; eauto; done.
 intros; eapply sound_eqtype_eta_hyp; eauto; done.
+intros; eapply sound_eqtype_formation_invert1; eauto; done.
+intros; eapply sound_eqtype_formation_invert2; eauto; done.
 intros; eapply sound_subtype_formation; eauto; done.
 intros; eapply sound_subtype_formation_univ; eauto; done.
 intros; eapply sound_subtype_intro; eauto; done.
@@ -213,6 +222,8 @@ intros; eapply sound_substitution_simple; eauto; done.
 intros; eapply sound_strengthen_context; eauto; done.
 intros; eapply sound_generalize; eauto; done.
 intros; eapply sound_generalize_tp; eauto; done.
+intros; eapply sound_generalize_eq; eauto; done.
+intros; eapply sound_generalize_eq_type; eauto; done.
 intros; eapply sound_compute; eauto; done.
 intros; eapply sound_compute_hyp; eauto; done.
 intros; eapply sound_symmetry; eauto; done.

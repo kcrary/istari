@@ -16,6 +16,7 @@ Require Import DefsEquiv.
 Require Import Equivalence.
 
 Require Import ValidationUtil.
+Require Import ValidationNat.
 
 
 Lemma voidForm_valid : voidForm_obligation. 
@@ -23,7 +24,7 @@ Lemma voidForm_valid : voidForm_obligation.
   intros G.
   valid_rewrite.
   eapply tr_formation_weaken.
-  apply tr_voidtp_formation.
+  apply tr_voidtp_formation_univ.
 Qed.
 
 Lemma voidEq_valid : voidEq_obligation. 
@@ -31,29 +32,94 @@ Lemma voidEq_valid : voidEq_obligation.
   intros G.
   valid_rewrite.
   eapply tr_formation_weaken.
-  apply tr_voidtp_formation.
+  apply tr_voidtp_formation_univ.
 Qed.
 
-(*should this be void : Ui for any i, or should it be void : U0
- both are provable but the first one is harder (induction over nats i think)*)
-Lemma voidFormUniv_valid : voidFormUniv_obligation. 
- unfoldtop. autounfold with valid_hint.
-  intros G i triv0 H.
-  valid_rewrite.
-  (*apply tr_voidtp_formation. *)
-Abort.
 
-Lemma voidEqUniv_valid : voidEqUniv_obligation. 
- unfoldtop. autounfold with valid_hint.
-  intros G i triv0 H.
-  valid_rewrite.
-Abort.
+Lemma voidFormUniv_valid : voidFormUniv_obligation.
+Proof.
+prepare.
+unfold Defs.void.
+intros G i ext0 H.
+apply (tr_univ_cumulative _ Defined.nzero); auto.
+  {
+  apply tr_voidtp_formation_univ.
+  }
+
+  {
+  rewrite -> leqpagetp_nzero_equiv.
+  apply tr_unittp_intro.
+  }
+Qed.
+
+
+Lemma voidEqUniv_valid : voidEqUniv_obligation.
+Proof.
+prepare.
+intros G i ext0 H.
+unfold Defs.void.
+apply (tr_univ_cumulative _ Defined.nzero); auto.
+  {
+  apply tr_voidtp_formation_univ.
+  }
+
+  {
+  rewrite -> leqpagetp_nzero_equiv.
+  apply tr_unittp_intro.
+  }
+Qed.
+
 
 Lemma voidElim_valid : voidElim_obligation.
   unfoldtop. autounfold with valid_hint.
   intros G a triv0 H.
   eapply tr_voidtp_elim; eauto.
 Qed.
+
+
+Lemma voidSub_valid : voidSub_obligation.
+Proof.
+prepare.
+intros G A ext0 H.
+unfold Defs.void.
+apply tr_subtype_intro; auto.
+  {
+  apply tr_voidtp_istype.
+  }
+apply (tr_voidtp_elim _ (var 0) (var 0)).
+eapply hypothesis; eauto using index_0.
+Qed.
+
+
+Lemma abortType_valid : abortType_obligation.
+Proof.
+prepare.
+intro G.
+rewrite -> def_intersect.
+rewrite -> def_intersect.
+rewrite -> def_univ.
+rewrite -> def_arrow.
+unfold Defs.void.
+unfold Defs.abort.
+apply tr_intersect_intro.
+  {
+  apply tr_nattp_formation.
+  }
+apply tr_intersect_intro.
+  {
+  apply tr_univ_formation.
+  unfold Defined.pagetp.
+  eapply hypothesis; eauto using index_0.
+  }
+simpsub.
+apply tr_pi_intro.
+  {
+  apply tr_voidtp_istype.
+  }
+apply (tr_voidtp_elim _ (var 0) (var 0)).
+eapply hypothesis; eauto using index_0.
+Qed.
+
 
 Lemma unitKind_valid : unitKind_obligation. 
   unfoldtop. autounfold with valid_hint. 
@@ -64,6 +130,7 @@ Lemma unitKind_valid : unitKind_obligation.
   eauto using deq_intro.
 Qed.
 
+
 Lemma unitKindEq_valid : unitKindEq_obligation. 
  unfoldtop. autounfold with valid_hint.
   intros G i triv0 H.
@@ -73,32 +140,55 @@ Lemma unitKindEq_valid : unitKindEq_obligation.
   eauto using deq_intro.
 Qed.
 
+
 Lemma unitForm_valid : unitForm_obligation. 
  unfoldtop. autounfold with valid_hint.
   intros G.
   valid_rewrite.
-  eapply tr_formation_weaken; apply tr_unittp_formation.
+  eapply tr_formation_weaken; apply tr_unittp_formation_univ.
 Qed.
 
   Lemma unitEq_valid : unitEq_obligation.
  unfoldtop. autounfold with valid_hint.
   intros G.
   valid_rewrite.
-  eapply tr_formation_weaken; apply tr_unittp_formation.
+  eapply tr_formation_weaken; apply tr_unittp_formation_univ.
   Qed.
 
-(*same problem as void*)
-Lemma unitFormUniv_valid : unitFormUniv_obligation. 
- unfoldtop. autounfold with valid_hint.
-  intros G i triv0 H.
-  valid_rewrite.
-Abort.
+
+Lemma unitFormUniv_valid : unitFormUniv_obligation.
+Proof.
+prepare.
+unfold Defs.unit.
+intros G i ext0 H.
+apply (tr_univ_cumulative _ Defined.nzero); auto.
+  {
+  apply tr_unittp_formation_univ.
+  }
+
+  {
+  rewrite -> leqpagetp_nzero_equiv.
+  apply tr_unittp_intro.
+  }
+Qed.
+
 
 Lemma unitEqUniv_valid : unitEqUniv_obligation.
-  unfoldtop. autounfold with valid_hint.
-  intros G i triv0 H.
-  valid_rewrite.
-Abort.
+Proof.
+prepare.
+intros G i ext0 H.
+unfold Defs.unit.
+apply (tr_univ_cumulative _ Defined.nzero); auto.
+  {
+  apply tr_unittp_formation_univ.
+  }
+
+  {
+  rewrite -> leqpagetp_nzero_equiv.
+  apply tr_unittp_intro.
+  }
+Qed.
+
 
 Lemma unitIntroOf_valid : unitIntroOf_obligation. 
  unfoldtop. autounfold with valid_hint.
@@ -115,15 +205,21 @@ Lemma unitIntro_valid : unitIntro_obligation.
 Qed.
 
 
-(* obsolete
-Lemma unitEta_valid : unitEta_obligation. 
-  unfoldtop. autounfold with valid_hint.
-  intros G M triv0 H.
-  valid_rewrite.
-  constructor.
-  apply tr_unittp_eta; eauto using deq_intro.
+Lemma unitExt_valid : unitExt_obligation.
+Proof.
+prepare.
+unfold Defs.unit.
+intros G m n ext1 ext0 Hm Hn.
+apply (tr_transitivity _ _ triv).
+  {
+  apply tr_unittp_eta; auto.
+  }
+
+  {
+  apply tr_symmetry.
+  apply tr_unittp_eta; auto.
+  }
 Qed.
-*)
 
 
 Lemma unitLeft_valid : unitLeft_obligation. 
@@ -137,27 +233,50 @@ Lemma boolForm_valid : boolForm_obligation.
   unfoldtop. autounfold with valid_hint.
   intros G.
   valid_rewrite.
-  eapply tr_formation_weaken; apply tr_booltp_formation.
+  eapply tr_formation_weaken; apply tr_booltp_formation_univ.
 Qed.
 
 Lemma boolEq_valid : boolEq_obligation. 
   unfoldtop. autounfold with valid_hint.
   intros G.
   valid_rewrite.
-  eapply tr_formation_weaken; apply tr_booltp_formation.
+  eapply tr_formation_weaken; apply tr_booltp_formation_univ.
 Qed.
 
-(*same problem as void*)
-Lemma boolFormUniv_valid : boolFormUniv_obligation. 
- unfoldtop. autounfold with valid_hint.
-  intros G i triv0 H.
-  valid_rewrite.
-  constructor.
-  Abort.
 
-Lemma boolEqUniv_valid : boolEqUniv_obligation. 
-  unfoldtop. autounfold with valid_hint.
-  Abort.
+Lemma boolFormUniv_valid : boolFormUniv_obligation.
+Proof.
+prepare.
+unfold Defs.bool.
+intros G i ext0 H.
+apply (tr_univ_cumulative _ Defined.nzero); auto.
+  {
+  apply tr_booltp_formation_univ.
+  }
+
+  {
+  rewrite -> leqpagetp_nzero_equiv.
+  apply tr_unittp_intro.
+  }
+Qed.
+
+
+Lemma boolEqUniv_valid : boolEqUniv_obligation.
+Proof.
+prepare.
+intros G i ext0 H.
+unfold Defs.bool.
+apply (tr_univ_cumulative _ Defined.nzero); auto.
+  {
+  apply tr_booltp_formation_univ.
+  }
+
+  {
+  rewrite -> leqpagetp_nzero_equiv.
+  apply tr_unittp_intro.
+  }
+Qed.
+
 
 Lemma boolIntro1Of_valid : boolIntro1Of_obligation.
   unfoldtop. autounfold with valid_hint.
@@ -173,16 +292,38 @@ Lemma boolIntro1Of_valid : boolIntro1Of_obligation.
   do 2 constructor.
  Qed.
 
-Lemma boolElimOf_valid : boolElimOf_obligation. 
-Abort.
 
-Lemma boolElimEq_valid : boolElimEq_obligation. 
-  unfoldtop. autounfold with valid_hint.
-  intros G a b m n p q r s triv0 triv1 triv2 H0 H1 H2.
-  valid_rewrite.
-  constructor.
-  apply tr_booltp_elim; eauto using deq_intro.
-Abort.
+Hint Rewrite def_ite : prepare.
+
+
+Lemma boolElimOf_valid : boolElimOf_obligation.
+Proof.
+prepare.
+unfold Defs.true.
+unfold Defs.false.
+intros G a m p r ext2 ext1 ext0 Hm Hp Hr.
+apply tr_booltp_elim; auto.
+Qed.
+
+
+Lemma boolElimEq_valid : boolElimEq_obligation.
+Proof.
+prepare.
+unfold Defs.true.
+unfold Defs.false.
+intros G a m n p q r s ext2 ext1 ext0 Hmn Hpq Hrs.
+apply tr_booltp_elim; auto.
+Qed.
+
+
+Lemma boolElim_valid : boolElim_obligation.
+Proof.
+prepare.
+unfold Defs.true.
+unfold Defs.false.
+intros G a m ext0 p r Hm Hp Hr.
+apply tr_booltp_elim; auto.
+Qed.
 
 
  Lemma boolElimIstype_valid : boolElimIstype_obligation.

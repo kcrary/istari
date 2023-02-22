@@ -50,6 +50,28 @@ apply star_refl.
 Qed.
 
 
+Lemma def_guard :
+  forall a b,
+    equiv (app (app Defs.guard a) b) (guard a b).
+Proof.
+intros a b.
+unfold Defs.guard.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app1.
+  apply step_app2.
+  }
+simpsub.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl.
+Qed.
+
+
 Lemma def_eeqtp :
   forall a b,
     equiv (app (app Defs.eeqtp a) b) (prod (subtype a b) (subtype b a)).
@@ -291,6 +313,44 @@ Qed.
 Lemma def_level : Defs.level = nattp.
 Proof.
 auto.
+Qed.
+
+
+Lemma def_letnext :
+  forall m n,
+    equiv (app (app Defs.letnext m) (lam n)) (subst1 (prev m) n).
+Proof.
+intros m n.
+unfold Defs.letnext.
+apply steps_equiv.
+eapply star_trans.
+  {
+  eapply star_step.
+    {
+    apply step_app1.
+    apply step_app2.
+    }
+  simpsub.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+apply star_one.
+apply step_app2.
+Qed.
+
+
+Lemma def_lzero :
+  equiv Defs.lzero Defined.nzero.
+Proof.
+unfold Defs.lzero.
+unfold Defined.nzero.
+rewrite -> def_inl.
+unfold Defined.sumleft.
+apply equiv_refl.
 Qed.
 
 

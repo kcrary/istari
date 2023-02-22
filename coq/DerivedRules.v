@@ -29,11 +29,10 @@ apply theta_fix.
 Qed.
 
 
-Lemma leqpagetp_nzero_equiv :
-  forall object m, @equiv object (leqpagetp nzero m) unittp.
+Lemma leqtp_nzero_equiv :
+  forall object m, @equiv object (app (app leqtp nzero) m) unittp.
 Proof.
 intros object m.
-unfold leqpagetp.
 unfold leqtp.
 apply steps_equiv.
 eapply star_trans.
@@ -77,6 +76,16 @@ eapply star_step.
 simpsub.
 apply star_refl.
 Qed.
+
+
+Lemma leqpagetp_nzero_equiv :
+  forall object m, @equiv object (leqpagetp nzero m) unittp.
+Proof.
+intros object m.
+unfold leqpagetp.
+apply leqtp_nzero_equiv.
+Qed.
+
 
 
 
@@ -722,7 +731,7 @@ Lemma tr_voidtp_istype :
 Proof.
 intros G.
 apply (tr_formation_weaken _ nzero).
-apply tr_voidtp_formation.
+apply tr_voidtp_formation_univ.
 Qed.
 
 
@@ -732,7 +741,7 @@ Lemma tr_unittp_istype :
 Proof.
 intros G.
 apply (tr_formation_weaken _ nzero).
-apply tr_unittp_formation.
+apply tr_unittp_formation_univ.
 Qed.
 
 
@@ -742,7 +751,7 @@ Lemma tr_booltp_istype :
 Proof.
 intros G.
 apply (tr_formation_weaken _ nzero).
-apply tr_booltp_formation.
+apply tr_booltp_formation_univ.
 Qed.
 
 
@@ -903,17 +912,7 @@ apply (tr_transitivity _ _ m).
 Qed.
 
 
-Lemma tr_eqtype_reflexivity:
-  forall G a a',
-    tr G (deqtype a a') ->
-    tr G (deqtype a a).
-Proof.
-  intros  G a a' H0. pose proof (tr_eqtype_symmetry _#3 H0) as H1.
-  apply (tr_eqtype_transitivity _#4 H0 H1).
-Qed.
-
-
-Lemma tr_eqtype_formation_invert1 :
+Lemma tr_eqtype_formation_left :
   forall G a b,
     tr G (deqtype a b)
     -> tr G (deqtype a a).
@@ -924,13 +923,13 @@ apply tr_eqtype_symmetry; auto.
 Qed.
 
 
-Lemma tr_eqtype_formation_invert2 :
+Lemma tr_eqtype_formation_right :
   forall G a b,
     tr G (deqtype a b)
     -> tr G (deqtype b b).
 Proof.
 intros G a b H.
-eapply tr_eqtype_formation_invert1.
+eapply tr_eqtype_formation_left.
 apply tr_eqtype_symmetry; eauto.
 Qed.
 

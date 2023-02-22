@@ -160,7 +160,7 @@ apply tr_mu_formation_univ.
   simpsub.
   apply tr_sumtype_formation_univ.
     {
-    apply tr_unittp_formation.
+    apply tr_unittp_formation_univ.
     }
   
     {
@@ -467,7 +467,7 @@ end.
   unfold nzero at 1 2.
   rewrite -> sumcase_left.
   simpsub.
-  apply tr_unittp_formation.
+  apply tr_unittp_formation_univ.
   }
 
   {
@@ -522,7 +522,7 @@ end.
     unfold nzero at 2 4.
     rewrite -> sumcase_left.
     simpsub.
-    apply tr_voidtp_formation.
+    apply tr_voidtp_formation_univ.
     }
 
     {

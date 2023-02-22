@@ -21,8 +21,9 @@ Require Import Dots.
 
 Require Import ValidationUtil.
 Require Import ValidationAll.
-Require Import ValidationExist.
+Require Import ValidationSigma.
 Require Import ValidationFuture.
+Require Import ValidationRec.
 Require Import ValidationLevel.
 Require Import ValidationMu.
 Require Import ValidationNat.
@@ -71,7 +72,7 @@ exact arrowEta_valid.
 exact arrowExt_valid.
 exact arrowOfExt_valid.
 exact arrowFormInv1_valid.
-admit.
+exact arrowFormInv2_valid.
 exact tarrowKind_valid.
 exact tarrowKindEq_valid.
 exact tarrowForm_valid.
@@ -110,23 +111,23 @@ exact intersectFormUniv_valid.
 exact intersectEqUniv_valid.
 exact intersectIntroOf_valid.
 exact intersectIntroEq_valid.
-admit.
+exact intersectIntro_valid.
 exact intersectElimOf_valid.
 exact intersectElimEq_valid.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
+exact intersectElim_valid.
+exact intersectFormInv1_valid.
+exact intersectFormInv2_valid.
+exact guardForm_valid.
+exact guardEq_valid.
+exact guardFormUniv_valid.
+exact guardEqUniv_valid.
+exact guardIntroOf_valid.
+exact guardIntroEq_valid.
+exact guardIntro_valid.
+exact guardElimOf_valid.
+exact guardElimEq_valid.
+exact guardElim_valid.
+exact guardSatEq_valid.
 exact existsForm_valid.
 exact existsEq_valid.
 exact existsFormUniv_valid.
@@ -134,17 +135,17 @@ exact existsEqUniv_valid.
 exact existsSub_valid.
 exact existsIntroOf_valid.
 exact existsIntroEq_valid.
-admit.
+exact existsIntro_valid.
 exact existsElim1Of_valid.
 exact existsElim1Eq_valid.
 exact existsElim2Of_valid.
 exact existsElim2Eq_valid.
 exact existsEta_valid.
-admit.
+exact existsExt_valid.
 exact existsLeft_valid.
-admit.
-admit.
-admit.
+exact existsFormInv1_valid.
+exact existsFormInv2_valid.
+exact existsFormInv2Eq_valid.
 exact prodKind_valid.
 exact prodKindEq_valid.
 exact prodForm_valid.
@@ -153,9 +154,9 @@ exact prodFormUniv_valid.
 exact prodEqUniv_valid.
 exact prodExistsEq_valid.
 exact prodExistsEqUniv_valid.
-admit.
-admit.
-admit.
+exact prodSub_valid.
+exact prodExistsSub_valid.
+exact existsProdSub_valid.
 exact prodIntroOf_valid.
 exact prodIntroEq_valid.
 exact prodIntro_valid.
@@ -166,29 +167,29 @@ exact prodElim2Of_valid.
 exact prodElim2Eq_valid.
 exact prodElim2_valid.
 exact prodEta_valid.
-admit.
+exact prodExt_valid.
 exact prodLeft_valid.
-admit.
-admit.
+exact prodFormInv1_valid.
+exact prodFormInv2_valid.
 exact futureKind_valid.
 exact futureKindEq_valid.
 exact futureForm_valid.
 exact futureEq_valid.
 exact futureFormUniv_valid.
 exact futureEqUniv_valid.
-admit.
+exact futureSub_valid.
 exact futureIntroOf_valid.
 exact futureIntroEq_valid.
 exact futureIntro_valid.
 exact futureElimOf_valid.
-admit.
-admit.
+exact futureElimOfLetnext_valid.
+exact futureElimOfLetnextNondep_valid.
 exact futureElimEq_valid.
 exact futureElimIstype_valid.
-admit.
+exact futureElimIstypeLetnext_valid.
 exact futureElimEqtype_valid.
 exact futureEta_valid.
-admit.
+exact futureExt_valid.
 exact futureLeft_valid.
 exact recKind_valid.
 exact recKindEq_valid.
@@ -197,34 +198,34 @@ exact recEq_valid.
 exact recFormUniv_valid.
 exact recEqUniv_valid.
 exact recUnroll_valid.
-admit.
+exact recUnrollUniv_valid.
 exact recBisimilar_valid.
 exact voidForm_valid.
 exact voidEq_valid.
-admit.
-admit.
+exact voidFormUniv_valid.
+exact voidEqUniv_valid.
 exact voidElim_valid.
-admit.
-admit.
+exact voidSub_valid.
+exact abortType_valid.
 exact unitKind_valid.
 exact unitKindEq_valid.
 exact unitForm_valid.
 exact unitEq_valid.
-admit.
-admit.
+exact unitFormUniv_valid.
+exact unitEqUniv_valid.
 exact unitIntroOf_valid.
 exact unitIntro_valid.
-admit.
+exact unitExt_valid.
 exact unitLeft_valid.
 exact boolForm_valid.
 exact boolEq_valid.
-admit.
-admit.
+exact boolFormUniv_valid.
+exact boolEqUniv_valid.
 exact boolIntro1Of_valid.
 exact boolIntro2Of_valid.
-admit.
-admit.
-admit.
+exact boolElimOf_valid.
+exact boolElimEq_valid.
+exact boolElim_valid.
 exact boolElimIstype_valid.
 exact boolElimEqtype_valid.
 exact boolLeft_valid.

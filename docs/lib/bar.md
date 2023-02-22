@@ -21,7 +21,13 @@ the future modality:
                 (fn x . f (let next x' = x in next (pause x' x)))
                 (next (fn x . f (let next x' = x in next (pause x' x))))
 
+The reduction for `ffix` is:
+
     ffix A f --> f (next (ffix A f))
+
+It appears in the registry under the name `Bar.unroll_ffix`.  It can
+also be used through the `unroll` tactic.
+
 
 The partial type `bar A` provides an `A` now, or sometime later:
 

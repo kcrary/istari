@@ -82,6 +82,8 @@ yet to be validated, but all of the "delicate" rules are validated.)
 
 - [Files](files.html)
 
+- [Registry](registry.html)
+
 - [Case analysis](case.html)
 
 - [Primitive tactics](primitive-tactics.html)

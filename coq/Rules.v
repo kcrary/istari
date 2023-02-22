@@ -209,6 +209,16 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr G (deq p q a)
       -> tr G (deq m n (subst1 p b))
 
+| tr_intersect_formation_invert1 :
+    forall G a a' b b',
+      tr G (deqtype (intersect a b) (intersect a' b'))
+      -> tr G (deqtype a a')
+
+| tr_intersect_formation_invert2 :
+    forall G a a' b b',
+      tr G (deqtype (intersect a b) (intersect a' b'))
+      -> tr (cons (hyp_tm a) G) (deqtype b b')
+
 (* Strong sums *)
 
 | tr_sigma_formation :
@@ -299,6 +309,26 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deq m n (prod a b))
       -> tr G (deq (ppi2 m) (ppi2 n) b)
 
+| tr_sigma_formation_invert1 :
+    forall G a a' b b',
+      tr G (deqtype (sigma a b) (sigma a' b'))
+      -> tr G (deqtype a a')
+
+| tr_sigma_formation_invert2 :
+    forall G a a' b b',
+      tr G (deqtype (sigma a b) (sigma a' b'))
+      -> tr (cons (hyp_tm a) G) (deqtype b b')
+
+| tr_prod_formation_invert1 :
+    forall G a a' b b',
+      tr G (deqtype (prod a b) (prod a' b'))
+      -> tr G (deqtype a a')
+
+| tr_prod_formation_invert2 :
+    forall G a a' b b',
+      tr G (deqtype (prod a b) (prod a' b'))
+      -> tr (cons (hyp_tm a) G) (deqtype (subst sh1 b) (subst sh1 b'))
+  
 (* Fut *)
 
 | tr_fut_kind_formation :
@@ -348,6 +378,13 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr (substctx (dot (next (var 0)) sh1) G2 ++ cons (hyp_tml a) G1) (deq m n (subst (under (length G2) (dot (next (var 0)) sh1)) b))
       -> tr (G2 ++ cons (hyp_tm (fut a)) G1) (deq (subst (under (length G2) (dot (prev (var 0)) sh1)) m) (subst (under (length G2) (dot (prev (var 0)) sh1)) n) b)
 
+| tr_fut_ext :
+    forall G a b c m n,
+      tr G (deq m m (fut b))
+      -> tr G (deq n n (fut c))
+      -> tr G (deq (next (prev m)) (next (prev n)) (fut a))
+      -> tr G (deq m n (fut a))
+
 (* Guarded recursive types *)
 
 | tr_rec_kind_formation :
@@ -386,8 +423,7 @@ Inductive tr : @context obj -> judgement -> Prop :=
 
 (* Void *)
 
-(* ought to be named tr_voidtp_formation_univ *)
-| tr_voidtp_formation :
+| tr_voidtp_formation_univ :
     forall G,
       tr G (deq voidtp voidtp (univ nzero))
 
@@ -403,8 +439,7 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deq lv lv pagetp)
       -> tr G (deq unittp unittp (kuniv lv))
 
-(* ought to be named tr_unittp_formation_univ *)
-| tr_unittp_formation :
+| tr_unittp_formation_univ :
     forall G,
       tr G (deq unittp unittp (univ nzero))
 
@@ -424,8 +459,7 @@ Inductive tr : @context obj -> judgement -> Prop :=
 
 (* Bool *)
 
-(* ought to be named tr_booltp_formation_univ *)
-| tr_booltp_formation :
+| tr_booltp_formation_univ :
     forall G,
       tr G (deq booltp booltp (univ nzero))
 
@@ -1104,6 +1138,16 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr (substctx (dot triv id) G2 ++ G1) (deq m n (subst (under (length G2) (dot triv id)) b))
       -> tr (G2 ++ hyp_tm (eqtype a a') :: G1) (deq (subst (under (length G2) sh1) m) (subst (under (length G2) sh1) n) b)
 
+| tr_eqtype_formation_invert1 :
+    forall G a a' b b',
+      tr G (deqtype (eqtype a b) (eqtype a' b'))
+      -> tr G (deqtype a a')
+
+| tr_eqtype_formation_invert2 :
+    forall G a a' b b',
+      tr G (deqtype (eqtype a b) (eqtype a' b'))
+      -> tr G (deqtype b b')
+
 (* Subtyping *)
 
 | tr_subtype_formation :
@@ -1158,7 +1202,6 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deqtype (subtype a b) (subtype a' b'))
       -> tr G (deqtype b b')
 
-
 (* Substitution *)
 
 | tr_substitution :
@@ -1193,6 +1236,18 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deqtype a a)
       -> tr (cons hyp_tp G) J
       -> tr G (substj (dot a id) J)
+
+| tr_generalize_eq :
+    forall G a b m n p q,
+      tr G (deq m n a)
+      -> tr (cons (hyp_tm a) G) (deq p q b)
+      -> tr G (deq (subst1 m p) (subst1 n q) (subst1 m b))
+
+| tr_generalize_eq_type :
+    forall G a b m n p q,
+      tr G (deq m n a)
+      -> tr (cons (hyp_tm a) G) (deq p q b)
+      -> tr G (deqtype (subst1 m b) (subst1 n b))
 
 
 (* Direct computation *)

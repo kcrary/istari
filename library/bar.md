@@ -19,7 +19,13 @@ the future modality:
     ffix : type:ffix
          = def:ffix
 
+The reduction for `ffix` is:
+
     ffix A f --> f (next (ffix A f))
+
+It appears in the registry under the name `Bar.unroll_ffix`.  It can
+also be used through the `unroll` tactic.
+
 
 The partial type `bar A` provides an `A` now, or sometime later:
 

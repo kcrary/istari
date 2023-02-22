@@ -1267,17 +1267,24 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       val injectionTactics : (int -> priority tacticm) H.table = H.table ()
 
       fun injectionMain i =
-         goalContextCase
-         /| $hyp \i\ $tm \Prim.eq\ (const? @ _) _ _ =>
-            \(fnc const =>
-                 (case H.find injectionTactics const of
-                     SOME tac => tac i
-
-                   | NONE => fail "not an injectible hypothesis"))\
-
-          | _ =>
-            \(fnc => fail "not an injectible hypothesis")\
-         /
+         let
+            do (jud, _) = withgoal
+         in
+            hypCase (J.hyp jud i)
+            /| $tm \Prim.eq\ ($whnfHard $as const? @ _) ? ? =>
+               \(fnc a const m n =>
+                    (case H.find injectionTactics const of
+                        SOME tac => 
+                           replaceHyp i (J.Tm (T.apply3 Prim.eq a m n))
+                           >>+
+                           tac i
+   
+                      | NONE => fail "not an injectible hypothesis"))\
+   
+             | _ =>
+               \(fnc => fail "not an injectible hypothesis")\
+            /
+         end
 
       fun injectionPriority hyp =
          let

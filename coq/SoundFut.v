@@ -967,3 +967,212 @@ rewrite -> promote_append.
 rewrite -> promote_shut.
 apply Hseqa; eauto using le_trans.
 Qed.
+
+
+Lemma sound_fut_ext :
+  forall G a b c m n,
+    pseq G (deq m m (fut b))
+    -> pseq G (deq n n (fut c))
+    -> pseq G (deq (next (prev m)) (next (prev n)) (fut a))
+    -> pseq G (deq m n (fut a)).
+Proof.
+intros G a b c m n.
+revert G.
+refine (seq_pseq 0 3 [] _ [] _ [] _ _ _).
+cbn.
+intros G Hseqm Hseqn Hseq.
+rewrite -> seq_deq in Hseqm, Hseqn, Hseq |- *.
+intros i s s' Hs.
+assert (exists m1 m2,
+          hygiene clo (subst s m)
+          /\ hygiene clo (subst s' m)
+          /\ star step (subst s m) (next m1)
+          /\ star step (subst s' m) (next m2)) as (m1 & m2 & Hclm & Hclm' & Hstepm1 & Hstepm2).
+  {
+  so (Hseqm _ _ _ Hs) as (R & Hl & _ & Hm & _).
+  simpsubin Hl.
+  invert (basic_value_inv _#6 value_fut Hl).
+    {
+    intros _ <- <-.
+    rewrite -> den_iufut0 in Hm.
+    destruct Hm as (m1 & m2 & _ & Hcl & Hcl' & Hstep & Hstep' & _).
+    exists m1, m2.
+    auto.
+    }
+  intros i' A _ <- <-.
+  rewrite -> den_iufut in Hm.
+  destruct Hm as (m1 & m2 & _ & Hcl & Hcl' & Hstep & Hstep' & _).
+  exists m1, m2.
+  auto.
+  }
+assert (exists n1 n2,
+          hygiene clo (subst s n)
+          /\ hygiene clo (subst s' n)
+          /\ star step (subst s n) (next n1)
+          /\ star step (subst s' n) (next n2)) as (n1 & n2 & Hcln & Hcln' & Hstepn1 & Hstepn2).
+  {
+  so (Hseqn _ _ _ Hs) as (R & Hl & _ & Hn & _).
+  simpsubin Hl.
+  invert (basic_value_inv _#6 value_fut Hl).
+    {
+    intros _ <- <-.
+    rewrite -> den_iufut0 in Hn.
+    destruct Hn as (n1 & n2 & _ & Hcl & Hcl' & Hstep & Hstep' & _).
+    exists n1, n2.
+    auto.
+    }
+  intros i' A _ <- <-.
+  rewrite -> den_iufut in Hn.
+  destruct Hn as (n1 & n2 & _ & Hcl & Hcl' & Hstep & Hstep' & _).
+  exists n1, n2.
+  auto.
+  }
+clear Hseqm Hseqn.
+so (Hseq _ _ _ Hs) as (R & Hl & Hr & Hm & Hn & Hmn).
+exists R.
+do2 2 split; auto.
+simpsubin Hl.
+simpsubin Hr.
+simpsubin Hm.
+simpsubin Hn.
+simpsubin Hmn.
+destruct i as [| i].
+  {
+  invert (basic_value_inv _#6 value_fut Hl).
+  intros _ <-.
+  rewrite -> !den_iufut0.
+  do2 2 split.
+    {
+    exists m1, m2.
+    do2 5 split; auto.
+    intros H.
+    omega.
+    }
+
+    {
+    exists n1, n2.
+    do2 5 split; auto.
+    intros H.
+    omega.
+    }
+
+    {
+    exists m1, n2.
+    do2 5 split; auto.
+    intros H.
+    omega.
+    }
+  }
+invert (basic_value_inv _#6 value_fut Hl).
+intros A Hal <-.
+rewrite -> !den_iufut in Hm, Hn, Hmn |- *.
+destruct Hm as (m1' & m2' & _ & _ & _ & Hstep1 & Hstep2 & H).
+so (determinism_normal_value _#3 value_next Hstep1) as Heq.
+injection Heq.
+intros <-.
+so (H (Nat.lt_0_succ _)) as Hm.
+clear Heq Hstep1 H.
+so (determinism_normal_value _#3 value_next Hstep2) as Heq.
+injection Heq.
+intros <-.
+clear Heq Hstep2.
+cbn in Hm.
+destruct Hn as (n1' & n2' & _ & _ & _ & Hstep1 & Hstep2 & H).
+so (determinism_normal_value _#3 value_next Hstep1) as Heq.
+injection Heq.
+intros <-.
+so (H (Nat.lt_0_succ _)) as Hn.
+clear Heq Hstep1 H.
+so (determinism_normal_value _#3 value_next Hstep2) as Heq.
+injection Heq.
+intros <-.
+clear Heq Hstep2.
+cbn in Hn.
+destruct Hmn as (m1' & n2' & _ & _ & _ & Hstep1 & Hstep2 & H).
+so (determinism_normal_value _#3 value_next Hstep1) as Heq.
+injection Heq.
+intros <-.
+so (H (Nat.lt_0_succ _)) as Hmn.
+clear Heq Hstep1 H.
+so (determinism_normal_value _#3 value_next Hstep2) as Heq.
+injection Heq.
+intros <-.
+clear Heq Hstep2.
+cbn in Hmn.
+so (hygiene_invert_auto _#5 (steps_hygiene _#4 Hstepm1 Hclm)) as H.
+cbn in H.
+destruct H as (Hclm1 & _).
+so (hygiene_invert_auto _#5 (steps_hygiene _#4 Hstepm2 Hclm')) as H.
+cbn in H.
+destruct H as (Hclm2 & _).
+so (hygiene_invert_auto _#5 (steps_hygiene _#4 Hstepn1 Hcln)) as H.
+cbn in H.
+destruct H as (Hcln1 & _).
+so (hygiene_invert_auto _#5 (steps_hygiene _#4 Hstepn2 Hcln')) as H.
+cbn in H.
+destruct H as (Hcln2 & _).
+assert (equiv (prev (subst s m)) m1) as Hequivm1.
+  {
+  apply steps_equiv.
+  eapply star_trans.
+    {
+    apply star_map'; eauto using step_prev1 with dynamic.
+    }
+  apply star_one.
+  apply step_prev2.
+  }
+assert (equiv (prev (subst s' m)) m2) as Hequivm2.
+  {
+  apply steps_equiv.
+  eapply star_trans.
+    {
+    apply star_map'; eauto using step_prev1 with dynamic.
+    }
+  apply star_one.
+  apply step_prev2.
+  }
+assert (equiv (prev (subst s n)) n1) as Hequivn1.
+  {
+  apply steps_equiv.
+  eapply star_trans.
+    {
+    apply star_map'; eauto using step_prev1 with dynamic.
+    }
+  apply star_one.
+  apply step_prev2.
+  }
+assert (equiv (prev (subst s' n)) n2) as Hequivn2.
+  {
+  apply steps_equiv.
+  eapply star_trans.
+    {
+    apply star_map'; eauto using step_prev1 with dynamic.
+    }
+  apply star_one.
+  apply step_prev2.
+  }
+do2 2 split.
+  {
+  exists m1, m2.
+  do2 5 split; auto.
+  intros _.
+  cbn.
+  eapply urel_equiv; eauto.
+  }
+
+  {
+  exists n1, n2.
+  do2 5 split; auto.
+  intros _.
+  cbn.
+  eapply urel_equiv; eauto.
+  }
+
+  {
+  exists m1, n2.
+  do2 5 split; auto.
+  intros _.
+  cbn.
+  eapply urel_equiv; eauto.
+  }
+Qed.

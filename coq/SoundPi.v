@@ -2206,3 +2206,136 @@ do2 4 split.
   apply Hact; auto.
   }
 Qed.
+
+
+Lemma sound_intersect_formation_invert1 :
+  forall G a a' b b',
+    pseq G (deqtype (intersect a b) (intersect a' b'))
+    -> pseq G (deqtype a a').
+Proof.
+intros G a b c d.
+revert G.
+refine (seq_pseq 0 1 [] _ _ _); cbn.
+intros G Hseq.
+rewrite -> seq_eqtype in Hseq |- *.
+intros i s s' Hs.
+so (Hseq _#3 Hs) as (R & Hpil & Hpir & Hpil' & Hpir').
+simpsubin Hpil.
+simpsubin Hpir.
+simpsubin Hpil'.
+simpsubin Hpir'.
+invert (basic_value_inv _#6 value_intersect Hpil).
+intros A B Hal Hbl Heql.
+invert (basic_value_inv _#6 value_intersect Hpir).
+intros A' B' Har Hbr Heqr.
+so (iuintersect_inj _#7 (eqtrans Heql (eqsymm Heqr))) as H.
+injectionT H.
+intros <-.
+injectionT H.
+intros <-.
+invert (basic_value_inv _#6 value_intersect Hpil').
+intros A' B' Hal' Hbl' Heql'.
+so (iuintersect_inj _#7 (eqtrans Heql (eqsymm Heql'))) as H.
+injectionT H.
+intros <-.
+injectionT H.
+intros <-.
+invert (basic_value_inv _#6 value_intersect Hpir').
+intros A' B' Har' Hbr' Heqr'.
+so (iuintersect_inj _#7 (eqtrans Heql (eqsymm Heqr'))) as H.
+injectionT H.
+intros <-.
+injectionT H.
+intros <-.
+exists A.
+auto.
+Qed.
+
+
+Lemma sound_intersect_formation_invert2 :
+  forall G a a' b b',
+    pseq G (deqtype (intersect a b) (intersect a' b'))
+    -> pseq (cons (hyp_tm a) G) (deqtype b b').
+Proof.
+intros G a b c d.
+revert G.
+refine (seq_pseq_hyp 4 [] a [] b [hyp_emp] c [hyp_emp] d 1 [] [] _ [] [_] _ _); cbn.
+intros G Hcla Hclb Hclc Hcld Hseq _.
+rewrite -> seq_eqtype in Hseq |- *.
+intros i ss ss' Hss.
+so (pwctx_cons_invert_simple _#5 Hss) as H; clear Hss.
+destruct H as (m & p & s & s' & Hs & Hmp & -> & ->).
+so (Hseq i s s' Hs) as (R & Hpil & Hpir & Hpil' & Hpir').
+simpsubin Hpil.
+simpsubin Hpir.
+simpsubin Hpil'.
+simpsubin Hpir'.
+invert (basic_value_inv _#6 value_intersect Hpil).
+intros A B Hal Hcl Heqacl.
+invert (basic_value_inv _#6 value_intersect Hpir).
+intros A' B' Har Hcr Heqacr.
+so (eqtrans Heqacl (eqsymm Heqacr)) as Heq.
+clear Heqacr.
+invert (basic_value_inv _#6 value_intersect Hpil').
+intros A'' B'' Hbl Hdl Heqbdl.
+so (eqtrans Heqacl (eqsymm Heqbdl)) as Heq'.
+clear Heqbdl.
+invert (basic_value_inv _#6 value_intersect Hpir').
+intros A''' B''' Hbr Hdr Heqbdr.
+so (eqtrans Heqacl (eqsymm Heqbdr)) as Heq''.
+clear Heqbdr.
+subst R.
+so (iuintersect_inj _#7 Heq) as H.
+injectionT H.
+intros <-.
+injectionT H.
+intros <-.
+so (iuintersect_inj _#7 Heq') as H.
+injectionT H.
+intros <-.
+injectionT H.
+intros <-.
+so (iuintersect_inj _#7 Heq'') as H.
+injectionT H.
+intros <-.
+injectionT H.
+intros <-.
+clear Heq Heq' Heq''.
+invertc Hmp.
+intros A' Hal' _ Hmp.
+so (basic_fun _#7 (interp_increase _#6 (toppg_max _) Hal) Hal'); subst A'.
+exists (pi1 B (urelspinj (den A) i m p Hmp)).
+simpsub.
+do2 3 split.
+  {
+  invert Hcl.
+  intros _ _ Hact.
+  so (Hact _#3 (le_refl _) Hmp) as H.
+  simpsubin H.
+  exact H.
+  }
+
+  {
+  invert Hcr.
+  intros _ _ Hact.
+  so (Hact _#3 (le_refl _) Hmp) as H.
+  simpsubin H.
+  exact H.
+  }
+
+  {
+  invert Hdl.
+  intros _ _ Hact.
+  so (Hact _#3 (le_refl _) Hmp) as H.
+  simpsubin H.
+  exact H.
+  }
+
+  {
+  invert Hdr.
+  intros _ _ Hact.
+  so (Hact _#3 (le_refl _) Hmp) as H.
+  simpsubin H.
+  exact H.
+  }
+Qed.

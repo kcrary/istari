@@ -5,7 +5,7 @@ Ctrl.import "datatype-load.iml";
 Ctrl.import "list-aux.iml";
 
 
-Namespace.beginModule "List";
+beginModule "List";
 
 
 typedef
@@ -80,25 +80,18 @@ recordTyping "list_case_type";
 
 (* Append *)
 
-defineRaw /append {a} l1 l2/
+define /append {a} l1 l2/
 /
   list_iter a (fn _ . list a) l2 (fn h _ t . ` cons a h t) l1
-/;
-
-
-
-lemma "append_type"
-/
-  ` append :
+//
   intersect (i : level) .
   forall (a : U i) .
      list a -> list a -> list a
 /;
 
-unfoldHead /append/.
+unfold /append/.
 typecheck.
 qed ();
-recordTyping "append_type";
 
 
 
@@ -186,36 +179,23 @@ definerec /length {a} l/
 
 inference.
 introOf /i a l/.
-revert /l/.
-assert /
-  forall (s : list_skel a) (l : list a) .
-    list_strip l = s : list_skel a
-    -> length a l : nat
-/ /H/.
-1:{
-  intro /l/.
-  apply /H (list_strip l)/.
-  auto.
-  }
-intro /s/.
-so /list_subterm_well_founded _ a s/ /Hwf/.
-induct /Hwf/.
+induct /l/.
 reintro /IH/.
-intro /l Heq/.
 destruct /l/ /| h t/.
-  {
-  unroll /length/.
-  typecheck.
-  }
 
-  {
-  unroll /length/.
-  typecheck1.
-  apply /IH (list_strip t)/ >> auto.
-  moveBefore /h t/ /s/.
-  subst /s/.
-  apply /cons_subterm/.
-  }
+(* nil *)
+{
+unroll /length/.
+typecheck.
+}
+
+(* cons *)
+{
+unroll /length/.
+typecheck.
+apply /IH/.
+apply /cons_subterm/.
+}
 qed ();
 
 

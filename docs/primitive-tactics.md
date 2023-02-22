@@ -113,7 +113,7 @@ primary subgoals.
 
 ### Primitives
 
-The `Tactic` module provides some primitive actions:
+The [`Tactic`](sig/tactic.html) module provides some primitive actions:
 
     val refine : Rule.rule -> tactic
     val chdir : Directory.directory -> tactic
@@ -302,6 +302,9 @@ recursively and obtain a fully normal form.
     
 
 ### Utilities
+
+- [`Tactic`](sig/tactic.html) provides tactic definition and
+  operations shown above, among others.
 
 - [`Trail`](sig/trail.html) establishes a trail of evar bindings that
   can be unwound when necessary.  Its most important operations are:

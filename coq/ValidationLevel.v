@@ -158,3 +158,14 @@ apply (tr_univ_cumulative _ nzero).
   apply tr_unittp_intro.
   }
 Qed.
+
+
+Lemma lleqZero_valid : lleqZero_obligation.
+Proof.
+prepare.
+intros G m ext0 H.
+unfold Defs.lleq.
+rewrite -> def_lzero.
+rewrite -> leqtp_nzero_equiv.
+apply tr_unittp_intro.
+Qed.

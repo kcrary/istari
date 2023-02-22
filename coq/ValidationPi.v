@@ -647,6 +647,20 @@ eapply tr_eqtype_eta2; eauto.
 Qed.
 
 
+Lemma arrowFormInv2_valid : arrowFormInv2_obligation.
+Proof.
+prepare.
+intros G a b m ext1 ext2 Hpi Hm.
+so (tr_pi_formation_invert2 _#5 Hpi) as Hb.
+cut (tr G (substj (dot m id) (deqtype (subst sh1 b) (subst sh1 b)))).
+  {
+  simpsub.
+  auto.
+  }
+eapply tr_generalize; eauto.
+Qed.
+
+
 Lemma tarrowKind_valid : tarrowKind_obligation.
 Proof.
 prepare.
@@ -1456,6 +1470,21 @@ apply tr_intersect_intro.
 Qed.
 
 
+Lemma intersectIntro_valid : intersectIntro_obligation.
+Proof.
+prepare.
+intros G a b ext m Hhyg Ha Hb.
+rewrite -> def_intersect.
+apply tr_intersect_intro; auto.
+simpsub.
+replace (subst (dot triv sh1) m) with m; auto.
+so (subst_into_absent_single _ _ _ triv Hhyg) as H.
+simpsubin H.
+symmetry.
+auto.
+Qed.
+
+
 Lemma intersectElimOf_valid : intersectElimOf_obligation.
 Proof.
 unfoldtop.
@@ -1500,4 +1529,137 @@ eapply tr_intersect_elim.
   apply tr_equal_elim.
   eapply tr_equal_eta2; eauto.
   }
+Qed.
+
+
+Lemma intersectElim_valid : intersectElim_obligation.
+Proof.
+prepare.
+intros G a b p m ext Hm Hp.
+rewrite -> def_intersect in Hm.
+so (tr_intersect_elim _#7 Hm Hp) as H.
+simpsub.
+auto.
+Qed.
+
+
+Lemma intersectFormInv1_valid : intersectFormInv1_obligation.
+Proof.
+prepare.
+intros G a b ext H.
+rewrite -> def_intersect in H.
+eapply tr_intersect_formation_invert1; eauto.
+Qed.
+
+
+Lemma intersectFormInv2_valid : intersectFormInv2_obligation.
+Proof.
+prepare.
+intros G a b m ext1 ext0 Hpi Hm.
+rewrite -> def_intersect in Hpi.
+simpsub.
+cut (tr (hyp_tm a :: G) (deqtype b b)).
+  {
+  intro Hb.
+  so (tr_generalize _#4 Hm Hb) as H.
+  simpsubin H.
+  exact H.
+  }
+eapply tr_intersect_formation_invert2; eauto.
+Qed.
+
+
+Hint Rewrite def_guard : prepare.
+
+
+Lemma guardForm_valid : guardForm_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+apply tr_guard_formation; auto.
+Qed.
+
+
+Lemma guardFormUniv_valid : guardFormUniv_obligation.
+Proof.
+prepare.
+intros G a b lv ext1 ext0 Ha Hb.
+apply tr_guard_formation_univ; auto.
+Qed.
+
+
+Lemma guardEq_valid : guardEq_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext1 ext0 Ha Hb.
+apply tr_guard_formation; auto.
+Qed.
+
+
+Lemma guardEqUniv_valid : guardEqUniv_obligation.
+Proof.
+prepare.
+intros G a a' b b' lv ext1 ext0 Ha Hb.
+apply tr_guard_formation_univ; auto.
+Qed.
+
+
+Lemma guardIntroOf_valid : guardIntroOf_obligation.
+Proof.
+prepare.
+intros G a b m ext1 ext0 Ha Hm.
+apply tr_guard_intro; auto.
+Qed.
+
+
+Lemma guardIntroEq_valid : guardIntroEq_obligation.
+Proof.
+prepare.
+intros G a b m n ext1 ext0 Ha Hmn.
+apply tr_guard_intro; auto.
+Qed.
+
+
+Lemma guardIntro_valid : guardIntro_obligation.
+Proof.
+prepare.
+intros G a b ext0 m Hhide Ha Hm.
+apply tr_guard_intro; auto.
+simpsub.
+replace (subst (dot triv sh1) m) with m; auto.
+so (subst_into_absent_single _#3 triv Hhide) as Heq.
+simpsubin Heq.
+symmetry; auto.
+Qed.
+
+
+Lemma guardElimOf_valid : guardElimOf_obligation.
+Proof.
+prepare.
+intros G a b m ext1 n Hm Hn.
+eapply tr_guard_elim; eauto.
+Qed.
+
+
+Lemma guardElimEq_valid : guardElimEq_obligation.
+Proof.
+prepare.
+intros G a b m n ext1 p Hmn Hp.
+eapply tr_guard_elim; eauto.
+Qed.
+
+
+Lemma guardElim_valid : guardElim_obligation.
+Proof.
+prepare.
+intros G a b m n Hm Hn.
+eapply tr_guard_elim; eauto.
+Qed.
+
+
+Lemma guardSatEq_valid : guardSatEq_obligation.
+Proof.
+prepare.
+intros G a b ext1 m Hb Hm.
+eapply tr_guard_sat_eq; eauto.
 Qed.

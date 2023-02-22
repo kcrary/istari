@@ -25,7 +25,7 @@ addition is left associative, while `Term :: [Term]` indicates that
 cons is right associative.
 
     Term ::=
-      fn OIdents . [Term]                                            (lambda)
+      fn OIdentsn . [Term]                                           (lambda)
       forall Bindings . [Term]                                       (dependent product)  
       exists Bindings . [Term]                                       (strong dependent sum)
       iforall Bindings . [Term]                                      (impredicative universal)
@@ -113,6 +113,9 @@ cons is right associative.
     OIdents ::=
       OIdent ... OIdent                                              (length can be zero)
 
+    OIdentsn ::=
+      OIdent ... OIdent                                              (length at least 1)
+
     Binding ::=
       OIdent                                                         (binding using evar for type)
       (OIdent : Term)                                                (binding with type supplied)
@@ -166,6 +169,7 @@ Notes:
   `additional OIdents . Term`.  For example, `additional x y . y`
   resolves to index 0; and if `z` resolves to index 3, then
   `additional x y . z` resolves to index 5.
+
 
 
 #### Literal terms
@@ -229,3 +233,53 @@ functions: `parseIdent`, `parseIdents`, `parseLongident`,
 
 These functions are all actually the identity function, but IML is
 instructed to parse their argument using the indicated nonterminal.
+
+
+
+#### Opacity
+
+Constants have one of four levels of opacity: soft, firm, hard, or
+opaque:
+
+- Hard: the default opacity for a constant with a definition.  The
+  constant can be unfolded, and a few tactics will unfold it
+  automatically.  It is never unfolded automatically by unification or
+  typechecking.
+
+- Opaque: the constant cannot be unfolded.  Any constant without a
+  definition is opaque, but opaque constants can have definitions.
+
+- Soft: the constant is automatically unfolded by unification,
+  typechecking, and a variety of tactics.  Soft constants are best
+  viewed as abbreviations.  Giving a type to a soft constant usually
+  serves no purpose because the typechecker automatically unfolds it
+  before determining its type.
+
+- Firm: like a soft constant, except the constant is not unfolded by
+  the typechecker in the subject position.  Thus, a firm constant can
+  be given a type for the typechecker to use.
+
+A constant's opacity can be altered using the function `setOpacity`.
+Since opacities can be altered, an opaque constant is not necessarily
+abstract.  To make a constant abstract, one may delete a constant's
+definition, thereby rendering it permanently opaque, using the
+function `abstract`.
+
+    (* abbreviated *)
+    signature CONSTANT =
+       sig
+          ...
+
+          datatype opacity = SOFT | FIRM | HARD | OPAQUE
+    
+          (* returns the constant's definition if the constant is not OPAQUE *)
+          val definition : constant -> term option
+    
+          val opacity : constant -> opacity
+          val setOpacity : constant -> opacity -> unit
+    
+          (* sets opacity to OPAQUE and deletes the definition (cannot be reversed) *)
+          val abstract : constant -> unit
+       end
+
+    structure Constant : CONSTANT

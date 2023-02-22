@@ -386,6 +386,15 @@ apply equivh_tm; auto.
 Qed.
 
 
+Add Parametric Morphism object : (@hyp_tml object)
+  with signature Equivalence.equiv ==> equivh
+  as tml_mor.
+Proof.
+intros h h' Hequiv.
+apply equivh_tml; auto.
+Qed.
+
+
 Add Parametric Morphism object : (@cons (@hyp object))
   with signature equivh ==> equivctx ==> equivctx
   as cons_mor.
@@ -438,12 +447,45 @@ reflexivity.
 Qed.
 
 
+Lemma equiv_deqtype :
+  forall object (a a' b b' : @term object),
+    equiv a a'
+    -> equiv b b'
+    -> equivj (deqtype a b) (deqtype a' b').
+Proof.
+intros.
+unfold deqtype.
+apply equiv_deq; auto using equiv_refl.
+apply equiv_eqtype; auto.
+Qed.
+
+
+Add Parametric Morphism object : (@deqtype object)
+  with signature (@equiv object) ==> (@equiv object) ==> (@equivj object)
+  as deqtype_mor.
+Proof.
+intros a a' Ha b b' Hb.
+apply equiv_deqtype; auto.
+Qed.
+
+
 Add Parametric Morphism object : (@pi object)
   with signature equiv ==> equiv ==> equiv
   as equiv_pi.
 Proof.
 intros m1 m1' H1 m2 m2' H2.
 unfold pi.
+rewrite H1, H2.
+reflexivity.
+Qed.
+
+
+Add Parametric Morphism object : (@intersect object)
+  with signature equiv ==> equiv ==> equiv
+  as equiv_interesct.
+Proof.
+intros m1 m1' H1 m2 m2' H2.
+unfold intersect.
 rewrite H1, H2.
 reflexivity.
 Qed.

@@ -118,6 +118,7 @@ UNITS = \
 	ValidationMu \
 	ValidationNat \
 	ValidationQuotient \
+	ValidationRec \
 	ValidationSigma \
 	ValidationSimple \
 	ValidationSum \

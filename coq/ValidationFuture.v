@@ -1,5 +1,7 @@
 
 Require Import Coq.Lists.List.
+Import ListNotations.
+
 Require Import Tactics.
 Require Import Sequence.
 Require Import Syntax.
@@ -140,86 +142,150 @@ Lemma futureLeft_valid : futureLeft_obligation.
   eauto using deqtype_intro.
 Qed.
 
-Lemma recKind_valid : recKind_obligation.
- unfoldtop. autounfold with valid_hint.
-  intros G i k triv0 triv1 H0 H1.
-  valid_rewrite. 
-  constructor.
-  assert (equivctx (hyp_tml (app Defs.kind i) :: G)
-                    (hyp_tml (kuniv i) :: G)) as Hctx.
-  {constructor. apply def_kindh_l. apply equivctx_refl. } 
-    rewrite -> Hctx in * |- *.
-  rewrite -> def_kind in * |- *.
-  apply tr_rec_kind_formation; eauto using deq_intro.
-  Qed.
+Lemma tr_future_sub :
+  forall G a b,
+    tr (promote G) (dsubtype a b)
+    -> tr G (dsubtype (fut a) (fut b)).
+Proof.
+intros G a b Ha.
+apply tr_subtype_intro.
+  {
+  apply tr_fut_formation.
+  eapply tr_subtype_istype1; eauto.
+  }
 
-Lemma recKindEq_valid : recKindEq_obligation.
- unfoldtop. autounfold with valid_hint.
-  intros G i k l triv0 triv1 H0 H1.
-  valid_rewrite. 
-  constructor.
-  assert (equivctx (hyp_tml (app Defs.kind i) :: G)
-                    (hyp_tml (kuniv i) :: G)) as Hctx.
-  {constructor. apply def_kindh_l. apply equivctx_refl. } 
-    rewrite -> Hctx in * |- *.
-  rewrite -> def_kind in * |- *.
-  apply tr_rec_kind_formation; eauto using deq_intro.
+  {
+  apply tr_fut_formation.
+  eapply tr_subtype_istype2; eauto.
+  }
+simpsub.
+apply (tr_fut_ext _ _ (subst sh1 a) (subst sh1 a)).
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+replace (next (prev (var 0))) with (@subst1 obj (prev (var 0)) (next (var 0))).
+2:{
+  simpsub.
+  auto.
+  }
+replace (fut (subst sh1 b)) with (subst1 (prev (var 0)) (fut (subst (sh 2) b))).
+2:{
+  simpsub.
+  auto.
+  }
+apply (tr_fut_elim _ (var 0) (var 0) (subst sh1 a) (next (var 0)) (next (var 0)) (fut (subst (sh 2) b))).
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  cbn.
+  fold (promote G).
+  eapply (weakening _ [_] []).
+    {
+    cbn [length Dots.unlift].
+    simpsub.
+    auto.
+    }
+  
+    {
+    cbn [length Dots.unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length Dots.unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_subtype_istype1; eauto.
+  }
+apply tr_fut_intro.
+cbn.
+fold (promote G).
+eapply (weakening _ [_] [_]).
+  {
+  cbn [length Dots.unlift].
+  simpsub.
+  auto.
+  }
+
+  {
+  cbn [length Dots.unlift].
+  simpsub.
+  auto.
+  }
+cbn [length Dots.unlift].
+simpsub.
+cbn [List.app].
+apply (tr_subtype_elim _ (subst sh1 a)).
+  {
+  eapply (weakening _ [_] []).
+    {
+    cbn [length Dots.unlift].
+    simpsub.
+    auto.
+    }
+  
+    {
+    cbn [length Dots.unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length Dots.unlift].
+  simpsub.
+  cbn [List.app].
+  exact Ha.
+  }
+
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+Qed.
+ 
+
+Hint Rewrite def_fut def_letnext : prepare.
+
+
+Lemma futureSub_valid : futureSub_obligation.
+Proof.
+prepare.
+intros G a b ext0 H.
+apply tr_future_sub; auto.
 Qed.
 
-Lemma recForm_valid : recForm_obligation. 
- unfoldtop. autounfold with valid_hint.
-  intros G a triv0 H.
-  valid_rewrite. 
-  constructor.
-  eauto using deqtype_intro.
-Qed.
 
- Lemma recEq_valid : recEq_obligation.
- unfoldtop. autounfold with valid_hint.
-  intros G a b triv0 H.
-  valid_rewrite. 
-  constructor.
-  eauto using deqtype_intro.
- Qed.
-
-Lemma recFormUniv_valid : recFormUniv_obligation. 
- unfoldtop. autounfold with valid_hint.
-  intros G a i triv0 triv1 H0 H1.
-  valid_rewrite. 
-  assert (equivctx (hyp_tml (app Defs.univ i) :: G)
-                    (hyp_tml (univ i) :: G)) as Hctx.
-  {constructor. apply def_univh_l. apply equivctx_refl. } 
-    rewrite -> Hctx in * |- *.
-  rewrite -> def_univ in * |- *.
-  constructor.
-  apply tr_rec_formation_univ; eauto using deq_intro.
-  Qed.
-
-  Lemma recEqUniv_valid : recEqUniv_obligation.
- unfoldtop. autounfold with valid_hint.
-  intros G a b i triv0 triv1 H0 H1.
-  valid_rewrite. 
-  assert (equivctx (hyp_tml (app Defs.univ i) :: G)
-                    (hyp_tml (univ i) :: G)) as Hctx.
-  {constructor. apply def_univh_l. apply equivctx_refl. } 
-    rewrite -> Hctx in * |- *.
-  rewrite -> def_univ in * |- *.
-  constructor.
-  apply tr_rec_formation_univ; eauto using deq_intro.
+Lemma futureElimOfLetnext_valid : futureElimOfLetnext_obligation.
+Proof.
+prepare.
+intros G a b m p ext2 ext1 ext0 Ha Hm Hp.
+eapply tr_fut_elim; eauto.
 Qed.
 
 
-Lemma recUnroll_valid : recUnroll_obligation. 
- unfoldtop. autounfold with valid_hint.
- intros G a triv0 H.
- valid_rewrite.
- apply tr_rec_unroll.
- eauto using deqtype_intro.
+Lemma futureElimOfLetnextNondep_valid : futureElimOfLetnextNondep_obligation.
+Proof.
+prepare.
+intros G a b m p ext2 ext1 ext0 Ha Hm Hp.
+replace b with (subst1 (prev m) (subst sh1 b)) by (simpsub; reflexivity).
+eapply tr_fut_elim; eauto.
 Qed.
 
-Lemma recBisimilar_valid : recBisimilar_obligation.
- unfoldtop. autounfold with valid_hint.
- intros G a b triv0 triv1 H0.
- valid_rewrite. 
- constructor; eauto using deqtype_intro.
+
+Lemma futureElimIstypeLetnext_valid : futureElimIstypeLetnext_obligation.
+Proof.
+prepare.
+intros G a b m ext2 ext1 ext0 Ha Hm Hb.
+eapply tr_fut_elim_eqtype; eauto.
+Qed.
+
+
+Lemma futureExt_valid : futureExt_obligation.
+Proof.
+prepare.
+intros G a m n ext2 ext1 ext0 Hm Hn Hmn.
+eapply tr_fut_ext; eauto.
+apply tr_fut_intro; auto.
 Qed.

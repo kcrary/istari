@@ -95,7 +95,7 @@ apply tr_sigma_formation_univ.
   {
   apply (tr_univ_cumulative _ nzero).
     {
-    apply tr_booltp_formation.
+    apply tr_booltp_formation_univ.
     }
 
     {

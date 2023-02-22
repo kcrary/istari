@@ -194,6 +194,13 @@ type that is similar to `tree_iter` except at the end:
            & (forall (n : nat) (t : forest a n) . Q n t)
            & unit
 
+Note that the level of the iterator's result (`U i` above) is given by
+the universe in the datatype declaration.  For this reason, it is
+often a good idea to define a datatype in `U i` even if the datatype
+could be defined in a fixed universe such as `U 0`.  Doing the latter
+would prevent using the iterator with a result type in any universe
+larger than `U 0`.
+
 
 ##### Iterator reduction
 

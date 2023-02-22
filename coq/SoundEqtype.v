@@ -334,3 +334,81 @@ intros A A' _ _ <-.
 do 3 eexists.
 reflexivity.
 Qed.
+
+
+Lemma sound_eqtype_formation_invert1 :
+  forall G a a' b b',
+    pseq G (deqtype (eqtype a b) (eqtype a' b'))
+    -> pseq G (deqtype a a').
+Proof.
+intros G a b c d.
+revert G.
+refine (seq_pseq 0 1 [] _ _ _).
+cbn.
+intros G Hseq.
+rewrite -> seq_eqtype in Hseq |- *.
+intros i s s' Hs.
+so (Hseq _ _ _ Hs) as (R & Hacl & Hacr & Hbdl & Hbdr).
+simpsubin Hacl.
+simpsubin Hacr.
+simpsubin Hbdl.
+simpsubin Hbdr.
+invert (basic_value_inv _#6 value_eqtype Hacl).
+intros A C Hal Hcl Heq.
+invert (basic_value_inv _#6 value_eqtype Hacr).
+intros A' C' Har Hcr Heq'.
+so (eqtrans Heq (eqsymm Heq')) as H.
+so (iueqtype_inj _#6 H) as (<- & <-).
+clear Heq' H.
+invert (basic_value_inv _#6 value_eqtype Hbdl).
+intros A' C' Hbl Hdl Heq'.
+so (eqtrans Heq (eqsymm Heq')) as H.
+so (iueqtype_inj _#6 H) as (<- & <-).
+clear Heq' H.
+invert (basic_value_inv _#6 value_eqtype Hbdr).
+intros A' C' Hbr Hdr Heq'.
+so (eqtrans Heq (eqsymm Heq')) as H.
+so (iueqtype_inj _#6 H) as (<- & <-).
+clear Heq Heq' H.
+exists A.
+auto.
+Qed.
+
+
+Lemma sound_eqtype_formation_invert2 :
+  forall G a a' b b',
+    pseq G (deqtype (eqtype a b) (eqtype a' b'))
+    -> pseq G (deqtype b b').
+Proof.
+intros G a b c d.
+revert G.
+refine (seq_pseq 0 1 [] _ _ _).
+cbn.
+intros G Hseq.
+rewrite -> seq_eqtype in Hseq |- *.
+intros i s s' Hs.
+so (Hseq _ _ _ Hs) as (R & Hacl & Hacr & Hbdl & Hbdr).
+simpsubin Hacl.
+simpsubin Hacr.
+simpsubin Hbdl.
+simpsubin Hbdr.
+invert (basic_value_inv _#6 value_eqtype Hacl).
+intros A C Hal Hcl Heq.
+invert (basic_value_inv _#6 value_eqtype Hacr).
+intros A' C' Har Hcr Heq'.
+so (eqtrans Heq (eqsymm Heq')) as H.
+so (iueqtype_inj _#6 H) as (<- & <-).
+clear Heq' H.
+invert (basic_value_inv _#6 value_eqtype Hbdl).
+intros A' C' Hbl Hdl Heq'.
+so (eqtrans Heq (eqsymm Heq')) as H.
+so (iueqtype_inj _#6 H) as (<- & <-).
+clear Heq' H.
+invert (basic_value_inv _#6 value_eqtype Hbdr).
+intros A' C' Hbr Hdr Heq'.
+so (eqtrans Heq (eqsymm Heq')) as H.
+so (iueqtype_inj _#6 H) as (<- & <-).
+clear Heq Heq' H.
+exists C.
+auto.
+Qed.

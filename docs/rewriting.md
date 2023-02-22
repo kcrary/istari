@@ -32,6 +32,12 @@ specific position for `x` or `x y`, but all rewrites will act on the
 prefix of a path so 0 will do.  The `showPosition` tool (see below)
 can assist in counting positions.
 
+When a hypothesis is rewritten, only earlier hypotheses are available
+to the rewrite.  Thus, for example, a hypothetical equality can only
+be used to rewrite a **later** hypothesis.  Similarly, any hypotheses
+used to satisfy typing obligations that are incurred by a rewrite must
+appear before the hypothesis being rewritten.
+
 
 
 ### Capturing bindings

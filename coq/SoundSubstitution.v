@@ -1050,6 +1050,136 @@ eapply sound_generalize_tp_pre; eauto.
 Qed.
 
 
+Lemma sound_generalize_eq :
+  forall G a b m n p q,
+    pseq G (deq m n a)
+    -> pseq (cons (hyp_tm a) G) (deq p q b)
+    -> pseq G (deq (subst1 m p) (subst1 n q) (subst1 m b)).
+Proof.
+intros G a b m n p q.
+revert G.
+refine (seq_pseq 0 2 [] _ [_] _ _ _).
+cbn.
+intros G Hseqmn Hseqpq.
+rewrite -> seq_deq in Hseqmn, Hseqpq |- *.
+intros i s s' Hs.
+so (Hseqmn _ _ _ Hs) as (A & Hal & Har & Hm & Hn & Hmn).
+assert (pwctx i (dot (subst s m) s) (dot (subst s' n) s') (cons (hyp_tm a) G)) as Hsmn.
+  {
+  apply pwctx_cons_tm_seq; auto.
+    {
+    eapply seqhyp_tm; eauto.
+    }
+    
+    {
+    intros j t t' Ht.
+    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
+    eauto.
+    }
+  }
+assert (pwctx i (dot (subst s m) s) (dot (subst s' m) s') (cons (hyp_tm a) G)) as Hsm.
+  {
+  apply pwctx_cons_tm_seq; auto.
+    {
+    eapply seqhyp_tm; eauto.
+    }
+    
+    {
+    intros j t t' Ht.
+    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
+    eauto.
+    }
+  }
+assert (pwctx i (dot (subst s n) s) (dot (subst s' n) s') (cons (hyp_tm a) G)) as Hsn.
+  {
+  apply pwctx_cons_tm_seq; auto.
+    {
+    eapply seqhyp_tm; eauto.
+    }
+    
+    {
+    intros j t t' Ht.
+    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
+    eauto.
+    }
+  }
+so (Hseqpq _ _ _ Hsm) as (R & Hbml & Hbmr & Hp & _).
+so (Hseqpq _ _ _ Hsn) as (R' & Hbnl & Hbnr & _ & Hq & _).
+so (Hseqpq _ _ _ Hsmn) as (R'' & Hbml' & Hbnr' & _ & _ & Hpq).
+so (interp_fun _#7 Hbml Hbml'); subst R''.
+so (interp_fun _#7 Hbnr Hbnr'); subst R'.
+exists R.
+simpsub.
+do2 4 split; auto.
+Qed.
+
+
+
+Lemma sound_generalize_eq_type :
+  forall G a b m n p q,
+    pseq G (deq m n a)
+    -> pseq (cons (hyp_tm a) G) (deq p q b)
+    -> pseq G (deqtype (subst1 m b) (subst1 n b)).
+Proof.
+intros G a b m n p q.
+revert G.
+refine (seq_pseq 0 2 [] _ [_] _ _ _).
+cbn.
+intros G Hseqmn Hseqb.
+rewrite -> seq_eqtype.
+rewrite -> seq_deq in Hseqmn, Hseqb.
+intros i s s' Hs.
+so (Hseqmn _ _ _ Hs) as (A & Hal & Har & Hm & Hn & Hmn).
+assert (pwctx i (dot (subst s m) s) (dot (subst s' n) s') (cons (hyp_tm a) G)) as Hsmn.
+  {
+  apply pwctx_cons_tm_seq; auto.
+    {
+    eapply seqhyp_tm; eauto.
+    }
+    
+    {
+    intros j t t' Ht.
+    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
+    eauto.
+    }
+  }
+assert (pwctx i (dot (subst s m) s) (dot (subst s' m) s') (cons (hyp_tm a) G)) as Hsm.
+  {
+  apply pwctx_cons_tm_seq; auto.
+    {
+    eapply seqhyp_tm; eauto.
+    }
+    
+    {
+    intros j t t' Ht.
+    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
+    eauto.
+    }
+  }
+assert (pwctx i (dot (subst s n) s) (dot (subst s' n) s') (cons (hyp_tm a) G)) as Hsn.
+  {
+  apply pwctx_cons_tm_seq; auto.
+    {
+    eapply seqhyp_tm; eauto.
+    }
+    
+    {
+    intros j t t' Ht.
+    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
+    eauto.
+    }
+  }
+so (Hseqb _ _ _ Hsm) as (R & Hbml & Hbmr & _).
+so (Hseqb _ _ _ Hsn) as (R' & Hbnl & Hbnr & _).
+so (Hseqb _ _ _ Hsmn) as (R'' & Hbml' & Hbnr' & _).
+so (interp_fun _#7 Hbml Hbml'); subst R''.
+so (interp_fun _#7 Hbnr Hbnr'); subst R'.
+exists R.
+simpsub.
+auto.
+Qed.
+
+
 Lemma sound_compute_pre :
   forall G a a' m m' n n',
     hygiene (ctxpred G) a

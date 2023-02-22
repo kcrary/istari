@@ -8,6 +8,8 @@ signature MAIN =
       val lemmagen : unit -> unit
       val docgen : unit -> unit
       val docgendb : unit -> unit
+      val webgen : unit -> unit
+      val webgendb : unit -> unit
       val gen : unit -> unit
 
    end
@@ -77,6 +79,26 @@ structure Main :> MAIN =
                (fn () => TextIO.closeOut outs)
          end
 
+      fun webgen () =
+         let
+            val rules = parse ()
+            val outs = TextIO.openOut "rules.md"
+         in
+            Finally.finally
+               (fn () => Webgen.gen outs rules)
+               (fn () => TextIO.closeOut outs)
+         end
+
+      fun webgendb () =
+         let
+            val rules = elaborate ()
+            val outs = TextIO.openOut "rules-db.md"
+         in
+            Finally.finally
+               (fn () => WebgenDB.gen outs rules)
+               (fn () => TextIO.closeOut outs)
+         end
+
       fun gen () =
          let
             val rules = parse ()
@@ -111,6 +133,22 @@ structure Main :> MAIN =
             in
                Finally.finally
                   (fn () => DocgenDB.gen outs rules')
+                  (fn () => TextIO.closeOut outs)
+            end;
+
+            let
+               val outs = TextIO.openOut "../rules/rules.md"
+            in
+               Finally.finally
+                  (fn () => Webgen.gen outs rules)
+                  (fn () => TextIO.closeOut outs)
+            end;
+
+            let
+               val outs = TextIO.openOut "../rules/rules-db.md"
+            in
+               Finally.finally
+                  (fn () => WebgenDB.gen outs rules')
                   (fn () => TextIO.closeOut outs)
             end
          end
