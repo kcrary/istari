@@ -40,7 +40,6 @@ Conventions:
 [Subset types](#subset-types)<br>
 [Squash](#squash)<br>
 [Quotient types](#quotient-types)<br>
-[Well-founded types](#well-founded-types)<br>
 [Impredicative universals](#impredicative-universals)<br>
 [Impredicative polymorphism](#impredicative-polymorphism)<br>
 [Impredicative existentials](#impredicative-existentials)<br>
@@ -2929,72 +2928,6 @@ Conventions:
       G |- istp A
       >>
       G |- istp (quotient A (fn . fn . B))
-
-
-### Well-founded types
-
-- `wtypeForm A B`
-
-      G |- istp (wtype A (fn . B))
-      >>
-      G |- istp A
-      G, A |- istp B
-
-- `wtypeEq A A' B B'`
-
-      G |- eqtp (wtype A (fn . B)) (wtype A' (fn . B'))
-      >>
-      G |- eqtp A A'
-      G, A |- eqtp B B'
-
-- `wtypeFormUniv A B I`
-
-      G |- of (univ I) (wtype A (fn . B))
-      >>
-      G |- of (univ I) A
-      G, A |- of (univ I[^1]) B
-
-- `wtypeEqUniv A A' B B' I`
-
-      G |- eq (univ I) (wtype A (fn . B)) (wtype A' (fn . B'))
-      >>
-      G |- eq (univ I) A A'
-      G, A |- eq (univ I[^1]) B B'
-
-- `wtypeElimOf A B C M N`
-
-      G |- of C[M . id] (wind (fn . fn . fn . N) M)
-      >>
-      G |- of (wtype A (fn . B)) M
-      G, A, (arrow B (wtype A[^1] (fn . B[0 . ^2]))), (forall B[^1] (fn . C[1 0 . ^3])) |- of C[(2 , 1) . ^3] N
-
-- `wtypeElimEq A B C M M' N N'`
-
-      G |- eq C[M . id] (wind (fn . fn . fn . N) M) (wind (fn . fn . fn . N') M')
-      >>
-      G |- eq (wtype A (fn . B)) M M'
-      G, A, (arrow B (wtype A[^1] (fn . B[0 . ^2]))), (forall B[^1] (fn . C[1 0 . ^3])) |- eq C[(2 , 1) . ^3] N N'
-
-- `wtypeElim A B C M`
-
-      G |- C[M . id] ext wind (fn . fn . fn . N) M
-      >>
-      G |- of (wtype A (fn . B)) M
-      G, A, (arrow B (wtype A[^1] (fn . B[0 . ^2]))), (forall B[^1] (fn . C[1 0 . ^3])) |- C[(2 , 1) . ^3] ext N
-
-- `wtypeUnroll A B`
-
-      G |- subtype (wtype A (fn . B)) (exists A (fn . arrow B (wtype A[^1] (fn . B[0 . ^2]))))
-      >>
-      G |- istp A
-      G, A |- istp B
-
-- `wtypeRoll A B`
-
-      G |- subtype (exists A (fn . arrow B (wtype A[^1] (fn . B[0 . ^2])))) (wtype A (fn . B))
-      >>
-      G |- istp A
-      G, A |- istp B
 
 
 ### Impredicative universals

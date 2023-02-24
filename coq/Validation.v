@@ -230,15 +230,6 @@ exact boolElimIstype_valid.
 exact boolElimEqtype_valid.
 exact boolLeft_valid.
 admit.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
 exact muForm_valid.
 exact muEq_valid.
 exact muFormUniv_valid.

@@ -208,3 +208,147 @@ induct /n/.
 reintro /IH/.
 typecheck.
 qed ();
+
+
+
+openModule /Wtype/;
+
+
+define /natish/
+/
+  wtype (x : bool) . if x then void else unit
+//
+  U 0
+/;
+
+unfold /natish/.
+typecheck.
+qed ();
+
+
+
+define /zeroish/
+/
+  (true , (fn _ . ()))
+//
+  natish
+/;
+
+unfold /zeroish , natish/.
+typecheck.
+reintro /x/.
+destruct /x/ /0/.
+qed ();
+
+
+
+define /succish x/
+/
+  (false , (fn _ . x))
+//
+  natish -> natish
+/;
+
+unfold /succish , natish at all/.
+typecheck.
+qed ();
+
+
+
+define /natrecish P hz hs n/
+/
+  wtype_iter bool (fn n . if n then void else unit) P
+    (fn x y f .
+       if x then
+         hz
+       else
+         hs (y ()) (f ()))
+    n
+//
+  intersect i .
+  forall (P : natish -> U i) .
+    P zeroish
+    -> (forall (m : natish) . P m -> P (succish m))
+    -> forall (n : natish) . P n
+/;
+
+inference.
+assert /natish = (wtype (x : bool) . if x then void else unit) : U 0/ /Heq/.
+  {
+  unfold /natish/.
+  typecheck.
+  }
+introOf /i P hz hs n/.
+unfold /natish in n/.
+induct /n/.
+reintro /IH/.
+destruct /n/ /x y/.
+destruct /x/ /|/.
+  {
+  unfold /natrecish/.
+  unroll /wtype_iter/.
+  reduce //.
+  infer /hz/ /H/.
+  typecheck.
+  unfold /zeroish/.
+  subsume /_/.
+    {
+    unfold /natish/.
+    apply /wtype_roll/.
+    }
+  reduce //.
+  compat.
+  extensionality /x/.
+    {
+    reintro /x/.
+    destruct /x/ /0/.
+    }
+
+    {
+    destruct /x/ /0/.
+    }
+  }
+
+  {
+  reduce /y/.
+  fold /natish in y/.
+  unfold /natrecish/.
+  unroll /wtype_iter/.
+  reduce //.
+  fold /natrecish P hz hs _/.
+  typecheck.
+    {
+    subsume /_/.
+      {
+      unfold /natish/.
+      apply /wtype_roll/.
+      }
+    reduce //.
+    unfold /succish/.
+    compat.
+    reduce //.
+    fold /natish/.
+    extensionality /x/.
+    compat.
+    extensionality /_/.
+    }
+
+    {
+    apply /IH/.
+    unfold /precedes/.
+    reduce //.
+    exists /()/.
+    reflexivity.
+    }
+  }
+qed ();
+
+
+
+reductions
+/
+  natrecish P hz hs (zeroish) --> hz ;
+  natrecish P hz hs (succish n) --> hs n (natrecish P hz hs n) ;
+  unfolding zeroish succish natrecish
+  unrolling wtype_iter
+/;

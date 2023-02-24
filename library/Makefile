@@ -2,7 +2,7 @@
 ISTARI=../ui/bin/istari-nolib
 PROCDOC=../ui/bin/procdoc
 
-DOCUNITS = acc bar bool decidable integer logic list nat relations stable
+DOCUNITS = acc bar bool decidable integer logic list nat relations stable wtype
 UNITS = $(DOCUNITS) datatype omega
 
 all : $(foreach i, $(UNITS), $(i).isto)
@@ -24,6 +24,7 @@ nat.isto : acc.isto acc-aux.iml bool.isto bool-aux.iml decidable.isto decidable-
 omega.isto : logic.isto logic-aux.iml bool.isto bool-aux.iml nat.isto nat-aux.iml integer.isto integer-aux.iml list.isto list-aux.iml
 relations.isto : acc.isto acc-aux.iml
 stable.isto : decidable.isto decidable-aux.iml logic.isto logic-aux.iml
+wtype.isto : acc.isto acc-aux.iml
 
 clean :
 	rm -f *.isto

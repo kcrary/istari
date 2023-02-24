@@ -1,0 +1,206 @@
+
+structure ParseWtype =
+   struct
+
+      structure T = ETerm
+
+      val wtype = Susp.delay (fn () => parseConstant /Wtype.wtype/)
+
+      fun parseWtype x a b = T.apply2 (Susp.force wtype) a (T.lam (SOME x) b)
+
+   end
+
+
+
+grammardef Wtype
+
+   open ParseWtype
+
+   rule Term(0)   ::= "wtype" "(" Ident ":" Term(0) ")" "." Term(0) => parseWtype
+
+   reserved "wtype" : Ident
+
+end
+
+grammaron Wtype
+
+
+
+functor AfterWtype () :> sig end =
+   struct
+
+      structure U = Show.Unparsing
+
+      val wtype = parseConstant /Wtype.wtype/
+
+      val () =
+         ConstantTable.insert U.unparsingTable wtype
+         (2, 0, ref true,
+          U.wrap
+             (U.apply2 wtype U.show (U.lam U.show))
+             (fn (a, (arg, b)) =>
+                 U.append [
+                          U.string "wtype (",
+                          U.string arg, 
+                          U.string " : ",
+                          U.box (a 0),
+                          U.string ") .",
+                          U.break 1,
+                          b 1
+                          ]))
+
+      val () =
+         U.reserved :=
+         SymbolSet.insert (!U.reserved) (Symbol.fromValue "wtype")
+
+   end
+
+
+
+functor AfterWtypeUnroll () :> sig end =
+   struct
+
+      structure T = Term
+
+      open Tactic
+      open Case
+
+      val wtype = parseConstant /Wtype.wtype/
+      val wtype_roll = parseConstant /Wtype.wtype_roll/
+      val wtype_eeqtp = parseConstant /Wtype.wtype_eeqtp/
+
+
+      fun unrolled binder a b =
+         T.apply2 Prim.exists a
+            (T.Lam (binder,
+                    T.apply2 Prim.arrow
+                       b
+                       (T.Sub (T.apply2 wtype a (T.Lam (binder, b)),
+                               T.shift1))))
+
+
+      val wtypeIntroOf =
+         goalCase
+         /
+            \Prim.ov\ (\wtype\ ? (fn ? . ?)) ($as (_ , _)) =>
+            \(fnc a binder b m =>
+                 (* M : wtype A . B *)
+                 refine (Rule.subsumptionOf
+                            (unrolled binder a b)
+                            (T.evar ())
+                            (T.evar ()))
+                 >>> [
+                     exactRaw
+                        (ETerm.literal
+                            (T.Elim (T.Const wtype_roll,
+                                     [T.App (T.evar ()),
+                                      T.App a,
+                                      T.App (T.Lam (binder, b))]))),
+                     
+                     RuleTactic.existsIntroOf
+                     ])\
+         /
+
+      val () =
+         (
+         ConstantTable.insert TypecheckInternal.introTactics wtype wtypeIntroOf;
+
+         Constant2Table.insert TypecheckInternal.subtypeTactics (wtype, Prim.exists)
+            (applyRaw /Wtype.wtype_unroll/);
+
+         Constant2Table.insert TypecheckInternal.subtypeTactics (Prim.exists, wtype)
+            (applyRaw /Wtype.wtype_roll/)
+         )
+
+
+      fun destWtype i pat set =
+         (case pat of
+             IntroPattern.And [p1, p2] =>
+                let
+                   do (jud, _) = withgoal
+
+                   val h = Judgement.hyp jud i
+                in
+                   hypCase h
+                   / $tm \wtype\ ? (fn ? . ?) =>
+                     \(fnc a binder b =>
+                          (* G, wtype a . b, ... |- C *)
+                          refine (Rule.subsumptionLeft i
+                                     (T.evar ())
+                                     (unrolled binder a b)
+                                     (T.evar ()))
+                          >>> [
+                              (* G, (wtype a . b) : type |- (wtype a . b <:> exists a . b -> (wtype a . b)[^])[^] *)
+                              refine (Rule.weaken 0 1)
+                              >>+
+                              (* G |- wtype a . b <:> exists a . b -> (wtype a . b)[^] *)
+                                      
+                              exactRaw
+                                 (ETerm.literal
+                                     (T.Elim (T.Const wtype_eeqtp,
+                                              [T.App (T.evar ()),
+                                               T.App a,
+                                               T.App (T.Lam (binder, b))])))
+                              >>
+                              idtacM (Seq.empty, DestructInternal.Tertiary),
+      
+                              (* G, exists a . b -> (wtype a . b)[^], ... |- C *)
+                              DestructInternal.dest i pat set
+                              ])\
+                   /
+                end
+
+           | _ =>
+                fail "wtype pattern expected")
+
+      val () =
+         ConstantTable.insert DestructInternal.destructTactics wtype destWtype
+
+   end
+
+
+
+functor AfterWtypeIter () :> sig end =
+   struct
+
+      structure T = Term
+
+      open Tactic
+
+      val wtype = parseConstant /Wtype.wtype/
+      val wtype_iter = parseConstant /Wtype.wtype_iter/
+      val precedes_well_founded = parseConstant /Wtype.precedes_well_founded/
+
+      val () =
+         ConstantTable.insert InductionInternal.iterators wtype (wtype_iter, 2, 0)
+
+
+      val wtypeInduction =
+         let
+            do (jud, dir) = withgoal
+
+            do (b, tac) =
+               BackchainInternal.soMain
+                  (Judgement.context jud)
+                  (T.Elim (T.Const precedes_well_founded,
+                           [T.App (T.evar ()),
+                            T.App (T.evar ()),
+                            T.App (T.evar ()),
+                            T.App T.zero]))
+                  (fn msg => fail msg)
+         in
+            refine (Rule.assert b (T.evar ()))
+            >>> [
+                tac,
+
+                chdir (Directory.bind0 dir)
+                >>
+                InductionInternal.accInduction
+                ]
+         end
+
+      val () =
+         ConstantTable.insert InductionInternal.inductionTactics wtype wtypeInduction
+
+   end
+

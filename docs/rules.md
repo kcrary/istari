@@ -49,7 +49,6 @@ of rules.
 [Subset types](#subset-types)<br>
 [Squash](#squash)<br>
 [Quotient types](#quotient-types)<br>
-[Well-founded types](#well-founded-types)<br>
 [Impredicative universals](#impredicative-universals)<br>
 [Impredicative polymorphism](#impredicative-polymorphism)<br>
 [Impredicative existentials](#impredicative-existentials)<br>
@@ -2938,72 +2937,6 @@ of rules.
       G |- A : type
       >>
       G |- (quotient (x y : A) . B) : type
-
-
-### Well-founded types
-
-- `wtypeForm A B`
-
-      G |- (wtype (x : A) . B) : type
-      >>
-      G |- A : type
-      G, x : A |- B : type
-
-- `wtypeEq A A' B B'`
-
-      G |- (wtype (x : A) . B) = (wtype (x : A') . B') : type
-      >>
-      G |- A = A' : type
-      G, x : A |- B = B' : type
-
-- `wtypeFormUniv A B I`
-
-      G |- (wtype (x : A) . B) : univ I
-      >>
-      G |- A : univ I
-      G, x : A |- B : univ I
-
-- `wtypeEqUniv A A' B B' I`
-
-      G |- (wtype (x : A) . B) = (wtype (x : A') . B') : univ I
-      >>
-      G |- A = A' : univ I
-      G, x : A |- B = B' : univ I
-
-- `wtypeElimOf A B C M N`
-
-      G |- wind (fn x . fn y . fn z . N) M : [M / w]C
-      >>
-      G |- M : wtype (x' : A) . B
-      G, x : A, y : ([x / x']B -> wtype (x' : A) . B), z : (forall (b : [x / x']B) . [y b / w]C) |- N : [(x , y) / w]C
-
-- `wtypeElimEq A B C M M' N N'`
-
-      G |- wind (fn x . fn y . fn z . N) M = wind (fn x . fn y . fn z . N') M' : [M / w]C
-      >>
-      G |- M = M' : (wtype (x' : A) . B)
-      G, x : A, y : ([x / x']B -> wtype (x' : A) . B), z : (forall (b : [x / x']B) . [y b / w]C) |- N = N' : [(x , y) / w]C
-
-- `wtypeElim A B C M`
-
-      G |- [M / w]C ext wind (fn x . fn y . fn z . N) M
-      >>
-      G |- M : wtype (x' : A) . B
-      G, x : A, y : ([x / x']B -> wtype (x' : A) . B), z : (forall (b : [x / x']B) . [y b / w]C) |- [(x , y) / w]C ext N
-
-- `wtypeUnroll A B`
-
-      G |- (wtype (x : A) . B) <: (exists (x' : A) . [x' / x]B -> wtype (x : A) . B)
-      >>
-      G |- A : type
-      G, x : A |- B : type
-
-- `wtypeRoll A B`
-
-      G |- (exists (x' : A) . [x' / x]B -> wtype (x : A) . B) <: (wtype (x : A) . B)
-      >>
-      G |- A : type
-      G, x : A |- B : type
 
 
 ### Impredicative universals

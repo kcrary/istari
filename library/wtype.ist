@@ -1,0 +1,193 @@
+
+Ctrl.import "acc-load.iml";
+
+Ctrl.import "wtype-aux.iml";
+
+
+beginModule "Wtype";
+
+
+grammaroff Wtype;
+
+
+define /wtype a b/
+/
+  mu t . exists (x : a) . b x -> t
+//
+  intersect i .
+  forall (a : U i) . (a -> U i) -> U i
+/;
+
+inference.
+introOf /i a b/.
+unfold /wtype/.
+typecheck.
+qed ();
+
+
+grammaron Wtype;
+
+structure Nothing = AfterWtype ();
+
+
+lemma "wtype_unroll"
+/
+  forall i (a : U i) (b : a -> U i) .
+    (wtype (x : a) . b x)
+    <:
+    (exists (x : a) . b x -> wtype (x : a) . b x)
+/;
+
+inference.
+intro /i a b x/.
+unrollType /wtype in x/.
+reduce /x/.
+hypof.
+qed ();
+
+
+
+lemma "wtype_roll"
+/
+  forall i (a : U i) (b : a -> U i) .
+    (exists (x : a) . b x -> wtype (x : a) . b x)
+    <:
+    (wtype (x : a) . b x)
+/;
+
+inference.
+intro /i a b x/.
+unrollType /wtype/.
+reduce //.
+hypof.
+qed ();
+
+
+
+lemma "wtype_eeqtp"
+/
+  forall i (a : U i) (b : a -> U i) .
+    (wtype (x : a) . b x)
+    <:>
+    (exists (x : a) . b x -> wtype (x : a) . b x)
+/;
+
+inference.
+intro /i a b/.
+unfold /eeqtp/.
+split >> autoWith /wtype_roll wtype_unroll/.
+qed ();
+
+
+
+structure Nothing = AfterWtypeUnroll ();
+
+
+
+definerec /wind f m/
+/
+  f (m #1) (m #2) (fn z . wind f (m #2 z))
+//
+  intersect (i : level) (a : U i) (b : a -> U i) (P : (wtype (x : a) . b x) -> U i) .
+  (forall (x : a) (y : b x -> wtype (x : a) . b x) .
+     (forall (z : b x) . P (y z)) -> P (x , y))
+  -> forall (m : wtype (x : a) . b x) . P m
+/;
+
+introOf /i a b P f m/.
+unfold /wtype in m/.
+induct /m/.
+reintro /t m Hsub IH/.
+fold /wtype (x : a) . b x in Hsub/.
+destruct /m/ /x y/.
+unroll /wind/.
+reduce //.
+typecheck.
+qed ();
+
+
+
+define /wtype_iter a b P f m/
+/
+  wind f m
+//
+  intersect (i : level) .
+  forall (a : U i) (b : a -> U i) (P : (wtype (x : a) . b x) -> U i) .
+    (forall (x : a) (y : b x -> wtype (x : a) . b x) .
+       (forall (z : b x) . P (y z)) -> P (x , y))
+    -> forall (m : wtype (x : a) . b x) . P m
+/;
+
+introOf /i a b P f m/.
+unfold /wtype_iter/.
+(* There ought to be a better way to do this. *)
+fold /wind ap i/.
+fold /wind ap i ap a/.
+fold /wind ap i ap a ap b/.
+fold /wind ap i ap a ap b ap P/.
+typecheck.
+qed ();
+
+
+
+val unroll_wtype_iter1 =
+  makeReduction1
+  /
+  wtype_iter a b P f m --> f (m #1) (m #2) (fn z . wtype_iter a b P f (m #2 z)) ;
+  unfolding wtype_iter
+  unrolling wind
+  /;
+
+
+val unroll_wind = Option.valOf (Database.findUnroll (parseConstant /wind/));
+val unroll_wtype_iter = Reduction.user1 unroll_wtype_iter1;
+
+Database.setUnroll (parseConstant /wtype_iter/) unroll_wtype_iter;
+
+Registry.write (parseIdent /unroll_wind/) (Registry.fromReduction unroll_wind);
+Registry.write (parseIdent /unroll_wtype_iter/) (Registry.fromReduction unroll_wtype_iter);
+
+
+
+define /precedes a b m n/
+/
+  exists (y : b (n #1)) . m = n #2 y : (wtype (x : a) . b x)
+//
+  intersect i .
+  forall (a : U i) (b : a -> U i) .
+    (wtype (x : a) . b x)
+    -> (wtype (x : a) . b x)
+    -> U i
+/;
+
+inference.
+introOf /i a b m n/.
+rewrite /-> wtype_eeqtp in n/.
+unfold /precedes/.
+typecheck.
+qed ();
+
+
+
+lemma "precedes_well_founded"
+/
+  forall i (a : U i) (b : a -> U i) (m : wtype (x : a) . b x) .
+    Acc (wtype (x : a) . b x) (precedes a b) m
+/;
+
+inference.
+intro /i a b m/.
+apply /wtype_iter a b (Acc _ (precedes a b))/.
+intro /x y IH/.
+apply /Acc.Acc_intro/.
+intro /n Hnm/.
+unfold /precedes in Hnm/.
+destruct /Hnm/ /z Heq/.
+moveBefore /z/ /n/.
+subst /n/.
+apply /IH/.
+qed ();
+
+
+
+structure Nothing = AfterWtypeIter ();
