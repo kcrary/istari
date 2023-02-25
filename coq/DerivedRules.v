@@ -607,6 +607,79 @@ Qed.
 
 
 
+Lemma tr_pi_elim3' :
+  forall G a1 a2 a3 b c m n p1 q1 p2 q2 p3 q3,
+    tr G (deq m n (pi a1 (pi a2 (pi a3 b))))
+    -> tr G (deq p1 q1 a1)
+    -> tr G (deq p2 q2 (subst1 p1 a2))
+    -> tr G (deq p3 q3 (subst (dot p2 (dot p1 id)) a3))
+    -> c = subst (dot p3 (dot p2 (dot p1 id))) b
+    -> tr G (deq (app (app (app m p1) p2) p3) (app (app (app n q1) q2) q3) c).
+Proof.
+intros G a1 a2 a3 b c m n p1 q1 p2 q2 p3 q3 H1 H2 H3 H4 ->.
+replace (subst (dot p3 (dot p2 (dot p1 id))) b) with (subst (dot p3 id) (subst (under 1 (dot p2 (dot p1 id))) b)).
+2:{
+  simpsub.
+  auto.
+  }
+eapply (tr_pi_elim _ (subst (dot p2 (dot p1 id)) a3)).
+  {
+  eapply tr_pi_elim2'.
+    {
+    eauto.
+    }
+
+    {
+    auto.
+    }
+
+    {
+    auto.
+    }
+
+    {
+    simpsub.
+    auto.
+    }
+  }
+
+  {
+  auto.
+  }
+Qed.
+
+
+Lemma tr_pi_elim4' :
+  forall G a1 a2 a3 a4 b c m n p1 q1 p2 q2 p3 q3 p4 q4,
+    tr G (deq m n (pi a1 (pi a2 (pi a3 (pi a4 b)))))
+    -> tr G (deq p1 q1 a1)
+    -> tr G (deq p2 q2 (subst1 p1 a2))
+    -> tr G (deq p3 q3 (subst (dot p2 (dot p1 id)) a3))
+    -> tr G (deq p4 q4 (subst (dot p3 (dot p2 (dot p1 id))) a4))
+    -> c = subst (dot p4 (dot p3 (dot p2 (dot p1 id)))) b
+    -> tr G (deq (app (app (app (app m p1) p2) p3) p4) (app (app (app (app n q1) q2) q3) q4) c).
+Proof.
+intros G a1 a2 a3 a4 b c m n p1 q1 p2 q2 p3 q3 p4 q4 H1 H2 H3 H4 H5 ->.
+replace (subst (dot p4 (dot p3 (dot p2 (dot p1 id)))) b) with (subst (dot p4 id) (subst (under 1 (dot p3 (dot p2 (dot p1 id)))) b)).
+2:{
+  simpsub.
+  auto.
+  }
+eapply (tr_pi_elim _ (subst (dot p3 (dot p2 (dot p1 id))) a4)).
+  {
+  eapply tr_pi_elim3'; eauto.
+  simpsub.
+  auto.
+  }
+
+
+  {
+  auto.
+  }
+Qed.
+
+
+
 Lemma tr_sigma_elim2' :
   forall G a b c m n,
     tr G (deq m n (sigma a b))

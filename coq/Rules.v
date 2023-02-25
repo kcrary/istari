@@ -1091,6 +1091,11 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deq a b (kuniv lv))
       -> tr G (deq a b (univ (nsucc lv)))
 
+| tr_kuniv_formation_invert :
+    forall G lv lv',
+      tr G (deqtype (kuniv lv) (kuniv lv'))
+      -> tr G (deq lv lv' pagetp)
+
 (* Type equality *)
 
 | tr_eqtype_formation :

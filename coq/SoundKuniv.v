@@ -193,3 +193,88 @@ do2 5 split; auto.
   apply pginterp_succ; auto.
   }
 Qed.
+
+
+Lemma sound_kuniv_formation_invert :
+  forall G lv lv',
+    pseq G (deqtype (kuniv lv) (kuniv lv'))
+    -> pseq G (deq lv lv' pagetp).
+Proof.
+intros G l m.
+revert G.
+refine (seq_pseq 0 1 [] _ _ _); cbn.
+intros G Hseq.
+rewrite -> seq_eqtype in Hseq.
+rewrite -> seq_deq.
+intros i s s' Hs.
+so (Hseq _#3 Hs) as (R & Hll & Hlr & Hml & Hmr).
+simpsubin Hll.
+simpsubin Hlr.
+simpsubin Hml.
+simpsubin Hmr.
+invert (basic_value_inv _#6 value_kuniv Hll).
+intros pg h Hpgll _ Heq.
+invert (basic_value_inv _#6 value_kuniv Hlr).
+intros pg' h' Hpglr _ Heq'.
+so (iukuniv_inj _#7 (eqtrans Heq (eqsymm Heq'))); subst pg'.
+clear Heq'.
+so (proof_irrelevance _ h h'); subst h'.
+invert (basic_value_inv _#6 value_kuniv Hml).
+intros pg' h' Hpgml _ Heq'.
+so (iukuniv_inj _#7 (eqtrans Heq (eqsymm Heq'))); subst pg'.
+clear Heq'.
+so (proof_irrelevance _ h h'); subst h'.
+invert (basic_value_inv _#6 value_kuniv Hmr).
+intros pg' h' Hpgmr _ Heq'.
+so (iukuniv_inj _#7 (eqtrans Heq (eqsymm Heq'))); subst pg'.
+clear Heq Heq'.
+so (proof_irrelevance _ h h'); subst h'.
+exists (nattp_def top i).
+simpsub.
+destruct Hpgll as (w & Hpgll & Heq & _).
+destruct Hpglr as (w' & Hpglr & Heq' & _).
+so (eqtrans (eqsymm Heq) Heq'); clear Heq'; subst w'.
+destruct Hpgml as (w' & Hpgml & Heq' & _).
+so (eqtrans (eqsymm Heq) Heq'); clear Heq'; subst w'.
+destruct Hpgmr as (w' & Hpgmr & Heq' & _).
+so (eqtrans (eqsymm Heq) Heq'); clear Heq'; subst w'.
+clear h Heq pg.
+destruct Hpgll as (j & Hpgll & Heq).
+destruct Hpglr as (j' & Hpglr & Heq').
+injection (eqtrans (eqsymm Heq) Heq').
+intros <-; clear Heq'.
+destruct Hpgml as (j' & Hpgml & Heq').
+injection (eqtrans (eqsymm Heq) Heq').
+intros <-; clear Heq'.
+destruct Hpgmr as (j' & Hpgmr & Heq').
+injection (eqtrans (eqsymm Heq) Heq').
+intros <-; clear Heq'.
+clear Heq.
+so (succ_nodecrease top) as Htop.
+do2 4 split.
+  {
+  apply interp_nattp.
+  }
+
+  {
+  apply interp_nattp.
+  }
+
+  {
+  rewrite -> nattp_nat_urel; auto.
+  exists j.
+  do2 2 split; auto.
+  }
+
+  {
+  rewrite -> nattp_nat_urel; auto.
+  exists j.
+  do2 2 split; auto.
+  }
+
+  {
+  rewrite -> nattp_nat_urel; auto.
+  exists j.
+  do2 2 split; auto.
+  }
+Qed.

@@ -343,6 +343,12 @@ apply step_app2.
 Qed.
 
 
+Lemma def_lleq : Defs.lleq = leqtp.
+Proof.
+auto.
+Qed.
+
+
 Lemma def_lzero :
   equiv Defs.lzero Defined.nzero.
 Proof.

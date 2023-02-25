@@ -30,6 +30,7 @@ UNITS = \
 	Model \
 	Morphism \
 	MuIndExtract \
+	NatLemmas \
 	Obligations \
 	Ofe \
 	Ordinal \
@@ -102,6 +103,7 @@ UNITS = \
 	Standardization \
 	Subst \
 	Subsumption \
+	SumLemmas \
 	Syntax \
 	System \
 	Tactics \

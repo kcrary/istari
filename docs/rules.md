@@ -3016,7 +3016,7 @@ of rules.
       >>
       G, x : K |- A : type
       G |- iforall I (x : K) . A ext M
-      G |- P : A
+      G |- P : K
 
 
 ### Impredicative polymorphism

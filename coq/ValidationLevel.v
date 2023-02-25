@@ -21,15 +21,9 @@ Require Import Dots.
 
 Require Import ValidationUtil.
 Require Import Defined.
-Require Import ValidationSum.
-Require Import ValidationNat.
+Require Import SumLemmas.
+Require Import NatLemmas.
 
-
-
-Lemma def_lleq : Defs.lleq = leqtp.
-Proof.
-auto.
-Qed.
 
 
 Hint Rewrite def_lleq : prepare.

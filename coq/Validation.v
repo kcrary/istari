@@ -229,7 +229,7 @@ exact boolElim_valid.
 exact boolElimIstype_valid.
 exact boolElimEqtype_valid.
 exact boolLeft_valid.
-admit.
+exact iteType_valid.
 exact muForm_valid.
 exact muEq_valid.
 exact muFormUniv_valid.
@@ -238,14 +238,16 @@ exact muUnroll_valid.
 exact muUnrollUniv_valid.
 exact muInd_valid.
 exact muIndUniv_valid.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
+exact iforallForm_valid.
+exact iforallEq_valid.
+exact iforallFormUniv_valid.
+exact iforallEqUniv_valid.
+exact iforallIntroOf_valid.
+exact iforallIntroEq_valid.
 exact iforallIntro_valid.
-
+exact iforallElimOf_valid.
+exact iforallElimEq_valid.
+exact iforallElim_valid.
 
 Abort.
   

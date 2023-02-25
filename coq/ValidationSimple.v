@@ -16,7 +16,7 @@ Require Import DefsEquiv.
 Require Import Equivalence.
 
 Require Import ValidationUtil.
-Require Import ValidationNat.
+Require Import NatLemmas.
 
 
 Lemma voidForm_valid : voidForm_obligation. 
@@ -346,3 +346,57 @@ Lemma boolLeft_valid : boolLeft_obligation.
  valid_rewrite.
  constructor; eauto using deq_intro; eauto using deqtype_intro.
  Qed.
+
+
+
+Hint Rewrite def_intersect def_arrow : prepare.
+
+
+Lemma iteType_valid : iteType_obligation.
+Proof.
+prepare.
+unfold Defs.ite, Defs.bool.
+intro G.
+simpsub.
+cbn [Nat.add].
+apply tr_intersect_intro.
+  {
+  apply tr_nattp_formation.
+  }
+apply tr_intersect_intro.
+  {
+  apply tr_univ_formation.
+  eapply hypothesis; eauto using index_0.
+  }
+simpsub.
+cbn [Nat.add].
+apply tr_pi_intro.
+  {
+  apply tr_booltp_istype.
+  }
+apply tr_pi_intro.
+  {
+  apply (tr_formation_weaken _ (var 2)).
+  eapply hypothesis; eauto using index_0, index_S.
+  }
+apply tr_pi_intro.
+  {
+  apply (tr_formation_weaken _ (var 3)).
+  eapply hypothesis; eauto using index_0, index_S.
+  }
+replace (var 3) with (@subst1 obj (var 2) (var 4)) by (simpsub; auto).
+apply tr_booltp_elim.
+  {
+  eapply hypothesis; eauto using index_0, index_S.
+  }
+
+  {
+  simpsub.
+  eapply hypothesis; eauto using index_0, index_S.
+  }
+
+  {
+  simpsub.
+  eapply hypothesis; eauto using index_0, index_S.
+  }
+Qed.

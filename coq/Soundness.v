@@ -198,6 +198,7 @@ intros; eapply sound_univ_formation_invert; eauto; done.
 intros; eapply sound_kuniv_formation; eauto; done.
 intros; eapply sound_kuniv_formation_univ; eauto; done.
 intros; eapply sound_kuniv_weaken; eauto; done.
+intros; eapply sound_kuniv_formation_invert; eauto; done.
 intros; eapply sound_eqtype_formation; eauto; done.
 intros; eapply sound_eqtype_formation_univ; eauto; done.
 intros; eapply sound_eqtype_convert; eauto; done.

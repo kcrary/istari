@@ -3007,7 +3007,7 @@ Conventions:
       >>
       G, K |- istp A[^1]
       G |- iforall I K (fn . A[^1]) ext M
-      G |- of A P
+      G |- of K P
 
 
 ### Impredicative polymorphism
