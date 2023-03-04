@@ -67,7 +67,7 @@ Definition kind : fterm := lam (kuniv (var 0)).
 Definition letnext : fterm := lam (lam (app (var 0) (prev (var 1)))).
 Definition lett : fterm := lam (lam (app (var 0) (var 1))).
 Definition level : fterm := nattp.
-Definition lleq : fterm := leqtp.
+Definition lleq : fterm := lam (lam (intersect2 (app (app leqtp (var 1)) (var 0)) (intersect2 (equal nattp (var 1) (var 1)) (equal nattp (var 0) (var 0))))).
 Definition lmax : fterm :=
   app theta
     (lam (lam (lam (sumcase

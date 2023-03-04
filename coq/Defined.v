@@ -78,3 +78,6 @@ Definition ltpagetp {object} m n : term object :=
 
 Definition squash {object} m : term object :=
   set unittp (subst sh1 m).
+
+Definition intersect2 {object} (a b : @term object) :=
+  intersect booltp (bite (var 0) (subst sh1 a) (subst sh1 b)).

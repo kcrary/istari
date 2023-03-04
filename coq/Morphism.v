@@ -9,7 +9,9 @@ Require Import Syntax.
 Require Import Subst.
 Require Import SimpSub.
 Require Import Equivalence.
+Require Import Equivalences.
 Require Import Rules.
+Require Import Defined.
 
 
 Definition equivr {object a} (r r' : @row object a) : Prop :=
@@ -480,9 +482,29 @@ reflexivity.
 Qed.
 
 
+Add Parametric Morphism object : (@ppair object)
+  with signature equiv ==> equiv ==> equiv
+  as equiv_pair.
+Proof.
+intros m1 m1' H1 m2 m2' H2.
+apply equiv_ppair; auto.
+Qed.
+
+
+Add Parametric Morphism object : (@set object)
+  with signature equiv ==> equiv ==> equiv
+  as equiv_set.
+Proof.
+intros m1 m1' H1 m2 m2' H2.
+unfold set.
+rewrite H1, H2.
+reflexivity.
+Qed.
+
+
 Add Parametric Morphism object : (@intersect object)
   with signature equiv ==> equiv ==> equiv
-  as equiv_interesct.
+  as equiv_intersect.
 Proof.
 intros m1 m1' H1 m2 m2' H2.
 unfold intersect.
@@ -577,6 +599,63 @@ Proof.
 intros m1 m1' H1 m2 m2' H2 m3 m3' H3.
 unfold bite.
 rewrite H1, H2, H3.
+reflexivity.
+Qed.
+
+
+Add Parametric Morphism object : (@sumleft object)
+  with signature equiv ==> equiv
+  as equiv_sumleft.
+Proof.
+intros m1 m1' H1.
+unfold sumleft.
+rewrite H1.
+reflexivity.
+Qed.
+
+
+Add Parametric Morphism object : (@sumright object)
+  with signature equiv ==> equiv
+  as equiv_sumright.
+Proof.
+intros m1 m1' H1.
+unfold sumright.
+rewrite H1.
+reflexivity.
+Qed.
+
+
+Add Parametric Morphism object : (@sumcase object)
+  with signature equiv ==> equiv ==> equiv ==> equiv
+  as equiv_sumcase.
+Proof.
+intros m1 m1' H1 m2 m2' H2 m3 m3' H3.
+unfold sumcase.
+apply equiv_bite.
+  {
+  apply equiv_ppi1.
+  rewrite H1.
+  reflexivity.
+  }
+
+  {
+  apply equiv_funct1; auto.
+  apply equiv_ppi2; auto.
+  }
+
+  {
+  apply equiv_funct1; auto.
+  apply equiv_ppi2; auto.
+  }
+Qed.
+
+
+Add Parametric Morphism object : (@nsucc object)
+  with signature equiv ==> equiv
+  as equiv_nsucc.
+Proof.
+intros m1 m1' H1.
+rewrite H1.
 reflexivity.
 Qed.
 

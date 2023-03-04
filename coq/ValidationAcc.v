@@ -682,7 +682,7 @@ Qed.
 
 
 
-Lemma accInv_valid : accInd_obligation.
+Lemma accInd_valid : accInd_obligation.
 Proof.
 prepare.
 intros G a b lv m n r ext3 ext2 p ext1 ext0 Ha Hr Hp Hm Hn.

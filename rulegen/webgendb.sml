@@ -129,7 +129,7 @@ structure WebgenDB :> WEBGENDB =
                 )
 
            | Triv =>
-                ())
+                write "()")
 
       and writeSub write sub =
          (case sub of
@@ -271,6 +271,7 @@ structure WebgenDB :> WEBGENDB =
          (
          write "- `";
          write (Symbol.toValue name);      
+         write " n";
 
          List.app
             (fn v =>
@@ -326,7 +327,7 @@ structure WebgenDB :> WEBGENDB =
                           writeSub write sub
                           ));
    
-                   write " |-  ";
+                   write " |- ";
                    writeTerm write precMin rhs;
    
                    (case extv of

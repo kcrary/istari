@@ -359,3 +359,90 @@ so (iuequal_inj _#17 (eqtrans Heql (eqsymm Heqr))) as (<- & _).
 exists pg, A.
 do2 5 split; auto.
 Qed.
+
+
+Lemma sound_equal_formation_invert2 :
+  forall G a a' m m' n n',
+    pseq G (deqtype (equal a m n) (equal a' m' n'))
+    -> pseq G (deq m m' a).
+Proof.
+intros G a b m n p q.
+revert G.
+refine (seq_pseq 0 1 [] _ _ _); cbn.
+intros G Hseq.
+rewrite -> seq_eqtype in Hseq.
+rewrite -> seq_deq.
+intros i s s' Hs.
+so (Hseq _#3 Hs) as (R & Hl & Hr & Hl' & Hr').
+simpsubin Hl.
+simpsubin Hr.
+simpsubin Hl'.
+simpsubin Hr'.
+invert (basic_value_inv _#6 value_equal Hl).
+intros m1 p1 A Hm1 Hp1 Hal Heql.
+invert (basic_value_inv _#6 value_equal Hl').
+intros m2 p2 A' Hm2 Hp2 Hal' Heql'.
+so (iuequal_inj _#17 (eqtrans Heql (eqsymm Heql'))) as (<- & Hml & Hpl).
+invert (basic_value_inv _#6 value_equal Hr).
+intros m3 p3 A' Hm3 Hp3 Har Heqr.
+invert (basic_value_inv _#6 value_equal Hr').
+intros m4 p4 A'' Hm4 Hp4 Har' Heqr'.
+so (iuequal_inj _#17 (eqtrans Heqr (eqsymm Heqr'))) as (<- & Hmr & Hpr).
+rewrite -> iuequal_swap in Heqr.
+so (iuequal_inj _#17 (eqtrans Heql (eqsymm Heqr))) as (<- & Hm & Hp).
+exists A.
+unfold srel in Hm1, Hp1, Hm2, Hp2, Hm3, Hp3, Hm4, Hp4, Hml, Hpl, Hmr, Hpr, Hm, Hp.
+do2 4 split; auto.
+  {
+  eapply (urel_zigzag _#4 m2 (subst s m)); eauto.
+  apply (urel_zigzag _#4 (subst s' m) m4); auto.
+  }
+
+  {
+  apply (urel_zigzag _#4 (subst s' m) m4); auto.
+  }
+Qed.
+
+
+
+Lemma sound_equal_formation_invert3 :
+  forall G a a' m m' n n',
+    pseq G (deqtype (equal a m n) (equal a' m' n'))
+    -> pseq G (deq n n' a).
+Proof.
+intros G a b m n p q.
+revert G.
+refine (seq_pseq 0 1 [] _ _ _); cbn.
+intros G Hseq.
+rewrite -> seq_eqtype in Hseq.
+rewrite -> seq_deq.
+intros i s s' Hs.
+so (Hseq _#3 Hs) as (R & Hl & Hr & Hl' & Hr').
+simpsubin Hl.
+simpsubin Hr.
+simpsubin Hl'.
+simpsubin Hr'.
+invert (basic_value_inv _#6 value_equal Hl).
+intros m1 p1 A Hm1 Hp1 Hal Heql.
+invert (basic_value_inv _#6 value_equal Hl').
+intros m2 p2 A' Hm2 Hp2 Hal' Heql'.
+so (iuequal_inj _#17 (eqtrans Heql (eqsymm Heql'))) as (<- & Hml & Hpl).
+invert (basic_value_inv _#6 value_equal Hr).
+intros m3 p3 A' Hm3 Hp3 Har Heqr.
+invert (basic_value_inv _#6 value_equal Hr').
+intros m4 p4 A'' Hm4 Hp4 Har' Heqr'.
+so (iuequal_inj _#17 (eqtrans Heqr (eqsymm Heqr'))) as (<- & Hmr & Hpr).
+rewrite -> iuequal_swap in Heqr.
+so (iuequal_inj _#17 (eqtrans Heql (eqsymm Heqr))) as (<- & Hm & Hp).
+exists A.
+unfold srel in Hm1, Hp1, Hm2, Hp2, Hm3, Hp3, Hm4, Hp4, Hml, Hpl, Hmr, Hpr, Hm, Hp.
+do2 4 split; auto.
+  {
+  eapply (urel_zigzag _#4 p2 (subst s p)); eauto.
+  apply (urel_zigzag _#4 (subst s' p) p4); auto.
+  }
+
+  {
+  apply (urel_zigzag _#4 (subst s' p) p4); auto.
+  }
+Qed.

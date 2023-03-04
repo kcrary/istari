@@ -20,6 +20,13 @@ the sake of convenience or performance.  Since the rules are (nearly)
 all verified, there is no robustness advantage to minimizing the set
 of rules.
 
+Rules are given here in human-readable format, using explicit
+variables.  The official rules, using de Bruijn indices, are given
+[here](rules-db.html).
+
+
+### Contents
+
 [Structural](#structural)<br>
 [Reduction](#reduction)<br>
 [Dependent functions](#dependent-functions)<br>
@@ -1837,8 +1844,6 @@ of rules.
 
       G |- univ J : univ I
       >>
-      G |- J : level
-      G |- I : level
       G |- lsucc J <l= I
 
 - `univFormUnivSucc I`
@@ -1852,7 +1857,6 @@ of rules.
       G |- univ J = univ K : univ I
       >>
       G |- J = K : level
-      G |- I : level
       G |- lsucc J <l= I
 
 - `univCumulativeOf A I J`
@@ -1860,7 +1864,6 @@ of rules.
       G |- A : univ J
       >>
       G |- A : univ I
-      G |- J : level
       G |- I <l= J
 
 - `univCumulativeEq A B I J`
@@ -1868,7 +1871,6 @@ of rules.
       G |- A = B : univ J
       >>
       G |- A = B : univ I
-      G |- J : level
       G |- I <l= J
 
 - `univCumulativeSuccOf A I`
@@ -1881,8 +1883,6 @@ of rules.
 
       G |- univ I <: univ J
       >>
-      G |- I : level
-      G |- J : level
       G |- I <l= J
 
 - `univForgetOf A I`
@@ -1930,8 +1930,6 @@ of rules.
 
       G |- kind I : univ K
       >>
-      G |- I : level
-      G |- K : level
       G |- lsucc (lsucc I) <l= K
 
 - `kindEqUniv I J K`
@@ -1939,7 +1937,6 @@ of rules.
       G |- kind I = kind J : univ K
       >>
       G |- I = J : level
-      G |- K : level
       G |- lsucc (lsucc I) <l= K
 
 - `kindForgetOf A I`
@@ -1958,8 +1955,6 @@ of rules.
 
       G |- kind I <: univ J
       >>
-      G |- I : level
-      G |- J : level
       G |- lsucc I <l= J
 
 
@@ -2758,6 +2753,7 @@ of rules.
       >>
       G |- M : {A}
       G |- N : {A}
+      G |- A : type
 
 - `squashLeft n A C`
 
@@ -2960,7 +2956,6 @@ of rules.
       G |- (iforall I (x : K) . A) : univ J
       >>
       G |- K : kind I
-      G |- J : level
       G |- I <l= J
       G, x : K |- A : univ J
 
@@ -2969,7 +2964,6 @@ of rules.
       G |- (iforall I (x : K) . A) = (iforall I (x : L) . B) : univ J
       >>
       G |- K = L : kind I
-      G |- J : level
       G |- I <l= J
       G, x : K |- A = B : univ J
 
@@ -3097,7 +3091,6 @@ of rules.
       G |- (iexists I (x : K) . A) : univ J
       >>
       G |- K : kind I
-      G |- J : level
       G |- I <l= J
       G, x : K |- A : univ J
 
@@ -3106,7 +3099,6 @@ of rules.
       G |- (iexists I (x : K) . A) = (iexists I (x : L) . B) : univ J
       >>
       G |- K = L : kind I
-      G |- J : level
       G |- I <l= J
       G, x : K |- A = B : univ J
 

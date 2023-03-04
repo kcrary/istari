@@ -794,6 +794,16 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deq (equal a m n) (equal a' m' n') (univ lv))
       -> tr G (deq a a' (univ lv))
 
+| tr_equal_formation_invert2 :
+    forall G a a' m m' n n',
+      tr G (deqtype (equal a m n) (equal a' m' n'))
+      -> tr G (deq m m' a)
+
+| tr_equal_formation_invert3 :
+    forall G a a' m m' n n',
+      tr G (deqtype (equal a m n) (equal a' m' n'))
+      -> tr G (deq n n' a)
+
 (* Set Types *)
 
 | tr_set_formation :
@@ -846,6 +856,11 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr (G2 ++ hyp_tm b :: hyp_tm a :: G1) J
       -> tr (G2 ++ hyp_tm b :: hyp_tm (set a b) :: G1) J
   
+| tr_set_formation_invert :
+    forall G a a' b b',
+      tr G (deqtype (set a b) (set a' b'))
+      -> tr G (deqtype a a')
+
 | tr_squash_idem :
     forall G a b,
       tr G (deqtype (set a b) (set a b))
@@ -1084,7 +1099,7 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deq lv1 lv2 pagetp)
       -> tr G (deq lv lv pagetp)
       -> tr G (deq triv triv (ltpagetp (nsucc lv1) lv))
-      -> tr G (deq (univ lv1) (univ lv2) (univ lv))
+      -> tr G (deq (kuniv lv1) (kuniv lv2) (univ lv))
   
 | tr_kuniv_weaken :
     forall G lv a b,

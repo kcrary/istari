@@ -11,6 +11,9 @@ Conventions:
 - Omitted extracts in the conclusion are taken to be `()`.  Omitted
   extracts in premises are unused.
 
+
+### Contents
+
 [Structural](#structural)<br>
 [Reduction](#reduction)<br>
 [Dependent functions](#dependent-functions)<br>
@@ -704,7 +707,7 @@ Conventions:
 
 - `intersectIntro A B`
 
-      G |- intersect A (fn . B) ext M[ . id]
+      G |- intersect A (fn . B) ext M[() . id]
       >>
       G |- istp A
       G, (hidden) A |- B ext M
@@ -790,7 +793,7 @@ Conventions:
 
 - `guardIntro A B`
 
-      G |- guard A B ext M[ . id]
+      G |- guard A B ext M[() . id]
       >>
       G |- istp A
       G, (hidden) A |- B[^1] ext M
@@ -925,11 +928,11 @@ Conventions:
       G |- eq A (M #1) (N #1)
       G |- eq B[M #1 . id] (M #2) (N #2)
 
-- `existsLeft A B C`
+- `existsLeft n A B C`
 
       G1, (exists A (fn . B)), G2 |- C ext M[under_n (0 #2 . 0 #1 . ^1)]
       >>
-      G1, A, B, G2[(1 , 0) . ^2] |-  C[under_n ((1 , 0) . ^2)] ext M
+      G1, A, B, G2[(1 , 0) . ^2] |- C[under_n ((1 , 0) . ^2)] ext M
 
 - `existsFormInv1 A B`
 
@@ -1106,11 +1109,11 @@ Conventions:
       G |- eq A (M #1) (N #1)
       G |- eq B (M #2) (N #2)
 
-- `prodLeft A B C`
+- `prodLeft n A B C`
 
       G1, (prod A B), G2 |- C ext M[under_n (0 #2 . 0 #1 . ^1)]
       >>
-      G1, A, B[^1], G2[(1 , 0) . ^2] |-  C[under_n ((1 , 0) . ^2)] ext M
+      G1, A, B[^1], G2[(1 , 0) . ^2] |- C[under_n ((1 , 0) . ^2)] ext M
 
 - `prodFormInv1 A B`
 
@@ -1421,12 +1424,12 @@ Conventions:
       G |- of (future A) N
       promote(G) |- eq A (M #prev) (N #prev)
 
-- `futureLeft A B`
+- `futureLeft n A B`
 
       G1, (future A), G2 |- B ext M[under_n (0 #prev . ^1)]
       >>
-      promote(G1) |-  istp A
-      G1, (later) A, G2[next 0 . ^1] |-  B[under_n (next 0 . ^1)] ext M
+      promote(G1) |- istp A
+      G1, (later) A, G2[next 0 . ^1] |- B[under_n (next 0 . ^1)] ext M
 
 
 ### Recursive types
@@ -1528,14 +1531,14 @@ Conventions:
 
 - `muUnroll A`
 
-      G |- eeqtp (mu (fn . A)) A[mu (fn . A) . id] ext ( , )
+      G |- eeqtp (mu (fn . A)) A[mu (fn . A) . id] ext (() , ())
       >>
       G, type |- istp A
       G |- positive (fn . A)
 
 - `muUnrollUniv A I`
 
-      G |- eeqtp (mu (fn . A)) A[mu (fn . A) . id] ext ( , )
+      G |- eeqtp (mu (fn . A)) A[mu (fn . A) . id] ext (() , ())
       >>
       G |- of level I
       G, (univ I) |- of (univ I[^1]) A
@@ -1543,7 +1546,7 @@ Conventions:
 
 - `muInd A B M`
 
-      G |- B[M . id] ext fix (fn . fn . N[1 .  . 0 .  . ^2]) M
+      G |- B[M . id] ext fix (fn . fn . N[1 . () . 0 . () . ^2]) M
       >>
       G, type |- istp A
       G |- positive (fn . A)
@@ -1552,7 +1555,7 @@ Conventions:
 
 - `muIndUniv A B I M`
 
-      G |- B[M . id] ext fix (fn . fn . N[1 .  . 0 .  . ^2] #1) M
+      G |- B[M . id] ext fix (fn . fn . N[1 . () . 0 . () . ^2] #1) M
       >>
       G |- of level I
       G, (univ I) |- of (univ I[^1]) A
@@ -1648,7 +1651,7 @@ Conventions:
 
 - `unitIntroOf`
 
-      G |- of unit 
+      G |- of unit ()
 
 - `unitIntro`
 
@@ -1661,11 +1664,11 @@ Conventions:
       G |- of unit M
       G |- of unit N
 
-- `unitLeft B`
+- `unitLeft n B`
 
       G1, unit, G2 |- B ext M[under_n (^1)]
       >>
-      G1, G2[ . id] |-  B[under_n ( . id)] ext M
+      G1, G2[() . id] |- B[under_n (() . id)] ext M
 
 
 ### Bool
@@ -1738,12 +1741,12 @@ Conventions:
       G |- eqtp A B
       G |- eqtp C D
 
-- `boolLeft A`
+- `boolLeft n A`
 
       G1, bool, G2 |- A ext ite 0+n M[under_n (^1)] N[under_n (^1)]
       >>
-      G1, G2[true . id] |-  A[under_n (true . id)] ext M
-      G1, G2[false . id] |-  A[under_n (false . id)] ext N
+      G1, G2[true . id] |- A[under_n (true . id)] ext M
+      G1, G2[false . id] |- A[under_n (false . id)] ext N
 
 - `iteType`
 
@@ -1828,8 +1831,6 @@ Conventions:
 
       G |- of (univ I) (univ J)
       >>
-      G |- of level J
-      G |- of level I
       G |- lleq (lsucc J) I
 
 - `univFormUnivSucc I`
@@ -1843,7 +1844,6 @@ Conventions:
       G |- eq (univ I) (univ J) (univ K)
       >>
       G |- eq level J K
-      G |- of level I
       G |- lleq (lsucc J) I
 
 - `univCumulativeOf A I J`
@@ -1851,7 +1851,6 @@ Conventions:
       G |- of (univ J) A
       >>
       G |- of (univ I) A
-      G |- of level J
       G |- lleq I J
 
 - `univCumulativeEq A B I J`
@@ -1859,7 +1858,6 @@ Conventions:
       G |- eq (univ J) A B
       >>
       G |- eq (univ I) A B
-      G |- of level J
       G |- lleq I J
 
 - `univCumulativeSuccOf A I`
@@ -1872,8 +1870,6 @@ Conventions:
 
       G |- subtype (univ I) (univ J)
       >>
-      G |- of level I
-      G |- of level J
       G |- lleq I J
 
 - `univForgetOf A I`
@@ -1921,8 +1917,6 @@ Conventions:
 
       G |- of (univ K) (kind I)
       >>
-      G |- of level I
-      G |- of level K
       G |- lleq (lsucc (lsucc I)) K
 
 - `kindEqUniv I J K`
@@ -1930,7 +1924,6 @@ Conventions:
       G |- eq (univ K) (kind I) (kind J)
       >>
       G |- eq level I J
-      G |- of level K
       G |- lleq (lsucc (lsucc I)) K
 
 - `kindForgetOf A I`
@@ -1949,8 +1942,6 @@ Conventions:
 
       G |- subtype (kind I) (univ J)
       >>
-      G |- of level I
-      G |- of level J
       G |- lleq (lsucc I) J
 
 
@@ -2150,7 +2141,7 @@ Conventions:
 
 - `eqIntro A M N`
 
-      G |- of (eq A M N) 
+      G |- of (eq A M N) ()
       >>
       G |- eq A M N
 
@@ -2167,11 +2158,11 @@ Conventions:
       G |- of (eq A M N) P
       G |- of (eq A M N) Q
 
-- `eqLeft A B P Q`
+- `eqLeft n A B P Q`
 
       G1, (eq A P Q), G2 |- B ext M[under_n (^1)]
       >>
-      G1, G2[ . id] |-  B[under_n ( . id)] ext M
+      G1, G2[() . id] |- B[under_n (() . id)] ext M
 
 - `eqRefl A M`
 
@@ -2242,7 +2233,7 @@ Conventions:
 
 - `ofIntro A M`
 
-      G |- of (of A M) 
+      G |- of (of A M) ()
       >>
       G |- of A M
 
@@ -2265,11 +2256,11 @@ Conventions:
       G |- of (of A M) P
       G |- of (of A M) Q
 
-- `ofLeft A B P`
+- `ofLeft n A B P`
 
       G1, (of A P), G2 |- B ext M[under_n (^1)]
       >>
-      G1, G2[ . id] |-  B[under_n ( . id)] ext M
+      G1, G2[() . id] |- B[under_n (() . id)] ext M
 
 - `ofEquand1 A M N`
 
@@ -2316,7 +2307,7 @@ Conventions:
 
 - `eqtpIntro A B`
 
-      G |- of (eqtp A B) 
+      G |- of (eqtp A B) ()
       >>
       G |- eqtp A B
 
@@ -2333,11 +2324,11 @@ Conventions:
       G |- of (eqtp A B) P
       G |- of (eqtp A B) Q
 
-- `eqtpLeft A B C`
+- `eqtpLeft n A B C`
 
       G1, (eqtp A B), G2 |- C ext M[under_n (^1)]
       >>
-      G1, G2[ . id] |-  C[under_n ( . id)] ext M
+      G1, G2[() . id] |- C[under_n (() . id)] ext M
 
 - `eqtpFunct A B M N`
 
@@ -2367,12 +2358,12 @@ Conventions:
       G |- eqtp A B
       G |- A ext M
 
-- `equivalenceLeft A B C`
+- `equivalenceLeft n A B C`
 
       G1, A, G2 |- C ext M
       >>
-      G1, (istp A) |-  eqtp A[^1] B[^1]
-      G1, B, G2 |-  C ext M
+      G1, (istp A) |- eqtp A[^1] B[^1]
+      G1, B, G2 |- C ext M
 
 - `eqtpRefl A`
 
@@ -2422,7 +2413,7 @@ Conventions:
 
 - `istpIntro A`
 
-      G |- of (istp A) 
+      G |- of (istp A) ()
       >>
       G |- istp A
 
@@ -2439,11 +2430,11 @@ Conventions:
       G |- of (istp A) P
       G |- of (istp A) Q
 
-- `istpLeft A B`
+- `istpLeft n A B`
 
       G1, (istp A), G2 |- B ext M[under_n (^1)]
       >>
-      G1, G2[ . id] |-  B[under_n ( . id)] ext M
+      G1, G2[() . id] |- B[under_n (() . id)] ext M
 
 - `inhabitedForm A`
 
@@ -2497,11 +2488,11 @@ Conventions:
       G |- of (subtype A B) P
       G |- of (subtype A B) Q
 
-- `subtypeLeft A B C`
+- `subtypeLeft n A B C`
 
       G1, (subtype A B), G2 |- C ext M[under_n (^1)]
       >>
-      G1, G2[ . id] |-  C[under_n ( . id)] ext M
+      G1, G2[() . id] |- C[under_n (() . id)] ext M
 
 - `subsumptionOf A B M`
 
@@ -2524,12 +2515,12 @@ Conventions:
       G |- subtype A B
       G |- A ext M
 
-- `subsumptionLeft A B C`
+- `subsumptionLeft n A B C`
 
       G1, A, G2 |- C ext M
       >>
-      G1, (istp A) |-  eeqtp A[^1] B[^1]
-      G1, B, G2 |-  C ext M
+      G1, (istp A) |- eeqtp A[^1] B[^1]
+      G1, B, G2 |- C ext M
 
 - `subtypeRefl A`
 
@@ -2651,25 +2642,25 @@ Conventions:
 
 - `squashIntroOfSquash A`
 
-      G |- of (squash A) 
+      G |- of (squash A) ()
       >>
       G |- istp A
       G |- squash A
 
 - `setElim A B C M`
 
-      G |- C ext N[ . id]
+      G |- C ext N[() . id]
       >>
       G, A |- istp B
       G |- of (set A (fn . B)) M
       G, (hidden) B[M . id] |- C[^1] ext N
 
-- `setLeft A B C`
+- `setLeft n A B C`
 
-      G1, (set A (fn . B)), G2 |- C ext M[under_n ( . id)]
+      G1, (set A (fn . B)), G2 |- C ext M[under_n (() . id)]
       >>
-      G1, A |-  istp B
-      G1, A, (hidden) B, G2[^1] |-  C[under_n (^1)] ext M
+      G1, A |- istp B
+      G1, A, (hidden) B, G2[^1] |- C[under_n (^1)] ext M
 
 - `setSquash A B`
 
@@ -2725,7 +2716,7 @@ Conventions:
 
 - `squashIntroOf A`
 
-      G |- of (squash A) 
+      G |- of (squash A) ()
       >>
       G |- A
 
@@ -2737,7 +2728,7 @@ Conventions:
 
 - `squashElim A C M`
 
-      G |- C ext N[ . id]
+      G |- C ext N[() . id]
       >>
       G |- of (squash A) M
       G |- istp A
@@ -2749,13 +2740,14 @@ Conventions:
       >>
       G |- of (squash A) M
       G |- of (squash A) N
+      G |- istp A
 
-- `squashLeft A C`
+- `squashLeft n A C`
 
-      G1, (squash A), G2 |- C ext M[under_n ( . ^1)]
+      G1, (squash A), G2 |- C ext M[under_n (() . ^1)]
       >>
-      G1 |-  istp A
-      G1, (hidden) A, G2[ . ^1] |-  C[under_n ( . ^1)] ext M
+      G1 |- istp A
+      G1, (hidden) A, G2[() . ^1] |- C[under_n (() . ^1)] ext M
 
 
 ### Quotient types
@@ -2855,7 +2847,7 @@ Conventions:
 
 - `quotientDescent A B C M N`
 
-      G |- C ext P[ . id]
+      G |- C ext P[() . id]
       >>
       G, A, A[^1] |- istp B
       G |- istp C
@@ -2864,64 +2856,64 @@ Conventions:
       G |- eq (quotient A (fn . fn . B)) M N
       G, (hidden) B[N . M . id] |- C[^1] ext P
 
-- `quotientLeft A B C`
+- `quotientLeft n A B C`
 
-      G1, (quotient A (fn . fn . B)), G2 |- C ext M[under_n ( . ^1)]
+      G1, (quotient A (fn . fn . B)), G2 |- C ext M[under_n (() . ^1)]
       >>
-      G1, (quotient A (fn . fn . B)), G2 |-  istp C
-      G1, (hidden) A, G2 |-  C ext M
+      G1, (quotient A (fn . fn . B)), G2 |- istp C
+      G1, (hidden) A, G2 |- C ext M
 
-- `quotientLeftRefl A B C`
+- `quotientLeftRefl n A B C`
 
-      G1, (quotient A (fn . fn . B)), G2 |- C ext M[under_n ( .  . ^1)]
+      G1, (quotient A (fn . fn . B)), G2 |- C ext M[under_n (() . () . ^1)]
       >>
-      G1, A, A[^1] |-  istp B
-      G1, (quotient A (fn . fn . B)), G2 |-  istp C
-      G1, (hidden) A, (hidden) B[0 . id], G2[^1] |-  C[under_n (^1)] ext M
+      G1, A, A[^1] |- istp B
+      G1, (quotient A (fn . fn . B)), G2 |- istp C
+      G1, (hidden) A, (hidden) B[0 . id], G2[^1] |- C[under_n (^1)] ext M
 
-- `quotientLeftIstype A B C`
+- `quotientLeftIstype n A B C`
 
       G1, (quotient A (fn . fn . B)), G2 |- istp C
       >>
-      G1, A, A[^1] |-  istp B
-      G1, A, A[^1], B, G2[^2] |-  eqtp C[under_n (^2)] C[under_n (1 . ^3)]
+      G1, A, A[^1] |- istp B
+      G1, A, A[^1], B, G2[^2] |- eqtp C[under_n (^2)] C[under_n (1 . ^3)]
 
-- `quotientLeftEqtype A B C D`
+- `quotientLeftEqtype n A B C D`
 
       G1, (quotient A (fn . fn . B)), G2 |- eqtp C D
       >>
-      G1, A, A[^1] |-  istp B
-      G1, A, A[^1], B, G2[^2] |-  eqtp C[under_n (^2)] D[under_n (1 . ^3)]
+      G1, A, A[^1] |- istp B
+      G1, A, A[^1], B, G2[^2] |- eqtp C[under_n (^2)] D[under_n (1 . ^3)]
 
-- `quotientLeftOf A B C M`
+- `quotientLeftOf n A B C M`
 
       G1, (quotient A (fn . fn . B)), G2 |- of C[under_n (^1)] M
       >>
-      G1, A, A[^1] |-  istp B
-      G1, A, A[^1], B, G2[^2] |-  eq C[under_n (^3)] M[under_n (^2)] M[under_n (1 . ^3)]
+      G1, A, A[^1] |- istp B
+      G1, A, A[^1], B, G2[^2] |- eq C[under_n (^3)] M[under_n (^2)] M[under_n (1 . ^3)]
 
-- `quotientLeftEq A B C M N`
+- `quotientLeftEq n A B C M N`
 
       G1, (quotient A (fn . fn . B)), G2 |- eq C[under_n (^1)] M N
       >>
-      G1, A, A[^1] |-  istp B
-      G1, A, A[^1], B, G2[^2] |-  eq C[under_n (^3)] M[under_n (^2)] N[under_n (1 . ^3)]
+      G1, A, A[^1] |- istp B
+      G1, A, A[^1], B, G2[^2] |- eq C[under_n (^3)] M[under_n (^2)] N[under_n (1 . ^3)]
 
-- `quotientLeftOfDep A B C M`
+- `quotientLeftOfDep n A B C M`
 
       G1, (quotient A (fn . fn . B)), G2 |- of C M
       >>
-      G1, A, A[^1] |-  istp B
-      G1, A, A[^1], B, G2[^2] |-  eqtp C[under_n (^2)] C[under_n (1 . ^3)]
-      G1, A, A[^1], B, G2[^2] |-  eq C[under_n (^2)] M[under_n (^2)] M[under_n (1 . ^3)]
+      G1, A, A[^1] |- istp B
+      G1, A, A[^1], B, G2[^2] |- eqtp C[under_n (^2)] C[under_n (1 . ^3)]
+      G1, A, A[^1], B, G2[^2] |- eq C[under_n (^2)] M[under_n (^2)] M[under_n (1 . ^3)]
 
-- `quotientLeftEqDep A B C M N`
+- `quotientLeftEqDep n A B C M N`
 
       G1, (quotient A (fn . fn . B)), G2 |- eq C M N
       >>
-      G1, A, A[^1] |-  istp B
-      G1, A, A[^1], B, G2[^2] |-  eqtp C[under_n (^2)] C[under_n (1 . ^3)]
-      G1, A, A[^1], B, G2[^2] |-  eq C[under_n (^2)] M[under_n (^2)] N[under_n (1 . ^3)]
+      G1, A, A[^1] |- istp B
+      G1, A, A[^1], B, G2[^2] |- eqtp C[under_n (^2)] C[under_n (1 . ^3)]
+      G1, A, A[^1], B, G2[^2] |- eq C[under_n (^2)] M[under_n (^2)] N[under_n (1 . ^3)]
 
 - `quotientFormInv A B`
 
@@ -2951,7 +2943,6 @@ Conventions:
       G |- of (univ J) (iforall I K (fn . A))
       >>
       G |- of (kind I) K
-      G |- of level J
       G |- lleq I J
       G, K |- of (univ J[^1]) A
 
@@ -2960,7 +2951,6 @@ Conventions:
       G |- eq (univ J) (iforall I K (fn . A)) (iforall I L (fn . B))
       >>
       G |- eq (kind I) K L
-      G |- of level J
       G |- lleq I J
       G, K |- eq (univ J[^1]) A B
 
@@ -2980,7 +2970,7 @@ Conventions:
 
 - `iforallIntro A I K`
 
-      G |- iforall I K (fn . A) ext M[ . id]
+      G |- iforall I K (fn . A) ext M[() . id]
       >>
       G |- of (kind I) K
       G, (hidden) K |- A ext M
@@ -3003,10 +2993,10 @@ Conventions:
 
 - `iforallElim A I K P`
 
-      G |- A ext M
+      G |- A[P . id] ext M
       >>
-      G, K |- istp A[^1]
-      G |- iforall I K (fn . A[^1]) ext M
+      G, K |- istp A
+      G |- iforall I K (fn . A) ext M
       G |- of K P
 
 
@@ -3038,7 +3028,7 @@ Conventions:
 
 - `foralltpIntro A`
 
-      G |- foralltp (fn . A) ext M[ . id]
+      G |- foralltp (fn . A) ext M[() . id]
       >>
       G, (hidden) type |- A ext M
 
@@ -3088,7 +3078,6 @@ Conventions:
       G |- of (univ J) (iexists I K (fn . A))
       >>
       G |- of (kind I) K
-      G |- of level J
       G |- lleq I J
       G, K |- of (univ J[^1]) A
 
@@ -3097,7 +3086,6 @@ Conventions:
       G |- eq (univ J) (iexists I K (fn . A)) (iexists I L (fn . B))
       >>
       G |- eq (kind I) K L
-      G |- of level J
       G |- lleq I J
       G, K |- eq (univ J[^1]) A B
 
@@ -3148,7 +3136,7 @@ Conventions:
 
 - `iexistsElim A B I K M`
 
-      G |- B ext P[M .  . id]
+      G |- B ext P[M . () . id]
       >>
       G |- istp K
       G, K |- istp A
@@ -3176,20 +3164,20 @@ Conventions:
 
 ### Miscellaneous
 
-- `substitution A B M`
+- `substitution n A B M`
 
       G1, A, G2 |- B ext N[under_n (^1)]
       >>
-      G1, A, G2 |-  istp B
-      G1, A, G2 |-  eq A[(^1) o ^n] 0+n M[(^1) o ^n]
-      G1, G2[M . id] |-  B[under_n (M . id)] ext N
+      G1, A, G2 |- istp B
+      G1, A, G2 |- eq A[(^1) o ^n] 0+n M[(^1) o ^n]
+      G1, G2[M . id] |- B[under_n (M . id)] ext N
 
-- `substitutionSimple A B M`
+- `substitutionSimple n A B M`
 
       G1, A, G2 |- B[under_n (^1)] ext N[under_n (^1)]
       >>
-      G1, A, G2 |-  eq A[(^1) o ^n] 0+n M[(^1) o ^n]
-      G1, G2[M . id] |-  B ext N
+      G1, A, G2 |- eq A[(^1) o ^n] 0+n M[(^1) o ^n]
+      G1, G2[M . id] |- B ext N
 
 - `generalize A B M`
 
@@ -3227,13 +3215,13 @@ Conventions:
 
 - `eeqtpSymm A B`
 
-      G |- eeqtp A B ext ( , )
+      G |- eeqtp A B ext (() , ())
       >>
       G |- eeqtp B A
 
 - `weakenEqtpEeqtp A B`
 
-      G |- eeqtp A B ext ( , )
+      G |- eeqtp A B ext (() , ())
       >>
       G |- eqtp A B
 
@@ -3311,16 +3299,6 @@ Conventions:
       >>
       G |- of level I
 
-- `integerIntroOf`
-
-      G |- of integer M
-      (where M is an integer literal)
-
-- `integerIntroEq`
-
-      G |- eq integer M M
-      (where M is an integer literal)
-
 - `integerToDefType`
 
       G |- of (arrow integer Integer) integer_to_def
@@ -3370,5 +3348,4 @@ Conventions:
       G |- eq 
              (arrow integer (arrow integer integer))
              timesz
-             (fn . fn . Timesz (timesz_def (integer_to_def 1) (integer_to_def 0)))
-
+             (fn . fn . integer_from_def (Times (integer_to_def 1) (integer_to_def 0)))

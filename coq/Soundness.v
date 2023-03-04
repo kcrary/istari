@@ -159,12 +159,15 @@ intros; eapply sound_equal_eta; eauto; done.
 intros; eapply sound_equal_eta_hyp; eauto; done.
 intros; eapply sound_equal_formation_invert1; eauto; done.
 intros; eapply sound_equal_formation_invert1_univ; eauto; done.
+intros; eapply sound_equal_formation_invert2; eauto; done.
+intros; eapply sound_equal_formation_invert3; eauto; done.
 intros; eapply sound_set_formation; eauto; done.
 intros; eapply sound_set_formation_univ; eauto; done.
 intros; eapply sound_set_intro; eauto; done.
 intros; eapply sound_set_elim1; eauto; done.
 intros; eapply sound_set_elim2; eauto; done.
 intros; eapply sound_set_hyp_weaken; eauto; done.
+intros; eapply sound_set_formation_invert; eauto; done.
 intros; eapply sound_squash_idem; eauto; done.
 intros; eapply sound_quotient_formation; eauto; done.
 intros; eapply sound_quotient_formation_univ; eauto; done.

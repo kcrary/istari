@@ -20,6 +20,62 @@ Local Ltac prove_equiv_compat :=
   apply mc_oper; repeat2 (apply mcr_cons); [.. | apply mcr_nil]; auto.
 
 
+Lemma equiv_beta :
+  forall (m n : @term object),
+    equiv (app (lam m) n) (subst1 n m).
+Proof.
+intros m n.
+apply steps_equiv.
+apply star_one.
+apply step_app2.
+Qed.
+
+
+Lemma equiv_beta1 :
+  forall (m n : @term object),
+    equiv (ppi1 (ppair m n)) m.
+Proof.
+intros m n.
+apply steps_equiv.
+apply star_one.
+apply step_ppi12.
+Qed.
+
+
+Lemma equiv_beta2 :
+  forall (m n : @term object),
+    equiv (ppi2 (ppair m n)) n.
+Proof.
+intros m n.
+apply steps_equiv.
+apply star_one.
+apply step_ppi22.
+Qed.
+
+
+Lemma equiv_bite_l :
+  forall (m n : @term object),
+    equiv (bite btrue m n) m.
+Proof.
+intros m n.
+apply steps_equiv.
+apply star_one.
+apply step_bite2.
+Qed.
+
+
+Lemma equiv_bite_r :
+  forall (m n : @term object),
+    equiv (bite bfalse m n) n.
+Proof.
+intros m n.
+apply steps_equiv.
+apply star_one.
+apply step_bite3.
+Qed.
+
+
+
 Lemma equiv_all :
   forall (a a' b b' c c' : term object),
     equiv a a'
@@ -151,6 +207,17 @@ Lemma equiv_con :
     equiv m1 m1'
     -> equiv m2 m2'
     -> equiv (con m1 m2) (con m1' m2').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
+Lemma equiv_exist :
+  forall (a a' b b' c c' : term object),
+    equiv a a'
+    -> equiv b b'
+    -> equiv c c'
+    -> equiv (exist a b c) (exist a' b' c').
 Proof.
 prove_equiv_compat.
 Qed.

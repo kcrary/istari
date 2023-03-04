@@ -1531,21 +1531,11 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                        (* 1a. Unify A with U e *)
                        if U.unify1 a (T.apply1 Prim.univ e) then
                           let
-                             val goal1 =
-                                (J.make ctx (T.apply2 Prim.ov (T.Const Prim.level) e),
-                                 dir)
- 
-                             val goal2 =
-                                (J.make ctx (T.apply2 Prim.ov (T.Const Prim.level) u),
-                                 dir)
- 
-                             val goal3 =
+                             val goal' =
                                 (J.make ctx (T.apply2 Prim.lleq e u),
                                  dir)
  
-                             val dest1 = ref $ lift (fn () => raise (Fail "dest1"))
-                             val dest2 = ref $ lift (fn () => raise (Fail "dest2"))
-                             val dest3 = ref $ lift (fn () => raise (Fail "dest3"))
+                             val dest' = newdest ()
                           in
                              progress := true;
  
@@ -1553,43 +1543,24 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                                 (
                                 (* G |- Ue <: Uu *)
                                 refine (Rule.univSub e u)
-                                >>> [
-                                    (* G |- e : level *)
-                                    play dest1,
-    
-                                    (* G |- u : level *)
-                                    play dest2,
-    
-                                    (* G |- lleq e u *)
-                                    play dest3
-                                    ]
+                                >>+
+                                (* G |- lleq e u *)
+                                play dest'
                                 );
  
                              (* Prove e <= u, and e, u : level. *)
                              constraints :=
-                                (table, goal1, dest1, history) ::
-                                (table, goal2, dest2, history) ::
-                                (table, goal3, dest3, history) ::
+                                (table, goal', dest', history) ::
                                 !constraints
                           end
                        (* 1b Unify A with Ki... *)   
                        else if U.unify1 a (T.apply1 Prim.kind e) then
                           let
-                             val goal1 =
-                                (J.make ctx (T.apply2 Prim.ov (T.Const Prim.level) e),
-                                 dir)
- 
-                             val goal2 =
-                                (J.make ctx (T.apply2 Prim.ov (T.Const Prim.level) u),
-                                 dir)
- 
-                             val goal3 =
+                             val goal' =
                                 (J.make ctx (T.apply2 Prim.lleq (T.apply1 Prim.lsucc e) u),
                                  dir)
- 
-                             val dest1 = ref $ lift (fn () => raise (Fail "dest1"))
-                             val dest2 = ref $ lift (fn () => raise (Fail "dest2"))
-                             val dest3 = ref $ lift (fn () => raise (Fail "dest3"))
+
+                             val dest' = newdest ()
                           in
                              progress := true;
  
@@ -1597,23 +1568,14 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                                 (
                                 (* G |- Ue <: Uu *)
                                 refine (Rule.kindUnivSub e u)
-                                >>> [
-                                    (* G |- e : level *)
-                                    play dest1,
-    
-                                    (* G |- u : level *)
-                                    play dest2,
-    
-                                    (* G |- lleq (lsucc e) u *)
-                                    play dest3
-                                    ]
+                                >>+
+                                (* G |- lleq (lsucc e) u *)
+                                play dest'
                                 );
  
                              (* Prove lsucc e <l= u, and e, u : level. *)
                              constraints :=
-                                (table, goal1, dest1, history) ::
-                                (table, goal2, dest2, history) ::
-                                (table, goal3, dest3, history) ::
+                                (table, goal', dest', history) ::
                                 !constraints
                           end
                        else

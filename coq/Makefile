@@ -26,6 +26,7 @@ UNITS = \
 	IntensionalNerect \
 	Judgement \
 	Lattice \
+	LevelLemmas \
 	MapTerm \
 	Model \
 	Morphism \
@@ -113,16 +114,24 @@ UNITS = \
 	Validation \
 	ValidationAcc \
 	ValidationAll \
-	ValidationPi \
+	ValidationEqtp \
+	ValidationEqual \
 	ValidationExist \
 	ValidationFuture \
+	ValidationIstp \
 	ValidationLevel \
+	ValidationMisc \
 	ValidationMu \
 	ValidationNat \
+	ValidationOf \
+	ValidationPi \
 	ValidationQuotient \
 	ValidationRec \
+	ValidationSet \
 	ValidationSigma \
 	ValidationSimple \
+	ValidationSquash \
+	ValidationSubtype \
 	ValidationSum \
 	ValidationUniv \
 	ValidationUtil

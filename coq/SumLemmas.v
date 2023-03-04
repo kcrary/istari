@@ -280,61 +280,6 @@ apply tr_sigma_intro.
 Qed.
 
 
-Lemma sumcase_left :
-  forall m n p,
-    @equiv obj (sumcase (sumleft m) n p) (subst1 m n).
-Proof.
-intros m n p.
-unfold sumcase, sumleft.
-eapply equiv_trans.
-  {
-  eapply equiv_bite; [| apply equiv_refl | apply equiv_refl].
-  apply steps_equiv.
-  apply star_one.
-  apply step_ppi12.
-  }
-eapply equiv_trans.
-  {
-  apply steps_equiv.
-  apply star_one.
-  apply step_bite2.
-  }
-apply equiv_funct; auto using equiv_refl.
-apply equivsub_dot; auto using equivsub_refl.
-apply steps_equiv.
-apply star_one.
-apply step_ppi22.
-Qed.
-
-
-
-Lemma sumcase_right :
-  forall m n p,
-    @equiv obj (sumcase (sumright m) n p) (subst1 m p).
-Proof.
-intros m n p.
-unfold sumcase, sumright.
-eapply equiv_trans.
-  {
-  eapply equiv_bite; [| apply equiv_refl | apply equiv_refl].
-  apply steps_equiv.
-  apply star_one.
-  apply step_ppi12.
-  }
-eapply equiv_trans.
-  {
-  apply steps_equiv.
-  apply star_one.
-  apply step_bite3.
-  }
-apply equiv_funct; auto using equiv_refl.
-apply equivsub_dot; auto using equivsub_refl.
-apply steps_equiv.
-apply star_one.
-apply step_ppi22.
-Qed.
-
-
 Lemma tr_sumtype_eta_hyp_triv :
   forall G1 G2 a b c,
     tr (substctx (dot (sumleft (var 0)) sh1) G2 ++ hyp_tm a :: G1) 
@@ -455,5 +400,100 @@ apply (tr_booltp_eta_hyp _ [_]).
     }
   rewrite -> Hequiv.
   exact Hright.
+  }
+Qed.
+
+
+Lemma tr_sumtype_elim :
+  forall G a b c m n p q r s,
+    tr G (deq m n (sumtype a b))
+    -> tr (hyp_tm a :: G) (deq p q (subst (dot (sumleft (var 0)) sh1) c))
+    -> tr (hyp_tm b :: G) (deq r s (subst (dot (sumright (var 0)) sh1) c))
+    -> tr G (deq
+               (sumcase m p r)
+               (sumcase n q s)
+               (subst1 m c)).
+Proof.
+intros G a b c m n p q r s Hmn Hpq Hrs.
+so (equiv_beta _ (sumcase (var 0) (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) r)) m) as H.
+simpsubin H.
+rewrite -> !subst_var0_sh1 in H.
+rewrite <- H; clear H.
+so (equiv_beta _ (sumcase (var 0) (subst (dot (var 0) (sh 2)) q) (subst (dot (var 0) (sh 2)) s)) n) as H.
+simpsubin H.
+rewrite -> !subst_var0_sh1 in H.
+rewrite <- H; clear H.
+apply (tr_pi_elim' _ (sumtype a b) c); auto.
+apply tr_pi_intro.
+  {
+  eapply tr_inhabitation_formation; eauto.
+  }
+unfold sumcase.
+unfold sumleft in Hpq.
+unfold sumright in Hrs.
+clear Hmn.
+simpsub.
+replace (bite (ppi1 (var 0)) (subst (dot (ppi2 (var 0)) sh1) p) (subst (dot (ppi2 (var 0)) sh1) r)) with (subst (dot (ppi2 (var 0)) (dot (ppi1 (var 0)) sh1)) (bite (var 1) (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) r))) by (simpsub; auto).
+replace (bite (ppi1 (var 0)) (subst (dot (ppi2 (var 0)) sh1) q) (subst (dot (ppi2 (var 0)) sh1) s)) with (subst (dot (ppi2 (var 0)) (dot (ppi1 (var 0)) sh1)) (bite (var 1) (subst (dot (var 0) (sh 2)) q) (subst (dot (var 0) (sh 2)) s))) by (simpsub; auto).
+apply (tr_sigma_eta_hyp _ []).
+simpsub.
+cbn [List.app].
+apply (tr_booltp_eta_hyp _ [_]).
+  {
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  rewrite -> equiv_bite_l.
+  auto.
+  }
+
+  {
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  rewrite -> equiv_bite_r.
+  auto.
+  }
+Qed.
+
+
+Lemma tr_sumtype_elim_eqtype :
+  forall G a b c d e f m n,
+    tr G (deq m n (sumtype a b))
+    -> tr (hyp_tm a :: G) (deqtype c d)
+    -> tr (hyp_tm b :: G) (deqtype e f)
+    -> tr G (deqtype (sumcase m c e) (sumcase n d f)).
+Proof.
+intros G a b c d e f m n Hmn Hcd Hef.
+replace (sumcase m c e) with (subst1 m (sumcase (var 0) (subst (dot (var 0) (sh 2)) c) (subst (dot (var 0) (sh 2)) e))).
+2:{
+  simpsub.
+  rewrite -> !subst_var0_sh1.
+  auto.
+  }
+replace (sumcase n d f) with (subst1 n (sumcase (var 0) (subst (dot (var 0) (sh 2)) d) (subst (dot (var 0) (sh 2)) f))).
+2:{
+  simpsub.
+  rewrite -> !subst_var0_sh1.
+  auto.
+  }
+eapply tr_functionality; eauto.
+apply (tr_sumtype_eta_hyp_triv _ []).
+  {
+  simpsub.
+  cbn [List.app].
+  rewrite -> !sumcase_left.
+  simpsub.
+  rewrite -> !subst_var0_sh1.
+  auto.
+  }
+
+  {
+  simpsub.
+  cbn [List.app].
+  rewrite -> !sumcase_right.
+  simpsub.
+  rewrite -> !subst_var0_sh1.
+  auto.
   }
 Qed.

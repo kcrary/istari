@@ -1352,3 +1352,42 @@ split.
   eapply urel_downward_leq; eauto.
   }
 Qed.
+
+
+Lemma sound_set_formation_invert :
+  forall G a a' b b',
+    pseq G (deqtype (set a b) (set a' b'))
+    -> pseq G (deqtype a a').
+Proof.
+intros G a b c d.
+revert G.
+refine (seq_pseq 0 1 [] _ _ _).
+cbn.
+intros G Hseq.
+rewrite -> seq_eqtype in Hseq |- *.
+intros i s s' Hs.
+so (Hseq _ _ _ Hs) as (R & Hacl & Hacr & Hbdl & Hbdr).
+simpsubin Hacl.
+invert (basic_value_inv _#6 value_set Hacl).
+intros A B1 Hal _ Heq.
+simpsubin Hacr.
+invert (basic_value_inv _#6 value_set Hacr).
+intros A' B2 Har _ Heq'.
+so (eqtrans Heq (eqsymm Heq')) as H.
+so (iuset_inj _#5 H); subst A'.
+clear H Heq'.
+simpsubin Hbdl.
+invert (basic_value_inv _#6 value_set Hbdl).
+intros A' B3 Hbl _ Heq'.
+so (eqtrans Heq (eqsymm Heq')) as H.
+so (iuset_inj _#5 H); subst A'.
+clear H Heq'.
+simpsubin Hbdr.
+invert (basic_value_inv _#6 value_set Hbdr).
+intros A' B4 Hbr _ Heq'.
+so (eqtrans Heq (eqsymm Heq')) as H.
+so (iuset_inj _#5 H); subst A'.
+clear H Heq' Heq.
+exists A.
+auto.
+Qed.

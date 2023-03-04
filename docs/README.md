@@ -45,9 +45,8 @@ guarded recursive kinds.  Guarded recursive kinds make it possible to
 reason about imperative code that uses higher-order state.
 
 The Istari type theory is itself formalized using a different proof
-assistant (Coq), and the Istari inference rules are validated
-according to that formalization.  (At present some of the rules have
-yet to be validated, but all of the "delicate" rules are validated.)
+assistant (Coq), and nearly all of the Istari inference rules are
+validated using that formalization.
 
 ---
 

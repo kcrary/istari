@@ -82,7 +82,7 @@ structure Main :> MAIN =
       fun webgen () =
          let
             val rules = parse ()
-            val outs = TextIO.openOut "rules.md"
+            val outs = TextIO.openOut "../rules/rules.md"
          in
             Finally.finally
                (fn () => Webgen.gen outs rules)
@@ -92,7 +92,7 @@ structure Main :> MAIN =
       fun webgendb () =
          let
             val rules = elaborate ()
-            val outs = TextIO.openOut "rules-db.md"
+            val outs = TextIO.openOut "../rules/rules-db.md"
          in
             Finally.finally
                (fn () => WebgenDB.gen outs rules)

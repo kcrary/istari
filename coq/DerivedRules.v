@@ -13,6 +13,7 @@ Require Import Hygiene.
 Require Import Rules.
 Require Import Morphism.
 Require Import Equivalence.
+Require Import Equivalences.
 Require Import Defined.
 Require Import PageType.
 Require Import Dots.
@@ -86,6 +87,102 @@ unfold leqpagetp.
 apply leqtp_nzero_equiv.
 Qed.
 
+
+Lemma sumcase_left :
+  forall m n p,
+    @equiv obj (sumcase (sumleft m) n p) (subst1 m n).
+Proof.
+intros m n p.
+unfold sumcase, sumleft.
+eapply equiv_trans.
+  {
+  eapply equiv_bite; [| apply equiv_refl | apply equiv_refl].
+  apply steps_equiv.
+  apply star_one.
+  apply step_ppi12.
+  }
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  apply star_one.
+  apply step_bite2.
+  }
+apply equiv_funct; auto using equiv_refl.
+apply equivsub_dot; auto using equivsub_refl.
+apply steps_equiv.
+apply star_one.
+apply step_ppi22.
+Qed.
+
+
+
+Lemma sumcase_right :
+  forall m n p,
+    @equiv obj (sumcase (sumright m) n p) (subst1 m p).
+Proof.
+intros m n p.
+unfold sumcase, sumright.
+eapply equiv_trans.
+  {
+  eapply equiv_bite; [| apply equiv_refl | apply equiv_refl].
+  apply steps_equiv.
+  apply star_one.
+  apply step_ppi12.
+  }
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  apply star_one.
+  apply step_bite3.
+  }
+apply equiv_funct; auto using equiv_refl.
+apply equivsub_dot; auto using equivsub_refl.
+apply steps_equiv.
+apply star_one.
+apply step_ppi22.
+Qed.
+
+
+Lemma unroll_leqtp :
+  forall m n,
+    @equiv obj
+      (app (app leqtp m) n)
+      (sumcase m
+         unittp
+         (sumcase (subst sh1 n)
+            voidtp
+            (app (app leqtp (var 1)) (var 0)))).
+Proof.
+intros m n.
+apply steps_equiv.
+unfold leqtp.
+eapply star_trans.
+  {
+  apply (star_map' _ _ (fun z => app z _)); eauto using step_app1.
+  eapply star_trans.
+    {
+    apply (star_map' _ _ (fun z => app z _)); eauto using step_app1.
+    eapply star_trans.
+      {
+      apply theta_fix.
+      }
+    apply star_one.
+    apply step_app2.
+    }
+  simpsub.
+  cbn [Nat.add].
+  apply star_one.
+  apply step_app2.
+  }
+simpsub.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+cbn [Nat.add].
+apply star_refl.
+Qed.
 
 
 
@@ -672,12 +769,40 @@ eapply (tr_pi_elim _ (subst (dot p3 (dot p2 (dot p1 id))) a4)).
   auto.
   }
 
-
   {
   auto.
   }
 Qed.
 
+
+Lemma tr_pi_elim5' :
+  forall G a1 a2 a3 a4 a5 b c m n p1 q1 p2 q2 p3 q3 p4 q4 p5 q5,
+    tr G (deq m n (pi a1 (pi a2 (pi a3 (pi a4 (pi a5 b))))))
+    -> tr G (deq p1 q1 a1)
+    -> tr G (deq p2 q2 (subst1 p1 a2))
+    -> tr G (deq p3 q3 (subst (dot p2 (dot p1 id)) a3))
+    -> tr G (deq p4 q4 (subst (dot p3 (dot p2 (dot p1 id))) a4))
+    -> tr G (deq p5 q5 (subst (dot p4 (dot p3 (dot p2 (dot p1 id)))) a5))
+    -> c = subst (dot p5 (dot p4 (dot p3 (dot p2 (dot p1 id))))) b
+    -> tr G (deq (app (app (app (app (app m p1) p2) p3) p4) p5) (app (app (app (app (app n q1) q2) q3) q4) q5) c).
+Proof.
+intros G a1 a2 a3 a4 a5 b c m n p1 q1 p2 q2 p3 q3 p4 q4 p5 q5 H1 H2 H3 H4 H5 H6 ->.
+replace (subst (dot p5 (dot p4 (dot p3 (dot p2 (dot p1 id))))) b) with (subst (dot p5 id) (subst (under 1 (dot p4 (dot p3 (dot p2 (dot p1 id))))) b)).
+2:{
+  simpsub.
+  auto.
+  }
+eapply (tr_pi_elim _ (subst (dot p4 (dot p3 (dot p2 (dot p1 id)))) a5)).
+  {
+  eapply tr_pi_elim4'; eauto.
+  simpsub.
+  auto.
+  }
+
+  {
+  auto.
+  }
+Qed.
 
 
 Lemma tr_sigma_elim2' :
@@ -865,6 +990,60 @@ apply tr_booltp_eta_hyp.
 Qed.
 
 
+Lemma tr_voidtp_formation_univ_gen :
+  forall G lv,
+    tr G (deq lv lv nattp)
+    -> tr G (deq voidtp voidtp (univ lv)).
+Proof.
+intros G lv H.
+apply (tr_univ_cumulative _ nzero); auto.
+  {
+  apply tr_voidtp_formation_univ.
+  }
+
+  {
+  rewrite -> leqpagetp_nzero_equiv.
+  apply tr_unittp_intro.
+  }
+Qed.
+
+
+Lemma tr_unittp_formation_univ_gen :
+  forall G lv,
+    tr G (deq lv lv nattp)
+    -> tr G (deq unittp unittp (univ lv)).
+Proof.
+intros G lv H.
+apply (tr_univ_cumulative _ nzero); auto.
+  {
+  apply tr_unittp_formation_univ.
+  }
+
+  {
+  rewrite -> leqpagetp_nzero_equiv.
+  apply tr_unittp_intro.
+  }
+Qed.
+
+
+Lemma tr_booltp_formation_univ_gen :
+  forall G lv,
+    tr G (deq lv lv nattp)
+    -> tr G (deq booltp booltp (univ lv)).
+Proof.
+intros G lv H.
+apply (tr_univ_cumulative _ nzero); auto.
+  {
+  apply tr_booltp_formation_univ.
+  }
+
+  {
+  rewrite -> leqpagetp_nzero_equiv.
+  apply tr_unittp_intro.
+  }
+Qed.
+
+
 (* pi *)
 
 Lemma tr_pi_of_ext :
@@ -1004,6 +1183,36 @@ Proof.
 intros G a b H.
 eapply tr_eqtype_formation_left.
 apply tr_eqtype_symmetry; eauto.
+Qed.
+
+
+Lemma tr_functionality :
+  forall G a b c m n,
+    tr (hyp_tm a :: G) (deqtype b c)
+    -> tr G (deq m n a)
+    -> tr G (deqtype (subst1 m b) (subst1 n c)).
+Proof.
+intros G a b c m n Hbc Hmn.
+unfold deqtype in Hbc.
+apply (tr_eqtype_transitivity _ _ (subst1 n b)).
+  {
+  apply (tr_eqtype_formation_invert1 _ (subst1 m b) (subst1 n b) (subst1 m c) (subst1 n c)).
+  assert (tr G (deqtype (subst1 m (eqtype b c)) (subst1 n (eqtype b c)))) as H.
+    {
+    eapply tr_generalize_eq_type; eauto.
+    }
+  simpsubin H.
+  exact H.
+  }
+
+  {
+  unfold deqtype.
+  replace (@triv obj) with (subst1 n triv) by (simpsub; auto).
+  replace (eqtype (subst1 n b) (subst1 n c)) with (subst1 n (eqtype b c)) by (simpsub; auto).
+  eapply tr_generalize_eq; eauto.
+  apply (tr_transitivity _ _ m); auto.
+  apply tr_symmetry; auto.
+  }
 Qed.
 
 

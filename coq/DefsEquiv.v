@@ -16,6 +16,16 @@ Require Rules.
 Require Defs.
 
 
+Lemma subst_leqtp :
+  forall object (s : @sub object), subst s leqtp = leqtp.
+Proof.
+prove_subst.
+Qed.
+
+
+Hint Rewrite subst_leqtp : subst.
+
+
 Ltac prove_the_hygiene :=
   repeat
     (match goal with
@@ -26,6 +36,40 @@ Ltac prove_the_hygiene :=
      end);
   repeat (apply hygiene_auto; cbn; repeat split); auto; 
   first [apply hygiene_var | apply hygiene_shift' | idtac]; auto.
+
+
+Lemma def_alltp :
+  forall a, equiv (app Defs.foralltp (lam a)) (alltp a).
+Proof.
+intros a.
+unfold Defs.foralltp.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  apply star_refl.
+  }
+
+  {
+  simpsub.
+  cbn [Nat.add].
+  apply equiv_alltp.
+  apply steps_equiv.
+  eapply star_step.
+    { 
+    apply step_app2.
+    }
+
+    {
+    simpsub.
+    rewrite -> subst_var0_sh1.
+    apply star_refl.
+    }
+}
+Qed.
 
 
 Lemma def_arrow :
@@ -145,6 +189,49 @@ apply star_refl.
 Qed.
 
 
+Lemma def_iexists :
+  forall i k a,
+    equiv (app (app (app Defs.iexists i) k) (lam a)) (exist i k a).
+Proof.
+intros i k a.
+unfold Defs.iexists.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app1.
+    apply step_app1.
+    apply step_app2.
+    }
+  simpsub.
+  eapply star_step.
+    {
+    apply step_app1.
+    apply step_app2.
+    }
+  simpsub.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+apply equiv_exist; auto using equiv_refl.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl'.
+rewrite <- eqsub_expand_id.
+simpsub.
+reflexivity.
+Qed.
+
+
 Lemma def_iforall :
   forall i k a,
     equiv (app (app (app Defs.iforall i) k) (lam a)) (all i k a).
@@ -190,7 +277,7 @@ Qed.
 
 Lemma def_inl :
   forall m,
-    equiv (app Defs.inl m) (ppair btrue m).
+    equiv (app Defs.inl m) (sumleft m).
 Proof.
 intros m.
 unfold Defs.inl.
@@ -206,7 +293,7 @@ Qed.
 
 Lemma def_inr :
   forall m,
-    equiv (app Defs.inr m) (ppair bfalse m).
+    equiv (app Defs.inr m) (sumright m).
 Proof.
 intros m.
 unfold Defs.inl.
@@ -343,9 +430,20 @@ apply step_app2.
 Qed.
 
 
-Lemma def_lleq : Defs.lleq = leqtp.
+Lemma def_lsucc :
+  forall m, equiv (app Defs.lsucc m) (nsucc m).
 Proof.
-auto.
+intro m.
+unfold Defs.lsucc.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  apply star_one.
+  apply step_app2.
+  }
+simpsub.
+rewrite -> def_inr.
+apply equiv_refl.
 Qed.
 
 
@@ -622,7 +720,7 @@ Qed.
 
 Lemma def_sum :
   forall a b,
-    equiv (app (app Defs.sum a) b) (sigma booltp (bite (var 0) (subst sh1 a) (subst sh1 b))).
+    equiv (app (app Defs.sum a) b) (sumtype a b).
 Proof.
 intros a b.
 unfold Defs.sum.
@@ -647,11 +745,8 @@ Qed.
 Lemma def_sumcase :
   forall m n p,
     equiv 
-      (app (app (app Defs.sumcase m) n) p)
-      (bite
-         (ppi1 m)
-         (app n (ppi2 m))
-         (app p (ppi2 m))).
+      (app (app (app Defs.sumcase m) (lam n)) (lam p))
+      (sumcase m n p).
 Proof.
 intros m n p.
 unfold Defs.sumcase.
@@ -671,13 +766,12 @@ eapply equiv_trans.
   apply step_app2.
   }
 simpsub.
-apply steps_equiv.
-eapply star_step.
-  {
-  apply step_app2.
-  }
+rewrite -> equiv_beta.
 simpsub.
-apply star_refl.
+rewrite -> !equiv_beta.
+simpsub.
+unfold sumcase.
+apply equiv_refl.
 Qed.
 
 
@@ -784,6 +878,25 @@ eapply equiv_trans.
     simpsub; auto. }
   }
 }
+Qed.
+
+
+Lemma def_squash : 
+  forall a,
+    equiv (app Defs.squash a) (squash a).
+Proof.
+intros a.
+unfold Defs.squash.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+
+  {
+  simpsub.
+  apply star_refl.
+  }
 Qed.
 
 

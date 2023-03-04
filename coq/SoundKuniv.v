@@ -109,7 +109,7 @@ Lemma sound_kuniv_formation_univ :
     pseq G (deq lv1 lv2 pagetp)
     -> pseq G (deq lv lv pagetp)
     -> pseq G (deq triv triv (ltpagetp (nsucc lv1) lv))
-    -> pseq G (deq (univ lv1) (univ lv2) (univ lv)).
+    -> pseq G (deq (kuniv lv1) (kuniv lv2) (univ lv)).
 Proof.
 intros G lv lv1 lv2.
 revert G.
@@ -138,33 +138,37 @@ destruct Hlt as (Hltstr & Hltcex).
 destruct Hlt' as (Hltstr' & Hltcex').
 exists (iuuniv the_system i pg').
 simpsub.
-assert (sint the_system pg' true i (univ (subst s lv1)) (iuuniv the_system i pg)) as Hintlv1l.
+assert (sint the_system pg' true i (kuniv (subst s lv1)) (iukuniv the_system i pg hl)) as Hintlv1l.
   {
   rewrite -> sint_unroll.
   apply interp_eval_refl.
-  apply interp_univ; auto.
+  apply interp_kuniv; auto.
+  split; auto.
   }
-assert (sint the_system pg' false i (univ (subst s' lv1)) (iuuniv the_system i pg)) as Hintlv1r.
+assert (sint the_system pg' false i (kuniv (subst s' lv1)) (iukuniv the_system i pg hl)) as Hintlv1r.
   {
   rewrite -> sint_unroll.
   apply interp_eval_refl.
-  apply interp_univ; auto.
+  apply interp_kuniv; auto.
+  split; auto.
   }
-assert (sint the_system pg' true i (univ (subst s lv2)) (iuuniv the_system i pg)) as Hintlv2l.
+assert (sint the_system pg' true i (kuniv (subst s lv2)) (iukuniv the_system i pg hl)) as Hintlv2l.
   {
   rewrite -> sint_unroll.
   apply interp_eval_refl.
-  apply interp_univ; auto.
+  apply interp_kuniv; auto.
+  split; auto.
   }
-assert (sint the_system pg' false i (univ (subst s' lv2)) (iuuniv the_system i pg)) as Hintlv2r.
+assert (sint the_system pg' false i (kuniv (subst s' lv2)) (iukuniv the_system i pg hl)) as Hintlv2r.
   {
   rewrite -> sint_unroll.
   apply interp_eval_refl.
-  apply interp_univ; auto.
+  apply interp_kuniv; auto.
+  split; auto.
   }
 do2 4 split;
 try (apply interp_eval_refl; apply interp_univ; eauto using pginterp_str_top, pginterp_cex_top; done);
-try (cbn; split; auto; exists (iuuniv the_system i pg); auto).
+try (cbn; split; auto; exists (iukuniv the_system i pg hl); auto).
 Qed.
 
 

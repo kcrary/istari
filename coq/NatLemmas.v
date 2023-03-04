@@ -12,13 +12,74 @@ Require Import Promote.
 Require Import Hygiene.
 Require Import Rules.
 Require Import DerivedRules.
+Require Defs.
 Require Import Equivalence.
+Require Import Equivalences.
+Require Import DefsEquiv.
 Require Import Dots.
+Require Import Morphism.
 
 Require Import Defined.
 Require Import SumLemmas.
 Require Import PageType.
-Require MuIndExtract.
+
+
+
+Definition natcase {object} m n p : term object :=
+  sumcase m (subst sh1 n) p.
+
+
+Lemma def_nat : eq Defs.nat nattp.
+Proof.
+auto.
+Qed.
+
+
+Lemma def_succ :
+  forall n,
+    equiv (app Defs.succ n) (nsucc n).
+Proof.
+intros n.
+unfold Defs.succ.
+rewrite -> equiv_beta.
+simpsub.
+unfold Defs.inr.
+simpsub.
+rewrite -> equiv_beta.
+simpsub.
+apply equiv_refl.
+Qed.
+
+
+Lemma def_zero :
+  equiv Defs.zero nzero.
+Proof.
+unfold Defs.zero.
+unfold Defs.inl.
+rewrite -> equiv_beta.
+simpsub.
+apply equiv_refl.
+Qed.
+
+
+Lemma def_natcase :
+  forall m n p,
+    equiv (app (app (app Defs.natcase m) n) (lam p)) (natcase m n p).
+Proof.
+intros m n p.
+unfold Defs.natcase.
+rewrite -> equiv_beta.
+simpsub.
+rewrite -> equiv_beta.
+simpsub.
+rewrite -> equiv_beta.
+simpsub.
+rewrite -> def_sumcase.
+rewrite -> equiv_beta.
+simpsub.
+rewrite -> subst_var0_sh1.
+apply equiv_refl.
+Qed.
 
 
 
@@ -273,6 +334,48 @@ auto.
 Qed.
 
 
+Lemma tr_nsucc_nattp_invert :
+  forall G m n,
+    tr G (deq (nsucc m) (nsucc n) nattp)
+    -> tr G (deq m n nattp).
+Proof.
+intros G m n Hsucc.
+cut (tr G (deq (app (lam (sumcase (var 0) nzero (var 0))) (nsucc m)) (app (lam (sumcase (var 0) nzero (var 0))) (nsucc n)) nattp)).
+  {
+  intro H.
+  rewrite -> !equiv_beta in H.
+  simpsubin H.
+  unfold nsucc in H.
+  rewrite -> !sumcase_right in H.
+  simpsubin H.
+  exact H.
+  }
+apply (tr_pi_elim' _ nattp nattp); auto.
+apply tr_pi_intro; auto using tr_nattp_formation.
+apply tr_equal_elim.
+eapply (tr_nattp_eta_hyp_triv _ []).
+  {
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  apply tr_equal_intro.
+  unfold nzero at 1 3.
+  rewrite -> sumcase_left.
+  simpsub.
+  apply tr_nzero_nattp.
+  }
+
+  {
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  apply tr_equal_intro.
+  unfold nsucc.
+  rewrite -> sumcase_right.
+  simpsub.
+  eapply hypothesis; eauto using index_0.
+  }
+Qed.
 
 
 Lemma nat_case :
@@ -402,56 +505,6 @@ apply (tr_sumtype_eta_hyp_triv _ [_; _]).
 Qed.
 
 
-Lemma subst_leqtp :
-  forall object (s : @sub object), subst s leqtp = leqtp.
-Proof.
-prove_subst.
-Qed.
-
-
-
-Lemma unroll_leqtp :
-  forall m n,
-    @equiv obj
-      (app (app leqtp m) n)
-      (sumcase m
-         unittp
-         (sumcase (subst sh1 n)
-            voidtp
-            (app (app leqtp (var 1)) (var 0)))).
-Proof.
-intros m n.
-apply steps_equiv.
-unfold leqtp.
-eapply star_trans.
-  {
-  apply (star_map' _ _ (fun z => app z _)); eauto using step_app1.
-  eapply star_trans.
-    {
-    apply (star_map' _ _ (fun z => app z _)); eauto using step_app1.
-    eapply star_trans.
-      {
-      apply theta_fix.
-      }
-    apply star_one.
-    apply step_app2.
-    }
-  simpsub.
-  cbn [Nat.add].
-  apply star_one.
-  apply step_app2.
-  }
-simpsub.
-eapply star_step.
-  {
-  apply step_app2.
-  }
-simpsub.
-cbn [Nat.add].
-apply star_refl.
-Qed.
-
-
 Lemma tr_leqtp_type :
   forall G, tr G (deq leqtp leqtp (pi nattp (pi nattp (univ nzero)))).
 Proof.
@@ -484,7 +537,6 @@ end.
   {
   simpsub.
   apply tr_equal_intro.
-  rewrite -> subst_leqtp.
   eapply tr_pi_of_ext.
     {
     apply tr_nattp_formation.
@@ -515,7 +567,6 @@ end.
     apply star_refl.
     }
   simpsub.
-  rewrite -> subst_leqtp.
   rewrite -> unroll_leqtp.
   unfold nzero at 1 2.
   rewrite -> sumcase_left.
@@ -527,7 +578,6 @@ end.
   simpsub.
   cbn [Nat.add].
   apply tr_equal_intro.
-  rewrite -> subst_leqtp.
   eapply tr_pi_of_ext.
     {
     apply tr_nattp_formation.
@@ -558,7 +608,6 @@ end.
     apply star_refl.
     }
   simpsub.
-  rewrite -> subst_leqtp.
   cbn [Nat.add].
   setoid_rewrite -> unroll_leqtp.
   unfold nsucc.
@@ -572,7 +621,7 @@ end.
     simpsub.
     cbn [Nat.add length List.app].
     apply tr_equal_intro.
-    unfold nzero at 2 4.
+    unfold nzero at 2 3.
     rewrite -> sumcase_left.
     simpsub.
     apply tr_voidtp_formation_univ.
@@ -586,7 +635,6 @@ end.
     rewrite -> sumcase_right.
     simpsub.
     cbn [Nat.add].
-    rewrite -> !subst_leqtp.
     apply tr_equal_intro.
     eapply tr_pi_elim'.
     2:{
@@ -692,13 +740,11 @@ apply (tr_pi_elim2' _
 2:{
   simpsub.
   unfold subst1.
-  rewrite -> subst_leqtp.
   auto.
   }
 
 2:{
   simpsub.
-  rewrite -> subst_leqtp.
   reflexivity.
   }
 apply tr_equal_elim.
@@ -712,7 +758,6 @@ apply (nat_induction _
          m); auto.
 3:{
   simpsub.
-  rewrite -> !subst_leqtp.
   reflexivity.
   }
 
@@ -720,7 +765,6 @@ apply (nat_induction _
 {
 simpsub.
 cbn [Nat.add].
-rewrite -> !subst_leqtp.
 apply tr_equal_intro.
 apply tr_pi_intro.
   {
@@ -749,7 +793,6 @@ apply tr_unittp_intro.
 {
 simpsub.
 cbn [Nat.add].
-rewrite -> !subst_leqtp.
 apply tr_equal_intro.
 apply tr_pi_intro.
   {
@@ -778,14 +821,12 @@ unfold nsucc at 2.
 rewrite -> sumcase_right.
 simpsub.
 cbn [Nat.add].
-rewrite -> subst_leqtp.
 apply (tr_nattp_eta_hyp_triv _ [_]).
   {
   cbn [length].
   simpsub.
   cbn [Nat.add List.app].
   unfold subst1.
-  rewrite -> !subst_leqtp.
   apply (tr_voidtp_elim _ (var 0) (var 0)).
   rewrite -> unroll_leqtp.
   unfold nsucc at 1.
@@ -801,7 +842,6 @@ apply (tr_nattp_eta_hyp_triv _ [_]).
   cbn [length].
   simpsub.
   cbn [Nat.add List.app].
-  rewrite -> !subst_leqtp.
   unfold nsucc.
   rewrite -> unroll_leqtp at 1.
   rewrite -> !sumcase_right.
@@ -811,7 +851,6 @@ apply (tr_nattp_eta_hyp_triv _ [_]).
   simpsub.
   cbn [Nat.add].
   unfold subst1.
-  rewrite -> !subst_leqtp.
   apply tr_equal_elim.
   apply (tr_equal_eta2 _#4 
            (app (app (lam (lam triv)) (var 1)) (var 0)) 
@@ -827,7 +866,6 @@ apply (tr_nattp_eta_hyp_triv _ [_]).
       {
       eapply hypothesis; eauto using index_S, index_0.
       simpsub.
-      rewrite -> !subst_leqtp.
       cbn [Nat.add].
       reflexivity.
       }
@@ -839,7 +877,6 @@ apply (tr_nattp_eta_hyp_triv _ [_]).
       {
       simpsub.
       cbn [Nat.add].
-      rewrite -> !subst_leqtp.
       reflexivity.
       }
     }
@@ -854,9 +891,472 @@ apply (tr_nattp_eta_hyp_triv _ [_]).
     
     {
     simpsub.
-    rewrite -> subst_leqtp.
     reflexivity.
     }
   }
 }
+Qed.
+
+
+Lemma equiv_lttp :
+  forall i j, @equiv obj (app (app lttp i) j) (app (app leqtp (nsucc i)) j).
+Proof.
+intros i j.
+unfold lttp.
+apply equiv_app; auto using equiv_refl.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+unfold subst1.
+apply star_refl.  
+Qed.
+
+
+Lemma tr_leqtp_refl :
+  forall G n,
+    tr G (deq n n nattp)
+    -> tr G (deq triv triv (app (app leqtp n) n)).
+Proof.
+intros G n H.
+apply (nat_induction _ (app (app leqtp (var 0)) (var 0)) n); auto.
+3:{
+  simpsub.
+  unfold subst1.
+  reflexivity.
+  }
+
+  {
+  simpsub.
+  unfold subst1.
+  rewrite -> unroll_leqtp.
+  unfold nzero.
+  rewrite -> sumcase_left.
+  simpsub.
+  apply tr_unittp_intro.
+  }
+
+  {
+  simpsub.
+  unfold nsucc.
+  setoid_rewrite -> unroll_leqtp at 2.
+  rewrite -> sumcase_right.
+  simpsub.
+  rewrite -> sumcase_right.
+  simpsub.
+  cbn [Nat.add].
+  apply (tr_leqtp_eta2 _#3 (app (var 0) (var 2)) (app (var 0) (var 2))).
+    {
+    apply (tr_subtype_elim _ (var 3)).
+      {
+      apply (tr_subtype_eta2 _#3 (var 1) (var 1)).
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+
+      {
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+    }
+
+    {
+    apply (tr_subtype_elim _ (var 3)).
+      {
+      apply (tr_subtype_eta2 _#3 (var 1) (var 1)).
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+
+      {
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+    }
+  eapply tr_pi_elim'.
+    {
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    cbn [Nat.add].
+    reflexivity.
+    }
+    
+    {
+    eapply hypothesis; eauto using index_0, index_S.
+    }
+
+    {
+    simpsub.
+    unfold subst1.
+    reflexivity.
+    }
+  }
+Qed.
+
+
+Lemma tr_leqtp_succ :
+  forall G n,
+    tr G (deq n n nattp)
+    -> tr G (deq triv triv (app (app leqtp n) (nsucc n))).
+Proof.
+intros G n Hn.
+apply (nat_induction _ (app (app leqtp (var 0)) (nsucc (var 0))) n); auto.
+3:{
+  simpsub.
+  unfold subst1.
+  reflexivity.
+  }
+
+  {
+  simpsub.
+  unfold subst1.
+  rewrite -> unroll_leqtp.
+  unfold nzero.
+  rewrite -> sumcase_left.
+  simpsub.
+  apply tr_unittp_intro.
+  }
+
+  {
+  simpsub.
+  unfold nsucc at 2 3.
+  setoid_rewrite -> unroll_leqtp at 2.
+  rewrite -> sumcase_right.
+  simpsub.
+  cbn [Nat.add].
+  rewrite -> sumcase_right.
+  fold (@nsucc obj (var 2)).
+  simpsub.
+  cbn [Nat.add].
+  apply (tr_leqtp_eta2 _#3 (app (var 0) (var 2)) (app (var 0) (var 2))).
+    {
+    apply (tr_subtype_elim _ (var 3)).
+      {
+      apply (tr_subtype_eta2 _#3 (var 1) (var 1)).
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+
+      {
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+    }
+
+    {
+    apply tr_nsucc_nattp.
+    apply (tr_subtype_elim _ (var 3)).
+      {
+      apply (tr_subtype_eta2 _#3 (var 1) (var 1)).
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+
+      {
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+    }
+  eapply tr_pi_elim'.
+    {
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    cbn [Nat.add].
+    reflexivity.
+    }
+    
+    {
+    eapply hypothesis; eauto using index_0, index_S.
+    }
+
+    {
+    simpsub.
+    unfold subst1.
+    reflexivity.
+    }
+  }
+Qed.
+
+
+Lemma tr_leqtp_trans :
+  forall G m n p,
+    tr G (deq m m nattp)
+    -> tr G (deq n n nattp)
+    -> tr G (deq p p nattp)
+    -> tr G (deq triv triv (app (app leqtp m) n))
+    -> tr G (deq triv triv (app (app leqtp n) p))
+    -> tr G (deq triv triv (app (app leqtp m) p)).
+Proof.
+intros G m n p Hm Hn Hp Hmn Hnp.
+apply (tr_leqtp_eta2 _ _ _ (app (app (app (app (lam (lam (lam (lam triv)))) n) p) triv) triv) (app (app (app (app (lam (lam (lam (lam triv)))) n) p) triv) triv)); auto.
+apply (tr_pi_elim4' _ nattp nattp (app (app leqtp (subst (sh 2) m)) (var 1)) (app (app leqtp (var 2)) (var 1)) (app (app leqtp (subst (sh 4) m)) (var 2))); auto.
+4:{
+  simpsub.
+  auto.
+  }
+
+2:{
+  simpsub.
+  auto.
+  }
+
+2:{
+  simpsub.
+  auto.
+  }
+apply tr_equal_elim.
+apply (nat_induction _ (equal (pi nattp (pi nattp (pi (app (app leqtp (var 2)) (var 1)) (pi (app (app leqtp (var 2)) (var 1)) (app (app leqtp (var 4)) (var 2)))))) (lam (lam (lam (lam triv)))) (lam (lam (lam (lam triv))))) m); auto.
+3:{
+  simpsub.
+  cbn [Nat.add].
+  auto.
+  }
+
+  {
+  simpsub.
+  cbn [Nat.add].
+  apply tr_equal_intro.
+  apply tr_pi_intro; auto using tr_nattp_formation.
+  apply tr_pi_intro; auto using tr_nattp_formation.
+  apply tr_pi_intro.
+    {
+    apply tr_leqtp_formation.
+      {
+      apply tr_nzero_nattp.
+      }
+
+      {
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+    }
+  apply tr_pi_intro.
+    {
+    apply tr_leqtp_formation.
+      {
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+
+      {
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+    }
+  setoid_rewrite -> unroll_leqtp at 3.
+  unfold nzero at 2.
+  rewrite -> sumcase_left.
+  simpsub.
+  apply tr_unittp_intro.
+  }
+
+  {
+  simpsub.
+  cbn [Nat.add].
+  apply tr_equal_intro.
+  apply tr_pi_intro; auto using tr_nattp_formation.
+  apply tr_pi_intro; auto using tr_nattp_formation.
+  apply tr_pi_intro.
+    {
+    apply tr_leqtp_formation.
+      {
+      apply tr_nsucc_nattp.
+      apply (tr_subtype_elim _ (var 5)).
+        {
+        apply (tr_subtype_eta2 _#3 (var 3) (var 3)).
+        eapply hypothesis; eauto using index_0, index_S.
+        }
+
+        {
+        eapply hypothesis; eauto using index_0, index_S.
+        }
+      }
+
+      {
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+    }
+  apply tr_pi_intro.
+    {
+    apply tr_leqtp_formation.
+      {
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+
+      {
+      eapply hypothesis; eauto using index_0, index_S.
+      }
+    }
+  setoid_rewrite -> unroll_leqtp at 6.
+  unfold nsucc at 2.
+  rewrite -> sumcase_right.
+  simpsub.
+  cbn [Nat.add].
+  eapply (tr_nattp_eta_hyp_triv _ [_; _; _]).
+    {
+    simpsub.
+    cbn [length].
+    simpsub.
+    cbn [Nat.add List.app].
+    setoid_rewrite -> unroll_leqtp at 2.
+    unfold nsucc at 1.
+    rewrite -> sumcase_right.
+    simpsub.
+    unfold nzero at 2.
+    rewrite -> sumcase_left.
+    simpsub.
+    apply (tr_voidtp_elim _ (var 1) (var 1)).
+    eapply hypothesis; eauto using index_0, index_S.
+    }
+  cbn [length].
+  simpsub.
+  cbn [length].
+  simpsub.
+  cbn [Nat.add List.app].
+  setoid_rewrite -> unroll_leqtp at 2.
+  unfold nsucc at 2.
+  rewrite -> sumcase_right.
+  simpsub.
+  rewrite -> sumcase_right.
+  simpsub.
+  cbn [Nat.add].
+  eapply (tr_nattp_eta_hyp_triv _ [_; _]).
+    {
+    simpsub.
+    cbn [length].
+    simpsub.
+    cbn [Nat.add List.app].
+    setoid_rewrite -> unroll_leqtp at 1.
+    unfold nsucc at 1.
+    rewrite -> sumcase_right.
+    simpsub.
+    unfold nzero at 1.
+    rewrite -> sumcase_left.
+    simpsub.
+    apply (tr_voidtp_elim _ (var 0) (var 0)).
+    eapply hypothesis; eauto using index_0.
+    }
+  cbn [length].
+  simpsub.
+  cbn [length].
+  simpsub.
+  cbn [Nat.add List.app].
+  setoid_rewrite -> unroll_leqtp at 1.
+  unfold nsucc.
+  rewrite -> sumcase_right.
+  simpsub.
+  rewrite -> sumcase_right.
+  simpsub.
+  cbn [Nat.add].
+  rewrite -> sumcase_right.
+  simpsub.
+  cbn [Nat.add].
+  apply (tr_leqtp_eta2 _#3 (app (app (app (app (lam (lam (lam (lam triv)))) (var 3)) (var 2)) (var 1)) (var 0)) (app (app (app (app (lam (lam (lam (lam triv)))) (var 3)) (var 2)) (var 1)) (var 0))).
+    {
+    apply (tr_subtype_elim _ (var 7)).
+      {
+      apply (tr_subtype_eta2 _#3 (var 5) (var 5)).
+      eapply hypothesis; eauto 7 using index_0, index_S.
+      }
+    eapply hypothesis; eauto 7 using index_0, index_S.
+    }
+  
+    {
+    eapply hypothesis; eauto using index_0, index_S.
+    }
+  eapply tr_pi_elim4'; eauto.
+    {
+    apply tr_equal_elim.
+    eapply (tr_equal_eta2 _#4 (app (var 4) (var 6)) (app (var 4) (var 6))).
+    eapply tr_pi_elim'; eauto.
+      {
+      eapply hypothesis; eauto using index_0, index_S.
+      simpsub.
+      cbn [Nat.add].
+      reflexivity.
+      }
+
+      {
+      eapply hypothesis; eauto 7 using index_0, index_S.
+      }
+
+      {
+      simpsub.
+      cbn [Nat.add].
+      reflexivity.
+      }
+    }
+
+    {
+    eapply hypothesis; eauto using index_0, index_S.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0, index_S.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0, index_S.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0, index_S.
+    }
+
+    {
+    simpsub.
+    auto.
+    }
+  }
+Qed.
+
+
+Definition natmax {object} m n : term object :=
+  app (app (app theta
+              (lam (lam (lam (natcase (var 1) 
+                                (var 0)
+                                (natcase (var 1)
+                                   (var 2)
+                                   (nsucc
+                                      (app (app (var 4) (var 1)) (var 0)))))))))
+         m)
+    n.
+
+
+Lemma subst_natmax :
+  forall object s m n,
+    @subst object s (natmax m n) = natmax (subst s m) (subst s n).
+Proof.
+intros object s m n.
+unfold natmax.
+simpsub.
+reflexivity.
+Qed.
+
+
+Lemma subst_natcase :
+  forall object s m n p,
+    @subst object s (natcase m n p) = natcase (subst s m) (subst s n) (subst (under 1 s) p).
+Proof.
+intros object s m n p.
+unfold natcase.
+simpsub.
+reflexivity.
+Qed.
+
+
+Hint Rewrite subst_natcase subst_natmax : subst.
+
+
+Lemma natcase_zero :
+  forall n p,
+    @equiv obj (natcase nzero n p) n.
+Proof.
+intros n p.
+unfold natcase, nzero.
+rewrite -> sumcase_left.
+simpsub.
+apply equiv_refl.
+Qed.
+
+
+Lemma natcase_succ :
+  forall m n p,
+    @equiv obj (natcase (nsucc m) n p) (subst1 m p).
+Proof.
+intros m n p.
+unfold natcase, nsucc.
+rewrite -> sumcase_right.
+apply equiv_refl.
 Qed.
