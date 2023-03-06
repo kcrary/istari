@@ -3348,4 +3348,4 @@ Conventions:
       G |- eq 
              (arrow integer (arrow integer integer))
              timesz
-             (fn . fn . integer_from_def (Times (integer_to_def 1) (integer_to_def 0)))
+             (fn . fn . integer_from_def (Timesz (integer_to_def 1) (integer_to_def 0)))
