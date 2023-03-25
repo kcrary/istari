@@ -54,7 +54,7 @@ Inductive robust {object} : nat -> term object -> Prop :=
       -> robust i b
       -> robust i (bite (subst (under i sh1) m) a b)
 
-(* Really should allow you to pick and choose with variables to drop, but this is
+(* Really should allow you to pick and choose which variables to drop, but this is
    all we need.
 *)
 | robust_weaken :

@@ -624,6 +624,9 @@ The destruction tactics are:
   `{ ... | ... }`) containing only identifers and `?`.  May work
   poorly if `x` is mentioned in the conclusion.
 
+  + `destructThinRaw /[hyp x]/ /[ipattern]/`
+
+    As `destructThin` but does not invoke the typechecker.
 
 - `inversion /[hyp x]/`
 
@@ -631,6 +634,10 @@ The destruction tactics are:
   hypothesis being destructed will not appear in the conclusion, no
   hypotheses will be disturbed, and any resulting hypotheses will
   appear at the bottom.
+
+  + `inversionRaw /[hyp x]/`
+
+    As `inversion` but does not invoke the typechecker.
 
 
 ### Chaining
