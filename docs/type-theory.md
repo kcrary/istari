@@ -197,13 +197,13 @@ necessary for technical reasons but is usually invisible in the
 implementation.)
 
 In general, a type `A` is a kind when `A` is isomorphic to a space in
-Istari's metric-space semantics.  Such types include function spaces
-(specifically [T-functions](#t-functions) and
-[K-functions](#k-functions)), non-dependent [products](#products),
-unit, the 
-[future modality](#future-modality), and [guarded recursive
-types](#recursive-types).  Impredicative quantification over guarded
-recursive types is one of the main novelties of Istari.
+Istari's metric-space semantics.  Such types include [function
+spaces](#functions) (specifically T-functions and K-functions),
+non-dependent [products](#strong-sums-and-products),
+[unit](#base-types), the [future modality](#future-modality), and
+[guarded recursive types](#recursive-types).  Impredicative
+quantification over guarded recursive types is one of the main
+novelties of the Istari type theory.
 
 Note that the indexing for kinds is off by one from the indexing for
 universes: `K(i)` (which contains `U(i)`) is a subset of `U(i+1)`.
@@ -435,7 +435,7 @@ it possible to express a store-passing transformation for imperative
 code [3].
 
 In a proof, one can unroll recursive types using the
-[rewrite](rewriting.html/rewriting-tactics) `unrollType`.
+[rewrite](rewriting.html#rewriting-tactics) `unrollType`.
 
 
 #### Inductive types
@@ -483,7 +483,7 @@ These are merely the connectives that Istari currently supports;
 several other connectives could be added without any semantic obstacle.
 
 In a proof, one can unroll inductive types using the
-[rewrite](rewriting.html/rewriting-tactics) `unrollType`.
+[rewrite](rewriting.html#rewriting-tactics) `unrollType`.
 
 ##### Robustness
 
@@ -842,9 +842,9 @@ useless.
 However, the fourth premise is a non-starter for the Istari type
 theory.  In many important cases, `C` is not even well-formed unless
 it is true.  Every typing lemma is an example.  (Recall the discussion
-of negatability [above](#typing).)  In such cases, it is impossible to
-prove the well-formedness of `C` before proving its truth.
-Consequently, one cannot reason by induction!
+of negatability [above](#negatability).)  In such cases, it is
+impossible to prove the well-formedness of `C` before proving its
+truth.  Consequently, one cannot reason by induction!
 
 Pointwise functionality allows us to scrap the fourth premise.  Since
 we only need to know that `C` is functional over substitutions
