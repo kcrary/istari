@@ -54,9 +54,20 @@ structure RegistryInternal :> REGISTRY_INTERNAL =
 
       exception Registry of string
 
-      fun signalError msg = raise (Registry msg)
+      fun signalError msg = raise (Registry 
+                                      (String.concat
+                                          [
+                                          "Error: ",
+                                          msg,
+                                          ".\n"
+                                          ]))
 
       fun signalSortError () = signalError "item has the wrong sort"
+
+      val () =
+         Handler.customHandler
+         (fn Registry msg => (print msg; true)
+           | _ => false)
 
 
       structure DL =
@@ -77,7 +88,14 @@ structure RegistryInternal :> REGISTRY_INTERNAL =
                    (DL.insertMerge (C.deref theRegistry) address x
                        (fn _ =>
                            (* already present *)
-                           signalError "already present in registry")))
+                           raise (Registry
+                                     (String.concat
+                                         [
+                                         "Error: ",
+                                         String.concatWith "." 
+                                            (List.map Symbol.toValue address),
+                                         " is already present in the registry.\n"
+                                         ])))))
        
       fun write name item =
          writeFull (Namespace.currentModule () @ [name]) (item, false)
@@ -91,7 +109,15 @@ structure RegistryInternal :> REGISTRY_INTERNAL =
 
            | _ =>
                 (case DL.find (C.deref theRegistry) name of
-                    NONE => signalError "not present in registry"
+                    NONE => 
+                       raise (Registry
+                                 (String.concat
+                                     [
+                                     "Error: ",
+                                     String.concatWith "." 
+                                        (List.map Symbol.toValue name),
+                                     " is not present in the registry.\n"
+                                     ]))
 
                   | SOME (item, _) => item))
 

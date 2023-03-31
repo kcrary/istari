@@ -2,6 +2,7 @@
 signature MEMORY =
    sig
 
+      (* Indicates that the current line has advanced. *)
       val advanceLine : unit -> unit
 
       (* Indicates the beginning of (possibly empty) dead space. *)
@@ -10,28 +11,25 @@ signature MEMORY =
       (* Asks the Prover for a checkpoint.  Saves it in the ring buffer. *)
       val checkpoint : unit -> unit
 
-      (* Is passed a checkpoint.  Saves it permanently (until rewound). *)
+      (* Is passed a checkpoint.  Saves it permanently (until rewound), attached to the
+         location of the most recent checkpoint.  Ignored if the most recent checkpoint
+         has been rewound.  (E.g., if the user tried to start a lemma in an interjection.)
+      *)
       val persistentCheckpoint : (unit -> unit) -> unit
 
-      (* Must follow checkpoint (not persistentCheckpoint).  Removes the checkpoint,
-         adjust the current line to the starting line, and moves the cursor up, but
-         does not rewind the state.
-      *)
-      val uncheckpoint : unit -> unit
-
-      (* Removes the last checkpoint, and adjusts the curent line up one.  Does not move
-         the cursor or rewind the state.  For undoing commands sent surreptitiously to the
-         Repl.
-      *)
-      val undo : unit -> unit
-
-      (* Discards the last checkpoint.  Does nothing else. *)
-      val discard : unit -> unit
-
-      (* Rewinds the state to the last checkpoint no later than !currentline - n.
+      (* Rewinds the state to the last checkpoint no later than (the current line) - n.
          Resets the beginning of deadspace to what it was then.
       *)
       val rewind : int -> unit
+
+      (* Resets the beginning of deadspace and the current line to the values
+         from the most recent checkpoint, then deletes that checkpoint.
+         Does not move the cursor or rewind the state.  Intended for cleaning
+         up after commands sent surreptitiously to the repl.
+      *)
+      val excise : unit -> unit
+
+
 
       (* First () argument captures the state; second restores it. *)
       val rewindHook : (unit -> unit -> bool) ref
@@ -49,8 +47,8 @@ functor MemoryFun (val withHandler : 'a -> (unit -> 'a) -> 'a)
 
       val currentLine = ref 0
       val deadspaceLine = ref 0
-      val startingDeadLine = ref 0  (* deadspace line of the last checkpoint *)
-      val startingLine = ref 0      (* line of the last checkpoint *)
+      val startingDeadLine = ref ~1 (* deadspace line of the last checkpoint *)
+      val startingLine = ref ~1     (* line of the last checkpoint *)
 
       val historySize = 200
       val maxint = Option.valOf Int.maxInt
@@ -84,29 +82,13 @@ functor MemoryFun (val withHandler : 'a -> (unit -> 'a) -> 'a)
          )
 
       fun persistentCheckpoint f =
-         (
-         ancientHistory :=
-         (!startingDeadLine, !startingLine, f) :: !ancientHistory
-         )
-
-      fun discard () =
-         (
-         cursor := (!cursor - 1) mod historySize;
-         Array.update (history, !cursor, blank)
-         )
-
-      fun uncheckpoint () =
-         (
-         UI.cursorUp (!currentLine - !startingLine);
-         currentLine := !startingLine;
-         discard ()
-         )
-
-      fun undo () =
-         (
-         currentLine := !currentLine - 1;
-         discard ()
-         )
+         if !startingLine <> ~1 then
+            (
+            ancientHistory :=
+               (!startingDeadLine, !startingLine, f) :: !ancientHistory
+            )
+         else
+            ()
 
       fun memoryHole () =
          let
@@ -136,6 +118,8 @@ functor MemoryFun (val withHandler : 'a -> (unit -> 'a) -> 'a)
                       ancientHistory := [];
                       deadspaceLine := 0;
                       currentLine := 0;
+                      startingDeadLine := ~1;
+                      startingLine := ~1;
                       UI.cursorUp curr;
                       !resetHook ()
                       )
@@ -148,6 +132,8 @@ functor MemoryFun (val withHandler : 'a -> (unit -> 'a) -> 'a)
                             ancientHistory := rest;
                             deadspaceLine := deadline;
                             currentLine := actual;
+                            startingDeadLine := ~1;
+                            startingLine := ~1;
                             UI.cursorUp (curr - actual);
                             withHandler () f
                          end
@@ -165,13 +151,13 @@ functor MemoryFun (val withHandler : 'a -> (unit -> 'a) -> 'a)
                       else
                          ancientHistory := l)
 
-            fun loop first i =
+            fun loop i =
                let
                   val (deadline, line, f) = Array.sub (history, i)
                in
                   if deadline <= target then
-                     if first orelse withHandler false f then
-                        (* the rewind succeeded, if attempted *)
+                     if withHandler false f then
+                        (* the rewind succeeded *)
                         let
                            val actual = Int.min (target, line)
                         in
@@ -180,6 +166,8 @@ functor MemoryFun (val withHandler : 'a -> (unit -> 'a) -> 'a)
                            tidyAncientLoop actual (!ancientHistory);
                            deadspaceLine := deadline;
                            currentLine := actual;
+                           startingDeadLine := ~1;
+                           startingLine := ~1;
                            UI.cursorUp (curr - actual)
                         end
                      else
@@ -197,11 +185,24 @@ functor MemoryFun (val withHandler : 'a -> (unit -> 'a) -> 'a)
                   else
                      (
                      Array.update (history, i, blank);
-                     loop false ((i - 1) mod historySize)
+                     loop ((i - 1) mod historySize)
                      )
                end
          in
-            loop true ((!cursor - 1) mod historySize)
+            loop ((!cursor - 1) mod historySize)
+         end
+
+      fun excise () =
+         let
+            val i = (!cursor - 1) mod historySize 
+            val (deadline, line, _) = Array.sub (history, i)
+         in
+            deadspaceLine := deadline;
+            currentLine := line;
+            startingDeadLine := ~1;
+            startingLine := ~1;
+            cursor := i;
+            Array.update (history, i, blank)
          end
 
    end

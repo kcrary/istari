@@ -36,7 +36,7 @@ in
    structure Repl = ReplStuff.Repl
    structure Ctrl = ReplStuff.Ctrl
    structure RecoverRepl = ReplStuff.RecoverRepl
-   structure RecoverReplAlt = ReplStuff.RecoverReplAlt
+   structure RecoverReplInside = ReplStuff.RecoverReplInside
 
 end
 

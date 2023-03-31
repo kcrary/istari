@@ -36,7 +36,7 @@ signature UI =
 
    UI -> REPL
    ----------
-   ^A <number> \n    : rewind to line <number>
+   ^A <number> \n    : rewind <number> lines
    ^B <code> \n      : interject with code
    ^E \n             : show state
 

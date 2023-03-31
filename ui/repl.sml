@@ -43,8 +43,9 @@ signature REPL =
       val proverShow : (unit -> unit) ref                (* display current goals *)
       val rewindHook : (unit -> unit -> bool) ref        (* obtain a checkpoint *)
       val resetHook : (unit -> unit) ref                 (* reset to initial state *)
-      val persistentCheckpoint : (unit -> unit) -> unit  (* save a checkpoint *)
       val exceptionHandler : (exn -> bool) ref           (* call on uncaught exceptions *)
+
+      val persistentCheckpoint : (unit -> unit) -> unit  (* save a persistent checkpoint *)
 
    end
 
@@ -89,7 +90,7 @@ functor ReplFun (structure Platform : PLATFORM
       structure Repl : REPL
       structure Ctrl : CTRL
       structure RecoverRepl : RECOVER_REPL
-      structure RecoverReplAlt : RECOVER_REPL
+      structure RecoverReplInside : RECOVER_REPL
    end
    =
    struct
@@ -421,9 +422,16 @@ functor ReplFun (structure Platform : PLATFORM
                   andalso
                   stringAllLoop f str (i+1) j
       
-            fun stringAll f str = stringAllLoop f str 0 (String.size str)      
+            fun stringAll f str = stringAllLoop f str 0 (String.size str)
+
+            (* True means we just slipped an interaction to the repl that wasn't from the 
+               buffer, so the next interaction really is the current interaction, so we
+               shouldn't set deadspace.
+            *)
+            val interjected = ref false
       
       
+            (* checkpoint is active for current interaction *)
             fun inputLoopMain input =
                (case input of
                    UI.ChannelClosed => raise Exit
@@ -455,9 +463,13 @@ functor ReplFun (structure Platform : PLATFORM
                              preInputLoop ()
                              )
 
-                        | I.EMPTY => ()
+                        | I.EMPTY => 
+                             (* Nothing here, return to processing the input. *)
+                             preInputLoop ()
       
-                        | I.COMPLETE => ()
+                        | I.COMPLETE => 
+                             (* Fall through and run it. *)
+                             interjected := true
       
                         | I.ERROR =>
                              (
@@ -477,10 +489,12 @@ functor ReplFun (structure Platform : PLATFORM
                           I.WAITING =>
                              inputLoop ()
           
-                        | I.COMPLETE => ()
+                        | I.COMPLETE => 
+                             (* Fall through and run it. *)
+                             ()
           
                         | I.EMPTY =>
-                             (* nothing here but comments after all *)
+                             (* Nothing here but comments after all. *)
                              (
                              Memory.deadspace ();
                              preInputLoop ()
@@ -488,7 +502,7 @@ functor ReplFun (structure Platform : PLATFORM
 
                         | I.ERROR =>
                              (
-                             Memory.uncheckpoint ();
+                             Memory.rewind 0;
                              UI.beep ();
                              preInputLoop ()
                              )
@@ -498,7 +512,7 @@ functor ReplFun (structure Platform : PLATFORM
                              raise (Fail "impossible"))
                       ))
       
-            (* oldLine is the line where the input begin, for rewinding purposes *)
+            (* checkpoint is active for current interaction *)
             and inputLoop () =
                (
                print (!secondaryPrompt);
@@ -507,7 +521,9 @@ functor ReplFun (structure Platform : PLATFORM
                inputLoopMain (UI.input ())
                )
       
-            (* skipping leading whitespace *)
+            (* skipping leading whitespace,
+               deadspace is set for current interaction
+            *)
             and preInputLoop () =
                (
                print (!primaryPrompt);
@@ -542,9 +558,9 @@ functor ReplFun (structure Platform : PLATFORM
       
       
       
+            (* deadspace is set for current interaction *)
             fun mainLoop () =
                (
-               Memory.deadspace ();
                preInputLoop ();
                SR.skipLine := true;
                SR.errorDetected := false;
@@ -562,13 +578,20 @@ functor ReplFun (structure Platform : PLATFORM
                then
                   (
                   I.undo ();
-                  Memory.uncheckpoint ();
+                  Memory.rewind 0;
                   UI.beep ();
                   commandQueues := [IQueue.iqueue ()];
                   mainLoop ()
                   )
                else 
+                  (
+                  if !interjected then
+                     interjected := false
+                  else
+                     Memory.deadspace ();
+
                   mainLoop ()
+                  )
                )
 
       
@@ -605,7 +628,7 @@ functor ReplFun (structure Platform : PLATFORM
                       (Symbol.fromValue "Ctrl")
                       ([Symbol.fromValue "Ctrl"], ctrlSig))
                   (Symbol.fromValue "RecoverRepl")
-                  ([Symbol.fromValue "RecoverReplAlt"], recoverSig)
+                  ([Symbol.fromValue "RecoverReplInside"], recoverSig)
       
 
 
@@ -633,6 +656,11 @@ functor ReplFun (structure Platform : PLATFORM
                       Platform.captureOutput SR.process;
                       commandQueues := [IQueue.iqueue ()];
              
+                      if !interjected then
+                         interjected := false
+                      else
+                         Memory.deadspace ();
+
                       mainLoop () handle Exit => ();
              
                       OS.FileSys.remove (!theTempFilename) handle OS.SysErr _ => ()
@@ -642,13 +670,6 @@ functor ReplFun (structure Platform : PLATFORM
             fun run () =
                (
                print "[IML repl started]\n\n";
-               runQuietly ()
-               )
-
-            fun recover () =
-               (
-               UI.beep ();
-               UI.message "Interrupt";
                runQuietly ()
                )
 
@@ -710,30 +731,41 @@ functor ReplFun (structure Platform : PLATFORM
 
          end
 
+
       (* After the UI interrupts, it sends RecoverRepl.recover ().
 
          We don't know whether an interrupt will come while running IML code, in which
-         case we will stay in the IML REPL, or while translating IML code, in which case
-         the IML REPL will be interrupted.  So we arrange the environment so that in the
-         IML REPL RecoverRepl points to RecoverReplAlt, but outside the IML REPL it points
-         to RecoverRepl.
+         case we will stay in the IML repl, or while translating IML code, in which case
+         the IML repl will be interrupted.  So we arrange the environment so that in the
+         IML repl RecoverRepl points to RecoverReplInside, but outside the IML repl it
+         points to RecoverRepl.
       *)
 
       structure RecoverRepl =
          struct
 
-            val recover = Repl.recover
+            fun recover () =
+               (
+               Memory.rewind 0;
+               UI.beep ();
+               UI.message "Interrupt";
+               Repl.interjected := true;
+               Repl.runQuietly ()
+               )
 
          end
 
-
-      structure RecoverReplAlt =
+      structure RecoverReplInside =
          struct
 
             fun recover () =
                (
-               Memory.undo ();
-               UI.message "Interrupt"
+               (* The state was already rewound.
+                  Just undo the surreptitious transmission of RecoverRepl.recover ().
+               *)
+               Memory.excise ();
+               UI.message "Interrupt";
+               Repl.interjected := true
                )
 
          end
