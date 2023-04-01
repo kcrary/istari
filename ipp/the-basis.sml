@@ -176,6 +176,23 @@ functor TheBasis (datatype data =
           ("exists", E 0),
           ("all", E 0)]
       
+      val sig1_LIST_PAIR =
+         [("UnequalLengths", E 0),
+          ("zip", E 0),
+          ("zipEq", E 0),
+          ("unzip", E 0),
+          ("app", E 0),
+          ("appEq", E 0),
+          ("map", E 0),
+          ("mapEq", E 0),
+          ("foldl", E 0),
+          ("foldr", E 0),
+          ("foldlEq", E 0),
+          ("foldrEq", E 0),
+          ("all", E 0),
+          ("exists", E 0),
+          ("allEq", E 0)]
+      
       val sig1_OPTION =
          [("option", T),
           ("getOpt", E 0),
@@ -268,6 +285,7 @@ functor TheBasis (datatype data =
           ("STRING", S sig1_STRING),
           ("CHAR", S sig1_CHAR),
           ("LIST", S sig1_LIST),
+          ("LIST_PAIR", S sig1_LIST_PAIR),
           ("OPTION", S sig1_OPTION),
           ("ARRAY", S sig1_ARRAY),
           ("IO", S sig1_IO),
@@ -286,6 +304,7 @@ functor TheBasis (datatype data =
           ("String", M sig1_STRING),
           ("Char", M sig1_CHAR),
           ("List", M sig1_LIST),
+          ("ListPair", M sig1_LIST_PAIR),
           ("Option", M sig1_OPTION),
           ("Array", M sig1_ARRAY),
           ("IO", M sig1_IO),
@@ -438,6 +457,23 @@ functor TheBasis (datatype data =
           ("exists", E 0),
           ("all", E 0)]
       
+      val sig2_LIST_PAIR =
+         [("UnequalLengths", E 0),
+          ("zip", E 0),
+          ("zipEq", E 0),
+          ("unzip", E 0),
+          ("app", E 0),
+          ("appEq", E 0),
+          ("map", E 0),
+          ("mapEq", E 0),
+          ("foldl", E 0),
+          ("foldr", E 0),
+          ("foldlEq", E 0),
+          ("foldrEq", E 0),
+          ("all", E 0),
+          ("exists", E 0),
+          ("allEq", E 0)]
+      
       val sig2_OPTION =
          [("option", T),
           ("getOpt", E 0),
@@ -553,6 +589,7 @@ functor TheBasis (datatype data =
           ("STRING", S sig2_STRING),
           ("CHAR", S sig2_CHAR),
           ("LIST", S sig2_LIST),
+          ("LIST_PAIR", S sig2_LIST_PAIR),
           ("OPTION", S sig2_OPTION),
           ("ARRAY", S sig2_ARRAY),
           ("MONO_ARRAY", S sig2_MONO_ARRAY),
@@ -572,6 +609,7 @@ functor TheBasis (datatype data =
           ("String", M sig2_STRING),
           ("Char", M sig2_CHAR),
           ("List", M sig2_LIST),
+          ("ListPair", M sig2_LIST_PAIR),
           ("Option", M sig2_OPTION),
           ("Array", M sig2_ARRAY),
           ("Word8Array", M sig2_MONO_ARRAY),

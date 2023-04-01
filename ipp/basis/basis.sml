@@ -195,6 +195,29 @@ signature Basis__LIST =
    end
 
 
+signature Basis__LIST_PAIR =
+   sig
+
+      exception UnequalLengths
+
+      val zip : 'a list -> 'b list -> ('a * 'b) list
+      val zipEq : 'a list -> 'b list -> ('a * 'b) list
+      val unzip : ('a * 'b) list -> 'a list * 'b list
+      val app : ('a -> 'b -> unit) -> 'a list -> 'b list -> unit
+      val appEq : ('a -> 'b -> unit) -> 'a list -> 'b list -> unit
+      val map : ('a -> 'b -> 'c) -> 'a list -> 'b list -> 'c list
+      val mapEq : ('a -> 'b -> 'c) -> 'a list -> 'b list -> 'c list
+      val foldl : ('a -> 'b -> 'c -> 'c) -> 'c -> 'a list -> 'b list -> 'c
+      val foldr : ('a -> 'b -> 'c -> 'c) -> 'c -> 'a list -> 'b list -> 'c
+      val foldlEq : ('a -> 'b -> 'c -> 'c) -> 'c -> 'a list -> 'b list -> 'c
+      val foldrEq : ('a -> 'b -> 'c -> 'c) -> 'c -> 'a list -> 'b list -> 'c
+      val all : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool
+      val exists : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool
+      val allEq : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool
+
+   end
+
+
 signature Basis__OPTION =
    sig
 
@@ -351,6 +374,7 @@ signature IML__BASIS =
       structure String : Basis__STRING where type string = String.string
       structure Char : Basis__CHAR where type char = Char.char
       structure List : Basis__LIST
+      structure ListPair : Basis__LIST_PAIR
       structure Option : Basis__OPTION where type 'a option = 'a Option.option
       structure Array : Basis__ARRAY where type 'a array = 'a Array.array
       structure IO : Basis__IO
@@ -721,6 +745,41 @@ structure Basis :> IML__BASIS =
                           NONE => findmap f rest
       
                         | y => y))
+
+         end
+
+      structure ListPair :> Basis__LIST_PAIR =
+         struct
+
+            exception UnequalLengths = ListPair.UnequalLengths
+
+            fun zip l1 l2 = ListPair.zip (l1, l2)
+
+            fun zipEq l1 l2 = ListPair.zipEq (l1, l2)
+
+            val unzip = ListPair.unzip
+
+            fun app f l1 l2 = ListPair.app (fn (x, y) => f x y) (l1, l2)
+
+            fun appEq f l1 l2 = ListPair.appEq (fn (x, y) => f x y) (l1, l2)
+
+            fun map f l1 l2 = ListPair.map (fn (x, y) => f x y) (l1, l2)
+
+            fun mapEq f l1 l2 = ListPair.mapEq (fn (x, y) => f x y) (l1, l2)
+
+            fun foldl f z l1 l2 = ListPair.foldl (fn (x, y, w) => f x y w) z (l1, l2)
+
+            fun foldlEq f z l1 l2 = ListPair.foldlEq (fn (x, y, w) => f x y w) z (l1, l2)
+
+            fun foldr f z l1 l2 = ListPair.foldr (fn (x, y, w) => f x y w) z (l1, l2)
+
+            fun foldrEq f z l1 l2 = ListPair.foldrEq (fn (x, y, w) => f x y w) z (l1, l2)
+
+            fun all f l1 l2 = ListPair.all (fn (x, y) => f x y) (l1, l2)
+
+            fun allEq f l1 l2 = ListPair.allEq (fn (x, y) => f x y) (l1, l2)
+
+            fun exists f l1 l2 = ListPair.exists (fn (x, y) => f x y) (l1, l2)
 
          end
 

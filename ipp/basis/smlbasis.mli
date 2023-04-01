@@ -6,6 +6,7 @@ module type WORD = Smlbasis_sig.WORD
 module type STRING = Smlbasis_sig.STRING
 module type CHAR = Smlbasis_sig.CHAR
 module type LIST = Smlbasis_sig.LIST
+module type LIST_PAIR = Smlbasis_sig.LIST_PAIR
 module type OPTION = Smlbasis_sig.OPTION
 module type ARRAY = Smlbasis_sig.ARRAY
 module type MONO_ARRAY = Smlbasis_sig.MONO_ARRAY
@@ -26,6 +27,7 @@ module Word64 : WORD with type word = Word64.word
 module String : STRING with type string = string
 module Char : CHAR with type char = char
 module List : LIST with type 'a list = 'a list
+module ListPair : LIST_PAIR
 module Option : OPTION with type 'a option = 'a option
 module Array : ARRAY with type 'a array = 'a array
 module Word8Array : MONO_ARRAY with type elem = Word8.word with type array = Word8.word array

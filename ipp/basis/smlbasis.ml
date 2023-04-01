@@ -325,6 +325,125 @@ module List : LIST with type 'a list = 'a list =
    end
 
 
+(* Can't use any of OCaml's list pair utilities because they handle
+   unequal lengths differently.
+*)
+
+module ListPair : LIST_PAIR =
+   struct
+
+      exception UnequalLengths = Basis.ListPair.UnequalLengths
+
+      let rec foldl f z l12 =
+         (match l12 with
+             ([], _) -> z
+
+           | (_, []) -> z
+
+           | (x :: rest1, y :: rest2) ->
+                foldl f (f (x, y, z)) (rest1, rest2))
+
+      let rec foldr f z l12 =
+         (match l12 with
+             ([], _) -> z
+
+           | (_, []) -> z
+
+           | (x :: rest1, y :: rest2) ->
+                f (x, y, foldr f z (rest1, rest2)))
+
+      let rec foldlEq f z l12 =
+         (match l12 with
+             ([], []) -> z
+
+           | (x :: rest1, y :: rest2) ->
+                foldlEq f (f (x, y, z)) (rest1, rest2)
+
+           | _ -> raise UnequalLengths)
+
+      let rec foldrEq f z l12 =
+         (match l12 with
+             ([], []) -> z
+
+           | (x :: rest1, y :: rest2) ->
+                f (x, y, foldrEq f z (rest1, rest2))
+
+           | _ -> raise UnequalLengths)
+
+      let zip l12 = foldr (fun (x, y, l) -> (x, y) :: l) [] l12
+      let zipEq l12 = foldrEq (fun (x, y, l) -> (x, y) :: l) [] l12
+      
+      let rec unzip l =
+         (match l with
+             [] -> ([], [])
+
+           | (x, y) :: rest ->
+                let (l1, l2) = unzip rest
+                in
+                   (x :: l1, y :: l2))
+
+      let rec app f l12 =
+         (match l12 with
+             ([], _) -> ()
+           | (_, []) -> ()
+
+           | (x :: rest1, y :: rest2) ->
+                (
+                f (x, y);
+                app f (rest1, rest2)
+                ))
+
+      let rec appEq f l12 =
+         (match l12 with
+             ([], []) -> ()
+
+           | (x :: rest1, y :: rest2) ->
+                (
+                f (x, y);
+                appEq f (rest1, rest2)
+                )
+
+           | _ -> raise UnequalLengths)
+
+      let map f l12 = foldr (fun (x, y, l) -> f (x, y) :: l) [] l12
+      let mapEq f l12 = foldrEq (fun (x, y, l) -> f (x, y) :: l) [] l12
+
+      let rec all f l12 =
+         (match l12 with
+             ([], _) -> true
+
+           | (_, []) -> true
+
+           | (x :: rest1, y :: rest2) ->
+                f (x, y)
+                &&
+                all f (rest1, rest2))
+
+      let rec allEq f l12 =
+         (match l12 with
+             ([], []) -> true
+
+           | (x :: rest1, y :: rest2) ->
+                f (x, y)
+                &&
+                allEq f (rest1, rest2)
+
+           | _ -> false)
+
+      let rec exists f l12 =
+         (match l12 with
+             ([], _) -> false
+
+           | (_, []) -> false
+
+           | (x :: rest1, y :: rest2) ->
+                f (x, y)
+                ||
+                exists f (rest1, rest2))
+
+   end
+
+
 module Option : OPTION with type 'a option = 'a option =
    struct
 

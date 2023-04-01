@@ -6,6 +6,7 @@ module type WORD = Basis_sig.WORD
 module type STRING = Basis_sig.STRING
 module type CHAR = Basis_sig.CHAR
 module type LIST = Basis_sig.LIST
+module type LIST_PAIR = Basis_sig.LIST_PAIR
 module type OPTION = Basis_sig.OPTION
 module type ARRAY = Basis_sig.ARRAY
 module type IO = Basis_sig.IO
@@ -25,6 +26,7 @@ module Word64 : WORD with type word = Word64.word
 module String : STRING with type string = string
 module Char : CHAR with type char = char
 module List : LIST with type 'a list = 'a list
+module ListPair : LIST_PAIR
 module Option : OPTION with type 'a option = 'a option
 module Array : ARRAY with type 'a array = 'a array
 module IO : IO
