@@ -43,6 +43,8 @@ ProverInternal.beforeLemmaHook :=
                  ))
        end);
 
+FileInternal.useHook := Ctrl.use;
+
 
 (* Begin *)
 

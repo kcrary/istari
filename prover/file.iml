@@ -4,8 +4,12 @@ signature FILE =
 
       exception LoadError of string
 
-      (* file name *)
+      (* load Istari library *)
       val load : string -> unit
+
+      
+      (* use IML file (but only once) *)
+      val import : string -> unit
 
    end
 
@@ -16,8 +20,12 @@ signature FILE_INTERNAL =
       include FILE
 
 
-      (* file name *)
+      (* save Istari library *)
       val save : string -> unit
+
+
+      (* the IML "use" function *)
+      val useHook : (string -> unit) ref
 
    end
 
@@ -385,6 +393,37 @@ structure FileInternal :> FILE_INTERNAL =
                             " does not support extracts"
                             ])
             end
+
+
+
+      val useHook : (string -> unit) ref =
+         ref (fn _ => signalError "use unimplemented")
+
+      structure StringSet = RedBlackSet (structure Elem = StringOrdered)
+
+      val imported : StringSet.set CR.cref = CR.new StringSet.empty
+
+
+      fun import filename =
+         let
+            val filename =
+               try
+                  Path.canonize filename
+               with Path.Path =>
+                  signalError ("bad path name " ^ filename)
+         in
+            if StringSet.member (CR.deref imported) filename then
+               ()
+            else
+               (
+               CR.assign imported (StringSet.insert (CR.deref imported) filename);
+
+               (* This will end up canonizing filename again, but it doesn't seem like
+                  a big enough deal to do anything about it.
+               *)
+               !useHook filename
+               )
+         end
 
    end
 

@@ -6,18 +6,7 @@ convention).  Istari library files contain constants definitions,
 lemmas, reductions, and whatever else the user puts into the registry.
 However, library files **do not** contain IML code, such as tactics.
 
-Thus IML code and Istari content must be loaded separately:
-
-- To read, compile, and execute an IML file:
-
-      Ctrl.use "[filename]";
-
-  Alternatively:
-
-      Ctrl.import "[filename]";
-
-  Import is like use, except that the same file can only be imported
-  once.  Subsequent imports of the same file have no effect.
+Thus Istari content and IML code must be loaded separately:
 
 - To load an Istari file:
 
@@ -26,6 +15,18 @@ Thus IML code and Istari content must be loaded separately:
   A file can be loaded only once; subsequent loads of the same file
   have no effect.  Often an Istari file is loaded indirectly by IML
   code (such as `nat-deps.iml` below).
+
+- To read, compile, and execute an IML file:
+
+      File.import "[filename]";
+
+  Like load, a file can only be imported once.  Subsequent imports
+  of the same file have no effect.
+
+  Alternatively, one can load an IML file unconditionally using the
+  primitive operation:
+
+      Ctrl.use "[filename]"
 
 
 

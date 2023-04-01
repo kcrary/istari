@@ -5,6 +5,7 @@ CM.make "../prover/prover.cm";
 
 Repl.uiOn := false;
 Repl.exceptionHandler := Handler.handler;
+FileInternal.useHook := Ctrl.use;
 
 
 (* Begin *)

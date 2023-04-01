@@ -1211,6 +1211,79 @@ structure Traverse :> TRAVERSE =
       fun traverseGdefs ctx gdefs = traverseGdefsMain ctx [] [] [] [] NONE gdefs
 
 
+      fun samePrecedence ((n:int, assoc, mode), (n', assoc', mode')) =
+         n = n'
+         andalso
+         (case (assoc, assoc') of
+             (PrecedenceTable.LEFT, PrecedenceTable.LEFT) => true
+           | (PrecedenceTable.RIGHT, PrecedenceTable.RIGHT) => true
+           | _ => false)
+         andalso
+         (case (mode, mode') of
+             (PrecedenceTable.CURRIED, PrecedenceTable.CURRIED) => true
+           | (PrecedenceTable.TUPLED, PrecedenceTable.TUPLED) => true
+           | _ => false)
+         
+      fun sameRhselem elems =
+         (case elems of
+             (Parse.Terminal sym, Parse.Terminal sym') =>
+                Symbol.eq (sym, sym')
+
+           | (Parse.TerminalIdent sym, Parse.TerminalIdent sym') =>
+                Symbol.eq (sym, sym')
+
+           | (Parse.Nonterminal (sym, n), Parse.Nonterminal (sym', n')) =>
+                n = n'
+                andalso
+                Symbol.eq (sym, sym')
+
+           | _ => false)
+
+      fun sameRule (((sym, n:int), rhs, action), ((sym', n'), rhs', action')) =
+         n = n'
+         andalso
+         Symbol.eq (sym, sym')
+         andalso
+         ListPair.allEq sameRhselem (rhs, rhs')
+         andalso
+         ListPair.allEq Symbol.eq (action, action')
+
+      fun sameOption f opts =
+         (case opts of
+             (NONE, NONE) => true
+
+           | (SOME x, SOME y) => f (x, y)
+
+           | _ => false)
+
+      fun sameBundle ({infixes, rules, reserved, starts, default}, {infixes=infixes', rules=rules', reserved=reserved', starts=starts', default=default'}) =
+         ListPair.allEq
+            (fn ((sym, prec), (sym', prec')) =>
+                    Symbol.eq (sym, sym')
+                    andalso
+                    samePrecedence (prec, prec'))
+            (infixes, infixes')
+         andalso
+         ListPair.allEq sameRule (rules, rules')
+         andalso
+         ListPair.allEq
+            (fn ((sym1, sym2), (sym1', sym2')) =>
+                Symbol.eq (sym1, sym1')
+                andalso
+                Symbol.eq (sym2, sym2'))
+            (reserved, reserved')
+         andalso
+         ListPair.allEq
+            (fn ((sym, l), (sym', l')) =>
+                Symbol.eq (sym, sym')
+                andalso
+                ListPair.allEq (sameOption Symbol.eq) (l, l'))
+            (starts, starts')
+         andalso
+         sameOption Symbol.eq (default, default')
+
+                
+
       val symIt = Symbol.fromValue "it"
 
       fun traverseDirective ctx (dir, span) =
@@ -1234,16 +1307,22 @@ structure Traverse :> TRAVERSE =
                 end
 
            | Vgrammardef ((id, idsp), gdefs) =>
-                if C.defined ctx id then
-                   raise (E.SemanticError ("multiply defined grammar extension " ^ Symbol.toValue id, idsp))
-                else
-                   let
-                      val gdefs' = traverseGdefs ctx gdefs
-                   in
-                      ((Vnull, span),
-                       C.define ctx id gdefs',
-                       C.define C.empty id gdefs')
-                   end
+                let
+                   val gdefs' = traverseGdefs ctx gdefs
+                in
+                   (case C.lookupBundle ctx id of
+                       NONE =>
+                          ((Vnull, span),
+                           C.define ctx id gdefs',
+                           C.define C.empty id gdefs')
+
+                     | SOME old =>
+                          if sameBundle (gdefs', old) then
+                             (* Redefining the same extension.  Do nothing. *)
+                             ((Vnull, span), ctx, C.empty)
+                          else
+                             raise (E.SemanticError ("multiply defined grammar extension " ^ Symbol.toValue id, idsp)))
+                end
 
            | Vgrammaron ids =>
                 let
