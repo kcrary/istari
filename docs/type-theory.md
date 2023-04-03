@@ -769,9 +769,10 @@ are isomorphic to defined integers in an appropriate way.  (This relies
 on the bignum implementation being correct, of course.)
 
 The introduction form for native integers are the integer literals
-(written z`-1, z`0, z`1, z`2, etc.)  An elimination form
-`integer_iter` is provided by the [Integer library](lib/integer.html),
-and a variety of native operations are provided as well.
+(written ``z`-1``, ``z`0``, ``z`1``, ``z`2``, etc.)  An elimination
+form `integer_iter` is provided by the [Integer
+library](lib/integer.html), and a variety of native operations are
+provided as well.
 
 
 
