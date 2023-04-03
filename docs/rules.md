@@ -335,6 +335,20 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- A = A' : univ I
       G, x : A |- B = B' : univ I
 
+- `arrowForallEq A A' B B'`
+
+      G |- (A -> B) = (forall (x : A') . B') : type
+      >>
+      G |- A = A' : type
+      G, x : A |- B = B' : type
+
+- `arrowForallEqUniv A A' B B' I`
+
+      G |- (A -> B) = (forall (x : A') . B') : univ I
+      >>
+      G |- A = A' : univ I
+      G, x : A |- B = B' : univ I
+
 - `arrowSub A A' B B'`
 
       G |- (A -> B) <: (A' -> B')
@@ -494,6 +508,22 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- A = A' : univ I
       G |- B = B' : univ I
 
+- `tarrowForallEq A A' B B'`
+
+      G |- (A -t> B) = (forall (x : A') . B') : type
+      >>
+      G |- A = A' : type
+      G, x : A |- B = B' : type
+      G |- B : type
+
+- `tarrowForallEqUniv A A' B B' I`
+
+      G |- (A -t> B) = (forall (x : A') . B') : univ I
+      >>
+      G |- A = A' : univ I
+      G, x : A |- B = B' : univ I
+      G |- B : univ I
+
 - `tarrowIntroOf A B M`
 
       G |- (fn x . M) : A -t> B
@@ -612,6 +642,22 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- A = A' : univ I
       G |- B = B' : univ I
+
+- `karrowForallEq A A' B B'`
+
+      G |- (A -k> B) = (forall (x : A') . B') : type
+      >>
+      G |- A = A' : type
+      G, x : A |- B = B' : type
+      G |- B : type
+
+- `karrowForallEqUniv A A' B B' I`
+
+      G |- (A -k> B) = (forall (x : A') . B') : univ I
+      >>
+      G |- A = A' : univ I
+      G, x : A |- B = B' : univ I
+      G |- B : univ I
 
 - `karrowIntroOf A B M`
 

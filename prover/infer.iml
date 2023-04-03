@@ -555,6 +555,27 @@ structure Infer :> INFER =
                       | _ =>
                            raise (InferError (m, NONE, "ill-formed annotation")))
  
+                 else if Constant.eq (const, Prim.fnann) then
+                    (case spine of
+                        T.App a :: T.App m' :: rest =>
+                           let
+                              val b = T.apply2 Prim.forall a (T.Lam (NONE, T.evar ()))
+
+                              val ntac = prove (J.make ctx (T.apply2 Prim.ov b m')) []
+ 
+                              val tac =
+                                 (* G |- fnann A M' : B *)
+                                 refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 2])))
+                                 >>
+                                 (* G |- M' : B *)
+                                 ntac
+                           in
+                              inferSpine ctx (T.apply2 Prim.fnann a m') b rest tac invis prove
+                           end
+ 
+                      | _ =>
+                           raise (InferError (m, NONE, "ill-formed annotated function")))
+
                  else if Constant.eq (const, Prim.ap) then
                     (case spine of
                         T.App m' :: T.App p :: rest =>
@@ -1090,6 +1111,9 @@ structure Infer :> INFER =
                  if Constant.eq (const, Prim.ann) then
                     raise (NotPath "first term is annotated")
  
+                 else if Constant.eq (const, Prim.fnann) then
+                    raise (NotPath "first term is annotated function")
+ 
                  else if Constant.eq (const, Prim.ap) then
                     (case spine1 of
                         T.App m' :: T.App p :: rest1 =>
@@ -1237,6 +1261,9 @@ structure Infer :> INFER =
                        \(fnc const' spine2 =>
                             if Constant.eq (const', Prim.ann) then
                                raise (NotPath "second term is annotated")
+  
+                            else if Constant.eq (const', Prim.fnann) then
+                               raise (NotPath "second term is annotated function")
   
                             else if Constant.eq (const', Prim.ap) then
                                raise (NotPath "second term is visibilized application")

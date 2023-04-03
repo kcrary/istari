@@ -25,7 +25,7 @@ addition is left associative, while `Term :: [Term]` indicates that
 cons is right associative.
 
     Term ::=
-      fn OIdentsn . [Term]                                           (lambda)
+      fn Bindingsn . [Term]                                          (lambda)
       forall Bindings . [Term]                                       (dependent product)  
       exists Bindings . [Term]                                       (strong dependent sum)
       iforall Bindings . [Term]                                      (impredicative universal)
@@ -117,11 +117,14 @@ cons is right associative.
       OIdent ... OIdent                                              (length at least 1)
 
     Binding ::=
-      OIdent                                                         (binding using evar for type)
+      OIdent                                                         (unannotated binding)
       (OIdent : Term)                                                (binding with type supplied)
 
     Bindings ::=       
       Binding ... Binding                                            (length can be zero)
+
+    Bindingsn ::=       
+      Binding ... Binding                                            (length at least 1)
 
     Level ::=
       Number + [Level]                                               (level plus)
@@ -145,17 +148,13 @@ Notes:
   `type -> C` is illegal), while `A = B : type -> C` asserts that the
   equality `A = B : type` implies `C`.
 
-- Note that `fn _ . M` and `fn . M` are two different terms.  The
-  former is a lambda that ignores its argument, while the latter takes
-  no arguments so it is actually the same as `M`.
-
 - The pair form is `(Term , Term)`, not `(Term, Term)` or
   `(Term,Term)`.  (Observe the whitespace on both sides of the comma.)
   For example, because of how IML [tokenizes
   input](iml.html#tokenization), the `x,` in `(x, y)` forms a single
   token, rather than two, which will result in a syntax error.
 
-- A tick (`` ` ``) before an identifier defeats the insertion of
+- A tick (`` ` ``) before an identifier suppresses the insertion of
   implicit arguments.  It also allows the identifier to be any constant
   name, even if the name collides with a keyword.
 
@@ -166,9 +165,14 @@ Notes:
   placeholder used by some tactics (*e.g.,* `so`).
 
 - One can bind additional de Bruijn positions using the syntax
-  `additional OIdents . Term`.  For example, `additional x y . y`
+  ``additional` OIdents . Term``.  For example, ``additional` x y . y``
   resolves to index 0; and if `z` resolves to index 3, then
-  `additional x y . z` resolves to index 5.
+  ``additional` x y . z`` resolves to index 5.
+
+- One can suppress the insertion of implicit arguments throughout an
+  entire term using the syntax ``explicit` Term``.  The inner term
+  should be parenthesized or otherwise syntactically atomic (that is,
+  it should appear in the last grouping of `Term` syntax).
 
 
 

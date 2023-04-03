@@ -3,6 +3,8 @@ use "../ui/use-repl.sml";
 Incremental.load "../prover/prover.proj";
 CM.make "../prover/prover.cm";
 
+FileInternal.useHook := Ctrl.use;
+
 Incremental.inputKnown "open Pervasive;";
 open Pervasive;
 

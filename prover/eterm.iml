@@ -17,6 +17,7 @@ signature ETERM =
 
       val const   : Constant.constant -> eterm
       val lam     : binder -> eterm -> eterm
+      val lamann  : binder -> eterm -> eterm -> eterm
       val app     : eterm -> eterm -> eterm
       val pair    : eterm -> eterm -> eterm
       val pi1     : eterm -> eterm
@@ -152,6 +153,18 @@ structure ETerm :> ETERM =
 
            | SOME x =>
                 T.Lam (SOME x, m imps (D.ibind dir x)))
+
+      fun lamann b a m imps dir = 
+         (case b of
+             NONE =>
+                T.apply2 Prim.fnann 
+                   (a imps dir)
+                   (T.Lam (NONE, m imps (D.ibind0 dir)))
+
+           | SOME x =>
+                T.apply2 Prim.fnann
+                   (a imps dir)
+                   (T.Lam (SOME x, m imps (D.ibind dir x))))
 
       fun app m1 m2 imps dir = T.Elim (m1 imps dir, [T.App (m2 imps dir)])
 
@@ -327,8 +340,8 @@ structure ParseTerm =
 
       fun longid strs = map Symbol.fromValue strs
 
-      fun bindingBare x = [(x, T.evar)]
-      fun bindingAnnot xl a = map (fn x => (x, a)) xl
+      fun bindingBare x = [(x, NONE)]
+      fun bindingAnnot xl a = map (fn x => (x, SOME a)) xl
 
       val literal = T.literal
 
@@ -365,21 +378,31 @@ structure ParseTerm =
 
 
 
-      fun lams xl m = foldr T.lam m xl
+      fun lam x a m =
+         (case a of
+             NONE => T.lam x m
+           | SOME a' => T.lamann x a' m)
 
-      fun forall x a b = T.apply2 Prim.forall a (T.lam x b)
+      fun lams xl m = foldr (fns (x, a) n => lam x a n) m xl
+
+      fun instance b =
+         (case b of
+             NONE => T.evar
+           | SOME a => a)
+
+      fun forall x a b = T.apply2 Prim.forall (instance a) (T.lam x b)
       fun foralls al b = foldr (fns (x, a) b => forall x a b) b al
 
-      fun exists x a b = T.apply2 Prim.exists a (T.lam x b)
+      fun exists x a b = T.apply2 Prim.exists (instance a) (T.lam x b)
       fun existss al b = foldr (fns (x, a) b => exists x a b) b al
 
-      fun iforall x a b = T.apply3 Prim.iforall T.evar a (T.lam x b)
+      fun iforall x a b = T.apply3 Prim.iforall T.evar (instance a) (T.lam x b)
       fun iforalls al b = foldr (fns (x, a) b => iforall x a b) b al
 
-      fun iexists x a b = T.apply3 Prim.iexists T.evar a (T.lam x b)
+      fun iexists x a b = T.apply3 Prim.iexists T.evar (instance a) (T.lam x b)
       fun iexistss al b = foldr (fns (x, a) b => iexists x a b) b al
 
-      fun intersect x a b = T.apply2 Prim.intersect a (T.lam x b)
+      fun intersect x a b = T.apply2 Prim.intersect (instance a) (T.lam x b)
       fun intersects al b = foldr (fns (x, a) b => intersect x a b) b al
 
       fun foralltp x b = T.apply1 Prim.foralltp (T.lam x b)
@@ -477,6 +500,8 @@ structure ParseTerm =
 
       fun shortConstant sym = Namespace.resolve [sym]
       fun longConstant address = Namespace.resolve address
+
+      fun explicit m = T.suppressImplicit m
 
 
 
@@ -652,6 +677,7 @@ structure ParseTerm =
                     cod prec
                     ]))
 
+      val () = registerBinder Prim.fnann "fn"
       val () = registerBinder Prim.forall "forall"
       val () = registerBinder Prim.exists "exists"
       val () = registerIBinder Prim.iforall "iforall"
@@ -1087,6 +1113,8 @@ grammardef Term
    rule Bindings  ::= => null
    rule Bindings  ::= Binding Bindings => append
 
+   rule Bindingsn ::= Binding Bindings => append
+
    rule Level(0)  ::= NUMBER "+" Level(0) => level_plus
    rule Level(1)  ::= "[" Levels "]" => level_max
    rule Level(1)  ::= NUMBER => level_lit
@@ -1097,7 +1125,7 @@ grammardef Term
    rule Levels    ::= Level(1) => sing
    rule Levels    ::= Level(1) Levels => cons
 
-   rule Term(0)   ::= "fn" OIdentsn "." Term(0) => lams
+   rule Term(0)   ::= "fn" Bindingsn "." Term(0) => lams
 
    rule Term(0)   ::= "forall" Bindings "." Term(0) => foralls
    rule Term(0)   ::= "exists" Bindings "." Term(0) => existss
@@ -1176,15 +1204,16 @@ grammardef Term
    rule Term(100) ::= "__" => hole
    rule Term(100) ::= "(" ")" => triv
    rule Term(100) ::= "level`" Level(1) => id
+   rule Term(100) ::= "explicit`" Level(100) => explicit
 
-   rule Term(0)   ::= "additional" OIdents "." Term(0) => additional
+   rule Term(0)   ::= "additional`" OIdents "." Term(0) => additional
 
    rule Constant  ::= Longident => longConstant
 
    rule Constants ::= => null
    rule Constants ::= Constant Constants => cons
 
-   reserved "K" "U" "additional" "ap" "case" "exists" "fn" "forall" "iexists" "iforall" "if" "in" "inl" "inl" "inr" "let" "mu" "next" "pi1" "pi2" "prev" "quotient" "rec" "then" "else" : Ident
+   reserved "K" "U" "ap" "case" "exists" "fn" "forall" "iexists" "iforall" "if" "in" "inl" "inl" "inr" "let" "mu" "next" "pi1" "pi2" "prev" "quotient" "rec" "then" "else" : Ident
 
    default Term
 

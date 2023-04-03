@@ -72,6 +72,8 @@ exact arrowForm_valid.
 exact arrowEq_valid.
 exact arrowFormUniv_valid.
 exact arrowEqUniv_valid.
+exact arrowForallEq_valid.
+exact arrowForallEqUniv_valid.
 exact arrowSub_valid.
 exact arrowForallSub_valid.
 exact forallArrowSub_valid.
@@ -94,6 +96,8 @@ exact tarrowFormUniv_valid.
 exact tarrowEqUniv_valid.
 exact tarrowArrowEq_valid.
 exact tarrowArrowEqUniv_valid.
+exact tarrowForallEq_valid.
+exact tarrowForallEqUniv_valid.
 exact tarrowIntroOf_valid.
 exact tarrowIntroEq_valid.
 exact tarrowIntro_valid.
@@ -110,6 +114,8 @@ exact karrowFormUniv_valid.
 exact karrowEqUniv_valid.
 exact karrowArrowEq_valid.
 exact karrowArrowEqUniv_valid.
+exact karrowForallEq_valid.
+exact karrowForallEqUniv_valid.
 exact karrowIntroOf_valid.
 exact karrowIntroEq_valid.
 exact karrowIntro_valid.
@@ -882,7 +888,3 @@ Qed.
    equivalence classes in that type.  The correctness of the isomorphism code
    is apparent by inspection.
 *)
-
-
-
-

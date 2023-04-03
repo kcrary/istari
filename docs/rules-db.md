@@ -322,6 +322,20 @@ Conventions:
       G |- eq (univ I) A A'
       G, A |- eq (univ I[^1]) B[^1] B'[^1]
 
+- `arrowForallEq A A' B B'`
+
+      G |- eqtp (arrow A B) (forall A' (fn . B'))
+      >>
+      G |- eqtp A A'
+      G, A |- eqtp B[^1] B'
+
+- `arrowForallEqUniv A A' B B' I`
+
+      G |- eq (univ I) (arrow A B) (forall A' (fn . B'))
+      >>
+      G |- eq (univ I) A A'
+      G, A |- eq (univ I[^1]) B[^1] B'
+
 - `arrowSub A A' B B'`
 
       G |- subtype (arrow A B) (arrow A' B')
@@ -481,6 +495,22 @@ Conventions:
       G |- eq (univ I) A A'
       G |- eq (univ I) B B'
 
+- `tarrowForallEq A A' B B'`
+
+      G |- eqtp (tarrow A B) (forall A' (fn . B'))
+      >>
+      G |- eqtp A A'
+      G, A |- eqtp B[^1] B'
+      G |- istp B
+
+- `tarrowForallEqUniv A A' B B' I`
+
+      G |- eq (univ I) (tarrow A B) (forall A' (fn . B'))
+      >>
+      G |- eq (univ I) A A'
+      G, A |- eq (univ I[^1]) B[^1] B'
+      G |- of (univ I) B
+
 - `tarrowIntroOf A B M`
 
       G |- of (tarrow A B) (fn . M)
@@ -599,6 +629,22 @@ Conventions:
       >>
       G |- eq (univ I) A A'
       G |- eq (univ I) B B'
+
+- `karrowForallEq A A' B B'`
+
+      G |- eqtp (karrow A B) (forall A' (fn . B'))
+      >>
+      G |- eqtp A A'
+      G, A |- eqtp B[^1] B'
+      G |- istp B
+
+- `karrowForallEqUniv A A' B B' I`
+
+      G |- eq (univ I) (karrow A B) (forall A' (fn . B'))
+      >>
+      G |- eq (univ I) A A'
+      G, A |- eq (univ I[^1]) B[^1] B'
+      G |- of (univ I) B
 
 - `karrowIntroOf A B M`
 

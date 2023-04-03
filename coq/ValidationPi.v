@@ -372,6 +372,22 @@ Lemma arrowEqUniv_valid : arrowEqUniv_obligation.
 Qed.
 
 
+Lemma arrowForallEq_valid : arrowForallEq_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext1 ext0 Ha Hb.
+apply tr_pi_formation; auto.
+Qed.
+
+
+Lemma arrowForallEqUniv_valid : arrowForallEqUniv_obligation.
+Proof.
+prepare.
+intros G a a' b b' i ext1 ext0 Ha Hb.
+apply tr_pi_formation_univ; auto.
+Qed.
+
+
 Lemma arrowSub_valid : arrowSub_obligation.
 Proof.
 unfoldtop.
@@ -757,6 +773,38 @@ apply tr_arrow_pi_equal_univ.
 Qed.
 
 
+Lemma tarrowForallEq_valid : tarrowForallEq_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext2 ext1 ext0 Ha Hbb Hb.
+apply (tr_eqtype_transitivity _ _ (pi a (subst sh1 b))).
+  {
+  apply tr_arrow_pi_equal; auto.
+  eapply tr_eqtype_formation_left; eauto.
+  }
+
+  {
+  apply tr_pi_formation; auto.
+  }
+Qed.
+
+
+Lemma tarrowForallEqUniv_valid : tarrowForallEqUniv_obligation.
+Proof.
+prepare.
+intros G a a' b b' i ext2 ext1 ext0 Ha Hbb Hb.
+apply (tr_transitivity _ _ (pi a (subst sh1 b))).
+  {
+  apply tr_arrow_pi_equal_univ; auto.
+  eapply tr_eq_reflexivity; eauto.
+  }
+
+  {
+  apply tr_pi_formation_univ; auto.
+  }
+Qed.
+
+
 Lemma tarrowIntroOf_valid: tarrowIntroOf_obligation.
   unfoldtop. autounfold with valid_hint.
   intros G a b m triv0 triv1 triv2 H1 H2 H3.
@@ -1114,6 +1162,38 @@ apply tr_karrow_pi_equal_univ.
 
   {
   apply (tr_transitivity _ _ b); [apply tr_symmetry |]; apply tr_equal_elim; eapply tr_equal_eta2; eauto.
+  }
+Qed.
+
+
+Lemma karrowForallEq_valid : karrowForallEq_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext2 ext1 ext0 Ha Hbb Hb.
+apply (tr_eqtype_transitivity _ _ (pi a (subst sh1 b))).
+  {
+  apply tr_karrow_pi_equal; auto.
+  eapply tr_eqtype_formation_left; eauto.
+  }
+
+  {
+  apply tr_pi_formation; auto.
+  }
+Qed.
+
+
+Lemma karrowForallEqUniv_valid : karrowForallEqUniv_obligation.
+Proof.
+prepare.
+intros G a a' b b' i ext2 ext1 ext0 Ha Hbb Hb.
+apply (tr_transitivity _ _ (pi a (subst sh1 b))).
+  {
+  apply tr_karrow_pi_equal_univ; auto.
+  eapply tr_eq_reflexivity; eauto.
+  }
+
+  {
+  apply tr_pi_formation_univ; auto.
   }
 Qed.
 
