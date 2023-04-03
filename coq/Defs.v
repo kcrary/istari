@@ -100,25 +100,25 @@ Definition void : fterm := voidtp.
 Definition wtype : fterm := lam (lam (wt (var 1) (app (var 1) (var 0)))).
 Definition zero : fterm := app inl triv.
 
-Definition sumcase : fterm := 
+Definition sum_case : fterm := 
   lam (lam (lam (bite 
                    (ppi1 (var 2))
                    (app (var 1) (ppi2 (var 2)))
                    (app (var 0) (ppi2 (var 2)))))).
 
-Definition natcase : fterm :=
+Definition nat_case : fterm :=
   lam (lam (lam (app
                    (app
-                      (app sumcase (var 2))
+                      (app sum_case (var 2))
                       (lam (var 2)))
                    (lam (app (var 1) (var 0)))))).
 
 Definition max : fterm :=
-  app theta (lam (lam (lam (app (app (app natcase
+  app theta (lam (lam (lam (app (app (app nat_case
                                         (var 1))
                                    (var 0))
                               (lam
-                                 (app (app (app natcase
+                                 (app (app (app nat_case
                                               (var 1))
                                          (var 2))
                                     (lam

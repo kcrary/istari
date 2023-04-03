@@ -9,3 +9,4 @@
 - [`List`](lib/list.html)
 - [`Nat`](lib/nat.html)
 - [`Stable`](lib/stable.html)
+- [`Wtype`](lib/wtype.html) (well-founded types)

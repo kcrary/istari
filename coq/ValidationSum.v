@@ -27,7 +27,7 @@ Require Import SumLemmas.
 Require Import ValidationSigma.
 
 
-Hint Rewrite def_inl def_inr def_sum def_sumcase : prepare.
+Hint Rewrite def_inl def_inr def_sum def_sum_case : prepare.
 
 
 Lemma sum_body_formation :
@@ -507,11 +507,11 @@ Hint Rewrite def_intersect def_pi def_arrow : prepare.
 Require Import NatLemmas.
 
 
-Lemma sumcaseType_valid : sumcaseType_obligation.
+Lemma sum_caseType_valid : sum_caseType_obligation.
 Proof.
 prepare.
 intros G.
-unfold Defs.sumcase.
+unfold Defs.sum_case.
 apply tr_intersect_intro; auto using tr_nattp_formation.
 simpsub.
 apply tr_intersect_intro.

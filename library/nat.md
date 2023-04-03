@@ -16,10 +16,10 @@ The iterator for natural numbers:
 
 A simpler case-analysis operation:
 
-    natcase : type:natcase
+    nat_case : type:nat_case
 
-    natcase (zero) z s --> z
-    natcase (succ n) z s --> s n
+    nat_case (zero) z s --> z
+    nat_case (succ n) z s --> s n
 
 
 ### Equality
@@ -143,7 +143,7 @@ Strong induction for natural numbers:
     minus : type:minus
 
     minus m (zero) --> m
-    minus m (succ n) --> natcase m zero (fn m' . minus m' n)
+    minus m (succ n) --> nat_case m zero (fn m' . minus m' n)
 
     plus_minus_cancel_l : type:plus_minus_cancel_l
 

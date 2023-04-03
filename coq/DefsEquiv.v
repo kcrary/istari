@@ -742,14 +742,14 @@ apply star_refl.
 Qed.
 
 
-Lemma def_sumcase :
+Lemma def_sum_case :
   forall m n p,
     equiv 
-      (app (app (app Defs.sumcase m) (lam n)) (lam p))
+      (app (app (app Defs.sum_case m) (lam n)) (lam p))
       (sumcase m n p).
 Proof.
 intros m n p.
-unfold Defs.sumcase.
+unfold Defs.sum_case.
 eapply equiv_trans.
   {
   apply equiv_app; [| apply equiv_refl].

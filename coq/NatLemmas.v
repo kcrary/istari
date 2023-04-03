@@ -64,17 +64,17 @@ Qed.
 
 Lemma def_natcase :
   forall m n p,
-    equiv (app (app (app Defs.natcase m) n) (lam p)) (natcase m n p).
+    equiv (app (app (app Defs.nat_case m) n) (lam p)) (natcase m n p).
 Proof.
 intros m n p.
-unfold Defs.natcase.
+unfold Defs.nat_case.
 rewrite -> equiv_beta.
 simpsub.
 rewrite -> equiv_beta.
 simpsub.
 rewrite -> equiv_beta.
 simpsub.
-rewrite -> def_sumcase.
+rewrite -> def_sum_case.
 rewrite -> equiv_beta.
 simpsub.
 rewrite -> subst_var0_sh1.

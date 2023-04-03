@@ -208,7 +208,7 @@ exact sumElim_valid.
 exact sumElimNondep_valid.
 exact sumElimIstype_valid.
 exact sumElimEqtype_valid.
-exact sumcaseType_valid.
+exact sum_caseType_valid.
 exact sumFormInv1_valid.
 exact sumFormInv2_valid.
 exact futureKind_valid.
@@ -704,7 +704,7 @@ auto.
 Qed.
 
 
-Hint Rewrite def_inl def_inr def_sum def_sumcase : prepare.
+Hint Rewrite def_inl def_inr def_sum def_sum_case : prepare.
 
 
 (* The sumLeft rule is hardcoded because it involves a pattern not used in any other
@@ -727,7 +727,7 @@ Lemma sumLeft_valid :
             (app
                (app 
                   (app
-                     Defs.sumcase 
+                     Defs.sum_case 
                      (var (length G2)))
                   (lam (subst (dots 1 (length G2) (dot (var 0) (sh (S (S (length G2)))))) M)))
                (lam (subst (dots 1 (length G2) (dot (var 0) (sh (S (S (length G2)))))) N)))
