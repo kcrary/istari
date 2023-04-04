@@ -4,6 +4,9 @@ signature PROVER =
 
       exception Prover of string
 
+      datatype problem = NotGround | Open | Marker
+      exception Unclean of problem * Term.term
+
       val apply : Tactic.tactic -> unit
       val enter : unit -> unit
       val leave : unit -> unit
@@ -48,10 +51,8 @@ signature PROVER_INTERNAL =
       include PROVER
 
 
-      datatype problem = NotGround | Open | Marker
-
       (* returns NONE if the term is ground, closed, and contains no markers *)
-      val clean : Term.term -> problem option
+      val checkClean : Term.term -> unit
 
 
       val setGoals : (Message.label * Tactic.goal) list -> (Refine.validation list -> unit) -> unit
@@ -81,6 +82,9 @@ structure ProverInternal :> PROVER_INTERNAL =
 
       exception Prover of string
 
+      datatype problem = NotGround | Open | Marker
+      exception Unclean of problem * T.term
+
       fun signalError msg = raise (Prover
                                       (String.concat
                                           [
@@ -89,11 +93,37 @@ structure ProverInternal :> PROVER_INTERNAL =
                                           ".\n"
                                           ]))
 
-      val () =
+      val () = 
          Handler.customHandler
-         (fn Prover msg => (print msg; true)
+         (fn Prover msg => 
+                (
+                print msg; 
+                true
+                )
+
+           | Unclean (prob, m) =>
+                (
+                print "Error: the definition contains ";
+                print 
+                   (case prob of
+                       NotGround => "unresolved evars"
+                     | Open => "free variables"
+                     | Marker => "markers");
+                print ":\n\n";
+
+                let
+                   val imp = !Show.showImplicits
+                in
+                   Show.showImplicits := true;
+                   Show.showClosed m;
+                   Show.showImplicits := imp
+                end;
+
+                true
+                )
+
            | _ => false)
-      
+
 
 
       (* The state of a proof underway is (d, juds, k)
@@ -336,9 +366,7 @@ structure ProverInternal :> PROVER_INTERNAL =
 
 
 
-      datatype problem = NotGround | Open | Marker
-
-      exception Unclean of problem
+      exception UncleanInternal of problem
 
       (* checks that m[s] is ground, its highest free variable is < k, and contains no markers *)
       fun cleanLoop k m s =
@@ -349,7 +377,7 @@ structure ProverInternal :> PROVER_INTERNAL =
                        if j < k then
                           ()
                        else
-                          raise (Unclean Open)
+                          raise (UncleanInternal Open)
 
                   | T.Term m' =>
                        cleanLoop k m' T.id)
@@ -385,7 +413,7 @@ structure ProverInternal :> PROVER_INTERNAL =
            | T.Evar eb =>
                 (case T.readEbind eb of
                     NONE =>
-                       raise (Unclean NotGround)
+                       raise (UncleanInternal NotGround)
 
                   | SOME m' =>
                        cleanLoop k m' s)
@@ -393,27 +421,13 @@ structure ProverInternal :> PROVER_INTERNAL =
            | T.Native _ => ()
 
            | T.Marker _ =>
-                raise (Unclean Marker))
-
-
-      fun clean m =
-         (try
-             (cleanLoop 0 m T.id; NONE)
-          with Unclean problem => SOME problem)
+                raise (UncleanInternal Marker))
 
 
       fun checkClean m =
-         (try
-             cleanLoop 0 m T.id
-          with
-             Unclean NotGround =>
-                signalError "lemma statement contains unresolved evars"
-
-           | Unclean Open =>
-                signalError "lemma statement contains free variables"
-
-           | Unclean Marker =>
-                signalError "lemma statement contains a marker")
+         try
+            cleanLoop 0 m T.id
+         with UncleanInternal prob => raise (Unclean (prob, m))
 
 
 

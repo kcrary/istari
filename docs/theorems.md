@@ -119,6 +119,10 @@ Istari replies:
 
     Lemma my_theorem defined.
 
+In unusual circumstances, a qed can fail due to an infirmity in the
+original lemma statement.  A discussion of how this can happen, and
+how it is easily corrected appears [here](theorem-infirmity.html).
+
 
 
 ### Rationale

@@ -18,6 +18,7 @@ structure MiscTactic :> MISC_TACTIC =
    struct
 
       structure D = Directory
+      structure J = Judgement
       structure T = Term
 
       open Tactic
@@ -26,20 +27,33 @@ structure MiscTactic :> MISC_TACTIC =
 
       val conclSym = Symbol.fromValue "concl"
 
-      fun change sym a =
+      fun change sym ea =
          if Symbol.eq (sym, conclSym) then
             let
                do (_, dir) = withgoal
             in
-               replaceConcl (ETerm.withdir dir a)
+               replaceConcl (ETerm.withdir dir ea)
             end
          else
             let
                do i = HypTactic.findhyp sym
-               do (_, dir) = withgoal
+               do (jud, dir) = withgoal
                val dir' = D.shift dir (i+1)
+
+               val a = ETerm.withdir dir' ea
+
+               val h =
+                  (case J.hyp jud i of
+                      J.Tm _ => J.Tm a
+                    | J.Tml _ => J.Tml a
+                    | J.Tmh _ => J.Tmh a
+                    | J.Let _ => J.Let a
+
+                    | _ => 
+                         (* will certainly fail *)
+                         J.Tm a)
             in
-               replaceHyp i (Judgement.Tm (ETerm.withdir dir' a))
+               replaceHyp i h
             end
 
 

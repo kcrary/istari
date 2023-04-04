@@ -91,21 +91,6 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
 
 
-      fun checkClean m =
-         (case P.clean m of
-             NONE => ()
-
-           | SOME P.NotGround =>
-                signalError "definition contains unresolved evars"
-
-           | SOME P.Open =>
-                signalError "definition contains free variables"
-
-           | SOME P.Marker =>
-                signalError "definition contains a marker")
-
-
-
       fun defineRaw (name, impargs, expargs) em =
          let
             val () = P.checkpoint ()
@@ -114,7 +99,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
             val m = ETerm.closed (List.foldr ETerm.lam em args)
          
-            val () = checkClean m
+            val () = P.checkClean m
 
             val const = Namespace.declare name (SOME m)
          in
@@ -161,6 +146,9 @@ structure DefineInternal :> DEFINE_INTERNAL =
                    [v] =>
                       (* v validates =M |- 0 : A[^] *)
                       let
+                         val () = P.checkClean a
+                         val () = P.checkClean m
+
                          val const = Namespace.declare name (SOME m)
 
                          val jud' = J.make S.empty (T.apply2 Prim.ov a (T.Const const))
@@ -266,7 +254,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
                   (ETerm.closed
                       (List.foldr ETerm.lam em (SOME name :: args)))
 
-            val () = checkClean m
+            val () = P.checkClean m
 
             val const = Namespace.declare name (SOME m)
 
@@ -320,6 +308,9 @@ structure DefineInternal :> DEFINE_INTERNAL =
                    [v] =>
                       (* v validates =M' |- 0 : A[^] *)
                       let
+                         val () = P.checkClean a
+                         val () = P.checkClean m'
+
                          val const = Namespace.declare name (SOME m')
 
                          val jud' = J.make S.empty (T.apply2 Prim.ov a (T.Const const))
