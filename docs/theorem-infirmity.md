@@ -109,7 +109,7 @@ unaffected!
 We can prove the second goal in a similar manner and complete the
 proof.  But we when enter `qed`, we get:
 
-    Error: the definition contains unresolved evars:
+    Error: the term contains unresolved evars:
     
     fn a l . list_case E132 E131 l true (fn v0 v1 . false)
 
@@ -164,7 +164,7 @@ For example:
 
 results in the error:
 
-    Error: the definition contains unresolved evars:
+    Error: the term contains unresolved evars:
     
     forall (x : nat) . length E0 (x :: nil E2) = 1 : nat
     
@@ -181,7 +181,7 @@ unparsing rules:
 After that, the error message will show a term that is not very easy
 to read, but that exposes every evar:
 
-    Error: the definition contains unresolved evars:
+    Error: the term contains unresolved evars:
     
     `forall nat (fn x . eq nat (length E0 (cons E1 x (nil E2))) (succ zero))
     
