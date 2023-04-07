@@ -113,6 +113,8 @@ proof.  But we when enter `qed`, we get:
     
     fn a l . list_case E132 E131 l true (fn v0 v1 . false)
 
+    Unresolved evars: E132 E131
+
 The evars remained unresolved at the end of the proof because we
 constructed a proof in which it never mattered what those types were.
 Nevertheless, before Istari will make the definition, it insists on
@@ -129,31 +131,64 @@ Fortunately, solving the problem is easy.  The error message always
 shows implicit arguments, even when display of implicit arguments is
 disabled.  Thus, we can cut-and-paste the definition from the error
 message and fill in the evars.  We wrap that with `` explicit` `` so
-that implicit arguments are suppressed and we return to the first line
-of the proof and impose our new version of the definition:
+that implicit arguments are suppressed, then we return to the
+definition and replace it with the new version:
 
-    change /isnil/ /explicit` (fn a l . list_case a bool l true (fn v0 v1 . false))/.
+    define /isnil {a} l/
+    /
+      explicit` (fn a l . list_case a bool l true (fn v0 v1 . false))
+    //
+      intersect i . forall (a : U i) . list a -> bool
+    /;
 
-This unifies the definition of `isnil` with the given term, thereby
-resolving its evars.  If the problem arose in an ordinary lemma (or if
-it arose from a definition's type), we would instead impose a new
-version of the goal's conclusion, using:
-
-    change /concl/ /explicit `([conclusion with evars filled in])/.
 
 
 ####  Unparsing rules
 
+Occasionally, resolved evars can be even more concealed.
 Some unparsing rules do not display all of the subterms.  A good
-example is, `cons A h t` is displayed `h :: t`.  Enabling display of
-implicit arguments will not make such terms visible.  If the error
-persists even after apparently filling in all the evars, try again
-after setting Istari not to use unparsing rules:
+example is `cons A h t`, which is displayed `h :: t`.  Enabling
+display of implicit arguments is not sufficient to make `A` visible.
+
+For example:
+
+    lemma "length_one"
+    /
+      forall (x : nat) .
+        length (x :: nil) = 1 : nat
+    /;
+    
+    intro /x/.
+    auto.
+    qed ();
+
+results in the error:
+
+    Error: the definition contains unresolved evars:
+    
+    forall (x : nat) . length E0 (x :: nil E2) = 1 : nat
+    
+    Unresolved evars: E0 E1 E2
+
+Here, the `length` term reduced to `1` before any evars were resolved.
+Disabling implicit arguments exposes `E0` and `E2`, but not `E1`,
+which is the type argument to the cons.  So when the error message
+lists evars that are still not revealed, set Istari to disable all
+unparsing rules:
 
     Show.disableAll := true;
 
-This usually makes terms that are not very easy to read, so it's
-preferable to do it only when necessary.
+After that, the error message will show a term that is not very easy
+to read, but that exposes every evar:
+
+    Error: the definition contains unresolved evars:
+    
+    `forall nat (fn x . eq nat (length E0 (cons E1 x (nil E2))) (succ zero))
+    
+    Unresolved evars: E0 E1 E2
+
+Again, one can fill in the evars, wrap the result with 
+`` explicit` ``, and replace the theorem statement.
 
 
 ---
