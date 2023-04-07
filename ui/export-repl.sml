@@ -10,8 +10,8 @@ Repl.uiOn := true;
 
 (* Set the hooks between the UI and Prover. *)
 
-Repl.proverShow := Message.display;
-
+Repl.showState := Message.display;
+Repl.showStateRewind := Prover.show;
 Repl.exceptionHandler := Handler.handler;
 
 Repl.rewindHook :=
@@ -19,11 +19,7 @@ Repl.rewindHook :=
        let
           val st = Checkpoint.checkpoint ()
        in
-          fn () => 
-             if Checkpoint.restore st then 
-                (Prover.show (); true)
-             else
-                false
+          fn () => Checkpoint.restore st
        end);
 
 (* Repl.resetHook is set below. *)
@@ -39,7 +35,7 @@ ProverInternal.beforeLemmaHook :=
                  Checkpoint.restore st;
                  (* Ignore failure here, as per checkpoint spec. *)
 
-                 Prover.show ()
+                 ()
                  ))
        end);
 

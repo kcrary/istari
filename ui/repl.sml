@@ -39,7 +39,8 @@ signature REPL =
       (* Hooks and such *)
 
       val uiOn : bool ref
-      val proverShow : (unit -> unit) ref                (* display current goals *)
+      val showState : (unit -> unit) ref                 (* show prover state *)
+      val showStateRewind : (unit -> unit) ref           (* show prover state after rewind *)
       val rewindHook : (unit -> unit -> bool) ref        (* obtain a checkpoint *)
       val resetHook : (unit -> unit) ref                 (* reset to initial state *)
       val exceptionHandler : (exn -> bool) ref           (* call on uncaught exceptions *)
@@ -149,7 +150,8 @@ functor ReplFun (structure Platform : PLATFORM
             structure S = Stream
             structure I = Incremental
       
-            val proverShow = ref (fn () => ())
+            val showState = ref (fn () => ())
+            val showStateRewind = ref (fn () => ())
             val uiOn = UI.on
             val exceptionHandler = exceptionHandler
       
@@ -405,6 +407,7 @@ functor ReplFun (structure Platform : PLATFORM
                       (
                       I.discard ();
                       Memory.rewind n;
+                      !showStateRewind ();
                       preInputLoop ()
                       )
       
@@ -499,7 +502,7 @@ functor ReplFun (structure Platform : PLATFORM
       
                  | UI.ShowState =>
                       (
-                      !proverShow ();
+                      !showState ();
                       preInputLoop ()
                       )
 
