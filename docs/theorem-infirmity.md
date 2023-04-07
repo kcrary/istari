@@ -145,7 +145,7 @@ definition and replace it with the new version:
 
 ####  Unparsing rules
 
-Occasionally, resolved evars can be even more concealed.
+Occasionally, unresolved evars can be even more concealed.
 Some unparsing rules do not display all of the subterms.  A good
 example is `cons A h t`, which is displayed `h :: t`.  Enabling
 display of implicit arguments is not sufficient to make `A` visible.
