@@ -82,9 +82,6 @@ structure ProverInternal :> PROVER_INTERNAL =
 
       exception Prover of string
 
-      datatype problem = NotGround | Open | Marker
-      exception Unclean of problem * T.term
-
       fun signalError msg = raise (Prover
                                       (String.concat
                                           [
@@ -93,32 +90,13 @@ structure ProverInternal :> PROVER_INTERNAL =
                                           ".\n"
                                           ]))
 
+
+
       val () = 
          Handler.customHandler
          (fn Prover msg => 
                 (
                 print msg; 
-                true
-                )
-
-           | Unclean (prob, m) =>
-                (
-                print "Error: the definition contains ";
-                print 
-                   (case prob of
-                       NotGround => "unresolved evars"
-                     | Open => "free variables"
-                     | Marker => "markers");
-                print ":\n\n";
-
-                let
-                   val imp = !Show.showImplicits
-                in
-                   Show.showImplicits := true;
-                   Show.showClosed m;
-                   Show.showImplicits := imp
-                end;
-
                 true
                 )
 
@@ -365,8 +343,10 @@ structure ProverInternal :> PROVER_INTERNAL =
       val theOriginalGoals : (label * goal) list option R.cref = R.new NONE
 
 
-
+      datatype problem = NotGround | Open | Marker
+      exception Unclean of problem * T.term
       exception UncleanInternal of problem
+
 
       (* checks that m[s] is ground, its highest free variable is < k, and contains no markers *)
       fun cleanLoop k m s =
@@ -428,6 +408,132 @@ structure ProverInternal :> PROVER_INTERNAL =
          try
             cleanLoop 0 m T.id
          with UncleanInternal prob => raise (Unclean (prob, m))
+
+
+
+      structure IS = RedBlackSet (structure Elem = IntOrdered)
+
+      (* freeEvarsMain (acc, set) m s
+
+         if    set contains exactly the elements of acc
+         then  l is the list of all free evars in m[s] that do not appear in set
+               (in the order in which they appear)
+               and
+               returns (rev l @ acc, union (set, l))
+      *)
+      fun freeEvarsMain (accset as (acc, set))  m s =
+         (case m of
+             T.Var i =>
+                (case T.substVar i s of
+                    T.Idx j =>
+                       accset
+
+                  | T.Term m' =>
+                       freeEvarsMain accset m' T.id)
+
+           | T.Const _ =>
+                accset
+
+           | T.Elim (h, spine) =>
+                List.foldl
+                   (fns elim accset =>
+                       (case elim of
+                           T.App n =>
+                              freeEvarsMain accset n s
+
+                         | _ =>
+                              accset))
+                   (freeEvarsMain accset h s)
+                   spine
+
+           | T.Lam (_, m1) =>
+                freeEvarsMain accset m1 (T.under 1 s)
+
+           | T.Pair (m1, m2) =>
+                freeEvarsMain (freeEvarsMain accset m1 s) m2 s
+
+           | T.Next m1 =>
+                freeEvarsMain accset m1 s
+
+           | T.Triv => accset
+
+           | T.Sub (m1, s') =>
+                freeEvarsMain accset m1 (T.compose s' s)
+
+           | T.Evar eb =>
+                (case T.readEbind eb of
+                    NONE =>
+                       let
+                          val i = T.ebindToInt eb
+                       in
+                          if IS.member set i then
+                             accset
+                          else
+                             (eb :: acc, IS.insert set i)
+                       end
+
+                  | SOME m' =>
+                       freeEvarsMain accset m' s)
+
+           | T.Native _ => accset
+
+           | T.Marker _ => accset)
+
+
+      fun freeEvars m =
+         let
+            val (l, _) = freeEvarsMain ([], IS.empty) m T.id
+         in
+            List.rev l
+         end
+
+
+      val () = 
+         Handler.customHandler
+         (fn Prover msg => 
+                (
+                print msg; 
+                true
+                )
+
+           | Unclean (prob, m) =>
+                (
+                print "Error: the term contains ";
+                print 
+                   (case prob of
+                       NotGround => "unresolved evars"
+                     | Open => "free variables"
+                     | Marker => "markers");
+                print ":\n\n";
+
+                let
+                   val imp = !Show.showImplicits
+                in
+                   Show.showImplicits := true;
+                   Show.showClosed m;
+                   Show.showImplicits := imp
+                end;
+
+                (case prob of
+                    NotGround =>
+                       (
+                       print "\nUnresolved evars:";
+                       List.app
+                          (fn ebind =>
+                              (
+                              print " E";
+                              print (Int.toString (T.ebindToInt ebind))
+                              ))
+                          (freeEvars m);
+                       print "\n"
+                       )
+                       
+                  | _ => ());
+
+                true
+                )
+
+           | _ => false)
 
 
 
