@@ -302,6 +302,12 @@ goal, generating zero or more subgoals.
   Creates a binding of `x = M`.
 
 
+- `squashHidden /[hyp]/`
+
+  Turns a hidden hypothesis of `A` into an unhidden hypothesis of 
+  `{ A }`.  There must be no dependencies on the hypothesis.
+
+
 
 ### Equality tactics
 

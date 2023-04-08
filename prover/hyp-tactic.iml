@@ -45,6 +45,7 @@ signature HYP_TACTIC =
       val unhidePriority : Tactic.priority tacticm
       val unhideRaw : tactic
       val unhide : tactic
+      val squashHidden : symbol list -> tactic
 
    end
 
@@ -587,6 +588,38 @@ structure HypTactic :> HYP_TACTIC =
       val unhideRaw = unhidePriority >> idtac
 
       val unhide = Typecheck.withTypecheckSnd unhidePriority
+
+
+      fun squashHidden hyps =
+         (case hyps of
+             [] =>
+                idtac
+
+           | hyp :: rest =>
+                let
+                   do i = findhyp hyp
+                   do (jud, _) = withgoal
+                in
+                   (case J.hyp jud i of
+                       J.Tmh a =>
+                          refine (Rule.assert 
+                                     (T.apply1 Prim.squash (T.Sub (a, T.Shift (i+1))))
+                                     (T.evar ()))
+                          >>> [
+                              refine (Rule.squashIntro (T.evar ()))
+                              >>
+                              refine (Rule.hypothesis i),
+              
+                              refine (Rule.weaken (i+1) 1)
+                              >>
+                              refine (Rule.exchange 0 1 i)
+                              >>
+                              squashHidden rest
+                              ]
+       
+                     | _ =>
+                          fail "hidden term hypotheses expected")
+                end)
 
    end
 
