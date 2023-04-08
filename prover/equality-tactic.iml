@@ -241,7 +241,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
 
       fun eeqtpSym tac =
-         goalCase
+         goalCaseT
          / \Prim.eeqtp\ ? ? =>
            \(fnc b a =>
                 refine (Rule.assert (T.apply2 Prim.eeqtp a b) (T.evar ()))
@@ -333,7 +333,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
 
       val idtacPri =
-         goalCase
+         goalCaseT
          /| \Prim.ov\ _ _ =>
             \(fnc => idtacM Secondary)\
 
@@ -351,11 +351,11 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          let
             do (jud, dir) = withgoal
          in
-            termCase (J.concl jud)
+            termCaseT (J.concl jud)
             /| \Prim.eq\ @ $ap ? $ap (\Prim.inl\ ?)
                   (| $ap (\Prim.inl\ ?) $nil =>
                      \(fnc b m n =>
-                          termCase b
+                          termCaseT b
                           /| \Prim.sum\ ? ? =>
                              \(fnc b1 b2 =>
                                   refine (Rule.sumIntro1Eq b1 b2 m n)
@@ -375,7 +375,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
              | \Prim.eq\ @ $ap ? $ap (\Prim.inr\ ?)
                   (| $ap (\Prim.inr\ ?) $nil =>
                      \(fnc b m n =>
-                          termCase b
+                          termCaseT b
                           /| \Prim.sum\ ? ? =>
                              \(fnc b1 b2 =>
                                   refine (Rule.sumIntro2Eq b1 b2 m n)
@@ -425,7 +425,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
              | \Prim.eq\ ? (? , ?) (? , ?) =>
                \(fnc b m1 m2 n1 n2 =>
-                    termCase b
+                    termCaseT b
                     /| \Prim.prod\ ? ? =>
                        \(fnc b1 b2 =>
                             refine (Rule.prodIntroEq b1 b2 m1 n1 m2 n2)
@@ -446,7 +446,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
              | \Prim.eq\ ? (fn ? . ?) (fn ? . ?) =>
                \(fnc b binder1 m binder2 n =>
-                    termCase b
+                    termCaseT b
                     /| \Prim.arrow\ ? ? =>
                        \(fnc dom cod =>
                             refine (Rule.arrowIntroEq dom cod m n)
@@ -473,7 +473,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
              | \Prim.eq\ ? (next ?) (next ?) =>
                \(fnc b m n =>
-                    termCase b
+                    termCaseT b
                     /| \Prim.future\ ? =>
                        \(fnc b1 =>
                             refine (Rule.futureIntroEq b1 (T.evar ()) (T.evar ()))
@@ -538,7 +538,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                     in
                        (case (elim1, elim2) of
                            (T.App p, T.App q) =>
-                              termCaseX (N.whnfHard t')
+                              termCase (N.whnfHard t')
                               /| \Prim.arrow\ ? ? =>
                                  \(fnc a b =>
                                       (b, 
@@ -556,7 +556,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                               /
 
                          | (T.Pi1, T.Pi1) =>
-                              termCaseX (N.whnfHard t')
+                              termCase (N.whnfHard t')
                               /| \Prim.prod\ ? ? =>
                                  \(fnc a b =>
                                       (a,
@@ -572,7 +572,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                               /
 
                          | (T.Pi2, T.Pi2) =>
-                              termCaseX (N.whnfHard t')
+                              termCase (N.whnfHard t')
                               /| \Prim.prod\ ? ? =>
                                  \(fnc a b =>
                                       (b,
@@ -603,7 +603,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
             val t = ETerm.withdir dir et
          in
-            termCase (J.concl jud)
+            termCaseT (J.concl jud)
             /| \Prim.eq\ ? ? ? =>
                \(fnc c e1 e2 =>
                     (case (e1, e2) of
@@ -656,7 +656,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                 refine (Rule.weaken 0 2) >> idtacM Primary
 
            | ident :: rest =>
-                goalCase
+                goalCaseT
                 /| \Prim.eq\ (const? @ _) _ _ =>
                    \(fnc const =>
                         (case H.find extensionalityTactics const of
@@ -672,7 +672,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                 /)
 
       fun extensionalityPriority l =
-         goalCase
+         goalCaseT
          /| \Prim.eq\ ? ? ? =>
             \(fnc a m n =>
                  assert2
@@ -698,7 +698,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       val extensionalityOfTactics : priority tacticm H.table = H.table ()
          
       val extensionalityOfPriority =
-         goalCase
+         goalCaseT
          /| \Prim.eq\ (const? @ _) _ _ =>
             \(fnc const =>
                  (case H.find extensionalityOfTactics const of
@@ -1009,7 +1009,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
 
       val setExtOf =
-         goalCase
+         goalCaseT
          / \Prim.eq\ (\Prim.set\ ? (fn ? . ?)) ? ? =>
            \(fnc a binder b m n =>
                 refine (Rule.setIntroEq a b m n)
@@ -1025,7 +1025,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
 
       val quotientExtOf =
-         goalCase
+         goalCaseT
          / \Prim.eq\ ($as (\Prim.quotient\ ? (fn . fn . ?))) ? ? =>
            \(fnc q a b m n =>
                 refine (Rule.quotientIntroEq a b m n)
@@ -1233,7 +1233,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          let
             do i = HypTactic.findhyp hyp
          in
-            goalContextCase
+            goalContextCaseT
             /| $hyp \i\ ($let _) =>
                \(fnc =>
                     let
@@ -1270,7 +1270,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          let
             do (jud, _) = withgoal
          in
-            hypCase (J.hyp jud i)
+            hypCaseT (J.hyp jud i)
             /| $tm \Prim.eq\ ($whnfHard $as const? @ _) ? ? =>
                \(fnc a const m n =>
                     (case H.find injectionTactics const of
@@ -1301,7 +1301,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       (* i : M = N : bool *)
       fun injectionBool i =
-         goalContextCase
+         goalContextCaseT
          / $hyp \i\ $tm \Prim.eq\ @ $ap \Prim.bool\
            (
               $ap \Prim.tru\ $ap \Prim.fals\ $nil =>
@@ -1371,7 +1371,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       (* i : M = N : nat *)
       fun injectionNat i =
-         goalContextCase
+         goalContextCaseT
          / $hyp \i\ $tm \Prim.eq\ @ $ap \Prim.nat\
            (
               $ap \Prim.zero\ $ap \Prim.zero\ $nil =>
@@ -1468,7 +1468,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       (* i : M = N : A % B *)
       fun injectionSum i =
-         goalContextCase
+         goalContextCaseT
          / $hyp \i\ $tm \Prim.eq\ @ $ap (\Prim.sum\ ? ?)
            (
               $ap ($as \Prim.inl\ ?) $ap ($as \Prim.inl\ ?) $nil =>
@@ -1581,7 +1581,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       (* i : M = N : exists A . B *)
       fun injectionExists i =
-         goalContextCase
+         goalContextCaseT
          /| $hyp \i\ $tm \Prim.eq\ (\Prim.exists\ ? (fn . ?)) ($as (? , ?)) ($as (? , ?)) =>
             \(fnc a b m m1 m2 n n1 n2 =>
                  refine (Rule.assert (T.apply3 Prim.eq a m1 n1) (T.evar ()))
@@ -1620,7 +1620,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       (* i : M = N : A & B *)
       fun injectionProd i =
-         goalContextCase
+         goalContextCaseT
          /| $hyp \i\ $tm \Prim.eq\ (\Prim.prod\ ? ?) ($as (? , ?)) ($as (? , ?)) =>
             \(fnc a b m m1 m2 n n1 n2 =>
                  refine (Rule.assert (T.apply3 Prim.eq a m1 n1) (T.evar ()))
@@ -1662,7 +1662,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          let
             do (_, dir) = withgoal
          in
-            goalContextCase
+            goalContextCaseT
             /| $hyp \i\ $tm \Prim.eq\ (\Prim.set\ ? (fn . ?)) ? ? =>
                \(fnc a b m n =>
                     (* |- C *)
@@ -1755,7 +1755,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          let
             do (_, dir) = withgoal
          in
-            goalContextCase
+            goalContextCaseT
             /| $hyp \i\ $tm \Prim.eq\ (\Prim.quotient\ ? (fn . fn . ?)) ? ? =>
                \(fnc a b m n =>
                     (* |- C *)

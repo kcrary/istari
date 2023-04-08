@@ -97,13 +97,13 @@ signature CASE =
 
       (* Raises NoMatch when matching fails. *)
       exception NoMatch
-      val termCaseX : term -> (term, unit, 'a) matcher -> 'a
-      val unitCaseX : (unit, unit, 'a) matcher -> 'a
-      val term2CaseX : term -> term -> (term * term, unit, 'a) matcher -> 'a
-      val term3CaseX : term -> term -> term -> (term * (term * term), unit, 'a) matcher -> 'a
-      val spineCaseX : spine -> (spine, unit, 'a) matcher -> 'a
-      val hypCaseX : hyp -> (hyp, unit, 'a) matcher -> 'a
-      val contextCaseX : context -> (context, unit, 'a) matcher -> 'a
+      val termCase : term -> (term, unit, 'a) matcher -> 'a
+      val unitCase : (unit, unit, 'a) matcher -> 'a
+      val term2Case : term -> term -> (term * term, unit, 'a) matcher -> 'a
+      val term3Case : term -> term -> term -> (term * (term * term), unit, 'a) matcher -> 'a
+      val spineCase : spine -> (spine, unit, 'a) matcher -> 'a
+      val hypCase : hyp -> (hyp, unit, 'a) matcher -> 'a
+      val contextCase : context -> (context, unit, 'a) matcher -> 'a
 
 
 
@@ -111,15 +111,15 @@ signature CASE =
          Will not try other matches when the resulting tactic or subsequent tactics fail.
       *)
 
-      val termCase : term -> (term, unit, 'a tacticm) matcher -> 'a tacticm
-      val unitCase : (unit, unit, 'a tacticm) matcher -> 'a tacticm
-      val term2Case : term -> term -> (term * term, unit, 'a tacticm) matcher -> 'a tacticm
-      val term3Case : term -> term -> term -> (term * term * term, unit, 'a tacticm) matcher -> 'a tacticm
-      val spineCase : spine -> (spine, unit, 'a tacticm) matcher -> 'a tacticm
-      val hypCase : hyp -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
-      val contextCase : context -> (context, unit, 'a tacticm) matcher -> 'a tacticm
-      val goalCase : (term, unit, 'a tacticm) matcher -> 'a tacticm
-      val goalContextCase : (context, unit, 'a tacticm) matcher -> 'a tacticm
+      val termCaseT : term -> (term, unit, 'a tacticm) matcher -> 'a tacticm
+      val unitCaseT : (unit, unit, 'a tacticm) matcher -> 'a tacticm
+      val term2CaseT : term -> term -> (term * term, unit, 'a tacticm) matcher -> 'a tacticm
+      val term3CaseT : term -> term -> term -> (term * term * term, unit, 'a tacticm) matcher -> 'a tacticm
+      val spineCaseT : spine -> (spine, unit, 'a tacticm) matcher -> 'a tacticm
+      val hypCaseT : hyp -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+      val contextCaseT : context -> (context, unit, 'a tacticm) matcher -> 'a tacticm
+      val goalCaseT : (term, unit, 'a tacticm) matcher -> 'a tacticm
+      val goalContextCaseT : (context, unit, 'a tacticm) matcher -> 'a tacticm
 
 
 
@@ -561,15 +561,15 @@ structure Case :> CASE =
          end
 
          
-      fun termCaseX m f = caseX (N.simplify m) f
-      fun term2CaseX m1 m2 f = caseX (N.simplify m1, N.simplify m2) f
-      fun term3CaseX m1 m2 m3 f = caseX (N.simplify m1, (N.simplify m2, N.simplify m3)) f
+      fun termCase m f = caseX (N.simplify m) f
+      fun term2Case m1 m2 f = caseX (N.simplify m1, N.simplify m2) f
+      fun term3Case m1 m2 m3 f = caseX (N.simplify m1, (N.simplify m2, N.simplify m3)) f
 
-      fun unitCaseX f = caseX () f
+      fun unitCase f = caseX () f
 
-      val spineCaseX = caseX
-      val hypCaseX = caseX
-      val contextCaseX = caseX
+      val spineCase = caseX
+      val hypCase = caseX
+      val contextCase = caseX
 
 
       fun caseT err x f goal fk sk =
@@ -578,28 +578,28 @@ structure Case :> CASE =
             (fn (tac, _) => tac goal fk sk)
 
 
-      fun termCase m f goal fk sk =
+      fun termCaseT m f goal fk sk =
          caseT "no match in termCase" (N.simplify m) f goal fk sk
 
-      fun term2Case m1 m2 f goal fk sk =
+      fun term2CaseT m1 m2 f goal fk sk =
          caseT "no match in term2Case" (N.simplify m1, N.simplify m2) f goal fk sk
 
-      fun term3Case m1 m2 m3 f goal fk sk =
+      fun term3CaseT m1 m2 m3 f goal fk sk =
          caseT "no match in term3Case" (N.simplify m1, N.simplify m2, N.simplify m3) f goal fk sk
 
-      fun unitCase f goal fk sk =
+      fun unitCaseT f goal fk sk =
          caseT "no match in unitCase" () f goal fk sk
 
-      fun spineCase m f goal fk sk = caseT "no match in spineCase" m f goal fk sk
-      fun hypCase m f goal fk sk = caseT "no match in hypCase" m f goal fk sk
-      fun contextCase m f goal fk sk = caseT "no match in contextCase" m f goal fk sk
+      fun spineCaseT m f goal fk sk = caseT "no match in spineCase" m f goal fk sk
+      fun hypCaseT m f goal fk sk = caseT "no match in hypCase" m f goal fk sk
+      fun contextCaseT m f goal fk sk = caseT "no match in contextCase" m f goal fk sk
 
 
-      fun goalCase f (goal as (jud, _)) fk sk =
+      fun goalCaseT f (goal as (jud, _)) fk sk =
          caseT "no match in goalCase" (N.simplify (J.concl jud)) f goal fk sk
 
 
-      fun goalContextCase f (goal as (jud, _)) fk sk =
+      fun goalContextCaseT f (goal as (jud, _)) fk sk =
          caseT "no match in goalContextCase" (J.context jud) f goal fk sk
              
 
@@ -642,13 +642,6 @@ structure Case :> CASE =
 structure CasePervasive =
    struct
 
-      val termCaseX = Case.termCaseX
-      val unitCaseX = Case.unitCaseX
-      val term2CaseX = Case.term2CaseX
-      val term3CaseX = Case.term3CaseX
-      val spineCaseX = Case.spineCaseX
-      val hypCaseX = Case.hypCaseX
-      val contextCaseX = Case.contextCaseX
       val termCase = Case.termCase
       val unitCase = Case.unitCase
       val term2Case = Case.term2Case
@@ -656,8 +649,15 @@ structure CasePervasive =
       val spineCase = Case.spineCase
       val hypCase = Case.hypCase
       val contextCase = Case.contextCase
-      val goalCase = Case.goalCase
-      val goalContextCase = Case.goalContextCase
+      val termCaseT = Case.termCaseT
+      val unitCaseT = Case.unitCaseT
+      val term2CaseT = Case.term2CaseT
+      val term3CaseT = Case.term3CaseT
+      val spineCaseT = Case.spineCaseT
+      val hypCaseT = Case.hypCaseT
+      val contextCaseT = Case.contextCaseT
+      val goalCaseT = Case.goalCaseT
+      val goalContextCaseT = Case.goalContextCaseT
       val termCaseB = Case.termCaseB
       val unitCaseB = Case.unitCaseB
       val term2CaseB = Case.term2CaseB
@@ -692,6 +692,8 @@ structure ParseCase =
       fun shortConstant name = Namespace.resolve [Symbol.fromValue name]
       fun longConstant name = Namespace.resolve (map Symbol.fromValue name)
 
+      fun altsing x = alt [x]
+
    end
 
 
@@ -718,6 +720,7 @@ grammardef Case
 
    rule Match(0)      ::= AltMatches => alt
    rule Match(0)      ::= "|" AltMatches => alt
+   rule Match(0)      ::= "|" Match(1) => altsing
    rule AltMatches    ::= Match(1) "|" Match(1) => duo
    rule AltMatches    ::= Match(1) "|" AltMatches => cons
 
@@ -786,13 +789,6 @@ grammardef Case
    reserved "x" "as" "az" "next" "fn" "var" "tm" "tml" "tmh" "tp" "tpl" "ap" : MatchConstant
 
 
-   start termCaseX _ Match
-   start unitCaseX Match
-   start term2CaseX _ _ Match
-   start term3CaseX _ _ _ Match
-   start spineCaseX _ Match
-   start hypCaseX _ Match
-   start contextCaseX _ Match
    start termCase _ Match
    start unitCase Match
    start term2Case _ _ Match
@@ -800,8 +796,15 @@ grammardef Case
    start spineCase _ Match
    start hypCase _ Match
    start contextCase _ Match
-   start goalCase Match
-   start goalContextCase Match
+   start termCaseT _ Match
+   start unitCaseT Match
+   start term2CaseT _ _ Match
+   start term3CaseT _ _ _ Match
+   start spineCaseT _ Match
+   start hypCaseT _ Match
+   start contextCaseT _ Match
+   start goalCaseT Match
+   start goalContextCaseT Match
    start termCaseB _ Match
    start unitCaseB Match
    start term2CaseB _ _ Match

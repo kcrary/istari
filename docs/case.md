@@ -13,7 +13,7 @@ isolate the cases where it is `forall`, `->`, or anything else.  The
 
 Then we write:
 
-    goalCase
+    goalCaseT
     /
       forall ? (fn . ?) =>
       \(fnc dom cod => ... do the forall thing ...)\
@@ -37,7 +37,7 @@ binding.
 The `=>` serves to attach code to that pattern.  The code is
 [antiquoted](iml.html#antiquote) IML code.  The parentheses within the
 antiquote are not necessary but are good style.  (Also, Emacs is
-happier with them.)  The IML code uses the `fnc`
+happier with them present.)  The IML code uses the `fnc`
 [form](iml.html#anonymous-multi-argument-functions) which takes an
 iterated pair as its argument.  The arguments are the bindings
 produced by `?` in the pattern, in the order they appeared.
@@ -46,7 +46,7 @@ The second clause is similar but simpler.  The third clause is simpler
 still, but illustrates the wildcard pattern (`_`), which matches
 anything but does not produce a binding.
 
-Note that `goalCase` and its cousins do not build decision trees; they
+Note that `goalCaseT` and its cousins do not build decision trees; they
 simply try each clause in order.  This is usually fine, but if
 performance is critical one may need to use primitive ML case analysis
 instead of `Case`.
@@ -58,7 +58,7 @@ We can also case analyze the context, instead of the conclusion.
 Suppose we wish to find any hypothesis whose type is `forall` or
 `->`.  Then we write:
 
-    goalContextCase
+    goalContextCaseT
     /
       $anyhyp 
         ($tm 
@@ -96,7 +96,7 @@ compactly, beginning with just `$anyhyp $tm`.
 There are many entry points into the case-analysis mechanism.  A few
 of the most important are:
 
-- `goalCase /[term matcher]/`
+- `goalCaseT /[term matcher]/`
 
   Matches against the current goal's conclusion and returns a tactic,
   which is applied to that goal.  Once it matches the conclusion and
@@ -105,12 +105,12 @@ of the most important are:
 
 - `goalCaseB /[term matcher]/`
 
-  Like `goalCase`, but it will backtrack into other clauses if the
+  Like `goalCaseT`, but it will backtrack into other clauses if the
   tactic fails, or if some subsequent tactic fails.
 
-- `termCase /[term]/ /[term matcher]/`
+- `termCaseT /[term]/ /[term matcher]/`
 
-  Like `goalCase`, but matches on a given term rather than the current
+  Like `goalCaseT`, but matches on a given term rather than the current
   goal's conclusion.
 
 - `termCaseB /[term]/ /[term matcher]/`
@@ -118,14 +118,14 @@ of the most important are:
   Like `goalCaseB`, but matches on a given term rather than the
   current goal's conclusion.
 
-- `termCaseX /[term]/ /[term matcher]/`
+- `termCase /[term]/ /[term matcher]/`
 
-  Like `termCase` but the result can have any type.  If no clauses
-  apply, `termCaseX` raises the `NoMatch` exception.
+  Like `termCaseT` but the result can have any type.  If no clauses
+  apply, `termCase` raises the `NoMatch` exception.
 
-- `goalContextCase /[context matcher]/`
+- `goalContextCaseT /[context matcher]/`
 
-  Like `goalCase`, but matches the current goal's context.
+  Like `goalCaseT`, but matches the current goal's context.
 
 - `goalContextCaseB /[context matcher]/`
 
@@ -408,25 +408,25 @@ written `$lit \(fix (fn x => m))\`.
 The full collection of entry points is:
 
     (* Returns arbitrary type, raises NoMatch when matching fails. *)
-    val termCaseX    : term -> (term, unit, 'a) matcher -> 'a
-    val unitCaseX    : (unit, unit, 'a) matcher -> 'a
-    val term2CaseX   : term -> term -> (term * term, unit, 'a) matcher -> 'a
-    val term3CaseX   : term -> term -> term -> (term * (term * term), unit, 'a) matcher -> 'a
-    val spineCaseX   : spine -> (spine, unit, 'a) matcher -> 'a
-    val hypCaseX     : hyp -> (hyp, unit, 'a) matcher -> 'a
-    val contextCaseX : context -> (context, unit, 'a) matcher -> 'a
+    val termCase         : term -> (term, unit, 'a) matcher -> 'a
+    val unitCase         : (unit, unit, 'a) matcher -> 'a
+    val term2Case        : term -> term -> (term * term, unit, 'a) matcher -> 'a
+    val term3Case        : term -> term -> term -> (term * (term * term), unit, 'a) matcher -> 'a
+    val spineCase        : spine -> (spine, unit, 'a) matcher -> 'a
+    val hypCase          : hyp -> (hyp, unit, 'a) matcher -> 'a
+    val contextCase      : context -> (context, unit, 'a) matcher -> 'a
 
     (* Returns a tactic.  Backtracks when matching fails.  Will not try other
        matches when the resulting tactic or subsequent tactics fail. *)
-    val termCase        : term -> (term, unit, 'a tacticm) matcher -> 'a tacticm
-    val unitCase        : (unit, unit, 'a tacticm) matcher -> 'a tacticm
-    val term2Case       : term -> term -> (term * term, unit, 'a tacticm) matcher -> 'a tacticm
-    val term3Case       : term -> term -> term -> (term * term * term, unit, 'a tacticm) matcher -> 'a tacticm
-    val spineCase       : spine -> (spine, unit, 'a tacticm) matcher -> 'a tacticm
-    val hypCase         : hyp -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
-    val contextCase     : context -> (context, unit, 'a tacticm) matcher -> 'a tacticm
-    val goalCase        : (term, unit, 'a tacticm) matcher -> 'a tacticm
-    val goalContextCase : (context, unit, 'a tacticm) matcher -> 'a tacticm
+    val termCaseT        : term -> (term, unit, 'a tacticm) matcher -> 'a tacticm
+    val unitCaseT        : (unit, unit, 'a tacticm) matcher -> 'a tacticm
+    val term2CaseT       : term -> term -> (term * term, unit, 'a tacticm) matcher -> 'a tacticm
+    val term3CaseT       : term -> term -> term -> (term * term * term, unit, 'a tacticm) matcher -> 'a tacticm
+    val spineCaseT       : spine -> (spine, unit, 'a tacticm) matcher -> 'a tacticm
+    val hypCaseT         : hyp -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+    val contextCaseT     : context -> (context, unit, 'a tacticm) matcher -> 'a tacticm
+    val goalCaseT        : (term, unit, 'a tacticm) matcher -> 'a tacticm
+    val goalContextCaseT : (context, unit, 'a tacticm) matcher -> 'a tacticm
 
     (* Returns a tactic.  Backtracks when matching fails.  Tries other matches 
        when the resulting tactic or a subsequent tactic fails. *)

@@ -601,7 +601,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                 let
                    (* n = |al| *)
                    fun innerloop n al a =
-                      termCaseX a
+                      termCase a
                       /
                        | \Prim.forall\ ? (fn . ?) =>
                          \fnc ai a' =>
@@ -614,7 +614,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                                      buildTableLoop (sz-1) rest table
  
                                 | SOME matcher =>
-                                     Case.spineCaseX spine
+                                     Case.spineCase spine
                                      (Case.alt
                                          [
                                          Case.wrap matcher
@@ -812,7 +812,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       datatype 'a tri = YES of 'a | NO | BAD
 
       fun isTypecheckGoalTri jud =
-         termCaseX (J.concl jud)
+         termCase (J.concl jud)
          /
           | \Prim.ov\ @
                ($ap _ $ap _ $nil => \(fnc => YES Of)\
@@ -867,7 +867,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
 
       fun assumption jud =
-         contextCaseX (J.context jud)
+         contextCase (J.context jud)
          / 
           | $anyhyp ($tm $unify \J.concl jud\ => \fnc => fn i => SOME i\ )
           | _ => \fnc => NONE\
@@ -1024,7 +1024,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                  | _ => raise (Fail "precondition4"))
          in
-            term2CaseX a m
+            term2Case a m
             /
              | (* 1. If A is level and M is an evar, set aside. *)
                \Prim.level\ ; evar? =>
@@ -1068,7 +1068,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                           dest := unboundError history i
    
                      | SOME (J.Tm b) =>
-                          termCaseX b
+                          termCase b
                           /
                            | \Prim.univ\ _ =>
                              \fnc => raise Backtrack\
@@ -1363,7 +1363,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                  | _ => raise (Fail "precondition5"))
          in
-            termCaseX a
+            termCase a
             /
                (* 1. If A is unknown, defer. *)
              | evar? =>
@@ -1412,7 +1412,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                           )
 
                      | SOME (J.Tm b) =>
-                          termCaseX b
+                          termCase b
                           /
                            | \Prim.univ\ ? =>
                              \fnc u =>
@@ -1520,7 +1520,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                  | _ => raise (Fail "precondition6"))
          in
-            term2CaseX a b
+            term2Case a b
             /
                (* 1. If B is Ui... *)
              | _ ; \Prim.univ\ ? =>
@@ -1727,7 +1727,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                  | _ => raise (Fail "precondition7"))
          in
-            term2CaseX a b
+            term2Case a b
             /
                (* 1. Unify A and B. *)
              | _ =!>
@@ -1843,7 +1843,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                  | _ => raise (Fail "precondition8"))
          in
-            term2CaseX a b
+            term2Case a b
             /
                (* 1. Unify A and B. *)
              | _ =!>
@@ -2059,7 +2059,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             val ctx = J.context jud
             val concl = J.concl jud
          in
-            termCaseX concl
+            termCase concl
             /
                \Prim.positive\ (fn . ?) =>
                \fnc a =>
@@ -2096,7 +2096,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       fun showConstraints cons =
          List.appi
             (fns i (_, (jud, dir), _, _) =>
-                termCaseX (J.concl jud)
+                termCase (J.concl jud)
                 /
                  | $as \Prim.lleq\ _ _ =>
                    \fnc a =>
@@ -2185,7 +2185,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                                               let
                                                  val newsz = cursz - oldsz
                                               in
-                                                 termCaseX (T.Sub (a, T.Shift (newsz+1)))
+                                                 termCase (T.Sub (a, T.Shift (newsz+1)))
                                                  /
                                                   | \Prim.lleq\ ($var \i\ ) ? =>
                                                     \fnc m =>
@@ -2500,23 +2500,23 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       (*** Populate the tables ***)
 
       val lambdaOnly =
-         goalCase
+         goalCaseT
          / \Prim.ov\ _ (fn . _) => \fnc => idtac\ /
 
       val pairOnly =
-         goalCase
+         goalCaseT
          / \Prim.ov\ _ (_ , _) => \fnc => idtac\ /
 
       val nextOnly =
-         goalCase
+         goalCaseT
          / \Prim.ov\ _ (next _) => \fnc => idtac\ /
 
       val trivOnly =
-         goalCase
+         goalCaseT
          / \Prim.ov\ _ () => \fnc => idtac\ /
 
       fun only const =
-         goalCase
+         goalCaseT
          / \Prim.ov\ _ (\const\ @ _) => \fnc => idtac\ /
          
 
@@ -2559,7 +2559,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
 
       val eeqtpForm =
-         goalCase
+         goalCaseT
          /
             \Prim.istp\ (\Prim.eeqtp\ ? ?) =>
             \fnc a b =>
@@ -2873,7 +2873,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
 
       val trivializePriority =
-         goalCase
+         goalCaseT
          /| const? @ _ =>
             \(fnc const =>
                  (case H.find trivialIntroTactics const of
