@@ -21,32 +21,29 @@ structure SubtypeTactic :> SUBTYPE_TACTIC =
    struct
 
       structure T = Term
-      structure C = Oldcase
       structure R = Reorder
       structure TC = Typecheck
 
       open Tactic
-
-      val ? = C.?
+      open CasePervasive
 
       fun subsume ea =
          let
             do a = withterm ea
          in
-            C.goalCaseAlt
-               [
-               C.apply3 Prim.eq C.what C.what C.what ?
-               (fn (b, m, n) =>
-                   refine (Rule.subsumptionEq a b m n)),
+            goalCaseT
+            /| \Prim.eq\ ? ? ? =>
+               \(fnc b m n =>
+                    refine (Rule.subsumptionEq a b m n))\
 
-               C.apply2 Prim.ov C.what C.what ?
-               (fn (b, m) =>
-                   refine (Rule.subsumptionOf a b m)),
+             | \Prim.ov\ ? ? =>
+               \(fnc b m =>
+                    refine (Rule.subsumptionOf a b m))\
 
-               C.what ?
-               (fn b =>
-                   refine (Rule.subsumption a b))
-               ]
+             | ? =>
+               \(fnc b =>
+                    refine (Rule.subsumption a b))\
+            /
          end
 
       val esubsume = subsume ETerm.evar
@@ -55,20 +52,19 @@ structure SubtypeTactic :> SUBTYPE_TACTIC =
          let
             do a = withterm ea
          in
-            C.goalCaseAlt
-               [
-               C.apply3 Prim.eq C.what C.what C.what ?
-               (fn (b, m, n) =>
-                   refine (Rule.equivalenceEq a b m n)),
+            goalCaseT
+            /| \Prim.eq\ ? ? ? =>
+               \(fnc b m n =>
+                    refine (Rule.equivalenceEq a b m n))\
 
-               C.apply2 Prim.ov C.what C.what ?
-               (fn (b, m) =>
-                   refine (Rule.equivalenceOf a b m)),
+             | \Prim.ov\ ? ? =>
+               \(fnc b m =>
+                    refine (Rule.equivalenceOf a b m))\
 
-               C.what ?
-               (fn b =>
-                   refine (Rule.equivalence a b))
-               ]
+             | ? =>
+               \(fnc b =>
+                    refine (Rule.equivalence a b))\
+            /
          end
 
       val eeqtp = eqtp ETerm.evar

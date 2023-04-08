@@ -58,7 +58,6 @@ signature INTRO_TACTIC_INTERNAL =
 structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
    struct
 
-      structure C = Oldcase
       structure D = DestructInternal
       structure H = ConstantTable
       structure J = Judgement
@@ -71,7 +70,6 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
 
       type term = Term.term
       type symbol = Symbol.symbol
-      val ? = C.?
       val evar = Term.evar
 
       open Tactic
@@ -428,18 +426,19 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
             do (jud, _) = withgoal
             val ctx = J.context jud
          in
-            C.goalCaseAlt
-               [
-               C.apply2 Prim.ov (C.apply2 Prim.arrow (C.constant Prim.void) C.wild) C.what ?
-               (fn (_, m) => proveLambdaArrow ctx m),
-   
-               C.apply2 Prim.ov (C.apply2 Prim.forall (C.constant Prim.void) (C.lam C.wild)) C.what ?
-               (fn (_, m) => proveLambdaPi ctx m),
-   
-               C.wild ?
-               (fn () =>
-                   fail "not a proveLambda goal")
-               ]
+            goalCaseT
+            /| \Prim.ov\ (\Prim.arrow\ \Prim.void\ _) ? =>
+               \(fnc m =>
+                    proveLambdaArrow ctx m)\
+
+             | \Prim.ov\ (\Prim.forall\ \Prim.void\ _) ? =>
+               \(fnc m => 
+                    proveLambdaPi ctx m)\
+
+             | _ =>
+               \(fnc =>
+                    fail "not a proveLambda goal")\
+            /
          end
 
 
@@ -449,94 +448,90 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
              nil => idtacM Primary
 
            | pat :: rest =>
-                (C.goalCaseAlt
-                    [
-                    C.apply2 Prim.ov 
-                       (C.whnfHard (C.apply2 Prim.intersect C.wild (C.lamb C.wild)))
-                       C.wild ?
-                    (fn (((), (binder, ())), ()) =>
-                        let
-                           val pat' =
-                              (case pat of
-                                  IntroPattern.Ident NONE =>
-                                     IntroPattern.Ident binder
+                goalCaseT
+                /| \Prim.ov\ ? _ =!>
+                   \(fnc a =>
+                        termCaseT (N.whnfHard a)
+                        /| \Prim.intersect\ _ (fn ? . _) =>
+                           \(fnc binder =>
+                                let
+                                   val pat' =
+                                      (case pat of
+                                          IntroPattern.Ident NONE =>
+                                             IntroPattern.Ident binder
+        
+                                        | _ => pat)
+                                in
+                                   refine (Rule.intersectIntroOf (T.evar ()) (T.evar ()) (T.evar ()))
+                                   >>> [
+                                       idtacM Secondary,
+        
+                                       D.destruct0 pat' (introOfPriority rest)
+                                       ]
+                                end)\
 
-                                | _ => pat)
-                        in
-                           refine (Rule.intersectIntroOf (T.evar ()) (T.evar ()) (T.evar ()))
-                           >>> [
-                               idtacM Secondary,
+                           | \Prim.guard\ _ _ =>
+                             \(fnc =>
+                                  refine (Rule.guardIntroOf (T.evar ()) (T.evar ()) (T.evar ()))
+                                  >>> [
+                                      idtacM Secondary,
+          
+                                      D.destruct0 pat (introOfPriority rest)
+                                      ])\
 
-                               D.destruct0 pat' (introOfPriority rest)
-                               ]
-                        end),
+                           | \Prim.forall\ _ (fn ? . _) =>
+                             \(fnc binder =>
+                                  let
+                                     val pat' =
+                                        (case pat of
+                                            IntroPattern.Ident NONE =>
+                                               IntroPattern.Ident binder
+          
+                                          | _ => pat)
+                                  in
+                                     refine (Rule.forallOfExt (T.evar ()) (T.Const Prim.void) (T.evar ()) (T.evar ()) (T.evar ()))
+                                     >>> [
+                                         idtacM Secondary,
+                                         attempt proveLambda >> idtacM Secondary,
+             
+                                         D.destruct0 pat' (introOfPriority rest)
+                                         ]
+                                  end)\
 
-                    C.apply2 Prim.ov
-                       (C.whnfHard (C.apply2 Prim.guard C.wild C.wild))
-                       C.wild ?
-                    (fn _ =>
-                        refine (Rule.guardIntroOf (T.evar ()) (T.evar ()) (T.evar ()))
-                        >>> [
-                            idtacM Secondary,
+                           | \Prim.arrow\ _ _ =>
+                             \(fnc =>
+                                  refine (Rule.arrowOfExt (T.evar ()) (T.Const Prim.void) (T.evar ()) (T.evar ()) (T.evar ()))
+                                  >>> [
+                                      idtacM Secondary,
+                                      attempt proveLambda >> idtacM Secondary,
+          
+                                      D.destruct0 pat (introOfPriority rest)
+                                      ])\
 
-                            D.destruct0 pat (introOfPriority rest)
-                            ]),
+                           | \Prim.foralltp\ (fn ? . _) =>
+                             \(fnc binder =>
+                                  let
+                                     val pat' =
+                                        (case pat of
+                                            IntroPattern.Ident NONE =>
+                                               IntroPattern.Ident binder
+          
+                                          | _ => pat)
+                                  in
+                                     refine (Rule.foralltpIntroOf (T.evar ()) (T.evar ()))
+                                     >>> [
+                                         D.destruct0 pat' (introOfPriority rest)
+                                         ]
+                                  end)\
 
-                    C.apply2 Prim.ov 
-                       (C.whnfHard (C.apply2 Prim.forall C.wild (C.lamb C.wild)))
-                       C.wild ?
-                    (fn (((), (binder, ())), ()) =>
-                        let
-                           val pat' =
-                              (case pat of
-                                  IntroPattern.Ident NONE =>
-                                     IntroPattern.Ident binder
+                           | _ =>
+                             \(fnc => raise Case.Backtrack)\
+                          /)\
 
-                                | _ => pat)
-                        in
-                           refine (Rule.forallOfExt (T.evar ()) (T.Const Prim.void) (T.evar ()) (T.evar ()) (T.evar ()))
-                           >>> [
-                               idtacM Secondary,
-                               attempt proveLambda >> idtacM Secondary,
-   
-                               D.destruct0 pat' (introOfPriority rest)
-                               ]
-                        end),
-
-                    C.apply2 Prim.ov 
-                       (C.whnfHard (C.apply2 Prim.arrow C.wild C.wild))
-                       C.wild ?
-                    (fn (((), ()), ()) =>
-                        refine (Rule.arrowOfExt (T.evar ()) (T.Const Prim.void) (T.evar ()) (T.evar ()) (T.evar ()))
-                        >>> [
-                            idtacM Secondary,
-                            attempt proveLambda >> idtacM Secondary,
-
-                            D.destruct0 pat (introOfPriority rest)
-                            ]),
-
-                    C.apply2 Prim.ov 
-                       (C.whnfHard (C.apply1 Prim.foralltp (C.lamb C.wild)))
-                       C.wild ?
-                    (fn ((binder, ()), ()) =>
-                        let
-                           val pat' =
-                              (case pat of
-                                  IntroPattern.Ident NONE =>
-                                     IntroPattern.Ident binder
-
-                                | _ => pat)
-                        in
-                           refine (Rule.foralltpIntroOf (T.evar ()) (T.evar ()))
-                           >>> [
-                               D.destruct0 pat' (introOfPriority rest)
-                               ]
-                        end),
-
-                    C.wild ?
-                    (fn () =>
-                        fail "not a conclusion for introOf")
-                    ]))
+                 | _ =>
+                   \(fnc =>
+                        fail "not a conclusion for introOf")\
+                /)
 
       fun introOfRaw pats = introOfPriority pats >> idtac
 

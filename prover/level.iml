@@ -110,16 +110,12 @@ signature LEVEL =
 structure Level :> LEVEL =
    struct
 
-      structure C = Oldcase
       structure I = Invert
       structure J = Judgement
       structure T = Term
 
       open Tactic
-
-      val ? = C.?
-      val ?? = C.??
-      val ??! = C.??!
+      open CasePervasive
 
       exception Error of string
       exception Exotic of string
@@ -178,50 +174,51 @@ structure Level :> LEVEL =
       
 
       fun canonize ctx m =
-         C.termCaseXAlt m
-            [
-            C.whatVar ?
-            (fn i => 
-                (
-                checkUvar ctx i;
-                (0, [(0, i)], [])
-                )),
+         termCase m
+         /| var? =>
+            \(fnc i =>
+                 (
+                 checkUvar ctx i;
+                 (0, [(0, i)], [])
+                 ))\
 
-            C.whatEvar ?
-            (fn (e, s) => (0, [], [(0, e, s)])),
+          | evar? =>
+            \(fnc (e, s) =>
+                 (0, [], [(0, e, s)]))\
 
-            C.constant Prim.lzero ?
-            (fn () => (0, [], [])),
+          | \Prim.lzero\ =>
+            \(fnc =>
+                 (0, [], []))\
 
-            C.apply1 Prim.lsucc C.what ?
-            (fn m' =>
-                let
-                   val (a, uvars, evars) = canonize ctx m'
-                in
-                   (a+1,
-                    map (fn (b, x) => (b+1, x)) uvars,
-                    map (fn (c, e, s) => (c+1, e, s)) evars)
-                end),
+          | \Prim.lsucc\ ? =>
+            \(fnc m' =>
+                 let
+                    val (a, uvars, evars) = canonize ctx m'
+                 in
+                    (a+1,
+                     map (fn (b, x) => (b+1, x)) uvars,
+                     map (fn (c, e, s) => (c+1, e, s)) evars)
+                 end)\
 
-            C.apply2 Prim.lmax C.what C.what ?
-            (fn (m1, m2) =>
-                let
-                   val (a1, uvars1, evars1) = canonize ctx m1
-                   val (a2, uvars2, evars2) = canonize ctx m2
-                in
-                   (Int.max a1 a2,
-                    uvars1 @ uvars2,
-                    evars1 @ evars2)
-                end),
+          | \Prim.lmax\ ? ? =>
+            \(fnc m1 m2 =>
+                 let
+                    val (a1, uvars1, evars1) = canonize ctx m1
+                    val (a2, uvars2, evars2) = canonize ctx m2
+                 in
+                    (Int.max a1 a2,
+                     uvars1 @ uvars2,
+                     evars1 @ evars2)
+                 end)\
 
-            C.whatPath C.swild ?
-            (fn (const, _) =>
-                raise (Exotic ("unrecognized level operator: " ^ Namespace.toString const))),
+          | const? @ _ =>
+            \(fnc const =>
+                 raise (Exotic ("unrecognized level operator: " ^ Namespace.toString const)))\
 
-            C.wild ?
-            (fn () => raise (Exotic "unrecognized level operator"))
-            ]
-
+          | _ =>
+            \(fnc =>
+                 raise (Exotic "unrecognized level operator"))\
+         /
 
 
 
@@ -253,53 +250,52 @@ structure Level :> LEVEL =
       fun extractConstraints goals =
          List.foldl
             (fns jud acc =>
-                C.termCaseXAlt (J.concl jud)
-                   [
-                   C.apply2 Prim.lleq C.what C.what ?
-                   (fn (m, n) =>
-                       let
-                          val ctx = J.context jud
-                          val left = canonize ctx m
-                          val right = canonize ctx n
-                       in
-                          (case right of
-                              (b, [], [(a, e, s)]) =>
-                                 if b > a then
-                                    (* Constraint has an evar under max. *)
-                                    raise (Exotic "evar under lmax")
-                                 else
-                                    (* b <= a, so we're looking at max(b, a+E[s]) = a+E[s] *)
-                                    (case I.invert s of
-                                        NONE =>
-                                           (* Not a pattern substitution. *)
-                                           raise (Exotic "non-pattern substitution")
-   
-                                      | SOME p =>
-                                           let
-                                              val (l, luvars, levars) = addExpr left (~a)
-   
-                                              val luvars' = List.mapPartial (substUvar p) luvars
-   
-                                              val levars' =
-                                                 List.map
-                                                    (fn (c, e', s) => (c, e', I.composeSubPsub s p))
-                                                    levars
-                                           in
-                                              ((l, luvars', levars'), e) :: acc
-                                           end)
+                termCase (J.concl jud)
+                /| \Prim.lleq\ ? ? =>
+                   \(fnc m n =>
+                        let
+                           val ctx = J.context jud
+                           val left = canonize ctx m
+                           val right = canonize ctx n
+                        in
+                           (case right of
+                               (b, [], [(a, e, s)]) =>
+                                  if b > a then
+                                     (* Constraint has an evar under max. *)
+                                     raise (Exotic "evar under lmax")
+                                  else
+                                     (* b <= a, so we're looking at max(b, a+E[s]) = a+E[s] *)
+                                     (case I.invert s of
+                                         NONE =>
+                                            (* Not a pattern substitution. *)
+                                            raise (Exotic "non-pattern substitution")
+    
+                                       | SOME p =>
+                                            let
+                                               val (l, luvars, levars) = addExpr left (~a)
+    
+                                               val luvars' = List.mapPartial (substUvar p) luvars
+    
+                                               val levars' =
+                                                  List.map
+                                                     (fn (c, e', s) => (c, e', I.composeSubPsub s p))
+                                                     levars
+                                            in
+                                               ((l, luvars', levars'), e) :: acc
+                                            end)
+ 
+                             | (_, _, []) =>
+                                  (* Set aside contraints that put no upward pressure on evars. *)
+                                  acc
+ 
+                             | _ =>
+                                  (* Constraint has an evar under max. *)
+                                  raise (Exotic "evar under max"))
+                        end)\
 
-                            | (_, _, []) =>
-                                 (* Set aside contraints that put no upward pressure on evars. *)
-                                 acc
-
-                            | _ =>
-                                 (* Constraint has an evar under max. *)
-                                 raise (Exotic "evar under max"))
-                       end),
-
-                   C.wild ?
-                   (fn () => acc)
-                   ])
+                 | _ =>
+                   \(fnc => acc)\
+                /)
             []
             goals
 
@@ -545,42 +541,43 @@ structure Level :> LEVEL =
 
 
       fun proveLevel ctx m =
-         C.termCaseAlt m
-            [
-            C.constant Prim.lzero ?
-            (fn () => refine Rule.lzeroLevel),
+         termCaseT m
+         /| \Prim.lzero\ =>
+            \(fnc =>
+                 refine Rule.lzeroLevel)\
 
-            C.apply1 Prim.lsucc C.what ?
-            (fn m' =>
-                refine (Rule.lsuccLevel m')
-                >> proveLevel ctx m'),
+          | \Prim.lsucc\ ? =>
+            \(fnc m' =>
+                 refine (Rule.lsuccLevel m')
+                 >> proveLevel ctx m')\
 
-            C.whatEvar ?
-            (fn (e, _) =>
-                (* An evar that is still unbound has no upward pressure, set it to 0. *)
-                (
-                Unify.setEbindSub e T.id (T.Const Prim.lzero);  (* can't fail *)
-                refine Rule.lzeroLevel
-                )),
+          | evar? =>
+            \(fnc (e, _) =>
+                 (* An evar that is still unbound has no upward pressure, set it to 0. *)
+                 (
+                 Unify.setEbindSub e T.id (T.Const Prim.lzero);  (* can't fail *)
+                 refine Rule.lzeroLevel
+                 ))\
 
-            C.whatVar ?
-            (fn i => 
-                (
-                checkUvar ctx i;
-                refine (Rule.hypothesisOf i)
-                )),
+          | var? =>
+            \(fnc i =>
+                 (
+                 checkUvar ctx i;
+                 refine (Rule.hypothesisOf i)
+                 ))\
 
-            C.apply2 Prim.lmax C.what C.what ?
-            (fn (m1, m2) =>
-                refine (Rule.lmaxLevel m1 m2)
-                >>> [
-                    proveLevel ctx m1,
-                    proveLevel ctx m2
-                    ]),
+          | \Prim.lmax\ ? ? =>
+            \(fnc m1 m2 =>
+                 refine (Rule.lmaxLevel m1 m2)
+                 >>> [
+                     proveLevel ctx m1,
+                     proveLevel ctx m2
+                     ])\
 
-            C.wild ?
-            (fn () => raise Unprovable)
-            ]
+          | _ =>
+            \(fnc =>
+                 raise Unprovable)\
+         /
             
 
       (* successorLevel M tac
@@ -592,58 +589,58 @@ structure Level :> LEVEL =
          Applies successor under maxes.
       *)
       fun successorLevel ctx m tac =
-         C.termCaseXAlt m
-            [
-            C.apply2 Prim.lmax C.what C.what ?
-            (fn (m1, m2) =>
-                let
-                   val (n1, tac1) =
-                      successorLevel ctx m1 
-                      (refine (Rule.eqRefl (T.Const Prim.level) (T.apply1 Prim.lsucc m1)) 
-                       >> proveLevel ctx (T.apply1 Prim.lsucc m1))
-
-                   val (n2, tac2) =
-                      successorLevel ctx m2
-                      (refine (Rule.eqRefl (T.Const Prim.level) (T.apply1 Prim.lsucc m2)) >> 
-                       proveLevel ctx (T.apply1 Prim.lsucc m2))
-
-                   (* tac proves succ (max M1 M2) = P
-                      tac1 proves N1 = succ M1
-                      tac2 proves N2 = succ M2
-                   *)
-                in
-                   (
-                   T.apply2 Prim.lmax n1 n2,
-
-                   (* max N1 N2 = P *)
-                   refine (Rule.eqTrans 
-                              (T.Const Prim.level)
-                              (T.evar ())
-                              (T.apply1 Prim.lsucc (T.apply2 Prim.lmax m1 m2))
-                              (T.evar ()))
-                   >>> [
-                       (* max N1 N2 = succ (max M1 M2) *)
-                       refine (Rule.lsuccMaxDistTrans (T.evar ()) (T.evar ()) (T.evar ()))
-                       >>
-                       (* max N1 N2 = max (succ M1) (succ M2) *)
-                       refine (Rule.lmaxEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
-                       >>> [
-                           (* N1 = succ M1 *)
-                           tac1,
-
-                           (* N2 = succ M2 *)
-                           tac2
-                           ],
-                       
-                       (* succ (max M1 M2) = P *)
-                       tac
-                       ]
-                   )
-                end),
-
-            C.wild ?
-            (fn () => (T.apply1 Prim.lsucc m, tac))
-            ]
+         termCase m
+         /| \Prim.lmax\ ? ? =>
+            \(fnc m1 m2 =>
+                 let
+                    val (n1, tac1) =
+                       successorLevel ctx m1 
+                       (refine (Rule.eqRefl (T.Const Prim.level) (T.apply1 Prim.lsucc m1)) 
+                        >> proveLevel ctx (T.apply1 Prim.lsucc m1))
+ 
+                    val (n2, tac2) =
+                       successorLevel ctx m2
+                       (refine (Rule.eqRefl (T.Const Prim.level) (T.apply1 Prim.lsucc m2)) >> 
+                        proveLevel ctx (T.apply1 Prim.lsucc m2))
+ 
+                    (* tac proves succ (max M1 M2) = P
+                       tac1 proves N1 = succ M1
+                       tac2 proves N2 = succ M2
+                    *)
+                 in
+                    (
+                    T.apply2 Prim.lmax n1 n2,
+ 
+                    (* max N1 N2 = P *)
+                    refine (Rule.eqTrans 
+                               (T.Const Prim.level)
+                               (T.evar ())
+                               (T.apply1 Prim.lsucc (T.apply2 Prim.lmax m1 m2))
+                               (T.evar ()))
+                    >>> [
+                        (* max N1 N2 = succ (max M1 M2) *)
+                        refine (Rule.lsuccMaxDistTrans (T.evar ()) (T.evar ()) (T.evar ()))
+                        >>
+                        (* max N1 N2 = max (succ M1) (succ M2) *)
+                        refine (Rule.lmaxEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                        >>> [
+                            (* N1 = succ M1 *)
+                            tac1,
+ 
+                            (* N2 = succ M2 *)
+                            tac2
+                            ],
+                        
+                        (* succ (max M1 M2) = P *)
+                        tac
+                        ]
+                    )
+                 end)\
+ 
+          | _ =>
+            \(fnc =>
+                 (T.apply1 Prim.lsucc m, tac))\
+         /
 
 
       (* normalizeLevel M
@@ -654,147 +651,147 @@ structure Level :> LEVEL =
          Pushes successors under maxes.
       *)
       fun normalizeLevel ctx m =
-         C.termCaseXAlt m
-            [
-            C.whatEvar ?
-            (fn (e, _) =>
-                (* An evar that is still unbound has no upward pressure, set it to 0. *)
-                (
-                Unify.setEbindSub e T.id (T.Const Prim.lzero);  (* can't fail *)
+         termCase m
+         /| evar? =>
+            \(fnc (e, _) =>
+                 (* An evar that is still unbound has no upward pressure, set it to 0. *)
+                 (
+                 Unify.setEbindSub e T.id (T.Const Prim.lzero);  (* can't fail *)
+ 
+                 (T.Const Prim.lzero,
+                  refine (Rule.eqRefl (T.Const Prim.level) (T.Const Prim.lzero))
+                  >> refine Rule.lzeroLevel)
+                 ))\
 
-                (T.Const Prim.lzero,
-                 refine (Rule.eqRefl (T.Const Prim.level) (T.Const Prim.lzero))
-                 >> refine Rule.lzeroLevel)
-                )),
-                 
-            C.apply1 Prim.lsucc C.what ?
-            (fn m' =>
-                let
-                   val (n, tac) = normalizeLevel ctx m'
-                   
-                   (* tac proves N = M' *)
+          | \Prim.lsucc\ ? =>
+            \(fnc m' =>
+                 let
+                    val (n, tac) = normalizeLevel ctx m'
+                    
+                    (* tac proves N = M' *)
+ 
+                    val tac' =
+                       (* succ N = succ M' *)
+                       refine (Rule.lsuccEq n m')
+                       >>
+                       (* N = M' *)
+                       tac
+ 
+                    val (n', tac'') =
+                       successorLevel ctx n tac'
+ 
+                    (* tac'' proves N' = succ M' *)
+                 in
+                    (n', tac'')
+                 end)\
 
-                   val tac' =
-                      (* succ N = succ M' *)
-                      refine (Rule.lsuccEq n m')
-                      >>
-                      (* N = M' *)
-                      tac
+          | \Prim.lmax\ ? ? =>
+            \(fnc m1 m2 =>
+                 let
+                    val (n1, tac1) = normalizeLevel ctx m1
+                    val (n2, tac2) = normalizeLevel ctx m2
+                 in
+                    (
+                    T.apply2 Prim.lmax n1 n2,
+ 
+                    (* max N1 N2 = max M1 M2 *)
+                    refine (Rule.lmaxEq n1 m1 n2 m2)
+                    >>> [tac1, tac2]
+                    )
+                 end)\
 
-                   val (n', tac'') =
-                      successorLevel ctx n tac'
+          | _ =>
+            \(fnc =>
+                 (
+                 m, 
+ 
+                 (* M = M : level *)
+                 refine (Rule.eqRefl (T.Const Prim.level) m)
+                 >>
+                 (* M : level *)
+                 proveLevel ctx m
+                 ))\
 
-                   (* tac'' proves N' = succ M' *)
-                in
-                   (n', tac'')
-                end),
-
-            C.apply2 Prim.lmax C.what C.what ?
-            (fn (m1, m2) =>
-                let
-                   val (n1, tac1) = normalizeLevel ctx m1
-                   val (n2, tac2) = normalizeLevel ctx m2
-                in
-                   (
-                   T.apply2 Prim.lmax n1 n2,
-
-                   (* max N1 N2 = max M1 M2 *)
-                   refine (Rule.lmaxEq n1 m1 n2 m2)
-                   >>> [tac1, tac2]
-                   )
-                end),
-
-            C.wild ?
-            (fn () =>
-                (
-                m, 
-
-                (* M = M : level *)
-                refine (Rule.eqRefl (T.Const Prim.level) m)
-                >>
-                (* M : level *)
-                proveLevel ctx m
-                ))
-            ]
+         /
 
 
       fun proveConstraint bounds ctx left right =
-         C.spineCaseXAlt [T.App (Normalize.simplify left), T.App (Normalize.simplify right)]
-            [
-            C.app (C.constant Prim.lzero) C.swild ??
-            (fn _ => 
-                refine (Rule.lleqZero right)
-                >> proveLevel ctx right),
+         term2Case (Normalize.simplify left) (Normalize.simplify right)
+         /| \Prim.lzero\ ; _ =>
+            \(fnc =>
+                 refine (Rule.lleqZero right)
+                 >> proveLevel ctx right)\
 
-            C.app (C.apply2 Prim.lmax C.what C.what) C.swild ??
-            (fn ((m1, m2), ()) =>
-                refine (Rule.lleqMaxL m1 m2 right)
-                >>> [
-                    proveConstraint bounds ctx m1 right,
-                    proveConstraint bounds ctx m2 right
-                    ]),
+          | \Prim.lmax\ ? ? ; _ =>
+            \(fnc m1 m2 =>
+                 refine (Rule.lleqMaxL m1 m2 right)
+                 >>> [
+                     proveConstraint bounds ctx m1 right,
+                     proveConstraint bounds ctx m2 right
+                     ])\
 
-            C.app C.wild (C.app (C.apply2 Prim.lmax C.what C.what) C.swild) ??
-            (fn ((), ((n1, n2), ())) =>
-                (try
-                    refine (Rule.lleqMaxR1 left n1 n2)
-                    >>> [
-                        proveConstraint bounds ctx left n1,
-                        proveLevel ctx n2
-                        ]
-                 with
-                    Unprovable =>
-                       refine (Rule.lleqMaxR2 left n1 n2)
-                       >>> [
-                           proveConstraint bounds ctx left n2,
-                           proveLevel ctx n1
-                           ])),
+          | _ ; \Prim.lmax\ ? ? =>
+            \(fnc n1 n2 =>
+                 (try
+                     refine (Rule.lleqMaxR1 left n1 n2)
+                     >>> [
+                         proveConstraint bounds ctx left n1,
+                         proveLevel ctx n2
+                         ]
+                  with
+                     Unprovable =>
+                        refine (Rule.lleqMaxR2 left n1 n2)
+                        >>> [
+                            proveConstraint bounds ctx left n2,
+                            proveLevel ctx n1
+                            ]))\
 
-            C.app (C.apply1 Prim.lsucc C.what) (C.app (C.apply1 Prim.lsucc C.what) C.swild) ??
-            (fn (m, (n, ())) =>
-                refine (Rule.lleqSucc m n)
-                >> proveConstraint bounds ctx m n),
+          | \Prim.lsucc\ ? ; \Prim.lsucc\ ? =>
+            \(fnc m n =>
+                 refine (Rule.lleqSucc m n)
+                 >> proveConstraint bounds ctx m n)\
 
-            C.swild ??!
-            (fn () =>
-                if Unify.unify1 left right then
-                   refine (Rule.lleqRefl left)
-                   >> proveLevel ctx left
-                else
-                   raise C.Backtrack),
+          | _ =!>
+            \(fnc =>
+                 if Unify.unify1 left right then
+                    refine (Rule.lleqRefl left)
+                    >> proveLevel ctx left
+                 else
+                    raise Case.Backtrack)\
 
-            C.app C.what (C.app (C.apply1 Prim.lsucc C.what) C.swild) ??!
-            (fn (m, (n, ())) =>
-                (try
-                    refine (Rule.lleqIncrease m n)
-                    >> proveConstraint bounds ctx m n
-                 with
-                    Unprovable => raise C.Backtrack)),
+          | ? ; \Prim.lsucc\ ? =!>
+            \(fnc m n =>
+                 (try
+                     refine (Rule.lleqIncrease m n)
+                     >> proveConstraint bounds ctx m n
+                  with
+                     Unprovable => raise Case.Backtrack))\
 
-            C.app C.whatVar C.swild ??
-            (fn (i, ()) =>
-                (case
-                    List.findmap
-                       (fn (middle, tac1) =>
-                           (try
-                               let
-                                  val tac2 = proveConstraint bounds ctx middle right
-                               in
-                                  SOME $
-                                  refine (Rule.lleqTrans left middle right)
-                                  >>> [tac1, tac2]
-                               end
-                            with
-                               Unprovable => NONE))
-                       (bounds i)
-                 of
-                    NONE => raise Unprovable
+          | var? ; _ =>
+            \(fnc i =>
+                 (case
+                     List.findmap
+                        (fn (middle, tac1) =>
+                            (try
+                                let
+                                   val tac2 = proveConstraint bounds ctx middle right
+                                in
+                                   SOME $
+                                   refine (Rule.lleqTrans left middle right)
+                                   >>> [tac1, tac2]
+                                end
+                             with
+                                Unprovable => NONE))
+                        (bounds i)
+                  of
+                     NONE => raise Unprovable
+ 
+                   | SOME tac => tac))\
 
-                  | SOME tac => tac)),
-
-            C.swild ??
-            (fn () => raise Unprovable)
-            ]
+          | _ ; _ =>
+            \(fnc =>
+                 raise Unprovable)\
+         /
       
 
       (* Checks that jud holds.  If so, returns a tactic that proves it.
@@ -804,32 +801,32 @@ structure Level :> LEVEL =
          let
             val ctx = J.context jud
          in
-            C.termCaseXAlt (J.concl jud)
-               [
-               C.apply2 Prim.ov (C.constant Prim.level) C.what ?
-               (fn ((), m) =>
-                   (try
-                       SOME $ proveLevel ctx m
-                    with
-                       Unprovable => NONE)),
-   
-               C.apply2 Prim.lleq C.what C.what ?
-               (fn (left, right) =>
-                   let
-                      val (left', ltac) = normalizeLevel ctx left
-                      val (right', rtac) = normalizeLevel ctx right
-                   in
-                      try
-                         SOME $
-                         refine (Rule.lleqResp left left' right right')
-                         >>> [ltac, rtac, proveConstraint bounds ctx left' right']
-                      with
-                         Unprovable => NONE
-                   end),
-   
-               C.wild ?
-               (fn () => SOME idtac)
-               ]
+            termCase (J.concl jud)
+            /| \Prim.ov\ \Prim.level\ ? =>
+               \(fnc m =>
+                    (try
+                        SOME $ proveLevel ctx m
+                     with
+                        Unprovable => NONE))\
+
+             | \Prim.lleq\ ? ? =>
+               \(fnc left right =>
+                    let
+                       val (left', ltac) = normalizeLevel ctx left
+                       val (right', rtac) = normalizeLevel ctx right
+                    in
+                       try
+                          SOME $
+                          refine (Rule.lleqResp left left' right right')
+                          >>> [ltac, rtac, proveConstraint bounds ctx left' right']
+                       with
+                          Unprovable => NONE
+                    end)\
+
+             | _ =>
+               \(fnc =>
+                    SOME idtac)\
+            /
          end
 
    end

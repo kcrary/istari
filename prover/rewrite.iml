@@ -253,7 +253,6 @@ structure RewriteInternal :> REWRITE_INTERNAL =
    struct
 
       structure B = BackchainInternal
-      structure C = Oldcase
       structure D = Directory
       structure ET = ETerm
       structure H = ConstantTable
@@ -263,8 +262,6 @@ structure RewriteInternal :> REWRITE_INTERNAL =
       structure R = Reduction
       structure T = Term
       structure TC = Typecheck
-
-      val ? = C.?
 
       open RewriteTypes
       open Tactic
@@ -3488,10 +3485,9 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                andalso
                                arityMatch arity spine
                             then
-                               C.termCaseXAlt (R.reduce red m)
-                                  [
-                                  C.path Prim.mu (C.app (C.lamb C.what) C.null) ?
-                                  (fn ((binder, body), ()) =>
+                               termCase (R.reduce red m)
+                               / \Prim.mu\ (fn ? . ?) =>
+                                 \(fnc binder body =>
                                       let
                                          val ftac =
                                             (* M <:> Body[M . id] *)
@@ -3541,11 +3537,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                       in
                                          SOME (T.Sub (body, T.Dot (m, T.id)),
                                                (Prim.eeqtp, SOME ftac, SOME rtac))
-                                      end),
-                
-                                  C.wild ?
-                                  (fn () => raise (Fail "impossible"))
-                                  ]
+                                      end)\
+                               /
                             else
                                NONE
       
@@ -3567,10 +3560,9 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                       andalso
                                       arityMatch arity spine
                                    then
-                                      C.termCaseXAlt (R.reduce red m)
-                                         [
-                                         C.path Prim.rec (C.app (C.lamb C.what) C.null) ?
-                                         (fn ((binder, body), ()) =>
+                                      termCase (R.reduce red m)
+                                      / \Prim.rec\ (fn ? . ?) =>
+                                        \(fnc binder body =>
                                              let
                                                 val ftac =
                                                    (* M = Body[M . id] : type *)
@@ -3595,11 +3587,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                              in
                                                 SOME (T.Sub (body, T.Dot (m, T.id)),
                                                       (Prim.eqtp, SOME ftac, SOME rtac))
-                                             end),
-                       
-                                         C.wild ?
-                                         (fn () => raise (Fail "impossible"))
-                                         ]
+                                             end)\
+                                      /
                                    else
                                       NONE
              
@@ -3618,10 +3607,9 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                       andalso
                                       arityMatch arity spine
                                    then
-                                      C.termCaseXAlt (R.reduce red m)
-                                         [
-                                         C.path Prim.rec (C.app (C.lamb C.what) C.null) ?
-                                         (fn ((binder, body), ()) =>
+                                      termCase (R.reduce red m)
+                                      / \Prim.rec\ (fn ? . ?) =>
+                                        \(fnc binder body =>
                                              let
                                                 val tac =
                                                    (* M = Body[M . id] : U lev *)
@@ -3645,11 +3633,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                              in
                                                 SOME (T.Sub (body, T.Dot (m, T.id)),
                                                       (T.apply1 Prim.univ lev, m, T.app (T.Lam (NONE, body)) m, [], tac))
-                                             end),
-                       
-                                         C.wild ?
-                                         (fn () => raise (Fail "impossible"))
-                                         ]
+                                             end)\
+                                      /
                                    else
                                       NONE
              
@@ -4274,57 +4259,60 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
 
       fun weakenSubtypeArrow tac =
-         C.goalCase
-            (C.apply2 Prim.arrow C.what C.what ?
-             (fn (a, b) =>
-                 refine (Rule.assert (T.apply2 Prim.subtype a b) (T.evar ()))
-                 >>> [
-                     (* A <: B *)
-                     tac,
+         goalCaseT
+         / \Prim.arrow\ ? ? =>
+           \(fnc a b =>
+                refine (Rule.assert (T.apply2 Prim.subtype a b) (T.evar ()))
+                >>> [
+                    (* A <: B *)
+                    tac,
 
-                     (* A <: B |- A[^] -> B[^] *)
-                     refine (Rule.arrowIntro (T.Sub (a, T.shift1)) (T.Sub (b, T.shift1)))
-                     >>> [
-                         (* A <: B |- A[^] : type *)
-                         refine (Rule.subtypeIstp1 (T.Sub (a, T.shift1)) (T.Sub (b, T.shift1)) )
-                         >>
-                         (* A <: B |- A[^] <: B[^] *)
-                         refine (Rule.hypothesis 0) >> done,
+                    (* A <: B |- A[^] -> B[^] *)
+                    refine (Rule.arrowIntro (T.Sub (a, T.shift1)) (T.Sub (b, T.shift1)))
+                    >>> [
+                        (* A <: B |- A[^] : type *)
+                        refine (Rule.subtypeIstp1 (T.Sub (a, T.shift1)) (T.Sub (b, T.shift1)) )
+                        >>
+                        (* A <: B |- A[^] <: B[^] *)
+                        refine (Rule.hypothesis 0) >> done,
 
-                         (* A <: B, A[^] |- B[^2] *)
-                         refine (Rule.subsumption (T.Sub (a, T.Shift 2)) (T.Sub (b, T.Shift 2)))
-                         >>> [
-                             (* A <: B, A[^] |- A[^2] <: B[^2] *)
-                             refine (Rule.hypothesis 1) >> done,
+                        (* A <: B, A[^] |- B[^2] *)
+                        refine (Rule.subsumption (T.Sub (a, T.Shift 2)) (T.Sub (b, T.Shift 2)))
+                        >>> [
+                            (* A <: B, A[^] |- A[^2] <: B[^2] *)
+                            refine (Rule.hypothesis 1) >> done,
 
-                             (* A <: B, A[^] |- A[^2] *)
-                             refine (Rule.hypothesis 0) >> done
-                             ]
-                         ]
-                     ]))
+                            (* A <: B, A[^] |- A[^2] *)
+                            refine (Rule.hypothesis 0) >> done
+                            ]
+                        ]
+                    ])\
+         /   
 
       fun weakenEeqtpSubtype tac =
-         C.goalCase
-            (C.apply2 Prim.subtype C.what C.what ?
-             (fn (a, b) =>
-                 (* A <: B *)
-                 refine (Rule.prodElim1 (T.evar ()) (T.apply2 Prim.subtype b a))
-                 >>
-                 (* A <: B & B <: A *)
-                 refine (Rule.unreduce (T.apply2 Prim.eeqtp a b) Reduction.unfold)
-                 >>
-                 (* A <:> B *)
-                 tac))
+         goalCaseT
+         / \Prim.subtype\ ? ? =>
+           \(fnc a b =>
+                (* A <: B *)
+                refine (Rule.prodElim1 (T.evar ()) (T.apply2 Prim.subtype b a))
+                >>
+                (* A <: B & B <: A *)
+                refine (Rule.unreduce (T.apply2 Prim.eeqtp a b) Reduction.unfold)
+                >>
+                (* A <:> B *)
+                tac)\
+         /
 
       fun weakenEqtpEeqtp tac =
-         C.goalCase
-            (C.apply2 Prim.eeqtp C.what C.what ?
-             (fn (a, b) =>
-                 (* A <:> B *)
-                 refine (Rule.weakenEqtpEeqtp a b)
-                 >>
-                 (* A = B : type *)
-                 tac))
+         goalCaseT
+         / \Prim.eeqtp\ ? ? =>
+           \(fnc a b =>
+                (* A <:> B *)
+                refine (Rule.weakenEqtpEeqtp a b)
+                >>
+                (* A = B : type *)
+                tac)\
+         /
 
       val () = 
          List.app
