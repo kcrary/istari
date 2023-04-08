@@ -866,12 +866,30 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
 
 
+      (* a in whnf *)
+      fun notEvar a =
+         (case a of
+             T.Elim (T.Sub _, _) => false
+           | _ => true)
+
+
       fun assumption jud =
-         contextCase (J.context jud)
-         / 
-          | $anyhyp ($tm $unify \J.concl jud\ => \fnc => fn i => SOME i\ )
-          | _ => \fnc => NONE\
-         /
+         let
+            val c = N.whnf (J.concl jud)
+         in
+            contextCase (J.context jud)
+            /| $anyhyp 
+                 ($tm $whnf ? =!>
+                  \(fnc a =>
+                       if notEvar a andalso Unify.unify1 a c then
+                          (fn i => SOME i)
+                       else
+                          raise Case.Backtrack)\)
+
+             | _ =>
+               \(fnc => NONE)\
+            /
+         end
 
 
       fun processSubgoals oldsz table history goals =
