@@ -7,7 +7,7 @@ The proof works by observing that the collection of all well-founded
 posets looks like a poset itself, using strict embedding as the order.
 That poset of well-founded posets, let's call it **P**, would need to
 reside one level higher in the universe hierarchy, but if the universe
-hierachy is collapsed, **P** is a poset at the same level.  Moreover,
+hierarchy is collapsed, **P** is a poset at the same level.  Moreover,
 (if the universe hierarchy is collapsed) we can show that **P** is
 well-founded.  However, **P** embeds into itself, which is a
 contradiction.
