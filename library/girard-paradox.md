@@ -15,7 +15,9 @@ contradiction.
 
 We express the proposition that *type* is a type in Istari by saying
 that `U (1 + i) <: U i`, for some level `i`.  From that it would
-follow that `U i : U i`.
+follow that `U i : U i`.  However, unlike the direct statement, the
+statement using subtyping is
+[negatable](../type-theory.html#negatability).
 
     girard_paradox : type:girard_paradox
 
