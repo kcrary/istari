@@ -1,0 +1,455 @@
+
+File.import "logic-load.iml";
+File.import "nat-load.iml";
+File.import "datatype-load.iml";
+
+beginModule "GirardParadox";
+
+
+
+defineRaw /relation i A/
+/
+  A -> A -> U i
+/;
+Constant.setOpacity (parseConstant /relation/) Constant.SOFT;
+
+
+
+define /transitive {A} R/
+/
+  forall (x y z : A) .
+    R x y
+    -> R y z
+    -> R x z
+//
+  intersect i . forall (A : U i) . relation i A -> U i
+/;
+
+unfold /transitive/.
+typecheck.
+qed ();
+Constant.setOpacity (parseConstant /transitive/) Constant.SOFT;
+
+
+
+define /well_founded {i A} R/
+/
+  forall (P : A -> U i) .
+    (forall (x : A) . (forall (y : A) . R y x -> P y) -> P x)
+    -> forall (x : A) . P x
+//
+  forall i (A : U i) . relation i A -> U (1 + i)
+/;
+
+unfold /well_founded/.
+typecheck.
+qed ();
+Constant.setOpacity (parseConstant /well_founded/) Constant.SOFT;
+
+
+
+typedef
+/
+  datatype
+    forall (i : level) .
+    U (1 + i)
+  of
+    poset : type =
+    | make :
+        forall (A : U i) (R : relation i A) .
+          transitive R
+          -> `well_founded i A R
+          -> poset
+/;
+
+
+
+define /car {i} S/
+/
+  poset_iter i (fn _ . U i) (fn A _ _ _ . A) S
+//
+  forall i . poset i -> U i
+/;
+
+inference.
+unfold /car/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  car _ (make _ A _ _ _) --> A ;
+  unfolding car
+/;
+
+
+
+define /rel {i} S/
+/
+  poset_iter i (fn S . relation i (`car i S)) (fn _ R _ _ . R) S
+//
+  forall i (S : poset i) . relation i (car S)
+/;
+
+inference.
+unfold /rel/.
+introOf /i S/.
+destruct /S/ /{ A R ht hw }/.
+reduce //.
+auto.
+qed ();
+
+
+
+reductions
+/
+  rel _ (make _ _ R _ _) --> R ;
+  unfolding rel
+/;
+
+
+
+lemma "poset_trans"
+/
+  forall i (S : poset i) . transitive (rel S)
+/;
+
+inference.
+intro /i S/.
+destruct /S/ /{ A R htrans hwf }/.
+reduce //.
+auto.
+qed ();
+
+
+
+lemma "poset_well_founded"
+/
+  forall i (S : poset i) . `well_founded i (car S) (rel S)
+/;
+
+inference.
+intro /i S/.
+destruct /S/ /{ A R htrans hwf }/.
+reduce //.
+auto.
+qed ();
+
+
+
+define /embeds {i} S T/
+/
+  exists (f : car S -> car T) (b : car T) .
+    (forall (x y : car S) . rel S x y -> rel T (f x) (f y))
+    & (forall (x : car S) . rel T (f x) b)
+//
+  forall i . relation (lsucc i) (poset i)
+/;
+
+inference.
+unfold /embeds/.
+typecheck.
+qed ();
+
+
+
+lemma "embeds_trans"
+/
+  forall i . transitive (`embeds i)
+/;
+
+unfold /transitive/.
+inference.
+intro /i S T V Hst Htv/.
+unfold /embeds in Hst in Htv in concl/.
+destruct /Hst/ /f b Hf Hb/.
+destruct /Htv/ /g c Hg Hc/.
+exists /(fn x . g (f x))/.
+exists /c/.
+split.
+  {
+  intro /x y Hxy/.
+  apply /Hg/.
+  apply /Hf/.
+  auto.
+  }
+
+  {
+  intro /x/.
+  apply /Hc/.
+  }
+qed ();
+
+
+
+define /type_colon_type i/
+/
+  U (1 + i) <: U i
+//
+  forall i . U (2 + i)
+/;
+
+inference.
+unfold /type_colon_type/.
+typecheck.
+qed ();
+
+
+
+lemma "embeds_well_founded"
+/
+  forall i . 
+    type_colon_type i
+    -> `well_founded (lsucc i) (poset i) (`embeds i)
+/;
+
+inference.
+unfold /well_founded/.
+intro /i Htt P Hind S/.
+apply /Hind/.
+intro /T HTS/.
+unfold /embeds in HTS/.
+destruct /HTS/ /f x Hf Hx/.
+revert /x T f Hf Hx/.
+applyRaw /poset_well_founded/ >> auto.
+1:{
+  subsume /car S -> U (1 + i)/.
+    {
+    unfold /type_colon_type in Htt/.
+    typecheck1 >> auto.
+    }
+  typecheck.
+  }
+intro /x IH T f Hf Hx/.
+apply /Hind/.
+intro /V HVT/.
+unfold /embeds in HVT/.
+destruct /HVT/ /g y Hg Hy/.
+apply /IH (f y) __ V (fn z . f (g z))/.
+  {
+  apply /Hx/.
+  }
+
+  {
+  intro /a b Hab/.
+  apply /Hf/.
+  apply /Hg/.
+  auto.
+  }
+
+  {
+  intro /z/.
+  apply /Hf/.
+  apply /Hy/.
+  }
+qed ();
+
+
+
+define /poset2 i tt/
+/
+  make i (poset i) (`embeds i) (embeds_trans i) (embeds_well_founded i tt)
+//
+  forall i . type_colon_type i -> poset i
+/;
+
+inference.
+introOf /i tt/.
+unfold /poset2/.
+typecheck1 >> auto.
+  {
+  unfold /type_colon_type in tt/.
+  subsume /U (1 + i)/ >> auto.
+  }
+
+  {
+  unfold /type_colon_type in tt/.
+  typecheck1 >> auto.
+  typecheck1 >> auto.
+  typecheck1 >> auto.
+  }
+qed ();
+
+
+
+define /poset_cap_car i S c/
+/
+  exists (x : car S) . rel S x c
+//
+  forall i (S : poset i) (c : car S) . U i
+/;
+
+inference.
+unfold /poset_cap_car/.
+typecheck.
+qed ();
+Constant.setOpacity (parseConstant /poset_cap_car/) Constant.SOFT;
+
+
+
+define /poset_cap_rel i S c x y/
+/
+  rel S (x #1) (y #1)
+//
+  forall i (S : poset i) (c : car S) . relation i (poset_cap_car i S c)
+/;
+
+inference.
+unfold /poset_cap_rel/.
+typecheck.
+qed ();
+Constant.setOpacity (parseConstant /poset_cap_rel/) Constant.SOFT;
+
+
+
+lemma "poset_cap_trans"
+/
+  forall i (S : poset i) (c : car S) .
+    `transitive (poset_cap_car i S c) (poset_cap_rel i S c)
+/;
+
+inference.
+intro /i S c x y z Hxy Hyz/.
+reduceHard /x y z Hxy Hyz concl/.
+destruct /x/ /x Hx/.
+destruct /y/ /y Hy/.
+destruct /z/ /z Hz/.
+reduce /Hxy Hyz/.
+apply /poset_trans/ >> auto.
+qed ();
+
+
+
+lemma "poset_cap_well_founded"
+/
+  forall i (S : poset i) (c : car S) .
+    `well_founded i (poset_cap_car i S c) (poset_cap_rel i S c)
+/;
+
+inference.
+intro /i S c P Hind x/.
+so /poset_well_founded i S/ /Hwf/.
+unfold /well_founded in Hwf/.
+destruct /x/ /x Hxc/.
+reduceHard /P/.
+so /Hwf (fn y . forall (h : rel S y c) . P (y , h)) __ x/ /H/.
+  {
+  intro /y IH/.
+  intro /Hyc/.
+  apply /Hind/.
+  intro /z Hzy/.
+  destruct /z/ /z Hz/.
+  apply /IH/ >> auto.
+  }
+
+  {
+  apply /H/.
+  }
+qed ();
+
+
+
+define /poset_cap i S c/
+/
+  make i (poset_cap_car i S c) (poset_cap_rel i S c) (poset_cap_trans i S c) (poset_cap_well_founded i S c)
+//
+  forall i (S : poset i) . car S -> poset i
+/;
+
+inference.
+unfold /poset_cap/.
+typecheck.
+unfold /poset_cap_rel/ >> auto.
+qed ();
+
+
+
+lemma "auto_embed"
+/
+  forall i (tt : type_colon_type i) .
+    embeds (poset2 i tt) (poset2 i tt)
+/;
+
+inference.
+intro /i tt/.
+unfold /embeds/.
+unfold /poset2 at all/.
+reduce //.
+exists /fn S . S/.
+exists /poset2 i tt/.
+split >> auto.
+intro /S/.
+unfold /embeds/.
+unfold /poset2 at all/ >> reduce //.
+exists /(fn x . poset_cap i S x)/.
+exists /S/.
+split.
+  {
+  intro /x y Hxy/.
+  unfold /embeds/.
+  unfold /poset_cap at all/.
+  reduce //.
+  exists /(fn z . (z #1 , poset_trans i S _# 3 (z #2) Hxy))/.
+  exists /(x , Hxy)/.
+  split.
+    {
+    reduceHard //.
+    intro /a b Hab/.
+    auto.
+    }
+
+    {
+    reduceHard //.
+    intro /(z Hz)/.
+    reduce //.
+    auto.
+    }
+  }
+
+  {
+  intro /x/.
+  unfold /embeds/.
+  unfold /poset_cap at all/ >> reduce //.
+  exists /(fn z . z #1)/.
+  exists /x/.
+  split.
+    {
+    intro /(a Ha) (b Hb) Hab/.
+    reduceHard /Hab/.
+    auto.
+    }
+    
+    {
+    intro /(z Hz)/.
+    reduce //.
+    auto.
+    }
+  }
+qed ();
+
+
+
+lemma "girard_paradox"
+/
+  forall i . not (U (1 + i) <: U i)
+/;
+
+inference.
+intro /i tt/.
+fold /type_colon_type i in tt/.
+so /auto_embed i tt/ /Hembed/.
+so /embeds_well_founded i tt/ /Hwf/.
+unfold /well_founded in Hwf/.
+setEq /T/ /poset2 i tt/ /poset i/ /Heq/.
+revert /T Heq/.
+apply /Hwf/.
+intro /T IH Heq/.
+subst /T/.
+apply /IH (poset2 i tt)/ >> auto.
+qed ();
+
+
+
+endModule ();

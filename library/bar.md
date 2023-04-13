@@ -1,9 +1,8 @@
 open:Bar
 # `Bar` (partial types)
 
-Inspired by the partial types ("bar types") of Constable and Smith
-(*Partial objects in constructive type theory*, 1987), but weaker,
-because we cannot implement the termination predicate.
+Inspired by the partial types ("bar types") of Constable and Smith [1],
+but weaker, because we cannot implement the termination predicate.
 
 Pause is just the identity, but we insert it in various places to
 break up redices so that accidental ill-typed terms don't result in
@@ -67,10 +66,17 @@ Finally we can define a fixpoint operator on partial objects:
          imp:bfix
 
 
-At this point we'd like to follow the development in Smith (*Partial
-Objects in Type Theory*, 1988) and define a termination predicate.
-Alas, we cannot.  Istari's step-indexed semantics is unable to express
-liveness properties such as termination.  If it could express
-termination, we would be able to draw a contradiction, because the
-type of `bfix` does not have Smith's admissibility requirement.  (See
-Smith (1988), theorem 60.)
+At this point we'd like to follow the development in Smith [2] and
+define a termination predicate.  Alas, we cannot.  Istari's
+step-indexed semantics is unable to express liveness properties such
+as termination.  If it could express termination, we would be able to
+draw a contradiction, because the type of `bfix` does not have Smith's
+admissibility requirement.  (See Smith [2], theorem 60.)
+
+---
+
+[1] Robert L. Constable and Scott Fraser Smith.  Partial Objects in
+Constructive Type Theory.  In *Second IEEE Symposium on Logic on
+Computer Science,* 1987.
+
+[2] Scott Fraser Smith.  *Partial Objects in Type Theory*, 1988.

@@ -360,7 +360,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
          in
             (case Database.findType const of
                 NONE =>
-                   raise (Fail (String.concat ["lemma ", name, " not found in database"]))
+                   signalError (String.concat ["lemma ", name, " not found in database"])
    
               | SOME (j, v) =>
                    let
@@ -368,7 +368,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
                          if Seq.null (J.context j) then
                             ()
                          else
-                            raise (Fail (name ^ " is not a typing lemma"))
+                            signalError (name ^ " is not a typing lemma")
 
                       val (a, const') =
                          termCase (J.concl j)
@@ -376,10 +376,10 @@ structure DefineInternal :> DEFINE_INTERNAL =
                           | \Prim.ov\ 
                                ($as \Prim.ov\ _ (const? @ $nil))
                                \const\ =>
-                            \fnc a x => (a, x)\
+                            \(fnc a x => (a, x))\
 
                           | _ =>
-                            \fnc => raise (Fail (name ^ " is not a typing lemma"))\
+                            \(fnc => signalError (name ^ " is not a typing lemma"))\
                          /
 
                       (* v validates J = |- const : A

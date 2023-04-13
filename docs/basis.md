@@ -10,6 +10,7 @@
 - [`Int`](basis/int.html)
 - [`IntInf`](basis/int-inf.html)
 - [`List`](basis/list.html)
+- [`ListPair`](basis/list-pair.html)
 - [`Option`](basis/option.html)
 - [`String`](basis/string.html)
 - [`TextIO`](basis/text-io.html)
