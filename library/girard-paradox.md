@@ -6,11 +6,11 @@ adaptation of set theory's Burali-Forti paradox into type theory.
 
 The proof works by observing that the collection of all well-founded
 posets looks like a poset itself, using strict embedding as the order.
-That poset of posets would need to reside one level higher in the
-universe hierarchy, but if the universe hierachy is collapsed, it is a
-poset at the same level.  Moreover, (if the universe hierarchy is
-collapsed) we can show that the poset of posets is well-founded.
-However, the poset of posets embeds into itself, which is a
+That poset of well-founded posets, let's call it **P**, would need to
+reside one level higher in the universe hierarchy, but if the universe
+hierachy is collapsed, **P** is a poset at the same level.  Moreover,
+(if the universe hierarchy is collapsed) we can show that **P** is
+well-founded.  However, **P** embeds into itself, which is a
 contradiction.
 
 We express the proposition that *type* is a type in Istari by saying
