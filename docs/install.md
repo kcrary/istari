@@ -9,7 +9,7 @@
 
 1. Obtain the distribution from Github:
 
-        git clone --recursive git@github.com:<your-github-id>/istari.git istari
+        git clone --recursive https://github.com/kcrary/istari.git istari
 
 2. Configure the build script, by copying `Makefile.inc.customize` to
    `Makefile.inc`, then edit `Makefile.inc` to fill in the `INSTALLDIR`
