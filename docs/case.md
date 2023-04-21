@@ -46,10 +46,13 @@ The second clause is similar but simpler.  The third clause is simpler
 still, but illustrates the wildcard pattern (`_`), which matches
 anything but does not produce a binding.
 
-Note that `goalCaseT` and its cousins do not build decision trees; they
-simply try each clause in order.  This is usually fine, but if
+#### Performance note
+
+Note that `goalCaseT` and its cousins do not perform a tail-call
+optimization.  Also, they do not build decision trees; they
+simply try each clause in order.  This is usually acceptable, but if
 performance is critical one may need to use primitive ML case analysis
-instead of `Case`.
+instead of `Case.`
 
 
 ### A context example

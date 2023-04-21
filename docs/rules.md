@@ -960,6 +960,12 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- M = N : (exists (x : A) . B)
 
+- `existsElim1 A B`
+
+      G |- A ext M #1
+      >>
+      G |- exists (x : A) . B ext M
+
 - `existsElim2Of A B M`
 
       G |- M #2 : [M #1 / x]B

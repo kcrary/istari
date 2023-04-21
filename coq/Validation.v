@@ -157,6 +157,7 @@ exact existsIntroEq_valid.
 exact existsIntro_valid.
 exact existsElim1Of_valid.
 exact existsElim1Eq_valid.
+exact existsElim1_valid.
 exact existsElim2Of_valid.
 exact existsElim2Eq_valid.
 exact existsEta_valid.

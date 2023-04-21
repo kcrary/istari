@@ -86,86 +86,161 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                 sk (a, tac)
 
            | T.App (T.Marker _) :: rest =>
-                (case N.whnfHard a of
-                    T.Elim (T.Const const, [T.App dom, T.App cod]) =>
-                       if Constant.eq (const, Prim.forall) then
-                          fk "marker used for dependent argument"
+                termCase (N.whnf a)
+                /| \Prim.arrow\ ? ? =>
+                   \(fnc dom cod =>
+                        soSpine cod rest
+                           (refine (Rule.arrowElim dom cod) >>>
+                            [tac, idtacM Primary])
+                           fk sk)\
 
-                       else if Constant.eq (const, Prim.arrow) then
-                          soSpine cod rest
-                             (refine (Rule.arrowElim dom cod) >>>
-                              [tac, idtacM Primary])
-                             fk sk
+                 | \Prim.tarrow\ ? ? =>
+                   \(fnc dom cod =>
+                        soSpine cod rest
+                           (refine (Rule.tarrowElim dom cod) >>>
+                            [tac, idtacM Primary])
+                           fk sk)\
 
-                      else
-                         fk "type error in marker application"
+                 | \Prim.karrow\ ? ? =>
+                   \(fnc dom cod =>
+                        soSpine cod rest
+                           (refine (Rule.karrowElim dom cod) >>>
+                            [tac, idtacM Primary])
+                           fk sk)\
 
-                  | _ => fk "type error in marker application")
+                 | \Prim.forall\ _ _ =>
+                   \(fnc =>
+                        fk "marker used for dependent argument")\
+
+                 | const? @ ? =>
+                   \(fnc const aspine =>
+                        soSpineRetry "type error in marker application" const aspine spine tac fk sk)\
+
+                 | _ =>
+                   \(fnc =>
+                        fk "type error in marker application")\
+                /
 
            | T.App n :: rest =>
-                (case N.whnf a of
-                    T.Elim (T.Const const, [T.App dom, T.App cod]) =>
-                       if Constant.eq (const, Prim.forall) then
-                          (case N.whnfHard cod of
-                              T.Lam (_, cod') =>
-                                 soSpine
-                                    (T.Sub (cod', T.Dot (n, T.id)))
-                                    rest
-                                    (refine (Rule.forallElim dom cod' n) >>>
-                                     [tac, idtacM Secondary])
-                                    fk sk
+                termCase (N.whnf a)
+                /| \Prim.forall\ ? (fn . ?) =>
+                   \(fnc dom cod =>
+                        soSpine
+                           (T.Sub (cod, T.Dot (n, T.id)))
+                           rest
+                           (refine (Rule.forallElim dom cod n) >>>
+                            [tac, idtacM Secondary])
+                           fk sk)\
 
-                            | _ => fk "type error in application")
+                 | \Prim.arrow\ ? ? =>
+                   \(fnc dom cod =>
+                        soSpine cod rest
+                           (refine (Rule.arrowElim dom cod) >>>
+                               [
+                               tac,
+                               refine (Rule.inhabitant dom n) >> idtacM Secondary
+                               ])
+                           fk sk)\
 
-                       else if Constant.eq (const, Prim.arrow) then
-                          soSpine cod rest
-                             (refine (Rule.arrowElim dom cod) >>>
-                                 [
-                                 tac,
-                                 refine (Rule.inhabitant dom n) >> idtacM Secondary
-                                 ])
-                             fk sk
+                 | \Prim.tarrow\ ? ? =>
+                   \(fnc dom cod =>
+                        soSpine cod rest
+                           (refine (Rule.tarrowElim dom cod) >>>
+                               [
+                               tac,
+                               refine (Rule.inhabitant dom n) >> idtacM Secondary
+                               ])
+                           fk sk)\
+                        
+                 | \Prim.karrow\ ? ? =>
+                   \(fnc dom cod =>
+                        soSpine cod rest
+                           (refine (Rule.karrowElim dom cod) >>>
+                               [
+                               tac,
+                               refine (Rule.inhabitant dom n) >> idtacM Secondary
+                               ])
+                           fk sk)\
 
-                      else
-                         fk "type error in application"
+                 | const? @ ? =>
+                   \(fnc const aspine =>
+                        soSpineRetry "type error in application" const aspine spine tac fk sk)\
 
-                  | _ => fk "type error in application")
+                 | _ =>
+                   \(fnc =>
+                        fk "type error in application")\
+                /
 
            | T.Pi1 :: rest =>
-                (case N.whnfHard a of
-                    T.Elim (T.Const const, [T.App a1, T.App a2]) =>
-                       if Constant.eq (const, Prim.exists) then
-                          fk "projection from exists after marker"
+                termCase (N.whnf a)
+                /| \Prim.exists\ ? (fn . ?) =>
+                   \(fnc a1 a2 =>
+                        soSpine a1 rest
+                           (refine (Rule.existsElim1 a1 a2) >> tac)
+                           fk sk)\
 
-                       else if Constant.eq (const, Prim.prod) then
-                          soSpine a1 rest
-                          (refine (Rule.prodElim1 a1 a2) >> tac)
-                          fk sk
+                 | \Prim.prod\ ? ? =>
+                   \(fnc a1 a2 =>
+                        soSpine a1 rest
+                           (refine (Rule.prodElim1 a1 a2) >> tac)
+                           fk sk)\
 
-                       else
-                          fk "type error in #1"
+                 | const? @ ? =>
+                   \(fnc const aspine =>
+                        soSpineRetry "type error in #1" const aspine spine tac fk sk)\
 
-                  | _ => fk "type error in #1")
+                 | _ =>
+                   \(fnc =>
+                        fk "type error in #1")\
+                /
 
            | T.Pi2 :: rest =>
-                (case N.whnfHard a of
-                    T.Elim (T.Const const, [T.App a1, T.App a2]) =>
-                       if Constant.eq (const, Prim.exists) then
-                          fk "projection from exists after marker"
+                termCase (N.whnf a)
+                /| \Prim.exists\ _ _ =>
+                   \(fnc =>
+                        fk "#2 from exists after marker")\
 
-                       else if Constant.eq (const, Prim.prod) then
-                          soSpine a2 rest
-                          (refine (Rule.prodElim2 a1 a2) >> tac)
-                          fk sk
+                 | \Prim.prod\ ? ? =>
+                   \(fnc a1 a2 =>
+                        soSpine a2 rest
+                           (refine (Rule.prodElim2 a1 a2) >> tac)
+                           fk sk)\
 
-                       else
-                          fk "type error in #2"
+                 | const? @ ? =>
+                   \(fnc const aspine =>
+                        soSpineRetry "type error in #2" const aspine spine tac fk sk)\
 
-                  | _ => fk "type error in #2")
+                 | _ =>
+                   \(fnc =>
+                        fk "type error in #2")\
+                /
 
            | T.Prev :: _ =>
                 (* Cannot typecheck a prev in isolation. *)
                 fk "isolated #prev")
+
+
+      and soSpineRetry msg const aspine spine tac fk sk =
+         (case Constant.opacity const of
+             Constant.OPAQUE =>
+                fk msg
+
+           | _ =>
+                let
+                   val n = Option.valOf (Constant.definition const)
+
+                   val tac' =
+                      (* G |- N @ aspine *)
+                      refine (Rule.unreduce
+                                 (T.Elim (T.Const const, aspine))
+                                 Reduction.unfold)
+                      >>+
+                      (* G |- const @ aspine *)
+                      tac
+                in
+                   soSpine (T.Elim (n, aspine)) spine tac' fk sk
+                end)         
+
                           
 
       (* comment in signature *)

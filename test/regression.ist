@@ -8,6 +8,115 @@ Ctrl.use "../library/integer-load.iml";
 
 
 
+lemma "infer_spine"
+/
+  forall i (a b c : U i) (f : { y : a -> b & c | unit }) (x : a) .
+    f x #1 : b
+/;
+
+inference.
+intro /i a b c f x/.
+assert /f : a -> b & c/ /Hf/.
+  {
+  typecheck.
+  }
+inferSpine /Hf/ /__ x #1/ /H/.
+hyp /H/.
+qed ();
+  
+
+
+lemma "so_pi1_after_marker"
+/
+  forall i (a b : U i) (c : b -> U i) (f : a -> exists (x : b) . c x) .
+    a -> b
+/;
+
+inference.
+intro /i a b c f x/.
+so /f __ #1/ /H/.
+  {
+  auto.
+  }
+hyp /H/.
+qed ();
+
+
+
+define /arrow' A B/
+/
+  A -> B
+//
+  intersect i . U i -> U i -> U i
+/;
+
+unfold /arrow'/.
+typecheck.
+qed ();
+
+
+
+define /prod' A B/
+/
+  A & B
+//
+  intersect i . U i -> U i -> U i
+/;
+
+unfold /prod'/.
+typecheck.
+qed ();
+
+
+
+lemma "destruct_unfolds"
+/
+  forall i (a b : U i) . prod' a b -> a & b
+/;
+
+inference.
+intro /i a b H/.
+destruct /H/ /H1 H2/.
+auto.
+qed ();
+
+
+
+lemma "so_unfolds"
+/
+  forall i (a b c d e : U i) (f : arrow' a (arrow' b (arrow' c (prod' d e)))) .
+    a -> b -> c -> d
+/;
+
+inference.
+intro /i a b c d e f x y z/.
+so /f x __ z #1/ /H1/.
+  {
+  hyp /y/.
+  }
+so /f x __ z #2/ /H2/.
+  {
+  hyp /y/.
+  }
+hyp /H1/.
+qed ();
+
+
+
+lemma "infer_unfolds"
+/
+  forall i (a b : U i) (f : arrow' a b) (x : a) .
+    f x : b
+/;
+
+inference.
+intro /i a b f x/.
+infer /f x/ /H/.
+hyp /H/.
+qed ();
+
+
+
 lemma "squash_hidden"
 /
   forall i (a : U i) (b : a -> U i) (c : U i) (x y : { z : a | b z }) .

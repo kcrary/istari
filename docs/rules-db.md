@@ -947,6 +947,12 @@ Conventions:
       >>
       G |- eq (exists A (fn . B)) M N
 
+- `existsElim1 A B`
+
+      G |- A ext M #1
+      >>
+      G |- exists A (fn . B) ext M
+
 - `existsElim2Of A B M`
 
       G |- of B[M #1 . id] (M #2)

@@ -191,13 +191,20 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
 
                      | SOME (J.Tm a) =>
                           (case a of
-                              T.Elim (T.Const const, _) =>
+                              T.Elim (T.Const const, spine) =>
                                  (case H.find destructTactics const of
                                      SOME tac =>
                                         tac i pat set
    
                                    | NONE =>
-                                        fail "undestructable type")
+                                        (case Constant.opacity const of
+                                            Constant.OPAQUE =>
+                                               fail "undestructable type"
+
+                                          | _ =>
+                                               refine (Rule.reduceHyp i R.unfold)
+                                               >>+
+                                               dest i pat set))
 
                             | _ => fail "undestructable type")
 

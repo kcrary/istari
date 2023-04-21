@@ -296,6 +296,7 @@ Qed.
 Hint Rewrite def_sigma def_prod : prepare.
 
 
+
 Lemma existsForm_valid : existsForm_obligation.
   unfoldtop. autounfold with valid_hint.
   intros G a b triv0 triv1 H1 H2.
@@ -504,6 +505,15 @@ Lemma existsElim1Eq_valid : existsElim1Eq_obligation.
   constructor.
   eapply tr_sigma_elim1; eauto using deq_intro.
   Qed.
+
+
+Lemma existsElim1_valid : existsElim1_obligation.
+Proof.
+prepare.
+intros G a b m Hm.
+eapply tr_sigma_elim1; eauto.
+Qed.
+
 
 Lemma existsElim2Of_valid : existsElim2Of_obligation.
   unfoldtop. autounfold with valid_hint.

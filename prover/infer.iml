@@ -55,6 +55,26 @@ signature INFER =
          -> term * Tactic.tactic
 
 
+      (* inferFrom G M A spine tac prove
+
+         if    tac proves G |- M : A
+         then  calls prove to generate tactics for subgoals, and
+               returns (B, tac')
+               where
+               tac' proves G |- M spine : B
+      
+         or raises InferError/NotPath if no such exists
+
+         Prove takes the judgement to prove, and any additional bindings.
+      *)
+      val inferFrom :
+         Judgement.context
+         -> term -> term -> elim list
+         -> Tactic.tactic
+         -> (Judgement.judgement -> Term.binder list -> Tactic.tactic)
+         -> term * Tactic.tactic
+
+
       (* inferPartial G M prove
 
          calls prove to generate tactics for subgoals, and
@@ -210,7 +230,7 @@ structure Infer :> INFER =
 
 
 
-      (* inferSpine G M A spine tac invis
+      (* inferSpine G M A spine tac invis prove
 
          if    tac proves G |- M : A
          then  calls prove to generate tactics for subgoals, and
@@ -432,9 +452,9 @@ structure Infer :> INFER =
                               cod rest tac' invis prove
                         end)\
 
-                 | _ =>
-                   \(fnc =>
-                        (a, tac, m, spine))\
+                 | ? =>
+                   \(fnc a' =>
+                        inferSpineRetry ctx m a' spine tac invis prove)\
                 /
 
            | T.Pi1 :: rest =>
@@ -465,9 +485,9 @@ structure Infer :> INFER =
                            inferSpine ctx (T.pi1 m) a1 rest tac' invis prove
                         end)\
 
-                 | _ =>
-                   \(fnc =>
-                        (a, tac, m, spine))\
+                 | ? =>
+                   \(fnc a' =>
+                        inferSpineRetry ctx m a' spine tac invis prove)\
                 /
 
            | T.Pi2 :: rest =>
@@ -500,14 +520,54 @@ structure Infer :> INFER =
                               rest tac' invis prove
                         end)\
 
-                 | _ =>
-                   \(fnc =>
-                        (a, tac, m, spine))\
+                 | ? =>
+                   \(fnc a' =>
+                        inferSpineRetry ctx m a' spine tac invis prove)\
                 /
 
            | T.Prev :: rest =>
                 (* Cannot typecheck a prev in isolation. *)
                 (a, tac, m, spine))
+
+
+
+      (* inferSpineRetry G M A spine tac invis prove
+
+         As inferSpine except:
+         - A is not an intersect/guard/foralltp
+         - A does not match the first elim in spine
+         - A in whnf
+
+         Tries to unfold A and proceed.
+      *)
+      and inferSpineRetry ctx m a spine tac invis prove =
+         termCase a
+         /| const? @ ? =>
+            \(fnc const aspine =>
+                 (case Constant.opacity const of
+                     Constant.OPAQUE =>
+                        (a, tac, m, spine)
+
+                   | _ =>
+                        let
+                           val n = Option.valOf (Constant.definition const)
+
+                           val tac' =
+                              (* G |- M : N @ aspine *)
+                              refine (Rule.unreduce
+                                         (T.apply2 Prim.ov a m)
+                                         (R.within [1] R.unfold))
+                              >>+
+                              (* G |- M : A *)
+                              tac
+                        in
+                           inferSpine ctx m (T.Elim (n, aspine)) spine tac' invis prove
+                        end))\
+
+          | _ =>
+            \(fnc =>
+                 (a, tac, m, spine))\
+         /
 
 
 
@@ -732,6 +792,16 @@ structure Infer :> INFER =
             (a, tac)
          end
 
+
+
+      fun inferFrom ctx m a spine tac prove =
+         let
+            val (b, tac', n, remainder) = inferSpine ctx m a spine tac true prove
+
+            val () = detectInferError n b remainder
+         in
+            (b, tac')
+         end
 
 
       fun inferPartial ctx m prove =

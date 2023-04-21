@@ -46,7 +46,7 @@ lexical analysis or whitespace.)  Tokenization is done in a
 simple-minded matter since it does not know anything about the
 grammar.
 
-The main rule is that token are separated by whitespace.  There are
+The main rule is that tokens are separated by whitespace.  There are
 three exceptions:
 
 - A parenthesis is a complete token, even when adjacent to other text.
@@ -101,8 +101,8 @@ is equivalent to:
     fn ((((), x), y), z) => [body]
 
 The `fnc` form is mainly used to interact with Istari's case-analysis
-module `Case`.  Unlike `fn`, neither `fns` nor `fnc` can accept
-multiple clauses.
+module [`Case`](case.html).  Unlike `fn`, neither `fns` nor `fnc` can
+accept multiple clauses.
 
 
 
