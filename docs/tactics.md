@@ -860,6 +860,20 @@ The destruction tactics are:
     As `infer` but does not invoke the typechecker on the path's
     arguments.
 
+  + `inferSpine /[hyp]/ /[term N]/ /[name option]/`
+
+    The hypothesis must have type `M : A` and `N` must have the form
+    `__ [spine]`.  Proves `M spine : B` starting from `M : A`, and
+    creates a new hypothesis of that type with the given name.  (A
+    name is invented if no name is supplied.)  For example, if `h` has
+    type `M : A & B` then `inferSpine /h/ /__ #1/ /h'/` will create a
+    hypothesis `h'` with type `M #1 : A`.
+
+  + `inferSpineRaw /[hyp]/ /[term N]/ /[name option]/`
+
+    As `inferSpine` but does not invoke the typechecker on the spine's
+    arguments.
+
 
 - `typechecker : unit -> unit`
 

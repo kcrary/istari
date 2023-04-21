@@ -927,21 +927,43 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             ([], [])
             goals
                  
-      val progress = ref true
 
-      (* obligations to resolve *)
-      val queue : obligation list ref = ref []
 
-      (* obligations that we deferred; try them again if we make progress *)
-      val deferred : obligation list ref = ref []
+      (* Group all of the typechecker's global state into a record that we can pass around
+         so the typechecker will be re-entrant.
 
-      (* level constraints, solve these last *)
-      val constraints : (table * goal * destination * history) list ref = ref []
+         We don't really want the user's callbacks to be calling the typechecker, but if they
+         do, we should be able to cope with it.  If we don't, the error they user will get are
+         very confusing.
 
-      val noqueue = ref false
+         The alternative of locking out calls to the typechecker while the typechecker is running
+         is not great either, because the typecheck can get wedged if the user happens to interrupt
+         while it's running, which would force the user to restart the prover from scratch.
+      *)
 
-      fun enqueue obs =
-         if !noqueue then
+      datatype state = ST of { progress : bool ref,
+
+                               (* obligations to resolve *)
+                               queue : obligation list ref,
+
+                               (* obligations that we deferred; try them again if we make progress *)
+                               deferred : obligation list ref,
+
+                               (* level constraints, solve these last *)
+                               constraints : (table * goal * destination * history) list ref,
+
+                               noqueue : bool }
+
+      fun newState noq obs =
+         ST { progress = ref false,
+              queue = ref obs,
+              deferred = ref [],
+              constraints = ref [],
+              noqueue = noq }
+
+
+      fun enqueue (ST { noqueue, queue }) obs =
+         if noqueue then
             List.app (fn (_, _, _, dest, _) => dest := idtac) obs
          else
             (
@@ -956,7 +978,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             queue := obs @ !queue
             )
 
-      fun defer (prob, table, goal as (jud, dir), dest, history) =
+      fun defer (ST { deferred }) (prob, table, goal as (jud, dir), dest, history) =
          (* avoid duplicating the history's head *)
          (
          if !trace then
@@ -974,7 +996,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       *)
 
 
-      fun tryRule table history tac (goal as (jud, _)) dest fk =
+      fun tryRule (st as ST { progress }) table history tac (goal as (jud, _)) dest fk =
          let
             val sz = Seq.length (J.context jud)
             do subgoals = execute tac goal fk
@@ -982,7 +1004,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             val (obs, tacs) = processSubgoals sz table history subgoals
          in
             progress := true;
-            enqueue obs;
+            enqueue st obs;
 
             (* We can't reuse tac's results without a cast, and it's
                probably cheaper (and definitely easier) just to run
@@ -992,8 +1014,9 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
          end
 
 
-      (* immediate table history tab key ctx concl dir pretac
+      (* immediate st table history tab key ctx concl dir pretac
 
+         st: the state record
          table: the table
          history: the current history
          tab: the classifier for the portion of the table we need (e.g., tabOv)
@@ -1002,7 +1025,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
          dest: a destination into which to place the proof
          pretac: a tactic to run before the table's tactic (e.g., for symmetry)
       *)
-      fun immediate table history tab key ctx concl dir dest pretac =
+      fun immediate (st as ST { progress }) table history tab key ctx concl dir dest pretac =
          let
             val r = ref []
 
@@ -1025,7 +1048,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
               | SOME tac =>
                    (
                    progress := true;
-                   enqueue (List.rev (!r));
+                   enqueue st (List.rev (!r));
                    dest := (pretac >> tac);
                    true
                    ))
@@ -1036,7 +1059,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Of checking ***)
 
-      fun typecheckOf table (goal as (jud, dir)) dest history =
+      fun typecheckOf (st as ST { progress, constraints }) table (goal as (jud, dir)) dest history =
          let
             val ctx = J.context jud
             val concl = J.concl jud
@@ -1057,7 +1080,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                (* 2. If M is unknown, defer. *)
              | _ ; evar? =>
                \fnc _ =>
-                   defer (Of, table, goal, dest, history)\
+                   defer st (Of, table, goal, dest, history)\
 
                (* 3. If M is marked manual, stop. *)
              | _ ; \Prim.manual\ _ =>
@@ -1078,7 +1101,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                (* 4. Look in the table. *)
              | _ =!>
                \fnc =>
-                   if immediate table history tabOv m ctx concl dir dest idtac then
+                   if immediate st table history tabOv m ctx concl dir dest idtac then
                       ()
                    else
                       raise Backtrack\
@@ -1116,7 +1139,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                \fnc const =>
                    (case H.find ofunivTactics const of
                        SOME tac =>
-                          tryRule table history tac goal dest
+                          tryRule st table history tac goal dest
                           (fn () =>
                               dest :=
                                  error history "ill-formed type expression"
@@ -1134,7 +1157,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                \fnc const =>
                    (case H.find ofkindTactics const of
                        SOME tac =>
-                          tryRule table history tac goal dest
+                          tryRule st table history tac goal dest
                           (fn () =>
                               dest :=
                                  error history "ill-formed kind expression"
@@ -1152,7 +1175,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                \fnc const =>
                    (case H.find introTactics const of
                        SOME tac =>
-                          tryRule table history tac goal dest
+                          tryRule st table history tac goal dest
                           (fn () => raise Backtrack)
 
                      | NONE => 
@@ -1163,7 +1186,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                \fnc const =>
                    (case H.find trivialIntroTactics const of
                        SOME tac =>
-                          tryRule table history (tac >> idtac) goal dest
+                          tryRule st table history (tac >> idtac) goal dest
                           (fn () => raise Backtrack)
 
                      | NONE => 
@@ -1207,7 +1230,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                               ]
                           );
                           
-                      enqueue
+                      enqueue st
                          [(Of, table, goal1, dest1, history),
                           (Of, table, goal2, dest2, history)]
                    end)\
@@ -1258,7 +1281,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                               ]
                           );
  
-                       enqueue
+                       enqueue st
                           [(Of, table, goal1, dest1, history),
                            (Of, table, goal2, dest2, history),
                            (Istp, table, goal3, dest3, history)]
@@ -1307,7 +1330,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                             (* mbtac proves G |- M : B *)
 
-                            val () = enqueue (List.rev (!r))
+                            val () = enqueue st (List.rev (!r))
   
                             val isuniv =
                                (case a of
@@ -1342,7 +1365,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                                in
                                   progress := true;
                                   dest := matac;
-                                  enqueue [(Subtype, table, goal', dest', history)]
+                                  enqueue st [(Subtype, table, goal', dest', history)]
                                end
                          end
                       with
@@ -1351,12 +1374,12 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                        | Infer.Ambiguous =>
                             (* 8b. a strict prefix of M's type is an evar, defer *)
-                            defer (Of, table, goal, dest, history)
+                            defer st (Of, table, goal, dest, history)
 
                        | Infer.NotPath msg =>
                             (* 9. M is not a path.  Reject. *)
                             (
-                            enqueue (List.rev (!r));
+                            enqueue st (List.rev (!r));
                             
                             dest :=
                                error history ("cannot infer type: " ^ msg)
@@ -1375,7 +1398,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Istp checking ***)
 
-      fun typecheckIstp table (goal as (jud, dir)) dest history =
+      fun typecheckIstp (st as ST { progress }) table (goal as (jud, dir)) dest history =
          let
             val ctx = J.context jud
             val concl = J.concl jud
@@ -1391,7 +1414,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                (* 1. If A is unknown, defer. *)
              | evar? =>
                \fnc _ =>
-                   defer (Istp, table, goal, dest, history)\
+                   defer st (Istp, table, goal, dest, history)\
 
                (* 2. If A is marked manual, stop. *)
              | \Prim.manual\ _ =>
@@ -1409,9 +1432,9 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
              | _ =!>
                \fnc =>
                    if 
-                      immediate table history tabIstp a ctx concl dir dest idtac
+                      immediate st table history tabIstp a ctx concl dir dest idtac
                       orelse
-                      immediate table history tabOv a ctx 
+                      immediate st table history tabOv a ctx 
                          (T.apply2 Prim.ov (T.apply1 Prim.univ (T.evar ())) a)
                          dir dest
                          (lift (fn () => refine (Rule.univForgetOf (T.evar ()) (T.evar ()))))
@@ -1477,7 +1500,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                                 val goal' =
                                    (J.make ctx (T.apply1 Prim.istp b), dir)
                              in
-                                enqueue [(Istp, table, goal', newdest (), history)]
+                                enqueue st [(Istp, table, goal', newdest (), history)]
                              end
 
                         | _ =>
@@ -1488,7 +1511,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                    (case H.find istpTactics const of
                        SOME tac =>
-                          tryRule table history tac goal dest
+                          tryRule st table history tac goal dest
                           (fn () =>
                               dest :=
                                  error history "ill-formed type expression"
@@ -1522,7 +1545,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                          play dest'
                          );
 
-                      enqueue [(Of, table, goal', dest', history)]
+                      enqueue st [(Of, table, goal', dest', history)]
                    end\
             /
          end
@@ -1532,7 +1555,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Subtype checking ***)
                       
-      fun typecheckSubtype table (goal as (jud, dir)) dest history =
+      fun typecheckSubtype (st as ST { progress, constraints }) table (goal as (jud, dir)) dest history =
          let
             val ctx = J.context jud
             val concl = J.concl jud
@@ -1633,7 +1656,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                              play dest'
                              );
  
-                          enqueue [(Istp, table, goal', dest', history)]
+                          enqueue st [(Istp, table, goal', dest', history)]
                        end
                     else
                        raise Backtrack)\
@@ -1642,18 +1665,18 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
              | _ =!>
                \fnc =>
                    if 
-                      immediate table history tabSubtype a ctx concl dir dest idtac
+                      immediate st table history tabSubtype a ctx concl dir dest idtac
                       orelse
-                      immediate table history tabEqtp a ctx (T.apply2 Prim.eqtp a b) dir dest 
+                      immediate st table history tabEqtp a ctx (T.apply2 Prim.eqtp a b) dir dest 
                          (lift (fn () => refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))))
                       orelse
-                      immediate table history tabEqtp b ctx (T.apply2 Prim.eqtp b a) dir dest
+                      immediate st table history tabEqtp b ctx (T.apply2 Prim.eqtp b a) dir dest
                          (lift (fn () =>
                                    refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))
                                    >>
                                    refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))))
                       orelse
-                      immediate table history tabEquniv a ctx
+                      immediate st table history tabEquniv a ctx
                          (T.apply3 Prim.eq (T.apply1 Prim.univ (T.evar ())) a b)
                          dir dest
                          (lift (fn () => 
@@ -1661,7 +1684,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                                    >>
                                    refine (Rule.univForgetEq (T.evar ()) (T.evar ()) (T.evar ()))))
                       orelse
-                      immediate table history tabEquniv b ctx
+                      immediate st table history tabEquniv b ctx
                          (T.apply3 Prim.eq (T.apply1 Prim.univ (T.evar ())) b a)
                          dir dest
                          (lift (fn () => 
@@ -1680,7 +1703,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                \fnc const1 const2 =>
                    (case H2.find subtypeTactics (const1, const2) of
                        SOME tac =>
-                          tryRule table history tac goal dest
+                          tryRule st table history tac goal dest
                           (fn () =>
                               dest :=
                                  error history "unexpected subtyping failure"
@@ -1698,7 +1721,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                \(fnc const =>
                     (case H.find subtypeLeftTactics const of
                         SOME tac =>
-                           tryRule table history tac goal dest
+                           tryRule st table history tac goal dest
                            (fn () =>
                                dest :=
                                   error history "unexpected subtyping failure"
@@ -1729,7 +1752,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                          play dest'
                          );
 
-                      enqueue [(Eqtp, table, goal', dest', history)]
+                      enqueue st [(Eqtp, table, goal', dest', history)]
                    end\
             /
          end
@@ -1739,7 +1762,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Eqtype checking ***)
                       
-      fun typecheckEqtp table (goal as (jud, dir)) dest history =
+      fun typecheckEqtp (st as ST { progress }) table (goal as (jud, dir)) dest history =
          let
             val ctx = J.context jud
             val concl = J.concl jud
@@ -1773,7 +1796,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                             play dest'
                             );
 
-                         enqueue [(Istp, table, goal', dest', history)]
+                         enqueue st [(Istp, table, goal', dest', history)]
                       end
                    else
                       raise Backtrack\
@@ -1782,17 +1805,17 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
              | _ =!>
                \fnc =>
                    if
-                      immediate table history tabEqtp a ctx concl dir dest idtac
+                      immediate st table history tabEqtp a ctx concl dir dest idtac
                       orelse
-                      immediate table history tabEqtp b ctx (T.apply2 Prim.eqtp b a) dir dest
+                      immediate st table history tabEqtp b ctx (T.apply2 Prim.eqtp b a) dir dest
                          (lift (fn () => refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))))
                       orelse
-                      immediate table history tabEquniv a ctx
+                      immediate st table history tabEquniv a ctx
                          (T.apply3 Prim.eq (T.apply1 Prim.univ (T.evar ())) a b)
                          dir dest
                          (lift (fn () => refine (Rule.univForgetEq (T.evar ()) (T.evar ()) (T.evar ()))))
                       orelse
-                      immediate table history tabEquniv b ctx
+                      immediate st table history tabEquniv b ctx
                          (T.apply3 Prim.eq (T.apply1 Prim.univ (T.evar ())) b a)
                          dir dest
                          (lift (fn () => 
@@ -1809,7 +1832,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                \fnc const1 const2 =>
                    (case H2.find eqtpTactics (const1, const2) of
                        SOME tac =>
-                          tryRule table history tac goal dest
+                          tryRule st table history tac goal dest
                           (fn () =>
                               dest :=
                                  error history "unexpected type equality failure"
@@ -1844,7 +1867,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                          play dest'
                          );
 
-                      enqueue [(Equniv, table, goal', dest', history)]
+                      enqueue st [(Equniv, table, goal', dest', history)]
                    end\
             /
          end
@@ -1854,7 +1877,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Equniv/Eqkind checking ***)
 
-      fun typecheckEqX tactics tab table (goal as (jud, dir)) dest history =
+      fun typecheckEqX tactics tab (st as ST { progress }) table (goal as (jud, dir)) dest history =
          let
             val ctx = J.context jud
             val concl = J.concl jud
@@ -1889,7 +1912,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                             play dest'
                             );
 
-                         enqueue [(Of, table, goal', dest', history)]
+                         enqueue st [(Of, table, goal', dest', history)]
                       end
                    else
                       raise Backtrack\
@@ -1898,9 +1921,9 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
              | _ =!>
                \fnc =>
                    if
-                      immediate table history tab a ctx concl dir dest idtac
+                      immediate st table history tab a ctx concl dir dest idtac
                       orelse
-                      immediate table history tab b ctx (T.apply3 Prim.eq class b a) dir dest
+                      immediate st table history tab b ctx (T.apply3 Prim.eq class b a) dir dest
                          (lift (fn () => refine (Rule.eqSymm (T.evar ()) (T.evar ()) (T.evar ()))))
                    then
                       ()
@@ -1912,7 +1935,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                \fnc const1 const2 =>
                    (case H2.find tactics (const1, const2) of
                        SOME tac =>
-                          tryRule table history tac goal dest
+                          tryRule st table history tac goal dest
                           (fn () =>
                               dest :=
                                  error history "unexpected type equality failure"
@@ -1973,7 +1996,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                             val goal2 =
                                (J.make (J.context jud) (T.apply2 Prim.ov class b), dir)
                          in
-                            enqueue
+                            enqueue st
                             [(Of, table, goal1, dest1, history),
                              (Of, table, goal2, dest2, history)]
                          end
@@ -1991,7 +2014,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       
                             val dest' = newdest ()
                          in
-                            enqueue (List.rev (!r));
+                            enqueue st (List.rev (!r));
       
                             dest :=
                                (
@@ -2006,7 +2029,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                                    ]
                                );
       
-                            enqueue [(Subtype, table, goal', dest', history)]
+                            enqueue st [(Subtype, table, goal', dest', history)]
                          end
                       with
                          Infer.InferError (c, dopt, msg) =>
@@ -2052,7 +2075,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Reflexivity equality (immediately hands of to Of checking) ***)
 
-      fun typecheckEqrefl table (goal as (jud, dir)) dest history =
+      fun typecheckEqrefl st table (goal as (jud, dir)) dest history =
          let
             val ctx = J.context jud
             val dest' = newdest ()
@@ -2064,7 +2087,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    in
                       dest := (refine (Rule.eqRefl a m) >> play dest');
 
-                      enqueue [(Of, table, goal', dest', history)]
+                      enqueue st [(Of, table, goal', dest', history)]
                    end
 
               | _ =>
@@ -2077,7 +2100,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Positivity checking ***)
 
-      fun typecheckPositive table (goal as (jud, dir)) dest history =
+      fun typecheckPositive (st as ST { progress }) table (goal as (jud, dir)) dest history =
          let
             val ctx = J.context jud
             val concl = J.concl jud
@@ -2088,7 +2111,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                \fnc a =>
                    if
                       (* a is under a binder so unshift it *)
-                      immediate table history tabPositive (T.Sub (a, T.Dot (T.Triv, T.id))) ctx concl dir dest idtac
+                      immediate st table history tabPositive (T.Sub (a, T.Dot (T.Triv, T.id))) ctx concl dir dest idtac
                    then
                       ()
                    else
@@ -2131,9 +2154,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             cons
 
 
-      fun resolveLevels () =
+      fun resolveLevels cons =
          let
-            val cons = !constraints
          in
             if !trace then
                (
@@ -2246,7 +2268,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Main loop ***)
 
-      fun dispatch (prob, table, goal as (jud, dir), dest, history) =
+      fun dispatch (st as ST { constraints }) (prob, table, goal as (jud, dir), dest, history) =
          let
             val history' = goal :: history
          in
@@ -2256,21 +2278,21 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                () ;
 
             (case prob of
-                Of => typecheckOf table goal dest history'
-              | Istp => typecheckIstp table goal dest history'
-              | Subtype => typecheckSubtype table goal dest history'
-              | Eqtp => typecheckEqtp table goal dest history'
-              | Equniv => typecheckEquniv table goal dest history'
-              | Eqkind => typecheckEqkind table goal dest history'
-              | Eqrefl => typecheckEqrefl table goal dest history'
-              | Positive => typecheckPositive table goal dest history'
+                Of => typecheckOf st table goal dest history'
+              | Istp => typecheckIstp st table goal dest history'
+              | Subtype => typecheckSubtype st table goal dest history'
+              | Eqtp => typecheckEqtp st table goal dest history'
+              | Equniv => typecheckEquniv st table goal dest history'
+              | Eqkind => typecheckEqkind st table goal dest history'
+              | Eqrefl => typecheckEqrefl st table goal dest history'
+              | Positive => typecheckPositive st table goal dest history'
 
               | Lleq =>
                    constraints := (table, goal, dest, history) :: !constraints)
          end
 
 
-      fun typecheckLoop () =
+      fun typecheckLoop (st as ST { progress, queue, deferred }) =
          (case !queue of
              [] =>
                 if !progress andalso not (List.null (!deferred)) then
@@ -2278,7 +2300,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    progress := false;
                    queue := List.rev (!deferred);
                    deferred := [];
-                   typecheckLoop ()
+                   typecheckLoop st
                    )
                 else
                    !deferred
@@ -2286,11 +2308,12 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
            | ob :: rest =>
                 (
                 queue := rest;
-                dispatch ob;
-                typecheckLoop ()
+                dispatch st ob;
+                typecheckLoop st
                 ))
 
 
+(* XX delete
       exception ReenteredTypechecker
       val inChecker = ref false
 
@@ -2321,26 +2344,25 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    Sum.INL y => y
                  | Sum.INR exn => raise exn)
             end
-         
+*)
+
 
       (* noq: don't enqueue subgoals or run level solver *)
       fun masterTypecheck noq obs =
-         bracket
-            (fn () =>
-                (
-                noqueue := noq;
-                queue := obs;
-                typecheckLoop ();
-                
-                if noq then
-                   List.app
-                      (fn (_, _, dest, _) => dest := idtac)
-                      (!constraints)
-                else
-                   resolveLevels ();
+         let
+            val st as ST { constraints, deferred } = newState noq obs
+         in
+            typecheckLoop st;
 
-                !deferred
-                ))
+            if noq then
+               List.app
+                  (fn (_, _, dest, _) => dest := idtac)
+                  (!constraints)
+            else
+               resolveLevels (!constraints);
+
+            !deferred
+         end
 
 
 
