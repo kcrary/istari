@@ -27,7 +27,6 @@ Require Import SumLemmas.
 Require Import NatLemmas.
 
 
-
 Hint Rewrite def_nat def_zero def_succ def_natcase : prepare.
 
 
@@ -152,6 +151,56 @@ exploit (tr_unittp_eta_hyp G [] triv triv (subst sh1 (eqtype a b))) as H.
 cbn [length List.app under] in H.
 simpsubin H.
 exact H.
+Qed.
+
+
+Lemma natUnroll_valid : natUnroll_obligation.
+Proof.
+prepare.
+intro G.
+rewrite -> def_sum.
+rewrite -> def_eeqtp.
+unfold Defs.unit.
+apply tr_prod_intro.
+  {
+  unfold nattp.
+  apply tr_mu_unroll.
+    {
+    apply tr_sumtype_formation.
+      {
+      apply tr_unittp_istype.
+      }
+    
+      {
+      apply tr_hyp_tp.
+      apply index_0.
+      }
+    }
+
+    {
+    apply tr_positive_nattp_body.
+    }
+  }
+
+  {
+  unfold nattp.
+  apply (tr_mu_roll _ (sumtype unittp (var 0))).
+    {
+    apply tr_sumtype_formation.
+      {
+      apply tr_unittp_istype.
+      }
+    
+      {
+      apply tr_hyp_tp.
+      apply index_0.
+      }
+    }
+
+    {
+    apply tr_positive_nattp_body.
+    }
+  }
 Qed.
 
 

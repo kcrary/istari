@@ -285,6 +285,7 @@ exact natFormUniv_valid.
 exact natEqUniv_valid.
 exact natElimEq_valid.
 exact natElimEqtype_valid.
+exact natUnroll_valid.
 exact zeroType_valid.
 exact succType_valid.
 exact univKind_valid.

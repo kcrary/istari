@@ -1,0 +1,206 @@
+
+signature REDEX =
+   sig
+
+      type term
+      type constant
+      type elim
+      type reduction
+
+
+      (* redex const
+
+         if    const has a reduction registered
+         then  returns SOME (i, binary, f)
+               where the (first) active argument of const is the ith
+               and for all spine1, m, spine2
+                   where |spine1| = i
+                         m is in simple form
+                   if    const spine1 m spine2 reduces
+                   then  f spine1 m spine2  returns  SOME (n, r)
+                         where  r : const spine1 m spine2 --> n
+                   else  f spine1 m spine2  returns  NONE
+         else  returns NONE
+
+         binary  iff  the const takes two active arguments
+         (the second always immediately follows the first)
+
+         if binary then i = 1
+      *)
+      val redex : constant 
+                  -> (int * bool
+                      * (elim list
+                         -> term
+                         -> elim list
+                         -> (term * reduction) option)) option
+
+   end
+
+
+signature REDEX_INTERNAL =
+   sig
+
+      include REDEX
+
+
+      type ureduction2
+
+      (* You probably don't want this.  You probably want Define.register instead. *)
+      val register : ureduction2 -> unit
+
+      val registered : constant -> bool
+
+   end
+
+
+functor RedexFun (structure Term : TERM
+                  structure Constant : CONSTANT
+                                       where type constant = Term.constant
+                                       where type term = Term.term
+                  structure Native : NATIVE
+                                     where type constant = Term.constant
+                                     where type term = Term.term
+                                     where type native = Term.native
+                  structure Reduction : REDUCTION_INTERNAL
+                                        where type constant = Term.constant
+                                        where type term = Term.term
+                                        where type elim = Term.elim
+                  structure Prim : PRIM
+                                   where type constant = Term.constant
+                  structure PrimReduction : PRIM_REDUCTION_INTERNAL
+                                            where type reduction = Reduction.reduction
+                                            where type ureduction2 = Reduction.ureduction2)
+   :>
+   REDEX_INTERNAL
+   where type term = Term.term
+   where type constant = Term.constant
+   where type elim = Term.elim
+   where type reduction = Reduction.reduction
+   where type ureduction2 = Reduction.ureduction2
+   =
+   struct
+
+      structure R = Reduction
+
+      open Term
+
+      type reduction = Reduction.reduction
+      type ureduction2 = Reduction.ureduction2
+
+      structure D = RedBlackDict (structure Key = Constant.Ordered)
+      structure H = CheckpointedHashTable (structure Key = Constant.Hashable)
+
+
+      (* We use two tables: the redex table and the user table.
+
+         The redex table directly implements redex (as above).
+       
+         For user redices, we can have multiple reductions for a single constant.
+         The user table tracks all of those.  It returns a reference to a dictionary, 
+         and that reference is used in the reduction function we put into the redex 
+         table.
+
+         If triggers red = (const1, i, const2), then:
+         - the redex table maps const1 to (i, reduceUser i d), where !d maps const2 to red
+         - the user table maps const1 to (i, d)
+      *)
+
+      val redexTable : (int * bool * (elim list -> term -> elim list -> (term * reduction) option)) H.table = H.table ()
+
+      val userTable : (int * Reduction.ureduction2 D.dict ref) H.table = H.table ()
+
+
+
+      fun redex const = H.find redexTable const
+
+
+
+      fun reduceUser d spine1 m spine3 =
+         (case m of
+             Elim (Const const', spine2) =>
+                (case D.find (!d) const' of
+                    NONE => NONE
+
+                  | SOME ured =>
+                       Option.map
+                          (fn n => (n, R.user2 ured))
+                          (try
+                              SOME (Reduction.ureduce2 ured spine1 spine2 spine3)
+                           with
+                              Reduction.Reduce => NONE))
+
+           | _ => NONE)
+
+
+      fun register ured =
+         let
+            val (const, i, const') = Reduction.triggers ured
+
+            val ((i', d), old) =
+               H.lookupOrInsert' 
+                  userTable
+                  const
+                  (fn () => (i, ref (D.singleton const' ured)))
+         in
+            if i <> i' then
+               raise (Fail "incompatible arities in registered reductions")
+            else if old then
+               d := D.insert (!d) const' ured
+            else
+               H.insert redexTable const (i, false, reduceUser d)
+         end
+
+      fun registered const = H.member redexTable const
+
+
+      
+      (* Register constants with primitive reductions. *)
+      val () = List.app register PrimReduction.redices
+
+
+
+      (* We have to hardcode letnext, rather than using the ureduction
+         mechanism, because its active argument expects an intro form
+         (Next) rather than a constant.
+      *)
+
+      fun reduceLetnext spine1 m spine2 =
+         (case (spine1, m, spine2) of
+             ([], Next arg, App body :: rest) =>
+                SOME (Elim (body, App arg :: rest), PrimReduction.letnext_next)
+
+           | _ =>
+                NONE)
+
+      val () = H.insert redexTable Prim.letnext (0, false, reduceLetnext)
+
+
+      
+      (* Native reductions *)
+
+      fun reduceNative1 f spine1 m spine2 =
+         (case (spine1, m) of
+             ([], Native x) =>
+                SOME (Elim (f x, spine2), R.native)
+
+           | _ =>
+                NONE)
+
+      fun reduceNative2 f spine1 m spine2 =
+         (case (spine1, m, spine2) of
+             ([], Native x, App (Native y) :: rest) =>
+                SOME (Elim (f x y, rest), R.native)
+
+           | _ => 
+                NONE)
+             
+      val () =
+         List.app
+            (fn (const, Native.Unary f) =>
+                   H.insert redexTable const (0, false, reduceNative1 f)
+
+              | (const, Native.Binary f) =>
+                   H.insert redexTable const (0, true, reduceNative2 f))
+            Native.operators
+
+   end

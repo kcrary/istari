@@ -1843,6 +1843,10 @@ Conventions:
       G |- eqtp A B
       G, nat |- eqtp C D
 
+- `natUnroll`
+
+      G |- eeqtp nat (sum unit nat) ext (() , ())
+
 - `zeroType`
 
       G |- of nat zero

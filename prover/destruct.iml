@@ -630,28 +630,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                              refine (Rule.weaken 0 1)
                              >>
                              (* |- nat <:> unit % nat *)
-                             refine (Rule.reduce
-                                        (R.trans
-                                            [
-                                            R.within [1] R.unfold,
-                                            R.within [2, 2] R.unfold
-                                            ]))
-                             >>
-                             (* mu . unit % 0 <:> unit % (mu . unit % 0) *)
-                             refine (Rule.muUnroll (T.evar ()))
-                             >>> [
-                                 (* Type |- unit % 0 : Type *)
-                                 refine (Rule.sumForm (T.evar ()) (T.evar ()))
-                                 >>> [
-                                     (* Type |- unit : Type *)
-                                     refine Rule.unitForm >> done,
-  
-                                     (* Type |- 0 : Type *)
-                                     refine (Rule.hypothesisOfTp 0) >> done
-                                     ],
-                                 
-                                 refine Rule.checkPositive >> done
-                                 ],
+                             refine Rule.natUnroll >> done,
   
                              (* unit % nat, G |- C *)
                              refine (Rule.sumLeft i (T.evar ()) (T.evar ()) (T.evar ()))
@@ -662,7 +641,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                                  (* G[inl () . id] |- C[under_i (inl () . id)] *)
                                  refold jud i 0 
                                     (T.Const Prim.zero)
-                                    R.unfold
+                                    (R.user1 PrimReduction.unroll_zero)
                                  >>
                                  (* G[zero . id] |- C[under_i (zero . id)] *)
                                  idtacM (S.empty, Principal set),
@@ -670,7 +649,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                                  (* nat, G[inr 0 . ^] |- C[under_i (inr 0 . ^)] *)
                                  refold jud i 1
                                     (T.apply1 Prim.succ T.zero)
-                                    (R.trans [R.unfold, R.beta 1])
+                                    (R.user1 PrimReduction.unroll_succ)
                                  >>
                                  (* nat, G[succ 0 . ^] |- C[under_i (succ 0 . ^)] *)
                                  dest i p set

@@ -49,14 +49,22 @@ signature PRIVILEGED =
 
       structure PrimReduction :
          PRIM_REDUCTION_INTERNAL
+         where type reduction = Reduction.reduction
          where type ureduction1 = Reduction.ureduction1
          where type ureduction2 = Reduction.ureduction2
 
-      structure Normalize : 
-         NORMALIZE_INTERNAL
+      structure Redex :
+         REDEX_INTERNAL
          where type term = Term.term
          where type constant = Term.constant
+         where type elim = Term.elim
+         where type reduction = Reduction.reduction
          where type ureduction2 = Reduction.ureduction2
+
+      structure Normalize : 
+         NORMALIZE
+         where type term = Term.term
+         where type constant = Term.constant
 
       structure Invert :
          INVERT
@@ -133,18 +141,25 @@ structure Privileged :> PRIVILEGED =
       structure PrimReduction =
          PrimReductionFun
          (structure Term = Term
+          structure Constant = Constant
           structure Prim = Prim
           structure Reduction = Reduction)
 
+      structure Redex =
+         RedexFun
+         (structure Term = Term
+          structure Constant = Constant
+          structure Native = Native
+          structure Reduction = Reduction
+          structure Prim = Prim
+          structure PrimReduction = PrimReduction)
+          
       structure Normalize =
          NormalizeFun
          (structure Term = Term
           structure Constant = Constant
           structure Simplify = Simplify
-          structure Native = Native
-          structure Reduction = Reduction
-          structure Prim = Prim
-          structure PrimReduction = PrimReduction)
+          structure Redex = Redex)
 
       structure Invert =
          InvertFun
@@ -172,7 +187,8 @@ structure PrimInternal = Privileged.Prim
 structure Native = Privileged.Native
 structure ReductionInternal = Privileged.Reduction
 structure PrimReductionInternal = Privileged.PrimReduction
-structure NormalizeInternal = Privileged.Normalize
+structure RedexInternal = Privileged.Redex
+structure Normalize = Privileged.Normalize
 structure Invert = Privileged.Invert
 structure Unify = Privileged.Unify
 
@@ -201,16 +217,18 @@ structure Reduction :>
 
 structure PrimReduction :>
    PRIM_REDUCTION
+   where type reduction = ReductionInternal.reduction
    where type ureduction1 = ReductionInternal.ureduction1
    where type ureduction2 = ReductionInternal.ureduction2
    = PrimReductionInternal
 
-structure Normalize :>
-   NORMALIZE
+structure Redex :>
+   REDEX
    where type term = Term.term
    where type constant = Term.constant
-   = NormalizeInternal
-
+   where type elim = Term.elim
+   where type reduction = Reduction.reduction
+   = RedexInternal
 
 structure ConstantTable =
    CheckpointedHashTable 

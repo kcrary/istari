@@ -1856,6 +1856,10 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- A = B : type
       G, x : nat |- C = D : type
 
+- `natUnroll`
+
+      G |- eeqtp nat (unit % nat) ext (() , ())
+
 - `zeroType`
 
       G |- zero : nat

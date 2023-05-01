@@ -2,6 +2,7 @@
 signature PRIM_REDUCTION =
    sig
 
+      type reduction
       type ureduction1
       type ureduction2
 
@@ -11,11 +12,17 @@ signature PRIM_REDUCTION =
 
       val ite_tru : ureduction2
       val ite_fals : ureduction2
+
       val sum_case_inl : ureduction2
       val sum_case_inr : ureduction2
+
       val nat_case_zero : ureduction2
       val nat_case_succ : ureduction2
+      val unroll_zero : ureduction1
+      val unroll_succ : ureduction1
       
+      val letnext_next : reduction
+
    end
 
 
@@ -31,6 +38,8 @@ signature PRIM_REDUCTION_INTERNAL =
 
 
 functor PrimReductionFun (structure Term : TERM
+                          structure Constant : CONSTANT
+                                               where type constant = Term.constant
                           structure Prim : PRIM
                                            where type constant = Term.constant
                           structure Reduction : REDUCTION_PRIV
@@ -39,6 +48,7 @@ functor PrimReductionFun (structure Term : TERM
                                                 where type elim = Term.elim)
    :> 
    PRIM_REDUCTION_INTERNAL
+   where type reduction = Reduction.reduction
    where type ureduction1 = Reduction.ureduction1
    where type ureduction2 = Reduction.ureduction2
    =
@@ -49,6 +59,7 @@ functor PrimReductionFun (structure Term : TERM
 
       open Prim
 
+      type reduction = Reduction.reduction
       type ureduction1 = Reduction.ureduction1
       type ureduction2 = Reduction.ureduction2
 
@@ -128,7 +139,16 @@ functor PrimReductionFun (structure Term : TERM
                 ])
             R.refl
 
+      val unroll_zero =
+         R.new1 zero 0 (T.apply1 inl T.Triv) R.unfold R.refl
+
+      val unroll_succ =
+         R.new1 succ 1 (T.apply1 inr T.zero) (R.trans [R.unfold, R.beta 1]) R.refl
+
       val () = theRedices := nat_case_zero :: nat_case_succ :: !theRedices
+
+      val letnext_next =
+         R.trans [R.unfold, R.beta 2, R.compat [R.beta 1]]
    
 
       val redices = !theRedices
