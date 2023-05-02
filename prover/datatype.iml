@@ -122,6 +122,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
       (* Resolved representation: organized, and uses terms in place of eterms.
          In the inner list, each element is (sym, conargs, indices).
+
+         Note: all index arguments and internal arguments bind, even those arising from an arrow.
+         Invisible and pervasive arguments also always bind.  Internal arguments never bind.
       *)
       type rtypedef =
          (symbol * term) list
@@ -1625,6 +1628,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             /
 
 
+      (* n: the number of arguments the merged iterator should take
+         consts: the iterators being merged
+      *)
       fun merge n consts =
          let
             val mergees = List.map X.constant consts
@@ -1639,6 +1645,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       mergeLoop n Seq.empty a mergees
                    end)
          end
+
+
+
+      
 
 
 
@@ -2019,7 +2029,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                    insert InductionInternal.iterators const (iterator, numberOfVisibleArgs, numberOfIndexArgs);
 
-                   insert EqualityTactic.injectionTactics const (injector env const numberOfIndexArgs iterator i)
+                   insert EqualityTacticInternal.injectionTactics const (injector env const numberOfIndexArgs iterator i)
                    ))
                tplist
          end
@@ -3421,6 +3431,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             val jointIter = define (Symbol.fromValue (firstName ^ "_iter_joint")) merged merged_t
             val () = Constant.setOpacity jointIter Constant.HARD
+
 
 
 
