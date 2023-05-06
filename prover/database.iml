@@ -4,6 +4,8 @@ signature DATABASE =
 
       type constant = Constant.constant
 
+      exception Database of string
+
       (* Every type entry in the database should have the form
          const |-> (J, v) 
          where  J is |- A, v validates J, and A has the form const : B.
@@ -12,13 +14,16 @@ signature DATABASE =
       *)
 
       val findType : constant -> (Judgement.judgement * Refine.validation) option
-      val enterType : constant -> Judgement.judgement -> Refine.validation -> unit
+      val setType : constant -> Judgement.judgement -> Refine.validation -> unit
+      val setTypeLocal : constant -> Judgement.judgement -> Refine.validation -> unit
 
       val findImplicits : constant -> int
       val setImplicits : constant -> int -> unit
+      val setImplicitsLocal : constant -> int -> unit  (* not to be exported *)
 
       val findUnroll : constant -> Reduction.reduction option
       val setUnroll : constant -> Reduction.reduction -> unit
+      val setUnrollLocal : constant -> Reduction.reduction -> unit  (* not to be exported *)
 
    end
 
@@ -28,16 +33,12 @@ signature DATABASE_INTERNAL =
 
       include DATABASE
 
+      
+      val writeDatabase : BinIO.outstream -> unit
+      val readDatabase : BinIO.instream -> unit
 
-      exception Database of string
-
-      val appLocal : (constant * (Judgement.judgement * Refine.validation) option * int * Reduction.reduction option -> unit) -> unit
-
-      (* doesn't set the dirty bit, so it won't be exported *)
-      val import : constant * (Judgement.judgement * Refine.validation) option * int * Reduction.reduction option -> unit
-
-      (* like enterType, but doesn't set the dirty bit *)
-      val primType : constant -> Judgement.judgement -> Refine.validation -> unit
+      (* enter a type as if it were imported *)
+      val importType : constant -> Judgement.judgement -> Refine.validation -> unit
 
    end
 
@@ -48,109 +49,10 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
       structure H = ConstantTable
       structure T = Term
       structure J = Judgement
+      structure P = Pickle
+      structure PP = Pickling
 
       type constant = Constant.constant
-
-
-      (* database entry: (type, implicits, unroller) *)
-
-      (* the value and a dirty bit
-         (The dirty bit is not set for primitives and imported entries.)
-      *)
-      type 'a entry = 'a * bool  
-
-      val theDatabase : ((Judgement.judgement * Refine.validation) option entry * int entry * Reduction.reduction option entry) H.table = H.table ()
-
-      fun findType const =
-         Option.mapPartial
-            (fn ((t, _), _, _) => t)
-            (H.find theDatabase const)
-
-      fun enterType const j v =
-         (
-         H.operate theDatabase const
-            (fn () => 
-                ((SOME (j, v), true), (0, false), (NONE, false)))
-            (fn (_, implicits, unroll,) => 
-                ((SOME (j, v), true), implicits, unroll));
-         ()
-         )
-
-      fun primType const j v =
-         (
-         H.operate theDatabase const
-            (fn () => 
-                ((SOME (j, v), false), (0, false), (NONE, false)))
-            (fn (_, implicits, unroll) =>
-                ((SOME (j, v), false), implicits, unroll));
-         ()
-         )
-
-
-      fun findImplicits const =
-         (case H.find theDatabase const of
-             SOME (_, (implicits, _), _) => implicits
-
-           | NONE => 0)
-
-      fun setImplicits const implicits =
-         (
-         H.operate theDatabase const
-            (fn () =>
-                ((NONE, false), (implicits, true), (NONE, false)))
-            (fn (t, _, unroll) =>
-                (t, (implicits, true), unroll));
-         ()
-         )
-
-
-      fun findUnroll const =
-         (case H.find theDatabase const of
-             SOME (_, _, (unroll, _)) => unroll
-
-           | NONE => NONE)
-
-      fun setUnroll const r =
-         (
-         H.operate theDatabase const
-            (fn () => 
-                ((NONE, false), (0, false), (SOME r, true)))
-            (fn (t, implicits, _) =>
-                (t, implicits, (SOME r, true)));
-         ()
-         )
-
-      fun primUnroll const r =
-         (
-         H.operate theDatabase const
-            (fn () =>
-                ((NONE, false), (0, false), (SOME r, false)))
-            (fn (t, implicits, _) =>
-                (t, implicits, (SOME r, false)));
-         ()
-         )
-
-
-      val () =
-         List.app
-            (fn r => primUnroll (ReductionInternal.trigger r) (Reduction.user1 r))
-            [
-            PrimReduction.unroll_fix,
-            PrimReduction.unroll_pause
-            ]
-
-
-      fun appLocal f =
-         H.app
-            (fn (const, ((t, td), (implicits, implicitsd), (unroll, unrolld))) =>
-                if td orelse implicitsd orelse unrolld then
-                   f (const,
-                      if td then t else NONE,
-                      if implicitsd then implicits else 0,
-                      if unrolld then unroll else NONE)
-                else
-                   ())
-            theDatabase
 
 
       exception Database of string
@@ -159,50 +61,266 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
          Handler.customHandler
          (fn Database str => (print str; true)
            | _ => false)
-      
 
-      exception Merge
 
-      fun mergeOpt opt opt' =
-         (case (opt, opt') of
-             (NONE, _) => opt'
 
-           | (_, NONE) => opt
+      datatype 'a status = 
+         Empty
+         (* Empty entry.  It can be written to.  Does not generate an export entry. *)
 
-           | (SOME _, SOME _) => raise Merge)
+       | Imported
+         (* Has been written to by another file.  Cannot be written to.  Does not generate an export entry. *)
 
-      fun mergeInt i i' =
-         if i = 0 then
-            i'
-         else if i' = 0 then
-            i
-         else if i = i' then
-            i
-         else
-            raise Merge
+       | Written of 'a
+         (* Has been written to by this file.  Cannot be written to.  Generates an export entry. *)
 
-      fun merge ((t, td), (implicits, implicitsd), (unroll, unrolld)) (t', implicits', unroll') =
-         (if td then (mergeOpt t t', true) else (t', false),
-          if implicitsd then (mergeInt implicits implicits', true) else (implicits', false),
-          if unrolld then (mergeOpt unroll unroll', true) else (unroll', false))
+      type 'a entry = 'a * 'a status
 
-      fun import (const, t, implicits, unroll) =
+      (* Local writes will change the entry without changing the status.  Thus, they will not be exported. *)
+
+
+      fun modify const status x =
+         (case status of
+             Empty =>
+                (x, Written x)
+
+           | _ =>
+                raise (Database (String.concat
+                                    [
+                                    "Conflicting modification to database entry for ",
+                                    Namespace.toString const,
+                                    ".\n"
+                                    ])))
+
+
+      fun import const status x =
+         (case status of
+             Empty =>
+                (x, Imported)
+
+           | _ =>
+                raise (Database (String.concat
+                                    [
+                                    "Conflicting import in database entry for ",
+                                    Namespace.toString const,
+                                    ".\n"
+                                    ])))
+
+
+      val empty = ((NONE, Empty), (0, Empty), (NONE, Empty))
+
+      fun alterType f (t, implicits, unroll) = (f t, implicits, unroll)
+      fun alterImplicits f (t, implicits, unroll) = (t, f implicits, unroll)
+      fun alterUnroll f (t, implicits, unroll) = (t, implicits, f unroll)
+
+
+
+      val theDatabase : 
+         ((Judgement.judgement * Refine.validation) option entry 
+          * int entry 
+          * Reduction.reduction option entry) H.table 
+         = H.table ()
+
+      fun alterEntry const f =
          (
          H.operate theDatabase const
-            (fn () => 
-                ((t, false), (implicits, false), (unroll, false)))
-            (fn entry => 
-                (try
-                    merge entry (t, implicits, unroll)
-                 with
-                    Merge =>
-                       raise (Database
-                                 (String.concat
-                                     ["Error: constant ",
-                                      Namespace.toString const,
-                                      " conflicts with an existing database entry.\n"]))));
+            (fn () => f empty)
+            f;
+
          ()
          )
+
+
+
+      fun findType const =
+         Option.mapPartial
+            (fn ((t, _), _, _) => t)
+            (H.find theDatabase const)
+
+      fun setType const jud v =
+         alterEntry const
+            (alterType 
+                (fn (_, status) => modify const status (SOME (jud, v))))
+
+      fun importType const jud v =
+         alterEntry const
+            (alterType 
+                (fn (_, status) => import const status (SOME (jud, v))))
+
+      fun setTypeLocal const jud v =
+         alterEntry const
+            (alterType 
+                (fn (_, status) => (SOME (jud, v), status)))
+
+
+      
+      fun findImplicits const =
+         (case H.find theDatabase const of
+             NONE => 0
+
+           | SOME (_, (i, _), _) => i)
+
+      fun setImplicits const i =
+         alterEntry const
+            (alterImplicits
+                (fn (_, status) => modify const status i))
+
+      fun importImplicits const i =
+         alterEntry const
+            (alterImplicits
+                (fn (_, status) => import const status i))
+
+      fun setImplicitsLocal const i =
+         alterEntry const
+            (alterImplicits
+                (fn (_, status) => (i, status)))
+
+
+
+      fun findUnroll const =
+         Option.mapPartial
+            (fn (_, _, (unroll, _)) => unroll)
+            (H.find theDatabase const)
+
+      fun setUnroll const r =
+         alterEntry const
+            (alterUnroll
+                (fn (_, status) => modify const status (SOME r)))
+
+      fun importUnroll const r =
+         alterEntry const
+            (alterUnroll
+                (fn (_, status) => import const status (SOME r)))
+
+      fun setUnrollLocal const r =
+         alterEntry const
+            (alterUnroll
+                (fn (_, status) => (SOME r, status)))
+
+
+
+      datatype database_entry =
+         NoMore
+       | Type of constant * (Judgement.judgement * Refine.validation)
+       | Implicits of constant * int
+       | Unroll of constant * Reduction.reduction
+
+
+      val impossible = Fail "impossible"
+
+      val puDatabaseEntry =
+         P.alt
+            (fn NoMore => 0
+              | Type _ => 1
+              | Implicits _ => 2
+              | Unroll _ => 3)
+            
+            [
+            P.const NoMore,
+
+            P.wrap
+               (fn Type (const, jud_v) => (const, jud_v)
+                 | _ => raise impossible)
+               Type
+               (P.pair PP.puConstant Refine.pu),
+
+            P.wrap
+               (fn Implicits (const, i) => (const, i)
+                 | _ => raise impossible)
+               Implicits
+               (P.pair PP.puConstant P.int),
+
+            P.wrap
+               (fn Unroll (const, r) => (const, r)
+                 | _ => raise impossible)
+               Unroll
+               (P.pair PP.puConstant ReductionInternal.puReduction)
+            ]
+
+      fun writeEntry outs x =
+         P.pickle
+            (BinIO.output1 outs)
+            puDatabaseEntry
+            x
+
+
+      fun writeDatabase outs =
+         (
+         H.app
+            (fn (const, ((_, tStat), (_, implicitsStat), (_, unrollStat))) =>
+                (
+                (case tStat of
+                    Written (SOME (jud, v)) =>
+                       writeEntry outs (Type (const, (jud, v)))
+
+                  | Written NONE =>
+                       raise (Fail "invariant")
+
+                  | _ => ());
+
+                (case implicitsStat of
+                    Written i =>
+                       writeEntry outs (Implicits (const, i))
+
+                  | _ => ());
+
+                (case unrollStat of
+                    Written (SOME r) =>
+                       writeEntry outs (Unroll (const, r))
+
+                  | Written NONE =>
+                       raise (Fail "invariant")
+
+                  | _ => ())
+                ))
+            theDatabase;
+
+         writeEntry outs NoMore
+         )
+                       
+
+      fun readDatabase ins =
+         if
+            (case
+                P.unpickle
+                   (fn () =>
+                       (case BinIO.input1 ins of
+                           SOME b => b
+                         | NONE => raise Pickle.Error))
+                   puDatabaseEntry
+             of
+                NoMore => false
+   
+              | Type (const, (jud, v)) =>
+                   (
+                   importType const jud v;
+                   true
+                   )
+   
+              | Implicits (const, i) =>
+                   (
+                   importImplicits const i;
+                   true
+                   )
+   
+              | Unroll (const, r) =>
+                   (
+                   importUnroll const r;
+                   true
+                   ))
+         then
+            readDatabase ins
+         else
+            ()
+
+
+      val () =
+         List.app
+            (fn r => importUnroll (ReductionInternal.trigger r) (Reduction.user1 r))
+            [
+            PrimReduction.unroll_fix,
+            PrimReduction.unroll_pause
+            ]
 
    end
 

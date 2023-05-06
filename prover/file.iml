@@ -33,7 +33,7 @@ signature FILE_INTERNAL =
 structure FileInternal :> FILE_INTERNAL =
    struct
 
-      val magicNumber = Bytestring.fromString "Ist0000B"
+      val magicNumber = Bytestring.fromString "Ist0000C"
 
       structure C = ConstantInternal
       structure CR = CheckpointedRef
@@ -151,49 +151,6 @@ structure FileInternal :> FILE_INTERNAL =
 
 
 
-      (* Database *)
-
-      val puDatabaseEntry =
-         P.option
-            (P.tuple4
-                PP.puConstant
-                (P.option Refine.pu)
-                P.int
-                (P.option R.puReduction))
-
-
-      fun writeDatabase outs =
-         (
-         D.appLocal
-            (fn entry =>
-                P.pickle
-                   (BinIO.output1 outs)
-                   puDatabaseEntry
-                   (SOME entry));
-
-         P.pickle
-            (BinIO.output1 outs)
-            puDatabaseEntry
-            NONE
-         )
-
-
-      fun readDatabase ins =
-         (case
-             P.unpickle 
-                (fn () => input1 ins)
-                puDatabaseEntry
-          of
-             NONE => ()
-
-           | SOME entry =>
-                (
-                D.import entry;
-                readDatabase ins
-                ))
-
-
-
       (* Registry *)
 
       val puRegistryEntry =
@@ -264,7 +221,7 @@ structure FileInternal :> FILE_INTERNAL =
                    P.pickle (BinIO.output1 outs) P.word32 (Nonce.nonce ());
                    P.pickle (BinIO.output1 outs) P.bool (Unsafe.allowed ());
                    writeNamespace outs;
-                   writeDatabase outs;
+                   DatabaseInternal.writeDatabase outs;
                    writeRegistry outs;
                    writeReductions outs;
                    DatatypeInternal.write (BinIO.output1 outs);
@@ -344,7 +301,7 @@ structure FileInternal :> FILE_INTERNAL =
                                   () ;
 
                                readNamespace ins;
-                               readDatabase ins;
+                               DatabaseInternal.readDatabase ins;
                                readRegistry ins;
                                readReductions ins;
                                DatatypeInternal.read (fn () => input1 ins);

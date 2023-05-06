@@ -117,7 +117,7 @@ evar.
   + `unfoldHead /[constant/variable] [targets]/`
 
     Unfolds a target term with the specified head constant or
-    variable, but does not weak-head-normalizes the result.  Thus, if
+    variable, but does not weak-head-normalize the result.  Thus, if
     the head takes arguments, unfoldHead will leave a beta redex.
 
 
