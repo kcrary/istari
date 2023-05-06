@@ -32,3 +32,7 @@
 6. Copy the contents of `emacs.customize` into your `.emacs` file, and
    edit the `istari-root` definition with the path to the Istari root
    directory.
+
+7. (Optional) If you want to receive occasional updates about Istari,
+   submit your name and email address using the form
+   [here](https://forms.gle/ZuFkEEz29ZMQ9YDi9).
