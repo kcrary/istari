@@ -108,7 +108,8 @@ goal, generating zero or more subgoals.
   The tactic `ifthen tac1 tac2 tac3` applies `tac1`.  If it succeeds,
   it calls `tac2` on its subgoals.  If it fails, it calls `tac3`.  The
   combininator commits to its choice: `tac2` will not backtrack into
-  `tac1` or `tac3`, and `tac3` will not backtrack into `tac1`.
+  `tac1` or `tac3`, and `tac3` will not backtrack into `tac1`.  This
+  distinguishes it from `first [andthen tac1 tac2, tac3]`.
 
 
 
@@ -252,7 +253,7 @@ goal, generating zero or more subgoals.
     Deletes `y` and renames `x` to `y`.
 
 
-- `moveBefore /[hyp] ... [hyp]/ /[target hyp or concl]/`
+- `moveBefore /[hyp] ... [hyp]/ /[target hyp]/`
 
   Moves the indicated hypotheses immediately before the target
   hypothesis.
@@ -414,6 +415,15 @@ goal, generating zero or more subgoals.
   + `injectionRaw /[hyp x]/`
 
     As `injection` but does not invoke the typechecker.
+
+  + `injectionn [n]`
+
+    As `injection` but operates on hypothesis `n` (counting backward
+    from 0).
+
+  + `injectionnRaw [n]`
+
+    As `injectionn` but does not invoke the typechecker.
 
 
 

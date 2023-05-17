@@ -35,6 +35,9 @@ structure Inversion :> INVERSION =
          tac (Seq.length (J.context jud)) goal fk sk
 
 
+      (* Perform injection or substitution, where possible, on hypotheses
+         n through n + num - 1.
+      *)
       fun injections num n =
          if num = 0 then
             idtacM Primary
@@ -46,10 +49,12 @@ structure Inversion :> INVERSION =
                           if i = j then
                              HypTactic.clearn n
                              >>
+                             (* one hypothesis deleted *)
                              injections (num-1) n
                           else
                              EqualityTacticInternal.substMain false i n (T.Var j)
                              >>!
+                             (* two hypotheses deleted: one equality, one variable *)
                              injections (num-2) n)\
    
                    | \Prim.eq\ _ var? ? =>
@@ -64,7 +69,7 @@ structure Inversion :> INVERSION =
                              do sz = withsize
                           in
                              ifthenM
-                                (EqualityTacticInternal.injectionMain n)
+                                (EqualityTactic.injectionnPriority n)
                                 (fn pri =>
                                     (case pri of
                                         Primary =>
@@ -86,6 +91,7 @@ structure Inversion :> INVERSION =
 
              | _ =>
                \(fnc =>
+                    (* one hypothesis kept *)
                     injections (num-1) (n+1))\
             /
          
