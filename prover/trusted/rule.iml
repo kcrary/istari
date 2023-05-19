@@ -96,6 +96,12 @@ signature RULE =
       (* <x> = <x> : integer *)
       val integerIntroEq : rule
 
+      (* <x> : symbol *)
+      val symbolIntroOf : rule
+
+      (* <x> = <x> : symbol *)
+      val symbolIntroEq : rule
+
 
 
       exception Failure         (* usually raised when a rule does not apply *)
@@ -1161,6 +1167,61 @@ structure Rule :> RULE =
                                  (case (N.whnf m, N.whnf n) of
                                      (Native (Integer x), Native (Integer y)) =>
                                         if IntInf.= x y then
+                                           ([], fn0 T.Triv)
+                                        else
+                                           raise Failure
+
+                                   | _ =>
+                                        raise Failure)
+                              else
+                                 raise Failure
+
+                         | _ =>
+                              raise Failure)
+                    else
+                       raise Failure
+
+               | _ =>
+                    raise Failure))
+
+      val symbolIntroOf =
+         ("symbolIntroOf",
+          fn jud =>
+             (case N.whnf (J.concl jud) of
+                 Elim (Const const, [App a, App m]) =>
+                    if Constant.eq (const, Prim.ov) then
+                       (case N.whnf a of
+                           Elim (Const const', []) =>
+                              if Constant.eq (const', Prim.symbol) then
+                                 (case N.whnf m of
+                                     Native (Symbol _) =>
+                                        ([], fn0 T.Triv)
+
+                                   | _ =>
+                                        raise Failure)
+                              else
+                                 raise Failure
+
+                         | _ =>
+                              raise Failure)
+                    else
+                       raise Failure
+
+               | _ =>
+                    raise Failure))
+
+      val symbolIntroEq =
+         ("symbolIntroEq",
+          fn jud =>
+             (case N.whnf (J.concl jud) of
+                 Elim (Const const, [App a, App m, App n]) =>
+                    if Constant.eq (const, Prim.eq) then
+                       (case N.whnf a of
+                           Elim (Const const', []) =>
+                              if Constant.eq (const', Prim.symbol) then
+                                 (case (N.whnf m, N.whnf n) of
+                                     (Native (Symbol x), Native (Symbol y)) =>
+                                        if Symbol.eq (x, y) then
                                            ([], fn0 T.Triv)
                                         else
                                            raise Failure

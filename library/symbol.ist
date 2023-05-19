@@ -1,0 +1,63 @@
+
+File.import "logic-load.iml";
+File.import "bool-load.iml";
+
+File.import "symbol-aux.iml";
+
+openModule /Bool/;
+
+
+beginModule "Symbol";
+
+
+Namespace.alias (parseIdent /symbol/) Prim.symbol;
+Namespace.alias (parseIdent /symbol_eqb/) Prim.symbol_eqb;
+
+
+structure Nothing = AfterSymbolEqb ();
+
+
+lemma "symbol_type"
+/
+  symbol : U 0
+/;
+
+typecheck.
+qed ();
+recordTyping "symbol_type";
+
+
+
+lemma "symbol_eqb_type"
+/
+  symbol_eqb : symbol -> symbol -> bool
+/;
+
+Tactic.refine Rule.symbol_eqbType.
+qed ();
+recordTyping "symbol_eqb_type";
+
+
+
+lemma "istrue_symbol_eqb"
+/
+  forall s t .
+    istrue (symbol_eqb s t) <-> s = t : symbol
+/;
+
+inference.
+intro /s t/.
+split.
+  {
+  intro /H/.
+  Tactic.refine (Rule.symbol_eqbSpec2 (Term.evar ()) (Term.evar ())).
+  apply /istrue_iff_eq_true/ >> auto.
+  }
+
+  {
+  intro /H/.
+  apply /istrue_iff_eq_true/.
+  Tactic.refine (Rule.symbol_eqbSpec1 (Term.evar ()) (Term.evar ())).
+  hyp /H/.
+  }
+qed ();

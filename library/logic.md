@@ -75,3 +75,9 @@
     eq_symm_iff : type:eq_symm_iff
 
     eq_trans : type:eq_trans
+
+
+### Not equal
+
+    neq : type:neq
+        = def:neq

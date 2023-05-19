@@ -6,9 +6,11 @@ structure ParseLogic =
 
       val not = Susp.delay (fn () => parseConstant /Logic.not/)
       val iff = Susp.delay (fn () => parseConstant /Logic.iff/)
+      val neq = Susp.delay (fn () => parseConstant /Logic.neq/)
 
       fun parseNot p = T.apply1 (Susp.force not) p
       fun parseIff p q = T.apply2 (Susp.force iff) p q
+      fun parseNeq m n a = T.apply3 (Susp.force neq) a m n
 
    end
 
@@ -17,7 +19,8 @@ grammardef Logic
 
    open ParseLogic
 
-   rule Term(5) ::= Term(6) "<->" Term(6) => parseIff
+   rule Term(5)  ::= Term(6) "<->" Term(6) => parseIff
+   rule Term(30) ::= Term(31) "<>" Term(31) ":" Term(31) => parseNeq
 
 end
 
@@ -155,5 +158,26 @@ functor AfterIff () :> sig end =
             (iff, Prim.arrow, true, weakenIffArrow),
             (iff, Prim.arrow, false, weakenIffArrowContra)
             ]
+
+   end
+
+
+functor AfterNeq () :> sig end =
+   struct
+
+      structure U = Show.Unparsing
+
+      val neq = parseConstant /Logic.neq/
+
+      fun register k arity prec unp =
+         ConstantTable.insert U.unparsingTable k (arity, prec, ref true, unp)
+
+      val () =
+         register neq 3 30
+         (U.wrap
+             (U.apply3 neq U.show U.show U.show)
+             (fn (a, m, n) => U.append [m 31, 
+                                        U.break 1, U.string "<> ", n 31, 
+                                        U.break 1, U.string ": ", a 31]))
 
    end

@@ -27,6 +27,7 @@ signature ETERM =
       val triv    : eterm
       val evar    : eterm
       val integer : IntInf.int -> eterm
+      val symbol  : Symbol.symbol -> eterm
 
       val hole    : eterm
       val marker  : symbol -> eterm
@@ -183,6 +184,8 @@ structure ETerm :> ETERM =
       fun evar _ _ = T.Evar (T.newEbind ())
 
       fun integer x _ _ = T.Native (T.Integer x)
+
+      fun symbol x _ _ = T.Native (T.Symbol x)
 
       val zilch = Symbol.fromValue ""
 
@@ -480,6 +483,13 @@ structure ParseTerm =
            | NONE => raise (Fail ("invalid integer literal " ^ str)))
 
       val integerEmbed = T.integer
+
+      fun symbol str =
+         T.symbol (Symbol.fromValue str)
+
+      val symbolEmbed = T.symbol
+
+
 
       val evar = T.evar
 
@@ -1200,6 +1210,8 @@ grammardef Term
    rule Term(100) ::= "z`" NUMBER => integer
    rule Term(100) ::= "z`" LEXEME => integerLexeme
    rule Term(100) ::= "z`" EMBED => integerEmbed
+   rule Term(100) ::= "sym`" STRING => symbol
+   rule Term(100) ::= "sym`" EMBED => symbolEmbed
    rule Term(100) ::= "_" => evar
    rule Term(100) ::= "__" => hole
    rule Term(100) ::= "(" ")" => triv

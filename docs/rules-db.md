@@ -3355,6 +3355,16 @@ Conventions:
       >>
       G |- of level I
 
+- `integerIntroOf`
+
+      G |- of integer M
+      (where M is an integer literal)
+
+- `integerIntroEq`
+
+      G |- eq integer M M
+      (where M is an integer literal)
+
 - `integerToDefType`
 
       G |- of (arrow integer Integer) integer_to_def
@@ -3365,43 +3375,92 @@ Conventions:
 
 - `integerIsomorphism1`
 
-      G |- eq (arrow integer integer) (fn . integer_from_def (integer_to_def 0)) (fn . 0)
+      G |- eq (arrow integer integer) (fn . integer_from_Integer (integer_to_Integer 0)) (fn . 0)
 
 - `integerIsomorphism2`
 
-      G |- eq (arrow Integer Integer) (fn . integer_to_def (integer_from_def 0)) (fn . 0)
+      G |- eq (arrow Integer Integer) (fn . integer_to_Integer (integer_from_Integer 0)) (fn . 0)
 
 - `pluszSpec`
 
       G |- eq 
              (arrow integer (arrow integer integer))
              plusz
-             (fn . fn . integer_from_def (Plusz (integer_to_def 1) (integer_to_def 0)))
+             (fn . fn . integer_from_Integer (Plusz (integer_to_Integer 1) (integer_to_Integer 0)))
 
 - `negzSpec`
 
       G |- eq 
              (arrow integer integer)
              negz 
-             (fn . integer_from_def (Negz (integer_to_def 0)))
+             (fn . integer_from_Integer (Negz (integer_to_Integer 0)))
 
 - `eqzbSpec`
 
       G |- eq
              (arrow integer (arrow integer bool))
              eqzb
-             (fn . fn . Eqzb (integer_to_def 1) (integer_to_def 0))
+             (fn . fn . Eqzb (integer_to_Integer 1) (integer_to_Integer 0))
 
 - `leqzbSpec`
 
       G |- eq 
              (arrow integer (arrow integer bool))
              leqzb
-             (fn . fn . Leqzb (integer_to_def 1) (integer_to_def 0))
+             (fn . fn . Leqzb (integer_to_Integer 1) (integer_to_Integer 0))
 
 - `timeszSpec`
 
       G |- eq 
              (arrow integer (arrow integer integer))
              timesz
-             (fn . fn . integer_from_def (Timesz (integer_to_def 1) (integer_to_def 0)))
+             (fn . fn . integer_from_Integer (Timesz (integer_to_Integer 1) (integer_to_Integer 0)))
+
+
+### Symbols
+
+- `symbolForm`
+
+      G |- istp symbol
+
+- `symbolEq`
+
+      G |- eqtp symbol symbol
+
+- `symbolFormUniv I`
+
+      G |- of (univ I) symbol
+      >>
+      G |- of level I
+
+- `symbolEqUniv I`
+
+      G |- eq (univ I) symbol symbol
+      >>
+      G |- of level I
+
+- `symbolIntroOf`
+
+      G |- of symbol M
+      (where M is an symbol literal)
+
+- `symbolIntroEq`
+
+      G |- eq symbol M M
+      (where M is an symbol literal)
+
+- `symbol_eqbType`
+
+      G |- of (arrow symbol (arrow symbol bool)) symbol_eqb
+
+- `symbol_eqbSpec1 M N`
+
+      G |- eq bool (symbol_eqb M N) true
+      >>
+      G |- eq symbol M N
+
+- `symbol_eqbSpec2 M N`
+
+      G |- eq symbol M N
+      >>
+      G |- eq bool (symbol_eqb M N) true

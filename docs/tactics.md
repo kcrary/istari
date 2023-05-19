@@ -637,8 +637,22 @@ The destruction tactics are:
 
   Destructs `x`, discharging impossible cases and simplifying the
   resulting equations.  The pattern must be a sum of products (*i.e.,*
-  `{ ... | ... }`) containing only identifers and `?`.  May work
-  poorly if `x` is mentioned in the conclusion.
+  `{ ... | ... }`) containing only identifers and `?`.
+
+  The tactic can work poorly when (1) `x` is mentioned in the
+  conclusion, (2) destruction generates equations that involve a
+  variable, and (3) the conclusion is not already known to be
+  well-formed.
+
+  (When destruction results in `M` being substituted for `x`, and the
+  simplified equations include `y = N : A` where `y` is part of `M`,
+  `destructThin` invokes substitution to resolve the equation.  If `x`
+  was mentioned in the original conclusion, then `y` will be mentioned
+  in the post-destruction conclusion, and invoking substitution on a
+  variable mentioned in the conclusion generates a proof obligation
+  that the conclusion is well-formed.  Often this is fine, but it can
+  be unfortunate when one cannot yet show that the conclusion is
+  well-formed, such as when one is proving a typing lemma.)
 
   + `destructThinRaw /[hyp x]/ /[ipattern]/`
 

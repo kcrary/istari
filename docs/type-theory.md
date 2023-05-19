@@ -775,6 +775,15 @@ library](lib/integer.html), and a variety of native operations are
 provided as well.
 
 
+#### Symbols
+
+[[rules]](rules.html#symbols)
+
+Symbols are a simple base type representing impoverished strings.
+Symbol literals are written like ``sym`"foo"``, and the only operation
+on symbols is equality.
+
+
 
 ## Additional topics
 

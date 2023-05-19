@@ -869,6 +869,7 @@ Qed.
    2. checkPositive and checkNegative
    3. the rules pertaining to let hypotheses
    4. the rules pertaining to native integers
+   5. the rules pertaining to symbols
 
    The reduction rules follow immediately from tr_compute and tr_compute_hyp.
 
@@ -889,4 +890,9 @@ Qed.
    integer type, and the integer literals as referring to representatives of
    equivalence classes in that type.  The correctness of the isomorphism code
    is apparent by inspection.
+
+   Like integers, the symbol rules cannot be proven correct because native integers
+   do not exist in the type theory.  However, the symbol rules are simple and it is
+   easy to see they are correct.
+
 *)

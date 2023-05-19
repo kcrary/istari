@@ -15,7 +15,14 @@ structure CompareTerm :> COMPARE_TERM =
       open Term
 
 
-      fun compareNative (Integer x, Integer y) = IntInf.compare x y
+      fun compareNative (native, native') =
+         (case (native, native') of
+             (Integer x, Integer y) => IntInf.compare x y
+
+           | (Integer _, _) => LESS
+           | (_, Integer _) => GREATER
+
+           | (Symbol x, Symbol y) => Symbol.compare (x, y))
 
 
       fun compareVar sz sz' depth i j =
@@ -224,7 +231,13 @@ structure HashTerm :> HASH_TERM =
       open Term
 
 
-      fun hashNative (Integer x) = IntInfHashable.hash x
+      fun hashNative native =
+         (case native of
+             Integer x =>
+                hashInc 0w1 (IntInfHashable.hash x)
+
+           | Symbol x =>
+                hashInc 0w2 (Symbol.hash x))
 
       
       fun hashVar shift depth i =

@@ -7,8 +7,8 @@ signature NATIVE =
       type native
 
       datatype operator =
-         Unary of native -> term
-       | Binary of native -> native -> term
+         Unary of native -> term option
+       | Binary of native -> native -> term option
 
       val operators : (constant * operator) list
 
@@ -29,36 +29,74 @@ functor NativeFun (structure Term : TERM
       open Term
 
 
-      fun eqzb (Integer p) (Integer q) =
-         if IntInf.= p q then
-            Const Prim.tru
-         else
-            Const Prim.fals
+      fun eqzb native native' =
+         (case (native, native') of
+             (Integer p, Integer q) =>
+                if IntInf.= p q then
+                   SOME (Const Prim.tru)
+                else
+                   SOME (Const Prim.fals)
 
-      (* When there are natives other than Integer, need a catch-all returning:
-         apply2 Prim.eqzb (Native x) (Native y))
-      *)
+           | _ =>
+                NONE)
+             
+
+      fun leqzb native native' =
+         (case (native, native') of
+             (Integer p, Integer q) =>
+                if IntInf.<= p q then
+                   SOME (Const Prim.tru)
+                else
+                   SOME (Const Prim.fals)
+
+           | _ =>
+                NONE)
 
 
-      fun leqzb (Integer p) (Integer q) =
-         if IntInf.<= p q then
-            Const Prim.tru
-         else
-            Const Prim.fals
+      fun negz native =
+         (case native of
+             Integer p =>
+                SOME (Native (Integer (IntInf.~ p)))
+
+           | _ =>
+                NONE)
 
 
-      fun negz (Integer p) = Native (Integer (IntInf.~ p))
+      fun plusz native native' =
+         (case (native, native') of
+             (Integer p, Integer q) =>
+                SOME (Native (Integer (IntInf.+ p q)))
+
+           | _ =>
+                NONE)
 
 
-      fun plusz (Integer p) (Integer q) = Native (Integer (IntInf.+ p q))
+      fun timesz native native' =
+         (case (native, native') of
+             (Integer p, Integer q) =>
+                SOME (Native (Integer (IntInf.* p q)))
 
-      
-      fun timesz (Integer p) (Integer q) = Native (Integer (IntInf.* p q))
+           | _ =>
+                NONE)
+
+
+      fun symbol_eqb native native' =
+         (case (native, native') of
+             (Symbol p, Symbol q) =>
+                if Symbol.eq (p, q) then
+                   SOME (Const Prim.tru)
+                else
+                   SOME (Const Prim.fals)
+
+           | _ =>
+                NONE)
+
+
 
 
       datatype operator =
-         Unary of native -> term
-       | Binary of native -> native -> term
+         Unary of native -> term option
+       | Binary of native -> native -> term option
 
       val operators =
          [
@@ -66,9 +104,8 @@ functor NativeFun (structure Term : TERM
          (Prim.leqzb, Binary leqzb),
          (Prim.negz, Unary negz),
          (Prim.plusz, Binary plusz),
-         (Prim.timesz, Binary timesz)
+         (Prim.timesz, Binary timesz),
+         (Prim.symbol_eqb, Binary symbol_eqb)
          ]
 
    end
-
-

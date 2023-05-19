@@ -77,3 +77,9 @@
     eq_symm_iff : forall (i : level) (a : U i) (x y : a) . x = y : a <-> y = x : a
 
     eq_trans : forall (i : level) (a : U i) (x y z : a) . x = y : a -> y = z : a -> x = z : a
+
+
+### Not equal
+
+    neq : intersect (i : level) . forall (a : U i) . a -> a -> U i
+        = fn a m n . not (m = n : a)

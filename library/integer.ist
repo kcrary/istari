@@ -28,7 +28,7 @@ definerecRaw /nat_to_integer n/
 
 definerecRaw /integer_to_nat x/
 /
-  if leqzb x z`0 then
+  if leqzb x z`0 thenq
     zero
   else
     succ (integer_to_nat (plusz x z`-1))
@@ -92,7 +92,7 @@ define /Integer/
 /;
 *)
 
-Namespace.alias (parseIdent /Integer/) Prim.integer_def;
+Namespace.alias (parseIdent /Integer/) Prim.cInteger;
 
 
 
@@ -106,7 +106,7 @@ define /Plusz a b/
 /;
 *)
 
-Namespace.alias (parseIdent /Plusz/) Prim.plusz_def;
+Namespace.alias (parseIdent /Plusz/) Prim.cPlusz;
 
 
 
@@ -120,7 +120,7 @@ define /Negz a/
 /;
 *)
 
-Namespace.alias (parseIdent /Negz/) Prim.negz_def;
+Namespace.alias (parseIdent /Negz/) Prim.cNegz;
 
 
 
@@ -134,7 +134,7 @@ define /Timesz a b/
 /;
 *)
 
-Namespace.alias (parseIdent /Timesz/) Prim.timesz_def;
+Namespace.alias (parseIdent /Timesz/) Prim.cTimesz;
 
 
 
@@ -148,7 +148,7 @@ define /Eqzb a b/
 /;
 *)
 
-Namespace.alias (parseIdent /Eqzb/) Prim.eqzb_def;
+Namespace.alias (parseIdent /Eqzb/) Prim.cEqzb;
 
 
 
@@ -162,7 +162,7 @@ define /Leqzb a b/
 /;
 *)
 
-Namespace.alias (parseIdent /Leqzb/) Prim.leqzb_def;
+Namespace.alias (parseIdent /Leqzb/) Prim.cLeqzb;
 
 
 
@@ -1280,8 +1280,8 @@ defineRaw /integerToDef x/
 
 
 
-Namespace.alias (parseIdent /integer_from_def/) Prim.integer_from_def;
-Namespace.alias (parseIdent /integer_to_def/) Prim.integer_to_def;
+Namespace.alias (parseIdent /integer_from_Integer/) Prim.integer_from_Integer;
+Namespace.alias (parseIdent /integer_to_Integer/) Prim.integer_to_Integer;
 
 
 structure Nothing = AfterIntegerToDef ();
@@ -1310,31 +1310,31 @@ reductions
 
 (* Now we read off the axioms that relate native integers to defined integers. *)
 
-lemma "integer_to_def_type"
+lemma "integer_to_Integer_type"
 /
-  integer_to_def : integer -> Integer
+  integer_to_Integer : integer -> Integer
 /;
 
 Tactic.refine Rule.integerToDefType.
 qed ();
-Define.recordTyping "integer_to_def_type";
+Define.recordTyping "integer_to_Integer_type";
 
 
 
-lemma "integer_from_def_type"
+lemma "integer_from_Integer_type"
 /
-  integer_from_def : Integer -> integer
+  integer_from_Integer : Integer -> integer
 /;
 
 Tactic.refine Rule.integerFromDefType.
 qed ();
-Define.recordTyping "integer_from_def_type";
+Define.recordTyping "integer_from_Integer_type";
 
 
 
 lemma "integer_isomorphism_prim"
 /
-  (fn x . integer_from_def (integer_to_def x)) = (fn x . x) : (integer -> integer)
+  (fn x . integer_from_Integer (integer_to_Integer x)) = (fn x . x) : (integer -> integer)
 /;
 
 Tactic.refine Rule.integerIsomorphism1.
@@ -1344,7 +1344,7 @@ qed ();
 
 lemma "Integer_isomorphism_prim"
 /
-  (fn x . integer_to_def (integer_from_def x)) = (fn x . x) : (Integer -> Integer)
+  (fn x . integer_to_Integer (integer_from_Integer x)) = (fn x . x) : (Integer -> Integer)
 /;
 
 Tactic.refine Rule.integerIsomorphism2.
@@ -1354,7 +1354,7 @@ qed ();
 
 lemma "plusz_spec_prim"
 /
-  plusz = (fn x y . integer_from_def (Plusz (integer_to_def x) (integer_to_def y)))
+  plusz = (fn x y . integer_from_Integer (Plusz (integer_to_Integer x) (integer_to_Integer y)))
   : (integer -> integer -> integer)
 /;
 
@@ -1365,7 +1365,7 @@ qed ();
 
 lemma "negz_spec_prim"
 /
-  negz = (fn x . integer_from_def (Negz (integer_to_def x)))
+  negz = (fn x . integer_from_Integer (Negz (integer_to_Integer x)))
   : (integer -> integer)
 /;
 
@@ -1376,7 +1376,7 @@ qed ();
 
 lemma "timesz_spec_prim"
 /
-  timesz = (fn x y . integer_from_def (Timesz (integer_to_def x) (integer_to_def y)))
+  timesz = (fn x y . integer_from_Integer (Timesz (integer_to_Integer x) (integer_to_Integer y)))
   : (integer -> integer -> integer)
 /;
 
@@ -1387,7 +1387,7 @@ qed ();
 
 lemma "eqzb_spec_prim"
 /
-  eqzb = (fn x y . Eqzb (integer_to_def x) (integer_to_def y))
+  eqzb = (fn x y . Eqzb (integer_to_Integer x) (integer_to_Integer y))
   : (integer -> integer -> bool)
 /;
 
@@ -1398,7 +1398,7 @@ qed ();
 
 lemma "leqzb_spec_prim"
 /
-  leqzb = (fn x y . Leqzb (integer_to_def x) (integer_to_def y))
+  leqzb = (fn x y . Leqzb (integer_to_Integer x) (integer_to_Integer y))
   : (integer -> integer -> bool)
 /;
 
@@ -1409,12 +1409,12 @@ qed ();
 
 lemma "integer_isomorphism"
 /
-  forall x . integer_from_def (integer_to_def x) = x : integer
+  forall x . integer_from_Integer (integer_to_Integer x) = x : integer
 /;
 
 inference.
 intro /x/.
-change /concl/ /(fn x . integer_from_def (integer_to_def x)) x = (fn x . x) x : _/.
+change /concl/ /(fn x . integer_from_Integer (integer_to_Integer x)) x = (fn x . x) x : _/.
 decompEq 1 /integer -> integer/ >> attempt reflexivity.
 apply /integer_isomorphism_prim/.
 qed ();
@@ -1423,12 +1423,12 @@ qed ();
 
 lemma "Integer_isomorphism"
 /
-  forall x . integer_to_def (integer_from_def x) = x : Integer
+  forall x . integer_to_Integer (integer_from_Integer x) = x : Integer
 /;
 
 inference.
 intro /x/.
-change /concl/ /(fn x . integer_to_def (integer_from_def x)) x = (fn x . x) x : _/.
+change /concl/ /(fn x . integer_to_Integer (integer_from_Integer x)) x = (fn x . x) x : _/.
 decompEq 1 /Integer -> Integer/ >> attempt reflexivity.
 apply /Integer_isomorphism_prim/.
 qed ();
@@ -1561,13 +1561,13 @@ Define.recordTyping "ltz_type";
 lemma "plusz_spec"
 /
   forall x y .
-    plusz x y = integer_from_def (Plusz (integer_to_def x) (integer_to_def y))
+    plusz x y = integer_from_Integer (Plusz (integer_to_Integer x) (integer_to_Integer y))
     : integer
 /;
 
 inference.
 intro /x y/.
-change /concl/ /_ = (fn x y . integer_from_def (Plusz (integer_to_def x) (integer_to_def y))) x y : _/.
+change /concl/ /_ = (fn x y . integer_from_Integer (Plusz (integer_to_Integer x) (integer_to_Integer y))) x y : _/.
 decompEq 2 /integer -> integer -> integer/ >> attempt reflexivity.
 apply /plusz_spec_prim/.
 qed ();
@@ -1577,12 +1577,12 @@ qed ();
 lemma "negz_spec"
 /
   forall x .
-    negz x = integer_from_def (Negz (integer_to_def x)) : integer
+    negz x = integer_from_Integer (Negz (integer_to_Integer x)) : integer
 /;
 
 inference.
 intro /x/.
-change /concl/ /_ = (fn x . integer_from_def (Negz (integer_to_def x))) x : _/.
+change /concl/ /_ = (fn x . integer_from_Integer (Negz (integer_to_Integer x))) x : _/.
 decompEq 1 /integer -> integer/ >> attempt reflexivity.
 apply /negz_spec_prim/.
 qed ();
@@ -1592,13 +1592,13 @@ qed ();
 lemma "timesz_spec"
 /
   forall x y .
-    timesz x y = integer_from_def (Timesz (integer_to_def x) (integer_to_def y))
+    timesz x y = integer_from_Integer (Timesz (integer_to_Integer x) (integer_to_Integer y))
     : integer
 /;
 
 inference.
 intro /x y/.
-change /concl/ /_ = (fn x y . integer_from_def (Timesz (integer_to_def x) (integer_to_def y))) x y : _/.
+change /concl/ /_ = (fn x y . integer_from_Integer (Timesz (integer_to_Integer x) (integer_to_Integer y))) x y : _/.
 decompEq 2 /integer -> integer -> integer/ >> attempt reflexivity.
 apply /timesz_spec_prim/.
 qed ();
@@ -1608,12 +1608,12 @@ qed ();
 lemma "eqzb_spec"
 /
   forall x y .
-    eqzb x y = Eqzb (integer_to_def x) (integer_to_def y) : bool
+    eqzb x y = Eqzb (integer_to_Integer x) (integer_to_Integer y) : bool
 /;
 
 inference.
 intro /x y/.
-change /concl/ /_ = (fn x y . Eqzb (integer_to_def x) (integer_to_def y)) x y : _/.
+change /concl/ /_ = (fn x y . Eqzb (integer_to_Integer x) (integer_to_Integer y)) x y : _/.
 decompEq 2 /integer -> integer -> bool/ >> attempt reflexivity.
 apply /eqzb_spec_prim/.
 qed ();
@@ -1623,25 +1623,25 @@ qed ();
 lemma "leqzb_spec"
 /
   forall x y .
-    leqzb x y = Leqzb (integer_to_def x) (integer_to_def y) : bool
+    leqzb x y = Leqzb (integer_to_Integer x) (integer_to_Integer y) : bool
 /;
 
 inference.
 intro /x y/.
-change /concl/ /_ = (fn x y . Leqzb (integer_to_def x) (integer_to_def y)) x y : _/.
+change /concl/ /_ = (fn x y . Leqzb (integer_to_Integer x) (integer_to_Integer y)) x y : _/.
 decompEq 2 /integer -> integer -> bool/ >> attempt reflexivity.
 apply /leqzb_spec_prim/.
 qed ();
 
 
 
-lemma "integer_to_def_zero"
+lemma "integer_to_Integer_zero"
 /
-  integer_to_def z`0 = Zeroz : Integer
+  integer_to_Integer z`0 = Zeroz : Integer
 /;
 
 unfold /Zeroz/.
-unfold /integer_to_def/.
+unfold /integer_to_Integer/.
 unroll /integer_to_nat/.
 reduce //.
 apply /Integer_eq/.
@@ -1651,13 +1651,13 @@ qed ();
 
 
 
-lemma "integer_to_def_one"
+lemma "integer_to_Integer_one"
 /
-  integer_to_def z`1 = Onez : Integer
+  integer_to_Integer z`1 = Onez : Integer
 /;
 
 unfold /Onez/.
-unfold /integer_to_def/.
+unfold /integer_to_Integer/.
 unroll /integer_to_nat at 0 0/.
 reduce //.
 apply /Integer_eq/.
@@ -1669,7 +1669,7 @@ qed ();
 
 lemma "leqz_spec"
 /
-  forall a b . leqz a b <-> Leqz (integer_to_def a) (integer_to_def b)
+  forall a b . leqz a b <-> Leqz (integer_to_Integer a) (integer_to_Integer b)
 /;
 
 inference.
@@ -1684,7 +1684,7 @@ qed ();
 
 lemma "ltz_spec"
 /
-  forall a b . ltz a b <-> Ltz (integer_to_def a) (integer_to_def b)
+  forall a b . ltz a b <-> Ltz (integer_to_Integer a) (integer_to_Integer b)
 /;
 
 inference.
@@ -1692,29 +1692,29 @@ intro /a b/.
 unfold /ltz , Ltz/.
 rewrite /-> plusz_spec , -> leqz_spec/.
 rewrite /-> Integer_isomorphism/.
-rewrite /-> integer_to_def_one/.
+rewrite /-> integer_to_Integer_one/.
 reflexivity.
 qed ();
 
 
 
-lemma "integer_from_def_zero"
+lemma "integer_from_Integer_zero"
 /
-  integer_from_def Zeroz = z`0 : integer
+  integer_from_Integer Zeroz = z`0 : integer
 /;
 
-unfold /Zeroz , integer_from_def/.
+unfold /Zeroz , integer_from_Integer/.
 reflexivity.
 qed ();
 
 
 
-lemma "integer_from_def_one"
+lemma "integer_from_Integer_one"
 /
-  integer_from_def Onez = z`1 : integer
+  integer_from_Integer Onez = z`1 : integer
 /;
 
-unfold /Onez , integer_from_def/.
+unfold /Onez , integer_from_Integer/.
 reflexivity.
 qed ();
 
@@ -1738,8 +1738,8 @@ rewrite /<- Integer_isomorphism Onez/.
 compat.
 rewrite /<- integer_isomorphism z`0 in H/.
 rewrite /<- integer_isomorphism z`1 in H/.
-rewrite /<- integer_from_def_zero in H/.
-rewrite /<- integer_from_def_one in H/.
+rewrite /<- integer_from_Integer_zero in H/.
+rewrite /<- integer_from_Integer_one in H/.
 rewrite /-> Integer_isomorphism in H at all/.
 hyp /H/.
 qed ();
@@ -1785,7 +1785,7 @@ lemma "plusz_id_l"
 inference.
 intro /a/.
 rewrite /-> plusz_spec/.
-rewrite /-> integer_to_def_zero/.
+rewrite /-> integer_to_Integer_zero/.
 rewrite /-> Plusz_id_l/.
 rewrite /-> integer_isomorphism/.
 reflexivity.
@@ -1817,7 +1817,7 @@ rewrite /-> plusz_spec/.
 rewrite /-> negz_spec/.
 rewrite /-> Integer_isomorphism/.
 rewrite /-> Plusz_inverse_l/.
-rewrite /-> integer_from_def_zero/.
+rewrite /-> integer_from_Integer_zero/.
 reflexivity.
 qed ();
 
@@ -2841,9 +2841,9 @@ lemma "smaller_well_founded"
 inference.
 set /f/ /fn x . 
            if leqzb z`0 x then 
-             Integer_to_nat (integer_to_def x)
+             Integer_to_nat (integer_to_Integer x)
            else
-             Integer_to_nat (integer_to_def (negz x))/.
+             Integer_to_nat (integer_to_Integer (negz x))/.
 assert /forall (x : integer) . f x : nat/ /Hof/.
   {
   intro /x/.
@@ -2864,7 +2864,7 @@ assert /forall (n : nat) (a : integer) .
 assert /forall x y . 
           z`0 <z= x 
           -> x <z y
-          -> Integer_to_nat (integer_to_def x) < Integer_to_nat (integer_to_def y)/ /Hprop/.
+          -> Integer_to_nat (integer_to_Integer x) < Integer_to_nat (integer_to_Integer y)/ /Hprop/.
   {
   inference.
   clear /f Hof/.
@@ -2872,7 +2872,7 @@ assert /forall x y .
   apply /Integer_to_nat_mono_lt/.
     {
     rewrite /-> leqz_spec in Hb/.
-    unfold /integer_to_def in Hb at 0/.
+    unfold /integer_to_Integer in Hb at 0/.
     unroll /integer_to_nat in Hb/.
     reduce /Hb/.
     fold /Zeroz in Hb/.
@@ -3753,7 +3753,7 @@ lemma "timesz_id_l"
 inference.
 intro /a/.
 rewrite /-> timesz_spec/.
-rewrite /-> integer_to_def_one/.
+rewrite /-> integer_to_Integer_one/.
 rewrite /-> Timesz_id_l/.
 rewrite /-> integer_isomorphism/.
 reflexivity.
@@ -3782,9 +3782,9 @@ lemma "timesz_ann_l"
 inference.
 intro /a/.
 rewrite /-> timesz_spec/.
-rewrite /-> integer_to_def_zero/.
+rewrite /-> integer_to_Integer_zero/.
 rewrite /-> Timesz_ann_l/.
-apply /integer_from_def_zero/.
+apply /integer_from_Integer_zero/.
 qed ();
 
 
@@ -3890,7 +3890,7 @@ intro /a a' b b' Hposa Hposb Ha Hb/.
 rewrite /-> leqz_spec in Hposa in Hposb in Ha in Hb in concl/.
 rewrite /-> timesz_spec at all/.
 rewrite /-> Integer_isomorphism at all/.
-rewrite /-> integer_to_def_zero in Hposa in Hposb/.
+rewrite /-> integer_to_Integer_zero in Hposa in Hposb/.
 apply /Timesz_Leqz/ >> auto.
 qed ();
 

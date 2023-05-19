@@ -3387,47 +3387,97 @@ defines the integers as a quotient over pairs of natural numbers
 
 - `integerToDefType`
 
-      G |- integer_to_def : integer -> Integer
+      G |- integer_to_Integer : integer -> Integer
 
 - `integerFromDefType`
 
-      G |- integer_from_def : Integer -> integer
+      G |- integer_from_Integer : Integer -> integer
 
 - `integerIsomorphism1`
 
-      G |- (fn x . integer_from_def (integer_to_def x)) = (fn x . x) : (integer -> integer)
+      G |- (fn x . integer_from_Integer (integer_to_Integer x)) = (fn x . x) : (integer -> integer)
 
 - `integerIsomorphism2`
 
-      G |- (fn x . integer_to_def (integer_from_def x)) = (fn x . x) : (Integer -> Integer)
+      G |- (fn x . integer_to_Integer (integer_from_Integer x)) = (fn x . x) : (Integer -> Integer)
 
 - `pluszSpec`
 
       G |- plusz 
-            = (fn x . fn y . integer_from_def (Plusz (integer_to_def x) (integer_to_def y))) 
+            = (fn x . fn y . integer_from_Integer (Plusz (integer_to_Integer x) (integer_to_Integer y))) 
             : (integer -> integer -> integer)
 
 - `negzSpec`
 
       G |- negz 
-            = (fn x . integer_from_def (Negz (integer_to_def x))) 
+            = (fn x . integer_from_Integer (Negz (integer_to_Integer x))) 
             : (integer -> integer)
 
 - `eqzbSpec`
 
       G |- eqzb 
-            = (fn x . fn y . Eqzb (integer_to_def x) (integer_to_def y))
+            = (fn x . fn y . Eqzb (integer_to_Integer x) (integer_to_Integer y))
             : (integer -> integer -> bool)
 
 - `leqzbSpec`
 
       G |- leqzb 
-            = (fn x . fn y . Leqzb (integer_to_def x) (integer_to_def y)) 
+            = (fn x . fn y . Leqzb (integer_to_Integer x) (integer_to_Integer y)) 
             : (integer -> integer -> bool)
 
 - `timeszSpec`
 
       G |- timesz 
-            = (fn x . fn y . integer_from_def (Timesz (integer_to_def x) (integer_to_def y))) 
+            = (fn x . fn y . integer_from_Integer (Timesz (integer_to_Integer x) (integer_to_Integer y))) 
             : (integer -> integer -> integer)
+
+
+### Symbols
+
+
+- `symbolForm`
+
+      G |- symbol : type
+
+- `symbolEq`
+
+      G |- symbol = symbol : type
+
+- `symbolFormUniv I`
+
+      G |- symbol : univ I
+      >>
+      G |- I : level
+
+- `symbolEqUniv I`
+
+      G |- symbol = symbol : univ I
+      >>
+      G |- I : level
+
+- `symbolIntroOf`
+
+      G |- M : symbol
+      (where M is an symbol literal)
+
+- `symbolIntroEq`
+
+      G |- M = M : symbol
+      (where M is an symbol literal)
+
+- `symbol_eqbType`
+
+      G |- symbol_eqb : symbol -> symbol -> bool
+
+- `symbol_eqbSpec1 M N`
+
+      G |- symbol_eqb M N = true : bool
+      >>
+      G |- M = N : symbol
+
+- `symbol_eqbSpec2 M N`
+
+      G |- M = N : symbol
+      >>
+      G |- symbol_eqb M N = true : bool
 
