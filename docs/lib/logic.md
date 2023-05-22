@@ -17,6 +17,8 @@
 
     iff_refl : forall (i : level) (P : U i) . P <-> P
 
+    iff_refl' : forall (i : level) (P Q : U i) . P = Q : U i -> P <-> Q
+
     iff_symm : forall (i : level) (P Q : U i) . P <-> Q -> Q <-> P
 
     iff_trans : forall (i : level) (P Q R : U i) . P <-> Q -> Q <-> R -> P <-> R

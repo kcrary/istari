@@ -22,15 +22,15 @@ Producing:
     cons : type:cons
          imp:cons
 
-The syntactic sugar `h :: t` is accepted for `` ` cons _ h t``, as usual.
+The syntactic sugar `h :: t` is accepted for `` `cons _ h t ``, as usual.
 
 
 The iterator for lists:
 
     list_iter : type:list_iter
 
-    list_iter A P z s (nil _) --> z
-    list_iter A P z s (cons _ h t) --> s h t (list_iter A P z s t)
+    list_iter a P z s (nil _) --> z
+    list_iter a P z s (cons _ h t) --> s h t (list_iter a P z s t)
 
 
 A simpler case-analysis operation:
@@ -50,13 +50,17 @@ A simpler case-analysis operation:
            imp:append
 
     append _ (nil _) l --> l
-    append A (cons _ h t) l --> cons A h (append A t l)
+    append a (cons _ h t) l --> cons a h (append a t l)
 
     append_id_l : type:append_id_l
 
     append_id_r : type:append_id_r
 
     append_assoc : type:append_assoc
+
+    append_cons_assoc : type:append_cons_assoc
+
+    append_eq_cons : type:append_eq_cons
 
 
 ### Length
@@ -66,9 +70,15 @@ A simpler case-analysis operation:
            imp:length
 
     length _ (nil _) --> 0
-    length A (cons _ _ t) --> succ (length A t)
+    length a (cons _ _ t) --> succ (length a t)
 
     length_append : type:length_append
+
+    length_zero_form : type:length_zero_form
+
+    length_succ_form : type:length_succ_form
+
+    length_nonzero_form : type:length_nonzero_form
 
 
 ### Fold
@@ -77,6 +87,15 @@ A simpler case-analysis operation:
 
     foldr _ _ z _ (nil _) --> z
     foldr a b z f (cons _ h t) --> f h (foldr a b z f t)
+
+    foldl : type:foldl
+
+    foldl _ _ z _ (nil _) --> z
+    foldl a b z f (cons _ h t) --> foldl a b (f h z) f t
+
+    foldr_append : type:foldr_append
+
+    foldl_append : type:foldl_append
 
 
 ### Map
@@ -88,7 +107,39 @@ A simpler case-analysis operation:
 
     map_compose : type:map_compose
 
+    map_append : type:map_append
+
+    map_as_foldr : type:map_as_foldr
+
+    length_map : type:length_map
+
+    foldr_map : type:foldr_map
+
+    foldl_map : type:foldl_map
+
     
+### Reverse
+
+    reverse : type:reverse
+
+    reverse a (nil _) --> nil a
+    reverse a (cons _ h t) --> append a (reverse a t) (cons a h (nil a))
+
+    reverse_as_foldl : type:reverse_as_foldl
+
+    reverse_append : type:reverse_append
+
+    reverse_invol : type:reverse_invol
+
+    length_reverse : type:length_reverse
+
+    foldl_as_foldr : type:foldl_as_foldr
+
+    foldr_as_foldl : type:foldr_as_foldl
+
+    reverse_map : type:reverse_map
+    
+
 ### Universal and existential predicates over lists
 
     datatype
@@ -99,7 +150,6 @@ A simpler case-analysis operation:
       Forall : list a -> type =
       | Forall_nil : Forall nil
       | Forall_cons : forall h t . P h -> Forall t -> Forall (h :: t)
-
 
     datatype
       intersect (i : level) .
@@ -124,3 +174,29 @@ A simpler case-analysis operation:
     Forall_forall : type:Forall_forall
 
     Exists_exists : type:Exists_exists
+
+    Forall_nil_iff : type:Forall_nil_iff
+
+    Exists_nil_iff : type:Exists_nil_iff
+
+    Forall_cons_iff : type:Forall_cons_iff
+
+    Exists_cons_iff : type:Exists_cons_iff
+
+    Forall_append : type:Forall_append
+
+    Exists_append : type:Exists_append
+
+    In_append : type:In_append
+
+    Forall_map : type:Forall_map
+
+    Exists_map : type:Exists_map
+
+    In_map : type:In_map
+
+    Forall_reverse : type:Forall_reverse
+
+    Exists_reverse : type:Exists_reverse
+
+    In_reverse : type:In_reverse

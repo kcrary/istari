@@ -167,6 +167,50 @@ qed ();
 
 
 
+lemma "append_cons_assoc"
+/
+  forall i (a : U i) (x : a) (l1 l2 : list a) .
+    append (`cons a x l1) l2 = x :: append l1 l2 : list a
+/;
+
+inference.
+intro /i a x l1 l2/.
+iterate /l1/ >> auto.
+qed ();
+
+
+
+lemma "append_eq_cons"
+/
+  forall i (a : U i) (h : a) (t l1 l2 : list a) .
+    h :: t = append l1 l2 : list a
+    -> (exists l1' .
+          l1 = h :: l1' : list a
+          & t = append l1' l2 : list a)
+       %
+       (l1 = nil : list a & l2 = h :: t : list a)
+/;
+
+inference.
+intro /i a h t l1 l2 Heq/.
+destruct /l1/ /| x l1'/.
+  {
+  right.
+  auto.
+  }
+
+  {
+  left.
+  exists /l1'/.
+  reduce /Heq/.
+  injection /Heq/.
+  reintro /Heqh Heqt/.
+  auto.
+  }
+qed ();
+
+
+
 (* Length *)
 
 definerec /length {a} l/
@@ -234,6 +278,71 @@ qed ();
 
 
 
+lemma "length_zero_form"
+/
+  forall i (a : U i) (l : list a) .
+    length l = 0 : nat
+    -> l = nil : list a
+/;
+
+inference.
+intro /i a l H/.
+destruct /l/ /| h t/ >> auto.
+reduce /H/.
+injection /H/.
+qed ();
+
+
+
+lemma "length_succ_form"
+/
+  forall i (a : U i) (l : list a) (n : nat) .
+    length l = succ n : nat
+    -> exists h t . l = h :: t : list a
+/;
+
+inference.
+intro /i a l n H/.
+destruct /l/ /| h t/.
+
+{
+reduce /H/.
+injection /H/.
+}
+
+{
+exists /h/.
+exists /t/.
+auto.
+}
+qed ();
+
+
+
+lemma "length_nonzero_form"
+/
+  forall i (a : U i) (l : list a) .
+    0 < length l
+    -> exists h t . l = h :: t : list a
+/;
+
+inference.
+intro /i a l H/.
+destruct /l/ /| h t/.
+
+{
+reduce /H/.
+so /Nat.lt_0_not _ H/ /0/.
+}
+
+{
+exists /h/.
+exists /t/.
+auto.
+}
+qed ();
+
+
 
 (* Fold *)
 
@@ -263,6 +372,78 @@ reductions
   unfolding foldr
 /;
 
+
+
+definerec /foldl {a b} z f l/
+/
+  `list_case a b l z (fn h t . foldl a b (f h z) f t)
+//
+  intersect i .
+  forall (a b : U i) .
+    b
+    -> (a -> b -> b)
+    -> list a
+    -> b
+/;
+
+inference.
+introOf /i a b z f l/.
+revert /z/.
+induct /l/.
+reintro /IH/.
+destruct /l/ /| h t/.
+
+(* nil *)
+{
+intro /z/.
+unroll /foldl/.
+hypof.
+}
+
+(* cons *)
+{
+intro /z/.
+unroll /foldl/.
+apply /IH/.
+apply /cons_subterm/.
+}
+qed ();
+
+
+
+reductions
+/
+  foldl _ _ z _ (nil _) --> z ;
+  foldl a b z f (cons _ h t) --> foldl a b (f h z) f t ;
+  unrolling foldl
+/;
+
+
+
+lemma "foldr_append"
+/
+  forall i (a b : U i) (z : b) (f : a -> b -> b) (l1 l2 : list a) .
+    foldr z f (append l1 l2) = foldr (foldr z f l2) f l1 : b
+/;
+
+inference.
+intro /i a b z f l1 l2/.
+iterate /l1/ >> auto.
+qed ();
+
+
+
+lemma "foldl_append"
+/
+  forall i (a b : U i) (z : b) (f : a -> b -> b) (l1 l2 : list a) .
+    foldl z f (append l1 l2) = foldl (foldl z f l1) f l2 : b
+/;
+
+inference.
+intro /i a b z f l1 l2/.
+revert /z/.
+iterate /l1/ >> auto.
+qed ();
 
 
 
@@ -301,6 +482,239 @@ lemma "map_compose"
 inference.
 intro /i a b c f g l/.
 iterate /l/ >> auto.
+qed ();
+
+
+
+lemma "map_append"
+/
+  forall i (a b : U i) (f : a -> b) (l1 l2 : list a) .
+    map f (append l1 l2) = append (map f l1) (map f l2) : list b
+/;
+
+inference.
+intro /i a b f l1 l2/.
+iterate /l1/ >> auto.
+qed ();
+
+
+
+lemma "map_as_foldr"
+/
+  forall i (a b : U i) (f : a -> b) (l : list a) .
+    map f l = foldr nil (fn h t . f h :: t) l : list b
+/;
+
+inference.
+intro /i a b f l/.
+iterate /l/ >> auto.
+qed ();
+
+
+
+lemma "length_map"
+/
+  forall i (a b : U i) (f : a -> b) (l : list a) .
+    length (map f l) = length l : nat
+/;
+
+inference.
+intro /i a b f l/.
+iterate /l/ >> auto.
+qed ();
+
+
+
+lemma "foldr_map"
+/
+  forall i (a b c : U i) (z : c) (f : b -> c -> c) (g : a -> b) (l : list a) .
+    foldr z f (map g l) = foldr z (fn h t . f (g h) t) l : c
+/;
+
+inference.
+intro /i a b c z f g l/.
+iterate /l/ >> auto.
+qed ();
+
+
+
+lemma "foldl_map"
+/
+  forall i (a b c : U i) (z : c) (f : b -> c -> c) (g : a -> b) (l : list a) .
+    foldl z f (map g l) = foldl z (fn h t . f (g h) t) l : c
+/;
+
+inference.
+intro /i a b c z f g l/.
+revert /z/.
+iterate /l/ >> auto.
+qed ();
+
+
+
+(* Reverse *)
+
+define /reverse {a} l/
+/
+  list_iter a (fn _ . list a) nil (fn h _ t . append t (h :: nil)) l
+//
+  intersect i . forall (a : U i) . list a -> list a
+/;
+
+inference.
+unfold /reverse/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  reverse a (nil _) --> nil a ;
+  reverse a (cons _ h t) --> append a (reverse a t) (cons a h (nil a)) ;
+  unfolding reverse
+/;
+
+
+
+lemma "reverse_as_foldl"
+/
+  forall i (a : U i) (l : list a) .
+    reverse l = foldl nil (fn h t . h :: t) l : list a
+/;
+
+inference.
+intro /i a/.
+assert /forall l1 l2 .
+           append (reverse l1) l2 = foldl l2 (fn h t . h :: t) l1 : list a/ /H/.
+  {
+  inference.
+  intro /l1/.
+  iterate /l1/ >> auto.
+  intro /h t IH l2/.
+  rewrite /-> append_assoc/.
+  reduce //.
+  apply /IH/.
+  }
+intro /l/.
+rewrite /<- H/.
+rewrite /-> append_id_r/.
+auto.
+qed ();
+
+
+
+lemma "reverse_append"
+/
+  forall i (a : U i) (l1 l2 : list a) .
+    reverse (append l1 l2) = append (reverse l2) (reverse l1) : list a
+/;
+
+inference.
+intro /i a l1/.
+iterate /l1/.
+
+(* nil *)
+{
+intro /l2/.
+rewrite /-> append_id_r/.
+auto.
+}
+
+(* cons *)
+{
+intro /h t IH l2/.
+rewrite /-> IH/.
+rewrite /-> append_assoc/.
+reflexivity.
+}
+qed ();
+
+
+
+lemma "reverse_invol"
+/
+  forall i (a : U i) (l : list a) .
+    reverse (reverse l) = l : list a
+/;
+
+inference.
+intro /i a l/.
+iterate /l/ >> auto.
+intro /h t IH/.
+rewrite /-> reverse_append/.
+reduce //.
+auto.
+qed ();
+
+
+
+lemma "length_reverse"
+/
+  forall i (a : U i) (l : list a) .
+    length (reverse l) = length l : nat
+/;
+
+inference.
+intro /i a l/.
+iterate /l/ >> auto.
+intro /h t IH/.
+rewrite /-> length_append/.
+reduce //.
+rewrite /-> IH/.
+rewrite /-> Nat.plus_commute/.
+reflexivity.
+qed ();
+
+
+
+lemma "foldl_as_foldr"
+/
+  forall i (a b : U i) (z : b) (f : a -> b -> b) (l : list a) .
+    foldl z f l = foldr z f (reverse l) : b
+/;
+
+inference.
+intro /i a b z f l/.
+revert /z/.
+iterate /l/ >> auto.
+intro /h t IH z/.
+rewrite /-> IH/.
+rewrite /-> foldr_append/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "foldr_as_foldl"
+/
+  forall i (a b : U i) (z : b) (f : a -> b -> b) (l : list a) .
+    foldr z f l = foldl z f (reverse l) : b
+/;
+
+inference.
+intro /i a b z f l/.
+rewrite /-> foldl_as_foldr/.
+rewrite /-> reverse_invol/.
+reflexivity.
+qed ();
+
+
+
+lemma "reverse_map"
+/
+  forall i (a b : U i) (f : a -> b) l .
+    reverse (map f l) = map f (reverse l) : list b
+/;
+
+inference.
+intro /i a b f l/.
+iterate /l/ >> auto.
+intro /h t IH/.
+rewrite /-> map_append/.
+reduce //.
+auto.
 qed ();
 
 
@@ -573,6 +987,327 @@ split.
     auto.
     }
   }
+qed ();
+
+
+
+lemma "Forall_nil_iff"
+/
+  forall i (a : U i) (P : a -> U i) .
+    Forall P nil
+    <->
+    unit
+/;
+
+inference.
+intro /i a P/.
+split >> auto.
+intro /_/.
+apply /Forall_nil/.
+qed ();
+
+
+
+lemma "Exists_nil_iff"
+/
+  forall i (a : U i) (P : a -> U i) .
+    Exists P nil
+    <->
+    void
+/;
+
+inference.
+intro /i a P/.
+split.
+  {
+  intro /H/.
+  inversion /H/.
+  }
+
+  {
+  intro /0/.
+  }
+qed ();
+
+
+
+lemma "Forall_cons_iff"
+/
+  forall i (a : U i) (P : a -> U i) x l .
+    Forall P (x :: l)
+    <->
+    P x & Forall P l
+/;
+
+inference.
+intro /i a P x l/.
+split.
+  {
+  intro /H/.
+  inversion /H/.
+  reintro /Hx Hl/.
+  auto.
+  }
+
+  {
+  intro /(Hx Hl)/.
+  apply /Forall_cons/ >> auto.
+  }
+qed ();
+
+
+
+lemma "Exists_cons_iff"
+/
+  forall i (a : U i) (P : a -> U i) x l .
+    Exists P (x :: l)
+    <->
+    P x % Exists P l
+/;
+
+inference.
+intro /i a P x l/.
+split.
+  {
+  intro /H/.
+  inversion /H/ >> auto.
+  }
+
+  {
+  intro /(Hx | Hl)/.
+    {
+    apply /Exists_hit/ >> auto.
+    }
+
+    {
+    apply /Exists_miss/ >> auto.
+    }
+  }
+qed ();
+
+
+
+lemma "Forall_append"
+/
+  forall i (a : U i) (P : a -> U i) l1 l2 .
+    Forall P (append l1 l2)
+    <->
+    Forall P l1 & Forall P l2
+/;
+
+inference.
+intro /i a P l1 l2/.
+iterate /l1/.
+  {
+  rewrite /-> Forall_nil_iff/.
+  rewrite /-> Logic.prod_id_l/.
+  }
+
+  {
+  intro /h t IH/.
+  rewrite /-> Forall_cons_iff at 0 0/.
+  rewrite /-> IH/.
+  rewrite /<- Logic.prod_assoc/.
+  }
+qed ();
+
+
+
+lemma "Exists_append"
+/
+  forall i (a : U i) (P : a -> U i) l1 l2 .
+    Exists P (append l1 l2)
+    <->
+    Exists P l1 % Exists P l2
+/;
+
+inference.
+intro /i a P l1 l2/.
+iterate /l1/.
+  {
+  rewrite /-> Exists_nil_iff/.
+  rewrite /-> Logic.sum_id_l/.
+  }
+
+  {
+  intro /h t IH/.
+  rewrite /-> Exists_cons_iff at 0 0/.
+  rewrite /-> IH/.
+  rewrite /<- Logic.sum_assoc/.
+  }
+qed ();
+
+
+
+lemma "In_append"
+/
+  forall i (a : U i) x l1 l2 .
+    In a x (append l1 l2)
+    <->
+    In a x l1 % In a x l2
+/;
+
+inference.
+intro /i a x l1 l2/.
+rewrite /-> In_as_exists/.
+rewrite /-> Exists_append/.
+rewrite /<- In_as_exists at all/.
+qed ();
+
+
+
+lemma "Forall_map"
+/
+  forall i (a b : U i) (P : b -> U i) (f : a -> b) (l : list a) .
+    Forall P (map f l)
+    <->
+    Forall (fn x . P (f x)) l
+/;
+
+inference.
+intro /i a b P f l/.
+rewrite /-> Forall_as_foldr at all/.
+rewrite /-> foldr_map/.
+apply /Logic.iff_refl/.
+qed ();
+
+
+
+lemma "Exists_map"
+/
+  forall i (a b : U i) (P : b -> U i) (f : a -> b) (l : list a) .
+    Exists P (map f l)
+    <->
+    Exists (fn x . P (f x)) l
+/;
+
+inference.
+intro /i a b P f l/.
+rewrite /-> Exists_as_foldr at all/.
+rewrite /-> foldr_map/.
+apply /Logic.iff_refl/.
+qed ();
+
+
+
+lemma "In_map"
+/
+  forall i (a b : U i) (f : a -> b) (x : b) (l : list a) .
+    In b x (map f l)
+    <->
+    (exists (y : a) .
+       In a y l
+       & x = f y : b)
+/;
+
+inference.
+intro /i a b f x l/.
+iterate /l/.
+  {
+  split.
+    {
+    intro /0/.
+    }
+
+    {
+    intro /(? 0 _)/.
+    }
+  }
+
+  {
+  intro /h t IH/.
+  rewrite /-> IH/.
+  split.
+    {
+    intro /(Heq | (y Hy Heq))/.
+      {
+      exists /h/.
+      auto.
+      }
+
+      {
+      exists /y/.
+      auto.
+      }
+    }
+
+    {
+    intro /(y (Heqy | Hy) Heqx)/.
+      {
+      left.
+      subst /y/.
+      auto.
+      }
+
+      {
+      right.
+      exists /y/.
+      auto.
+      }
+    }
+  }
+qed ();
+
+
+
+lemma "Forall_reverse"
+/
+  forall i (a : U i) (P : a -> U i) l .
+    Forall P (reverse l)
+    <->
+    Forall P l
+/;
+
+inference.
+intro /i a P l/.
+iterate /l/ >> auto.
+intro /h t IH/.
+rewrite /-> Forall_cons_iff/.
+rewrite /-> Forall_append/.
+rewrite /-> Forall_cons_iff/.
+rewrite /-> Forall_nil_iff/.
+rewrite /-> Logic.prod_id_r/.
+rewrite /<- IH/.
+rewrite /-> Logic.prod_commute/.
+qed ();
+
+
+
+lemma "Exists_reverse"
+/
+  forall i (a : U i) (P : a -> U i) l .
+    Exists P (reverse l)
+    <->
+    Exists P l
+/;
+
+inference.
+intro /i a P l/.
+iterate /l/ >> auto.
+intro /h t IH/.
+rewrite /-> Exists_cons_iff/.
+rewrite /-> Exists_append/.
+rewrite /-> Exists_cons_iff/.
+rewrite /-> Exists_nil_iff/.
+rewrite /-> Logic.sum_id_r/.
+rewrite /<- IH/.
+rewrite /-> Logic.sum_commute/.
+qed ();
+
+
+
+lemma "In_reverse"
+/
+  forall i (a : U i) x l .
+    In a x (reverse l)
+    <->
+    In a x l
+/;
+
+inference.
+intro /i a x l/.
+rewrite /-> In_as_exists at 0 0/.
+apply /Exists_reverse/.
 qed ();
 
 

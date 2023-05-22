@@ -18,6 +18,8 @@
 
     iff_refl : type:iff_refl
 
+    iff_refl' : type:iff_refl'
+
     iff_symm : type:iff_symm
 
     iff_trans : type:iff_trans
