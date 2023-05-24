@@ -2592,6 +2592,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                  and |G2| = number of external arguments in scope
 
                                conargs are in G, G2
+
+                               iconstituents and strips include an argument depth', and their terms
+                               are in a context G, G1' where |G1'| = depth' and G1' is a prefix of G1.
+
                                returns the constructor and its type in G, G1
                                and returns the subterm lemma and its type in G, G1
                             *)
@@ -2653,14 +2657,15 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                                               []))])
                                            in
                                               foldl2
-                                                 (fns (v, _, _) (stripconst', indices') t =>
+                                                 (fns (v, _, _) (stripconst', depth', indices') t =>
                                                      T.apply2 Prim.prod
                                                         (T.Elim (T.Const subtermConst,
                                                                  sp @ [
                                                                       T.App (T.Elim (T.Const stripconst',
                                                                                      sp
                                                                                      @ List.map
-                                                                                          (fn (m, _, _, _) => T.App (T.Sub (m, fst s)))
+                                                                                          (fn (m, _, _) => 
+                                                                                              T.App (T.Sub (m, T.Shift (depth-depth'))))
                                                                                           indices'
                                                                                      @ [T.App v])),
 
@@ -2712,12 +2717,13 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                    let
                                       val (kconst, _, kstripconst, _, _, _) = Array.sub typeInfo k
 
+                                      val indices' = List.map (fn m => X.sub (X.use m) s) indices
+
                                       val c as (cterm, _, _) = 
                                          X.forget $
                                          X.apps
                                             (X.weaken (X.constant kconst) depth)
-                                            (List.map (fn m => X.weaken m depth) topargs
-                                             @ List.map (fn m => X.sub (X.use m) s) indices)
+                                            (List.map (fn m => X.weaken m depth) topargs @ indices')
 
                                       val (body, bodytp, subtermbody, subtermbodytp) =
                                          makeCon
@@ -2726,7 +2732,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                             rest
                                             xconstituents
                                             ((depth+1, X.var 0 c) :: iconstituents)
-                                            ((kstripconst, indices) :: strips)
+                                            ((kstripconst, depth, indices') :: strips)
                                    in
                                       (X.lam NONE c body,
 
