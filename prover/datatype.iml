@@ -33,6 +33,9 @@ signature DATATYPE =
       val typedefRaw : typedef -> unit
       val typedef : typedef -> unit
 
+      (* When set to true, does not validate datatype elaboration.  Requires unsafe mode. *)
+      val rapid : bool ref
+
    end
 
 
@@ -734,11 +737,26 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
       extension Answer of (Message.label * goal) list * Tactic.validator
 
+      val rapid = ref false
+
+      (* When using rapid datatype elaboration, we could save even more time by not building
+         the tactics in the first place, but this is much cleaner and should be good enough.
+      *)
+
       fun execute ctx a tac =
          let
             val jud = J.make ctx a
+
+            val tac' =
+               if !rapid then
+                  if Unsafe.allowed () then
+                     refine Rule.trustme
+                  else
+                     signalError "rapid datatype elaboration requires unsafe mode"
+               else
+                  tac
          in
-            (case Tactic.execute (jud, D.empty) tac of
+            (case Tactic.execute (jud, D.empty) tac' of
                 Sum.INL v =>
                    (jud, v)
 
