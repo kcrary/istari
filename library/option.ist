@@ -1,0 +1,143 @@
+
+File.import "nat-load.iml";
+File.import "datatype-load.iml";
+
+
+beginModule "Option";
+
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    forall (a : U i) .
+    U i
+  of
+    option : type =
+    | None : option
+    | Some : a -> option
+/;
+
+
+Database.setImplicits (parseConstant /None/) 1;
+Database.setImplicits (parseConstant /Some/) 1;
+
+
+
+define /option_case {a b} l mnone msome/
+/
+  option_iter a (fn _ . b) mnone msome l
+//
+  intersect i . 
+  forall (a b : U i) .
+    option a
+    -> b
+    -> (a -> b)
+    -> b
+/;
+
+inference.
+unfold /option_case/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  option_case _ _ (None _) n _ --> n ;
+  option_case _ _ (Some _ x) _ s --> s x ;
+  unfolding option_case
+/;
+
+
+
+define /bind {a b} l f/
+/
+  option_case l None (fn x . f x)
+//
+  intersect i . forall (a b : U i) . option a -> (a -> option b) -> option b
+/;
+
+inference.
+unfold /bind/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  bind _ b (None _) _ --> None b ;
+  bind _ _ (Some _ x) f --> f x ;
+  unfolding bind
+/;
+
+
+
+define /join {a} l/
+/
+  bind l (fn x . x)
+//
+  intersect i . forall (a : U i) . option (option a) -> option a
+/;
+
+inference.
+unfold /join/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  join a (None _) --> None a ;
+  join _ (Some _ l) --> l ;
+  unfolding join
+/;
+
+
+
+define /map {a b} f l/
+/
+  bind l (fn x . Some (f x))
+//
+  intersect i . forall (a b : U i) . (a -> b) -> option a -> option b
+/;
+
+inference.
+unfold /map/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  map _ b _ (None _) --> None b ;
+  map _ b f (Some _ x) --> Some b (f x) ;
+  unfolding map
+/;
+
+
+
+define /valof {a} l x/
+/
+  option_case l x (fn y . y)
+//
+  intersect i . forall (a : U i) . option a -> a -> a
+/;
+
+inference.
+unfold /valof/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  valof _ (None _) x --> x ;
+  valof _ (Some _ x) _ --> x ;
+  unfolding valof
+/;
