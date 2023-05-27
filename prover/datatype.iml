@@ -48,6 +48,8 @@ signature DATATYPE_INTERNAL =
       val write : (Word8.word -> unit) -> unit
       val read : (unit -> Word8.word) -> unit
 
+      val constructors : Constant.constant list ConstantTable.table
+
    end
 
 
@@ -1671,10 +1673,6 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-      
-
-
-
       (* Injection *)
 
       fun lams num m = natrecl num (fns _ p => T.Lam (NONE, p)) m
@@ -2038,23 +2036,47 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-      fun populate (env as ENV {persnum=numberOfVisibleArgs, tplist}) =
+      val constructors : constant list ConstantTable.table = ConstantTable.table ()
+
+
+
+      fun populate (env as ENV {persnum=numberOfVisibleArgs, tplist, conlist}) =
          let
             val destructor' = destructor env
             val insert = ConstantTable.insert
+
+            val () =
+               List.appi
+                  (fns i (TENV {const, iterator, numargs=numberOfIndexArgs, strip}) =>
+                      (
+                      insert DE.destructTactics const destructor';
+   
+                      insert InductionInternal.inductionTactics const (inductor env const numberOfIndexArgs strip);
+   
+                      insert InductionInternal.iterators const (iterator, numberOfVisibleArgs, numberOfIndexArgs);
+   
+                      insert EqualityTacticInternal.injectionTactics const (injector env const numberOfIndexArgs iterator i)
+                      ))
+                  tplist
+
+
+            (* populate constructors table *)
+
+            val tab = Array.array (List.length tplist) []
+
+            val () =
+               List.app
+                  (fn (CENV {const, tpnum}) =>
+                      Array.update tab tpnum (const :: Array.sub tab tpnum))
+                  conlist
+
+            val () =
+               List.appi 
+                  (fns i (TENV {const=tpconst}) =>
+                      ConstantTable.insert constructors tpconst (Array.sub tab i))
+                  tplist
          in
-            List.appi
-               (fns i (TENV {const, iterator, numargs=numberOfIndexArgs, strip}) =>
-                   (
-                   insert DE.destructTactics const destructor';
-
-                   insert InductionInternal.inductionTactics const (inductor env const numberOfIndexArgs strip);
-
-                   insert InductionInternal.iterators const (iterator, numberOfVisibleArgs, numberOfIndexArgs);
-
-                   insert EqualityTacticInternal.injectionTactics const (injector env const numberOfIndexArgs iterator i)
-                   ))
-               tplist
+            ()
          end
 
 

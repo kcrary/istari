@@ -473,19 +473,44 @@ structure TacticInternal :> TACTIC_INTERNAL =
 
       
       fun attempt tac goal fk sk =
-         tac goal (fn _ => sk ([(blank, goal)], valhd, fk)) sk
+         let
+            val mark = Trail.mark ()
+         in
+            tac goal 
+               (fn _ => 
+                   (
+                   Trail.rewind mark;
+                   sk ([(blank, goal)], valhd, fk)
+                   ))
+               sk
+         end
 
-      fun first tacs goal fk sk =
+      fun firstLoop mark tacs goal fk sk =
          (case tacs of
              nil => fk "no tactics in first"
 
            | [tac] => tac goal fk sk
 
            | tac :: rest =>
-                tac goal (fn _ => first rest goal fk sk) sk)
+                tac goal 
+                   (fn _ => 
+                       (
+                       Trail.rewind mark;
+                       firstLoop mark rest goal fk sk
+                       ))
+                   sk)
+
+      fun first tacs goal fk sk =
+         let
+            val mark = Trail.mark ()
+         in
+            firstLoop mark tacs goal fk sk
+         end
 
 
+(* XX delete
       fun repeat tac goal = attempt (andthen tac (repeat tac)) goal
+*)
 
       fun repeatCountLoop tac i goal =
          first [
@@ -506,14 +531,25 @@ structure TacticInternal :> TACTIC_INTERNAL =
 
 
       fun orthen tac1 tac2 goal fk sk =
-         tac1 goal
-            (fn _ => tac2 () goal fk sk)
-            sk
+         let
+            val mark = Trail.mark ()
+         in
+            tac1 goal
+               (fn _ => 
+                   (
+                   Trail.rewind mark;
+                   tac2 () goal fk sk
+                   ))
+               sk
+         end
 
 
       fun ifthen iftac thentac elsetac goal fk sk =
          let
-            do (subgoals, validate, _) = iftac goal (fn _ => elsetac goal fk sk)
+            val mark = Trail.mark ()
+
+            do (subgoals, validate, _) =
+               iftac goal (fn _ => (Trail.rewind mark; elsetac goal fk sk))
 
             do (allgoals, subvalidate, fk'') = andthenloopM [] (fn _ => thentac) subgoals [] fk
          in
@@ -523,12 +559,19 @@ structure TacticInternal :> TACTIC_INTERNAL =
 
       fun ifthenM iftac thentac elsetac goal fk sk =
          let
-            do (subgoals, validate, _) = iftac goal (fn _ => elsetac goal fk sk)
+            val mark = Trail.mark ()
+
+            do (subgoals, validate, _) = 
+               iftac goal (fn _ => (Trail.rewind mark; elsetac goal fk sk))
 
             do (allgoals, subvalidate, fk'') = andthenloopM [] thentac subgoals [] fk
          in
             sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
          end
+
+
+      fun repeat tac goal fk sk =
+         ifthen tac (repeat tac) idtac goal fk sk
 
 
       fun withgoal tac goal fk sk = tac goal goal fk sk

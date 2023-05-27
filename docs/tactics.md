@@ -18,6 +18,11 @@ goal, generating zero or more subgoals.
   displayed to the user if it backtracks all the way to the top
   level.
 
+  + `done : tactic`
+
+    Like `fail` but without the stigma.  Intended for marking points where
+    no subgoals are expected.
+
 
 - `cut : tactic -> tactic`
 
@@ -29,12 +34,6 @@ goal, generating zero or more subgoals.
 - `lift : (unit -> tactic) -> tactic`
 
   Determines the tactic only when it is time to use it.
-
-
-- `done : tactic`
-
-  Like `fail` but without the stigma.  Intended for marking points where
-  no subgoals are expected.
 
 
 - `andthen : tactic -> tactic -> tactic`
@@ -126,6 +125,15 @@ goal, generating zero or more subgoals.
   + `introRaw /[ipattern] ... [ipattern]/`
   
     As `intro` but does not invoke the typechecker.
+
+  + `intros`
+
+    Repeatedly introduces the conclusion type, generating names as
+    needed.  Similar to `repeat (intro /?/)`.
+
+  + `introsRaw`
+
+    As `intros` but does not invoke the typechecker.
 
 
 - `split`
@@ -938,7 +946,9 @@ The destruction tactics are:
 
   - `autoWith /[lemma name] ... [lemma name]/`
 
-    As `auto` but also backchains using the indicated lemmas.
+    As `auto` but also backchains using the indicated lemmas.  If a
+    "lemma" is a datatype, it backchains with all the datatype's
+    constructors.
 
   - `nautoWith [n] /[lemma name] ... [lemma name]/`
 
@@ -1079,8 +1089,8 @@ using error message `msg`.
 Exceptions tend to work clumsily with continuation-passing style.  The
 `tryf` function mediates the interface between them:
 
-    exception Tryf of string
-    tryf : (unit -> 'a) -> ('a -> 'b tacticm) -> 'b tacticm
+    exception Tactic.Tryf of string
+    Tactic.tryf : (unit -> 'a) -> ('a -> 'b tacticm) -> 'b tacticm
 
 The tactic `tryf f tac` will call `f ()` to obtain `x : 'a`, and then
 execute `tac x`.  But if `f ()` raises `Tryf msg`, the combinator
@@ -1148,7 +1158,7 @@ These tactics are primarily used to implement other tactics:
 - These primitive operations are discussed as part of [primitive
   tactics](primitive-tactics.html):
 
-      val refine : Rule.rule -> tactic
-      val chdir : Directory.directory -> tactic
-      val cast : Judgement.djudgement -> Refine.validation -> tactic
-      val execute : judgement -> tactic -> (Refine.validation, string) Sum.sum
+      Tactic.refine : Rule.rule -> tactic
+      Tactic.chdir : Directory.directory -> tactic
+      Tactic.cast : Judgement.djudgement -> Refine.validation -> tactic
+      Tactic.execute : judgement -> tactic -> (Refine.validation, string) Sum.sum

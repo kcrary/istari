@@ -11,6 +11,10 @@ signature INTRO_TACTIC =
       val introRaw : IntroPattern.ipattern list -> tactic
       val intro : IntroPattern.ipattern list -> tactic
 
+      val introsPriority : priority tacticm
+      val introsRaw : tactic
+      val intros : tactic
+
       val split : tactic
       val splitn : int -> tactic
 
@@ -143,6 +147,22 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
       fun introRaw pats = introPriority pats >> idtac
 
       fun intro pats = Typecheck.withTypecheckSnd $ introPriority pats
+
+      fun introsPriority goal fk sk =
+         ifthenM 
+            (introPriority [IntroPattern.Ident NONE])
+            (fn pri =>
+                (case pri of
+                    Primary => introsPriority
+
+                  | Secondary => idtacM Secondary))
+            (idtacM Primary)
+            goal fk sk
+
+      val introsRaw = introsPriority >> idtac
+
+      val intros = Typecheck.withTypecheckSnd introsPriority
+
 
 
       val introLet =

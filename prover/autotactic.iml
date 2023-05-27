@@ -16,7 +16,6 @@ signature AUTOTACTIC =
    end
 
 
-
 structure Autotactic :> AUTOTACTIC =
    struct
 
@@ -33,16 +32,30 @@ structure Autotactic :> AUTOTACTIC =
 
       
 
+      fun apply const = Backchain.applyPriority (ETerm.literal (Term.Const const))
+
       fun tryTools tools =
          (case tools of
-             [] => fail ""
+             [] => fail "autotactic: no more tools"
 
            | Lemma const :: rest =>
-                first
-                   [
-                   BackchainInternal.applyPriority (ETerm.literal (Term.Const const)),
-                   tryTools rest
-                   ])
+                (case ConstantTable.find DatatypeInternal.constructors const of
+                    NONE =>
+                       (* not a datatype *)
+                       first
+                          [
+                          apply const,
+                          tryTools rest
+                          ]
+
+                  | SOME l =>
+                       (* datatype, use its constructors *)
+                       first
+                          [
+                          first (List.map apply l),
+                          tryTools rest
+                          ]))
+
 
 
       fun autoLoop n symok tools =
@@ -59,7 +72,7 @@ structure Autotactic :> AUTOTACTIC =
             / $anyhyp $tm 
               ((\Prim.forall\ _ _ | \Prim.arrow\ _ _) =>
                \(fnc => fn i =>
-                    BackchainInternal.applyPriority (ETerm.literal (Term.Var i))
+                    Backchain.applyPriority (ETerm.literal (Term.Var i))
                     >>= autoCont n true tools)\)
             /,
 
@@ -74,7 +87,7 @@ structure Autotactic :> AUTOTACTIC =
                if TC.isTypecheckGoal jud then
                   idtacM Secondary
                else
-                  fail ""
+                  fail "autotactic: not a typechecking goal"
             end,
 
             EqualityTacticInternal.compatPriority
@@ -84,14 +97,14 @@ structure Autotactic :> AUTOTACTIC =
                EqualityTacticInternal.symmetryPriority
                >>= autoCont n false tools
             else
-               fail ""
+               fail "autotactic: symmetry disallowed"
             ]
 
       and autoCont n symok tools pri =
          (case pri of
              Primary =>
                 if n = 0 then
-                   fail ""
+                   fail "autotactic depth exhausted"
                 else
                    autoLoop (n-1) symok tools
 

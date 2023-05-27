@@ -54,6 +54,15 @@ fun go prelude (_, args) =
 
    (* Make the startup splash cleaner. *)
    Control.Print.out := {say = (fn _ => ()), flush = (fn () => ())};
+
+   if C.rapidFlag () then
+      (
+      Unsafe.allow ();
+      Datatype.rapid := true
+      )
+   else
+      ();
+
    
    if Repl.batch (C.inputFile ()) then
       (

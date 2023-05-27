@@ -11,6 +11,8 @@ signature BATCH_COMMAND_LINE =
       val inputFile : unit -> string
       val outputFile : unit -> string option
 
+      val rapidFlag : unit -> bool
+
    end
 
 
@@ -30,7 +32,8 @@ structure BatchCommandLine :> BATCH_COMMAND_LINE =
          print "istari usage:\n";
          print "  istari [options] <istari-file>\n\
                \  -no             do not write output\n\
-               \  -o <filename>   output file name\n";
+               \  -o <filename>   set output file name\n\
+               \  -rapid          activate unsafe mode and rapid datatype elaboration\n";
          exit ()
          )
 
@@ -55,6 +58,8 @@ structure BatchCommandLine :> BATCH_COMMAND_LINE =
                            SOME (Path.joinExt base "isto")
                         end)))
 
+      val rapidKey : bool C.id_key = C.key (C.default false)
+
 
       val parser =
          C.or
@@ -68,6 +73,7 @@ structure BatchCommandLine :> BATCH_COMMAND_LINE =
                 
                 C.unitOpt "-no" outfileKey NONE,
                 C.stringOpt "-o" (C.mapKeyIn SOME outfileKey),
+                C.unitOpt "-rapid" rapidKey true,
 
                 C.map (fn name => C.write infileKey name) C.nohyph
                 ])
@@ -90,5 +96,7 @@ structure BatchCommandLine :> BATCH_COMMAND_LINE =
       fun inputFile () = C.read infileKey (!theLog)
 
       fun outputFile () = C.read outfileKey (!theLog)
+
+      fun rapidFlag () = C.read rapidKey (!theLog)
 
    end
