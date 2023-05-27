@@ -954,6 +954,12 @@ The destruction tactics are:
 
     Combines `nauto` and `autoWith`.
 
+  - `nautoWithRaw [n] /[lemma name] ... [lemma name]/`
+
+    As `nautoWith` except that typechecking subgoals are set aside.
+    The tactic succeds if only typechecking goals remain.  If
+    primary goals would remain, the tactic does nothing.
+
 
 
 ### Arithmetic
