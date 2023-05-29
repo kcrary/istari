@@ -2,6 +2,7 @@
 File.import "logic-load.iml";
 File.import "nat-load.iml";
 File.import "datatype-load.iml";
+File.import "option-load.iml";
 File.import "list-aux.iml";
 
 
@@ -1310,6 +1311,276 @@ rewrite /-> In_as_exists at 0 0/.
 apply /Exists_reverse/.
 qed ();
 
+
+
+(* Nth *)
+
+alias /option/ /Option.option/;
+alias /None/ /Option.None/;
+alias /Some/ /Option.Some/;
+
+
+define /nth {a} l i/
+/
+  list_iter a (fn _ . nat -> option a)
+    (fn _ . None)
+    (fn h _ f i .
+       nat_case i
+         (Some h)
+         (fn i' . f i'))
+    l
+    i
+//
+  intersect lv . forall (a : U lv) . list a -> nat -> option a
+/;
+
+inference.
+unfold /nth/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  nth a (nil _) _ --> None a ;
+  nth a (cons _ h t) i --> nat_case i (Some a h) (fn i' . nth a t i') ;
+  unfolding nth
+/;
+
+
+
+lemma "nth_within_length"
+/
+  forall lv (a : U lv) l i .
+    i < length l
+    <-> (exists x . nth l i = Some x : option a)
+/;
+
+inference.
+intro /lv a l/.
+iterate /l/.
+
+(* nil *)
+{
+intro /i/.
+split.
+  {
+  intro /H/.
+  so /Nat.lt_0_not _ H/ /0/.
+  }
+
+  {
+  intro /(x H)/.
+  injection /H/.
+  }
+}
+
+(* cons *)
+{
+intro /h t IH i/.
+destruct /i/ /| i/.
+  {
+  split.
+    {
+    intro /Hlt/.
+    exists /h/.
+    auto.
+    }
+
+    {
+    intro /(x Heq)/.
+    apply /Nat.lt_0_succ/.
+    }
+  }
+split.
+  {
+  intro /Hlt/.
+  apply /IH/.
+  apply /Nat.lt_succ_invert/ >> auto.
+  }
+
+  {
+  intro /(x Heq)/.
+  apply /Nat.lt_succ_succ/.
+  apply /IH/.
+  exists /x/.
+  reduce /Heq/.
+  auto.
+  }
+}
+qed ();
+
+
+
+lemma "nth_outside_length"
+/
+  forall lv (a : U lv) l i .
+    length l <= i
+    <->
+    nth l i = None : option a
+/;
+
+inference.
+intro /lv a l/.
+iterate /l/.
+
+(* nil *)
+{
+intro /i/.
+split.
+  {
+  auto.
+  }
+
+  {
+  intro /_/.
+  apply /Nat.leq_0_min/.
+  }
+}
+
+(* cons *)
+{
+intro /h t IH i/.
+destruct /i/ /| i/.
+  {
+  split.
+    {
+    intro /Hleq/.
+    so /Nat.leq_succ_0_not _ Hleq/ /0/.
+    }
+
+    {
+    intro /Heq/.
+    injection /Heq/.
+    }
+  }
+split.
+  {
+  intro /Hleq/.
+  apply /IH/.
+  apply /Nat.leq_succ_invert/ >> auto.
+  }
+
+  {
+  intro /Heq/.
+  apply /Nat.leq_succ_succ/.
+  apply /IH/ >> auto.
+  }
+}
+qed ();
+
+
+
+lemma "nth_append_left"
+/
+  forall lv (a : U lv) l1 l2 i .
+    i < length l1
+    -> nth (append l1 l2) i = nth l1 i : option a
+/;
+
+inference.
+intro /lv a l1 l2/.
+iterate /l1/.
+
+(* nil *)
+{
+intro /i H/.
+so /Nat.lt_0_not _ H/ /0/.
+}
+
+(* cons *)
+{
+intro /h t IH i Hlt/.
+destruct /i/ /| i/.
+  {
+  reduce //.
+  auto.
+  }
+reduce //.
+apply /IH/.
+apply /Nat.lt_succ_invert/ >> auto.
+}
+qed ();
+
+
+
+lemma "nth_append_right"
+/
+  forall lv (a : U lv) l1 l2 i .
+    length l1 <= i
+    -> nth (append l1 l2) i = nth l2 (i - length l1) : option a
+/;
+
+inference.
+intro /lv a l1 l2/.
+iterate /l1/.
+
+(* nil *)
+{
+intro /i _/.
+auto.
+}
+
+(* cons *)
+{
+intro /h t IH i Hleq/.
+destruct /i/ /| i/.
+  {
+  so /Nat.leq_succ_0_not _ Hleq/ /0/.
+  }
+reduce //.
+apply /IH/.
+apply /Nat.leq_succ_invert/ >> auto.
+}
+qed ();
+
+
+
+lemma "nth_map"
+/
+  forall lv (a b : U lv) (f : a -> b) l i .
+    nth (map f l) i = Option.map f (nth l i) : option b
+/;
+
+inference.
+intro /lv a b f l/.
+iterate /l/ >> auto.
+intro /h t IH i/.
+destruct /i/ /| i/.
+  {
+  reduce //.
+  auto.
+  }
+reduce //.
+apply /IH/.
+qed ();
+
+
+
+lemma "nth_In"
+/
+  forall lv (a : U lv) l i .
+    Option.option_case (nth l i)
+      unit
+      (fn x . In a x l)
+/;
+
+inference.
+intro /lv a l/.
+iterate /l/ >> auto.
+intro /h t IH i/.
+destruct /i/ /| i/.
+  {
+  reduce //.
+  auto.
+  }
+reduce //.
+so /IH i/ /H/.
+revert /H/.
+generalize /nth t i/ /_/ /x/.
+destruct /x/ /{ | x }/ >> auto.
+qed ();
 
 
 Namespace.endModule ();

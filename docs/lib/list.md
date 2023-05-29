@@ -257,3 +257,30 @@ A simpler case-analysis operation:
 
     In_reverse : forall (i : level) (a : U i) (x : a) (l : list a) .
                     In a x (reverse l) <-> In a x l
+
+
+### Nth
+
+    nth : intersect (lv : level) . forall (a : U lv) . list a -> nat -> option a
+
+    nth a (nil _) _ --> None a
+    nth a (cons _ h t) i --> nat_case i (Some a h) (fn i' . nth a t i')
+
+    nth_within_length : forall (lv : level) (a : U lv) (l : list a) (i : nat) .
+                           i < length l <-> (exists (x : a) . nth l i = Some x : option a)
+
+    nth_outside_length : forall (lv : level) (a : U lv) (l : list a) (i : nat) .
+                            length l <= i <-> nth l i = None : option a
+
+    nth_append_left : forall (lv : level) (a : U lv) (l1 l2 : list a) (i : nat) .
+                         i < length l1 -> nth (append l1 l2) i = nth l1 i : option a
+
+    nth_append_right : forall (lv : level) (a : U lv) (l1 l2 : list a) (i : nat) .
+                          length l1 <= i
+                          -> nth (append l1 l2) i = nth l2 (i - length l1) : option a
+
+    nth_map : forall (lv : level) (a b : U lv) (f : a -> b) (l : list a) (i : nat) .
+                 nth (map f l) i = Option.map f (nth l i) : option b
+
+    nth_In : forall (lv : level) (a : U lv) (l : list a) (i : nat) .
+                Option.option_case (nth l i) unit (fn x . In a x l)

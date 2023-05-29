@@ -200,3 +200,23 @@ A simpler case-analysis operation:
     Exists_reverse : type:Exists_reverse
 
     In_reverse : type:In_reverse
+
+
+### Nth
+
+    nth : type:nth
+
+    nth a (nil _) _ --> None a
+    nth a (cons _ h t) i --> nat_case i (Some a h) (fn i' . nth a t i')
+
+    nth_within_length : type:nth_within_length
+
+    nth_outside_length : type:nth_outside_length
+
+    nth_append_left : type:nth_append_left
+
+    nth_append_right : type:nth_append_right
+
+    nth_map : type:nth_map
+
+    nth_In : type:nth_In
