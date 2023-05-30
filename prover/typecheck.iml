@@ -51,7 +51,7 @@ signature TYPECHECK_INTERNAL =
       val isTypecheckGoal : Judgement.judgement -> bool
 
       val multigoalTypecheck :
-         Tactic.goal list
+         (string * Tactic.goal) list
          -> (Message.label * Tactic.goal) list * (Refine.validation list -> Refine.validation list)
 
 
@@ -332,7 +332,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Error reporting ***)
 
-      type history = goal list
+      type origin = string
+      type history = origin * goal list
 
       fun bracketNumberString i =
          if i < 10 then
@@ -355,43 +356,49 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                 end)
 
 
-      fun errorDetail history msg details () =
+      fun errorDetail hist msg details () =
          (
          print msg;
          print "\n";
 
          details ();
 
-         (case history of
+         (case hist of
              [] => ()
 
            | (jud, dir) :: _ =>
                 (
                 print "\nwith history:\n";
-                printHistLoop 0 history (S.length (J.context jud)) dir
+                printHistLoop 0 hist (S.length (J.context jud)) dir
                 ));
 
          print "\n"
          )
 
 
-      fun error history msg details =
-         idtacM $
-         Message.addDetail
-            (Message.fromString "undischarged typing obligation")
-            (errorDetail history ("Type error: " ^ msg) details)
+      fun attach str1 str2 =
+         if str2 =$ "" then
+            str1
+         else
+            String.concat [str1, "; ", str2]
 
-      fun nonerror history (jud, dir) =
+      fun error (origin, hist) msg details =
          idtacM $
          Message.addDetail
-            (Message.fromString "undischarged typing obligation")
-            (errorDetail history "Non-typechecking typing obligation" (fn () => ()))
+            (Message.fromString (attach "undischarged typing obligation" origin))
+            (errorDetail hist ("Type error: " ^ msg) details)
 
-      fun unprocessed history (jud, dir) =
+      fun nonerror (origin, hist) (jud, dir) =
          idtacM $
          Message.addDetail
-            (Message.fromString "undischarged typing obligation")
-            (errorDetail history "Unprocessed level constraint" (fn () => ()))
+            (Message.fromString (attach "undischarged typing obligation" origin))
+            (errorDetail hist "Non-typechecking typing obligation" (fn () => ()))
+
+      fun unprocessed (origin, hist) (jud, dir) =
+         idtacM $
+         Message.addDetail
+            (Message.fromString (attach "undischarged typing obligation" origin))
+            (errorDetail hist "Unprocessed level constraint" (fn () => ()))
 
       fun badgoalError history (jud, dir) =
          error history "ill-formed typechecking goal" (fn () => ())
@@ -897,7 +904,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
          end
 
 
-      fun processSubgoals oldsz table history goals =
+      fun processSubgoals oldsz table (history as (origin, hist)) goals =
          List.foldr
             (fns (_, goal as (jud, dir)) (obs, tacs) =>
                 let
@@ -913,14 +920,14 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                                | NONE =>
                                     ([(Istp, table', wf goal, dest, history)],
-                                     nonerror (goal :: history) goal))
+                                     nonerror (origin, goal :: hist) goal))
 
                         | YES prob =>
                              ([(prob, table', goal, dest, history)],
                               play dest)
 
                         | BAD =>
-                             ([], badgoalError (goal :: history) goal))
+                             ([], badgoalError (origin, goal :: hist) goal))
                 in
                    (obs' @ obs, tac :: tacs)
                 end)
@@ -978,7 +985,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             queue := obs @ !queue
             )
 
-      fun defer (ST { deferred }) (prob, table, goal as (jud, dir), dest, history) =
+      fun defer (ST { deferred }) (prob, table, goal as (jud, dir), dest, (origin, hist)) =
          (* avoid duplicating the history's head *)
          (
          if !trace then
@@ -986,7 +993,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
          else
             ();
 
-         deferred := (prob, table, goal, dest, List.tl history) :: !deferred
+         deferred := (prob, table, goal, dest, (origin, List.tl hist)) :: !deferred
          )
 
       (* NB!  When we put a tactic into the destination that accompanies a goal,
@@ -1059,7 +1066,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Of checking ***)
 
-      fun typecheckOf (st as ST { progress, constraints }) table (goal as (jud, dir)) dest history =
+      fun typecheckOf (st as ST { progress, constraints }) table (goal as (jud, dir)) dest (history as (origin, hist)) =
          let
             val ctx = J.context jud
             val concl = J.concl jud
@@ -1094,7 +1101,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                       refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 1])))
                       (* G |- M : A *)
                       >>
-                      idtacM (Message.fromString "manual typing obligation")
+                      idtacM (Message.fromString (attach "manual typing obligation" origin))
                       )
                    )\
    
@@ -1309,13 +1316,13 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                                         | NONE =>
                                              ([(Istp, table', wf subgoal, subdest, history)],
-                                              nonerror (subgoal :: history) subgoal))
+                                              nonerror (origin, subgoal :: hist) subgoal))
 
                                  | YES prob =>
                                       ([(prob, table', subgoal, subdest, history)],
                                        play subdest)
 
-                                 | BAD => ([], badgoalError (subgoal :: history) subgoal))
+                                 | BAD => ([], badgoalError (origin, subgoal :: hist) subgoal))
 
                          in
                             r := obs @ !r;
@@ -1877,7 +1884,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Equniv/Eqkind checking ***)
 
-      fun typecheckEqX tactics tab (st as ST { progress }) table (goal as (jud, dir)) dest history =
+      fun typecheckEqX tactics tab (st as ST { progress }) table (goal as (jud, dir)) dest (history as (origin, hist)) =
          let
             val ctx = J.context jud
             val concl = J.concl jud
@@ -1971,14 +1978,14 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                                         | NONE =>
                                              ([(Istp, table', wf subgoal, subdest, history)],
-                                              nonerror (subgoal :: history) subgoal))
+                                              nonerror (origin, subgoal :: hist) subgoal))
 
                                  | YES prob =>
                                       ([(prob, table', subgoal, subdest, history)],
                                        play subdest)
 
                                  | BAD =>
-                                      ([], badgoalError (subgoal :: history) subgoal))
+                                      ([], badgoalError (origin, subgoal :: hist) subgoal))
                          in
                             r := obs @ !r;
                             tac
@@ -2268,9 +2275,9 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Main loop ***)
 
-      fun dispatch (st as ST { constraints }) (prob, table, goal as (jud, dir), dest, history) =
+      fun dispatch (st as ST { constraints }) (prob, table, goal as (jud, dir), dest, (history as (origin, hist))) =
          let
-            val history' = goal :: history
+            val history' = (origin, goal :: hist)
          in
             if !trace then
                showPrefixed "checking " dir (J.concl jud)
@@ -2313,40 +2320,6 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                 ))
 
 
-(* XX delete
-      exception ReenteredTypechecker
-      val inChecker = ref false
-
-      fun bracket f =
-         if !inChecker then
-            raise ReenteredTypechecker
-         else
-            let
-               val () =
-                  (
-                  inChecker := true;
-                  progress := false;
-                  deferred := [];
-                  constraints := []
-                  )
-   
-               val x = 
-                  try
-                     Sum.INL (f ())
-                  with exn => Sum.INR exn
-            in
-               queue := [];
-               deferred := [];
-               constraints := [];
-               inChecker := false;
-   
-               (case x of
-                   Sum.INL y => y
-                 | Sum.INR exn => raise exn)
-            end
-*)
-
-
       (* noq: don't enqueue subgoals or run level solver *)
       fun masterTypecheck noq obs =
          let
@@ -2371,12 +2344,12 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       fun goalsToTacs goals =
          List.foldr
-            (fns (pri, goal as (jud, dir)) (obs, tacs) =>
-                (case pri of
-                    Primary => 
+            (fns (metadata, goal as (jud, dir)) (obs, tacs) =>
+                (case metadata of
+                    NONE => 
                        (obs, idtac :: tacs)
 
-                  | Secondary =>
+                  | SOME origin =>
                        let
                           val dest = newdest ()
                           val table = buildTable jud
@@ -2384,15 +2357,15 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                           val (obs', tac) =
                              (case isTypecheckGoalTri jud of
                                  NO =>
-                                    ([(Istp, table, wf goal, dest, [])],
+                                    ([(Istp, table, wf goal, dest, (origin, []))],
                                      idtac)
 
                                | YES prob =>
-                                    ([(prob, table, goal, dest, [])],
+                                    ([(prob, table, goal, dest, (origin, []))],
                                      play dest)
 
                                | BAD =>
-                                    ([], badgoalError [goal] goal))
+                                    ([], badgoalError (origin, [goal]) goal))
                        in
                           (obs' @ obs, tac :: tacs)
                        end))
@@ -2401,18 +2374,20 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
 
 
-      fun ambiguous history goal =
+      fun ambiguous (origin, hist) goal =
          idtacM $
          Message.addDetail
-            (Message.fromString "ambiguous typing obligation")
-            (errorDetail (goal :: history) "Ambiguous goal" (fn () => ()))
+            (Message.fromString (attach "ambiguous typing obligation" origin))
+            (errorDetail (goal :: hist) "Ambiguous goal" (fn () => ()))
 
 
-      fun withTypecheckMain tac (goal as (_, dir)) fk sk =
+      fun withTypecheckMain f tac (goal as (_, dir)) fk sk =
          let
             do (subgoals, validate, _) = tac goal fk
 
-            val (obs, tacs) = goalsToTacs subgoals
+            val (obs, tacs) = 
+               goalsToTacs
+                  (map (fn (x, goal) => (f x, goal)) subgoals)
 
             val remaining = masterTypecheck false obs
 
@@ -2428,11 +2403,25 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
          end
 
 
-      fun withTypecheckSnd tac = withTypecheckMain tac
+      fun priorityToOrigin pri =
+         (case pri of
+             Primary => NONE
+           | Secondary => SOME "")
+      
+      fun withTypecheckSnd tac = 
+         withTypecheckMain 
+            priorityToOrigin
+            tac
 
-      fun withTypecheck tac = withTypecheckSnd (tac >> idtacM Secondary)
+      fun withTypecheck tac = 
+         withTypecheckMain
+            (fn label => SOME (Message.toString label))
+            tac
 
-      val typecheck = withTypecheckSnd (idtacM Secondary)
+      val typecheck = 
+         withTypecheckMain
+            (fn _ => SOME "")
+            idtac
 
                    
       fun inference (goal as (jud, dir)) fk sk =
@@ -2441,7 +2430,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                (J.make (J.context jud) (T.apply1 Prim.istp (J.concl jud)),
                 dir)
 
-            val (obs, _) = goalsToTacs [(Secondary, goal')]
+            val (obs, _) = goalsToTacs [(SOME "", goal')]
          in
             (* Do all this just for the side effects. *)
             masterTypecheck false obs;
@@ -2457,7 +2446,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    val dest = newdest ()
 
                    val remaining =
-                      masterTypecheck true [(prob, buildTable jud, goal, dest, [])]
+                      masterTypecheck true [(prob, buildTable jud, goal, dest, ("", []))]
 
                    val () =
                       List.app
@@ -2475,8 +2464,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       fun multigoalTypecheck goals =
          let
-            val goals' = map (fn goal => (Secondary, goal)) goals
-            val (obs, tacs) = goalsToTacs goals'
+            val (obs, tacs) = goalsToTacs (List.map (fn (origin, goal) => (SOME origin, goal)) goals)
          
             val remaining = masterTypecheck false obs
 
@@ -2486,7 +2474,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                   remaining
          in
             (case 
-                andthenloop tacs goals' []
+                andthenloop tacs goals []
                 (fn msg => raise (Fail ("internal typechecking tactic failure:" ^ msg)))
                 (fn (subgoals, validate, _) => Answer (subgoals, validate))
              of

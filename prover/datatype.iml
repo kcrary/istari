@@ -74,7 +74,6 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       structure RR = RegistryInternal
       structure S = Seq
       structure T = Term
-      structure TC = TypecheckInternal
       structure U = Unify
       structure X = XTerm
 
@@ -461,7 +460,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-      type 'a res = goal list * (validation list -> 'a * validation list)
+      type origin = string
+      type 'a res = (origin * goal) list * (validation list -> 'a * validation list)
 
       fun 'a unitres (goal, f : validation -> 'a) : 'a res =
          ([goal],
@@ -473,7 +473,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
       val nilres : 'a list res = ([], (fn vs => ([], vs)))
 
-      fun 'a consres ((goal, f1) : goal * (validation -> 'a)) ((goals, f2) : 'a list res) : 'a list res =
+      fun 'a consres ((goal, f1) : (origin * goal) * (validation -> 'a)) ((goals, f2) : 'a list res) : 'a list res =
          (goal :: goals,
           (fn [] =>
                  raise Refine.ValidationFailure
@@ -534,12 +534,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             nilres
             l1 l2
 
-      fun growres dir ctx a g goals =
+      fun growres label dir ctx a g goals =
          let
             val jud = J.make ctx a
          in
             consres
-               ((jud, dir), (fn v => g jud v))
+               ((label, (jud, dir)), (fn v => g jud v))
                goals
          end
 
@@ -552,7 +552,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          In the itypedef, each term comes with a tactic that proves it is well-formed 
          (using the validations from the typechecking goals).
       *)
-      fun reprocess ((invis, pers, univ, dts) : rtypedef) : goal list * (validation list -> itypedef) =
+      fun reprocess ((invis, pers, univ, dts) : rtypedef) : (origin * goal) list * (validation list -> itypedef) =
          let
             val ((invisdir, invisctx), invisres) =
                bifold
@@ -560,7 +560,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       ((D.bind dir sym,
                         S.cons (J.Tm a) ctx),
 
-                       growres dir ctx
+                       growres ("pervasive argument " ^ Symbol.toValue sym) dir ctx
                           (T.apply1 Prim.istp a)
                           (fns jud v => (sym, (a, T.Const Prim.bogus, jud, v)))))
                   (fn _ => nilres)
@@ -574,7 +574,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       ((D.bind dir sym,
                         S.cons (J.Tm a) ctx),
 
-                       growres dir ctx
+                       growres ("pervasive argument " ^ Symbol.toValue sym) dir ctx
                           (T.apply1 Prim.istp a)
                           (fns jud v => (sym, (a, T.Const Prim.bogus, jud, v)))))
                   (fn _ => nilres)
@@ -585,13 +585,15 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             val univtacres =
                unitres
-               ((univjud, fulldir), (fn v => (univjud, v)))
+               (("universe", (univjud, fulldir)), (fn v => (univjud, v)))
 
 
             val dtsres =
                mapres
                   (fn (dtsym, tyargs, dcons) =>
                       let
+                         val dtorigin = "datatype " ^ Symbol.toValue dtsym
+
                          val (_, tyargres) =
                             bifold
                                (fns (symopt, a) (dir, ctx, depth) =>
@@ -602,7 +604,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                         S.cons (J.Tm a) ctx,
                                         depth+1),
                                        
-                                       growres dir ctx
+                                       growres dtorigin dir ctx
                                           (T.apply2 Prim.ov t a)
                                           (fns jud v => (symopt, (a, t, jud, v))))
                                    end)
@@ -614,6 +616,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                             mapres
                                (fns (dconsym, conargs, indices) =>
                                    let
+                                      val origin = "constructor " ^ Symbol.toValue dconsym
+
                                       val ((dir, ctx, depth), conargsres) =
                                          bifold
                                             (fns arg (dir, ctx, depth) =>
@@ -626,7 +630,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                             S.cons (J.Tm a) ctx,
                                                             depth+1),
    
-                                                           growres dir ctx
+                                                           growres origin dir ctx
                                                               (T.apply2 Prim.ov t a)
                                                               (fns jud v => External (binderopt, (a, t, jud, v))))
                                                        end
@@ -644,7 +648,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                                     in
                                                                        (T.Dot (index, st),
    
-                                                                        growres dir ctx
+                                                                        growres origin dir ctx
                                                                            (T.apply2 Prim.ov t index)
                                                                            (fns jud v => (index, t, jud, v)))
                                                                     end)
@@ -670,7 +674,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                 in
                                                    (T.Dot (index, st),
    
-                                                    growres dir ctx
+                                                    growres origin dir ctx
                                                        (T.apply2 Prim.ov t index)
                                                        (fns jud v => (index, t, jud, v)))
                                                 end)
@@ -3575,9 +3579,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             val () = checkLibrariesLoaded ()
          
             val (goals, f) = reprocess (resolve typedef)
-            val goals' = List.map (fn goal => (Message.blank, goal)) goals
 
-            do vs = ProverInternal.setGoals goals'
+            do vs = ProverInternal.setGoals (List.map (fn (origin, goal) => (Message.fromString origin, goal)) goals)
          in
             makeDatatype (f vs)
          end

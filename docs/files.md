@@ -30,7 +30,7 @@ Thus Istari content and IML code must be loaded separately:
 
 
 
-### Naming conventions
+### Library naming conventions
 
 The Istari library adopts a naming convention for the various files
 that attend an Istari file.  We use `Nat` as an example:
