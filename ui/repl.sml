@@ -14,6 +14,8 @@ signature CTRL =
       val printLength : int ref
       val stringDepth : int ref
 
+      val gcMessages : bool -> unit
+
 
       val allowBeep : bool ref
       val primaryPrompt : string ref
@@ -77,6 +79,7 @@ signature PLATFORM =
             val printDepth : int ref
             val printLength : int ref
             val stringDepth : int ref
+            val gcMessages : bool -> unit
 
          end
 
@@ -581,6 +584,7 @@ functor ReplFun (structure Platform : PLATFORM
                makeStruct
                   ["load", "use", "escape", "exit", "pwd", "cd",
                    "printDepth", "printLength", "stringDepth",
+                   "gcMessages",
                    "allowBeep", "primaryPrompt", "secondaryPrompt"]
       
             val recoverSig =

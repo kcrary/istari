@@ -23,6 +23,7 @@ local
                val printDepth = Control.Print.printDepth
                val printLength = Control.Print.printLength
                val stringDepth = Control.Print.stringDepth
+               val gcMessages = SMLofNJ.Internals.GC.messages
    
             end
          
