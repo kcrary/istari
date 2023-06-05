@@ -1225,6 +1225,15 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   end
 
 
+            fun normalizeHyps max i goal fk sk =
+               if i >= max then
+                  idtac goal fk sk
+               else
+                  (refine (Rule.normalizeHyp i)
+                   >>+
+                   normalizeHyps max (i+1)) goal fk sk
+
+
             fun destOne hyp persact origjud pat (CENV {tpnum=i, connum=j, args, numargs, indices}) set =
                (case pat of
                    IP.And pats =>
@@ -1257,6 +1266,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                  (* G, C, hide D, E[^] ... D[^hyp+2] |- ... *)
                                  refine (Rule.weaken (hyp+2) 1)
                                  >>
+                                 (* G, C, E ... D[^hyp+1] |- ... *)
                                  cut
                                     (repeat
                                         (
@@ -1284,6 +1294,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                      (* G, C, E ... <equalities> |- ... *)
                                      splitArgs 0 (hyp+eqs) T.id persact args
                                      >>
+                                     normalizeHyps eqs 0
+                                     >>+
                                      (* G, <arguments>, ..., <equalities> |- ... *)
                                      refine (Rule.exchange 0 eqs hyp)
                                      >>

@@ -36,10 +36,11 @@ structure Inversion :> INVERSION =
 
 
       (* Perform injection or substitution, where possible, on hypotheses
-         n through n + num - 1.
+         n down through stop (inclusive).  Only substitute for variables
+         between stop and lid (inclusive).
       *)
-      fun injections num n =
-         if num = 0 then
+      fun injections lid stop n =
+         if n < stop then
             idtacM Primary
          else
             goalContextCaseT
@@ -50,21 +51,34 @@ structure Inversion :> INVERSION =
                              HypTactic.clearn n
                              >>
                              (* one hypothesis deleted *)
-                             injections (num-1) n
-                          else
+                             injections (lid-1) stop (n-1)
+                          else if i <= lid then
+                             (* Make sure the left-hand equand is a new variable (i.e.,
+                                introduced by destruction).  Note that stop <= n < i.
+
+                                Note that the rhs is made of up index variables for the
+                                hypothesis that was destructed, all of which must be old
+                                variables, so there won't be a dependency problem subsituted
+                                j for i.
+                             *)
                              EqualityTacticInternal.substMain false i n (T.Var j)
                              >>!
                              (* two hypotheses deleted: one equality, one variable *)
-                             injections (num-2) n)\
-   
+                             injections (lid-2) stop (n-1)
+                          else
+                             injections lid stop (n-1))\
+                             
                    | \Prim.eq\ _ var? ? =>
                      \(fnc i m =>
-                          EqualityTacticInternal.substMain false i n m
-                          >>!
-                          injections (num-2) n)\
+                          if i <= lid then
+                             EqualityTacticInternal.substMain false i n m
+                             >>!
+                             injections (lid-2) stop (n-1)
+                          else
+                             injections lid stop (n-1))\
    
-                   | \Prim.eq\ _ _ _ =>
-                     \(fnc =>
+                   | \Prim.eq\ _ (const? @ _) (const? @ _) =>
+                     \(fnc _ _ =>
                           let
                              do sz = withsize
                           in
@@ -81,18 +95,17 @@ structure Inversion :> INVERSION =
                                               >>
                                               HypTactic.exchange 0 new n
                                               >>
-                                              injections (num - 1 + new) n
+                                              injections (lid - 1 + new) stop (n - 1 + new)
                                            end
       
                                       | _ => idtacM pri))
-                                (injections (num-1) (n+1))
+                                (injections lid stop (n-1))
                           end)\
                   )
 
              | _ =>
                \(fnc =>
-                    (* one hypothesis kept *)
-                    injections (num-1) (n+1))\
+                    injections lid stop (n-1))\
             /
          
 
@@ -149,8 +162,9 @@ structure Inversion :> INVERSION =
                        >>!
                        let
                           do sz' = withsize
+                          val first = n + sz' - sz
                        in
-                          injections (sz' - sz + 1) n
+                          injections first n first
                        end)
                       (List.map post pats)
                       (post (IP.And []))
