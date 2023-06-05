@@ -911,7 +911,7 @@ The destruction tactics are:
 
   Runs the typechecker on all of the current goals.
 
-  Note this this is not a tactic, so it is invoked `typechecker ();`, not `typechecker.`
+  Note that this is not a tactic, so it is invoked `typechecker ();`, not `typechecker.`
 
 
 - `trivialize`

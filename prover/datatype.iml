@@ -1083,6 +1083,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          hypotheses in-place, which the iterator cannot do.)
       *)
 
+
       fun destructor (ENV {invis, pers, univ=univ_mobile, a=a_mobile, dcons=dcons_mobile, tplist, conlist}) =
          let
             val a = X.use a_mobile
@@ -1224,11 +1225,13 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   end
 
 
-            fun destOne hyp persact jud pat (CENV {tpnum=i, connum=j, args, numargs, indices}) set =
+            fun destOne hyp persact origjud pat (CENV {tpnum=i, connum=j, args, numargs, indices}) set =
                (case pat of
                    IP.And pats =>
                       let
                          val v = D.freshSet set
+
+                         do (jud, _) = withgoal
                       in
                          (* G, exists (set C . D) . E ... |- ... *)
                          refine (Rule.existsLeft hyp (T.evar ()) (T.evar ()) (T.evar ()))
@@ -1250,7 +1253,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                  >>
                                  (* G, C, D, E[^] ... |- D[^hyp+2] *)
                                  refine (Rule.hypothesis (hyp+1)) >> done,
-                                 
+
                                  (* G, C, hide D, E[^] ... D[^hyp+2] |- ... *)
                                  refine (Rule.weaken (hyp+2) 1)
                                  >>
@@ -1288,7 +1291,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                      let
                                         val CENV {const=conConst, red} = Array.sub conInfo j
                                      in
-                                        DE.refold jud hyp (numargs+eqs)
+                                        DE.refold origjud hyp (numargs+eqs)
                                            (T.Elim
                                                (T.Const conConst,
                                                 List.map
@@ -1320,7 +1323,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                  | _ => fail "datatype pattern expected")
 
 
-            fun destAll hyp persact jud pats tpnum cons set =
+            fun destAll hyp persact origjud pats tpnum cons set =
                (case cons of
                    [] =>
                       (case pats of
@@ -1342,12 +1345,20 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                  | [] => (IP.And [], []))
                             else
                                (IP.And [], [])
+
+                         do (jud, _) = withgoal
+
+                         val (a, b) =
+                            hypCase (J.hyp jud hyp)
+                            / $tm $whnfHard \Prim.sum\ ? ? =>
+                              \(fnc a b => (a, b))\
+                            /
                       in
                          refine (Rule.sumLeft hyp (T.evar ()) (T.evar ()) (T.evar ()))
                          >>> [
-                             destOne hyp persact jud pat con set,
+                             destOne hyp persact origjud pat con set,
    
-                             destAll hyp persact jud pats' tpnum rest set
+                             destAll hyp persact origjud pats' tpnum rest set
                              ]
                       end)
 
@@ -2006,34 +2017,38 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             fun inject ihyp =
                goalContextCaseT
-               / $hyp \ihyp\ $tm \Prim.eq\ (\tpconst\ @ ?) ($as (const? @ ?)) ($as (const? @ ?)) =>
-                 \(fnc dtspine m mconst mspine n nconst nspine =>
-                      let
-                         do (visSpine, indSpine, mpos, npos) =
-                            tryf
-                            (fn () =>
-                                (case List.splitOpt dtspine nvis of
-                                    NONE =>
-                                       raise (Tryf "type error in injection hypothesis")
-       
-                                  | SOME (visSpine, indSpine) => 
-                                       (case CD.find constructorInvert mconst of
-                                           NONE => 
-                                              raise (Tryf "equand is not a constructor")
-       
-                                         | SOME mpos =>
-                                              (case CD.find constructorInvert nconst of
-                                                  NONE => 
-                                                     raise (Tryf "equand is not a contructor")
-       
-                                                | SOME npos =>
-                                                     (visSpine, indSpine, mpos, npos)))))
-                      in
-                         if mpos = npos then
-                            injectYes ihyp visSpine indSpine mpos m n
-                         else
-                            injectNo ihyp visSpine indSpine mpos m npos n
-                      end)\
+               /| $hyp \ihyp\ $tm \Prim.eq\ (\tpconst\ @ ?) ($as (const? @ ?)) ($as (const? @ ?)) =>
+                  \(fnc dtspine m mconst mspine n nconst nspine =>
+                       let
+                          do (visSpine, indSpine, mpos, npos) =
+                             tryf
+                             (fn () =>
+                                 (case List.splitOpt dtspine nvis of
+                                     NONE =>
+                                        raise (Tryf "type error in injection hypothesis")
+        
+                                   | SOME (visSpine, indSpine) => 
+                                        (case CD.find constructorInvert mconst of
+                                            NONE => 
+                                               raise (Tryf "equand is not a constructor")
+        
+                                          | SOME mpos =>
+                                               (case CD.find constructorInvert nconst of
+                                                   NONE => 
+                                                      raise (Tryf "equand is not a contructor")
+        
+                                                 | SOME npos =>
+                                                      (visSpine, indSpine, mpos, npos)))))
+                       in
+                          if mpos = npos then
+                             injectYes ihyp visSpine indSpine mpos m n
+                          else
+                             injectNo ihyp visSpine indSpine mpos m npos n
+                       end)\
+
+                | _ =>
+                  \(fnc =>
+                       fail "not an injectible hypothesis")\
                /
          in
             inject
