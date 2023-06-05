@@ -19,7 +19,8 @@ signature HYP_TACTIC =
 
       val renamen : int -> symbol -> tactic
       val rename : symbol -> symbol -> tactic
-      val reintro : symbol option list -> tactic
+
+      val reintro : IntroPattern.ipattern list -> tactic
 
       val weaken : int -> int -> tactic
       val clearn : int -> tactic
@@ -226,53 +227,47 @@ structure HypTactic :> HYP_TACTIC =
             renamen i to
          end
 
-      fun reintroMain names =
-         let
-            val n = List.length names
-            do (_, dir) = withgoal
-         in
-            try
-               let
-                  val dir' = D.shift dir n
-               in
-                  chdir (bindmany dir' names)
-               end
-            with
-               Invalid _ => fail "context too short for so many names"
-
-             | Directory.Shadow name =>
-                  fail (String.concat ["identifier ", Symbol.toValue name, " is in use"])
-         end
-
-
       (* names given youngest first, n is the number of younger hyps being kept *)
-      fun reintroLoop n names dir =
-         (case names of
+      fun reintroLoop n pats dir =
+         (case pats of
              [] =>
                 idtacM dir
 
-           | NONE :: rest =>
-                let
-                   val (old, dir') = D.expose dir
-                in
-                   setFailure 
-                      ("cannot clear hypothesis " ^ Symbol.toValue old)
-                      (refine (Rule.weaken n 1))
-                   >>
-                   reintroLoop n rest dir'
-                end
+           | pat :: rest =>
+                (case D.exposeOpt dir of
+                    NONE =>
+                       fail "too many patterns specified"
 
-           | SOME name :: rest =>
-                let
-                   do dir' = andthenM $ reintroLoop (n+1) rest (D.tl dir)
-                in
-                   idtacM (D.bind dir' name)
-                end)
+                  | SOME (old, dir') =>
+                       (case pat of
+                           IntroPattern.Wild =>
+                              setFailure 
+                                 ("cannot clear hypothesis " ^ Symbol.toValue old)
+                                 (refine (Rule.weaken n 1))
+                              >>
+                              reintroLoop n rest dir'
 
-      fun reintro names =
+                         | IntroPattern.Ident NONE =>
+                              let
+                                 do dir' = andthenM $ reintroLoop (n+1) rest dir'
+                              in
+                                 idtacM (D.bind dir' old)
+                              end
+
+                         | IntroPattern.Ident (SOME name) =>
+                              let
+                                 do dir' = andthenM $ reintroLoop (n+1) rest dir'
+                              in
+                                 idtacM (D.bind dir' name)
+                              end
+
+                         | _ =>
+                              fail "reintro expects simple patterns")))
+
+      fun reintro pats =
          let
             do (_, dir) = withgoal
-            do dir' = andthenM $ reintroLoop 0 (List.rev names) dir
+            do dir' = andthenM $ reintroLoop 0 (List.rev pats) dir
          in
             chdir dir'
          end
@@ -622,4 +617,3 @@ structure HypTactic :> HYP_TACTIC =
                 end)
 
    end
-

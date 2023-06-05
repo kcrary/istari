@@ -1,0 +1,69 @@
+
+structure IntroPattern =
+   struct
+
+      datatype ipattern =
+         Wild
+       | Ident of Symbol.symbol option
+       | And of ipattern list
+       | Or of ipattern list
+
+   end
+   
+
+structure ParseIntroPattern =
+   struct
+
+      open IntroPattern
+
+      val vacuous = Or []
+      val wild = Wild
+      val auto = Ident NONE
+      fun ident sym = Ident (SOME sym)
+      fun identity p = p
+      fun tuple l = And l
+      val null = []
+      fun sing x = [x]
+      fun cons p l = p :: l
+
+      fun pairs l =
+         (case l of
+             [] => And []
+
+           | [p] => p
+
+           | p :: rest => And [p, pairs rest])
+
+      fun or l p = Or [pairs l, p]
+
+      fun cotuple l = Or (map And l)
+
+   end
+
+
+grammardef IntroPattern
+
+   open ParseIntroPattern
+
+   rule IntroPatternAtom ::= "0" => vacuous
+   rule IntroPatternAtom ::= "_" => wild
+   rule IntroPatternAtom ::= "?" => auto
+   rule IntroPatternAtom ::= Ident => ident
+   rule IntroPatternAtom ::= EMBED => ident
+   rule IntroPatternAtom ::= "(" IntroPattern ")" => identity
+   rule IntroPatternAtom ::= "[" IntroPatterns "]" => tuple
+   rule IntroPatternAtom ::= "{" IntroPatternArms "}" => cotuple
+
+   rule IntroPatterns    ::= => null
+   rule IntroPatterns    ::= IntroPatternAtom IntroPatterns => cons
+
+   rule IntroPatternArms ::= IntroPatterns => sing
+   rule IntroPatternArms ::= IntroPatterns "|" IntroPatternArms => cons
+
+   rule IntroPattern     ::= IntroPatterns => pairs
+   rule IntroPattern     ::= IntroPatterns "|" IntroPattern => or
+
+end
+
+
+grammaron IntroPattern
