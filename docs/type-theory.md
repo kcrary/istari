@@ -673,7 +673,7 @@ to ensure the predicate is well-formed.
 
 A variation on the subset type (the *intensional* subset type) chooses
 the other side of the tradeoff.  For `iset (x : A) . B` to equal
-`iset (x : C) . D` requires that `C` and `D` be equal, and not
+`iset (x : C) . D` requires that `B` and `D` be equal, and not
 merely imply each other.  This allows one to conclude 
 `x : A |- B : type` from `iset (x : A) . B : type`, which allows us to
 eliminate a premise in some rules.  Intensional subset types are less
