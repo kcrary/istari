@@ -234,10 +234,20 @@ goal, generating zero or more subgoals.
     use the indicated name.
 
 
-- `reintro /[name option] ... [name option]/`
+- `reintro /[ipattern] ... [ipattern]/`
 
-  Renames the last hypotheses to use the indicated names, or clear
-  them if no name is supplied.
+  Each pattern must be a name, `?`, or `_`.  Renames the last
+  hypotheses in the context so that each hypothesis uses the supplied
+  name, retains the old name if the `?` pattern is supplied, or is
+  cleared if the `_` pattern is supplied.
+
+  + `renameBefore /[ipattern] ... [ipattern]/ /[hyp x]/`
+
+    As `reintro` except it operates on the last hypotheses that precede `x`.
+
+  + `renameBefore /[ipattern] ... [ipattern]/ /concl/`
+
+    Equivalent to `reintro /[ipattern] ... [ipattern]/`.
 
 
 - `clear /[hyp] ... [hyp]/`
@@ -269,6 +279,12 @@ goal, generating zero or more subgoals.
   + `moveBefore /[hyp] ... [hyp]/ /concl/`
 
      Moves the indicated hypotheses to the end.
+
+  + `moveBeforeDeps /[hyp] ... [hyp]/ /[target hyp]/`
+
+    Moves the indicated hypotheses, and any hypotheses they depend on,
+    immediately before the target hypothesis.  The moved hypotheses
+    will appear in the same order they appeared in originally.
 
   + `exchange [m] [n] [p]`
 
@@ -450,12 +466,25 @@ goal, generating zero or more subgoals.
 - `subst /[hyp x]/`
 
   When there exists another hypothesis with type `x = M : A` or 
-  `M = x : A`, replaces occurrences of `x` with `M`.  Note that `M` must not
-  refer to hypotheses after `x`.
+  `M = x : A`, replaces occurrences of `x` with `M`.
 
   + `substRaw /[hyp x]/`
 
     As `subst` but does not invoke the typechecker.
+
+  + `substStrict /[hyp x]/`
+
+    As `subst` but will not move hypotheses to make substitution
+    possible.  Thus `M` must not refer to hypotheses after `x`.
+
+    On rare occasions `substStrict` might work when `subst` fails,
+    because `subst` might fail due to a spurious cyclic dependency
+    (one that can be eliminated by normalizing, or by pruning an evar
+    dependency).
+
+  + `substStrictRaw /[hyp x]/`
+
+    As `substStrict` but does not invoke the typechecker.
 
 
 The substitution tactics above first attempt to use a substitution

@@ -6,6 +6,71 @@ Ctrl.use "../library/acc-load.iml";
 Ctrl.use "../library/nat-load.iml";
 Ctrl.use "../library/integer-load.iml";
 
+fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
+
+
+
+lemma "substitution_cycle"
+/
+  forall i (a : U i) (f : a -> a) (x : a) .
+    x = f x : a
+    -> unit
+/;
+
+inference.
+intro /i a f x Heq/.
+shouldfail (subst /x/).
+split.
+qed ();
+
+
+lemma "substitution_with_move"
+/
+  forall i (a : U i) (P : a -> U i) (x y z : a) .
+    x = z : a
+    -> P z
+    -> P x
+/;
+
+inference.
+intro /i a P x y z Heq Hz/.
+shouldfail (substStrict /x/).
+subst /x/.
+hyp /Hz/.
+qed ();
+
+
+lemma "move_deps"
+/
+  forall i (t a : U i) (b : a -> U i) (c : forall (x : a) . b x -> U i)
+    (a1 a2 : a) (b1 b2 : b a1) (c1 c2 : c a1 b1) (t1 : t) .
+    unit
+/;
+
+inference.
+intro /i t a b c a1 a2 b1 b2 c1 c2 t1/.
+shouldfail (moveBeforeDeps /t1/ /t/).
+moveBeforeDeps /c2 c1/ /t/.
+split.
+qed ();
+
+
+lemma "rename_before"
+/
+  0 <= 1
+  -> 0 <= 2
+  -> 0 <= 3
+  -> 0 <= 4
+  -> 0 <= 5
+  -> 0 <= 6
+  -> 0 <= 7
+  -> unit
+/;
+
+intro /a b c d e f g/.
+renameBefore /x _ ? y/ /f/.
+split.
+qed ();
 
 
 lemma "extensionality_iset"

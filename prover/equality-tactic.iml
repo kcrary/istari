@@ -45,8 +45,11 @@ signature EQUALITY_TACTIC =
       val substitution : Symbol.symbol -> ETerm.eterm -> tactic
 
       val substPriority : Symbol.symbol -> priority tacticm
+      val substStrictPriority : Symbol.symbol -> priority tacticm
       val substRaw : Symbol.symbol -> tactic
+      val substStrictRaw : Symbol.symbol -> tactic
       val subst : Symbol.symbol -> tactic
+      val substStrict : Symbol.symbol -> tactic
 
       val injectionPriority : Symbol.symbol -> priority tacticm
       val injectionRaw : Symbol.symbol -> tactic
@@ -68,6 +71,8 @@ signature EQUALITY_TACTIC_INTERNAL =
       (* substMain reverse i j m
 
          hypothesis j has type (i = m : A), or the reverse
+
+         Will not move hypotheses to make substitution possible.
       *)
       val substMain : bool -> int -> int -> Term.term -> priority tacticm
 
@@ -1323,7 +1328,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                fail "substitutend depends on later hypotheses"
          end
 
-      fun substPriority hyp =
+      fun substFlexPriority strict hyp =
          let
             do i = HypTactic.findhyp hyp
          in
@@ -1341,20 +1346,51 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
              | $anyhyp $tm
                  (| \Prim.eq\ _ ($var \i\) ? =>
-                    \(fnc m => fn j => substMain false i j m)\
+                    \(fnc m => fn j => 
+                         if strict then
+                            substMain false i j m
+                         else
+                            HypTactic.moveTermDeps m i
+                            >>+
+                            (* j cannot have moved, but i and m are probably different now *)
+                            goalContextCaseT
+                            / $hyp \j\ $tm \Prim.eq\ _ var? ? =>
+                              \(fnc i' m' =>
+                                   substMain false i' j m')\
+                            /)\
 
                   | \Prim.eq\ _ ? ($var \i\) =>
-                    \(fnc m => fn j => substMain true i j m)\)
+                    \(fnc m => fn j =>
+                         if strict then
+                            substMain true i j m
+                         else
+                            HypTactic.moveTermDeps m i
+                            >>+
+                            (* j cannot have moved, but i and m are probably different now *)
+                            goalContextCaseT
+                            / $hyp \j\ $tm \Prim.eq\ _ ? var? =>
+                              \(fnc m' i' =>
+                                   substMain true i' j m')\
+                            /)\)
 
              | _ =>
                \(fnc => fail "no equality hypothesis found")\
             /
          end
 
+      val substPriority = substFlexPriority false
+
       fun substRaw hyp = substPriority hyp >> idtac
 
       fun subst hyp =
          TC.withTypecheckSnd $ substPriority hyp
+
+      val substStrictPriority = substFlexPriority true
+
+      fun substStrictRaw hyp = substStrictPriority hyp >> idtac
+
+      fun substStrict hyp =
+         TC.withTypecheckSnd $ substStrictPriority hyp
 
 
 

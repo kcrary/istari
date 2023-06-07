@@ -21,6 +21,7 @@ signature HYP_TACTIC =
       val rename : symbol -> symbol -> tactic
 
       val reintro : IntroPattern.ipattern list -> tactic
+      val renameBefore : IntroPattern.ipattern list -> symbol -> tactic
 
       val weaken : int -> int -> tactic
       val clearn : int -> tactic
@@ -33,6 +34,7 @@ signature HYP_TACTIC =
       val movePos : symbol list -> int -> tactic
       val moveBefore : symbol list -> symbol -> tactic
       val moveAfter : symbol list -> symbol -> tactic
+      val moveBeforeDeps : symbol list -> symbol -> tactic
 
       val copy : symbol -> symbol option -> tactic
 
@@ -47,6 +49,10 @@ signature HYP_TACTIC =
       val unhideRaw : tactic
       val unhide : tactic
       val squashHidden : symbol list -> tactic
+
+
+      (* move the term's dependencies before the indicated hypothesis *)
+      val moveTermDeps : Term.term -> int -> tactic
 
    end
 
@@ -270,6 +276,25 @@ structure HypTactic :> HYP_TACTIC =
             do dir' = andthenM $ reintroLoop 0 (List.rev pats) dir
          in
             chdir dir'
+         end
+
+      fun renameBefore pats sym =
+         let
+            do jo = findhypOrConcl sym
+         in
+            (case jo of
+                NONE => reintro pats
+
+              | SOME j =>
+                   let
+                      do (_, dir) = withgoal
+
+                      val (names, dir) = D.split dir (j+1)
+                      
+                      do dir' = andthenM $ reintroLoop (j+1) (List.rev pats) dir
+                   in
+                      chdir (D.binds dir' names)
+                   end)
          end
 
 
@@ -615,5 +640,212 @@ structure HypTactic :> HYP_TACTIC =
                      | _ =>
                           fail "hidden term hypotheses expected")
                 end)
+
+
+
+      structure IS = RedBlackSet (structure Elem = IntOrdered)
+
+      val cycle = Tryf "move impossible due to cyclic dependency"
+
+      (* dependencies cap adjust depth m s
+
+         Suppose the free variables of m[s] are I.
+         Let I' = { i - depth + adjust  |  i in I  and  i >= depth }
+         
+         if    cap in I'
+         then  raises cycle
+         else  returns I' intersect { i | i < cap }
+
+         Does not normalize, so it may detect spurious dependencies.  Also, does not prune
+         out dependencies from evars.
+      *)
+      fun dependencies cap adjust depth m s =
+         (case m of
+             T.Var i =>
+                (case T.substVar i s of
+                    T.Idx j =>
+                       if j < depth then
+                          IS.empty
+                       else
+                          let
+                             val j' = j - depth + adjust
+                          in
+                             (case Int.compare j' cap of
+                                 LESS =>
+                                    IS.singleton j'
+
+                               | EQUAL =>
+                                    raise cycle
+
+                               | GREATER =>
+                                    IS.empty)
+                          end
+
+                  | T.Term n =>
+                       dependencies cap adjust depth n T.id)
+
+           | T.Const _ => IS.empty
+
+           | T.Elim (m1, spine) =>
+                IS.union 
+                   (dependencies cap adjust depth m1 s)
+                   (List.foldl
+                       (fns elim set =>
+                           (case elim of
+                               T.App mk =>
+                                  IS.union
+                                     (dependencies cap adjust depth mk s)
+                                     set
+
+                             | _ => set))
+                       IS.empty
+                       spine)
+
+           | T.Lam (_, m1) =>
+                dependencies cap adjust (depth+1) m1 (T.under 1 s)
+
+           | T.Pair (m1, m2) =>
+                IS.union
+                   (dependencies cap adjust depth m1 s)
+                   (dependencies cap adjust depth m2 s)
+
+           | T.Next m1 =>
+                dependencies cap adjust depth m1 s
+
+           | T.Triv => IS.empty
+
+           | T.Sub (m1, s') =>
+                dependencies cap adjust depth m1 (T.compose s' s)
+
+           | T.Evar eb =>
+                (case T.readEbind eb of
+                    SOME n =>
+                       dependencies cap adjust depth n T.id
+
+                  | NONE =>
+                       dependenciesSub cap adjust depth s)
+
+           | T.Native _ => IS.empty
+
+           | T.Marker _ => IS.empty)
+
+      and dependenciesSub cap adjust depth s =
+         (case s of
+             T.Shift j =>
+                if j - depth + adjust > cap then
+                   IS.empty
+                else
+                   raise cycle
+
+           | T.Dot (m, s') =>
+                IS.union
+                   (dependencies cap adjust depth m T.id)
+                   (dependenciesSub cap adjust depth s)
+
+           | T.Idot (j, s') =>
+                let
+                   val j' = j - depth + adjust
+                in
+                   (case Int.compare j' cap of
+                       LESS =>
+                          IS.singleton j'
+
+                     | EQUAL =>
+                          raise cycle
+
+                     | GREATER =>
+                          IS.empty)
+                end)
+
+      (* dependenciesTrans G cap set acc
+
+         returns L @ acc
+         where 
+            L is a list (ordered decreasing) of the transitive dependencies of the
+            hypotheses in set that are less then cap
+
+         (or raises Cycle if cap would have been in L)
+      *)
+      fun dependenciesTrans ctx cap set acc =
+         if IS.isEmpty set then
+            acc
+         else
+            let
+               val i = IS.least set
+               val set' = IS.remove set i
+
+               val a =
+                  (case S.nth ctx i of
+                      J.Tm a => a
+                    | J.Tml a => a
+                    | J.Tmh a => a
+                    | J.Let a => a
+                    | J.Tp => T.Triv
+                    | J.Tpl => T.Triv
+                    | J.Tph => T.Triv)
+
+               val set'' =
+                  IS.union
+                     (dependencies cap (i+1) 0 a T.id)
+                     set'
+            in
+               dependenciesTrans ctx cap set'' (i :: acc)
+            end
+
+      (* the set is given by a function so we can put its computation inside the handler *)
+      fun moveDepsMain ctx dir setf to =
+         let
+            do l =
+               tryf
+               (fn () =>
+                   List.map 
+                      (fn k => D.name dir k)
+                      (dependenciesTrans ctx to (setf ()) []))
+         in
+            movePos l (to+1)
+         end
+            
+
+      fun moveBeforeDeps from to =
+         let
+            do j = findhyp to
+            do (jud, dir) = withgoal
+            val idir = D.idir dir
+         in
+            moveDepsMain 
+               (J.context jud)
+               dir
+               (fn () =>
+                   List.foldl
+                      (fns sym set =>
+                          let
+                             val i = D.lookupVar idir sym 
+                          in
+                             (case Int.compare i j of
+                                 LESS =>
+                                    IS.insert set i
+    
+                               | EQUAL =>
+                                    raise cycle
+    
+                               | GREATER =>
+                                    set)
+                          end)
+                      IS.empty
+                      from)
+               j
+         end
+         
+
+      fun moveTermDeps m to =
+         let
+            do (jud, dir) = withgoal
+         in
+            moveDepsMain 
+               (J.context jud) 
+               dir
+               (fn () => dependencies to 0 0 m T.id)
+               to
+         end
 
    end
