@@ -1139,6 +1139,21 @@ cbn.
 reflexivity.
 }
 
+(* iset *)
+{
+intros pg s i a b A B _ IH1 _ IH2 IHo h.
+so (IH1 IHo h) as (A' & ->).
+so (IH2 IHo (den A') (eq_refl _) h) as (B' & ->).
+clear IH1 IH2.
+exists (iuiset (cin pg) A' B').
+rewrite -> extend_iuiset.
+f_equal.
+apply nearrow_extensionality.
+intro x.
+cbn.
+reflexivity.
+}
+
 (* quotient *)
 {
 intros pg s i a b A B hs ht _ IH1 _ IH2 IHo h.
@@ -1943,6 +1958,7 @@ try (intros;
            |eapply interp_prod
            |eapply interp_sigma
            |eapply interp_set
+           |eapply interp_iset
            |eapply interp_fut_zero
            |eapply interp_fut
            |eapply interp_void

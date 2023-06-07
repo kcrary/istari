@@ -41,6 +41,7 @@ Conventions:
 [Type formation](#type-formation)<br>
 [Subtyping](#subtyping)<br>
 [Subset types](#subset-types)<br>
+[Intensional subset types](#intensional-subset-types)<br>
 [Squash](#squash)<br>
 [Quotient types](#quotient-types)<br>
 [Impredicative universals](#impredicative-universals)<br>
@@ -2733,6 +2734,120 @@ Conventions:
 - `setSubElim A A' B`
 
       G |- subtype (set A (fn . B)) A'
+      >>
+      G |- subtype A A'
+      G, A |- istp B
+
+
+### Intensional subset types
+
+- `isetForm A B`
+
+      G |- istp (iset A (fn . B))
+      >>
+      G |- istp A
+      G, A |- istp B
+
+- `isetEq A A' B B'`
+
+      G |- eqtp (iset A (fn . B)) (iset A' (fn . B'))
+      >>
+      G |- eqtp A A'
+      G, A |- eqtp B B'
+
+- `isetFormUniv A B I`
+
+      G |- of (univ I) (iset A (fn . B))
+      >>
+      G |- of (univ I) A
+      G, A |- of (univ I[^1]) B
+
+- `isetEqUniv A A' B B' I`
+
+      G |- eq (univ I) (iset A (fn . B)) (iset A' (fn . B'))
+      >>
+      G |- eq (univ I) A A'
+      G, A |- eq (univ I[^1]) B B'
+
+- `isetWeakenOf A B M`
+
+      G |- of A M
+      >>
+      G |- of (iset A (fn . B)) M
+
+- `isetWeakenEq A B M N`
+
+      G |- eq A M N
+      >>
+      G |- eq (iset A (fn . B)) M N
+
+- `isetWeaken A B`
+
+      G |- A ext M
+      >>
+      G |- iset A (fn . B) ext M
+
+- `isetIntroOf A B M`
+
+      G |- of (iset A (fn . B)) M
+      >>
+      G, A |- istp B
+      G |- of A M
+      G |- B[M . id]
+
+- `isetIntroEq A B M N`
+
+      G |- eq (iset A (fn . B)) M N
+      >>
+      G, A |- istp B
+      G |- eq A M N
+      G |- B[M . id]
+
+- `isetIntro A B M`
+
+      G |- iset A (fn . B) ext M
+      >>
+      G, A |- istp B
+      G |- of A M
+      G |- B[M . id]
+
+- `isetIntroOfSquash A B M`
+
+      G |- of (iset A (fn . B)) M
+      >>
+      G, A |- istp B
+      G |- of A M
+      G |- squash B[M . id]
+
+- `isetElim A B C M`
+
+      G |- C ext N[() . id]
+      >>
+      G |- of (iset A (fn . B)) M
+      G, (hidden) B[M . id] |- C[^1] ext N
+
+- `isetLeft n A B C`
+
+      G1, (iset A (fn . B)), G2 |- C ext M[under_n (() . id)]
+      >>
+      G1, A, (hidden) B, G2[^1] |- C[under_n (^1)] ext M
+
+- `isetFormInv1 A B`
+
+      G |- istp A
+      >>
+      G |- istp (iset A (fn . B))
+
+- `isetFormInv2 A B M`
+
+      G |- istp B[M . id]
+      >>
+      G |- istp (iset A (fn . B))
+      G |- of A M
+
+- `isetSubElim A A' B`
+
+      G |- subtype (iset A (fn . B)) A'
       >>
       G |- subtype A A'
       G, A |- istp B

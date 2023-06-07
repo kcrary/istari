@@ -35,6 +35,7 @@ cons is right associative.
       rec Ident . [Term]                                             (recursive type)
       mu Ident . [Term]                                              (inductive type)
       wtype ( Ident : [Term] ) . [Term]                              (W type)
+      iset ( Ident : [Term] ) . [Term]                               (intensional set type)
       quotient ( Ident Ident : [Term] ) . [Term]                     (quotient type)
       Term -> [Term]                                                 (ordinary arrow)
       Term -t> [Term]                                                (tarrow kind)
@@ -113,12 +114,9 @@ cons is right associative.
     OIdents ::=
       OIdent ... OIdent                                              (length can be zero)
 
-    OIdentsn ::=
-      OIdent ... OIdent                                              (length at least 1)
-
     Binding ::=
       OIdent                                                         (unannotated binding)
-      (OIdent : Term)                                                (binding with type supplied)
+      (OIdents : Term)                                               (binding with type supplied)
 
     Bindings ::=       
       Binding ... Binding                                            (length can be zero)

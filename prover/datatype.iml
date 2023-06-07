@@ -1246,89 +1246,85 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                          refine (Rule.existsLeft hyp (T.evar ()) (T.evar ()) (T.evar ()))
                          >>
                          (* G, set C . D, E ... |- ... *)
-                         refine (Rule.setLeft (hyp+1) (T.evar ()) (T.evar ()) (T.evar ()))
+                         refine (Rule.isetLeft (hyp+1) (T.evar ()) (T.evar ()) (T.evar ()))
+                         >>+
+                         (* G, C, hide D, E[^] ... |- ... *)
+                         refine (Rule.assert (T.evar ()) (T.evar ()))
                          >>> [
-                             (* G, C |- D : type *)
-                             idtacM (Seq.cons v Seq.empty, DE.Tertiary),
-       
-                             (* G, C, hide D, E[^] ... |- ... *)
-                             refine (Rule.assert (T.evar ()) (T.evar ()))
-                             >>> [
-                                 (* G, C, hide D, E[^] ... |- D[^hyp+2] *)
-                                 refine (Rule.inhabitant (T.evar ()) T.Triv)
-                                 >>
-                                 (* G, C, D, E[^] ... |- () : D[^hyp+2] *)
-                                 refine (Rule.eqIntro (T.evar ()) (T.evar ()) (T.evar ()))
-                                 >>
-                                 (* G, C, D, E[^] ... |- D[^hyp+2] *)
-                                 refine (Rule.hypothesis (hyp+1)) >> done,
+                             (* G, C, hide D, E[^] ... |- D[^hyp+2] *)
+                             refine (Rule.inhabitant (T.evar ()) T.Triv)
+                             >>
+                             (* G, C, D, E[^] ... |- () : D[^hyp+2] *)
+                             refine (Rule.eqIntro (T.evar ()) (T.evar ()) (T.evar ()))
+                             >>
+                             (* G, C, D, E[^] ... |- D[^hyp+2] *)
+                             refine (Rule.hypothesis (hyp+1)) >> done,
 
-                                 (* G, C, hide D, E[^] ... D[^hyp+2] |- ... *)
-                                 refine (Rule.weaken (hyp+2) 1)
+                             (* G, C, hide D, E[^] ... D[^hyp+2] |- ... *)
+                             refine (Rule.weaken (hyp+2) 1)
+                             >>
+                             (* G, C, E ... D[^hyp+1] |- ... *)
+                             cut
+                                (repeat
+                                    (
+                                    EqualityTacticInternal.injectionSum 0
+                                    >>
+                                    refine (Rule.weaken 1 1)
+                                    ))
+                             >>
+                             (* G, C, E ... <equality> |- ... *)
+                             cut
+                                (repeatCount
+                                    (
+                                    EqualityTacticInternal.injectionExists 0
+                                    >>
+                                    refine (Rule.weaken 2 1)
+                                    ))
+                             >>= 
+                             (* eqs is the number of times the above code ran, which is
+                                the number of equalities generated.
+                             *)
+                             (fn eqs =>
+                                 (* G, C, E ... <equalities>, () = () : unit |- ... *)
+                                 refine (Rule.weaken 0 1)
                                  >>
-                                 (* G, C, E ... D[^hyp+1] |- ... *)
-                                 cut
-                                    (repeat
-                                        (
-                                        EqualityTacticInternal.injectionSum 0
-                                        >>
-                                        refine (Rule.weaken 1 1)
-                                        ))
+                                 (* G, C, E ... <equalities> |- ... *)
+                                 splitArgs 0 (hyp+eqs) T.id persact args
                                  >>
-                                 (* G, C, E ... <equality> |- ... *)
-                                 cut
-                                    (repeatCount
-                                        (
-                                        EqualityTacticInternal.injectionExists 0
-                                        >>
-                                        refine (Rule.weaken 2 1)
-                                        ))
-                                 >>= 
-                                 (* eqs is the number of times the above code ran, which is
-                                    the number of equalities generated.
-                                 *)
-                                 (fn eqs =>
-                                     (* G, C, E ... <equalities>, () = () : unit |- ... *)
-                                     refine (Rule.weaken 0 1)
-                                     >>
-                                     (* G, C, E ... <equalities> |- ... *)
-                                     splitArgs 0 (hyp+eqs) T.id persact args
-                                     >>
-                                     normalizeHyps eqs 0
-                                     >>+
-                                     (* G, <arguments>, ..., <equalities> |- ... *)
-                                     refine (Rule.exchange 0 eqs hyp)
-                                     >>
-                                     (* G, <arguments>, <equalities>, ... |- ... *)
-                                     let
-                                        val CENV {const=conConst, red} = Array.sub conInfo j
-                                     in
-                                        DE.refold origjud hyp (numargs+eqs)
-                                           (T.Elim
-                                               (T.Const conConst,
-                                                List.map
-                                                   (fn m => T.App (T.Sub (m, T.Shift (numargs+eqs))))
-                                                   persact
-                                                @
-                                                natrecr numargs
-                                                   (fns k l => T.App (T.Var (k+eqs)) :: l)
-                                                   []))
-                                           red
-                                     end
-                                     >>
-                                     (* G, <arguments>, <equalities>, ... |- ... *)
-                                     let
-                                        do (vars, (pats', set')) =
-                                           DE.andthenp S.empty $ destArgs hyp pats (numargs+eqs) set
-                                     in
-                                        (case pats' of
-                                            [] =>
-                                               idtacM (vars, DE.Principal set')
+                                 normalizeHyps eqs 0
+                                 >>+
+                                 (* G, <arguments>, ..., <equalities> |- ... *)
+                                 refine (Rule.exchange 0 eqs hyp)
+                                 >>
+                                 (* G, <arguments>, <equalities>, ... |- ... *)
+                                 let
+                                    val CENV {const=conConst, red} = Array.sub conInfo j
+                                 in
+                                    DE.refold origjud hyp (numargs+eqs)
+                                       (T.Elim
+                                           (T.Const conConst,
+                                            List.map
+                                               (fn m => T.App (T.Sub (m, T.Shift (numargs+eqs))))
+                                               persact
+                                            @
+                                            natrecr numargs
+                                               (fns k l => T.App (T.Var (k+eqs)) :: l)
+                                               []))
+                                       red
+                                 end
+                                 >>
+                                 (* G, <arguments>, <equalities>, ... |- ... *)
+                                 let
+                                    do (vars, (pats', set')) =
+                                       DE.andthenp S.empty $ destArgs hyp pats (numargs+eqs) set
+                                 in
+                                    (case pats' of
+                                        [] =>
+                                           idtacM (vars, DE.Principal set')
 
-                                          | _ =>
-                                               fail "too many patterns supplied for arm")
-                                     end)
-                                 ]
+                                      | _ =>
+                                           fail "too many patterns supplied for arm")
+                                 end)
                              ]
                       end
 

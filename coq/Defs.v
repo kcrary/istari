@@ -126,6 +126,7 @@ Definition max : fterm :=
                                           (app (app (var 4) (var 1)) (var 0)))))))))).
 
 Definition set : fterm := lam (lam (set (var 1) (app (var 1) (var 0)))).
+Definition iset : fterm := lam (lam (iset (var 1) (app (var 1) (var 0)))).
 Definition sigma : fterm := lam (lam (sigma (var 1) (app (var 1) (var 0)))).
 Definition theta : fterm := theta.
 Definition triv : fterm := triv.

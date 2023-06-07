@@ -1010,11 +1010,101 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          /
 
 
+      fun isetExt _ tac =
+         goalCaseT
+         / \Prim.eq\ (\Prim.iset\ ? (fn . ?)) ? ? =>
+           \(fnc a b m n =>
+                (* ... |- m = n : iset a . b *)
+                refine (Rule.isetElim a b (T.evar ()) m)
+                >>> [
+                    (* ... |- m : set a . b *)
+                    refine (Rule.hypothesis 1) >> done,
+
+                    (* ... b[m . id] (hidden) |- m[^] = n[^] : set a[^] . b[0 . ^2] *)
+                    refine (Rule.isetIntroEq 
+                               (T.Sub (a, T.Shift 1))
+                               (T.Sub (b, T.under 1 (T.Shift 1)))
+                               (T.Sub (m, T.Shift 1))
+                               (T.Sub (n, T.Shift 1)))
+                    >>> [
+                        (* ... __, a[^] |- b[0 . ^2] : type *)
+                        refine (Rule.isetFormInv2
+                                   (T.Sub (a, T.Shift 2))
+                                   (T.Sub (b, T.under 1 (T.Shift 2)))
+                                   T.zero)
+                        >>> [
+                            (* ... __, a[^] |- iset a[^2] . b[0 . ^3] : type *)
+                            refine (Rule.weaken 0 2)
+                            >>+
+                            (* ... |- iset a . b : type *)
+                            refine (Rule.inhabitedForm (T.evar ()))
+                            >>+
+                            (* ... |- iset a . b *) 
+                            refine (Rule.inhabitant (T.evar ()) m)
+                            >>+
+                            (* ... |- m : iset a . b *)
+                            refine (Rule.hypothesis 1) >> done,
+                            
+                            (* ... __, a[^] |- 0 : a[^2] *)
+                            refine (Rule.hypothesisOf 0) >> done
+                            ],
+
+                        (* ... __ |- m[^] = n[^] : a[^] *)
+                        eassert2 ()
+                        >>> [
+                            (* ... __ |- m[^] : a[^] *)
+                            refine (Rule.isetWeakenOf 
+                                       (T.Sub (a, T.Shift 1))
+                                       (T.Sub (b, T.under 1 (T.Shift 1)))
+                                       (T.Sub (m, T.Shift 1)))
+                            >>
+                            (* ... __ |- m : iset a[^] . b[0 . ^2] *)
+                            refine (Rule.hypothesis 2) >> done,
+   
+                            (* ... __ |- n[^] : a[^] *)
+                            refine (Rule.isetWeakenOf 
+                                       (T.Sub (a, T.Shift 1))
+                                       (T.Sub (b, T.under 1 (T.Shift 1)))
+                                       (T.Sub (n, T.Shift 1)))
+                            >>
+                            (* ... __ |- n[^] : iset a[^] . b[0 . ^2] *)
+                            refine (Rule.hypothesis 1) >> done,
+   
+                            refine (Rule.weaken 2 3)
+                            >>
+                            tac
+                            ],
+
+                        (* ... b[m . id] |- b[0 . ^2][m[^] . id]
+                                          = b[m[^] . ^]
+                        *)
+                        refine (Rule.hypothesis 0) >> done
+                        ]
+                    ])\
+         /
+
+
       val setExtOf =
          goalCaseT
          / \Prim.eq\ (\Prim.set\ ? (fn ? . ?)) ? ? =>
            \(fnc a binder b m n =>
                 refine (Rule.setIntroEq a b m n)
+                >>> [
+                    withgoal
+                    (fn (_, dir) => chdir (D.bindVary dir binder) >> idtacM Secondary),
+
+                    idtacM Primary,
+
+                    idtacM Primary
+                    ])\
+         /
+
+
+      val isetExtOf =
+         goalCaseT
+         / \Prim.eq\ (\Prim.iset\ ? (fn ? . ?)) ? ? =>
+           \(fnc a binder b m n =>
+                refine (Rule.isetIntroEq a b m n)
                 >>> [
                     withgoal
                     (fn (_, dir) => chdir (D.bindVary dir binder) >> idtacM Secondary),
@@ -1094,6 +1184,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             (Prim.karrow, tkarrowExt Rule.karrowExt Rule.karrowElimOf),
             (Prim.exists, existsExt),
             (Prim.set, setExt),
+            (Prim.iset, isetExt),
             (Prim.prod, prodExt),
             (Prim.future, futureExt),
             (Prim.unit, unitExt RT.unitExt),
@@ -1110,6 +1201,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             (fn (const, tac) => H.insert extensionalityOfTactics const tac)
             [
             (Prim.set, setExtOf),
+            (Prim.iset, isetExtOf),
             (Prim.quotient, quotientExtOf)
             ]
 

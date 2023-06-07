@@ -59,6 +59,7 @@ Inductive canon : forall {a}, @operator object a -> Prop :=
 | canon_cpi2           : canon (oper_cpi2 _)
 | canon_ppair          : canon (oper_ppair _)
 | canon_set            : canon (oper_set _)
+| canon_iset           : canon (oper_iset _)
 | canon_quotient       : canon (oper_quotient _)
 | canon_guard          : canon (oper_guard _)
 | canon_wt             : canon (oper_wt _)
@@ -723,6 +724,12 @@ intros; apply value_i; eauto with dynamic.
 Qed.
 
 
+Lemma value_iset : forall {m1 m2}, value (iset m1 m2).
+Proof.
+intros; apply value_i; eauto with dynamic.
+Qed.
+
+
 Lemma value_quotient : forall {m1 m2}, value (quotient m1 m2).
 Proof.
 intros; apply value_i; eauto with dynamic.
@@ -803,6 +810,7 @@ Arguments value_cpi1 {object m1}.
 Arguments value_cpi2 {object m1}.
 Arguments value_ppair {object m1 m2}.
 Arguments value_set {object m1 m2}.
+Arguments value_iset {object m1 m2}.
 Arguments value_quotient {object m1 m2}.
 Arguments value_guard {object m1 m2}.
 Arguments value_wt {object m1 m2}.
@@ -813,7 +821,7 @@ Arguments value_extt {object x}.
 Hint Constructors canon : dynamic.
 
 
-Hint Resolve value_univ value_cty value_con value_karrow value_arrow value_pi value_clam value_capp value_ctlam value_ctapp value_lam value_intersect value_fut value_cnext value_cprev value_next value_rec value_equal value_triv value_eqtype value_subtype value_kuniv value_all value_alltp value_exist value_mu value_ispositive value_isnegative value_voidtp value_unittp value_cunit value_booltp value_btrue value_bfalse value_prod value_sigma value_cpair value_cpi1 value_cpi2 value_ppair value_set value_quotient value_guard value_wt value_ext value_extt : dynamic.
+Hint Resolve value_univ value_cty value_con value_karrow value_arrow value_pi value_clam value_capp value_ctlam value_ctapp value_lam value_intersect value_fut value_cnext value_cprev value_next value_rec value_equal value_triv value_eqtype value_subtype value_kuniv value_all value_alltp value_exist value_mu value_ispositive value_isnegative value_voidtp value_unittp value_cunit value_booltp value_btrue value_bfalse value_prod value_sigma value_cpair value_cpi1 value_cpi2 value_ppair value_set value_iset value_quotient value_guard value_wt value_ext value_extt : dynamic.
 
 
 Hint Resolve var_normal value_normal : dynamic.

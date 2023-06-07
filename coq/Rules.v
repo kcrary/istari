@@ -861,6 +861,51 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deqtype (set a b) (set a' b'))
       -> tr G (deqtype a a')
 
+| tr_iset_formation :
+    forall G a a' b b',
+      tr G (deqtype a a')
+      -> tr (cons (hyp_tm a) G) (deqtype b b')
+      -> tr G (deqtype (iset a b) (iset a' b'))
+  
+| tr_iset_formation_univ :
+    forall G lv a a' b b',
+      tr G (deq a a' (univ lv))
+      -> tr (cons (hyp_tm a) G) (deq b b' (univ (subst sh1 lv)))
+      -> tr G (deq (iset a b) (iset a' b') (univ lv))
+  
+| tr_iset_intro :
+    forall G a b m n p,
+      tr G (deq m n a)
+      -> tr G (deq p p (subst1 m b))
+      -> tr (hyp_tm a :: G) (deqtype b b)
+      -> tr G (deq m n (iset a b))
+  
+| tr_iset_elim1 :
+    forall G a b m n,
+      tr G (deq m n (iset a b))
+      -> tr G (deq m n a)
+  
+| tr_iset_elim2 :
+    forall G a b m J,
+      tr G (deq m m (iset a b))
+      -> tr (hyp_tm (subst1 m b) :: G) (substj sh1 J)
+      -> tr G J
+  
+| tr_iset_hyp_weaken :
+    forall G1 G2 a b J,
+      tr (G2 ++ hyp_tm b :: hyp_tm a :: G1) J
+      -> tr (G2 ++ hyp_tm b :: hyp_tm (iset a b) :: G1) J
+  
+| tr_iset_formation_invert1 :
+    forall G a a' b b',
+      tr G (deqtype (iset a b) (iset a' b'))
+      -> tr G (deqtype a a')
+
+| tr_iset_formation_invert2 :
+    forall G a a' b b',
+      tr G (deqtype (iset a b) (iset a' b'))
+      -> tr (cons (hyp_tm a) G) (deqtype b b')
+
 | tr_squash_idem :
     forall G a b,
       tr G (deqtype (set a b) (set a b))

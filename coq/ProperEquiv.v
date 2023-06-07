@@ -126,6 +126,7 @@ try (intros;
            |apply interp_intersect
            |apply interp_sigma
            |apply interp_set
+           |apply interp_iset
            |apply interp_fut_zero
            |apply interp_fut
            |apply interp_karrow_type

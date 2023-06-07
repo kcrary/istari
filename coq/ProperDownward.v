@@ -529,6 +529,14 @@ apply interp_set; auto.
 apply IH2; auto.
 }
 
+(* iset *)
+{
+intros pg s i a b A B Ha IH1 Hb IH2 j Hj.
+rewrite -> iutruncate_iuiset.
+apply interp_iset; auto.
+apply IH2; auto.
+}
+
 (* quotient *)
 {
 intros pg s i a b A B hs ht Ha IH1 Hb IH2 j Hj.

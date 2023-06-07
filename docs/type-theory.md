@@ -659,7 +659,7 @@ Destructing `x : { x : A | B }` produces `x : A` and `y : B`, but
 since the proof of `B` is not retained, the `y` hypothesis must be
 [*hidden*](#hypotheses) to ensure that it is not used in the extract.
 
-Equality of subset type is strong as regards the type, but weak as
+Equality of subset types is strong as regards the type, but weak as
 regards the predicate.  For `{ x : A | B }` to be equal to 
 `{ x : C | D }`, we must have that `A` and `C` are equal types, but
 `B` and `D` merely need to imply each other.  This is usually
@@ -670,6 +670,16 @@ A special case of this is we cannot conclude from
 `{ x : A | B } : type` that `x : A |- B : type`, and that means that
 eliminating a subset-type hypothesis must usually generate a subgoal
 to ensure the predicate is well-formed.
+
+A variation on the subset type (the *intensional* subset type) chooses
+the other side of the tradeoff.  For `iset (x : A) . B` to equal
+`iset (x : C) . D` requires that `C` and `D` be equal, and not
+merely imply each other.  This allows one to conclude 
+`x : A |- B : type` from `iset (x : A) . B : type`, which allows us to
+eliminate a premise in some rules.  Intensional subset types are less
+useful for most purposes due to their restricted equality, but
+they are occasionally preferable due to their streamlined inference
+rules.  Istari uses them internally in its treatment of datatypes.
 
 A degenerate form of the subset type that is often useful is the
 squash type: `{ A }` is defined to mean `{ _ : unit | A }`.  The

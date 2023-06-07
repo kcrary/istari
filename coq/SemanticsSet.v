@@ -173,6 +173,14 @@ Definition iuset (w : ordinal) (A : wiurel w) (B : urelsp (den A) -n> wiurel_ofe
    meta_iurel A).
 
 
+Definition iuiset (w : ordinal) (A : wiurel w) (B : urelsp (den A) -n> wiurel_ofe w) : wiurel w
+  :=
+  (set_urel w (den A) (nearrow_compose den_ne B),
+   meta_pair (meta_iurel A) 
+     (meta_fn (den A) 
+      (nearrow_compose meta_iurel_ne B))).
+
+
 Lemma iuset_inj :
   forall w A A' B B',
     iuset w A B = iuset w A' B'
@@ -183,6 +191,29 @@ unfold iuset in Heq.
 so (f_equal (fun z => snd z) Heq) as Heq'.
 cbn in Heq'.
 exact (meta_iurel_inj _#3 Heq').
+Qed.
+
+
+Lemma iuiset_inj :
+  forall w A A' B B',
+    iuiset w A B = iuiset w A' B'
+    -> eq_dep (wiurel w) (fun r => urelsp (den r) -n> wiurel_ofe w) A B A' B'.
+Proof.
+intros w A A' B B' Heq.
+unfold iuiset in Heq.
+so (f_equal (fun z => snd z) Heq) as Heq'.
+cbn in Heq'.
+so (meta_pair_inj _#5 Heq') as (H3 & H4).
+so (meta_iurel_inj _#3 H3); subst A'.
+so (meta_fn_inj _#5 H4) as H5.
+apply eq_impl_eq_dep_snd.
+clear Heq Heq' H3 H4.
+so (eq_dep_impl_eq_snd _#5 H5) as Heq.
+apply nearrow_extensionality.
+intro x.
+so (f_equal (fun z => pi1 z x) Heq) as Heq'.
+cbn in Heq'.
+eapply meta_iurel_inj; eauto.
 Qed.
 
 
@@ -216,6 +247,46 @@ f_equal.
 Qed.
 
 
+Lemma iutruncate_iuiset :
+  forall n w A B,
+    iutruncate (S n) (iuiset w A B)
+    =
+    iuiset w 
+      (iutruncate (S n) A)
+      (nearrow_compose
+         (nearrow_compose (iutruncate_ne (S n)) B)
+         (embed_ceiling_ne (S n) (den A))).
+Proof.
+intros n w A B.
+assert (S n > 0) as Hpos by omega.
+unfold iuiset.
+unfold iutruncate.
+unfold den.
+cbn [fst snd].
+f_equal.
+  {
+  rewrite -> ceiling_set.
+  f_equal.
+  apply nearrow_extensionality.
+  auto.
+  }
+
+  {
+  rewrite -> !meta_truncate_pair; auto.
+  f_equal.
+    {
+    apply meta_truncate_iurel; auto.
+    }
+  rewrite -> meta_truncate_fn; auto.
+  f_equal.
+  apply nearrow_extensionality.
+  intro C.
+  cbn -[meta_truncate].
+  apply meta_truncate_iurel; auto.
+  }
+Qed.
+
+
 Lemma extend_iuset :
   forall v w (h : v <<= w) A B,
     extend_iurel h (iuset v A B)
@@ -234,6 +305,41 @@ f_equal.
   f_equal.
   apply nearrow_extensionality; auto.
   }
+rewrite -> extend_meta_iurel.
+reflexivity.
+Qed.
+
+
+Lemma extend_iuiset :
+  forall v w (h : v <<= w) A B,
+    extend_iurel h (iuiset v A B)
+    =
+    iuiset w (extend_iurel h A)
+      (nearrow_compose
+         (nearrow_compose (extend_iurel_ne h) B)
+         (deextend_urelsp_ne h (den A))).
+Proof.
+intros v w h A B.
+unfold iuiset, extend_iurel.
+cbn.
+f_equal.
+  {
+  rewrite -> (extend_set _ _ h).
+  f_equal.
+  apply nearrow_extensionality; auto.
+  }
+unfold meta_iurel.
+cbn.
+rewrite -> !extend_meta_pair.
+rewrite -> extend_meta_urel.
+rewrite -> extend_meta_fn.
+f_equal.
+f_equal.
+f_equal.
+apply exT_extensionality_prop.
+cbn.
+fextensionality 1.
+intro x.
 rewrite -> extend_meta_iurel.
 reflexivity.
 Qed.

@@ -81,6 +81,7 @@ Inductive operator : list nat -> Type :=
 | oper_ppi2        : operator [0]
 
 | oper_set         : operator [0; 1]
+| oper_iset        : operator [0; 1]
 
 | oper_quotient    : operator [0; 2]
 
@@ -540,6 +541,7 @@ Definition ppair {obj} m1 m2       : @term obj := oper _ (oper_ppair _) (rw_cons
 Definition ppi1 {obj} m            : @term obj := oper _ (oper_ppi1 _) (rw_cons _ _ m rw_nil).
 Definition ppi2 {obj} m            : @term obj := oper _ (oper_ppi2 _) (rw_cons _ _ m rw_nil).
 Definition set {obj} m1 m2         : @term obj := oper _ (oper_set _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
+Definition iset {obj} m1 m2        : @term obj := oper _ (oper_iset _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition quotient {obj} m1 m2    : @term obj := oper _ (oper_quotient _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition guard {obj} m1 m2       : @term obj := oper _ (oper_guard _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition wt {obj} m1 m2          : @term obj := oper _ (oper_wt _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
@@ -701,6 +703,9 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 
 | same_set :
     same_operator [0; 1] [0; 1] (oper_set A) (oper_set B)
+
+| same_iset :
+    same_operator [0; 1] [0; 1] (oper_iset A) (oper_iset B)
 
 | same_quotient :
     same_operator [0; 2] [0; 2] (oper_quotient A) (oper_quotient B)

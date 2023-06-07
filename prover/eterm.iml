@@ -445,6 +445,8 @@ structure ParseTerm =
 
       fun set x a b = T.apply2 Prim.set a (T.lam (SOME x) b)
 
+      fun iset x a b = T.apply2 Prim.iset a (T.lam (SOME x) b)
+
       val squash = T.apply1 Prim.squash
 
       fun ov m a = T.apply2 Prim.ov a m
@@ -520,38 +522,6 @@ structure ParseTerm =
       fun register k arity prec unp =
          ConstantTable.insert U.unparsingTable k (arity, prec, ref true, unp)
 
-
-      fun binderContent str (doms, cod) =
-         U.box $
-         U.append
-            [
-            U.box $
-            U.append
-               [
-               U.string str,
-               U.append
-                  (map 
-                      (fn (arg, dom) => 
-                         U.append
-                            [
-                            U.break 1,
-                            U.string "(",
-                            U.box $ 
-                               U.append
-                               [
-                               U.string arg,
-                               U.break 1,
-                               U.string ": ",
-                               U.box $ dom 0
-                               ],
-                            U.string ")"
-                            ])
-                      doms),
-               U.string " ."
-               ],
-            U.break 1,
-            cod 0,
-            ]
 
       fun idents args =
          U.box $
@@ -954,6 +924,26 @@ structure ParseTerm =
                         ])))
 
       val () =
+         register Prim.iset 2 0
+         (U.wrap
+             (U.apply2 Prim.iset U.show (U.lam U.show))
+             (fn (a, (arg, b)) =>
+                 U.box $
+                 U.append
+                    [
+                    U.string "iset",
+                    U.break 1,
+                    U.string "(",
+                    U.string arg,
+                    U.break 1,
+                    U.string ": ",
+                    U.box $ a 0,
+                    U.string ") .",
+                    U.break 1,
+                    b 0
+                    ]))
+
+      val () =
          register Prim.squash 1 100
          (U.wrap
              (U.apply1 Prim.squash U.show)
@@ -1143,6 +1133,8 @@ grammardef Term
    rule Term(0)   ::= "iexists" Bindings "." Term(0) => iexistss
    rule Term(0)   ::= "intersect" Bindings "." Term(0) => intersects
    rule Term(0)   ::= "foralltp" OIdents "." Term(0) => foralltps
+
+   rule Term(0)   ::= "iset" "(" Ident ":" Term(0) ")" "." Term(0) => iset
 
    rule Term(0)   ::= "rec" Ident "." Term(0) => rec
    rule Term(0)   ::= "mu" Ident "." Term(0) => mu

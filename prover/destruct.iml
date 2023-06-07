@@ -334,6 +334,22 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                 fail "set pattern expected")
 
 
+      fun destIset i pat set =
+         (case pat of
+             And [p1, p2] =>
+                (refine $ Rule.isetLeft i (evar ()) (evar ()) (evar ()))
+                >>+
+                let
+                   do (vars1, set1) = andthenp S.empty $ dest (i+1) p1 set
+                   do (vars2, set2) = andthenp vars1 $ dest i p2 set1
+                in
+                   idtacM (S.append vars1 vars2, Principal set2)
+                end
+
+           | _ =>
+                fail "set pattern expected")
+
+
 
       fun varyAndBindSetPat set p =
          (case p of
@@ -665,6 +681,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
             insert Prim.eq (destUnit (fn i => RuleTactic.refine4 $ Rule.eqLeft i));
             insert Prim.ov (destUnit (fn i => RuleTactic.refine3 $ Rule.ofLeft i));
             insert Prim.set destSet;
+            insert Prim.iset destIset;
             insert Prim.quotient destQuotient;
             insert Prim.eqtp (destUnit (fn i => RuleTactic.refine3 $ Rule.eqtpLeft i));
             insert Prim.istp (destUnit (fn i => RuleTactic.refine2 $ Rule.istpLeft i));
@@ -751,7 +768,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                    >> tac
 
               | Wild =>
-                   refine (Rule.weaken 0 1)
+                   cut (setFailure "dependency exists on hypothesis to be weakened" (refine (Rule.weaken 0 1)))
                    >> tac
 
               | _ =>

@@ -843,6 +843,16 @@ so (IH2 _ Hb); subst B'.
 reflexivity.
 }
 
+(* iset *)
+{
+intros pg s i a b A B _ IH1 _ IH2 X HX.
+invertc HX.
+intros A' B' Ha Hb <-.
+so (IH1 _ Ha); subst A'.
+so (IH2 _ Hb); subst B'.
+reflexivity.
+}
+
 (* quotient *)
 {
 intros pg s i a b A B hs ht _ IH1 _ IH2 X HX.

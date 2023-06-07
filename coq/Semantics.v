@@ -267,6 +267,13 @@ with basicv : page -> bool -> nat -> sterm -> wiurel stop -> Prop :=
         -> functional pg s i (den A) b B
         -> basicv pg s i (set a b) (iuset stop A B)
 
+| interp_iset :
+    forall pg s i a b
+      (A : wiurel stop) (B : urelsp (den A) -n> wiurel_ofe stop),
+        basic pg s i a A
+        -> functional pg s i (den A) b B
+        -> basicv pg s i (iset a b) (iuiset stop A B)
+
 | interp_quotient :
     forall pg s i a b
       (A : wiurel stop)

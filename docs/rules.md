@@ -54,6 +54,7 @@ variables.  The official rules, using de Bruijn indices, are given
 [Type formation](#type-formation)<br>
 [Subtyping](#subtyping)<br>
 [Subset types](#subset-types)<br>
+[Intensional subset types](#intensional-subset-types)<br>
 [Squash](#squash)<br>
 [Quotient types](#quotient-types)<br>
 [Impredicative universals](#impredicative-universals)<br>
@@ -2746,6 +2747,120 @@ variables.  The official rules, using de Bruijn indices, are given
 - `setSubElim A A' B`
 
       G |- {x : A | B} <: A'
+      >>
+      G |- A <: A'
+      G, x : A |- B : type
+
+
+### Intensional subset types
+
+- `isetForm A B`
+
+      G |- iset A (fn x . B) : type
+      >>
+      G |- A : type
+      G, x : A |- B : type
+
+- `isetEq A A' B B'`
+
+      G |- iset A (fn x . B) = iset A' (fn x . B') : type
+      >>
+      G |- A = A' : type
+      G, x : A |- B = B' : type
+
+- `isetFormUniv A B I`
+
+      G |- iset A (fn x . B) : univ I
+      >>
+      G |- A : univ I
+      G, x : A |- B : univ I
+
+- `isetEqUniv A A' B B' I`
+
+      G |- iset A (fn x . B) = iset A' (fn x . B') : univ I
+      >>
+      G |- A = A' : univ I
+      G, x : A |- B = B' : univ I
+
+- `isetWeakenOf A B M`
+
+      G |- M : A
+      >>
+      G |- M : iset A (fn x . B)
+
+- `isetWeakenEq A B M N`
+
+      G |- M = N : A
+      >>
+      G |- M = N : iset A (fn x . B)
+
+- `isetWeaken A B`
+
+      G |- A ext M
+      >>
+      G |- iset A (fn x . B) ext M
+
+- `isetIntroOf A B M`
+
+      G |- M : iset A (fn x . B)
+      >>
+      G, x : A |- B : type
+      G |- M : A
+      G |- [M / x]B
+
+- `isetIntroEq A B M N`
+
+      G |- M = N : iset A (fn x . B)
+      >>
+      G, x : A |- B : type
+      G |- M = N : A
+      G |- [M / x]B
+
+- `isetIntro A B M`
+
+      G |- iset A (fn x . B) ext M
+      >>
+      G, x : A |- B : type
+      G |- M : A
+      G |- [M / x]B
+
+- `isetIntroOfSquash A B M`
+
+      G |- M : iset A (fn x . B)
+      >>
+      G, x : A |- B : type
+      G |- M : A
+      G |- {[M / x]B}
+
+- `isetElim A B C M`
+
+      G |- C ext [() / y]N
+      >>
+      G |- M : iset A (fn x . B)
+      G, y (hidden) : [M / x]B |- C ext N
+
+- `isetLeft n A B C`
+
+      G1, x : (iset A (fn x . B)), G2 |- C ext [() / y]M
+      >>
+      G1, x : A, y (hidden) : B, G2 |- C ext M
+
+- `isetFormInv1 A B`
+
+      G |- A : type
+      >>
+      G |- iset A (fn x . B) : type
+
+- `isetFormInv2 A B M`
+
+      G |- [M / x]B : type
+      >>
+      G |- iset A (fn x . B) : type
+      G |- M : A
+
+- `isetSubElim A A' B`
+
+      G |- iset A (fn x . B) <: A'
       >>
       G |- A <: A'
       G, x : A |- B : type

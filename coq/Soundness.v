@@ -168,6 +168,14 @@ intros; eapply sound_set_elim1; eauto; done.
 intros; eapply sound_set_elim2; eauto; done.
 intros; eapply sound_set_hyp_weaken; eauto; done.
 intros; eapply sound_set_formation_invert; eauto; done.
+intros; eapply sound_iset_formation; eauto; done.
+intros; eapply sound_iset_formation_univ; eauto; done.
+intros; eapply sound_iset_intro; eauto; done.
+intros; eapply sound_iset_elim1; eauto; done.
+intros; eapply sound_iset_elim2; eauto; done.
+intros; eapply sound_iset_hyp_weaken; eauto; done.
+intros; eapply sound_iset_formation_invert1; eauto; done.
+intros; eapply sound_iset_formation_invert2; eauto; done.
 intros; eapply sound_squash_idem; eauto; done.
 intros; eapply sound_quotient_formation; eauto; done.
 intros; eapply sound_quotient_formation_univ; eauto; done.

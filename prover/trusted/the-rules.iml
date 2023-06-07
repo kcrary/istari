@@ -408,6 +408,22 @@ signature THE_RULES =
       val setSquash : term -> term -> rule
       val setFormInv : term -> term -> rule
       val setSubElim : term -> term -> term -> rule
+      val isetForm : term -> term -> rule
+      val isetEq : term -> term -> term -> term -> rule
+      val isetFormUniv : term -> term -> term -> rule
+      val isetEqUniv : term -> term -> term -> term -> term -> rule
+      val isetWeakenOf : term -> term -> term -> rule
+      val isetWeakenEq : term -> term -> term -> term -> rule
+      val isetWeaken : term -> term -> rule
+      val isetIntroOf : term -> term -> term -> rule
+      val isetIntroEq : term -> term -> term -> term -> rule
+      val isetIntro : term -> term -> term -> rule
+      val isetIntroOfSquash : term -> term -> term -> rule
+      val isetElim : term -> term -> term -> term -> rule
+      val isetLeft : int -> term -> term -> term -> rule
+      val isetFormInv1 : term -> term -> rule
+      val isetFormInv2 : term -> term -> term -> rule
+      val isetSubElim : term -> term -> term -> rule
       val squashForm : term -> rule
       val squashEq : term -> term -> rule
       val squashFormUniv : term -> term -> rule
@@ -542,6 +558,7 @@ val const_integer = Const Prim.integer
 val const_integer_from_Integer = Const Prim.integer_from_Integer
 val const_integer_to_Integer = Const Prim.integer_to_Integer
 val const_intersect = Const Prim.intersect
+val const_iset = Const Prim.iset
 val const_istp = Const Prim.istp
 val const_ite = Const Prim.ite
 val const_karrow = Const Prim.karrow
@@ -944,6 +961,22 @@ fun setLeft gsize a b c = Arg.lmake "setLeft" [] gsize [J.Tm (Elim (const_set, [
 fun setSquash a b = Arg.make "setSquash" [] (Elim (const_eqtp, [App (Elim (const_set, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_set, [App (a), App (Lam (NONE, Elim (const_squash, [App (b), ]))), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_set, [App (a), App (Lam (NONE, b)), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun setFormInv a b = Arg.make "setFormInv" [] (Elim (const_istp, [App (a), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_set, [App (a), App (Lam (NONE, b)), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun setSubElim a a' b = Arg.make "setSubElim" [] (Elim (const_subtype, [App (Elim (const_set, [App (a), App (Lam (NONE, b)), ])), App (a'), ])) [(Arg.Unhide, [], Elim (const_subtype, [App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isetForm a b = Arg.make "isetForm" [] (Elim (const_istp, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isetEq a a' b b' = Arg.make "isetEq" [] (Elim (const_eqtp, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_iset, [App (a'), App (Lam (NONE, b')), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eqtp, [App (b), App (b'), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isetFormUniv a b i = Arg.make "isetFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Elim (const_univ, [App (Sub (i, Shift 1)), ])), App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isetEqUniv a a' b b' i = Arg.make "isetEqUniv" [] (Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_iset, [App (a'), App (Lam (NONE, b')), ])), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eq, [App (Elim (const_univ, [App (Sub (i, Shift 1)), ])), App (b), App (b'), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isetWeakenOf a b m = Arg.make "isetWeakenOf" [] (Elim (const_of, [App (a), App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isetWeakenEq a b m n = Arg.make "isetWeakenEq" [] (Elim (const_eq, [App (a), App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), App (m), App (n), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isetWeaken a b = Arg.make "isetWeaken" [] (a) [(Arg.Nothing, [], Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), ] (fn [m, ] => m | _ => raise Arg.ExtractFailure)
+fun isetIntroOf a b m = Arg.make "isetIntroOf" [] (Elim (const_of, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), App (m), ])) [(Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Unhide, [], Sub (b, Dot (m, Shift 0))), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isetIntroEq a b m n = Arg.make "isetIntroEq" [] (Elim (const_eq, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), App (m), App (n), ])) [(Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), (Arg.Unhide, [], Elim (const_eq, [App (a), App (m), App (n), ])), (Arg.Unhide, [], Sub (b, Dot (m, Shift 0))), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isetIntro a b m = Arg.make "isetIntro" [m, ] (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])) [(Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Unhide, [], Sub (b, Dot (m, Shift 0))), ] (fn [_, _, _, ] => m | _ => raise Arg.ExtractFailure)
+fun isetIntroOfSquash a b m = Arg.make "isetIntroOfSquash" [] (Elim (const_of, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), App (m), ])) [(Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Unhide, [], Elim (const_squash, [App (Sub (b, Dot (m, Shift 0))), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isetElim a b c m = Arg.make "isetElim" [] (c) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), App (m), ])), (Arg.Nothing, [J.Tmh (Sub (b, Dot (m, Shift 0))), ], Sub (c, Shift 1)), ] (fn [_, n, ] => Sub (n, Dot (Triv, Shift 0)) | _ => raise Arg.ExtractFailure)
+fun isetLeft gsize a b c = Arg.lmake "isetLeft" [] gsize [J.Tm (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), ] (c) [(Arg.Nothing, [J.Tmh (b), J.Tm (a), ], SOME (Shift 1), Sub (c, under gsize (Shift 1))), ] (fn [m, ] => Sub (m, under gsize (Dot (Triv, Shift 0))) | _ => raise Arg.ExtractFailure)
+fun isetFormInv1 a b = Arg.make "isetFormInv1" [] (Elim (const_istp, [App (a), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isetFormInv2 a b m = Arg.make "isetFormInv2" [] (Elim (const_istp, [App (Sub (b, Dot (m, Shift 0))), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isetSubElim a a' b = Arg.make "isetSubElim" [] (Elim (const_subtype, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), App (a'), ])) [(Arg.Unhide, [], Elim (const_subtype, [App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun squashForm a = Arg.make "squashForm" [] (Elim (const_istp, [App (Elim (const_squash, [App (a), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun squashEq a b = Arg.make "squashEq" [] (Elim (const_eqtp, [App (Elim (const_squash, [App (a), ])), App (Elim (const_squash, [App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), (Arg.Unhide, [J.Tm (a), ], Sub (b, Shift 1)), (Arg.Unhide, [J.Tm (b), ], Sub (a, Shift 1)), ] (fn [_, _, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun squashFormUniv a i = Arg.make "squashFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_squash, [App (a), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
