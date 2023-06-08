@@ -50,7 +50,7 @@ signature CONSTANT_INTERNAL =
 
          You probably don't want this.  You probably want Namespace.declare instead.
       *)
-      val declare : term option -> Symbol.symbol list -> constant
+      val declare : term option -> Symbol.symbol list -> opacity -> constant
 
 
       (* Returns the symbol list that was supplied when the constant was declared.
@@ -282,18 +282,20 @@ functor ConstantFun (structure Term : TERM
          end
 
 
-      fun declare def path =
+      fun declare def path opac =
          let
             val const = !nextConstant
 
             val def' = Option.map crush def
-
-            val opac =
-               (case def' of
-                   NONE => OPAQUE
-
-                 | SOME _ => HARD)
          in
+            (case (def', opac) of
+                (NONE, OPAQUE) => ()
+
+              | (NONE, _) =>
+                   raise (Invalid "non-opqaque constants without definition")
+
+              | (SOME _, _) => ());
+
             Trail.commit ();
             nextConstant := const + 1;
             ArrayInf.update (theConstants, const, (def', path, opac));
