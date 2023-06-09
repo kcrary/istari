@@ -73,6 +73,12 @@ example, zero is ``z`0``.
 
     leqz_0_1 : z`0 <z= z`1
 
+    ltz_0_1 : z`0 <z z`1
+
+    leqz_neg1_0 : z`-1 <z z`0
+
+    ltz_neg1_0 : z`-1 <z z`0
+
     leqz_refl : forall (a : integer) . a <z= a
 
     leqz_refl_eq : forall (a b : integer) . a = b : integer -> a <z= b
@@ -170,11 +176,16 @@ This one gives transitivity in the form needed for rewriting:
     ltzb : integer -> integer -> bool
          = fn a b . leqzb (z`1 +z a) b
 
+    neqzb : integer -> integer -> bool
+          = fn a b . Bool.notb (eqzb a b)
+
     istrue_eqzb : forall (a b : integer) . Bool.istrue (eqzb a b) <-> a = b : integer
 
     istrue_leqzb : forall (a b : integer) . Bool.istrue (leqzb a b) <-> a <z= b
 
     istrue_ltzb : forall (a b : integer) . Bool.istrue (ltzb a b) <-> a <z b
+
+    istrue_neqzb : forall (a b : integer) . Bool.istrue (neqzb a b) <-> a <> b : integer
 
 
 ### Induction
@@ -212,7 +223,7 @@ positive case that works upwards.
 ### Relation to natural numbers
 
     nat_to_integer : nat -> integer
-                   =rec= fn n . natcase n z`0 (fn n' . z`1 +z nat_to_integer n')
+                   =rec= fn n . nat_case n z`0 (fn n' . z`1 +z nat_to_integer n')
 
     nat_to_integer (zero) --> z`0
     nat_to_integer (succ n) --> plusz z`1 (nat_to_integer n)
@@ -237,8 +248,7 @@ positive case that works upwards.
     integer_to_nat_succ : forall (a : integer) .
                              z`0 <z= a -> integer_to_nat (z`1 +z a) = succ (integer_to_nat a) : nat
 
-    integer_to_nat_mono : forall (a b : integer) .
-                             z`0 <z= a -> a <z= b -> integer_to_nat a <= integer_to_nat b
+    integer_to_nat_mono : forall (a b : integer) . a <z= b -> integer_to_nat a <= integer_to_nat b
 
     integer_to_nat_mono_lt : forall (a b : integer) .
                                 z`0 <z= a -> a <z b -> integer_to_nat a < integer_to_nat b
@@ -264,11 +274,15 @@ positive case that works upwards.
 
     eq_integer_decide : forall (a b : integer) . Decidable.decidable (a = b : integer)
 
+    neq_integer_decide : forall (a b : integer) . Decidable.decidable (a <> b : integer)
+
     leqz_decide : forall (a b : integer) . Decidable.decidable (a <z= b)
 
     ltz_decide : forall (a b : integer) . Decidable.decidable (a <z b)
 
     eq_integer_stable : forall (a b : integer) . Stable.stable (a = b : integer)
+
+    neq_integer_stable : forall (a b : integer) . Stable.stable (a <> b : integer)
 
     leqz_stable : forall (a b : integer) . Stable.stable (a <z= b)
 
@@ -279,6 +293,8 @@ positive case that works upwards.
     integer_trichotomy : forall (a b : integer) . a <z b % a = b : integer % b <z a
 
     integer_dichotomy : forall (a b : integer) . a <z= b % b <z a
+
+    integer_dichotomy_weak : forall (a b : integer) . a <z= b % b <z= a
 
     integer_dichotomy_neq : forall (a b : integer) . not (a = b : integer) -> a <z b % b <z a
 
@@ -371,3 +387,97 @@ positive case that works upwards.
 
     timesz_cancel_leqz_r_remainder : forall (a b c r : integer) .
                                         z`0 <z c -> r <z c -> a *z c <z= b *z c +z r -> a <z= b
+
+
+### Minimum/Maximum
+
+    minz : integer -> integer -> integer
+         = fn a b . if leqzb a b then a else b
+
+    maxz : integer -> integer -> integer
+         = fn a b . if leqzb a b then b else a
+
+    negz_minz : forall (a b : integer) . ~z (minz a b) = maxz (~z a) (~z b) : integer
+
+    negz_maxz : forall (a b : integer) . ~z (maxz a b) = minz (~z a) (~z b) : integer
+
+    maxz_as_minz : forall (a b : integer) . maxz a b = ~z (minz (~z a) (~z b)) : integer
+
+    minz_as_maxz : forall (a b : integer) . minz a b = ~z (maxz (~z a) (~z b)) : integer
+
+    minz_commute : forall (a b : integer) . minz a b = minz b a : integer
+
+    maxz_commute : forall (a b : integer) . maxz a b = maxz b a : integer
+
+    minz_assoc : forall (a b c : integer) . minz (minz a b) c = minz a (minz b c) : integer
+
+    maxz_assoc : forall (a b c : integer) . maxz (maxz a b) c = maxz a (maxz b c) : integer
+
+    minz_leq_l : forall (a b : integer) . minz a b <z= a
+
+    minz_leq_r : forall (a b : integer) . minz a b <z= b
+
+    maxz_leq_l : forall (a b : integer) . a <z= maxz a b
+
+    maxz_leq_r : forall (a b : integer) . b <z= maxz a b
+
+    minz_glb : forall (a b c : integer) . c <z= a -> c <z= b -> c <z= minz a b
+
+    maxz_lub : forall (a b c : integer) . a <z= c -> b <z= c -> maxz a b <z= c
+
+    minz_eq_l : forall (a b : integer) . a <z= b -> minz a b = a : integer
+
+    minz_eq_r : forall (a b : integer) . b <z= a -> minz a b = b : integer
+
+    maxz_eq_l : forall (a b : integer) . b <z= a -> maxz a b = a : integer
+
+    maxz_eq_r : forall (a b : integer) . a <z= b -> maxz a b = b : integer
+
+    minz_idem : forall (a : integer) . minz a a = a : integer
+
+    maxz_idem : forall (a : integer) . maxz a a = a : integer
+
+    minz_dist_maxz_l : forall (a b c : integer) .
+                          minz (maxz a b) c = maxz (minz a c) (minz b c) : integer
+
+    minz_dist_maxz_r : forall (a b c : integer) .
+                          minz a (maxz b c) = maxz (minz a b) (minz a c) : integer
+
+    maxz_dist_minz_l : forall (a b c : integer) .
+                          maxz (minz a b) c = minz (maxz a c) (maxz b c) : integer
+
+    maxz_dist_minz_r : forall (a b c : integer) .
+                          maxz a (minz b c) = minz (maxz a b) (maxz a c) : integer
+
+    plusz_dist_minz_l : forall (a b c : integer) .
+                           a +z minz b c = minz (a +z b) (a +z c) : integer
+
+    plusz_dist_minz_r : forall (a b c : integer) .
+                           minz a b +z c = minz (a +z c) (b +z c) : integer
+
+    plusz_dist_maxz_l : forall (a b c : integer) .
+                           a +z maxz b c = maxz (a +z b) (a +z c) : integer
+
+    plusz_dist_maxz_r : forall (a b c : integer) .
+                           maxz a b +z c = maxz (a +z c) (b +z c) : integer
+
+    nat_to_integer_min : forall (m n : nat) .
+                            nat_to_integer (Nat.min m n)
+                              = minz (nat_to_integer m) (nat_to_integer n)
+                              : integer
+
+    nat_to_integer_max : forall (m n : nat) .
+                            nat_to_integer (Nat.max m n)
+                              = maxz (nat_to_integer m) (nat_to_integer n)
+                              : integer
+
+    integer_to_nat_min : forall (a b : integer) .
+                            integer_to_nat (minz a b)
+                              = Nat.min (integer_to_nat a) (integer_to_nat b)
+                              : nat
+
+    integer_to_nat_max : forall (a b : integer) .
+                            integer_to_nat (maxz a b)
+                              = Nat.max (integer_to_nat a) (integer_to_nat b)
+                              : nat
+

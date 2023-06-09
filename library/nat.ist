@@ -2343,6 +2343,58 @@ qed ();
 
 
 
+lemma "min_idem"
+/
+  forall n . min n n = n : nat
+/;
+
+inference.
+intro /n/.
+apply /min_eq_l/.
+apply /leq_refl/.
+qed ();
+
+
+
+lemma "plus_dist_min_r"
+/
+  forall m n p . m + min n p = min (m + n) (m + p) : nat
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+
+(* 0 *)
+{
+intro /n p/.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /m IH n p/.
+rewrite /-> min_succ/.
+compat.
+apply /IH/.
+}
+qed ();
+
+
+
+lemma "plus_dist_min_l"
+/
+  forall m n p . min m n + p = min (m + p) (n + p) : nat
+/;
+
+inference.
+intro /m n p/.
+rewrite /-> plus_commute at 0 1 2/.
+apply /plus_dist_min_r/.
+qed ();
+
+
+
 (* Maximum *)
 
 definerec /max m n/
@@ -2676,6 +2728,244 @@ qed ();
 
 
 
+lemma "max_idem"
+/
+  forall n . max n n = n : nat
+/;
+
+inference.
+intro /n/.
+apply /max_eq_l/.
+apply /leq_refl/.
+qed ();
+
+
+
+lemma "min_dist_max_r"
+/
+  forall m n p . min m (max n p) = max (min m n) (min m p) : nat
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+
+(* 0 *)
+{
+intro /n p/.
+rewrite /-> min_ann_l at all/.
+rewrite /-> max_id_l/.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /m IH n p/.
+destruct /n/ /| n/.
+  {
+  rewrite /-> min_ann_r/.
+  rewrite /-> max_id_l at all/.
+  reflexivity.
+  }
+destruct /p/ /| p/.
+  {
+  rewrite /-> min_ann_r/.
+  rewrite /-> max_id_r at all/.
+  reflexivity.
+  }
+rewrite /-> max_succ/.
+rewrite /-> min_succ at all/.
+rewrite /-> max_succ/.
+compat.
+apply /IH/.
+}
+qed ();
+
+
+
+lemma "min_dist_max_l"
+/
+  forall m n p . min (max m n) p = max (min m p) (min n p) : nat
+/;
+
+inference.
+intro /m n p/.
+rewrite /-> min_commute at 0 1 2/.
+apply /min_dist_max_r/.
+qed ();
+
+
+
+lemma "min_max_same"
+/
+  forall m n . min m (max m n) = m : nat
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+
+(* 0 *)
+{
+intro /n/.
+apply /min_ann_l/.
+}
+
+(* succ *)
+{
+intro /m IH n/.
+destruct /n/ /| n/.
+  {
+  rewrite /-> max_id_r/.
+  apply /min_idem/.
+  }
+rewrite /-> max_succ , -> min_succ/.
+compat.
+apply /IH/.
+}
+qed ();
+
+
+
+lemma "max_min_same"
+/
+  forall m n . max m (min m n) = m : nat
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+
+(* 0 *)
+{
+intro /n/.
+rewrite /-> min_ann_l/.
+apply /max_idem/.
+}
+
+(* succ *)
+{
+intro /m IH n/.
+destruct /n/ /| n/.
+  {
+  rewrite /-> min_ann_r/.
+  rewrite /-> max_id_r/.
+  reflexivity.
+  }
+rewrite /-> min_succ , -> max_succ/.
+compat.
+apply /IH/.
+}
+qed ();
+
+
+
+lemma "max_dist_min_r"
+/
+  forall m n p . max m (min n p) = min (max m n) (max m p) : nat
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+
+(* 0 *)
+{
+intro /n p/.
+rewrite /-> max_id_l at all/.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /m IH n p/.
+destruct /n/ /| n/.
+  {
+  rewrite /-> min_ann_l/.
+  rewrite /-> max_id_r at all/.
+  destruct /p/ /| p/.
+    {
+    rewrite /-> max_id_r/.
+    rewrite /-> min_idem/.
+    reflexivity.
+    }
+  rewrite /-> max_succ/.
+  rewrite /-> min_succ/.
+  compat.
+  symmetry.
+  apply /min_max_same/.
+  }
+destruct /p/ /| p/.
+  {
+  rewrite /-> min_ann_r/.
+  rewrite /-> max_id_r at all/.
+  rewrite /-> min_commute/.
+  symmetry.
+  apply /min_max_same/.
+  }
+rewrite /-> min_succ/.
+rewrite /-> max_succ at all/.
+rewrite /-> min_succ/.
+compat.
+apply /IH/.
+}
+qed ();
+
+
+
+lemma "max_dist_min_l"
+/
+  forall m n p . max (min m n) p = min (max m p) (max n p) : nat
+/;
+
+inference.
+intro /m n p/.
+rewrite /-> max_commute at 0 1 2/.
+apply /max_dist_min_r/.
+qed ();
+
+
+
+lemma "plus_dist_max_r"
+/
+  forall m n p . m + max n p = max (m + n) (m + p) : nat
+/;
+
+inference.
+intro /m/.
+iterate /m/.
+
+(* 0 *)
+{
+intro /n p/.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /m IH n p/.
+rewrite /-> max_succ/.
+compat.
+apply /IH/.
+}
+qed ();
+
+
+
+lemma "plus_dist_max_l"
+/
+  forall m n p . max m n + p = max (m + p) (n + p) : nat
+/;
+
+inference.
+intro /m n p/.
+rewrite /-> plus_commute at 0 1 2/.
+apply /plus_dist_max_r/.
+qed ();
+
+
+
+
 (* Effective comparisons *)
 
 (* Built-in:
@@ -2970,7 +3260,37 @@ apply /istrue_leqb/.
 qed ();
 
 
-structure Nothing = AfterIstrueLtb ();
+
+define /neqb m n/
+/
+  notb (eqb m n)
+//
+  nat -> nat -> bool
+/;
+
+introOf /m n/.
+unfold /neqb/.
+typecheck.
+qed ();
+
+
+
+lemma "istrue_neqb"
+/
+  forall m n .
+    istrue (neqb m n) <-> m <> n : nat
+/;
+
+inference.
+intro /m n/.
+unfold /neqb , neq/.
+rewrite /-> istrue_notb/.
+rewrite /-> istrue_eqb/.
+qed ();
+
+
+
+structure Nothing = AfterIstrueNeqb ();
 
 
 
@@ -2982,6 +3302,20 @@ lemma "eq_nat_decide"
 /;
 
 intro /m n/.
+apply /Decidable.decidable_from_bool _ _ (eqb m n)/.
+apply /istrue_eqb/.
+qed ();
+
+
+
+lemma "neq_nat_decide"
+/
+  forall (m n : nat) . Decidable.decidable (m <> n : nat)
+/;
+
+intro /m n/.
+unfold /neq/.
+apply /Decidable.decidable_not/.
 apply /Decidable.decidable_from_bool _ _ (eqb m n)/.
 apply /istrue_eqb/.
 qed ();
@@ -3022,6 +3356,18 @@ apply /Stable.decidable_impl_stable/.
 apply /eq_nat_decide/.
 qed ();
   
+
+
+lemma "neq_nat_stable"
+/
+  forall (m n : nat) . Stable.stable (m <> n : nat)
+/;
+
+intro /m n/.
+apply /Stable.decidable_impl_stable/.
+apply /neq_nat_decide/.
+qed ();
+
 
 
 lemma "leq_stable"
@@ -3136,6 +3482,17 @@ so /nat_trichotomy m n/ /H | H | H/.
   right.
   auto.
   }
+qed ();
+
+
+
+lemma "nat_dichotomy_weak"
+/
+  forall (m n : nat) . m <= n % n <= m
+/;
+
+intro /m n/.
+so /nat_dichotomy m n/ /Hmn | Hnm/ >> autoWith /lt_impl_leq/.
 qed ();
 
 

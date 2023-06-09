@@ -6,7 +6,7 @@ signature ETERM =
       type symbol = Symbol.symbol
       type binder = symbol option
 
-      exception UnknownConstant of symbol list
+      exception Syntax of string
 
       val var     : symbol -> eterm        (* always a variable *)
       val short   : symbol -> eterm
@@ -108,22 +108,15 @@ structure ETerm :> ETERM =
                    T.Const const)
          
 
-      exception UnknownConstant of symbol list
+      exception Syntax = SyntaxError.Syntax
 
-      val () =
-         Handler.customHandler
-         (fn UnknownConstant syms =>
-                (
-                print "Error: unknown constant ";
-                print (String.concatWith "." (List.map Symbol.toValue syms));
-                print ".\n";
-                true
-                )
-           | _ => false)
-                
-
-      fun signalUnknownConstant syms = raise (UnknownConstant syms)
-
+      fun signalUnknownConstant syms = 
+         raise (Syntax (String.concat
+                           [
+                           "unknown constant ",
+                           String.concatWith "." (List.map Symbol.toValue syms),
+                           "."
+                           ]))
 
 
       fun longExplicit syms _ _ =
@@ -330,6 +323,7 @@ structure ParseTerm =
    struct
 
       structure T = ETerm
+      exception Syntax = SyntaxError.Syntax
 
 
       fun id x = x
@@ -363,7 +357,7 @@ structure ParseTerm =
 
       fun level_max l =
          (case l of
-             [] => raise (Fail "bad level")
+             [] => raise (Syntax "bad level")
 
            | [m] => m
 
@@ -482,7 +476,7 @@ structure ParseTerm =
          (case FromString.toIntInf str of
              SOME x => T.integer x
 
-           | NONE => raise (Fail ("invalid integer literal " ^ str)))
+           | NONE => raise (Syntax ("invalid integer literal " ^ str)))
 
       val integerEmbed = T.integer
 

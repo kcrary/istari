@@ -247,6 +247,12 @@ Strong induction for natural numbers:
 
     min_eq_r : forall (m n : nat) . n <= m -> min m n = n : nat
 
+    min_idem : forall (n : nat) . min n n = n : nat
+
+    plus_dist_min_l : forall (m n p : nat) . min m n + p = min (m + p) (n + p) : nat
+
+    plus_dist_min_r : forall (m n p : nat) . m + min n p = min (m + n) (m + p) : nat
+
 
 ### Maximum
 
@@ -272,32 +278,59 @@ Strong induction for natural numbers:
 
     max_eq_r : forall (m n : nat) . m <= n -> max m n = n : nat
 
+    max_idem : forall (n : nat) . max n n = n : nat
+
+    plus_dist_max_l : forall (m n p : nat) . max m n + p = max (m + p) (n + p) : nat
+
+    plus_dist_max_r : forall (m n p : nat) . m + max n p = max (m + n) (m + p) : nat
+
+    min_dist_max_l : forall (m n p : nat) . min (max m n) p = max (min m p) (min n p) : nat
+
+    min_dist_max_r : forall (m n p : nat) . min m (max n p) = max (min m n) (min m p) : nat
+
+    max_dist_min_l : forall (m n p : nat) . max (min m n) p = min (max m p) (max n p) : nat
+
+    max_dist_min_r : forall (m n p : nat) . max m (min n p) = min (max m n) (max m p) : nat
+
+    min_max_same : forall (m n : nat) . min m (max m n) = m : nat
+
+    max_min_same : forall (m n : nat) . max m (min m n) = m : nat
+
 
 ### Effective comparisons
 
     eqb : nat -> nat -> bool
 
-    istrue_eqb : forall (m n : nat) . Bool.istrue (eqb m n) <-> m = n : nat
-
     leqb : nat -> nat -> bool
-
-    istrue_leqb : forall (m n : nat) . Bool.istrue (leqb m n) <-> m <= n
 
     ltb : nat -> nat -> bool
         = fn m n . leqb (succ m) n
 
+    neqb : nat -> nat -> bool
+         = fn m n . Bool.notb (eqb m n)
+
+    istrue_eqb : forall (m n : nat) . Bool.istrue (eqb m n) <-> m = n : nat
+
+    istrue_leqb : forall (m n : nat) . Bool.istrue (leqb m n) <-> m <= n
+
     istrue_ltb : forall (m n : nat) . Bool.istrue (ltb m n) <-> m < n
+
+    istrue_neqb : forall (m n : nat) . Bool.istrue (neqb m n) <-> m <> n : nat
 
 
 ### Decidability
 
     eq_nat_decide : forall (m n : nat) . Decidable.decidable (m = n : nat)
 
+    neq_nat_decide : forall (m n : nat) . Decidable.decidable (m <> n : nat)
+
     leq_decide : forall (m n : nat) . Decidable.decidable (m <= n)
 
     lt_decide : forall (m n : nat) . Decidable.decidable (m < n)
 
     eq_nat_stable : forall (m n : nat) . Stable.stable (m = n : nat)
+
+    neq_nat_stable : forall (m n : nat) . Stable.stable (m <> n : nat)
 
     leq_stable : forall (m n : nat) . Stable.stable (m <= n)
 
@@ -308,5 +341,7 @@ Strong induction for natural numbers:
     nat_trichotomy : forall (m n : nat) . m < n % m = n : nat % n < m
 
     nat_dichotomy : forall (m n : nat) . m <= n % n < m
+
+    nat_dichotomy_weak : forall (m n : nat) . m <= n % n <= m
 
     nat_dichotomy_neq : forall (m n : nat) . not (m = n : nat) -> m < n % n < m

@@ -244,6 +244,12 @@ Strong induction for natural numbers:
 
     min_eq_r : type:min_eq_r
 
+    min_idem : type:min_idem
+
+    plus_dist_min_l : type:plus_dist_min_l
+
+    plus_dist_min_r : type:plus_dist_min_r
+
 
 ### Maximum
 
@@ -269,32 +275,59 @@ Strong induction for natural numbers:
 
     max_eq_r : type:max_eq_r
 
+    max_idem : type:max_idem
+
+    plus_dist_max_l : type:plus_dist_max_l
+
+    plus_dist_max_r : type:plus_dist_max_r
+
+    min_dist_max_l : type:min_dist_max_l
+
+    min_dist_max_r : type:min_dist_max_r
+
+    max_dist_min_l : type:max_dist_min_l
+
+    max_dist_min_r : type:max_dist_min_r
+
+    min_max_same : type:min_max_same
+
+    max_min_same : type:max_min_same
+
 
 ### Effective comparisons
 
     eqb : type:eqb
 
-    istrue_eqb : type:istrue_eqb
-
     leqb : type:leqb
-
-    istrue_leqb : type:istrue_leqb
 
     ltb : type:ltb
         = def:ltb
 
+    neqb : type:neqb
+         = def:neqb
+
+    istrue_eqb : type:istrue_eqb
+
+    istrue_leqb : type:istrue_leqb
+
     istrue_ltb : type:istrue_ltb
+
+    istrue_neqb : type:istrue_neqb
 
 
 ### Decidability
 
     eq_nat_decide : type:eq_nat_decide
 
+    neq_nat_decide : type:neq_nat_decide
+
     leq_decide : type:leq_decide
 
     lt_decide : type:lt_decide
 
     eq_nat_stable : type:eq_nat_stable
+
+    neq_nat_stable : type:neq_nat_stable
 
     leq_stable : type:leq_stable
 
@@ -305,5 +338,7 @@ Strong induction for natural numbers:
     nat_trichotomy : type:nat_trichotomy
 
     nat_dichotomy : type:nat_dichotomy
+
+    nat_dichotomy_weak : type:nat_dichotomy_weak
 
     nat_dichotomy_neq : type:nat_dichotomy_neq

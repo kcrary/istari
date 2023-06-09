@@ -73,6 +73,12 @@ example, zero is ``z`0``.
 
     leqz_0_1 : type:leqz_0_1
 
+    ltz_0_1 : type:ltz_0_1
+
+    leqz_neg1_0 : type:leqz_neg1_0
+
+    ltz_neg1_0 : type:ltz_neg1_0
+
     leqz_refl : type:leqz_refl
 
     leqz_refl_eq : type:leqz_refl_eq
@@ -168,11 +174,16 @@ This one gives transitivity in the form needed for rewriting:
     ltzb : type:ltzb
          = def:ltzb
 
+    neqzb : type:neqzb
+          = def:neqzb
+
     istrue_eqzb : type:istrue_eqzb
 
     istrue_leqzb : type:istrue_leqzb
 
     istrue_ltzb : type:istrue_ltzb
+
+    istrue_neqzb : type:istrue_neqzb
 
 
 ### Induction
@@ -237,11 +248,15 @@ positive case that works upwards.
 
     eq_integer_decide : type:eq_integer_decide
 
+    neq_integer_decide : type:neq_integer_decide
+
     leqz_decide : type:leqz_decide
 
     ltz_decide : type:ltz_decide
 
     eq_integer_stable : type:eq_integer_stable
+
+    neq_integer_stable : type:neq_integer_stable
 
     leqz_stable : type:leqz_stable
 
@@ -252,6 +267,8 @@ positive case that works upwards.
     integer_trichotomy : type:integer_trichotomy
 
     integer_dichotomy : type:integer_dichotomy
+
+    integer_dichotomy_weak : type:integer_dichotomy_weak
 
     integer_dichotomy_neq : type:integer_dichotomy_neq
 
@@ -330,3 +347,77 @@ positive case that works upwards.
     timesz_cancel_leqz_l_remainder : type:timesz_cancel_leqz_l_remainder
 
     timesz_cancel_leqz_r_remainder : type:timesz_cancel_leqz_r_remainder
+
+
+### Minimum/Maximum
+
+    minz : type:minz
+         = def:minz
+
+    maxz : type:maxz
+         = def:maxz
+
+    negz_minz : type:negz_minz
+
+    negz_maxz : type:negz_maxz
+
+    maxz_as_minz : type:maxz_as_minz
+
+    minz_as_maxz : type:minz_as_maxz
+
+    minz_commute : type:minz_commute
+
+    maxz_commute : type:maxz_commute
+
+    minz_assoc : type:minz_assoc
+
+    maxz_assoc : type:maxz_assoc
+
+    minz_leq_l : type:minz_leq_l
+
+    minz_leq_r : type:minz_leq_r
+
+    maxz_leq_l : type:maxz_leq_l
+
+    maxz_leq_r : type:maxz_leq_r
+
+    minz_glb : type:minz_glb
+
+    maxz_lub : type:maxz_lub
+
+    minz_eq_l : type:minz_eq_l
+
+    minz_eq_r : type:minz_eq_r
+
+    maxz_eq_l : type:maxz_eq_l
+
+    maxz_eq_r : type:maxz_eq_r
+
+    minz_idem : type:minz_idem
+
+    maxz_idem : type:maxz_idem
+
+    minz_dist_maxz_l : type:minz_dist_maxz_l
+
+    minz_dist_maxz_r : type:minz_dist_maxz_r
+
+    maxz_dist_minz_l : type:maxz_dist_minz_l
+
+    maxz_dist_minz_r : type:maxz_dist_minz_r
+
+    plusz_dist_minz_l : type:plusz_dist_minz_l
+
+    plusz_dist_minz_r : type:plusz_dist_minz_r
+
+    plusz_dist_maxz_l : type:plusz_dist_maxz_l
+
+    plusz_dist_maxz_r : type:plusz_dist_maxz_r
+
+    nat_to_integer_min : type:nat_to_integer_min
+
+    nat_to_integer_max : type:nat_to_integer_max
+
+    integer_to_nat_min : type:integer_to_nat_min
+
+    integer_to_nat_max : type:integer_to_nat_max
+

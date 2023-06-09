@@ -1193,13 +1193,12 @@ qed ();
 lemma "Integer_to_nat_mono"
 /
   forall a b .
-    Leqz Zeroz a
-    -> Leqz a b
+    Leqz a b
     -> Integer_to_nat a <= Integer_to_nat b
 /;
 
 inference.
-intro /a b Hpos Hab/.
+intro /a b Hab/.
 infer /a/ /Hofa/.
 infer /b/ /Hofb/.
 destruct /a/ /[(a a')]/.
@@ -1245,9 +1244,6 @@ rewrite /succ (Integer_to_nat a) = Integer_to_nat (Plusz Onez a) : nat/.
   reflexivity.
   }
 apply /Integer_to_nat_mono/ >> auto.
-apply /Leqz_trans/ >> auto.
-rewrite /<- Plusz_id_l a/.
-apply /Plusz_Leqz/ >> autoWith /Leqz_refl Leqz_Zeroz_Onez/.
 qed ();
 
 
@@ -2065,6 +2061,30 @@ qed ();
 
 
 
+lemma "ltz_0_1"
+/
+  z`0 <z z`1
+/;
+
+unfold /ltz , leqz/.
+reduce //.
+apply /Bool.istrue_true/.
+qed ();
+
+
+
+lemma "leqz_neg1_0"
+/
+  z`-1 <z z`0
+/;
+
+unfold /ltz , leqz/.
+reduce //.
+apply /Bool.istrue_true/.
+qed ();
+
+
+
 lemma "ltz_neg1_0"
 /
   z`-1 <z z`0
@@ -2814,7 +2834,35 @@ rewrite /-> istrue_leqzb/.
 qed ();
 
 
-structure Nothing = AfterIstrueLtzb ();
+
+define /neqzb a b/
+/
+  Bool.notb (eqzb a b)
+//
+  integer -> integer -> bool
+/;
+
+unfold /neqzb/.
+typecheck.
+qed ();
+
+
+
+lemma "istrue_neqzb"
+/
+  forall a b .
+    Bool.istrue (neqzb a b) <-> a <> b : integer
+/;
+
+inference.
+intro /a b/.
+unfold /neqzb , neq/.
+rewrite /-> Bool.istrue_notb/.
+rewrite /-> istrue_eqzb/.
+qed ();
+
+
+structure Nothing = AfterIstrueNeqzb ();
 
 
 
@@ -3378,8 +3426,7 @@ qed ();
 lemma "integer_to_nat_mono"
 /
   forall a b .
-    z`0 <z= a
-    -> a <z= b
+    a <z= b
     -> integer_to_nat a <= integer_to_nat b
 /;
 
@@ -3389,7 +3436,7 @@ iterate /a/.
 
 (* 0 *)
 {
-intro /b _ _/.
+intro /b _/.
 unroll /integer_to_nat/.
 reduce //.
 apply /Nat.leq_0_min/.
@@ -3397,18 +3444,23 @@ apply /Nat.leq_0_min/.
 
 (* neg *)
 {
-intro /a Hneg IH b Hpos _/.
-so /plusz_leqz _# 4 (leqz_refl z`1) (leqz_trans _# 3 Hneg Hpos)/ /H/.
-rewrite /<- plusz_assoc in H/.
-reduce /H/.
-rewrite /-> plusz_id_l in H/.
-fold /ltz _ _ in H/.
-so /ltz_irrefl _ H/ /0/.
+intro /a Hneg IH b _/.
+rewrite /-> integer_to_nat_neg/.
+1:{
+  apply /Nat.leq_0_min/.
+  }
+apply /leqz_ltz_trans _ (z`-1 +z z`0)/.
+  {
+  apply /plusz_leqz z`-1 z`-1 a z`0/ >> auto.
+  apply /leqz_refl/.
+  }
+reduce //.
+apply /ltz_neg1_0/.
 }
 
 (* pos *)
 {
-intro /a Hpos IH b _ Hab/.
+intro /a Hpos IH b Hab/.
 rewrite /-> integer_to_nat_succ/ >> auto.
 rewrite /<- plusz_id_l b/.
 convert /(z`1 +z z`-1) +z b/.
@@ -3442,12 +3494,7 @@ lemma "integer_to_nat_mono_lt"
 inference.
 unfold /Nat.lt , ltz/.
 intro /a b Ha Hab/.
-so /integer_to_nat_mono _ _ __ Hab/ /H/.
-  {
-  rewrite /<- plusz_id_l z`0/.
-  apply /plusz_leqz z`0 z`1 z`0 a/ >> auto.
-  apply /leqz_0_1/.
-  }
+so /integer_to_nat_mono _ _ Hab/ /H/.
 unroll /integer_to_nat in H/.
 revert /H/.
 boolCase /leqzb (z`1 +z a) z`0/ /Hc/.
@@ -3548,6 +3595,20 @@ qed ();
 
 
 
+lemma "neq_integer_decide"
+/
+  forall (a b : integer) . Decidable.decidable (a <> b : integer)
+/;
+
+intro /a b/.
+unfold /neq/.
+apply /Decidable.decidable_not/.
+apply /Decidable.decidable_from_bool _ _ (eqzb a b)/.
+apply /istrue_eqzb/.
+qed ();
+
+
+
 lemma "leqz_decide"
 /
   forall (a b : integer) . Decidable.decidable (a <z= b)
@@ -3582,6 +3643,18 @@ apply /Stable.decidable_impl_stable/.
 apply /eq_integer_decide/.
 qed ();
   
+
+
+lemma "neq_integer_stable"
+/
+  forall (a b : integer) . Stable.stable (a <> b : integer)
+/;
+
+intro /a b/.
+apply /Stable.decidable_impl_stable/.
+apply /neq_integer_decide/.
+qed ();
+
 
 
 lemma "leqz_stable"
@@ -3696,6 +3769,18 @@ so /integer_trichotomy m n/ /H | H | H/.
   right.
   auto.
   }
+qed ();
+
+
+
+lemma "integer_dichotomy_weak"
+/
+  forall a b . a <z= b % b <z= a
+/;
+
+inference.
+intro /a b/.
+so /integer_dichotomy a b/ /Hab | Hnab/ >> autoWith /ltz_impl_leqz/.
 qed ();
 
 
@@ -4406,4 +4491,614 @@ inference.
 intro /a b c r Hpos Hr Hleq/.
 rewrite /-> timesz_commute in Hleq at 0 1/.
 apply /timesz_cancel_leqz_l_remainder/ >> auto.
+qed ();
+
+
+
+(* Minimum/Maximum *)
+
+define /minz a b/
+/
+  if leqzb a b then a else b
+//
+  integer -> integer -> integer
+/;
+
+unfold /minz/.
+typecheck.
+qed ();
+
+
+
+define /maxz a b/
+/
+  if leqzb a b then b else a
+//
+  integer -> integer -> integer
+/;
+
+unfold /maxz/.
+typecheck.
+qed ();
+
+
+
+lemma "negz_minz"
+/
+  forall a b . ~z (minz a b) = maxz (~z a) (~z b) : integer
+/;
+
+inference.
+intro /a b/.
+unfold /minz , maxz/.
+boolCase /leqzb a b/ /Hab/ >> boolCase /leqzb (~z a) (~z b)/ /Hba/.
+  {
+  compat.
+  apply /leqz_antisymm/ >> auto.
+  apply /negz_leqz'/ >> auto.
+  }
+
+  {
+  rewrite /-> not_leqz in Hab/.
+  rewrite /-> not_leqz in Hba/.
+  so /negz_ltz' _ _ Hba/ /Hba'/.
+  so /ltz_irrefl _ (ltz_trans _ _ _ Hba' Hab)/ /0/.
+  }
+qed ();
+
+
+
+lemma "maxz_as_minz"
+/
+  forall a b . maxz a b = ~z (minz (~z a) (~z b)) : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> negz_minz/.
+rewrite /-> negz_invol at all/.
+reflexivity.
+qed ();
+
+
+
+lemma "negz_maxz"
+/
+  forall a b . ~z (maxz a b) = minz (~z a) (~z b) : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> maxz_as_minz/.
+rewrite /-> negz_invol/.
+reflexivity.
+qed ();
+
+
+
+lemma "minz_as_maxz"
+/
+  forall a b . minz a b = ~z (maxz (~z a) (~z b)) : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> negz_maxz/.
+rewrite /-> negz_invol at all/.
+reflexivity.
+qed ();
+
+
+
+lemma "minz_commute"
+/
+  forall a b . minz a b = minz b a : integer
+/;
+
+inference.
+intro /a b/.
+unfold /minz at all/.
+boolCase /leqzb a b/ /Hab/ >> boolCase /leqzb b a/ /Hba/.
+  {
+  apply /leqz_antisymm/ >> auto.
+  }
+
+  {
+  so /Hab __/ /0/.
+  rewrite /-> not_leqz in Hba/.
+  apply /ltz_impl_leqz/ >> auto.
+  }
+qed ();
+
+
+
+lemma "maxz_commute"
+/
+  forall a b . maxz a b = maxz b a : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> maxz_as_minz at all/.
+compat.
+apply /minz_commute/.
+qed ();
+
+
+
+lemma "minz_assoc"
+/
+  forall a b c . minz (minz a b) c = minz a (minz b c) : integer
+/;
+
+inference.
+intro /a b c/.
+unfold /minz at all/.
+boolCase /leqzb b c/ /Hbc/ >> boolCase /leqzb a b/ /Hab/.
+  {
+  boolCase /leqzb a c/ /Hac/.
+  so /Hac __/ /0/.
+  apply /leqz_trans/ >> auto.
+  }
+
+  {
+  boolCase /leqzb b c/ /Hbc'/.
+  so /Hbc' Hbc/ /0/.
+  }
+
+  {
+  boolCase /leqzb b c/ /Hbc'/.
+    {
+    so /Hbc Hbc'/ /0/.
+    }
+  boolCase /leqzb a c/ /Hac/.
+  rewrite /-> not_leqz in Hbc/.
+  rewrite /-> not_leqz in Hab/.
+  apply /leqz_antisymm/ >> auto.
+  apply /ltz_impl_leqz/.
+  apply /ltz_trans/ >> auto.
+  }
+qed ();
+
+
+
+lemma "maxz_assoc"
+/
+  forall a b c . maxz (maxz a b) c = maxz a (maxz b c) : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> maxz_as_minz at all/.
+rewrite /-> negz_invol at all/.
+compat.
+apply /minz_assoc/.
+qed ();
+
+
+
+lemma "minz_leq_l"
+/
+  forall a b . minz a b <z= a
+/;
+
+inference.
+intro /a b/.
+unfold /minz/.
+boolCase /leqzb a b/ /Hab/.
+  {
+  apply /leqz_refl/.
+  }
+rewrite /-> not_leqz in Hab/.
+apply /ltz_impl_leqz/ >> auto.
+qed ();
+
+
+
+lemma "minz_leq_r"
+/
+  forall a b . minz a b <z= b
+/;
+
+inference.
+intro /a b/.
+rewrite /-> minz_commute/.
+apply /minz_leq_l/.
+qed ();
+
+
+
+lemma "maxz_leq_l"
+/
+  forall a b . a <z= maxz a b
+/;
+
+inference.
+intro /a b/.
+rewrite /-> maxz_as_minz/.
+apply /negz_leqz'/.
+rewrite /-> negz_invol/.
+apply /minz_leq_l/.
+qed ();
+
+
+
+lemma "maxz_leq_r"
+/
+  forall a b . b <z= maxz a b
+/;
+
+inference.
+intro /a b/.
+rewrite /-> maxz_commute/.
+apply /maxz_leq_l/.
+qed ();
+
+
+
+lemma "minz_glb"
+/
+  forall a b c . c <z= a -> c <z= b -> c <z= minz a b
+/;
+
+inference.
+intro /a b c Ha Hb/.
+unfold /minz/.
+boolCase /leqzb a b/ /Hab/ >> auto.
+qed ();
+
+
+
+lemma "maxz_lub"
+/
+  forall a b c . a <z= c -> b <z= c -> maxz a b <z= c
+/;
+
+inference.
+intro /a b c Ha Hb/.
+unfold /maxz/.
+boolCase /leqzb a b/ /Hab/ >> auto.
+qed ();
+
+  
+
+lemma "minz_eq_l"
+/
+  forall a b . a <z= b -> minz a b = a : integer
+/;
+
+inference.
+intro /a b Hab/.
+unfold /minz/.
+boolCase /leqzb a b/ /H/.
+rewrite /-> not_leqz in H/.
+so /ltz_irrefl _ (leqz_ltz_trans _ _ _ Hab H)/ /0/.
+qed ();
+
+
+
+lemma "minz_eq_r"
+/
+  forall a b . b <z= a -> minz a b = b : integer
+/;
+
+inference.
+intro /a b Hba/.
+rewrite /-> minz_commute/.
+apply /minz_eq_l/ >> auto.
+qed ();
+
+
+
+lemma "maxz_eq_l"
+/
+  forall a b . b <z= a -> maxz a b = a : integer
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> maxz_as_minz/.
+rewrite /-> minz_eq_l/.
+  {
+  apply /negz_leqz/ >> auto.
+  }
+apply /negz_invol/.
+qed ();
+
+
+
+lemma "maxz_eq_r"
+/
+  forall a b . a <z= b -> maxz a b = b : integer
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> maxz_commute/.
+apply /maxz_eq_l/ >> auto.
+qed ();
+
+
+
+lemma "minz_idem"
+/
+  forall a . minz a a = a : integer
+/;
+
+inference.
+intro /a/.
+rewrite /-> minz_eq_l/ >> auto.
+apply /leqz_refl/.
+qed ();
+
+
+
+lemma "maxz_idem"
+/
+  forall a . maxz a a = a : integer
+/;
+
+inference.
+intro /a/.
+rewrite /-> maxz_eq_l/ >> auto.
+apply /leqz_refl/.
+qed ();
+
+
+
+lemma "minz_dist_maxz_l"
+/
+  forall a b c . minz (maxz a b) c = maxz (minz a c) (minz b c) : integer
+/;
+
+inference.
+intro /a b c/.
+revert /a b/.
+assert /forall a b . a <z= b -> minz (maxz a b) c = maxz (minz a c) (minz b c) : integer/ /H/.
+  {
+  inference.
+  intro /a b Hab/.
+  rewrite /-> maxz_eq_r a b/ >> auto.
+  so /integer_dichotomy_weak b c/ /Hbc | Hcb/.
+    {
+    rewrite /-> minz_eq_l b c at all/ >> auto.
+    rewrite /-> minz_eq_l a c/ >> autoWith /leqz_trans/.
+    rewrite /-> maxz_eq_r/ >> auto.
+    }
+
+    {
+    rewrite /-> minz_eq_r b c at all/ >> auto.
+    so /integer_dichotomy_weak a c/ /Hac | Hca/.
+      {
+      rewrite /-> minz_eq_l/ >> auto.
+      rewrite /-> maxz_eq_r/ >> auto.
+      }
+
+      {
+      rewrite /-> minz_eq_r/ >> auto.
+      symmetry.
+      apply /maxz_idem/.
+      }
+    }
+  }
+intro /a b/.
+so /integer_dichotomy_weak a b/ /Hab | Hba/.
+  {
+  apply /H/ >> auto.
+  }
+
+  {
+  rewrite /-> maxz_commute at 0 1/.
+  apply /H/ >> auto.
+  }
+qed ();
+
+
+
+lemma "minz_dist_maxz_r"
+/
+  forall a b c . minz a (maxz b c) = maxz (minz a b) (minz a c) : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> minz_commute at 0 1 2/.
+apply /minz_dist_maxz_l/.
+qed ();
+
+
+
+lemma "maxz_dist_minz_l"
+/
+  forall a b c . maxz (minz a b) c = minz (maxz a c) (maxz b c) : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> minz_as_maxz at all/.
+rewrite /-> maxz_as_minz at 4 3 0/.
+rewrite /-> negz_invol at all/.
+compat.
+apply /minz_dist_maxz_l/.
+qed ();
+
+
+
+lemma "maxz_dist_minz_r"
+/
+  forall a b c . maxz a (minz b c) = minz (maxz a b) (maxz a c) : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> maxz_commute at 0 1 2/.
+apply /maxz_dist_minz_l/.
+qed ();
+
+
+
+lemma "plusz_dist_minz_r"
+/
+  forall a b c . a +z minz b c = minz (a +z b) (a +z c) : integer
+/;
+
+inference.
+intro /a b c/.
+so /integer_dichotomy_weak b c/ /Hbc | Hcb/.
+  {
+  rewrite /-> minz_eq_l/ >> auto.
+  rewrite /-> minz_eq_l/ >> auto.
+  apply /plusz_leqz/ >> auto.
+  apply /leqz_refl/.
+  }
+
+  {
+  rewrite /-> minz_eq_r/ >> auto.
+  rewrite /-> minz_eq_r/ >> auto.
+  apply /plusz_leqz/ >> auto.
+  apply /leqz_refl/.
+  }
+qed ();
+
+
+
+lemma "plusz_dist_minz_l"
+/
+  forall a b c . minz a b +z c = minz (a +z c) (b +z c) : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusz_commute at 0 1 2/.
+apply /plusz_dist_minz_r/.
+qed ();
+
+
+
+lemma "plusz_dist_maxz_r"
+/
+  forall a b c . a +z maxz b c = maxz (a +z b) (a +z c) : integer
+/;
+
+inference.
+intro /a b c/.
+so /integer_dichotomy_weak b c/ /Hbc | Hcb/.
+  {
+  rewrite /-> maxz_eq_r/ >> auto.
+  rewrite /-> maxz_eq_r/ >> auto.
+  apply /plusz_leqz/ >> auto.
+  apply /leqz_refl/.
+  }
+
+  {
+  rewrite /-> maxz_eq_l/ >> auto.
+  rewrite /-> maxz_eq_l/ >> auto.
+  apply /plusz_leqz/ >> auto.
+  apply /leqz_refl/.
+  }
+qed ();
+
+
+
+lemma "plusz_dist_maxz_l"
+/
+  forall a b c . maxz a b +z c = maxz (a +z c) (b +z c) : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusz_commute at 0 1 2/.
+apply /plusz_dist_maxz_r/.
+qed ();
+
+
+
+lemma "nat_to_integer_min"
+/
+  forall m n . nat_to_integer (Nat.min m n) = minz (nat_to_integer m) (nat_to_integer n) : integer
+/;
+
+inference.
+assert /forall m n . m <= n -> nat_to_integer (Nat.min m n) = minz (nat_to_integer m) (nat_to_integer n) : integer/ /H/.
+  {
+  inference.
+  intro /m n Hmn/.
+  rewrite /-> Nat.min_eq_l/ >> auto.
+  rewrite /-> minz_eq_l/ >> auto.
+  apply /nat_to_integer_mono/ >> auto.
+  }
+intro /m n/.
+so /Nat.nat_dichotomy_weak m n/ /Hmn | Hnm/ >> auto.
+rewrite /-> Nat.min_commute/.
+rewrite /-> minz_commute/.
+apply /H/ >> auto.
+qed ();
+
+
+
+lemma "nat_to_integer_max"
+/
+  forall m n . nat_to_integer (Nat.max m n) = maxz (nat_to_integer m) (nat_to_integer n) : integer
+/;
+
+inference.
+assert /forall m n . n <= m -> nat_to_integer (Nat.max m n) = maxz (nat_to_integer m) (nat_to_integer n) : integer/ /H/.
+  {
+  inference.
+  intro /m n Hmn/.
+  rewrite /-> Nat.max_eq_l/ >> auto.
+  rewrite /-> maxz_eq_l/ >> auto.
+  apply /nat_to_integer_mono/ >> auto.
+  }
+intro /m n/.
+so /Nat.nat_dichotomy_weak m n/ /Hmn | Hnm/ >> auto.
+rewrite /-> Nat.max_commute/.
+rewrite /-> maxz_commute/.
+apply /H/ >> auto.
+qed ();
+
+
+
+lemma "integer_to_nat_min"
+/
+  forall a b . integer_to_nat (minz a b) = Nat.min (integer_to_nat a) (integer_to_nat b) : nat
+/;
+
+inference.
+assert /forall a b . a <z= b -> integer_to_nat (minz a b) = Nat.min (integer_to_nat a) (integer_to_nat b) : nat/ /H/.
+  {
+  inference.
+  intro /a b Hab/.
+  rewrite /-> minz_eq_l/ >> auto.
+  rewrite /-> Nat.min_eq_l/ >> auto.
+  apply /integer_to_nat_mono/ >> auto.
+  }
+intro /a b/.
+so /integer_dichotomy_weak a b/ /Hab | Hba/ >> auto.
+rewrite /-> minz_commute/.
+rewrite /-> Nat.min_commute/.
+apply /H/ >> auto.
+qed ();
+
+
+
+lemma "integer_to_nat_max"
+/
+  forall a b . integer_to_nat (maxz a b) = Nat.max (integer_to_nat a) (integer_to_nat b) : nat
+/;
+
+inference.
+assert /forall a b . a <z= b -> integer_to_nat (maxz a b) = Nat.max (integer_to_nat a) (integer_to_nat b) : nat/ /H/.
+  {
+  inference.
+  intro /a b Hab/.
+  rewrite /-> maxz_eq_r/ >> auto.
+  rewrite /-> Nat.max_eq_r/ >> auto.
+  apply /integer_to_nat_mono/ >> auto.
+  }
+intro /a b/.
+so /integer_dichotomy_weak a b/ /Hab | Hba/ >> auto.
+rewrite /-> maxz_commute/.
+rewrite /-> Nat.max_commute/.
+apply /H/ >> auto.
 qed ();
