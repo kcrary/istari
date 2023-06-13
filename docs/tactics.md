@@ -1009,26 +1009,38 @@ The destruction tactics are:
   Prints a counterexample for the last invocation of Omega to fail.
 
 
-Istari's implementation of Omega understands the following constants
-in arithmetic expressions: nat and integer literals, nat
-and integer linear arithmetic (`succ`, `plus`, `minus`, `plusz`,
-`negz`, `minusz`), nat and integer multiplication (`times`,
-`timesz`) provided at least one operand is a literal,
-`nat_to_integer`, and `integer_to_nat`.  Other expressions are
-uninterpreted and taken as additional variables.
+Omega understands the following constants in arithmetic expressions:
 
-In propositions it understands equality at `nat` or `integer`, nat and
-integer inequalities (`leq`, `lt`, `leqz`, `ltz`),
-and the propositional connectives (`prod`, `sum`, `arrow`, `unit`,
-`void`).  Other propositions are treated as `void` in positive
-positions, and as `unit` in negative positions.
+- nat and integer literals,
+
+- linear arithmetic (`succ`, `plus`, `pred`, `minus`, `plusz`, `negz`,
+  `minusz`),
+
+- multiplication (`times`, `timesz`) in which at least one operand is
+  a literal,
+
+- minimum and maximum (`min`, `max`, `minz`, `maxz`),
+
+- `nat_to_integer`, and `integer_to_nat`.
+
+Other expressions are uninterpreted and taken as additional variables.
+
+In propositions Omega understands:
+
+- equal and not-equal at `nat` or `integer`, 
+
+- nat and integer inequalities (`leq`, `lt`, `leqz`, `ltz`),
+
+- the propositional connectives (`prod`, `sum`, `arrow`, `unit`,
+`void`).
+
+Other propositions are treated as `void` in positive positions, and as
+`unit` in negative positions.
 
 Note that quantified propositions are not understood.  For example,
 `forall x . x <= x` in a positive position (such as the conclusion) is
 treated as `void`.  Consequently it fails with an empty
 counterexample, which may be surprising.
-
-
 
 
 

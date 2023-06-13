@@ -179,17 +179,24 @@ This one gives transitivity in the form needed for rewriting:
 
     istrue_eqzb : type:istrue_eqzb
 
+    istrue_neqzb : type:istrue_neqzb
+
     istrue_leqzb : type:istrue_leqzb
 
     istrue_ltzb : type:istrue_ltzb
 
-    istrue_neqzb : type:istrue_neqzb
+    notb_eqzb : type:notb_eqzb
+
+    notb_neqzb : type:notb_neqzb
+
+    notb_leqzb : type:notb_leqzb
+
+    notb_ltzb : type:notb_ltzb
 
 
 ### Induction
 
-We say that `a` is smaller than `b` if they are both non-positive and
-`b <z a`, or if they are both non-negative and `a <z b`:
+We say that `a` is smaller than `b` when `b` < `a` &le; 0 or 0 &le; `a` < `b`:
 
     smaller : type:smaller
             = def:smaller
@@ -238,6 +245,8 @@ positive case that works upwards.
     integer_to_nat_mono_lt : type:integer_to_nat_mono_lt
 
     plusz_to_nat : type:plusz_to_nat
+
+    pred_to_integer : type:pred_to_integer
 
     minus_to_integer : type:minus_to_integer
 
@@ -299,6 +308,8 @@ positive case that works upwards.
     negz_dist_timesz_r : type:negz_dist_timesz_r
 
     negz_as_timesz : type:negz_as_timesz
+
+    timesz_compat : type:timesz_compat
 
     timesz_leqz : type:timesz_leqz
 
@@ -413,11 +424,10 @@ positive case that works upwards.
 
     plusz_dist_maxz_r : type:plusz_dist_maxz_r
 
-    nat_to_integer_min : type:nat_to_integer_min
+    min_to_integer : type:min_to_integer
 
-    nat_to_integer_max : type:nat_to_integer_max
+    max_to_integer : type:max_to_integer
 
-    integer_to_nat_min : type:integer_to_nat_min
+    minz_to_nat : type:minz_to_nat
 
-    integer_to_nat_max : type:integer_to_nat_max
-
+    maxz_to_nat : type:maxz_to_nat

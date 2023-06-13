@@ -181,17 +181,24 @@ This one gives transitivity in the form needed for rewriting:
 
     istrue_eqzb : forall (a b : integer) . Bool.istrue (eqzb a b) <-> a = b : integer
 
+    istrue_neqzb : forall (a b : integer) . Bool.istrue (neqzb a b) <-> a != b : integer
+
     istrue_leqzb : forall (a b : integer) . Bool.istrue (leqzb a b) <-> a <z= b
 
     istrue_ltzb : forall (a b : integer) . Bool.istrue (ltzb a b) <-> a <z b
 
-    istrue_neqzb : forall (a b : integer) . Bool.istrue (neqzb a b) <-> a <> b : integer
+    notb_eqzb : forall (a b : integer) . Bool.notb (eqzb a b) = neqzb a b : bool
+
+    notb_neqzb : forall (a b : integer) . Bool.notb (neqzb a b) = eqzb a b : bool
+
+    notb_leqzb : forall (a b : integer) . Bool.notb (leqzb a b) = ltzb b a : bool
+
+    notb_ltzb : forall (a b : integer) . Bool.notb (ltzb a b) = leqzb b a : bool
 
 
 ### Induction
 
-We say that `a` is smaller than `b` if they are both non-positive and
-`b <z a`, or if they are both non-negative and `a <z b`:
+We say that `a` is smaller than `b` when `b` < `a` &le; 0 or 0 &le; `a` < `b`:
 
     smaller : integer -> integer -> U 0
             = fn a b . b <z a & a <z= z`0 % a <z b & z`0 <z= a
@@ -258,6 +265,9 @@ positive case that works upwards.
                       -> z`0 <z= b
                       -> integer_to_nat (a +z b) = integer_to_nat a + integer_to_nat b : nat
 
+    pred_to_integer : forall (n : nat) .
+                         0 < n -> nat_to_integer (Nat.pred n) = z`-1 +z nat_to_integer n : integer
+
     minus_to_integer : forall (m n : nat) .
                           n <= m
                           -> nat_to_integer (m - n)
@@ -274,7 +284,7 @@ positive case that works upwards.
 
     eq_integer_decide : forall (a b : integer) . Decidable.decidable (a = b : integer)
 
-    neq_integer_decide : forall (a b : integer) . Decidable.decidable (a <> b : integer)
+    neq_integer_decide : forall (a b : integer) . Decidable.decidable (a != b : integer)
 
     leqz_decide : forall (a b : integer) . Decidable.decidable (a <z= b)
 
@@ -282,7 +292,7 @@ positive case that works upwards.
 
     eq_integer_stable : forall (a b : integer) . Stable.stable (a = b : integer)
 
-    neq_integer_stable : forall (a b : integer) . Stable.stable (a <> b : integer)
+    neq_integer_stable : forall (a b : integer) . Stable.stable (a != b : integer)
 
     leqz_stable : forall (a b : integer) . Stable.stable (a <z= b)
 
@@ -296,7 +306,7 @@ positive case that works upwards.
 
     integer_dichotomy_weak : forall (a b : integer) . a <z= b % b <z= a
 
-    integer_dichotomy_neq : forall (a b : integer) . not (a = b : integer) -> a <z b % b <z a
+    integer_dichotomy_neq : forall (a b : integer) . a != b : integer -> a <z b % b <z a
 
 
 ### Multiplication
@@ -325,6 +335,9 @@ positive case that works upwards.
     negz_dist_timesz_r : forall (a b : integer) . ~z (a *z b) = a *z ~z b : integer
 
     negz_as_timesz : forall (a : integer) . ~z a = z`-1 *z a : integer
+
+    timesz_compat : forall (a a' b b' : integer) .
+                       a = a' : integer -> b = b' : integer -> a *z b = a' *z b' : integer
 
     timesz_leqz : forall (a a' b b' : integer) .
                      z`0 <z= a -> z`0 <z= b -> a <z= a' -> b <z= b' -> a *z b <z= a' *z b'
@@ -450,34 +463,33 @@ positive case that works upwards.
                           maxz a (minz b c) = minz (maxz a b) (maxz a c) : integer
 
     plusz_dist_minz_l : forall (a b c : integer) .
-                           a +z minz b c = minz (a +z b) (a +z c) : integer
-
-    plusz_dist_minz_r : forall (a b c : integer) .
                            minz a b +z c = minz (a +z c) (b +z c) : integer
 
-    plusz_dist_maxz_l : forall (a b c : integer) .
-                           a +z maxz b c = maxz (a +z b) (a +z c) : integer
+    plusz_dist_minz_r : forall (a b c : integer) .
+                           a +z minz b c = minz (a +z b) (a +z c) : integer
 
-    plusz_dist_maxz_r : forall (a b c : integer) .
+    plusz_dist_maxz_l : forall (a b c : integer) .
                            maxz a b +z c = maxz (a +z c) (b +z c) : integer
 
-    nat_to_integer_min : forall (m n : nat) .
-                            nat_to_integer (Nat.min m n)
-                              = minz (nat_to_integer m) (nat_to_integer n)
-                              : integer
+    plusz_dist_maxz_r : forall (a b c : integer) .
+                           a +z maxz b c = maxz (a +z b) (a +z c) : integer
 
-    nat_to_integer_max : forall (m n : nat) .
-                            nat_to_integer (Nat.max m n)
-                              = maxz (nat_to_integer m) (nat_to_integer n)
-                              : integer
+    min_to_integer : forall (m n : nat) .
+                        nat_to_integer (Nat.min m n)
+                          = minz (nat_to_integer m) (nat_to_integer n)
+                          : integer
 
-    integer_to_nat_min : forall (a b : integer) .
-                            integer_to_nat (minz a b)
-                              = Nat.min (integer_to_nat a) (integer_to_nat b)
-                              : nat
+    max_to_integer : forall (m n : nat) .
+                        nat_to_integer (Nat.max m n)
+                          = maxz (nat_to_integer m) (nat_to_integer n)
+                          : integer
 
-    integer_to_nat_max : forall (a b : integer) .
-                            integer_to_nat (maxz a b)
-                              = Nat.max (integer_to_nat a) (integer_to_nat b)
-                              : nat
+    minz_to_nat : forall (a b : integer) .
+                     integer_to_nat (minz a b)
+                       = Nat.min (integer_to_nat a) (integer_to_nat b)
+                       : nat
 
+    maxz_to_nat : forall (a b : integer) .
+                     integer_to_nat (maxz a b)
+                       = Nat.max (integer_to_nat a) (integer_to_nat b)
+                       : nat

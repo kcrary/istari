@@ -59,6 +59,7 @@ cons is right associative.
       Term = Term : type                                             (type equality)
       Term <: Term                                                   (subtyping)
       Term <:> Term                                                  (extensional type equivalence)
+      Term != Term : Term                                            (inequality)
       Term <= Term                                                   (natural number inequality)
       Term < Term                                                    (natural number inequality)
       Term <l= Term                                                  (level inequality)

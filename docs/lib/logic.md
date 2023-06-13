@@ -83,5 +83,6 @@
 
 ### Not equal
 
+    (* != *)
     neq : intersect (i : level) . forall (a : U i) . a -> a -> U i
         = fn a m n . not (m = n : a)

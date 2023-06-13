@@ -848,7 +848,7 @@ structure Nothing = AfterLtWellFounded ();
 
 
 
-(* Addition and Subtraction *)
+(* Operations *)
 
 (*
 Built-in:
@@ -870,11 +870,20 @@ Database.setUnroll Prim.plus
 
 
 
+defineRaw /pred n/
+/
+  nat_case n
+    0
+    (fn n' . n')
+/;
+
+
+
 definerecRaw /minus m n/
 /
   nat_case n
     m
-    (fn n' . nat_case m 0 (fn m' . minus m' n'))
+    (fn n' . minus (pred m) n')
 /;
 
 
@@ -906,12 +915,17 @@ reductions
 /
   plus (zero) n --> n ;
   plus (succ m) n --> succ (plus m n) ;
+  pred (zero) --> zero ;
+  pred (succ n) --> n ;
   minus m (zero) --> m ;
-  minus m (succ n) --> nat_case m 0 (fn m' . minus m' n) ;
+  minus m (succ n) --> minus (pred m) n ;
   unrolling plus minus
+  unfolding pred
 /;
 
 
+
+(* Addition and Subtraction *)
 
 lemma "plus_type"
 /
@@ -938,6 +952,24 @@ recordTyping "plus_type";
 
 
 
+lemma "pred_type"
+/
+  pred : nat -> nat
+/;
+
+introOf /n/.
+destruct /n/ /| n/.
+  {
+  reduce //.
+  typecheck.
+  }
+reduce //.
+typecheck.
+qed ();
+recordTyping "pred_type";
+
+
+
 lemma "minus_type"
 /
   minus : nat -> nat -> nat
@@ -949,11 +981,6 @@ induct /n/.
 reintro /IH/.
 intro /m/.
 destruct /n/ /| n/.
-  {
-  reduce //.
-  typecheck.
-  }
-destruct /m/ /| m/.
   {
   reduce //.
   typecheck.
@@ -1163,10 +1190,12 @@ inference.
 intro /m n/.
 iterate /m/.
 
+(* 0 *)
 {
 reflexivity.
 }
 
+(* succ *)
 {
 intro /m IH/.
 hyp /IH/.
@@ -1285,13 +1314,15 @@ lemma "minus_0_l"
 /;
 
 inference.
-intro /(| n)/.
+intro /n/.
+iterate /n/.
   {
   reflexivity.
   }
 
   {
-  reflexivity.
+  intro /n IH/.
+  hyp /IH/.
   }
 qed ();
 
@@ -1351,7 +1382,8 @@ intro /n IH m p/.
 destruct /m/ /| m/.
   {
   reduce //.
-  apply /minus_0_l/.
+  rewrite /-> minus_0_l at all/.
+  reflexivity.
   }
 reduce //.
 apply /IH/.
@@ -1384,6 +1416,27 @@ qed ();
 
 
 
+lemma "pred_leq"
+/
+  forall n . pred n <= n
+/;
+
+inference.
+intro /n/.
+destruct /n/ /| n/.
+  {
+  reduce //.
+  apply /leq_refl/.
+  }
+
+  {
+  reduce //.
+  apply /leq_succ/.
+  }
+qed ();
+
+
+
 lemma "minus_leq_l"
 /
   forall m n . m - n <= m
@@ -1401,7 +1454,8 @@ intro /n IH m/.
 destruct /m/ /| m/.
   {
   reduce //.
-  apply /leq_refl/.
+  rewrite /-> minus_0_l/.
+  apply /leq_0_min/.
   }
 reduce //.
 apply /leq_trans _ m/.
@@ -1443,6 +1497,7 @@ intro /n IH m m' n' Hm Hn/.
 destruct /m/ /| m/.
   {
   reduce //.
+  rewrite /-> minus_0_l/.
   apply /leq_0_min/.
   }
 reduce //.
@@ -1997,6 +2052,40 @@ qed ();
 
 
 
+lemma "times_dist_pred_l"
+/
+  forall m n . pred m * n = m * n - n : nat
+/;
+
+inference.
+intro /m p/.
+destruct /m/ /| m/.
+  {
+  reduce //.
+  rewrite /-> minus_0_l/.
+  reflexivity.
+  }
+reduce //.
+rewrite /-> plus_commute/.
+rewrite /-> plus_minus_cancel_r/.
+reflexivity.
+qed ();
+
+
+
+lemma "times_dist_pred_r"
+/
+  forall m n . m * pred n = m * n - m : nat
+/;
+
+inference.
+intro /m n/.
+rewrite /-> times_commute at 0 1/.
+apply /times_dist_pred_l/.
+qed ();
+
+
+
 lemma "times_dist_minus_l"
 /
   forall m n p . (m - n) * p = m * p - n * p : nat
@@ -2011,18 +2100,9 @@ iterate /n/.
   reflexivity.
   }
 intro /n IH m/.
-destruct /m/ /| m/.
-  {
-  reduce //.
-  rewrite /-> minus_0_l/.
-  reflexivity.
-  }
-reduce //.
 rewrite /-> IH/.
-rewrite /-> plus_commute at 0/.
-rewrite /<- minus_assoc/.
-rewrite /-> plus_minus_cancel_r/.
-reflexivity.
+rewrite /-> times_dist_pred_l/.
+apply /minus_assoc/.
 qed ();
 
 
@@ -3278,7 +3358,7 @@ qed ();
 lemma "istrue_neqb"
 /
   forall m n .
-    istrue (neqb m n) <-> m <> n : nat
+    istrue (neqb m n) <-> m != n : nat
 /;
 
 inference.
@@ -3289,8 +3369,59 @@ rewrite /-> istrue_eqb/.
 qed ();
 
 
-
 structure Nothing = AfterIstrueNeqb ();
+
+
+lemma "notb_eqb"
+/
+  forall m n . notb (eqb m n) = neqb m n : bool
+/;
+
+inference.
+intro /m n/.
+unfold /neqb/.
+reflexivity.
+qed ();
+
+
+
+lemma "notb_neqb"
+/
+  forall m n . notb (neqb m n) = eqb m n : bool
+/;
+
+inference.
+intro /m n/.
+unfold /neqb/.
+apply /notb_invol/.
+qed ();
+
+
+
+lemma "notb_leqb"
+/
+  forall m n . notb (leqb m n) = ltb n m : bool
+/;
+
+inference.
+intro /m n/.
+apply /iff_eq_bool/.
+rewrite /-> istrue_notb , -> istrue_leqb , -> istrue_ltb/.
+apply /not_leq/.
+qed ();
+
+
+
+lemma "notb_ltb"
+/
+  forall m n . notb (ltb m n) = leqb n m : bool
+/;
+
+inference.
+intro /m n/.
+rewrite /<- notb_leqb/.
+apply /notb_invol/.
+qed ();
 
 
 
@@ -3310,7 +3441,7 @@ qed ();
 
 lemma "neq_nat_decide"
 /
-  forall (m n : nat) . Decidable.decidable (m <> n : nat)
+  forall (m n : nat) . Decidable.decidable (m != n : nat)
 /;
 
 intro /m n/.
@@ -3360,7 +3491,7 @@ qed ();
 
 lemma "neq_nat_stable"
 /
-  forall (m n : nat) . Stable.stable (m <> n : nat)
+  forall (m n : nat) . Stable.stable (m != n : nat)
 /;
 
 intro /m n/.
@@ -3500,7 +3631,7 @@ qed ();
 lemma "nat_dichotomy_neq"
 /
   forall (m n : nat) .
-    not (m = n : nat)
+    m != n : nat
     -> m < n % n < m
 /;
 

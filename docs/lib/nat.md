@@ -141,10 +141,15 @@ Strong induction for natural numbers:
 
 ### Subtraction
 
+    pred : nat -> nat
+
+    pred (zero) --> zero
+    pred (succ n) --> n
+
     minus : nat -> nat -> nat
 
     minus m (zero) --> m
-    minus m (succ n) --> nat_case m zero (fn m' . minus m' n)
+    minus m (succ n) --> minus (pred m) n
 
     plus_minus_cancel_l : forall (m n : nat) . m + n - m = n : nat
 
@@ -163,6 +168,8 @@ Strong induction for natural numbers:
     minus_assoc : forall (m n p : nat) . m - n - p = m - (n + p) : nat
 
     minus_succ : forall (m n : nat) . succ m - succ n = m - n : nat
+
+    pred_leq : forall (n : nat) . pred n <= n
 
     minus_leq_l : forall (m n : nat) . m - n <= m
 
@@ -212,6 +219,10 @@ Strong induction for natural numbers:
     times_dist_plus_r : forall (m n p : nat) . m * (n + p) = m * n + m * p : nat
 
     times_leq : forall (m m' n n' : nat) . m <= m' -> n <= n' -> m * n <= m' * n'
+
+    times_dist_pred_l : forall (m n : nat) . pred m * n = m * n - n : nat
+
+    times_dist_pred_r : forall (m n : nat) . m * pred n = m * n - m : nat
 
     times_dist_minus_l : forall (m n p : nat) . (m - n) * p = m * p - n * p : nat
 
@@ -311,11 +322,21 @@ Strong induction for natural numbers:
 
     istrue_eqb : forall (m n : nat) . Bool.istrue (eqb m n) <-> m = n : nat
 
+    istrue_neqb : forall (m n : nat) . Bool.istrue (neqb m n) <-> m <> n : nat
+
     istrue_leqb : forall (m n : nat) . Bool.istrue (leqb m n) <-> m <= n
 
     istrue_ltb : forall (m n : nat) . Bool.istrue (ltb m n) <-> m < n
 
-    istrue_neqb : forall (m n : nat) . Bool.istrue (neqb m n) <-> m <> n : nat
+    notb_eqb : forall (m n : nat) . Bool.notb (eqb m n) = neqb m n : bool
+
+    notb_neqb : forall (m n : nat) . Bool.notb (neqb m n) = eqb m n : bool
+
+    notb_leqb : forall (m n : nat) . Bool.notb (leqb m n) = ltb n m : bool
+
+    notb_ltb : forall (m n : nat) . Bool.notb (ltb m n) = leqb n m : bool
+
+
 
 
 ### Decidability

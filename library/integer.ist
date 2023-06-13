@@ -2851,7 +2851,7 @@ qed ();
 lemma "istrue_neqzb"
 /
   forall a b .
-    Bool.istrue (neqzb a b) <-> a <> b : integer
+    Bool.istrue (neqzb a b) <-> a != b : integer
 /;
 
 inference.
@@ -2863,6 +2863,58 @@ qed ();
 
 
 structure Nothing = AfterIstrueNeqzb ();
+
+
+lemma "notb_eqzb"
+/
+  forall a b . Bool.notb (eqzb a b) = neqzb a b : bool
+/;
+
+inference.
+intro /a b/.
+unfold /neqzb/.
+reflexivity.
+qed ();
+
+
+
+lemma "notb_neqzb"
+/
+  forall a b . Bool.notb (neqzb a b) = eqzb a b : bool
+/;
+
+inference.
+intro /a b/.
+unfold /neqzb/.
+apply /Bool.notb_invol/.
+qed ();
+
+
+
+lemma "notb_leqzb"
+/
+  forall a b . Bool.notb (leqzb a b) = ltzb b a : bool
+/;
+
+inference.
+intro /a b/.
+apply /Bool.iff_eq_bool/.
+rewrite /-> Bool.istrue_notb , -> istrue_leqzb , -> istrue_ltzb/.
+apply /not_leqz/.
+qed ();
+
+
+
+lemma "notb_ltzb"
+/
+  forall a b . Bool.notb (ltzb a b) = leqzb b a : bool
+/;
+
+inference.
+intro /a b/.
+rewrite /<- notb_leqzb/.
+apply /Bool.notb_invol/.
+qed ();
 
 
 
@@ -3512,6 +3564,28 @@ qed ();
 
 
 
+lemma "pred_to_integer"
+/
+  forall n . 
+    0 < n
+    -> nat_to_integer (Nat.pred n) = z`-1 +z nat_to_integer n : integer
+/;
+
+inference.
+intro /n Hlt/.
+destruct /n/ /| n/.
+  {
+  so /Nat.lt_irrefl _ Hlt/ /0/.
+  }
+reduce //.
+rewrite /<- plusz_assoc/.
+reduce //.
+rewrite /-> plusz_id_l/.
+reflexivity.
+qed ();
+
+
+
 lemma "minus_to_integer"
 /
   forall m n . 
@@ -3597,7 +3671,7 @@ qed ();
 
 lemma "neq_integer_decide"
 /
-  forall (a b : integer) . Decidable.decidable (a <> b : integer)
+  forall (a b : integer) . Decidable.decidable (a != b : integer)
 /;
 
 intro /a b/.
@@ -3647,7 +3721,7 @@ qed ();
 
 lemma "neq_integer_stable"
 /
-  forall (a b : integer) . Stable.stable (a <> b : integer)
+  forall (a b : integer) . Stable.stable (a != b : integer)
 /;
 
 intro /a b/.
@@ -3788,7 +3862,7 @@ qed ();
 lemma "integer_dichotomy_neq"
 /
   forall (a b : integer) .
-    not (a = b : integer)
+    a != b : integer
     -> a <z b % b <z a
 /;
 
@@ -3956,6 +4030,23 @@ intro /a/.
 rewrite /<- timesz_id_l a/.
 rewrite /-> negz_dist_timesz_l/.
 reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "timesz_compat"
+/
+  forall a a' b b' .
+    a = a' : integer
+    -> b = b' : integer
+    -> a *z b = a' *z b' : integer
+/;
+
+inference.
+intro /a a' b b' Ha Hb/.
+subst /a'/.
+subst /b'/.
 reflexivity.
 qed ();
 
@@ -5013,7 +5104,7 @@ qed ();
 
 
 
-lemma "nat_to_integer_min"
+lemma "min_to_integer"
 /
   forall m n . nat_to_integer (Nat.min m n) = minz (nat_to_integer m) (nat_to_integer n) : integer
 /;
@@ -5036,7 +5127,7 @@ qed ();
 
 
 
-lemma "nat_to_integer_max"
+lemma "max_to_integer"
 /
   forall m n . nat_to_integer (Nat.max m n) = maxz (nat_to_integer m) (nat_to_integer n) : integer
 /;
@@ -5059,7 +5150,7 @@ qed ();
 
 
 
-lemma "integer_to_nat_min"
+lemma "minz_to_nat"
 /
   forall a b . integer_to_nat (minz a b) = Nat.min (integer_to_nat a) (integer_to_nat b) : nat
 /;
@@ -5082,7 +5173,7 @@ qed ();
 
 
 
-lemma "integer_to_nat_max"
+lemma "maxz_to_nat"
 /
   forall a b . integer_to_nat (maxz a b) = Nat.max (integer_to_nat a) (integer_to_nat b) : nat
 /;

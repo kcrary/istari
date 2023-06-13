@@ -113,6 +113,7 @@ functor OmegaFun () :> OMEGA =
             fun find module item = Namespace.resolve [Symbol.fromValue module, Symbol.fromValue item]
 
             val not = find "Logic" "not"
+            val neq = find "Logic" "neq"
 
             val findBool = find "Bool"
             val andb = findBool "andb"
@@ -125,16 +126,21 @@ functor OmegaFun () :> OMEGA =
 
             val findNat = find "Nat"
             val eqb = findNat "eqb"
+            val neqb = findNat "neqb"
             val leqb = findNat "leqb"
             val leq = findNat "leq"
             val lt = findNat "lt"
             val ltb = findNat "ltb"
             val plus = findNat "plus"
+            val pred = findNat "pred"
             val minus = findNat "minus"
             val times = findNat "times"
+            val min = findNat "min"
+            val max = findNat "max"
 
             val findInt = find "Integer"
             val eqzb = findInt "eqzb"
+            val neqzb = findInt "neqzb"
             val leqz = findInt "leqz"
             val leqzb = findInt "leqzb"
             val ltz = findInt "ltz"
@@ -147,6 +153,8 @@ functor OmegaFun () :> OMEGA =
             val nat_to_integer_inv = findInt "nat_to_integer_inv"
             val plusz_compat = findInt "plusz_compat"
             val timesz = findInt "timesz"
+            val minz = findInt "minz"
+            val maxz = findInt "maxz"
 
             val findOmega = find "Omega"
             val add = findOmega "add"
@@ -273,6 +281,30 @@ functor OmegaFun () :> OMEGA =
             val tequiv_true = findOmega "tequiv_true"
             val times_typing = findOmega "times_typing"
             val timesz_typing = findOmega "timesz_typing"
+
+            val min_typing = findOmega "min_typing"
+            val max_typing = findOmega "max_typing"
+            val minz_typing = findOmega "minz_typing"
+            val maxz_typing = findOmega "maxz_typing"
+            val neqb_typing = findOmega "neqb_typing"
+            val neqzb_typing = findOmega "neqzb_typing"
+            val neq_inhabitant_from_neqb = findOmega "neq_inhabitant_from_neqb"
+            val neq_inhabitant_from_neqzb = findOmega "neq_inhabitant_from_neqzb"
+            val tequiv_neq = findOmega "tequiv_neq"
+            val tequiv_neqz = findOmega "tequiv_neqz"
+            val fequiv_neq = findOmega "fequiv_neq"
+            val fequiv_neqz = findOmega "fequiv_neqz"
+            val neqb_from_neq = findOmega "neqb_from_neq"
+            val neqzb_from_neq = findOmega "neqzb_from_neq"
+            val pred_typing = findOmega "pred_typing"
+            val pred_extend = findOmega "pred_extend"
+            val natequiv_pred = findOmega "natequiv_pred"
+            val min_extend = findOmega "min_extend"
+            val natequiv_min = findOmega "natequiv_min"
+            val intequiv_minz = findOmega "intequiv_minz"
+            val max_extend = findOmega "max_extend"
+            val natequiv_max = findOmega "natequiv_max"
+            val intequiv_maxz = findOmega "intequiv_maxz"
 
             val notb_fals = Registry.toUreduction2 $ Registry.read [Symbol.fromValue "Bool", Symbol.fromValue "notb_fals"]
 
@@ -538,21 +570,21 @@ functor OmegaFun () :> OMEGA =
 
       fun processTerm corr m t =
          termCase (N.whnf m)
-         /| integer? =>
-            \(fnc _ =>
+         /| $as integer? =>
+            \(fnc m' _ =>
                  (case t of
                      Integer =>
-                        (corr, m,
+                        (corr, m',
                          (fn _ => refine Rule.integerIntroOf))
 
                    | _ =>
                         raise mismatch))\
 
-          | nat? =>
-            \(fnc n =>
+          | $as nat? =>
+            \(fnc m' n =>
                  (case t of
                      Nat =>
-                        (corr, m,
+                        (corr, m',
                          (fn _ => natIntroOf n))
 
                    | _ =>
@@ -569,6 +601,10 @@ functor OmegaFun () :> OMEGA =
           | \C.minus\ ? ? =>
             \(fnc m1 m2 =>
                  processTerm2 Nat Nat Nat C.minus C.minus_typing corr m1 m2 t)\
+
+          | \C.pred\ ? =>
+            \(fnc m1 =>
+                 processTerm1 Nat Nat C.pred C.pred_typing corr m1 t)\
 
             (* one or the other factor must be a constant *)
           | (\C.times\ ($as (nat? => \fst\)) ? | \C.times\ ? ($as (nat? => \fst\))) =>
@@ -600,10 +636,26 @@ functor OmegaFun () :> OMEGA =
             \(fnc m1 =>
                  processTerm1 Nat Integer C.integer_to_nat C.integer_to_nat_typing corr m1 t)\
 
-          | _ =>
-            \(fnc =>
+          | \C.min\ ? ? =>
+            \(fnc m1 m2 =>
+                 processTerm2 Nat Nat Nat C.min C.min_typing corr m1 m2 t)\
+
+          | \C.max\ ? ? =>
+            \(fnc m1 m2 =>
+                 processTerm2 Nat Nat Nat C.max C.max_typing corr m1 m2 t)\
+
+          | \C.minz\ ? ? =>
+            \(fnc m1 m2 =>
+                 processTerm2 Integer Integer Integer C.minz C.minz_typing corr m1 m2 t)\
+
+          | \C.maxz\ ? ? =>
+            \(fnc m1 m2 =>
+                 processTerm2 Integer Integer Integer C.maxz C.maxz_typing corr m1 m2 t)\
+
+          | ? =>
+            \(fnc m' =>
                  let
-                    val (corr, j) = lookup corr m t
+                    val (corr, j) = lookup corr m' t
                  in
                     (corr, T.Var j,
                      (fn k => refine (Rule.hypothesis (k-j-1))))
@@ -703,6 +755,10 @@ functor OmegaFun () :> OMEGA =
                \(fnc m n =>
                     processRight2 Nat Nat C.eqb C.eqb_typing C.eq_inhabitant_from_eqb corr m n)\
 
+          | \C.neq\ \Prim.nat\ ? ? =>
+               \(fnc m n =>
+                    processRight2 Nat Nat C.neqb C.neqb_typing C.neq_inhabitant_from_neqb corr m n)\
+
           | \C.leq\ ? ? =>
                \(fnc m n =>
                     processRight2 Nat Nat C.leqb C.leqb_typing C.leq_inhabitant_from_leqb corr m n)\
@@ -714,6 +770,10 @@ functor OmegaFun () :> OMEGA =
           | \Prim.eq\ \Prim.integer\ ? ? =>
                \(fnc m n =>
                     processRight2 Integer Integer C.eqzb C.eqzb_typing C.eq_inhabitant_from_eqzb corr m n)\
+
+          | \C.neq\ \Prim.integer\ ? ? =>
+               \(fnc m n =>
+                    processRight2 Integer Integer C.neqzb C.neqzb_typing C.neq_inhabitant_from_neqzb corr m n)\
 
           | \C.leqz\ ? ? =>
                \(fnc m n =>
@@ -1000,8 +1060,9 @@ functor OmegaFun () :> OMEGA =
 
             fun tac k =
                (* G, G' |- M[^k] ?? N[^k] *)
-               inhabitTriv
-               >>
+               refine (Rule.inhabitant (T.evar ()) (T.evar ()))
+               >>+
+               (* G, G' |- E : M[^k] ?? N[^k] *)
                invoke lemma
                   [(shift m k, mtac k), (shift n k, ntac k)]
                   1
@@ -1045,6 +1106,10 @@ functor OmegaFun () :> OMEGA =
                \(fnc m n =>
                     processLeft2 Nat Nat C.eqb C.eqb_typing C.eqb_from_eq corr m n)\
 
+          | \C.neq\ \Prim.nat\ ? ? =>
+               \(fnc m n =>
+                    processLeft2 Nat Nat C.neqb C.neqb_typing C.neqb_from_neq corr m n)\
+
           | \C.leq\ ? ? =>
                \(fnc m n =>
                     processLeft2 Nat Nat C.leqb C.leqb_typing C.leqb_from_leq corr m n)\
@@ -1056,6 +1121,10 @@ functor OmegaFun () :> OMEGA =
           | \Prim.eq\ \Prim.integer\ ? ? =>
                \(fnc m n =>
                     processLeft2 Integer Integer C.eqzb C.eqzb_typing C.eqzb_from_eq corr m n)\
+
+          | \C.neq\ \Prim.integer\ ? ? =>
+               \(fnc m n =>
+                    processLeft2 Integer Integer C.neqzb C.neqzb_typing C.neqzb_from_neq corr m n)\
 
           | \C.leqz\ ? ? =>
                \(fnc m n =>
@@ -1852,6 +1921,199 @@ functor OmegaFun () :> OMEGA =
          end
          
 
+      (* extend n args lemma
+       
+         if    the goal is  G |- ...
+               lemma has the type:
+                  forall n f (x1 : A1) ... (xl : Al) .
+                     exists (g : bounded 1+n -> integer) .
+                        <fact> & f = g : (bounded n -> integer)
+               args = [(m1, mtac1) ... (ml, mtacl)]
+               mtaci proves G |- Mi : Ai 
+               G contains a hypothesis named solution such that  G |- solution : bounded n -> integer 
+         then  generates the subgoal  G', <fact>, <junk> |- ...
+               where G' is obtained from G by replacing solution's type with  bounded 1+n -> integer
+               the directory is unchanged (specifically, has not added two names)
+      *)
+      fun extend lemma n args =
+         let
+            do (_, dir) = withgoal
+            val soln = D.lookupVar (D.idir dir) solution
+         in
+            (* G, H |- ... *)
+            assert ()
+            >>> [
+                invoke lemma
+                   (literalArg n :: varArg soln :: args)
+                   0 >> done,
+                   
+                (* G, H, exists (bounded 1+n -> integer) . <fact> & soln+1 = 0 : (bounded n -> integer) |- ... *)
+                refine (Rule.existsLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
+                >>+
+                (* G, H, bounded 1+n -> integer, <fact> & soln+1 = 0 : (bounded n -> integer) |- ... *)
+                refine (Rule.prodLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
+                >>+
+                (* G, H, bounded 1+n -> integer, <fact>, soln+2 = 1 : (bounded n -> integer) |- ...
+                   let H = H1, bounded n -> integer, H2  with |H2| = soln
+                   that is: G, H1, bounded n -> integer, H2, bounded 1+n -> integer, 0 n = M[^] : integer, soln+2 = 1 : (bounded n -> integer) |- ...
+                *)
+                refine (Rule.exchange 2 1 (soln+1))
+                >>+
+                (* G, H1, bounded 1+n -> integer, bounded n -> integer, H2[0 . ^2], <fact>, soln+1 = soln+2 : (bounded n -> integer) |- ... *)
+                refine (Rule.substitutionSimple (soln+2) (T.evar ()) (T.evar ()) (T.evar ()))
+                >>> [
+                    (* G, H1, bounded 1+n -> integer, bounded n -> integer, H2[0 . ^2], 
+                       <fact>, soln+1 = soln+2 : (bounded n -> integer) |- soln+2 = 0[^soln+3] : bounded n -> integer
+                    *)
+                    refine (Rule.hypothesis 0),
+                    
+                    (* G, H1, bounded 1+n -> integer, H2, <fact>, <now junk> |- ...
+                       let Hmod = H1, bounded 1+n -> integer, H2  (note H2[0 . ^2][0 . id] = H2)
+                       that is: G, Hmod, <fact>, <junk> |- ...
+                    *)
+                    idtac
+                    ]
+                ]
+         end
+
+
+      fun stdTermCase1 e g advanceLemma extendLemma lemma sz n d m m1 =
+         let
+            do () = tryTable advanceLemma n d m
+
+            val (n1, d1, props1, expr1, name1, eph1, tac1) = e sz n d m1
+
+            val name = gensym ()
+            val propname = gensym ()
+
+            val d2 = TD.insert d1 m (n1, 1+n1, name)
+
+            val expr = varExpr n1
+
+            val props =
+               (propname, g expr expr1) :: props1
+
+            val tac =
+               (* G, H |- ... *)
+               tac1
+               >>+
+               (* G, H1 |- ...
+                  where
+                  G, H1 |- solution : bounded n1 -> integer 
+                  G, H1 |- name1 : (blah : Xequiv n1 solution)
+               *)
+               let
+                  do (_, dir) = withgoal
+                  val idir = D.idir dir
+                  val soln = D.lookupVar idir solution
+                  val i1 = D.lookupVar idir name1
+               in
+                  (* G, H1 |- ... *)
+                  extend extendLemma n1
+                     [(T.evar (), ofExprFromOfXequiv i1)]
+                  >>+
+                  (* G, H1' |- xyzzy_prop n1 solution blah, <junk> |- ... *)
+                  refine (Rule.normalizeHyp 1)
+                  >>+
+                  assert ()
+                  >>> [
+                      invoke lemma
+                         [literalArg n1, varArg (soln+2), ofArg (i1+2)]
+                         1
+                      >>+
+                      (* G, H1', xyzzy_prop n1 solution blah, <junk> |- xyzzy_prop n1 solution blah *)
+                      refine (Rule.hypothesis 1),
+
+                      (* G, H1', <now junk>, <junk>, <stuff> & ((blah , blah) : Xequiv 1+n1 solution) |- ... *)
+                      refine (Rule.prodLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
+                      >>+
+                      (* G, H1', <now junk>, <junk>, <stuff>, ((blah , blah) : Xequiv 1+n1 solution) |- ... *)
+                      refine (Rule.weaken 2 2)
+                      >>+
+                      (* G, H1', <stuff>, ((blah , blah) : Xequiv 1+n1 solution) |- ... *)
+                      chdir (D.binds dir [propname, name])
+                      ]
+               end
+         in
+            (n1+1, d2, props, expr, name, false, tac)
+         end
+
+
+      fun stdTermCase2 e f g advanceLemma extendLemma lemma sz n d m m1 m2 =
+         let
+            do () = tryTable advanceLemma n d m
+
+            val (n1, d1, props1, expr1, name1, eph1, tac1) = e sz n d m1
+            val (n2, d2, props2, expr2, name2, eph2, tac2) = f sz n1 d1 m2
+
+            val name = gensym ()
+            val propname = gensym ()
+
+            val d3 = TD.insert d2 m (n2, 1+n2, name)
+
+            val expr = varExpr n2
+
+            val props =
+               (propname, g expr expr1 expr2) :: props1 @ props2
+
+            val tac =
+               (* G, H |- ... *)
+               tac1
+               >>+
+               (* G, H1 |- ... *)
+               tac2
+               >>+
+               (* G, H2 |- ...
+                  where
+                  G, H2 |- solution : bounded n2 -> integer 
+                  G, H2 |- name1 : (blah : Xequiv n1 solution)
+                  G, H2 |- name2 : (blah : Xequiv n2 solution)
+               *)
+               let
+                  do (_, dir) = withgoal
+                  val idir = D.idir dir
+                  val soln = D.lookupVar idir solution
+                  val i1 = D.lookupVar idir name1
+                  val i2 = D.lookupVar idir name2
+               in
+                  (* G, H2 |- ... *)
+                  extend extendLemma n2
+                     [(T.evar (), ofExprFromOfXequiv i1),
+                      (T.evar (), ofExprFromOfXequiv i2)]
+                  >>+
+                  (* G, H2', xyzzy_prop n2 solution blah blah, <junk> |- ... *)
+                  refine (Rule.normalizeHyp 1)
+                  >>+
+                  assert ()
+                  >>> [
+                      invoke2 lemma
+                         [literalArg n1, literalArg n2, varArg (soln+2)]
+                         1
+                         [ofArg (i1+2), ofArg (i2+2)]
+                         1
+                      >>> [
+                          (* n1 <= n2 *)
+                          proveLeq,
+
+                          (* G, H2', xyzzy_prop n2 solution blah blah, <junk> |- xyzzy_prop n2 solution blah blah *)
+                          refine (Rule.hypothesis 1)
+                          ],
+
+                      (* G, H2', <now junk>, <junk>, <stuff> & ((blah , blah) : Xequiv 1+n2 solution) |- ... *)
+                      refine (Rule.prodLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
+                      >>+
+                      (* G, H2', <junk>, <junk>, <stuff>, ((blah , blah) : Xequiv 1+n2 solution) |- ... *)
+                      refine (Rule.weaken 2 2)
+                      >>+
+                      (* G, H2', <stuff>, ((blah , blah) : Xequiv 1+n2 solution) |- ... *)
+                      chdir (D.binds dir [propname, name])
+                      ]
+               end
+         in
+            (n2+1, d3, props, expr, name, false, tac)
+         end
+            
+
       fun stdTermTimes e lemma lemma0 sz n d m0 a m1 =
          let
             val (n1, d1, props1, expr1, name1, eph1, tac1) = e sz n d m1
@@ -1897,8 +2159,14 @@ functor OmegaFun () :> OMEGA =
                       (if eph1 then HypTactic.clear [name1] else idtac)
                       ]
                end
+
+            val expr =
+               if a == 0I then
+                  []
+               else
+                  multExpr a expr1
          in
-            (n1, d1, props1, multExpr a expr1, name, true, tac)
+            (n1, d1, props1, expr, name, true, tac)
          end
 
 
@@ -2008,62 +2276,6 @@ functor OmegaFun () :> OMEGA =
                  
 
                
-      (* extend n args lemma
-       
-         if    the goal is  G |- ...
-               lemma has the type:
-                  forall n f (x1 : A1) ... (xl : Al) .
-                     exists (g : bounded 1+n -> integer) .
-                        <fact> & f = g : (bounded n -> integer)
-               args = [(m1, mtac1) ... (ml, mtacl)]
-               mtaci proves G |- Mi : Ai 
-               G contains a hypothesis named solution such that  G |- solution : bounded n -> integer 
-         then  generates the subgoal  G', <fact>, <junk> |- ...
-               where G' is obtained from G by replacing solution's type with  bounded 1+n -> integer
-               the directory is unchanged (specifically, has not added two names)
-      *)
-      fun extend lemma n args =
-         let
-            do (_, dir) = withgoal
-            val soln = D.lookupVar (D.idir dir) solution
-         in
-            (* G, H |- ... *)
-            assert ()
-            >>> [
-                invoke lemma
-                   (literalArg n :: varArg soln :: args)
-                   0 >> done,
-                   
-                (* G, H, exists (bounded 1+n -> integer) . <fact> & soln+1 = 0 : (bounded n -> integer) |- ... *)
-                refine (Rule.existsLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
-                >>+
-                (* G, H, bounded 1+n -> integer, <fact> & soln+1 = 0 : (bounded n -> integer) |- ... *)
-                refine (Rule.prodLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
-                >>+
-                (* G, H, bounded 1+n -> integer, <fact>, soln+2 = 1 : (bounded n -> integer) |- ...
-                   let H = H1, bounded n -> integer, H2  with |H2| = soln
-                   that is: G, H1, bounded n -> integer, H2, bounded 1+n -> integer, 0 n = M[^] : integer, soln+2 = 1 : (bounded n -> integer) |- ...
-                *)
-                refine (Rule.exchange 2 1 (soln+1))
-                >>+
-                (* G, H1, bounded 1+n -> integer, bounded n -> integer, H2[0 . ^2], <fact>, soln+1 = soln+2 : (bounded n -> integer) |- ... *)
-                refine (Rule.substitutionSimple (soln+2) (T.evar ()) (T.evar ()) (T.evar ()))
-                >>> [
-                    (* G, H1, bounded 1+n -> integer, bounded n -> integer, H2[0 . ^2], 
-                       <fact>, soln+1 = soln+2 : (bounded n -> integer) |- soln+2 = 0[^soln+3] : bounded n -> integer
-                    *)
-                    refine (Rule.hypothesis 0),
-                    
-                    (* G, H1, bounded 1+n -> integer, H2, <fact>, <now junk> |- ...
-                       let Hmod = H1, bounded 1+n -> integer, H2  (note H2[0 . ^2][0 . id] = H2)
-                       that is: G, Hmod, <fact>, <junk> |- ...
-                    *)
-                    idtac
-                    ]
-                ]
-         end
-
-
       (* stdInt sz n d M
 
          if    G |- M : integer
@@ -2183,6 +2395,28 @@ functor OmegaFun () :> OMEGA =
           | \C.nat_to_integer\ ? =>
             \(fnc m1 =>
                  stdTerm1 stdNat (fn x => x) C.intequiv_nat_to_integer sz n d m1)\
+
+          | \C.minz\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTermCase2 stdInt stdInt
+                    (fns expr expr1 expr2 =>
+                        Or (And (eqProp expr expr1,
+                                 leqProp expr1 expr2),
+                            And (eqProp expr expr2,
+                                 ltProp expr2 expr1)))
+                    C.intequiv_advance C.min_extend C.intequiv_minz
+                    sz n d m m1 m2)\
+
+          | \C.maxz\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTermCase2 stdInt stdInt
+                    (fns expr expr1 expr2 =>
+                        Or (And (eqProp expr expr2,
+                                 leqProp expr1 expr2),
+                            And (eqProp expr expr1,
+                                 ltProp expr2 expr1)))
+                    C.intequiv_advance C.max_extend C.intequiv_maxz
+                    sz n d m m1 m2)\
 
           | _ =>
             \(fnc =>
@@ -2311,152 +2545,60 @@ functor OmegaFun () :> OMEGA =
             \(fnc m1 m0 a =>
                  stdTermTimes stdNat C.natequiv_times_r C.natequiv_times_zero_r sz n d m0 (I.fromInt a) m1)\
 
+          | \C.pred\ ? =>
+            \(fnc m1 =>
+                 stdTermCase1 stdNat
+                    (fns expr expr1 =>
+                        Or (And (eqProp expr (addExpr (constExpr ~1I) expr1),
+                                 ltProp [] expr1),
+                            And (Equal expr,
+                                 leqProp expr1 [])))
+                    C.natequiv_advance C.pred_extend C.natequiv_pred
+                    sz n d m m1)\
+
           | \C.minus\ ? ? =>
             \(fnc m1 m2 =>
-                 let
-                    do () = tryTable C.natequiv_advance n d m
-
-                    val (n1, d1, props1, expr1, name1, eph1, tac1) = stdNat sz n d m1
-                    val (n2, d2, props2, expr2, name2, eph2, tac2) = stdNat sz n1 d1 m2
-
-                    val name = gensym ()
-                    val propname = gensym ()
-
-                    val d3 = TD.insert d2 m (n2, 1+n2, name)
-
-                    val expr = varExpr n2
-
-                    val props =
-                       (propname,
+                 stdTermCase2 stdNat stdNat
+                    (fns expr expr1 expr2 =>
                         Or (And (eqProp expr (subtractExpr expr1 expr2),
                                  leqProp expr2 expr1),
                             And (Equal expr,
                                  ltProp expr1 expr2)))
-                       :: props1 @ props2
-
-                    val tac =
-                       (* G, H |- ... *)
-                       tac1
-                       >>+
-                       (* G, H1 |- ... *)
-                       tac2
-                       >>+
-                       (* G, H2 |- ...
-                          where
-                          G, H2 |- solution : bounded n2 -> integer 
-                          G, H2 |- name1 : (blah : natequiv n1 solution)
-                          G, H2 |- name2 : (blah : natequiv n2 solution)
-                       *)
-                       let
-                          do (_, dir) = withgoal
-                          val idir = D.idir dir
-                          val soln = D.lookupVar idir solution
-                          val i1 = D.lookupVar idir name1
-                          val i2 = D.lookupVar idir name2
-                       in
-                          (* G, H2 |- ... *)
-                          extend C.minus_extend n2
-                             [(T.evar (), ofExprFromOfXequiv i1),
-                              (T.evar (), ofExprFromOfXequiv i2)]
-                          >>+
-                          (* G, H2', minus_prop n2 solution blah blah, <junk> |- ... *)
-                          refine (Rule.normalizeHyp 1)
-                          >>+
-                          assert ()
-                          >>> [
-                              invoke2 C.natequiv_minus
-                                 [literalArg n1, literalArg n2, varArg (soln+2)]
-                                 1
-                                 [ofArg (i1+2), ofArg (i2+2)]
-                                 1
-                              >>> [
-                                  (* n1 <= n2 *)
-                                  proveLeq,
-
-                                  (* G, H2', minus_prop n2 solution blah blah, <junk> |- minus_prop n2 solution blah blah *)
-                                  refine (Rule.hypothesis 1)
-                                  ],
-
-                              (* G, H2', <now junk>, <junk>, <stuff> & ((blah , blah) : natequiv 1+n2 solution) |- ... *)
-                              refine (Rule.prodLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
-                              >>+
-                              (* G, H2', <junk>, <junk>, <stuff>, ((blah , blah) : natequiv 1+n2 solution) |- ... *)
-                              refine (Rule.weaken 2 2)
-                              >>+
-                              (* G, H2', <stuff>, ((blah , blah) : natequiv 1+n2 solution) |- ... *)
-                              chdir (D.binds dir [propname, name])
-                              ]
-                       end
-                 in
-                    (n2+1, d3, props, expr, name, false, tac)
-                 end)\
+                    C.natequiv_advance C.minus_extend C.natequiv_minus
+                    sz n d m m1 m2)\
 
           | \C.integer_to_nat\ ? =>
             \(fnc m1 =>
-                 let
-                    do () = tryTable C.natequiv_advance n d m
-
-                    val (n1, d1, props1, expr1, name1, eph1, tac1) = stdInt sz n d m1
-
-                    val name = gensym ()
-                    val propname = gensym ()
-
-                    val d2 = TD.insert d1 m (n1, 1+n1, name)
-
-                    val expr = varExpr n1
-
-                    val props =
-                       (propname,
+                 stdTermCase1 stdNat
+                    (fns expr expr1 =>
                         Or (And (eqProp expr expr1,
                                  Inequal expr1),
                             And (Equal expr,
                                  lt0Prop expr1)))
-                        :: props1
+                    C.natequiv_advance C.integer_to_nat_extend C.natequiv_integer_to_nat
+                    sz n d m m1)\
 
-                    val tac =
-                       (* G, H |- ... *)
-                       tac1
-                       >>+
-                       (* G, H1 |- ...
-                          where
-                          G, H1 |- solution : bounded n1 -> integer 
-                          G, H1 |- name1 : (blah : natequiv n1 solution)
-                       *)
-                       let
-                          do (_, dir) = withgoal
-                          val idir = D.idir dir
-                          val soln = D.lookupVar idir solution
-                          val i1 = D.lookupVar idir name1
-                       in
-                          (* G, H1 |- ... *)
-                          extend C.integer_to_nat_extend n1
-                             [(T.evar (), ofExprFromOfXequiv i1)]
-                          >>+
-                          (* G, H1' |- integer_to_nat_prop n1 solution blah, <junk> |- ... *)
-                          refine (Rule.normalizeHyp 1)
-                          >>+
-                          assert ()
-                          >>> [
-                              invoke C.natequiv_integer_to_nat
-                                 [literalArg n1, varArg (soln+2), ofArg (i1+2)]
-                                 1
-                              >>+
-                              (* G, H1', integer_to_nat_prop n1 solution blah, <junk> |- integer_to_nat_prop n1 solution blah *)
-                              refine (Rule.hypothesis 1),
+          | \C.min\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTermCase2 stdNat stdNat
+                    (fns expr expr1 expr2 =>
+                        Or (And (eqProp expr expr1,
+                                 leqProp expr1 expr2),
+                            And (eqProp expr expr2,
+                                 ltProp expr2 expr1)))
+                    C.natequiv_advance C.min_extend C.natequiv_min
+                    sz n d m m1 m2)\
 
-                              (* G, H1', <now junk>, <junk>, <stuff> & ((blah , blah) : natequiv 1+n1 solution) |- ... *)
-                              refine (Rule.prodLeft 0 (T.evar ()) (T.evar ()) (T.evar ()))
-                              >>+
-                              (* G, H1', <now junk>, <junk>, <stuff>, ((blah , blah) : natequiv 1+n1 solution) |- ... *)
-                              refine (Rule.weaken 2 2)
-                              >>+
-                              (* G, H1', <stuff>, ((blah , blah) : natequiv 1+n1 solution) |- ... *)
-                              chdir (D.binds dir [propname, name])
-                              ]
-                       end
-                 in
-                    (n1+1, d2, props, expr, name, false, tac)
-                 end)\
+          | \C.max\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTermCase2 stdNat stdNat
+                    (fns expr expr1 expr2 =>
+                        Or (And (eqProp expr expr2,
+                                 leqProp expr1 expr2),
+                            And (eqProp expr expr1,
+                                 ltProp expr2 expr1)))
+                    C.natequiv_advance C.max_extend C.natequiv_max
+                    sz n d m m1 m2)\
 
           | _ =>
             \(fnc =>
@@ -2489,6 +2631,10 @@ functor OmegaFun () :> OMEGA =
             \(fnc m1 m2 =>
                  stdTerm2 stdNat stdNat eqProp C.tequiv_eq sz n d m1 m2)\
 
+          | \C.neqb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdNat stdNat neqProp C.tequiv_neq sz n d m1 m2)\
+
           | \C.leqb\ ? ? =>
             \(fnc m1 m2 =>
                  stdTerm2 stdNat stdNat leqProp C.tequiv_leq sz n d m1 m2)\
@@ -2500,6 +2646,10 @@ functor OmegaFun () :> OMEGA =
           | \C.eqzb\ ? ? =>
             \(fnc m1 m2 =>
                  stdTerm2 stdInt stdInt eqProp C.tequiv_eqz sz n d m1 m2)\
+
+          | \C.neqzb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdInt stdInt neqProp C.tequiv_neqz sz n d m1 m2)\
 
           | \C.leqzb\ ? ? =>
             \(fnc m1 m2 =>
@@ -2563,6 +2713,10 @@ functor OmegaFun () :> OMEGA =
             \(fnc m1 m2 =>
                  stdTerm2 stdNat stdNat neqProp C.fequiv_eq sz n d m1 m2)\
 
+          | \C.neqb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdNat stdNat eqProp C.fequiv_neq sz n d m1 m2)\
+
           | \C.leqb\ ? ? =>
             \(fnc m1 m2 =>
                  stdTerm2 stdNat stdNat (fns a b => ltProp b a) C.fequiv_leq sz n d m1 m2)\
@@ -2574,6 +2728,10 @@ functor OmegaFun () :> OMEGA =
           | \C.eqzb\ ? ? =>
             \(fnc m1 m2 =>
                  stdTerm2 stdInt stdInt neqProp C.fequiv_eqz sz n d m1 m2)\
+
+          | \C.neqzb\ ? ? =>
+            \(fnc m1 m2 =>
+                 stdTerm2 stdInt stdInt eqProp C.fequiv_neqz sz n d m1 m2)\
 
           | \C.leqzb\ ? ? =>
             \(fnc m1 m2 =>

@@ -140,10 +140,15 @@ Strong induction for natural numbers:
 
 ### Subtraction
 
+    pred : type:pred
+
+    pred (zero) --> zero
+    pred (succ n) --> n
+
     minus : type:minus
 
     minus m (zero) --> m
-    minus m (succ n) --> nat_case m zero (fn m' . minus m' n)
+    minus m (succ n) --> minus (pred m) n
 
     plus_minus_cancel_l : type:plus_minus_cancel_l
 
@@ -162,6 +167,8 @@ Strong induction for natural numbers:
     minus_assoc : type:minus_assoc
 
     minus_succ : type:minus_succ
+
+    pred_leq : type:pred_leq
 
     minus_leq_l : type:minus_leq_l
 
@@ -210,6 +217,10 @@ Strong induction for natural numbers:
     times_dist_plus_r : type:times_dist_plus_r
 
     times_leq : type:times_leq
+
+    times_dist_pred_l : type:times_dist_pred_l
+
+    times_dist_pred_r : type:times_dist_pred_r
 
     times_dist_minus_l : type:times_dist_minus_l
 
@@ -308,11 +319,21 @@ Strong induction for natural numbers:
 
     istrue_eqb : type:istrue_eqb
 
+    istrue_neqb : type:istrue_neqb
+
     istrue_leqb : type:istrue_leqb
 
     istrue_ltb : type:istrue_ltb
 
-    istrue_neqb : type:istrue_neqb
+    notb_eqb : type:notb_eqb
+
+    notb_neqb : type:notb_neqb
+
+    notb_leqb : type:notb_leqb
+
+    notb_ltb : type:notb_ltb
+
+
 
 
 ### Decidability

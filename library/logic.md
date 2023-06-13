@@ -81,5 +81,6 @@
 
 ### Not equal
 
+    (* != *)
     neq : type:neq
         = def:neq
