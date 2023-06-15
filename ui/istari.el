@@ -511,3 +511,5 @@
   "Toggle showing substitutions."
   (interactive)
   (istari-interject "Show.showSubstitutions := not (!Show.showSubstitutions); if !Show.showSubstitutions then print \"Display of evar substitutions enabled.\\n\" else print \"Display of evar substitutions disabled.\\n\";"))
+
+(run-hooks 'istari-hook)
