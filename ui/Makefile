@@ -13,11 +13,11 @@ generated : lexrepl-nj.cmlex.sml
 
 server : generated
 	cd ../prover; make smlnj
-	echo "export true;" | sml export-repl.sml
+	echo "export true;" | sml export-server.sml
 
 server-nolib : generated
 	cd ../prover; make smlnj
-	echo "export false;" | sml export-repl.sml
+	echo "export false;" | sml export-server.sml
 
 batch : generated
 	cd ../prover; make smlnj

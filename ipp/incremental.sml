@@ -2,33 +2,39 @@
 signature INCREMENTAL =
    sig
 
-      val reset : Context.context -> unit
+      type token
+      type program
+      type receipt
 
-      datatype status = WAITING | COMPLETE | MORE | EMPTY | ERROR
+      val lex : char Stream.stream -> Span.pos -> token Stream.stream
+      val parse : token Stream.stream -> program * token Stream.stream
+      val span : program -> Span.span
 
-      (* Input from console (status is never MORE) *)
+      (* compile a program, update context *)
+      val compile : program -> receipt
 
-      val input : (unit -> TextIO.outstream) -> string -> status
-      val discard : unit -> unit
+      (* update context according to the provided code without generating output code *)
+      val consult : string -> receipt
 
-      (* Input from file (status is never WAITING or EMPTY) *)
+      (* update context for compiled project files *)
+      val load : string -> unit
 
-      type used
-      (* stream to use, input filename *)
-      val useFile : (unit -> TextIO.outstream) -> string -> used
-      val inputUsed : used -> status
-      val closeUsed : used -> unit
-
-      (* undo last interaction *)
+      (* undo the last interaction *)
       val undo : unit -> unit
 
-      (* project filename -> did it load successully? *)
-      val load : string -> bool
+      (* set IPP context as indicated *)
+      val reset : Context.context -> unit
 
-      (* preprocess but do not generate code, no errors tolerated *)
-      val inputKnown : string -> unit
+      (* showErrorMesasage p span source name msg
 
-      val invert : ((int * int) * (int * int)) -> string -> unit
+         Inverts the span for p.
+         Takes the resulting (original) span and displays context for the
+         error context drawn from source.  Uses name (if SOME) for the file name.
+      *)
+      val showErrorMessage : receipt -> Span.span -> ShowContext.source -> string option -> string -> unit
+
+      (* where to put compiled code *)
+      val outputStream : (unit -> TextIO.outstream) ref
 
    end
 
@@ -37,242 +43,56 @@ structure Incremental :> INCREMENTAL =
    struct
 
       structure S = Stream
+
       type token = Token.token
+      type program = Syntax.program
+      type receipt = Syntax.program
 
-      exception Block = Lexer.Block
-      exception BlockModal = Lexer.BlockModal
-
-      (* If the parser gets to block, it will raise the Block exception rather than
-         signalling a syntax error.  This is how we distinguish between an incomplete
-         input and a syntax error.
-      *)
       
-      fun parseLoop s acc =
-         let
-            val (p, s') = Parser.parseIncremental s
+      val lex = Lexer.lexRepl
+      val parse = Parser.parseIncremental
 
-            (* We accept this parse if it is a complete interaction, meaning that
-               s' is block or nil.  If there is anything before that, it is an
-               incomplete interaction.
-            *)
+      fun span (_, sp) = sp
 
-            val done =
-               (case S.front s' of
-                   S.Nil => true
-                 | _ => false)
-               handle Block => true
-         in
-            if done then
-               foldl
-                  (fn ((d1, sp1), (d2, sp2)) => (d1 @ d2, Span.join sp1 sp2))
-                  p acc
-            else
-               parseLoop s' (p :: acc)
-         end
+      
+      val outputStream : (unit -> TextIO.outstream) ref = ref (fn () => raise (Fail "unimplemented"))
 
-      datatype parse_result = EMPTYPARSE | NOPARSE | SOMEPARSE of Syntax.program
-
-      fun tryParse strs =
-         let
-            val s =
-               foldl 
-                  (fn (str, s) => S.@ (S.fromString str, s))
-                  (S.eager S.Nil) strs
-
-            val strm = Lexer.lexRepl s
-         in
-            if
-               (S.front strm; false)
-               handle Block => true
-                    | BlockModal => false
-            then
-               (* no lexemes found, and did not end in another mode *)
-               EMPTYPARSE
-            else
-               SOMEPARSE (parseLoop strm [])
-               handle Block => NOPARSE
-                    | BlockModal => NOPARSE
-         end
 
       val initial = Initial.basis (!Language.target) (!Language.smlCompatibility)
 
-      val theInput : string list ref = ref []
+      val nullspan = (Span.origin, Span.origin)
+
       val theContext = ref initial
-      val oldInput : RowCol.source ref = ref RowCol.empty
       val oldContext = ref initial
-      val oldProg : Syntax.program ref = ref ([], (0,0))
-
-      fun reset ctx =
-         (
-         theContext := ctx;
-         oldContext := ctx;
-         theInput := [];
-         oldInput := RowCol.empty;
-         oldProg := ([], (0,0))
-         )
-
-      fun withErrorHandling src x f =
-         f ()
-         handle Error.Error (errstr, place) =>
-            (
-            theInput := [];
-            print "Error: ";
-            print errstr;
-
-            (case place of
-                Error.POS pos =>
-                   let
-                      val ((row, col), _) =
-                         RowCol.fromSpan src (pos, pos)
-                   in
-                      print " at ";
-                      print (Int.toString row);
-                      print ".";
-                      print (Int.toString col);
-
-                      print "\n";
-                      RowCol.display src ((row, col), (row, col+1))
-                   end
-
-              | Error.SPAN span =>
-                   let
-                      val (rcs as ((row1, col1), (row2, col2))) =
-                         RowCol.fromSpan src span
-                   in
-                      print " at ";
-                      print (Int.toString row1);
-                      print ".";
-                      print (Int.toString col1);
-                      print "-";
-                      print (Int.toString row2);
-                      print ".";
-                      print (Int.toString col2);
-
-                      print "\n";
-                      RowCol.display src rcs
-                   end
-
-              | Error.UNKNOWN =>
-                   print "\n");
-            
-            x
-            )
-
-      datatype status = WAITING | COMPLETE | MORE | ERROR | EMPTY
-
-      fun input outsfn str =
-         let
-            val strs = str :: !theInput
-            val () = theInput := strs
-            val src = RowCol.stringsToSource (rev strs)
-         in
-            withErrorHandling src ERROR
-            (fn () =>
-                (case tryParse strs of
-                    NOPARSE =>
-                       WAITING
-    
-                  | EMPTYPARSE =>
-                       EMPTY
-
-                  | SOMEPARSE p =>
-                       let
-                          val ctx = !theContext
-                          val (p', ctx', _) = Traverse.traverse ctx p
-                          val outs = outsfn ()
-                       in
-                           theInput := [];
-                           theContext := ctx';
-                           oldInput := src;
-                           oldContext := ctx;
-                           oldProg := p';
-                           Render.render outs [] p';
-                           TextIO.closeOut outs;
-                           COMPLETE
-                        end))
-         end
-
-      fun discard () =
-         theInput := []
-
-      type used =
-         string *
-         TextIO.instream * 
-         (unit -> TextIO.outstream) * 
-         RowCol.source * 
-         Token.token Stream.stream ref
-
-      fun useFile outsfn filename =
-         let
-            val ins =
-               TextIO.openIn filename
-               handle IO.Io _ =>
-                  raise (Error.GeneralError ("unable to open file " ^ filename))
-
-            val src = RowCol.filenameToSource filename
-
-            val s = Lexer.lexUse (S.fromTextInstream ins)
-         in
-            print "[reading ";
-            print filename;
-            print "]\n";
-
-            (filename, ins, outsfn, src, ref s)
-         end
-
-      fun inputUsed (_, ins, outsfn, src, sr) =
-         withErrorHandling src ERROR
-         (fn () =>
-             let
-                val (p, s') = Parser.parseIncremental (!sr)
-                val ctx = !theContext
-                val (p', ctx', _) = Traverse.traverse ctx p
-                val outs = outsfn ()
-             in
-                theContext := ctx';
-                oldContext := ctx;
-                oldInput := src;
-                oldProg := p';
-                Render.render outs [] p';
-                TextIO.closeOut outs;
-
-                sr := s';
-
-                (case S.front s' of
-                    S.Nil => COMPLETE
-
-                  | S.Cons _ => MORE)
-             end)
-
-      fun closeUsed (filename, ins, _, _, sr) =
-         (
-         TextIO.closeIn ins;
-         sr := S.eager S.Nil;
-         print "[closing ";
-         print filename;
-         print "]\n"
-         )
+      val lastProgram : Syntax.program ref = ref ([], (Span.origin, Span.origin))
 
 
-      
-      fun inputKnown str =
+      fun compile p =
          let
             val ctx = !theContext
-            val (p, _) = Parser.parseIncremental (Lexer.lexUse (S.fromString str))
-            val (_, ctx', _) = Traverse.traverse ctx p
+            val (p', ctx', _) = Traverse.traverse ctx p
+            val outs = !outputStream ()
          in
             theContext := ctx';
-            oldContext := ctx
+            oldContext := ctx;
+            Render.render outs [] p';
+            TextIO.closeOut outs;
+            p'
          end
+      
 
+      fun consult code =
+         let
+            val (p, _) = parse (lex (Stream.fromString code) Span.origin)
 
-
-      fun undo () =
-         (
-         theInput := [];
-         theContext := !oldContext
-         )
-
+            val ctx = !theContext
+            val (p', ctx', _) = Traverse.traverse ctx p
+         in
+            theContext := ctx';
+            oldContext := ctx;
+            p'
+         end
+      
 
       fun load projname =
          let
@@ -280,42 +100,45 @@ structure Incremental :> INCREMENTAL =
             val ctx' = Context.union ctx (Make.load projname)
          in
             theContext := ctx';
-            oldContext := ctx;
-            true
-         end handle Error.Error (errstr, _) =>
-            (
-            print "Error: ";
-            print errstr;
-            print "\n";
-            false
-            )
-
-
-      fun invert inspan msg =
-         let
-            val span =
-               InvertRC.invert [] (!oldProg) inspan
-
-            val src = !oldInput
-
-            val (rcs as ((row1, col1), (row2, col2))) =
-               RowCol.fromSpan src span
-               handle Error.NotFound =>
-                  (* This really shouldn't happen, since we just found it. *)
-                  ((1, #1 span), (1, #2 span))
-         in
-            print (String.concat [Int.toString row1, ".", Int.toString col1,
-                                  "-",
-                                  Int.toString row2, ".", Int.toString col2]);
-            print msg;
-
-            RowCol.display src rcs
+            oldContext := ctx
          end
-         handle NotFound =>
-            (* Hopefully this never happens, but if it does, we'd like to print *something*. *)
-            (
-            print "<location not found>";
-            print msg
-            )
+
+
+      fun undo () =
+         theContext := !oldContext
+
+
+      fun reset ctx =
+         (
+         theContext := ctx;
+         oldContext := ctx
+         )
+
+
+      fun showErrorMessage p inspan source sourcename msg =
+         let
+            val span as ((row1, col1), (row2, col2)) =
+               InvertRC.invert [] p inspan
+         in
+            (case sourcename of
+                NONE => ()
+              | SOME name =>
+                   (
+                   print name;
+                   print ":"
+                   ));
+
+            print (Int.toString row1);
+            print ".";
+            print (Int.toString col1);
+            print "-";
+            print (Int.toString row2);
+            print ".";
+            print (Int.toString col2);
+            print msg;
+            print "\n";
+
+            ShowContext.display source span
+         end
 
    end

@@ -1,22 +1,49 @@
 
+(* Protocol between the UI and the REPL:
+
+   REPL -> UI
+   ----------
+   ^A m <message> ^B : display message
+   ^A b ^B           : sound bell
+   ^A c <number> ^B  : move cursor to indicated line
+   ^A r ^B           : set glyph to ready
+   ^A p ^B           : set glyph to ready-partial
+   ^A w ^B           : set glyph to working
+   ^A f ^B           : flush
+
+   UI -> REPL
+   ----------
+   ^A <number> \n    : rewind to indicated line
+   ^B <code> \n      : interject with code
+   ^E \n             : done sending
+   ^F \n             : acknowledge flush
+
+   The UI always ends every send with an escape sequence, so that is the only
+   time the Repl can block.
+
+*)
+
+
 signature UI =
    sig
-
-      val on : bool ref  (* is the UI active? *)
+      
       val allowBeep : bool ref
 
+      val output : string -> unit
       val message : string -> unit
       val beep : unit -> unit
-      val cursorUp : int -> unit
-      val ready : unit -> unit
-      val readyPartial : unit -> unit
+      val moveCursor : int -> unit      (* move the cursor to the indicated line *)
+      val ready : unit -> unit          (* set the cursor glyph *)
+      val readyPartial : unit -> unit   (* set the cursor glyph *)
+      val working : unit -> unit        (* set the cursor glyph *)
+      val flush : unit -> unit          (* induce the UI to send FlushAck *)
 
       datatype input =
-         Line of string  (* nonempty, ends in newline *)
-
-       | Rewind of int
-       | Interject of string
-       | ShowState
+         Line of string          (* nonempty, ends in newline *)
+       | Interjection of string  (* nonempty, ends in newline *)
+       | Ready                   (* ask for acknowledgement when ready *)
+       | FlushAck                (* acknowledge a flush request *)
+       | Rewind of int           (* rewind to the indicated line *)
        | ChannelClosed
 
       val input : unit -> input
@@ -24,84 +51,101 @@ signature UI =
    end
 
 
-(* Protocol between the REPL and the UI, if Repl.ui is set:
+structure NullUI :> UI =
+   struct
 
-   REPL -> UI
-   ----------
-   ^A m <message> ^B : display message
-   ^A b ^B           : sound bell
-   ^A c <number> ^B  : move cursor up <number> lines
-   ^A r ^B           : ready for input
-   ^A p ^B           : ready for input (partial input)
+      val allowBeep = ref true
 
-   UI -> REPL
-   ----------
-   ^A <number> \n    : rewind <number> lines
-   ^B <code> \n      : interject with code
-   ^E \n             : show state
+      fun output str = print str
 
-   (The reason UI -> REPL uses special codes, rather than just function calls,
-   is to arrange not to screw up the REPL's idea of what line we're on.)
-*)
+      fun message _ = ()
+
+      fun beep () = ()
+
+      fun moveCursor _ = ()
+
+      fun ready () = ()
+
+      fun readyPartial () = ()
+
+      fun working () = ()
+
+      fun flush () = ()
+
+      datatype input =
+         Line of string
+       | Interjection of string
+       | Ready
+       | FlushAck
+       | Rewind of int
+       | ChannelClosed
+
+      fun input () = 
+         (case TextIO.inputLine TextIO.stdIn of
+             NONE => ChannelClosed
+
+           | SOME str => Line str)
+
+   end
 
 
 structure UI :> UI =
    struct
 
-      val on = ref false
-
       val allowBeep = ref true
 
+      fun output str = print str
+
       fun message str =
-         if !on then
-            (
-            print "\^Am";
-            print str;
-            print "\^B"
-            )
-         else
-            ()
+         (
+         print "\^Am";
+         print str;
+         print "\^B"
+         )
 
       fun beep () =
-         if !on andalso !allowBeep then
+         if !allowBeep then
             print "\^Ab\^B"
          else
             ()
 
-      fun cursorUp n =
-         if !on then
-            (
-            print "\^Ac";
-            print (Int.toString n);
-            print "\^B"
-            )
-         else
-            ()
+      fun moveCursor n =
+         (
+         print "\^Ac";
+         print (Int.toString n);
+         print "\^B"
+         )
 
       fun ready () =
-         if !on then
-            (
-            print "\^Ar\^B";
-            TextIO.flushOut TextIO.stdOut
-            )
-         else
-            ()
+         (
+         print "\^Ar\^B";
+         TextIO.flushOut TextIO.stdOut
+         )
 
       fun readyPartial () =
-         if !on then
-            (
-            print "\^Ap\^B";
-            TextIO.flushOut TextIO.stdOut
-            )
-         else
-            ()
+         (
+         print "\^Ap\^B";
+         TextIO.flushOut TextIO.stdOut
+         )
+
+      fun working () =
+         (
+         print "\^Aw\^B";
+         TextIO.flushOut TextIO.stdOut
+         )
+
+      fun flush () =
+         (
+         print "\^Af\^B";
+         TextIO.flushOut TextIO.stdOut
+         )
 
       datatype input =
-         Line of string       (* nonempty, ends in newline *)
-
+         Line of string
+       | Interjection of string
+       | Ready
+       | FlushAck
        | Rewind of int
-       | Interject of string  (* nonempty, ends in newline *)
-       | ShowState
        | ChannelClosed
 
       fun input () =
@@ -114,10 +158,13 @@ structure UI :> UI =
                        Rewind (Option.getOpt (Int.fromString (String.extract (str, 1, NONE)), 0))
 
                   | #"\^B" =>
-                       Interject (String.extract (str, 1, NONE))
+                       Interjection (String.extract (str, 1, NONE))
 
                   | #"\^E" =>
-                       ShowState
+                       Ready
+
+                  | #"\^F" =>
+                       FlushAck
 
                   | _ => Line str))
 

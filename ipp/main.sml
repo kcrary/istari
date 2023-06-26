@@ -77,7 +77,7 @@ structure Main =
 
             val () = Language.smlCompatibility := smlCompat
 
-            val (left, right) =
+            val rcs =
                Make.withInstream fullname
                   (fn ins =>
                       let
@@ -94,15 +94,10 @@ structure Main =
                   raise Exit
                   )
 
-            val source = RowCol.filenameToSource fullname
+            val source = ShowContext.filenameToSource fullname
 
             (* We could suspend this, in case we don't need it, but it doesn't seem worth the trouble. *)
-            val (rcs as ((row1, col1), (row2, col2))) =
-               RowCol.fromSpan source (left, right)
-               handle Error.NotFound =>
-                  (* This shouldn't happen, unless someone is mucking with the file while
-                     we're trying to use it. *)
-                  ((1, left), (1, right))
+            val ((row1, col1), (row2, col2)) = rcs
          in
             print (String.concat [Int.toString row1, ".", Int.toString col1,
                                   "-",
@@ -113,7 +108,7 @@ structure Main =
             print msg;
             print "\n";
 
-            RowCol.display source rcs;
+            ShowContext.display source rcs;
             true
          end handle Exit => false
 
@@ -187,7 +182,7 @@ structure Main =
                   )
          in
             L.target := C.read targetKey log;
-            RowCol.maxContext := C.read maxContextKey log;
+            ShowContext.maxContext := C.read maxContextKey log;
 
             (C.read modeKey log log)
             handle
@@ -199,10 +194,9 @@ structure Main =
                   (case place of
                       Error.POS pos =>
                          let
-                            val source = RowCol.filenameToSource (!Make.currentFilename)
+                            val source = ShowContext.filenameToSource (!Make.currentFilename)
 
-                            val ((row, col), _) =
-                               RowCol.fromSpan source (pos, pos)
+                            val (row, col) = pos
                          in
                             print " at ";
                             print (Int.toString row);
@@ -219,15 +213,14 @@ structure Main =
                                );
 
                             print "\n";
-                            RowCol.display source ((row, col), (row, col+1))
+                            ShowContext.display source ((row, col), (row, col+1))
                          end
 
                     | Error.SPAN span =>
                          let
-                            val source = RowCol.filenameToSource (!Make.currentFilename)
+                            val source = ShowContext.filenameToSource (!Make.currentFilename)
 
-                            val (rcs as ((row1, col1), (row2, col2))) =
-                               RowCol.fromSpan source span
+                            val ((row1, col1), (row2, col2)) = span
                          in
                             print " at ";
                             print (Int.toString row1);
@@ -248,7 +241,7 @@ structure Main =
                                );
 
                             print "\n";
-                            RowCol.display source rcs
+                            ShowContext.display source span
                          end
 
                     | Error.UNKNOWN =>

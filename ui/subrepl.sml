@@ -26,7 +26,10 @@ functor SubReplFun (structure PostProcess : POSTPROCESS) :> SUBREPL =
       val errorDetected = ref false
       val errorHandler : (errinfo -> unit) ref = ref (fn _ => ())
 
-      val theBuffer : string list ref = ref []  (* invariant: contains no newlines *)
+      (* carried over output text
+         invariant: contains no newlines
+      *)
+      val theBuffer : string list ref = ref []
 
       fun processLine s =
          (case PP.classify s of
@@ -69,6 +72,7 @@ functor SubReplFun (structure PostProcess : POSTPROCESS) :> SUBREPL =
              [] => raise (Fail "impossible")
 
            | [_] =>
+                (* stuff after the last newline *)
                 theBuffer := str :: !theBuffer
 
            | first :: rest =>

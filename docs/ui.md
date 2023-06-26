@@ -87,12 +87,3 @@ then enter `M-i` to repeat that adjustment on subsequent lines.
 By default, Istari auto-loads the Istari libraries.  To suppress this
 (such as when one is working on the libraries), use `C-c p l`.  This
 must be done before starting the server.
-
-
-
-### A bug
-
-Occasionally Emacs gets confused about what line Istari is on.  I
-would be very grateful for a reproducible instance of this bug!  When
-this happens, one can correct Emacs's opinion by placing the cursor at
-the correct position and entering `C-c p a`.

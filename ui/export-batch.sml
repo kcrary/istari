@@ -1,24 +1,39 @@
+CM.make "sources.cm";
+use "platform-nj.sml";
+CM.make "../ipp/basis/basis.cm";
 
-use "use-repl.sml";
+local
+
+   structure ReplStuff =
+      ReplFun (structure Platform = PlatformNJ
+               structure UI = NullUI
+               structure PostProcess = PostProcessNJ
+               structure Memory = NullMemory
+               structure Buffer = SimpleBuffer)
+
+in
+
+   structure Repl = ReplStuff.Repl
+   structure Ctrl = ReplStuff.Ctrl
+
+end;
+
+
 Incremental.load "../prover/prover.proj";
 CM.make "../prover/prover.cm";
 
-Repl.uiOn := false;
-Repl.exceptionHandler := Handler.handler;
+
+(* Set hooks *)
+
+Repl.Hooks.exceptionHandler := Handler.handler;
+
 FileInternal.useHook := Ctrl.use;
 
 
 (* Begin *)
 
-Incremental.inputKnown "open Pervasive;";
+Incremental.consult "open Pervasive;\n";
 open Pervasive;
-
-
-val exportPath = "bin/istari-heapimg"
-val exportPathNolib = "bin/istari-nolib-heapimg"
-val {system, version_id, date} = Compiler.version
-val replDate = Date.toString (Date.fromTimeUniv (Time.now ()))
-
 
 
 structure C = BatchCommandLine
@@ -32,6 +47,11 @@ fun endAllModules () =
    else
       endAllModules ()
 
+
+val exportPath = "bin/istari-heapimg"
+val exportPathNolib = "bin/istari-nolib-heapimg"
+val {system, version_id, date} = Compiler.version
+val replDate = Date.toString (Date.fromTimeUniv (Time.now ()))
 
 fun go prelude (_, args) =
    (
@@ -63,7 +83,6 @@ fun go prelude (_, args) =
    else
       ();
 
-   
    if Repl.batch (C.inputFile ()) then
       (
       (case C.outputFile () of

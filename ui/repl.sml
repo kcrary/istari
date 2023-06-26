@@ -1,9 +1,28 @@
 
+signature REPL_HOOKS =
+   sig
+
+      (* Call on uncaught exceptions. *)
+      val exceptionHandler : (exn -> bool) ref
+
+      (* First () argument captures the state; second restores it. *)
+      val checkpoint : (unit -> unit -> bool) ref
+
+      (* Reset to initial state. *)
+      val reset : (unit -> unit) ref
+
+      (* Display appropriate information *)
+      val onReady : (unit -> unit) ref
+      val onRewind : (unit -> unit) ref
+
+   end
+
+
 signature CTRL =
    sig
 
       val load : string -> unit     (* load a compiled project *)
-      val use : string -> unit      (* load a file *)
+      val use : string -> unit      (* use an IML file *)
       val escape : unit -> unit
       val exit : unit -> 'a
 
@@ -12,14 +31,9 @@ signature CTRL =
 
       val printDepth : int ref
       val printLength : int ref
-      val stringDepth : int ref
-
+      val stringLength : int ref
       val gcMessages : bool -> unit
-
-
       val allowBeep : bool ref
-      val primaryPrompt : string ref
-      val secondaryPrompt : string ref
 
    end
 
@@ -27,27 +41,12 @@ signature CTRL =
 signature REPL =
    sig
 
-      (* Start the REPL. *)
       val run : unit -> unit
-
-      (* Reset the preprocessor state, effectively emptying the environment. *)
-      val reset : unit -> unit
 
       (* load the indicated file, as it it were being used, true result indicates success *)
       val batch : string -> bool
 
-
-
-      (* Hooks and such *)
-
-      val uiOn : bool ref
-      val showState : (unit -> unit) ref                 (* show prover state *)
-      val showStateRewind : (unit -> unit) ref           (* show prover state after rewind *)
-      val rewindHook : (unit -> unit -> bool) ref        (* obtain a checkpoint *)
-      val resetHook : (unit -> unit) ref                 (* reset to initial state *)
-      val exceptionHandler : (exn -> bool) ref           (* call on uncaught exceptions *)
-
-      val persistentCheckpoint : (unit -> unit) -> unit  (* save a persistent checkpoint *)
+      structure Hooks : REPL_HOOKS
 
    end
 
@@ -70,25 +69,26 @@ signature PLATFORM =
       (* load the compiled project with the given base name *)
       val load : string -> bool
 
+      (* install a function to process output *)
       val captureOutput : (string -> unit) -> unit
+
+      (* set the output function back to the default *)
       val resetOutput : unit -> unit
 
-      structure Tools :
-         sig
-
-            val printDepth : int ref
-            val printLength : int ref
-            val stringDepth : int ref
-            val gcMessages : bool -> unit
-
-         end
+      val printDepth : int ref
+      val printLength : int ref
+      val stringLength : int ref
+      val gcMessages : bool -> unit
 
    end
 
 
 functor ReplFun (structure Platform : PLATFORM
+                 structure UI : UI
+                 structure Buffer : BUFFER
+                 structure Memory : MEMORY
                  structure PostProcess : POSTPROCESS)
-   :> 
+   :>
    sig
       structure Repl : REPL
       structure Ctrl : CTRL
@@ -98,612 +98,598 @@ functor ReplFun (structure Platform : PLATFORM
    =
    struct
 
-      (* Processing the ML REPL's output. *)
-      structure SR = SubReplFun (structure PostProcess = PostProcess)
-      
-      exception Exit
+      val interjectionRow = 0
+      val firstRow = 1  
+      val firstCol = 0
 
-      val exceptionHandler : (exn -> bool) ref = ref (fn _ => false)
 
-      fun withHandler x f =
-         f ()
-         handle
-            Exit => raise Exit
+      structure SubRepl = SubReplFun (structure PostProcess = PostProcess)
 
-          | Error.Error (msg, _) =>
-               (
-               print "IPP error: ";
+      exception Exit = Buffer.Exit
+      exception Exception
+      exception SilentException
+
+      val theTempFilename = ref "/dev/null"
+
+
+      structure Hooks =
+         struct
+
+            val exceptionHandler : (exn -> bool) ref = ref (fn _ => false)
+            val checkpoint = Memory.rewindHook
+            val reset = Memory.resetHook
+            val onReady = Buffer.onReadyHook
+            val onRewind = ref (fn () => ())
+
+         end
+
+
+
+      (* Executing IML *)
+
+      fun showIppError sourcename source msg place =
+         if Error.isUnknown place then
+            (case sourcename of
+                NONE =>
+                   (
+                   print "\nError: ";
+                   print msg
+                   )
+
+              | SOME name =>
+                   (
+                   print "\n";
+                   print name;
+                   print ":? Error: ";
+                   print msg;
+                   print "\n"
+                   ))
+         else
+            let
+               val span as ((row1, col1), (row2, col2)) =
+                  (case place of
+                      Error.SPAN span => span
+
+                    | Error.POS pos => (pos, pos)
+
+                    | Error.UNKNOWN => raise (Fail "impossible"))
+            in
+               print "\n";
+
+               (case sourcename of
+                   NONE => ()
+                 | SOME name =>
+                      (
+                      print name;
+                      print ":"
+                      ));
+   
+               print (Int.toString row1);
+               print ".";
+               print (Int.toString col1);
+               print "-";
+               print (Int.toString row2);
+               print ".";
+               print (Int.toString col2);
+               print " Error: ";
                print msg;
-               print "\n\n";
-               SR.errorDetected := true;
-               x
+               print "\n";
+   
+               ShowContext.display source span
+            end
+            
+
+
+      (* This will also handle lexing errors that arise in s. *)
+      fun parse sourcename source s =
+         Incremental.parse s
+         handle
+            Error.Error (msg, place) =>
+               (
+               showIppError sourcename source msg place;
+               raise Exception
+               )
+               
+
+      fun handleExn exn =
+         (case exn of
+             Exit => raise Exit
+
+           | SilentException => raise SilentException
+
+           | _ =>
+                if !Hooks.exceptionHandler exn then
+                   (
+                   Incremental.undo ();
+                   raise Exception
+                   )
+                else
+                   (
+                   print "Uncaught exception: ";
+                   print (exnMessage exn);
+                   print "\n";
+                   Incremental.undo ();
+                   raise Exception
+                   ))
+
+      
+      (* source is the full character stream; p is drawn from the middle of it *)
+      fun execute sourcename source p =
+         let
+            val p' =
+               Incremental.compile p
+               handle
+                  Error.Error (msg, place) =>
+                     (
+                     showIppError sourcename source msg place;
+                     raise Exception
+                     )
+         in
+            SubRepl.errorDetected := false;
+   
+            SubRepl.errorHandler := 
+               (fn (_, span, msg) =>
+                   (
+                   print "\n";
+                   Incremental.showErrorMessage p' span source sourcename msg
+                   ));
+   
+            (* suppress the message generated by use *)
+            SubRepl.skipLine := true;
+   
+            (Platform.use (!theTempFilename)
+             handle exn => handleExn exn);
+   
+            if !SubRepl.errorDetected then
+               (
+               Incremental.undo ();
+               raise Exception
+               )
+            else
+               ()
+         end
+
+
+
+      (* Loading IML projects *)
+
+      exception LoadError
+
+      structure Regexp =
+         RegexpFun (structure Streamable =
+                       MonomorphizeStreamable (structure Streamable = StreamStreamable
+                                               type elem = char))
+
+      local
+
+         open Regexp
+         fun filesep ch = ch = #"/" orelse ch = #"\\"
+         fun notfilesep ch = not (filesep ch)
+
+      in
+
+         val reFilename = seq [plus' any, set filesep,
+                               capture (plus' (set notfilesep)),
+                               string ".iml.sml"]
+      end
+
+
+      fun ippload projfilename runCommands =
+         let
+            val () = 
+               Incremental.load projfilename
+               handle
+                  Error.Error (msg, place) =>
+                     (
+                     print "IPP error: ";
+                     print msg;
+                     print " at ";
+                     print (Error.placeToString "" place);
+                     print "\n\n";
+                     raise LoadError
+                     )
+
+            val proj = Make.getProjectBase projfilename
+         in
+            print "[loading ";
+            print proj;
+            print "]\n";
+
+            SubRepl.errorHandler :=
+               (fn (errfile, span, msg) =>
+                   (case Regexp.match reFilename (Stream.fromString errfile) of
+                       NONE =>
+                          (
+                          print "<file not identified>";
+                          print msg
+                          )
+          
+                     | SOME [Regexp.One goodname] =>
+                          (
+                          Main.invert projfilename goodname span msg;
+                          ()
+                          )
+          
+                     | SOME _ =>
+                          raise (Fail "impossible")));
+
+            (if Platform.load proj then () else raise LoadError)
+            handle exn =>
+               (
+               Incremental.undo ();
+               handleExn exn
+               );
+
+            runCommands ()
+         end
+
+
+
+      (* Using IML source files *)
+
+      fun useLoop sourcename source s runCommands =
+         (case Stream.front s of
+             Stream.Nil => ()
+
+           | Stream.Cons _ =>
+                let
+                   val (p, s') = parse sourcename source s
+                in
+                   execute sourcename source p;
+                   runCommands ();
+                   useLoop sourcename source s' runCommands
+                end)
+
+
+      fun ippuse filename runCommands =
+         let
+            val filename =
+               Path.canonize filename
+               handle Path.Path =>
+                  raise (Error.GeneralError ("bad path name " ^ filename))
+
+            val olddir = OS.FileSys.getDir ()
+
+            val (newdir, _) = Path.split filename
+
+            val () = OS.FileSys.chDir newdir
+
+            val () =
+               (
+               print "[opening ";
+               print filename;
+               print "]\n"
                )
 
-          | exn =>
-               if !exceptionHandler exn then
-                  (
-                  print "\n";
-                  SR.errorDetected := true;
-                  x
-                  )
-               else
-                  (
-                  print "Uncaught exception ";
-                  print (exnMessage exn);
-                  print "\n\n";
-                  SR.errorDetected := true;
-                  x
-                  )
-
-      fun onException f g =
-         f ()
-         handle exn =>
-            (
-            g ();
-            raise exn
-            )
+            val ins = TextIO.openIn filename
+            val strm = Stream.fromTextInstream ins
+            val source = ShowContext.streamToSource firstRow strm
+            val s = Incremental.lex strm Span.origin
+         in
+            Finally.finally
+               (fn () => useLoop (SOME filename) source s runCommands)
+               (fn () => 
+                   (
+                   TextIO.closeIn ins;
+                   OS.FileSys.chDir olddir
+                   ))
+         end
 
 
-      structure Memory = MemoryFun (val withHandler = withHandler)
-      
+
+      (* The command loop
+
+         IML's behavior here is different from SML/NJ.
+
+         In SML/NJ, when you "use" a file, this is what happens:
+
+         1. the declaration containing the use is typechecked and compiled
+         2. the compiled code is executed
+         3. during that execution, the "use" happens immediately, which results in
+            more execution and more bindings are introduced
+         4. the binding resulting from the original declaration is introduced
+
+         Some consequences:
+         - bindings from the used file are not visible to the original declaration
+           (because it was typechecked and compiled before the used file)
+
+         - side effects from the used file *are* visible to the original declaration
+
+         - if the used file raises an exception, the original declaration's binding
+           never takes place (because the side-effect preempts it)
+
+         - oddly, if the used file contains a type error, "use" terminates successfully,
+           so the original declaration's binding does take place
+
+         We rely on SML/NJ's behavior -- specifically how side-effects take place
+         immediately -- but do not reproduce it.
+
+
+         In IML, when you "use" a file, this is what happens:
+
+         1. the declaration containing the use is typechecked and compiled
+         2. the compiled code is executed
+         3. during that execute, the "use" enqueues a "use" command, and then returns
+         4. the binding resulting from the original declaration is introduced
+         5. enqueued commands take place
+
+         (Actually, 4 happens before 2, and is undone if 2 or 3 fails, but the user
+         can't tell that.)
+
+         Consequently:
+         - side effects from the used file are *not* visible to the original declaration
+         - an exception does not stop the original binding from taking place
+
+         In principle we could emulate SML/NJ's behavior, but that would require
+         re-engineering the IML's incremental interface to separate compiling IML
+         code from introducing the resulting binding.  It doesn't seem worth it to do
+         that just to get the same behavior as SML/NJ in a corner case.
+      *)
+
+      datatype command =
+         LOAD of string
+       | USE of string
+
+      val commands : command IQueue.iqueue ref = ref (IQueue.iqueue ())
+
+      fun runCommands () =
+         let
+            val q = !commands
+         in
+            if IQueue.isEmpty q then
+               ()
+            else
+               let
+                  val command = IQueue.remove q
+
+                  val newq = IQueue.iqueue ()
+               in
+                  commands := newq;
+   
+                  Finally.finally
+                     (fn () => 
+                         (case command of
+                             LOAD filename => ippload filename runCommands
+                           | USE filename => ippuse filename runCommands))
+                     (fn () => commands := q);
+
+                  runCommands ()
+               end
+         end
+
+
+
+      (* The REPL's main loop(s) *)
+
+      (* Keeps processing the input as long as no exceptional conditions arise.
+
+         source is the original character source (i.e., not advanced as we go along)
+      *)
+      fun mainLoop source s =
+         let
+            val (p, s') = parse NONE source s
+         in
+            (* does nothing if there's not a checkpoint location waiting for this *)
+            Memory.checkpoint ();
+
+            execute NONE source p;
+            runCommands ();
+            Buffer.signal ();
+            mainLoop source s'
+         end
+            
+
+      fun interjectLoop source s =
+         (case Stream.front s of
+             Stream.Nil => ()
+
+           | _ =>
+                let
+                   val (p, s') = parse NONE source s
+                in
+                   execute NONE source p;
+                   runCommands ();
+                   interjectLoop source s'
+                end)
+
+
+      (* Calls mainLoop, handles exceptional conditions, then restarts the main loop.
+
+         row is the current row.
+         gapStart is the row of the beginning of the preceding gap (possibly empty).
+      *)
+      fun replLoop gapStart row =
+         let
+            val () = Memory.setLocation (gapStart, row)
+
+            val () = Buffer.signal ()
+
+            val strm = Buffer.new gapStart row
+         in
+            mainLoop (ShowContext.streamToSource row strm) (Incremental.lex strm (row, firstCol))
+            handle
+               Buffer.Interjection s =>
+                  let
+                     val (a, b) = Memory.rewindLast ()
+                  in
+                     UI.moveCursor b;
+   
+                     (interjectLoop 
+                         (ShowContext.streamToSource interjectionRow s)
+                         (Incremental.lex s (interjectionRow, firstCol))
+                      handle Exception => ());
+   
+                     replLoop a b
+                  end
+   
+             | Buffer.Rewind n =>
+                  let
+                     val (a, b) = Memory.rewind n
+                     val line = Int.min (b, n)
+                  in
+                     UI.moveCursor line;
+                     !Hooks.onRewind ();
+                     replLoop a line
+                  end
+   
+             | Exception =>
+                  let
+                     val (a, b) = Memory.rewindLast ()
+                  in
+                     UI.moveCursor b;
+                     UI.beep ();
+                     replLoop a b
+                  end
+
+             | SilentException =>
+                  (* same as Exception but no beep *)
+                  let
+                     val (a, b) = Memory.rewindLast ()
+                  in
+                     UI.moveCursor b;
+                     replLoop a b
+                  end
+                  
+         end
+  
+
+
+      (* Set up initial environment *)
+
+      fun makeStruct l =
+         foldl
+            (fn (str, c) => 
+                let
+                   val sym = Symbol.fromValue str
+                in
+                   Context.forwardExp c sym ([sym], 0)
+                end)
+            Context.empty
+            l
+
+      val ctrlSig =
+         makeStruct
+            ["load", "use", "escape", "exit", 
+             "pwd", "cd",
+             "printDepth", "printLength", "stringLength", "gcMessages", "allowBeep"]
+
+      val recoverSig =
+         makeStruct ["recover"]
+
+      val initial =
+         Context.forwardMod
+            (Context.forwardMod
+                (Context.forwardSig
+                    (Initial.basis (Language.SML) false)
+                    (Symbol.fromValue "CTRL")
+                    (Symbol.fromValue "CTRL", ctrlSig))
+                (Symbol.fromValue "Ctrl")
+                ([Symbol.fromValue "Ctrl"], ctrlSig))
+            (Symbol.fromValue "RecoverRepl")
+            ([Symbol.fromValue "RecoverReplInside"], recoverSig)
+
+      val () = Incremental.reset initial
+
+
+
+      (* Start the REPL *)
+
+      fun startRepl a b =
+         let
+            val tempFilename = OS.FileSys.tmpName ()
+         in
+            theTempFilename := tempFilename;
+            Incremental.outputStream := (fn () => TextIO.openOut tempFilename);
+            Platform.captureOutput SubRepl.process;
+            commands := IQueue.iqueue ();
+
+            replLoop a b handle Exit => ();
+
+            Platform.resetOutput ();
+            OS.FileSys.remove tempFilename handle OS.SysErr _ => ()
+         end
+
+
+      fun run () =
+         (
+         print "[IML repl started]\n\n";
+         startRepl firstRow firstRow
+         )
+
+
+      fun batch filename =
+         let
+            val tempFilename = OS.FileSys.tmpName ()
+
+            val () =
+               (
+               theTempFilename := tempFilename;
+               Incremental.outputStream := (fn () => TextIO.openOut (!theTempFilename));
+               Platform.captureOutput SubRepl.process;
+               commands := IQueue.iqueue ();
+
+               IQueue.insert (!commands) (USE filename)
+               )
+
+            val result =
+               (runCommands (); true)
+               handle
+                  Exit => false
+                | Exception => false
+         in
+            Platform.resetOutput ();
+            OS.FileSys.remove tempFilename handle OS.SysErr _ => ();
+
+            if result then
+               ()
+            else
+               print "[exiting]\n";
+
+            result
+         end
+
 
       structure Repl =
          struct
 
-            structure S = Stream
-            structure I = Incremental
-      
-            val showState = ref (fn () => ())
-            val showStateRewind = ref (fn () => ())
-            val uiOn = UI.on
-            val exceptionHandler = exceptionHandler
-      
-            val localTempFilename = "iml-temp-buffer.sml"
-            val theTempFilename = ref ""
-      
-      
-            (* Error handlers *)
-      
-            fun mainErrorHandler (_, span, msg) = 
-               (
-               print "\n";
-               I.invert span msg
-               )
-               
-            structure R =
-               RegexpFun (structure Streamable =
-                             MonomorphizeStreamable (structure Streamable = StreamStreamable
-                                                     type elem = char))
-      
-            local
-      
-               open R
-               fun filesep ch = ch = #"/" orelse ch = #"\\"
-               fun notfilesep ch = not (filesep ch)
-      
-            in
-      
-               val reFilename = seq [plus' any, set filesep,
-                                     capture (plus' (set notfilesep)),
-                                     string ".iml.sml"]
-            end
-      
-            fun loadErrorHandler projfilename (errfile, span, msg) =
-               (case R.match reFilename (S.fromString errfile) of
-                   NONE =>
-                      (
-                      print "<file not identified>";
-                      print msg
-                      )
-      
-                 | SOME [R.One goodname] =>
-                      (
-                      Main.invert projfilename goodname span msg;
-                      ()
-                      )
-      
-                 | SOME _ =>
-                      raise (Fail "impossible"))
-      
+            val run = run
+            val batch = batch
 
-      
-      
-      
-            (* Commands for Ctrl *)
-      
-            datatype command = 
-               LOAD of string 
-             | USE of string 
-             | ESCAPE
-      
-            (* a stack of queues *)
-            val commandQueues : command IQueue.iqueue list ref = ref [IQueue.iqueue ()]
-
-            fun enqueue command =
-               (case !commandQueues of
-                   [] => raise (Fail "invariant")
-
-                 | q :: _ =>
-                      IQueue.insert q command)
-
-
-
-            exception LoadError
-
-            fun load projfilename =
-               if I.load projfilename then
-                  let
-                     val proj = Make.getProjectBase projfilename
-                     
-                     val () =
-                        (
-                        print "[loading ";
-                        print proj;
-                        print "]\n"
-                        )
-      
-                     val () = SR.errorHandler := loadErrorHandler projfilename
-                  in
-                     if
-                        onException
-                           (fn () => Platform.load proj)
-                           I.undo
-                     then
-                        ()
-                     else
-                        (
-                        I.undo ();
-                        raise LoadError
-                        )
-                  end
-               else
-                  ()
-      
-
-            exception UseError
-
-            fun useLoop used =
-               let
-                  val status = I.inputUsed used
-               in
-                  (case status of
-                      I.ERROR =>
-                         (
-                         I.closeUsed used;
-                         commandQueues := [IQueue.iqueue ()];
-                         raise UseError
-                         )
-
-                    | _ =>
-                         (
-                         SR.skipLine := true;
-                         SR.errorDetected := false;
-                         SR.errorHandler := mainErrorHandler;
-
-                         onException
-                            (fn () => Platform.use (!theTempFilename))
-                            (fn () =>
-                                (
-                                I.closeUsed used;
-                                I.undo ();
-                                commandQueues := [IQueue.iqueue ()]
-                                ));
-
-                         if !SR.errorDetected then
-                            (
-                            I.closeUsed used;
-                            I.undo ();
-                            commandQueues := [IQueue.iqueue ()];
-                            raise UseError
-                            )
-                         else
-                            (
-                            onException
-                               runCommands
-                               (fn () =>
-                                   (
-                                   I.closeUsed used;
-                                   commandQueues := [IQueue.iqueue ()]
-                                   ));
-
-                            (case status of
-                                I.COMPLETE =>
-                                   I.closeUsed used
-
-                              | I.MORE =>
-                                   useLoop used
-
-                              | _ =>
-                                   (* file input cannot return WAITING or EMPTY status *)
-                                   raise (Fail "impossible"))
-                            )
-                         ))
-               end
-
-            and ippuse filename =
-               let
-                  val filename =
-                     Path.canonize filename
-                     handle Path.Path =>
-                        raise (Error.GeneralError ("bad path name " ^ filename))
-
-                  val olddir = OS.FileSys.getDir ()
-
-                  val (newdir, _) = Path.split filename
-               in
-                  OS.FileSys.chDir newdir;
-
-                  onException
-                     (fn () =>
-                         (
-                         useLoop (I.useFile (fn () => TextIO.openOut (!theTempFilename)) filename);
-                         OS.FileSys.chDir olddir
-                         ))
-                     (fn () => OS.FileSys.chDir olddir)
-               end
-
-
-            and runCommands () =
-               (case !commandQueues of
-                   [] => raise (Fail "invariant")
-
-                 | commandQueue :: restQueues =>
-                      if IQueue.isEmpty commandQueue then
-                         (case restQueues of
-                             [] =>
-                                ()
-
-                           | _ :: _ =>
-                                (
-                                commandQueues := restQueues;
-                                runCommands ()
-                                ))
-                      else
-                         (case IQueue.remove commandQueue of
-                             LOAD filename =>
-                                (
-                                load filename;
-                                runCommands ()
-                                )
-                
-                           | USE filename =>
-                                (
-                                (* any commands here take precedence over those already in the queue *)
-                                commandQueues := IQueue.iqueue () :: !commandQueues;
-
-                                ippuse filename;
-                                runCommands ()
-                                )
-                
-                           | ESCAPE => raise Exit))
-
-      
-
-            (* The IML REPL *)
-               
-            val primaryPrompt = ref "% "
-            val secondaryPrompt = ref "= "
-      
-            fun stringAllLoop f str i j =
-               if i >= j then
-                  true
-               else
-                  f (String.sub (str, i))
-                  andalso
-                  stringAllLoop f str (i+1) j
-      
-            fun stringAll f str = stringAllLoop f str 0 (String.size str)
-
-            (* True means we just slipped an interaction to the repl that wasn't from the 
-               buffer, so the next interaction really is the current interaction, so we
-               shouldn't set deadspace.
-            *)
-            val interjected = ref false
-      
-      
-            (* checkpoint is active for current interaction *)
-            fun inputLoopMain input =
-               (case input of
-                   UI.ChannelClosed => raise Exit
-      
-                 | UI.Rewind n =>
-                      (
-                      I.discard ();
-                      Memory.rewind n;
-                      !showStateRewind ();
-                      preInputLoop ()
-                      )
-      
-                 | UI.ShowState =>
-                      (* Ignore this if we're in the middle of something. *)
-                      inputLoop ()
-
-                 | UI.Interject line =>
-                      (
-                      (* First scrap any input. *)
-                      I.discard ();
-                      Memory.rewind 0;
-                      
-                      (case I.input (fn () => TextIO.openOut (!theTempFilename)) line of
-                          I.WAITING =>
-                             (* The interjection must be a complete interaction. Abort. *)
-                             (
-                             I.discard ();
-                             UI.message "Incomplete interjection";
-                             UI.beep ();
-                             preInputLoop ()
-                             )
-
-                        | I.EMPTY => 
-                             (* Nothing here, return to processing the input. *)
-                             preInputLoop ()
-      
-                        | I.COMPLETE => 
-                             (* Fall through and run it. *)
-                             interjected := true
-      
-                        | I.ERROR =>
-                             (
-                             UI.beep ();
-                             preInputLoop ()
-                             )
-
-                        | I.MORE =>
-                             (* console input cannot return MORE status *)
-                             raise (Fail "impossible"))
-                      )
-      
-                 | UI.Line str =>
-                      (
-                      Memory.advanceLine ();
-                      (case I.input (fn () => TextIO.openOut (!theTempFilename)) str of
-                          I.WAITING =>
-                             inputLoop ()
-          
-                        | I.COMPLETE => 
-                             (* Fall through and run it. *)
-                             ()
-          
-                        | I.EMPTY =>
-                             (* Nothing here but comments after all. *)
-                             (
-                             Memory.deadspace ();
-                             preInputLoop ()
-                             )
-
-                        | I.ERROR =>
-                             (
-                             Memory.rewind 0;
-                             UI.beep ();
-                             preInputLoop ()
-                             )
-
-                        | I.MORE =>
-                             (* console input cannot return MORE status *)
-                             raise (Fail "impossible"))
-                      ))
-      
-            (* checkpoint is active for current interaction *)
-            and inputLoop () =
-               (
-               print (!secondaryPrompt);
-      
-               UI.readyPartial ();
-               inputLoopMain (UI.input ())
-               )
-      
-            (* skipping leading whitespace,
-               deadspace is set for current interaction
-            *)
-            and preInputLoop () =
-               (
-               print (!primaryPrompt);
-      
-               UI.ready ();
-               (case UI.input () of
-                   UI.ChannelClosed => raise Exit
-      
-                 | UI.ShowState =>
-                      (
-                      !showState ();
-                      preInputLoop ()
-                      )
-
-                 | input =>
-                      if 
-                         (case input of
-                             UI.Line str => stringAll Char.isSpace str
-                           | _ => false)
-                      then
-                         (* blank line *)
-                         (
-                         Memory.advanceLine ();
-                         preInputLoop ()
-                         )
-                      else
-                         (
-                         Memory.checkpoint ();
-                         inputLoopMain input
-                         ))
-               )
-      
-      
-      
-            (* deadspace is set for current interaction *)
-            fun mainLoop () =
-               (
-               preInputLoop ();
-               SR.skipLine := true;
-               SR.errorDetected := false;
-               SR.errorHandler := mainErrorHandler;
-      
-               withHandler () (fn () => Platform.use (!theTempFilename));
-               TextIO.flushOut TextIO.stdOut;
-               (* reactivate output in case we muted the SML repl *)
-               Platform.captureOutput SR.process;
-      
-               if
-                  !SR.errorDetected
-                  orelse
-                  (withHandler () runCommands; !SR.errorDetected)
-               then
-                  (
-                  I.undo ();
-                  Memory.rewind 0;
-                  UI.beep ();
-                  commandQueues := [IQueue.iqueue ()];
-                  mainLoop ()
-                  )
-               else 
-                  (
-                  if !interjected then
-                     interjected := false
-                  else
-                     Memory.deadspace ();
-
-                  mainLoop ()
-                  )
-               )
-
-      
-      
-            (* Ctrl and the initial environment *)
-      
-            fun makeStruct l =
-               foldl
-                  (fn (str, c) => 
-                      let
-                         val sym = Symbol.fromValue str
-                      in
-                         Context.forwardExp c sym ([sym], 0)
-                      end)
-                  Context.empty
-                  l
-
-            val ctrlSig =
-               makeStruct
-                  ["load", "use", "escape", "exit", "pwd", "cd",
-                   "printDepth", "printLength", "stringDepth",
-                   "gcMessages",
-                   "allowBeep", "primaryPrompt", "secondaryPrompt"]
-      
-            val recoverSig =
-               makeStruct ["recover"]
-
-            val initial =
-               Context.forwardMod
-                  (Context.forwardMod
-                      (Context.forwardSig
-                          (Initial.basis (Language.SML) false)
-                          (Symbol.fromValue "CTRL")
-                          (Symbol.fromValue "CTRL", ctrlSig))
-                      (Symbol.fromValue "Ctrl")
-                      ([Symbol.fromValue "Ctrl"], ctrlSig))
-                  (Symbol.fromValue "RecoverRepl")
-                  ([Symbol.fromValue "RecoverReplInside"], recoverSig)
-      
-
-
-            (* Startup *)
-      
-            (* Put Ctrl into the IPP environment. *)
-            val () = I.reset initial
-      
-            fun reset () = I.reset initial
-      
-            val oldout = { say = print, flush = (fn () => ()) }
-      
-            fun runQuietly () =
-               Finally.finally
-                  (fn () =>
-                      (
-                      (* When the UI starts the repl, it starts it with the output functions
-                         empty, to make the startup splash cleaner.  We'll just undo that now.  
-                         (We don't know if this is the first time time the repl is being run, 
-                         but it's not harmful to do it extra times.)
-                      *)
-                      Platform.resetOutput ();
-      
-                      theTempFilename := OS.FileSys.tmpName ();
-                      Platform.captureOutput SR.process;
-                      commandQueues := [IQueue.iqueue ()];
-             
-                      if !interjected then
-                         interjected := false
-                      else
-                         Memory.deadspace ();
-
-                      mainLoop () handle Exit => ();
-             
-                      OS.FileSys.remove (!theTempFilename) handle OS.SysErr _ => ()
-                      ))
-                  (fn () => Platform.resetOutput ())
-      
-            fun run () =
-               (
-               print "[IML repl started]\n\n";
-               runQuietly ()
-               )
-
-            fun batch filename =
-               Finally.finally
-                  (fn () =>
-                      let
-                         val q = IQueue.iqueue ()
-                      in
-                         (* As above. *)
-                         Platform.resetOutput ();
-         
-                         theTempFilename := OS.FileSys.tmpName ();
-                         Platform.captureOutput SR.process;
-                         commandQueues := [q];
-
-                         IQueue.insert q (USE filename);
-
-                         let
-                            val res =
-                               withHandler false (fn () => (runCommands (); true))
-                               handle Exit =>
-                                  (
-                                  print "[exiting]\n";
-                                  false
-                                  )
-                         in
-                            OS.FileSys.remove (!theTempFilename) handle OS.SysErr _ => ();
-
-                            res
-                         end
-                      end)
-                  (fn () => Platform.resetOutput ())
-
-
-            val rewindHook = Memory.rewindHook
-            val resetHook = Memory.resetHook
-            val persistentCheckpoint = Memory.persistentCheckpoint
+            structure Hooks = Hooks
 
          end
+
 
       structure Ctrl =
          struct
 
-            fun load str = Repl.enqueue (Repl.LOAD str)
-            fun use str = Repl.enqueue (Repl.USE str)
-            fun escape () = Repl.enqueue Repl.ESCAPE
-            fun exit () = OS.Process.exit OS.Process.success
-      
+            fun load filename = IQueue.insert (!commands) (LOAD filename)
+
+            fun use filename = IQueue.insert (!commands) (USE filename)
+
+            fun escape () = raise Exit
+
+            fun exit () = 
+               (
+               Platform.resetOutput ();
+               
+               TextIO.print "[running the proper exit code]\n";
+               OS.Process.exit OS.Process.success
+               )
+
             val pwd = OS.FileSys.getDir
             val cd = OS.FileSys.chDir
-      
-            open Platform.Tools
 
+            val printDepth = Platform.printDepth
+            val printLength = Platform.printLength
+            val stringLength = Platform.stringLength
+            val gcMessages = Platform.gcMessages
             val allowBeep = UI.allowBeep
-            val primaryPrompt = Repl.primaryPrompt
-            val secondaryPrompt = Repl.secondaryPrompt
 
          end
 
-
-      (* After the UI interrupts, it sends RecoverRepl.recover ().
+         
+      (* After the UI interrupts, it sends "RecoverRepl.recover ();".
 
          We don't know whether an interrupt will come while running IML code, in which
          case we will stay in the IML repl, or while translating IML code, in which case
@@ -716,28 +702,39 @@ functor ReplFun (structure Platform : PLATFORM
          struct
 
             fun recover () =
-               (
-               Memory.rewind 0;
-               UI.beep ();
-               UI.message "Interrupt";
-               Repl.interjected := true;
-               Repl.runQuietly ()
-               )
+               (* In this scenario, the interrupt arrived while in the IML repl code,
+                  so the IML interrupted, placing us at the SML/NJ repl prompt.  The UI then
+                  sent "RecoverRepl.recover ();", which got us here.
+
+                  Now we have to do all the usual exception recovery stuff before
+                  restarting the repl.
+               *)
+               let
+                  val (a, b) = Memory.rewindLast ()
+               in
+                  UI.moveCursor b;
+                  UI.beep ();
+                  UI.message "Interrupt";
+                  startRepl a b
+               end
 
          end
+
 
       structure RecoverReplInside =
          struct
 
             fun recover () =
-               (
-               (* The state was already rewound.
-                  Just undo the surreptitious transmission of RecoverRepl.recover ().
+               (* In this scenario, the interrupt arrived while in Platform.use, so we
+                  handled it as an uncaught exception and rewound the state as usual.  
+                  At that point everything was fine, but the UI didn't know that, so
+                  it sent "RecoverRepl.recover ();" anyway, which got us here.
+
+                  At this point we want to gracefully pretend that this was never called
+                  at all, so we will raise the SilentException exception.  That will do the
+                  usual exception stuff except that it won't ring the bell a second time.
                *)
-               Memory.excise ();
-               UI.message "Interrupt";
-               Repl.interjected := true
-               )
+               raise SilentException
 
          end
 

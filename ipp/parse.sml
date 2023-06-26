@@ -37,7 +37,7 @@ signature PARSE =
                     -> SymbolSet.set 
                     -> parser SymbolDict.dict
 
-      val parse : parser -> Syntax.element list -> Span.span -> (Syntax.exp, int) Sum.sum
+      val parse : parser -> Syntax.element list -> Span.span -> (Syntax.exp, Span.pos) Sum.sum
 
       val reservedNonterminals : Symbol.symbol list
 
@@ -83,7 +83,7 @@ structure Parse :> PARSE =
 
       (* Putting the starting position into a ref is a hack, but it dramatically simplifies the plumbing. *)
 
-      val startPos = ref 0
+      val startPos = ref Span.origin
 
       fun elementToSpan elem =
          (case elem of
@@ -106,7 +106,7 @@ structure Parse :> PARSE =
 
       fun parse p elems (pos, _) = 
          (
-         startPos := pos + 1;
+         startPos := Span.add pos 1;
          
          (case P.parse p elems of
              Sum.INL x => Sum.INL x

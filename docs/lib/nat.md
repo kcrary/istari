@@ -322,7 +322,7 @@ Strong induction for natural numbers:
 
     istrue_eqb : forall (m n : nat) . Bool.istrue (eqb m n) <-> m = n : nat
 
-    istrue_neqb : forall (m n : nat) . Bool.istrue (neqb m n) <-> m <> n : nat
+    istrue_neqb : forall (m n : nat) . Bool.istrue (neqb m n) <-> m != n : nat
 
     istrue_leqb : forall (m n : nat) . Bool.istrue (leqb m n) <-> m <= n
 
@@ -343,7 +343,7 @@ Strong induction for natural numbers:
 
     eq_nat_decide : forall (m n : nat) . Decidable.decidable (m = n : nat)
 
-    neq_nat_decide : forall (m n : nat) . Decidable.decidable (m <> n : nat)
+    neq_nat_decide : forall (m n : nat) . Decidable.decidable (m != n : nat)
 
     leq_decide : forall (m n : nat) . Decidable.decidable (m <= n)
 
@@ -351,7 +351,7 @@ Strong induction for natural numbers:
 
     eq_nat_stable : forall (m n : nat) . Stable.stable (m = n : nat)
 
-    neq_nat_stable : forall (m n : nat) . Stable.stable (m <> n : nat)
+    neq_nat_stable : forall (m n : nat) . Stable.stable (m != n : nat)
 
     leq_stable : forall (m n : nat) . Stable.stable (m <= n)
 
@@ -365,4 +365,4 @@ Strong induction for natural numbers:
 
     nat_dichotomy_weak : forall (m n : nat) . m <= n % n <= m
 
-    nat_dichotomy_neq : forall (m n : nat) . not (m = n : nat) -> m < n % n < m
+    nat_dichotomy_neq : forall (m n : nat) . m != n : nat -> m < n % n < m

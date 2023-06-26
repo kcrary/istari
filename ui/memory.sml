@@ -2,32 +2,34 @@
 signature MEMORY =
    sig
 
-      (* Indicates that the current line has advanced. *)
-      val advanceLine : unit -> unit
+      (* (a, b) where b is the line of interest, and a is the first line of any blank space
+         that precedes it.
+      *)
+      type location = int * int
 
-      (* Indicates the beginning of (possibly empty) dead space. *)
-      val deadspace : unit -> unit
 
-      (* Asks the Prover for a checkpoint.  Saves it in the ring buffer. *)
+      (* Create a tentative checkpoint at the current location.
+         A tentative checkpoint carries no rewind data and is overwritten by the
+         next setLocation.
+      *)
+      val setLocation : location -> unit
+
+      (* Obtains a checkpoint.  Saves it at the current tentative checkpoint, making it
+         non-tentative.  Ignored if the last checkpoint is not tentative.
+      *)
       val checkpoint : unit -> unit
 
-      (* Is passed a checkpoint.  Saves it permanently (until rewound), attached to the
-         location of the most recent checkpoint.  Ignored if the most recent checkpoint
-         has been rewound.  (E.g., if the user tried to start a lemma in an interjection.)
+      (* Make the last checkpoint persistent. *)
+      val saveLast : unit -> unit
+      
+      (* Restores the last checkpoint at (a, b) such that a <= n.  Returns its location.
+         If the last such non-persistent checkpoint fails, then restores
+         the last such persistent checkpoint instead.
       *)
-      val persistentCheckpoint : (unit -> unit) -> unit
+      val rewind : int -> location
 
-      (* Rewinds the state to the last checkpoint no later than (the current line) - n.
-         Resets the beginning of deadspace to what it was then.
-      *)
-      val rewind : int -> unit
-
-      (* Resets the beginning of deadspace and the current line to the values
-         from the most recent checkpoint, then deletes that checkpoint.
-         Does not move the cursor or rewind the state.  Intended for cleaning
-         up after commands sent surreptitiously to the repl.
-      *)
-      val excise : unit -> unit
+      (* Restores the last checkpoint.  Returns its location. *)
+      val rewindLast : unit -> location
 
 
 
@@ -40,148 +42,150 @@ signature MEMORY =
    end
 
 
-functor MemoryFun (val withHandler : 'a -> (unit -> 'a) -> 'a)
-   :> MEMORY
-   =
+structure NullMemory :> MEMORY =
    struct
 
-      val currentLine = ref 0
-      val deadspaceLine = ref 0
-      val startingDeadLine = ref ~1 (* deadspace line of the last checkpoint *)
-      val startingLine = ref ~1     (* line of the last checkpoint *)
+      type location = int * int
 
-      val historySize = 200
-      val maxint = Option.valOf Int.maxInt
-      val blank = (maxint, maxint, (fn () => false))
+      fun setLocation _ = ()
+      fun checkpoint () = ()
+      fun saveLast () = ()
+      fun rewind _ = (1, 0)
+      fun rewindLast () = (1, 0)
 
-      (* first int: start of dead space, second int: start of content *)
-      val history : (int * int * (unit -> bool)) Array.array =
-         Array.array (historySize, blank)
+      val rewindHook = ref (fn () => fn () => false)
+      val resetHook = ref (fn () => ())
 
-      (* cursor points to next checkpoint *)
-      val cursor = ref 0
+   end
 
-      val ancientHistory : (int * int * (unit -> unit)) list ref = ref []
+
+structure Memory :> MEMORY =
+   struct
+
+      type location = int * int
 
       val rewindHook = ref (fn () => fn () => false)
       val resetHook = ref (fn () => ())
 
 
-      fun advanceLine () =
-         currentLine := !currentLine + 1
+      val historySize = 200
+      val maxInt = Option.valOf Int.maxInt
+      fun noop () = true
+      val blank = (maxInt, maxInt, false, noop)
 
-      fun deadspace () =
-         deadspaceLine := !currentLine
+      (* each entry is (a, b, tentative, the_checkpoint) *)
+      val history : (int * int * bool * (unit -> bool)) Array.array =
+         Array.array (historySize, blank)
+
+      (* cursor points to last entry *)
+      val cursor = ref 0
+
+      val persistentHistory : (int * int * (unit -> bool)) list ref = ref []
+
+
+      fun setLocation (a, b) =
+         let
+            val (_, _, tentative, _) = Array.sub (history, !cursor)
+         in
+            if tentative then
+               ()
+            else
+               cursor := (!cursor + 1) mod historySize;
+
+            Array.update (history, !cursor, (a, b, true, noop))
+         end
+
 
       fun checkpoint () =
-         (
-         startingDeadLine := !deadspaceLine;
-         startingLine := !currentLine;
-         Array.update (history, !cursor, (!deadspaceLine, !currentLine, !rewindHook ()));
-         cursor := (!cursor + 1) mod historySize
-         )
-
-      fun persistentCheckpoint f =
-         if !startingLine <> ~1 then
-            (
-            ancientHistory :=
-               (!startingDeadLine, !startingLine, f) :: !ancientHistory
-            )
-         else
-            ()
-
-      fun memoryHole () =
          let
-            fun loop i =
-               if i = historySize then
-                  ()
-               else
-                  (
-                  Array.update (history, i, blank);
-                  loop (i+1)
-                  )
+            val (a, b, tentative, _) = Array.sub (history, !cursor)
          in
-            loop 0
+            if tentative then
+               Array.update (history, !cursor, (a, b, false, !rewindHook ()))
+            else
+               ()
          end
-         
+
+
+      fun saveLast () =
+         let
+            val (a, b, _, ckpt) = Array.sub (history, !cursor)
+         in
+            if a = maxInt then
+               ()
+            else
+               persistentHistory := (a, b, ckpt) :: !persistentHistory
+         end
+               
+
+      fun eraseRingbuffer i =
+         if i >= historySize then
+            ()
+         else
+            (
+            Array.update (history, i, blank);
+            eraseRingbuffer (i+1)
+            )
+
+
+      fun tidyPersistentLoop n l =
+         (case l of
+             [] =>
+                persistentHistory := []
+
+           | (a, _, _) :: rest =>
+                if n <= a then
+                   tidyPersistentLoop n rest
+                else
+                   persistentHistory := l)
+            
+
       fun rewind n =
          let
-            val curr = !currentLine
-
-            (* don't go negative, even if the user adds lines top of the file *)
-            val target = Int.max (curr - n, 0)
-
-            fun ancientLoop l =
+            fun persistentLoop l =
                (case l of
                    [] =>
                       (
-                      ancientHistory := [];
-                      deadspaceLine := 0;
-                      currentLine := 0;
-                      startingDeadLine := ~1;
-                      startingLine := ~1;
-                      UI.cursorUp curr;
-                      !resetHook ()
+                      persistentHistory := [];
+                      !resetHook ();
+                      (1, 1)
                       )
 
-                 |  (deadline, line, f) :: rest =>
-                      if deadline <= target then
-                         let
-                            val actual = Int.min (target, line)
-                         in
-                            ancientHistory := rest;
-                            deadspaceLine := deadline;
-                            currentLine := actual;
-                            startingDeadLine := ~1;
-                            startingLine := ~1;
-                            UI.cursorUp (curr - actual);
-                            withHandler () f
-                         end
+                 | (a, b, ckpt) :: rest =>
+                      if a <= n then
+                         (
+                         ckpt ();  (* ignore bool result *)
+                         persistentHistory := rest;
+                         (a, b)
+                         )
                       else
-                         ancientLoop rest)
-
-            fun tidyAncientLoop actual l =
-               (case l of
-                   [] =>
-                      ancientHistory := []
-
-                 | (_, line, _) :: rest =>
-                      if actual <= line then
-                         tidyAncientLoop actual rest
-                      else
-                         ancientHistory := l)
+                         persistentLoop rest)
 
             fun loop i =
                let
-                  val (deadline, line, f) = Array.sub (history, i)
+                  val (a, b, _, ckpt) = Array.sub (history, i)
                in
-                  if deadline <= target then
-                     if withHandler false f then
-                        (* the rewind succeeded *)
-                        let
-                           val actual = Int.min (target, line)
-                        in
-                           Array.update (history, i, blank);
-                           cursor := i;
-                           tidyAncientLoop actual (!ancientHistory);
-                           deadspaceLine := deadline;
-                           currentLine := actual;
-                           startingDeadLine := ~1;
-                           startingLine := ~1;
-                           UI.cursorUp (curr - actual)
-                        end
+                  if a <= n then
+                     if ckpt () then
+                        (* The rewind succeeded. *)
+                        (
+                        Array.update (history, i, blank);
+                        cursor := (i - 1) mod historySize;
+                        tidyPersistentLoop a (!persistentHistory);
+                        (a, b)
+                        )
                      else
-                        (* Cannot be rewound.  Empty the ring buffer (nothing else in it
-                           will be any better), and look for a persistent checkpoint.
+                        (* The rewind failed.  Nothing else in the ring buffer
+                           will be any better, so erase it and resort to the
+                           persistent history.
                         *)
                         (
-                        memoryHole ();
-                        ancientLoop (!ancientHistory)
+                        eraseRingbuffer 0;
+                        persistentLoop (!persistentHistory)
                         )
-                  else if line = maxint then
-                     (
-                     ancientLoop (!ancientHistory)
-                     )
+                  else if a = maxInt then
+                     (* Exhausted the ring buffer. *)
+                     persistentLoop (!persistentHistory)
                   else
                      (
                      Array.update (history, i, blank);
@@ -189,20 +193,10 @@ functor MemoryFun (val withHandler : 'a -> (unit -> 'a) -> 'a)
                      )
                end
          in
-            loop ((!cursor - 1) mod historySize)
+            loop (!cursor)
          end
+   
 
-      fun excise () =
-         let
-            val i = (!cursor - 1) mod historySize 
-            val (deadline, line, _) = Array.sub (history, i)
-         in
-            deadspaceLine := deadline;
-            currentLine := line;
-            startingDeadLine := ~1;
-            startingLine := ~1;
-            cursor := i;
-            Array.update (history, i, blank)
-         end
+      fun rewindLast () = rewind maxInt
 
    end

@@ -1,51 +1,25 @@
 
-signature ROWCOL =
+signature SHOW_CONTEXT =
    sig
       
       type source
 
       val empty : source
       val filenameToSource : string -> source
-      val stringsToSource : string list -> source
 
-      val fromSpan : source -> Span.span -> (int * int) * (int * int)
-      val display : source -> (int * int) * (int * int) -> unit
+      (* position is where the stream begins *)
+      val streamToSource : int -> char Stream.stream -> source
+
+      val display : source -> Span.span -> unit
 
       val maxContext : int ref
 
    end
 
 
-structure RowCol :> ROWCOL =
+structure ShowContext :> SHOW_CONTEXT =
    struct
 
-      (* These NotFound errors shouldn't happen unless someone is modifying the file as we use it. *)
-
-      fun fromSpanMain src (left, right) =
-         let
-            fun scan n row col =
-               if n = 0 then
-                  (row, col)
-               else
-                  (case src () of
-                      NONE => raise Error.NotFound
-   
-                    | SOME ch =>
-                         if ch = #"\n" then
-                            scan (n-1) (row+1) 0
-                         else
-                            scan (n-1) row (col+1))
-
-            (* The row should not start from one, but it is, alas, standard. *)
-            val (row1, col1) = scan left 1 0
-
-            (* We shouldn't have right < left, but easiest just to handle it. *)
-            val (row2, col2) = scan (Int.max (right-left, 0)) row1 col1
-         in
-            ((row1, col1), (row2, col2))
-         end
-
-         
       fun repeat n f =
          if n <= 0 then
             ()
@@ -58,11 +32,15 @@ structure RowCol :> ROWCOL =
 
       val maxContext = ref 8
 
-      fun displayMain src ((row1, col1), (row2, col2)) =
+      (* row0 is where src begins *)
+      fun displayMain row0 src ((row1, col1), (row2, col2)) =
          if !maxContext = 0 then
             ()
          else
             let
+               val row1 = row1 - row0 + 1
+               val row2 = row2 - row0 + 1
+
                val max = !maxContext
             
                fun skipLine () =
@@ -100,16 +78,14 @@ structure RowCol :> ROWCOL =
 
                     | SOME ch => print (String.str ch))
             in
-               print "\n";
-            
                if row1 = row2 then
                   (
                   repeat (row1-1) skipLine;
                   print "| ";
                   copyLine ();
-                  repeat col1 (fn () => print " ");
                   print "  ";
-                  repeat (col2-col1) (fn () => print "^");
+                  repeat col1 (fn () => print " ");
+                  repeat (Int.max (1, col2-col1)) (fn () => print "^");
                   print "\n"
                   )
                else
@@ -142,73 +118,43 @@ structure RowCol :> ROWCOL =
             end handle Error.NotFound => print "\n"
 
 
-      (* character generator, cleanup *)
-      type source = unit -> ((unit -> char option) * (unit -> unit))
+      (* first row of the source, character generator, cleanup *)
+      type source = unit -> (int * (unit -> char option) * (unit -> unit))
 
-      val empty : source = fn () => ((fn () => NONE), (fn () => ()))
+      val empty : source = fn () => (1, (fn () => NONE), (fn () => ()))
 
       fun filenameToSource filename () =
          let
             val ins = TextIO.openIn filename
          in
-            ((fn () => 
+            (1,
+             (fn () => 
                  (TextIO.input1 ins
                   handle IO.Io _ => NONE)),
              (fn () => TextIO.closeIn ins))
          end
 
-      fun dropEmpty l =
-         (case l of
-             [] => []
+      fun streamLoop sr () =
+         (case Stream.front (!sr) of
+             Stream.Nil => NONE
 
-           | str :: rest =>
-                if str = "" then
-                   dropEmpty rest
-                else
-                   l)
+           | Stream.Cons (ch, s') =>
+                (
+                sr := s';
+                SOME ch
+                ))
 
-      fun stringsToFun strs =
-         let
-            val first = ref ""
-            val rest = ref strs
-            val i = ref 0
-         in
-            fn () =>
-               (let
-                   val ch = String.sub (!first, !i)
-                in
-                   i := !i + 1;
-                   SOME ch
-                end
-                handle Subscript =>
-                   (case dropEmpty (!rest) of
-                       [] => NONE
+      fun streamToSource row s () =
+         (row, streamLoop (ref s), (fn () => ()))
 
-                     | h' :: t' =>
-                          (
-                          first := h';
-                          rest := t';
-                          i := 1;
-                          SOME (String.sub (h', 0))
-                          )))
-         end
-
-      fun stringsToSource strs () =
-         (stringsToFun strs, (fn () => ()))
-
-      fun usingSource source f =
-         let
-            val (src, cleanup) = source ()
-         in
-            Finally.finally
-               (fn () => f src)
-               cleanup
-         end
-
-      fun fromSpan source span =
-         usingSource source (fn src => fromSpanMain src span)
 
       fun display source span =
-         usingSource source (fn src => displayMain src span)
+         let
+            val (start, src, cleanup) = source ()
+         in
+            Finally.finally
+               (fn () => displayMain start src span)
+               cleanup
+         end
 
    end

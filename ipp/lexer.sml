@@ -3,18 +3,13 @@ signature LEXER =
    sig
 
       (* puts EOF marker at the end of stream, lexes ;/. as SEMICOLON/PERIOD *)
-      val lex : char Stream.stream -> Token.token Stream.stream
+      val lexFull : char Stream.stream -> Token.token Stream.stream
 
       (* puts EOF marker at the end of stream, lexes ;/. as SEMICOLON_SEP/PERIOD_SEP *)
       val lexUse : char Stream.stream -> Token.token Stream.stream
 
-      exception Block
-      exception BlockModal
-      (* puts (raise Block) at the end of the stream,
-         except puts (raise BlockModal) at the end of the stream in a mode other than main
-         lexes ;/. as SEMICOLON_SEP/PERIOD_SEP
-      *)
-      val lexRepl : char Stream.stream -> Token.token Stream.stream
+      (* as lexUse, but takes the initial position as an argument *)
+      val lexRepl : char Stream.stream -> Span.pos -> Token.token Stream.stream
 
       val lexIpc : char Stream.stream -> Token.token Stream.stream
       val lexProject : char Stream.stream -> (string * Span.span) list
@@ -56,6 +51,17 @@ structure Lexer :> LEXER =
                 hexStringToInt rest (acc * 16 + IntInf.fromInt (hexdigit ch)))
             
 
+      fun advance pos l =
+         (case l of
+             nil => pos
+
+           | #"\n" :: rest =>
+                advance (addnl pos) rest
+
+           | _ :: rest =>
+                advance (add pos 1) rest)
+
+
       fun mktok str f =
          let val sym = Symbol.fromValue str
          in
@@ -77,7 +83,7 @@ structure Lexer :> LEXER =
       exception Block
       exception BlockModal
 
-      datatype lex_mode = FULL | USE | REPL
+      datatype lex_mode = FULL | USE
       val theLexMode = ref FULL
 
       val imlKeywordList =
@@ -234,7 +240,7 @@ structure Lexer :> LEXER =
                       so curr can never be nil at this point.
                    *)
                    val acc =
-                      DOT (pos, pos+1)
+                      DOT (pos, add pos 1)
                       :: identify table (implode (rev curr)) (currstart, pos) 
                       :: acc
                 in
@@ -247,19 +253,19 @@ structure Lexer :> LEXER =
 
                      | ch :: rest' =>
                           if Char.isAlpha ch then
-                             longIdentify table acc [ch] (pos+1) (pos+2) rest'
+                             longIdentify table acc [ch] (add pos 1) (add pos 2) rest'
                           else
                              (* The lexer ensures that the remaining characters are all symbols. *)
                              let
                                 val str = implode rest
                              in
-                                rev (identify table str (pos+1, pos+1 + size str)
+                                rev (identify table str (add pos 1, add pos (1 + size str))
                                      :: acc)
                              end)
                 end
 
            | ch :: rest =>
-                longIdentify table acc (ch :: curr) currstart (pos+1) rest)
+                longIdentify table acc (ch :: curr) currstart (add pos 1) rest)
                           
 
       open Stream
@@ -296,40 +302,42 @@ structure Lexer :> LEXER =
 
             (* General *)
             
-            fun action f ({ match, len, follow, self, ...}:info) (k as LEX cont) pos =
-               Cons (f (match, len, pos), lazy (fn () => cont follow k (pos+len)))
+            fun action f ({ match, len, follow, ...}:info) (k as LEX cont) pos =
+               Cons (f (match, len, pos), lazy (fn () => cont follow k (add pos len)))
 
-            fun simple tokfn ({ match, len, follow, self, ...}:info) (k as LEX cont) pos =
-               Cons (tokfn (pos, pos+len), lazy (fn () => cont follow k (pos+len)))
+            fun simple tokfn ({ match, len, follow, ...}:info) (k as LEX cont) pos =
+               Cons (tokfn (pos, add pos len), lazy (fn () => cont follow k (add pos len)))
 
-            fun skip ({ len, follow, self, ...}:info) (k as LEX cont) pos =
-               cont follow k (pos+len)
+            fun skip ({ match, follow, ...}:info) (k as LEX cont) pos =
+               cont follow k (advance pos match)
 
             fun switch tokfn (f : self -> char stream -> t) ({ len, follow, self, ...}:info) (LEX _)  pos =
                let val cont = f self
                in
-                  Cons (tokfn (pos, pos+len), lazy (fn () => cont follow (LEX cont) (pos+len)))
+                  Cons (tokfn (pos, add pos len), lazy (fn () => cont follow (LEX cont) (add pos len)))
                end
 
             fun ident table =
                action
-               (fn (match, len, pos) => identify table (implode match) (pos, pos+len))
+               (fn (match, len, pos) => identify table (implode match) (pos, add pos len))
 
             fun longid table ({ match, len, follow, self, ...}:info) (k as LEX cont) pos =
                Stream.front
                (Stream.@ (Stream.fromList (longIdentify table [] [] pos pos match),
-                          lazy (fn () => cont follow k (pos+len))))
+                          lazy (fn () => cont follow k (add pos len))))
+
+               
 
             val tyvar =
                action
                (fn (match, len, pos) =>
-                   TYVAR (Symbol.fromValue (implode match), (pos, pos+len)))
+                   TYVAR (Symbol.fromValue (implode match), (pos, add pos len)))
 
             val number =
                action
                (fn (match, len, pos) =>
                    (case Int.fromString (implode match) of
-                       SOME n => NUMBER (n, (pos, pos+len))
+                       SOME n => NUMBER (n, (pos, add pos len))
 
                      | NONE =>
                           raise (SyntaxError ("illegal number", pos))))
@@ -339,7 +347,7 @@ structure Lexer :> LEXER =
                (fn (match, len, pos) =>
                    (* the basis is happy to ignore the trailing 'I' *)
                    (case IntInf.fromString (implode match) of
-                       SOME n => BIGNUM (n, (pos, pos+len))
+                       SOME n => BIGNUM (n, (pos, add pos len))
 
                      | NONE =>
                           raise (SyntaxError ("illegal number", pos))))
@@ -351,14 +359,14 @@ structure Lexer :> LEXER =
                    let
                       val n = hexStringToInt (List.drop (match, 2)) 0
                    in
-                      BIGNUM (n, (pos, pos+len))
+                      BIGNUM (n, (pos, add pos len))
                    end)
 
             val nnumber =
                action
                (fn (match, len, pos) =>
                    (case Int.fromString (implode (List.tl match)) of
-                       SOME n => NUMBER (~n, (pos, pos+len))
+                       SOME n => NUMBER (~n, (pos, add pos len))
 
                      | NONE =>
                           raise (SyntaxError ("illegal number", pos))))
@@ -369,14 +377,14 @@ structure Lexer :> LEXER =
                    let
                       val n = IntInf.toInt (hexStringToInt (List.drop (match, 2)) 0)
                    in
-                      NUMBER (n, (pos, pos+len))
+                      NUMBER (n, (pos, add pos len))
                    end)
 
             val wordlit =
                action
                (fn (match, len, pos) =>
                    (case IntInf.fromString (implode (List.drop (match, 2))) of
-                       SOME n => WORD (n, (pos, pos+len))
+                       SOME n => WORD (n, (pos, add pos len))
 
                      | NONE =>
                           raise (SyntaxError ("illegal number", pos))))
@@ -387,28 +395,28 @@ structure Lexer :> LEXER =
                    let
                       val n = hexStringToInt (List.drop (match, 3)) 0
                    in
-                      WORD (n, (pos, pos+len))
+                      WORD (n, (pos, add pos len))
                    end)
 
             val number_lbrace =
                action
                (fn (match, len, pos) =>
                    (case Int.fromString (implode (List.take (match, len-2))) of
-                       SOME n => NUMBER_LBRACE (n, (pos, pos+len))
+                       SOME n => NUMBER_LBRACE (n, (pos, add pos len))
 
                      | NONE =>
                           raise (SyntaxError ("illegal number", pos))))
 
             fun enter_comment ({ len, follow, self, ... }:info) (k as LEX cont) pos =
                let
-                  val (follow', pos') = #comment self follow (pos + len) pos
+                  val (follow', pos') = #comment self follow (add pos len) pos
                in
                   cont follow' k pos'
                end
 
             fun enter_string ({ len, follow, self, ...}:info) (k as LEX cont) pos =
                let
-                  val (chars, follow', pos') = #string self follow (pos + len) pos []
+                  val (chars, follow', pos') = #string self follow (add pos len) pos []
                in
                   Cons (STRING (String.implode (rev chars), (pos, pos')),
                         lazy (fn () => cont follow' k pos'))
@@ -416,7 +424,7 @@ structure Lexer :> LEXER =
 
             fun enter_char ({ len, follow, self, ...}:info) (k as LEX cont) pos =
                let
-                  val (chars, follow', pos') = #string self follow (pos + len) pos []
+                  val (chars, follow', pos') = #string self follow (add pos len) pos []
                in
                   (case chars of
                       [ch] =>
@@ -441,18 +449,12 @@ structure Lexer :> LEXER =
                (fn (_, len, pos) => 
                    (case !theLexMode of
                        FULL =>
-                          SEMICOLON (pos, pos+len)
+                          SEMICOLON (pos, add pos len)
 
                      | _ =>
-                          SEMICOLON_SEP (pos, pos+len)))
+                          SEMICOLON_SEP (pos, add pos len)))
 
-            fun eof _ _ pos =
-               (case !theLexMode of
-                   REPL =>
-                      raise Block
-                      
-                 | _ =>
-                      Cons (EOF (pos, pos), eager Nil))
+            fun eof _ _ pos = Cons (EOF (pos, pos), eager Nil)
 
             fun error _ _ pos = raise (SyntaxError ("illegal lexeme", pos))
 
@@ -485,21 +487,16 @@ structure Lexer :> LEXER =
                action
                (fn (match, len, pos) =>
                    LEXEME (Symbol.fromValue (String.substring (implode match, 1, len-2)),
-                           (pos, pos+len)))
+                           (pos, add pos len)))
 
             val grammar_ident_string =
                action
                (fn (match, len, pos) =>
                    TIDENT (Symbol.fromValue (String.substring (implode match, 1, len-2)),
-                           (pos, pos+len)))
+                           (pos, add pos len)))
 
             fun unclosed_grammar _ _ pos = 
-               (case !theLexMode of
-                   REPL =>
-                      raise BlockModal
-
-                 | _ =>
-                      raise (SyntaxError ("unclosed grammardef", pos)))
+               raise (SyntaxError ("unclosed grammardef", pos))
 
 
             (* Term mode *)
@@ -510,7 +507,7 @@ structure Lexer :> LEXER =
                    let
                       val sym = Symbol.fromValue (implode match)
                    in
-                      TIDENT (sym, (pos, pos+len))
+                      TIDENT (sym, (pos, add pos len))
                    end)
 
             val term_longid =
@@ -520,7 +517,7 @@ structure Lexer :> LEXER =
                       String.tokens here.
                    *)
                    LONGTIDENT (List.map Symbol.fromValue (String.tokens (fn ch => ch = #".") (implode match)),
-                               (pos, pos+len)))
+                               (pos, add pos len)))
 
             val term_number =
                action
@@ -529,7 +526,7 @@ structure Lexer :> LEXER =
                       val str = implode match
                    in
                       (case Int.fromString (implode match) of
-                          SOME n => TNUMBER (n, Symbol.fromValue str, (pos, pos+len))
+                          SOME n => TNUMBER (n, Symbol.fromValue str, (pos, add pos len))
    
                         | NONE =>
                              raise (SyntaxError ("illegal number", pos)))
@@ -541,19 +538,14 @@ structure Lexer :> LEXER =
                    let
                       val sym = Symbol.fromValue (implode match)
                    in
-                      LEXEME (sym, (pos, pos+len))
+                      LEXEME (sym, (pos, add pos len))
                    end)
 
             val exit_term = switch EXIT_TERM #main
             val enter_main = switch ENTER_MAIN #main
 
             fun unclosed_term _ _ pos =
-               (case !theLexMode of
-                   REPL =>
-                      raise BlockModal
-
-                 | _ =>
-                      raise (SyntaxError ("unclosed term", pos)))
+               raise (SyntaxError ("unclosed term", pos))
 
 
             (* ipc mode *)
@@ -566,26 +558,21 @@ structure Lexer :> LEXER =
 
             (* Comment mode *)
 
-            fun comment_skip ({ len, follow, self, ...}:info) pos start =
-               #comment self follow (pos + len) start
+            fun comment_skip ({ match, follow, self, ...}:info) pos start =
+               #comment self follow (advance pos match) start
 
             fun reenter_comment ({ len, follow, self, ... }:info) pos start =
                let
-                  val (follow', pos') = #comment self follow (pos + len) start
+                  val (follow', pos') = #comment self follow (add pos len) start
                in
                   #comment self follow' pos' start
                end
 
             fun exit_comment ({ len, follow, ... }:info) pos _ =
-               (follow, pos+len)
+               (follow, add pos len)
 
             fun unclosed_comment _ pos start =
-               (case !theLexMode of
-                   REPL =>
-                      raise BlockModal
-
-                 | _ =>
-                      raise (SyntaxError ("unclosed comment", start)))
+               raise (SyntaxError ("unclosed comment", start))
 
             (* Not sure this can even happen. *)
             fun comment_error _ pos _ = raise (SyntaxError ("illegal character", pos))
@@ -594,7 +581,7 @@ structure Lexer :> LEXER =
             (* String mode *)
 
             fun string_action f ({ match, len, follow, self, ...}:info) pos start acc =
-               #string self follow (pos+len) start (f (match, acc))
+               #string self follow (add pos len) start (f (match, acc))
                
             val string_elem =
                string_action
@@ -625,48 +612,34 @@ structure Lexer :> LEXER =
                       :: acc
                  | _ => raise (Fail "impossible by lexer design"))
 
-            fun string_skip ({ len, follow, self, ... }:info) pos start acc =
-               #string self follow (pos+len) start acc
+            fun string_skip ({ match, follow, self, ... }:info) pos start acc =
+               #string self follow (advance pos match) start acc
 
             fun exit_string ({ len, follow, ... }:info) pos _ acc =
-               (acc, follow, pos+len)
+               (acc, follow, add pos len)
 
             fun unclosed_string _ pos start _ =
-               (case !theLexMode of
-                   REPL =>
-                      raise BlockModal
-
-                 | _ =>
-                      raise (SyntaxError ("unclosed string", start)))
+               raise (SyntaxError ("unclosed string", start))
 
             fun string_error _ pos _ _ = raise (SyntaxError ("illegal character", pos))
 
             fun incomplete_string_skip (info as { follow, ...}:info) pos start acc =
-               (case !theLexMode of
-                   REPL =>
-                      (case Stream.front follow of
-                          Stream.Nil =>
-                             raise BlockModal
-    
-                        | _ => string_error info pos start acc)
-
-                 | _ =>
-                      string_error info pos start acc)
+               string_error info pos start acc
 
 
 
             (* project *)
 
-            fun project_skip ({ len, follow, self, ...}:info) pos acc =
-               #project self follow (pos+len) acc
+            fun project_skip ({ match, follow, self, ...}:info) pos acc =
+               #project self follow (advance pos match) acc
 
             fun project_filename ({ len, follow, self, match, ...}:info) pos acc =
-               #project self follow (pos+len) 
-                  ((String.implode match, (pos, pos+len)) :: acc)
+               #project self follow (add pos len) 
+                  ((String.implode match, (pos, add pos len)) :: acc)
 
             fun project_comment ({ len, follow, self, ...}:info) pos acc =
                let
-                  val (follow', pos') = #comment self follow (pos+len) pos
+                  val (follow', pos') = #comment self follow (add pos len) pos
                in
                   #project self follow' pos' acc
                end
@@ -683,36 +656,36 @@ structure Lexer :> LEXER =
          (structure Streamable = StreamStreamable
           structure Arg = Arg)
 
-      fun doLex f s = lazy (fn () => f s (Arg.LEX f) 0)
+      fun doLex f s pos = lazy (fn () => f s (Arg.LEX f) pos)
 
-      fun lex s = 
+      fun lexFull s = 
          (
          Arg.exitGrammarTo := #main;
          theLexMode := FULL;
-         doLex LexMain.main s
+         doLex LexMain.main s origin
          )
 
       fun lexUse s = 
          (
          Arg.exitGrammarTo := #main;
          theLexMode := USE;
-         doLex LexMain.main s
+         doLex LexMain.main s origin
          )
 
-      fun lexRepl s = 
+      fun lexRepl s pos = 
          (
          Arg.exitGrammarTo := #main;
-         theLexMode := REPL;
-         doLex LexMain.main s
+         theLexMode := USE;
+         doLex LexMain.main s pos
          )
 
       fun lexIpc s =
          (
          Arg.exitGrammarTo := #ipc;
-         doLex LexMain.ipc s
+         doLex LexMain.ipc s origin
          )
 
       fun lexProject s =
-         LexMain.project s 0 []
+         LexMain.project s origin []
 
    end

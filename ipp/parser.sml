@@ -6,7 +6,6 @@ signature PARSER =
 
       val parseFull : char Stream.stream -> Syntax.program
       val parseIpc : char Stream.stream -> PreContext.precontext
-
       val parseIncremental : Token.token Stream.stream -> Syntax.program * Token.token Stream.stream
 
    end
@@ -19,8 +18,6 @@ structure Parser :> PARSER =
       open Span
 
       structure S = Stream
-
-      type pos = int
 
       fun fst (x, _) = x
       fun snd (_, x) = x
@@ -458,17 +455,10 @@ structure Parser :> PARSER =
             fun exp_directives (e as (_, sp), ds) = (Vexp e, sp) :: ds
             val id_directives = identity
 
-(* XX delete
-            fun exp_command e = (Vexp e, snd e)
-            fun apply_command e = Hardcode.apply e
-            fun enter_command span = Hardcode.enter span
-            fun leave_command span = Hardcode.leave span
-*)
-
             fun directives_program dirs =
                (case dirs of
                    [] =>
-                      ([], (0, 0))
+                      ([], (origin, origin))
    
                  | first :: _ =>
                       (dirs, join (snd first) (snd (List.last dirs))))
@@ -611,9 +601,9 @@ structure Parser :> PARSER =
                  | LEXEME (_, span) => span
                  | LONGTIDENT (_, span) => span
                  | EOF span => span
-                 | FULL => (0,0)
-                 | INCREMENTAL => (0,0)
-                 | IPC => (0,0))
+                 | FULL => (origin, origin)
+                 | INCREMENTAL => (origin, origin)
+                 | IPC => (origin, origin))
 
             fun error s =
                let
@@ -641,7 +631,7 @@ structure Parser :> PARSER =
       *)
 
       fun parseFull s =
-         (case ParseMain.parse (S.eager (S.Cons (Token.FULL, Lexer.lex s))) of
+         (case ParseMain.parse (S.eager (S.Cons (Token.FULL, Lexer.lexFull s))) of
              (Arg.PROGRAM p, s') =>
                 (case S.front s' of
                     S.Cons (Token.EOF _, _) => p
@@ -664,22 +654,24 @@ structure Parser :> PARSER =
            | _ =>
                 (* The normal case. *)
                 (case ParseMain.parse (S.eager (S.Cons (Token.INCREMENTAL, s))) of
-                    (Arg.PROGRAM p, s') =>
+                    (Arg.PROGRAM (p, sp), s') =>
                        (case S.front s' of
-                           S.Cons (Token.SEMICOLON_SEP _, s'') => (p, s'')
+                           S.Cons (Token.SEMICOLON_SEP sp', s'') => 
+                              ((p, join sp sp'), s'')
        
-                         | S.Cons (Token.PERIOD_SEP _, s'') =>
+                         | S.Cons (Token.PERIOD_SEP sp', s'') =>
                               (* An interaction ending with a period must be a single expression.
                                  Anything else is a syntax error.
                               *)
                               (case p of
-                                  ([(Vexp e, span)], _) =>
-                                     (([Hardcode.apply e], span), s'')
+                                  [(Vexp e, sp)] =>
+                                     (([Hardcode.apply e], join sp sp'), s'')
        
                                 | _ =>
                                      Arg.error s')
        
-                         | S.Cons (Token.EOF _, s'') => (p, s'')
+                         | S.Cons (Token.EOF _, s'') => 
+                              ((p, sp), s'')
 
                          | _ => 
                               Arg.error s')

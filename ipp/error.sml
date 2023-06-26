@@ -4,7 +4,6 @@ signature ERROR =
 
       datatype place = POS of Span.pos | SPAN of Span.span | UNKNOWN
 
-      val advancePlace : place -> int -> place
       val placeToString : string -> place -> string
       val isUnknown : place -> bool
       
@@ -25,19 +24,14 @@ structure Error :> ERROR =
 
       datatype place = POS of Span.pos | SPAN of Span.span | UNKNOWN
 
-      fun advancePlace place n =
-         (case place of
-             POS m => POS (m + n)
-
-           | SPAN (l, r) => SPAN (l + n, r + n)
-
-           | UNKNOWN => UNKNOWN)
+      fun posToString (row, col) =
+         String.concat [Int.toString row, ".", Int.toString col]
 
       fun placeToString prefix place =
          (case place of
-             POS pos => prefix ^ Int.toString pos
+             POS pos => prefix ^ posToString pos
 
-           | SPAN (l, r) => String.concat [prefix, Int.toString l, "-", Int.toString r]
+           | SPAN (l, r) => String.concat [prefix, posToString l, "-", posToString r]
 
            | UNKNOWN => "")
 

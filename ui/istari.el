@@ -42,7 +42,6 @@
 (define-key istari-mode-map [f9] 'istari-step)
 (define-key istari-mode-map [f10] 'istari-run)
 
-(define-key istari-mode-map "\C-cpa" 'istari-adjust)
 (define-key istari-mode-map "\C-cpt" 'istari-terminate)
 (define-key istari-mode-map "\C-cpl" 'istari-toggle-load-libraries)
 
@@ -99,11 +98,12 @@
           (setq ist-output-window (get-buffer-window ist-output-buffer t))))
     (set-window-point ist-output-window (point-max))))
 
-(defvar ist-overlay)
-(defvar ist-cursor)
+(defvar ist-overlay) ; used to designate the read-only region
+(defvar ist-cursor)  ; working region visible to the user
 (defvar ist-read-only-curr)
 
 ;; borrowed this code from ProofGeneral
+;; it still allows modification by undo; I don't know how to prevent that
 (defun ist-read-only-hook (overlay after start end &optional len)
   (unless (or inhibit-read-only (= (overlay-start overlay) (overlay-end overlay)))
     (error "Read-only region")))
@@ -119,16 +119,27 @@
   (overlay-put ist-overlay 'modification-hooks nil)
   (overlay-put ist-overlay 'insert-in-front-hooks nil))
 
-(defun ist-get-cursor ()
-  (overlay-start ist-cursor))
-
-(defun ist-set-cursor (pos)
+(defun ist-set-cursor-start (pos)
   (if (= (overlay-start ist-cursor) (overlay-end ist-cursor))
-      (move-overlay ist-cursor pos pos)
-    (move-overlay ist-cursor pos (overlay-end ist-cursor)))
+      (progn
+        (move-overlay ist-cursor pos pos)
+        (move-overlay ist-overlay (point-min) pos))
+    (move-overlay ist-cursor pos (overlay-end ist-cursor))))
+
+(defun ist-set-cursor-end (pos)
+  (move-overlay ist-cursor (overlay-start ist-cursor) pos)
   (move-overlay ist-overlay (point-min) pos))
 
+(defun ist-minimize-cursor ()
+  (let
+      ((pos (overlay-start ist-cursor)))
+    (move-overlay ist-cursor pos pos)
+    (move-overlay ist-overlay (point-min) pos)))
+
+(defvar ist-working nil)
+
 (defun ist-cursor-working ()
+  (setq ist-working t)
   (if (display-graphic-p)
       (overlay-put ist-cursor
                    'before-string
@@ -138,6 +149,7 @@
                  'before-string "[working]\n")))
     
 (defun ist-cursor-ready ()
+  (setq ist-working nil)
   (if (display-graphic-p)
       (overlay-put ist-cursor
                    'before-string
@@ -147,6 +159,7 @@
                  'before-string "[ready]\n")))
 
 (defun ist-cursor-partial ()
+  (setq ist-working nil)
   (if (display-graphic-p)
       (overlay-put ist-cursor
                    'before-string
@@ -155,80 +168,64 @@
     (overlay-put ist-cursor
                  'before-string "[partial]\n")))
     
-(defvar ist-partial)
-
-(defun ist-cursor-ready-or-partial ()
-  (if ist-partial
-      (ist-cursor-partial)
-    (ist-cursor-ready)))
-
-
-(defvar ist-rewind-detected)
-
-(defun ist-move-marker (n)
-  (save-excursion
-    (goto-char (ist-get-cursor))
-    (forward-line n)
-    (ist-set-cursor (point))))
-
-(defvar ist-sending nil)
+(defun ist-line-number-to-pos (line)
+  (with-current-buffer ist-source-buffer
+    (save-excursion
+      (goto-char (point-min))
+      (forward-line (- line 1))
+      (point))))
 
 (defun ist-escape (str)
   (let ((code (elt str 0)))
     (cond
-     ((eq code ?r)
-      (if ist-sending
-          (setq ist-partial nil)
-        (ist-cursor-ready))
-      (ist-signal))
-     ((eq code ?p)
-      (if ist-sending
-          (setq ist-partial t)
-        (ist-cursor-partial))
-      (ist-signal))
      ((eq code ?c)
-      (ist-move-marker (- (string-to-number (substring str 1))))
-      (setq ist-rewind-detected t))
+      (ist-set-cursor-start (ist-line-number-to-pos (string-to-number (substring str 1)))))
+     ((eq code ?r)
+      (ist-cursor-ready))
+     ((eq code ?p)
+      (ist-cursor-partial))
+     ((eq code ?w)
+      (ist-cursor-working))
+     ((eq code ?f)
+      (ist-minimize-cursor)
+      (ist-send-string "\^F\n"))
      ((eq code ?m)
       (message "%s" (substring str 1)))
      ((eq code ?b)
       (ding)))))
 
-(defun ist-signal ()
-  (if ist-sending
-      (ist-send-loop)))
-
 (defvar ist-output-buffer)
 (defvar ist-output-window)
 (defvar ist-output-frame nil)
-(defvar ist-output-mode 'ist-output-normal)
-(defvar ist-rewind-detected nil)
-(defvar ist-retained-output "")
 
-(defun ist-output-escape (str)
-  (let* ((str (concat ist-retained-output str))
-         (pos (seq-position str 2)))
-    (if pos
-        (progn
-          (setq ist-retained-output "")
-          (setq ist-output-mode 'ist-output-normal)
-          (ist-escape (substring str 0 pos))
-          (ist-output-normal (substring str (+ pos 1))))
-      (setq ist-retained-output str))))
-
-(defun ist-output-normal (str)
-  (let ((pos (seq-position str 1)))
-    (cond
-     (pos (progn
-            (ist-buf-print (substring str 0 pos))
-            (setq ist-retained-output "")
-            (setq ist-output-mode 'ist-output-escape)
-            (ist-output-escape (substring str (+ pos 1)))))
-     (t (ist-buf-print str)))))
+(defvar ist-output-mode-normal t)
+(defvar ist-retained-output nil)
 
 ;; filter function for handling istari output
 (defun ist-ml-output (proc str)
-  (funcall ist-output-mode str))
+  (if ist-retained-output
+      (progn
+        (setq str (concat ist-retained-output str))
+        (ist-retained-output nil)))
+  (while (not (string= str ""))
+    (if ist-output-mode-normal
+        (let ((pos (seq-position str 1)))
+          (if pos
+              (progn
+                (ist-buf-print (substring str 0 pos))
+                (setq ist-output-mode-normal nil)
+                (setq str (substring str (+ pos 1))))
+            (ist-buf-print str)
+            (setq str "")))
+      (let
+          ((pos (seq-position str 2)))
+        (if pos
+            (progn
+              (ist-escape (substring str 0 pos))
+              (setq ist-output-mode-normal t)
+              (setq str (substring str (+ pos 1))))
+          (setq ist-retained-output str)
+          (setq str ""))))))
 
 (defvar ist-source-buffer)
 (defvar ist-ml-proc)
@@ -270,11 +267,16 @@
     (setq ist-sending nil)
     (setq ist-output-buffer (get-buffer-create "*istari*"))
     (setq ist-output-window nil)
+    (setq ist-output-mode-normal t)
+    (setq ist-retained-output nil)
     (ist-frame)
     (setq ist-ml-proc 
-          (start-process "ist-ml" "*subordinate istari process*" "sml" 
-                         (concat "@SMLload=" 
-                                 (if istari-load-libraries istari-binary istari-nolib-binary))))
+          (let 
+              ; connect using a pipe (Emacs has a bug with large sends using ptys)
+              ((process-connection-type nil)) 
+            (start-process "ist-ml" "*subordinate istari process*" "sml" 
+                           (concat "@SMLload=" 
+                                   (if istari-load-libraries istari-binary istari-nolib-binary)))))
     (set-process-filter (get-process "ist-ml") 'ist-ml-output)
     ;; make sure the input is flushed
     (accept-process-output ist-ml-proc)))
@@ -316,40 +318,29 @@
   (interactive "MCode: ")
   (unless ist-running
     (istari-start))
-  (if ist-sending
+  (if ist-working
       (ist-not-yet)
     (ist-send-string (concat "\^B" str "\n"))))
 
-(defun ist-advance ()
-  (with-current-buffer ist-source-buffer
-    (let* ((start (ist-get-cursor))
-           (end (next-line-position start)))
-      (ist-set-cursor end)
-      (ist-send-string (buffer-substring start end)))))
-
-(defun ist-send-loop ()
-  (let
-      ((pos (ist-get-cursor)))
-    (if (or
-         ist-rewind-detected
-         (>= pos (overlay-end ist-cursor)))
-        (progn
-          (setq ist-sending nil)
-          (move-overlay ist-cursor pos pos)
-          (ist-cursor-ready-or-partial)
-          (ist-send-string "\^E\n"))
-      (ist-advance))))
-
 (defun ist-send (pos)
-  (let ((pos (line-start-position pos))
-        (cur (ist-get-cursor)))
-    (move-overlay ist-cursor cur (max pos cur))
-    (if ist-sending
-        nil
-      (setq ist-sending t)
-      (setq ist-rewind-detected nil)
-      (ist-cursor-working)
-      (ist-send-loop))))
+  (with-current-buffer ist-source-buffer
+    (let ((new (line-start-position pos))
+          (cur (overlay-end ist-cursor)))
+      (if (> new cur)
+          (progn
+            (ist-set-cursor-end new)
+            (process-send-region ist-ml-proc cur new)
+            (ist-send-string "\^E\n"))))))
+
+(defun ist-rewind (pos)
+  (with-current-buffer ist-source-buffer
+    (let
+        ((start (overlay-start ist-cursor))
+         (end (overlay-end ist-cursor))
+         (pos (line-start-position pos)))
+      (if (or (< start end) (> pos end))
+          (ding)
+        (ist-send-string (concat "\^A" (number-to-string (line-number-at-pos (line-start-position pos))) "\n"))))))
 
 (defun istari-next ()
   "Send next line to Istari."
@@ -357,22 +348,12 @@
   (unless ist-running
     (istari-start))
   (if (eq (current-buffer) ist-source-buffer)
-      (let* ((start (or (and ist-sending (overlay-end ist-cursor)) (ist-get-cursor)))
+      (let* ((start (overlay-end ist-cursor))
              (end (next-line-position start)))
         (if (= start end) ; end of buffer
             (ding)
           (ist-send end)))
     (error "Istari running in another buffer.")))
-
-(defun ist-rewind (pos)
-  (if ist-sending
-      (ist-not-yet)
-    (let*
-        ((pos (line-start-position pos))
-         (n (- (line-number-at-pos (ist-get-cursor))
-               (line-number-at-pos pos))))
-      (when (> n 0)
-        (ist-send-string (concat "\^A" (number-to-string n) "\n"))))))
 
 (defun istari-goto (pos)
   "Send code to Istari or rewind Istari state."
@@ -380,20 +361,9 @@
   (unless ist-running
     (istari-start))
   (if (eq (current-buffer) ist-source-buffer)
-      (if (>= pos (ist-get-cursor))
+      (if (>= pos (overlay-end ist-cursor))
           (ist-send pos)
         (ist-rewind pos))
-    (error "Istari running in another buffer.")))
-
-(defun istari-adjust (pos)
-  "Set the UI's position."
-  (interactive "d")
-  (unless ist-running
-    (error "Istari not running."))
-  (if (eq (current-buffer) ist-source-buffer)
-      (if ist-sending
-          (ist-not-yet)
-        (ist-set-cursor (line-start-position pos)))
     (error "Istari running in another buffer.")))
 
 (defun istari-prev ()
@@ -402,12 +372,10 @@
   (unless ist-running
     (error "Istari not running."))
   (if (eq (current-buffer) ist-source-buffer)
-      (if ist-sending
-          (ist-not-yet)
-        (ist-rewind (save-excursion
-                         (goto-char (ist-get-cursor))
-                         (forward-line -1)
-                         (point))))
+      (ist-rewind (save-excursion
+                    (goto-char (overlay-end ist-cursor))
+                    (forward-line -1)
+                    (point)))
     (error "Istari running in another buffer.")))
 
 (defun istari-goto-marker ()
@@ -417,7 +385,7 @@
     (error "Istari not running."))
   (if (not (eq (current-buffer) ist-source-buffer))
       (switch-to-buffer ist-source-buffer))
-  (goto-char (ist-get-cursor)))
+  (goto-char (overlay-start ist-cursor)))
 
 (defun istari-interrupt ()
   "Interrupt Istari process."
@@ -425,9 +393,6 @@
   (unless ist-running
     (error "Istari not running."))
   (interrupt-process ist-ml-proc)
-  (ist-cursor-ready)
-  (setq ist-sending nil)
-  (move-overlay ist-cursor (ist-get-cursor) (ist-get-cursor))
   (ist-send-string "RecoverRepl.recover ();\n"))
 
 (defun istari-restart ()
