@@ -5,18 +5,19 @@ signature INDUCTION =
       type tactic = Tactic.tactic
       type 'a tacticm = 'a Tactic.tacticm
       type priority = Tactic.priority
+      type hypothesis = Hyp.hypothesis
 
-      val inductPriority : Symbol.symbol -> priority tacticm
-      val inductRaw : Symbol.symbol -> tactic
-      val induct : Symbol.symbol -> tactic
+      val inductPriority : hypothesis -> priority tacticm
+      val inductRaw : hypothesis -> tactic
+      val induct : hypothesis -> tactic
 
-      val iteratePriority : Symbol.symbol -> priority tacticm
-      val iterateRaw : Symbol.symbol -> tactic
-      val iterate : Symbol.symbol -> tactic
+      val iteratePriority : hypothesis -> priority tacticm
+      val iterateRaw : hypothesis -> tactic
+      val iterate : hypothesis -> tactic
 
-      val inductMuUnivPriority : Symbol.symbol -> ETerm.eterm -> priority tacticm
-      val inductMuUnivRaw : Symbol.symbol -> ETerm.eterm -> tactic
-      val inductMuUniv : Symbol.symbol -> ETerm.eterm -> tactic
+      val inductMuUnivPriority : hypothesis -> ETerm.eterm -> priority tacticm
+      val inductMuUnivRaw : hypothesis -> ETerm.eterm -> tactic
+      val inductMuUniv : hypothesis -> ETerm.eterm -> tactic
 
    end
 
@@ -59,17 +60,19 @@ structure InductionInternal :> INDUCTION_INTERNAL =
       open Tactic
       open CasePervasive
 
+      type hypothesis = Hyp.hypothesis
+
 
       val inductionTactics : priority tacticm H.table = H.table ()
 
 
       fun inductPriority hyp =
          let
-            do i = HypTactic.findhyp hyp
+            do i = Hyp.findhyp hyp
          in
             (cut $
              setFailure "hypotheses depend on induction variable" $
-             HypTactic.exchange 0 i 1)
+             Hyp.exchange 0 i 1)
             >>
             let
                do (jud, _) = withgoal
@@ -116,7 +119,7 @@ structure InductionInternal :> INDUCTION_INTERNAL =
            | Sum.INR msg => fail msg)
          
 
-      (* Like HypTactic.revert0, except:
+      (* Like Hyp.revert0, except:
          - it doesn't try to create arrows,
          - it doesn't bother to create meaningful binders,
          - it doesn't try to cope with hidden hypotheases, and
@@ -154,7 +157,7 @@ structure InductionInternal :> INDUCTION_INTERNAL =
            | i :: rest =>
                 (cut $
                  setFailure "hypotheses depend on index argument" $
-                 HypTactic.exchange 0 i 1)
+                 Hyp.exchange 0 i 1)
                 >>
                 let
                    do vars' =
@@ -176,13 +179,15 @@ structure InductionInternal :> INDUCTION_INTERNAL =
                 end)
          
 
+      val conclHyp = Hyp.NAME (Symbol.fromValue "concl")
+
       fun iteratePriority hyp =
          let
-            do i = HypTactic.findhyp hyp
+            do i = Hyp.findhyp hyp
          in
             (cut $
              setFailure "hypotheses depend on iteration variable" $
-             HypTactic.exchange 0 i 1)
+             Hyp.exchange 0 i 1)
             >>
             goalContextCaseT
             /| $hyp 0 $tm $whnfHard const? @ ? =>
@@ -237,7 +242,7 @@ structure InductionInternal :> INDUCTION_INTERNAL =
                               (fn pri =>
                                   (case pri of
                                       Primary =>
-                                         Rewrite.reduce [(Symbol.fromValue "concl", SOME (false, [0]))]
+                                         Rewrite.reduce [(conclHyp, SOME (false, [0]))]
                                          >> idtacM Primary
 
                                     | _ => idtacM pri))
@@ -288,12 +293,12 @@ structure InductionInternal :> INDUCTION_INTERNAL =
 
       fun inductMuUnivPriority hyp em =
          let
-            do i = HypTactic.findhyp hyp
+            do i = Hyp.findhyp hyp
             do lv = withterm em
          in
             (cut $
              setFailure "hypotheses depend on induction variable" $
-             HypTactic.exchange 0 i 1)
+             Hyp.exchange 0 i 1)
             >>
             let
                do (jud, dir) = withgoal
@@ -355,7 +360,7 @@ structure InductionInternal :> INDUCTION_INTERNAL =
             \fnc v =>
                 (* move Acc's argument last (except for the Acc itself) *)
                 (cut $ setFailure "hypotheses depend on accessibility argument" $
-                 HypTactic.exchange 1 (v-1) 1)
+                 Hyp.exchange 1 (v-1) 1)
                 >>
                 let
                    do (jud, dir) = withgoal

@@ -1495,7 +1495,7 @@ functor OmegaFun () :> OMEGA =
                    refine (Rule.assert a (T.evar ()))
                    >>> [
                        (* G, G' |- A *)
-                       HypTactic.clearAll
+                       Hyp.clearAll
                        >>
                        (* |- A *)
                        intros []
@@ -1817,7 +1817,7 @@ functor OmegaFun () :> OMEGA =
                                 (* xequiv (M[^k] , M') : xequiv n solution |- ... *)
                                 chdir (D.bind dir name')
                                 >>+
-                                HypTactic.clear [name]
+                                Hyp.clear [Hyp.NAME name]
                                 ]
                          end
                    in
@@ -1862,7 +1862,7 @@ functor OmegaFun () :> OMEGA =
                       >>+
                       chdir (D.bind dir name)
                       >>+
-                      (if eph1 then HypTactic.clear [name1] else idtac)
+                      (if eph1 then Hyp.clear [Hyp.NAME name1] else idtac)
                       ]
                end
          in
@@ -1913,7 +1913,7 @@ functor OmegaFun () :> OMEGA =
                       >>+
                       chdir (D.bind dir name)
                       >>+
-                      HypTactic.clear ((if eph1 then [name1] else []) @ (if eph2 then [name2] else []))
+                      Hyp.clear ((if eph1 then [Hyp.NAME name1] else []) @ (if eph2 then [Hyp.NAME name2] else []))
                       ]
                end
          in
@@ -2156,7 +2156,7 @@ functor OmegaFun () :> OMEGA =
                       >>+
                       chdir (D.bind dir name)
                       >>+
-                      (if eph1 then HypTactic.clear [name1] else idtac)
+                      (if eph1 then Hyp.clear [Hyp.NAME name1] else idtac)
                       ]
                end
 
@@ -2221,7 +2221,7 @@ functor OmegaFun () :> OMEGA =
                       >>+
                       chdir (D.bind dir name)
                       >>+
-                      HypTactic.clear [name1]
+                      Hyp.clear [Hyp.NAME name1]
                       ]
                end
          in
@@ -2267,7 +2267,7 @@ functor OmegaFun () :> OMEGA =
                       >>+
                       chdir (D.bind dir name)
                       >>+
-                      HypTactic.clear [name1, name2]
+                      Hyp.clear [Hyp.NAME name1, Hyp.NAME name2]
                       ]
                end
          in
@@ -4497,20 +4497,22 @@ functor OmegaFun () :> OMEGA =
       fun implement n plan =
          (case plan of
              SplitPlan (h1o, h2o, h, cont) =>
-                De.destructRaw h (IP.And [(case h1o of NONE => IP.Wild | SOME h1 => IP.Ident (SOME h1)),
-                                          (case h2o of NONE => IP.Wild | SOME h2 => IP.Ident (SOME h2))])
+                De.destructRaw (Hyp.NAME h)
+                   (IP.And [(case h1o of NONE => IP.Wild | SOME h1 => IP.Ident (SOME h1)),
+                            (case h2o of NONE => IP.Wild | SOME h2 => IP.Ident (SOME h2))])
                 >>+
                 implement n cont
 
            | CasesPlan (h1, cont1, h2, cont2, h) =>
-                De.destructRaw h (IP.Or [IP.Ident (SOME h1), IP.Ident (SOME h2)])
+                De.destructRaw (Hyp.NAME h)
+                   (IP.Or [IP.Ident (SOME h1), IP.Ident (SOME h2)])
                 >>> [
                     implement n cont1 >> done,
                     implement n cont2 >> done
                     ]
 
            | AbortPlan h =>
-                De.destructRaw h (IP.Or [])
+                De.destructRaw (Hyp.NAME h) (IP.Or [])
                 >>
                 done
 
@@ -5000,12 +5002,12 @@ functor OmegaFun () :> OMEGA =
                 end
 
            | CopyPlan (h', h, cont) =>
-                HypTactic.copy h (SOME h')
+                Hyp.copy (Hyp.NAME h) (SOME h')
                 >>+
                 implement n cont
 
            | RenamePlan (h', h, cont) =>
-                HypTactic.rename h h'
+                Hyp.rename (Hyp.NAME h) h'
                 >>+
                 implement n cont
 

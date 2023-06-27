@@ -5,6 +5,7 @@ signature EQUALITY_TACTIC =
       type tactic = Tactic.tactic
       type 'a tacticm = 'a Tactic.tacticm
       type priority = Tactic.priority
+      type hypothesis = Hyp.hypothesis
 
       val reflexivityPriority : priority tacticm
       val reflexivityRaw : tactic
@@ -14,9 +15,9 @@ signature EQUALITY_TACTIC =
       val symmetryRaw : tactic
       val symmetry : tactic
 
-      val symmetryInPriority : Symbol.symbol -> priority tacticm
-      val symmetryInRaw : Symbol.symbol -> tactic
-      val symmetryIn : Symbol.symbol -> tactic
+      val symmetryInPriority : hypothesis -> priority tacticm
+      val symmetryInRaw : hypothesis -> tactic
+      val symmetryIn : hypothesis -> tactic
 
       val transitivityPriority : ETerm.eterm -> priority tacticm
       val transitivityRaw : ETerm.eterm -> tactic
@@ -40,24 +41,22 @@ signature EQUALITY_TACTIC =
       val substitutionLiteralPriority : int -> Term.term -> priority tacticm
       val substitutionLiteral : int -> Term.term -> tactic
 
-      val substitutionPriority : Symbol.symbol -> ETerm.eterm -> priority tacticm
-      val substitutionRaw : Symbol.symbol -> ETerm.eterm -> tactic
-      val substitution : Symbol.symbol -> ETerm.eterm -> tactic
+      val substitutionPriority : hypothesis -> ETerm.eterm -> priority tacticm
+      val substitutionRaw : hypothesis -> ETerm.eterm -> tactic
+      val substitution : hypothesis -> ETerm.eterm -> tactic
 
-      val substPriority : Symbol.symbol -> priority tacticm
-      val substStrictPriority : Symbol.symbol -> priority tacticm
-      val substRaw : Symbol.symbol -> tactic
-      val substStrictRaw : Symbol.symbol -> tactic
-      val subst : Symbol.symbol -> tactic
-      val substStrict : Symbol.symbol -> tactic
+      val substPriority : hypothesis -> priority tacticm
+      val substStrictPriority : hypothesis -> priority tacticm
+      val substRaw : hypothesis -> tactic
+      val substStrictRaw : hypothesis -> tactic
+      val subst : hypothesis -> tactic
+      val substStrict : hypothesis -> tactic
 
-      val injectionPriority : Symbol.symbol -> priority tacticm
-      val injectionRaw : Symbol.symbol -> tactic
-      val injection : Symbol.symbol -> tactic
+      val substAll : tactic
 
-      val injectionnPriority : int -> priority tacticm
-      val injectionnRaw : int -> tactic
-      val injectionn : int -> tactic
+      val injectionPriority : hypothesis -> priority tacticm
+      val injectionRaw : hypothesis -> tactic
+      val injection : hypothesis -> tactic
 
    end
 
@@ -132,6 +131,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       open CasePervasive
 
       type priority = priority
+      type hypothesis = Hyp.hypothesis
 
 
       val reflexivityTactics : priority tacticm H.table = H.table ()
@@ -232,7 +232,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       fun symmetryInPriority name =
          let
-            do i = HypTactic.findhyp name
+            do i = Hyp.findhyp name
          in
             symmetryInLiteral i
          end
@@ -1254,7 +1254,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                 
       fun substitutionPriority hyp em =
          let
-            do i = HypTactic.findhyp hyp
+            do i = Hyp.findhyp hyp
             do m = withterm em
          in
             substitutionLiteralPriority i m
@@ -1330,7 +1330,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       fun substFlexPriority strict hyp =
          let
-            do i = HypTactic.findhyp hyp
+            do i = Hyp.findhyp hyp
          in
             goalContextCaseT
             /| $hyp \i\ ($let _) =>
@@ -1350,7 +1350,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                          if strict then
                             substMain false i j m
                          else
-                            HypTactic.moveTermDeps m i
+                            Hyp.moveTermDeps m i
                             >>+
                             (* j cannot have moved, but i and m are probably different now *)
                             goalContextCaseT
@@ -1364,7 +1364,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                          if strict then
                             substMain true i j m
                          else
-                            HypTactic.moveTermDeps m i
+                            Hyp.moveTermDeps m i
                             >>+
                             (* j cannot have moved, but i and m are probably different now *)
                             goalContextCaseT
@@ -1392,12 +1392,19 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       fun substStrict hyp =
          TC.withTypecheckSnd $ substStrictPriority hyp
 
+      val substAll =
+         repeat $
+         goalContextCaseT
+         / $anyhyp ($tm (\Prim.eq\ _ var? _ | \Prim.eq\ _ _ var?) =>
+                    \(fnc x => fn _ => subst (Hyp.NUMBER x))\)
+         /
 
 
       val injectionTactics : (int -> priority tacticm) H.table = H.table ()
 
-      fun injectionnPriority i =
+      fun injectionPriority hyp =
          let
+            do i = Hyp.findhyp hyp
             do (jud, _) = withgoal
          in
             hypCaseT (J.hyp jud i)
@@ -1416,20 +1423,9 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             /
          end
 
-      fun injectionPriority hyp =
-         let
-            do i = HypTactic.findhyp hyp
-         in
-            injectionnPriority i
-         end
-
       fun injectionRaw hyp = injectionPriority hyp >> idtac
 
       fun injection hyp = TC.withTypecheckSnd $ injectionPriority hyp
-
-      fun injectionnRaw i = injectionnPriority i >> idtac
-
-      fun injectionn i = TC.withTypecheckSnd $ injectionnPriority i
 
 
 

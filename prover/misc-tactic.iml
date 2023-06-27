@@ -3,9 +3,8 @@ signature MISC_TACTIC =
    sig
       
       type tactic = Tactic.tactic
-      type symbol = Symbol.symbol
 
-      val change : symbol -> ETerm.eterm -> tactic
+      val change : Hyp.hypothesis -> ETerm.eterm -> tactic
 
       val exfalso : tactic
 
@@ -27,34 +26,39 @@ structure MiscTactic :> MISC_TACTIC =
 
       val conclSym = Symbol.fromValue "concl"
 
-      fun change sym ea =
-         if Symbol.eq (sym, conclSym) then
-            let
-               do (_, dir) = withgoal
-            in
-               replaceConcl (ETerm.withdir dir ea)
-            end
-         else
-            let
-               do i = HypTactic.findhyp sym
-               do (jud, dir) = withgoal
-               val dir' = D.shift dir (i+1)
-
-               val a = ETerm.withdir dir' ea
-
-               val h =
-                  (case J.hyp jud i of
-                      J.Tm _ => J.Tm a
-                    | J.Tml _ => J.Tml a
-                    | J.Tmh _ => J.Tmh a
-                    | J.Let _ => J.Let a
-
-                    | _ => 
-                         (* will certainly fail *)
-                         J.Tm a)
-            in
-               replaceHyp i h
-            end
+      fun change h ea =
+         let
+            do h' = Hyp.findhypOrConcl h
+         in
+            (case h' of
+                NONE =>
+                   let
+                      do (_, dir) = withgoal
+                   in
+                      replaceConcl (ETerm.withdir dir ea)
+                   end
+   
+              | SOME i =>
+                   let
+                      do (jud, dir) = withgoal
+                      val dir' = D.shift dir (i+1)
+       
+                      val a = ETerm.withdir dir' ea
+       
+                      val h =
+                         (case J.hyp jud i of
+                             J.Tm _ => J.Tm a
+                           | J.Tml _ => J.Tml a
+                           | J.Tmh _ => J.Tmh a
+                           | J.Let _ => J.Let a
+       
+                           | _ => 
+                                (* will certainly fail *)
+                                J.Tm a)
+                   in
+                      replaceHyp i h
+                   end)
+         end
 
 
       val exfalso =

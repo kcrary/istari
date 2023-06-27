@@ -1,15 +1,24 @@
 
-signature HYP_TACTIC =
+signature HYP =
    sig
 
       type tactic = Tactic.tactic
       type 'a tacticm = 'a Tactic.tacticm
+
       type symbol = Symbol.symbol
+      datatype hypothesis = NAME of symbol | NUMBER of int
 
-      val findhyp : Symbol.symbol -> (int -> 'a tacticm) -> 'a tacticm
-      val findhypOrConcl : Symbol.symbol -> (int option -> 'a tacticm) -> 'a tacticm
+      (* raises Tactic.Tryf on failure *)
+      val hypothesisToHyp : Tactic.goal -> hypothesis -> int
+      val hypothesisToHypOrConcl : Tactic.goal -> hypothesis -> int option
 
-      val hyp : symbol -> tactic
+      val findhyp : hypothesis -> (int -> 'a tacticm) -> 'a tacticm
+      val findhypOrConcl : hypothesis -> (int option -> 'a tacticm) -> 'a tacticm
+      val findhyps : hypothesis list -> (int list -> 'a tacticm) -> 'a tacticm
+      val findname : hypothesis -> (symbol -> 'a tacticm) -> 'a tacticm
+      val findnames : hypothesis list -> (symbol list -> 'a tacticm) -> 'a tacticm
+
+      val hyp : hypothesis -> tactic
       val hypof : tactic
 
       val hypofOf : Term.term -> tactic
@@ -17,29 +26,27 @@ signature HYP_TACTIC =
       val hypofIstp : Term.term -> tactic
       val hypofEqtp : Term.term -> tactic
 
-      val renamen : int -> symbol -> tactic
-      val rename : symbol -> symbol -> tactic
+      val rename : hypothesis -> symbol -> tactic
 
       val reintro : IntroPattern.ipattern list -> tactic
-      val renameBefore : IntroPattern.ipattern list -> symbol -> tactic
+      val renameBefore : IntroPattern.ipattern list -> hypothesis -> tactic
 
       val weaken : int -> int -> tactic
-      val clearn : int -> tactic
-      val clear : symbol list -> tactic
+      val clear : hypothesis list -> tactic
       val clearAll : tactic
-      val renameOver : symbol -> symbol -> tactic
+      val renameOver : hypothesis -> hypothesis -> tactic
 
       val exchange : int -> int -> int -> tactic
       val moven : int -> int -> tactic
-      val movePos : symbol list -> int -> tactic
-      val moveBefore : symbol list -> symbol -> tactic
-      val moveAfter : symbol list -> symbol -> tactic
-      val moveBeforeDeps : symbol list -> symbol -> tactic
+      val movePos : hypothesis list -> int -> tactic
+      val moveBefore : hypothesis list -> hypothesis -> tactic
+      val moveAfter : hypothesis list -> hypothesis -> tactic
+      val moveBeforeDeps : hypothesis list -> hypothesis -> tactic
 
-      val copy : symbol -> symbol option -> tactic
+      val copy : hypothesis -> symbol option -> tactic
 
       val revert0 : tactic
-      val revert : symbol list -> tactic
+      val revert : hypothesis list -> tactic
 
       val set : symbol -> ETerm.eterm -> tactic
 
@@ -48,7 +55,12 @@ signature HYP_TACTIC =
       val unhidePriority : Tactic.priority tacticm
       val unhideRaw : tactic
       val unhide : tactic
-      val squashHidden : symbol list -> tactic
+      val squashHidden : hypothesis list -> tactic
+
+      (* infer the type obtained by following the supplied typing with the indicated spine *)
+      val inferSpinePriority : hypothesis -> ETerm.eterm -> Symbol.symbol option -> Tactic.priority tacticm
+      val inferSpineRaw : hypothesis -> ETerm.eterm -> Symbol.symbol option -> tactic
+      val inferSpine : hypothesis -> ETerm.eterm -> Symbol.symbol option -> tactic
 
 
       (* move the term's dependencies before the indicated hypothesis *)
@@ -57,7 +69,7 @@ signature HYP_TACTIC =
    end
 
 
-structure HypTactic :> HYP_TACTIC =
+structure Hyp :> HYP =
    struct
 
       structure H = ConstantTable
@@ -72,30 +84,93 @@ structure HypTactic :> HYP_TACTIC =
       open CasePervasive
 
       type symbol = Symbol.symbol
+      datatype hypothesis = NAME of symbol | NUMBER of int
+
+      fun hypothesisToString hyp =
+         (case hyp of
+             NAME sym => Symbol.toValue sym
+
+           | NUMBER i => Int.toString i)
 
       val conclSym = Symbol.fromValue "concl"
 
-      fun findhyp name tac (goal as (_, dir)) fk sk =
-         if Symbol.eq (name, conclSym) then
-            fk "invalid hypothesis concl"
-         else
-            (case D.lookupOpt (D.idir dir) name of
-                SOME (D.Hvar i) =>
-                   tac i goal fk sk
-   
-              | _ =>
-                   fk ("no hypothesis " ^ Symbol.toValue name))
+      fun hypothesisToHyp (jud, dir) hyp =
+         (case hyp of
+             NAME name =>
+                if Symbol.eq (name, conclSym) then
+                   raise (Tryf "invalid hypothesis concl")
+                else
+                   (case D.lookupOpt (D.idir dir) name of
+                       SOME (D.Hvar i) => i
+          
+                     | _ =>
+                          raise (Tryf ("no hypothesis " ^ Symbol.toValue name)))
 
-      fun findhypOrConcl name tac (goal as (_, dir)) fk sk =
-         if Symbol.eq (name, conclSym) then
-            tac NONE goal fk sk
-         else
-            (case D.lookupOpt (D.idir dir) name of
-                SOME (D.Hvar i) =>
-                   tac (SOME i) goal fk sk
+           | NUMBER i =>
+                if 0 <= i andalso i < S.length (J.context jud) then
+                   i
+                else
+                   raise (Tryf ("no hypothesis numbered " ^ Int.toString i)))
 
-              | _ =>
-                   fk ("no hypothesis " ^ Symbol.toValue name))
+      fun hypothesisToHypOrConcl (jud, dir) hyp =
+         (case hyp of
+             NAME name =>
+                if Symbol.eq (name, conclSym) then
+                   NONE
+                else
+                   (case D.lookupOpt (D.idir dir) name of
+                       SOME (D.Hvar i) =>
+                          SOME i
+       
+                     | _ =>
+                          raise (Tryf ("no hypothesis " ^ Symbol.toValue name)))
+
+           | NUMBER i =>
+                if 0 <= i andalso i < S.length (J.context jud) then
+                   SOME i
+                else
+                   raise (Tryf ("no hypothesis numbered " ^ Int.toString i)))
+         
+      fun hypothesisToName (_, dir) hyp =
+         (case hyp of
+             NAME name => name
+
+           | NUMBER i =>
+                (case D.nameOpt dir i of
+                    SOME name => name
+
+                  | NONE => raise (Tryf ("no hypothesis numbered " ^ Int.toString i))))
+
+      fun findhyp hyp tac goal fk sk =
+         tryf 
+            (fn () => hypothesisToHyp goal hyp)
+            tac
+            goal fk sk
+
+      fun findhypOrConcl hyp tac (goal as (jud, dir)) fk sk =
+         tryf
+            (fn () => hypothesisToHypOrConcl goal hyp)
+            tac
+            goal fk sk
+
+      fun findhyps hyps tac goal fk sk =
+         tryf
+            (fn () => List.map (hypothesisToHyp goal) hyps)
+            tac
+            goal fk sk
+
+      fun findname hyp tac goal fk sk =
+         tryf
+            (fn () => hypothesisToName goal hyp)
+            tac
+            goal fk sk
+
+      fun findnames hyps tac goal fk sk =
+         tryf
+            (fn () => List.map (hypothesisToName goal) hyps)
+            tac
+            goal fk sk
+
 
 
       fun bindmany dir l =
@@ -105,9 +180,9 @@ structure HypTactic :> HYP_TACTIC =
             l
 
 
-      fun hyp name = 
+      fun hyp h = 
          let
-            do i = findhyp name
+            do i = findhyp h
          in
             setFailure "hypothesis does not match goal" $
             Tactic.refine (Rule.hypothesis i)
@@ -278,9 +353,9 @@ structure HypTactic :> HYP_TACTIC =
             chdir dir'
          end
 
-      fun renameBefore pats sym =
+      fun renameBefore pats h =
          let
-            do jo = findhypOrConcl sym
+            do jo = findhypOrConcl h
          in
             (case jo of
                 NONE => reintro pats
@@ -325,7 +400,7 @@ structure HypTactic :> HYP_TACTIC =
 
            | name :: rest =>
                 let
-                   do i = findhyp name
+                   do i = findhyp (NAME name)
                 in
                    cut (transformFailure 
                            (fn _ => String.concat ["dependencies on ", Symbol.toValue name, " exist"])
@@ -333,9 +408,20 @@ structure HypTactic :> HYP_TACTIC =
                    >> clearLoop rest
                 end)
          
-      fun clear l = clearLoop (List.rev l)
+      fun clear l = 
+         let
+            do l' = findnames l
+         in
+            clearLoop (List.rev l')
+         end            
 
-      fun renameOver from to = clear [to] >> rename from to
+
+      fun renameOver from to = 
+         let
+            do to' = findname to
+         in
+            clear [NAME to'] >> rename from to'
+         end
          
          
 
@@ -381,12 +467,12 @@ structure HypTactic :> HYP_TACTIC =
 
            | from :: rest =>
                 let
-                   do i = findhyp from
+                   do i = findhyp (NAME from)
                 in
                    if i > j then
                       let
                          do j' = andthenM $ movePosLoop rest j
-                         do i' = findhyp from
+                         do i' = findhyp (NAME from)
                       in
                          moven i' j'
                          >> idtacM (j'+1)
@@ -401,7 +487,12 @@ structure HypTactic :> HYP_TACTIC =
                       end
                 end)
 
-      fun movePos froms j = movePosLoop froms j >> idtac
+      fun movePos froms j =
+         let
+            do froms' = findnames froms
+         in
+            movePosLoop froms' j >> idtac
+         end
 
 
       fun moveBefore froms to =
@@ -508,21 +599,26 @@ structure HypTactic :> HYP_TACTIC =
          setFailure "cannot revert hypothesis on which others depend" (exchange 0 i 1)
          >> revert0
 
-      fun revertone hyp =
+      fun revertone name =
          let
-            do i = findhyp hyp
+            do i = findhyp (NAME name)
          in
             revertn i
          end
 
-      fun revertLoop hyps =
-         (case hyps of
+      fun revertLoop names =
+         (case names of
              [] => idtac
 
-           | hyp :: rest =>
-                revertone hyp >> revertLoop rest)
+           | name :: rest =>
+                revertone name >> revertLoop rest)
 
-      fun revert hyps = revertLoop (List.rev hyps)
+      fun revert hyps =
+         let
+            do hyps' = findnames hyps
+         in
+            revertLoop (List.rev hyps')
+         end
 
 
       fun set sym em =
@@ -610,14 +706,14 @@ structure HypTactic :> HYP_TACTIC =
       val unhide = Typecheck.withTypecheckSnd unhidePriority
 
 
-      fun squashHidden hyps =
+      fun squashHiddenLoop hyps =
          (case hyps of
              [] =>
                 idtac
 
-           | hyp :: rest =>
+           | name :: rest =>
                 let
-                   do i = findhyp hyp
+                   do i = findhyp (NAME name)
                    do (jud, _) = withgoal
                 in
                    (case J.hyp jud i of
@@ -627,19 +723,26 @@ structure HypTactic :> HYP_TACTIC =
                                      (T.evar ()))
                           >>> [
                               refine (Rule.squashIntro (T.evar ()))
-                              >>
+                              >>+
                               refine (Rule.hypothesis i),
               
                               refine (Rule.weaken (i+1) 1)
-                              >>
+                              >>+
                               refine (Rule.exchange 0 1 i)
-                              >>
-                              squashHidden rest
+                              >>+
+                              squashHiddenLoop rest
                               ]
        
                      | _ =>
                           fail "hidden term hypotheses expected")
                 end)
+
+      fun squashHidden hyps =
+         let
+            do hyps' = findnames hyps
+         in
+            squashHiddenLoop hyps'
+         end
 
 
 
@@ -799,7 +902,7 @@ structure HypTactic :> HYP_TACTIC =
                tryf
                (fn () =>
                    List.map 
-                      (fn k => D.name dir k)
+                      (fn k => NAME (D.name dir k))
                       (dependenciesTrans ctx to (setf ()) []))
          in
             movePos l (to+1)
@@ -809,17 +912,16 @@ structure HypTactic :> HYP_TACTIC =
       fun moveBeforeDeps from to =
          let
             do j = findhyp to
-            do (jud, dir) = withgoal
-            val idir = D.idir dir
+            do goal as (jud, dir) = withgoal
          in
             moveDepsMain 
                (J.context jud)
                dir
                (fn () =>
                    List.foldl
-                      (fns sym set =>
+                      (fns h set =>
                           let
-                             val i = D.lookupVar idir sym 
+                             val i = hypothesisToHyp goal h
                           in
                              (case Int.compare i j of
                                  LESS =>
@@ -848,4 +950,52 @@ structure HypTactic :> HYP_TACTIC =
                to
          end
 
+
+      (* This stuff doesn't really belong here, but Typecheck is prior to this, before
+         hypothesis is defined.
+      *)
+
+      fun inferSpinePriority hyp en symopt =
+         let
+            do i = findhyp hyp
+         in
+            Typecheck.inferSpinePriority i en symopt
+         end
+
+      fun inferSpineRaw hyp en symopt = inferSpinePriority hyp en symopt >> idtac
+
+      fun inferSpine hyp en symopt = Typecheck.withTypecheckSnd $ inferSpinePriority hyp en symopt
+
    end
+
+
+structure ParseHypothesis =
+   struct
+
+      val null = []
+      fun cons x y = x :: y
+
+      val name = Hyp.NAME
+      val number = Hyp.NUMBER
+
+   end
+
+
+grammardef Hypothesis
+
+   open ParseHypothesis
+
+   rule Hypothesis ::= Ident => name
+   rule Hypothesis ::= NUMBER => number
+   rule Hypothesis ::= "#" NUMBER => number
+   rule Hypothesis ::= EMBED => name
+   rule Hypothesis ::= "#" EMBED => number
+   
+
+   rule Hypotheses ::= => null
+   rule Hypotheses ::= Hypothesis Hypotheses => cons
+
+end
+
+
+grammaron Hypothesis

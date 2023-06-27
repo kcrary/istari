@@ -2,23 +2,20 @@
 signature DESTRUCT =
    sig
 
+      type hypothesis = Hyp.hypothesis
       type symbol = Symbol.symbol
       type ipattern = IntroPattern.ipattern
       type tactic = Tactic.tactic
       type 'a tacticm = 'a Tactic.tacticm
       type priority = Tactic.priority
 
-      val destructnPriority : int -> ipattern -> priority tacticm
-      val destructnRaw : int -> ipattern -> tactic
-      val destructn : int -> ipattern -> tactic
+      val destructPriority : hypothesis -> ipattern -> priority tacticm
+      val destructRaw : hypothesis -> ipattern -> tactic
+      val destruct : hypothesis -> ipattern -> tactic
 
-      val destructPriority : symbol -> ipattern -> priority tacticm
-      val destructRaw : symbol -> ipattern -> tactic
-      val destruct : symbol -> ipattern -> tactic
-
-      val destructSetPriority : symbol -> symbol option -> priority tacticm
-      val destructSetRaw : symbol -> symbol option -> tactic
-      val destructSet : symbol -> symbol option -> tactic
+      val destructSetPriority : hypothesis -> symbol option -> priority tacticm
+      val destructSetRaw : hypothesis -> symbol option -> tactic
+      val destructSet : hypothesis -> symbol option -> tactic
 
       val assertLiteralPriority : Term.term -> ipattern -> priority tacticm
       val assertLiteralRaw : Term.term -> ipattern -> tactic
@@ -135,6 +132,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
       structure TC = Typecheck
       structure R = Reduction
 
+      type hypothesis = Hyp.hypothesis
       type symbol = Symbol.symbol
 
       structure H = ConstantTable
@@ -700,10 +698,10 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                 idtacM Primary
 
            | Ident (SOME sym) =>
-                HypTactic.renamen i sym >> idtacM Primary
+                Hyp.rename (Hyp.NUMBER i) sym >> idtacM Primary
 
            | Wild =>
-                HypTactic.weaken i 1 >> idtacM Primary
+                Hyp.weaken i 1 >> idtacM Primary
 
            | _ =>
                 let
@@ -747,7 +745,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
 
       fun destructPriority hyp pat =
          let
-            do i = HypTactic.findhyp hyp
+            do i = Hyp.findhyp hyp
          in
             destructnPriority i pat
          end
@@ -789,7 +787,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
 
       fun destructSetPriority hyp name =
          let
-            do i = HypTactic.findhyp hyp
+            do i = Hyp.findhyp hyp
             do (jud, dir) = withgoal
          in
             (case J.hyp jud i of

@@ -47,7 +47,7 @@ signature REWRITE =
 
          empty target list parses as concl at hit 0
       *)
-      type targets = (symbol * (bool * int list) option) list
+      type targets = (Hyp.hypothesis * (bool * int list) option) list
 
       val rewrite           : (rewrite * targets) list -> tactic
       val rewriteRaw        : (rewrite * targets) list -> tactic
@@ -2587,27 +2587,27 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
 
 
-      fun rewriteOnce rew sym i nohits sequel =
+      fun rewriteOnce rew h i nohits sequel =
          let
-            do hyp = HypTactic.findhypOrConcl sym
+            do hyp = Hyp.findhypOrConcl h
 
             do goal = withgoal
          in
-            transformFailure (fn msg => "rewrite failed: " ^ msg)
-            (try
-                (case rew hyp goal of
-                    Computational core =>
-                       rewriteComputational i core hyp goal
-                       >>> [sequel]
+            try
+               (case rew hyp goal of
+                   Computational core =>
+                      rewriteComputational i core hyp goal
+                      >>+ 
+                      sequel
 
-                  | Equality core =>
-                       rewriteEquality i core hyp goal sequel
+                 | Equality core =>
+                      rewriteEquality i core hyp goal sequel
 
-                  | Relation core =>
-                       rewriteRelation i core hyp goal sequel)
-             with
-                RewriteFailure msg => fail msg
-              | InsufficientHits msg => nohits msg)
+                 | Relation core =>
+                      rewriteRelation i core hyp goal sequel)
+            with
+               RewriteFailure msg => fail msg
+             | InsufficientHits msg => nohits msg
          end
 
 
@@ -2665,14 +2665,21 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                           innerloop l ()
                        end))
 
-      fun rewritePriority aims =
+      fun rewriteOuterLoop aims =
          (case aims of
              [] =>
                 idtacM Primary
 
            | (rew, targets) :: rest =>
-                rewriteLoop rew targets
-                   (lift (fn () => rewritePriority rest)))
+                (rewriteLoop rew targets
+                    (lift (fn () => rewriteOuterLoop rest))))
+
+      fun rewritePriority aims =
+         transformFailure 
+            (fn msg => "rewrite failed: " ^ msg)
+            (rewriteOuterLoop aims)
+            
+         
 
 
       fun rewriteRaw tgts = rewritePriority tgts >> idtac
@@ -2687,27 +2694,27 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             (m, n, bv, c)
          end
 
-      fun testRewriteMain rew sym i f =
+      fun testRewriteMain rew h i f =
          try
             let
                val goal as (jud, dir) = Prover.currentGoal ()
    
                val (a, hyp, dir') =
-                  if Symbol.eq (sym, conclSym) then
-                     (Judgement.concl jud, NONE, dir)
-                  else
-                     (case D.lookupOpt (D.idir dir) sym of
-                         SOME (D.Hvar h) =>
+                  try
+                     (case Hyp.hypothesisToHypOrConcl goal h of
+                         NONE =>
+                            (Judgement.concl jud, NONE, dir)
+
+                       | SOME h =>
                             ((case J.hypOpt jud h of
                                  SOME (J.Tm a) => a
                                | SOME (J.Tml a) => a
                                | SOME (J.Tmh a) => a
                                | _ => raise (Invalid "hypothesis has wrong sort")),
                              SOME h,
-                             D.shift dir (h+1))
-   
-                       | _ =>
-                            raise (Invalid "no such hypothesis"))
+                             D.shift dir (h+1)))
+                  with
+                     Tryf msg => raise (Invalid msg)
    
                val mark = Trail.mark ()
    
@@ -2878,7 +2885,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
 
       type captures = symbol option list
-      type targets = (symbol * (bool * int list) option) list
+      type targets = (Hyp.hypothesis * (bool * int list) option) list
 
 
 
@@ -4340,17 +4347,17 @@ structure ParseRewrite =
       fun sing x = [x]
       fun cons h t = h :: t
 
-      val conclSym = Symbol.fromValue "concl"
+      val conclHyp = Hyp.NAME (Symbol.fromValue "concl")
 
       fun occurNums l = SOME (false, l)
       fun occurPos l = SOME (true, l)
       val occurAll = NONE
 
-      fun targetInAt ident occ = (ident, occ)
-      fun targetIn ident = (ident, SOME (false, [0]))
+      fun targetInAt h occ = (h, occ)
+      fun targetIn h = (h, SOME (false, [0]))
 
-      fun targetsAt occ = [(conclSym, occ)]
-      val targetsEmpty = [(conclSym, SOME (false, [0]))]
+      fun targetsAt occ = [(conclHyp, occ)]
+      val targetsEmpty = [(conclHyp, SOME (false, [0]))]
 
       val withinNone = []
       val withinSome = id
@@ -4380,8 +4387,8 @@ grammardef Rewrite
    rule Occurrences      ::= "pos" Numbersn => occurPos
    rule Occurrences      ::= "all" => occurAll
 
-   rule Target           ::= "in" Ident "at" Occurrences => targetInAt
-   rule Target           ::= "in" Ident => targetIn
+   rule Target           ::= "in" Hypothesis "at" Occurrences => targetInAt
+   rule Target           ::= "in" Hypothesis => targetIn
 
    rule Targetsn         ::= Target => sing
    rule Targetsn         ::= Target Targetsn => cons
@@ -4390,8 +4397,8 @@ grammardef Rewrite
    rule Targets          ::= Targetsn => id
 
    rule ShortTarget      ::= Target => id
-   rule ShortTarget      ::= Ident "at" Occurrences => targetInAt
-   rule ShortTarget      ::= Ident => targetIn
+   rule ShortTarget      ::= Hypothesis "at" Occurrences => targetInAt
+   rule ShortTarget      ::= Hypothesis => targetIn
    
    rule ShortTargetsn    ::= ShortTarget => sing
    rule ShortTargetsn    ::= ShortTarget ShortTargetsn => cons

@@ -64,6 +64,8 @@ signature CASE =
       val triv : (term, 'a, 'a) matcher
       val marker : Symbol.symbol -> (term, 'a, 'a) matcher
 
+      val notvar : (term, 'a, 'a * term) matcher
+
       val unify : term -> (term, 'a, 'a) matcher
 
       val whnf : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
@@ -381,6 +383,14 @@ structure Case :> CASE =
 
            | _ => fk ())
 
+         
+      fun notvar m x fk sk =
+         (case m of
+             T.Var _ =>
+                fk ()
+
+           | _ => sk ((x, m), fk))
+         
 
       fun unify n m x fk sk =
          if Unify.unify1 n m then
@@ -739,6 +749,7 @@ grammardef Case
    rule Match(4)      ::= "evar?" => whatEvar
    rule Match(4)      ::= "nat?" => nat
    rule Match(4)      ::= "integer?" => integer
+   rule Match(4)      ::= "notvar?" => notvar
 
    rule Match(4)      ::= "(" Matches ")" => id
    rule Matches       ::= Match(0) "," Match(0) => pair

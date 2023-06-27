@@ -112,6 +112,29 @@ goal, generating zero or more subgoals.
 
 
 
+### Hypotheses
+
+Many tactics take a hypothesis or a list of hypotheses as an argument.
+Hypotheses are given by the grammar:
+
+    Hypothesis ::= [name]
+                   [number]
+                   # [number]
+                   \ ... antiquoted name ... \
+                   # \ ... antiquoted number ... \
+
+Hypothesis numbers count backward from the end of the context,
+starting with 0.  The `#` to indicate a number is optional for literal
+numbers, but it is required for antiquoted numbers.
+
+In IML hypotheses are given by the datatype:
+
+    datatype hypothesis = NAME of symbol | NUMBER of int
+
+which appears in the `Hyp` structure.
+
+
+
 ### Introduction tactics
 
 - `intro /[ipattern] ... [ipattern]/`
@@ -228,11 +251,6 @@ goal, generating zero or more subgoals.
 
   Renames the indicated hypothesis to use the indicated name.
 
-  + `renamen [n] /[name]/`
-
-    Renames hypothesis number `n` (counting backward from 0) to
-    use the indicated name.
-
 
 - `reintro /[ipattern] ... [ipattern]/`
 
@@ -257,10 +275,6 @@ goal, generating zero or more subgoals.
   + `weaken [m] [n]`
 
     Deletes hypotheses numbered `m` through `m+n-1` (counting backward from 0).
-
-  + `clearn [n]`
-
-    Deletes hypothesis number `n` (counting backward from 0).
 
   + `clearAll`
 
@@ -290,11 +304,6 @@ goal, generating zero or more subgoals.
 
     Swaps hypotheses numbered `m` through `m+n-1` with `m+n` through
     `m+n+p-1` (counting backward from 0).
-
-  + `moven [m] [n]`
-
-    Moves hypothesis number `m` to position `n` (counting backward
-    from 0).
 
   + `movePos /[hyp] ... [hyp]/ [n]`
 
@@ -327,9 +336,9 @@ goal, generating zero or more subgoals.
   Creates a binding of `x = M`.
 
 
-- `squashHidden /[hyp]/`
+- `squashHidden /[hyp] ... [hyp]/`
 
-  Turns a hidden hypothesis of `A` into an unhidden hypothesis of 
+  Turns hidden hypotheses of `A` into an unhidden hypotheses of 
   `{ A }`.  There must be no dependencies on the hypothesis.
 
 
@@ -440,15 +449,6 @@ goal, generating zero or more subgoals.
 
     As `injection` but does not invoke the typechecker.
 
-  + `injectionn [n]`
-
-    As `injection` but operates on hypothesis `n` (counting backward
-    from 0).
-
-  + `injectionnRaw [n]`
-
-    As `injectionn` but does not invoke the typechecker.
-
 
 
 ### Substitution
@@ -485,6 +485,11 @@ goal, generating zero or more subgoals.
   + `substStrictRaw /[hyp x]/`
 
     As `substStrict` but does not invoke the typechecker.
+
+  + `substAll`
+
+    Carry out all available substitutions, using `subst`.  Prefers
+    left-to-right when either direction is possible.
 
 
 The substitution tactics above first attempt to use a substitution
@@ -639,15 +644,6 @@ The destruction tactics are:
   + `destructRaw /[hyp x]/ /[ipattern]/`
 
     As `destruct` but does not invoke the typechecker.
-
-  + `destructn [n] /[ipattern]/`
-
-    As `destruct` but destructs hypothesis `n` (counting backward
-    from 0).
-
-  + `destructnRaw [n] /[ipattern]/`
-
-    As `destructn` but does not invoke the typechecker.
 
 
 - `assert /[term A]/ /[ipattern]/`
@@ -1167,11 +1163,17 @@ These tactics are primarily used to implement other tactics:
   Invokes its argument tactic, passing the current goal to that
   tactic.
 
+  + `Tactic.withdir : (Directory.directory -> 'a tacticm) -> 'a tacticm`
+
+    Invokes its argument tactic, passing the current
+    [`directory`](sig/directory.html) (the part of the goal used to
+    relate names to de Bruijn indices) to that tactic.
+
   + `Tactic.withidir : (Directory.idirectory -> 'a tacticm) -> 'a tacticm`
 
     Invokes its argument tactic, passing the current
     [`idirectory`](sig/directory.html) (the part of the goal used to
-    turn external terms into internal terms) to that tactic.
+    turn names into de Bruijn indices) to that tactic.
 
   + `Tactic.withterm : ETerm.eterm -> (Term.term -> 'a tacticm) -> 'a tacticm`
 

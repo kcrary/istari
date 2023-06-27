@@ -5,14 +5,15 @@ signature INVERSION =
       type tactic = Tactic.tactic
       type 'a tacticm = 'a Tactic.tacticm
       type priority = Tactic.priority
+      type hypothesis = Hyp.hypothesis
 
-      val destructThinPriority : Symbol.symbol -> IntroPattern.ipattern -> priority tacticm
-      val destructThinRaw : Symbol.symbol -> IntroPattern.ipattern -> tactic
-      val destructThin : Symbol.symbol -> IntroPattern.ipattern -> tactic
+      val destructThinPriority : hypothesis -> IntroPattern.ipattern -> priority tacticm
+      val destructThinRaw : hypothesis -> IntroPattern.ipattern -> tactic
+      val destructThin : hypothesis -> IntroPattern.ipattern -> tactic
 
-      val inversionPriority : Symbol.symbol -> priority tacticm
-      val inversionRaw : Symbol.symbol -> tactic
-      val inversion : Symbol.symbol -> tactic
+      val inversionPriority : hypothesis -> priority tacticm
+      val inversionRaw : hypothesis -> tactic
+      val inversion : hypothesis -> tactic
 
    end
 
@@ -29,6 +30,8 @@ structure Inversion :> INVERSION =
 
       open Tactic
       open CasePervasive
+
+      type hypothesis = Hyp.hypothesis
 
 
       fun withsize tac (goal as (jud, _)) fk sk =
@@ -48,7 +51,7 @@ structure Inversion :> INVERSION =
                   (| \Prim.eq\ _ var? var? =>
                      \(fnc i j =>
                           if i = j then
-                             HypTactic.clearn n
+                             Hyp.clear [Hyp.NUMBER n]
                              >>
                              (* one hypothesis deleted *)
                              injections (lid-1) stop (n-1)
@@ -83,7 +86,7 @@ structure Inversion :> INVERSION =
                              do sz = withsize
                           in
                              ifthenM
-                                (EqualityTactic.injectionnPriority n)
+                                (EqualityTactic.injectionPriority (Hyp.NUMBER n))
                                 (fn pri =>
                                     (case pri of
                                         Primary =>
@@ -91,9 +94,9 @@ structure Inversion :> INVERSION =
                                               do sz' = withsize
                                               val new = sz' - sz
                                            in
-                                              HypTactic.clearn (n + new)
+                                              Hyp.clear [Hyp.NUMBER (n + new)]
                                               >>
-                                              HypTactic.exchange 0 new n
+                                              Hyp.exchange 0 new n
                                               >>
                                               injections (lid - 1 + new) stop (n - 1 + new)
                                            end
@@ -158,7 +161,7 @@ structure Inversion :> INVERSION =
                         | _ => fail "inversion pattern expected")
                 in
                    andthenlPadPri
-                      (Destruct.destructnPriority n (IP.Or [])
+                      (Destruct.destructPriority (Hyp.NUMBER n) (IP.Or [])
                        >>!
                        let
                           do sz' = withsize
@@ -176,9 +179,9 @@ structure Inversion :> INVERSION =
 
       fun destructThinPriority hyp pat =
          let
-            do n = HypTactic.findhyp hyp
+            do n = Hyp.findhyp hyp
             do (_, dir) = withgoal
-            val set = D.removeSet (D.set dir) hyp
+            val set = D.removeSet (D.set dir) (D.name dir n)
          in
             destructThinMain n pat set
          end
@@ -192,7 +195,7 @@ structure Inversion :> INVERSION =
          let
             do (_, dir) = withgoal
          in
-            HypTactic.copy hyp NONE
+            Hyp.copy hyp NONE
             >>
             destructThinMain 0 (IP.Or []) (D.set dir)
          end

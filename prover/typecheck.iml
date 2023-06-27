@@ -28,9 +28,7 @@ signature TYPECHECK =
       val infer : ETerm.eterm -> Symbol.symbol option -> tactic
 
       (* infer the type obtained by following the supplied typing with the indicated spine *)
-      val inferSpinePriority : Symbol.symbol -> ETerm.eterm -> Symbol.symbol option -> priority tacticm
-      val inferSpineRaw : Symbol.symbol -> ETerm.eterm -> Symbol.symbol option -> tactic
-      val inferSpine : Symbol.symbol -> ETerm.eterm -> Symbol.symbol option -> tactic
+      val inferSpinePriority : int -> ETerm.eterm -> Symbol.symbol option -> priority tacticm
 
       (* prove the goal using () for its extract, subgoals will have the same context *)
       val trivializePriority : priority tacticm
@@ -2530,66 +2528,57 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       val zilch = Symbol.fromValue ""
 
-      fun inferSpinePriority hyp en symopt =
+      fun inferSpinePriority i en symopt =
          let
             do (goal as (jud, dir)) = withgoal
             val n = ETerm.withdir dir en
          in
-            (case D.lookupVarOpt (D.idir dir) hyp of
-                NONE =>
-                   fail ("no hypothesis " ^ Symbol.toValue hyp)
+            goalContextCaseT
+            /| $hyp \i\ $tm \Prim.ov\ ? ? =>
+               \(fnc a m =>
+                    termCaseT n
+                    /| ($marker \zilch\) @ ? =>
+                       \(fnc spine =>
+                            (case
+                                (try
+                                    Sum.INL (Infer.inferFrom (J.context jud) m a spine
+                                                (refine (Rule.hypothesis i))
+                                                (fns _ _ => idtac))
+                                 with
+                                    Infer.InferError (m', aopt, msg) =>
+                                       Sum.INR (m', aopt, msg)
+                
+                                  | Infer.NotPath msg =>
+                                       Sum.INR (n, NONE, "not a path: " ^ msg))
+                             of
+                                Sum.INL (b, tac) =>
+                                   refine (Rule.assert (T.apply2 Prim.ov b (T.Elim (m, spine))) (T.evar ()))
+                                   >>> [
+                                       (* G |- M @ spine : B *)
+                                       tac >> idtacM Secondary,
+                                       
+                                       chdir (D.bindh dir symopt) >> idtacM Primary
+                                       ]
+                
+                              | Sum.INR (m', bopt, msg) =>
+                                   (
+                                   Message.message 20 0
+                                      (errorDetail [] ("Type error: inference failed: " ^ msg)
+                                          (inferDetail dir m' bopt));
+                
+                                   fail "type error"
+                                   )))\
 
-              | SOME i =>
-                   goalContextCaseT
-                   /| $hyp \i\ $tm \Prim.ov\ ? ? =>
-                      \(fnc a m =>
-                           termCaseT n
-                           /| ($marker \zilch\) @ ? =>
-                              \(fnc spine =>
-                                   (case
-                                       (try
-                                           Sum.INL (Infer.inferFrom (J.context jud) m a spine
-                                                       (refine (Rule.hypothesis i))
-                                                       (fns _ _ => idtac))
-                                        with
-                                           Infer.InferError (m', aopt, msg) =>
-                                              Sum.INR (m', aopt, msg)
-                       
-                                         | Infer.NotPath msg =>
-                                              Sum.INR (n, NONE, "not a path: " ^ msg))
-                                    of
-                                       Sum.INL (b, tac) =>
-                                          refine (Rule.assert (T.apply2 Prim.ov b (T.Elim (m, spine))) (T.evar ()))
-                                          >>> [
-                                              (* G |- M @ spine : B *)
-                                              tac >> idtacM Secondary,
-                                              
-                                              chdir (D.bindh dir symopt) >> idtacM Primary
-                                              ]
-                       
-                                     | Sum.INR (m', bopt, msg) =>
-                                          (
-                                          Message.message 20 0
-                                             (errorDetail [] ("Type error: inference failed: " ^ msg)
-                                                 (inferDetail dir m' bopt));
-                       
-                                          fail "type error"
-                                          )))\
+                     | _ =>
+                       \(fnc =>
+                            fail "expecting a path with __ at head")\
+                    /)\
 
-                            | _ =>
-                              \(fnc =>
-                                   fail "expecting a path with __ at head")\
-                           /)\
-
-                    | _ =>
-                      \(fnc =>
-                           fail (Symbol.toValue hyp ^ " is not a typing hypothesis"))\
-                   /)
+             | _ =>
+               \(fnc =>
+                    fail (Symbol.toValue (D.name dir i) ^ " is not a typing hypothesis"))\
+            /
          end
-
-      fun inferSpineRaw hyp en symopt = inferSpinePriority hyp en symopt >> idtac
-
-      fun inferSpine hyp en symopt = withTypecheckSnd $ inferSpinePriority hyp en symopt
 
 
 
