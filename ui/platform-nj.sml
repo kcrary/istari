@@ -18,6 +18,15 @@ structure PlatformNJ :> PLATFORM =
       val printDepth = Control.Print.printDepth
       val printLength = Control.Print.printLength
       val stringLength = Control.Print.stringDepth
+
       val gcMessages = SMLofNJ.Internals.GC.messages
+
+      fun exnHistory exn =
+         (case SMLofNJ.exnHistory exn of
+             [] => []
+
+           | _ :: l => 
+             (* the first entry is always bogus *)
+             l)
 
    end

@@ -306,6 +306,17 @@ apply tr_booltp_elim; auto.
 Qed.
 
 
+Lemma boolElimOfNondep_valid : boolElimOfNondep_obligation.
+Proof.
+prepare.
+unfold Defs.true.
+unfold Defs.false.
+intros G a m p r ext2 ext1 ext0 Hm Hp Hr.
+replace a with (subst1 m (subst sh1 a)) by (simpsub; reflexivity).
+apply tr_booltp_elim; simpsub; auto.
+Qed.
+
+
 Lemma boolElimEq_valid : boolElimEq_obligation.
 Proof.
 prepare.
@@ -347,6 +358,41 @@ Lemma boolLeft_valid : boolLeft_obligation.
  constructor; eauto using deq_intro; eauto using deqtype_intro.
  Qed.
 
+
+
+Lemma boolContradiction_valid : boolContradiction_obligation.
+Proof.
+prepare.
+unfold Defs.true.
+unfold Defs.false.
+unfold Defs.bool.
+intros G a ext0 H.
+apply (tr_voidtp_elim _ triv triv triv triv).
+eapply (tr_compute _ _ (bite bfalse unittp voidtp)); eauto using equiv_refl.
+  {
+  apply equiv_symm.
+  apply steps_equiv.
+  apply Relation.star_one.
+  apply Dynamic.step_bite3.
+  }
+apply (tr_eqtype_convert _#3 (bite btrue unittp voidtp)).
+2:{
+  eapply (tr_compute _ _ unittp); eauto using equiv_refl, tr_unittp_intro.
+  apply steps_equiv.
+  apply Relation.star_one.
+  apply Dynamic.step_bite2.
+  }
+apply tr_booltp_elim_eqtype; auto.
+  {
+  eapply tr_formation_weaken.
+  apply tr_unittp_formation_univ.
+  }
+
+  {
+  eapply tr_formation_weaken.
+  apply tr_voidtp_formation_univ.
+  }
+Qed.
 
 
 Hint Rewrite def_intersect def_arrow : prepare.

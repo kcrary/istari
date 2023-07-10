@@ -1507,86 +1507,30 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
               $ap \Prim.zero\ $ap \Prim.zero\ $nil =>
               \(fnc => idtac)\
 
-            | $ap \Prim.zero\ $ap ($as \Prim.succ\ _) $nil =>
+            | $ap \Prim.zero\ $ap (\Prim.succ\ ?) $nil =>
               \(fnc n =>
-                   refine (Rule.voidElim (T.evar ()))
-                   >>
-                   (* void *)
-                   refine (Rule.equivalence (T.Const Prim.unit) (T.Const Prim.void))
-                   >>> [
-                       (* unit = void : type *)
-                       refine (Rule.natElimEqtype 
-                                  (T.Const Prim.unit) (T.Const Prim.unit)
-                                  (T.Const Prim.void) (T.Const Prim.void)
-                                  (T.Const Prim.zero) n)
-                       >>> [
-                           (* zero = succ _ : nat *)
-                           refine (Rule.hypothesis i),
+                   refine (Rule.natContradiction (T.evar ()) n)
+                   >>+
+                   refine (Rule.hypothesis i))\
 
-                           (* A |- unit = unit : type *)
-                           refine Rule.unitEq,
-  
-                           (* A |- void = void : type *)
-                           refine Rule.voidEq 
-                           ],
-  
-                       (* unit *)
-                       refine Rule.unitIntro
-                       ])\
-
-            | $ap ($as \Prim.succ\ _) $ap \Prim.zero\ $nil =>
+            | $ap (\Prim.succ\ ?) $ap \Prim.zero\ $nil =>
               \(fnc n =>
-                   refine (Rule.voidElim (T.evar ()))
-                   >>
-                   (* void *)
-                   refine (Rule.equivalence (T.Const Prim.unit) (T.Const Prim.void))
+                   refine (Rule.natContradiction (T.evar ()) n)
+                   >>+
+                   refine (Rule.eqSymm (T.evar ()) (T.evar ()) (T.evar ()))
+                   >>+
+                   refine (Rule.hypothesis i))\
+
+            | $ap (\Prim.succ\ ?) $ap (\Prim.succ\ ?) $nil =>
+              \(fnc m n =>
+                   refine (Rule.assert' (T.apply3 Prim.eq (T.Const Prim.nat) m n) (T.evar ()))
                    >>> [
-                       (* unit = void : type *)
-                       refine (Rule.natElimEqtype 
-                                  (T.Const Prim.void) (T.Const Prim.void)
-                                  (T.Const Prim.unit) (T.Const Prim.unit)
-                                  n (T.Const Prim.zero))
-                       >>> [
-                           (* succ _ = zero : nat *)
-                           refine (Rule.hypothesis i),
+                       (* M = N : nat *)
+                       refine (Rule.natInjection m n)
+                       >>+
+                       (* succ M = succ N : nat *)
+                       refine (Rule.hypothesis i),
 
-                           (* A |- void = void : type *)
-                           refine Rule.voidEq,
-
-                           (* A |- unit = unit : type *)
-                           refine Rule.unitEq
-                           ],
-  
-                       (* unit *)
-                       refine Rule.unitIntro
-                       ])\
-
-            | $ap ($as \Prim.succ\ ?) $ap ($as \Prim.succ\ ?) $nil =>
-              \(fnc m m' n n' =>
-                   refine (Rule.assert (T.apply3 Prim.eq (T.Const Prim.nat) m' n') (T.evar ()))
-                   >>> [
-                       (* M' = N' : nat
-                          that is:
-                          nat_case(succ M', zero, . 0) = sum_case(succ N', zero, . 0) 
-                            : nat [succ M' . id]
-                       *)
-                       refine (Rule.natElimEq
-                                  (T.Const Prim.nat)
-                                  m n (T.Const Prim.zero) (T.Const Prim.zero) T.zero T.zero)
-                       >>> [
-                           (* succ M' = succ N' : nat *)
-                           refine (Rule.hypothesis i),
-  
-                           (* zero = zero : nat *)
-                           refine (Rule.eqRefl (T.Const Prim.nat) (T.Const Prim.zero))
-                           >>
-                           (* zero : nat *)
-                           refine Rule.zeroType,
-                           
-                           (* nat |- 0 = 0 : nat *)
-                           refine (Rule.hypothesisEq 0)
-                           ],
-  
                        withgoal (fn (_, dir) => chdir (D.bind0 dir))
                        ])\
            )
@@ -1601,108 +1545,45 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          goalContextCaseT
          / $hyp \i\ $tm \Prim.eq\ @ $ap (\Prim.sum\ ? ?)
            (
-              $ap ($as \Prim.inl\ ?) $ap ($as \Prim.inl\ ?) $nil =>
-              \(fnc a b m m' n n' =>
-                   refine (Rule.assert (T.apply3 Prim.eq a m' n') (T.evar ()))
-                   >>> [
-                       (* M' = N' : A
-                          that is:
-                          sum_case(inl M', . 0, . 0) = sum_case(inl N', . 0, . 0) 
-                            : sum_case(0, . A[^2], . B[^2])[inl M' . id]
-                       *)
-                       refine (Rule.sumElimEq
-                                  a b
-                                  (T.apply3 Prim.sum_case 
-                                      T.zero
-                                      (T.Lam (NONE, T.Sub (a, T.Shift 2)))
-                                      (T.Lam (NONE, T.Sub (b, T.Shift 2))))
-                                  m n
-                                  T.zero T.zero T.zero T.zero)
-                       >>> [
-                           (* inl M' = inl N' : A % B *)
-                           refine (Rule.hypothesis i),
-  
-                           (* A |- 0 : 0 : A[^] *)
-                           refine (Rule.hypothesisEq 0),
-  
-                           (* B |- 0 : 0 : B[^] *)
-                           refine (Rule.hypothesisEq 0)
-                           ],
-  
-                       withgoal (fn (_, dir) => chdir (D.bind0 dir))
-                       ])\
-
-            | $ap ($as \Prim.inr\ ?) $ap ($as \Prim.inr\ ?) $nil =>
-              \(fnc a b m m' n n' =>
-                   refine (Rule.assert (T.apply3 Prim.eq b m' n') (T.evar ()))
-                   >>> [
-                       refine (Rule.sumElimEq
-                                  a b
-                                  (T.apply3 Prim.sum_case 
-                                      T.zero
-                                      (T.Lam (NONE, T.Sub (a, T.Shift 2)))
-                                      (T.Lam (NONE, T.Sub (b, T.Shift 2))))
-                                  m n
-                                  T.zero T.zero T.zero T.zero)
-                       >>> [
-                           refine (Rule.hypothesis i),
-  
-                           refine (Rule.hypothesisEq 0),
-  
-                           refine (Rule.hypothesisEq 0)
-                           ],
-  
-                       withgoal (fn (_, dir) => chdir (D.bind0 dir))
-                       ])\
-
-            | $ap ($as \Prim.inl\ _) $ap ($as \Prim.inr\ _) $nil =>
+              $ap (\Prim.inl\ ?) $ap (\Prim.inl\ ?) $nil =>
               \(fnc a b m n =>
-                   refine (Rule.voidElim (T.evar ()))
-                   >>
-                   (* void *)
-                   refine (Rule.equivalence (T.Const Prim.unit) (T.Const Prim.void))
+                   refine (Rule.assert' (T.apply3 Prim.eq a m n) (T.evar ()))
                    >>> [
-                       (* unit = void : type *)
-                       refine (Rule.sumElimEqtype a b
-                                  (T.Const Prim.unit) (T.Const Prim.unit)
-                                  (T.Const Prim.void) (T.Const Prim.void)
-                                  m n)
-                       >>> [
-                           (* inl M' = inr N' : A % B *)
-                           refine (Rule.hypothesis i),
-  
-                           (* A |- unit = unit : type *)
-                           refine Rule.unitEq,
-  
-                           (* A |- void = void : type *)
-                           refine Rule.voidEq 
-                           ],
-  
-                       (* unit *)
-                       refine Rule.unitIntro
+                       (* M = N : A *)
+                       refine (Rule.sumInjection1 a b m n)
+                       >>+
+                       (* inl M = inl N : A % B *)
+                       refine (Rule.hypothesis i),
+
+                       withgoal (fn (_, dir) => chdir (D.bind0 dir))
                        ])\
+
+            | $ap (\Prim.inr\ ?) $ap (\Prim.inr\ ?) $nil =>
+              \(fnc a b m n =>
+                   refine (Rule.assert' (T.apply3 Prim.eq b m n) (T.evar ()))
+                   >>> [
+                       (* M = N : B *)
+                       refine (Rule.sumInjection2 a b m n)
+                       >>+
+                       (* inr M = inr N : A % B *)
+                       refine (Rule.hypothesis i),
+
+                       withgoal (fn (_, dir) => chdir (D.bind0 dir))
+                       ])\
+
+            | $ap (\Prim.inl\ ?) $ap (\Prim.inr\ ?) $nil =>
+              \(fnc a b m n =>
+                   refine (Rule.sumContradiction a b (T.evar ()) m n)
+                   >>+
+                   refine (Rule.hypothesis i))\
                  
-            | $ap ($as \Prim.inr\ _) $ap ($as \Prim.inl\ _) $nil =>
+            | $ap (\Prim.inr\ ?) $ap (\Prim.inl\ ?) $nil =>
               \(fnc a b m n =>
-                   refine (Rule.voidElim (T.evar ()))
-                   >>
-                   refine (Rule.equivalence (T.Const Prim.unit) (T.Const Prim.void))
-                   >>> [
-                       refine (Rule.sumElimEqtype a b
-                                  (T.Const Prim.void) (T.Const Prim.void)
-                                  (T.Const Prim.unit) (T.Const Prim.unit)
-                                  m n)
-                       >>> [
-                           refine (Rule.hypothesis i),
-  
-                           refine Rule.voidEq,
-  
-                           refine Rule.unitEq
-                           ],
-  
-                       (* unit *)
-                       refine Rule.unitIntro
-                       ])\
+                   refine (Rule.sumContradiction a b (T.evar ()) n m)
+                   >>+
+                   refine (Rule.eqSymm (T.evar ()) (T.evar ()) (T.evar ()))
+                   >>+
+                   refine (Rule.hypothesis i))\
            )
 
           | _ => \(fnc => fail "not an injection expression")\

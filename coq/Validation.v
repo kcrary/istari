@@ -209,6 +209,9 @@ exact sumElim_valid.
 exact sumElimNondep_valid.
 exact sumElimIstype_valid.
 exact sumElimEqtype_valid.
+exact sumContradiction_valid.
+exact sumInjection1_valid.
+exact sumInjection2_valid.
 exact sum_caseType_valid.
 exact sumFormInv1_valid.
 exact sumFormInv2_valid.
@@ -273,11 +276,13 @@ exact boolEqUniv_valid.
 exact boolIntro1Of_valid.
 exact boolIntro2Of_valid.
 exact boolElimOf_valid.
+exact boolElimOfNondep_valid.
 exact boolElimEq_valid.
 exact boolElim_valid.
 exact boolElimIstype_valid.
 exact boolElimEqtype_valid.
 exact boolLeft_valid.
+exact boolContradiction_valid.
 exact iteType_valid.
 exact natForm_valid.
 exact natEq_valid.
@@ -286,6 +291,8 @@ exact natEqUniv_valid.
 exact natElimEq_valid.
 exact natElimEqtype_valid.
 exact natUnroll_valid.
+exact natContradiction_valid.
+exact natInjection_valid.
 exact zeroType_valid.
 exact succType_valid.
 exact univKind_valid.
@@ -342,6 +349,7 @@ exact eqFormUniv_valid.
 exact eqEqUniv_valid.
 exact eqIntro_valid.
 exact eqElim_valid.
+exact eqTrivialize_valid.
 exact eqExt_valid.
 exact eqLeft_valid.
 exact eqRefl_valid.

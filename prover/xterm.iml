@@ -4,21 +4,23 @@
 signature XTERM =
    sig
 
-      (* A xterm is
-         - (M, A, tac)       where tac proves M : A, or
-         - (A, bogus, tac)   where tac proves A : type
+      (* An xterm is   (M, A, tac)   where tac proves M : A
+         An xtype is   (A, tac)      where tac proves A : type
 
-         An mxterm is
-         - (M, A, J, v)      where v validates J and J is M : A
-         - (M, bogus, J, v)  where v validates J and J is M : type
+         An mxterm is  (M, A, J, v)  where v validates J and J is M : A
+         An mxtype is  (A, J, v)  where v validates J and J is A : type
       *)
 
       type term = Term.term
       type xterm = term * term * Tactic.tactic
+      type xtype = term * Tactic.tactic
       type mxterm = term * term * Judgement.judgement * Refine.validation
+      type mxtype = term * Judgement.judgement * Refine.validation
 
       val term : xterm -> term
+      val typ : xtype -> term
       val mterm : mxterm -> term
+      val mtyp : mxtype -> term
 
       (* var i A
 
@@ -26,7 +28,7 @@ signature XTERM =
          >>
          G(i) = A
       *)
-      val var : int -> xterm -> xterm
+      val var : int -> xtype -> xterm
 
       (* vart i A
 
@@ -38,38 +40,40 @@ signature XTERM =
 
       val constant : Constant.constant -> xterm
 
-      val arrow : xterm -> xterm -> xterm
-      val arrowDep : xterm -> xterm -> xterm
+      val arrow : xtype -> xtype -> xtype
+      val arrowDep : xtype -> xtype -> xtype
       val arrowUniv : xterm -> xterm -> xterm
-      val lam : Term.binder -> xterm -> xterm -> xterm
+      val lam : Term.binder -> xtype -> xterm -> xterm
 
       (* G |- A -> B : type  -->  G |- A : type *)
-      val arrowInv1 : xterm -> xterm
+      val arrowInv1 : xtype -> xtype
 
       (* G |- A -> B : type  -->  G, A |- B : type *)
-      val arrowInv2 : xterm -> xterm
+      val arrowInv2 : xtype -> xtype
 
-      val forall : Term.binder -> xterm -> xterm -> xterm
+      val forall : Term.binder -> xtype -> xtype -> xtype
       val forallUniv : Term.binder -> xterm -> xterm -> xterm
-      val lamAll : Term.binder -> xterm -> xterm -> xterm   (* fn (x : A) . M *)
+      val lamAll : Term.binder -> xtype -> xterm -> xterm   (* fn (x : A) . M *)
 
       (* G |- forall A . B : type  -->  G |- A : type *)
-      val forallInv1 : xterm -> xterm
+      val forallInv1 : xtype -> xtype
 
       (* G |- forall A . B : type  -->  G, A |- B : type *)
-      val forallInv2 : xterm -> xterm
+      val forallInv2 : xtype -> xtype
 
       val intersectUniv : Term.binder -> xterm -> xterm -> xterm
-      val lamInt : Term.binder -> xterm -> xterm -> xterm   (* A |- M *)
-      val intersectInv1 : xterm -> xterm
-      val intersectInv2 : xterm -> xterm
+      val lamInt : Term.binder -> xtype -> xterm -> xterm   (* A |- M *)
+      val intersectInv1 : xtype -> xtype
+      val intersectInv2 : xtype -> xtype
 
 
       val app : xterm -> xterm -> xterm
       val apps : xterm -> xterm list -> xterm
       val appGuard : xterm -> Tactic.tactic -> xterm
 
-      val prod : xterm -> xterm -> xterm
+      val appWithGoal : xterm -> (xtype -> xterm) -> xterm
+
+      val prod : xtype -> xtype -> xtype
       val prodUniv : xterm -> xterm -> xterm
       val pair : xterm -> xterm -> xterm
       val pi1 : xterm -> xterm
@@ -82,12 +86,12 @@ signature XTERM =
       *)
       val splitProd : int -> xterm -> term -> xterm
 
-      val exists : Term.binder -> xterm -> xterm -> xterm
+      val exists : Term.binder -> xtype -> xtype -> xtype
       val existsUniv : Term.binder -> xterm -> xterm -> xterm
-      val pairEx : xterm -> xterm -> xterm -> xterm  (* <M, N> : A *)
+      val pairEx : xterm -> xterm -> xtype -> xterm  (* <M, N> : A *)
       val pi1Ex : xterm -> xterm
       val pi2Ex : xterm -> xterm
-      val tupleEx : xterm list -> xterm -> xterm   (* <M1, ... <Mn, ()>> : A *)
+      val tupleEx : xterm list -> xtype -> xterm   (* <M1, ... <Mn, ()>> : A *)
 
       (* if    G, A, B, G'[(1, 0) . ^2] |- M : C[under_i (1, 0) . ^2]
                i = |G'|
@@ -96,15 +100,15 @@ signature XTERM =
       val splitExists : int -> xterm -> term -> xterm
 
       (* G |- exists A . B : type  -->  G, A |- B : type *)
-      val existsInv2 : xterm -> xterm
+      val existsInv2 : xtype -> xtype
 
 
       val sumUniv : xterm -> xterm -> xterm
-      val inN : int -> xterm -> xterm -> xterm               (* inr ... inr inl M : A *)
-      val cas : xterm -> xterm -> xterm -> xterm -> xterm    (* sum_case(M, .N, .P) : C[M . id] *)
-      val multicase : xterm -> xterm list -> xterm -> xterm
+      val inN : int -> xterm -> xtype -> xterm               (* inr ... inr inl M : A *)
+      val cas : xterm -> xterm -> xterm -> xtype -> xterm    (* sum_case(M, .N, .P) : C[M . id] *)
+      val multicase : xterm -> xterm list -> xtype -> xterm
       
-      val unit : xterm
+      val unit : xtype
       val unitUniv : xterm -> xterm   (* unit : Ui *)
       val triv : xterm
 
@@ -116,25 +120,42 @@ signature XTERM =
 
       val voidUniv : xterm -> xterm   (* void : Ui *)
 
+      val integer : xtype
+      val integerUniv : xterm -> xterm   (* integer : Ui *)
+      val integerLiteral : IntInf.int -> xterm
+
+      val ifthenelse : xterm -> xterm -> xterm -> xterm
+
       val nat : int -> xterm
 
-      val univ : xterm -> xterm
+      val univ : xterm -> xtype
       val univUniv : xterm -> xterm
-      val forget : xterm -> xterm
+      val forget : xterm -> xtype
       val cumulativeSucc : xterm -> xterm
       val lsucc : xterm -> xterm
+
+      val lett : Term.binder -> xterm -> xterm -> xterm
     
       val weaken : xterm -> int -> xterm
+      val tweaken : xtype -> int -> xtype
       val weakenUnder : xterm -> int -> int -> xterm
+      val tweakenUnder : xtype -> int -> int -> xtype
+
+      (* apply the reduction to the type *)
+      val reduce : Reduction.reduction -> xterm -> xterm
+      val unreduce : xtype -> Reduction.reduction -> xterm -> xterm
 
       val hole : term -> term -> xterm
       val inhabitant : xterm -> Tactic.tactic
       val compact : Judgement.context -> xterm -> xterm
+      val tcompact : Judgement.context -> xtype -> xtype
 
       val use : mxterm -> xterm
+      val tuse : mxtype -> xtype
       val mobilize : Judgement.context -> xterm -> mxterm
+      val tmobilize : Judgement.context -> xtype -> mxtype
 
-      val inhabitedForm : xterm -> xterm
+      val inhabitedForm : xterm -> xtype
       
 
       (* (s, action)
@@ -149,19 +170,20 @@ signature XTERM =
       type xsub = Term.sub * xsub_action
 
       val sub : xterm -> xsub -> xterm
+      val tsub : xtype -> xsub -> xtype
 
       val id : xsub
       val shift : int -> xsub
-      val dot : xterm -> xterm -> xsub -> xsub  (* dot M A s = M . s, where M : A[s] *)
+      val dot : xterm -> xtype -> xsub -> xsub  (* dot M A s = M . s, where M : A[s] *)
       val compose : xsub -> xsub -> xsub
 
       val underShift : int -> int -> xsub       (* underShift i j = under_i ^j *)
       val dotid : xterm -> xsub
       val underEasy : int -> xsub -> xsub       (* underEasy k s = under_k s, but s must be Easy *)
-      val under : xterm list -> xsub -> xsub    (* under [Ai | i = 1 .. k] s = under_k s
+      val under : xtype list -> xsub -> xsub    (* under [Ai | i = 1 .. k] s = under_k s
                                                    where G, A1[s], ..., Ak[under_k-1 s] |- under_k s : G', A1, ..., Ak *)
 
-      val existsLeft : xterm -> xsub            (* existsLeft (exists A . B) = s, where G, (exists A . B) |- s : G, A, B *)
+      val existsLeft : xtype -> xsub            (* existsLeft (exists A . B) = s, where G, (exists A . B) |- s : G, A, B *)
       val prodLeft : xsub                       (* G, A & B |- prodLeft : G, A, B[^] *)
 
    end
@@ -182,18 +204,21 @@ structure XTerm :>
 
 
       type term = T.term
-      type xterm = T.term * T.term * tactic
+      type xterm = term * term * Tactic.tactic
+      type xtype = term * Tactic.tactic
       type mxterm = term * term * Judgement.judgement * Refine.validation
-
+      type mxtype = term * Judgement.judgement * Refine.validation
 
       val elements : T.term list ref = ref []
 
       fun error str l =
          (
          elements := l;
-         raise (Fail ("xterm error: str"))
+         raise (Fail ("xterm error: " ^ str))
          )
 
+
+      val doCheck = false
 
       fun checkNo _ = ()
 
@@ -207,10 +232,7 @@ structure XTerm :>
                 else
                    raise Case.Backtrack)
 
-(* for debugging
-      val check = checkYes
-*)
-      val check = checkNo
+      val check = if doCheck then checkYes else checkNo
       
 
 
@@ -228,17 +250,15 @@ structure XTerm :>
 
       fun mterm (m, _, _, _) = m
 
+      fun typ (a, _) = a
 
-      fun var i (a, u, _) =
-         termCase u
-         / \Prim.bogus\ =!>
-           \(fnc =>
-                (T.Var i,
-                 T.Sub (a, T.Shift (i+1)),
-                 refine (Rule.hypothesisOf i)))\
+      fun mtyp (a, _, _) = a
 
-         | _ => \(fnc => error "var" [natTerm i, a, u])\
-         /
+
+      fun var i (a, _) =
+         (T.Var i,
+          T.Sub (a, T.Shift (i+1)),
+          refine (Rule.hypothesisOf i))
 
 
       fun vart i a =
@@ -257,37 +277,29 @@ structure XTerm :>
          with _ => error "constant" [(T.Const const)]
 
 
-      fun arrow (a, u, atac) (b, u', btac) =
-         term2Case u u'
-         / \Prim.bogus\ ; \Prim.bogus\ =>
-           \(fnc =>
-                (T.apply2 Prim.arrow a b,
-                 bogus,
-       
-                 refine (Rule.arrowForm a b)
-                 >>> [atac, refine (Rule.weaken 0 1) >> btac]))\
+      fun arrow (a, atac) (b, btac) =
+         (T.apply2 Prim.arrow a b,
 
-         | _ => \(fnc => error "arrow" [a, u, b, u'])\
-         /
+          refine (Rule.arrowForm a b)
+          >>> [atac, refine (Rule.weaken 0 1) >> btac])
 
 
-      fun arrowDep (a, u, atac) (b, u', btac) =
-         term2Case u u'
-         / \Prim.bogus\ ; \Prim.bogus\ =!>
-           \(fnc =>
-                let
-                   val b' = T.Sub (b, T.Dot (bogus, T.id))
-                in
-                   check [(T.Sub (b', T.shift1), b)];
+      fun arrowDep (a, atac) (b, btac) =
+         unitCase
+         /| _ =!>
+            \(fnc =>
+                 let
+                    val b' = T.Sub (b, T.Dot (bogus, T.id))
+                 in
+                    check [(T.Sub (b', T.shift1), b)];
+        
+                    (T.apply2 Prim.arrow a b',
+           
+                     refine (Rule.arrowForm a b')
+                     >>> [atac, btac])
+                 end)\
 
-                   (T.apply2 Prim.arrow a b',
-                    bogus,
-          
-                    refine (Rule.arrowForm a b')
-                    >>> [atac, btac])
-                end)\
-
-         | _ => \(fnc => error "arrowDep" [a, u, b, u'])\
+          | _ => \(fnc => error "arrowDep" [a, b])\
          /
 
 
@@ -308,33 +320,32 @@ structure XTerm :>
          /
 
 
-      fun lam binder (a, u, atac) (m, b, mtac) =
-         termCase u
-         / \Prim.bogus\ =!>
-           \(fnc =>
-                let
-                   (* b shouldn't mention 0 *)
-                   val b' = T.Sub (b, T.Dot (bogus, T.id))
-                in
-                   check [(T.Sub (b', T.shift1), b)];
+      fun lam binder (a, atac) (m, b, mtac) =
+         unitCase
+         /| _ =!>
+            \(fnc =>
+                 let
+                    (* b shouldn't mention 0 *)
+                    val b' = T.Sub (b, T.Dot (bogus, T.id))
+                 in
+                    check [(T.Sub (b', T.shift1), b)];
+        
+                    (T.Lam (binder, m),
+                     T.apply2 Prim.arrow a b',
+        
+                     refine (Rule.arrowIntroOf a b' m)
+                     >>> [atac, mtac])
+                 end)\
 
-                   (T.Lam (binder, m),
-                    T.apply2 Prim.arrow a b',
-       
-                    refine (Rule.arrowIntroOf a b' m)
-                    >>> [atac, mtac])
-                end)\
-
-         | _ => \(fnc => error "lam" [a, u, m, b])\
+          | _ => \(fnc => error "lam" [a, m, b])\
          /
 
 
-      fun arrowInv1 (ab, u, abtac) =
-         term2Case ab u
-         / \Prim.arrow\ ? ? ; \Prim.bogus\ =!>
+      fun arrowInv1 (ab, abtac) =
+         termCase ab
+         / \Prim.arrow\ ? ? =!>
            \(fnc a b =>
                 (a,
-                 bogus,
  
                  (* G |- A : type *)
                  refine (Rule.arrowFormInv1 a b)
@@ -342,16 +353,15 @@ structure XTerm :>
                  (* G |- A -> B : type *)
                  abtac))\
 
-         | _ => \(fnc => error "arrowInv1" [ab, u])\
+         | _ => \(fnc => error "arrowInv1" [ab])\
          /
 
 
-      fun arrowInv2 (ab, u, abtac) =
-         term2Case ab u
-         / \Prim.arrow\ ? ? ; \Prim.bogus\ =!>
+      fun arrowInv2 (ab, abtac) =
+         termCase ab
+         / \Prim.arrow\ ? ? =!>
            \(fnc a b =>
                 (T.Sub (b, T.shift1),
-                 bogus,
  
                  (* G, A |- B[^] : type *)
                  refine (Rule.arrowFormInv2
@@ -369,24 +379,15 @@ structure XTerm :>
                      refine (Rule.hypothesisOf 0)
                      ]))\
 
-         | _ => \(fnc => error "arrowInv2" [ab, u])\
+         | _ => \(fnc => error "arrowInv2" [ab])\
          /
 
 
-      fun forall binder (a, u, atac) (b, u', btac) =
-         term2Case u u'
-         / \Prim.bogus\ ; \Prim.bogus\ =!>
-           \(fnc =>
-                (
-                (T.apply2 Prim.forall a (T.Lam (binder, b)), 
-                 bogus,
- 
-                 refine (Rule.forallForm a b)
-                 >>> [atac, btac])
-                ))\
+      fun forall binder (a, atac) (b, btac) =
+         (T.apply2 Prim.forall a (T.Lam (binder, b)), 
 
-         | _ => \(fnc => error "forall" [a, u, b, u'])\
-         /
+          refine (Rule.forallForm a b)
+          >>> [atac, btac])
 
 
       fun forallUniv binder (a, u, atac) (b, u', btac) =
@@ -406,26 +407,19 @@ structure XTerm :>
          /
 
 
-      fun lamAll binder (a, u, atac) (m, b, mtac) =
-         termCase u
-         / \Prim.bogus\ =!>
-           \(fnc =>
-                (T.Lam (binder, m),
-                 T.apply2 Prim.forall a (T.Lam (binder, b)),
-                 
-                 refine (Rule.forallIntroOf a b m)
-                 >>> [atac, mtac]))\
-
-         | _ => \(fnc => error "lamAll" [a, u, m, b])\
-         /
+      fun lamAll binder (a, atac) (m, b, mtac) =
+         (T.Lam (binder, m),
+          T.apply2 Prim.forall a (T.Lam (binder, b)),
+          
+          refine (Rule.forallIntroOf a b m)
+          >>> [atac, mtac])
 
 
-      fun forallInv1 (ab, u, abtac) =
-         term2Case ab u
-         / \Prim.forall\ ? (fn . ?) ; \Prim.bogus\ =!>
+      fun forallInv1 (ab, abtac) =
+         termCase ab
+         / \Prim.forall\ ? (fn . ?) =!>
            \(fnc a b =>
                 (a,
-                 bogus,
  
                  (* G |- A : type *)
                  refine (Rule.forallFormInv1 a b)
@@ -433,16 +427,15 @@ structure XTerm :>
                  (* G |- forall A . B : type *)
                  abtac))\
 
-         | _ => \(fnc => error "forallInv1" [ab, u])\
+         | _ => \(fnc => error "forallInv1" [ab])\
          /
 
 
-      fun forallInv2 (ab, u, abtac) =
-         term2Case ab u
-         / \Prim.forall\ ? (fn . ?) ; \Prim.bogus\ =!>
+      fun forallInv2 (ab, abtac) =
+         termCase ab
+         / \Prim.forall\ ? (fn . ?) =!>
            \(fnc a b =>
                 (b,
-                 bogus,
  
                  (* G, A |- B : type
                           = B[0 . ^2][0 . id] : type
@@ -462,7 +455,7 @@ structure XTerm :>
                      refine (Rule.hypothesisOf 0)
                      ]))\
 
-         | _ => \(fnc => error "forallInv2" [ab, u])\
+         | _ => \(fnc => error "forallInv2" [ab])\
          /
 
 
@@ -483,32 +476,31 @@ structure XTerm :>
          /
 
 
-      fun lamInt binder (a, u, atac) (m, b, mtac) =
-         termCase u
-         / \Prim.bogus\ =!>
-           \(fnc =>
-                let
-                   val m' = T.Sub (m, T.Dot (bogus, T.id))
-                in
-                   check [(T.Sub (m', T.shift1), m)];
+      fun lamInt binder (a, atac) (m, b, mtac) =
+         unitCase
+         /| _ =>
+            \(fnc =>
+                 let
+                    val m' = T.Sub (m, T.Dot (bogus, T.id))
+                 in
+                    check [(T.Sub (m', T.shift1), m)];
+        
+                    (m',
+                     T.apply2 Prim.intersect a (T.Lam (binder, b)),
+           
+                     refine (Rule.intersectIntroOf a b m')
+                     >>> [atac, mtac])
+                 end)\
 
-                   (m',
-                    T.apply2 Prim.intersect a (T.Lam (binder, b)),
-          
-                    refine (Rule.intersectIntroOf a b m')
-                    >>> [atac, mtac])
-                end)\
-
-         | _ => \(fnc => error "lamInt" [a, u, m, b])\
+          | _ => \(fnc => error "lamInt" [a, m, b])\
          /
        
 
-      fun intersectInv1 (ab, u, abtac) =
-         term2Case ab u
-         / \Prim.intersect\ ? (fn . ?) ; \Prim.bogus\ =!>
+      fun intersectInv1 (ab, abtac) =
+         termCase ab
+         / \Prim.intersect\ ? (fn . ?) =!>
            \(fnc a b =>
                 (a,
-                 bogus,
  
                  (* G |- A : type *)
                  refine (Rule.intersectFormInv1 a b)
@@ -516,16 +508,15 @@ structure XTerm :>
                  (* G |- intersect A . B : type *)
                  abtac))\
 
-         | _ => \(fnc => error "intersectInv1" [ab, u])\
+         | _ => \(fnc => error "intersectInv1" [ab])\
          /
 
 
-      fun intersectInv2 (ab, u, abtac) =
-         term2Case ab u
-         / \Prim.intersect\ ? (fn . ?) ; \Prim.bogus\ =!>
+      fun intersectInv2 (ab, abtac) =
+         termCase ab
+         / \Prim.intersect\ ? (fn . ?) =!>
            \(fnc a b =>
                 (b,
-                 bogus,
  
                  (* G, A |- B : type
                           = B[0 . ^2][0 . id] : type
@@ -545,7 +536,7 @@ structure XTerm :>
                      refine (Rule.hypothesisOf 0)
                      ]))\
 
-         | _ => \(fnc => error "intersectInv2" [ab, u])\
+         | _ => \(fnc => error "intersectInv2" [ab])\
          /
 
 
@@ -593,6 +584,108 @@ structure XTerm :>
          List.foldl (fns n f => app f n) m l
 
 
+      fun appWithGoal (m, ab, mtac) f =
+         termCase ab
+         / \Prim.arrow\ ? ? =>
+           \(fnc a b =>
+                let
+                   val x = 
+                      (a,
+
+                       (* A : type *)
+                       refine (Rule.arrowFormInv1 a b)
+                       >>+
+                       (* A -> B : type *)
+                       refine (Rule.inhabitedForm (T.evar ()))
+                       >>+
+                       (* A -> B *)
+                       refine (Rule.inhabitant (T.evar ()) m)
+                       >>+
+                       (* M : A -> B *)
+                       mtac)
+
+                   val (p, a', ptac) = f x
+                in
+                   try
+                      check [(a, a')]
+                   with
+                      Case.Backtrack => error "appWithGoal-arrow" [m, ab, p, a'];
+
+                   (T.app m p, 
+                    b,
+    
+                    refine (Rule.arrowElimOf a b m p)
+                    >>> [mtac, ptac])
+                end)\
+
+         | \Prim.forall\ ? (fn . ?) =>
+           \(fnc a b =>
+                let
+                   val x =
+                      (a,
+
+                       (* A : type *)
+                       refine (Rule.forallFormInv1 a b)
+                       >>+
+                       (* forall A . B : type *)
+                       refine (Rule.inhabitedForm (T.evar ()))
+                       >>+
+                       (* forall A . B *)
+                       refine (Rule.inhabitant (T.evar ()) m)
+                       >>+
+                       (* M : forall A . B *)
+                       mtac)
+
+                   val (p, a', ptac) = f x
+                in
+                   try
+                      check [(a, a')]
+                   with
+                      Case.Backtrack => error "appWithGoal-forall" [m, ab, p, a'];
+
+                   (T.app m p,
+                    T.Sub (b, T.Dot (p, T.id)),
+    
+                    refine (Rule.forallElimOf a b m p)
+                    >>> [mtac, ptac])
+                end)\
+
+         | \Prim.intersect\ ? (fn . ?) =>
+           \(fnc a b =>
+                let
+                   val x =
+                      (a,
+
+                       (* A : type *)
+                       refine (Rule.intersectFormInv1 a b)
+                       >>+
+                       (* intersect A . B : type *)
+                       refine (Rule.inhabitedForm (T.evar ()))
+                       >>+
+                       (* intersect A . B *)
+                       refine (Rule.inhabitant (T.evar ()) m)
+                       >>+
+                       (* M : intersect A . B *)
+                       mtac)
+
+                   val (p, a', ptac) = f x
+                in
+                   try
+                      check [(a, a')]
+                   with
+                      Case.Backtrack => error "appWithGoal-intersect" [m, ab, p, a'];
+
+                   (m,
+                    T.Sub (b, T.Dot (p, T.id)),
+    
+                    refine (Rule.intersectElimOf a b m p)
+                    >>> [mtac, ptac])
+                end)\
+
+         | _ => \(fnc => error "appWithGoal" [m, ab])\
+         /
+                
+      
       fun appGuard (m, ab, mtac) atac =
          termCase ab
          / \Prim.guard\ ? ? =!>
@@ -608,18 +701,11 @@ structure XTerm :>
          /
 
 
-      fun prod (a, u, atac) (b, u', btac) =
-         term2Case u u'
-         / \Prim.bogus\ ; \Prim.bogus\ =>
-           \(fnc =>
-                (T.apply2 Prim.prod a b, 
-                 bogus,
-       
-                 refine (Rule.prodForm a b)
-                 >>> [atac, btac]))\
+      fun prod (a, atac) (b, btac) =
+         (T.apply2 Prim.prod a b, 
 
-         | _ => \(fnc => error "prod" [a, u, b, u'])\
-         /
+          refine (Rule.prodForm a b)
+          >>> [atac, btac])
 
 
       fun prodUniv (a, u, atac) (b, u', btac) =
@@ -698,18 +784,11 @@ structure XTerm :>
          /
 
 
-      fun exists binder (a, u, atac) (b, u', btac) =
-         term2Case u u'
-         / \Prim.bogus\ ; \Prim.bogus\ =!>
-           \(fnc =>
-                (T.apply2 Prim.exists a (T.Lam (binder, b)), 
-                 bogus,
-       
-                 refine (Rule.existsForm a b)
-                 >>> [atac, btac]))\
+      fun exists binder (a, atac) (b, btac) =
+         (T.apply2 Prim.exists a (T.Lam (binder, b)), 
 
-         | _ => \(fnc => error "exists" [a, u, b, u'])\
-         /
+          refine (Rule.existsForm a b)
+          >>> [atac, btac])
 
 
       fun existsUniv binder (a, u, atac) (b, u', btac) =
@@ -729,9 +808,9 @@ structure XTerm :>
          /
 
 
-      fun pairEx (m, a, mtac) (n, bm, ntac) (b, u, btac) =
-         termCase u
-         / \Prim.bogus\ =!>
+      fun pairEx (m, a, mtac) (n, bm, ntac) (b, btac) =
+         unitCase
+         / _ =!>
            \(fnc =>
                 (
                 check [(bm, T.Sub (b, T.Dot (m, T.id)))];
@@ -742,7 +821,7 @@ structure XTerm :>
                  >>> [btac, mtac, ntac])
                 ))\
 
-         | _ => \(fnc => error "pairEx" [m, a, n, bm, b, u])\
+         | _ => \(fnc => error "pairEx" [m, a, n, bm, b])\
          /
 
 
@@ -795,12 +874,11 @@ structure XTerm :>
          /
 
 
-      fun existsInv2 (ab, u, abtac) =
-         term2Case ab u
-         / \Prim.exists\ ? (fn . ?) ; \Prim.bogus\ =!>
+      fun existsInv2 (ab, abtac) =
+         termCase ab
+         / \Prim.exists\ ? (fn . ?) =!>
            \(fnc a b =>
                 (b,
-                 bogus,
  
                  (* G, A |- B : type
                           = B[0 . ^2][0 . id] : type
@@ -820,7 +898,7 @@ structure XTerm :>
                      refine (Rule.hypothesisOf 0)
                      ]))\
 
-         | _ => \(fnc => error "existsInv2" [ab, u])\
+         | _ => \(fnc => error "existsInv2" [ab])\
          /
 
 
@@ -843,7 +921,6 @@ structure XTerm :>
          
       val unit =
          (T.Const Prim.unit,
-          bogus,
           refine Rule.unitForm)
 
 
@@ -906,6 +983,48 @@ structure XTerm :>
          /
           
 
+      val integer =
+         (T.Const Prim.integer,
+          refine Rule.integerForm)
+
+
+      fun integerUniv (lv, a, lvtac) =
+         unitCase
+         / _ =!>
+           \(fnc =>
+                (
+                check [(a, T.Const Prim.level)];
+                (T.Const Prim.integer,
+                 T.apply1 Prim.univ lv,
+                 
+                 refine (Rule.integerFormUniv lv) >> lvtac)
+                ))\
+
+         | _ => \(fnc => error "integerUniv" [lv, a])\
+         /
+
+
+      fun integerLiteral i =
+         (T.Native (T.Integer i),
+          T.Const Prim.integer,
+          refine Rule.integerIntroOf)
+          
+
+      fun ifthenelse (cond, c, condtac) (t, a, ttac) (f, a', ftac) =
+         unitCase
+         /| _ =!>
+            \(fnc =>
+                 (
+                 check [(c, T.Const Prim.bool), (a, a')];
+                 (T.apply3 Prim.ite cond t f,
+                  a,
+                  refine (Rule.boolElimOfNondep a cond t f) >>> [condtac, ttac, ftac])
+                 ))\
+
+          | _ => \(fnc => error "ifthenelse" [cond, c, t, a, f, a'])\
+         /
+
+
       fun nat i =
          if i = 0 then
             (T.Const Prim.zero,
@@ -931,7 +1050,6 @@ structure XTerm :>
                 (
                 check [(a, T.Const Prim.level)];
                 (T.apply1 Prim.univ lv,
-                 bogus,
        
                  refine (Rule.univForm lv) >> lvtac)
                 ))\
@@ -958,7 +1076,6 @@ structure XTerm :>
          / \Prim.univ\ ? =!>
            \(fnc lv =>
                 (a, 
-                 bogus,
  
                  refine (Rule.univForgetOf a lv) >> atac))\
 
@@ -998,6 +1115,26 @@ structure XTerm :>
          /
 
 
+      fun lett binder (m, a, mtac) (n, b, ntac) =
+         unitCase
+         /| _ =>
+            \(fnc =>
+                 let
+                    (* b shouldn't mention 0 *)
+                    val b' = T.Sub (b, T.Dot (bogus, T.id))
+                 in
+                    check [(T.Sub (b', T.shift1), b)];
+        
+                    (T.apply2 Prim.lett m (T.Lam (binder, n)),
+                     b',
+     
+                     refine (Rule.letForm a b' m n) >>> [mtac, ntac])
+                 end)\
+
+          | _ => \(fnc => error "lett" [m, a, n, b])\
+         /
+        
+
       fun weaken (m, a, mtac) i =
          (T.Sub (m, T.Shift i),
           T.Sub (a, T.Shift i),
@@ -1005,9 +1142,21 @@ structure XTerm :>
           refine (Rule.weaken 0 i) >> mtac)
 
 
+      fun tweaken (m, mtac) i =
+         (T.Sub (m, T.Shift i),
+
+          refine (Rule.weaken 0 i) >> mtac)
+
+
       fun weakenUnder (m, a, mtac) j i =
          (T.Sub (m, T.under j (T.Shift i)),
           T.Sub (a, T.under j (T.Shift i)),
+
+          refine (Rule.weaken j i) >> mtac)
+
+
+      fun tweakenUnder (m, mtac) j i =
+         (T.Sub (m, T.under j (T.Shift i)),
 
           refine (Rule.weaken j i) >> mtac)
 
@@ -1034,76 +1183,127 @@ structure XTerm :>
                         raise (Fail "precondition")))\
 
           | \Prim.exists\ ? (fn . ?) =>
-            \fnc b c =>
-                (case l of
-                    (m, b', mtac) :: rest =>
-                       (
-                       check [(b, b')];
+            \(fnc b c =>
+                 (case l of
+                     (m, b', mtac) :: rest =>
+                        (
+                        check [(b, b')];
+ 
+                        (* G, (exists B . C) : type |- (M[^], Rest[^]) : exists B[^] . C[0 . ^2] *)
+                        refine (Rule.assert (T.Sub (T.apply2 Prim.ov b m, T.shift1)) (T.evar ()))
+                        >>> [
+                            (* G, (exists B . C) : type |- M[^] : B[^] *)
+                            refine (Rule.weaken 0 1)
+                            >>
+                            (* G |- M : B *)
+                            mtac,
+ 
+                            (* G, (exists B . C) : type, M[^] : B[^] |- (M[^2], Rest[^2]) : exists B[^2] . C[0 . ^3] *)
+                            refine (Rule.existsIntroOf (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                            >>> [
+                                (* G, (exists B . C) : type, M[^] : B[^], B[^2] |- C[0 . ^3] : type
+                                                                                 = C[0 . ^4][0 . id] *)
+                                refine (Rule.existsFormInv2 (T.Sub (b, T.Shift 3)) (T.Sub (c, T.Idot (0, T.Shift 4))) T.zero)
+                                >>> [
+                                    (* G, (exists B . C) : type, M[^] : B[^], B[^2] |- exists B[^3] . C[0 . ^4] : type *)
+                                    refine (Rule.hypothesis 2),
+                                    
+                                    (* G, (exists B . C) : type, M[^] : B[^], B[^2] |- 0 : B[^3] *)
+                                    refine (Rule.hypothesisOf 0)
+                                    ],
+     
+                                (* G, (exists B . C) : type, M[^] : B[^] |- M[^2] : B[^2] *)
+                                refine (Rule.hypothesis 0),
+     
+                                (* G, (exists B . C) : type, M[^] : B[^] |- Rest[^2] : C[0 . ^3][M[^2] . id]
+                                                                          = Rest[^2] : C[M[^2] . ^2]
+                                *)
+                                refine (Rule.assert (T.apply1 Prim.istp (T.Sub (c, T.Dot (T.Sub (m, T.Shift 2), T.Shift 2)))) (T.evar ()))
+                                >>> [
+                                    (* G, (exists B. C) : type, M[^] : B[^] |- C[M[^2] . ^2] : type
+                                                                             = C[0 . ^3][M[^2] . id]
+                                    *)
+                                    refine (Rule.existsFormInv2 (T.Sub (b, T.Shift 2)) (T.Sub (c, T.Idot (0, T.Shift 3))) (T.Sub (m, T.Shift 2)))
+                                    >>> [
+                                        (* G, (exists B . C) : type, M[^] : B[^] |- exists B[^2] . C[0 . ^3] : type *)
+                                        refine (Rule.hypothesis 1),
+     
+                                        (* G, (exists B . C) : type, M[^] : B[^] |- M[^2] : B[^2] *)
+                                        refine (Rule.hypothesis 0)
+                                        ],
+     
+                                    (* G, (exists B . C) : type, M[^] : B[^], C[M[^2] . ^2] : type |- Rest[^3] : C[M[^3] . ^3] *)
+                                    refine (Rule.weaken 1 2)
+                                    >>
+                                    (* G, C[M . id] : type |- Rest[^1] : C[M[^] . ^] *)
+                                    tupleExLoop (T.Sub (c, T.Dot (m, T.id))) rest
+                                    ]
+                                ]
+                            ]
+                        )
+ 
+                   | [] =>
+                        (* too few arguments *)
+                        raise (Fail "precondition")))\
+ 
+          | \Prim.prod\ ? ? =>
+            \(fnc b c =>
+                 (case l of
+                     (m, b', mtac) :: rest =>
+                        (
+                        check [(b, b')];
+                        
+                        (* G, (B & C) : type |- (M[^], Rest[^]) : B[^] & C[^] *)
+                        refine (Rule.assert (T.Sub (T.apply2 Prim.ov b m, T.shift1)) (T.evar ()))
+                        >>> [
+                            (* G, (B & C) : type |- M[^] : B[^] *)
+                            refine (Rule.weaken 0 1)
+                            >>+
+                            (* G |- M : B *)
+                            mtac,
 
-                       (* G, (exists B . C) : type |- (M[^], Rest[^]) : exists B[^] . C[0 . ^2] *)
-                       refine (Rule.assert (T.Sub (T.apply2 Prim.ov b m, T.shift1)) (T.evar ()))
-                       >>> [
-                           (* G, (exists B . C) : type |- M[^] : B[^] *)
-                           refine (Rule.weaken 0 1)
-                           >>
-                           (* G |- M : B *)
-                           mtac,
+                            (* G, (B & C) : type, M[^] : B[^] |- (M[^2], Rest[^2]) : B[^2] & C[^2] *)
+                            refine (Rule.prodIntroOf (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                            >>> [
+                                (* G, (B & C) : type, M[^] : B[^] |- M[^2] : B[^2] *)
+                                refine (Rule.hypothesis 0),
 
-                           (* G, (exists B . C) : type, M[^] : B[^] |- (M[^2], Rest[^2]) : exists B[^2] . C[0 . ^3] *)
-                           refine (Rule.existsIntroOf (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
-                           >>> [
-                               (* G, (exists B . C) : type, M[^] : B[^], B[^2] |- C[0 . ^3] : type
-                                                                                = C[0 . ^4][0 . id] *)
-                               refine (Rule.existsFormInv2 (T.Sub (b, T.Shift 3)) (T.Sub (c, T.Idot (0, T.Shift 4))) T.zero)
-                               >>> [
-                                   (* G, (exists B . C) : type, M[^] : B[^], B[^2] |- exists B[^3] . C[0 . ^4] : type *)
-                                   refine (Rule.hypothesis 2),
-                                   
-                                   (* G, (exists B . C) : type, M[^] : B[^], B[^2] |- 0 : B[^3] *)
-                                   refine (Rule.hypothesisOf 0)
-                                   ],
-    
-                               (* G, (exists B . C) : type, M[^] : B[^] |- M[^2] : B[^2] *)
-                               refine (Rule.hypothesis 0),
-    
-                               (* G, (exists B . C) : type, M[^] : B[^] |- Rest[^2] : C[0 . ^3][M[^2] . id]
-                                                                         = Rest[^2] : C[M[^2] . ^2]
-                               *)
-                               refine (Rule.assert (T.apply1 Prim.istp (T.Sub (c, T.Dot (T.Sub (m, T.Shift 2), T.Shift 2)))) (T.evar ()))
-                               >>> [
-                                   (* G, (exists B. C) : type, M[^] : B[^] |- C[M[^2] . ^2] : type
-                                                                            = C[0 . ^3][M[^2] . id]
-                                   *)
-                                   refine (Rule.existsFormInv2 (T.Sub (b, T.Shift 2)) (T.Sub (c, T.Idot (0, T.Shift 3))) (T.Sub (m, T.Shift 2)))
-                                   >>> [
-                                       (* G, (exists B . C) : type, M[^] : B[^] |- exists B[^2] . C[0 . ^3] : type *)
-                                       refine (Rule.hypothesis 1),
-    
-                                       (* G, (exists B . C) : type, M[^] : B[^] |- M[^2] : B[^2] *)
-                                       refine (Rule.hypothesis 0)
-                                       ],
-    
-                                   (* G, (exists B . C) : type, M[^] : B[^], C[M[^2] . ^2] : type |- Rest[^3] : C[M[^3] . ^3] *)
-                                   refine (Rule.weaken 1 2)
-                                   >>
-                                   (* G, C[M . id] : type |- Rest[^1] : C[M[^] . ^] *)
-                                   tupleExLoop (T.Sub (c, T.Dot (m, T.id))) rest
-                                   ]
-                               ]
-                           ]
-                       )
+                                (* G, (B & C) : type, M[^] : B[^] |- Rest[^2] : C[^2] *)
+                                refine (Rule.assert (T.apply1 Prim.istp (T.Sub (c, T.Shift 2))) (T.evar ()))
+                                >>> [
+                                    (* G, (B & C) : type, M[^] : B[^] |- C[^2] : type *)
+                                    refine (Rule.prodFormInv2 (T.Sub (b, T.Shift 2)) (T.evar ()))
+                                    >>> [
+                                        (* G, (B & C) : type, M[^] : B[^] |- B[^2] & C[^2] : type *)
+                                        refine (Rule.hypothesis 1),
 
-                  | [] =>
-                       (* too few arguments *)
-                       raise (Fail "precondition"))\
+                                        (* G, (B & C) : type, M[^] : B[^] |- B[^2] *)
+                                        refine (Rule.inhabitant (T.evar ()) (T.Sub (m, T.Shift 2)))
+                                        >>+
+                                        (* G, (B & C) : type, M[^] : B[^] |- M[^2] : B[^2] *)
+                                        refine (Rule.hypothesis 0)
+                                        ],
+    
+                                    (* G, (B & C) : type, M[^] : B[^], C[^2] : type |- Rest[^3] : C[^3] *)
+                                    refine (Rule.weaken 1 2)
+                                    >>+
+                                    (* G, C : type |- Rest[^] : C[^] *)
+                                    tupleExLoop c rest
+                                    ]
+                                ]
+                            ]
+                        )
 
+                   | [] =>
+                        (* too few arguments *)
+                        raise (Fail "precondition")))\
 
          | _ => \(fnc => raise Case.Backtrack)\
          /
 
-      fun tupleEx l (a, u, atac) =
-         termCase u
-         / \Prim.bogus\ =!>
+      fun tupleEx l (a, atac) =
+         unitCase
+         / _ =!>
            \(fnc =>
                 let
                    val tac = tupleExLoop a l
@@ -1129,7 +1329,7 @@ structure XTerm :>
                         (List.foldr
                             (fns (m, b, _) l' =>
                                 m :: b :: l')
-                            [a, u]
+                            [a]
                             l))\
          /
 
@@ -1201,9 +1401,9 @@ structure XTerm :>
          else
             T.apply1 Prim.inr (inNTerm (i-1) m)
 
-      fun inN i (m, b, mtac) (a, u, atac) =
-         termCase u
-         / \Prim.bogus\ =!>
+      fun inN i (m, b, mtac) (a, atac) =
+         unitCase
+         / _ =!>
            \(fnc =>
                 let
                    val tac = inNLoop a i b mtac
@@ -1223,14 +1423,14 @@ structure XTerm :>
                                  ]))
                 end)\
 
-         | _ => \(fnc => error "inN" [natTerm i, m, b, a, u])\
+         | _ => \(fnc => error "inN" [natTerm i, m, b, a])\
          /
 
 
 
-      fun cas (m, a, mtac) (n, b, ntac) (p, b', ptac) (c, d, ctac) =
-         term2Case a d
-         / \Prim.sum\ ? ? ; \Prim.bogus\ =!>
+      fun cas (m, a, mtac) (n, b, ntac) (p, b', ptac) (c, ctac) =
+         termCase a
+         / \Prim.sum\ ? ? =!>
            \(fnc a1 a2 =>
                 (
                 check [(b, T.Sub (c, T.Dot (T.apply1 Prim.inl T.zero, T.shift1))),
@@ -1243,7 +1443,7 @@ structure XTerm :>
                  >>> [mtac, ntac, ptac])
                 ))\
 
-         | _ => \(fnc => error "cas" [m, a, n, b, p, b', c, d])\
+         | _ => \(fnc => error "cas" [m, a, n, b, p, b', c])\
          /
 
 
@@ -1312,9 +1512,9 @@ structure XTerm :>
                 | _ => \(fnc => raise Case.Backtrack)\
                 /)
 
-      fun multicase (m, a, mtac) l (c, d, _) =
-         term2Case a d
-         / \Prim.sum\ ? ? ; \Prim.bogus\ =!>
+      fun multicase (m, a, mtac) l (c, _) =
+         termCase a
+         / \Prim.sum\ ? ? =!>
            \(fnc a1 a2 =>
                 (case l of
                     [] => raise Case.Backtrack
@@ -1333,7 +1533,7 @@ structure XTerm :>
                            >>> [mtac, ntac, ptac])
                        end))\
 
-         | \Prim.void\ ; \Prim.bogus\ =!>
+         | \Prim.void\ =!>
            \(fnc =>
                 (case l of
                     [] =>
@@ -1353,14 +1553,52 @@ structure XTerm :>
                         (m :: a ::
                          List.foldr
                             (fns (m, b, _) l' => m :: b :: l')
-                            [c, d]
+                            [c]
                             l))\
-        /
+         /
 
+
+
+      fun reduce r (m, a, mtac) =
+         let
+            val b = 
+               try
+                  Reduction.reduce r a
+               with
+                  Reduction.Reduce => error "reduce" [m, a]
+         in
+            (m, b,
+
+             (* M : B *)
+             refine (Rule.unreduce (T.apply2 Prim.ov a m) (Reduction.compat [r]))
+             >>+
+             (* M : A *)
+             mtac)
+         end
+
+
+      fun unreduce (b, _) r (m, a, mtac) =
+         (
+         if doCheck then
+            try
+               check [(Reduction.reduce r b, a)]
+            with
+               Reduction.Reduce => error "unreduce-fail" [b, m, a]
+             | Case.Backtrack => error "unreduce" [b, m, a]
+         else
+            ();
+
+         (m, b,
+
+          (* M : B *)
+          refine (Rule.reduce (Reduction.compat [r]))
+          >>+
+          (* M : A *)
+          mtac)
+         )
 
 
       fun hole m a = (m, a, idtac)
-
 
 
       fun inhabitant (m, a, tac) =
@@ -1370,14 +1608,7 @@ structure XTerm :>
 
       fun mobilize ctx (m, a, tac) =
          let
-            val jud = 
-               termCase a
-               /| \Prim.bogus\ =>
-                  \(fnc => Judgement.make ctx (T.apply1 Prim.istp m))\
-
-                | _ =>
-                  \(fnc => Judgement.make ctx (T.apply2 Prim.ov a m))\
-               /
+            val jud = Judgement.make ctx (T.apply2 Prim.ov a m)
          in
             (case Tactic.execute (jud, Directory.empty) tac of
                 Sum.INL v =>
@@ -1388,12 +1619,29 @@ structure XTerm :>
          end
 
 
+      fun tmobilize ctx (m, tac) =
+         let
+            val jud = Judgement.make ctx (T.apply1 Prim.istp m)
+         in
+            (case Tactic.execute (jud, Directory.empty) tac of
+                Sum.INL v =>
+                   (m, jud, v)
+
+              | Sum.INR msg =>
+                   raise (Fail ("xterm internal proof failure: " ^ msg)))
+         end
+
+
       fun use (m, a, jud, v) = (m, a, cast jud v)
+
+      fun tuse (m, jud, v) = (m, cast jud v)
 
       fun compact ctx m = use (mobilize ctx m)
 
+      fun tcompact ctx m = tuse (tmobilize ctx m)
+
       fun inhabitedForm (m, a, tac) =
-         (a, bogus,
+         (a,
           
           (* A : type *)
           refine (Rule.inhabitedForm a)
@@ -1430,6 +1678,11 @@ structure XTerm :>
          (T.Sub (m, s),
           T.Sub (a, s),
           lift (fn () => perform action (T.apply2 Prim.ov a m) mtac))
+
+
+      fun tsub (m, mtac) (s, action) =
+         (T.Sub (m, s),
+          lift (fn () => perform action (T.apply1 Prim.istp m) mtac))
 
 
       val id = (T.id, Easy [])
@@ -1480,9 +1733,9 @@ structure XTerm :>
                         (perform action c ctac))))
              
 
-      fun dot (m, a_s, mtac) (a, u, atac) (s, action) =
-         termCase u
-         / \Prim.bogus\ =!>
+      fun dot (m, a_s, mtac) (a, atac) (s, action) =
+         unitCase
+         / _ =!>
            \(fnc =>
                 (
                 (* a_s should be A[s] *)
@@ -1519,7 +1772,7 @@ structure XTerm :>
                          ]))
                 ))\
 
-         | _ => \(fnc => error "dot" [m, a_s, a, u, T.Sub (T.Triv, s)])\
+         | _ => \(fnc => error "dot" [m, a_s, a, T.Sub (T.Triv, s)])\
          /
 
 
@@ -1536,45 +1789,40 @@ structure XTerm :>
                    ctac
                    )
 
-           | (ak, u, aktac) :: rest =>
-                termCase u
-                / \Prim.bogus\ =!>
-                  \(fnc =>
-                       (* G, A1[s], ..., Ak[under_k-1 s] |- C[under_k s]
-                                                          = C[0 . (under_k-1 s o ^)]
-                                                          = C[0 . (under_k-1 s o ^2)][0 . id]
-                       *)
-                       refine (Rule.forallElim
-                                  (T.Sub (ak, T.compose (T.under (k-1) s) T.shift1))
-                                  (T.Sub (c, T.Idot (0, T.compose (T.under (k-1) s) (T.Shift 2))))
-                                  T.zero)
+           | (ak, aktac) :: rest =>
+                (* G, A1[s], ..., Ak[under_k-1 s] |- C[under_k s]
+                                                   = C[0 . (under_k-1 s o ^)]
+                                                   = C[0 . (under_k-1 s o ^2)][0 . id]
+                *)
+                refine (Rule.forallElim
+                           (T.Sub (ak, T.compose (T.under (k-1) s) T.shift1))
+                           (T.Sub (c, T.Idot (0, T.compose (T.under (k-1) s) (T.Shift 2))))
+                           T.zero)
+                >>> [
+                    (* G, A1[s] ... Ak[under_k-1 s] |- forall Ak[under_k-1 s o ^] . C[0 . (under_k-1 s o ^2)]
+                                                     = (forall Ak . C)[under_k-1 s o ^]
+                    *)
+                    refine (Rule.weaken 0 1)
+                    >>
+                    (* G, A1[s] ... Ak-1[under_k-2 s] |- (forall Ak . C)[under_k-1 s] *)
+                    underHard (k-1) rest s stac 
+                       (T.apply2 Prim.forall ak (T.Lam (NONE, c)))
+                       (
+                       (* G, A1, ..., Ak-1 |- forall Ak . C *)
+                       refine (Rule.forallIntro ak c)
                        >>> [
-                           (* G, A1[s] ... Ak[under_k-1 s] |- forall Ak[under_k-1 s o ^] . C[0 . (under_k-1 s o ^2)]
-                                                            = (forall Ak . C)[under_k-1 s o ^]
-                           *)
-                           refine (Rule.weaken 0 1)
-                           >>
-                           (* G, A1[s] ... Ak-1[under_k-2 s] |- (forall Ak . C)[under_k-1 s] *)
-                           underHard (k-1) rest s stac 
-                              (T.apply2 Prim.forall ak (T.Lam (NONE, c)))
-                              (
-                              (* G, A1, ..., Ak-1 |- forall Ak . C *)
-                              refine (Rule.forallIntro ak c)
-                              >>> [
-                                  (* G, A1, ..., Ak-1 |- Ak : type *)
-                                  aktac,
+                           (* G, A1, ..., Ak-1 |- Ak : type *)
+                           aktac,
 
-                                  (* G, A1, ..., Ak-1 |- C *)
-                                  ctac
-                                  ]
-                              ),
-       
-                           (* G, A1[s] ... Ak[under_k-1 s] |- 0 : Ak[under_k-1 s o ^] *)
-                           refine (Rule.hypothesisOf 0)
-                           ])\
+                           (* G, A1, ..., Ak-1 |- C *)
+                           ctac
+                           ]
+                       ),
 
-                | _ => \(fnc => raise Case.Backtrack)\
-               /)
+                    (* G, A1[s] ... Ak[under_k-1 s] |- 0 : Ak[under_k-1 s o ^] *)
+                    refine (Rule.hypothesisOf 0)
+                    ])
+
 
       fun under al (s, action) =
          unitCase
@@ -1593,7 +1841,7 @@ structure XTerm :>
                            Hard (underHard k al s stac)))
                 end)\
 
-         | _ => \(fnc => error "under" (List.foldr (fns (a, u, _) l => a :: u :: l) [T.Sub (T.Triv, s)] al))\
+         | _ => \(fnc => error "under" (List.foldr (fns (a, _) l => a :: l) [T.Sub (T.Triv, s)] al))\
         /
 
 
@@ -1629,7 +1877,7 @@ structure XTerm :>
          end
 
 
-      fun existsLeft (ab, u, _) =
+      fun existsLeft (ab, _) =
          termCase ab
          / \Prim.exists\ ? (fn . ?) =>
            \fnc a b =>
@@ -1655,7 +1903,7 @@ structure XTerm :>
                end\
 
          | _ =>
-           \(fnc => error "existsLeft" [ab, u])\
+           \(fnc => error "existsLeft" [ab])\
          /
 
    end

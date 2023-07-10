@@ -6,9 +6,9 @@ signature DATATYPE =
       type eterm = ETerm.eterm
 
       type typedef =
-         (symbol * eterm) list               (* invisible persistent arguments *)
+         (symbol * eterm) list               (* invisible pervasive arguments *)
          *
-         (symbol * eterm) list               (* persistent arguments *)
+         (symbol * eterm) list               (* pervasive arguments *)
          *
          eterm                               (* universe *)
          *
@@ -140,11 +140,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             * (symbol * term conarg list * term list) list) list
 
       type mxterm = X.mxterm
+      type mxtype = X.mxtype
 
       (* Internal representation: as resolved, but with mxterms. *)
       type itypedef =
-         (symbol * mxterm) list
-         * (symbol * mxterm) list
+         (symbol * mxtype) list
+         * (symbol * mxtype) list
          * mxterm
          * (symbol
             * (symbol option * mxterm) list
@@ -298,7 +299,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                      ([], D.iempty)
                      invis
    
-               (* Invisible variables are available to each other, persistent variables,
+               (* Invisible variables are available to each other, visible pervasive variables,
                   and the universe, but nothing else.
                *)
    
@@ -562,7 +563,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                        growres ("pervasive argument " ^ Symbol.toValue sym) dir ctx
                           (T.apply1 Prim.istp a)
-                          (fns jud v => (sym, (a, T.Const Prim.bogus, jud, v)))))
+                          (fns jud v => (sym, (a, jud, v)))))
                   (fn _ => nilres)
                   (D.empty, S.empty)
                   invis
@@ -576,7 +577,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                        growres ("pervasive argument " ^ Symbol.toValue sym) dir ctx
                           (T.apply1 Prim.istp a)
-                          (fns jud v => (sym, (a, T.Const Prim.bogus, jud, v)))))
+                          (fns jud v => (sym, (a, jud, v)))))
                   (fn _ => nilres)
                   (invisdir, invisctx)
                   pers
@@ -769,6 +770,20 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
               | Sum.INR msg => raise (Fail ("datatype internal proof failure: " ^ msg)))
          end
+
+
+      fun compact ctx m =
+         if !rapid then
+            m
+         else
+            X.compact ctx m
+         
+
+      fun tcompact ctx m =
+         if !rapid then
+            m
+         else
+            X.tcompact ctx m
          
 
       (* check a proof, and turn it into a tactic *)
@@ -797,10 +812,11 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       fun loadSymbol module str =
          Susp.delay (fn () => Namespace.resolve [module, Symbol.fromValue str])
 
+      val accSym = Symbol.fromValue "Acc"
       val datatypeSym = Symbol.fromValue "Datatype"
       val natSym = Symbol.fromValue "Nat"
 
-      val constAcc = loadSymbol (Symbol.fromValue "Acc") "Acc"
+      val constAcc = loadSymbol accSym "Acc"
       val constLeq = loadSymbol natSym "leq"
       val constLeq_0_min = loadSymbol natSym "leq_0_min"
       val constLeq_succ_succ = loadSymbol natSym "leq_succ_succ"
@@ -818,6 +834,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       val constStrip = loadSymbol datatypeSym "strip"
       val constSubtermCon = loadSymbol datatypeSym "subterm_con"
       val constIter = loadSymbol datatypeSym "dt_iter"
+
+      val eqzbTac = Susp.delay (fn () => snd (Infer.inferConstant Prim.eqzb))
 
 
 
@@ -849,14 +867,6 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                 (X.apps (xconstant constSubtermCon) [lv, a, dcons, n])
                 tac)
             [x, y]
-
-      fun xcompact ctx m =
-         X.compact
-            (List.foldr
-                (fns (c, _, _) g => Seq.cons (J.Tm c) g)
-                Seq.empty
-                ctx)
-            m
 
 
       fun xleqProof m n =
@@ -890,7 +900,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          let
             val const = Namespace.declare sym (SOME (N.simplifyAll def))
 
-(* for debugging
+(* XX for debugging
             val () =
                if Unify.unify1 deft t then
                   ()
@@ -982,21 +992,26 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       datatype environment =
          ENV of
          {
-         invis : (symbol * mxterm) list,   (* invisible pervasives *)
-         invisnum : int,                   (* number of invisible pervasives *)
-         pers : (symbol * mxterm) list,    (* visible pervasives *)
-         persnum : int,                    (* number of visible pervasives *)
-         univ : mxterm,                    (* the universe *)
-         a : mxterm,                       (* the "a" when the datatype is written as "dt a dcons" *)
-         dcons : mxterm,                   (* the "dcons" when the datatype is written as "dt a dcons" *)
-         tplist : type_environment list,   (* for each datatype, in order *)
-         conlist : con_environment list,   (* for each constructor, in order *)
-         skeleton : constant,              (* the skeleton constant *)
-         subterm : constant,               (* the subterm constant *)
-         subtermWf : constant,             (* the subterm-well-founded constant *)
-         iterReds : R.ureduction2 list     (* the iterator reductions *)
+         invis : (symbol * mxtype) list,                       (* invisible pervasives *)
+         invisnum : int,                                       (* number of invisible pervasives *)
+         pers : (symbol * mxtype) list,                        (* visible pervasives *)
+         persnum : int,                                        (* number of visible pervasives *)
+         univ : mxterm,                                        (* the universe *)
+         a : mxterm,                                           (* the "a" when the datatype is written as "dt a dcons" *)
+         dcons : mxterm,                                       (* the "dcons" when the datatype is written as "dt a dcons" *)
+         tplist : type_environment list,                       (* for each datatype, in order *)
+         conlist : con_environment list,                       (* for each constructor, in order *)
+         skeleton : constant,                                  (* the skeleton constant *)
+         subterm : constant,                                   (* the subterm constant *)
+         subtermWf : constant,                                 (* the subterm-well-founded constant *)
+         discriminators : constant Array.array,                (* the discriminators *)
+         extractorTypes : constant Array.array,                (* the extractor types *)
+         extractors : constant Array.array,                    (* the extractors *)
+         discriminatorReductions : R.ureduction2 Array.array,  (* the discriminator's reductions *)
+         extractorTypeReductions : R.ureduction2 Array.array,  (* the extractor type's reductions *)
+         extractorReductions : R.ureduction2 Array.array,      (* the extractor type's reductions *)
          }
-         
+
       val theDatatypes : environment list CR.cref = CR.new []
 
       val pumx : mxterm P.pu =
@@ -1004,6 +1019,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             (fn (m, a, jud, v) => (m, a, (jud, v)))
             (fn (m, a, (jud, v)) => (m, a, jud, v))
             (P.tuple3 PP.puTerm PP.puTerm Refine.pu)
+
+      val pumxt : mxtype P.pu =
+         P.wrap
+            (fn (m, jud, v) => (m, (jud, v)))
+            (fn (m, (jud, v)) => (m, jud, v))
+            (P.tuple2 PP.puTerm Refine.pu)
 
       val puConarg : mxterm conarg P.pu =
          P.alt
@@ -1054,25 +1075,30 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                
       val puEnv : environment P.pu =
          P.wrap
-            (fn ENV {invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, skeleton, subterm, subtermWf, iterReds} =>
-                (invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, (skeleton, subterm, subtermWf, iterReds)))
-            (fn (invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, (skeleton, subterm, subtermWf, iterReds)) =>
-                ENV {invis=invis, invisnum=invisnum, pers=pers, persnum=persnum, univ=univ, a=a, dcons=dcons, tplist=tplist, conlist=conlist, skeleton=skeleton, subterm=subterm, subtermWf=subtermWf, iterReds=iterReds})
+            (fn ENV {invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions} =>
+                (invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, (skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions)))
+            (fn (invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, (skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions)) =>
+                ENV {invis=invis, invisnum=invisnum, pers=pers, persnum=persnum, univ=univ, a=a, dcons=dcons, tplist=tplist, conlist=conlist, skeleton=skeleton, subterm=subterm, subtermWf=subtermWf, discriminators=discriminators, extractorTypes=extractorTypes, extractors=extractors, discriminatorReductions=discriminatorReductions, extractorTypeReductions=extractorTypeReductions, extractorReductions=extractorReductions})
             (P.tuple10
-                (P.list (P.pair PP.puSymbol pumx))
+                (P.list (P.pair PP.puSymbol pumxt))
                 P.int
-                (P.list (P.pair PP.puSymbol pumx))
+                (P.list (P.pair PP.puSymbol pumxt))
                 P.int
                 pumx
                 pumx
                 pumx
                 (P.list puTenv)
                 (P.list puCenv)
-                (P.tuple4
+                (P.tuple9
                     PP.puConstant
                     PP.puConstant
                     PP.puConstant
-                    (P.list R.puUreduction2)))
+                    (P.array PP.puConstant)
+                    (P.array PP.puConstant)
+                    (P.array PP.puConstant)
+                    (P.array R.puUreduction2)
+                    (P.array R.puUreduction2)
+                    (P.array R.puUreduction2)))
 
 
 
@@ -1114,10 +1140,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                  | (_, c) :: l' =>
                       let
-                         val c = X.use c
+                         val c = X.tuse c
                       in
                          collectInvis l'
-                            (X.dot (X.hole (T.evar ()) (T.Sub (X.term c, fst s))) c s)
+                            (X.dot (X.hole (T.evar ()) (T.Sub (X.typ c, fst s))) c s)
                       end)
                          
 
@@ -1128,10 +1154,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                  | ((_, c) :: l', T.App m :: spine') =>
                       let
-                         val c = X.use c
+                         val c = X.tuse c
                       in
                          collectPers l' spine'
-                            (X.dot (X.hole m (T.Sub (X.term c, fst s))) c s)
+                            (X.dot (X.hole m (T.Sub (X.typ c, fst s))) c s)
                             (m :: persactrev)
                       end
 
@@ -1613,71 +1639,85 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-      (* For merging iterators into the joint iterator. *)
+      (* For building other functions from iterators *)
 
-      fun mergeLoop n ctx a mergees =
-         if n = 0 then
-            X.tuple mergees
+      fun mimicType i n ctx a items f =
+         if i = n then
+            f i ctx a items
          else
-            termCase (X.term a)
+            termCase (X.typ a)
             /| \Prim.intersect\ _ (fn ? . _) =>
                \(fnc binder =>
                     let
                        val dom = X.intersectInv1 a
-                       val ctx' = Seq.cons (J.Tm (X.term dom)) ctx
-                       val cod = X.compact ctx' (X.intersectInv2 a)
+                       val ctx' = Seq.cons (J.Tm (X.typ dom)) ctx
+                       val cod = tcompact ctx' (X.intersectInv2 a)
 
-                       val mergees' =
+                       val items' =
                           List.map
                              (fn m => X.app (X.weaken m 1) (X.var 0 dom))
-                             mergees
+                             items
                     
-                       val m = mergeLoop (n-1) ctx' cod mergees'
+                       val ms = mimicType (i+1) n ctx' cod items' f
                     in
-                       X.lamInt binder dom m
+                       List.map
+                          (X.lamInt binder dom)
+                          ms
                     end)\
 
              | \Prim.forall\ _ (fn ? . _) =>
                \(fnc binder =>
                     let
                        val dom = X.forallInv1 a
-                       val ctx' = Seq.cons (J.Tm (X.term dom)) ctx
-                       val cod = X.compact ctx' (X.forallInv2 a)
+                       val ctx' = Seq.cons (J.Tm (X.typ dom)) ctx
+                       val cod = tcompact ctx' (X.forallInv2 a)
 
-                       val mergees' =
+                       val items' =
                           List.map
                              (fn m => X.app (X.weaken m 1) (X.var 0 dom))
-                             mergees
+                             items
                     
-                       val m = mergeLoop (n-1) ctx' cod mergees'
+                       val ms = mimicType (i+1) n ctx' cod items' f
                     in
-                       X.lamAll binder dom m
+                       List.map
+                          (X.lamAll binder dom)
+                          ms
                     end)\
 
              | \Prim.arrow\ _ _ =>
                \(fnc =>
                     let
                        val dom = X.arrowInv1 a
-                       val ctx' = Seq.cons (J.Tm (X.term dom)) ctx
-                       val cod = X.compact ctx' (X.arrowInv2 a)
+                       val ctx' = Seq.cons (J.Tm (X.typ dom)) ctx
+                       val cod = tcompact ctx' (X.arrowInv2 a)
 
-                       val mergees' =
+                       val items' =
                           List.map
                              (fn m => X.app (X.weaken m 1) (X.var 0 dom))
-                             mergees
+                             items
                     
-                       val m = mergeLoop (n-1) ctx' cod mergees'
+                       val ms = mimicType (i+1) n ctx' cod items' f
                     in
-                       X.lam NONE dom m
+                       List.map
+                          (X.lam NONE dom)
+                          ms
                     end)\
 
              | _ =>
                \(fnc =>
-                    raise (Fail "unexpected type in merge"))\
+                    f i ctx a items)\
             /
 
+      fun mimicType1 ctx a f =
+         List.hd $
+         mimicType 0 ~1 ctx a [] (fns n _ _ _ => [f n])
 
-      (* n: the number of arguments the merged iterator should take
+
+
+
+      (* Merging iterators into the joint iterator.
+
+         n: the number of arguments the merged iterator should take
          consts: the iterators being merged
       *)
       fun merge n consts =
@@ -1689,42 +1729,34 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
               | m :: _ =>
                    let
-                      val a = X.compact Seq.empty (X.inhabitedForm m)
+                      val a = tcompact Seq.empty (X.inhabitedForm m)
                    in
-                      mergeLoop n Seq.empty a mergees
+                      List.hd $
+                      mimicType 0 n Seq.empty a mergees
+                         (fns n' _ _ mergees' =>
+                             if n' = n then
+                                [X.tuple mergees']
+                             else
+                                raise (Fail "unexpected type in merge"))
                    end)
          end
 
 
 
+
       (* Injection *)
 
-      fun lams num m = natrecl num (fns _ p => T.Lam (NONE, p)) m
-
       fun injector
-         (ENV {invisnum=ninvis, persnum=nvis, tplist, conlist, iterReds=redlist, univ})
-         tpconst nind iterConst tpnum 
+         (ENV {tplist, conlist, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions})
          =
          let
-            val ninds =
-               List.map
-                  (fn TENV {args} => List.length args)
+            (* maps type constants to their type # *)
+            val (_, typeInvert) =
+               List.foldl
+                  (fns (TENV {const}) (i, d) =>
+                      (i+1, CD.insert d const i))
+                  (0, CD.empty)
                   tplist
-
-            val ncaseargs =
-               List.map
-                  (fn CENV {args} =>
-                      List.foldl
-                         (fns arg n =>
-                             (case arg of
-                                 External _ => n+1
-
-                               | Internal _ => n+2))
-                         0
-                         args)
-                  conlist
-
-            val reductions = Array.fromList redlist
 
             (* maps constructor constants to their constructor # *)
             val (_, constructorInvert) =
@@ -1734,187 +1766,166 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   (0, CD.empty)
                   conlist
 
-            val constants =
-               Array.fromList $
-               List.map
-                  (fn TENV {const} => const)
-                  tplist
 
-            (* for each constructor:
-               1. the tuple of its arguments (living inside the arguments to the iterator's case, and beyond that it doesn't matter)
-               2. the type of the above tuple (living inside the pervasives)
+            (* h : M = N : A 
+               where A = const spine
+                     M = mconst ...
+                     N = nconst ...
             *)
-            val payloads =
-               Array.fromList $
-               List.map
-                  (fn CENV {args=conargs} =>
-                      Susp.delay
-                      (fn () =>
-                          let
-                             val (_, tuple) =
-                                List.foldr
-                                   (fns conarg (n, tuple) =>
-                                       (* n = the number of iterator case arguments consumed building tuple *)
-                                       (case conarg of
-                                           External _ =>
-                                              (n+1, T.Pair (T.Var n, tuple))
+            fun injectNo h a const spine m mconst n nconst =
+               let
+                  do (jud, _) = withgoal
 
-                                         | Internal _ =>
-                                              (n+2, T.Pair (T.Var (n+1), tuple))))
-                                   (0, T.Triv)
-                                   conargs
+                  val pos = CD.lookup typeInvert const
 
-                             val (_, tp) =
-                                bifold
-                                   (fns conarg depth =>
-                                       (case conarg of
-                                           External (_, b) =>
-                                              (depth+1,
-                                               (fn c => 
-                                                   T.apply2 Prim.exists
-                                                        (X.mterm b)
-                                                        (T.Lam (NONE, c))))
-                                               
-                                         | Internal (j, indices) =>
-                                              (depth,
-                                               (fn c =>
-                                                   T.apply2 Prim.prod
-                                                      (T.Elim (T.Const (Array.sub constants j),
-                                                               natrecr nvis (fns k l => T.App (T.Var (k+depth)) :: l) []
-                                                               @ List.map (fn b => T.App (X.mterm b)) indices))
-                                                      c))))
-                                   (fn _ => T.Const Prim.unit)
-                                   0
-                                   conargs
-                          in
-                             (tuple, tp)
-                          end))
-                  conlist
+                  val mpos =
+                     (case CD.find constructorInvert mconst of
+                         NONE =>
+                            raise (Tryf (String.concat [Namespace.toString mconst, " is not a constructor for ", Namespace.toString const]))
 
-            (* for each constructor, its datatype number *)
-            val dtnumbers =
-               Array.fromList $
-               List.map
-                  (fn CENV {tpnum} => tpnum)
-                  conlist
+                       | SOME i => i)
 
-            fun injectYes ihyp visSpine indSpine pos m n =
+                  val npos =
+                     (case CD.find constructorInvert nconst of
+                         NONE =>
+                            raise (Tryf (String.concat [Namespace.toString nconst, " is not a constructor for ", Namespace.toString const]))
+
+                       | SOME i => i)
+
+                  val d = T.Elim (T.Const (Array.sub discriminators pos), spine)
+
+                  val (_, dtac) = Infer.infer (J.context jud) d (fns _ _ => idtac)
+
+                  val mlit = T.Native (T.Integer (IntInf.fromInt mpos))
+                  val eqzb_literal1 = T.apply1 Prim.eqzb mlit
+
+                  val dm = T.Elim (d, [T.App m])
+                  val dn = T.Elim (d, [T.App n])
+               in
+                  (* C *)
+                  refine (Rule.boolContradiction (T.evar ()))
+                  >>+
+                  (* true = false : bool *)
+                  refine (Rule.unreduce
+                             (T.apply3 Prim.eq
+                                 (T.Const Prim.bool)
+                                 (T.apply2 Prim.eqzb mlit dm)
+                                 (T.apply2 Prim.eqzb mlit dn))
+                             (R.compat
+                                 [
+                                 R.refl,
+                                 R.trans [R.within [2] (R.user2 (Array.sub discriminatorReductions mpos)), R.native],
+                                 R.trans [R.within [2] (R.user2 (Array.sub discriminatorReductions npos)), R.native]
+                                 ]))
+                  >>+
+                  (* (eqzb mpos (D M)) = (eqzb mpos (D N)) : bool *)
+                  refine (Rule.arrowElimEq
+                             (T.Const Prim.integer)
+                             (T.evar ())
+                             eqzb_literal1
+                             eqzb_literal1
+                             dm
+                             dn)
+                  >>> [
+                      (* eqzb mpos = eqzb mpos : integer -> bool *)
+                      refine (Rule.eqRefl (T.evar ()) (T.evar ()))
+                      >>+
+                      (* eqzb mpos : integer -> bool *)
+                      refine (Rule.arrowElimOf
+                                 (T.Const Prim.integer)
+                                 (T.evar ())
+                                 (T.Const Prim.eqzb)
+                                 mlit)
+                      >>> [
+                          (* eqzb : integer -> integer -> bool *)
+                          Susp.force eqzbTac >> done,
+
+                          (* mpos : integer *)
+                          refine (Rule.integerIntroOf) >> done
+                          ],
+
+                      (* D M = D N : integer *)
+                      refine (Rule.arrowElimEq
+                                 a
+                                 (T.evar ())
+                                 d
+                                 d
+                                 m
+                                 n)
+                      >>> [
+                          (* D = D : A -> integer *)
+                          refine (Rule.eqRefl (T.evar ()) (T.evar ()))
+                          >>+
+                          (* D : A -> integer *)
+                          dtac >> idtacM Secondary,
+                          
+                          (* M = N : A *)
+                          refine (Rule.hypothesis h) >> done
+                          ]
+                      ]
+               end
+
+
+            (* h : M = N : A 
+               where A = const spine
+                     M = mconst ...
+                     N = mconst ...
+            *)
+            fun injectYes h a const spine m mconst n =
                let
                   do (jud, dir) = withgoal
 
-                  val dtnum = Array.sub dtnumbers pos
+                  val pos = CD.lookup typeInvert const
 
-                  do s =
-                     tryf
-                     (fn () =>
-                         List.foldl
-                            (fns elim s =>
-                                (case elim of
-                                    T.App c => T.Dot (c, s)
-    
-                                  | _ => raise (Tryf "type error in injection hypothesis")))
-                            (natrecl ninvis
-                                (fns _ s => T.Dot (T.evar (), s))
-                                (T.Shift (S.length (J.context jud))))
-                            visSpine)
+                  val mpos =
+                     (case CD.find constructorInvert mconst of
+                         NONE =>
+                            raise (Tryf (String.concat [Namespace.toString mconst, " is not a constructor for ", Namespace.toString const]))
 
-                  val (tuple, payload) = Susp.force (Array.sub payloads pos)
+                       | SOME i => i)
 
-                  val payload' = T.Sub (payload, s)
+                  val e = T.Elim (T.Const (Array.sub extractors pos), spine)
+                  val et = T.Elim (T.Const (Array.sub extractorTypes pos), spine)
 
-                  val trigger =
-                     T.Elim (T.Const iterConst,
-                             visSpine
-                             @ List.map
-                                  (fn num => T.App (lams (num+1) (T.Const Prim.bool)))
-                                  ninds
-                             @ List.mapi
-                                  (fns i num =>
-                                      T.App (lams num
-                                                (if i = pos then
-                                                    T.Const Prim.tru
-                                                 else
-                                                    T.Const Prim.fals)))
-                                  ncaseargs)
-
-                  val discrim =
-                     T.Elim (T.Const iterConst,
-                             visSpine
-                             @ List.mapi
-                                  (fns i num =>
-                                      T.App (lams (num+1)
-                                                (if i = dtnum then
-                                                    T.apply3 Prim.ite
-                                                       (T.Elim (T.Sub (trigger, T.Shift (num+1)),
-                                                                natrecr (num+1)
-                                                                   (fns j l => T.App (T.Var j) :: l)
-                                                                   []))
-                                                       (T.Sub (payload', T.Shift (num+1)))
-                                                       (T.Const Prim.unit)
-                                                 else
-                                                    T.Const Prim.unit)))
-                                  ninds
-                             @ List.mapi
-                                  (fns i num =>
-                                      T.App (lams num
-                                                (if i = pos then
-                                                    tuple
-                                                 else
-                                                    T.Triv)))
-                                  ncaseargs
-                             @ indSpine)
-
-                  do (dom, cod, discrimtac) =
-                     tryf
-                     (fn () =>
-                         (try
-                             let
-                                val (discrimtp, discrimtac) =
-                                   Infer.infer
-                                   (J.context jud)
-                                   discrim
-                                   (fns _ _ => idtac)
-
-                                val (dom, cod) =
-                                   termCase discrimtp
-                                   / \Prim.forall\ ? (fn . ?) => \(fnc dom cod => (dom, cod))\ /
-                             in
-                                (dom, cod, discrimtac)
-                             end
-                          with
-                             Infer.NotPath _ => raise (Tryf "bad iterator constant in injection")
-                           | Infer.InferError _ => raise (Tryf "iterator has unexpected type in injection")
-                           | Case.NoMatch => raise (Tryf "iterator has unexpected type in injection")))
-
-                  val m' = N.whnf (T.app discrim m)
-                  val n' = N.whnf (T.app discrim n)
+                  val (_, etac) = Infer.infer (J.context jud) e (fns _ _ => idtac)
                in
+                  (* C *)
                   refine (Rule.assert'
-                             (T.apply3 Prim.eq payload' m' n')
+                             (T.apply3 Prim.eq (T.app et m) (T.app e m) (T.app e n))
                              (T.evar ()))
                   >>> [
-                      (* keep the iterator out of the extract *)
-                      refine (Rule.inhabitant (T.evar ()) T.Triv)
-                      >>
-                      refine (Rule.eqIntro (T.evar ()) (T.evar ()) (T.evar ()))
-                      >>
-                      (* m' = n' : payload'
-                         where m' =equiv= discrim m
-                               n' =equiv= discrim n
-                               payload' =equiv= cod[m . id]  (by construction of discrim)
-                      *)
-                      refine (Rule.forallElimEq dom cod discrim discrim m n)
+                      (* E M = E N : ET M *)
+                      refine (Rule.eqTrivialize (T.evar ()) (T.evar ()) (T.evar ()))
+                      >>+
+                      (* E M = E N : ET M *)
+                      refine (Rule.forallElimEq
+                                 a
+                                 (T.app (T.Sub (et, T.shift1)) T.zero)
+                                 e
+                                 e
+                                 m
+                                 n)
                       >>> [
-                          (* discrim = discrim : forall dom . cod *)
+                          (* E = E : forall A . ET[^] 0 *)
                           refine (Rule.eqRefl (T.evar ()) (T.evar ()))
-                          >>
-                          (* discrim : forall dom . cod *)
-                          discrimtac >> idtacM Secondary,
+                          >>+
+                          (* E : forall A . ET[^] 0 *)
+                          etac >> idtacM Secondary,
 
-                          (* m = n : dom *)
-                          refine (Rule.hypothesis ihyp) >> done
+                          (* M = N : A *)
+                          refine (Rule.hypothesis h) >> done
                           ],
 
+                      (* E M = E N : ET M |- C[^] *)
+                      refine (Rule.reduceHyp 0
+                                 (R.compat
+                                     [
+                                     R.user2 (Array.sub extractorTypeReductions mpos),
+                                     R.user2 (Array.sub extractorReductions mpos),
+                                     R.user2 (Array.sub extractorReductions mpos)
+                                     ]))
+                      >>+
+                      (* package = package' : package-type |- C[^] *)
                       cut
                          (repeatCount
                              (
@@ -1932,131 +1943,15 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       ]
                end
 
-            (* ihyp : M = N : D *)
-            fun injectNo ihyp visSpine indSpine mpos m npos n =
-               let
-                  do (jud, dir) = withgoal
 
-                  val discrim =
-                     T.Elim (T.Const iterConst,
-                             visSpine
-                             @ List.map
-                                  (fn num =>
-                                      T.App (lams (num+1) (T.Const Prim.bool)))
-                                  ninds
-                             @ List.mapi
-                                  (fns i num =>
-                                      T.App (lams num
-                                                (if i = mpos then
-                                                    T.Const Prim.tru
-                                                 else
-                                                    T.Const Prim.fals)))
-                                  ncaseargs
-                             @ indSpine)
-
-                  do (dom, cod, discrimtac) =
-                     tryf
-                     (fn () =>
-                         (try
-                             let
-                                val (discrimtp, discrimtac) =
-                                   Infer.infer
-                                   (J.context jud)
-                                   discrim
-                                   (fns _ _ => idtac)
-
-                                val (dom, cod) =
-                                   termCase discrimtp
-                                   / \Prim.forall\ ? (fn . ?) => \(fnc dom cod => (dom, cod))\ /
-                             in
-                                (dom, cod, discrimtac)
-                             end
-                          with
-                             Infer.NotPath _ => raise (Tryf "bad iterator constant in injection")
-                           | Infer.InferError _ => raise (Tryf "iterator has unexpected type in injection")
-                           | Case.NoMatch => raise (Tryf "iterator has unexpected type in injection")))
-               in
-                  refine (Rule.voidElim (T.evar ()))
-                  >>
-                  (* void *)
-                  refine (Rule.equivalence (T.Const Prim.unit) (T.Const Prim.void))
-                  >>> [
-                      (* unit = void : type *)
-                      refine (Rule.boolElimEqtype
-                                 (T.Const Prim.unit) (T.Const Prim.unit)
-                                 (T.Const Prim.void) (T.Const Prim.void)
-                                 (T.Const Prim.tru) (T.Const Prim.fals))
-                      >>> [
-                          (* true = false : bool *)
-                          refine (Rule.unreduce
-                                     (T.apply3 Prim.eq 
-                                         (T.Const Prim.bool)
-                                         (T.app discrim m)
-                                         (T.app discrim n))
-                                     (R.compat
-                                         [R.refl,
-                                          R.user2 (Array.sub reductions mpos),
-                                          R.user2 (Array.sub reductions npos)]))
-                          >>
-                          (* discrim m = discrim n : bool *)
-                          refine (Rule.forallElimEq dom cod discrim discrim m n)
-                          >>> [
-                              (* discrim = discrim : forall dom . cod *)
-                              refine (Rule.eqRefl (T.evar ()) (T.evar ()))
-                              >>
-                              (* discrim : forall dom . cod *)
-                              discrimtac >> idtacM Secondary,
-
-                              (* m = n : dom *)
-                              refine (Rule.hypothesis ihyp) >> done
-                              ],
-
-                          (* A |- unit = unit : type *)
-                          refine Rule.unitEq >> done,
- 
-                          (* A |- void = void : type *)
-                          refine Rule.voidEq  >> done
-                          ],
-   
-                      (* unit *)
-                      refine Rule.unitIntro >> done
-                      ]
-               end
-
-            fun inject ihyp =
+            fun inject h =
                goalContextCaseT
-               /| $hyp \ihyp\ $tm \Prim.eq\ (\tpconst\ @ ?) ($as (const? @ ?)) ($as (const? @ ?)) =>
-                  \(fnc dtspine m mconst mspine n nconst nspine =>
-                       let
-                          do (visSpine, indSpine, mpos, npos) =
-                             tryf
-                             (fn () =>
-                                 (case List.splitOpt dtspine nvis of
-                                     NONE =>
-                                        raise (Tryf "type error in injection hypothesis")
-        
-                                   | SOME (visSpine, indSpine) => 
-                                        (case CD.find constructorInvert mconst of
-                                            NONE => 
-                                               raise (Tryf "equand is not a constructor")
-        
-                                          | SOME mpos =>
-                                               (case CD.find constructorInvert nconst of
-                                                   NONE => 
-                                                      raise (Tryf "equand is not a contructor")
-        
-                                                 | SOME npos =>
-                                                      (visSpine, indSpine, mpos, npos)))))
-                       in
-                          if mpos = npos then
-                             injectYes ihyp visSpine indSpine mpos m n
-                          else
-                             injectNo ihyp visSpine indSpine mpos m npos n
-                       end)\
-
-                | _ =>
-                  \(fnc =>
-                       fail "not an injectible hypothesis")\
+               / $hyp \h\ $tm \Prim.eq\ ($as (const? @ ?)) ($as (const? @ _)) ($as (const? @ _)) =>
+                 \(fnc a const spine m mconst n nconst =>
+                      if Constant.eq (mconst, nconst) then
+                         injectYes h a const spine m mconst n
+                      else
+                         injectNo h a const spine m mconst n nconst)\
                /
          in
             inject
@@ -2071,11 +1966,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       fun populate (env as ENV {persnum=numberOfVisibleArgs, tplist, conlist}) =
          let
             val destructor' = destructor env
+            val injector' = injector env
             val insert = ConstantTable.insert
 
             val () =
-               List.appi
-                  (fns i (TENV {const, iterator, numargs=numberOfIndexArgs, strip}) =>
+               List.app
+                  (fn (TENV {const, iterator, numargs=numberOfIndexArgs, strip}) =>
                       (
                       insert DE.destructTactics const destructor';
    
@@ -2083,7 +1979,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
    
                       insert InductionInternal.iterators const (iterator, numberOfVisibleArgs, numberOfIndexArgs);
    
-                      insert EqualityTacticInternal.injectionTactics const (injector env const numberOfIndexArgs iterator i)
+                      insert EqualityTacticInternal.injectionTactics const injector'
                       ))
                   tplist
 
@@ -2124,14 +2020,13 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             val (ctxPers, xctxPers) =
                List.foldl
-                  (fns (_, (c as (cterm, _, _, _))) (ctx, xctx) => 
+                  (fns (_, (c as (cterm, _, _))) (ctx, xctx) => 
                       (Seq.cons (J.Tm cterm) ctx,
-                       X.use c :: xctx))
+                       X.tuse c :: xctx))
                   (Seq.empty, [])
                   (invis @ pers)
 
 
-            (* This should already be compacted, but belt-and-suspenders. *)
             val univ = X.use univ_mobile
 
 
@@ -2204,12 +2099,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   (* G |- C : Ui *)
 
                   val n =
-                     X.tupleEx (map (fn p => X.sub (X.use p) s) indices) (X.weaken (X.forget c) 1)
+                     X.tupleEx (map (fn p => X.sub (X.use p) s) indices) (X.tweaken (X.forget c) 1)
 
                   (* G, B |- N : C[^]  where  N = (P1[s], .. (Pk[s], ())) *)
 
                in 
-                  X.inN j n (X.weaken (X.forget a) 1)
+                  X.inN j n (X.tweaken (X.forget a) 1)
                end
 
 
@@ -2318,18 +2213,18 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             fun wrap m =
                List.foldr
-                  (fns (sym, d) n => X.lamInt (SOME sym) (X.use d) n)
+                  (fns (sym, d) n => X.lamInt (SOME sym) (X.tuse d) n)
                   (List.foldr
-                      (fns (sym, d) n => X.lamAll (SOME sym) (X.use d) n)
+                      (fns (sym, d) n => X.lamAll (SOME sym) (X.tuse d) n)
                       m
                       pers)
                   invis
 
             fun wraptp m =
                List.foldr
-                  (fns (sym, (d, _, _, _)) n => T.apply2 Prim.intersect d (T.Lam (SOME sym, n)))
+                  (fns (sym, (d, _, _)) n => T.apply2 Prim.intersect d (T.Lam (SOME sym, n)))
                   (List.foldr
-                      (fns (sym, (d, _, _, _)) n => T.apply2 Prim.forall d (T.Lam (SOME sym, n)))
+                      (fns (sym, (d, _, _)) n => T.apply2 Prim.forall d (T.Lam (SOME sym, n)))
                       m
                       pers)
                   invis
@@ -2338,26 +2233,26 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             fun wrapLemma m =
                List.foldr
-                  (fns (sym, d) n => X.lamAll (SOME sym) (X.use d) n)
+                  (fns (sym, d) n => X.lamAll (SOME sym) (X.tuse d) n)
                   (List.foldr
-                      (fns (sym, d) n => X.lamAll (SOME sym) (X.use d) n)
+                      (fns (sym, d) n => X.lamAll (SOME sym) (X.tuse d) n)
                       m
                       pers)
                   invis
 
             fun wraptpLemma m =
                List.foldr
-                  (fns (sym, (d, _, _, _)) n => T.apply2 Prim.forall d (T.Lam (SOME sym, n)))
+                  (fns (sym, (d, _, _)) n => T.apply2 Prim.forall d (T.Lam (SOME sym, n)))
                   (List.foldr
-                      (fns (sym, (d, _, _, _)) n => T.apply2 Prim.forall d (T.Lam (SOME sym, n)))
+                      (fns (sym, (d, _, _)) n => T.apply2 Prim.forall d (T.Lam (SOME sym, n)))
                       m
                       pers)
                   invis
 
-            (* to fill in persistent arguments, when in the scope of persistent arguments *)
+            (* to fill in pervasive arguments, when in the scope of pervasive arguments *)
             val (_, topargs) =
                List.foldr
-                  (fns (_, c) (i, l) => (i+1, X.var i (X.use c) :: l))
+                  (fns (_, c) (i, l) => (i+1, X.var i (X.tuse c) :: l))
                   (0, [])
                   (invis @ pers)
 
@@ -2384,13 +2279,13 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   (wrap (X.apps (xconstant constRep) [univ, a, dcons]))
                   (wraptp (T.apply1 Prim.univ (X.term univ)))
 
-            val skel = X.compact ctxPers $ X.forget $ X.apps (xconstant constRep) [univ, a, dcons]
+            val skel = tcompact ctxPers $ X.forget $ X.apps (xconstant constRep) [univ, a, dcons]
 
             val skeltp = 
                T.Elim (T.Const skeletonConst, topvisargsSpine)
 
             val subterm =
-               X.compact ctxPers $
+               compact ctxPers $
                X.apps (xconstant constSubtermDt)
                   [
                   univ,
@@ -2416,8 +2311,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             val subtermTransConst =
                let
                   val a1 = skel
-                  val a2 = X.weaken skel 1
-                  val a3 = X.weaken skel 2
+                  val a2 = X.tweaken skel 1
+                  val a3 = X.tweaken skel 2
 
                   val a4 =
                      X.forget $
@@ -2515,8 +2410,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                          X.inN j
                                             (X.tupleEx 
                                                 (maprev (xadjust depth) constituents)
-                                                (X.weaken (X.forget d) depth))
-                                            (X.weaken (X.forget a) depth)
+                                                (X.tweaken (X.forget d) depth))
+                                            (X.tweaken (X.forget a) depth)
 
                                       val dt =
                                          X.apps (xconstant constDt)
@@ -2673,7 +2568,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                       val xtuple = 
                                          (X.tupleEx
                                              (maprev (xadjust depth) xconstituents)
-                                             (X.weaken (X.forget b) depth))
+                                             (X.tweaken (X.forget b) depth))
 
                                       val iconstituents' = map (xadjust depth) iconstituents
 
@@ -2748,7 +2643,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
  
                               | External (binderopt, c) :: rest =>
                                    let
-                                      val csh = X.sub (X.forget (X.use c)) s
+                                      val csh = X.tsub (X.forget (X.use c)) s
 
                                       val (body, bodytp, subtermbody, subtermbodytp) =
                                          makeCon
@@ -2763,22 +2658,22 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                           NONE =>
                                              (X.lam NONE csh body,
 
-                                              T.apply2 Prim.arrow (X.term csh) (unshift bodytp),
+                                              T.apply2 Prim.arrow (X.typ csh) (unshift bodytp),
 
                                               X.lamAll NONE csh subtermbody,
 
                                               (fn const =>
-                                                  T.apply2 Prim.forall (X.term csh) (T.Lam (NONE, subtermbodytp const))))
+                                                  T.apply2 Prim.forall (X.typ csh) (T.Lam (NONE, subtermbodytp const))))
 
                                         | SOME binder =>
                                              (X.lamAll binder csh body,
 
-                                              T.apply2 Prim.forall (X.term csh) (T.Lam (binder, bodytp)),
+                                              T.apply2 Prim.forall (X.typ csh) (T.Lam (binder, bodytp)),
 
                                               X.lamAll binder csh subtermbody,
 
                                               (fn const =>
-                                                  T.apply2 Prim.forall (X.term csh) (T.Lam (binder, subtermbodytp const)))))
+                                                  T.apply2 Prim.forall (X.typ csh) (T.Lam (binder, subtermbodytp const)))))
                                    end
 
                               | Internal (k, indices) :: rest =>
@@ -2787,7 +2682,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                                       val indices' = List.map (fn m => X.sub (X.use m) s) indices
 
-                                      val c as (cterm, _, _) = 
+                                      val c as (cterm, _) = 
                                          X.forget $
                                          X.apps
                                             (X.weaken (X.constant kconst) depth)
@@ -2869,7 +2764,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                  | (binder, arg) :: rest =>
                       let
-                         val arg' = X.sub (X.forget (X.use arg)) s
+                         val arg' = X.tsub (X.forget (X.use arg)) s
 
                          val (def, t) =
                             underIndexArguments arrows
@@ -2880,10 +2775,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       in
                          if arrows andalso not (Option.isSome binder) then
                             (X.lam NONE arg' def,
-                             T.apply2 Prim.arrow (X.term arg') (unshift t))
+                             T.apply2 Prim.arrow (X.typ arg') (unshift t))
                          else
                             (X.lamAll binder arg' def,
-                             T.apply2 Prim.forall (X.term arg') (T.Lam (binder, t)))
+                             T.apply2 Prim.forall (X.typ arg') (T.Lam (binder, t)))
                       end)
 
 
@@ -2895,7 +2790,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                  | (binder, arg) :: rest =>
                       let
-                         val arg' = X.sub (X.forget (X.use arg)) s
+                         val arg' = X.tsub (X.forget (X.use arg)) s
 
                          val (def, t) =
                             typeUnderIndexArguments arrows
@@ -2906,10 +2801,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       in
                          if arrows andalso not (Option.isSome binder) then
                             (X.arrowDep arg' def,
-                             T.apply2 Prim.arrow (X.term arg') (unshift t))
+                             T.apply2 Prim.arrow (X.typ arg') (unshift t))
                          else
                             (X.forall binder arg' def,
-                             T.apply2 Prim.forall (X.term arg') (T.Lam (binder, t)))
+                             T.apply2 Prim.forall (X.typ arg') (T.Lam (binder, t)))
                       end)
                
 
@@ -2954,7 +2849,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       let
                          val binder = Option.join binderopt
 
-                         val c' = X.sub (X.forget (X.use c)) s
+                         val c' = X.tsub (X.forget (X.use c)) s
 
                          val (def, t) =
                             makeArmType i j
@@ -2965,7 +2860,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                rest
                       in
                          (X.forall binder c' def,
-                          T.apply2 Prim.forall (X.term c') (T.Lam (binder, t)))
+                          T.apply2 Prim.forall (X.typ c') (T.Lam (binder, t)))
                       end
 
                  | Internal (this_i, these_indices) :: rest =>
@@ -3197,7 +3092,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                          (* This appears after the case is added to the context, so depth+1. *)
 
-                         val b' = X.weaken (X.forget b) (depth+1)
+                         val b' = X.tweaken (X.forget b) (depth+1)
 
                          val dom =
                             List.foldr
@@ -3257,7 +3152,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                             X.lamAll NONE b'
                                (X.lamAll NONE dom
                                    (X.lam NONE rc
-                                       (unpackConstr 0 (X.term b') 0 (X.term dom) (X.term rc) [] result conargs
+                                       (unpackConstr 0 (X.typ b') 0 (X.typ dom) (X.typ rc) [] result conargs
                                            (fns num armargs =>
                                                (* context is ..., arm_def, ..num.. *)
                                                X.apps (X.var num arm_def) armargs))))
@@ -3304,7 +3199,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                          (* G, <pervasives>, <predicates>, <index arguments> |- s : G, <pervasives>, <index arguments> *)
 
-                         val arg' = X.sub (X.forget (X.use arg)) s
+                         val arg' = X.tsub (X.forget (X.use arg)) s
 
                          val pred =
                             makeIterPredBody k 
@@ -3330,9 +3225,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                (case dts' of
                    [] =>
                       let
-                         val a' = X.weaken (X.forget a) depth
+                         val a' = X.tweaken (X.forget a) depth
 
-                         val xresult as (result, _, _) =
+                         val xresult as (result, _) =
                             X.arrow
                                (X.forget
                                    (X.apps (xconstant constDt)
@@ -3360,8 +3255,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                dts
 
                          val fullpredicate =
-                            xcompact ctx $
-                            X.lamAll NONE a' (X.multicase (X.var 0 a') (List.rev armsrev) (X.weakenUnder xresult 1 1))
+                            compact
+                               (List.foldr
+                                   (fns (c, _) g => Seq.cons (J.Tm c) g)
+                                   Seq.empty
+                                   ctx)
+                               (X.lamAll NONE a' (X.multicase (X.var 0 a') (List.rev armsrev) (X.tweakenUnder xresult 1 1)))
                       in
                          makeIterCore ctx depth 0 fullpredicate [] cont allcons
                       end
@@ -3438,7 +3337,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   (Susp.force reductions)
                   iterInfoList
 
-            val iterReductions =
+            val iterReductionList =
                List.map
                   (fn (i, j, name, conargs, numberOfConargs, _) =>
                       let
@@ -3496,6 +3395,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       end)
                   allcons
 
+            val iterReductions = Array.fromList iterReductionList
+
 
 
 
@@ -3513,8 +3414,510 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
+            
+            (* 10. Create the discriminator and extractor *)
 
-            (* 10. Populate the tables *)
+            (* The discriminators (for 'no' instances of injection) *)
+      
+            (* numdts : number of datatypes remaining
+               iters : the iterators (as applied to the predicates for datatype already processed)
+               ctx : the context insidee the pervasive arguments
+            *)
+            fun discrimBody numdts iters ctx =
+               if numdts = 0 then
+                  let
+                     val (_, revargs) =
+                        natrecr numberOfConstructors
+                           (fns i (a, acc) =>
+                               let
+                                  val dom = X.arrowInv1 a
+      
+                                  val arg =
+                                     mimicType1 ctx dom (fn _ => X.integerLiteral (IntInf.fromInt i))
+      
+                                  val cod = tcompact ctx (X.tsub (X.arrowInv2 a) (X.dotid arg))
+                               in
+                                  (cod, arg :: acc)
+                               end)
+                           (tcompact ctx (X.inhabitedForm (List.hd iters)), [])
+      
+                     val args = List.rev revargs
+                  in
+                     List.map
+                        (fn iter => X.apps iter args)
+                        iters
+                  end
+               else
+                  let
+                     val dom = tcompact ctx (X.forallInv1 (X.inhabitedForm (List.hd iters)))
+                     
+                     val m = mimicType1 ctx dom (fn n => X.weaken (X.integerUniv univ) n)
+      
+                     val iters' =
+                        List.map
+                           (fn iter => X.app iter m)
+                           iters
+                  in
+                     discrimBody (numdts-1) iters' ctx
+                  end
+
+            val discriminatorList =
+               let
+                  val iters = List.map (fn (iter, _) => X.constant iter) iterInfoList
+                  val a = tcompact Seq.empty (X.inhabitedForm (List.hd iters))
+      
+                  val discrims =
+                     mimicType 0 numberOfPervasiveArgs Seq.empty a iters
+                     (fns n ctx _ iters' =>
+                         if n = numberOfPervasiveArgs then
+                            let
+                               val bodies = discrimBody mut iters' ctx
+                            in
+                               (* Wish we could just use bodies, but we need to turn that last forall into an arrow. *)
+                               map2
+                                  (fns body (_, _, _, _, _, numberOfIndexArgs) =>
+                                      let
+                                         val body = compact ctx body
+                                         val b = tcompact ctx (X.inhabitedForm body)
+                                      in
+                                         List.hd $
+                                         mimicType 0 numberOfIndexArgs ctx b [body]
+                                         (fns _ _ c l =>
+                                             let
+                                                val dom = X.forallInv1 c
+                                             in
+                                                [X.lam NONE dom 
+                                                    (X.app (X.weaken (List.hd l) 1) (X.var 0 dom))]
+                                             end)
+                                      end)
+                                  bodies typeInfoList
+                            end
+                         else
+                            raise (Fail "unexpected type in makeDiscrims"))
+               in
+                  map2
+                     (fns (dtname, _, _) (discrim as (_, t, _)) =>
+                         let
+                            val name = Symbol.fromValue (Symbol.toValue dtname ^ "_discrim")
+                         in
+                            define name discrim (Normalize.normalize t)
+                         end)
+                     dts discrims
+               end
+
+            val discriminators = Array.fromList discriminatorList
+
+            val discriminatorReductionList =
+               map
+                  (fn (i, j, name, _, numberOfArgs, _) =>
+                      let
+                         val (_, _, _, _, _, numberOfIndexArgs) = Array.sub typeInfo i
+                         val (iterConst, constName) = Array.sub iterInfo i
+                         val discrimConst = Array.sub discriminators i
+                         val (conConst, _, _) = Array.sub conInfo j
+                         val iterRed = Array.sub iterReductions j
+
+                         val r =
+                            R.new2
+                               discrimConst
+                               (numberOfVisibleArgs + numberOfIndexArgs) 0
+                               conConst
+                               (numberOfVisibleArgs + numberOfArgs)
+                               (T.Native (T.Integer (IntInf.fromInt j)))
+                               (R.trans [R.unfold, R.betas, R.user2 iterRed, R.betas])
+                               R.refl
+                      in
+                         RR.write
+                            (Symbol.fromValue (String.concat [constName, "_discrim_", Symbol.toValue name]))
+                            (RR.fromUreduction2 r);
+
+                         r
+                      end)
+                  allcons
+
+            val discriminatorReductions = Array.fromList discriminatorReductionList
+
+
+            (* The extractors (for 'yes' instances of injection) *)
+
+            val (extractorTypeList, extractorList, extractorTypeReductionList, extractorReductionList) =
+               let
+                  val (pervl, wrap) =
+                     List.foldl
+                        (fns (sym, dom) (pervl, wrap) =>
+                            let
+                               val dom = X.tuse dom
+                            in
+                               (dom :: pervl,
+                                (fn m => wrap (X.lamInt (SOME sym) dom m)))
+                            end)
+                        ([], (fn m => m))
+                        invis
+                        
+                  val (pervl, wrap) =
+                     List.foldl
+                        (fns (sym, dom) (pervl, wrap) =>
+                            let
+                               val dom = X.tuse dom
+                            in
+                               (dom :: pervl,
+                                (fn m => wrap (X.lamAll (SOME sym) dom m)))
+                            end)
+                        (pervl, wrap)
+                        pers
+      
+                  val ctx = S.mapFromList (fn a => J.Tm (X.typ a)) pervl
+      
+                  val pervargs =
+                     List.rev $
+                     List.mapi
+                        (fns i a => X.var i a)
+                        pervl
+      
+                  (* the datatypes, inside the pervasive arguments *)
+                  val tpsIn =
+                     Array.tabulate mut
+                        (fn i => 
+                            let
+                               val (const, _, _, _, _, _) = Array.sub typeInfo i
+                            in
+                               X.apps (X.constant const) pervargs
+                            end)
+      
+                  val univ = X.use univ_mobile
+      
+                  val (_, _, extractorTypeListRev, extractorListRev, extractorTypeReductionListRev, extractorReductionListRev) =
+                     List.foldl
+                        (fns (dtname, _, cons) (dtsSoFar, consSoFar, extractorTypeListRev, extractorListRev, extractorTypeReductionListRev, extractorReductionListRev) =>
+                            (* accumulator:
+                               datatypes processed so far
+                               constructor processed so far
+                               extractor type constants (reversed)
+                               extractor constants (reversed)
+                               extractor type reductions (reversed)
+                               extractor reductions (reversed)
+                            *)
+                            (case cons of
+                                [] =>
+                                   (* If this datatype has no constructors, no need for extractor, so put out a bogus constant. *)
+                                   (dtsSoFar + 1, 
+                                    consSoFar, 
+                                    Prim.bogus :: extractorTypeListRev,
+                                    Prim.bogus :: extractorListRev,
+                                    extractorTypeReductionListRev,
+                                    extractorReductionListRev)
+                                   
+                              | _ =>
+                                   let
+                                      val (_, _, _, _, _, numberOfIndexArgs) = Array.sub typeInfo dtsSoFar
+                                      val (iterconst, _) = Array.sub iterInfo dtsSoFar
+                                      val discrimconst = Array.sub discriminators dtsSoFar
+
+                                      val numberOfConstructorsHere = List.length cons
+      
+                                      (* numberOfConstructorsHere > 0 *)
+             
+                                      (* for each constructor:
+                                         - the tuple of the constructor's arguments (in the iterator-arm context, containing not
+                                           only the arguments, but also the recursive variables provided by the iterator, even
+                                           though those recursive variables are ignored)
+
+                                         - and the type of the tuple (pervasive context)
+
+                                         (We have to go back to the original datatype information here.  We can't work from the
+                                         iterator's type in this case (as we could with the discriminator) because we need to be
+                                         able to show that the extractor's arms' types belong to the right universe.)
+                                      *)
+                                      val arms =
+                                         List.map
+                                            (fn (_, args, _) =>
+                                                let
+                                                   (* the type in the ambient context *)
+                                                   val ((numext, numint), t) =
+                                                      bifold
+                                                         (fns arg (numext, numint) =>
+                                                             (case arg of
+                                                                 External (binder, u) =>
+                                                                    ((numext+1, numint),
+                                                                     (fn t =>
+                                                                         X.existsUniv (Option.join binder) (X.use u) t))
+                   
+                                                               | Internal (j, indices) =>
+                                                                    ((numext, numint+1),
+                                                                     (fn t =>
+                                                                         X.prodUniv
+                                                                            (X.apps
+                                                                                (X.weaken (Array.sub tpsIn j) numext)
+                                                                                (List.map X.use indices))
+                                                                            t))))
+                                                         (fn (numext, _) => X.unitUniv (X.weaken univ numext))
+                                                         (0, 0)
+                                                         args
+                   
+                                                   val tot = numext + 2 * numint
+                   
+                                                   val (_, elems) =
+                                                      bifold
+                                                         (* G2 |- s : G1
+                                                            where G1 is the context within the constructor (internal args bind 0)
+                                                                  G2 is the context within the iterator (internal args bind 2)
+                   
+                                                            depth = |G2|
+                                                         *)
+                                                         (fns arg (depth, s) =>
+                                                             (case arg of
+                                                                 External (_, u) =>
+                                                                    ((depth+1, X.underEasy 1 s),
+                                                                     (fn elems =>
+                                                                         X.var (tot - depth - 1) (X.tsub (X.forget (X.use u)) s) :: elems))
+                   
+                                                               | Internal (j, indices) =>
+                                                                    ((depth+2, X.compose s (X.shift 2)),
+                                                                     (fn elems =>
+                                                                         X.var 
+                                                                            (tot - depth - 1)
+                                                                            (X.forget
+                                                                                (X.apps
+                                                                                    (X.weaken (Array.sub tpsIn j) depth)
+                                                                                    (List.map (fn m => X.sub (X.use m) s) indices)))
+                                                                         :: elems))))
+                                                         (fn _ => [])
+                                                         (0, X.id)
+                                                         args
+                   
+                                                   val t = compact ctx t
+                                                in
+                                                   (X.tupleEx elems (X.forget (X.weaken t tot)), t)
+                                                end)
+                                            cons
+             
+                                      (* Build the extractor's type.
+
+                                         We can't use the iterator to determine the extraction type directly,
+                                         because we would be using the iterator at too high a universe.
+                                         Instead, use the discriminator to get a number, and then branch on
+                                         the number.
+                                      *)
+      
+                                      (* Build a decision tree for number i to j (exclusive)
+                                         |l| >= j - i >= 1
+                                         depth is the size of the context beyond the pervasives
+                                         returns (tree, l') where l' is the rest of l
+                                      *)
+                                      fun decisionTree depth i j l =
+                                         if i + 1 = j then
+                                            (case l of
+                                                [] =>
+                                                   raise (Fail "precondition")
+                                
+                                              | (_, h) :: t =>
+                                                   (X.weaken h depth, t))
+                                         else
+                                            let
+                                               val k = i + (j - i) div 2
+                                
+                                               val (left, l') = decisionTree depth i k l
+                                               val (right, l'') = decisionTree depth k j l'
+                                            in
+                                               (X.ifthenelse
+                                                   (X.apps (X.constant Prim.leqzb)
+                                                       [X.var 0 X.integer, X.integerLiteral (IntInf.fromInt (k - 1))])
+                                                   left right,
+                                                l'')
+                                            end
+      
+                                      fun decisionTreeReduction x i j acc =
+                                         if i + 1 = j then
+                                            List.rev acc
+                                         else
+                                            let
+                                               val k = i + (j - i) div 2
+                                            in
+                                               if x < k then
+                                                  decisionTreeReduction x i k
+                                                     (R.user2 PrimReduction.ite_tru :: R.compat [R.native] :: acc)
+                                               else
+                                                  decisionTreeReduction x k j
+                                                     (R.user2 PrimReduction.ite_fals :: R.compat [R.native] :: acc)
+                                            end
+
+                                      val discrimPerv = compact ctx (X.apps (X.constant discrimconst) pervargs)
+      
+                                      val exttp =
+                                         List.hd $
+                                         mimicType 0 ~1 ctx (X.tcompact ctx (X.inhabitedForm discrimPerv)) 
+                                            [discrimPerv]
+                                            (fns n _ _ l =>
+                                                let
+                                                   val d = List.hd l
+         
+                                                   val (body, _) =
+                                                      decisionTree 
+                                                         (n + 1)
+                                                         consSoFar
+                                                         (consSoFar + numberOfConstructorsHere)
+                                                         arms
+                                                in
+                                                   [X.lett NONE d body]
+                                                end)
+      
+                                      val exttpFull as (_, exttpType, _) = wrap exttp
+      
+                                      val exttpName = Symbol.fromValue (Symbol.toValue dtname ^ "_Extract")
+             
+                                      val exttpConst = define exttpName exttpFull exttpType
+
+                                      val exttpReds =
+                                         map2i
+                                            (fns i (name, args, _) (_, t) =>
+                                                let
+                                                   val pos = consSoFar + i
+                                                   val (conConst, _, _) = Array.sub conInfo pos
+                                                   val numberOfArgs = List.length args
+
+                                                   val pre =
+                                                      R.trans
+                                                         ([
+                                                          R.unfold,
+                                                          R.betas,
+                                                          R.compat [R.user2 (Array.sub discriminatorReductions pos)],
+                                                          R.user1 PrimReduction.reduce_lett,
+                                                          R.beta 1
+                                                          ]
+                                                          @
+                                                          decisionTreeReduction 
+                                                             pos consSoFar (consSoFar + numberOfConstructorsHere) [])
+
+                                                   val res = 
+                                                      (* t lives in the context with the pervasives only *)
+                                                      T.Sub (X.term t, T.Shift (numberOfIndexArgs + numberOfVisibleArgs + numberOfArgs))
+
+                                                   val r =
+                                                      R.new2
+                                                         exttpConst
+                                                         (numberOfVisibleArgs + numberOfIndexArgs) 0
+                                                         conConst
+                                                         (numberOfVisibleArgs + numberOfArgs)
+                                                         res
+                                                         pre
+                                                         R.refl
+                                                in
+                                                   r
+                                                end)
+                                            cons arms
+
+                                      (* build the extractor itself *)
+      
+                                      val iterPerv = compact ctx (X.apps (X.constant iterconst) pervargs)
+      
+                                      val ext1 =
+                                         natrecl dtsSoFar
+                                            (fns _ m =>
+                                                X.appWithGoal (compact ctx m)
+                                                (fn a =>
+                                                    mimicType1 ctx a (fn n => X.weaken (X.unitUniv univ) n)))
+                                            iterPerv
+             
+                                      val ext2 = X.app ext1 (X.apps (X.constant exttpConst) pervargs)
+             
+                                      val ext3 =
+                                         natrecl (mut - dtsSoFar - 1)
+                                            (fns _ m =>
+                                                X.appWithGoal (compact ctx m)
+                                                (fn a =>
+                                                    mimicType1 ctx a (fn n => X.weaken (X.unitUniv univ) n)))
+                                            ext2
+             
+                                      val ext4 =
+                                         natrecl consSoFar
+                                            (fns _ m =>
+                                                X.appWithGoal (compact ctx m)
+                                                (fn a =>
+                                                    mimicType1 ctx a (fn n => X.triv)))
+                                            ext3
+             
+                                      val ext5 =
+                                         foldl2
+                                            (fns (arm, _) r m =>
+                                                X.appWithGoal 
+                                                   (compact ctx m)
+                                                   (fn a =>
+                                                       List.hd $
+                                                       mimicType 0 ~1 ctx a []
+                                                       (fns _ _ b _ => [X.unreduce b (R.user2 r) arm])))
+                                            ext4
+                                            arms exttpReds
+
+                                      val ext6 =
+                                         natrecl (numberOfConstructors - consSoFar - numberOfConstructorsHere)
+                                            (fns _ m =>
+                                                X.appWithGoal (compact ctx m)
+                                                (fn a =>
+                                                    mimicType1 ctx a (fn _ => X.triv)))
+                                            ext5
+             
+                                      val extFull as (_, extType, _) = wrap ext6
+             
+                                      val extName = Symbol.fromValue (Symbol.toValue dtname ^ "_extract")
+             
+                                      val extConst = define extName extFull extType
+
+                                      val extReds =
+                                         List.mapi
+                                            (fns i (name, args, _) =>
+                                                let
+                                                   val pos = consSoFar + i
+                                                   val (conConst, _, _) = Array.sub conInfo pos
+                                                   val numberOfArgs = List.length args
+                                                   val iterRed = Array.sub iterReductions pos
+
+                                                   val pre =
+                                                      R.trans [R.unfold, R.betas, R.user2 iterRed, R.betas]
+
+                                                   val arm =
+                                                      natrecr numberOfArgs
+                                                         (fns j m => T.Pair (T.Var j, m))
+                                                         T.Triv
+
+                                                   val r =
+                                                      R.new2
+                                                         extConst
+                                                         (numberOfVisibleArgs + numberOfIndexArgs) 0
+                                                         conConst
+                                                         (numberOfVisibleArgs + numberOfArgs)
+                                                         arm
+                                                         pre
+                                                         R.refl
+                                                in
+                                                   r
+                                                end)
+                                            cons
+                                   in
+                                      (dtsSoFar + 1,
+                                       consSoFar + numberOfConstructorsHere, 
+                                       exttpConst :: extractorTypeListRev,
+                                       extConst :: extractorListRev,
+                                       List.revAppend exttpReds extractorTypeReductionListRev,
+                                       List.revAppend extReds extractorReductionListRev)
+                                   end))
+                        (0, 0, [], [], [], [])
+                        dts
+               in
+                  (List.rev extractorTypeListRev, 
+                   List.rev extractorListRev, 
+                   List.rev extractorTypeReductionListRev,
+                   List.rev extractorReductionListRev)
+               end
+
+            val extractorTypes = Array.fromList extractorTypeList
+            val extractors = Array.fromList extractorList
+            val extractorTypeReductions = Array.fromList extractorTypeReductionList
+            val extractorReductions = Array.fromList extractorReductionList
+
+
+
+
+            (* 11. Populate the tables *)
 
             val tplist =
                map3
@@ -3543,7 +3946,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                skeleton = skeletonConst,
                subterm = subtermConst,
                subtermWf = subtermWellFoundedConst,
-               iterReds = iterReductions,
+               discriminators = discriminators,
+               extractorTypes = extractorTypes,
+               extractors = extractors,
+               discriminatorReductions = discriminatorReductions,
+               extractorTypeReductions = extractorTypeReductions,
+               extractorReductions = extractorReductions
                }
          in
             populate env;
@@ -3552,7 +3960,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-            (* 11. Make all the contants opaque. *)
+            (* 12. Make all the contants opaque. *)
 
             close skeletonConst;
             close subtermConst;
@@ -3575,7 +3983,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                    ))
                conInfoList;
 
-            List.app (fn (const, _) => close const) iterInfoList
+            List.app (fn (const, _) => close const) iterInfoList;
+
+            Array.app (fn const => close const) discriminators;
+            Array.app (fn const => close const) extractorTypes;
+            Array.app (fn const => close const) extractors
+                   
          end
 
 
@@ -3590,8 +4003,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                        signalError (module ^ " library not loaded")))
             (* doesn't really matter which element from the module we pick *)
             [
+            ("Acc", "Acc"),
             ("Nat", "leq"),
-            ("Datatype", "dt")
+            ("Datatype", "dt"),
+            ("Integer", "leqzb")
             ]
 
 

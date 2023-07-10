@@ -676,6 +676,47 @@ end.
 Qed.
 
 
+Lemma tr_nattp_elim_eqtype :
+  forall G a b c d m n,
+    tr G (deq m n nattp)
+    -> tr G (deqtype a b)
+    -> tr (hyp_tm nattp :: G) (deqtype c d)
+    -> tr G (deqtype (natcase m a c) (natcase n b d)).
+Proof.
+intros G a b c d m n Hm Hab Hcd.
+unfold natcase.
+eapply (tr_sumtype_elim_eqtype _ unittp); eauto.
+  {
+  apply (tr_subtype_elim _ nattp); auto.
+  unfold nattp.
+  apply tr_mu_unroll.
+    {
+    apply tr_sumtype_formation.
+      {
+      apply tr_unittp_istype.
+      }
+
+      {
+      apply tr_hyp_tp; eauto using index_0.
+      }
+    }
+
+    {
+    apply tr_positive_nattp_body.
+    }
+  }
+unfold deqtype.
+exploit (tr_unittp_eta_hyp G [] triv triv (subst sh1 (eqtype a b))) as H.
+  {
+  simpsub.
+  exact Hab.
+  }
+cbn [length List.app under] in H.
+simpsubin H.
+exact H.
+Qed.
+
+
 Lemma tr_leqtp_formation_univ :
   forall G m m' n n',
     tr G (deq m m' nattp)

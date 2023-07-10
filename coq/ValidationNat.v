@@ -121,36 +121,7 @@ Lemma natElimEqtype_valid : natElimEqtype_obligation.
 Proof.
 prepare.
 intros G a b c d m n ext2 ext1 ext0 Hmn Hab Hcd.
-unfold natcase.
-eapply (tr_sumtype_elim_eqtype _ unittp); eauto.
-  {
-  apply (tr_subtype_elim _ nattp); auto.
-  unfold nattp.
-  apply tr_mu_unroll.
-    {
-    apply tr_sumtype_formation.
-      {
-      apply tr_unittp_istype.
-      }
-
-      {
-      apply tr_hyp_tp; eauto using index_0.
-      }
-    }
-
-    {
-    apply tr_positive_nattp_body.
-    }
-  }
-unfold deqtype.
-exploit (tr_unittp_eta_hyp G [] triv triv (subst sh1 (eqtype a b))) as H.
-  {
-  simpsub.
-  exact Hab.
-  }
-cbn [length List.app under] in H.
-simpsubin H.
-exact H.
+apply tr_nattp_elim_eqtype; auto.
 Qed.
 
 
@@ -201,6 +172,52 @@ apply tr_prod_intro.
     apply tr_positive_nattp_body.
     }
   }
+Qed.
+
+
+Lemma natContradiction_valid : natContradiction_obligation.
+Proof.
+prepare.
+intros G a m ext0 H.
+apply (tr_voidtp_elim _ triv triv triv triv).
+eapply (tr_compute _ _ (natcase (nsucc m) unittp voidtp)); eauto using equiv_refl.
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply natcase_succ.
+    }
+  simpsub.
+  apply equiv_refl.
+  }
+apply (tr_eqtype_convert _#3 (natcase nzero unittp voidtp)).
+2:{
+  eapply (tr_compute _ _ unittp); eauto using equiv_refl, tr_unittp_intro.
+  eapply equiv_trans.
+    {
+    apply natcase_zero.
+    }
+  simpsub.
+  apply equiv_refl.
+  }
+apply tr_nattp_elim_eqtype; auto.
+  {
+  eapply tr_formation_weaken.
+  apply tr_unittp_formation_univ.
+  }
+
+  {
+  eapply tr_formation_weaken.
+  apply tr_voidtp_formation_univ.
+  }
+Qed.
+
+
+Lemma natInjection_valid : natInjection_obligation.
+Proof.
+prepare.
+intros G m n ext0 H.
+apply tr_nsucc_nattp_invert; auto.
 Qed.
 
 

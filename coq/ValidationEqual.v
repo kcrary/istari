@@ -72,6 +72,14 @@ auto.
 Qed.
 
 
+Lemma eqTrivialize_valid : eqTrivialize_obligation.
+Proof.
+prepare.
+intros G a m n ext0 H.
+auto.
+Qed.
+
+
 Lemma eqExt_valid : eqExt_obligation.
 Proof.
 unfoldtop.

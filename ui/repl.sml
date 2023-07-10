@@ -78,7 +78,9 @@ signature PLATFORM =
       val printDepth : int ref
       val printLength : int ref
       val stringLength : int ref
+
       val gcMessages : bool -> unit
+      val exnHistory : exn -> string list
 
    end
 
@@ -208,6 +210,15 @@ functor ReplFun (structure Platform : PLATFORM
                    print "Uncaught exception: ";
                    print (exnMessage exn);
                    print "\n";
+
+                   (case Platform.exnHistory exn of
+                       [] => ()
+                     | l => 
+                          (
+                          print "\nBacktrace:\n";
+                          app (fn str => (print str; print "\n")) l
+                          ));
+
                    Incremental.undo ();
                    raise Exception
                    ))

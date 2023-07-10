@@ -475,6 +475,152 @@ eapply tr_sumtype_elim_eqtype; eauto.
 Qed.
 
 
+Lemma sumContradiction_valid : sumContradiction_obligation.
+Proof.
+prepare.
+intros G a b c m n ext0 H.
+apply (tr_voidtp_elim _ triv triv triv triv).
+eapply (tr_compute _ _ (sumcase (sumright n) unittp voidtp)); eauto using equiv_refl.
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply sumcase_right.
+    }
+  simpsub.
+  apply equiv_refl.
+  }
+apply (tr_eqtype_convert _#3 (sumcase (sumleft m) unittp voidtp)).
+2:{
+  eapply (tr_compute _ _ unittp); eauto using equiv_refl, tr_unittp_intro.
+  eapply equiv_trans.
+    {
+    apply sumcase_left.
+    }
+  simpsub.
+  apply equiv_refl.
+  }
+eapply tr_sumtype_elim_eqtype; eauto.
+  {
+  eapply tr_formation_weaken.
+  apply tr_unittp_formation_univ.
+  }
+
+  {
+  eapply tr_formation_weaken.
+  apply tr_voidtp_formation_univ.
+  }
+Qed.
+
+
+Lemma sumInjection1_valid : sumInjection1_obligation.
+Proof.
+prepare.
+intros G a b m n ext0 H.
+eapply (tr_compute _ _ (subst1 (sumleft m) (sumcase (var 0) (subst (sh 2) a) (subst (sh 2) b))) _ (sumcase (sumleft m) (var 0) (var 0)) _ (sumcase (sumleft n) (var 0) (var 0))).
+  {
+  simpsub.
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply sumcase_left.
+    }
+  simpsub.
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply sumcase_left.
+    }
+  simpsub.
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply sumcase_left.
+    }
+  simpsub.
+  apply equiv_refl.
+  }
+eapply tr_sumtype_elim; eauto.
+  {
+  simpsub.
+  rewrite -> sumcase_left.
+  simpsub.
+  apply tr_hyp_tm.
+  apply index_0.
+  }
+
+  {
+  simpsub.
+  rewrite -> sumcase_right.
+  simpsub.
+  apply tr_hyp_tm.
+  apply index_0.
+  }
+Qed.
+
+
+Lemma sumInjection2_valid : sumInjection2_obligation.
+Proof.
+prepare.
+intros G a b m n ext0 H.
+eapply (tr_compute _ _ (subst1 (sumright m) (sumcase (var 0) (subst (sh 2) a) (subst (sh 2) b))) _ (sumcase (sumright m) (var 0) (var 0)) _ (sumcase (sumright n) (var 0) (var 0))).
+  {
+  simpsub.
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply sumcase_right.
+    }
+  simpsub.
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply sumcase_right.
+    }
+  simpsub.
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply sumcase_right.
+    }
+  simpsub.
+  apply equiv_refl.
+  }
+eapply tr_sumtype_elim; eauto.
+  {
+  simpsub.
+  rewrite -> sumcase_left.
+  simpsub.
+  apply tr_hyp_tm.
+  apply index_0.
+  }
+
+  {
+  simpsub.
+  rewrite -> sumcase_right.
+  simpsub.
+  apply tr_hyp_tm.
+  apply index_0.
+  }
+Qed.
+
+
 Lemma sumFormInv1_valid : sumFormInv1_obligation.
 Proof.
 prepare.

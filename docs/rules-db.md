@@ -1263,7 +1263,7 @@ Conventions:
 
 - `sumElimOf A B C M P R`
 
-      G |- of C[M . id] (sumcase M (fn . P) (fn . R))
+      G |- of C[M . id] (sum_case M (fn . P) (fn . R))
       >>
       G |- of (sum A B) M
       G, A |- of C[inl 0 . ^1] P
@@ -1271,7 +1271,7 @@ Conventions:
 
 - `sumElimOfNondep A B C M P R`
 
-      G |- of C (sumcase M (fn . P) (fn . R))
+      G |- of C (sum_case M (fn . P) (fn . R))
       >>
       G |- of (sum A B) M
       G, A |- of C[^1] P
@@ -1279,7 +1279,7 @@ Conventions:
 
 - `sumElimEq A B C M N P Q R S`
 
-      G |- eq C[M . id] (sumcase M (fn . P) (fn . R)) (sumcase N (fn . Q) (fn . S))
+      G |- eq C[M . id] (sum_case M (fn . P) (fn . R)) (sum_case N (fn . Q) (fn . S))
       >>
       G |- eq (sum A B) M N
       G, A |- eq C[inl 0 . ^1] P Q
@@ -1287,7 +1287,7 @@ Conventions:
 
 - `sumElim A B C M`
 
-      G |- C[M . id] ext sumcase M (fn . P) (fn . R)
+      G |- C[M . id] ext sum_case M (fn . P) (fn . R)
       >>
       G |- of (sum A B) M
       G, A |- C[inl 0 . ^1] ext P
@@ -1295,7 +1295,7 @@ Conventions:
 
 - `sumElimNondep A B C`
 
-      G |- C ext sumcase M (fn . P) (fn . R)
+      G |- C ext sum_case M (fn . P) (fn . R)
       >>
       G |- sum A B ext M
       G, A |- C[^1] ext P
@@ -1303,7 +1303,7 @@ Conventions:
 
 - `sumElimIstype A B C E M`
 
-      G |- istp (sumcase M (fn . C) (fn . E))
+      G |- istp (sum_case M (fn . C) (fn . E))
       >>
       G |- of (sum A B) M
       G, A |- istp C
@@ -1311,7 +1311,7 @@ Conventions:
 
 - `sumElimEqtype A B C D E F M N`
 
-      G |- eqtp (sumcase M (fn . C) (fn . E)) (sumcase N (fn . D) (fn . F))
+      G |- eqtp (sum_case M (fn . C) (fn . E)) (sum_case N (fn . D) (fn . F))
       >>
       G |- eq (sum A B) M N
       G, A |- eqtp C D
@@ -1319,14 +1319,32 @@ Conventions:
 
 - `sumLeft n A B C`
 
-      G1, (sum A B), G2 |- C ext sumcase n (fn . M[1 .. n . 0 . ^n+1]) (fn . N[1 .. n . 0 . ^n+1])
+      G1, (sum A B), G2 |- C ext sum_case n (fn . M[1 .. n . 0 . ^n+1]) (fn . N[1 .. n . 0 . ^n+1])
       >>
       G1, A, G2[inl 0 . ^1] |- C[under_n (inl 0 . ^1)] ext M
       G1, B, G2[inr 0 . ^1] |- C[under_n (inr 0 . ^1)] ext N
 
-- `sumcaseType`
+- `sumContradiction A B C M N`
 
-      G |- of (intersect level (fn . intersect (univ 0) (fn . intersect (univ 1) (fn . intersect (univ 2) (fn . arrow (sum 2 1) (arrow (arrow 2 0) (arrow (arrow 1 0) 0))))))) sumcase
+      G |- C
+      >>
+      G |- eq (sum A B) (inl M) (inr N)
+
+- `sumInjection1 A B M N`
+
+      G |- eq A M N
+      >>
+      G |- eq (sum A B) (inl M) (inl N)
+
+- `sumInjection2 A B M N`
+
+      G |- eq B M N
+      >>
+      G |- eq (sum A B) (inr M) (inr N)
+
+- `sum_caseType`
+
+      G |- of (intersect level (fn . intersect (univ 0) (fn . intersect (univ 1) (fn . intersect (univ 2) (fn . arrow (sum 2 1) (arrow (arrow 2 0) (arrow (arrow 1 0) 0))))))) sum_case
 
 - `sumFormInv1 A B`
 
@@ -1762,6 +1780,14 @@ Conventions:
       G |- of A[true . id] P
       G |- of A[false . id] R
 
+- `boolElimOfNondep A M P R`
+
+      G |- of A (ite M P R)
+      >>
+      G |- of bool M
+      G |- of A P
+      G |- of A R
+
 - `boolElimEq A M N P Q R S`
 
       G |- eq A[M . id] (ite M P R) (ite N Q S)
@@ -1800,6 +1826,12 @@ Conventions:
       >>
       G1, G2[true . id] |- A[under_n (true . id)] ext M
       G1, G2[false . id] |- A[under_n (false . id)] ext N
+
+- `boolContradiction A`
+
+      G |- A
+      >>
+      G |- eq bool true false
 
 - `iteType`
 
@@ -1847,6 +1879,18 @@ Conventions:
 - `natUnroll`
 
       G |- eeqtp nat (sum unit nat) ext (() , ())
+
+- `natContradiction A M`
+
+      G |- A
+      >>
+      G |- eq nat zero (succ M)
+
+- `natInjection M N`
+
+      G |- eq nat M N
+      >>
+      G |- eq nat (succ M) (succ N)
 
 - `zeroType`
 
@@ -2207,6 +2251,12 @@ Conventions:
       G |- eq A M N
       >>
       G |- of (eq A M N) P
+
+- `eqTrivialize A M N`
+
+      G |- eq A M N
+      >>
+      G |- eq A M N
 
 - `eqExt A M N P Q`
 

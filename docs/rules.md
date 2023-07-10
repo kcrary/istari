@@ -1276,7 +1276,7 @@ variables.  The official rules, using de Bruijn indices, are given
 
 - `sumElimOf A B C M P R`
 
-      G |- sumcase M (fn x . P) (fn x . R) : [M / y]C
+      G |- sum_case M (fn x . P) (fn x . R) : [M / y]C
       >>
       G |- M : A % B
       G, x : A |- P : [inl x / y]C
@@ -1284,7 +1284,7 @@ variables.  The official rules, using de Bruijn indices, are given
 
 - `sumElimOfNondep A B C M P R`
 
-      G |- sumcase M (fn x . P) (fn x . R) : C
+      G |- sum_case M (fn x . P) (fn x . R) : C
       >>
       G |- M : A % B
       G, x : A |- P : C
@@ -1292,7 +1292,7 @@ variables.  The official rules, using de Bruijn indices, are given
 
 - `sumElimEq A B C M N P Q R S`
 
-      G |- sumcase M (fn x . P) (fn x . R) = sumcase N (fn x . Q) (fn x . S) : [M / y]C
+      G |- sum_case M (fn x . P) (fn x . R) = sum_case N (fn x . Q) (fn x . S) : [M / y]C
       >>
       G |- M = N : (A % B)
       G, x : A |- P = Q : [inl x / y]C
@@ -1300,7 +1300,7 @@ variables.  The official rules, using de Bruijn indices, are given
 
 - `sumElim A B C M`
 
-      G |- [M / y]C ext sumcase M (fn x . P) (fn x . R)
+      G |- [M / y]C ext sum_case M (fn x . P) (fn x . R)
       >>
       G |- M : A % B
       G, x : A |- [inl x / y]C ext P
@@ -1308,7 +1308,7 @@ variables.  The official rules, using de Bruijn indices, are given
 
 - `sumElimNondep A B C`
 
-      G |- C ext sumcase M (fn x . P) (fn x . R)
+      G |- C ext sum_case M (fn x . P) (fn x . R)
       >>
       G |- A % B ext M
       G, x : A |- C ext P
@@ -1316,7 +1316,7 @@ variables.  The official rules, using de Bruijn indices, are given
 
 - `sumElimIstype A B C E M`
 
-      G |- sumcase M (fn x . C) (fn x . E) : type
+      G |- sum_case M (fn x . C) (fn x . E) : type
       >>
       G |- M : A % B
       G, x : A |- C : type
@@ -1324,7 +1324,7 @@ variables.  The official rules, using de Bruijn indices, are given
 
 - `sumElimEqtype A B C D E F M N`
 
-      G |- sumcase M (fn x . C) (fn x . E) = sumcase N (fn x . D) (fn x . F) : type
+      G |- sum_case M (fn x . C) (fn x . E) = sum_case N (fn x . D) (fn x . F) : type
       >>
       G |- M = N : (A % B)
       G, x : A |- C = D : type
@@ -1332,14 +1332,32 @@ variables.  The official rules, using de Bruijn indices, are given
 
 - `sumLeft n A B C`
 
-      G1, x : (A % B), G2 |- C ext sumcase x (fn y . M) (fn y . N)
+      G1, x : (A % B), G2 |- C ext sum_case x (fn y . M) (fn y . N)
       >>
       G1, y : A, [inl y / x]G2 |- [inl y / x]C ext M
       G1, y : B, [inr y / x]G2 |- [inl r / x]C ext N
 
-- `sumcaseType`
+- `sumContradiction A B C M N`
 
-      G |- sumcase : intersect (i : level) . intersect (a : univ i) . intersect (b : univ i) . intersect (c : univ i) . a % b -> (a -> c) -> (b -> c) -> c
+      G |- C
+      >>
+      G |- inl M = inr N : (A % B)
+
+- `sumInjection1 A B M N`
+
+      G |- M = N : A
+      >>
+      G |- inl M = inl N : (A % B)
+
+- `sumInjection2 A B M N`
+
+      G |- M = N : B
+      >>
+      G |- inr M = inr N : (A % B)
+
+- `sum_caseType`
+
+      G |- sum_case : intersect (i : level) . intersect (a : univ i) . intersect (b : univ i) . intersect (c : univ i) . a % b -> (a -> c) -> (b -> c) -> c
 
 - `sumFormInv1 A B`
 
@@ -1775,6 +1793,14 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- P : [true / x]A
       G |- R : [false / x]A
 
+- `boolElimOfNondep A M P R`
+
+      G |- ite M P R : A
+      >>
+      G |- M : bool
+      G |- P : A
+      G |- R : A
+
 - `boolElimEq A M N P Q R S`
 
       G |- ite M P R = ite N Q S : [M / x]A
@@ -1813,6 +1839,12 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G1, [true / x]G2 |- [true / x]A ext M
       G1, [false / x]G2 |- [false / x]A ext N
+
+- `boolContradiction A`
+
+      G |- A
+      >>
+      G |- true = false : bool
 
 - `iteType`
 
@@ -1860,6 +1892,18 @@ variables.  The official rules, using de Bruijn indices, are given
 - `natUnroll`
 
       G |- eeqtp nat (unit % nat) ext (() , ())
+
+- `natContradiction A M`
+
+      G |- A
+      >>
+      G |- zero = succ M : nat
+
+- `natInjection M N`
+
+      G |- M = N : nat
+      >>
+      G |- succ M = succ N : nat
 
 - `zeroType`
 
@@ -2220,6 +2264,12 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- M = N : A
       >>
       G |- P : M = N : A
+
+- `eqTrivialize A M N`
+
+      G |- M = N : A
+      >>
+      G |- M = N : A
 
 - `eqExt A M N P Q`
 

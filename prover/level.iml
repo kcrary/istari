@@ -31,6 +31,8 @@ signature LEVEL =
       *)
       val prove : (int -> (Term.term * Tactic.tactic) list) -> Judgement.judgement -> Tactic.tactic option
 
+      val trace : bool ref
+
    end
 
 
@@ -131,6 +133,7 @@ structure Level :> LEVEL =
       val hasScopeViolation = ref false
       val hasInconsistentScope = ref false
 
+      val trace = ref false
 
 
 
@@ -371,6 +374,16 @@ structure Level :> LEVEL =
                    val () = dictr := dict
 
                    val () =
+                      if !trace then
+                         (
+                         print "searching E";
+                         print (Int.toString (T.ebindToInt e));
+                         print "\n"
+                         )
+                      else
+                         ()
+
+                   val () =
                       List.app
                          (fn (_, e, _) => dfs dictr e)
                          evars
@@ -473,6 +486,17 @@ structure Level :> LEVEL =
       fun solve goals =
          try
             let
+               val () =
+                  if !trace then
+                     (
+                     print "solving:\n";
+                     List.app
+                        (fn jud => Show.showClosed (J.concl jud))
+                        goals
+                     )
+                  else
+                     ()
+
                val () = hasStrictCycle := false
                val () = hasScopeViolation := false
                val () = hasInconsistentScope := false
@@ -506,6 +530,12 @@ structure Level :> LEVEL =
                      queue
    
                (* No gray nodes left, so apply always returns ground expressions. *)
+
+               val () =
+                  if !trace then
+                     print "dfs complete\n"
+                  else
+                     ()
             in
                (* make the bindings *)
                D.app
@@ -520,6 +550,11 @@ structure Level :> LEVEL =
                          ()
                       end)
                   (!dictr);
+
+               if !trace then
+                  print "bindings complete\n"
+               else
+                  ();
 
                if !hasStrictCycle orelse !hasScopeViolation orelse !hasInconsistentScope then
                   INCONSISTENT $
@@ -801,6 +836,14 @@ structure Level :> LEVEL =
          let
             val ctx = J.context jud
          in
+            if !trace then
+               (
+               print "proving ";
+               Show.showClosed (J.concl jud)
+               )
+            else
+               ();
+
             termCase (J.concl jud)
             /| \Prim.ov\ \Prim.level\ ? =>
                \(fnc m =>
