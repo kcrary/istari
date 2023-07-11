@@ -200,6 +200,10 @@ functor ReplFun (structure Platform : PLATFORM
            | SilentException => raise SilentException
 
            | _ =>
+                (
+                !Hooks.onReady ();
+                print "\n";
+
                 if !Hooks.exceptionHandler exn then
                    (
                    Incremental.undo ();
@@ -221,7 +225,8 @@ functor ReplFun (structure Platform : PLATFORM
 
                    Incremental.undo ();
                    raise Exception
-                   ))
+                   )
+                ))
 
       
       (* source is the full character stream; p is drawn from the middle of it *)
