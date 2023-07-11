@@ -77,6 +77,7 @@ functor OmegaFun () :> OMEGA =
       datatype ('a, 'b) sum = INL of 'a | INR of 'b
 
 (* Diagnostic code
+
       (* shadowing Tactic's version *)
       fun done goal fk sk =
          (
@@ -1791,9 +1792,10 @@ functor OmegaFun () :> OMEGA =
                 if n = vn then
                    (n, d, [], varExpr v, name, false, idtac)
                 else
+                   (* variables have been allocated since this was tabled, so advance it *)
                    let
                       val name' = gensym ()
-
+                      
                       val d' = TD.insert d m (v, n, name')
 
                       val tac =
@@ -1816,8 +1818,8 @@ functor OmegaFun () :> OMEGA =
    
                                 (* xequiv (M[^k] , M') : xequiv n solution |- ... *)
                                 chdir (D.bind dir name')
-                                >>+
-                                Hyp.clear [Hyp.NAME name]
+
+                                (* It would be nice to clean out the old assumption (name) now, but it might be in use. *)
                                 ]
                          end
                    in
@@ -1868,6 +1870,7 @@ functor OmegaFun () :> OMEGA =
          in
             (n1, d1, props1, g expr1, name, true, tac)
          end
+
 
 
       fun stdTerm2 e f g lemma sz n d m1 m2 =
@@ -2841,7 +2844,7 @@ functor OmegaFun () :> OMEGA =
                          is going to re-prune the conclusion every time a new variable is added, so it's worth having the
                          conclusion be just void.
 
-                         (We could avoid the typecheck by standardizing first, but then we have M sitting in the conclusion
+                         (We could avoid the typecheck by standardizing first, but then we'd have M sitting in the conclusion
                          the whole time.)
                       *)
                       refine (Rule.assert 
@@ -3061,6 +3064,216 @@ functor OmegaFun () :> OMEGA =
 
        | Append of log_entry list
 
+
+(* Diagnostic code
+
+      fun printSym h = print (Symbol.toValue h)
+
+      fun printLogEntry entry =
+         (case entry of
+             Split (h1, h2, h) =>
+                (
+                print "Split ";
+                printSym h1;
+                print ", ";
+                printSym h2;
+                print " = ";
+                printSym h;
+                print "\n"
+                )
+
+           | Cases (h1, log1, h2, log2, h) =>
+                (
+                print "Cases ";
+                printSym h1;
+                print ", ";
+                printSym h2;
+                print " = ";
+                printSym h;
+                print "\n";
+                print "{\n";
+                printLog log1;
+                print "}{\n";
+                printLog log2;
+                print "}\n"
+                )
+
+           | Abort h =>
+                (
+                print "Abort ";
+                printSym h;
+                print "\n"
+                )
+
+           | Combine (h, comb) =>
+                (
+                print "Combine ";
+                printSym h;
+                print " = ";
+                List.app
+                   (fn (a, name) =>
+                       (
+                       print (I.toStringStd a);
+                       print "*";
+                       print (Symbol.toValue name);
+                       print " "
+                       ))
+                   comb;
+                print "\n"
+                )
+
+           | EqualContra h =>
+                (
+                print "EqualContra ";
+                printSym h;
+                print "\n"
+                )
+
+           | InequalContra h =>
+                (
+                print "InequalContra ";
+                printSym h;
+                print "\n"
+                )
+
+           | EqualDivide (h', h, e, a) =>
+                (
+                print "Equal ";
+                printSym h';
+                print " = ";
+                printSym h;
+                print " -> ";
+                printExpr e;
+                print " / ";
+                print (I.toStringStd a);
+                print "\n"
+                )
+
+           | EqualDivideContra (h, e, a, b) =>
+                (
+                print "EqualDivideContra ";
+                printSym h;
+                print " -> ";
+                printExpr e;
+                print " - ";
+                print (I.toStringStd b);
+                print " / ";
+                print (I.toStringStd a);
+                print "\n"
+                )
+
+           | InequalDivide (h', h, e, a, b) =>
+                (
+                print "InequalDivide ";
+                printSym h';
+                print " = ";
+                printSym h;
+                print " -> ";
+                printExpr e;
+                print " - ";
+                print (I.toStringStd b);
+                print " / ";
+                print (I.toStringStd a);
+                print "\n"
+                )
+
+           | Define (h, e) =>
+                (
+                print "Define ";
+                printSym h;
+                print " = ";
+                printExpr e;
+                print "\n"
+                )
+
+           | Antisymm (h, h1, h2) =>
+                (
+                print "Antisymm ";
+                printSym h;
+                print " = ";
+                printSym h1;
+                print ", ";
+                printSym h2;
+                print "\n"
+                )
+
+           | Perimeter (h, a, b, h1, h2) =>
+                (
+                print "Perimeter ";
+                printSym h;
+                print " = ";
+                print (I.toStringStd a);
+                print ", ";
+                print (I.toStringStd b);
+                print ", ";
+                printSym h1;
+                print ", ";
+                printSym h2;
+                print "\n"
+                )
+
+           | InequalIncrement (h', h) =>
+                (
+                print "InequalIncrement ";
+                printSym h';
+                print " = ";
+                printSym h;
+                print "\n"
+                )
+
+           | Negate (h', h, e, log) =>
+                (
+                print "Negate ";
+                printSym h';
+                print " = fn (";
+                printSym h;
+                print " : ";
+                printExpr e;
+                print ") =>\n";
+                print "{\n";
+                printLog log;
+                print "}\n"
+                )
+
+           | Apply (h1, h2) =>
+                (
+                print "Apply ";
+                printSym h1;
+                print " ";
+                printSym h2;
+                print "\n"
+                )
+
+           | InequalWeaken (h', h, a) =>
+                (
+                print "InequalWeaken ";
+                printSym h';
+                print " = ";
+                printSym h;
+                print ", ";
+                print (I.toStringStd a);
+                print "\n"
+                )
+
+           | Copy (h1, h2) =>
+                (
+                print "Copy ";
+                printSym h1;
+                print " = ";
+                printSym h2;
+                print "\n"
+                )
+
+           | Append log =>
+                (
+                print "Append\n";
+                print "{\n";
+                printLog log;
+                print "}\n"
+                ))
+
+      and printLog l = List.app printLogEntry l
+*)
 
 
       (* for each v --> (name, exp) in a substitution:
@@ -4111,8 +4324,6 @@ functor OmegaFun () :> OMEGA =
 
 
 (* Diagnostic code
-
-      fun printSym h = print (Symbol.toValue h)
 
       fun printSymOpt ho =
          (case ho of
