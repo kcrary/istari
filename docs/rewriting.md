@@ -85,6 +85,11 @@ evar.
 
     As `rewrite` but do not run the type checker.
 
+  + `rewriteThen /[rewrite] [targets]/ [tac]`
+
+    As `rewrite` but then run `tac` on the first subgoal.  Intended for use
+    with rewrites using the equation form.
+
 
 - `convert /[term M] within [captures] [targets]/`
 

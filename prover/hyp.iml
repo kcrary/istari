@@ -45,12 +45,14 @@ signature HYP =
 
       val copy : hypothesis -> symbol option -> tactic
 
-      val revert0 : tactic
+      val revert0 : bool -> tactic  (* bool: always use forall *)
       val revert : hypothesis list -> tactic
+      val revertDep : hypothesis list -> tactic  (* always use forall *)
 
       val set : symbol -> ETerm.eterm -> tactic
 
       val assumption : tactic
+      val eassumption : tactic
 
       val unhidePriority : Tactic.priority tacticm
       val unhideRaw : tactic
@@ -534,7 +536,7 @@ structure Hyp :> HYP =
          end
 
 
-      val revert0 =
+      fun revert0 dep =
          let
             do (jud, dir) = withgoal
             val (name, dir') = D.expose dir
@@ -546,15 +548,19 @@ structure Hyp :> HYP =
                    >>> [
                        refine (Rule.weaken 0 1)
                        >> chdir dir'
-                       >> first [
-                                refine (Rule.unreduce
-                                           (T.apply2 Prim.arrow 
-                                               a 
-                                               (T.Sub (c, T.Dot (T.Triv, T.id))))
-                                           Reduction.unfold),
-
-                                replaceConcl (T.apply2 Prim.forall a (T.Lam (SOME name, c)))
-                                ],
+                       >> 
+                       (if dep then
+                           replaceConcl (T.apply2 Prim.forall a (T.Lam (SOME name, c)))
+                        else
+                           first [
+                                 refine (Rule.unreduce
+                                            (T.apply2 Prim.arrow 
+                                                a 
+                                                (T.Sub (c, T.Dot (T.Triv, T.id))))
+                                            Reduction.unfold),
+ 
+                                 replaceConcl (T.apply2 Prim.forall a (T.Lam (SOME name, c)))
+                                 ]),
 
                        refine (Rule.hypothesisOf 0)
                        ]
@@ -595,29 +601,36 @@ structure Hyp :> HYP =
                    fail "no such hypothesis")
          end
 
-      fun revertn i =
+      fun revertn dep i =
          setFailure "cannot revert hypothesis on which others depend" (exchange 0 i 1)
-         >> revert0
+         >> revert0 dep
 
-      fun revertone name =
+      fun revertone dep name =
          let
             do i = findhyp (NAME name)
          in
-            revertn i
+            revertn dep i
          end
 
-      fun revertLoop names =
+      fun revertLoop dep names =
          (case names of
              [] => idtac
 
            | name :: rest =>
-                revertone name >> revertLoop rest)
+                revertone dep name >> revertLoop dep rest)
 
       fun revert hyps =
          let
             do hyps' = findnames hyps
          in
-            revertLoop (List.rev hyps')
+            revertLoop false (List.rev hyps')
+         end
+
+      fun revertDep hyps =
+         let
+            do hyps' = findnames hyps
+         in
+            revertLoop true (List.rev hyps')
          end
 
 
@@ -634,9 +647,18 @@ structure Hyp :> HYP =
          setFailure "no matching assumption" $
          goalContextCaseB
          /
-            $anyhyp ($tm _ => \fnc => fn i => refine (Rule.hypothesis i)\)
+            $anyhyp ($tm _ => \(fnc => fn i => 
+                                   refine (Rule.hypothesis i))\)
          /
 
+
+      val eassumption =
+         setFailure "no matching assumption" $
+         goalContextCaseB
+         /
+            $anyhyp ($tm _ => \(fnc => fn i => 
+                                   refine (Rule.hypothesisOf i))\)
+         /
 
 
       fun ifthenPri iftac thentac elsetac =

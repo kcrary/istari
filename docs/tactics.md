@@ -246,6 +246,18 @@ which appears in the `Hyp` structure.
 
   Proves a goal of the form `x : A`, if the type of `x` is `A`.
 
+  + `eassumption`
+
+    Proves a goal of the form `[evar] : A` if there exists a
+    hypothesis with type `A`.
+
+    This behavior is usually not desired if the evar is used
+    elsewhere, so this is not part of the autotactic.  It is intended
+    for situations in which a lemma has just been applied that has a
+    non-dependent antecedent represented using `forall` instead of
+    `->`.  (For example, a datatype iterator when the predicate does
+    not depend on the identity of the iterated term.)
+
 
 - `rename /[hyp]/ /[name]/`
 
@@ -326,9 +338,15 @@ which appears in the `Hyp` structure.
 
   Moves the indicated hypotheses into the conclusion.
 
-  + `revert0`
+  + `revertDep /[hyp] ... [hyp]/`
 
-    Moves the last hypothesis into the conclusion.
+    As `revert` except it always uses `forall`, even when an arrow
+    would suffice.
+
+  + `revert0 [bool]`
+
+    Moves the last hypothesis into the conclusion.  If `bool` is true,
+    then it uses `forall` even if an arrow would suffice.
 
 
 - `set /[name x]/ /[term M]/`
@@ -654,6 +672,10 @@ The destruction tactics are:
   + `assertRaw /[term A]/ /[ipattern]/`
 
     As `assert` but does not invoke the typechecker.
+
+  + `assertThen /[term A]/ /[ipattern]/ [tac]`
+
+    As `assert` but then run `tac` on the first subgoal.
 
 
 - `destructSet /[hyp x]/ /[name]/`

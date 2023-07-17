@@ -80,6 +80,7 @@ cons is right associative.
       [Term] #1                                                      (first projection)
       [Term] #2                                                      (second projection)
       [Term] #prev                                                   (unscoped future elim)
+      [Term] ## Number                                               (#2 ... #2 #1)
       pi1 Term                                                       (first projection)
       pi2 Term                                                       (second projection)
       prev Term                                                      (unscoped future elim)
