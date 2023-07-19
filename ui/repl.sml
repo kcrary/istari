@@ -34,6 +34,7 @@ signature CTRL =
       val stringLength : int ref
       val gcMessages : bool -> unit
       val allowBeep : bool ref
+      val backtrace : bool ref
 
    end
 
@@ -125,6 +126,8 @@ functor ReplFun (structure Platform : PLATFORM
 
          end
 
+      val backtrace = ref false
+
 
 
       (* Executing IML *)
@@ -215,13 +218,16 @@ functor ReplFun (structure Platform : PLATFORM
                    print (exnMessage exn);
                    print "\n";
 
-                   (case Platform.exnHistory exn of
-                       [] => ()
-                     | l => 
-                          (
-                          print "\nBacktrace:\n";
-                          app (fn str => (print str; print "\n")) l
-                          ));
+                   if !backtrace then
+                      (case Platform.exnHistory exn of
+                          [] => ()
+                        | l => 
+                             (
+                             print "\nBacktrace:\n";
+                             app (fn str => (print str; print "\n")) l
+                             ))
+                   else
+                      ();
 
                    Incremental.undo ();
                    raise Exception
@@ -587,7 +593,7 @@ functor ReplFun (structure Platform : PLATFORM
          makeStruct
             ["load", "use", "escape", "exit", 
              "pwd", "cd",
-             "printDepth", "printLength", "stringLength", "gcMessages", "allowBeep"]
+             "printDepth", "printLength", "stringLength", "gcMessages", "allowBeep", "backtrace"]
 
       val recoverSig =
          makeStruct ["recover"]
@@ -701,6 +707,7 @@ functor ReplFun (structure Platform : PLATFORM
             val stringLength = Platform.stringLength
             val gcMessages = Platform.gcMessages
             val allowBeep = UI.allowBeep
+            val backtrace = backtrace
 
          end
 

@@ -17,7 +17,7 @@ signature REFINE =
       *)
       exception ValidationFailure
 
-      val extracts : bool
+      val extracts : unit -> bool
       val extract : validation -> Term.term option
       
       (* reify J v path
@@ -31,14 +31,18 @@ signature REFINE =
       val reify : judgement -> validation -> Symbol.symbol list -> Term.constant * judgement * validation
 
 
+      (* Raised when extracts are enabled but the pickled validation does not contain one. *)
       exception NoExtracts
 
       val pu : (judgement * validation) Pickle.pu
 
+
+      val disableExtracts : unit -> unit
+
    end
 
 
-structure RefineExt :> REFINE =
+structure Refine :> REFINE =
    struct
 
       structure C = ConstantInternal
@@ -48,26 +52,44 @@ structure RefineExt :> REFINE =
       type judgement = J.judgement
       type rule = Rule.rule
 
+      (* term is trivial when extracts are disabled *)
       type validation = T.term * J.id * Trail.token
 
-   
+
+      val extractsOn = ref true
+
+      
       exception ValidationFailure
 
-      fun check subgoals valids youngest acc =
+      fun checkExt subgoals valids youngest acc =
          (case (subgoals, valids) of
              (nil, _) => 
                 (List.rev acc, valids, youngest)
 
            | (subgoal :: subgoals, (m, id, tok) :: valids) =>
                 if Trail.valid tok andalso J.eq (J.id subgoal, id) then
-                   check subgoals valids (Trail.merge youngest tok) (m :: acc)
+                   checkExt subgoals valids (Trail.merge youngest tok) (m :: acc)
                 else
                    raise ValidationFailure
 
            | _ =>
                 raise ValidationFailure)
 
-      fun refine rule goal =
+      fun checkMin subgoals valids youngest =
+         (case (subgoals, valids) of
+             (nil, _) => 
+                (valids, youngest)
+
+           | (subgoal :: subgoals, (_, id, tok) :: valids) =>
+                if Trail.valid tok andalso J.eq (J.id subgoal, id) then
+                   checkMin subgoals valids (Trail.merge youngest tok)
+                else
+                   raise ValidationFailure
+
+           | _ =>
+                raise ValidationFailure)
+
+      fun refineExt rule goal =
          let
             val (subgoals, txext) = Rule.apply rule goal
 
@@ -75,7 +97,7 @@ structure RefineExt :> REFINE =
             
             fun txvalid valids =
                let
-                  val (exts, valids', tok') = check subgoals valids tok []
+                  val (exts, valids', tok') = checkExt subgoals valids tok []
                in
                   ((txext exts, J.id goal, tok'), valids')
                end
@@ -83,11 +105,44 @@ structure RefineExt :> REFINE =
             (subgoals, txvalid)
          end
 
+      fun refineMin rule goal =
+         let
+            val (subgoals, _) = Rule.apply rule goal
+
+            val tok = Trail.token ()
+
+            fun txvalid valids =
+               let
+                  val (valids', tok') = checkMin subgoals valids tok
+               in
+                  ((T.Triv, J.id goal, tok'), valids')
+               end
+         in
+            (subgoals, txvalid)
+         end
+
+      val refineCurr = ref refineExt
+
+      (* avoid branching to make this slightly faster *)
+      fun refine rule goal = !refineCurr rule goal
+
+
+
       fun id (_, x, _) = x
 
       fun valid (_, _, tok) = Trail.valid tok
 
-      fun cast j j' =
+      fun extracts () = !extractsOn
+
+      fun extract (m, _, _) =
+         if !extractsOn then
+            SOME m
+         else
+            NONE
+
+
+
+      fun castExt j j' =
          if J.eq (J.id j, J.id j') then
             SOME (fn v => v)
          else if (J.unifyWeaken j j'; Unify.solve ()) then
@@ -107,9 +162,36 @@ structure RefineExt :> REFINE =
          else
             NONE
 
-      val extracts = true
+      fun castMin j j' =
+         if J.eq (J.id j, J.id j') then
+            SOME (fn v => v)
+         else if (J.unifyWeaken j j'; Unify.solve ()) then
+            let
+               val tok = Trail.token ()
+            in
+               SOME (fn (_, x, tok') =>
+                        let
+                           val tok'' = Trail.merge tok tok'
+                        in
+                           if Trail.valid tok'' andalso J.eq (J.id j, x) then
+                              (T.Triv, J.id j', tok'')
+                           else
+                              raise ValidationFailure
+                        end)
+            end
+         else
+            NONE
 
-      fun extract (m, _, _) = SOME m
+      (* It is possible for a validation-coercion function created with extracts were enabled
+         to persist when extract are disabled.  But if that happens it's harmless.  At worst,
+         an extract is kept that might otherwise be gc'ed.
+      *)
+
+      fun cast j j' =
+         if !extractsOn then
+            castExt j j'
+         else
+            castMin j j'
 
 
 
@@ -121,7 +203,13 @@ structure RefineExt :> REFINE =
          then
             let
                val () = Trail.commit ()
-               val const = C.declare (SOME m) path C.HARD
+
+               val const =
+                  if !extractsOn then
+                     C.declare (SOME m) path C.HARD
+                  else
+                     C.declare NONE path C.OPAQUE
+
                val a = J.concl j
                val j' = J.make Seq.empty (T.apply2 Prim.ov a (T.Const const))
             in
@@ -137,7 +225,7 @@ structure RefineExt :> REFINE =
 
       exception NoExtracts
 
-      val pu =
+      val puExt =
          P.wrap
             (fn (jud, (ext, id, tok)) =>
                 if 
@@ -171,110 +259,9 @@ structure RefineExt :> REFINE =
                 PP.puTerm
                 (P.option PP.puTerm))
 
-   end
-
-
-structure RefineMin :> REFINE =
-   struct
-
-      structure C = ConstantInternal
-      structure J = Judgement
-      structure T = Term
-
-      type judgement = J.judgement
-      type rule = Rule.rule
-
-      type validation = J.id * Trail.token
-
-   
-      exception ValidationFailure
-
-      fun check subgoals valids youngest =
-         (case (subgoals, valids) of
-             (nil, _) => 
-                (valids, youngest)
-
-           | (subgoal :: subgoals, (id, tok) :: valids) =>
-                if Trail.valid tok andalso J.eq (J.id subgoal, id) then
-                   check subgoals valids (Trail.merge youngest tok)
-                else
-                   raise ValidationFailure
-
-           | _ =>
-                raise ValidationFailure)
-
-      fun refine rule goal =
-         let
-            val (subgoals, _) = Rule.apply rule goal
-
-            val tok = Trail.token ()
-
-            fun txvalid valids =
-               let
-                  val (valids', tok') = check subgoals valids tok
-               in
-                  ((J.id goal, tok'), valids')
-               end
-         in
-            (subgoals, txvalid)
-         end
-
-      fun id (x, _) = x
-
-      fun valid (_, tok) = Trail.valid tok
-
-      fun cast j j' =
-         if J.eq (J.id j, J.id j') then
-            SOME (fn v => v)
-         else if (J.unifyWeaken j j'; Unify.solve ()) then
-            let
-               val tok = Trail.token ()
-            in
-               SOME (fn (x, tok') =>
-                        let
-                           val tok'' = Trail.merge tok tok'
-                        in
-                           if Trail.valid tok'' andalso J.eq (J.id j, x) then
-                              (J.id j', tok'')
-                           else
-                              raise ValidationFailure
-                        end)
-            end
-         else
-            NONE
-
-      val extracts = false
-
-      fun extract _ = NONE
-
-
-      fun reify j (id, tok) path =
-         if
-            Trail.valid tok andalso
-            Seq.null (J.context j) andalso
-            J.eq (J.id j, id)
-         then
-            let
-               val () = Trail.commit ()
-               val const = C.declare NONE path C.OPAQUE
-               val a = J.concl j
-               val j' = J.make Seq.empty (T.apply2 Prim.ov a (T.Const const))
-            in
-               (const, j', (J.id j', tok))
-            end
-         else
-            raise ValidationFailure
-
-
-
-      structure P = Pickle
-      structure PP = Pickling
-
-      exception NoExtracts
-
-      val pu =
+      val puMin =
          P.wrap
-            (fn (jud, (id, tok)) =>
+            (fn (jud, (_, id, tok)) =>
                 if 
                    Trail.valid tok andalso
                    J.eq (J.id jud, id)
@@ -293,14 +280,27 @@ structure RefineMin :> REFINE =
                       val jud = J.make ctx concl
                    in
                       Trail.commit ();
-                      (jud, (J.id jud, Trail.always))
+                      (jud, (T.Triv, J.id jud, Trail.always))
                    end)
             (P.tuple3 
                 J.puContext
                 PP.puTerm
                 (P.option PP.puTerm))
 
+      val pu =
+         P.lift
+            (fn () =>
+                if !extractsOn then
+                   puExt
+                else
+                   puMin)
+
+
+
+      fun disableExtracts () =
+         (
+         extractsOn := false;
+         refineCurr := refineMin
+         )
+
    end
-
-
-structure Refine = RefineExt

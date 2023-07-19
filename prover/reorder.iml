@@ -217,16 +217,20 @@ structure Reorder :> REORDER =
          let
             do (subgoals, validate, fk') = tac goal fk
          in
-            try
-               let
-                  val (subgoals', perm) = reord subgoals
+            (case
+                (try
+                    Sum.INL (reord subgoals)
+                 with
+                    Reorder msg => Sum.INR msg)
+             of
+                Sum.INL (subgoals', perm) =>
+                   let
+                      fun validate' vs = validate (perm vs)
+                   in
+                      sk (subgoals', validate', fk')
+                   end
 
-                  fun validate' vs = validate (perm vs)
-               in
-                  sk (subgoals', validate', fk')
-               end
-            with
-               Reorder msg => fk msg
+              | Sum.INR msg => fk msg)
          end
 
    end
