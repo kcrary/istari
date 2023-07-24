@@ -84,18 +84,24 @@ fun go prelude (_, args) =
       ();
 
    if Repl.batch (C.inputFile ()) then
-      (
-      (case C.outputFile () of
-          NONE => ()
-
-        | SOME name => 
-             (
-             endAllModules ();
-             FileInternal.save name
-             ));
-
-      OS.Process.success
-      )
+      if Prover.underway () then
+         (
+         print "Error: file ended with proof underway.\n";
+         OS.Process.failure
+         )
+      else
+         (
+         (case C.outputFile () of
+             NONE => ()
+   
+           | SOME name => 
+                (
+                endAllModules ();
+                FileInternal.save name
+                ));
+   
+         OS.Process.success
+         )
    else
       OS.Process.failure
    )

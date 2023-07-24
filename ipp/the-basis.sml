@@ -168,6 +168,8 @@ functor TheBasis (datatype data =
           ("map", E 0),
           ("mapi", E 0),
           ("mapPartial", E 0),
+          ("revMap", E 0),
+          ("revMapi", E 0),
           ("app", E 0),
           ("appi", E 0),
           ("find", E 0),

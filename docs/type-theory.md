@@ -948,11 +948,10 @@ well-formed.
 
 ---
 
-[1] R.L. Constable and S.F. Allen and H.M. Bromley and W.R. Cleaveland
-and J.F. Cremer and R.W. Harper and D.J. Howe and T.B. Knoblock and
-N.P. Mendler and P. Panangaden and J.T. Sasaki and
-S.F. Smith. *Implementing Mathematics with the Nuprl Proof Development
-System.* Prentice-Hall, 1986.
+[1] R.L. Constable, S.F. Allen, H.M. Bromley, W.R. Cleaveland,
+J.F. Cremer, R.W. Harper, D.J. Howe, T.B. Knoblock, N.P. Mendler,
+P. Panangaden, J.T. Sasaki, and S.F. Smith. *Implementing Mathematics
+with the Nuprl Proof Development System.* Prentice-Hall, 1986.
 
 [2] Per Martin-L&ouml;f. Constructive mathematics and computer
 programming. In *Sixth International Congress of Logic Methodology and

@@ -87,6 +87,8 @@ validated using that formalization.
 
 - [Primitive tactics](primitive-tactics.html)
 
+- [Unification](unification.html)
+
 - [Library](library.html)
 
 - [IML basis](basis.html)

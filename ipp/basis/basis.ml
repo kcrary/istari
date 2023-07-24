@@ -343,8 +343,9 @@ module List : LIST with type 'a list = 'a list =
       let foldl f b l = List.fold_left (fun y x -> f x y) b l
       let foldr f b l = List.fold_right f l b
       let map = List.map
-      let mapPartial = List.filter_map
       let mapi = List.mapi
+      let mapPartial = List.filter_map
+      let revMap = List.rev_map
       let app = List.iter
       let appi = List.iteri
       let find = List.find_opt
@@ -352,6 +353,15 @@ module List : LIST with type 'a list = 'a list =
       let exists = List.exists
       let all = List.for_all
       let findmap = List.find_map
+
+      let revMapi f l =
+         let (_, l') =
+            List.fold_left
+               (fun (i, l') x -> (i+1, f i x :: l'))
+               (0, [])
+               l
+         in
+            l'
 
    end
 

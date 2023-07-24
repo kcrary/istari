@@ -181,8 +181,10 @@ signature Basis__LIST =
       val foldl : ('a -> 'b -> 'b) -> 'b -> 'a list -> 'b
       val foldr : ('a -> 'b -> 'b) -> 'b -> 'a list -> 'b
       val map : ('a -> 'b) -> 'a list -> 'b list
-      val mapPartial : ('a -> 'b option) -> 'a list -> 'b list
       val mapi : (int -> 'a -> 'b) -> 'a list -> 'b list
+      val mapPartial : ('a -> 'b option) -> 'a list -> 'b list
+      val revMap : ('a -> 'b) -> 'a list -> 'b list
+      val revMapi : (int -> 'a -> 'b) -> 'a list -> 'b list
       val app : ('a -> unit) -> 'a list -> unit
       val appi : (int -> 'a -> unit) -> 'a list -> unit
 
@@ -723,6 +725,23 @@ structure Basis :> IML__BASIS =
                  | h :: t => f i h :: mapiMain f (i+1) t)
 
             fun mapi f l = mapiMain f 0 l
+
+            fun revMap f l =
+               List.foldl
+                  (fn (x, l') => f x :: l')
+                  []
+                  l
+
+            fun revMapi f l =
+               let
+                  val (_, l') =
+                     List.foldl
+                        (fn (x, (i, l')) => (i+1, f i x :: l'))
+                        (0, [])
+                        l
+               in
+                  l'
+               end
 
             fun appiMain f i l =
                (case l of

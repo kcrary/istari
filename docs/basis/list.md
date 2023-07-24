@@ -25,8 +25,10 @@
           val foldl : ('a -> 'b -> 'b) -> 'b -> 'a list -> 'b
           val foldr : ('a -> 'b -> 'b) -> 'b -> 'a list -> 'b
           val map : ('a -> 'b) -> 'a list -> 'b list
-          val mapPartial : ('a -> 'b option) -> 'a list -> 'b list
           val mapi : (int -> 'a -> 'b) -> 'a list -> 'b list
+          val mapPartial : ('a -> 'b option) -> 'a list -> 'b list
+          val revMap : ('a -> 'b) -> 'a list -> 'b list
+          val revMapi : (int -> 'a -> 'b) -> 'a list -> 'b list
           val app : ('a -> unit) -> 'a list -> unit
           val appi : (int -> 'a -> unit) -> 'a list -> unit
     
@@ -39,3 +41,19 @@
        end
     
     structure List : LIST
+
+- `last : 'a list -> 'a`
+
+  Returns the last element of the list.  Raises `Invalid` if the list is empty.
+
+- `revAppend : 'a list -> 'a list -> 'a list`
+
+  Given `l` and `l'`, returns `rev l @ l'`.
+
+- `revMap : ('a -> 'b) -> 'a list -> 'b list`
+
+  Given `f` and `l`, returns `rev (map f l)` but possibly more efficient.
+
+- `revMapi : (int -> 'a -> 'b) -> 'a list -> 'b list`
+
+  Given `f` and `l`, returns `rev (mapi f l)` but possibly more efficient.

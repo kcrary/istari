@@ -186,6 +186,8 @@ module type LIST =
       val map : ('a -> 'b) -> 'a list -> 'b list
       val mapi : (int -> 'a -> 'b) -> 'a list -> 'b list
       val mapPartial : ('a -> 'b option) -> 'a list -> 'b list
+      val revMap : ('a -> 'b) -> 'a list -> 'b list
+      val revMapi : (int -> 'a -> 'b) -> 'a list -> 'b list
       val app : ('a -> unit) -> 'a list -> unit
       val appi : (int -> 'a -> unit) -> 'a list -> unit
 

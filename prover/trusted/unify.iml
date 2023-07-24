@@ -79,9 +79,8 @@ functor UnifyFun (structure Term : TERM
          if    m = E[s]
          then  (maybe) binds E
                and
-               returns (N, unch)
+               returns N
                such that  N = E[s][p]
-                          unch=true iff N = M
       *)
       fun pruneEvar m e s p =
          let
@@ -117,83 +116,177 @@ functor UnifyFun (structure Term : TERM
             (case p of
                 Pshift 0 =>
                    (* E[s][p] = E[s] = M *)
-                   (m, true)
+                   m
 
               | _ =>
                    (* E[s][p] = E'[s''] *)
-                   (Sub (e', s''), false))
+                   Sub (e', s''))
          end
                    
                    
+
+      (* We want to preserve the original term being pruned if possible, for two reasons:
+         1. to save physical storage
+         2. to avoid surprise for the user
+
+         But, we don't want to preserve the original term if it had to be normalized to
+         make it prune.  Normalization can change a term with improper variables into one
+         that passes.  It's not incorrect (from a mathematical perspective) to use the
+         old term (it's beta-equivalent, after all), but it would be very confusing.
+
+         To prevent this, we make a "noop" pass (not interleaved with reduction) to see
+         if pruning does nothing.  If it fails, then we use the general case and build a
+         new term.  Since the noop pass does not employ reduction, there doesn't seem to
+         be a way to combine it with the general pass.  (There is some performance cost
+         to doing this.)
+
+         Thus, we have three different prune operations:
+         1. the "noop" check
+         2. the general pass
+         3. the master pass that employs both noop and general
+
+         (Also, there's quick-prune that returns nothing.)
+      *)
+
+      exception PruneNoop
+
+      (* pruneNoop e d depth m s p
+
+         suppose  e = ebindToInt E
+         if    m[s][p] = m[s]
+               for every i in domain(d), i+depth not in m[s]
+               m[s] does not contain E
+         then  return ()
+         else  raise PruneNoop 
+      *)
+      fun pruneNoop e d depth m s p =
+         (case m of
+             Var i =>
+                (case substVar i s of
+                    Idx j =>
+                       (case psubstVar j p of
+                           NONE => raise PruneNoop
+
+                         | SOME k =>
+                              if j = k then
+                                 (case D.find d (k-depth) of
+                                     NONE => ()
+
+                                   | SOME _ => raise PruneNoop)
+                              else
+                                 raise PruneNoop)
+
+                  | Term n =>
+                       pruneNoop e d depth n id p)
+
+           | Const _ => ()
+
+           | Elim (h, spine) =>
+                (
+                pruneNoop e d depth h s p;
+
+                List.app
+                   (fn App n => pruneNoop e d depth n s p
+                     | _ => ())
+                   spine
+                )
+
+           | Lam (_, m1) =>
+                pruneNoop e d (depth+1) m1 (under 1 s) (punder p)
+
+           | Pair (m1, m2) =>
+                (
+                pruneNoop e d depth m1 s p;
+                pruneNoop e d depth m2 s p
+                )
+
+           | Next m1 =>
+                pruneNoop e d depth m1 s p
+
+           | Triv => ()
+
+           | Sub (m1, s') =>
+                pruneNoop e d depth m1 (compose s' s) p
+
+           | Evar eb =>
+                (case readEbind eb of
+                    NONE =>
+                       (case p of
+                           Pshift 0 =>
+                              if e = ebindToInt eb then
+                                 raise PruneNoop
+                              else
+                                 ()
+
+                         | _ => raise PruneNoop)
+
+                  | SOME n =>
+                       pruneNoop e d depth n s p)
+
+           | Native _ => ()
+
+           | Marker _ => ())
+
+
+
       datatype boolish = NO | MAYBE | YES
 
-      (* masterPrune e d depth m p
+      (* pruneGeneral e d depth m p
          
          suppose e = ebindToInt E
 
          if    m[p] is defined (i.e., contains no undefineds) and E does not occur in m[p]
-         then  returns (m[p], unchanged)
+         then  returns m[p]
                and
                for every i such that i >= depth and i-depth in Range(d),
                   if i appears in m[p], mark d(i-depth) with yes
                   if i might appear in m[p], mark d(i-depth) with MAYBE if it's not already YES
-               unchanged=true iff m[p] = m
          else  raises Unify
       *)
-      fun masterPrune e d depth m p =
-         (case pruneWhnf e d depth (whnf m) p of
-             (_, true) => (m, true)
-           | x => x)
+      fun pruneGeneral e d depth m p = pruneWhnf e d depth (whnf m) p
 
       and pruneWhnf e d depth m p =
          (case m of
              Elim (n, spine) =>
                 let
-                   val (n', unch1) = pruneHead e d depth n p
-                   val (spine', unch2) = pruneSpine e d depth spine p
+                   val n' = pruneHead e d depth n p
+
+                   val spine' =
+                      List.map
+                         (fn App m => App (pruneGeneral e d depth m p)
+                           | elim => elim)
+                         spine
                 in
-                   if unch1 andalso unch2 then
-                      (m, true)
-                   else
-                      (Elim (n', spine'), false)
+                   Elim (n', spine')
                 end
 
            | Lam (b, m1) =>
                 let
-                   val (m1', unch) = masterPrune e d (depth+1) m1 (punder p)
+                   val m1' = pruneGeneral e d (depth+1) m1 (punder p)
                 in
-                   if unch then
-                      (m, true)
-                   else
-                      (Lam (b, m1'), false)
+                   Lam (b, m1')
                 end
 
            | Pair (m1, m2) =>
                 let
-                   val (m1', unch1) = masterPrune e d depth m1 p
-                   val (m2', unch2) = masterPrune e d depth m2 p
+                   val m1' = pruneGeneral e d depth m1 p
+                   val m2' = pruneGeneral e d depth m2 p
                 in
-                   if unch1 andalso unch2 then
-                      (m, true)
-                   else
-                      (Pair (m1', m2'), false)
+                   Pair (m1', m2')
                 end
 
            | Next m1 =>
                 let
-                   val (m1', unch) = masterPrune e d depth m1 p
+                   val m1' = pruneGeneral e d depth m1 p
                 in
-                   if unch then
-                      (m, true)
-                   else
-                      (Next m1', false)
+                   Next m1'
                 end
 
-           | Triv => (m, true)
+           | Triv => m
 
-           | Native _ => (m, true)
+           | Native _ => m
 
-           | Marker _ => (m, true)
+           | Marker _ => m
 
            | _ =>
                 raise (Fail "should be whnf"))
@@ -219,13 +312,10 @@ functor UnifyFun (structure Term : TERM
                        else
                           ();
 
-                       if i = j then
-                          (m, true)
-                       else
-                          (Var j, false)
+                       Var j
                        ))
 
-           | Const _ => (m, true)
+           | Const _ => m
 
            | Sub (Evar e', s) =>
                 (* whnf ensures evar is free *)
@@ -238,7 +328,7 @@ functor UnifyFun (structure Term : TERM
                 else
                    (* mark variables in d *)
                    let
-                      val (m', unch) = pruneEvar m e' s p
+                      val m' = pruneEvar m e' s p
                    in
                       if D.isEmpty d then
                          ()
@@ -286,7 +376,7 @@ functor UnifyFun (structure Term : TERM
                            | _ =>
                                 raise (Fail "impossible"));
 
-                      (m', unch)
+                      m'
                    end
 
            | _ =>
@@ -298,34 +388,28 @@ functor UnifyFun (structure Term : TERM
                 *)
                 pruneWhnf e d depth m p)
 
-      and pruneSpine e d depth spine p =
-         (case
-             pruneSpineLoop e d depth (List.rev spine) p [] true
-          of
-             (_, true) => (spine, true)
-           | x => x)
 
-      (* expects spine in reverse order *)
-      and pruneSpineLoop e d depth spine p acc unchacc =
-         (case spine of
-             [] =>
-                (acc, unchacc)
+      fun pruneHeadMaster e d depth m p =
+         try
+            (
+            pruneNoop e d depth m id p;
+            m
+            )
+         with PruneNoop => pruneHead e d depth m p
 
-           | App m :: rest =>
-                let
-                   val (m', unch) = masterPrune e d depth m p
-                in
-                   pruneSpineLoop e d depth rest p (App m' :: acc) (unchacc andalso unch)
-                end
 
-           | elim :: rest =>
-                pruneSpineLoop e d depth rest p (elim :: acc) unchacc)
-
+      fun pruneMaster e d depth m p =
+         try
+            (
+            pruneNoop e d depth m id p;
+            m
+            )
+         with PruneNoop => pruneGeneral e d depth m p
 
 
       fun prune m p =
          try
-            SOME (fst (masterPrune ~1 D.empty 0 m p))
+            SOME (pruneMaster ~1 D.empty 0 m p)
          with Unify => NONE
 
 
@@ -920,7 +1004,7 @@ functor UnifyFun (structure Term : TERM
                     of
                        SOME p =>
                           let
-                             val (n', _) = masterPrune (ebindToInt e1) D.empty 0 n p
+                             val n' = pruneMaster (ebindToInt e1) D.empty 0 n p
                           in
                              progress := true;
 
@@ -935,7 +1019,7 @@ functor UnifyFun (structure Term : TERM
                            of
                               SOME p =>
                                  let
-                                    val (m', _) = masterPrune (ebindToInt e2) D.empty 0 m p
+                                    val m' = pruneMaster (ebindToInt e2) D.empty 0 m p
                                  in
                                     progress := true;
 
@@ -1239,20 +1323,14 @@ functor UnifyFun (structure Term : TERM
                                        (fns i d => D.insert d i (ref NO))
                                        D.empty
 
-                                 val (h', unch_h') = pruneHead (ebindToInt e) d 0 h p
-                                 val (nspine1', unch_nspine1') = pruneSpineLoop (ebindToInt e) d 0 nspine1rev p [] true
+                                 val ei = ebindToInt e
+                                 val h' = pruneHeadMaster ei d 0 h p
 
-                                 val h' =
-                                    if unch_h' then
-                                       h
-                                    else
-                                       h'
-                                    
                                  val nspine1' =
-                                    if unch_nspine1' then
-                                       List.rev nspine1rev
-                                    else
-                                       nspine1'
+                                    List.revMap
+                                       (fn App n => App (pruneMaster ei d 0 n p)
+                                         | elim => elim)
+                                       nspine1rev
 
                                  (* N[p]
                                     = (h nspine)[p]
@@ -1302,7 +1380,7 @@ functor UnifyFun (structure Term : TERM
                                         let
                                            val unsh =
                                               iterateup c
-                                                 (fns _ unsh => Dot (Triv, unsh))
+                                                 (fns _ unsh => Dot (Triv, unsh))  (* XX orphan *)
                                                  Term.id
 
                                            val n'' =
@@ -1324,7 +1402,7 @@ functor UnifyFun (structure Term : TERM
                          | _ =>
                               (* This will clearly not create an eta redex, so do the simple thing. *)
                               let
-                                 val (n', _) = masterPrune (ebindToInt e) D.empty 0 n p
+                                 val n' = pruneMaster (ebindToInt e) D.empty 0 n p
 
                                  (* N' = N[p]
                                     so (fn ..a times.. fn . N')[s] mspine = N'[s'] = N[p][s'] = N
@@ -1446,7 +1524,7 @@ functor UnifyFun (structure Term : TERM
 
                         | NONE => raise Unify)
 
-                   val (m', _) = masterPrune (ebindToInt e) D.empty 0 m p
+                   val m' = pruneMaster (ebindToInt e) D.empty 0 m p
                 in
                    Trail.setEbind e m';
                    true
