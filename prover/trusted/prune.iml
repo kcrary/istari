@@ -1,0 +1,835 @@
+
+signature PRUNE =
+   sig
+
+      type term
+      type sub
+      type ebind
+
+      datatype psub =
+         Pshift  of int
+       | Pidot   of int * psub
+       | Pundef  of psub
+
+      val printPsub : psub -> unit
+
+      val psubstVar : int -> psub -> int option
+      val punder : psub -> psub
+
+      val subToPsub : sub -> psub
+      val composePsub : psub -> psub -> psub
+      val composeSubPsub : sub -> psub -> psub
+      val composePsubSub : psub -> sub -> psub
+
+      val orphan : term
+      val psubToSub : psub -> sub
+
+
+      (* invert s
+
+         if    s is a pattern substitution
+         then  p o s <= id
+               for all p', if p' o s <= id then p' <= p
+               and
+               return (SOME p)
+         else  return NONE
+
+         We say p <= s if every substitutend in p is either undef or is identical to the
+         corresponding substitutend in s.  Note that if s <= s', then s = s'.
+      *)
+      val invert : sub -> psub option
+
+      val isPatternSub : sub -> bool  (* slightly cheaper if you don't need the inverse *)
+
+
+      (* intersection p1 p2
+
+         if    there exists a psub p such that p <= p1 and p <= p2
+         then  returns SOME p where p is the maximum such
+         else  returns NONE
+      *)
+      val intersection : psub -> psub -> psub option
+
+
+      (* restriction p
+       
+         returns    (s, s')
+         such that  s o p = s'
+         and        s is injective
+         and        s is maximal in the sense that it has the largest range of any such s
+      *)
+      val restriction : psub -> sub * sub
+
+
+      (* prune M p
+
+         returns SOME M[p] if M[p] is defined
+
+         Will prune evars to try to make it succeed.
+      *)
+      val prune : term -> psub -> term option
+
+
+      datatype tri = NO | MAYBE | YES
+      structure Dict : DICT where type key = int
+
+      (* pruneGeneral e d M p
+
+         suppose e = ebindToInt E
+
+         returns SOME M[p] if M[p] is defined and does not contain E
+
+         Also marks in d any variables appearing in both domain(d) and M.
+
+         Will prune evars to try to make it succeed.
+      *)
+      val pruneGeneral : int -> tri ref Dict.dict -> term -> psub -> term option
+
+
+      (* pruneable M p
+
+         returns true if M[p] is defined
+
+         Will prune evars to try to make it succeed.
+      *)
+      val pruneable : term -> psub -> bool
+
+
+      (* setEbindSub E s m  sets  E[s] := m, bool indicates success *)
+      val setEbindSub : ebind -> sub -> term -> bool
+
+   end
+
+
+functor PruneFun (structure Term : TERM
+                  structure Prim : PRIM
+                                   where type constant = Term.constant
+                  structure Trail : TRAIL_PRIV
+                                    where type term = Term.term
+                                    where type ebind = Term.ebind
+                  structure Normalize : NORMALIZE
+                                        where type term = Term.term)
+   :> 
+   PRUNE
+   where type term = Term.term
+   where type sub = Term.sub
+   where type ebind = Term.ebind
+   =
+   struct
+
+      structure T = Term
+      structure N = Normalize
+
+      structure Dict = RedBlackDict (structure Key = IntOrdered)
+
+      type term = T.term
+      type sub = T.sub
+      type ebind = T.ebind
+
+
+      datatype psub =
+         Pshift  of int
+       | Pidot   of int * psub
+       | Pundef  of psub
+
+
+      fun printPsub p =
+         (case p of
+             Pshift k => 
+                (
+                print "^";
+                print (Int.toString k)
+                )
+
+           | Pidot (i, p') =>
+                (
+                print (Int.toString i);
+                print " . ";
+                printPsub p'
+                )
+
+           | Pundef p' =>
+                (
+                print "undef . ";
+                printPsub p
+                ))
+
+
+      fun idot i s =
+         (case s of
+             T.Shift j =>
+                if i+1 = j then
+                   T.Shift i
+                else
+                   T.Idot (i, s)
+
+           | _ =>
+                T.Idot (i, s))
+
+      fun pidot i p =
+         (case p of
+             Pshift j =>
+                 if i+1 = j then
+                    Pshift i
+                 else
+                    Pidot (i, p)
+
+           | _ =>
+                Pidot (i, p))
+
+
+      fun pidotMaybe jo p =
+         (case jo of
+             NONE =>
+                Pundef p
+
+           | SOME j =>
+                pidot j p)
+
+
+      fun psubstVar i p =
+         (case (i, p) of
+             (0, Pidot (j, _)) => SOME j
+
+           | (i, Pidot (_, p')) =>
+                 psubstVar (i-1) p'
+
+           | (0, Pundef _) => NONE
+
+           | (i, Pundef p') =>
+                psubstVar (i-1) p'
+
+           | (i, Pshift j) =>
+                SOME (i + j))
+
+
+      fun undefs i p =
+         if i = 0 then
+            p
+         else
+            undefs (i-1) (Pundef p)
+
+
+      fun shiftPsub p i =
+         (case p of
+             Pshift j =>
+                Pshift (j + i)
+
+           | Pidot (j, p') =>
+                Pidot (j + i, shiftPsub p' i)
+
+           | Pundef p' =>
+                Pundef (shiftPsub p' i))
+
+
+      fun punder p =
+         (case p of
+             Pshift 0 => p
+
+           | _ => Pidot (0, shiftPsub p 1))
+
+
+
+      (* truncatePsub i p
+
+         returns ^i o p
+      *)
+      fun truncatePsub i p =
+         if i = 0 then
+            p
+         else
+            (case p of
+                Pidot (_, p') => truncatePsub (i-1) p'
+
+              | Pundef p' => truncatePsub (i-1) p'
+
+              | Pshift j => Pshift (i + j))
+
+
+      (* composeSubPsub s p
+
+         returns    p'
+         where      p' is the greatest (ie, most-defined) psub s.t. p' <= s o p
+
+         Note that any dots in s (other than a variable) will become undefs, since
+         a psub cannot have the form (m . p).
+
+         This behavior is desired, because the because the alternative --
+         letting (m . s) o p = (m[p] . s o p)) -- creates a branch point:
+         Pruning m must restrict some evars, which might be a mistake if
+         the variable in question is never actually used.  We don't want to
+         backtrack.
+      *)
+      fun composeSubPsub s p =
+         (case s of
+             T.Dot (m, s') =>
+                (case N.whnf m of
+                    T.Elim (T.Var i, []) =>
+                       pidotMaybe (psubstVar i p) (composeSubPsub s' p)
+
+                  | _ =>
+                       Pundef (composeSubPsub s' p))
+
+           | T.Idot (i, s') =>
+                pidotMaybe (psubstVar i p) (composeSubPsub s' p)
+
+           | T.Shift i =>
+                truncatePsub i p)
+
+
+      fun composePsub p1 p2 =
+         (case p1 of
+             Pshift i =>
+                truncatePsub i p2
+
+           | Pidot (i, p1') =>
+                pidotMaybe (psubstVar i p2) (composePsub p1' p2)
+
+           | Pundef p1' =>
+                Pundef (composePsub p1' p2))
+
+
+      fun subToPsub s =
+         (case s of
+             T.Shift i => Pshift i
+
+           | T.Dot (m, s') =>
+                (case N.whnf m of
+                    T.Elim (T.Var i, []) =>
+                       pidot i (subToPsub s')
+
+                  | _ =>
+                       Pundef (subToPsub s'))
+
+           | T.Idot (i, s') =>
+                pidot i (subToPsub s'))
+
+
+      fun composePsubSub p s =
+         (case p of
+             Pshift i =>
+                subToPsub (T.compose (T.Shift i) s)
+
+           | Pidot (i, p') =>
+                (case T.substVar i s of
+                    T.Idx j =>
+                       pidot j (composePsubSub p' s)
+
+                  | T.Term m =>
+                       (case N.whnf m of
+                           T.Elim (T.Var j, []) =>
+                              pidot j (composePsubSub p' s)
+
+                         | _ =>
+                              Pundef (composePsubSub p' s)))
+
+           | Pundef p' =>
+                Pundef (composePsubSub p' s))
+
+
+
+      val orphan = T.Elim (T.Const Prim.orphan, [])
+
+      fun psubToSub p =
+         (case p of
+             Pshift k => T.Shift k
+
+           | Pidot (i, p') => T.Idot (i, psubToSub p')
+
+           | Pundef p' => T.Dot (orphan, psubToSub p'))
+
+
+
+      exception Invert
+
+      fun invertLoop d i s =
+         (case s of
+             T.Shift n => 
+                (d, i, n)
+
+           | T.Idot (j, s') =>
+                let
+                   val d' =
+                      Dict.insertMerge d j i (fn _ => raise Invert)
+                in
+                   invertLoop d' (i+1) s'
+                end
+
+           | T.Dot (m, s') =>
+                (case N.whnf m of
+                    T.Elim (T.Var j, []) =>
+                       let
+                          val d' =
+                             Dict.insertMerge d j i (fn _ => raise Invert)
+                       in
+                          invertLoop d' (i+1) s'
+                       end
+
+                  | _ =>
+                       invertLoop d (i+1) s'))
+
+      fun invert s =
+         try
+            let
+               val (d, a, b) = invertLoop Dict.empty 0 s
+   
+               val () =
+                  if
+                     Dict.isEmpty d 
+                     orelse 
+                     fst (Dict.greatest d) < b
+                  then
+                     ()
+                  else
+                     raise Invert
+   
+               (* 1. domain(d) is all less than b
+                  2. if d(j) = i then i[s] = j
+                  3. ^a o s = ^b
+               *)
+   
+               val (k, p) =
+                  Dict.foldr
+                  (fn (j, i, (k, p)) =>
+                      (* ^k o desired-answer = p and j < k *)
+                      (j,
+                       pidot i (undefs (k-j-1) p)))
+                  (b, Pshift a)
+                  d
+            in
+               SOME (undefs k p)
+            end
+         with Invert => NONE
+
+
+
+      fun isPatternSub s =
+         try
+            let
+               val (d, _, b) = invertLoop Dict.empty 0 s
+            in
+               Dict.isEmpty d
+               orelse
+               fst (Dict.greatest d) < b
+            end
+         with Invert => false
+
+
+
+      exception Intersection
+
+      fun intersectionLoop p1 p2 =
+         (case (p1, p2) of
+             (Pidot (i, p1'), Pidot (j, p2')) =>
+                let
+                   val p = intersectionLoop p1' p2'
+                in
+                   if i = j then
+                      pidot i p
+                   else
+                      Pundef p
+                end
+
+           | (Pundef p1', Pundef p2') =>
+                let
+                   val p = intersectionLoop p1' p2'
+                in
+                   Pundef p
+                end
+
+           | (Pundef p1', Pidot (_, p2')) =>
+                let
+                   val p = intersectionLoop p1' p2'
+                in
+                   Pundef p
+                end
+
+           | (Pidot (_, p1'), Pundef p2') =>
+                let
+                   val p = intersectionLoop p1' p2'
+                in
+                   Pundef p
+                end
+
+           | (Pidot (i, p1'), Pshift j) =>
+                let
+                   val p = intersectionLoop p1' (Pshift (j+1))
+                in
+                   if i = j then
+                      pidot i p
+                   else
+                      Pundef p
+                end
+
+           | (Pshift j, Pidot (i, p2')) =>
+                let
+                   val p = intersectionLoop (Pshift (j+1)) p2'
+                in
+                   if i = j then
+                      pidot i p
+                   else
+                      Pundef p
+                end
+
+           | (Pundef p1', Pshift j) =>
+                let
+                   val p = intersectionLoop p1' (Pshift (j+1))
+                in
+                   Pundef p
+                end
+
+           | (Pshift j, Pundef p2') =>
+                let
+                   val p = intersectionLoop (Pshift (j+1)) p2'
+                in
+                   Pundef p
+                end
+
+           | (Pshift i, Pshift j) =>
+                if i = j then
+                   p1
+                else
+                   raise Intersection)
+
+      fun intersection p1 p2 =
+         try
+            SOME (intersectionLoop p1 p2)
+         with
+            Intersection => NONE
+
+
+
+      (* restrictionLoop i p
+
+         returns    (s, s')
+         such that  s o (undef_1 ... undef_i . p) = s'
+                    s and s' are everywhere defined
+         and s is injective
+         and s is maximal in the sense that it has the largest range of any such s
+         and s and s' are represented using Shift and Idot
+      *)
+      fun restrictionLoop i p =
+         (case p of
+             Pidot (j, p') =>
+                let
+                   val (s, s') = restrictionLoop (i+1) p'
+                   (* s o (undef_1 ... undef_i undef . p') = s'
+                      so
+                      (i . s) o (undef_1 ... undef_i . p)
+                      = (i . s) o (undef_1 ... undef_i . j . p')
+                      =  j . s o (undef_1 ... undef_i . j . p')
+                      >= j . s o (undef_1 ... undef_i undef . p')
+                      =  j . s'
+                      but j . s' is fully defined, so
+                      (i . s) o (undef_1 ... undef_i . p) = j . s'
+                   *)
+                in
+                   (idot i s, idot j s')
+                end
+
+           | Pundef p' =>
+                restrictionLoop (i+1) p'
+
+           | Pshift j =>
+                (* ^i o (undef_1 ... undef_i . p) = p = ^j *)
+                (T.Shift i, T.Shift j))
+
+      fun restriction p = restrictionLoop 0 p
+
+
+
+      exception Occurs
+
+      fun occursMain e m s =
+         (case m of
+             T.Var i =>
+                (case T.substVar i s of
+                    T.Idx _ => ()
+
+                  | T.Term n => occursMain e n T.id)
+
+           | T.Const _ => ()
+
+           | T.Elim (h, spine) =>
+                (
+                occursMain e h s;
+                List.app 
+                   (fn T.App n => occursMain e n s
+                     | _ => ())
+                   spine
+                )
+
+           | T.Lam (_, m1) =>
+                occursMain e m1 (T.under 1 s)
+
+           | T.Pair (m1, m2) =>
+                (
+                occursMain e m1 s;
+                occursMain e m2 s
+                )
+
+           | T.Next m1 =>
+                occursMain e m1 s
+
+           | T.Triv => ()
+
+           | T.Sub (m1, s') =>
+                occursMain e m1 (T.compose s' s)
+
+           | T.Evar eb =>
+                (case T.readEbind eb of
+                    NONE =>
+                       if T.ebindToInt eb = e then
+                          raise Occurs
+                       else
+                          ()
+
+                  | SOME n =>
+                       occursMain e n s)
+
+           | T.Native _ => ()
+
+           | T.Marker _ => ())
+
+
+      fun occurs e m =
+         try
+            (occursMain e m T.id; false)
+         with
+            Occurs => true
+
+
+
+      exception Prune
+
+
+      datatype tri = NO | MAYBE | YES
+
+
+      
+      (* markSub d depth s
+
+         if    s represented using Shift and Idot
+         then  marks MAYBE in d any i in domain(d) such that s contains depth+i
+               and is not already marked YES.
+      *)
+      fun markSubMaybe d depth s =
+         (case s of
+             T.Shift k =>
+                let
+                   val (_, d') = Dict.partitionlt d (k-depth)
+                in
+                   Dict.app
+                      (fn (_, ref YES) => ()
+                        | (_, r) => r := MAYBE)
+                      d'
+                end
+
+           | T.Idot (j, s') =>
+                (
+                if j >= depth then
+                   (case Dict.find d (j-depth) of
+                       NONE => ()
+
+                     | SOME (ref YES) => ()
+
+                     | SOME r => r := MAYBE)
+                else
+                   ();
+
+                markSubMaybe d depth s'
+                )
+
+           | _ =>
+                raise (Fail "precondition"))
+
+
+
+      exception Prune
+
+
+      (* pruneGeneral e d depth M p
+         
+         if    M[p] is defined (i.e., contains no undefineds)
+         then  returns ()
+               and
+               for every i such that i >= depth and i-depth in Range(d),
+                  if i appears in M[p], mark d(i-depth) with YES
+                  if i might appear in M[p], mark d(i-depth) with MAYBE if it's not already YES
+         else  raises Prune
+      *)
+      fun pruneMain d depth m p = pruneWhnf d depth (N.whnf m) p
+
+      and pruneWhnf d depth m p =
+         (case m of
+             T.Elim (T.Var i, spine) =>
+                (case psubstVar i p of
+                    NONE =>
+                       raise Prune
+
+                  | SOME j => 
+                       (
+                       if j >= depth then
+                          (case Dict.find d (j-depth) of
+                              NONE => ()
+
+                            | SOME r => r := YES)
+                       else
+                          ();
+
+                       pruneSpine d depth spine p
+                       ))
+
+           | T.Elim (T.Const _, spine) =>
+                pruneSpine d depth spine p
+
+           | T.Elim (T.Sub (T.Evar eb, s), spine) =>
+                (* whnf ensures evar is free *)
+                let
+                   val p' = composeSubPsub s p
+
+                   (* p' <= s o p *)
+       
+                   val (s', s'') = restriction p'
+
+                   (* s' o p' = s''
+                      s'' is everywhere defined
+                      s' is represented using Shift and Idot
+                   *)
+                in
+                   (case s' of
+                       T.Shift 0 => ()
+
+                     | _ =>
+                          let
+                             val e' = T.evar ()
+                          in
+                             (* set E := E'[s']
+                                then E[s][p] >= E[p'] = E'[s'][p'] = E'[s' o p'] = E'[s''].
+                                s'' is fully defined, so E[s][p] = E'[s''].
+                             *)
+                             Trail.setEbind eb (T.Sub (e', s'))
+                          end);
+
+                   (* mark variables in d *)
+                   if Dict.isEmpty d then
+                      ()
+                   else
+                      markSubMaybe d depth s'';
+
+                   pruneSpine d depth spine p
+                end
+
+           | T.Elim (m1, spine) =>
+                (* Since M is whnf, m1 is an intro, and intros are all whnf.
+
+                   As it happens, this must be part of an ill-typed term, but we
+                   have to deal with it.
+                *)
+                (
+                pruneWhnf d depth m1 p;
+                pruneSpine d depth spine p
+                )
+                
+           | T.Lam (b, m1) =>
+                pruneMain d (depth+1) m1 (punder p)
+
+           | T.Pair (m1, m2) =>
+                (
+                pruneMain d depth m1 p;
+                pruneMain d depth m2 p
+                )
+
+           | T.Next m1 =>
+                pruneMain d depth m1 p
+
+           | T.Triv => ()
+
+           | T.Native _ => ()
+
+           | T.Marker _ => ()
+
+           | _ =>
+                raise (Fail "should be in whnf"))
+
+      and pruneSpine d depth spine p =
+         List.app
+            (fn T.App m => pruneMain d depth m p
+              | _ => ())
+            spine
+
+
+
+      fun pruneGeneral e d m p =
+         try
+            (
+            pruneMain d 0 m p;
+
+            (* PERFORMANCE NOTE:
+               There is a 7.5% performance penalty to doing the occurs check this way, as opposed
+               to doing it on normal forms as part of pruning.  But, if it's done on normal forms,
+               then there can exist cyclic terms (although never in normal forms).  Coping with
+               this complicates a lot of other code that otherwise would not need to deal with
+               cycle detection.  Plus the documentation would need to explain it.
+
+               I'm hoping that the cost can be diminished by interleaving the occurs check with
+               pruning, but checking all the subterms that are discarded by normalization.  That
+               seems possible, but would require that Normalize.whnf be instrumented somehow.
+            *)
+            if e >= 0 andalso occurs e m then
+               raise Prune
+            else
+               ();
+
+            SOME (T.Sub (m, psubToSub p))
+            )
+         with Prune => NONE
+
+
+
+      fun prune m p = 
+         try
+            (
+            pruneMain Dict.empty 0 m p;
+            SOME (T.Sub (m, psubToSub p))
+            )
+         with Prune => NONE
+
+
+      
+      fun pruneable m p =
+         try
+            (
+            pruneMain Dict.empty 0 m p;
+            true
+            )
+         with Prune => false
+
+
+      fun setEbindSub eb s m =
+         let
+            val mark = Trail.mark ()
+         in
+            (try
+                let
+                   val p =
+                      (case invert s of
+                          SOME p => p
+
+                        | NONE => raise Prune)
+                in
+                   pruneMain Dict.empty 0 m p;
+
+                   (* see performance note above *)
+                   if occurs (T.ebindToInt eb) m then
+                      raise Prune
+                   else
+                      ();
+
+                   Trail.setEbind eb (T.Sub (m, psubToSub p));
+                   true
+                end
+             with Prune => (Trail.rewind mark; false))
+         end
+
+   end

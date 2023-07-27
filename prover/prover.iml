@@ -4,9 +4,6 @@ signature PROVER =
 
       exception Prover of string
 
-      datatype problem = NotGround | Open | Marker
-      exception Unclean of problem * Term.term
-
       val apply : Tactic.tactic -> unit
       val enter : unit -> unit
       val leave : unit -> unit
@@ -53,7 +50,7 @@ signature PROVER_INTERNAL =
       include PROVER
 
 
-      (* returns NONE if the term is ground, closed, and contains no markers *)
+      (* raises Namespace.Unclean if the term is open or not ground *)
       val checkClean : Term.term -> unit
 
 
@@ -91,18 +88,6 @@ structure ProverInternal :> PROVER_INTERNAL =
                                           msg,
                                           ".\n"
                                           ]))
-
-
-
-      val () = 
-         Handler.customHandler
-         (fn Prover msg => 
-                (
-                print msg; 
-                true
-                )
-
-           | _ => false)
 
 
 
@@ -345,71 +330,11 @@ structure ProverInternal :> PROVER_INTERNAL =
       val theOriginalGoals : (label * goal) list option R.cref = R.new NONE
 
 
-      datatype problem = NotGround | Open | Marker
-      exception Unclean of problem * T.term
-      exception UncleanInternal of problem
-
-
-      (* checks that m[s] is ground, its highest free variable is < k, and contains no markers *)
-      fun cleanLoop k m s =
-         (case m of
-             T.Var i =>
-                (case T.substVar i s of
-                    T.Idx j =>
-                       if j < k then
-                          ()
-                       else
-                          raise (UncleanInternal Open)
-
-                  | T.Term m' =>
-                       cleanLoop k m' T.id)
-
-           | T.Const _ => ()
-
-           | T.Elim (h, spine) =>
-                (
-                cleanLoop k h s;
-                List.app
-                   (fn T.App n => cleanLoop k n s
-                     | _ => ())
-                   spine
-                )
-
-           | T.Lam (_, m1) =>
-                cleanLoop (k+1) m1 (T.under 1 s)
-
-           | T.Pair (m1, m2) =>
-                (
-                cleanLoop k m1 s;
-                cleanLoop k m2 s
-                )
-
-           | T.Next m1 =>
-                cleanLoop k m1 s
-
-           | T.Triv => ()
-
-           | T.Sub (m1, s') =>
-                cleanLoop k m1 (T.compose s' s)
-
-           | T.Evar eb =>
-                (case T.readEbind eb of
-                    NONE =>
-                       raise (UncleanInternal NotGround)
-
-                  | SOME m' =>
-                       cleanLoop k m' s)
-
-           | T.Native _ => ()
-
-           | T.Marker _ =>
-                raise (UncleanInternal Marker))
-
-
       fun checkClean m =
-         try
-            cleanLoop 0 m T.id
-         with UncleanInternal prob => raise (Unclean (prob, m))
+         (case T.isClean m of
+             NONE => ()
+
+           | SOME prob => raise (Namespace.Unclean (prob, m)))
 
 
 
@@ -423,7 +348,7 @@ structure ProverInternal :> PROVER_INTERNAL =
                and
                returns (rev l @ acc, union (set, l))
       *)
-      fun freeEvarsMain (accset as (acc, set))  m s =
+      fun freeEvarsMain (accset as (acc, set)) m s =
          (case m of
              T.Var i =>
                 (case T.substVar i s of
@@ -473,9 +398,9 @@ structure ProverInternal :> PROVER_INTERNAL =
                           else
                              (eb :: acc, IS.insert set i)
                        end
-
-                  | SOME m' =>
-                       freeEvarsMain accset m' s)
+   
+                     | SOME m' =>
+                          freeEvarsMain accset m' s)
 
            | T.Native _ => accset
 
@@ -498,14 +423,13 @@ structure ProverInternal :> PROVER_INTERNAL =
                 true
                 )
 
-           | Unclean (prob, m) =>
+           | Namespace.Unclean (prob, m) =>
                 (
                 print "Error: the term contains ";
                 print 
                    (case prob of
-                       NotGround => "unresolved evars"
-                     | Open => "free variables"
-                     | Marker => "markers");
+                       T.NotGround => "unresolved evars"
+                     | T.Open => "free variables");
                 print ":\n\n";
 
                 let
@@ -517,7 +441,7 @@ structure ProverInternal :> PROVER_INTERNAL =
                 end;
 
                 (case prob of
-                    NotGround =>
+                    T.NotGround =>
                        (
                        print "\nUnresolved evars:";
                        List.app

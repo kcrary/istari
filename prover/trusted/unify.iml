@@ -3,38 +3,15 @@ signature UNIFY =
    sig
 
       type term
-      type ebind
-      type sub
-      type psub
 
       val unify : term -> term -> unit
       val impossible : unit -> unit
 
       val solve : unit -> bool
-      val solveUntidy : unit -> bool     (* doesn't rewind on unification failure *)
 
       val unify1 : term -> term -> bool  (* unify followed by solve *)
 
       val errorMessage : string ref
-
-
-      (* prune M p
-
-         returns SOME M[p] if M[p] is defined
-      *)
-      val prune : term -> psub -> term option
-
-
-      (* quickPrune M p
-
-         returns true if M[p] is defined
-      *)
-      val quickPrune : term -> psub -> bool
-
-
-      (* setEbindSub E s m  sets  E[s] := m, bool indicates success *)
-      val setEbindSub : ebind -> sub -> term -> bool
-
 
       (* number of times solve has been called *)
       val count : int ref
@@ -50,443 +27,25 @@ functor UnifyFun (structure Term : TERM
                                     where type ebind = Term.ebind
                   structure Normalize : NORMALIZE
                                         where type term = Term.term
-                  structure Invert : INVERT
-                                     where type term = Term.term
-                                     where type sub = Term.sub)
+                  structure Prune : PRUNE
+                                    where type term = Term.term
+                                    where type sub = Term.sub)
    :> UNIFY
       where type term = Term.term
-      where type ebind = Term.ebind
-      where type sub = Term.sub
-      where type psub = Invert.psub
    =
    struct
 
-      structure Term = Term
-      open Term
-      open Normalize
-      open Invert
+      structure T = Term
+      structure N = Normalize
+      
+      structure Dict = Prune.Dict
 
-      structure D = RedBlackDict (structure Key = IntOrdered)
+      type term = Term.term
 
       exception Unify
 
       val errorMessage = ref ""
 
-
-
-      (* pruneEvar m E s p
-      
-         if    m = E[s]
-         then  (maybe) binds E
-               and
-               returns N
-               such that  N = E[s][p]
-      *)
-      fun pruneEvar m e s p =
-         let
-            val p' = composeSubPsub s p
-            (* p' <= s o p *)
-
-            val (s', s'') = restriction p'
-            (* s' o p' = s'' and s'' is everywhere defined *)
-
-            val e' =
-               (case s' of
-                   Shift 0 =>
-                      (* E[s][p] >= E[p'] = E[id o p'] = E[s' o p'] = E[s''].
-                         s'' is fully defined, so E[s][p] = E[s''].
-                      *)
-                      Evar e
-   
-                 | _ =>
-                      let
-                         val e' = evar ()
-                      in
-                         (* let E := E'[s']
-                            then E[s][p] >= E[p'] = E'[s'][p'] = E'[s' o p'] = E'[s''].
-                            s'' is fully defined, so E[s][p] = E'[s''].
-                         *)
-                         Trail.setEbind e (Sub (e', s'));
-
-                         e'
-                      end)
-
-            (* Either way, E[s][p] = E'[s''] *)
-         in
-            (case p of
-                Pshift 0 =>
-                   (* E[s][p] = E[s] = M *)
-                   m
-
-              | _ =>
-                   (* E[s][p] = E'[s''] *)
-                   Sub (e', s''))
-         end
-                   
-                   
-
-      (* We want to preserve the original term being pruned if possible, for two reasons:
-         1. to save physical storage
-         2. to avoid surprise for the user
-
-         But, we don't want to preserve the original term if it had to be normalized to
-         make it prune.  Normalization can change a term with improper variables into one
-         that passes.  It's not incorrect (from a mathematical perspective) to use the
-         old term (it's beta-equivalent, after all), but it would be very confusing.
-
-         To prevent this, we make a "noop" pass (not interleaved with reduction) to see
-         if pruning does nothing.  If it fails, then we use the general case and build a
-         new term.  Since the noop pass does not employ reduction, there doesn't seem to
-         be a way to combine it with the general pass.  (There is some performance cost
-         to doing this.)
-
-         Thus, we have three different prune operations:
-         1. the "noop" check
-         2. the general pass
-         3. the master pass that employs both noop and general
-
-         (Also, there's quick-prune that returns nothing.)
-      *)
-
-      exception PruneNoop
-
-      (* pruneNoop e d depth m s p
-
-         suppose  e = ebindToInt E
-         if    m[s][p] = m[s]
-               for every i in domain(d), i+depth not in m[s]
-               m[s] does not contain E
-         then  return ()
-         else  raise PruneNoop 
-      *)
-      fun pruneNoop e d depth m s p =
-         (case m of
-             Var i =>
-                (case substVar i s of
-                    Idx j =>
-                       (case psubstVar j p of
-                           NONE => raise PruneNoop
-
-                         | SOME k =>
-                              if j = k then
-                                 (case D.find d (k-depth) of
-                                     NONE => ()
-
-                                   | SOME _ => raise PruneNoop)
-                              else
-                                 raise PruneNoop)
-
-                  | Term n =>
-                       pruneNoop e d depth n id p)
-
-           | Const _ => ()
-
-           | Elim (h, spine) =>
-                (
-                pruneNoop e d depth h s p;
-
-                List.app
-                   (fn App n => pruneNoop e d depth n s p
-                     | _ => ())
-                   spine
-                )
-
-           | Lam (_, m1) =>
-                pruneNoop e d (depth+1) m1 (under 1 s) (punder p)
-
-           | Pair (m1, m2) =>
-                (
-                pruneNoop e d depth m1 s p;
-                pruneNoop e d depth m2 s p
-                )
-
-           | Next m1 =>
-                pruneNoop e d depth m1 s p
-
-           | Triv => ()
-
-           | Sub (m1, s') =>
-                pruneNoop e d depth m1 (compose s' s) p
-
-           | Evar eb =>
-                (case readEbind eb of
-                    NONE =>
-                       (case p of
-                           Pshift 0 =>
-                              if e = ebindToInt eb then
-                                 raise PruneNoop
-                              else
-                                 ()
-
-                         | _ => raise PruneNoop)
-
-                  | SOME n =>
-                       pruneNoop e d depth n s p)
-
-           | Native _ => ()
-
-           | Marker _ => ())
-
-
-
-      datatype boolish = NO | MAYBE | YES
-
-      (* pruneGeneral e d depth m p
-         
-         suppose e = ebindToInt E
-
-         if    m[p] is defined (i.e., contains no undefineds) and E does not occur in m[p]
-         then  returns m[p]
-               and
-               for every i such that i >= depth and i-depth in Range(d),
-                  if i appears in m[p], mark d(i-depth) with yes
-                  if i might appear in m[p], mark d(i-depth) with MAYBE if it's not already YES
-         else  raises Unify
-      *)
-      fun pruneGeneral e d depth m p = pruneWhnf e d depth (whnf m) p
-
-      and pruneWhnf e d depth m p =
-         (case m of
-             Elim (n, spine) =>
-                let
-                   val n' = pruneHead e d depth n p
-
-                   val spine' =
-                      List.map
-                         (fn App m => App (pruneGeneral e d depth m p)
-                           | elim => elim)
-                         spine
-                in
-                   Elim (n', spine')
-                end
-
-           | Lam (b, m1) =>
-                let
-                   val m1' = pruneGeneral e d (depth+1) m1 (punder p)
-                in
-                   Lam (b, m1')
-                end
-
-           | Pair (m1, m2) =>
-                let
-                   val m1' = pruneGeneral e d depth m1 p
-                   val m2' = pruneGeneral e d depth m2 p
-                in
-                   Pair (m1', m2')
-                end
-
-           | Next m1 =>
-                let
-                   val m1' = pruneGeneral e d depth m1 p
-                in
-                   Next m1'
-                end
-
-           | Triv => m
-
-           | Native _ => m
-
-           | Marker _ => m
-
-           | _ =>
-                raise (Fail "should be whnf"))
-
-      (* m is a head or an intro (intro arises only in ill-typed cases) *)
-      and pruneHead e d depth m p =
-         (case m of
-             Var i =>
-                (case psubstVar i p of
-                    NONE =>
-                       (
-                       errorMessage := "scope violation";
-                       raise Unify
-                       )
-
-                  | SOME j => 
-                       (
-                       if j >= depth then
-                          (case D.find d (j-depth) of
-                              NONE => ()
-
-                            | SOME r => r := YES)
-                       else
-                          ();
-
-                       Var j
-                       ))
-
-           | Const _ => m
-
-           | Sub (Evar e', s) =>
-                (* whnf ensures evar is free *)
-                if e = ebindToInt e' then
-                   (* occurs check fails *)
-                   (
-                   errorMessage := "occurs check failure";
-                   raise Unify
-                   )
-                else
-                   (* mark variables in d *)
-                   let
-                      val m' = pruneEvar m e' s p
-                   in
-                      if D.isEmpty d then
-                         ()
-                      else
-                         (* Mark variables in d that appear in m'.
-                            By construction we know that m' has the form
-                            E'[s'], where s' is made up from Idots and Shift.
-                         *)
-                         (case m' of
-                             Sub (Evar _, s') =>
-                                let
-                                   fun loop t =
-                                      (case t of
-                                          Shift k =>
-                                             let
-                                                val (_, d') = D.partitionlt d (k-depth)
-                                             in
-                                                D.app
-                                                   (fn (_, ref YES) => ()
-                                                     | (_, r) => r := MAYBE)
-                                                   d'
-                                             end
-   
-                                        | Idot (j, t') =>
-                                             (
-                                             if j >= depth then
-                                                (case D.find d (j-depth) of
-                                                    NONE => ()
-   
-                                                  | SOME (ref YES) => ()
-   
-                                                  | SOME r => r := MAYBE)
-                                             else
-                                                ();
-   
-                                             loop t'
-                                             )
-   
-                                        | _ =>
-                                             raise (Fail "impossible"))
-                                in
-                                   loop s'
-                                end
-   
-                           | _ =>
-                                raise (Fail "impossible"));
-
-                      m'
-                   end
-
-           | _ =>
-                (* By precondition this is an intro and intros are all in whnf.
-
-                   As it happens, this must be part of an ill-typed term.  One
-                   wishes we could just reject here, but ill-typed terms can
-                   appear within well-typed terms, so we have to deal with them.
-                *)
-                pruneWhnf e d depth m p)
-
-
-      fun pruneHeadMaster e d depth m p =
-         try
-            (
-            pruneNoop e d depth m id p;
-            m
-            )
-         with PruneNoop => pruneHead e d depth m p
-
-
-      fun pruneMaster e d depth m p =
-         try
-            (
-            pruneNoop e d depth m id p;
-            m
-            )
-         with PruneNoop => pruneGeneral e d depth m p
-
-
-      fun prune m p =
-         try
-            SOME (pruneMaster ~1 D.empty 0 m p)
-         with Unify => NONE
-
-
-
-      (* quick-prune: don't need to return the result (or check for occurrences) *)
-
-      fun quickPruneMain m p =
-         quickPruneWhnf (whnf m) p
-
-      (* m is in whnf, or m is a head *)
-      and quickPruneWhnf m p =
-         (case m of
-             Var i =>
-                (case psubstVar i p of
-                    NONE => raise Unify
-
-                  | SOME j => ())
-
-           | Const _ => ()
-
-           | Sub (Evar e, s) =>
-                (* whnf ensures evar is free *)
-                (* compare to pruneEvar *)
-                let
-                   val p' = composeSubPsub s p
-                   val (s', _) = restriction p'
-                in
-                   (case s' of
-                       Shift 0 =>
-                          ()
-
-                     | _ =>
-                          Trail.setEbind e (Sub (evar (), s')))
-                end
-                   
-           | Elim (h, spine) =>
-                (
-                quickPruneWhnf h p;
-                List.app
-                   (fn App n => quickPruneMain n p
-                     | _ => ())
-                   spine
-                )
-
-           | Lam (b, m1) =>
-                quickPruneMain m1 (punder p)
-
-           | Pair (m1, m2) =>
-                (
-                quickPruneMain m1 p;
-                quickPruneMain m2 p
-                )
-
-           | Next m1 =>
-                quickPruneMain m1 p
-
-           | Triv => ()
-
-           | Evar _ =>
-                raise (Fail "should be whnf or head")
-
-           | Sub _ =>
-                raise (Fail "should be whnf or head")
-
-           | Native _ => ()
-
-           | Marker _ => ())
-
-
-      fun quickPrune m p =
-         let
-            val mark = Trail.mark ()
-         in
-            try
-               (quickPruneMain m p; true)
-            with Unify => (Trail.rewind mark; false)
-         end
 
 
       fun isSoft opacity =
@@ -499,29 +58,29 @@ functor UnifyFun (structure Term : TERM
 
       exception Different
 
-      fun sameMain m n = sameWhnf (whnf m) (whnf n)
+      fun sameMain m n = sameWhnf (N.whnf m) (N.whnf n)
 
       (* m and n are both whnf, or they are both heads *)
       and sameWhnf m n =
          (case (m, n) of
-             (Elim (Var i, spine), Elim (Var j, spine')) =>
+             (T.Elim (T.Var i, spine), T.Elim (T.Var j, spine')) =>
                 if i = j then
                    sameSpineMain spine spine'
                 else
                    raise Different
 
-           | (Elim (Const const, spine), Elim (Const const', spine')) =>
+           | (T.Elim (T.Const const, spine), T.Elim (T.Const const', spine')) =>
                 if Constant.eq (const, const') then
                    sameSpineMain spine spine'
                 else if isSoft (Constant.opacity const) then
-                   sameWhnf (whnfHard m) n
+                   sameWhnf (N.whnfHard m) n
                 else if isSoft (Constant.opacity const') then
-                   sameWhnf m (whnfHard n)
+                   sameWhnf m (N.whnfHard n)
                 else
                    raise Different
 
-           | (Elim (Sub (Evar e1, s1), spine1), Elim (Sub (Evar e2, s2), spine2)) =>
-                if eqEbind e1 e2 then
+           | (T.Elim (T.Sub (T.Evar e1, s1), spine1), T.Elim (T.Sub (T.Evar e2, s2), spine2)) =>
+                if T.eqEbind e1 e2 then
                    (
                    sameSubMain s1 s2;
                    sameSpineMain spine1 spine2
@@ -529,27 +88,27 @@ functor UnifyFun (structure Term : TERM
                 else
                    raise Different
 
-           | (Elim (Var _, _), _) => raise Different
+           | (T.Elim (T.Var _, _), _) => raise Different
 
-           | (_, Elim (Var _, _)) => raise Different
+           | (_, T.Elim (T.Var _, _)) => raise Different
 
-           | (Elim (Const const, _), _) =>
+           | (T.Elim (T.Const const, _), _) =>
                 if isSoft (Constant.opacity const) then
-                   sameWhnf (whnfHard m) n
+                   sameWhnf (N.whnfHard m) n
                 else
                    raise Different
 
-           | (_, Elim (Const const, _)) =>
+           | (_, T.Elim (T.Const const, _)) =>
                 if isSoft (Constant.opacity const) then
-                   sameWhnf m (whnfHard n)
+                   sameWhnf m (N.whnfHard n)
                 else
                    raise Different
 
-           | (Elim (Sub _, _), _) => raise Different
+           | (T.Elim (T.Sub _, _), _) => raise Different
 
-           | (_, Elim (Sub _, _)) => raise Different
+           | (_, T.Elim (T.Sub _, _)) => raise Different
 
-           | (Elim (m1, spine), Elim (n1, spine')) =>
+           | (T.Elim (m1, spine), T.Elim (n1, spine')) =>
                 (* We've eliminated all the cases in which m1 and n1 are heads,
                    so m1 and n1 are intros but do not match their spines.
                    (Thus m and n are ill-typed, but we still have to do something
@@ -560,54 +119,54 @@ functor UnifyFun (structure Term : TERM
                 sameSpineMain spine spine'
                 )
 
-           | (Lam (_, m'), Lam (_, n')) =>
+           | (T.Lam (_, m'), T.Lam (_, n')) =>
                 sameMain m' n'
 
-           | (Pair (m1, m2), Pair (n1, n2)) =>
+           | (T.Pair (m1, m2), T.Pair (n1, n2)) =>
                 (
                 sameMain m1 n1;
                 sameMain m2 n2
                 )
 
-           | (Next m', Next n') =>
+           | (T.Next m', T.Next n') =>
                 sameMain m' n'
 
-           | (Triv, Triv) => ()
+           | (T.Triv, T.Triv) => ()
 
-           | (Native x, Native y) =>
-                if sameNative x y then
+           | (T.Native x, T.Native y) =>
+                if T.sameNative x y then
                    ()
                 else
                    raise Different
 
-           | (Marker sym, Marker sym') =>
+           | (T.Marker sym, T.Marker sym') =>
                 if Symbol.eq (sym, sym') then
                    ()
                 else
                    raise Different
 
-           | (Var _, _) =>
+           | (T.Var _, _) =>
                 raise (Fail "should be whnf")
 
-           | (_, Var _) =>
+           | (_, T.Var _) =>
                 raise (Fail "should be whnf")
 
-           | (Const _, _) =>
+           | (T.Const _, _) =>
                 raise (Fail "should be whnf")
 
-           | (_, Const _) =>
+           | (_, T.Const _) =>
                 raise (Fail "should be whnf")
 
-           | (Evar _, _) =>
+           | (T.Evar _, _) =>
                 raise (Fail "should be whnf")
 
-           | (_, Evar _) =>
+           | (_, T.Evar _) =>
                 raise (Fail "should be whnf")
 
-           | (Sub _, _) =>
+           | (T.Sub _, _) =>
                 raise (Fail "should be whnf")
 
-           | (_, Sub _) =>
+           | (_, T.Sub _) =>
                 raise (Fail "should be whnf")
 
            | _ => raise Different)
@@ -626,67 +185,67 @@ functor UnifyFun (structure Term : TERM
 
       and sameElim elim elim' =
          (case (elim, elim') of
-             (App m, App n) => sameMain m n
+             (T.App m, T.App n) => sameMain m n
 
-           | (Pi1, Pi1) => ()
-           | (Pi2, Pi2) => ()
-           | (Prev, Prev) => ()
+           | (T.Pi1, T.Pi1) => ()
+           | (T.Pi2, T.Pi2) => ()
+           | (T.Prev, T.Prev) => ()
 
            | _ => raise Different)
 
       and sameSubMain s t =
          (case (s, t) of
-             (Shift i, Shift j) =>
+             (T.Shift i, T.Shift j) =>
                 if i = j then
                    ()
                 else
                    raise Different
 
-           | (Dot (m, s'), Dot (n, t')) =>
+           | (T.Dot (m, s'), T.Dot (n, t')) =>
                 (
                 sameMain m n;
                 sameSubMain s' t'
                 )
 
-           | (Idot (i, s'), Idot (j, t')) =>
+           | (T.Idot (i, s'), T.Idot (j, t')) =>
                 if i = j then
                    sameSubMain s' t'
                 else
                    raise Different
 
-           | (Dot (m, s'), Idot (j, t')) =>
+           | (T.Dot (m, s'), T.Idot (j, t')) =>
                 (
-                sameMain m (Var j);
+                sameMain m (T.Var j);
                 sameSubMain s' t'
                 )
 
-           | (Idot (i, s'), Dot (m, t')) =>
+           | (T.Idot (i, s'), T.Dot (m, t')) =>
                 (
-                sameMain (Var i) m;
+                sameMain (T.Var i) m;
                 sameSubMain s' t'
                 )
 
-           | (Dot (m, s'), Shift i) =>
+           | (T.Dot (m, s'), T.Shift i) =>
                 (
-                sameMain m (Var i);
-                sameSubMain s' (Shift (i+1))
+                sameMain m (T.Var i);
+                sameSubMain s' (T.Shift (i+1))
                 )
 
-           | (Shift i, Dot (m, t')) =>
+           | (T.Shift i, T.Dot (m, t')) =>
                 (
-                sameMain (Var i) m;
-                sameSubMain (Shift (i+1)) t'
+                sameMain (T.Var i) m;
+                sameSubMain (T.Shift (i+1)) t'
                 )
 
-           | (Idot (i, s'), Shift j) =>
+           | (T.Idot (i, s'), T.Shift j) =>
                 if i = j then
-                   sameSubMain s' (Shift (j+1))
+                   sameSubMain s' (T.Shift (j+1))
                 else
                    raise Different
 
-           | (Shift i, Idot (j, t')) =>
+           | (T.Shift i, T.Idot (j, t')) =>
                 if i = j then
-                   sameSubMain (Shift (i+1)) t'
+                   sameSubMain (T.Shift (i+1)) t'
                 else
                    raise Different)
 
@@ -715,10 +274,10 @@ functor UnifyFun (structure Term : TERM
              [] => 
                 SOME (n, s)
 
-           | App m :: rest =>
-                (case whnf m of
-                    Elim (Var i, []) =>
-                       collectSpine (n+1) (Idot (i, s)) rest
+           | T.App m :: rest =>
+                (case N.whnf m of
+                    T.Elim (T.Var i, []) =>
+                       collectSpine (n+1) (T.Idot (i, s)) rest
 
                   | _ => NONE)
 
@@ -728,6 +287,17 @@ functor UnifyFun (structure Term : TERM
                 *)
                 NONE)
 
+
+
+      fun prune e d m p =
+         (case Prune.pruneGeneral e d m p of
+             SOME m' => m'
+
+           | NONE =>
+                (
+                errorMessage := "pruning failure";
+                raise Unify
+                ))
 
 
       (* pruneSpineEta c 0 sp p
@@ -748,10 +318,10 @@ functor UnifyFun (structure Term : TERM
                 [] =>
                    (i, sp)
 
-              | App m :: rest =>
-                   (case whnf m of
-                       Elim (Var j, []) =>
-                          (case psubstVar j p of
+              | T.App m :: rest =>
+                   (case N.whnf m of
+                       T.Elim (T.Var j, []) =>
+                          (case Prune.psubstVar j p of
                               NONE =>
                                  (i, sp)
 
@@ -777,14 +347,14 @@ functor UnifyFun (structure Term : TERM
          if i = c then
             SOME i
          else
-            (case ! (D.lookup d i) of
-                NO =>
+            (case ! (Dict.lookup d i) of
+                Prune.NO =>
                    confirmEta c d (i+1)
 
-              | YES =>
+              | Prune.YES =>
                    SOME i
 
-              | MAYBE =>
+              | Prune.MAYBE =>
                    NONE)
 
 
@@ -801,7 +371,7 @@ functor UnifyFun (structure Term : TERM
             (i, s1, s2)
          else
             (case (s1, s2) of
-                (Idot (j1, s1'), Idot (j2, s2')) =>
+                (T.Idot (j1, s1'), T.Idot (j2, s2')) =>
                    if j1 = j2 then
                       commonPrefix a (i+1) s1' s2'
                    else
@@ -824,18 +394,18 @@ functor UnifyFun (structure Term : TERM
 
 
       val progress = ref false
-      val queue : (term * term) list ref = ref []
+      val queue : (T.term * T.term) list ref = ref []
 
       fun defer m n =
          queue := (m, n) :: !queue
 
 
       fun solveMain m n =
-         solveWhnf (whnf m) (whnf n)
+         solveWhnf (N.whnf m) (N.whnf n)
 
       and solveWhnf m n =
          (case (m, n) of
-             (Elim (Var i, spine), Elim (Var j, spine')) =>
+             (T.Elim (T.Var i, spine), T.Elim (T.Var j, spine')) =>
                 if i = j then
                    (
                    progress := true;
@@ -847,24 +417,24 @@ functor UnifyFun (structure Term : TERM
                    raise Unify
                    )
 
-           | (Elim (Const const, spine), Elim (Const const', spine')) =>
+           | (T.Elim (T.Const const, spine), T.Elim (T.Const const', spine')) =>
                 if Constant.eq (const, const') then
                    (
                    progress := true;
                    solveSpine spine spine'
                    )
                 else if isSoft (Constant.opacity const) then
-                   solveWhnf (whnfHard m) n
+                   solveWhnf (N.whnfHard m) n
                 else if isSoft (Constant.opacity const') then
-                   solveWhnf m (whnfHard n)
+                   solveWhnf m (N.whnfHard n)
                 else
                    (
                    errorMessage := "clash";
                    raise Unify
                    )
 
-           | (Elim (Sub (Evar e1, s1), spine1), Elim (Sub (Evar e2, s2), spine2)) =>
-                if eqEbind e1 e2 then
+           | (T.Elim (T.Sub (T.Evar e1, s1), spine1), T.Elim (T.Sub (T.Evar e2, s2), spine2)) =>
+                if T.eqEbind e1 e2 then
                    (* flex-flex-same *)
                    if sameSub s1 s2 andalso sameSpine spine1 spine2 then
                       (* m and n are the same *)
@@ -893,7 +463,7 @@ functor UnifyFun (structure Term : TERM
                                        errorMessage := "incompatible spines in evar";
                                        raise Unify
                                        )
-                                    else if not (isPatternSub s1' andalso isPatternSub s2') then
+                                    else if not (Prune.isPatternSub s1' andalso Prune.isPatternSub s2') then
                                        defer m n
                                     else
                                        let
@@ -917,7 +487,7 @@ functor UnifyFun (structure Term : TERM
                                           *)
 
                                           val p1 =
-                                             (case invert s1'' of
+                                             (case Prune.invert s1'' of
                                                  SOME p1 => p1
 
                                                | NONE =>
@@ -925,7 +495,7 @@ functor UnifyFun (structure Term : TERM
                                                     raise (Fail "impossible"))
 
                                           val p2 =
-                                             (case invert s2'' of
+                                             (case Prune.invert s2'' of
                                                  SOME p2 => p2
 
                                                | NONE =>
@@ -935,7 +505,7 @@ functor UnifyFun (structure Term : TERM
                                           (* p1 o s1'' <= id  and  p2 o s2'' <= id *)
 
                                           val p =
-                                             (case intersection p1 p2 of
+                                             (case Prune.intersection p1 p2 of
                                                  NONE =>
                                                     (* This can't happen in a well-formed constraint.
 
@@ -962,7 +532,7 @@ functor UnifyFun (structure Term : TERM
 
                                           (* p <= p1, p2 *)
 
-                                          val (s, s') = restriction p
+                                          val (s, s') = Prune.restriction p
 
                                           (* s o p = s'
 
@@ -992,19 +562,19 @@ functor UnifyFun (structure Term : TERM
 
                                           Trail.setEbind e1
                                              (iterateup (a-b)
-                                                 (fns _ l => Lam (NONE, l))
-                                                 (Sub (evar (), s')))
+                                                 (fns _ l => T.Lam (NONE, l))
+                                                 (T.Sub (T.evar (), s')))
                                        end))
                 else
                    (* flex-flex-different *)
                    (case 
                        (case spine1 of
-                           [] => invert s1
+                           [] => Prune.invert s1
                          | _ => NONE)
                     of
                        SOME p =>
                           let
-                             val n' = pruneMaster (ebindToInt e1) D.empty 0 n p
+                             val n' = prune (T.ebindToInt e1) Dict.empty n p
                           in
                              progress := true;
 
@@ -1014,12 +584,12 @@ functor UnifyFun (structure Term : TERM
                      | NONE =>
                           (case
                               (case spine2 of
-                                  [] => invert s2
+                                  [] => Prune.invert s2
                                 | _ => NONE)
                            of
                               SOME p =>
                                  let
-                                    val m' = pruneMaster (ebindToInt e2) D.empty 0 m p
+                                    val m' = prune (T.ebindToInt e2) Dict.empty m p
                                  in
                                     progress := true;
 
@@ -1041,7 +611,7 @@ functor UnifyFun (structure Term : TERM
                                                (* ai is the number of arguments Ei is given.
                                                   for any L, (fn ..ai times.. fn . L)[si] spinei = L[si']
                                                *)
-                                               if not (isPatternSub s1' andalso isPatternSub s2') then
+                                               if not (Prune.isPatternSub s1' andalso Prune.isPatternSub s2') then
                                                   defer m n
                                                else
                                                   let
@@ -1067,7 +637,7 @@ functor UnifyFun (structure Term : TERM
                                                      *)
                         
                                                      val p1 =
-                                                        (case invert s1'' of
+                                                        (case Prune.invert s1'' of
                                                             SOME p1 => p1
                         
                                                           | NONE =>
@@ -1076,7 +646,7 @@ functor UnifyFun (structure Term : TERM
                         
                                                      (* p1 o s1'' <= id *)
                         
-                                                     val (s, s') = restriction (composeSubPsub s2'' p1)
+                                                     val (s, s') = Prune.restriction (Prune.composeSubPsub s2'' p1)
                         
                                                      (* s o (s2'' o p1) = s'
                         
@@ -1103,59 +673,59 @@ functor UnifyFun (structure Term : TERM
                                                         = N
                                                      *)
                         
-                                                     val e = evar ()
+                                                     val e = T.evar ()
                                                   in
                                                      progress := true;
                         
                                                      Trail.setEbind e1
                                                         (iterateup (a1-b)
-                                                            (fns _ l => Lam (NONE, l))
-                                                            (Sub (e, s')));
+                                                            (fns _ l => T.Lam (NONE, l))
+                                                            (T.Sub (e, s')));
                         
                                                      Trail.setEbind e2
                                                         (iterateup (a2-b)
-                                                            (fns _ l => Lam (NONE, l))
-                                                            (Sub (e, s)))
+                                                            (fns _ l => T.Lam (NONE, l))
+                                                            (T.Sub (e, s)))
                                                   end))))
 
-           | (Elim (Sub (Evar e, s), spine), _) =>
+           | (T.Elim (T.Sub (T.Evar e, s), spine), _) =>
                 solveFlexRigid m e s spine n
 
-           | (_, Elim (Sub (Evar e, s), spine)) =>
+           | (_, T.Elim (T.Sub (T.Evar e, s), spine)) =>
                 (* This will turn the contraint around if we defer, but that probably doesn't matter. *)
                 solveFlexRigid n e s spine m
 
-           | (Elim (Const const, _), _) =>
+           | (T.Elim (T.Const const, _), _) =>
                 if isSoft (Constant.opacity const) then
-                   solveWhnf (whnfHard m) n
+                   solveWhnf (N.whnfHard m) n
                 else
                    (
                    errorMessage := "clash";
                    raise Unify
                    )
 
-           | (_, Elim (Const const, _)) =>
+           | (_, T.Elim (T.Const const, _)) =>
                 if isSoft (Constant.opacity const) then
-                   solveWhnf m (whnfHard n)
+                   solveWhnf m (N.whnfHard n)
                 else
                    (
                    errorMessage := "clash";
                    raise Unify
                    )
 
-           | (Elim (Var _, _), _) =>
+           | (T.Elim (T.Var _, _), _) =>
                 (
                 errorMessage := "clash";
                 raise Unify
                 )
 
-           | (_, Elim (Var _, _)) => 
+           | (_, T.Elim (T.Var _, _)) => 
                 (
                 errorMessage := "clash";
                 raise Unify
                 )
 
-           | (Elim (m1, spine), Elim (n1, spine')) =>
+           | (T.Elim (m1, spine), T.Elim (n1, spine')) =>
                 (* We've eliminated all the cases in which m1 and n1 are heads,
                    so m1 and n1 are intros but do not match their spines.
                    (Thus m and n are ill-typed, but we still have to do something
@@ -1166,30 +736,30 @@ functor UnifyFun (structure Term : TERM
                 solveSpine spine spine'
                 )
 
-           | (Lam (_, m1), Lam (_, n1)) =>
+           | (T.Lam (_, m1), T.Lam (_, n1)) =>
                 (
                 progress := true;
                 solveMain m1 n1
                 )
 
-           | (Pair (m1, m2), Pair (n1, n2)) =>
+           | (T.Pair (m1, m2), T.Pair (n1, n2)) =>
                 (
                 progress := true;
                 solveMain m1 n1;
                 solveMain m2 n2
                 )
 
-           | (Next m1, Next n1) =>
+           | (T.Next m1, T.Next n1) =>
                 (
                 progress := true;
                 solveMain m1 n1
                 )
 
-           | (Triv, Triv) =>
+           | (T.Triv, T.Triv) =>
                 progress := true
 
-           | (Native x, Native y) =>
-                if sameNative x y then
+           | (T.Native x, T.Native y) =>
+                if T.sameNative x y then
                    progress := true
                 else
                    (
@@ -1197,7 +767,7 @@ functor UnifyFun (structure Term : TERM
                    raise Unify
                    )
 
-           | (Marker sym, Marker sym') =>
+           | (T.Marker sym, T.Marker sym') =>
                 if Symbol.eq (sym, sym') then
                    progress := true
                 else
@@ -1206,28 +776,28 @@ functor UnifyFun (structure Term : TERM
                    raise Unify
                    )
 
-           | (Var _, _) =>
+           | (T.Var _, _) =>
                 raise (Fail "should be whnf")
 
-           | (_, Var _) =>
+           | (_, T.Var _) =>
                 raise (Fail "should be whnf")
 
-           | (Const _, _) =>
+           | (T.Const _, _) =>
                 raise (Fail "should be whnf")
 
-           | (_, Const _) =>
+           | (_, T.Const _) =>
                 raise (Fail "should be whnf")
 
-           | (Evar _, _) =>
+           | (T.Evar _, _) =>
                 raise (Fail "should be whnf")
 
-           | (_, Evar _) =>
+           | (_, T.Evar _) =>
                 raise (Fail "should be whnf")
 
-           | (Sub _, _) =>
+           | (T.Sub _, _) =>
                 raise (Fail "should be whnf")
 
-           | (_, Sub _) =>
+           | (_, T.Sub _) =>
                 raise (Fail "should be whnf")
 
            | _ =>
@@ -1256,11 +826,11 @@ functor UnifyFun (structure Term : TERM
 
       and solveElim elim elim' =
          (case (elim, elim') of
-             (App m, App n) => solveMain m n
+             (T.App m, T.App n) => solveMain m n
 
-           | (Pi1, Pi1) => ()
-           | (Pi2, Pi2) => ()
-           | (Prev, Prev) => ()
+           | (T.Pi1, T.Pi1) => ()
+           | (T.Pi2, T.Pi2) => ()
+           | (T.Prev, T.Prev) => ()
 
            | _ =>
                 (
@@ -1284,7 +854,7 @@ functor UnifyFun (structure Term : TERM
                 (* a is the number of arguments E is given.
                    for any L, (fn ..a times.. fn . L)[s] mspine = L[s']
                 *)
-                (case invert s' of
+                (case Prune.invert s' of
                     NONE =>
                        (* not in the pattern fragment *)
                        defer m n
@@ -1306,7 +876,7 @@ functor UnifyFun (structure Term : TERM
                           an eta redex.
                        *)
                        (case n of
-                           Elim (h, nspine) =>
+                           T.Elim (h, nspine) =>
                               let
                                  val (b, nspine1rev) = pruneSpineEta a 0 (List.rev nspine) p
 
@@ -1320,15 +890,15 @@ functor UnifyFun (structure Term : TERM
 
                                  val d =
                                     iterateup b
-                                       (fns i d => D.insert d i (ref NO))
-                                       D.empty
+                                       (fns i d => Dict.insert d i (ref Prune.NO))
+                                       Dict.empty
 
-                                 val ei = ebindToInt e
-                                 val h' = pruneHeadMaster ei d 0 h p
+                                 val enum = T.ebindToInt e
+                                 val h' = prune enum d h p
 
                                  val nspine1' =
                                     List.revMap
-                                       (fn App n => App (pruneMaster ei d 0 n p)
+                                       (fn T.App n => T.App (prune enum d n p)
                                          | elim => elim)
                                        nspine1rev
 
@@ -1380,17 +950,17 @@ functor UnifyFun (structure Term : TERM
                                         let
                                            val unsh =
                                               iterateup c
-                                                 (fns _ unsh => Dot (Triv, unsh))  (* XX orphan *)
-                                                 Term.id
+                                                 (fns _ unsh => T.Dot (Prune.orphan, unsh))
+                                                 T.id
 
                                            val n'' =
                                               iterateup (a-c)
-                                                 (fns _ l => Lam (NONE, l))
-                                                 (Elim (Sub (h', unsh),
-                                                        ssubst nspine1' unsh
+                                                 (fns _ l => T.Lam (NONE, l))
+                                                 (T.Elim (T.Sub (h', unsh),
+                                                        T.ssubst nspine1' unsh
                                                         @
                                                         iterateup (b-c)
-                                                           (fns i l => App (Var i) :: l)
+                                                           (fns i l => T.App (T.Var i) :: l)
                                                            []))
                                         in
                                            progress := true;
@@ -1402,7 +972,7 @@ functor UnifyFun (structure Term : TERM
                          | _ =>
                               (* This will clearly not create an eta redex, so do the simple thing. *)
                               let
-                                 val n' = pruneMaster (ebindToInt e) D.empty 0 n p
+                                 val n' = prune (T.ebindToInt e) Dict.empty n p
 
                                  (* N' = N[p]
                                     so (fn ..a times.. fn . N')[s] mspine = N'[s'] = N[p][s'] = N
@@ -1413,7 +983,7 @@ functor UnifyFun (structure Term : TERM
 
                                  val n'' =
                                     iterateup a
-                                       (fns _ l => Lam (NONE, l)) 
+                                       (fns _ l => T.Lam (NONE, l)) 
                                        n'
                               in
                                  progress := true;
@@ -1446,7 +1016,7 @@ functor UnifyFun (structure Term : TERM
 
 
       datatype constraints =
-         Possible of (term * term) list
+         Possible of (T.term * T.term) list
        | Impossible
 
       val constraints = ref (Possible [])
@@ -1462,7 +1032,7 @@ functor UnifyFun (structure Term : TERM
 
       val count = ref 0
 
-      fun solveUntidy () =
+      fun solve () =
          (
          count := 1 + !count;
          (case !constraints of
@@ -1473,34 +1043,24 @@ functor UnifyFun (structure Term : TERM
                 )
 
            | Possible c =>
-                (
-                constraints := Possible [];
-
-                try
-                   (
-                   solveLoop c;
-                   true
-                   )
-                with Unify =>
-                   (
-                   queue := [];  (* gc it *)
-                   false
-                   )
-                ))
+                let
+                   val mark = Trail.mark ()
+                in
+                   constraints := Possible [];
+   
+                   try
+                      (
+                      solveLoop c;
+                      true
+                      )
+                   with Unify =>
+                      (
+                      queue := [];  (* gc it *)
+                      Trail.rewind mark;
+                      false
+                      )
+                end)
          )
-
-      fun solve () =
-         let
-            val mark = Trail.mark ()
-         in
-            if solveUntidy () then
-               true
-            else
-               (
-               Trail.rewind mark;
-               false
-               )
-         end
 
 
       fun unify1 m n =
@@ -1508,28 +1068,5 @@ functor UnifyFun (structure Term : TERM
          unify m n;
          solve ()
          )
-
-
-
-      (* Will fail if m contains e, or if s is not invertible. *)
-      fun setEbindSub e s m =
-         let
-            val mark = Trail.mark ()
-         in
-            (try
-                let
-                   val p =
-                      (case invert s of
-                          SOME p => p
-
-                        | NONE => raise Unify)
-
-                   val m' = pruneMaster (ebindToInt e) D.empty 0 m p
-                in
-                   Trail.setEbind e m';
-                   true
-                end
-             with Unify => (Trail.rewind mark; false))
-         end
 
    end

@@ -123,6 +123,10 @@ signature TERM =
       (* underShift i j = under i (Shift j) *)
       val underShift : int -> int -> sub
 
+
+      datatype problem = NotGround | Open
+      val isClean : term -> problem option
+
    end
 
 
@@ -330,5 +334,70 @@ functor TermFun (type constant)
             Shift j
          else
             underShiftMain 0 i j
+
+
+      datatype problem = NotGround | Open
+
+      exception CleanLoop of problem
+
+      (* Checks that m[s] is ground and its highest free variable is < depth. *)
+      fun isCleanLoop depth m s =
+         (case m of
+             Var i =>
+                (case substVar i s of
+                    Idx j =>
+                       if j < depth then
+                          ()
+                       else
+                          raise (CleanLoop Open)
+
+                  | Term m' =>
+                       isCleanLoop depth m' id)
+
+           | Const _ => ()
+
+           | Elim (h, spine) =>
+                (
+                isCleanLoop depth h s;
+                List.app
+                   (fn App n => isCleanLoop depth n s
+                     | _ => ())
+                   spine
+                )
+
+           | Lam (_, m1) =>
+                isCleanLoop (depth+1) m1 (under 1 s)
+
+           | Pair (m1, m2) =>
+                (
+                isCleanLoop depth m1 s;
+                isCleanLoop depth m2 s
+                )
+
+           | Next m1 =>
+                isCleanLoop depth m1 s
+
+           | Triv => ()
+
+           | Sub (m1, s') =>
+                isCleanLoop depth m1 (compose s' s)
+
+           | Evar eb =>
+                (case readEbind eb of
+                    NONE =>
+                       raise (CleanLoop NotGround)
+
+                  | SOME m' =>
+                       isCleanLoop depth m' s)
+
+           | Native _ => ()
+
+           | Marker _ => ())
+
+      fun isClean m =
+         try
+            (isCleanLoop 0 m id; NONE)
+         with
+            CleanLoop prob => SOME prob
 
    end

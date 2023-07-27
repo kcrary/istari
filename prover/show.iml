@@ -96,6 +96,9 @@ structure Show :> SHOW =
       structure S = Seq
       structure D = Directory
 
+      structure IS = RedBlackSet (structure Elem = IntOrdered)
+                   
+
       type goal = Judgement.judgement * Directory.directory
 
       val indent = 2
@@ -179,28 +182,32 @@ structure Show :> SHOW =
       val showLiteralBinders = ref false
       val showVeryLiteral = ref false
 
-      fun showLiteralLoop pp prec m =
+      (* if !showVeryLiteral then s = id
+
+         'evars' is for cycle detection because it's barely possible for there to be
+         a cycle in the raw, unsimplified syntax via the substitutions.
+         If !showVeryLiteral=false, raw substitutions aren't shown so evars is
+         ignored.
+      *)
+      fun showLiteralMain pp evars prec m s spine =
          (case m of
              T.Var i =>
-                (
-                PP.print pp (Int.toString i)
-                )
+                (case T.substVar i s of
+                    T.Idx j =>
+                       showWithLiteralSpine pp evars prec
+                          (fn _ => PP.print pp (Int.toString j))
+                          spine
+
+                  | T.Term n =>
+                       showLiteralMain pp evars prec n T.id spine)
 
            | T.Const const =>
-                showAddress pp (Namespace.name const)
+                showWithLiteralSpine pp evars prec
+                   (fn _ => showAddress pp (Namespace.name const))
+                   spine
 
-           | T.Elim (m1, []) =>
-                showLiteralLoop pp prec m1
-
-           | T.Elim (m1, spine) =>
-                (
-                lparen pp prec precApp;
-                PP.openBox pp PP.Consistent indent;
-                showLiteralLoop pp precApp m1;
-                showLiteralSpine pp spine;
-                PP.closeBox pp;
-                rparen pp prec precApp
-                )
+           | T.Elim (m1, spine') =>
+                showLiteralMain pp evars prec m1 s (T.ssubst spine' s @ spine)
 
            | T.Lam (bo, m1) =>
                 let
@@ -213,97 +220,153 @@ structure Show :> SHOW =
                       else
                          ""
                 in
-                   PP.openBox pp PP.Consistent indent;
-                   lparen pp prec precLam;
-                   PP.print pp "fn ";
-                   PP.print pp str;
-                   PP.print pp ".";
-                   PP.break pp 1;
-                   showLiteralLoop pp precLam m1;
-                   rparen pp prec precLam;
-                   PP.closeBox pp
+                   showWithLiteralSpine pp evars prec
+                      (fn prec' =>
+                          (
+                          PP.openBox pp PP.Consistent indent;
+                          lparen pp prec' precLam;
+                          PP.print pp "fn ";
+                          PP.print pp str;
+                          PP.print pp ".";
+                          PP.break pp 1;
+                          showLiteralMain pp evars precLam m1 (T.under 1 s) [];
+                          rparen pp prec' precLam;
+                          PP.closeBox pp
+                          ))
+                      spine
                 end
 
            | T.Pair _ =>
-                (
-                PP.print pp "(";
-                PP.openBox pp PP.Consistent 0;
-                showLiteralTuple pp m;  (* prints the close parenthesis *)
-                PP.closeBox pp
-                )
+                showWithLiteralSpine pp evars prec
+                   (fn _ =>
+                       (
+                       PP.print pp "(";
+                       PP.openBox pp PP.Consistent 0;
+                       showLiteralTuple pp evars m s;  (* prints the close parenthesis *)
+                       PP.closeBox pp
+                       ))
+                    spine
                 
            | T.Next m1 =>
-                (
-                PP.openBox pp PP.Consistent indent;
-                lparen pp prec precApp;
-                PP.print pp "next";
-                PP.break pp 1;
-                showLiteralLoop pp (precApp+1) m1;
-                rparen pp prec precApp;
-                PP.closeBox pp
-                )
+                showWithLiteralSpine pp evars prec
+                   (fn prec' =>
+                       (
+                       PP.openBox pp PP.Consistent indent;
+                       lparen pp prec' precApp;
+                       PP.print pp "next";
+                       PP.break pp 1;
+                       showLiteralMain pp evars (precApp+1) m1 s;
+                       rparen pp prec' precApp;
+                       PP.closeBox pp
+                       ))
+                   spine
 
            | T.Triv =>
-                PP.print pp "()"
+                showWithLiteralSpine pp evars prec
+                   (fn _ => PP.print pp "()")
+                   spine
 
-           | T.Sub (m1, s) =>
-                (
-                PP.openBox pp PP.Consistent indent;
-                lparen pp prec precSub;
-                showLiteralLoop pp precSub m1;
-                PP.break pp 0;
-                PP.print pp "[";
-                PP.openBox pp PP.Consistent indent;
-                showLiteralSubLoop pp s;
-                PP.closeBox pp;
-                PP.print pp "]";
-                rparen pp prec precSub;
-                PP.closeBox pp
-                )
+           | T.Sub (m1, s') =>
+                if !showVeryLiteral then
+                   (* by precondition, s = id *)
+                   showWithLiteralSpine pp evars prec
+                      (fn _ =>
+                          (
+                          PP.openBox pp PP.Consistent indent;
+                          lparen pp prec precSub;
+                          showLiteralMain pp evars precSub m1 T.id [];
+                          PP.break pp 0;
+                          PP.print pp "[";
+                          PP.openBox pp PP.Consistent indent;
+                          showLiteralSubMain pp evars s';
+                          PP.closeBox pp;
+                          PP.print pp "]";
+                          rparen pp prec precSub;
+                          PP.closeBox pp
+                          ))
+                      spine
+                else
+                   showLiteralMain pp evars prec m1 (T.compose s' s) spine
 
            | T.Evar eb =>
                 (case T.readEbind eb of
-                    SOME m1 => showLiteralLoop pp prec m1
+                    SOME m1 =>
+                       if !showVeryLiteral then
+                          let
+                             val enum = T.ebindToInt eb
+                          in
+                             if IS.member evars enum then
+                                showWithLiteralSpine pp evars prec
+                                   (fn _ => PP.print pp "~cycle~")
+                                   spine
+                             else
+                                showLiteralMain pp (IS.insert evars enum) prec m1 s spine
+                          end
+                       else
+                          showLiteralMain pp evars prec m1 s spine
 
                   | NONE =>
-                       (
-                       PP.print pp "E";
-                       PP.print pp (Int.toString (T.ebindToInt eb))
-                       ))
+                       showWithLiteralSpine pp evars prec
+                          (fn _ =>
+                              (
+                              PP.print pp "E";
+                              PP.print pp (Int.toString (T.ebindToInt eb))
+                              ))
+                          spine)
 
            | T.Native x =>
-                showNative pp x
+                showWithLiteralSpine pp evars prec
+                   (fn _ => showNative pp x)
+                   spine
 
            | T.Marker sym =>
+                showWithLiteralSpine pp evars prec
+                   (fn _ =>
+                       (
+                       PP.print pp "_";
+                       PP.print pp (Symbol.toValue sym);
+                       PP.print pp "_"
+                       ))
+                   spine)
+
+
+      and showWithLiteralSpine pp evars prec f spine =
+         (case spine of
+             [] => f prec
+
+           | _ =>
                 (
-                PP.print pp "_";
-                PP.print pp (Symbol.toValue sym);
-                PP.print pp "_"
+                lparen pp prec precApp;
+                PP.openBox pp PP.Consistent indent;
+                f precApp;
+                showLiteralSpine pp evars spine;
+                PP.closeBox pp;
+                rparen pp prec precApp
                 ))
+                
 
-
-      and showLiteralTuple pp m =
+      and showLiteralTuple pp evars m s =
          (case m of
              T.Pair (m1, m2) =>
                 (
                 PP.openBox pp PP.Consistent indent;
-                showLiteralLoop pp precConstituent m1;
+                showLiteralMain pp evars precConstituent m1 s [];
                 PP.print pp " ,";
                 PP.closeBox pp;
                 PP.break pp 1;
-                showLiteralTuple pp m2
+                showLiteralTuple pp evars m2 s
                 )
 
            | _ =>
                 (
                 PP.openBox pp PP.Consistent indent;
-                showLiteralLoop pp precConstituent m;
+                showLiteralMain pp evars precConstituent m s [];
                 PP.print pp ")";
                 PP.closeBox pp
                 ))
-                
 
-      and showLiteralSpine pp spine =
+
+      and showLiteralSpine pp evars spine =
          (case spine of
              [] => ()
 
@@ -313,16 +376,17 @@ structure Show :> SHOW =
 
                 (case elim of
                     T.App m =>
-                       showLiteralLoop pp (precApp+1) m
+                       showLiteralMain pp evars (precApp+1) m T.id []
 
                   | T.Pi1 => PP.print pp "#1"
                   | T.Pi2 => PP.print pp "#2"
                   | T.Prev => PP.print pp "#prev");
 
-                showLiteralSpine pp rest
+                showLiteralSpine pp evars rest
                 ))
 
-      and showLiteralSubLoop pp s =
+
+      and showLiteralSubMain pp evars s =
          (case s of
              T.Shift i =>
                 (
@@ -332,10 +396,10 @@ structure Show :> SHOW =
 
            | T.Dot (m, s) =>
                 (
-                showLiteralLoop pp precSub m;
+                showLiteralMain pp evars precSub m T.id [];
                 PP.print pp " .";
                 PP.break pp 1;
-                showLiteralSubLoop pp s
+                showLiteralSubMain pp evars s
                 )
                 
            | T.Idot (i, s) =>
@@ -343,33 +407,26 @@ structure Show :> SHOW =
                 PP.print pp (Int.toString i);
                 PP.print pp " .";
                 PP.break pp 1;
-                showLiteralSubLoop pp s
+                showLiteralSubMain pp evars s
                 ))
 
-      fun showLiteralMain pp prec m =
-         if !showVeryLiteral then
-            showLiteralLoop pp prec m
-         else
-            showLiteralLoop pp prec (Normalize.simplifyAll m)
-      
-
       fun showLiteral m =
-         showTop 0 (fn pp => showLiteralMain pp precMin m)
+         showTop 0 (fn pp => showLiteralMain pp IS.empty precMin m T.id [])
 
       fun showLiteralSub s =
-         showTop 0 (fn pp => showLiteralSubLoop pp s)
+         showTop 0 (fn pp => showLiteralSubMain pp IS.empty s)
 
 
       fun showLiteralHyp pp hyp =
          (case hyp of
              J.Tm a => 
-                showLiteralMain pp precMin a
+                showLiteralMain pp IS.empty precMin a T.id []
 
            | J.Tml a =>
-                showLiteralMain pp precMin a
+                showLiteralMain pp IS.empty precMin a T.id []
 
            | J.Tmh a =>
-                showLiteralMain pp precMin a
+                showLiteralMain pp IS.empty precMin a T.id []
 
            | J.Tp =>
                 PP.print pp "type"
@@ -381,7 +438,7 @@ structure Show :> SHOW =
                 PP.print pp "type"
 
            | J.Let a =>
-                showLiteralMain pp precMin a)
+                showLiteralMain pp IS.empty precMin a T.id [])
 
 
       fun hypLiteralCategory hyp =
@@ -422,7 +479,7 @@ structure Show :> SHOW =
              PP.print pp "|-";
              PP.newline pp;
              PP.openBox pp PP.Consistent indent;
-             showLiteralMain pp precMin (J.concl jud)
+             showLiteralMain pp IS.empty precMin (J.concl jud) T.id []
              ))
 
       val showLiteralGoal = showLiteralGoalIndent 0
@@ -434,7 +491,11 @@ structure Show :> SHOW =
 
       exception NoMatch
 
-      (* matching the entire term?, margin, dir, term to unparse *)
+      (* matching the entire term?,
+         margin, 
+         dir,
+         term to unparse
+      *)
       type 'a unparser = bool -> int -> Directory.directory -> T.term -> 'a
 
       structure H = ConstantTable
@@ -473,7 +534,8 @@ structure Show :> SHOW =
 
            | T.Evar eb =>
                 (case T.readEbind eb of
-                    NONE => (List.rev acc, T.Sub (m, s))
+                    NONE => 
+                       (List.rev acc, T.Sub (m, s))
 
                   | SOME m' =>
                        collectLams m' s acc)
@@ -493,7 +555,10 @@ structure Show :> SHOW =
               | _ => NONE)
 
 
-      (* dir: names of free variables, margin: number to start naming unnamed free variables at *)
+      (* dir: names of free variables,
+         margin: number to start naming unnamed free variables at 
+         evars: within the unfolding of these evars (for detecting cycles)
+      *)
       fun showMain pp margin dir prec m s spine =
          (case m of
              T.Var i =>
@@ -541,8 +606,8 @@ structure Show :> SHOW =
            | T.Sub (m1, s') =>
                 showMain pp margin dir prec m1 (T.compose s' s) spine
 
-           | T.Evar e =>
-                (case T.readEbind e of
+           | T.Evar eb =>
+                (case T.readEbind eb of
                     NONE =>
                        showRootSpine pp margin dir prec m s spine
 
@@ -663,7 +728,7 @@ structure Show :> SHOW =
                 showTuple pp margin dir (N.simplify (T.Sub (m, s)));  (* prints the close parenthesis *)
                 PP.closeBox pp
                 )
-                
+
            | T.Next m1 =>
                 (
                 PP.openBox pp PP.Consistent indent;
@@ -754,7 +819,7 @@ structure Show :> SHOW =
               | _ =>
                    (
                    PP.print pp "[";
-                   showLiteralSubLoop pp s;
+                   showLiteralSubMain pp IS.empty s;
                    PP.print pp "]"
                    ))
          else

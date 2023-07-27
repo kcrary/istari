@@ -112,7 +112,6 @@ signature LEVEL =
 structure Level :> LEVEL =
    struct
 
-      structure I = Invert
       structure J = Judgement
       structure T = Term
 
@@ -225,11 +224,11 @@ structure Level :> LEVEL =
 
 
 
-      type expression = int * (int * int) list * (int * T.ebind * I.psub) list
+      type expression = int * (int * int) list * (int * T.ebind * Prune.psub) list
 
 
       fun substUvar p (a, x) =
-         (case I.psubstVar x p of
+         (case Prune.psubstVar x p of
              NONE =>
                 (
                 hasScopeViolation := true;
@@ -238,11 +237,11 @@ structure Level :> LEVEL =
 
            | SOME x' => SOME (a, x'))
 
-      fun substEvar p (a, e, p') = (a, e, Invert.composePsub p' p)
+      fun substEvar p (a, e, p') = (a, e, Prune.composePsub p' p)
 
       fun subst (expr as (a, uvars, evars)) p =
          (case p of
-             I.Pshift 0 => expr
+             Prune.Pshift 0 => expr
              
            | _ =>
                 (a,
@@ -268,7 +267,7 @@ structure Level :> LEVEL =
                                      raise (Exotic "evar under lmax")
                                   else
                                      (* b <= a, so we're looking at max(b, a+E[s]) = a+E[s] *)
-                                     (case I.invert s of
+                                     (case Prune.invert s of
                                          NONE =>
                                             (* Not a pattern substitution. *)
                                             raise (Exotic "non-pattern substitution")
@@ -281,7 +280,7 @@ structure Level :> LEVEL =
     
                                                val levars' =
                                                   List.map
-                                                     (fn (c, e', s) => (c, e', I.composeSubPsub s p))
+                                                     (fn (c, e', s) => (c, e', Prune.composeSubPsub s p))
                                                      levars
                                             in
                                                ((l, luvars', levars'), e) :: acc
@@ -403,7 +402,7 @@ structure Level :> LEVEL =
                                 else
                                    ();
 
-                                (case I.intersection p1 p2 of
+                                (case Prune.intersection p1 p2 of
                                     NONE =>
                                        (* Constraint requires e to live in incompatible scopes. *)
                                        (
@@ -416,7 +415,7 @@ structure Level :> LEVEL =
                                 )
                              else
                                 (p2, entry :: evars''))
-                         (I.Pshift 0, [])
+                         (Prune.Pshift 0, [])
                          evars'
                 in
                    dictr :=
@@ -546,7 +545,7 @@ structure Level :> LEVEL =
                          (* This cannot fail because the identity substitution won't prune
                             anything, and their are no evars to fail the occurs check.
                          *)
-                         Unify.setEbindSub e T.id (toTerm a uvars);
+                         Prune.setEbindSub e T.id (toTerm a uvars);
                          ()
                       end)
                   (!dictr);
@@ -590,7 +589,7 @@ structure Level :> LEVEL =
             \(fnc (e, _) =>
                  (* An evar that is still unbound has no upward pressure, set it to 0. *)
                  (
-                 Unify.setEbindSub e T.id (T.Const Prim.lzero);  (* can't fail *)
+                 Prune.setEbindSub e T.id (T.Const Prim.lzero);  (* can't fail *)
                  refine Rule.lzeroLevel
                  ))\
 
@@ -691,7 +690,7 @@ structure Level :> LEVEL =
             \(fnc (e, _) =>
                  (* An evar that is still unbound has no upward pressure, set it to 0. *)
                  (
-                 Unify.setEbindSub e T.id (T.Const Prim.lzero);  (* can't fail *)
+                 Prune.setEbindSub e T.id (T.Const Prim.lzero);  (* can't fail *)
  
                  (T.Const Prim.lzero,
                   refine (Rule.eqRefl (T.Const Prim.level) (T.Const Prim.lzero))

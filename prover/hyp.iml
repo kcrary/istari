@@ -772,54 +772,28 @@ structure Hyp :> HYP =
 
       val cycle = Tryf "move impossible due to cyclic dependency"
 
-      (* dependencies cap adjust depth m s
+      (* dependencies cap adjust depth m
 
-         Suppose the free variables of m[s] are I.
+         Suppose the free variables of m are I.
          Let I' = { i - depth + adjust  |  i in I  and  i >= depth }
          
          if    cap in I'
          then  raises cycle
          else  returns I' intersect { i | i < cap }
 
-         Does not normalize, so it may detect spurious dependencies.  Also, does not prune
-         out dependencies from evars.
+         Does not prune out dependencies from evars.
       *)
-      fun dependencies cap adjust depth m s =
-         (case m of
-             T.Var i =>
-                (case T.substVar i s of
-                    T.Idx j =>
-                       if j < depth then
-                          IS.empty
-                       else
-                          let
-                             val j' = j - depth + adjust
-                          in
-                             (case Int.compare j' cap of
-                                 LESS =>
-                                    IS.singleton j'
-
-                               | EQUAL =>
-                                    raise cycle
-
-                               | GREATER =>
-                                    IS.empty)
-                          end
-
-                  | T.Term n =>
-                       dependencies cap adjust depth n T.id)
-
-           | T.Const _ => IS.empty
-
-           | T.Elim (m1, spine) =>
+      fun dependencies cap adjust depth m =
+         (case Normalize.whnf m of
+             T.Elim (m1, spine) =>
                 IS.union 
-                   (dependencies cap adjust depth m1 s)
+                   (dependenciesHead cap adjust depth m1)
                    (List.foldl
                        (fns elim set =>
                            (case elim of
                                T.App mk =>
                                   IS.union
-                                     (dependencies cap adjust depth mk s)
+                                     (dependencies cap adjust depth mk)
                                      set
 
                              | _ => set))
@@ -827,32 +801,53 @@ structure Hyp :> HYP =
                        spine)
 
            | T.Lam (_, m1) =>
-                dependencies cap adjust (depth+1) m1 (T.under 1 s)
+                dependencies cap adjust (depth+1) m1
 
            | T.Pair (m1, m2) =>
                 IS.union
-                   (dependencies cap adjust depth m1 s)
-                   (dependencies cap adjust depth m2 s)
+                   (dependencies cap adjust depth m1)
+                   (dependencies cap adjust depth m2)
 
            | T.Next m1 =>
-                dependencies cap adjust depth m1 s
+                dependencies cap adjust depth m1
 
            | T.Triv => IS.empty
 
-           | T.Sub (m1, s') =>
-                dependencies cap adjust depth m1 (T.compose s' s)
-
-           | T.Evar eb =>
-                (case T.readEbind eb of
-                    SOME n =>
-                       dependencies cap adjust depth n T.id
-
-                  | NONE =>
-                       dependenciesSub cap adjust depth s)
-
            | T.Native _ => IS.empty
 
-           | T.Marker _ => IS.empty)
+           | T.Marker _ => IS.empty
+
+           | T.Var _ => raise (Fail "should be whnf")
+           | T.Const _ => raise (Fail "should be whnf")
+           | T.Evar _ => raise (Fail "should be whnf")
+           | T.Sub _ => raise (Fail "should be whnf"))
+
+      and dependenciesHead cap adjust depth h =
+         (case h of
+             T.Var j =>
+                if j < depth then
+                   IS.empty
+                else
+                   let
+                      val j' = j - depth + adjust
+                   in
+                      (case Int.compare j' cap of
+                          LESS =>
+                             IS.singleton j'
+
+                        | EQUAL =>
+                             raise cycle
+
+                        | GREATER =>
+                             IS.empty)
+                   end
+
+           | T.Const _ => IS.empty
+
+           | T.Sub (T.Evar _, s) =>
+                dependenciesSub cap adjust depth s
+
+           | _ => raise (Fail "should be head"))
 
       and dependenciesSub cap adjust depth s =
          (case s of
@@ -864,7 +859,7 @@ structure Hyp :> HYP =
 
            | T.Dot (m, s') =>
                 IS.union
-                   (dependencies cap adjust depth m T.id)
+                   (dependencies cap adjust depth m)
                    (dependenciesSub cap adjust depth s)
 
            | T.Idot (j, s') =>
@@ -911,7 +906,7 @@ structure Hyp :> HYP =
 
                val set'' =
                   IS.union
-                     (dependencies cap (i+1) 0 a T.id)
+                     (dependencies cap (i+1) 0 a)
                      set'
             in
                dependenciesTrans ctx cap set'' (i :: acc)
@@ -968,7 +963,7 @@ structure Hyp :> HYP =
             moveDepsMain 
                (J.context jud) 
                dir
-               (fn () => dependencies to 0 0 m T.id)
+               (fn () => dependencies to 0 0 m)
                to
          end
 

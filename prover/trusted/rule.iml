@@ -123,7 +123,7 @@ structure Rule :> RULE =
       structure J = Judgement
       structure N = Normalize
       structure S = Seq
-      structure I = Invert
+      structure P = Prune
       structure U = Unify
 
       exception Failure
@@ -150,22 +150,22 @@ structure Rule :> RULE =
                 if easy then
                    raise ContextToPsubEasy
                 else
-                   I.Pshift i
+                   P.Pshift i
 
            | S.Cons (J.Tmh _, g') =>
-                I.Pundef (contextToPsubMain false (i+1) g')
+                P.Pundef (contextToPsubMain false (i+1) g')
 
            | S.Cons (J.Tp, g') =>
-                I.Pundef (contextToPsubMain false (i+1) g')
+                P.Pundef (contextToPsubMain false (i+1) g')
 
            | S.Cons (_, g') =>
-                I.Pidot (i, contextToPsubMain easy (i+1) g'))
+                P.Pidot (i, contextToPsubMain easy (i+1) g'))
 
       fun contextToPsub g =
          try
             contextToPsubMain true 0 g
          with
-            ContextToPsubEasy => I.Pshift 0
+            ContextToPsubEasy => P.Pshift 0
 
       fun checkHidden jud ms =
          (case ms of
@@ -176,11 +176,11 @@ structure Rule :> RULE =
                    val p = contextToPsub (J.context jud)
                 in
                    (case p of
-                       I.Pshift 0 => ()
+                       P.Pshift 0 => ()
  
                      | _ =>
                           List.app (fn m =>
-                                       if U.quickPrune m p then
+                                       if Prune.pruneable m p then
                                           ()
                                        else
                                           raise HiddenVariable) ms)
@@ -781,14 +781,14 @@ structure Rule :> RULE =
          let
             val mark = Trail.mark ()
          in
-            if U.quickPrune a p then
+            if Prune.pruneable a p then
                (* we're happy if a doesn't mention i *)
                acc
             else
                (
                Trail.rewind mark;
                (* generate an obligation if a doesn't mention any variable < i *)
-               (case U.prune a q of
+               (case P.prune a q of
                    NONE =>
                       (
                       Trail.rewind mark;
@@ -870,7 +870,7 @@ structure Rule :> RULE =
                           let
                              val mark = Trail.mark ()
                           in
-                             if U.quickPrune m p then
+                             if Prune.pruneable m p then
                                 checkPosNegMain sign i p q b
                                    (checkPosNegMain sign i p q c acc)
                              else
@@ -898,7 +898,7 @@ structure Rule :> RULE =
       and checkPosNegLam sign i p q a acc =
          (case Normalize.whnf a of
              T.Lam (_, b) =>
-                checkPosNegMain sign (i+1) (I.punder p) (I.Pundef q) b acc
+                checkPosNegMain sign (i+1) (P.punder p) (P.Pundef q) b acc
 
            | _ =>
                 raise Failure)
@@ -916,7 +916,7 @@ structure Rule :> RULE =
                let
                   val obs =
                      checkPosNegMain sign 0 
-                        (I.Pundef (I.Pshift 0)) (I.Pshift 0)
+                        (P.Pundef (P.Pshift 0)) (P.Pshift 0)
                         a []
 
                   val ctx = J.context jud

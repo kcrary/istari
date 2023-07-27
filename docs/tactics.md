@@ -497,8 +497,7 @@ which appears in the `Hyp` structure.
 
     On rare occasions `substStrict` might work when `subst` fails,
     because `subst` might fail due to a spurious cyclic dependency
-    (one that can be eliminated by normalizing, or by pruning an evar
-    dependency).
+    (one that could be eliminated pruning an evar dependency).
 
   + `substStrictRaw /[hyp x]/`
 

@@ -43,14 +43,25 @@ signature CONSTANT_INTERNAL =
       include CONSTANT
 
 
+      (* fills in variable and evars to make the term closed and ground *)
+      val clean : term -> term
+
+
+      type problem
+
+      exception DeclareUnclean of problem
+
       (* Creates a constant with a given definition, and recording a luid and
          a symbol list, the latter of which the namespace manager uses to recover
          a constant's name.  (The namespace manager uses the constant's full path
          name reversed.)
 
          You probably don't want this.  You probably want Namespace.declare instead.
+
+         If bool is true, cleans the definition to make it closed and ground.
+         If bool is false, raises DeclareUnclean if the definition is open or not ground.
       *)
-      val declare : term option -> Symbol.symbol list -> opacity -> constant
+      val declare : bool -> term option -> Symbol.symbol list -> opacity -> constant
 
 
       (* Returns the symbol list that was supplied when the constant was declared.
@@ -81,6 +92,7 @@ functor ConstantFun (structure Term : TERM
    :> CONSTANT_INTERNAL
       where type constant = int
       where type term = Term.term
+      where type problem = Term.problem
    =
    struct
 
@@ -91,6 +103,7 @@ functor ConstantFun (structure Term : TERM
       structure T = Term
 
       type term = T.term
+      type problem = T.problem
 
    
       fun eq (i, j) = i = j
@@ -110,6 +123,7 @@ functor ConstantFun (structure Term : TERM
             val eq = eq
             val hash = Word.fromInt
          end
+
 
       datatype opacity = SOFT | FIRM | HARD | OPAQUE
 
@@ -202,16 +216,17 @@ functor ConstantFun (structure Term : TERM
 
 
 
+      structure IS = RedBlackSet (structure Elem = IntOrdered)
 
       (* Compute the maximum index appearing in m[s], and bind free evars to Triv. *)
-      fun freevars m s =
+      fun cleanLoop m s =
          (case m of
              T.Var i =>
                 (case T.substVar i s of
                     T.Idx j => j + 1
 
                   | T.Term m' =>
-                       freevars m' T.id)
+                       cleanLoop m' T.id)
 
            | T.Const _ => 0
 
@@ -219,14 +234,14 @@ functor ConstantFun (structure Term : TERM
                 List.foldl
                 (fns e j =>
                     (case e of
-                        T.App n => Int.max (freevars n s) j
+                        T.App n => Int.max (cleanLoop n s) j
                       | _ => j))
-                (freevars h s)
+                (cleanLoop h s)
                 spine
 
            | T.Lam (_, m1) =>
                 let
-                   val i = freevars m1 (T.under 1 s)
+                   val i = cleanLoop m1 (T.under 1 s)
                 in
                    if i = 0 then
                       0
@@ -235,15 +250,15 @@ functor ConstantFun (structure Term : TERM
                 end
 
            | T.Pair (m1, m2) =>
-                Int.max (freevars m1 s) (freevars m2 s)
+                Int.max (cleanLoop m1 s) (cleanLoop m2 s)
 
            | T.Next m1 =>
-                freevars m1 s
+                cleanLoop m1 s
 
            | T.Triv => 0
 
            | T.Sub (m1, s') =>
-                freevars m1 (T.compose s' s)
+                cleanLoop m1 (T.compose s' s)
 
            | T.Evar eb =>
                 (case T.readEbind eb of
@@ -254,7 +269,7 @@ functor ConstantFun (structure Term : TERM
                        )
 
                   | SOME m' =>
-                       freevars m' s)
+                       cleanLoop m' s)
 
            | T.Native _ => 0
 
@@ -262,12 +277,10 @@ functor ConstantFun (structure Term : TERM
                 raise (Invalid "definition contains marker"))
 
 
-      (* Turns unbound variables and evars into Triv.  Rejects markers. *)
-      fun crush m =
+      (* Turns unbound variables and free evars into Triv. *)
+      fun clean m =
          let
-            val i = freevars m T.id
-
-            val () = Trail.commit ()
+            val i = cleanLoop m T.id
 
             fun mksub j =
                if j = 0 then
@@ -282,25 +295,39 @@ functor ConstantFun (structure Term : TERM
          end
 
 
-      fun declare def path opac =
+
+      exception DeclareUnclean of problem
+
+      fun declare force def path opac =
          let
             val const = !nextConstant
 
-            val def' = Option.map crush def
+            val def' =
+               (case def of
+                   NONE => NONE
+
+                 | SOME m =>
+                      if force then
+                         SOME (clean m)
+                      else
+                         (case T.isClean m of
+                             NONE => def
+
+                           | SOME prob => raise (DeclareUnclean prob)))
          in
             (case (def', opac) of
                 (NONE, OPAQUE) => ()
 
               | (NONE, _) =>
-                   raise (Invalid "non-opqaque constants without definition")
+                   raise (Invalid "non-opaque constant without definition")
 
-              | (SOME _, _) => ());
+              | (SOME _, _) => Trail.commit ());
 
-            Trail.commit ();
             nextConstant := const + 1;
             ArrayInf.update (theConstants, const, (def', path, opac));
             const
          end
+
 
 
       val puOpacity =

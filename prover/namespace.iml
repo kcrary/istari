@@ -6,8 +6,12 @@ signature NAMESPACE =
       type symbol = Symbol.symbol
       type address = symbol list  (* nonempty *)
 
-      exception Namespace of string  (* signalled for any error *)
-      
+      (* raised if a term to be defined is open or not ground *)
+      exception Unclean of Term.problem * Term.term
+
+      (* raised for any other error *)
+      exception Namespace of string
+
       val declare : symbol -> Term.term option -> constant
 
       val resolve : address -> constant
@@ -175,6 +179,9 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
          end
 
 
+      (* the handler is in Prover *)
+      exception Unclean of Term.problem * Term.term
+
       fun declare sym def =
          let
             val path = R.deref thePath
@@ -185,13 +192,20 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
 
                  | SOME _ => C.HARD)
          in
-            insert sym 
-               (fn () => 
-                   let
-                      val const = C.declare def (sym :: List.rev path) opac
-                   in
-                      ((const, false), const)
-                   end)
+            try
+               insert sym 
+                  (fn () => 
+                      let
+                         val const = C.declare false def (sym :: List.rev path) opac
+                      in
+                         ((const, false), const)
+                      end)
+            with
+               ConstantInternal.DeclareUnclean prob =>
+                  (case def of
+                      NONE => raise (Fail "impossible")
+
+                    | SOME m => raise (Unclean (prob, m)))
          end
 
 

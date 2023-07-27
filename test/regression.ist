@@ -10,6 +10,111 @@ fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
 
 
 
+lemma "make_orphan"
+/
+  forall (x y : nat) (P : nat -> U 0) . P x -> P (if true then x else y)
+/;
+
+intro /x y P H/.
+clear /y/.
+reduce //.
+hyp /H/.
+qed ();
+
+
+
+lemma "make_orphan_unify"
+/
+  forall i 
+    (a : nat -> U i)
+    (b : U i)
+    (x : nat)
+    (f : a _ -> b)
+    (x' : nat)
+    (y : a (succ (if true then x else x')))
+    . b
+/;
+
+inference.
+intro /i a b x f x' y/.
+1:{
+  exact /f y/.
+  }
+reduce //.
+typecheck.
+qed ();
+
+
+
+(* XX delete
+lemma "make_cycle"
+/
+  forall i (a : nat -> U i) (b : U i) (x : nat) .
+    let E = _
+    in
+      forall 
+        (f : a E -> b)
+        (y : a (succ (if true then x else E))) .
+        b
+/;
+
+inference.
+intro /i a b x/.
+unfold /let/.
+intro /f y/.
+2:{
+  exact /f y/.
+  }
+
+  {
+  reduce //.
+  typecheck.
+  }
+
+  {
+  reduce //.
+  typecheck.
+  }
+qed ();
+*)
+
+
+
+lemma "make_free_variable"
+/
+  let x = l` 0 in unit
+/;
+
+unfold /let/.
+split.
+Prover.abandon ();
+
+
+
+lemma "open_extract"
+/
+  unit
+/;
+
+exactRaw /let x = l` 0 in ()/.
+unfold /let/.
+typecheck.
+qed ();
+
+
+
+lemma "free_evar_extract"
+/
+  unit
+/;
+
+exactRaw /let x = _ in ()/.
+unfold /let/.
+typecheck.
+qed ();
+
+
+
 lemma "substitution_cycle"
 /
   forall i (a : U i) (f : a -> a) (x : a) .
