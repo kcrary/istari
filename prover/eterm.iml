@@ -340,6 +340,17 @@ structure ParseTerm =
       fun bindingBare x = [(x, NONE)]
       fun bindingAnnot xl a = map (fn x => (x, SOME a)) xl
 
+      fun appendBlanks n l =
+         (case Int.compare n 0 of
+             LESS =>
+                raise (Syntax "negative repetition in bindings")
+
+           | EQUAL =>
+                l
+
+           | GREATER =>
+                appendBlanks (n-1) ((NONE, NONE) :: l))
+
       val literal = T.literal
 
       val short = T.short
@@ -497,10 +508,15 @@ structure ParseTerm =
       val evar = T.evar
 
       fun appEvars m n =
-         if n = 0 then
-            m
-         else
-            appEvars (T.app m T.evar) (n-1)
+         (case Int.compare n 0 of
+             LESS =>
+                raise (Syntax "negative repetition in apply to evars")
+
+           | EQUAL =>
+                m
+
+           | GREATER =>
+                appEvars (T.app m T.evar) (n-1))
 
 
 
@@ -1114,8 +1130,10 @@ grammardef Term
 
    rule Bindings  ::= => null
    rule Bindings  ::= Binding Bindings => append
+   rule Bindings  ::= "_#" NUMBER Bindings => appendBlanks
 
    rule Bindingsn ::= Binding Bindings => append
+   rule Bindingsn ::= "_#" NUMBER Bindings => appendBlanks
 
    rule Level(0)  ::= NUMBER "+" Level(0) => level_plus
    rule Level(1)  ::= "[" Levels "]" => level_max

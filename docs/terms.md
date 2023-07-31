@@ -111,7 +111,7 @@ cons is right associative.
 
     OIdent ::=
       Ident
-      _
+      _                                                              (anonymous argument)
 
     OIdents ::=
       OIdent ... OIdent                                              (length can be zero)
@@ -121,7 +121,7 @@ cons is right associative.
       (OIdents : Term)                                               (binding with type supplied)
 
     Bindings ::=       
-      Binding ... Binding                                            (length can be zero)
+      Binding ... Binding                                            (length at least 0)
 
     Bindingsn ::=       
       Binding ... Binding                                            (length at least 1)
@@ -161,8 +161,7 @@ Notes:
 - An [antiquoted](iml.html#antiquote) internal term should have the
   type `Term.term`.
 
-- A hole (`__`) is not a valid term in the logic.  It is a
-  placeholder used by some tactics (*e.g.,* `so`).
+- A hole (`__`) is a placeholder used by some tactics (*e.g.,* `so`).
 
 - One can bind additional de Bruijn positions using the syntax
   ``additional` OIdents . Term``.  For example, ``additional` x y . y``
@@ -173,6 +172,11 @@ Notes:
   entire term using the syntax ``explicit` Term``.  The inner term
   should be parenthesized or otherwise syntactically atomic (that is,
   it should appear in the last grouping of `Term` syntax).
+
+- One can put multiple anonymous arguments into a `Bindings` or
+  `Bindingsn` by writing `_# Number`.  The multiplicity can be zero.
+  (The requirement that a `Bindingsn` be nonempty can be defeated
+  using a zero multiplicity.)
 
 
 

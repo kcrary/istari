@@ -251,6 +251,8 @@ Strong induction for natural numbers:
 
     min_glb : type:min_glb
 
+    min_leq : type:min_leq
+
     min_eq_l : type:min_eq_l
 
     min_eq_r : type:min_eq_r
@@ -281,6 +283,8 @@ Strong induction for natural numbers:
     max_leq_r : type:max_leq_r
 
     max_lub : type:max_lub
+
+    max_leq : type:max_leq
 
     max_eq_l : type:max_eq_l
 

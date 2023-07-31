@@ -158,7 +158,8 @@ in which they appear.
 ---
 
 [1] The claim that all non-principal solutions fall into these two
-categories is not currently proven.
+categories is not currently proven.  (Nor is it obvious even how
+to specify the two categories rigorously in general.)
 
 [2] For example, see: Gille Dowek, Th&eacute;r&egrave;se Hardin, Claude
 Kirchner, and Frank Pfenning. Unification via Explicit Substitutions:

@@ -254,6 +254,8 @@ Strong induction for natural numbers:
 
     min_glb : forall (m n p : nat) . p <= m -> p <= n -> p <= min m n
 
+    min_leq : forall (m m' n n' : nat) . m <= m' -> n <= n' -> min m n <= min m' n'
+
     min_eq_l : forall (m n : nat) . m <= n -> min m n = m : nat
 
     min_eq_r : forall (m n : nat) . n <= m -> min m n = n : nat
@@ -284,6 +286,8 @@ Strong induction for natural numbers:
     max_leq_r : forall (m n : nat) . n <= max m n
 
     max_lub : forall (m n p : nat) . m <= p -> n <= p -> max m n <= p
+
+    max_leq : forall (m m' n n' : nat) . m <= m' -> n <= n' -> max m n <= max m' n'
 
     max_eq_l : forall (m n : nat) . n <= m -> max m n = m : nat
 

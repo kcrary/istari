@@ -10,6 +10,7 @@
 - [`List`](lib/list.html)
 - [`Nat`](lib/nat.html)
 - [`Option`](lib/option.html)
+- [`Relations`](lib/relations.html)
 - [`Stable`](lib/stable.html)
 - [`Symbol`](lib/symbol.html)
 - [`Wtype`](lib/wtype.html) (well-founded types)
