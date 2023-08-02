@@ -1585,4 +1585,363 @@ destruct /x/ /{ | x }/ >> auto.
 qed ();
 
 
+
+(* Zip *)
+
+define /zip {a b} l1/
+/
+  list_iter a (fn _ . list b -> list (a & b))
+    (fn _ . nil)
+    (fn h1 _ f l2 .
+       list_case l2
+         nil
+         (fn h2 t2 . (h1 , h2) :: f t2))
+    l1
+//
+  intersect i . forall (a b : U i) . list a -> list b -> list (a & b)
+/;
+
+inference.
+unfold /zip/.
+typecheck.
+qed ();
+
+
+
+define /unzip {a b} l/
+/
+  list_iter (a & b) (fn _ . list a & list b)
+    (nil , nil)
+    (fn h _ p . (h #1 :: p #1 , h #2 :: p #2))
+    l
+//
+  intersect i . forall (a b : U i) . list (a & b) -> list a & list b
+/;
+
+inference.
+unfold /unzip/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  zip a b (nil _) _ --> nil (a & b) ;
+  zip a b (cons _ h1 t1) l2 --> list_case b (list (a & b)) l2 (nil (a & b)) (fn h2 t2 . cons (a & b) (h1 , h2) (zip a b t1 t2)) ;
+
+  unzip a b (nil _) --> (nil a , nil b) ;
+  unzip a b (cons _ h t) --> (cons a (h #1) (unzip a b t #1) , cons b (h #2) (unzip a b t #2)) ;
+  
+  unfolding zip unzip
+/;
+
+
+
+lemma "zip_unzip"
+/
+  forall i (a b : U i) (l : list (a & b)) .
+    zip (unzip l #1) (unzip l #2) = l : list (a & b)
+/;
+
+inference.
+intro /i a b l/.
+iterate /l/ >> auto.
+(* cons *)
+intro /h t IH/.
+compat >> auto.
+destruct /h/ /x y/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "unzip_zip"
+/
+  forall i (a b : U i) (l1 : list a) (l2 : list b) .
+    length l1 = length l2 : nat
+    -> unzip (zip l1 l2) = (l1 , l2) : (list a & list b)
+/;
+
+inference.
+intro /i a b l1/.
+iterate /l1/.
+
+(* nil *)
+{
+intro /l2 Hlen/.
+destruct /l2/ /| h t/ >> auto.
+reduce /Hlen/.
+injection /Hlen/.
+}
+
+(* cons *)
+{
+intro /h1 t1 IH l2 Hlen/.
+destruct /l2/ /| h2 t2/.
+  {
+  reduce /Hlen/.
+  injection /Hlen/.
+  }
+reduce //.
+reduce /Hlen/.
+injection /Hlen/.
+reintro /Hlen'/.
+rewrite /-> IH at all/ >> auto.
+}
+qed ();
+
+
+
+lemma "append_zip"
+/
+  forall i (a b : U i) (l1 l1' : list a) (l2 l2' : list b) .
+    length l1 = length l2 : nat
+    -> append (zip l1 l2) (zip l1' l2') = zip (append l1 l1') (append l2 l2') : list (a & b)
+/;
+
+inference.
+intro /i a b l1/.
+iterate /l1/.
+
+(* nil *)
+{
+intro /l1' l2 l2' Hlen/.
+destruct /l2/ /| h2 t2/.
+  {
+  reduce //.
+  reflexivity.
+  }
+
+  {
+  reduce /Hlen/.
+  injection /Hlen/.
+  }
+}
+
+(* cons *)
+{
+intro /h1 t1 IH l1' l2 l2' Hlen/.
+destruct /l2/ /| h2 t2/.
+  {
+  reduce /Hlen/.
+  injection /Hlen/.
+  }
+reduce //.
+reduce /Hlen/.
+injection /Hlen/.
+reintro /Hlen'/.
+compat.
+apply /IH/ >> auto.
+}
+qed ();
+
+
+
+lemma "append_unzip"
+/
+  forall i (a b : U i) (l l' : list (a & b)) .
+    append (unzip l #1) (unzip l' #1) = unzip (append l l') #1 : list a
+    & append (unzip l #2) (unzip l' #2) = unzip (append l l') #2 : list b
+/;
+
+inference.
+intro /i a b l l'/.
+iterate /l/.
+
+(* nil *)
+{
+auto.
+}
+
+(* cons *)
+{
+intro /h t (IH1 IH2)/.
+destruct /h/ /x y/.
+reduce //.
+split >> compat >> auto.
+}
+qed ();
+
+
+
+lemma "length_zip"
+/
+  forall i (a b : U i) (l1 : list a) (l2 : list b) .
+    length (zip l1 l2) = Nat.min (length l1) (length l2) : nat
+/;
+
+inference.
+intro /i a b l1/.
+iterate /l1/.
+
+(* nil *)
+{
+intro /l2/.
+rewrite /-> Nat.min_ann_l/.
+reflexivity.
+}
+
+(* cons *)
+{
+intro /h1 t1 IH1 l2/.
+destruct /l2/ /| h2 t2/.
+  {
+  reduce //.
+  rewrite /-> Nat.min_ann_r/.
+  reflexivity.
+  }
+reduce //.
+rewrite /-> Nat.min_succ/.
+compat.
+apply /IH1/.
+}
+qed ();
+
+
+
+lemma "length_unzip"
+/
+  forall i (a b : U i) (l : list (a & b)) .
+    length (unzip l #1) = length l : nat
+    & length (unzip l #2) = length l : nat
+/;
+
+inference.
+intro /i a b l/.
+iterate /l/ >> auto.
+(* cons *)
+intro /h t (IH1 IH2)/.
+rewrite /-> IH1 , -> IH2/.
+auto.
+qed ();
+
+
+
+lemma "reverse_zip"
+/
+  forall i (a b : U i) (l1 : list a) (l2 : list b) .
+    length l1 = length l2 : nat
+    -> reverse (zip l1 l2) = zip (reverse l1) (reverse l2) : list (a & b)
+/;
+
+inference.
+intro /i a b l1/.
+iterate /l1/.
+
+(* nil *)
+{
+intro /l2 Hlen/.
+reflexivity.
+}
+
+(* cons *)
+{
+intro /h1 t1 IH l2 Hlen/.
+destruct /l2/ /| h2 t2/.
+  {
+  reduce /Hlen/.
+  injection /Hlen/.
+  }
+reduce /Hlen/.
+injection /Hlen/.
+reintro /Hlen'/.
+reduce //.
+rewrite /<- append_zip/.
+  {
+  rewrite /-> length_reverse at all/.
+  hyp /Hlen'/.
+  }
+compat.
+apply /IH/ >> auto.
+}
+qed ();
+
+
+
+lemma "reverse_unzip"
+/
+  forall i (a b : U i) (l : list (a & b)) .
+    reverse (unzip l #1) = unzip (reverse l) #1 : list a
+    & reverse (unzip l #2) = unzip (reverse l) #2 : list b
+/;
+
+inference.
+intro /i a b l/.
+iterate /l/ >> auto.
+(* cons *)
+intro /h t (IH1 IH2)/.
+destruct /h/ /x y/.
+reduce //.
+rewrite /-> IH1 , -> IH2/.
+rewrite /<- append_unzip _# 5 #1/.
+rewrite /<- append_unzip _# 5 #2/.
+auto.
+qed ();
+
+
+
+lemma "nth_zip"
+/
+  forall lv (a b : U lv) (l1 : list a) (l2 : list b) (i : nat) .
+    nth (zip l1 l2) i
+    =
+    Option.bind
+      (nth l1 i)
+      (fn x .
+         Option.bind
+           (nth l2 i)
+           (fn y . Option.Some (x , y)))
+    : Option.option (a & b)
+/;
+
+inference.
+intro /lv a b l1/.
+iterate /l1/ >> auto.
+(* cons *)
+intro /h1 t1 IH l2 i/.
+destruct /l2/ /| h2 t2/.
+  {
+  reduce //.
+  generalize /nat_case _ _ _/ /_/ /z/.
+  destruct /z/ /{| z}/ >> reduce // >> reflexivity.
+  }
+reduce //.
+destruct /i/ /| i/.
+  {
+  reduce //.
+  reflexivity.
+  }
+reduce //.
+rewrite /-> IH/.
+reflexivity.
+qed ();
+
+
+
+lemma "nth_unzip"
+/
+  forall lv (a b : U lv) (l : list (a & b)) (i : nat) .
+    nth (unzip l #1) i = Option.map (fn x . x #1) (nth l i) : Option.option a
+    & nth (unzip l #2) i = Option.map (fn x . x #2) (nth l i) : Option.option b
+/;
+
+inference.
+intro /lv a b l/.
+iterate /l/ >> auto.
+(* cons *)
+intro /h t IH i/.
+destruct /i/ /| i/.
+  {
+  reduce //.
+  auto.
+  }
+reduce //.
+rewrite /-> IH i #1 , -> IH i #2/.
+auto.
+qed ();
+
+
+
 Namespace.endModule ();

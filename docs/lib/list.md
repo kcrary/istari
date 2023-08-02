@@ -99,11 +99,12 @@ A simpler case-analysis operation:
 ### Fold
 
     foldr : intersect (i : level) . forall (a b : U i) . b -> (a -> b -> b) -> list a -> b
-
+          (2 implicit arguments)
     foldr _ _ z _ (nil _) --> z
     foldr a b z f (cons _ h t) --> f h (foldr a b z f t)
 
     foldl : intersect (i : level) . forall (a b : U i) . b -> (a -> b -> b) -> list a -> b
+          (2 implicit arguments)
 
     foldl _ _ z _ (nil _) --> z
     foldl a b z f (cons _ h t) --> foldl a b (f h z) f t
@@ -118,6 +119,7 @@ A simpler case-analysis operation:
 ### Map
 
     map : intersect (i : level) . forall (a b : U i) . (a -> b) -> list a -> list b
+        (2 implicit arguments)
 
     map _ b _ (nil _) --> nil b
     map a b f (cons _ h t) --> cons b (f h) (map a b f t)
@@ -156,6 +158,7 @@ A simpler case-analysis operation:
 ### Reverse
 
     reverse : intersect (i : level) . forall (a : U i) . list a -> list a
+            (1 implicit argument)
 
     reverse a (nil _) --> nil a
     reverse a (cons _ h t) --> append a (reverse a t) (cons a h (nil a))
@@ -262,6 +265,7 @@ A simpler case-analysis operation:
 ### Nth
 
     nth : intersect (lv : level) . forall (a : U lv) . list a -> nat -> option a
+        (1 implicit argument)
 
     nth a (nil _) _ --> None a
     nth a (cons _ h t) i --> nat_case i (Some a h) (fn i' . nth a t i')
@@ -284,3 +288,60 @@ A simpler case-analysis operation:
 
     nth_In : forall (lv : level) (a : U lv) (l : list a) (i : nat) .
                 Option.option_case (nth l i) unit (fn x . In a x l)
+
+
+### Zip and Unzip
+
+    zip : intersect (i : level) . forall (a b : U i) . list a -> list b -> list (a & b)
+        (2 implicit arguments)
+
+    zip a b (nil _) _ --> nil (a & b)
+    zip a b (cons _ h1 t1) l2 --> list_case b (list (a & b)) 
+                                    l2 
+                                    (nil (a & b)) 
+                                    (fn h2 t2 . cons (a & b) (h1 , h2) (zip a b t1 t2))
+
+    unzip : intersect (i : level) . forall (a b : U i) . list (a & b) -> list a & list b
+          (2 implicit arguments)
+
+    unzip a b (nil _) --> (nil a , nil b)
+    unzip a b (cons _ h t) --> (cons a (h #1) (unzip a b t #1) , cons b (h #2) (unzip a b t #2))
+
+    zip_unzip : forall (i : level) (a b : U i) (l : list (a & b)) .
+                   zip (unzip l #1) (unzip l #2) = l : list (a & b)
+
+    unzip_zip : forall (i : level) (a b : U i) (l1 : list a) (l2 : list b) .
+                   length l1 = length l2 : nat -> unzip (zip l1 l2) = (l1 , l2) : (list a & list b)
+
+    append_zip : forall (i : level) (a b : U i) (l1 l1' : list a) (l2 l2' : list b) .
+                    length l1 = length l2 : nat
+                    -> append (zip l1 l2) (zip l1' l2')
+                         = zip (append l1 l1') (append l2 l2')
+                         : list (a & b)
+
+    append_unzip : forall (i : level) (a b : U i) (l l' : list (a & b)) .
+                      append (unzip l #1) (unzip l' #1) = unzip (append l l') #1 : list a
+                      & append (unzip l #2) (unzip l' #2) = unzip (append l l') #2 : list b
+
+    length_zip : forall (i : level) (a b : U i) (l1 : list a) (l2 : list b) .
+                    length (zip l1 l2) = Nat.min (length l1) (length l2) : nat
+
+    length_unzip : forall (i : level) (a b : U i) (l : list (a & b)) .
+                      length (unzip l #1) = length l : nat & length (unzip l #2) = length l : nat
+
+    reverse_zip : forall (i : level) (a b : U i) (l1 : list a) (l2 : list b) .
+                     length l1 = length l2 : nat
+                     -> reverse (zip l1 l2) = zip (reverse l1) (reverse l2) : list (a & b)
+
+    reverse_unzip : forall (i : level) (a b : U i) (l : list (a & b)) .
+                       reverse (unzip l #1) = unzip (reverse l) #1 : list a
+                       & reverse (unzip l #2) = unzip (reverse l) #2 : list b
+
+    nth_zip : forall (lv : level) (a b : U lv) (l1 : list a) (l2 : list b) (i : nat) .
+                 nth (zip l1 l2) i
+                   = Option.bind (nth l1 i) (fn x . Option.bind (nth l2 i) (fn y . Some (x , y)))
+                   : option (a & b)
+
+    nth_unzip : forall (lv : level) (a b : U lv) (l : list (a & b)) (i : nat) .
+                   nth (unzip l #1) i = Option.map (fn x . x #1) (nth l i) : option a
+                   & nth (unzip l #2) i = Option.map (fn x . x #2) (nth l i) : option b

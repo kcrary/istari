@@ -84,11 +84,12 @@ A simpler case-analysis operation:
 ### Fold
 
     foldr : type:foldr
-
+          imp:foldr
     foldr _ _ z _ (nil _) --> z
     foldr a b z f (cons _ h t) --> f h (foldr a b z f t)
 
     foldl : type:foldl
+          imp:foldl          
 
     foldl _ _ z _ (nil _) --> z
     foldl a b z f (cons _ h t) --> foldl a b (f h z) f t
@@ -101,6 +102,7 @@ A simpler case-analysis operation:
 ### Map
 
     map : type:map
+        imp:map
 
     map _ b _ (nil _) --> nil b
     map a b f (cons _ h t) --> cons b (f h) (map a b f t)
@@ -121,6 +123,7 @@ A simpler case-analysis operation:
 ### Reverse
 
     reverse : type:reverse
+            imp:reverse
 
     reverse a (nil _) --> nil a
     reverse a (cons _ h t) --> append a (reverse a t) (cons a h (nil a))
@@ -205,6 +208,7 @@ A simpler case-analysis operation:
 ### Nth
 
     nth : type:nth
+        imp:nth
 
     nth a (nil _) _ --> None a
     nth a (cons _ h t) i --> nat_case i (Some a h) (fn i' . nth a t i')
@@ -220,3 +224,41 @@ A simpler case-analysis operation:
     nth_map : type:nth_map
 
     nth_In : type:nth_In
+
+
+### Zip and Unzip
+
+    zip : type:zip
+        imp:zip
+
+    zip a b (nil _) _ --> nil (a & b)
+    zip a b (cons _ h1 t1) l2 --> list_case b (list (a & b)) 
+                                    l2 
+                                    (nil (a & b)) 
+                                    (fn h2 t2 . cons (a & b) (h1 , h2) (zip a b t1 t2))
+
+    unzip : type:unzip
+          imp:unzip
+
+    unzip a b (nil _) --> (nil a , nil b)
+    unzip a b (cons _ h t) --> (cons a (h #1) (unzip a b t #1) , cons b (h #2) (unzip a b t #2))
+
+    zip_unzip : type:zip_unzip
+
+    unzip_zip : type:unzip_zip
+
+    append_zip : type:append_zip
+
+    append_unzip : type:append_unzip
+
+    length_zip : type:length_zip
+
+    length_unzip : type:length_unzip
+
+    reverse_zip : type:reverse_zip
+
+    reverse_unzip : type:reverse_unzip
+
+    nth_zip : type:nth_zip
+
+    nth_unzip : type:nth_unzip
