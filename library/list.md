@@ -192,6 +192,10 @@ A simpler case-analysis operation:
 
     In_append : type:In_append
 
+    Forall_implies : type:Forall_implies
+
+    Exists_implies : type:Exists_implies
+
     Forall_map : type:Forall_map
 
     Exists_map : type:Exists_map

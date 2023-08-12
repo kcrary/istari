@@ -64,10 +64,15 @@ structure Inversion :> INVERSION =
                                 variables, so there won't be a dependency problem subsituted
                                 j for i.
                              *)
-                             EqualityTacticInternal.substMain false i n (T.Var j)
-                             >>!
-                             (* two hypotheses deleted: one equality, one variable *)
-                             injections (lid-2) stop (n-1)
+                             ifthenM
+                                (EqualityTacticInternal.substMain false i n (T.Var j))
+
+                                (* two hypotheses deleted: one equality, one variable *)
+                                (fn Primary => injections (lid-2) stop (n-1)
+                                  | pri => idtacM pri)
+
+                                (* substitution failed, skip it *)
+                                (lift (fn () => injections lid stop (n-1)))
                           else
                              injections lid stop (n-1))\
                              

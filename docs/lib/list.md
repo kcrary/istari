@@ -243,6 +243,12 @@ A simpler case-analysis operation:
     In_append : forall (i : level) (a : U i) (x : a) (l1 l2 : list a) .
                    In a x (append l1 l2) <-> In a x l1 % In a x l2
 
+    Forall_implies : forall (i : level) (a : U i) (P Q : a -> U i) (l : list a) .
+                        (forall (x : a) . P x -> Q x) -> Forall P l -> Forall Q l
+
+    Exists_implies : forall (i : level) (a : U i) (P Q : a -> U i) (l : list a) .
+                        (forall (x : a) . P x -> Q x) -> Exists P l -> Exists Q l
+
     Forall_map : forall (i : level) (a b : U i) (P : b -> U i) (f : a -> b) (l : list a) .
                     Forall P (map f l) <-> Forall (fn x . P (f x)) l
 
