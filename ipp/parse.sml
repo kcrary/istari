@@ -191,16 +191,30 @@ structure Parse :> PARSE =
             ("LEXEME", lexeme)
             ]
 
+         val location =
+            P.mapAll
+               (fn ((), i, _, vec) => 
+                   let
+                      val pos as (r, c) = getInputPos vec i
+                      val span = (pos, pos)
+                   in
+                      (S.Etuple [(S.Enumber r, span), (S.Enumber c, span)],
+                       span)
+                   end)
+               (P.return ())
       in
 
          val primitives =
+            (Symbol.fromValue "LOCATION", (fn _ => location))
+            ::
             map
                (fn (ident, f) =>
                    (Symbol.fromValue ident, (fn reserved => P.match (f reserved))))
                builtin
 
          val reservedNonterminals =
-            map (fn (ident, _) => Symbol.fromValue ident) builtin
+            Symbol.fromValue "LOCATION" 
+            :: map (fn (ident, _) => Symbol.fromValue ident) builtin
 
       end
 

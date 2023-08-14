@@ -6,8 +6,9 @@ opened.  The Istari server itself will start when the user begins
 processing the file, by calling `istari-start` or just by beginning to
 navigate the file.
 
-A listing of all the key commands discussed below can be obtained
-using `C-h m`.
+A listing of all the key commands discussed below appears at the end
+of this page.  A similar listing can also be obtained in Emacs using 
+`C-h m`.
 
 
 ### Navigation
@@ -28,6 +29,9 @@ One can interrupt Istari using `C-c C-c`.  One can terminate Istari
 using `C-c p t`.
 
 One can move the cursor to Istari's current position using `C-c .`.
+
+One can interject code (*i.e.,* execute code that does not appear in
+the file) using `C-c i`.
 
 
 
@@ -70,15 +74,31 @@ environment:
 
 - `C-c r a` will list all the constants currently loaded.
 
+By default, Istari will suppress displaying implicit arguments, and it
+will suppress displaying substitutions attached to evars.  These can
+be toggled using `C-c c i` and `C-c c s`, respectively.
+
 
 
 ### Reindentation
 
 Since Istari uses a user-customizable parser, it isn't easy to
 implement a smart indenter.  To reindent a block of code, place the
-cursor at the beginning of the first line, enter `C-c C-s` to set the
+cursor at the beginning of the first line, enter `C-c C-l` to set the
 initial indentation, adjust that first line to its desired column,
 then enter `M-i` to repeat that adjustment on subsequent lines.
+
+
+
+### Protection of executed code
+
+By default, code above Istari's current line is set to read only.  The
+user can toggle this using `C-c C-r`.  Use caution when editing code
+already-executed code.  If you insert or delete newlines above the
+current line, Istari's UI will become confused.
+
+Undo can alter the read-only region, because I don't know how to
+prevent it from doing so.
 
 
 
@@ -87,3 +107,37 @@ then enter `M-i` to repeat that adjustment on subsequent lines.
 By default, Istari auto-loads the Istari libraries.  To suppress this
 (such as when one is working on the libraries), use `C-c p l`.  This
 must be done before starting the server.
+
+
+
+### Key commands
+
+| Key command                      | Function                               |
+| -------------------------------- | -------------------------------------- |
+| `C-c C-n` or `[F4]`              | next line                              |
+| `C-c C-p` or `C-c C-u` or `[F5]` | previous line                          |
+| `C-c [return]` or `C-return`     | goto line                              |
+| `C-c .`                          | move cursor to current line            |
+|                                  |                                        |
+| `C-c l`                          | set initial indentation                |
+| `M-i`                            | reindent next line                     |
+| <code>M-&#124</code>             | insert and indent vertical bar         | 
+|                                  |                                        |
+| `C-c C-c`                        | interrupt                              |
+| `C-c i`                          | interject with IML code                |
+|                                  |                                        |
+| `C-c s`                          | show current goals                     |
+| `C-c S`                          | show current goals verbosely           |
+| `C-c C-d`                        | give detail on current goal            |
+|                                  |                                        |
+| `C-c r t`                        | give the type of a constant            |
+| `C-c r s`                        | give the type/definition of a constant |
+| `C-c r m`                        | list all constants in an Istari module |
+| `C-c r a`                        | list all constants                     |
+|                                  |                                        |
+| `C-c c i`                        | show implicit arguments                |
+| `C-c c s`                        | show substitutions                     |
+| `C-c C-r`                        | toggle read-only above current line    |
+|                                  |                                        |
+| `C-c p t`                        | terminate Istari                       |
+| `C-c p l`                        | toggle loading libraries               |

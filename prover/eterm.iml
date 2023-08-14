@@ -8,37 +8,36 @@ signature ETERM =
 
       exception Syntax of string
 
-      val var     : symbol -> eterm        (* always a variable *)
-      val short   : symbol -> eterm
-      val long    : symbol list -> eterm   (* always a constant *)
+      val var      : symbol -> eterm        (* always a variable *)
+      val short    : symbol -> eterm
+      val long     : symbol list -> eterm   (* always a constant *)
 
-      val shortExplicit : symbol -> eterm
-      val longExplicit : symbol list -> eterm
+      val explicit : eterm -> eterm
 
-      val const   : Constant.constant -> eterm
-      val lam     : binder -> eterm -> eterm
-      val lamann  : binder -> eterm -> eterm -> eterm
-      val app     : eterm -> eterm -> eterm
-      val pair    : eterm -> eterm -> eterm
-      val pi1     : eterm -> eterm
-      val pi2     : eterm -> eterm
-      val next    : eterm -> eterm
-      val prev    : eterm -> eterm
-      val triv    : eterm
-      val evar    : eterm
-      val integer : IntInf.int -> eterm
-      val symbol  : Symbol.symbol -> eterm
+      val const    : Constant.constant -> eterm
+      val lam      : binder -> eterm -> eterm
+      val lamann   : binder -> eterm -> eterm -> eterm
+      val app      : eterm -> eterm -> eterm
+      val pair     : eterm -> eterm -> eterm
+      val pi1      : eterm -> eterm
+      val pi2      : eterm -> eterm
+      val next     : eterm -> eterm
+      val prev     : eterm -> eterm
+      val triv     : eterm
+      val evar     : eterm
+      val integer  : IntInf.int -> eterm
+      val symbol   : Symbol.symbol -> eterm
 
-      val hole    : eterm
-      val marker  : symbol -> eterm
+      val hole     : eterm
+      val marker   : symbol -> eterm
 
-      val apply1  : Constant.constant -> eterm -> eterm
-      val apply2  : Constant.constant -> eterm -> eterm -> eterm
-      val apply3  : Constant.constant -> eterm -> eterm -> eterm -> eterm
-      val apply4  : Constant.constant -> eterm -> eterm -> eterm -> eterm -> eterm
+      val apply1   : Constant.constant -> eterm -> eterm
+      val apply2   : Constant.constant -> eterm -> eterm -> eterm
+      val apply3   : Constant.constant -> eterm -> eterm -> eterm -> eterm
+      val apply4   : Constant.constant -> eterm -> eterm -> eterm -> eterm -> eterm
 
-      val appn    : eterm -> eterm list -> eterm
-      val applyn  : Constant.constant -> eterm list -> eterm
+      val appn     : eterm -> eterm list -> eterm
+      val applyn   : Constant.constant -> eterm list -> eterm
 
       val additional : symbol option list -> eterm -> eterm
 
@@ -52,9 +51,8 @@ signature ETERM =
       (* subst M x N = [M/x] N *)
       val subst    : eterm -> symbol -> eterm -> eterm
 
-      val suppressImplicit : eterm -> eterm
-      val withidirExplicit : Directory.idirectory -> eterm -> Term.term
-      val withdirExplicit  : Directory.directory -> eterm -> Term.term
+      (* raises Syntax using the given location if the eterm contains an unbound variable *)
+      val withloc  : int * int -> eterm -> eterm
 
    end
 
@@ -91,11 +89,6 @@ structure ETerm :> ETERM =
                    T.Elim (m, loop n [])
                 end)
 
-      fun shortExplicit x _ dir =
-         (case D.lookup dir x of
-             D.Hvar i => T.Var i
-           | D.Hconst k => T.Const k)
-
       fun short x imps dir =
          (case D.lookup dir x of
              D.Hvar i =>
@@ -119,14 +112,6 @@ structure ETerm :> ETERM =
                            ]))
 
 
-      fun longExplicit syms _ _ =
-         (case Namespace.resolveOpt syms of
-             NONE =>
-                signalUnknownConstant syms
-
-           | SOME const =>
-                T.Const const)
-
       fun long syms imps _ =
          (case Namespace.resolveOpt syms of
              NONE =>
@@ -138,6 +123,7 @@ structure ETerm :> ETERM =
                 else
                    T.Const const)
          
+
       fun const const _ _ = T.Const const
 
       fun lam b m imps dir = 
@@ -222,12 +208,8 @@ structure ETerm :> ETERM =
 
       fun withdir dir m = m true (Directory.idir dir)
 
-      fun suppressImplicit m _ dir = m false dir
+      fun explicit m _ dir = m false dir
       
-      fun withidirExplicit idir m = m false idir
-
-      fun withdirExplicit dir m = m false (Directory.idir dir)
-
 
       fun absoluteMain from to depth m =
          (case Normalize.simplify m of
@@ -316,6 +298,23 @@ structure ETerm :> ETERM =
          T.Sub (en imps (D.ibind dir sym),
                 T.Dot (em imps dir, T.id))
 
+
+      fun withloc (r, c) m imps dir =
+         try
+            m imps dir
+         with
+            D.Unbound sym =>
+               raise (Syntax (String.concat
+                                 [
+                                 "unbound variable ",
+                                 Symbol.toValue sym,
+                                 " at ",
+                                 Int.toString r,
+                                 ".",
+                                 Int.toString c,
+                                 "."
+                                 ]))
+
    end
 
 
@@ -353,11 +352,11 @@ structure ParseTerm =
 
       val literal = T.literal
 
-      val short = T.short
-      val shortExplicit = T.shortExplicit
+      fun short pos sym = T.withloc pos (T.short sym)
+      fun shortExplicit pos sym = T.withloc pos (T.explicit (T.short sym))
       fun long strs = T.long (map Symbol.fromValue strs)
-      fun longExplicit strs = T.longExplicit (map Symbol.fromValue strs)
-      val var = T.var
+      fun longExplicit strs = T.explicit (T.long (map Symbol.fromValue strs))
+      fun var pos sym = T.withloc pos (T.var sym)
 
 
       fun level_plus n m =
@@ -530,7 +529,7 @@ structure ParseTerm =
       fun shortConstant sym = Namespace.resolve [sym]
       fun longConstant address = Namespace.resolve address
 
-      fun explicit m = T.suppressImplicit m
+      fun explicit m = T.explicit m
 
 
 
@@ -1138,7 +1137,7 @@ grammardef Term
    rule Level(0)  ::= NUMBER "+" Level(0) => level_plus
    rule Level(1)  ::= "[" Levels "]" => level_max
    rule Level(1)  ::= NUMBER => level_lit
-   rule Level(1)  ::= Ident => var
+   rule Level(1)  ::= LOCATION Ident => var
    rule Level(1)  ::= "(" Level(0) ")" => id
    rule Level(1)  ::= EMBED => id
 
@@ -1215,8 +1214,8 @@ grammardef Term
    rule Term(100) ::= EMBED => literal
    rule Term(100) ::= "e`" EMBED => id
    rule Term(100) ::= "l`" LTerm => literal
-   rule Term(100) ::= Ident => short
-   rule Term(100) ::= "`" AnyIdent => shortExplicit
+   rule Term(100) ::= LOCATION Ident => short
+   rule Term(100) ::= "`" LOCATION AnyIdent => shortExplicit
    rule Term(100) ::= LONGID => long
    rule Term(100) ::= "`" LONGID => longExplicit
    rule Term(100) ::= NUMBER => number

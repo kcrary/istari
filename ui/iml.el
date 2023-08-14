@@ -1,5 +1,5 @@
 ;; iml.el  Major mode for editing iml.
-;; Minimalistic (ie, predictable); just the way I like it.
+;; Minimalistic (ie, predictable)
 
 (defvar iml-indent-increment 3 "*Iml indentation increment.")
 (defvar iml-ignore-leading-bar t "*Whether indentation should ignore leading bars.")
@@ -19,7 +19,7 @@
 (defun define-iml-bindings-into-map (keymap)
   (define-key keymap "\t" 'iml-tab)
   (define-key keymap (kbd "<C-tab>") 'iml-backtab)
-  (define-key keymap "\C-c\C-s" 'iml-set-indent)
+  (define-key keymap "\C-c\C-l" 'iml-set-indent)
   (define-key keymap "\M-i" 'iml-repeat-indent)
   (define-key keymap "\M-|" 'iml-electric-bar)
   (define-key keymap "\C-\M-i" 'indent-relative))

@@ -7,20 +7,20 @@ signature FH_PARSE =
       type elem
       type 'a parser
 
-      val return   : 'a -> 'a parser
-      val fail     : 'a parser
-      val or       : 'a parser list -> 'a parser
-      val seqp     : 'a parser -> 'b parser -> ('a * 'b) parser
-      val seql     : 'a parser list -> 'a list parser
-      val match    : (elem -> 'a option) -> 'a parser
+      val return    : 'a -> 'a parser
+      val fail      : 'a parser
+      val or        : 'a parser list -> 'a parser
+      val seqp      : 'a parser -> 'b parser -> ('a * 'b) parser
+      val seql      : 'a parser list -> 'a list parser
+      val match     : (elem -> 'a option) -> 'a parser
 
-      val map      : ('a -> 'b) -> 'a parser -> 'b parser
-      val mapSpan  : ('a * int * int -> 'b) -> 'a parser -> 'b parser
-      val mapAll   : ('a * int * int * elem Vector.vector -> 'b) -> 'a parser -> 'b parser
+      val map       : ('a -> 'b) -> 'a parser -> 'b parser
+      val mapSpan   : ('a * int * int -> 'b) -> 'a parser -> 'b parser
+      val mapAll    : ('a * int * int * elem Vector.vector -> 'b) -> 'a parser -> 'b parser
 
-      val anchor   : 'a parser Susp.susp -> 'a parser
+      val anchor    : 'a parser Susp.susp -> 'a parser
 
-      val parse    : 'a parser -> elem list -> ('a, int) Sum.sum
+      val parse     : 'a parser -> elem list -> ('a, int) Sum.sum
 
    end
 
