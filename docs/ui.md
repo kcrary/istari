@@ -31,7 +31,7 @@ using `C-c p t`.
 One can move the cursor to Istari's current position using `C-c .`.
 
 One can interject code (*i.e.,* execute code that does not appear in
-the file) using `C-c i`.
+the file) using `C-c x`.
 
 
 
@@ -112,32 +112,35 @@ must be done before starting the server.
 
 ### Key commands
 
-| Key command                      | Function                               |
-| -------------------------------- | -------------------------------------- |
-| `C-c C-n` or `[F4]`              | next line                              |
-| `C-c C-p` or `C-c C-u` or `[F5]` | previous line                          |
-| `C-c [return]` or `C-return`     | goto line                              |
-| `C-c .`                          | move cursor to current line            |
-|                                  |                                        |
-| `C-c l`                          | set initial indentation                |
-| `M-i`                            | reindent next line                     |
-| <code>M-&#124</code>             | insert and indent vertical bar         | 
-|                                  |                                        |
-| `C-c C-c`                        | interrupt                              |
-| `C-c i`                          | interject with IML code                |
-|                                  |                                        |
-| `C-c s`                          | show current goals                     |
-| `C-c S`                          | show current goals verbosely           |
-| `C-c C-d`                        | give detail on current goal            |
-|                                  |                                        |
-| `C-c r t`                        | give the type of a constant            |
-| `C-c r s`                        | give the type/definition of a constant |
-| `C-c r m`                        | list all constants in an Istari module |
-| `C-c r a`                        | list all constants                     |
-|                                  |                                        |
-| `C-c c i`                        | show implicit arguments                |
-| `C-c c s`                        | show substitutions                     |
-| `C-c C-r`                        | toggle read-only above current line    |
-|                                  |                                        |
-| `C-c p t`                        | terminate Istari                       |
-| `C-c p l`                        | toggle loading libraries               |
+| Key command                      | Function                                   |
+| -------------------------------- | ------------------------------------------ |
+| `C-c C-n` or `[F4]`              | next line                                  |
+| `C-c C-p` or `C-c C-u` or `[F5]` | previous line                              |
+| `C-c [return]` or `C-return`     | goto line                                  |
+| `C-c .`                          | move cursor to current line                |
+|                                  |                                            |
+| `C-c l`                          | set initial indentation                    |
+| `M-i`                            | reindent next line                         |
+| <code>M-&#124</code>             | insert and indent vertical bar             | 
+|                                  |                                            |
+| `C-c C-c`                        | interrupt                                  |
+| `C-c x`                          | interject with IML code                    |
+|                                  |                                            |
+| `C-c s`                          | show current goals                         |
+| `C-c S`                          | show current goals verbosely               |
+| `C-c C-d`                        | give detail on current goal                |
+|                                  |                                            |
+| `C-c r t`                        | give the type of a constant                |
+| `C-c r s`                        | give the type and definition of a constant |
+| `C-c r m`                        | list all constants in an Istari module     |
+| `C-c r a`                        | list all constants                         |
+|                                  |                                            |
+| `C-c i a`                        | insert applications for a constant         |
+| `C-c i i`                        | insert introductions for the current goal  |
+|                                  |                                            |
+| `C-c c i`                        | show implicit arguments                    |
+| `C-c c s`                        | show substitutions                         |
+| `C-c C-r`                        | toggle read-only above current line        |
+|                                  |                                            |
+| `C-c p t`                        | terminate Istari                           |
+| `C-c p l`                        | toggle loading libraries                   |

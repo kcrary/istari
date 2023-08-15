@@ -7,6 +7,11 @@ signature REPORT =
       val show : Namespace.address -> unit
       val showType : Namespace.address -> unit
 
+      (* These require the UI. *)
+
+      val insertApp : Namespace.address -> unit
+      val insertIntros : unit -> unit
+
    end
 
 
@@ -74,98 +79,154 @@ structure Report :> REPORT =
             print "Module does not exist.\n\n"
 
 
-      fun show addr =
+
+      fun argumentCount a acc =
+         termCase a
+         /| \Prim.intersect\ _ (fn . ?) =>
+            \(fnc b => argumentCount b acc)\
+
+          | \Prim.forall\ _ (fn . ?) =>
+            \(fnc b => argumentCount b (1 + acc))\
+
+          | _ =>
+            \(fnc => acc)\
+         /
+
+
+      fun beginInsert () = print "\x01i"
+      fun endInsert () = print "\x02"
+
+      fun showConstant showDef showApp addr =
          (case Namespace.resolveOpt addr of
              NONE =>
                 print "\nNo such constant.\n"
 
            | SOME const =>
-                (
-                print "\n";
-                print (Namespace.toString const);
-
                 let
-                   val implicits =
-                      (case Database.findImplicits const of
-                          0 => []
+                   val implicits = Database.findImplicits const
 
-                        | n =>
-                             [Int.toString n ^ " implicit arguments"])
+                   val topt =
+                      (case Database.findType const of
+                          NONE => NONE
+
+                        | SOME (jud, _) =>
+                             if Seq.null (Judgement.context jud) then
+                                termCase (Judgement.concl jud)
+                                /| \Prim.ov\ ? \const\ =>
+                                   \(fnc a => SOME a)\
+      
+                                 | _ =>
+                                   \(fnc => NONE)\
+                                /
+                             else
+                                NONE)
                 in
-                   (case String.concatWith ", " implicits of
-                       "" =>
-                          print "\n"
+                   print "\n";
+                   print (Namespace.toString const);
 
-                     | str =>
+                   if implicits = 0 then
+                      print "\n"
+                   else
+                      (
+                      print "  [";
+                      print (Int.toString implicits);
+                      print " implicit arguments]\n"
+                      );
+
+                   if showDef then
+                      (case Constant.definition const of
+                          NONE => ()
+      
+                        | SOME m =>
+                             Show.showPrefixed "  = " Directory.empty m)
+                   else
+                      ();
+
+                   (case topt of
+                       NONE =>
+                          print " is untyped.\n"
+
+                     | SOME t =>
                           (
-                          print "  [";
-                          print str;
-                          print "]\n"
+                          Show.showPrefixed "  : " Directory.empty t;
+
+                          if showApp then
+                             (
+                             beginInsert ();
+                             (case Int.max 0 (argumentCount t 0 - implicits) of
+                                 0 => print " "
+
+                               | 1 => print " _ "
+
+                               | n =>
+                                    (
+                                    print " _# ";
+                                    print (Int.toString n);
+                                    print " "
+                                    ));
+                             endInsert ()
+                             )
+                          else 
+                             ()
                           ))
-                end;
+                end)
+                          
 
-                (case Constant.definition const of
-                    NONE => ()
-
-                  | SOME m =>
-                       Show.showPrefixed "  = " Directory.empty m);
-
-                (case Database.findType const of
-                    NONE => ()
-
-                  | SOME (jud, _) =>
-                       if Seq.null (Judgement.context jud) then
-                          termCase (Judgement.concl jud)
-                          /| \Prim.ov\ ? \const\ =>
-                             \(fnc a =>
-                                  Show.showPrefixed "  : " Directory.empty a)\
-
-                           | _ =>
-                             \(fnc => print "  : (nonstandard)\n")\
-                          /
-                       else
-                          print "  : (nonstandard)\n")
-                ))
+      val show = showConstant true false
+      val showType = showConstant false false
+      val insertApp = showConstant false true
 
 
-      fun showType addr =
-         (case Namespace.resolveOpt addr of
-             NONE =>
-                print "\nNo such constant.\n"
 
-           | SOME const =>
-                (
-                print "\n";
-                print (Namespace.toString const);
+      fun generateIntros dir a acc =
+         termCase a
+         /| ( \Prim.intersect\ _ (fn ? . ?)
+            | \Prim.forall\ _ (fn ? . ?)
+            | \Prim.lett\ _ (fn ? . ?)
+            ) =>
+            \(fnc binder b =>
+                 let
+                    val (sym, dir') = Directory.varyAndBind dir binder
+                 in
+                    generateIntros dir' b (sym :: acc)
+                 end)\
 
-                (case Database.findType const of
-                    NONE =>
-                       print " is untyped.\n"
+          | \Prim.arrow\ _ ? =>
+            \(fnc b =>
+                 let
+                    val (sym, dir') = Directory.freshAndBind dir
+                 in
+                    generateIntros dir' b (sym :: acc)
+                 end)\
 
-                  | SOME (jud, _) =>
-                       (
-                       (case Database.findImplicits const of
-                           0 => print "\n"
+          | _ =>
+            \(fnc => List.rev acc)\
+         /
 
-                         | n =>
-                              (
-                              print "  [";
-                              print (Int.toString n);
-                              print " implicit arguments]\n"
-                              ));
+      fun insertIntros () =
+         let
+            val (jud, dir) = Prover.currentGoal ()
+            val syms = generateIntros dir (Judgement.concl jud) []
+         in
+            (case syms of
+                [] => ()
 
-                       if Seq.null (Judgement.context jud) then
-                          termCase (Judgement.concl jud)
-                          /| \Prim.ov\ ? \const\ =>
-                             \(fnc a =>
-                                  Show.showPrefixed "  : " Directory.empty a)\
+              | sym :: rest =>
+                   (
+                   beginInsert ();
+       
+                   print (Symbol.toValue sym);
 
-                           | _ =>
-                             \(fnc => print "  : (nonstandard)\n")\
-                          /
-                       else
-                          print "  : (nonstandard)\n")
-                       )
-                ))
+                   List.app
+                      (fn sym =>
+                          (
+                          print " ";
+                          print (Symbol.toValue sym)
+                          ))
+                      rest;
+       
+                   endInsert ()
+                   ))
+         end
 
    end

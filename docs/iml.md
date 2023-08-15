@@ -233,6 +233,19 @@ interpreting it as a comment (*e.g.,* `( * )`).
 
 
 
+### Strings
+
+IML's string escapes are:
+
+| escape                    | meaning                   |
+| ------------------------- | ------------------------- |
+| `\n`                      | newline                   |
+| `\"`                      | quotation mark            |
+| `\\`                      | backslash                 |
+| `\x[two hex digits]`      | indicated ASCII character |
+| `\[nonempty whitespace]\` | omitted                   |
+
+
 
 ### Other omissions
 

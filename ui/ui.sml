@@ -10,6 +10,7 @@
    ^A p ^B           : set glyph to ready-partial
    ^A w ^B           : set glyph to working
    ^A f ^B           : flush
+   ^A i <text> ^B    : insert text into buffer
 
    UI -> REPL
    ----------

@@ -35,7 +35,7 @@
 (define-key istari-mode-map [f5] 'istari-next)
 (define-key istari-mode-map "\C-c\C-m" 'istari-goto)
 (define-key istari-mode-map [3 C-return] 'istari-goto)
-(define-key istari-mode-map "\C-ci" 'istari-interject)
+(define-key istari-mode-map "\C-cx" 'istari-interject)
 (define-key istari-mode-map (kbd "C-c C-.") 'istari-goto-marker)
 (define-key istari-mode-map "\C-c\C-c" 'istari-interrupt)
 (define-key istari-mode-map "\C-c\C-r" 'istari-read-only)
@@ -52,6 +52,8 @@
 (define-key istari-mode-map "\C-crm" 'istari-report-module)
 (define-key istari-mode-map "\C-crs" 'istari-report-show)
 (define-key istari-mode-map "\C-crt" 'istari-report-type)
+(define-key istari-mode-map "\C-cia" 'istari-insert-application)
+(define-key istari-mode-map "\C-cii" 'istari-insert-intros)
 (define-key istari-mode-map "\C-cci" 'istari-show-implicits)
 (define-key istari-mode-map "\C-ccs" 'istari-show-substitutions)
 
@@ -175,6 +177,8 @@
       (forward-line (- line 1))
       (point))))
 
+(defvar ist-permit-insert nil)
+
 (defun ist-escape (str)
   (let ((code (elt str 0)))
     (cond
@@ -192,7 +196,16 @@
      ((eq code ?m)
       (message "%s" (substring str 1)))
      ((eq code ?b)
-      (ding)))))
+      (ding))
+     ((eq code ?i)
+      (if ist-permit-insert
+          (progn
+            (condition-case err
+                (insert (substring str 1))
+              (error (progn 
+                       (ding)
+                       (message (format "Error inserting: %s" err)))))
+            (setq ist-permit-insert nil)))))))
 
 (defvar ist-output-buffer)
 (defvar ist-output-window)
@@ -430,6 +443,17 @@
     (message "Loading libraries disabled")))
 
 
+;; This is to make (thing-at-point 'longid) work
+
+(defun skip-longid-forward (&optional arg)
+  (if
+      (and arg (< arg 0))
+      (skip-syntax-backward "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'_.")
+  (skip-syntax-forward "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'_.")))
+
+(put 'longid 'forward-op 'skip-longid-forward)
+
+
 ;; Utilities
 
 (defun istari-detail ()
@@ -459,12 +483,14 @@
 
 (defun istari-report-show (str)
   "Report the definition and type of a constant."
-  (interactive "MConstant: ")
+  (interactive
+   (list (read-from-minibuffer "Constant: " (thing-at-point 'longid))))
   (istari-interject (concat "Report.show (parseLongident /" str "/);")))
   
 (defun istari-report-type (str)
   "Report the type of a constant."
-  (interactive "MConstant: ")
+  (interactive
+   (list (read-from-minibuffer "Constant: " (thing-at-point 'longid))))
   (istari-interject (concat "Report.showType (parseLongident /" str "/);")))
 
 (defun istari-show-implicits ()
@@ -476,5 +502,18 @@
   "Toggle showing substitutions."
   (interactive)
   (istari-interject "Show.showSubstitutions := not (!Show.showSubstitutions); if !Show.showSubstitutions then print \"Display of evar substitutions enabled.\\n\" else print \"Display of evar substitutions disabled.\\n\";"))
+
+(defun istari-insert-application (str)
+  "Insert application for a constant."
+  (interactive
+   (list (read-from-minibuffer "Constant: " (thing-at-point 'longid))))
+  (istari-interject (concat "Report.insertApp (parseLongident /" str "/);"))
+  (setq ist-permit-insert t))
+
+(defun istari-insert-intros ()
+  "Insert intros for the current goal."
+  (interactive)
+  (istari-interject "Report.insertIntros ();")
+  (setq ist-permit-insert t))
 
 (run-hooks 'istari-hook)
