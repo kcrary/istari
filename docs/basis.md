@@ -14,4 +14,5 @@
 - [`Option`](basis/option.html)
 - [`String`](basis/string.html)
 - [`TextIO`](basis/text-io.html)
+- [`Vector`](basis/vector.html)
 - [`Word`](basis/word.html)

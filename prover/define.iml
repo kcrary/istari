@@ -674,8 +674,10 @@ structure ParseDefine =
       fun sing x = [x]
       fun cons x y = x :: y
 
-      fun definePattern name expargs = (name, [], expargs)
-      fun definePatternImplicits name impargs expargs = (name, impargs, expargs)
+      fun grouped_simple l = ([], l)
+      fun grouped l l' = (l, l')
+
+      fun definePattern name (impargs, expargs) = (name, impargs, expargs)
 
       fun reduce1Pattern head args rhs = (head, args, rhs)
       fun reduce2Pattern head1 args1 head2 args2 args3 rhs = (head1, args1, head2, args2, args3, rhs)
@@ -695,8 +697,10 @@ grammardef Define
 
    open ParseDefine
 
-   rule DefinePattern    ::= Ident OIdents => definePattern
-   rule DefinePattern    ::= Ident "{" OIdents "}" OIdents => definePatternImplicits
+   rule GroupedOIdents   ::= OIdents => grouped_simple
+   rule GroupedOIdents   ::= "{" OIdents "}" OIdents => grouped
+
+   rule DefinePattern    ::= Ident GroupedOIdents => definePattern
 
    rule Reduce1Pattern   ::= Constant OIdents "-->" Term => reduce1Pattern
    rule Reduce2Pattern   ::= Constant OIdents "(" Constant OIdents ")" OIdents "-->" Term => reduce2Pattern

@@ -9,6 +9,7 @@ module type LIST = Smlbasis_sig.LIST
 module type LIST_PAIR = Smlbasis_sig.LIST_PAIR
 module type OPTION = Smlbasis_sig.OPTION
 module type ARRAY = Smlbasis_sig.ARRAY
+module type VECTOR = Smlbasis_sig.VECTOR
 module type MONO_ARRAY = Smlbasis_sig.MONO_ARRAY
 module type MONO_ARRAY_SLICE = Smlbasis_sig.MONO_ARRAY_SLICE
 module type IO = Smlbasis_sig.IO
@@ -30,6 +31,7 @@ module List : LIST with type 'a list = 'a list
 module ListPair : LIST_PAIR
 module Option : OPTION with type 'a option = 'a option
 module Array : ARRAY with type 'a array = 'a array
+module Vector : VECTOR
 module Word8Array : MONO_ARRAY with type elem = Word8.word with type array = Word8.word array
 module Word8ArraySlice : MONO_ARRAY_SLICE with type elem = Word8.word with type array = Word8.word array with type slice = (Word8.word array * int * int)
 module IO : IO

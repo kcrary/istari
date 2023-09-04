@@ -19,50 +19,99 @@ typedef
 
 
 
-
-
-
-
-defineRaw /treesize a n x/
+define /strange a/
 /
-  tree_iter a
-    (fn _ _ . nat)
-    (fn _ _ . nat)
-    0
-    (fn _ _ _ m . (succ m))
-    (fn _ _ m . m)
-    0
-    (fn _ _ _ m1 _ m2 . m1 + m2)
-    n
-    x
+  fnind strange : tree [a] __ -> nat of
+  | One _ _ . 1
+  | Node n _ _ . succ n
+  | _ . 0
+
+  and strange' : forall (x : forest n) . x = x : forest a n of
+  | _ . ()
+//
+  intersect i .  forall (a : U i) n . tree a n -> nat
 /;
 
+inference.
+unfold /strange/.
+typecheck.
+qed ();
 
 
-defineRaw /forestsize a n x/
+
+defineInd /a/
 /
-  forest_iter a
-    (fn _ _ . nat)
-    (fn _ _ . nat)
-    0
-    (fn _ _ _ m . (succ m))
-    (fn _ _ m . m)
-    0
-    (fn _ _ _ m1 _ m2 . m1 + m2)
-    n
-    x
+  treesize : tree [a] __ -> nat of
+  | Empty . 0
+  | Node _ x f . succ (forestsize f)
+  | One _ t . treesize t
+  
+  and
+  forestsize : forest __ -> nat of
+  | Nil . 0
+  | Cons _ _ t f . treesize t + forestsize f
+//
+  intersect i . forall (a : U i) n . tree a n -> nat
+  and
+  intersect i . forall (a : U i) n . forest a n -> nat
 /;
 
 
 
-reductions /
-treesize _ _ (Empty _) --> 0 ;
-treesize a _ (Node _ n _ x) --> succ (forestsize a n x) ;
-treesize a _ (One _ n x) --> treesize a n x ;
-forestsize _ _ (Nil _) --> 0 ;
-forestsize a _ (Cons _ m n x y) --> treesize a m x + forestsize a n y ;
-unfolding treesize forestsize
+lemma "tree_case"
+/
+  forall i (a : U i) n (t : tree a (succ n)) .
+    0 < (case t : tree of
+         | Empty . 0
+         | _ . 1)
 /;
+
+inference.
+intro /i a n t/.
+destruct /t/ /{}/.
+  {
+  omega.
+  }
+
+  {
+  reduce //.
+  omega.
+  }
+
+  {
+  reduce //.
+  omega.
+  }
+qed ();
+
+
+
+lemma "tree_case_annot"
+/
+  forall i (a : U i) n (t : tree a (succ n)) .
+    (case t : tree :> U i of
+     | Empty . void
+     | _ . unit)
+/;
+
+inference.
+intro /i a n t/.
+destruct /t/ /{}/.
+  {
+  omega.
+  }
+
+  {
+  reduce //.
+  split.
+  }
+
+  {
+  reduce //.
+  split.
+  }
+qed ();
+
 
 
 lemma "destructThin"
@@ -157,37 +206,6 @@ inversion /t/.
   split.
   }
 qed ();
-
-
-
-lemma "treesize_type"
-/
-  treesize :
-  intersect i .
-  forall (a : U i) n . tree a n -> nat
-/;
-
-inference.
-introOf /i a n x/.
-unfold /treesize/.
-typecheck.
-qed ();
-recordTyping "treesize_type";
-
-
-lemma "forestsize_type"
-/
-  forestsize :
-  intersect i .
-  forall (a : U i) n . forest a n -> nat
-/;
-
-inference.
-introOf /i a n x/.
-unfold /forestsize/.
-typecheck.
-qed ();
-recordTyping "forestsize_type";
 
 
 
@@ -504,4 +522,3 @@ apply /dof_app b/.
   hyp /Hy/.
   }
 qed ();
-

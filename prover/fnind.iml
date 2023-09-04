@@ -1,0 +1,888 @@
+
+signature FNIND =
+   sig
+
+      type symbol = Symbol.symbol
+      type address = Namespace.address
+      type eterm = ETerm.eterm
+
+      type arm = 
+         (* in non-default arms *)
+            (
+            address                 (* constructor name *)
+            *
+            symbol option list      (* constructor arguments *)
+            ) option
+         *
+         eterm                      (* body *)
+
+      type func =
+         symbol                     (* function name *)
+         * 
+         address                    (* datatype name *)
+         * 
+         eterm list option          (* pervasive arguments *)
+         *
+         symbol option list option  (* index arguments *)
+         *
+         symbol option              (* function argument *)
+         *
+         eterm                      (* result type (hole means cannot depend on index args or argument *)
+         *
+         arm list                   (* arms *)
+
+      val fnind : func list -> eterm
+      val indcase : eterm -> symbol list -> eterm option -> arm list -> eterm
+
+      val defineInd : symbol option list * symbol option list -> func list -> ETerm.eterm list -> unit
+
+   end
+
+
+structure Fnind :> FNIND =
+   struct
+
+      structure D = Directory
+      structure E = ETermInternal
+      structure T = Term
+      structure R = Reduction
+
+      type symbol = Symbol.symbol
+      type address = Namespace.address
+      type eterm = ETerm.eterm
+
+      exception Syntax = SyntaxError.Syntax
+
+      structure CD = SplayDict (structure Key = Constant.Ordered)
+
+
+      type arm = 
+         (* in non-default arms *)
+            (
+            address                 (* constructor name *)
+            *
+            symbol option list      (* constructor arguments *)
+            ) option
+         *
+         eterm                      (* body *)
+
+      type func =
+         symbol                     (* function name *)
+         * 
+         address                    (* datatype name *)
+         * 
+         eterm list option          (* pervasive arguments *)
+         *
+         symbol option list option  (* index arguments *)
+         *
+         symbol option              (* function argument *)
+         *
+         eterm                      (* result type (hole means cannot depend on index args or argument *)
+         *
+         arm list                   (* arms *)
+
+
+
+      fun signalError name msgs =
+         raise (Syntax (String.concat
+                           ([
+                            "In inductive function ",
+                            Symbol.toValue name,
+                            ", "
+                            ] @ msgs)))
+
+
+      fun addressToString addr = String.concatWith "." (List.map Symbol.toValue addr)
+
+
+      fun repeat n f acc =
+         if n = 0 then
+            acc
+         else
+            repeat (n-1) f (f acc)
+
+
+      fun mapVectorToList f vec =
+         List.tabulate
+            (Vector.length vec)
+            (fn i => f (Vector.sub vec i))
+
+
+      fun appVectorAndList f vec l =
+         List.appi
+            (fns i y => f (Vector.sub vec i) y)
+            l
+
+
+      fun elim m spine =
+         (case spine of
+             [] => m
+
+           | _ :: _ => T.Elim (m, spine))
+
+      
+      val zilch = Symbol.fromValue ""
+
+
+      exception Recurse
+
+      (* name of the function being recursed with,
+         its argument's datatype,
+         the number of its argument's datatype,
+         the name of the function in which recursion is invoked,
+         the vector indicating internal/external arguments, and the number of internal arguments, innermost arg first
+         the depth that corr lives in
+      *)
+      fun recurse fname dtarg dtnum callname corr depth dir spine =
+         try
+            (case spine of
+                [] =>
+                   raise Recurse
+
+              | T.App m :: restspine =>
+                   (case Normalize.simplify m of
+                       T.Elim (T.Var i, []) =>
+                          (try
+                              (case Vector.sub corr (i - (D.isize dir - depth)) of
+                                  NONE =>
+                                     raise Recurse
+ 
+                                | SOME dtnum' =>
+                                     if dtnum = dtnum' then
+                                        (* recursive result variable is always immediately after the subterm variable *)
+                                        elim (T.Var (i-1)) restspine
+                                     else
+                                        raise Recurse)
+                           with
+                              Invalid _ => raise Recurse)
+
+                     | _ =>
+                          raise Recurse)
+
+              | _ =>
+                   raise Recurse)
+         with
+            Recurse =>
+               signalError callname ["recursive call using ",
+                                     Symbol.toValue fname,
+                                     " must be applied to an immediate subterm in type family ",
+                                     Namespace.toString dtarg,
+                                     "."]
+
+
+      fun elabFnind funcs special dir imps =
+         (case funcs of
+             [] => raise (Invalid "empty fnind")
+
+           | (fname1, dt1, _, _, _, _, _) :: _ =>
+                let
+                   val dt1const =
+                      try
+                         Namespace.resolve dt1
+                      with
+                         Namespace.Namespace _ =>
+                            signalError fname1 ["type ", addressToString dt1, " is unbound."]
+                in
+                   (case Datatype.info dt1const of
+                       NONE =>
+                          signalError fname1 [addressToString dt1, " is not a datatype."]
+   
+                     | SOME (n1, bundle as (_, nPerv, nDts, dtinfo)) =>
+                          let
+                             val pervs =
+                                List.foldl
+                                   (fns (fname, _, pervs', _, _, _, _) pervs =>
+                                       (case (pervs', pervs) of
+                                           (NONE, _) => pervs
+
+                                         | (SOME l, NONE) => 
+                                              if List.length l = nPerv then
+                                                 SOME (List.map
+                                                          (fn em => T.App (E.expose em special dir imps []))
+                                                          l)
+                                              else
+                                                 signalError fname [Int.toString nPerv,
+                                                                    " pervasive arguments were expected."]
+
+                                         | (SOME _, SOME _) =>
+                                              signalError fname ["pervasive arguments specified multiple times."]))
+                                   NONE
+                                   funcs
+
+                             val pervs' =
+                                (case pervs of
+                                    NONE =>
+                                       repeat nPerv
+                                          (fn l => T.App (T.evar ()) :: l)
+                                          []
+          
+                                  | SOME l => l)
+
+                             val dict =
+                                List.foldl
+                                   (fns (fname, dt, _, indices, arg, rhs, arms) dict =>
+                                       let
+                                          val dtconst =
+                                             try
+                                                Namespace.resolve dt
+                                             with
+                                                Namespace.Namespace _ =>
+                                                   signalError fname ["type ", addressToString dt, " is unbound."]
+
+                                          fun collectArms arms armdict =
+                                             (case arms of
+                                                 [] =>
+                                                    (armdict, NONE)
+                       
+                                               | [(NONE, body)] =>
+                                                    (armdict, SOME body)
+                       
+                                               | (SOME (constr, args), body) :: rest =>
+                                                    let
+                                                       val const =
+                                                          try 
+                                                             Namespace.resolve constr
+                                                          with
+                                                             Namespace.Namespace _ =>
+                                                                signalError fname ["constructor ", 
+                                                                                   addressToString constr,
+                                                                                   " is unbound."]
+                                                    in
+                                                       collectArms rest
+                                                          (CD.insertMerge armdict const (args, body)
+                                                              (fn _ =>
+                                                                  signalError fname ["redundant arm for constructor ",
+                                                                                     addressToString constr,
+                                                                                     "."]))
+                                                    end
+                       
+                                               | (NONE, _) :: _ :: _ =>
+                                                    signalError fname ["default arm must be last."])
+
+                                          val (armdict, default) = collectArms arms CD.empty
+                                       in
+                                          CD.insertMerge dict dtconst 
+                                             (fname, indices, arg, rhs, armdict, default)
+                                             (fn _ => 
+                                                 raise (Syntax (String.concat
+                                                                   [
+                                                                   "In inductive function, redundant function ",
+                                                                   Symbol.toValue fname,
+                                                                   " for datatype ",
+                                                                   addressToString dt,
+                                                                   "."
+                                                                   ])))
+                                       end)
+                                   CD.empty
+                                   funcs
+
+                             val preds =
+                                mapVectorToList
+                                   (fn (dt, _, nIndex, _, _) =>
+                                       T.App $
+                                       (case CD.find dict dt of
+                                           NONE =>
+                                              (* this datatype has no function, give it a trivial one *)
+                                              repeat nIndex
+                                                 (fn m => T.Lam (NONE, m))
+                                                 (T.Lam (NONE, T.Const Prim.unit))
+
+                                         | SOME (fname, indices, arg, rhs, _, _) =>
+                                              let
+                                                 val (indicesfn, dir') =
+                                                    (case indices of
+                                                        NONE =>
+                                                           (repeat nIndex (fn m => T.Lam (NONE, m)),
+                                                            D.ibind0s dir nIndex)
+
+                                                      | SOME l =>
+                                                           if List.length l = nIndex then
+                                                              ((fn m =>
+                                                                   List.foldr
+                                                                      (fns binder m' => T.Lam (binder, m'))
+                                                                      m
+                                                                      l),
+                                                               D.ibindhs dir l)
+                                                           else
+                                                              signalError fname [Int.toString nIndex,
+                                                                                 " index arguments were expected."])
+
+                                                 val dir' = D.ibindh dir' arg
+
+                                                 val rhs' =
+                                                    let
+                                                       val t = Normalize.simplify $ E.expose rhs special dir' imps []
+                                                    in
+                                                       (case t of
+                                                           T.Marker sym =>
+                                                              if Symbol.eq (sym, zilch) then
+                                                                 (* result does not depend on indices or arg *)
+                                                                 T.Sub (T.evar (), T.Shift (nIndex + 1))
+                                                              else
+                                                                 t
+
+                                                         | _ => t)
+                                                    end
+                                              in
+                                                 indicesfn (T.Lam (arg, rhs'))
+                                              end))
+                                   dtinfo
+
+                             (* newspecials are things to be inserted into special, once given callname, corr, and depth
+                                recdir removes the recursive functions since dir takes priority over special
+                             *)
+                             val (newspecials, recdir, _, i) =
+                                Vector.foldl
+                                   (fns (dt, _, _, _, _) (newspecials, recdir, set, i) =>
+                                       (case CD.find dict dt of
+                                           NONE =>
+                                              (newspecials, recdir, set, i+1)
+
+                                         | SOME (fname, _, _, _, _, _) =>
+                                              if SymbolSet.member set fname then
+                                                 signalError fname ["name is used multiple times"]
+                                              else
+                                                 ((fname, recurse fname dt i) :: newspecials,
+                                                  D.iremove recdir fname,
+                                                  SymbolSet.insert set fname,
+                                                  i+1)))
+                                   ([], dir, SymbolSet.empty, 0)
+                                   dtinfo
+
+                             val (allarms, dict') =
+                                Vector.foldr
+                                   (fns (dt, _, _, nConstr, constrs) (allarms, dict) =>
+                                       (case CD.find dict dt of
+                                           NONE =>
+                                              (* no function, give it trivial arms *)
+                                              (mapVectorToList
+                                                  (fn (_, _, sorts, _) =>
+                                                      T.App $
+                                                      List.foldr
+                                                         (fns sort m =>
+                                                             (case sort of
+                                                                 NONE => T.Lam (NONE, m)
+
+                                                               | SOME _ => T.Lam (NONE, T.Lam (NONE, m))))
+                                                         T.Triv
+                                                         sorts)
+                                                  constrs
+                                                  @ allarms,
+                                               dict)
+
+                                         | SOME (fname, _, _, _, armdict, default) =>
+                                              let
+                                                 val default' =
+                                                    Option.map
+                                                       (fn e => E.expose e special dir imps [])
+                                                       default
+
+                                                 val (thesearms, armdict') =
+                                                    Vector.foldr
+                                                       (fns (const, nArgs, sorts, _) (thesearms, armdict) =>
+                                                           (case CD.find armdict const of
+                                                               NONE =>
+                                                                  (* no arm, use default *)
+                                                                  (case default' of
+                                                                      NONE =>
+                                                                         signalError fname ["constructor ",
+                                                                                            Namespace.toString const,
+                                                                                            " is not covered."]
+  
+                                                                    | SOME m =>
+                                                                         let
+                                                                            val totalargs =
+                                                                               List.foldl
+                                                                                  (fns sort totalargs =>
+                                                                                      (case sort of
+                                                                                          NONE => totalargs+1
+                                                                                        | SOME _ => totalargs+2))
+                                                                                  0
+                                                                                  sorts
+                                                                         in
+                                                                            (T.App
+                                                                                (repeat totalargs
+                                                                                    (fn n => T.Lam (NONE, n))
+                                                                                    (T.Sub (m, T.Shift totalargs)))
+                                                                                :: thesearms,
+                                                                             armdict)
+                                                                         end)
+
+                                                             | SOME (args, body) =>
+                                                                  if List.length args = nArgs then
+                                                                     let
+                                                                        val (dir', corr) =
+                                                                           ListPair.foldl
+                                                                              (fns binder sort (dir', corr) =>
+                                                                                  (case sort of
+                                                                                      NONE =>
+                                                                                         (* external argument *)
+                                                                                         (D.ibindh dir' binder,
+                                                                                          NONE :: corr)
+
+                                                                                    | SOME i =>
+                                                                                         (* internal argument *)
+                                                                                         (D.ibind0 (D.ibindh dir' binder),
+                                                                                          NONE :: SOME i :: corr)))
+                                                                              (recdir, [])
+                                                                              args
+                                                                              sorts
+
+                                                                        val corr = Vector.fromList corr
+                                                                        val depth = D.isize dir'
+
+                                                                        val special' =
+                                                                           List.foldl
+                                                                              (fns (name, f) special =>
+                                                                                  SymbolDict.insert special name (f fname corr depth))
+                                                                              special
+                                                                              newspecials
+                                                                           
+                                                                        val body' = E.expose body special' dir' imps []
+                                                                     in
+                                                                        (T.App
+                                                                            (ListPair.foldr
+                                                                                (fns binder sort m =>
+                                                                                    (case sort of
+                                                                                        NONE =>
+                                                                                           (* external argument *)
+                                                                                           T.Lam (binder, m)
+    
+                                                                                      | SOME _ =>
+                                                                                           (* internal argument *)
+                                                                                           T.Lam (binder, T.Lam (NONE, m))))
+                                                                                body'
+                                                                                args
+                                                                                sorts)
+                                                                            :: thesearms,
+                                                                         CD.remove armdict const)
+                                                                     end
+                                                                  else
+                                                                     signalError fname ["constructor ",
+                                                                                        Namespace.toString const,
+                                                                                        " expects ",
+                                                                                        Int.toString nArgs,
+                                                                                        " arguments."]))
+                                                       ([], armdict)
+                                                       constrs
+                                              in
+                                                 if CD.isEmpty armdict' then
+                                                    (
+                                                    (case default of
+                                                        NONE => ()
+
+                                                      | SOME _ =>
+                                                           if CD.size armdict (* not armdict', which is empty *) = nConstr then
+                                                              signalError fname ["the default arm is redundant."]
+                                                           else
+                                                              ());
+
+                                                    (thesearms @ allarms,
+                                                     CD.remove dict dt)
+                                                    )
+                                                 else
+                                                    let
+                                                       val (const, _) = CD.least armdict'
+                                                    in
+                                                       signalError fname [Namespace.toString const,
+                                                                          " is not a constructor for ",
+                                                                          Namespace.toString dt,
+                                                                          "."]
+                                                    end
+                                              end))
+                                   ([], dict)
+                                   dtinfo
+
+                             val iterspine = pervs' @ preds @ allarms
+                          in
+                             if CD.isEmpty dict' then
+                                (n1, bundle, dict, pervs', preds, allarms)
+                             else
+                                let
+                                   val (const, (fname, _, _, _, _, _)) = CD.least dict'
+                                in
+                                   signalError fname [Namespace.toString const,
+                                                      " is not a datatype mutually defined with ",
+                                                      addressToString dt1,
+                                                      "."]
+                                end
+                          end)
+                end)
+
+
+      fun fnind funcs =
+         E.hide
+         (fns special dir imps spine =>
+             let
+                val (n1, (_, _, _, dtinfo), _, pervs, preds, arms) = elabFnind funcs special dir imps
+
+                val (_, iterator, _, _, _) = Vector.sub dtinfo n1
+             in
+                elim
+                   (T.Elim (T.Const iterator, pervs @ preds @ arms))
+                   spine
+             end)
+
+
+      fun indcase obj dt result arms =
+         E.hide
+         (fns special dir imps spine =>
+             let
+                val fname = Symbol.gensym ()
+
+                val result' =
+                   (case result of
+                       NONE =>
+                          (* Don't allow the result type to depend on the index arguments or the argument.
+                             Type inference for that is likely to be hopeless.
+                          *)
+                          ETerm.hole
+
+                     | SOME ea => ea)
+
+                val (n1, (_, _, _, dtinfo), _, pervs, preds, arms') = 
+                   elabFnind [(fname, dt, NONE, NONE, NONE, result', arms)] special dir imps
+
+                val (_, iterator, nIndex, _, _) = Vector.sub dtinfo n1
+
+                val indices =
+                   Int.natrecUp
+                      (fns _ l => T.App (T.evar ()) :: l)
+                      []
+                      nIndex
+             in
+                elim
+                   (T.Elim (T.Const iterator, pervs @ preds @ arms' @ indices @ [T.App (E.expose obj special dir imps [])]))
+                   spine
+             end)
+
+
+      open Tactic
+
+      fun defineInd (impargs, expargs) funcs tps =
+         let
+            val () = ProverInternal.checkpoint ()
+
+            val args = impargs @ expargs
+
+            val nFnindArgsImplicit = List.length impargs
+            val nFnindArgs = nFnindArgsImplicit + List.length expargs
+
+            val dir =
+               List.foldl
+                  (fns arg dir => D.bindh dir arg)
+                  D.empty
+                  args
+
+            val (_, (_, nVis, nDts, dtinfo), dict, pervs, preds, arms) = elabFnind funcs SymbolDict.empty (D.idir dir) true
+
+            val iterspine = pervs @ preds @ arms
+
+            val nArms = List.length arms  (* there's probably a better way to get this *)
+
+            val defs =
+               try
+                  ListPair.mapEq
+                     (fns (fname, dtname, _, _, _, _, _) ea =>
+                         let
+                            (* This shouldn't fail since the functions have been elaborated already.
+                               Still, ideally do this less clumsily.
+                            *)
+                            val (n, _) = Option.valOf $ Datatype.info $ Namespace.resolve dtname
+                            val (_, iterator, _, _, _) = Vector.sub dtinfo n
+                         
+                            val a = ETerm.closed ea
+
+                            val m = 
+                               List.foldr
+                                  (fns arg m => T.Lam (arg, m))
+                                  (T.Elim (T.Const iterator, iterspine))
+                                  args
+
+                            val jud = Judgement.make Seq.empty (T.apply2 Prim.ov a m)
+                         in
+                            (fname, iterator, m, a, jud)
+                         end)
+                     funcs
+                     tps
+               with
+                  ListPair.UnequalLengths =>
+                     raise (Syntax "number of functions must equal number of types.")
+
+            val (goals, f) =
+               TypecheckInternal.multigoalTypecheck 
+                  (List.map (fn (fname, _, _, _, jud) => (Symbol.toValue fname, (jud, D.empty))) defs)
+
+            fun finish vs =
+               let
+                  val () = 
+                     List.app
+                        (fn (_, _, _, a, _) => ProverInternal.checkClean a)
+                        defs
+
+                  val (constsRev, mapping) =
+                     ListPair.foldl
+                        (fns (fname, iterator, m, a, jud) v (constsRev, mapping) =>
+                            let
+                               val const = Namespace.declare fname (SOME m)
+      
+                               val jud' = Judgement.make Seq.empty (T.apply2 Prim.ov a (T.Const const))
+      
+                               val tac =
+                                  (* |- const : A *)
+                                  refine (Rule.reduce (R.within [2] R.unfold))
+                                  >>+
+                                  (* |- M : A *)
+                                  cast jud v
+                            in
+                               (case execute (jud', D.empty) tac of
+                                   Sum.INL v' =>
+                                      (
+                                      Database.setType const jud' v';
+
+                                      if nFnindArgsImplicit > 0 then
+                                         Database.setImplicits const nFnindArgsImplicit
+                                      else
+                                         ();
+      
+                                      print "Inductive function ";
+                                      print (Symbol.toValue fname);
+                                      print " defined.\n";
+
+                                      (const :: constsRev, CD.insert mapping iterator const)
+                                      )
+      
+                                 | Sum.INR _ =>
+                                      (* This shouldn't happen. *)
+                                      raise (Fail "internal definition error in fnindDef"))
+                            end)
+                        ([], CD.empty)
+                        defs
+                        vs
+
+                  fun antireduce nIndex nConstrArgs depth m =
+                     (case Normalize.simplify m of
+                         T.Elim (h as T.Const const, spine) =>
+                            (case CD.find mapping const of
+                                NONE =>
+                                   let
+                                      val (spine', reds) = antireduceSpine nIndex nConstrArgs depth spine
+                                   in
+                                      (T.Elim (h, spine'), R.compat reds)
+                                   end
+            
+                              | SOME const' =>
+                                   let
+                                      val (spine', reds) =
+                                         antireduceSpine nIndex nConstrArgs depth (List.drop spine (nVis + nDts + nArms))
+            
+                                      val reds' =
+                                         Int.natrecUp
+                                            (fns _ l => R.refl :: l)
+                                            reds
+                                            nFnindArgs
+                                   in
+                                      (T.Elim (T.Const const', 
+                                               Int.natrecUp
+                                                  (fns i l => T.App (T.Var (i + nVis + nConstrArgs + nIndex + depth)) :: l)
+                                                  spine'
+                                                  nFnindArgs),
+                                       R.trans [R.unfold, R.beta nFnindArgs, R.compat reds'])
+                                   end)
+
+                       | T.Elim (h as T.Var _, spine) =>
+                            let
+                               val (spine', reds) = antireduceSpine nIndex nConstrArgs depth spine
+                            in
+                               (T.Elim (h, spine'), R.compat reds)
+                            end
+
+                       | T.Elim (h as T.Sub _, spine) =>
+                            (* It is possible that the iterator appears in the evar substitution, but we're willing to
+                               neglect such a weird scenario.  If it happens, the user can do the definition manually.
+                            *)
+                            let
+                               val (spine', reds) = antireduceSpine nIndex nConstrArgs depth spine
+                            in
+                               (T.Elim (h, spine'), R.compat reds)
+                            end
+
+                       | T.Elim (m1, spine) =>
+                            let
+                               val (m1', red1) = antireduce nIndex nConstrArgs depth m1
+                               val (spine', reds) = antireduceSpine nIndex nConstrArgs depth spine
+                            in
+                               (T.Elim (m1', spine'),
+                                R.trans [R.compat reds, R.within [0] red1])
+                            end
+
+                       | T.Lam (binder, m1) =>
+                            let
+                               val (m1', red) = antireduce nIndex nConstrArgs (depth+1) m1
+                            in
+                               (T.Lam (binder, m1'),
+                                R.within [0] red)
+                            end
+
+                       | T.Pair (m1, m2) =>
+                            let
+                               val (m1', red1) = antireduce nIndex nConstrArgs depth m1
+                               val (m2', red2) = antireduce nIndex nConstrArgs depth m2
+                            in
+                               (T.Pair (m1', m2'),
+                                R.trans [R.within [0] red1, R.within [1] red2])
+                            end
+
+                       | T.Next m1 =>
+                            let
+                               val (m1', red) = antireduce nIndex nConstrArgs depth m1
+                            in
+                               (T.Next m1',
+                                R.within [0] red)
+                            end
+
+                       | m' =>
+                            (m', R.refl))
+
+                  and antireduceSpine nIndex nConstrArgs depth spine =
+                     List.foldr
+                        (fns elim (newspine, reds) =>
+                            (case elim of
+                                T.App m =>
+                                   let
+                                      val (m', red) = antireduce nIndex nConstrArgs depth m
+                                   in
+                                      (T.App m' :: newspine, red :: reds)
+                                   end
+
+                              | _ =>
+                                   (elim :: newspine, reds)))
+                        ([], [])
+                        spine
+               in
+                  (* install reductions *)
+                  appVectorAndList
+                     (fns (_, _, nIndex, _, constrs) fconst =>
+                         Vector.app
+                            (fn (constr, nConstrArgs, args, ured) =>
+                                let
+                                   val lhs =
+                                      T.Elim (T.Const fconst,
+                                              Int.natrecUp
+                                                 (fns i l => T.App (T.Var (i + nVis + nConstrArgs)) :: l)
+                                                 [T.App
+                                                     (T.Elim (T.Const constr,
+                                                              Int.natrecUp
+                                                                 (fns i l => T.App (T.Var i) :: l)
+                                                                 []
+                                                                 (nVis + nConstrArgs)))]
+                                                 (nFnindArgs + nIndex))
+   
+                                   val nArmArgs =
+                                      List.foldl
+                                         (fns sort n =>
+                                             (case sort of
+                                                 NONE => n+1
+                                               | SOME _ => n+2))
+                                         0
+                                         args
+
+                                   val red1 = R.trans [R.unfold, R.beta nFnindArgs, R.user2 ured, R.beta nArmArgs]
+   
+                                   val middle = R.reduce red1 lhs
+   
+                                   val (rhs, red2) =
+                                      (* in middle, replace calls to the iterators with calls to the induction functions *)
+                                      antireduce nIndex nConstrArgs 0 middle
+   
+                                   val ured' = R.new2 fconst (nFnindArgs + nIndex) 0 constr (nVis + nConstrArgs) rhs red1 red2
+
+                                   val name1 = Symbol.toValue (List.last (Namespace.fullname fconst))
+                                   val name2 = Symbol.toValue (List.last (Namespace.fullname constr))
+                                in
+                                   Define.register ured';
+
+                                   Registry.write
+                                      (Symbol.fromValue (String.concat [name1, "_", name2]))
+                                      (Registry.fromUreduction2 ured')
+                                end)
+                            constrs)
+                     dtinfo
+                     (List.rev constsRev)
+               end
+         in
+            (case goals of
+                [] =>
+                   finish (f [])
+
+              | _ :: _ =>
+                   let
+                      do vs = ProverInternal.setGoals goals
+                   in
+                      finish (f vs)
+                   end)
+         end
+
+   end
+
+
+structure ParseFnind =
+   struct
+
+      val none = NONE
+      val some = SOME
+      val null = []
+      fun sing x = [x]
+      fun cons x y = x :: y
+
+
+      fun fnind_header_forall x dt pervs indices rhs = (dt, pervs, indices, SOME x, rhs)
+      fun fnind_header_arrow dt pervs indices rhs = (dt, pervs, indices, NONE, rhs)
+
+      fun fnind_arm constr args body = (SOME (constr, args), body)
+      fun fnind_arm_default body = (NONE, body)
+
+      fun fnind_func fname (dt, pervs, indices, arg, rhs) arms = (fname, dt, pervs, indices, arg, rhs, arms)
+
+      val fnind = Fnind.fnind
+
+      fun indcase obj dt arms = Fnind.indcase obj dt NONE arms
+      fun indcase_annot obj dt result arms = Fnind.indcase obj dt (SOME result) arms
+
+   end
+
+
+grammardef Fnind
+
+   open ParseFnind
+
+   rule FnindSpecPerv  ::= "[" Terms "]" => some
+   rule FnindSpecPerv  ::= => none
+
+   rule FnindSpecIndex ::= OIdents => some
+   rule FnindSpecIndex ::= "__" => none
+
+   rule FnindHeader    ::= "forall" "(" Ident ":" Longident FnindSpecPerv FnindSpecIndex ")" "." Term(0) => fnind_header_forall
+   rule FnindHeader    ::= Longident FnindSpecPerv FnindSpecIndex "->" Term(0) => fnind_header_arrow
+
+   rule FnindArm       ::= "|" Longident OIdents "." Term(0) => fnind_arm
+   rule FnindArm       ::= "|" "_" "." Term(0) => fnind_arm_default
+   rule FnindArms      ::= => null
+   rule FnindArms      ::= FnindArm FnindArms => cons
+
+   rule FnindFunc      ::= Ident ":" FnindHeader "of" FnindArms => fnind_func
+   rule FnindFuncs     ::= FnindFunc => sing
+   rule FnindFuncs     ::= FnindFunc "and" FnindFuncs => cons
+   
+   rule TermsWithAnd   ::= Term => sing
+   rule TermsWithAnd   ::= Term "and" TermsWithAnd => cons
+
+   rule Term(0)        ::= "fnind" FnindFuncs => fnind
+
+   rule Term(0)        ::= "case" Term(1) ":" Longident "of" FnindArms => indcase
+   rule Term(0)        ::= "case" Term(1) ":" Longident ":>" Term(1) "of" FnindArms => indcase_annot
+
+end
+
+
+grammaron Fnind

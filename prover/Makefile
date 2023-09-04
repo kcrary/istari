@@ -17,4 +17,5 @@ ocaml : ocaml-generated prover.make
 
 clean :
 	rm -f *.iml.sml *.iml-ml *.sml.sml *.sml-ml *.cmi *.cmo *.cma *.ipds *.ipdo prover.cm prover.make
+	cd trusted; rm -f *.iml.sml *.iml-ml *.sml.sml *.sml-ml *.cmi *.cmo *.cma *.ipds *.ipdo prover.cm prover.make	
 	rm -rf .cm

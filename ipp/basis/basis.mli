@@ -9,6 +9,7 @@ module type LIST = Basis_sig.LIST
 module type LIST_PAIR = Basis_sig.LIST_PAIR
 module type OPTION = Basis_sig.OPTION
 module type ARRAY = Basis_sig.ARRAY
+module type VECTOR = Basis_sig.VECTOR
 module type IO = Basis_sig.IO
 module type TEXT_IO = Basis_sig.TEXT_IO
 module type BIN_IO = Basis_sig.BIN_IO
@@ -29,6 +30,7 @@ module List : LIST with type 'a list = 'a list
 module ListPair : LIST_PAIR
 module Option : OPTION with type 'a option = 'a option
 module Array : ARRAY with type 'a array = 'a array
+module Vector : VECTOR
 module IO : IO
 module TextIO : TEXT_IO
 

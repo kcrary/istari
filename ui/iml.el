@@ -260,4 +260,7 @@
     (insert "\n")
     (indent-to i)))
 
+
+(run-hooks 'iml-hook)
+
 (provide 'iml-mode)

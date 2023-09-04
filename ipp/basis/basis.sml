@@ -42,6 +42,9 @@ signature Basis__INTEGER =
       val toInt : int -> Int.int
       val fromInt : Int.int -> int
 
+      val natrecUp : (int -> 'a -> 'a) -> 'a -> int -> 'a
+      val natrecDown : (int -> 'a -> 'a) -> 'a -> int -> 'a
+
    end
 
 
@@ -193,6 +196,7 @@ signature Basis__LIST =
       val filter : ('a -> bool) -> 'a list -> 'a list
       val exists : ('a -> bool) -> 'a list -> bool
       val all : ('a -> bool) -> 'a list -> bool
+      val tabulate : int -> (int -> 'a) -> 'a list
 
    end
 
@@ -256,6 +260,26 @@ signature Basis__ARRAY =
       val foldri : (int -> 'a -> 'b -> 'b) -> 'b -> 'a array -> 'b
       val app : ('a -> unit) -> 'a array -> unit
       val appi : (int -> 'a -> unit) -> 'a array -> unit
+
+   end
+
+
+signature Basis__VECTOR =
+   sig
+
+      type 'a vector
+      
+      val fromList : 'a list -> 'a vector
+      val tabulate : int -> (int -> 'a) -> 'a vector
+      val length : 'a vector -> int
+      val sub : 'a vector -> int -> 'a
+
+      val foldl : ('a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
+      val foldli : (int -> 'a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
+      val foldr : ('a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
+      val foldri : (int -> 'a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
+      val app : ('a -> unit) -> 'a vector -> unit
+      val appi : (int -> 'a -> unit) -> 'a vector -> unit
 
    end
 
@@ -379,6 +403,7 @@ signature IML__BASIS =
       structure ListPair : Basis__LIST_PAIR
       structure Option : Basis__OPTION where type 'a option = 'a Option.option
       structure Array : Basis__ARRAY where type 'a array = 'a Array.array
+      structure Vector : Basis__VECTOR where type 'a vector = 'a Vector.vector
       structure IO : Basis__IO
       structure TextIO : Basis__TEXT_IO where type instream = TextIO.instream where type outstream = TextIO.outstream
       structure BinIO : Basis__BIN_IO where type instream = BinIO.instream where type outstream = BinIO.outstream
@@ -486,6 +511,34 @@ structure Basis :> IML__BASIS =
                else
                   IntInf.toString x
             
+            fun natrecUpLoop f x i n =
+               if i = n then
+                  x
+               else
+                  natrecUpLoop f (f i x) (IntInf.+ (i, 1)) n
+
+            fun natrecUp f x n =
+               if IntInf.< (n, 0) then
+                  raise (Invalid "negative argument to IntInf.natrecUp")
+               else
+                  natrecUpLoop f x 0 n
+
+            fun natrecDownLoop f x i =
+               if i = 0 then
+                  x
+               else
+                  let
+                     val i' = IntInf.- (i, 1)
+                  in
+                     natrecDownLoop f (f i' x) i'
+                  end
+
+            fun natrecDown f x n =
+               if IntInf.< (n, 0) then
+                  raise (Invalid "negative argument to IntInf.natrecDown")
+               else
+                  natrecDownLoop f x n
+
             fun pow x y = IntInf.pow (x, y)
             val log2 = IntInf.log2
             fun orb x y = IntInf.orb (x, y)
@@ -553,6 +606,34 @@ structure Basis :> IML__BASIS =
             
             fun fromInt x = x
             fun toInt x = x
+
+            fun natrecUpLoop f x i n =
+               if (i : int) = n then
+                  x
+               else
+                  natrecUpLoop f (f i x) (Int.+ (i, 1)) n
+
+            fun natrecUp f x n =
+               if Int.< (n, 0) then
+                  raise (Invalid "negative argument to natrecUp")
+               else
+                  natrecUpLoop f x 0 n
+
+            fun natrecDownLoop f x i =
+               if i = 0 then
+                  x
+               else
+                  let
+                     val i' = Int.- (i, 1)
+                  in
+                     natrecDownLoop f (f i' x) i'
+                  end
+
+            fun natrecDown f x n =
+               if Int.< (n, 0) then
+                  raise (Invalid "negative argument to natrecDown")
+               else
+                  natrecDownLoop f x n
 
          end
 
@@ -765,6 +846,8 @@ structure Basis :> IML__BASIS =
       
                         | y => y))
 
+            fun tabulate n f = List.tabulate (n, f)
+
          end
 
       structure ListPair :> Basis__LIST_PAIR =
@@ -864,6 +947,32 @@ structure Basis :> IML__BASIS =
                   a'
                end
                handle Subscript => raise (Invalid "subarray")
+ 
+         end
+
+
+      structure Vector :> Basis__VECTOR where type 'a vector = 'a Vector.vector =
+         struct
+
+            open Vector
+
+            fun fromList l =
+               Vector.fromList l
+               handle Size => raise (Invalid "size")
+
+            fun tabulate n f =
+               Vector.tabulate (n, f)
+               handle Size => raise (Invalid "size")
+
+            fun sub a n =
+               Vector.sub (a, n)
+               handle Subscript => raise (Invalid "subscript")
+
+            fun foldl f z a = Vector.foldl (fn (x, y) => f x y) z a
+            fun foldli f z a = Vector.foldli (fn (i, x, y) => f i x y) z a
+            fun foldr f z a = Vector.foldr (fn (x, y) => f x y) z a
+            fun foldri f z a = Vector.foldri (fn (i, x, y) => f i x y) z a
+            fun appi f a = Vector.appi (fn (i, x) => f i x) a
  
          end
 

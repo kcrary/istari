@@ -1,0 +1,147 @@
+(* A copy of ../docs/datatype-induction.ist. *)
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    forall (a : U i) .
+    U i
+  of
+    tree : nat -> type =
+    | Empty : tree 0
+    | Node : forall (n : nat) . a -> forest n -> tree (succ n)
+    and
+    forest : nat -> type =
+    | Nil : forest 0
+    | Cons : forall (m n : nat) . tree m -> forest n -> forest (m + n)
+/;
+
+
+
+define /treesize a n x/
+/
+  tree_iter a
+    (fn _ _ . nat)
+    (fn _ _ . nat)
+    0
+    (fn _ _ _ m . (succ m))
+    0
+    (fn _ _ _ m1 _ m2 . Nat.plus m1 m2)
+    n
+    x
+//
+  intersect (i : level) .
+  forall (a : U i) (n : nat) .
+    tree a n -> nat
+/;
+
+introOf /i a n x/.
+unfold /treesize/.
+typecheck.
+qed ();
+
+
+
+define /forestsize a n x/
+/
+  forest_iter a
+    (fn _ _ . nat)
+    (fn _ _ . nat)
+    0
+    (fn _ _ _ m . (succ m))
+    0
+    (fn _ _ _ m1 _ m2 . Nat.plus m1 m2)
+    n
+    x
+//
+  intersect (i : level) .
+  forall (a : U i) (n : nat) .
+    forest a n -> nat
+/;
+
+introOf /i a n x/.
+unfold /forestsize/.
+typecheck.
+qed ();
+
+
+
+lemma "treesize_id"
+/
+  forall i (a : U i) (n : nat) (t : tree a n) .
+    treesize a n t = n : nat
+/;
+
+inference.
+intro /i a/.
+assert 
+/
+  forall (s : tree_skel a) .
+    (forall (n : nat) (t : tree a n) .
+       tree_strip t = s : tree_skel a 
+       -> treesize a n t = n : nat)
+    & (forall (n : nat) (f : forest a n) . 
+         forest_strip f = s : tree_skel a 
+         -> forestsize a n f = n : nat)
+/ /H/.
+1:{
+  intro /n t/.
+  apply /H (tree_strip t)/.
+  reflexivity.
+  }
+intro /s/.
+so /tree_subterm_well_founded _ a s/ /Hwf/.
+induct /Hwf/.
+reintro /IH/.
+split.
+  {
+  intro /n t Heq/.
+  moveBefore /n t/ /s/.
+  subst /s/.
+  destruct /t/ /{ Heq | n' x f Heq }/.
+    {
+    subst /n/.
+    unfold /treesize/.
+    auto.
+    }
+
+    {
+    moveBefore /n'/ /n/.
+    subst /n/.
+    unfold /treesize/.
+    fold /forestsize _ _ f/.
+    compat.
+    apply /IH (forest_strip f)/ >> auto.
+    apply /Node_subterm/.
+    }
+  }
+
+  {
+  intro /n f Heq/.
+  moveBefore /n f/ /s/.
+  subst /s/.
+  destruct /f/ /{ Heq | m' n' t f Heq }/.
+    {
+    subst /n/.
+    unfold /forestsize/.
+    auto.
+    }
+
+    {
+    moveBefore /m' n'/ /n/.
+    subst /n/.
+    unfold /forestsize/.
+    fold /treesize _ _ t , forestsize _ _ f/.
+    compat.
+      {
+      apply /IH (tree_strip t)/ >> auto.
+      apply /Cons_subterm/.
+      }
+
+      {
+      apply /IH (forest_strip f)/ >> auto.
+      apply /Cons_subterm/.
+      }
+    }
+  }
+qed ();

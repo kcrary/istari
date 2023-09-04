@@ -65,9 +65,11 @@ validated using that formalization.
 
 - [Term syntax](terms.html)
 
+- [Theorems](theorems.html)
+
 - [Definitions](definitions.html)
 
-- [Theorems](theorems.html)
+- [Datatypes](datatypes.html)
 
 - [Tactics](tactics.html)
 

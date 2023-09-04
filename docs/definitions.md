@@ -90,7 +90,7 @@ command `definerecRaw`, subject to the same hazard discussed above.
 
 
 
-### Datatypes
+### Datatype definitions
 
 One defines datatypes with the `typedef` command.  For example:
 
@@ -144,158 +144,7 @@ Defining a datatype incurs several typing obligations.  With
 typechecker if possible.  With `typedefRaw` they are all handed over
 to the user.
 
-
-##### Iteration
-
-In addition to the datatypes and constructors, a datatype definition
-also creates several constants that are useful for induction.  For
-each datatype it creates an iterator whose name is the datatype's name
-prepended to `_iter`.  For example, `tree_iter` has the type:
-
-    intersect (i : level) .
-    forall 
-      (a : U i)
-      (P : forall (n : nat) . tree a n -> U i)
-      (Q : forall (n : nat) . forest a n -> U i) .
-        P 0 (Empty a)
-        -> (forall (n : nat) .
-              forall (x : a) .
-              forall (f : forest a n) . Q n f 
-              -> P (succ n) (Node a n x f))
-        -> Q 0 (Nil a)
-        -> (forall (m n : nat) .
-              forall (t : tree a m) . P m t
-              -> forall (f : forest a n) . Q n f
-              -> Q (m + n) (Cons a m n t f))
-        -> forall (n : nat) (t : tree a n) . P n t
-
-Iterators such as this are used by the [`iterate` tactic](tactics.html#induction).
-
-It also creates a joint iterator who names is the first datatype's
-name prepended to `_iter_joint`.  For example, `tree_iter_joint` has a
-type that is similar to `tree_iter` except at the end:
-
-    intersect (i : level) .
-    forall 
-      (a : U i)
-      (P : forall (n : nat) . tree a n -> U i)
-      (Q : forall (n : nat) . forest a n -> U i) .
-        P 0 (Empty a)
-        -> (forall (n : nat) .
-              forall (x : a) .
-              forall (f : forest a n) . Q n f 
-              -> P (succ n) (Node a n x f))
-        -> Q 0 (Nil a)
-        -> (forall (m n : nat) .
-              forall (t : tree a m) . P m t
-              -> forall (f : forest a n) . Q n f
-              -> Q (m + n) (Cons a m n t f))
-        -> (forall (n : nat) (t : tree a n) . P n t)
-           & (forall (n : nat) (t : forest a n) . Q n t)
-           & unit
-
-Note that the level of the iterator's result (`U i` above) is given by
-the universe in the datatype declaration.  For this reason, it is
-often a good idea to define a datatype in `U i` even if the datatype
-could be defined in a fixed universe such as `U 0`.  Doing the latter
-would prevent using the iterator with a result type in any universe
-larger than `U 0`.
-
-
-##### Iterator reduction
-
-A datatype definition also creates a number of reductions involving the
-iterator.  For example:
-
-    tree_iter a P Q empcase nodecase nilcase conscase _ (Node a n x f)
-
-reduces to:
-
-    nodecase n x f (forest_iter a P Q empcase nodecase nilcase conscase n f)
-
-These reductions are registered with the normalization engine and
-applied automatically.  In addition they are placed in the registry so
-that users can obtain them for writing tactics.  The name is the
-iterator's name prepended to the constructor's name.  For example, the
-preceding reduction would be written under the name `tree_iter_Node`.
-
-
-##### Strong induction
-
-The iteration constants are useful only when the proposition being
-proved is already known to be well-typed (specifically, to have type
-`U i`).  Also, they provide the induction hypothesis only on immediate
-subterms.  For more general induction, datatype definitions also
-create a subterm orderings.
-
-We want to have a single subterm ordering for the whole datatype
-bundle, and not have n^2 orderings for n datatypes (*e.g.,* trees in
-trees, trees in forests, forests in forests, forests in trees).  We
-also want the subterm ordering to be insensitive to index arguments.
-Thus, we define a *skeleton* type that represents the gross structure
-of elements of any datatype in the bundle (using the first datatype for
-the name):
-
-    tree_skel    : intersect (i : level) . forall (a : U i) . U i
-
-Thus the skeleton for a `tree a 3` and a `forest a 10` both have type
-`tree_skel a`.
-
-Next, the definition provides a transitive and well-founded subterm
-order over skeletons:
-
-    tree_subterm : intersect (i : level) . forall (a : U i) . tree_skel a -> tree_skel a -> U i
-
-    tree_subterm_trans 
-      : forall (i : level) (a : U i) (x y z : tree_skel a) .
-          tree_subterm a x y -> tree_subterm a y z -> tree_subterm a x z
-
-    tree_subterm_well_founded
-      : forall (i : level) (a : U i) (x : tree_skel a) . Acc (tree_skel a) (tree_subterm a) x
-
-(See the [`Acc` library module](lib/acc.html) for a discussion of the
-`Acc` type.)
-
-For each datatype there is a *strip* function that strips a datatype
-down to its skeleton, such as:
-
-    forest_strip : intersect (i : level) . forall (a : U i) (n : nat) . forest a n -> tree_skel a
-
-Finally, for each constructor there is a subterm lemma, such as:
-
-    Cons_subterm
-      : forall (i : level) (a : U i) (m n : nat) (t : tree a m) (f : forest a n) .
-          tree_subterm a (tree_strip a m t) (forest_strip (Cons a m n t f))
-          & tree_subterm a (forest_strip a n f) (forest_strip (Cons a m n t f))
-          & unit
-
-For maximum clarity, the types are given above with all implicit
-arguments shown.  In fact, the subterm predicate takes all pervasive
-arguments (`a`, in the example) implicitly, and the strip functions
-take all but the last argument implicitly.
-
-To perform strong induction over the subterm order using these tools:
-
-1. strip the induction variable, obtaining a skeleton,
-
-2. use the well-foundedness lemma to show that induction variable's
-   skeleton is *accessible*,
-
-3. do induction over the accessibility hypothesis, and
-
-4. invoke the induction hypothesis as needed, using the subterm lemmas
-   to show that a subterm's skeleton is smaller than the current
-   term's skeleton.
-
-A worked example appears [here](datatype-induction.ist).  Note that
-this process is usually not necessary.  In the common case in which
-the conclusion is known *a priori* to be well-typed, and strong
-induction is not needed, the `iterate` tactic is sufficient and much
-simpler.  When the datatype definition is not mutually dependent, the
-`induct` tactic automates this process.  Thus, the long form is
-necessary only for mutually dependent datatypes when the conclusion is
-not yet known to be well-typed or strong induction is required.
-
+For more discussion of how datatypes are used, see the [datatypes page](datatypes.html).
 
 
 ### Reductions
@@ -341,3 +190,49 @@ valid) *will* be accepted, but it will result in normalization
 looping.  Since unification tries to avoid normalizing, the
 non-terminating behavior might not arise for some time, making its
 cause not obvious when it finally does.
+
+
+
+### Inductive function definitions
+
+To define an inductive function, one can make an ordinary definition
+using a [datatype iterator](datatypes.html#the-iterator).  However,
+Istari provides a command to streamline the process:
+
+    defineInd /a/
+    /
+      treesize : tree [a] __ -> nat of
+      | Empty . 0
+      | Node _ x f . succ (forestsize f)
+      | One _ t . treesize t
+      
+      and
+      forestsize : forest __ -> nat of
+      | Nil . 0
+      | Cons _ _ t f . treesize t + forestsize f
+    /
+    /
+      intersect i . forall (a : U i) n . tree a n -> nat
+      and
+      intersect i . forall (a : U i) n . forest a n -> nat
+    /;
+
+This defines multiple inductive functions simultaneously, installs the
+appropriate [reductions](#reductions), and attempts to prove the
+typing lemmas.  The syntax of the inductive functions is discussed
+[here](datatypes.html#inductive-functions).  (Note that the keyword
+`fnind` is dropped.)
+
+The first argument to `defInd` (in the example, `a`) gives a list of
+arguments that each inductive function should take.  Those arguments
+are available to the pervasive arguments (`[a]`), and to the arms of
+the inductive functions (not used in this example).  The second
+argument gives the inductive functions, and the third argument gives
+their types, as a list separated by `and`.
+
+In addition to installing the appropriate reductions, it writes them to
+the registry.  For example:
+
+    treesize _ _ (Empty _) --> 0
+
+is written using the name `treesize_Empty`.

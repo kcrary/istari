@@ -8,101 +8,140 @@ signature ETERM =
 
       exception Syntax of string
 
-      val var      : symbol -> eterm        (* always a variable *)
-      val short    : symbol -> eterm
-      val long     : symbol list -> eterm   (* always a constant *)
+      val closed     : eterm -> Term.term
+      val withidir   : Directory.idirectory -> eterm -> Term.term
+      val withdir    : Directory.directory -> eterm -> Term.term
 
-      val explicit : eterm -> eterm
+      val literal    : Term.term -> eterm
 
-      val const    : Constant.constant -> eterm
-      val lam      : binder -> eterm -> eterm
-      val lamann   : binder -> eterm -> eterm -> eterm
-      val app      : eterm -> eterm -> eterm
-      val pair     : eterm -> eterm -> eterm
-      val pi1      : eterm -> eterm
-      val pi2      : eterm -> eterm
-      val next     : eterm -> eterm
-      val prev     : eterm -> eterm
-      val triv     : eterm
-      val evar     : eterm
-      val integer  : IntInf.int -> eterm
-      val symbol   : Symbol.symbol -> eterm
+      val short      : symbol -> eterm
+      val var        : symbol -> eterm        (* always a variable *)
+      val long       : symbol list -> eterm   (* always a constant *)
 
-      val hole     : eterm
-      val marker   : symbol -> eterm
+      (* suppress insertion of implicit variables *)
+      val explicit   : eterm -> eterm
 
-      val apply1   : Constant.constant -> eterm -> eterm
-      val apply2   : Constant.constant -> eterm -> eterm -> eterm
-      val apply3   : Constant.constant -> eterm -> eterm -> eterm -> eterm
-      val apply4   : Constant.constant -> eterm -> eterm -> eterm -> eterm -> eterm
+      val const      : Constant.constant -> eterm
+      val lam        : binder -> eterm -> eterm
+      val lamann     : binder -> eterm -> eterm -> eterm
+      val app        : eterm -> eterm -> eterm
+      val pair       : eterm -> eterm -> eterm
+      val pi1        : eterm -> eterm
+      val pi2        : eterm -> eterm
+      val next       : eterm -> eterm
+      val prev       : eterm -> eterm
+      val triv       : eterm
+      val evar       : eterm
+      val integer    : IntInf.int -> eterm
+      val symbol     : Symbol.symbol -> eterm
+      val hole       : eterm
+      val marker     : symbol -> eterm
 
-      val appn     : eterm -> eterm list -> eterm
-      val applyn   : Constant.constant -> eterm list -> eterm
+      val apply1     : Constant.constant -> eterm -> eterm
+      val apply2     : Constant.constant -> eterm -> eterm -> eterm
+      val apply3     : Constant.constant -> eterm -> eterm -> eterm -> eterm
+      val apply4     : Constant.constant -> eterm -> eterm -> eterm -> eterm -> eterm
+      val applyn     : Constant.constant -> eterm list -> eterm
+      val appn       : eterm -> eterm list -> eterm
 
+      (* binds additional variables before resolving *)
       val additional : symbol option list -> eterm -> eterm
 
-      val literal  : Term.term -> eterm
-      val closed   : eterm -> Term.term
-      val withidir : Directory.idirectory -> eterm -> Term.term
-      val withdir  : Directory.directory -> eterm -> Term.term
-
-      val absolute : Directory.directory -> Term.term -> eterm
+      (* absolute dir M returns an eterm that resolves to M using dir *)
+      val absolute   : Directory.directory -> Term.term -> eterm
 
       (* subst M x N = [M/x] N *)
-      val subst    : eterm -> symbol -> eterm -> eterm
+      val subst      : eterm -> symbol -> eterm -> eterm
 
       (* raises Syntax using the given location if the eterm contains an unbound variable *)
-      val withloc  : int * int -> eterm -> eterm
+      val withloc    : int * int -> eterm -> eterm
 
    end
 
 
-structure ETerm :> ETERM =
+structure ETermInternal 
+   :> sig
+         include ETERM
+
+         type eterm_ =
+            (Directory.idirectory -> Term.elim list -> Term.term) SymbolDict.dict
+            -> Directory.idirectory
+            -> bool
+            -> Term.elim list
+            -> Term.term
+
+         val expose : eterm -> eterm_
+         val hide : eterm_ -> eterm
+      end
+   =
    struct
 
       structure D = Directory
       structure T = Term
+      structure SD = SymbolDict
 
-      type eterm = bool -> D.idirectory -> Term.term
       type symbol = Symbol.symbol
       type binder = symbol option
 
+      type eterm =
+         (D.idirectory -> T.elim list -> T.term) SymbolDict.dict  (* special forms *)
+         -> D.idirectory   (* identifers *)
+         -> bool           (* insert implicit arguments? *)
+         -> T.elim list    (* delayed spine *)
+         -> T.term
 
-      fun var x _ dir = T.Var (D.lookupVar dir x)
+      type eterm_ = eterm
 
-      fun implicits n m =
-         (case Int.compare n 0 of
-             LESS =>
-                raise (Invalid "ETerm.implicits")
 
-           | EQUAL =>
-                m
+      fun expose x = x
+      fun hide x = x
 
-           | GREATER =>
-                let
-                   fun loop n acc =
-                      if n = 0 then
-                         acc
-                      else
-                         loop (n-1) (T.App (T.evar ()) :: acc)
-                in
-                   T.Elim (m, loop n [])
-                end)
 
-      fun short x imps dir =
-         (case D.lookup dir x of
-             D.Hvar i =>
-                T.Var i
+      fun elim m spine =
+         (case spine of
+             [] => m
 
-           | D.Hconst const =>
-                if imps then
-                   implicits (Database.findImplicits const) (T.Const const)
-                else
-                   T.Const const)
+           | _ :: _ => T.Elim (m, spine))
+
+
+      fun implicits n acc =
+         if n <= 0 then
+            acc
+         else
+            implicits (n-1) (T.App (T.evar ()) :: acc)
          
 
       exception Syntax = SyntaxError.Syntax
 
+
+      fun short sym special dir imps spine =
+         (case D.lookupOpt dir sym of
+             SOME (D.Hvar i) =>
+                elim (T.Var i) spine
+
+           | SOME (D.Hconst const) =>
+                (case SD.find special sym of
+                    NONE =>
+                       elim 
+                          (T.Const const)
+                          (if imps then
+                              implicits (Database.findImplicits const) spine
+                           else
+                              spine)
+
+                  | SOME f => 
+                       (* specials shadow constants *)
+                       f dir spine)
+
+           | NONE =>
+                (case SD.find special sym of
+                    NONE => raise (D.Unbound sym)
+
+                  | SOME f => f dir spine))
+         
+
+      fun var sym _ dir _ spine = elim (T.Var (D.lookupVar dir sym)) spine
+         
       fun signalUnknownConstant syms = 
          raise (Syntax (String.concat
                            [
@@ -111,105 +150,143 @@ structure ETerm :> ETERM =
                            "."
                            ]))
 
-
-      fun long syms imps _ =
+      fun long syms _ _ imps spine =
          (case Namespace.resolveOpt syms of
              NONE =>
                 signalUnknownConstant syms
 
            | SOME const =>
-                if imps then
-                   implicits (Database.findImplicits const) (T.Const const)
-                else
-                   T.Const const)
+                elim
+                   (T.Const const)
+                   (if imps then
+                       implicits (Database.findImplicits const) spine
+                    else
+                       spine))
          
 
-      fun const const _ _ = T.Const const
+      fun const const _ _ _ spine = elim (T.Const const) spine
 
-      fun lam b m imps dir = 
-         (case b of
-             NONE =>
-                T.Lam (NONE, m imps (D.ibind0 dir))
+      fun lam binder body special dir imps spine =
+         elim
+            (case binder of
+                NONE =>
+                   T.Lam (NONE, body special (D.ibind0 dir) imps [])
+   
+              | SOME x =>
+                   T.Lam (binder, body special (D.ibind dir x) imps []))
+            spine
 
-           | SOME x =>
-                T.Lam (SOME x, m imps (D.ibind dir x)))
+      fun lamann binder a body special dir imps spine =
+         elim
+            (case binder of
+                NONE =>
+                   T.apply2 Prim.fnann
+                      (a special dir imps [])
+                      (T.Lam (NONE, body special (D.ibind0 dir) imps []))
+   
+              | SOME x =>
+                   T.apply2 Prim.fnann
+                      (a special dir imps [])
+                      (T.Lam (binder, body special (D.ibind dir x) imps [])))
+            spine
 
-      fun lamann b a m imps dir = 
-         (case b of
-             NONE =>
-                T.apply2 Prim.fnann 
-                   (a imps dir)
-                   (T.Lam (NONE, m imps (D.ibind0 dir)))
+      fun app m1 m2 special dir imps spine =
+         m1 special dir imps (T.App (m2 special dir imps []) :: spine)
 
-           | SOME x =>
-                T.apply2 Prim.fnann
-                   (a imps dir)
-                   (T.Lam (SOME x, m imps (D.ibind dir x))))
+      fun pair m1 m2 special dir imps spine =
+         elim
+            (T.Pair (m1 special dir imps [],
+                     m2 special dir imps []))
+            spine
 
-      fun app m1 m2 imps dir = T.Elim (m1 imps dir, [T.App (m2 imps dir)])
+      fun pi1 m special dir imps spine = m special dir imps (T.Pi1 :: spine)
 
-      fun pair m1 m2 imps dir = T.Pair (m1 imps dir, m2 imps dir)
+      fun pi2 m special dir imps spine = m special dir imps (T.Pi2 :: spine)
 
-      fun pi1 m imps dir = T.Elim (m imps dir, [T.Pi1])
+      fun next m special dir imps spine =
+         elim
+            (T.Next (m special dir imps []))
+            spine
 
-      fun pi2 m imps dir = T.Elim (m imps dir, [T.Pi2])
+      fun prev m special dir imps spine = m special dir imps (T.Prev :: spine)
 
-      fun next m imps dir = T.Next (m imps dir)
+      fun triv _ _ _ spine = elim T.Triv spine
 
-      fun prev m imps dir = T.Elim (m imps dir, [T.Prev])
+      fun evar _ _ _ spine = elim (T.evar ()) spine
 
-      fun triv _ _ = T.Triv
+      fun integer x _ _ _ spine = elim (T.Native (T.Integer x)) spine
 
-      fun evar _ _ = T.Evar (T.newEbind ())
-
-      fun integer x _ _ = T.Native (T.Integer x)
-
-      fun symbol x _ _ = T.Native (T.Symbol x)
+      fun symbol x _ _ _ spine = elim (T.Native (T.Symbol x)) spine
 
       val zilch = Symbol.fromValue ""
 
-      fun hole _ _ = T.Marker zilch
+      fun hole _ _ _ spine = elim (T.Marker zilch) spine
 
-      fun marker sym _ _ = T.Marker sym
+      fun marker sym _ _ _ spine = elim (T.Marker sym) spine
 
-      fun apply1 const m1 imps dir = T.Elim (T.Const const, [T.App (m1 imps dir)])
+      fun apply1 c m1 special dir imps spine =
+         T.Elim (T.Const c, T.App (m1 special dir imps []) :: spine)
 
-      fun apply2 const m1 m2 imps dir = T.Elim (T.Const const, [T.App (m1 imps dir), T.App (m2 imps dir)])
+      fun apply2 c m1 m2 special dir imps spine =
+         T.Elim (T.Const c, 
+                 T.App (m1 special dir imps []) 
+                 :: T.App (m2 special dir imps []) 
+                 :: spine)
 
-      fun apply3 const m1 m2 m3 imps dir = T.Elim (T.Const const, [T.App (m1 imps dir), T.App (m2 imps dir), T.App (m3 imps dir)])
-
-      fun apply4 const m1 m2 m3 m4 imps dir = T.Elim (T.Const const, [T.App (m1 imps dir), T.App (m2 imps dir), T.App (m3 imps dir), T.App (m4 imps dir)])
-
-      fun appn m l imps dir =
-         T.Elim (m imps dir,
-                 List.map (fn mi => T.App (mi imps dir)) l)
-
-      fun applyn const l imps dir =
-         T.Elim (T.Const const,
-                 List.map (fn mi => T.App (mi imps dir)) l)
+      fun apply3 c m1 m2 m3 special dir imps spine =
+         T.Elim (T.Const c, 
+                 T.App (m1 special dir imps []) 
+                 :: T.App (m2 special dir imps []) 
+                 :: T.App (m3 special dir imps []) 
+                 :: spine)
 
 
-      fun additional xs m imps dir =
+      fun apply4 c m1 m2 m3 m4 special dir imps spine =
+         T.Elim (T.Const c, 
+                 T.App (m1 special dir imps []) 
+                 :: T.App (m2 special dir imps []) 
+                 :: T.App (m3 special dir imps []) 
+                 :: T.App (m4 special dir imps []) 
+                 :: spine)
+
+      fun applyn c l special dir imps spine =
+         T.Elim (T.Const c, 
+                 List.foldr
+                    (fns m rest => T.App (m special dir imps []) :: rest)
+                    spine
+                    l)
+
+      fun appn m1 l special dir imps spine =
+         m1 special dir imps
+            (List.foldr
+                (fns m rest => T.App (m special dir imps []) :: rest)
+                spine
+                l)
+
+      fun additional xs m special dir imps spine =
          (case xs of
              [] =>
-                m imps dir
+                m special dir imps spine
 
            | NONE :: rest =>
-                additional rest m imps (D.ibind0 dir)
+                additional rest m special (D.ibind0 dir) imps spine
 
            | SOME x :: rest =>
-                additional rest m imps (D.ibind dir x))
+                additional rest m special (D.ibind dir x) imps spine)
 
-      fun closed m = m true Directory.iempty
+      fun literal m _ _ _ spine = elim m spine
 
-      fun literal m _ _ = m
+      fun explicit m special dir _ spine = m special dir false spine
 
-      fun withidir idir m = m true idir
 
-      fun withdir dir m = m true (Directory.idir dir)
 
-      fun explicit m _ dir = m false dir
-      
+      fun closed m = m SD.empty D.iempty true []
+
+      fun withidir idir m = m SD.empty idir true []
+
+      fun withdir dir m = m SD.empty (Directory.idir dir) true []
+
+
 
       fun absoluteMain from to depth m =
          (case Normalize.simplify m of
@@ -291,17 +368,20 @@ structure ETerm :> ETERM =
                       absoluteSub from to depth (T.Idot (k, T.Shift (k+1)))
                 end)
 
-      fun absolute from m _ to = absoluteMain from to 0 m
+      fun absolute from m _ to _ spine =
+         elim (absoluteMain from to 0 m) spine
 
 
-      fun subst em sym en imps dir =
-         T.Sub (en imps (D.ibind dir sym),
-                T.Dot (em imps dir, T.id))
+      fun subst em sym en special dir imps spine =
+         elim
+            (T.Sub (en special (D.ibind dir sym) imps [],
+                    T.Dot (em special dir imps [], T.id)))
+            spine
 
 
-      fun withloc (r, c) m imps dir =
+      fun withloc (r, c) m special dir imps spine =
          try
-            m imps dir
+            m special dir imps spine
          with
             D.Unbound sym =>
                raise (Syntax (String.concat
@@ -316,6 +396,9 @@ structure ETerm :> ETERM =
                                  ]))
 
    end
+
+
+structure ETerm :> ETERM where type eterm = ETermInternal.eterm = ETermInternal
 
 
 structure ParseTerm =
@@ -1231,6 +1314,9 @@ grammardef Term
    rule Term(100) ::= "explicit`" Term(100) => explicit
 
    rule Term(0)   ::= "additional`" OIdents "." Term(0) => additional
+
+   rule Terms     ::= => null
+   rule Terms     ::= Term(100) Terms => cons
 
    rule Constant  ::= Longident => longConstant
 

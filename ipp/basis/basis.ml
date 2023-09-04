@@ -58,6 +58,32 @@ module Int : INTEGER with type int = int =
       let fromInt x = x
       let toInt x = x
 
+      let rec natrecUpLoop f x i n =
+         if i = n then
+            x
+         else
+            natrecUpLoop f (f i x) (i+1) n
+
+      let natrecUp f x n =
+         if n < 0 then
+            raise (Invalid_argument "negative argument to natrecUp")
+         else
+            natrecUpLoop f x 0 n
+
+      let rec natrecDownLoop f x i =
+         if i = 0 then
+            x
+         else
+            let i' = i - 1
+            in
+               natrecDownLoop f (f i' x) i'
+
+      let natrecDown f x n =
+         if n < 0 then
+            raise (Invalid_argument "negative argument to natrecDown")
+         else
+            natrecDownLoop f x n
+
    end
 
 
@@ -96,6 +122,32 @@ module IntInf : INT_INF with type int = Z.t =
 
       let fromInt = Z.of_int
       let toInt = Z.to_int
+
+      let rec natrecUpLoop f x i n =
+         if Z.equal i n then
+            x
+         else
+            natrecUpLoop f (f i x) (Z.add i Z.one) n
+
+      let natrecUp f x n =
+         if Z.lt n Z.zero then
+            raise (Invalid_argument "negative argument to IntInf.natrecUp")
+         else
+            natrecUpLoop f x Z.zero n
+
+      let rec natrecDownLoop f x i =
+         if Z.equal i Z.zero then
+            x
+         else
+            let i' = Z.sub i Z.one
+            in
+               natrecDownLoop f (f i' x) i'
+
+      let natrecDown f x n =
+         if Z.lt n Z.zero then
+            raise (Invalid_argument "negative argument to IntInf.natrecDown")
+         else
+            natrecDownLoop f x n
 
       let pow = Z.pow
       let log2 = Z.log2
@@ -363,6 +415,18 @@ module List : LIST with type 'a list = 'a list =
          in
             l'
 
+      let rec tabulateLoop i n f acc =
+         if i = n then
+            List.rev acc
+         else
+            tabulateLoop (i+1) n f (f i :: acc)
+
+      let tabulate n f =
+         if n < 0 then
+            raise (Invalid_argument "size")
+         else
+            tabulateLoop 0 n f []
+
    end
 
 
@@ -505,6 +569,34 @@ module Option : OPTION with type 'a option = 'a option =
    end
 
 
+(* Need this before Array is shadowed. *)
+module Vector : VECTOR =
+   struct
+
+      type nonrec 'a vector = 'a array
+
+      let fromList = Array.of_list
+      let tabulate = Array.init  (* I am told that we can rely on init applying the initializer in increasing order. *)
+      let length = Array.length
+      let sub = Array.get
+      let foldl f b a = Array.fold_left (fun y x -> f x y) b a
+      let foldr f b a = Array.fold_right f a b
+      let app = Array.iter
+      let appi = Array.iteri
+
+      let foldli f b a =
+         let (_, y) = Array.fold_left (fun (i, y) x -> (i+1, f i x y)) (0, b) a
+         in
+            y
+
+      let foldri f b a =
+         let (_, y) = Array.fold_right (fun x (i, y) -> (i+1, f i x y)) a (0, b)
+         in
+            y
+
+   end
+
+
 module Array : ARRAY with type 'a array = 'a array =
    struct
 
@@ -512,7 +604,7 @@ module Array : ARRAY with type 'a array = 'a array =
 
       let array = Array.make
       let fromList = Array.of_list
-      let tabulate = Array.init
+      let tabulate = Array.init  (* I am told that we can rely on init applying the initializer in increasing order. *)
       let length = Array.length
       let sub = Array.get
       let update = Array.set

@@ -13,7 +13,8 @@ signature UNPARSING =
       val break : int -> content
       val append : content list -> content
       val box : content -> content
-      val boxi : int -> content -> content  (* box with custom indentation *)
+      val boxi : int -> content -> content   (* box with custom indentation *)
+      val vboxi : int -> content -> content  (* vertical box with custom indentation *)
       val parens : bool -> content -> content
 
       (* will not match the entire term; returned content takes the precedence as an argument *)
@@ -82,11 +83,23 @@ signature SHOW =
 
       val enable : Constant.constant -> bool -> unit
       val disableAll : bool ref
+      val sugarFnind : bool ref
 
    end
 
 
-structure Show :> SHOW =
+structure ShowInternal
+   :> sig
+         include SHOW
+
+         type 'a unparser_ = bool -> int -> Directory.directory -> Term.term -> 'a
+
+         exception NoMatch
+
+         val exposeUnparser : 'a Unparsing.unparser -> 'a unparser_
+         val hideUnparser : 'a unparser_ -> 'a Unparsing.unparser
+      end
+   =
    struct
 
       structure PP = PrettyPrint
@@ -491,12 +504,15 @@ structure Show :> SHOW =
 
       exception NoMatch
 
-      (* matching the entire term?,
-         margin, 
-         dir,
-         term to unparse
-      *)
-      type 'a unparser = bool -> int -> Directory.directory -> T.term -> 'a
+      type 'a unparser =
+         bool                    (* are we matching the entire term?
+                                    (There's no use for the show combinator to match an entire
+                                    term because that would result in looping)
+                                 *)
+         -> int                  (* "margin": the index to start naming unnamed free variables at *)
+         -> Directory.directory  (* the directory *)
+         -> T.term               (* term to unparse *)
+         -> 'a
 
       structure H = ConstantTable
 
@@ -511,7 +527,14 @@ structure Show :> SHOW =
          end
 
       val disableAll = ref false
-                
+
+      (* Actually used in Datatype, not Show, but belong here because it's a control for show. *)
+      val sugarFnind = ref true
+
+      type 'a unparser_ = 'a unparser
+      fun exposeUnparser x = x
+      fun hideUnparser x = x
+
 
       val showSubstitutions = ref false
       val showImplicits = ref false
@@ -557,7 +580,6 @@ structure Show :> SHOW =
 
       (* dir: names of free variables,
          margin: number to start naming unnamed free variables at 
-         evars: within the unfolding of these evars (for detecting cycles)
       *)
       fun showMain pp margin dir prec m s spine =
          (case m of
@@ -844,7 +866,7 @@ structure Show :> SHOW =
 
 
 
-      structure Unparsing :> UNPARSING =
+      structure Unparsing =
          struct
 
             type constant = T.constant
@@ -869,6 +891,13 @@ structure Show :> SHOW =
             fun boxi i c pp =
                (
                PP.openBox pp PP.Consistent i;
+               c pp;
+               PP.closeBox pp
+               )
+
+            fun vboxi i c pp =
+               (
+               PP.openBox pp PP.Vertical i;
                c pp;
                PP.closeBox pp
                )
@@ -1151,3 +1180,11 @@ structure Show :> SHOW =
          (fn pp => showHyps pp ctx dir)
 
    end
+
+
+structure Show 
+   :> SHOW 
+      where type Unparsing.content = ShowInternal.Unparsing.content
+      where type 'a Unparsing.unparser = 'a ShowInternal.Unparsing.unparser
+      where type 'a Unparsing.sunparser = 'a ShowInternal.Unparsing.sunparser
+ = ShowInternal

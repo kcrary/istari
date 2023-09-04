@@ -175,6 +175,7 @@ signature Smlbasis__LIST =
       val filter : ('a -> bool) -> 'a list -> 'a list
       val exists : ('a -> bool) -> 'a list -> bool
       val all : ('a -> bool) -> 'a list -> bool
+      val tabulate : int * (int -> 'a) -> 'a list
 
    end
 
@@ -236,6 +237,26 @@ signature Smlbasis__ARRAY =
       val foldri : (int * 'a * 'b -> 'b) -> 'b -> 'a array -> 'b
       val app : ('a -> unit) -> 'a array -> unit
       val appi : (int * 'a -> unit) -> 'a array -> unit
+
+   end
+
+
+signature Smlbasis__VECTOR =
+   sig
+
+      type 'a vector
+
+      val fromList : 'a list -> 'a vector
+      val tabulate : int * (int -> 'a) -> 'a vector
+      val length : 'a vector -> int
+      val sub : 'a vector * int -> 'a
+
+      val foldl : ('a * 'b -> 'b) -> 'b -> 'a vector -> 'b
+      val foldli : (int * 'a * 'b -> 'b) -> 'b -> 'a vector -> 'b
+      val foldr : ('a * 'b -> 'b) -> 'b -> 'a vector -> 'b
+      val foldri : (int * 'a * 'b -> 'b) -> 'b -> 'a vector -> 'b
+      val app : ('a -> unit) -> 'a vector -> unit
+      val appi : (int * 'a -> unit) -> 'a vector -> unit
 
    end
 
@@ -387,6 +408,7 @@ signature IML__SMLBASIS =
       structure ListPair : Smlbasis__LIST_PAIR
       structure Option : Smlbasis__OPTION where type 'a option = 'a Option.option
       structure Array : Smlbasis__ARRAY where type 'a array = 'a Array.array
+      structure Vector : Smlbasis__VECTOR where type 'a vector = 'a Vector.vector
       structure Word8Array : Smlbasis__MONO_ARRAY where type elem = Word8.word where type array = Word8Array.array 
       structure Word8ArraySlice : Smlbasis__MONO_ARRAY_SLICE where type elem = Word8.word where type array = Word8Array.array where type slice = Word8ArraySlice.slice
       structure IO : Smlbasis__IO
@@ -427,6 +449,7 @@ structure OriginalBasis =
       structure ListPair = ListPair
       structure Option = Option
       structure Array = Array
+      structure Vector = Vector
       structure Word8Array = Word8Array
       structure Word8ArraySlice = Word8ArraySlice
 

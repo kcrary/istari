@@ -322,6 +322,18 @@ module List : LIST with type 'a list = 'a list =
       let foldl f b l = List.fold_left (fun y x -> f (x, y)) b l
       let foldr f b l = List.fold_right (fun x y -> f (x, y)) l b
 
+      let rec tabulateLoop i n f acc =
+         if i = n then
+            List.rev acc
+         else
+            tabulateLoop (i+1) n f (f i :: acc)
+
+      let tabulate (n, f) =
+         if n < 0 then
+            raise (Invalid_argument "size")
+         else
+            tabulateLoop 0 n f []
+
    end
 
 
@@ -588,6 +600,41 @@ module Word8ArraySlice : MONO_ARRAY_SLICE with type elem = Word8.word with type 
    end
 
 
+(* Before Array so as not to have the primitive Array library shadowed yet. *)
+module Vector : VECTOR =
+   struct
+
+      type nonrec 'a vector = 'a array
+
+      let fromList = Array.of_list
+      
+      let tabulate (n, f) = Array.init n f
+
+      let length = Array.length
+
+      let sub (a, i) =
+         try
+            Array.get a i
+         with Invalid_argument _ -> raise Subscript
+         
+      let foldl f b a = Array.fold_left (fun y x -> f (x, y)) b a
+      let foldr f b a = Array.fold_right (fun x y -> f (x, y)) a b
+      let app = Array.iter
+      let appi f a = Array.iteri (fun i x -> f (i, x)) a
+
+      let foldli f b a =
+         let (_, y) = Array.fold_left (fun (i, y) x -> (i+1, f (i, x, y))) (0, b) a
+         in
+            y
+
+      let foldri f b a =
+         let (_, y) = Array.fold_right (fun x (i, y) -> (i-1, f (i, x, y))) a (Array.length a - 1, b)
+         in
+            y
+
+   end
+
+
 module Array : ARRAY with type 'a array = 'a array =
    struct
 
@@ -595,7 +642,9 @@ module Array : ARRAY with type 'a array = 'a array =
 
       let array (n, x) = Array.make n x
       let fromList = Array.of_list
+
       let tabulate (n, f) = Array.init n f
+
       let length = Array.length
 
       let sub (a, i) =
@@ -612,6 +661,18 @@ module Array : ARRAY with type 'a array = 'a array =
       let foldr f b a = Array.fold_right (fun x y -> f (x, y)) a b
       let app = Array.iter
       let appi f a = Array.iteri (fun i x -> f (i, x)) a
+
+      let rec tabulateLoop i n f acc =
+         if i = n then
+            Array.of_list (List.rev acc)
+         else
+            tabulateLoop (i+1) n f (f i :: acc)
+         
+      let tabulate (n, f) =
+         if n < 0 then
+            raise (Invalid_argument "size")
+         else
+            tabulateLoop 0 n f []
 
       let foldli f b a =
          let (_, y) = Array.fold_left (fun (i, y) x -> (i+1, f (i, x, y))) (0, b) a

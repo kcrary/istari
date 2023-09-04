@@ -4,11 +4,12 @@ signature DATATYPE =
 
       type symbol = Symbol.symbol
       type eterm = ETerm.eterm
+      type constant = Constant.constant
 
       type typedef =
          (symbol * eterm) list               (* invisible pervasive arguments *)
          *
-         (symbol * eterm) list               (* pervasive arguments *)
+         (symbol * eterm) list               (* visible pervasive arguments *)
          *
          eterm                               (* universe *)
          *
@@ -37,7 +38,39 @@ signature DATATYPE =
       val rapid : bool ref
 
       (* List of constructors for each datatype. *)
-      val constructors : Constant.constant list ConstantTable.table
+      val constructors : constant -> constant list option
+
+      type bundle =
+         int                          (* number of invisible pervasive arguments *)
+         *
+         int                          (* number of visible pervasive arguments *)
+         *
+         int                          (* number of mutually recursive datatypes *)
+         *
+            (* each mutually recursive data type *)
+            (
+            constant                  (* the datatype *)
+            *
+            constant                  (* its iterator *)
+            *
+            int                       (* number of index arguments *)
+            *
+            int                       (* number of constructors *)
+            *
+            (* each constructor *)
+               (
+               constant               (* the constructor *)
+               *
+               int                    (* constructor's number of arguments *)
+               *
+               int option list        (* which of the constructor's arguments are internal, and if so, for what datatype # *)
+               *
+               Reduction.ureduction2  (* the reduction for the iterator applied to the constructor *)
+               ) Vector.vector
+            ) Vector.vector
+
+      (* returns (which datatype this is out of the bundle, the bundle) *)
+      val info : constant -> (int * bundle) option
 
    end
 
@@ -71,8 +104,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       structure R = ReductionInternal
       structure RR = RegistryInternal
       structure S = Seq
+      structure SH = ShowInternal
       structure T = Term
       structure U = Unify
+      structure UP = Show.Unparsing
       structure X = XTerm
 
       type symbol = Symbol.symbol
@@ -935,7 +970,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       val cPsym = Symbol.fromValue "P"
 
 
-      fun unshift m = T.Sub (m, T.Dot (T.Const Prim.bogus, T.id))  (* XX orphan *)
+      fun unshift m = T.Sub (m, T.Dot (T.Const Prim.orphan, T.id))
 
       (* for unpackConstr *)
       datatype entry = Item of (int * term) | Subst of T.sub
@@ -965,48 +1000,50 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       datatype type_environment =
          TENV of
          {
-         const : constant,                 (* the type constant *)
-         red : R.reduction,                (* unfolds the constant *)
-         args : (T.binder * mxterm) list,  (* the index arguments *)
-         numargs : int,                    (* the number of index arguments *)
-         adisj : mxterm,                   (* the disjunct of "a" corresponding to this datatype *)
-         iterator : constant,              (* the iterator constant *)
-         strip : constant,                 (* the strip constant *)
+         const : constant,                  (* the type constant *)
+         red : R.reduction,                 (* unfolds the constant *)
+         args : (T.binder * mxterm) list,   (* the index arguments *)
+         numargs : int,                     (* the number of index arguments *)
+         adisj : mxterm,                    (* the disjunct of "a" corresponding to this datatype *)
+         iterator : constant,               (* the iterator constant *)
+         strip : constant,                  (* the strip constant *)
          }
 
       datatype con_environment =
          CENV of
          {
-         const : constant,                 (* the constructor constant *)
-         red : R.reduction,                (* unfolds the constant *)
-         tpnum : int,                      (* belongs to this datatype # *)
-         connum : int,                     (* is constructor # *)
-         args : mxterm conarg list,        (* the constructor's argument *)
-         numargs : int,                    (* the constructor's number of arguments *)
-         indices : mxterm list,            (* the constructor's indices *)
+         const : constant,                  (* the constructor constant *)
+         red : R.reduction,                 (* unfolds the constant *)
+         tpnum : int,                       (* belongs to this datatype # *)
+         connum : int,                      (* is constructor # *)
+         args : mxterm conarg list,         (* the constructor's arguments *)
+         numargs : int,                     (* the constructor's number of arguments *)
+         indices : mxterm list,             (* the constructor's indices *)
+         iteratorReduction : R.ureduction2  (* the iterator reduction for this constructor *)
          }
 
       datatype environment =
          ENV of
          {
-         invis : (symbol * mxtype) list,                       (* invisible pervasives *)
-         invisnum : int,                                       (* number of invisible pervasives *)
-         pers : (symbol * mxtype) list,                        (* visible pervasives *)
-         persnum : int,                                        (* number of visible pervasives *)
-         univ : mxterm,                                        (* the universe *)
-         a : mxterm,                                           (* the "a" when the datatype is written as "dt a dcons" *)
-         dcons : mxterm,                                       (* the "dcons" when the datatype is written as "dt a dcons" *)
-         tplist : type_environment list,                       (* for each datatype, in order *)
-         conlist : con_environment list,                       (* for each constructor, in order *)
-         skeleton : constant,                                  (* the skeleton constant *)
-         subterm : constant,                                   (* the subterm constant *)
-         subtermWf : constant,                                 (* the subterm-well-founded constant *)
-         discriminators : constant Array.array,                (* the discriminators *)
-         extractorTypes : constant Array.array,                (* the extractor types *)
-         extractors : constant Array.array,                    (* the extractors *)
-         discriminatorReductions : R.ureduction2 Array.array,  (* the discriminator's reductions *)
-         extractorTypeReductions : R.ureduction2 Array.array,  (* the extractor type's reductions *)
-         extractorReductions : R.ureduction2 Array.array,      (* the extractor type's reductions *)
+         invis : (symbol * mxtype) list,                         (* invisible pervasives *)
+         invisnum : int,                                         (* number of invisible pervasives *)
+         pers : (symbol * mxtype) list,                          (* visible pervasives *)
+         persnum : int,                                          (* number of visible pervasives *)
+         univ : mxterm,                                          (* the universe *)
+         a : mxterm,                                             (* the "a" when the datatype is written as "dt a dcons" *)
+         dcons : mxterm,                                         (* the "dcons" when the datatype is written as "dt a dcons" *)
+         tplist : type_environment list,                         (* for each datatype, in order *)
+         conlist : con_environment list,                         (* for each constructor, in order *)
+         skeleton : constant,                                    (* the skeleton constant *)
+         subterm : constant,                                     (* the subterm constant *)
+         subtermWf : constant,                                   (* the subterm-well-founded constant *)
+         discriminators : constant Vector.vector,                (* the discriminators *)
+         extractorTypes : constant Vector.vector,                (* the extractor types *)
+         extractors : constant Vector.vector,                    (* the extractors *)
+         discriminatorReductions : R.ureduction2 Vector.vector,  (* the discriminator's reductions *)
+         extractorTypeReductions : R.ureduction2 Vector.vector,  (* the extractor type's reductions *)
+         extractorReductions : R.ureduction2 Vector.vector,      (* the extractor type's reductions *)
+         totalConstructors : int,                                (* the total number of constructors *)
          }
 
       val theDatatypes : environment list CR.cref = CR.new []
@@ -1057,25 +1094,26 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
       val puCenv : con_environment P.pu =
          P.wrap
-            (fn CENV {const, red, tpnum, connum, args, numargs, indices} =>
-                (const, red, tpnum, connum, args, numargs, indices))
-            (fn (const, red, tpnum, connum, args, numargs, indices) =>
-                CENV {const=const, red=red, tpnum=tpnum, connum=connum, args=args, numargs=numargs, indices=indices})
-            (P.tuple7
+            (fn CENV {const, red, tpnum, connum, args, numargs, indices, iteratorReduction} =>
+                (const, red, tpnum, connum, args, numargs, indices, iteratorReduction))
+            (fn (const, red, tpnum, connum, args, numargs, indices, iteratorReduction) =>
+                CENV {const=const, red=red, tpnum=tpnum, connum=connum, args=args, numargs=numargs, indices=indices, iteratorReduction=iteratorReduction})
+            (P.tuple8
                 PP.puConstant
                 R.puReduction
                 P.int
                 P.int
                 (P.list puConarg)
                 P.int
-                (P.list pumx))
+                (P.list pumx)
+                R.puUreduction2)
                
       val puEnv : environment P.pu =
          P.wrap
-            (fn ENV {invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions} =>
-                (invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, (skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions)))
-            (fn (invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, (skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions)) =>
-                ENV {invis=invis, invisnum=invisnum, pers=pers, persnum=persnum, univ=univ, a=a, dcons=dcons, tplist=tplist, conlist=conlist, skeleton=skeleton, subterm=subterm, subtermWf=subtermWf, discriminators=discriminators, extractorTypes=extractorTypes, extractors=extractors, discriminatorReductions=discriminatorReductions, extractorTypeReductions=extractorTypeReductions, extractorReductions=extractorReductions})
+            (fn ENV {invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions, totalConstructors} =>
+                (invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, (skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions, totalConstructors)))
+            (fn (invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, (skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions, totalConstructors)) =>
+                ENV {invis=invis, invisnum=invisnum, pers=pers, persnum=persnum, univ=univ, a=a, dcons=dcons, tplist=tplist, conlist=conlist, skeleton=skeleton, subterm=subterm, subtermWf=subtermWf, discriminators=discriminators, extractorTypes=extractorTypes, extractors=extractors, discriminatorReductions=discriminatorReductions, extractorTypeReductions=extractorTypeReductions, extractorReductions=extractorReductions, totalConstructors=totalConstructors})
             (P.tuple10
                 (P.list (P.pair PP.puSymbol pumxt))
                 P.int
@@ -1086,16 +1124,17 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                 pumx
                 (P.list puTenv)
                 (P.list puCenv)
-                (P.tuple9
+                (P.tuple10
                     PP.puConstant
                     PP.puConstant
                     PP.puConstant
-                    (P.array PP.puConstant)
-                    (P.array PP.puConstant)
-                    (P.array PP.puConstant)
-                    (P.array R.puUreduction2)
-                    (P.array R.puUreduction2)
-                    (P.array R.puUreduction2)))
+                    (P.vector PP.puConstant)
+                    (P.vector PP.puConstant)
+                    (P.vector PP.puConstant)
+                    (P.vector R.puUreduction2)
+                    (P.vector R.puUreduction2)
+                    (P.vector R.puUreduction2)
+                    P.int))
 
 
 
@@ -1113,8 +1152,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             val dcons = X.use dcons_mobile
             val univ = X.use univ_mobile
 
-            val typeInfo = Array.fromList tplist
-            val conInfo = Array.fromList conlist
+            val typeInfo = Vector.fromList tplist
+            val conInfo = Vector.fromList conlist
             
             val (_, typeConstantsInvert) =
                List.foldl
@@ -1209,7 +1248,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       refine (Rule.exchange (hyp+1) 1 1)
                       >>
                       let
-                         val TENV {const, red} = Array.sub typeInfo i
+                         val TENV {const, red} = Vector.sub typeInfo i
                       in
                          refine (Rule.unreduceHyp (hyp+2)
                                     (T.Elim 
@@ -1321,7 +1360,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                  >>
                                  (* G, <arguments>, <equalities>, ... |- ... *)
                                  let
-                                    val CENV {const=conConst, red} = Array.sub conInfo j
+                                    val CENV {const=conConst, red} = Vector.sub conInfo j
                                  in
                                     DE.refold origjud hyp (numargs+eqs)
                                        (T.Elim
@@ -1375,7 +1414,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                                  | [] => (IP.And [], []))
                             else
-                               (IP.And [], [])
+                               (IP.And [], pats)
 
                          do (jud, _) = withgoal
 
@@ -1406,7 +1445,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                 (try
                                     let
                                        val i = CD.lookup typeConstantsInvert const
-                                       val TENV {red, args, adisj} = Array.sub typeInfo i
+                                       val TENV {red, args, adisj} = Vector.sub typeInfo i
                                        val sinvis = collectInvis invis X.id
                                        val (s, persact, spine') = collectPers pers spine sinvis []
                                        val a_s = X.sub a s
@@ -1789,7 +1828,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                        | SOME i => i)
 
-                  val d = T.Elim (T.Const (Array.sub discriminators pos), spine)
+                  val d = T.Elim (T.Const (Vector.sub discriminators pos), spine)
 
                   val (_, dtac) = Infer.infer (J.context jud) d (fns _ _ => idtac)
 
@@ -1811,8 +1850,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                              (R.compat
                                  [
                                  R.refl,
-                                 R.trans [R.within [2] (R.user2 (Array.sub discriminatorReductions mpos)), R.native],
-                                 R.trans [R.within [2] (R.user2 (Array.sub discriminatorReductions npos)), R.native]
+                                 R.trans [R.within [2] (R.user2 (Vector.sub discriminatorReductions mpos)), R.native],
+                                 R.trans [R.within [2] (R.user2 (Vector.sub discriminatorReductions npos)), R.native]
                                  ]))
                   >>+
                   (* (eqzb mpos (D M)) = (eqzb mpos (D N)) : bool *)
@@ -1881,8 +1920,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                        | SOME i => i)
 
-                  val e = T.Elim (T.Const (Array.sub extractors pos), spine)
-                  val et = T.Elim (T.Const (Array.sub extractorTypes pos), spine)
+                  val e = T.Elim (T.Const (Vector.sub extractors pos), spine)
+                  val et = T.Elim (T.Const (Vector.sub extractorTypes pos), spine)
 
                   val (_, etac) = Infer.infer (J.context jud) e (fns _ _ => idtac)
                in
@@ -1917,9 +1956,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       refine (Rule.reduceHyp 0
                                  (R.compat
                                      [
-                                     R.user2 (Array.sub extractorTypeReductions mpos),
-                                     R.user2 (Array.sub extractorReductions mpos),
-                                     R.user2 (Array.sub extractorReductions mpos)
+                                     R.user2 (Vector.sub extractorTypeReductions mpos),
+                                     R.user2 (Vector.sub extractorReductions mpos),
+                                     R.user2 (Vector.sub extractorReductions mpos)
                                      ]))
                       >>+
                       (* package = package' : package-type |- C[^] *)
@@ -1956,10 +1995,318 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-      val constructors : constant list ConstantTable.table = ConstantTable.table ()
+
+      type bundle =
+         int                          (* number of invisible pervasive arguments *)
+         *
+         int                          (* number of visible pervasive arguments *)
+         *
+         int                          (* number of mutually recursive datatypes *)
+         *
+            (* each mutually recursive data type *)
+            (
+            constant                  (* the datatype *)
+            *
+            constant                  (* its iterator *)
+            *
+            int                       (* number of index arguments *)
+            *
+            int                       (* number of constructors *)
+            *
+            (* each constructor *)
+               (
+               constant               (* the constructor *)
+               *
+               int                    (* constructor's number of arguments *)
+               *
+               int option list        (* which of the constructor's arguments are internal, and if so, for what datatype # *)
+               *
+               Reduction.ureduction2  (* the reduction for the iterator applied to the constructor *)
+               ) Vector.vector
+            ) Vector.vector
+
+      val theConstructors : constant list ConstantTable.table = ConstantTable.table ()
+      fun constructors const = ConstantTable.find theConstructors const
+
+      val theInfo : (int * bundle) ConstantTable.table = ConstantTable.table ()
+      fun info const = ConstantTable.find theInfo const
 
 
-      fun populate (env as ENV {persnum=numberOfVisibleArgs, tplist, conlist}) =
+
+      (* Display of inductive functions
+
+         This really ought to be in Fnind, but the dependencies make it impossible to put it there without an
+         ugly back-patch.
+      *)
+
+      fun splitOrNoMatch l n =
+         (case List.splitOpt l n of
+             SOME (l1, l2) => (l1, l2)
+
+           | NONE => raise SH.NoMatch)
+
+      val precMin = 0
+      val precMax = 100
+
+      fun iteratorUnparser n1 ((_, nPerv, nDts, dtinfo) : bundle) : UP.content UP.unparser =
+         let
+            val (_, iterator, _, _, _) = Vector.sub dtinfo n1
+         in
+            SH.hideUnparser
+            (fns _ margin dir term =>
+                if !Show.sugarFnind then
+                   (case N.simplify term of
+                       T.Elim (T.Const headconst, spine) =>
+                          if Constant.eq (headconst, iterator) then
+                             let
+                                val (pervsElims, spine') = splitOrNoMatch spine nPerv
+                                val (predsElims, restspine) = splitOrNoMatch spine' nDts
+                                
+                                val pervs =
+                                   List.map
+                                      (fn T.App m =>
+                                             SH.exposeUnparser UP.show false margin dir m precMax
+
+                                        | _ => raise SH.NoMatch)
+                                      pervsElims
+
+                                val preds =
+                                   List.mapi
+                                      (fns i elim =>
+                                          (case elim of
+                                              T.App m =>
+                                                 let
+                                                    val (_, _, nIndex, _, _) = Vector.sub dtinfo i
+
+                                                    fun loop n dir acc m =
+                                                       if n = 0 then
+                                                          (acc,
+                                                           SH.exposeUnparser UP.show false margin dir m precMin)
+                                                       else
+                                                          (case N.simplify m of
+                                                              T.Lam (binder, m1) =>
+                                                                 let
+                                                                    val (sym, dir') = D.varyAndBind dir binder
+                                                                 in
+                                                                    loop (n-1) dir' (sym :: acc) m1
+                                                                 end
+
+                                                            | _ => raise SH.NoMatch)
+                                                 in
+                                                    loop (nIndex+1) dir [] m
+                                                 end
+
+                                            | _ => raise SH.NoMatch))
+                                      predsElims
+
+                                val (recsymsRev, recdir) =
+                                   Int.natrecUp
+                                      (fns i (recsymsRev, recdir) =>
+                                          let
+                                             val (dt, _, _, _, _) = Vector.sub dtinfo i
+
+                                             val suggestion =
+                                                Symbol.fromValue $
+                                                (Symbol.toValue (List.last (Namespace.fullname dt)) ^ "_fn")
+
+                                             val (sym, recdir') = D.varyAndBind recdir (SOME suggestion)
+                                          in
+                                             (sym :: recsymsRev, recdir')
+                                          end)
+                                      ([], dir)
+                                      nDts
+                                   
+                                fun funcsLoop iDt recsyms preds spine func1 funcsAcc =
+                                   if iDt = nDts then
+                                      (* spine should now be empty *)
+                                      (func1, funcsAcc)
+                                   else
+                                      let
+                                         val (dt, _, _, nConstrs, constrs) = Vector.sub dtinfo iDt
+
+                                         fun armsLoop i spine armsAcc =
+                                            if i = nConstrs then
+                                               (armsAcc, spine)
+                                            else
+                                               (case spine of
+                                                   T.App armterm :: restspine =>
+                                                      let
+                                                         val (const, _, sorts, _) = Vector.sub constrs i
+
+                                                         fun argsLoop depth innerdir s sorts m argsAcc =
+                                                            (case sorts of
+                                                                [] =>
+                                                                   let
+                                                                      val body =
+                                                                         SH.exposeUnparser UP.show false margin innerdir (T.Sub (m, s)) precMin
+                                                                   in
+                                                                      UP.append
+                                                                         [
+                                                                         UP.break 1,  (* will be a newline because we will be in vertical mode *)
+                                                                         UP.string "| ",
+
+                                                                         UP.box $
+                                                                         UP.append
+                                                                            [
+                                                                            UP.string (Namespace.toString const),
+                                                                            
+                                                                            UP.append
+                                                                               (List.foldl
+                                                                                   (fns sym l => UP.string " " :: UP.string (Symbol.toValue sym) :: l)
+                                                                                   []
+                                                                                   argsAcc),
+   
+                                                                            UP.string " .",
+                                                                            UP.break 1,
+                                                                            UP.box body
+                                                                            ]
+                                                                         ]
+                                                                   end
+
+                                                              | NONE :: rest =>
+                                                                   (* external argument *)
+                                                                   (case N.simplify m of
+                                                                       T.Lam (binder, m1) =>
+                                                                          let
+                                                                             val (sym, innerdir') = D.varyAndBind innerdir binder
+                                                                          in
+                                                                             argsLoop (depth+1) innerdir' (T.under 1 s) rest m1 (sym :: argsAcc)
+                                                                          end
+
+                                                                     | _ => raise SH.NoMatch)
+
+                                                              | SOME indDt :: rest =>
+                                                                   (* internal argument, referring to datatype #indDt *)
+                                                                   (case N.simplify m of
+                                                                       T.Lam (binder, m1) =>
+                                                                          (case N.simplify m1 of
+                                                                              T.Lam (_, m2) =>
+                                                                                 let
+                                                                                    val (sym, innerdir') = D.varyAndBind innerdir binder
+
+                                                                                    (* The inductive result, as if the recursive functions could
+                                                                                       be called independently.
+                                                                                    *)
+                                                                                    val inductive =
+                                                                                       T.Elim (T.Var (depth + nDts - indDt),
+                                                                                               [T.App (T.Var 0)])
+                                                                                 in
+                                                                                    argsLoop (depth+1) innerdir'
+                                                                                       (T.Dot (inductive, T.under 1 s))
+                                                                                       rest m2 (sym :: argsAcc)
+                                                                                 end
+
+                                                                            | _ => raise SH.NoMatch)
+
+                                                                     | _ => raise SH.NoMatch))
+
+                                                         val arm = argsLoop 0 recdir (T.Shift nDts) sorts armterm []
+                                                      in
+                                                         armsLoop (i+1) restspine (arm :: armsAcc)
+                                                      end
+
+                                                 | _ => raise SH.NoMatch)
+
+                                         val (armsRev, restspine) = armsLoop 0 spine []
+                                      in
+                                         (case (recsyms, preds) of
+                                             (recsym :: recsyms', (thearg :: indices, pred) :: preds') =>
+                                                let
+                                                   val func =
+                                                      UP.append
+                                                         [
+                                                         (* put in a newline except for the first function *)
+                                                         if iDt = n1 then UP.string "" else UP.break 1,
+
+                                                         UP.box $
+                                                         UP.append
+                                                            [
+                                                            if iDt = n1 then UP.string "fnind " else UP.string "and ",
+                                                            UP.string (Symbol.toValue recsym),
+                                                            UP.string " : forall (",
+                                                            UP.string (Symbol.toValue thearg),
+                                                            UP.string " : ",
+                                                            UP.string (Namespace.toString dt),
+   
+                                                            (if iDt = n1 then
+                                                                (case pervs of
+                                                                    [] => UP.append []
+       
+                                                                  | perv1 :: restpervs =>
+                                                                       UP.box $
+                                                                       UP.append
+                                                                          [
+                                                                          UP.string " [",
+                                                                          UP.box perv1,
+                                                                          
+                                                                          UP.append
+                                                                             (List.map
+                                                                                 (fn perv =>
+                                                                                     UP.append
+                                                                                        [
+                                                                                        UP.string " ",
+                                                                                        UP.box perv
+                                                                                        ])
+                                                                                 restpervs),
+       
+                                                                          UP.string "]"
+                                                                          ])
+                                                             else
+                                                                UP.append []),
+
+                                                            UP.append
+                                                               (List.revMap
+                                                                   (fn sym => 
+                                                                       UP.append
+                                                                          [
+                                                                          UP.string " ",
+                                                                          UP.string (Symbol.toValue sym)
+                                                                          ])
+                                                                   indices),
+   
+                                                            UP.string ") .",
+                                                            UP.break 1,
+                                                            UP.box pred,
+                                                            UP.string " of",
+                                                            ],
+
+                                                         UP.append (List.rev armsRev)
+                                                         ]
+                                                in
+                                                   if iDt = n1 then
+                                                      funcsLoop (iDt + 1) recsyms' preds' restspine (SOME func) funcsAcc
+                                                   else
+                                                      funcsLoop (iDt + 1) recsyms' preds' restspine func1 (func :: funcsAcc)
+                                                end
+
+                                           | _ =>
+                                                (* has to look like the pattern above, or we would have failed already *)
+                                                raise (Fail "impossible"))
+                                      end
+
+                                val (func1, funcsRev) = funcsLoop 0 (List.rev recsymsRev) preds restspine NONE []
+                                val funcs = Option.valOf func1 :: List.rev funcsRev
+                             in
+                                UP.box $
+                                UP.append
+                                   [
+                                   UP.string "(",
+                                   UP.vboxi 0 (UP.append funcs),
+                                   UP.string ")"
+                                   ]
+                             end
+                          else
+                             raise SH.NoMatch
+
+                     | _ =>
+                          raise SH.NoMatch)
+                else
+                   raise SH.NoMatch)
+         end
+
+
+
+      fun populate (env as ENV {invisnum=numberOfInvisibleArgs, persnum=numberOfVisibleArgs, tplist, conlist, discriminators, totalConstructors}) =
          let
             val destructor' = destructor env
             val injector' = injector env
@@ -1980,20 +2327,64 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   tplist
 
 
-            (* populate constructors table *)
+            (* populate constructors and info tables, and the unparsing table *)
 
-            val tab = Array.array (List.length tplist) []
+            val tab = Array.array (List.length tplist) (0, [], [])
 
+            (* correlate the constructors by datataype, since (annoyingly) they are not *)
             val () =
                List.app
-                  (fn (CENV {const, tpnum}) =>
-                      Array.update tab tpnum (const :: Array.sub tab tpnum))
+                  (fn (CENV {const, tpnum, numargs, args, iteratorReduction}) =>
+                      let
+                         val (n, lshort, lfull) = Array.sub tab tpnum
+
+                         val args' =
+                            List.map
+                               (fn External _ => NONE
+                                 | Internal (i, _) => SOME i)
+                               args
+
+                         val info = (const, numargs, args', iteratorReduction)
+                      in
+                         Array.update tab tpnum 
+                            (n+1,
+                             const :: lshort,
+                             info :: lfull)
+                      end)
                   conlist
+
+            val numberOfDatatypes = Vector.length discriminators  (* a convenient way to get the count *)
+
+            val bundle =
+               (numberOfInvisibleArgs,
+                numberOfVisibleArgs,
+                numberOfDatatypes,
+                Vector.fromList
+                   (List.mapi
+                       (fns i (TENV {const=tpconst, iterator, numargs=numberOfIndexArgs}) =>
+                           let
+                              val (numberOfConstructors, _, l) = Array.sub tab i
+                           in
+                              (tpconst,
+                               iterator,
+                               numberOfIndexArgs,
+                               numberOfConstructors,
+                               Vector.fromList (List.rev l))
+                           end)
+                       tplist))
+
+            val iterArity = numberOfVisibleArgs + numberOfDatatypes + totalConstructors
 
             val () =
                List.appi 
-                  (fns i (TENV {const=tpconst}) =>
-                      ConstantTable.insert constructors tpconst (Array.sub tab i))
+                  (fns i (TENV {const=tpconst, iterator}) =>
+                      let
+                         val (_, l, _) = Array.sub tab i
+                      in
+                         ConstantTable.insert theConstructors tpconst l;
+                         ConstantTable.insert theInfo tpconst (i, bundle);
+                         ConstantTable.insert UP.unparsingTable iterator (iterArity, precMax, ref true, iteratorUnparser i bundle)
+                      end)
                   tplist
          in
             ()
@@ -2078,7 +2469,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             val a : X.xterm = X.use a_mobile
 
-            val indextps : X.mxterm Array.array = Array.fromList indextpsList
+            val indextps : X.mxterm Vector.vector = Vector.fromList indextpsList
 
 
 
@@ -2090,7 +2481,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             *)
             fun procIndices j s indices =
                let
-                  val c = X.use (Array.sub indextps j)
+                  val c = X.use (Vector.sub indextps j)
 
                   (* G |- C : Ui *)
 
@@ -2165,7 +2556,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       end)
                   allcons
 
-            val dconsarr = Array.fromList dconsl
+            val dconsarr = Vector.fromList dconsl
 
 
 
@@ -2393,7 +2784,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                List.mapi
                   (fns j (dtsym, args, constructors) =>
                       let
-                         val d = X.use (Array.sub indextps j)
+                         val d = X.use (Vector.sub indextps j)
 
                          val numberOfIndexArgs = List.length args
                          val numberOfTotalArgs = numberOfVisibleArgs + numberOfIndexArgs
@@ -2527,8 +2918,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                numberOfIndexArgs: the number of index arguments
             *)
 
-            val typeInfo = Array.fromList typeInfoList
-            val numberOfTypes = Array.length typeInfo
+            val typeInfo = Vector.fromList typeInfoList
+            val numberOfTypes = Vector.length typeInfo
 
 
 
@@ -2541,8 +2932,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                List.map
                   (fn (i, j, consym, conargs, _, indices) =>
                       let
-                         val (tpconst, _, stripconst, _, _, _) = Array.sub typeInfo i
-                         val (b, _, _) = Array.sub dconsarr j
+                         val (tpconst, _, stripconst, _, _, _) = Vector.sub typeInfo i
+                         val (b, _, _) = Vector.sub dconsarr j
 
                          fun makeCon depth s conargs xconstituents iconstituents strips =
                             (* G, G1 |- s : G, G2
@@ -2674,7 +3065,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                               | Internal (k, indices) :: rest =>
                                    let
-                                      val (kconst, _, kstripconst, _, _, _) = Array.sub typeInfo k
+                                      val (kconst, _, kstripconst, _, _, _) = Vector.sub typeInfo k
 
                                       val indices' = List.map (fn m => X.sub (X.use m) s) indices
 
@@ -2735,7 +3126,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       end)
                   allcons
 
-            val conInfo = Array.fromList conInfoList
+            val conInfo = Vector.fromList conInfoList
 
 
 
@@ -2820,7 +3211,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                (case conargs of
                    [] =>
                       let
-                         val (conConst, _, _) = Array.sub conInfo j
+                         val (conConst, _, _) = Vector.sub conInfo j
 
                          val k = predindex + numberOfTypes - 1 - i
                       in
@@ -2861,7 +3252,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                  | Internal (this_i, these_indices) :: rest =>
                       let
-                         val (this_const, _, _, _, _, _) = Array.sub typeInfo this_i
+                         val (this_const, _, _, _, _, _) = Vector.sub typeInfo this_i
 
                          val indices' = List.map (fn m => X.sub (X.use m) s) these_indices
 
@@ -3052,7 +3443,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                       underIndexArguments false ctx depth 0 (X.shift depth) args
                                       (fns _ depth' numberOfArgs s =>
                                           let
-                                             val (const, _, _, argtuple, _, _) = Array.sub typeInfo k
+                                             val (const, _, _, argtuple, _, _) = Vector.sub typeInfo k
                                           in
                                              (X.apps (xconstant constIter)
                                                  [
@@ -3084,7 +3475,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                          val (arm_def, arm_t) =
                             makeArmType i j ctx depth predindex indices (X.shift depth) [] conargs
 
-                         val (b, ms, n) = Array.sub dconsarr j
+                         val (b, ms, n) = Vector.sub dconsarr j
 
                          (* This appears after the case is added to the context, so depth+1. *)
 
@@ -3267,7 +3658,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                             typeUnderIndexArguments false ctx depth 0 (X.shift depth) args
                             (fns ctx' depth' numberOfArgs _ =>
                                 let
-                                   val (const, _, _, _, _, _) = Array.sub typeInfo depth
+                                   val (const, _, _, _, _, _) = Vector.sub typeInfo depth
                                    
                                    val xspine =
                                       natrecr numberOfPervasiveArgs
@@ -3320,7 +3711,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       end)
                   iters
 
-            val iterInfo = Array.fromList iterInfoList
+            val iterInfo = Vector.fromList iterInfoList
 
 
 
@@ -3337,9 +3728,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                List.map
                   (fn (i, j, name, conargs, numberOfConargs, _) =>
                       let
-                         val (iterConst, constName) = Array.sub iterInfo i
-                         val (_, _, _, _, _, numberOfIndexArgs) = Array.sub typeInfo i
-                         val (conConst, _, _) = Array.sub conInfo j
+                         val (iterConst, constName) = Vector.sub iterInfo i
+                         val (_, _, _, _, _, numberOfIndexArgs) = Vector.sub typeInfo i
+                         val (conConst, _, _) = Vector.sub conInfo j
 
                          val iterParams = numberOfVisibleArgs + numberOfTypes + numberOfConstructors + numberOfIndexArgs
                          val conParams = numberOfVisibleArgs + numberOfConargs
@@ -3358,8 +3749,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                                      | Internal (i', indices) =>
                                           let
-                                             val (iterConst', _) = Array.sub iterInfo i'
-                                             val (_, _, _, _, _, numberOfIndexArgs') = Array.sub typeInfo i'
+                                             val (iterConst', _) = Vector.sub iterInfo i'
+                                             val (_, _, _, _, _, numberOfIndexArgs') = Vector.sub typeInfo i'
 
                                              val iterParamsBeforeIndex = numberOfVisibleArgs + numberOfTypes + numberOfConstructors
 
@@ -3391,7 +3782,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       end)
                   allcons
 
-            val iterReductions = Array.fromList iterReductionList
+            val iterReductions = Vector.fromList iterReductionList
 
 
 
@@ -3501,17 +3892,17 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                      dts discrims
                end
 
-            val discriminators = Array.fromList discriminatorList
+            val discriminators = Vector.fromList discriminatorList
 
             val discriminatorReductionList =
                map
                   (fn (i, j, name, _, numberOfArgs, _) =>
                       let
-                         val (_, _, _, _, _, numberOfIndexArgs) = Array.sub typeInfo i
-                         val (iterConst, constName) = Array.sub iterInfo i
-                         val discrimConst = Array.sub discriminators i
-                         val (conConst, _, _) = Array.sub conInfo j
-                         val iterRed = Array.sub iterReductions j
+                         val (_, _, _, _, _, numberOfIndexArgs) = Vector.sub typeInfo i
+                         val (iterConst, constName) = Vector.sub iterInfo i
+                         val discrimConst = Vector.sub discriminators i
+                         val (conConst, _, _) = Vector.sub conInfo j
+                         val iterRed = Vector.sub iterReductions j
 
                          val r =
                             R.new2
@@ -3531,7 +3922,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       end)
                   allcons
 
-            val discriminatorReductions = Array.fromList discriminatorReductionList
+            val discriminatorReductions = Vector.fromList discriminatorReductionList
 
 
             (* The extractors (for 'yes' instances of injection) *)
@@ -3572,10 +3963,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       
                   (* the datatypes, inside the pervasive arguments *)
                   val tpsIn =
-                     Array.tabulate mut
+                     Vector.tabulate mut
                         (fn i => 
                             let
-                               val (const, _, _, _, _, _) = Array.sub typeInfo i
+                               val (const, _, _, _, _, _) = Vector.sub typeInfo i
                             in
                                X.apps (X.constant const) pervargs
                             end)
@@ -3605,9 +3996,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                    
                               | _ =>
                                    let
-                                      val (_, _, _, _, _, numberOfIndexArgs) = Array.sub typeInfo dtsSoFar
-                                      val (iterconst, _) = Array.sub iterInfo dtsSoFar
-                                      val discrimconst = Array.sub discriminators dtsSoFar
+                                      val (_, _, _, _, _, numberOfIndexArgs) = Vector.sub typeInfo dtsSoFar
+                                      val (iterconst, _) = Vector.sub iterInfo dtsSoFar
+                                      val discrimconst = Vector.sub discriminators dtsSoFar
 
                                       val numberOfConstructorsHere = List.length cons
       
@@ -3643,7 +4034,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                                      (fn t =>
                                                                          X.prodUniv
                                                                             (X.apps
-                                                                                (X.weaken (Array.sub tpsIn j) numext)
+                                                                                (X.weaken (Vector.sub tpsIn j) numext)
                                                                                 (List.map X.use indices))
                                                                             t))))
                                                          (fn (numext, _) => X.unitUniv (X.weaken univ numext))
@@ -3674,7 +4065,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                                             (tot - depth - 1)
                                                                             (X.forget
                                                                                 (X.apps
-                                                                                    (X.weaken (Array.sub tpsIn j) depth)
+                                                                                    (X.weaken (Vector.sub tpsIn j) depth)
                                                                                     (List.map (fn m => X.sub (X.use m) s) indices)))
                                                                          :: elems))))
                                                          (fn _ => [])
@@ -3768,7 +4159,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                             (fns i (name, args, _) (_, t) =>
                                                 let
                                                    val pos = consSoFar + i
-                                                   val (conConst, _, _) = Array.sub conInfo pos
+                                                   val (conConst, _, _) = Vector.sub conInfo pos
                                                    val numberOfArgs = List.length args
 
                                                    val pre =
@@ -3776,7 +4167,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                          ([
                                                           R.unfold,
                                                           R.betas,
-                                                          R.compat [R.user2 (Array.sub discriminatorReductions pos)],
+                                                          R.compat [R.user2 (Vector.sub discriminatorReductions pos)],
                                                           R.user1 PrimReduction.reduce_lett,
                                                           R.beta 1
                                                           ]
@@ -3863,9 +4254,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                             (fns i (name, args, _) =>
                                                 let
                                                    val pos = consSoFar + i
-                                                   val (conConst, _, _) = Array.sub conInfo pos
+                                                   val (conConst, _, _) = Vector.sub conInfo pos
                                                    val numberOfArgs = List.length args
-                                                   val iterRed = Array.sub iterReductions pos
+                                                   val iterRed = Vector.sub iterReductions pos
 
                                                    val pre =
                                                       R.trans [R.unfold, R.betas, R.user2 iterRed, R.betas]
@@ -3905,10 +4296,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                    List.rev extractorReductionListRev)
                end
 
-            val extractorTypes = Array.fromList extractorTypeList
-            val extractors = Array.fromList extractorList
-            val extractorTypeReductions = Array.fromList extractorTypeReductionList
-            val extractorReductions = Array.fromList extractorReductionList
+            val extractorTypes = Vector.fromList extractorTypeList
+            val extractors = Vector.fromList extractorList
+            val extractorTypeReductions = Vector.fromList extractorTypeReductionList
+            val extractorReductions = Vector.fromList extractorReductionList
 
 
 
@@ -3922,10 +4313,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   typeInfoList indextpsList iterInfoList
 
             val conlist =
-               map2 
-                  (fns (const, red, _) (i, j, _, args, numargs, indices) =>
-                      CENV {const=const, red=red, tpnum=i, connum=j, args=args, numargs=numargs, indices=indices})
-                  conInfoList allcons
+               map3
+                  (fns (const, red, _) (i, j, _, args, numargs, indices) iteratorReduction =>
+                      CENV {const=const, red=red, tpnum=i, connum=j, args=args, numargs=numargs, indices=indices, iteratorReduction=iteratorReduction})
+                  conInfoList allcons iterReductionList
 
             val env =
                ENV
@@ -3947,7 +4338,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                extractors = extractors,
                discriminatorReductions = discriminatorReductions,
                extractorTypeReductions = extractorTypeReductions,
-               extractorReductions = extractorReductions
+               extractorReductions = extractorReductions,
+               totalConstructors = numberOfConstructors,
                }
          in
             populate env;
@@ -3981,9 +4373,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             List.app (fn (const, _) => close const) iterInfoList;
 
-            Array.app (fn const => close const) discriminators;
-            Array.app (fn const => close const) extractorTypes;
-            Array.app (fn const => close const) extractors
+            Vector.app (fn const => close const) discriminators;
+            Vector.app (fn const => close const) extractorTypes;
+            Vector.app (fn const => close const) extractors
                    
          end
 

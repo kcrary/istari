@@ -42,7 +42,9 @@ functor TheBasis (datatype data =
           ("toString", E 0),
           ("toStringStd", E 0),
           ("fromInt", E 0),
-          ("toInt", E 0)]
+          ("toInt", E 0),
+          ("natrecUp", E 0),
+          ("natrecDown", E 0)]
       
       val sig1_INT_INF =
          [("int", T),
@@ -76,7 +78,9 @@ functor TheBasis (datatype data =
           ("andb", E 0),
           ("notb", E 0),
           ("shl", E 0),
-          ("shr", E 0)]
+          ("shr", E 0),
+          ("natrecUp", E 0),
+          ("natrecDown", E 0)]
       
       val sig1_WORD =
          [("word", T),
@@ -176,7 +180,8 @@ functor TheBasis (datatype data =
           ("findmap", E 0),
           ("filter", E 0),
           ("exists", E 0),
-          ("all", E 0)]
+          ("all", E 0),
+          ("tabulate", E 0)]
       
       val sig1_LIST_PAIR =
          [("UnequalLengths", E 0),
@@ -215,6 +220,19 @@ functor TheBasis (datatype data =
           ("update", E 0),
           ("blit", E 0),
           ("subarray", E 0),
+          ("foldl", E 0),
+          ("foldli", E 0),
+          ("foldr", E 0),
+          ("foldri", E 0),
+          ("app", E 0),
+          ("appi", E 0)]
+      
+      val sig1_VECTOR =
+         [("vector", T),
+          ("fromList", E 0),
+          ("tabulate", E 0),
+          ("length", E 0),
+          ("sub", E 0),
           ("foldl", E 0),
           ("foldli", E 0),
           ("foldr", E 0),
@@ -290,6 +308,7 @@ functor TheBasis (datatype data =
           ("LIST_PAIR", S sig1_LIST_PAIR),
           ("OPTION", S sig1_OPTION),
           ("ARRAY", S sig1_ARRAY),
+          ("VECTOR", S sig1_VECTOR),
           ("IO", S sig1_IO),
           ("TEXT_IO", S sig1_TEXT_IO),
           ("BIN_IO", S sig1_BIN_IO),
@@ -309,6 +328,7 @@ functor TheBasis (datatype data =
           ("ListPair", M sig1_LIST_PAIR),
           ("Option", M sig1_OPTION),
           ("Array", M sig1_ARRAY),
+          ("Vector", M sig1_VECTOR),
           ("IO", M sig1_IO),
           ("TextIO", M sig1_TEXT_IO),
           ("BinIO", M sig1_BIN_IO),
@@ -457,7 +477,8 @@ functor TheBasis (datatype data =
           ("find", E 0),
           ("filter", E 0),
           ("exists", E 0),
-          ("all", E 0)]
+          ("all", E 0),
+          ("tabulate", E 0)]
       
       val sig2_LIST_PAIR =
          [("UnequalLengths", E 0),
@@ -494,6 +515,19 @@ functor TheBasis (datatype data =
           ("length", E 0),
           ("sub", E 0),
           ("update", E 0),
+          ("foldl", E 0),
+          ("foldli", E 0),
+          ("foldr", E 0),
+          ("foldri", E 0),
+          ("app", E 0),
+          ("appi", E 0)]
+      
+      val sig2_VECTOR =
+         [("vector", T),
+          ("fromList", E 0),
+          ("tabulate", E 0),
+          ("length", E 0),
+          ("sub", E 0),
           ("foldl", E 0),
           ("foldli", E 0),
           ("foldr", E 0),
@@ -594,6 +628,7 @@ functor TheBasis (datatype data =
           ("LIST_PAIR", S sig2_LIST_PAIR),
           ("OPTION", S sig2_OPTION),
           ("ARRAY", S sig2_ARRAY),
+          ("VECTOR", S sig2_VECTOR),
           ("MONO_ARRAY", S sig2_MONO_ARRAY),
           ("MONO_ARRAY_SLICE", S sig2_MONO_ARRAY_SLICE),
           ("IO", S sig2_IO),
@@ -614,6 +649,7 @@ functor TheBasis (datatype data =
           ("ListPair", M sig2_LIST_PAIR),
           ("Option", M sig2_OPTION),
           ("Array", M sig2_ARRAY),
+          ("Vector", M sig2_VECTOR),
           ("Word8Array", M sig2_MONO_ARRAY),
           ("Word8ArraySlice", M sig2_MONO_ARRAY_SLICE),
           ("IO", M sig2_IO),

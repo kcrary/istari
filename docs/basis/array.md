@@ -24,3 +24,7 @@
        end
     
     structure Array : ARRAY
+
+- `tabulate : int -> (int -> 'a) -> 'a array`
+
+  Applies the initializer in order of increasing index.

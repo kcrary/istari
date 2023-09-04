@@ -45,6 +45,9 @@ module type INTEGER =
       val toInt : int -> prim__int
       val fromInt : prim__int -> int
 
+      val natrecUp : (int -> 'a -> 'a) -> 'a -> int -> 'a
+      val natrecDown : (int -> 'a -> 'a) -> 'a -> int -> 'a
+
    end
 
 
@@ -196,6 +199,7 @@ module type LIST =
       val filter : ('a -> bool) -> 'a list -> 'a list
       val exists : ('a -> bool) -> 'a list -> bool
       val all : ('a -> bool) -> 'a list -> bool
+      val tabulate : int -> (int -> 'a) -> 'a list
 
    end
 
@@ -259,6 +263,26 @@ module type ARRAY =
       val foldri : (int -> 'a -> 'b -> 'b) -> 'b -> 'a array -> 'b
       val app : ('a -> unit) -> 'a array -> unit
       val appi : (int -> 'a -> unit) -> 'a array -> unit
+
+   end
+
+
+module type VECTOR =
+   sig
+
+      type 'a vector
+
+      val fromList : 'a list -> 'a vector
+      val tabulate : int -> (int -> 'a) -> 'a vector
+      val length : 'a vector -> int
+      val sub : 'a vector -> int -> 'a
+
+      val foldl : ('a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
+      val foldli : (int -> 'a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
+      val foldr : ('a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
+      val foldri : (int -> 'a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
+      val app : ('a -> unit) -> 'a vector -> unit
+      val appi : (int -> 'a -> unit) -> 'a vector -> unit
 
    end
 

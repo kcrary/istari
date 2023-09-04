@@ -37,6 +37,7 @@
           val filter : ('a -> bool) -> 'a list -> 'a list
           val exists : ('a -> bool) -> 'a list -> bool
           val all : ('a -> bool) -> 'a list -> bool
+          val tabulate : int -> (int -> 'a) -> 'a list
     
        end
     
@@ -57,3 +58,7 @@
 - `revMapi : (int -> 'a -> 'b) -> 'a list -> 'b list`
 
   Given `f` and `l`, returns `rev (mapi f l)` but possibly more efficient.
+
+- `tabulate : int -> (int -> 'a) -> 'a list`
+
+  Applies the initializer in order of increasing index.

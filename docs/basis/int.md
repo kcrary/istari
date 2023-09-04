@@ -33,6 +33,9 @@
           val toInt : int -> Int.int
           val fromInt : Int.int -> int
 
+          val natrecUp : (int -> 'a -> 'a) -> 'a -> int -> 'a
+          val natrecDown : (int -> 'a -> 'a) -> 'a -> int -> 'a
+
        end
     
     structure Int : INTEGER where type int = Pervasive.int
@@ -66,3 +69,12 @@
 - `toStringStd : int -> string`
 
   Prints negative numbers using standard notation (*e.g.,* `-12`).
+
+- `natrecUp : (int -> 'a -> 'a) -> 'a -> int -> 'a`
+
+  Iterates upward.  Given `f`, `x`, and nonnegative `n`, returns `f (n-1) (... f 0 x ...)`.
+
+- `natrecDown : (int -> 'a -> 'a) -> 'a -> int -> 'a`
+
+  Iterates downward.  Given `f`, `x`, and nonnegative `n`, returns `f 0 (... f (n-1) x ...)`.
+
