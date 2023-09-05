@@ -850,44 +850,46 @@ The destruction tactics are:
 
 ### Induction
 
-- `induct /[hyp x]/`
+- `sinduction /[hyp x]/`
 
   Invokes induction on `x`.  The form of the subgoals generated
   depends on `x`'s type.  This induction tactic is suitable when the
-  conclusion is not already known to be a well-formed type.  For
-  natural numbers and for datatypes it also provides strong induction.
-  (The strong induction on datatypes employs the [subterm
-  order](definitions.html#strong-induction).)
+  conclusion is not already known to be a well-formed type.  For most
+  types it provides strong induction (a.k.a. course-of-values
+  induction), and in any case it provides the strongest induction
+  available for that type.  (The strong induction on datatypes employs
+  the [subterm order](definitions.html#strong-induction).)
 
-  + `inductRaw /[hyp x]/`
+  + `sinductionRaw /[hyp x]/`
 
-    As `induct` but does not invoke the typechecker.
-
-
-- `iterate /[hyp x]/`
-
-  Invokes induction on `x`.  The form of the subgoals generated
-  depends on `x`'s type.  This induction tactic generally produces
-  simpler goals than `induct`, but it is not suitable unless the
-  typechecker can establish that the conclusion is a well-formed type.
-  In particular, it is not suitable for typing lemmas.
-
-  + `iterateRaw /[hyp x]/`
-
-    As `iterate` but does not invoke the typechecker.
+    As `sinduction` but does not invoke the typechecker.
 
 
-- `inductMuUniv /[hyp x]/ /[term i]/`
+- `induction /[hyp x]/`
+
+  Invokes induction on `x` by utilizing the iterator for `x`'s type.
+  The form of the subgoals generated thus depends on `x`'s type.  This
+  induction tactic generally produces simpler goals than `sinduction`,
+  but it is not suitable unless the typechecker can establish that the
+  conclusion is a well-formed type.  In particular, it is not suitable
+  for typing lemmas.
+
+  + `inductionRaw /[hyp x]/`
+
+    As `induction` but does not invoke the typechecker.
+
+
+- `muUnivInduction /[hyp x]/ /[level i]/`
 
   When `x`'s type is an inductive type (*i.e.,* a `mu` type), invokes
-  induction on `x`.  Unlike how `induct` would behave on `x`,
-  `inductMuUniv` assumes that `x`'s type belongs to `U i`.  It
+  induction on `x`.  Unlike how `sinduction` would behave,
+  `muUnivInduction` assumes that `x`'s type belongs to `U i`.  It
   generates a stronger hypothesis, but also a stronger conclusion.
-  (Useful only in unusual circumstances.)
+  (This is useful only in unusual circumstances.)
 
-  + `inductMuUnivRaw /[hyp x]/ /[term i]/`
+  + `muUnivInductionRaw /[hyp x]/ /[level i]/`
 
-    As `inductMuUniv` but does not invoke the typechecker.
+    As `muUnivInduction` but does not invoke the typechecker.
 
 
 

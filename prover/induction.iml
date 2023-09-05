@@ -7,17 +7,17 @@ signature INDUCTION =
       type priority = Tactic.priority
       type hypothesis = Hyp.hypothesis
 
-      val inductPriority : hypothesis -> priority tacticm
-      val inductRaw : hypothesis -> tactic
-      val induct : hypothesis -> tactic
+      val sinductionPriority : hypothesis -> priority tacticm
+      val sinductionRaw : hypothesis -> tactic
+      val sinduction : hypothesis -> tactic
 
-      val iteratePriority : hypothesis -> priority tacticm
-      val iterateRaw : hypothesis -> tactic
-      val iterate : hypothesis -> tactic
+      val inductionPriority : hypothesis -> priority tacticm
+      val inductionRaw : hypothesis -> tactic
+      val induction : hypothesis -> tactic
 
-      val inductMuUnivPriority : hypothesis -> ETerm.eterm -> priority tacticm
-      val inductMuUnivRaw : hypothesis -> ETerm.eterm -> tactic
-      val inductMuUniv : hypothesis -> ETerm.eterm -> tactic
+      val muUnivInductionPriority : hypothesis -> ETerm.eterm -> priority tacticm
+      val muUnivInductionRaw : hypothesis -> ETerm.eterm -> tactic
+      val muUnivInduction : hypothesis -> ETerm.eterm -> tactic
 
    end
 
@@ -66,7 +66,7 @@ structure InductionInternal :> INDUCTION_INTERNAL =
       val inductionTactics : priority tacticm H.table = H.table ()
 
 
-      fun inductPriority hyp =
+      fun sinductionPriority hyp =
          let
             do i = Hyp.findhyp hyp
          in
@@ -97,22 +97,22 @@ structure InductionInternal :> INDUCTION_INTERNAL =
          end
 
 
-      fun inductRaw hyp = inductPriority hyp >> idtac
+      fun sinductionRaw hyp = sinductionPriority hyp >> idtac
 
-      fun induct hyp = TC.withTypecheckSnd (inductPriority hyp)
+      fun sinduction hyp = TC.withTypecheckSnd (sinductionPriority hyp)
 
 
       
       val iterators : (Constant.constant * int * int) H.table = H.table ()
 
 
-      exception Iterate of string
+      exception Induction of string
 
       fun tryf f sk =
          (case
              (try
                  Sum.INL (f ())
-              with Iterate msg => Sum.INR msg)
+              with Induction msg => Sum.INR msg)
           of
              Sum.INL x => sk x
 
@@ -171,7 +171,7 @@ structure InductionInternal :> INDUCTION_INTERNAL =
                                    | GREATER => j
 
                                    | EQUAL =>
-                                        raise (Iterate "index arguments must be distinct variables")))
+                                        raise (Induction "index arguments must be distinct variables")))
                              rest)
                 in
                    revert0
@@ -181,7 +181,7 @@ structure InductionInternal :> INDUCTION_INTERNAL =
 
       val conclHyp = Hyp.NAME (Symbol.fromValue "concl")
 
-      fun iteratePriority hyp =
+      fun inductionPriority hyp =
          let
             do i = Hyp.findhyp hyp
          in
@@ -205,7 +205,7 @@ structure InductionInternal :> INDUCTION_INTERNAL =
                                         val ind =
                                            (case List.dropOpt spine nvis of
                                                NONE =>
-                                                  raise (Iterate "type error in hypothesis for iteration")
+                                                  raise (Induction "type error in hypothesis for iteration")
       
                                              | SOME ind => ind)
 
@@ -220,17 +220,17 @@ structure InductionInternal :> INDUCTION_INTERNAL =
                                                                 (n+1, v-1 :: vars)
              
                                                            | _ => 
-                                                                raise (Iterate "index arguments must be variables"))
+                                                                raise (Induction "index arguments must be variables"))
 
                                                     | _ => 
-                                                         raise (Iterate "type error in hypothesis for iteration")))
+                                                         raise (Induction "type error in hypothesis for iteration")))
                                               (0, [])
                                               ind
                                      in
                                         if nind = nind' then
                                            vars
                                         else
-                                           raise (Iterate "type error in hypothesis for iteration")
+                                           raise (Induction "type error in hypothesis for iteration")
                                      end)
                            in
                               revert0
@@ -254,9 +254,9 @@ structure InductionInternal :> INDUCTION_INTERNAL =
          end
 
 
-      fun iterateRaw hyp = iteratePriority hyp >> idtac
+      fun inductionRaw hyp = inductionPriority hyp >> idtac
 
-      fun iterate hyp = TC.withTypecheckSnd (iteratePriority hyp)
+      fun induction hyp = TC.withTypecheckSnd (inductionPriority hyp)
 
 
 
@@ -291,7 +291,7 @@ structure InductionInternal :> INDUCTION_INTERNAL =
          end
 
 
-      fun inductMuUnivPriority hyp em =
+      fun muUnivInductionPriority hyp em =
          let
             do i = Hyp.findhyp hyp
             do lv = withterm em
@@ -347,9 +347,9 @@ structure InductionInternal :> INDUCTION_INTERNAL =
          end
 
 
-      fun inductMuUnivRaw hyp em = inductMuUnivPriority hyp em >> idtac
+      fun muUnivInductionRaw hyp em = muUnivInductionPriority hyp em >> idtac
 
-      fun inductMuUniv hyp em = TC.withTypecheckSnd (inductMuUnivPriority hyp em)
+      fun muUnivInduction hyp em = TC.withTypecheckSnd (muUnivInductionPriority hyp em)
 
 
       
