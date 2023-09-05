@@ -858,7 +858,7 @@ The destruction tactics are:
   types it provides strong induction (a.k.a. course-of-values
   induction), and in any case it provides the strongest induction
   available for that type.  (The strong induction on datatypes employs
-  the [subterm order](datatypes.html#strong-induction).)
+  the [subterm order](datatypes.html#strong-induction-and-the-subterm-ordering).)
 
   + `sinductionRaw /[hyp x]/`
 
