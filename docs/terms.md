@@ -46,6 +46,7 @@ cons is right associative.
       case Term of | inl OIdent . [Term] | inr OIdent . [Term]       (sum elim)
       Term : [Term]                                                  (typing)
       Term : type                                                    (type formation)
+      fnind ... inductive function ...                               (inductive function)
 
       if [Term] then [Term] else [Term]                              (if-then-else)
 
@@ -178,6 +179,8 @@ Notes:
   (The requirement that a `Bindingsn` be nonempty can be defeated
   using a zero multiplicity.)
 
+- The syntax for inductive functions appears
+  [here](datatypes.html#inductive-functions).
 
 
 #### Literal terms
