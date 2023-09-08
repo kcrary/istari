@@ -1,6 +1,7 @@
 
 File.import "logic-load.iml";
 File.import "bool-load.iml";
+File.import "decidable-aux.iml";
 Namespace.openModule (parseLongident /Logic/);
 
 Namespace.beginModule "Decidable";
@@ -20,6 +21,53 @@ unfold /decidable/.
 typecheck.
 qed ();
 Constant.setOpacity (parseConstant /decidable/) Constant.FIRM;
+
+
+
+lemma "decidable_equiv"
+/
+  forall i (P Q : U i) . (P <-> Q) -> decidable P -> decidable Q
+/;
+
+intro /i P Q Hiff HdecP/.
+destruct /HdecP/ /Hyes | Hno/.
+  {
+  left.
+  apply /Hiff/ >> auto.
+  }
+
+  {
+  right.
+  intro /H/.
+  witness /Hno __/.
+  apply /Hiff/ >> auto.
+  }
+qed ();
+
+
+
+lemma "decidable_compat_iff"
+/
+  forall i (P Q : U i) .
+    P <-> Q
+    -> decidable P <-> decidable Q
+/;
+
+inference.
+intro /i P Q Hiff/.
+split.
+  {
+  apply /decidable_equiv/ >> auto.
+  }
+
+  {
+  apply /decidable_equiv/ >> auto.
+  }
+qed ();
+
+
+
+structure Nothing = AfterDecidable ();
 
 
 
@@ -83,6 +131,77 @@ destruct /Hp/ /Hp | Hnp/.
   so /Hnp Hp/ /0/.
   }
 destruct /Hq/ /Hq | Hnq/.
+  {
+  auto.
+  }
+right.
+intro /H/.
+so /Hnq (H Hp)/ /0/.
+qed ();
+
+
+
+lemma "decidable_and_dep"
+/
+  forall i (P Q : U i) . decidable P -> (P -> decidable Q) -> decidable (P & Q)
+/;
+
+inference.
+intro /a P Q Hp Hq/.
+destruct /Hp/ /Hp | Hnp/.
+1:{
+  right.
+  intro /(Hp _)/.
+  so /Hnp Hp/ /0/.
+  }
+so /Hq Hp/ /Hq' | Hnq/.
+1:{
+  right.
+  intro /(_ Hq')/.
+  so /Hnq Hq'/ /0/.
+  }
+auto.
+qed ();
+
+
+
+lemma "decidable_or_dep"
+/
+  forall i (P Q : U i) . decidable P -> (not P -> decidable Q) -> decidable (P % Q)
+/;
+
+inference.
+intro /a P Q Hp Hq/.
+destruct /Hp/ /Hp | Hnp/ >> auto.
+so /Hq Hnp/ /Hq' | Hnq/ >> auto.
+right.
+intro /(Hp | Hq')/.
+  {
+  so /Hnp Hp/ /0/.
+  }
+
+  {
+  so /Hnq Hq'/ /0/.
+  }
+qed ();
+
+
+
+
+lemma "decidable_implies_dep"
+/
+  forall i (P Q : U i) . decidable P -> (P -> decidable Q) -> decidable (P -> Q)
+/;
+
+inference.
+intro /a P Q Hp Hq/.
+destruct /Hp/ /Hp | Hnp/.
+1:{
+  left.
+  intro /Hp/.
+  so /Hnp Hp/ /0/.
+  }
+so /Hq Hp/ /Hq' | Hnq/.
   {
   auto.
   }

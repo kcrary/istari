@@ -1,11 +1,417 @@
 
+Ctrl.use "datatypes.iml";
 File.import "acc-load.iml";
+File.import "logic-load.iml";
+File.import "decidable-load.iml";
+File.import "finite-load.iml";
 
 
 beginModule "Relations";
 
 
-define /lexrel {a b} Q R x y/
+(* Transitive/reflexive closure *)
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    forall (a : U i) (R : a -> a -> U i) .
+    U i
+  of
+    star : a -> a -> type =
+    | star_refl :
+        forall x .
+          star x x
+
+    | star_step :
+        forall x y z .
+          R x y
+          -> star y z
+          -> star x z
+/;
+
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    forall (a : U i) (R : a -> a -> U i) .
+    U i
+  of
+    plus : a -> a -> type =
+    | plus_one :
+        forall x y .
+          R x y
+          -> plus x y
+
+    | plus_step :
+        forall x y z .
+          R x y
+          -> plus y z
+          -> plus x z
+/;
+
+
+Database.setImplicits (parseConstant /star/) 1;
+Database.setImplicits (parseConstant /plus/) 1;
+
+
+
+lemma "star_one"
+/
+  forall i (a : U i) (R : a -> a -> U i) x y .
+    R x y
+    -> star R x y
+/;
+
+inference.
+intro /i a R x y Hxy/.
+apply /star_step/ >> auto.
+apply /star_refl/.
+qed ();
+
+
+
+lemma "star_trans"
+/
+  forall i (a : U i) (R : a -> a -> U i) x y z .
+    star R x y
+    -> star R y z
+    -> star R x z
+/;
+
+inference.
+intro /i a R x y z Hxy Hyz/.
+revert /z Hyz/.
+induction /Hxy/ >> auto.
+(* step *)
+intro /x y z Hxy _ IH w Hzw/.
+apply /star_step/ >> auto.
+qed ();
+
+
+
+lemma "plus_trans"
+/
+  forall i (a : U i) (R : a -> a -> U i) x y z .
+    plus R x y
+    -> plus R y z
+    -> plus R x z
+/;
+
+inference.
+intro /i a R x y z Hxy Hyz/.
+revert /z Hyz/.
+induction /Hxy/.
+
+(* one *)
+{
+intro /x y Rxy z Ryz/.
+apply /plus_step/ >> auto.
+}
+
+(* step *)
+{
+intro /x y z Hxy _ IH w Hzw/.
+apply /plus_step/ >> auto.
+}
+qed ();
+
+
+
+lemma "star_plus_trans"
+/
+  forall i (a : U i) (R : a -> a -> U i) x y z .
+    star R x y
+    -> plus R y z
+    -> plus R x z
+/;
+
+inference.
+intro /i a R x y z Hxy Hyz/.
+revert /z Hyz/.
+induction /Hxy/ >> auto.
+(* step *)
+intro /x y z Hxy _ IH w Hzw/.
+apply /plus_step/ >> auto.
+qed ();
+
+
+
+lemma "plus_star_trans"
+/
+  forall i (a : U i) (R : a -> a -> U i) x y z .
+    plus R x y
+    -> star R y z
+    -> plus R x z
+/;
+
+inference.
+intro /i a R x y z Hxy Hyz/.
+revert /x Hxy/.
+induction /Hyz/ >> auto.
+(* step *)
+intro /x y z Hxy _ IH w Hwx/.
+so /IH _ (plus_one _# 4 Hxy)/ /Hxz/.
+apply /plus_trans/ >> auto.
+qed ();
+
+
+
+lemma "plus_impl_star"
+/
+  forall i (a : U i) (R : a -> a -> U i) x y .
+    plus R x y
+    -> star R x y
+/;
+
+inference.
+intro /i a R x y Hxy/.
+induction /Hxy/.
+
+(* one *)
+{
+intro /x y Hxy/.
+apply /star_step/ >> auto.
+apply /star_refl/.
+}
+
+(* step *)
+{
+intro /x y z Hxy _ IH/.
+apply /star_step/ >> auto.
+}
+qed ();
+
+
+
+lemma "plus_first"
+/
+  forall i (a : U i) (R : a -> a -> U i) x z .
+    plus R x z
+    -> exists y . R x y & star R y z
+/;
+
+inference.
+intro /i a R x z Hxz/.
+induction /Hxz/.
+
+(* one *)
+{
+intro /x y Hxy/.
+exists /y/.
+split >> auto.
+apply /star_refl/.
+}
+
+(* step *)
+{
+intro /x y z Hxy Hyz _/.
+exists /y/.
+split >> autoWith /plus_impl_star/.
+}
+qed ();
+
+
+
+lemma "plus_first_iff"
+/
+  forall i (a : U i) (R : a -> a -> U i) x z .
+    plus R x z
+    <-> (exists y . R x y & star R y z)
+/;
+
+inference.
+intro /i a R x z/.
+split.
+  {
+  apply /plus_first/.
+  }
+
+  {
+  intro /(y Hxy Hyz)/.
+  apply /plus_star_trans/ >> auto.
+  apply /plus_one/ >> auto.
+  }
+qed ();
+
+
+
+lemma "plus_last"
+/
+  forall i (a : U i) (R : a -> a -> U i) x z .
+    plus R x z
+    -> exists y . star R x y & R y z
+/;
+
+inference.
+intro /i a R x z Hxz/.
+induction /Hxz/.
+
+(* one *)
+{
+intro /x y Hxy/.
+exists /x/.
+split >> autoWith /star_refl/.
+}
+
+(* step *)
+{
+intro /x y z Hxy _ (w Hyw Hwz)/.
+exists /w/.
+split >> autoWith /star_step/.
+}
+qed ();
+
+
+
+lemma "plus_last_iff"
+/
+  forall i (a : U i) (R : a -> a -> U i) x z .
+    plus R x z
+    <-> (exists y . star R x y & R y z)
+/;
+
+inference.
+intro /i a R x z/.
+split.
+  {
+  apply /plus_last/ >> auto.
+  }
+
+  {
+  intro /(y Hxy Hyz)/.
+  apply /star_plus_trans/ >> auto.
+  apply /plus_one/ >> auto.
+  }
+qed ();
+
+  
+
+lemma "star_impl_eq_or_plus"
+/
+  forall i (a : U i) (R : a -> a -> U i) x y .
+    star R x y
+    -> x = y : a % plus R x y
+/;
+
+inference.
+intro /i a R x y Hxy/.
+induction /Hxy/.
+
+(* refl *)
+{
+intro /x/.
+left >> auto.
+}
+
+(* step *)
+{
+intro /x y z Hxy Hyz _/.
+right.
+rewrite /-> plus_first_iff/.
+exists /y/.
+auto.
+}
+qed ();
+
+
+
+lemma "star_neq_impl_plus"
+/
+  forall i (a : U i) (R : a -> a -> U i) x y .
+    star R x y
+    -> x != y : a
+    -> plus R x y
+/;
+
+inference.
+intro /i a R x y Hxy Hneq/.
+so /star_impl_eq_or_plus _# 5 Hxy/ /Heq | Hplus/ >> auto.
+so /Hneq Heq/ /0/.
+qed ();
+
+
+
+lemma "star_reverse"
+/
+  forall i (a : U i) (R R' : a -> a -> U i) .
+    (forall x y . R x y -> R' y x)
+    -> forall x y . star R x y -> star R' y x
+/;
+
+inference.
+intro /i a R R' Hrev x y Hxy/.
+induction /Hxy/.
+
+(* refl *)
+{
+intro /x/.
+apply /star_refl/ >> auto.
+}
+
+(* step *)
+{
+intro /x y z Hxy _ Hrzy/.
+apply /star_trans/ >> auto.
+apply /star_one/.
+apply /Hrev/ >> auto.
+}
+qed ();
+
+
+
+lemma "plus_reverse"
+/
+  forall i (a : U i) (R R' : a -> a -> U i) .
+    (forall x y . R x y -> R' y x)
+    -> forall x y . plus R x y -> plus R' y x
+/;
+
+inference.
+intro /i a R R' Hrev x y Hxy/.
+rewrite /-> plus_first_iff in Hxy/.
+rewrite /-> plus_last_iff/.
+destruct /Hxy/ /z Hxz Hzy/.
+exists /z/.
+split >> autoWith /star_reverse/.
+qed ();
+
+
+
+lemma "plus_well_founded"
+/
+  forall i (a : U i) (R : a -> a -> U i) .
+    (forall x . Acc a R x)
+    -> (forall x . Acc a (plus R) x)
+/;
+
+inference.
+intro /i a R Hwf x/.
+so /Hwf x/ /H/.
+clear /Hwf/.
+sinduction /H/.
+reintro /IH/.
+apply /Acc.Acc_intro/.
+intro /y Hyx/.
+rewrite /-> plus_last_iff in Hyx/.
+destruct /Hyx/ /z Hyz Hzx/.
+so /IH _ Hzx/ /Hz/.
+clear /x IH Hzx/.
+revert /Hz/.
+induction /Hyz/ >> auto.
+(* step *)
+intro /x y z Hxy _ IH Hz/.
+so /Acc.Acc_elim _# 4 x (IH Hz)/ /H/.
+apply /H/.
+apply /plus_one/ >> auto.
+qed ();
+
+
+
+(* Lexicographic order *)
+
+define /lexpair {a b} Q R x y/
 /
   Q (x #1) (y #1)
   % x #1 = y #1 : a & R (x #2) (y #2)
@@ -16,23 +422,23 @@ define /lexrel {a b} Q R x y/
 /;
 
 inference.
-unfold /lexrel/.
+unfold /lexpair/.
 typecheck.
 qed ();
 
 
 
-lemma "lexrel_well_founded"
+lemma "lexpair_well_founded"
 /
   forall i (a b : U i) (Q : a -> a -> U i) (R : b -> b -> U i) .
     (forall x . Acc a Q x)
     -> (forall x . Acc b R x)
-    -> forall x . Acc (a & b) (lexrel Q R) x
+    -> forall x . Acc (a & b) (lexpair Q R) x
 /;
 
 inference.
 intro /i a b Q R HwfQ HwfR/.
-assert /forall x y . Acc (a & b) (lexrel Q R) (x , y)/ /H/.
+assert /forall x y . Acc (a & b) (lexpair Q R) (x , y)/ /H/.
 1:{
   intro /(x y)/.
   apply /H/.
@@ -47,7 +453,7 @@ sinduction /H/.
 reintro /IHb/.
 apply /Acc.Acc_intro/.
 intro /(v w) Hlt/.
-unfold /lexrel in Hlt/.
+unfold /lexpair in Hlt/.
 reduce /Hlt/.
 destruct /Hlt/ /Hlt | (Heq Hlt)/.
   {
@@ -56,6 +462,174 @@ destruct /Hlt/ /Hlt | (Heq Hlt)/.
 subst /v/.
 apply /IHb/ >> auto.
 qed ();
+
+
+
+(* Transpose *)
+
+define /transpose R x y/
+/
+  R y x
+//
+  intersect i (a : U i) .
+    (a -> a -> U i) -> (a -> a -> U i)
+/;
+
+inference.
+unfold /transpose/.
+typecheck.
+qed ();
+
+
+
+Constant.setOpacity (parseConstant /transpose/) Constant.SOFT;
+
+
+
+lemma "transpose_invol"
+/
+  forall i (a : U i) (R : a -> a -> U i) .
+    transpose (transpose R) = R : (a -> a -> U i)
+/;
+
+inference.
+intro /i a R/.
+unfold /transpose at all/.
+extensionality /x y/.
+reflexivity.
+qed ();
+
+
+
+lemma "star_reverse_transpose"
+/
+  forall i (a : U i) (R : a -> a -> U i) x y .
+    star R x y
+    <-> star (transpose R) y x
+/;
+
+inference.
+intro /i a R x y/.
+split.
+  {
+  apply /star_reverse/ >> auto.
+  }
+
+  {
+  apply /star_reverse/ >> auto.
+  }
+qed ();
+
+
+
+lemma "plus_reverse_transpose"
+/
+  forall i (a : U i) (R : a -> a -> U i) x y .
+    plus R x y
+    <-> plus (transpose R) y x
+/;
+
+inference.
+intro /i a R x y/.
+split.
+  {
+  apply /plus_reverse/ >> auto.
+  }
+
+  {
+  apply /plus_reverse/ >> auto.
+  }
+qed ();
+
+
+
+lemma "decidable_plus"
+/
+  forall i (a : U i) (R : a -> a -> U i) .
+    (forall x y . Decidable.decidable (R x y))
+    -> (forall x . Acc a R x)
+    -> (forall y . Finite.finite (fn x . R x y))
+    -> forall x y . Decidable.decidable (plus R x y)
+/;
+
+inference.
+intro /i a R Hdec Hwf Hfinite x y/.
+revert /x/.
+so /Hwf y/ /Hacc/.
+clear /Hwf/.
+sinduction /Hacc/.
+reintro /IH/.
+intro /x/.
+so /Hdec x y/ /Hxy | Hnxy/.
+  {
+  left.
+  apply /plus_one/.
+  auto.
+  }
+so /Hfinite y/ /L HL/.
+reduce /HL/.
+apply /Decidable.decidable_equiv _ (exists z . R z y & plus R x z)/.
+  {
+  split.
+    {
+    intro /(z Hxz Hzy)/.
+    rewrite /-> plus_last_iff/.
+    exists /z/ >> autoWith /plus_impl_star/.
+    }
+
+    {
+    intro /Hxy/.
+    rewrite /-> plus_reverse_transpose in Hxy/.
+    inversion /Hxy/.
+      {
+      reintro /Hxy'/.
+      so /Hnxy Hxy'/ /0/.
+      }
+    reintro /z Hxz Hzy/.
+    rewrite /<- plus_reverse_transpose in Hzy/.
+    exists /z/ >> auto.
+    }
+  }
+apply /Finite.decidable_exists_finite/ >> auto.
+qed ();
+
+
+
+lemma "decidable_star"
+/
+  forall i (a : U i) (R : a -> a -> U i) .
+    (forall x y . Decidable.decidable (x = y : a))
+    -> (forall x y . Decidable.decidable (R x y))
+    -> (forall x . Acc a R x)
+    -> (forall y . Finite.finite (fn x . R x y))
+    -> forall x y . Decidable.decidable (star R x y)
+/;
+
+inference.
+intro /i a R Hdeceq Hdec Hacc Hfinite x y/.
+so /Hdeceq x y/ /Heq | Hneq/.
+  {
+  subst /y/.
+  left.
+  apply /star_refl/.
+  }
+so /decidable_plus _# 3 Hdec Hacc Hfinite x y/ /Hxy | Hnxy/.
+  {
+  left.
+  apply /plus_impl_star/ >> auto.
+  }
+right.
+intro /Hxy/.
+so /star_impl_eq_or_plus _# 5 Hxy/ /Heq | Hxy'/.
+  {
+  so /Hneq Heq/ /0/.
+  }
+
+  {
+  so /Hnxy Hxy'/ /0/.
+  }
+qed ();
+
 
 
 endModule ();

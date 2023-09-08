@@ -2,7 +2,7 @@
 ISTARI=../ui/bin/istari-nolib
 PROCDOC=../ui/bin/procdoc
 
-DOCUNITS = acc bar bool decidable girard-paradox integer logic list nat option relations stable symbol wtype
+DOCUNITS = acc bar bool decidable finite girard-paradox integer logic list nat option relations stable symbol wtype
 UNITS = $(DOCUNITS) datatype omega
 
 all : $(foreach i, $(UNITS), $(i).isto)
@@ -15,22 +15,26 @@ docs : $(foreach i, $(DOCUNITS), ../docs/lib/$(i).md)
 ../docs/lib/%.md : %.md
 	$(PROCDOC) $< $@
 
-.PHONY : datatypes
-datatypes : acc.isto nat.isto datatype.isto integer.isto
+DATATYPES = acc.isto nat.isto datatype.isto integer.isto
 
-bool.isto : logic.isto logic-aux.iml
-datatype.isto : acc.isto acc-aux.iml nat.isto nat-aux.iml
-decidable.isto : logic.isto logic-aux.iml bool.isto bool-aux.iml
-integer.isto : nat.isto nat-aux.iml acc.isto acc-aux.iml bool.isto bool-aux.iml decidable.isto decidable-aux.iml stable.isto stable-aux.iml
-girard-paradox.isto : logic.isto logic-aux.iml nat.isto nat-aux.iml datatypes
-list.isto : datatypes nat.isto nat-aux.iml option.isto integer.isto
-nat.isto : acc.isto acc-aux.iml bool.isto bool-aux.iml decidable.isto decidable-aux.iml stable.isto stable-aux.iml
-omega.isto : logic.isto logic-aux.iml bool.isto bool-aux.iml nat.isto nat-aux.iml integer.isto integer-aux.iml list.isto list-aux.iml
-option.isto : datatypes integer.isto
-relations.isto : acc.isto acc-aux.iml
-stable.isto : decidable.isto decidable-aux.iml logic.isto logic-aux.iml
-symbol.isto : logic.isto logic-aux.iml bool.isto bool-aux.iml
-wtype.isto : acc.isto acc-aux.iml
+## In many of these, the dependency is on both x.isto and x-aux.iml, but since
+## the former always depends on the latter, there's no need to include the latter
+## dependency.
+
+bool.isto : logic.isto
+datatype.isto : acc.isto nat.isto
+decidable.isto : logic.isto bool.isto
+finite.isto : logic.isto decidable.isto list.isto
+girard-paradox.isto : $(DATATYPES) logic.isto nat.isto
+integer.isto : nat.isto acc.isto bool.isto decidable.isto stable.isto
+list.isto : $(DATATYPES) nat.isto  option.isto integer.isto
+nat.isto : acc.isto bool.isto decidable.isto stable.isto
+omega.isto : logic.isto bool.isto nat.isto integer.isto list.isto
+option.isto : $(DATATYPES) integer.isto
+relations.isto : $(DATATYPES) acc.isto decidable.isto finite.isto
+stable.isto : decidable.isto logic.isto
+symbol.isto : logic.isto bool.isto
+wtype.isto : acc.isto
 
 clean :
 	rm -f *.isto

@@ -40,7 +40,9 @@ A simpler case-analysis operation:
 
     list_case : intersect (i : level) .
                    forall (a b : U i) . list a -> b -> (a -> list a -> b) -> b
-              = fn a b l mnil mcons . list_iter a (fn v0 . b) mnil (fn h t v0 . mcons h t) l
+              = fn a b l mnil mcons . (fnind list_fn : forall (v0 : list [a]) . b of
+                                        | nil . mnil
+                                        | cons h t . mcons h t) l
               (2 implicit arguments)
 
     list_case _ _ (nil _) z _ --> z
@@ -50,7 +52,9 @@ A simpler case-analysis operation:
 ### Append
 
     append : intersect (i : level) . forall (a : U i) . list a -> list a -> list a
-           = fn a l1 l2 . list_iter a (fn v0 . list a) l2 (fn h v0 t . h :: t) l1
+           = fn a l1 l2 . (fnind list_fn : forall (v0 : list [a]) . list a of
+                            | nil . l2
+                            | cons h v0 . h :: list_fn v0) l1
            (1 implicit argument)
 
     append _ (nil _) l --> l

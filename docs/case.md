@@ -245,9 +245,10 @@ The most important combinators are:
 
 ##### Other term combinators
 
-    val unify    : term -> (term, 'a, 'a) matcher
-    val whnf     : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
-    val whnfHard : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+    val unify     : term -> (term, 'a, 'a) matcher
+    val whnf      : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+    val whnfHard  : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
+    val whnfBasic : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
 
 - `unify t` matches against any term that unifies with `t`, producing
   no bindings.  In the parser it is written `$unify \ ... antiquoted
@@ -258,6 +259,9 @@ The most important combinators are:
 
 - `whnfHard m` hard weak-head normalizes the term being matched before
   passing it to `m`.  In the parser it is written `$whnfHard m`.
+
+- `whnfBasic m` basic weak-head normalizes the term being matched before
+  passing it to `m`.  In the parser it is written `$whnfBasic m`.
 
 
 
@@ -480,6 +484,7 @@ is given in brackets.  For example, `Match ; [Match]` indicates that
       $unify \ ... antiquoted term ... \                 (unify)
       $whnf [Match]                                      (whnf)
       $whnfHard [Match]                                  (whnfHard)
+      $whnfBasic [Match]                                 (whnfBasic)
       ----------------   spines   ----------------
       $nil                                               (null)
       $ap Match [Match]                                  (app)

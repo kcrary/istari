@@ -4,6 +4,7 @@
 - [`Bar`](lib/bar.html) (partial types)
 - [`Bool`](lib/bool.html)
 - [`Decidable`](lib/decidable.html)
+- [`Finite`](lib/finite.html)
 - [`Integer`](lib/integer.html)
 - [`GirardParadox`](lib/girard-paradox.html) (type is not a type)
 - [`Logic`](lib/logic.html)

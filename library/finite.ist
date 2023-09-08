@@ -1,0 +1,226 @@
+
+File.import "logic-load.iml";
+File.import "decidable-load.iml";
+File.import "list-load.iml";
+
+openModule /Logic/;
+openModule /Decidable/;
+
+beginModule "Finite";
+
+
+define /finite {a} P/
+/
+  exists L . forall x . P x -> List.In a x L
+//
+  intersect i . forall (a : U i) .
+    (a -> U i) -> U i
+/;
+
+inference.
+unfold /finite/.
+typecheck.
+qed ();
+
+
+
+lemma "finite_subset"
+/
+  forall i (a : U i) (P Q : a -> U i) .
+    (forall x . P x -> Q x)
+    -> finite Q
+    -> finite P
+/;
+
+inference.
+intro /i a P Q Hincl HQ/.
+destruct /HQ/ /L HL/.
+unfold /finite/.
+exists /L/.
+intro /x Hx/.
+auto.
+qed ();
+
+
+
+lemma "decidable_forall_finite"
+/
+  forall i (a : U i) (P Q : a -> U i) .
+    finite P
+    -> (forall x . decidable (P x))
+    -> (forall x . P x -> decidable (Q x))
+    -> decidable (forall x . P x -> Q x)
+/;
+
+inference.
+intro /i a P Q Hfin HdecP HdecQ/.
+destruct /Hfin/ /L HL/.
+apply /decidable_equiv _ (forall x . List.In a x L -> P x -> Q x)/.
+  {
+  split.
+    {
+    intro /H x Hx/.
+    apply /H/ >> auto.
+    }
+
+    {
+    intro /H x Hinx Hx/.
+    apply /H/ >> auto.
+    }
+  }
+clear /HL/.
+induction /L/.
+
+(* nil *)
+{
+left.
+intro /? 0/.
+}
+
+(* cons *)
+{
+intro /x L IH/.
+destruct /IH/ /HyesL | HnoL/.
+1:{
+  right.
+  intro /H/.
+  so /HnoL __/ /0/.
+  intro /y Hiny HPy/.
+  apply /H/ >> auto.
+  }
+so /HdecP x/ /HPx | HnPx/.
+1:{
+  left.
+  intro /y Hy HPy/.
+  destruct /Hy/ /Heq | Hiny/.
+    {
+    subst /y/.
+    so /HnPx HPy/ /0/.
+    }
+  
+    {
+    apply /HyesL/ >> auto.
+    }
+  }
+so /HdecQ x HPx/ /HQx | HnQx/.
+  {
+  left.
+  intro /y Hy HPy/.
+  destruct /Hy/ /Heq | Hiny/.
+    {
+    subst /y/.
+    hyp /HQx/.
+    }
+
+    {
+    apply /HyesL/ >> auto.
+    }
+  }
+right.
+intro /H/.
+so /HnQx __/ /0/.
+apply /H/ >> auto.
+}
+qed ();
+
+
+
+
+lemma "decidable_exists_finite_simple"
+/
+  forall i (a : U i) (P : a -> U i) .
+    finite P
+    -> (forall x . decidable (P x))
+    -> decidable (exists x . P x)
+/;
+
+inference.
+intro /i a P Hfin Hdec/.
+destruct /Hfin/ /L HL/.
+apply /decidable_equiv _ (exists x . List.In a x L & P x)/.
+  {
+  split.
+    {
+    intro /(x Hinx Hx)/.
+    exists /x/.
+    auto.
+    }
+
+    {
+    intro /(x Hx)/.
+    exists /x/.
+    auto.
+    }
+  }
+clear /HL/.
+induction /L/.
+
+(* nil *)
+{
+right.
+intro /(? 0 _)/.
+}
+
+(* cons *)
+{
+intro /x L IH/.
+so /Hdec x/ /Hyes | Hno/.
+  {
+  left.
+  exists /x/.
+  split >> auto.
+  }
+
+  {
+  destruct /IH/ /(y Hiny Hy) | Hstillno/.
+    {
+    left.
+    exists /y/.
+    split >> auto.
+    }
+
+    {
+    right.
+    intro /(y Hiny Hy)/.
+    destruct /Hiny/ /Heq | Hiny/.
+      {
+      subst /y/.
+      so /Hno Hy/ /0/.
+      }
+
+      {
+      so /Hstillno __/ /0/.
+      exists /y/.
+      auto.
+      }
+    }
+  }
+}
+qed ();
+
+
+
+
+lemma "decidable_exists_finite"
+/
+  forall i (a : U i) (P Q : a -> U i) .
+    finite P
+    -> (forall x . decidable (P x))
+    -> (forall x . P x -> decidable (Q x))
+    -> decidable (exists x . P x & Q x)
+/;
+
+inference.
+intro /i a P Q Hfin HdecP HdecQ/.
+apply /decidable_exists_finite_simple _ _ (fn x . P x & Q x)/.
+  {
+  witness /finite_subset _# 4 __ Hfin/.
+  intro /x (H _)/.
+  hyp /H/.
+  }
+
+  {
+  intro /x/.
+  apply /decidable_and_dep/ >> auto.
+  }
+qed ();
