@@ -88,6 +88,11 @@ employed.
   Like `ap`, this unfolds to just `f x y`, so an annotation can be
   folded into existence.
 
+- One can give a type for the argument of a function by writing:
+
+      fn (x : A) . M
+
+  This unfolds to just `fn x . M`.
 
 
 

@@ -163,6 +163,7 @@ Notes:
   type `Term.term`.
 
 - A hole (`__`) is a placeholder used by some tactics (*e.g.,* `so`).
+  It is written as two consecutive underscores.
 
 - One can bind additional de Bruijn positions using the syntax
   ``additional` OIdents . Term``.  For example, ``additional` x y . y``
@@ -263,15 +264,18 @@ opaque:
 - Soft: the constant is automatically unfolded by unification,
   typechecking, and a variety of tactics.  Soft constants are best
   viewed as abbreviations.  Giving a type to a soft constant usually
-  serves no purpose because the typechecker automatically unfolds it
-  before determining its type.
+  serves no purpose (other than documentation) because the typechecker
+  automatically unfolds it before determining its type.
 
 - Firm: like a soft constant, except the constant is not unfolded by
   the typechecker in the subject position.  Thus, a firm constant can
-  be given a type for the typechecker to use.
+  be given a type for the typechecker to use.  This is typically used
+  for constants whose purpose is to give
+  [assistance to the typechecker](typechecking.html#coping-strategies) 
+  (`ann`, `ap`, `fnann`, `manual`).
 
 A constant's opacity can be altered using the function `setOpacity`.
-Since opacities can be altered, an opaque constant is not necessarily
+Since opacities can be altered, an opaque constant is not entirely
 abstract.  To make a constant abstract, one may delete a constant's
 definition, thereby rendering it permanently opaque, using the
 function `abstract`.

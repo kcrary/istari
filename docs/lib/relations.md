@@ -1,6 +1,6 @@
 # `Relations`
 
-Reflexive-transitive closure of relations:
+Reflexive-transitive closure of relations is defined:
 
     datatype
       intersect (i : level) .
@@ -18,15 +18,20 @@ Reflexive-transitive closure of relations:
             -> star y z
             -> star x z
 
-(The type argument `a` to star is implicit.)
+Producing:
+
+    star : intersect (i : level) . forall (a : U i) (R : a -> a -> U i) . a -> a -> U i
+         (1 implicit argument)
 
     star_refl : intersect (i : level) . forall (a : U i) (R : a -> a -> U i) (x : a) . star R x x
+              (0 implicit arguments)
 
     star_step : intersect (i : level) .
                    forall (a : U i) (R : a -> a -> U i) (x y z : a) .
                      R x y -> star R y z -> star R x z
+              (0 implicit arguments)
 
-Transitive closure of relations:
+Transitive closure of relations is defined:
 
     datatype
       intersect (i : level) .
@@ -45,14 +50,21 @@ Transitive closure of relations:
             -> plus y z
             -> plus x z
 
-(The type argument `a` to plus is implicit.)
+Producing:
+
+    plus : intersect (i : level) . forall (a : U i) (R : a -> a -> U i) . a -> a -> U i
+         (1 implicit argument)
 
     plus_one : intersect (i : level) .
                   forall (a : U i) (R : a -> a -> U i) (x y : a) . R x y -> plus R x y
+              (0 implicit arguments)
 
     plus_step : intersect (i : level) .
                    forall (a : U i) (R : a -> a -> U i) (x y z : a) .
                      R x y -> plus R y z -> plus R x z
+              (0 implicit arguments)
+
+Lemmas:
 
     star_one : forall (i : level) (a : U i) (R : a -> a -> U i) (x y : a) . R x y -> star R x y
 

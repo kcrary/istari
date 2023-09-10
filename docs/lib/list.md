@@ -70,6 +70,9 @@ A simpler case-analysis operation:
     append_cons_assoc : forall (i : level) (a : U i) (x : a) (l1 l2 : list a) .
                            append (x :: l1) l2 = x :: append l1 l2 : list a
 
+    append_eq_nil : forall (i : level) (a : U i) (l1 l2 : list a) .
+                       nil = append l1 l2 : list a -> l1 = nil : list a & l2 = nil : list a
+
     append_eq_cons : forall (i : level) (a : U i) (h : a) (t l1 l2 : list a) .
                         h :: t = append l1 l2 : list a
                         -> (exists (l1' : list a) .

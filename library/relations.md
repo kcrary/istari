@@ -1,7 +1,7 @@
 open:Relations
 # `Relations`
 
-Reflexive-transitive closure of relations:
+Reflexive-transitive closure of relations is defined:
 
     datatype
       intersect (i : level) .
@@ -19,13 +19,18 @@ Reflexive-transitive closure of relations:
             -> star y z
             -> star x z
 
-(The type argument `a` to star is implicit.)
+Producing:
+
+    star : type:star
+         imp:star
 
     star_refl : type:star_refl
+              imp:star_refl
 
     star_step : type:star_step
+              imp:star_step
 
-Transitive closure of relations:
+Transitive closure of relations is defined:
 
     datatype
       intersect (i : level) .
@@ -44,11 +49,18 @@ Transitive closure of relations:
             -> plus y z
             -> plus x z
 
-(The type argument `a` to plus is implicit.)
+Producing:
+
+    plus : type:plus
+         imp:plus
 
     plus_one : type:plus_one
+              imp:plus_one
 
     plus_step : type:plus_step
+              imp:plus_step
+
+Lemmas:
 
     star_one : type:star_one
 

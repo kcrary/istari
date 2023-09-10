@@ -38,6 +38,10 @@ signature INTRO_TACTIC =
       val introOfRaw : IntroPattern.ipattern list -> tactic
       val introOf : IntroPattern.ipattern list -> tactic
 
+      val contrapositivePriority : Hyp.hypothesis -> priority tacticm
+      val contrapositiveRaw : Hyp.hypothesis -> tactic
+      val contrapositive : Hyp.hypothesis -> tactic
+
       val proveLambda : tactic
 
    end
@@ -63,6 +67,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
    struct
 
       structure D = DestructInternal
+      structure DI = Directory
       structure H = ConstantTable
       structure J = Judgement
       structure N = Normalize
@@ -564,6 +569,47 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
       fun introOfRaw pats = introOfPriority pats >> idtac
 
       fun introOf pats = Typecheck.withTypecheckSnd $ introOfPriority pats
+
+
+
+      fun contrapositivePriority hyp =
+         let
+            do n = Hyp.findhyp hyp
+
+            do (_, dir) = withgoal
+
+            val (dir3, dir12) = DI.split dir n
+            val (sym, dir1) = DI.expose dir12
+            val dir' = DI.bind (DI.binds dir1 dir3) sym
+         in
+            setFailure "hypothesis and conclusion are not in contrapositive configuration" $
+            cut $
+            (* A -> C ... |- B -> C[..] *)
+            refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+            >>> [
+                (* A -> C ... | B : type *)
+                idtacM Secondary,
+
+                (* A -> C ... B |- C *)
+                refine (Rule.arrowElim (T.evar ()) (T.evar ()))
+                >>> [
+                    (* A -> C ... B |- A[..] -> C[..] *)
+                    refine (Rule.hypothesis (n+1)) >> done,
+
+                    (* A -> C ... B |- A[..] *)
+                    refine (Rule.weaken (n+1) 1)
+                    >>
+                    (* ... B[..] |- A[..] *)
+                    chdir dir'
+                    >>
+                    idtacM Primary
+                    ]
+                ]
+         end
+
+      fun contrapositiveRaw hyp = contrapositivePriority hyp >> idtac
+
+      fun contrapositive hyp = Typecheck.withTypecheckSnd $ contrapositivePriority hyp
 
    end
 

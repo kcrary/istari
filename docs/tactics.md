@@ -229,6 +229,18 @@ which appears in the `Hyp` structure.
     As `introOf` but does not invoke the typechecker.
 
 
+- `contrapositive /[hyp h]/`
+
+  If `h`'s type is `A -> C` and the conclusion is `B -> C`, replaces `h`
+  with `B` and the conclusion with `A`.  This is particularly useful
+  when `C` is `void`, that is, when `h`'s type is `not A` and the
+  conclusion is `not B`.
+
+  - `contrapositiveRaw /[hyp h]/`
+
+    As `contrapositive` but does not invoke the typechecker.
+
+
 
 ### Hypothesis tactics
 
@@ -244,7 +256,7 @@ which appears in the `Hyp` structure.
 
 - `hypof`
 
-  Proves a goal of the form `x : A`, if the type of `x` is `A`.
+  Proves a goal of the form `x : A`, if `x`'s type is `A`.
 
   + `eassumption`
 

@@ -151,6 +151,7 @@ given by:
 
     datatype native =
        Integer of IntInf.int
+     | Symbol of Symbol.symbol
 
     datatype term =
        Var    of int
@@ -180,7 +181,7 @@ given by:
 The `binder` in `Lam` is not significant to the type theory.  The
 implementation uses it to suggest a name for the bound variable.  A
 `Marker` taking the empty symbol is the internal representation of the
-[marker psuedo-term](terms.html#the-term-grammar) (`__`).  (The
+[hole pseudo-term](terms.html#the-term-grammar) (`__`).  (The
 datatype also allows distinguished markers in which a nonempty symbol
 is used.  Currently no tactics use this form.)
 
@@ -334,5 +335,7 @@ recursively and obtain a fully normal form.
       val setEbindSub : ebind -> sub -> term -> bool
 
   The `unify` operation adds a constraint to the queue, and `solve`
-  attempts to solve all constraints in the queue.  The `unify1`
-  solves one constraint (plus any others that were previously queued).
+  attempts to solve all constraints in the queue.  The `unify1` solves
+  one constraint (plus any others that were previously queued).
+  Calling `setEbindSub e s m` attemps to assign to `e` in order to
+  make `e[s]` equal to `m`, and returns true if it succeeded.

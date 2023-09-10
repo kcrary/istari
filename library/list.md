@@ -60,6 +60,8 @@ A simpler case-analysis operation:
 
     append_cons_assoc : type:append_cons_assoc
 
+    append_eq_nil : type:append_eq_nil
+
     append_eq_cons : type:append_eq_cons
 
 
