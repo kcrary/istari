@@ -36,8 +36,8 @@ Require Import ValidationNat.
 Require Import ValidationOf.
 Require Import ValidationPi.
 Require Import ValidationQuotient.
-Require Import ValidationSimple.
 Require Import ValidationSet.
+Require Import ValidationSimple.
 Require Import ValidationSquash.
 Require Import ValidationSubtype.
 Require Import ValidationSum.

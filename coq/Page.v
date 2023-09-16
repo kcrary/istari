@@ -184,6 +184,19 @@ apply cin_cex.
 Qed.
 
 
+Lemma le_page_antisymm :
+  forall pg pg',
+    le_page pg pg'
+    -> le_page pg' pg
+    -> pg = pg'.
+Proof.
+intros pg pg' H1 H2.
+destruct H1 as (? & ? & ?).
+destruct H2 as (? & ? & ?).
+apply page_extensionality; eauto using le_ord_antisymm.
+Qed.
+
+
 Lemma toppg_max :
   forall pg, le_page pg toppg.
 Proof.

@@ -548,7 +548,7 @@ Qed.
    will produce a subgoal of the form:
 
    forall G,
-     hygiene (ctxpred (Hi ++ G) pi)
+     hygiene (ctxpred (H1 ++ G) pi)
      -> ...
      -> hygiene (ctxpred (Hm ++ G) pm)
      -> seq (G1a ++ G1b ++ G) J1

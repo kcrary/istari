@@ -827,14 +827,14 @@ Definition levind (w : ordinal) : Prop
   (forall pg s i a a' R,
      str pg << w
      -> cex pg <<= stop
-     -> restriction (cex pg) a a'
+     -> restriction (succ (cex pg)) a a'
      -> kinterp pg s i a R
      -> kinterp pg s i a' R)
   /\
   (forall pg s i a a' R,
      str pg << w
      -> cex pg <<= stop
-     -> restriction (cex pg) a a'
+     -> restriction (succ (cex pg)) a a'
      -> interp pg s i a R
      -> interp pg s i a' R)
   /\
@@ -1555,10 +1555,9 @@ pextensionality.
   exists R.
   rewrite -> sint_unroll in Hm, Hp |- *.
   rewrite <- !restrict_extend in Hm, Hp.
-  so (lt_ord_impl_le_ord _ _ Hcex) as Hle.
   so (le_ord_trans _#3 (cex_top gpg) (succ_nodecrease _)) as Hlestop.
-  so (restriction_decrease _#4 Hle (restrict_impl_restriction wc m)) as Hrestm.
-  so (restriction_decrease _#4 Hle (restrict_impl_restriction wc p)) as Hrestp.
+  so (restriction_decrease _#4 Hcex (restrict_impl_restriction wc m)) as Hrestm.
+  so (restriction_decrease _#4 Hcex (restrict_impl_restriction wc p)) as Hrestp.
   split; eapply (IHo anderl); eauto.
   }
 }
@@ -1874,16 +1873,57 @@ auto.
 Qed.
 
 
-(* We have to use restriction here, as opposed to saying
-   (a = restrict_term w a'), because the latter isn't preserved in
+Lemma restriction_stop :
+  forall m n,
+    restriction stop m n
+    -> m = n.
+Proof.
+apply (restriction_term_mut_ind stop
+         (fun m n => m = n)
+         (fun a r r' => r = r')); auto.
+
+(* oper *)
+{
+intros a th r s _ <-.
+reflexivity.
+}
+
+(* ext *)
+{
+intros Q h Hle.
+exfalso.
+refine (lt_ord_irrefl stop _).
+eapply le_lt_ord_trans; eauto.
+}
+
+(* extt *)
+{
+intros Q h Hle.
+exfalso.
+refine (lt_ord_irrefl stop _).
+eapply le_lt_ord_trans; eauto.
+}
+
+(* cons *)
+{
+intros j a m n r s _ <- _ <-.
+reflexivity.
+}
+Qed.
+
+
+(* This lemma states that in a semantics interpretation of a term, any
+   objnones in the term can be replaced by objsomes, provided that the
+   objsomes are at too high a level to be used in the interpretation.
+
+   We have to use restriction here, as opposed to saying something like
+   (a = restrict_term (succ w) a'), because the latter isn't preserved in
    some cases.  For instance, in the clam case, you substitute using
    an object that might be restricted away if you applied
    (restrict_term w).
 
-   We use wc as the restriction level, which means that whenever
-   objnone is promoted to objsome, the level is at least wc.  (Which
-   means that (restrict_term wc) returns the same thing for each
-   term.)
+   Note that (restrict_term (succ (cex pg))) returns the same thing
+   for each term.
 
    In principle, we could say something stronger: that an objnone can
    be promoted to any objsome, regardless of level.  But (to get ctapp
@@ -1892,35 +1932,45 @@ Qed.
    state and which we would then have to prove for every type.  It
    would be doable, but since we don't seem to need the stronger
    statement, we don't bother.
-  *)
+
+   (Also, we could imagine some types for which the stronger version
+   wouldn't work at all.  For example, a syntactic equality type (that
+   internalized equiv) wouldn't handle the term being tinkered with this
+   way.)
+
+   We could also say something slightly stronger: use the level (cex pg)
+   instead of (succ (cex pg)).  We used to do that, but changed to this
+   to allow the syntactic equality type.  We ended up ditching that, but
+   this is more principled anyway, so we kept it.
+*)
 
 Lemma semantics_restriction :
   (forall pg s i a a' Q,
      levind (str pg)
-     -> restriction (cex pg) a a'
+     -> restriction (succ (cex pg)) a a'
      -> kinterp pg s i a Q
      -> kinterp pg s i a' Q)
   /\
   (forall pg s i a a' Q,
      levind (str pg)
-     -> restriction (cex pg) a a'
+     -> restriction (succ (cex pg)) a a'
      -> cinterp pg s i a Q
      -> cinterp pg s i a' Q)
   /\
   (forall pg s i a a' R,
      levind (str pg)
-     -> restriction (cex pg) a a'
+     -> restriction (succ (cex pg)) a a'
      -> interp pg s i a R
      -> interp pg s i a' R).
 Proof.
 exploit (semantics_ind the_system
-           (fun pg s i m X => forall m', levind (str pg) -> restriction (cex pg) m m' -> kbasicv the_system pg s i m' X)
-           (fun pg s i m X => forall m', levind (str pg) -> restriction (cex pg) m m' -> cbasicv the_system pg s i m' X)
-           (fun pg s i m X => forall m', levind (str pg) -> restriction (cex pg) m m' -> basicv the_system pg s i m' X)
-           (fun pg s i m X => forall m', levind (str pg) -> restriction (cex pg) m m' -> kbasic the_system pg s i m' X)
-           (fun pg s i m X => forall m', levind (str pg) -> restriction (cex pg) m m' -> cbasic the_system pg s i m' X)
-           (fun pg s i m X => forall m', levind (str pg) -> restriction (cex pg) m m' -> basic the_system pg s i m' X)
-           (fun pg s i A m X => forall m', levind (str pg) -> restriction (cex pg) m m' -> functional the_system pg s i A m' X))
+           (fun pg s i m X => forall m', levind (str pg) -> restriction (succ (cex pg)) m m' -> kbasicv the_system pg s i m' X)
+           (fun pg s i m X => forall m', levind (str pg) -> restriction (succ (cex pg)) m m' -> cbasicv the_system pg s i m' X)
+           (fun pg s i m X => forall m', levind (str pg) -> restriction (succ (cex pg)) m m' -> basicv the_system pg s i m' X)
+           (fun pg s i m X => forall m', levind (str pg) -> restriction (succ (cex pg)) m m' -> kbasic the_system pg s i m' X)
+           (fun pg s i m X => forall m', levind (str pg) -> restriction (succ (cex pg)) m m' -> cbasic the_system pg s i m' X)
+           (fun pg s i m X => forall m', levind (str pg) -> restriction (succ (cex pg)) m m' -> basic the_system pg s i m' X)
+           (fun pg s i A m X => forall m', levind (str pg) -> restriction (succ (cex pg)) m m' -> functional the_system pg s i A m' X))
   as Hind;
 try (intros;
      match goal with
@@ -2073,7 +2123,7 @@ fold (ctapp b' m').
 eapply interp_ctapp; eauto.
 so (cinterp_level_bound _#5 Hintb) as Hlev.
 cbn in Hlev.
-so (le_ord_trans _#3 (le_ord_max_l l (level K)) (le_ord_trans _#3 Hlev (cin_cex pg))) as Hlev'.
+so (le_ord_trans _#3 (le_ord_trans _#3 (le_ord_max_l l (level K)) (le_ord_trans _#3 Hlev (cin_cex pg))) (succ_nodecrease _)) as Hlev'.
 rewrite <- (restrict_restriction _#3 (restriction_decrease _#4 Hlev' Hrestm)); auto.
 }
 
@@ -2098,6 +2148,7 @@ apply IH; auto.
 
   {
   eapply restriction_decrease; eauto.
+  apply le_ord_succ.
   apply cex_mono; auto.
   }
 }
@@ -2155,12 +2206,12 @@ rewrite -> extend_srel in Hmp', Hnq'.
 rewrite -> (restrict_restriction _ m m') in Hmp'; auto.
 2:{
   cbn.
-  exact (restriction_decrease _#4 (cin_cex pg) Hm').
+  exact (restriction_decrease _#4 (le_ord_trans _#3 (cin_cex pg) (succ_nodecrease _)) Hm').
   }
 rewrite -> (restrict_restriction _ n n') in Hnq'; auto.
 2:{
   cbn.
-  exact (restriction_decrease _#4 (cin_cex pg) Hn').
+  exact (restriction_decrease _#4 (le_ord_trans _#3 (cin_cex pg) (succ_nodecrease _)) Hn').
   }
 rewrite <- extend_srel in Hmp', Hnq'.
 rewrite <- (den_extend_iurel _ _ h) in Hmp', Hnq'.
@@ -2200,6 +2251,7 @@ apply (interp_all _#7 gpg _ _ h); eauto using restriction_hygiene, pginterp_rest
 
     {
     eapply restriction_decrease; eauto.
+    apply le_ord_succ.
     apply cex_mono; auto.
     }
   }
@@ -2247,6 +2299,7 @@ apply (interp_exist _#7 gpg _ _ h); eauto using restriction_hygiene, pginterp_re
 
     {
     eapply restriction_decrease; eauto.
+    apply le_ord_succ.
     apply cex_mono; auto.
     }
   }
@@ -3011,6 +3064,7 @@ eapply semantics_level_internal; eauto using semantics_levind.
 Qed.
 
 
+(* Not currently used. *)
 Lemma interp_level_external :
   forall pg s i a R,
    interp pg s i a R
@@ -3023,32 +3077,10 @@ apply cex_top.
 Qed.
 
 
-Lemma interp_level_restricted :
-  forall pg s i a R,
-    interp pg s i (restrict_term (succ (cex pg)) a) R
-    -> interp pg s i a R.
-Proof.
-intros pg s i a R Hint.
-set (wc := cex pg).
-so (restriction_decrease _#4 (succ_nodecrease wc) (restrict_impl_restriction (succ wc) a)) as Hrest.
-eapply semantics_restriction; eauto using semantics_levind.
-Qed.
-
-
-Lemma interp_level_external_iff :
-  forall pg s i a R,
-    interp pg s i a R
-    <->
-    interp pg s i (restrict_term (succ (cex pg)) a) R.
-Proof.
-intros pg s i a R.
-split; eauto using interp_level_external, interp_level_restricted.
-Qed.
-
-
+(* Not currently used. *)
 Lemma interp_restriction :
   forall pg s i a a' R,
-    restriction (cex pg) a a'
+    restriction (succ (cex pg)) a a'
     -> interp pg s i a R
     -> interp pg s i a' R.
 Proof.

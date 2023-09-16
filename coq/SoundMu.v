@@ -2180,18 +2180,57 @@ Definition down w := map_term (extend stop w).
 Definition up w := map_term (extend w stop).
 
 
+Lemma down_up_cancel :
+  forall w m,
+    w <<= stop
+    -> down w (up w m) = m.
+Proof.
+intros w m Hw.
+unfold down, up.
+apply extend_term_cancel; auto.
+Qed.
+
+
+(* In an earlier version we were able to get by saying that m' is
+   always (up (cin pg) m) and similarly for p.  This simplified things,
+   and it worked because with the old version of semantics_restriction,
+   (up w (down w m)) is just as good as m when working at level w.
+   (Semantics_restriction allowed you to replace objnones with objsomes
+   at level w, so you could get from (up w (down w m)) back to m.)
+
+   Now that semantics_restriction only allows you to replace objnones
+   with objsomes at level succ w, it is useless for that purpose, so the
+   simplification doesn't work any more.  Now we have to keep track of
+   the higher-level terms (m' and p') explicitly.
+
+   To make contingent_action uniform, we have to mod out by equivalence,
+   and once we have equiv in play, we need hygiene in order to prove what
+   we need.
+
+   Finally, we need to know m' and p' before we commit to R.  It used to
+   be that m' and p' were determined by m and p (as discussed above),
+   but now we need to take them explicitly before determining R.  This
+   doesn't really change anything, but it makes things a little more
+   messy.
+*)
+
 Definition contingent_action pg A (P : nat -> sterm -> sterm -> Prop)
   : nat -> relation (wterm (cin pg))
   :=
   fun i m p =>
     rel A i m p
-    /\ exists R,
-         forall j b c,
-           j <= i
-           -> P j b c
-           -> interp pg true j (subst1 (up (cin pg) m) b) (iutruncate (S j) R)
-              /\ interp pg false j (subst1 (up (cin pg) p) c) (iutruncate (S j) R)
-              /\ rel (den R) j triv triv.
+    /\ forall m' p',
+         equiv m (down (cin pg) m')
+         -> equiv p (down (cin pg) p')
+         -> hygiene clo m'
+         -> hygiene clo p'
+         -> exists R,
+              forall j b c,
+                j <= i
+                -> P j b c
+                -> interp pg true j (subst1 m' b) (iutruncate (S j) R)
+                   /\ interp pg false j (subst1 p' c) (iutruncate (S j) R)
+                   /\ rel (den R) j triv triv.
 
 
 Lemma contingent_uniform :
@@ -2210,62 +2249,72 @@ eapply urel_closed; eauto.
 (* equiv *)
 {
 intros i m m' p p' Hclm' Hclp' Hequivm Hequivp Hmp.
-destruct Hmp as (Hmp & R & HR).
+destruct Hmp as (Hmp & H).
 split.
   {
   eapply urel_equiv; eauto.
   }
+intros n q Hn Hq Hcln Hclq.
+so (H _ _ (equiv_trans _#4 Hequivm Hn) (equiv_trans _#4 Hequivp Hq) Hcln Hclq) as (R & HR).
 exists R.
 intros j b c Hj Hbc.
 so (HR j b c Hj Hbc) as (Hb & Hc & Hinh).
-do2 2 split; auto.
-  {
-  eapply basic_equiv; eauto.
-    {
-    so (basic_closed _#6 Hb) as Hhyg.
-    so (hygiene_clo_subst1_invert_permit _#3 Hhyg) as Hclb.
-    apply hygiene_subst1; auto.
-    apply map_hygiene; auto.
-    }
-
-    {
-    apply equiv_funct1; auto using equiv_refl.
-    apply map_equiv; auto.
-    }
-  }
-
-  {
-  eapply basic_equiv; eauto.
-    {
-    so (basic_closed _#6 Hc) as Hhyg.
-    so (hygiene_clo_subst1_invert_permit _#3 Hhyg) as Hclb.
-    apply hygiene_subst1; auto.
-    apply map_hygiene; auto.
-    }
-
-    {
-    apply equiv_funct1; auto using equiv_refl.
-    apply map_equiv; auto.
-    }
-  }
+auto.
 }
 
 (* zigzag *)
 {
 intros i m p n q Hmp Hnp Hnq.
-destruct Hmp as (Hmp & R & HRmp).
-destruct Hnp as (Hnp & R' & HRnp).
-destruct Hnq as (Hnq & R'' & HRnq).
+destruct Hmp as (Hmp & HRmp).
+destruct Hnp as (Hnp & HRnp).
+destruct Hnq as (Hnq & HRnq).
+so (urel_closed _#5 Hnp) as (Hcln & Hclp).
 split.
   {
   eapply urel_zigzag; eauto.
   }
+intros m' q' Hequivm Hequivq Hclm' Hclq'.
+exploit (HRmp m' (up (cin pg) p)) as H; auto.
+  {
+  rewrite -> down_up_cancel; auto using equiv_refl, cin_stop.
+  }
+
+  {
+  apply map_hygiene; auto.
+  }
+destruct H as (R & HRmp').
 exists R.
 intros j b c Hj Hbc.
-so (HRmp _ _ _ Hj Hbc) as (Hm & Hp & Hinh).
-so (HRnp _ _ _ Hj Hbc) as (Hn & Hp' & _).
+so (HRmp' j b c Hj Hbc) as (Hm & Hp & Hinh).
+exploit (HRnp (up (cin pg) n) (up (cin pg) p)) as H.
+  {
+  rewrite -> down_up_cancel; auto using equiv_refl, cin_stop.
+  }
+
+  {
+  rewrite -> down_up_cancel; auto using equiv_refl, cin_stop.
+  }
+
+  {
+  apply map_hygiene; auto.
+  }
+
+  {
+  apply map_hygiene; auto.
+  }
+destruct H as (R' & HRnp').
+so (HRnp' _ _ _ Hj Hbc) as (Hn & Hp' & _).
 so (interp_fun _#7 Hp Hp') as Heq.
-so (HRnq _ _ _ Hj Hbc) as (Hn' & Hq & _).
+exploit (HRnq (up (cin pg) n) q') as H; auto.
+  {
+  rewrite -> down_up_cancel; auto using equiv_refl, cin_stop.
+  }
+
+  {
+  apply map_hygiene; auto.
+  }
+destruct H as (R'' & HRnq').
+so (HRnq' _ _ _ Hj Hbc) as (Hn' & Hq & _).
 so (interp_fun _#7 Hn Hn') as Heq'.
 do2 2 split; auto.
   {
@@ -2278,15 +2327,15 @@ do2 2 split; auto.
 (* downward *)
 {
 intros i m p Hmp.
-destruct Hmp as (Hmp & R & HR).
+destruct Hmp as (Hmp & H).
 split.
   {
   apply urel_downward; auto.
   }
+intros m' p' Hm Hp Hclm' Hclp'.
+so (H _ _ Hm Hp Hclm' Hclp') as (R & HR).
 exists R.
-intros j b c Hj.
-apply HR.
-omega.
+auto.
 }
 Qed.
 
@@ -2386,50 +2435,45 @@ Definition contingent_instance pg A b s s' G :=
 
 
 Lemma contingent_instance_elim :
-  forall pg A b s s' G i m p,
+  forall pg A b s s' G i m p m' p',
     rel (contingent_instance pg A b s s' G) i m p
+    -> m = down (cin pg) m'
+    -> p = down (cin pg) p'
     -> rel A i m p
        /\ exists R,
             forall j t t',
               j <= i
               -> relctx j s s' t t' G
-              -> interp pg true j (subst (dot (up (cin pg) m) t) b) (iutruncate (S j) R)
-                 /\ interp pg false j (subst (dot (up (cin pg) p) t') b) (iutruncate (S j) R)
+              -> interp pg true j (subst (dot m' t) b) (iutruncate (S j) R)
+                 /\ interp pg false j (subst (dot p' t') b) (iutruncate (S j) R)
                  /\ rel (den R) j triv triv.
 Proof.
-intros pg A b s s' G i m p H.
-destruct H as (Hmp & R & HR).
+intros pg A b s s' G i m p m' p' H Hm' Hp'.
+destruct H as (Hmp & H).
 split; auto.
+so (urel_closed _#5 Hmp) as (Hclm & Hclp).
+destruct (H m' p' (equiv_refl' _#3 Hm') (equiv_refl' _#3 Hp')) as (R & HR).
+  {
+  rewrite -> Hm' in Hclm.
+  eapply map_hygiene_conv; eauto.
+  }
+
+  {
+  rewrite -> Hp' in Hclp.
+  eapply map_hygiene_conv; eauto.
+  }
 exists R.
 intros j t t' Hj Ht.
-exploit (HR j (subst (under 1 t) b) (subst (under 1 t') b)) as H; auto.
+exploit (HR j (subst (under 1 t) b) (subst (under 1 t') b)) as H'; auto.
   {
   exists t, t'.
   auto.
   }
-simpsubin H.
-exact H.
+simpsubin H'.
+exact H'.
 Qed.
 
        
-Lemma interp_updown :
-  forall pg w z i s m a A,
-    cex pg <<= w
-    -> interp pg z i (subst (dot (up w (down w m)) s) a) A
-    -> interp pg z i (subst (dot m s) a) A.
-Proof.
-intros pg w z i s m a A Hle Hint.
-unfold up, down in Hint.
-rewrite <- restrict_extend in Hint.
-so (restrict_impl_restriction w m) as Hrestm.
-so (restriction_refl w (subst (under 1 s) a)) as Hresta.
-so (restriction_funct1 _#5 Hrestm Hresta) as Hrest.
-simpsubin Hrest.
-eapply interp_restriction; eauto.
-eapply restriction_decrease; eauto.
-Qed.
-
-
 (* The sound_mu_ind_univ rule depends on the page's cex and cin being
    equal.  That turns out to be true for every page that the syntax
    supports, but we don't like to rely on that property.  If we ever
@@ -2577,21 +2621,12 @@ assert (incl C Mu) as Hincl.
 cut (rel C i (down top (subst s m)) (down top (subst s' m))).
   {
   intro H.
-  so (contingent_instance_elim _#9 H) as (Hn & R & HR); clear H.
-  so (HR i s s' (le_refl _) (relctx_refl _#4 Hs)) as H.
+  so (contingent_instance_elim _#11 H (eq_refl _) (eq_refl _)) as (Hn & R & HR); clear H.
+  exploit (HR i s s') as H; auto using relctx_refl.
   destruct H as (Hl & Hr & Hinh).
-  simpsubin Hl.
-  simpsubin Hr.
   exists (iutruncate (S i) R).
   simpsub.
   do2 4 split; auto; try (split; [omega | auto]; done).
-    {
-    eapply interp_updown; eauto using le_ord_refl.
-    }
-
-    {
-    eapply interp_updown; eauto using le_ord_refl.
-    }
   }
 cut (incl Mu C); auto.
 clear m Hm Hseqm.
@@ -2650,21 +2685,12 @@ assert (forall k t t',
     destruct Hnq as (H & Hnq).
     assert (l <= k) as Hlk by omega.
     clear H.
-    so (contingent_instance_elim _#9 Hnq) as (_ & R & HR).
+    so (contingent_instance_elim _#11 Hnq (eq_refl _) (eq_refl _)) as (_ & R & HR).
     so (HR _#3 (le_refl _) (relctx_downward _#7 Hlk Hst)) as (Hn & Hq & _).
     clear HR.
     exists (iutruncate (S l) R).
     simpsub.
-    change (map_term (extend (succ top) top) n) with (down top n) in Hn.
-    change (map_term (extend (succ top) top) q) with (down top q) in Hq.
-    split.
-      {
-      eapply (interp_updown _ top); eauto using le_ord_refl.
-      }
-
-      {
-      eapply (interp_updown _ top); eauto using le_ord_refl.
-      }
+    auto.
     }
   }
 assert (forall k t t',
@@ -2692,17 +2718,21 @@ assert (forall k t t',
     apply le_ord_refl.
     }
   }
-assert (forall k t t',
+assert (forall k t t' m' p',
           k <= j
           -> relctx k s s' t t' G
+          -> equiv m (down top m')
+          -> equiv p (down top p')
+          -> hygiene clo m'
+          -> hygiene clo p'
           -> pwctx k
-               (dot (lam triv) (dot triv (dot (up top m) (dot (exttin top C h) t))))
-               (dot (lam triv) (dot triv (dot (up top p) (dot (exttin top C h) t'))))
+               (dot (lam triv) (dot triv (dot m' (dot (exttin top C h) t))))
+               (dot (lam triv) (dot triv (dot p' (dot (exttin top C h) t'))))
                (hyp_tm (pi (var 2) (subst (under 1 (sh 3)) b)) ::
                 hyp_tm (subtype (var 1) (mu (subst (dot (var 0) (sh 3)) a))) ::
                 hyp_tm a :: hyp_tp :: G)) as Hss.
   {
-  intros k t t' Hk Hst.
+  intros k t t' m' p' Hk Hst Hequivm Hequivp Hclm Hclp.
   assert (k <= i) as Hki by omega.
   set (h' := lt_ord_impl_le_ord _ _ h).
   set (C' := extend_iurel h' (iutruncate (S k) (iubase C))).
@@ -2736,8 +2766,14 @@ assert (forall k t t',
         apply (seqhyp_tm _#5 (iutruncate (S k) (extend_iurel h' (pi1 F C)))); auto.
         cbn.
         split; [omega |].
-        unfold up.
-        rewrite -> !extend_term_cancel; auto.
+        apply (urel_equiv _ _ _ m _ p); auto.
+          {
+          apply map_hygiene; auto.
+          }
+
+          {
+          apply map_hygiene; auto.
+          }
         apply (urel_downward_leq _#3 j); auto.
         }
 
@@ -2797,7 +2833,7 @@ assert (forall k t t',
       }
 
       {
-      clear i j m p Hmp s s' t t' Hs Hst Hmul Hmur HF C Hincl Hj Htp C' F Mu h h' HmonoF k Hk Hki Hfunc.
+      clear i j m p Hmp s s' t t' Hs Hst Hmul Hmur HF C Hincl Hj Htp C' F Mu h h' HmonoF k Hk Hki Hfunc m' p' Hequivm Hequivp Hclm Hclp.
       intros i ss ss' Hss.
       so (pwctx_cons_invert_simple _#5 Hss) as (m & p & s1 & s1' & Hs1 & Hmp & -> & ->).
       so (pwctx_cons_invert_simple _#5 Hs1) as (c & d & s & s' & Hs & Hcd & -> & ->).
@@ -2825,7 +2861,7 @@ assert (forall k t t',
     simpsub.
     change (3 + 1) with 4.
     simpsub.
-    clear m p Hmp.
+    clear m p Hmp m' p' Hequivm Hequivp Hclm Hclp.
     so (Hfunc _ _ _ Hk Hst) as H.
     destruct H as (B & Hbl & Hbr).
     fold h' in Hbl, Hbr.
@@ -2868,7 +2904,7 @@ assert (forall k t t',
       rewrite -> den_extend_iurel in H.
       cbn -[C] in H.
       destruct H as (_ & H).
-      so (contingent_instance_elim _#9 H) as (Hnq' & R & HR).
+      so (contingent_instance_elim _#11 H (eq_refl _) (eq_refl _)) as (Hnq' & R & HR).
       clear H.
       so (HR _ _ _ (le_refl _) (relctx_downward _#7 Hlk Hst)) as (Hl & _ & Hinh).
       clear HR.
@@ -2877,7 +2913,7 @@ assert (forall k t t',
       so (Hact _#3 Hlk Hnq) as Hl'.
       clear Hact.
       simpsubin Hl'.
-      so (interp_fun _#7 (interp_updown _#8 (le_ord_refl _) Hl) Hl') as Heq.
+      so (interp_fun _#7 Hl Hl') as Heq.
       match goal with
       | |- rel (den ?Z) _ _ _ => replace Z with (iutruncate (S l) R)
       end.
@@ -3002,10 +3038,6 @@ assert (forall k t t',
       }
     }
   }
-so (Hseqind j _ _ (Hss j s s' (le_refl _) (relctx_refl _#4 (pwctx_downward _#5 Hj Hs)))) as (R & Hl & Hr & Hinh & _).
-simpsubin Hl.
-simpsubin Hr.
-simpsubin Hinh.
 split.
   {
   unfold Mu.
@@ -3014,15 +3046,20 @@ split.
   cbn in Hincl'.
   apply Hincl'; auto.
   }
+intros m' p' Hequivm Hequivp Hclm' Hclp'.
+so (Hseqind j _ _ (Hss j s s' m' p' (le_refl _) (relctx_refl _#4 (pwctx_downward _#5 Hj Hs)) Hequivm Hequivp Hclm' Hclp')) as (R & Hl & Hr & Hinh & _).
+simpsubin Hl.
+simpsubin Hr.
+simpsubin Hinh.
 exists R.
 intros k c d Hk Hcd.
 destruct Hcd as (t & t' & Hst & -> & ->).
 simpsub.
 assert (k <= i) as Hki by omega.
-so (Hseqind k _ _ (Hss k t t' Hk Hst)) as H.
+so (Hseqind k _ _ (Hss k t t' m' p' Hk Hst Hequivm Hequivp Hclm' Hclp')) as H.
 simpsubin H.
 destruct H as (R' & Hlt & Hrt & _).
-so (Hseqind k _ _ (Hss k s t' Hk (relctx_swap1 _#6 Hst))) as H.
+so (Hseqind k _ _ (Hss k s t' m' p' Hk (relctx_swap1 _#6 Hst) Hequivm Hequivp Hclm' Hclp')) as H.
 simpsubin H.
 destruct H as (R'' & Hl' & Hrt' & _).
 so (interp_fun _#7 Hl' (basic_downward _#7 Hk Hl)); subst R''.
@@ -3199,8 +3236,8 @@ assert (incl C Mu) as Hincl.
 cut (rel C i (down w (subst s m)) (down w (subst s' m))).
   {
   intro H.
-  so (contingent_instance_elim _#9 H) as (Hn & R & HR); clear H.
-  so (HR i s s' (le_refl _) (relctx_refl _#4 Hs)) as H.
+  so (contingent_instance_elim _#11 H (eq_refl _) (eq_refl _)) as (Hn & R & HR); clear H.
+  exploit (HR i s s') as H; auto using relctx_refl.
   destruct H as (Hl & Hr & Hinh).
   simpsubin Hl.
   simpsubin Hr.
@@ -3209,12 +3246,10 @@ cut (rel C i (down w (subst s m)) (down w (subst s' m))).
   do2 4 split; auto; try (split; [omega | auto]; done).
     {
     apply (interp_increase pg); auto using toppg_max.
-    eapply interp_updown; eauto.
     }
 
     {
     apply (interp_increase pg); auto using toppg_max.
-    eapply interp_updown; eauto.
     }
   }
 cut (incl Mu C); auto.
@@ -3275,21 +3310,14 @@ assert (forall k t t',
     destruct Hnq as (H & Hnq).
     assert (l <= k) as Hlk by omega.
     clear H.
-    so (contingent_instance_elim _#9 Hnq) as (_ & R & HR).
+    so (contingent_instance_elim _#11 Hnq (eq_refl _) (eq_refl _)) as (_ & R & HR).
     so (HR _#3 (le_refl _) (relctx_downward _#7 Hlk Hst)) as (Hn & Hq & _).
     clear HR.
     exists (iutruncate (S l) R).
     simpsub.
     change (map_term (extend stop w) n) with (down w n) in Hn.
     change (map_term (extend stop w) q) with (down w q) in Hq.
-    split.
-      {
-      eapply interp_updown; eauto.
-      }
-
-      {
-      eapply interp_updown; eauto.
-      }
+    split; auto.
     }
   }
 assert (forall k t t',
@@ -3359,17 +3387,21 @@ assert (forall k t t',
       }
     }
   }
-assert (forall k t t',
+assert (forall k t t' m' p',
           k <= j
           -> relctx k s s' t t' G
+          -> equiv m (down (cin pg) m')
+          -> equiv p (down (cin pg) p')
+          -> hygiene clo m'
+          -> hygiene clo p'
           -> pwctx k
-               (dot (lam triv) (dot triv (dot (up w m) (dot (exttin w C h) t))))
-               (dot (lam triv) (dot triv (dot (up w p) (dot (exttin w C h) t'))))
+               (dot (lam triv) (dot triv (dot m' (dot (exttin w C h) t))))
+               (dot (lam triv) (dot triv (dot p' (dot (exttin w C h) t'))))
                (hyp_tm (pi (var 2) (subst (under 1 (sh 3)) b)) ::
                 hyp_tm (subtype (var 1) (mu (subst (dot (var 0) (sh 3)) a))) ::
                 hyp_tm a :: hyp_tm (univ lv) :: G)) as Hss.
   {
-  intros k t t' Hk Hst.
+  intros k t t' m' p' Hk Hst Hequivm Hequivp Hclm Hclp.
   assert (k <= i) as Hki by omega.
   set (h' := lt_ord_impl_le_ord _ _ h).
   set (C' := extend_iurel h' (iutruncate (S k) (iubase C))).
@@ -3403,8 +3435,14 @@ assert (forall k t t',
         apply (seqhyp_tm _#5 (iutruncate (S k) (extend_iurel h' (pi1 F C)))); eauto using interp_increase, toppg_max.
         cbn.
         split; [omega |].
-        unfold up.
-        rewrite -> !extend_term_cancel; auto.
+        apply (urel_equiv _ _ _ m _ p); auto.
+          {
+          apply map_hygiene; auto.
+          }
+
+          {
+          apply map_hygiene; auto.
+          }
         apply (urel_downward_leq _#3 j); auto.
         }
 
@@ -3464,7 +3502,7 @@ assert (forall k t t',
       }
 
       {
-      clear i j m p Hmp s s' t t' Hs Hst Hmul Hmur HF C Hincl Hj Htp C' F Mu h h' HmonoF k Hk Hki Hfunc Hlvl.
+      clear i j m p Hmp s s' t t' Hs Hst Hmul Hmur HF C Hincl Hj Htp C' F Mu h h' HmonoF k Hk Hki Hfunc Hlvl m' p' Hequivm Hequivp Hclm Hclp.
       intros i ss ss' Hss.
       so (pwctx_cons_invert_simple _#5 Hss) as (m & p & s1 & s1' & Hs1 & Hmp & -> & ->).
       so (pwctx_cons_invert_simple _#5 Hs1) as (c & d & s & s' & Hs & Hcd & -> & ->).
@@ -3500,7 +3538,7 @@ assert (forall k t t',
     simpsub.
     change (3 + 1) with 4.
     simpsub.
-    clear m p Hmp.
+    clear m p Hmp m' p' Hclm Hclp Hequivm Hequivp.
     so (Hfunc _ _ _ Hk Hst) as H.
     destruct H as (B & Hbl & Hbr).
     fold h' in Hbl, Hbr.
@@ -3545,7 +3583,7 @@ assert (forall k t t',
       rewrite -> den_extend_iurel in H.
       cbn -[C] in H.
       destruct H as (_ & H).
-      so (contingent_instance_elim _#9 H) as (Hnq' & R & HR).
+      so (contingent_instance_elim _#11 H (eq_refl _) (eq_refl _)) as (Hnq' & R & HR).
       clear H.
       so (HR _ _ _ (le_refl _) (relctx_downward _#7 Hlk Hst)) as (Hl & _ & Hinh).
       clear HR.
@@ -3554,7 +3592,7 @@ assert (forall k t t',
       so (Hact _#3 Hlk Hnq) as Hl'.
       clear Hact.
       simpsubin Hl'.
-      so (interp_fun _#7 (interp_updown _#8 Hexw Hl) Hl') as Heq.
+      so (interp_fun _#7 Hl Hl') as Heq.
       match goal with
       | |- rel (den ?Z) _ _ _ => replace Z with (iutruncate (S l) R)
       end.
@@ -3696,12 +3734,6 @@ assert (forall k t t',
       }
     }
   }
-so (Hseqind j _ _ (Hss j s s' (le_refl _) (relctx_refl _#4 (pwctx_downward _#5 Hj Hs)))) as (pg' & R & Hlvl' & _ & Hl & Hr & Hinh).
-simpsubin Hlvl'.
-so (pginterp_fun _#3 Hlvl Hlvl'); subst pg'; clear Hlvl'.
-simpsubin Hl.
-simpsubin Hr.
-simpsubin Hinh.
 split.
   {
   unfold Mu.
@@ -3710,18 +3742,25 @@ split.
   cbn in Hincl'.
   apply Hincl'; auto.
   }
+intros m' p' Hequivm Hequivp Hclm' Hclp'.
+so (Hseqind j _ _ (Hss j s s' _ _ (le_refl _) (relctx_refl _#4 (pwctx_downward _#5 Hj Hs)) Hequivm Hequivp Hclm' Hclp')) as (pg' & R & Hlvl' & _ & Hl & Hr & Hinh).
+simpsubin Hlvl'.
+so (pginterp_fun _#3 Hlvl Hlvl'); subst pg'; clear Hlvl'.
+simpsubin Hl.
+simpsubin Hr.
+simpsubin Hinh.
 exists R.
 intros k c d Hk Hcd.
 destruct Hcd as (t & t' & Hst & -> & ->).
 simpsub.
 assert (k <= i) as Hki by omega.
 fold w.
-so (Hseqind k _ _ (Hss k t t' Hk Hst)) as H.
+so (Hseqind k _ _ (Hss k t t' _ _ Hk Hst Hequivm Hequivp Hclm' Hclp')) as H.
 simpsubin H.
 destruct H as (pg' & R' & Hlvl' & _ & Hlt & Hrt & _).
 simpsubin Hlvl'.
 so (pginterp_fun _#3 Hlvl' (relctx_pginterp _#8 Hseqlv Hst Hlvl andel)); subst pg'; clear Hlvl'.
-so (Hseqind k _ _ (Hss k s t' Hk (relctx_swap1 _#6 Hst))) as H.
+so (Hseqind k _ _ (Hss k s t' _ _ Hk (relctx_swap1 _#6 Hst) Hequivm Hequivp Hclm' Hclp')) as H.
 simpsubin H.
 destruct H as (pg' & R'' & Hlvl' & _ & Hl' & Hrt' & _).
 so (pginterp_fun _#3 Hlvl Hlvl'); subst pg'; clear Hlvl'.
