@@ -1073,6 +1073,15 @@ Note that quantified propositions are not understood.  For example,
 treated as `void`.  Consequently it fails with an empty
 counterexample, which may be surprising.
 
+Terms must be identical to be taken as the *same* uninterpreted
+variable.  This can be surprising, particularly with terms that
+mention evars.  For example, the terms `` `length nat L `` and ``
+`length E1 L `` are taken as two different terms -- even though they
+display the same way -- which will very likely cause Omega to fail.
+To lessen the likelihood of this, `omega` (but not `omegaRaw`) runs
+the `inference` tactic first to attempt to resolve evars.
+Nevertheless, it is possible for evars to leak through inference.
+
 
 
 ### Miscellaneous tactics

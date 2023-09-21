@@ -190,7 +190,13 @@ A simpler case-analysis operation:
 
     Forall_append : type:Forall_append
 
-    Exists_append : type:Exists_append
+    Exists_append_1 : type:Exists_append_1
+
+    Exists_append_2 : type:Exists_append_2
+
+    Forall_append_iff : type:Forall_append_iff
+
+    Exists_append_iff : type:Exists_append_iff
 
     In_append : type:In_append
 

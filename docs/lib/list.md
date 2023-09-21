@@ -242,10 +242,19 @@ A simpler case-analysis operation:
                          Exists P (x :: l) <-> P x % Exists P l
 
     Forall_append : forall (i : level) (a : U i) (P : a -> U i) (l1 l2 : list a) .
-                       Forall P (append l1 l2) <-> Forall P l1 & Forall P l2
+                       Forall P l1 -> Forall P l2 -> Forall P (append l1 l2)
 
-    Exists_append : forall (i : level) (a : U i) (P : a -> U i) (l1 l2 : list a) .
-                       Exists P (append l1 l2) <-> Exists P l1 % Exists P l2
+    Exists_append_1 : forall (i : level) (a : U i) (P : a -> U i) (l1 l2 : list a) .
+                         Exists P l1 -> Exists P (append l1 l2)
+
+    Exists_append_2 : forall (i : level) (a : U i) (P : a -> U i) (l1 l2 : list a) .
+                         Exists P l2 -> Exists P (append l1 l2)
+
+    Forall_append_iff : forall (i : level) (a : U i) (P : a -> U i) (l1 l2 : list a) .
+                           Forall P (append l1 l2) <-> Forall P l1 & Forall P l2
+
+    Exists_append_iff : forall (i : level) (a : U i) (P : a -> U i) (l1 l2 : list a) .
+                           Exists P (append l1 l2) <-> Exists P l1 % Exists P l2
 
     In_append : forall (i : level) (a : U i) (x : a) (l1 l2 : list a) .
                    In a x (append l1 l2) <-> In a x l1 % In a x l2
