@@ -44,10 +44,14 @@ structure Fnind :> FNIND =
 
       structure D = Directory
       structure E = ETermInternal
-      structure T = Term
+      structure N = Normalize
       structure R = Reduction
+      structure SH = ShowInternal
+      structure T = Term
+      structure UP = Show.Unparsing
 
       type symbol = Symbol.symbol
+      type constant = Constant.constant
       type address = Namespace.address
       type eterm = ETerm.eterm
 
@@ -124,6 +128,7 @@ structure Fnind :> FNIND =
       val zilch = Symbol.fromValue ""
 
 
+
       exception Recurse
 
       (* name of the function being recursed with,
@@ -187,7 +192,7 @@ structure Fnind :> FNIND =
                        NONE =>
                           signalError fname1 [addressToString dt1, " is not a datatype."]
    
-                     | SOME (n1, bundle as (_, nPerv, nDts, dtinfo)) =>
+                     | SOME (n1, bundle as (_, nPerv, nDts, _, dtinfo)) =>
                           let
                              val pervs =
                                 List.foldl
@@ -514,7 +519,7 @@ structure Fnind :> FNIND =
          E.hide
          (fns special dir imps spine =>
              let
-                val (n1, (_, _, _, dtinfo), _, pervs, preds, arms) = elabFnind funcs special dir imps
+                val (n1, (_, _, _, _, dtinfo), _, pervs, preds, arms) = elabFnind funcs special dir imps
 
                 val (_, iterator, _, _, _) = Vector.sub dtinfo n1
              in
@@ -540,7 +545,7 @@ structure Fnind :> FNIND =
 
                      | SOME ea => ea)
 
-                val (n1, (_, _, _, dtinfo), _, pervs, preds, arms') = 
+                val (n1, (_, _, _, _, dtinfo), _, pervs, preds, arms') = 
                    elabFnind [(fname, dt, NONE, NONE, NONE, result', arms)] special dir imps
 
                 val (_, iterator, nIndex, _, _) = Vector.sub dtinfo n1
@@ -555,6 +560,289 @@ structure Fnind :> FNIND =
                    (T.Elim (T.Const iterator, pervs @ preds @ arms' @ indices @ [T.App (E.expose obj special dir imps [])]))
                    spine
              end)
+
+
+
+      (* Display of inductive functions *)
+
+      fun splitOrNoMatch l n =
+         (case List.splitOpt l n of
+             SOME (l1, l2) => (l1, l2)
+
+           | NONE => raise SH.NoMatch)
+
+      val precMin = 0
+      val precMax = 100
+
+      fun iteratorUnparser n1 ((_, nPerv, nDts, _, dtinfo) : Datatype.bundle) : UP.content UP.unparser =
+         let
+            val (_, iterator, _, _, _) = Vector.sub dtinfo n1
+         in
+            SH.hideUnparser
+            (fns _ margin dir term =>
+                if !Show.sugarFnind then
+                   (case N.simplify term of
+                       T.Elim (T.Const headconst, spine) =>
+                          if Constant.eq (headconst, iterator) then
+                             let
+                                val (pervsElims, spine') = splitOrNoMatch spine nPerv
+                                val (predsElims, restspine) = splitOrNoMatch spine' nDts
+                                
+                                val pervs =
+                                   List.map
+                                      (fn T.App m =>
+                                             SH.exposeUnparser UP.show false margin dir m precMax
+
+                                        | _ => raise SH.NoMatch)
+                                      pervsElims
+
+                                val preds =
+                                   List.mapi
+                                      (fns i elim =>
+                                          (case elim of
+                                              T.App m =>
+                                                 let
+                                                    val (_, _, nIndex, _, _) = Vector.sub dtinfo i
+
+                                                    fun loop n dir acc m =
+                                                       if n = 0 then
+                                                          (acc,
+                                                           SH.exposeUnparser UP.show false margin dir m precMin)
+                                                       else
+                                                          (case N.simplify m of
+                                                              T.Lam (binder, m1) =>
+                                                                 let
+                                                                    val (sym, dir') = D.varyAndBind dir binder
+                                                                 in
+                                                                    loop (n-1) dir' (sym :: acc) m1
+                                                                 end
+
+                                                            | _ => raise SH.NoMatch)
+                                                 in
+                                                    loop (nIndex+1) dir [] m
+                                                 end
+
+                                            | _ => raise SH.NoMatch))
+                                      predsElims
+
+                                val (recsymsRev, recdir) =
+                                   Int.natrecUp
+                                      (fns i (recsymsRev, recdir) =>
+                                          let
+                                             val (dt, _, _, _, _) = Vector.sub dtinfo i
+
+                                             val suggestion =
+                                                Symbol.fromValue $
+                                                (Symbol.toValue (List.last (Namespace.fullname dt)) ^ "_fn")
+
+                                             val (sym, recdir') = D.varyAndBind recdir (SOME suggestion)
+                                          in
+                                             (sym :: recsymsRev, recdir')
+                                          end)
+                                      ([], dir)
+                                      nDts
+                                   
+                                fun funcsLoop iDt recsyms preds spine func1 funcsAcc =
+                                   if iDt = nDts then
+                                      (* spine should now be empty *)
+                                      (func1, funcsAcc)
+                                   else
+                                      let
+                                         val (dt, _, _, nConstrs, constrs) = Vector.sub dtinfo iDt
+
+                                         fun armsLoop i spine armsAcc =
+                                            if i = nConstrs then
+                                               (armsAcc, spine)
+                                            else
+                                               (case spine of
+                                                   T.App armterm :: restspine =>
+                                                      let
+                                                         val (const, _, sorts, _) = Vector.sub constrs i
+
+                                                         fun argsLoop depth innerdir s sorts m argsAcc =
+                                                            (case sorts of
+                                                                [] =>
+                                                                   let
+                                                                      val body =
+                                                                         SH.exposeUnparser UP.show false margin innerdir (T.Sub (m, s)) precMin
+                                                                   in
+                                                                      UP.append
+                                                                         [
+                                                                         UP.break 1,  (* will be a newline because we will be in vertical mode *)
+                                                                         UP.string "| ",
+
+                                                                         UP.box $
+                                                                         UP.append
+                                                                            [
+                                                                            UP.string (Namespace.toString const),
+                                                                            
+                                                                            UP.append
+                                                                               (List.foldl
+                                                                                   (fns sym l => UP.string " " :: UP.string (Symbol.toValue sym) :: l)
+                                                                                   []
+                                                                                   argsAcc),
+   
+                                                                            UP.string " .",
+                                                                            UP.break 1,
+                                                                            UP.box body
+                                                                            ]
+                                                                         ]
+                                                                   end
+
+                                                              | NONE :: rest =>
+                                                                   (* external argument *)
+                                                                   (case N.simplify m of
+                                                                       T.Lam (binder, m1) =>
+                                                                          let
+                                                                             val (sym, innerdir') = D.varyAndBind innerdir binder
+                                                                          in
+                                                                             argsLoop (depth+1) innerdir' (T.under 1 s) rest m1 (sym :: argsAcc)
+                                                                          end
+
+                                                                     | _ => raise SH.NoMatch)
+
+                                                              | SOME indDt :: rest =>
+                                                                   (* internal argument, referring to datatype #indDt *)
+                                                                   (case N.simplify m of
+                                                                       T.Lam (binder, m1) =>
+                                                                          (case N.simplify m1 of
+                                                                              T.Lam (_, m2) =>
+                                                                                 let
+                                                                                    val (sym, innerdir') = D.varyAndBind innerdir binder
+
+                                                                                    (* The inductive result, as if the recursive functions could
+                                                                                       be called independently.
+                                                                                    *)
+                                                                                    val inductive =
+                                                                                       T.Elim (T.Var (depth + nDts - indDt),
+                                                                                               [T.App (T.Var 0)])
+                                                                                 in
+                                                                                    argsLoop (depth+1) innerdir'
+                                                                                       (T.Dot (inductive, T.under 1 s))
+                                                                                       rest m2 (sym :: argsAcc)
+                                                                                 end
+
+                                                                            | _ => raise SH.NoMatch)
+
+                                                                     | _ => raise SH.NoMatch))
+
+                                                         val arm = argsLoop 0 recdir (T.Shift nDts) sorts armterm []
+                                                      in
+                                                         armsLoop (i+1) restspine (arm :: armsAcc)
+                                                      end
+
+                                                 | _ => raise SH.NoMatch)
+
+                                         val (armsRev, restspine) = armsLoop 0 spine []
+                                      in
+                                         (case (recsyms, preds) of
+                                             (recsym :: recsyms', (thearg :: indices, pred) :: preds') =>
+                                                let
+                                                   val func =
+                                                      UP.append
+                                                         [
+                                                         (* put in a newline except for the first function *)
+                                                         if iDt = n1 then UP.string "" else UP.break 1,
+
+                                                         UP.box $
+                                                         UP.append
+                                                            [
+                                                            if iDt = n1 then UP.string "fnind " else UP.string "and ",
+                                                            UP.string (Symbol.toValue recsym),
+                                                            UP.string " : forall (",
+                                                            UP.string (Symbol.toValue thearg),
+                                                            UP.string " : ",
+                                                            UP.string (Namespace.toString dt),
+   
+                                                            (if iDt = n1 then
+                                                                (case pervs of
+                                                                    [] => UP.append []
+       
+                                                                  | perv1 :: restpervs =>
+                                                                       UP.box $
+                                                                       UP.append
+                                                                          [
+                                                                          UP.string " [",
+                                                                          UP.box perv1,
+                                                                          
+                                                                          UP.append
+                                                                             (List.map
+                                                                                 (fn perv =>
+                                                                                     UP.append
+                                                                                        [
+                                                                                        UP.string " ",
+                                                                                        UP.box perv
+                                                                                        ])
+                                                                                 restpervs),
+       
+                                                                          UP.string "]"
+                                                                          ])
+                                                             else
+                                                                UP.append []),
+
+                                                            UP.append
+                                                               (List.revMap
+                                                                   (fn sym => 
+                                                                       UP.append
+                                                                          [
+                                                                          UP.string " ",
+                                                                          UP.string (Symbol.toValue sym)
+                                                                          ])
+                                                                   indices),
+   
+                                                            UP.string ") .",
+                                                            UP.break 1,
+                                                            UP.box pred,
+                                                            UP.string " of",
+                                                            ],
+
+                                                         UP.append (List.rev armsRev)
+                                                         ]
+                                                in
+                                                   if iDt = n1 then
+                                                      funcsLoop (iDt + 1) recsyms' preds' restspine (SOME func) funcsAcc
+                                                   else
+                                                      funcsLoop (iDt + 1) recsyms' preds' restspine func1 (func :: funcsAcc)
+                                                end
+
+                                           | _ =>
+                                                (* has to look like the pattern above, or we would have failed already *)
+                                                raise (Fail "impossible"))
+                                      end
+
+                                val (func1, funcsRev) = funcsLoop 0 (List.rev recsymsRev) preds restspine NONE []
+                                val funcs = Option.valOf func1 :: List.rev funcsRev
+                             in
+                                UP.box $
+                                UP.append
+                                   [
+                                   UP.string "(",
+                                   UP.vboxi 0 (UP.append funcs),
+                                   UP.string ")"
+                                   ]
+                             end
+                          else
+                             raise SH.NoMatch
+
+                     | _ =>
+                          raise SH.NoMatch)
+                else
+                   raise SH.NoMatch)
+         end
+
+
+      (* Set the function that Datatype will call to install iterator unparsers. *)
+      val () =
+         DatatypeInternal.install :=
+         (fn const =>
+             let
+                val (i, bundle as (_, numberOfVisibleArgs, numberOfDatatypes, totalConstructors, dtinfo)) = Option.valOf $ Datatype.info const
+                val (_, iterator, _, _, _) = Vector.sub dtinfo i
+                val arity = numberOfVisibleArgs + numberOfDatatypes + totalConstructors
+             in
+                ConstantTable.insert UP.unparsingTable iterator (arity, precMax, ref true, iteratorUnparser i bundle)
+             end)
+
 
 
       open Tactic
@@ -574,7 +862,7 @@ structure Fnind :> FNIND =
                   D.empty
                   args
 
-            val (_, (_, nVis, nDts, dtinfo), dict, pervs, preds, arms) = elabFnind funcs SymbolDict.empty (D.idir dir) true
+            val (_, (_, nVis, nDts, _, dtinfo), dict, pervs, preds, arms) = elabFnind funcs SymbolDict.empty (D.idir dir) true
 
             val iterspine = pervs @ preds @ arms
 

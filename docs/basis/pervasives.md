@@ -32,7 +32,6 @@
     val foldr : ('a -> 'b -> 'b) -> 'b -> 'a list -> 'b
     val map : ('a -> 'b) -> 'a list -> 'b list
     val app : ('a -> unit) -> 'a list -> unit
-    val map : ('a -> 'b) -> 'a list -> 'b list
     val ref : 'a -> 'a ref
     val (!) : 'a ref -> 'a
     val (:=) : 'a ref -> 'a -> unit
