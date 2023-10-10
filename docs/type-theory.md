@@ -189,12 +189,12 @@ contains all kinds available at level `i`.  Notably, `U(i)` belongs to
 
 For example, to quantify
 [impredicatively](#impredicative-quantification) over all small types,
-one writes `iforall 0 (a : U(0)) . whatever`.  The resulting type
-belongs to `U(0)`, assuming that `whatever` belongs to `U(0)`.  Thus,
-the quantifier in that type ranges over itself.  (The first parameter
-`0` indicates the level of the kind of the domain `U(0)`.  It is
-necessary for technical reasons but is usually invisible in the
-implementation.)
+one might write `iforall 0 (a : U(0)) . whatever`.  This quantifies
+impredicatively at level `0`, since `U(0)` belongs to `K(0)`.  Thus,
+the resulting type belongs to `U(0)`, assuming that `whatever` also
+belongs to `U(0)`.  Thus, the quantifier in that type ranges over
+itself.  (In the implementation, the first `0` is suppressed, and
+inferred automatically.)
 
 In general, a type `A` is a kind when `A` is isomorphic to a space in
 Istari's metric-space semantics.  Such types include [function
@@ -719,11 +719,13 @@ produces a `C` for every argument in `A`, but that it produces the
 [[rules]](rules.html#impredicative-universals)
 
 Universal and existential quantification enjoy impredicative versions,
-written `iforall i (t : A) . B` and `iexists i (t : A) . B`.  In each,
-`A` must be a kind belonging to `K(i)` and `B` must be a type
-belonging to `U(i)`.  Then each belongs to `U(i)`.  In contrast, if
-the usual predicative quantification were used, then each would belong
-to `U(1 + i)`, since `A` would belong to `U(1 + i)`, not `U(i)`.
+which might be written `iforall i (t : A) . B` and 
+`iexistsi (t : A) . B`.  (In the implementation, the `i` is suppressed,
+and inferred automaticaly.)  In each, `A` must be a kind belonging to
+`K(i)` and `B` must be a type belonging to `U(i)`.  Then each belongs
+to `U(i)`.  In contrast, if the usual predicative quantification were
+used, then each would belong to `U(1 + i)`, since `A` would belong to
+`U(1 + i)`, not `U(i)`.
 
 The impredicative universal is like an intersection type in that the
 argument `t` is not passed as an argument to the "function."  This is

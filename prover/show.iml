@@ -31,15 +31,20 @@ signature UNPARSING =
 
       val lam : 'a unparser -> (string * 'a) unparser
       
+      val lift : (unit -> 'a unparser) -> 'a unparser
       val wrap : 'a unparser -> ('a -> 'b) -> 'b unparser
       val wrapcond : 'a unparser -> ('a -> 'b option) -> 'b unparser
       val alt : 'a unparser list -> 'a unparser
       val fix : ('a unparser -> 'a unparser) -> 'a unparser
+      val fail : 'a unparser
 
       val apply1 : constant -> 'a unparser -> 'a unparser
       val apply2 : constant -> 'a unparser -> 'b unparser -> ('a * 'b) unparser
       val apply3 : constant -> 'a unparser -> 'b unparser -> 'c unparser -> ('a * 'b * 'c) unparser
       val apply4 : constant -> 'a unparser -> 'b unparser -> 'c unparser -> 'd unparser -> ('a * 'b * 'c * 'd) unparser
+
+      (* fails if Show.showImplicits is set *)
+      val ifNoImplicits : 'a unparser -> 'a unparser
 
 
       (* Tables *)
@@ -991,6 +996,8 @@ structure ShowInternal
 
                  | _ => raise NoMatch)
 
+            fun lift f entire margin dir m = f () entire margin dir m
+               
             fun wrap unp f entire margin dir m = f (unp entire margin dir m)
 
             fun wrapcond unp f entire margin dir m =
@@ -1016,6 +1023,8 @@ structure ShowInternal
 
             fun fix f entire margin dir m = f (fix f) entire margin dir m
 
+            fun fail _ _ _ _ = raise NoMatch
+
             fun apply1 const unp =
                wrap
                (path const (app unp null))
@@ -1035,6 +1044,12 @@ structure ShowInternal
                wrap
                (path const (app unp1 (app unp2 (app unp3 (app unp4 null)))))
                (fn (w, (x, (y, (z, ())))) => (w, x, y, z))
+
+            fun ifNoImplicits unp entire margin dir m =
+               if !showImplicits then
+                  raise NoMatch
+               else
+                  unp entire margin dir m
 
             val unparsingTable = unparsingTable
             val reserved = reserved

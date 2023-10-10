@@ -141,56 +141,6 @@ definition and replace it with the new version:
       intersect i . forall (a : U i) . list a -> bool
     /;
 
-
-
-####  Unparsing rules
-
-Occasionally, unresolved evars can be even more concealed.
-Some unparsing rules do not display all of the subterms.  A good
-example is `cons A h t`, which is displayed `h :: t`.  Enabling
-display of implicit arguments is not sufficient to make `A` visible.
-
-For example:
-
-    lemma "length_one"
-    /
-      forall (x : nat) .
-        length (x :: nil) = 1 : nat
-    /;
-    
-    intro /x/.
-    auto.
-    qed ();
-
-results in the error:
-
-    Error: the term contains unresolved evars:
-    
-    forall (x : nat) . length E0 (x :: nil E2) = 1 : nat
-    
-    Unresolved evars: E0 E1 E2
-
-Here, the `length` term reduced to `1` before any evars were resolved.
-Disabling implicit arguments exposes `E0` and `E2`, but not `E1`,
-which is the type argument to the cons.  So when the error message
-lists evars that are still not revealed, set Istari to disable all
-unparsing rules:
-
-    Show.disableAll := true;
-
-After that, the error message will show a term that is not very easy
-to read, but that exposes every evar:
-
-    Error: the term contains unresolved evars:
-    
-    `forall nat (fn x . eq nat (length E0 (cons E1 x (nil E2))) (succ zero))
-    
-    Unresolved evars: E0 E1 E2
-
-Again, one can fill in the evars, wrap the result with 
-`` explicit` ``, and replace the theorem statement.
-
-
 ---
 
 [1] Users who try to craft validations directly, instead of using
