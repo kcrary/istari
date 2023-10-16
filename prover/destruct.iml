@@ -796,15 +796,31 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                    termCaseT (N.whnf (T.Sub (c, T.Shift (i+1))))
                    /
                     | \Prim.ov\ ($whnf \Prim.set\ ? (fn . ?)) ? =>
-                      \fnc a b m =>
-                          refine (Rule.setElim a b (T.evar ()) m)
-                          >>> [
-                              chdir (D.bind0 dir) >> idtacM Secondary,
-       
-                              refine (Rule.hypothesis i) >> done,
-       
-                              chdir (D.bindh dir name) >> idtacM Primary
-                              ]\
+                      \(fnc a b m =>
+                           refine (Rule.setElim a b (T.evar ()) m)
+                           >>> [
+                               chdir (D.bind0 dir) >> idtacM Secondary,
+        
+                               refine (Rule.hypothesis i) >> done,
+        
+                               chdir (D.bindh dir name) 
+                               >>+
+                               refine (Rule.assert (T.apply2 Prim.ov (T.Sub (a, T.shift1)) (T.Sub (m, T.shift1))) (T.evar ()))
+                               >>> [
+                                   (* M[^] : A[^] *)
+                                   refine (Rule.setWeakenOf (T.Sub (a, T.shift1)) (T.Sub (b, T.underShift 1 1)) (T.Sub (m, T.shift1)))
+                                   >>+
+                                   (* M[^] : {A[^] | B[0 . ^2]} *)
+                                   refine (Rule.hypothesis (i+1)) >> done,
+ 
+                                   (* M[^] : A[^] |- ... *)
+                                   refine (Rule.exchange 0 1 (i+1))
+                                   >>+
+                                   refine (Rule.weaken (i+2) 1)
+                                   >>+
+                                   idtacM Primary
+                                   ]
+                               ])\
 
                     | _ =>
                       \fnc => fail "hypothesis should assign some term a set type"\

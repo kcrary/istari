@@ -347,6 +347,25 @@ structure Infer :> INFER =
                           spine tac' invis prove
                     end)\
 
+             | \Prim.set\ ? (fn . ?) =>
+               \(fnc b c =>
+                    (case spine of
+                        nil =>
+                           (* only eliminate set when there are more elims to come *)
+                           (a, tac, m, [])
+
+                      | _ :: _ =>
+                           let
+                              val tac' =
+                                 (* G |- M : B *)
+                                 refine (Rule.setWeakenOf b c m)
+                                 >>+
+                                 (* G |- M : { B | C } *)
+                                 tac
+                           in
+                              inferSpine ctx m b spine tac' invis prove
+                           end))\
+
              | ? =>
                \(fnc a' =>
                     inferSpineElim ctx m a spine tac invis prove)\

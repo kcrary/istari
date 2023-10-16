@@ -691,8 +691,9 @@ The destruction tactics are:
 
 - `destructSet /[hyp x]/ /[name]/`
 
-  If `x` has type `M : { y : A | B(y) }`, creates a new hypothesis
-  (using the given name) with the type `B(M)`.
+  If `x` has type `M : { y : A | B(y) }`, replaces `x` by `M : A` and
+  creates a new hypothesis (using the given name) with the type
+  `B(M)`.
 
   + `destructSetRaw /[hyp x]/ /[name]/`
 
