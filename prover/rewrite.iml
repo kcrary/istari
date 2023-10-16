@@ -18,7 +18,7 @@ signature REWRITE =
       *)
 
       val identityRew       : rewrite
-      val usingRew          : bool -> captures -> eterm -> rewrite  (* bool: reverse the direction *)
+      val usingRew          : bool -> bool -> captures -> eterm -> rewrite  (* bool 1: strict, bool 2: reverse the direction *)
       val replaceRew        : captures -> eterm -> eterm -> eterm -> rewrite
       val convertRew        : captures -> eterm -> rewrite
       val convertHeadRew    : captures -> constant -> eterm -> rewrite
@@ -3887,7 +3887,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                         else
                            N.simplify (T.Sub (m, T.underShift added bvs'))
 
-                     val hit = Option.isSome (P.identicalPrefixSimp m' p)
+                     val hit = Option.isSome (P.identicalPrefix m' p)
                   in
                      Trail.rewind mark;
                      hit
@@ -3904,7 +3904,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
    
                         val s = T.underShift added bvs'
                      in
-                        (case P.identicalPrefixSimp (N.simplify (T.Sub (m, s))) p of
+                        (case P.identicalPrefix (N.simplify (T.Sub (m, s))) p of
                             NONE =>
                                (
                                Trail.rewind mark;
@@ -3927,7 +3927,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
          end
 
 
-      fun usingRew reverse capture elem hyp (jud, dir) =
+      fun usingRew strict reverse capture elem hyp (jud, dir) =
          let
             val (ctx, dir) =
                (case hyp of
@@ -3984,6 +3984,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                 (* btac' partially proves G |- M = N : A *)
 
                                 val m = N.simplify m
+
+                                val prefix = if strict then P.identicalPrefix else P.intermediatePrefix
                                 
                                 val () =
                                    (case m of
@@ -4007,7 +4009,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                             else
                                                N.simplify (T.Sub (m, T.underShift added bvs'))
                                          
-                                         val hit = Option.isSome (P.identicalPrefixSimp m' p)
+                                         val hit = Option.isSome (prefix m' p)
                                       in
                                          Trail.rewind mark;
                                          hit
@@ -4024,7 +4026,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
       
                                             val s = T.underShift added bvs'
                                          in
-                                            (case P.identicalPrefixSimp (N.simplify (T.Sub (m, s))) p of
+                                            (case prefix (N.simplify (T.Sub (m, s))) p of
                                                 NONE =>
                                                    (
                                                    Trail.rewind mark;
@@ -4077,6 +4079,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
                                 val m = N.simplify m
                                 
+                                val prefix = if strict then P.identicalPrefix else P.intermediatePrefix
+
                                 val () =
                                    (case m of
                                        T.Elim (T.Sub _, _) =>
@@ -4099,7 +4103,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                             else
                                                N.simplify (T.Sub (m, T.underShift added bvs'))
 
-                                         val hit = Option.isSome (P.identicalPrefixSimp m' p)
+                                         val hit = Option.isSome (prefix m' p)
                                       in
                                          Trail.rewind mark;
                                          hit
@@ -4124,7 +4128,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                                   >> chdir dir
                                                   >> tac
                                          in
-                                            (case P.identicalPrefixSimp (N.simplify (T.Sub (m, s))) p of
+                                            (case prefix (N.simplify (T.Sub (m, s))) p of
                                                 NONE =>
                                                    (
                                                    Trail.rewind mark;
@@ -4365,9 +4369,11 @@ structure ParseRewrite =
       val withinNone = []
       val withinSome = id
 
-      fun rewriteForward m capture = Rewrite.usingRew false capture m
-      fun rewriteBackward m capture = Rewrite.usingRew true capture m
+      fun rewriteForward m capture = Rewrite.usingRew false false capture m
+      fun rewriteBackward m capture = Rewrite.usingRew false true capture m
       fun rewriteRepl m n a capture = Rewrite.replaceRew capture m n a
+      fun rewriteForwardStrict m capture = Rewrite.usingRew true false capture m
+      fun rewriteBackwardStrict m capture = Rewrite.usingRew true true capture m
 
       fun head longid dir = Directory.lookupLong dir longid
 
@@ -4416,6 +4422,8 @@ grammardef Rewrite
    rule Rewrite          ::= "->" Term Within => rewriteForward
    rule Rewrite          ::= "<-" Term Within => rewriteBackward
    rule Rewrite          ::= Term(31) "=" Term(31) ":" Term(31) Within => rewriteRepl
+   rule Rewrite          ::= "-->" Term Within => rewriteForwardStrict
+   rule Rewrite          ::= "<--" Term Within => rewriteBackwardStrict
 
    rule Head             ::= Longident => head
 

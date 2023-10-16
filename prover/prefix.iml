@@ -6,14 +6,30 @@ signature PREFIX =
 
       val identical : term -> term -> bool
 
-      (* identicalPrefixSimp m n
+
+      (* identicalPrefix m n
 
          if    m and n are simple
-         then  if    either m or n has an evar head
-               then  return NONE
-               else  return SOME spine  iff  m spine is identical to n
+         then  if    neither m nor n has evar head
+                     n can be written as m spine
+               then  return SOME spine
+               else  return NONE
       *)
-      val identicalPrefixSimp : term -> term -> Term.elim list option
+      val identicalPrefix : term -> term -> Term.elim list option
+
+
+      (* intermediatePrefix m n
+
+         if    m and n is simple
+         then  if    neither m nor n has evar head
+                     n can be written as n' spine
+                     m unifies with n'
+                     m and n' have the same head
+               then  return SOME spine
+               else  return NONE
+      *)
+      val intermediatePrefix : term -> term -> Term.elim list option
+
 
       (* unifyPrefix m n
 
@@ -180,7 +196,7 @@ structure Prefix :> PREFIX =
            | _ => NONE)
 
 
-      fun identicalPrefixSimp m n =
+      fun identicalPrefix m n =
          (case (m, n) of
              (Elim (Sub _, _), _) => NONE
 
@@ -252,6 +268,7 @@ structure Prefix :> PREFIX =
                    NONE
 
            | _ => NONE)
+
 
 
       fun onNone x k =
@@ -461,5 +478,49 @@ structure Prefix :> PREFIX =
          in
             unifyPrefixMain m n mark
          end
+
+
+
+      fun intermediatePrefix m n =
+         (case (m, n) of
+             (Elim (Sub _, _), _) => NONE
+
+           | (_, Elim (Sub _, _)) => NONE
+
+           | (Elim (Var i, spine), Elim (Var j, spine')) =>
+                if i = j then
+                   unifyPrefixSpine spine spine'
+                else
+                   NONE
+
+           | (Elim (Var _, _), _) => NONE
+           | (_, Elim (Var _, _)) => NONE
+
+           | (Elim (Const const, spine), Elim (Const const', spine')) =>
+                if Constant.eq (const, const') then
+                   unifyPrefixSpine spine spine'
+                else
+                   NONE
+
+           | (Elim (Const _, _), _) => NONE
+           | (_, Elim (Const _, _)) => NONE
+
+           | (Elim (m1, spine), Elim (n1, spine')) =>
+                if Unify.unify1 m1 n1 then
+                   unifyPrefixSpine spine spine'
+                else
+                   NONE
+
+           | (_, Elim (n1, spine)) =>
+                if Unify.unify1 m n1 then
+                   SOME spine
+                else
+                   NONE
+
+           | _ =>
+                if Unify.unify1 m n then
+                   SOME []
+                else
+                   NONE)
 
    end

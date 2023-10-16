@@ -21,16 +21,16 @@ In a `[short-target]` (as in reduce) the `in` can be omitted.
 Hit numbers are counted in a pre-order, left-to-right traversal
 starting at 0.  Hits are counted anew for each application, so if a
 rewrite eliminates a hit, then using that rewrite on the first two
-hits would be occurrences `0 0` (not `0 1`).  The `testRewrite` tool
-(see below) can assist in counting hits.
+hits would be occurrences `0 0` (not `0 1`).  The `testRewrite`
+[tool](#rewriting-tools) can assist in counting hits.
 
 Term positions are also counted in a pre-order, left-to-right
 traversal starting at 0.  Position counts are affected by the fact
 that paths are stored in spinal notation, so in `x y z`, position 0 is
 `x y z`, position 1 is `y`, and position 2 is `z`.  There is no
 specific position for `x` or `x y`, but all rewrites will act on the
-prefix of a path so 0 will do.  The `showPosition` tool (see below)
-can assist in counting positions.
+prefix of a path so 0 will do.  The `showPosition`
+[tool](#rewriting-tools) can assist in counting positions.
 
 When a hypothesis is rewritten, only earlier hypotheses are available
 to the rewrite.  Thus, for example, a hypothetical equality can only
@@ -59,15 +59,25 @@ to be empty.
 
   The equation is a term (usually a hypothesis or lemma name) which,
   after exploitation (see eexploit), has type `R M N` where R is a
-  relation.  (Often R is equality.)  Replaces M with N.
+  relation.  (Often R is equality.)  Replaces M with N.  [Intermediate
+  matching](#matching).
+
+  + `--> [equation] within [captures]`
+
+    As above, but uses [strict matching](#matching).
 
 - `<- [equation] within [captures]`
 
-  As above but replaces N with M.
+  As above but replaces N with M.  [Intermediate matching](#matching).
+
+  + `<-- [equation] within [captures]`
+
+    As above, but uses [strict matching](#matching).
 
 - `[term M] = [term N] : [term A] within [captures]`
 
-  Replaces M with N.  Generates a subgoal to establish that `M = N : A`.
+  Replaces M with N.  Generates a subgoal to establish that 
+  `M = N : A`.  [Strict matching](#matching).
 
 In the above rewrites, the term being replaced cannot have an evar
 head.  That is, it must not be an evar, nor an elim starting from an
@@ -224,3 +234,35 @@ evar.
 
   When set to true, the rewriter traces the process of propagating a
   relation through the goal.
+
+
+
+### Matching
+
+When the rewriter searches for terms matching its target, it employs
+one of three levels of strictness:
+
+- *Strict:* the term must match the target precisely.
+
+- *Beta:* the term must match the target up to beta-equivalence.
+
+- *Intermediate:* like beta, except the term and target must have the
+  same head.  This cuts the search space dramatically, making
+  rewriting much faster.
+
+Rewrites using `->` and `<-` use intermediate matching, while the
+variants `-->` and `<--` use strict matching.  Intermediate matching
+is normally preferred because of its better flexibility, but sometimes
+strict matching is preferable.  Consider the goal:
+
+    P (0 + 1 + x)
+
+Rewriting this goal with `-> Nat.plus_assoc` will fail, because its
+target is `E1 + E2 + E3` while the goal, up to beta equivalence, is 
+`P (1 + x)`.  Unification cannot uniquely solve the constraint 
+`E1 + E2 = 1`.  One can resolve this by giving the arguments
+explicitly, as in `-> Nat.plus_assoc 0 1 x`, but that is more verbose.
+
+Alternatively, `--> Nat.plus_assoc` works without explicit arguments.
+That is because it does not respect beta-equivalence, so each evar's
+binding is uniquely determined.
