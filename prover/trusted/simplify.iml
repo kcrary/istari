@@ -18,6 +18,22 @@ signature SIMPLIFY =
 
       val same : term -> term -> bool
 
+
+      
+      (* applySubterm f path M
+
+         Applies f to a subterm M, where the particular subterm is identified by path.
+
+         M elim1 ... elimn  M is subterm 0, Ni is subterm i (where elimi = Ni)
+                            (assuming n >= 1)
+         fn . M             M is subterm 0
+         (M0 , M1)          Mi is subterm i
+         next M             M is subterm 0
+      *)
+
+      exception ApplySubterm
+      val applySubterm : (term -> term) -> int list -> term -> term
+
    end
 
 
@@ -240,5 +256,74 @@ functor SimplifyFun (structure Term : TERM
                 k1 = i2
                 andalso
                 sameSub (Shift (k1+1)) s2')
+
+
+
+      exception ApplySubterm
+
+      fun applySubterm f l c =
+         (case l of
+             [] => f c
+
+           | i :: rest =>
+                let
+                   val (h, spine) = simp c id []
+                in
+                   (case spine of
+                       [] =>
+                          (case h of
+                              Lam (binder, m) =>
+                                 if i = 0 then
+                                    Lam (binder, applySubterm f rest m)
+                                 else
+                                    raise ApplySubterm
+
+                            | Pair (m1, m2) =>
+                                 if i = 0 then
+                                    Pair (applySubterm f rest m1, m2)
+                                 else if i = 1 then
+                                    Pair (m1, applySubterm f rest m2)
+                                 else
+                                    raise ApplySubterm
+
+                            | Next m1 =>
+                                 if i = 0 then
+                                    Next (applySubterm f rest m1)
+                                 else
+                                    raise ApplySubterm
+
+                            | _ =>
+                                 raise ApplySubterm)
+
+                     | _ :: _ =>
+                          (case Int.compare i 0 of
+                              LESS =>
+                                 raise ApplySubterm
+
+                            | EQUAL =>
+                                 Elim (applySubterm f rest h, spine)
+
+                            | GREATER =>
+                                 Elim (h, applySubtermSpine f rest (i-1) spine [])))
+                end)
+
+      and applySubtermSpine f path i spine acc =
+         (case spine of
+             [] => 
+                raise ApplySubterm
+
+           | (elim as App m) :: rest =>
+                if i = 0 then
+                   List.revAppend
+                      acc
+                      (App (applySubterm f path m) :: rest)
+                else
+                   applySubtermSpine f path (i-1) rest (elim :: acc)
+
+           | elim :: rest =>
+                if i = 0 then
+                   raise ApplySubterm
+                else
+                   applySubtermSpine f path (i-1) rest (elim :: acc))
 
    end

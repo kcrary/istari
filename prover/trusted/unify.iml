@@ -399,8 +399,49 @@ functor UnifyFun (structure Term : TERM
          queue := (m, n) :: !queue
 
 
+
+      (* solveSimple M N
+
+         if    M is a bare evar, say E, and E does not appear in N
+         then  bind E to N
+               and
+               return true
+         else  return false
+      *)
+      fun solveSimple m n =
+         (case m of
+             T.Elim (m', []) =>
+                solveSimple m' n
+
+           | T.Evar e1 =>
+                (case T.readEbind e1 of
+                    SOME m' =>
+                       solveSimple m' n
+
+                  | NONE =>
+                       if Prune.occurs (T.ebindToInt e1) n then
+                          false
+                       else
+                          (
+                          Trail.setEbind e1 n;
+                          true
+                          ))
+
+           | T.Sub (m', T.Shift 0) =>
+                solveSimple m' n
+
+           | _ =>
+                false)
+
+
+
       fun solveMain m n =
-         solveWhnf (N.whnf m) (N.whnf n)
+         if solveSimple m n then
+            progress := true
+         else if solveSimple n m then
+            progress := true
+         else
+            solveWhnf (N.whnf m) (N.whnf n)
 
       and solveWhnf m n =
          (case (m, n) of

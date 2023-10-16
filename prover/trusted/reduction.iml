@@ -36,11 +36,7 @@ signature REDUCTION =
 
       (* within path red  follows path to a subterm, where red is applied
 
-         M elim1 ... elimn  M is subterm 0, Ni is subterm i (where elimi = Ni)
-                            (assuming n >= 1)
-         \.M                M is subterm 0
-         <M0, M1>           Mi is subterm i
-         next M             M is subterm 0
+         Paths are interpreted as by Simplify.applySubterm.
       *)
       val within : int list -> reduction -> reduction
 
@@ -293,47 +289,13 @@ functor ReductionFun (structure Term : TERM
                               raise Reduce))
 
            | Within (path, red) =>
-                (case path of
-                    [] =>
-                       reduceHead red h spine
-
-                  | i :: rest =>
-                       (case spine of
-                           [] =>
-                              (case h of
-                                  Lam (binder, m1) =>
-                                     if i = 0 then
-                                        Lam (binder, reduceMain (Within (rest, red)) m1 id [])
-                                     else
-                                        raise Reduce
-
-                                | Pair (m1, m2) =>
-                                     if i = 0 then
-                                        Pair (reduceMain (Within (rest, red)) m1 id [], m2)
-                                     else if i = 1 then
-                                        Pair (m1, reduceMain (Within (rest, red)) m2 id [])
-                                     else
-                                        raise Reduce
-
-                                | Next m1 =>
-                                     if i = 0 then
-                                        Next (reduceMain (Within (rest, red)) m1 id [])
-                                     else
-                                        raise Reduce
-
-                                | _ =>
-                                     raise Reduce)
-
-                         | _ :: _ =>
-                              (case Int.compare i 0 of
-                                  LESS =>
-                                     raise Reduce
-
-                                | EQUAL =>
-                                     Elim (reduceMain (Within (rest, red)) h id [], spine)
-
-                                | GREATER =>
-                                     Elim (h, reduceElim (Within (rest, red)) (i-1) spine []))))
+                (try
+                    Simplify.applySubterm
+                       (fn m => reduceMain red m id [])
+                       path
+                       (Elim (h, spine))
+                 with
+                    Simplify.ApplySubterm => raise Reduce)
 
            | Compat reds =>
                 Elim (h, reduceSpine reds spine [])

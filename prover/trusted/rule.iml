@@ -49,6 +49,12 @@ signature RULE =
       val unreduceHypAt : int -> int -> Judgement.hyp -> term -> Reduction.reduction -> rule
 
 
+      (* the path is interpreted as in Simplify.applySubterm *)
+      val whnfHypAt : int -> int list -> rule
+      val whnfConclAt : int list -> rule
+
+      val whnfHyp : int -> rule
+      val whnfConcl : rule
       val whnfHardHyp : int -> rule
       val whnfHardConcl : rule
       val normalizeHyp : int -> rule
@@ -735,6 +741,49 @@ structure Rule :> RULE =
              end)
                    
     
+
+      fun applySubterm f path c =
+         try
+            Simplify.applySubterm f path c
+         with
+            Simplify.ApplySubterm => raise Failure
+
+
+      fun whnfHypAt i path =
+         ("whnfHypAt",
+          fn jud =>
+             let
+                val (c, f) = onhypTm jud i
+             in
+                ([f (applySubterm N.whnf path c)],
+                 fn1 (fn m => m))
+             end)
+
+
+      fun whnfConclAt path =
+         ("whnfConclAt",
+          fn jud =>
+             ([J.make (J.context jud) (applySubterm N.whnf path (J.concl jud))],
+              fn1 (fn m => m)))
+
+
+      fun whnfHyp i =
+         ("whnfHyp",
+          fn jud =>
+             let
+                val (c, f) = onhypTm jud i
+             in
+                ([f (N.whnf c)],
+                 fn1 (fn m => m))
+             end)
+
+
+      val whnfConcl =
+         ("whnfConcl",
+          fn jud =>
+             ([J.make (J.context jud) (N.whnf (J.concl jud))],
+              fn1 (fn m => m)))
+
 
       fun whnfHardHyp i =
          ("whnfHardHyp",
