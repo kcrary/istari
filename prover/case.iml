@@ -95,17 +95,8 @@ signature CASE =
       val lett : (term, 'a, 'b) matcher -> (hyp, 'a, 'b) matcher
 
 
-      (* contexts
-
-         The hypothesis being matched is shifted into the entire context's scope.
-      *)
-
-      val hyp : int -> (hyp, 'a, 'b) matcher -> (context, 'a, 'b) matcher
-      val anyhyp : (hyp, 'a, int -> 'b) matcher -> (context, 'a, 'b) matcher
-
-
-
       (* Raises NoMatch when matching fails. *)
+
       exception NoMatch
       val termCase : term -> (term, unit, 'a) matcher -> 'a
       val unitCase : (unit, unit, 'a) matcher -> 'a
@@ -113,8 +104,8 @@ signature CASE =
       val term3Case : term -> term -> term -> (term * (term * term), unit, 'a) matcher -> 'a
       val spineCase : spine -> (spine, unit, 'a) matcher -> 'a
       val hypCase : hyp -> (hyp, unit, 'a) matcher -> 'a
-      val contextCase : context -> (context, unit, 'a) matcher -> 'a
-
+      val contextCase : context -> Directory.directory -> (hyp, unit * Symbol.symbol, 'a) matcher -> 'a
+      val contextnCase : context -> (hyp, unit * int, 'a) matcher -> 'a
 
 
       (* Backtracks when matching fails.
@@ -127,10 +118,12 @@ signature CASE =
       val term3CaseT : term -> term -> term -> (term * term * term, unit, 'a tacticm) matcher -> 'a tacticm
       val spineCaseT : spine -> (spine, unit, 'a tacticm) matcher -> 'a tacticm
       val hypCaseT : hyp -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
-      val contextCaseT : context -> (context, unit, 'a tacticm) matcher -> 'a tacticm
+      val contextCaseT : context -> Directory.directory -> (hyp, unit * Symbol.symbol, 'a tacticm) matcher -> 'a tacticm
+      val contextnCaseT : context -> (hyp, unit * int, 'a tacticm) matcher -> 'a tacticm
       val goalCaseT : (term, unit, 'a tacticm) matcher -> 'a tacticm
-      val goalContextCaseT : (context, unit, 'a tacticm) matcher -> 'a tacticm
-
+      val goalHypCaseT : int -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+      val goalContextCaseT : (hyp, unit * Symbol.symbol, 'a tacticm) matcher -> 'a tacticm
+      val goalContextnCaseT : (hyp, unit * int, 'a tacticm) matcher -> 'a tacticm
 
 
       (* Backtracks when matching fails.
@@ -143,9 +136,12 @@ signature CASE =
       val term3CaseB : term -> term -> term -> (term * term * term, unit, 'a tacticm) matcher -> 'a tacticm
       val spineCaseB : spine -> (spine, unit, 'a tacticm) matcher -> 'a tacticm
       val hypCaseB : hyp -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
-      val contextCaseB : context -> (context, unit, 'a tacticm) matcher -> 'a tacticm
+      val contextCaseB : context -> Directory.directory -> (hyp, unit * Symbol.symbol, 'a tacticm) matcher -> 'a tacticm
+      val contextnCaseB : context -> (hyp, unit * int, 'a tacticm) matcher -> 'a tacticm
       val goalCaseB : (term, unit, 'a tacticm) matcher -> 'a tacticm
-      val goalContextCaseB : (context, unit, 'a tacticm) matcher -> 'a tacticm
+      val goalHypCaseB : int -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+      val goalContextCaseB : (hyp, unit * Symbol.symbol, 'a tacticm) matcher -> 'a tacticm
+      val goalContextnCaseB : (hyp, unit * int, 'a tacticm) matcher -> 'a tacticm
 
 
       (* Note on rationale:
@@ -544,16 +540,7 @@ structure Case :> CASE =
 
 
 
-      fun hyp i f ctx x fk sk =
-         (case Seq.nthOpt ctx i of
-             NONE =>
-                fk ()
-
-           | SOME h =>
-                f (J.subHyp h (T.Shift (i+1))) x fk sk)
-
-
-      fun anyhypLoop f i l x fk sk =
+      fun anyhypNumLoop f i l fk sk =
          (case Seq.expose l of
              Seq.Nil =>
                 fk ()
@@ -561,11 +548,22 @@ structure Case :> CASE =
            | Seq.Cons (h, rest) =>
                 f
                    (J.subHyp h (T.Shift (i+1)))
-                   x
-                   (fn () => anyhypLoop f (i+1) rest x fk sk)
-                   (fn (g, fk') => sk (g i, fk')))
+                   ((), i)
+                   (fn () => anyhypNumLoop f (i+1) rest fk sk)
+                   sk)
 
-      fun anyhyp f ctx x fk sk = anyhypLoop f 0 ctx x fk sk
+      fun anyhypLoop f i l dir fk sk =
+         (case (Seq.expose l, Directory.exposeOpt dir) of
+             (Seq.Cons (h, l'), SOME (sym, dir')) =>
+                f
+                   (J.subHyp h (T.Shift (i+1)))
+                   ((), sym)
+                   (fn () => anyhypLoop f (i+1) l' dir' fk sk)
+                   sk
+
+           | _ =>
+                fk ())
+
 
 
       exception NoMatch
@@ -591,7 +589,31 @@ structure Case :> CASE =
 
       val spineCase = caseX
       val hypCase = caseX
-      val contextCase = caseX
+
+      fun 'b contextCase ctx dir (f : (hyp, unit * Symbol.symbol, 'b) matcher) : 'b =
+         let
+            extension Answer of 'b
+         in
+            (case
+                anyhypLoop f 0 ctx dir (fn () => raise NoMatch) (fn (y, _) => Answer y)
+             of
+                Answer y => y
+
+              | _ => raise (Fail "impossible"))
+         end
+
+      fun 'b contextnCase ctx (f : (hyp, unit * int, 'b) matcher) : 'b =
+         let
+            extension Answer of 'b
+         in
+            (case
+                anyhypNumLoop f 0 ctx (fn () => raise NoMatch) (fn (y, _) => Answer y)
+             of
+                Answer y => y
+
+              | _ => raise (Fail "impossible"))
+         end
+
 
 
       fun caseT err x f goal fk sk =
@@ -599,37 +621,58 @@ structure Case :> CASE =
             (fn () => fk err)
             (fn (tac, _) => tac goal fk sk)
 
-
       fun termCaseT m f goal fk sk =
-         caseT "no match in termCase" (N.simplify m) f goal fk sk
+         caseT "no match in termCaseT" (N.simplify m) f goal fk sk
 
       fun term2CaseT m1 m2 f goal fk sk =
-         caseT "no match in term2Case" (N.simplify m1, N.simplify m2) f goal fk sk
+         caseT "no match in term2CaseT" (N.simplify m1, N.simplify m2) f goal fk sk
 
       fun term3CaseT m1 m2 m3 f goal fk sk =
-         caseT "no match in term3Case" (N.simplify m1, N.simplify m2, N.simplify m3) f goal fk sk
+         caseT "no match in term3CaseT" (N.simplify m1, N.simplify m2, N.simplify m3) f goal fk sk
 
       fun unitCaseT f goal fk sk =
-         caseT "no match in unitCase" () f goal fk sk
+         caseT "no match in unitCaseT" () f goal fk sk
 
-      fun spineCaseT m f goal fk sk = caseT "no match in spineCase" m f goal fk sk
-      fun hypCaseT m f goal fk sk = caseT "no match in hypCase" m f goal fk sk
-      fun contextCaseT m f goal fk sk = caseT "no match in contextCase" m f goal fk sk
+      fun spineCaseT m f goal fk sk = caseT "no match in spineCaseT" m f goal fk sk
+      fun hypCaseT m f goal fk sk = caseT "no match in hypCaseT" m f goal fk sk
 
+      fun contextCaseT ctx dir f goal fk sk =
+         anyhypLoop f 0 ctx dir
+            (fn () => fk "no match in contextCaseT")
+            (fn (tac, _) => tac goal fk sk)
+
+      fun contextnCaseT ctx f goal fk sk =
+         anyhypNumLoop f 0 ctx
+            (fn () => fk "no match in contextnCaseT")
+            (fn (tac, _) => tac goal fk sk)
 
       fun goalCaseT f (goal as (jud, _)) fk sk =
-         caseT "no match in goalCase" (N.simplify (J.concl jud)) f goal fk sk
+         caseT "no match in goalCaseT" (N.simplify (J.concl jud)) f goal fk sk
 
+      fun goalHypCaseT i f (goal as (jud, _)) fk sk =
+         (case Seq.nthOpt (J.context jud) i of
+             NONE =>
+                fk "no such hypothesis in goalHypCaseT"
 
-      fun goalContextCaseT f (goal as (jud, _)) fk sk =
-         caseT "no match in goalContextCase" (J.context jud) f goal fk sk
+           | SOME h =>
+                caseT "no match in goalHypCaseT" (J.subHyp h (T.Shift (i+1))) f goal fk sk)
+
+      fun goalContextCaseT f (goal as (jud, dir)) fk sk =
+         anyhypLoop f 0 (J.context jud) dir
+            (fn () => fk "no match in goalContextCaseT")
+            (fn (tac, _) => tac goal fk sk)
+
+      fun goalContextnCaseT f (goal as (jud, _)) fk sk =
+         anyhypNumLoop f 0 (J.context jud)
+            (fn () => fk "no match in goalContextnCaseT")
+            (fn (tac, _) => tac goal fk sk)
+
              
 
       fun caseB err x f goal fk sk =
          f x ()
             (fn () => fk err)
             (fn (tac, fk') => tac goal (fn _ => fk' ()) sk)
-
 
       fun termCaseB m goal fk sk =
          caseB "no match in termCaseB" (N.simplify m) goal fk sk
@@ -645,15 +688,37 @@ structure Case :> CASE =
 
       fun spineCaseB m f goal fk sk = caseB "no match in spineCaseB" m f goal fk sk
       fun hypCaseB m f goal fk sk = caseB "no match in hypCaseB" m f goal fk sk
-      fun contextCaseB m f goal fk sk = caseB "no match in contextCaseB" m f goal fk sk
 
+      fun contextCaseB ctx dir f goal fk sk =
+         anyhypLoop f 0 ctx dir
+            (fn () => fk "no match in contextCaseBy")
+            (fn (tac, fk') => tac goal (fn _ => fk' ()) sk)
+
+      fun contextnCaseB ctx f goal fk sk =
+         anyhypNumLoop f 0 ctx
+            (fn () => fk "no match in contextnCaseB")
+            (fn (tac, fk') => tac goal (fn _ => fk' ()) sk)
 
       fun goalCaseB f (goal as (jud, _)) fk sk =
          caseB "no match in goalCaseB" (N.simplify (J.concl jud)) f goal fk sk
 
+      fun goalHypCaseB i f (goal as (jud, _)) fk sk =
+         (case Seq.nthOpt (J.context jud) i of
+             NONE =>
+                fk "no such hypothesis in goalHypCaseB"
 
-      fun goalContextCaseB f (goal as (jud, _)) fk sk =
-         caseB "no match in goalContextCaseB" (J.context jud) f goal fk sk
+           | SOME h =>
+                caseB "no match in goalHypCaseB" (J.subHyp h (T.Shift (i+1))) f goal fk sk)
+
+      fun goalContextCaseB f (goal as (jud, dir)) fk sk =
+         anyhypLoop f 0 (J.context jud) dir
+            (fn () => fk "no match in goalContextCaseB")
+            (fn (tac, fk') => tac goal (fn _ => fk' ()) sk)
+
+      fun goalContextnCaseB f (goal as (jud, _)) fk sk =
+         anyhypNumLoop f 0 (J.context jud)
+            (fn () => fk "no match in goalContextnCaseB")
+            (fn (tac, fk') => tac goal (fn _ => fk' ()) sk)
 
 
       fun parseMatch x = x
@@ -671,6 +736,7 @@ structure CasePervasive =
       val spineCase = Case.spineCase
       val hypCase = Case.hypCase
       val contextCase = Case.contextCase
+      val contextnCase = Case.contextnCase
       val termCaseT = Case.termCaseT
       val unitCaseT = Case.unitCaseT
       val term2CaseT = Case.term2CaseT
@@ -678,8 +744,11 @@ structure CasePervasive =
       val spineCaseT = Case.spineCaseT
       val hypCaseT = Case.hypCaseT
       val contextCaseT = Case.contextCaseT
+      val contextnCaseT = Case.contextnCaseT
       val goalCaseT = Case.goalCaseT
+      val goalHypCaseT = Case.goalHypCaseT
       val goalContextCaseT = Case.goalContextCaseT
+      val goalContextnCaseT = Case.goalContextnCaseT
       val termCaseB = Case.termCaseB
       val unitCaseB = Case.unitCaseB
       val term2CaseB = Case.term2CaseB
@@ -687,8 +756,11 @@ structure CasePervasive =
       val spineCaseB = Case.spineCaseB
       val hypCaseB = Case.hypCaseB
       val contextCaseB = Case.contextCaseB
+      val contextnCaseB = Case.contextnCaseB
       val goalCaseB = Case.goalCaseB
+      val goalHypCaseB = Case.goalHypCaseB
       val goalContextCaseB = Case.goalContextCaseB
+      val goalContextnCaseB = Case.goalContextnCaseB
 
       fun parseMatch x = x
 
@@ -789,11 +861,6 @@ grammardef Case
    rule Match(3)      ::= "$tpl" => tpl
    rule Match(3)      ::= "$let" Match(3) => lett
 
-   (* contexts *)
-   rule Match(3)      ::= "$hyp" NUMBER Match(3) => hyp
-   rule Match(3)      ::= "$hyp" EMBED Match(3) => hyp
-   rule Match(3)      ::= "$anyhyp" Match(3) => anyhyp
-
    (* special spines *)
    rule Spine         ::= => null
    rule Spine         ::= Match(4) Spine => app
@@ -816,25 +883,32 @@ grammardef Case
    start term3Case _ _ _ Match
    start spineCase _ Match
    start hypCase _ Match
-   start contextCase _ Match
+   start contextCase _ _ Match
+   start contextnCase _ Match
    start termCaseT _ Match
    start unitCaseT Match
    start term2CaseT _ _ Match
    start term3CaseT _ _ _ Match
    start spineCaseT _ Match
    start hypCaseT _ Match
-   start contextCaseT _ Match
+   start contextCaseT _ _ Match
+   start contextnCaseT _ Match
    start goalCaseT Match
+   start goalHypCaseT _ Match
    start goalContextCaseT Match
+   start goalContextnCaseT Match
    start termCaseB _ Match
    start unitCaseB Match
    start term2CaseB _ _ Match
    start term3CaseB _ _ _ Match
    start spineCaseB _ Match
    start hypCaseB _ Match
-   start contextCaseB _ Match
+   start contextCaseB _ _ Match
+   start contextnCaseB _ Match
    start goalCaseB Match
+   start goalHypCaseB _ Match
    start goalContextCaseB Match
+   start goalContextnCaseB Match
 
    start parseMatch Match
 

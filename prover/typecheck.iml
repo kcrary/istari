@@ -887,18 +887,17 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
          let
             val c = N.whnf (J.concl jud)
          in
-            contextCase (J.context jud)
-            /| $anyhyp 
-                 ($tm $whnf ? =!>
-                  \(fnc a =>
+            try 
+               contextnCase (J.context jud)
+               /| $tm $whnf ? =!>
+                  \(fnc i a =>
                        if notEvar a andalso Unify.unify1 a c then
-                          (fn i => SOME i)
+                          SOME i
                        else
-                          raise Case.Backtrack)\)
-
-             | _ =>
-               \(fnc => NONE)\
-            /
+                          raise Case.Backtrack)\
+               /
+            with
+               Case.NoMatch => NONE
          end
 
 
@@ -2549,8 +2548,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             do (goal as (jud, dir)) = withgoal
             val n = ETerm.withdir dir en
          in
-            goalContextCaseT
-            /| $hyp \i\ $tm \Prim.ov\ ? ? =>
+            goalHypCaseT i
+            /| $tm \Prim.ov\ ? ? =>
                \(fnc a m =>
                     termCaseT n
                     /| ($marker \zilch\) @ ? =>

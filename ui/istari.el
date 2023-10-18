@@ -219,7 +219,7 @@
   (if ist-retained-output
       (progn
         (setq str (concat ist-retained-output str))
-        (ist-retained-output nil)))
+        (setq ist-retained-output nil)))
   (while (not (string= str ""))
     (if ist-output-mode-normal
         (let ((pos (seq-position str 1)))

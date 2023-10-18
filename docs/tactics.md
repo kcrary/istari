@@ -79,7 +79,9 @@ goal, generating zero or more subgoals.
 
 - `first : tactic list -> tactic`
 
-  Applies each tactic in turn, until one succeeds.
+  Applies each tactic in turn, until one succeeds.  If none of them
+  succeed, the failure message from the last tactic is used as the
+  failure message.
 
 
 - `repeat : tactic -> tactic`
@@ -1102,6 +1104,15 @@ pages.
 - `exfalso`
 
   Replaces the current goal with `void`.  Also unhides any hidden hypotheses.
+
+
+- `Tactic.sideEffect : (unit -> unit) -> tactic`
+
+  Execute the function argument for its side effects, and do nothing.
+
+  + `displayTac : string -> tactic`
+
+    Print the string and do nothing.
 
 
 - `trustme`

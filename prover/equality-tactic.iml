@@ -1333,50 +1333,53 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          let
             do i = Hyp.findhyp hyp
          in
-            goalContextCaseT
-            /| $hyp \i\ ($let _) =>
-               \(fnc =>
-                    let
-                       do (_, dir) = withgoal
-                       val (d3, d12) = D.split dir i
-                    in
-                       refine (Rule.letSubst i)
-                       >> chdir (D.binds (D.tl d12) d3)
-                       >> idtacM Primary
-                    end)\
+            first
+               [
+               goalHypCaseT i
+               / $let _ =>
+                 \(fnc =>
+                      let
+                         do (_, dir) = withgoal
+                         val (d3, d12) = D.split dir i
+                      in
+                         refine (Rule.letSubst i)
+                         >> chdir (D.binds (D.tl d12) d3)
+                         >> idtacM Primary
+                      end)\
+               /,
 
-             | $anyhyp $tm
-                 (| \Prim.eq\ _ ($var \i\) ? =>
-                    \(fnc m => fn j => 
-                         if strict then
-                            substMain false i j m
-                         else
-                            Hyp.moveTermDeps m i
-                            >>+
-                            (* j cannot have moved, but i and m are probably different now *)
-                            goalContextCaseT
-                            / $hyp \j\ $tm \Prim.eq\ _ var? ? =>
-                              \(fnc i' m' =>
-                                   substMain false i' j m')\
-                            /)\
+               goalContextnCaseT
+               /| $tm \Prim.eq\ _ ($var \i\) ? =>
+                  \(fnc j m =>
+                       if strict then
+                          substMain false i j m
+                       else
+                          Hyp.moveTermDeps m i
+                          >>+
+                          (* j cannot have moved, but i and m are probably different now *)
+                          goalHypCaseT j
+                          / $tm \Prim.eq\ _ var? ? =>
+                            \(fnc i' m' =>
+                                 substMain false i' j m')\
+                          /)\
+  
+                | $tm \Prim.eq\ _ ? ($var \i\) =>
+                  \(fnc j m =>
+                       if strict then
+                          substMain true i j m
+                       else
+                          Hyp.moveTermDeps m i
+                          >>+
+                          (* j cannot have moved, but i and m are probably different now *)
+                          goalHypCaseT j
+                          / $tm \Prim.eq\ _ ? var? =>
+                            \(fnc m' i' =>
+                                 substMain true i' j m')\
+                          /)\
+               /,
 
-                  | \Prim.eq\ _ ? ($var \i\) =>
-                    \(fnc m => fn j =>
-                         if strict then
-                            substMain true i j m
-                         else
-                            Hyp.moveTermDeps m i
-                            >>+
-                            (* j cannot have moved, but i and m are probably different now *)
-                            goalContextCaseT
-                            / $hyp \j\ $tm \Prim.eq\ _ ? var? =>
-                              \(fnc m' i' =>
-                                   substMain true i' j m')\
-                            /)\)
-
-             | _ =>
-               \(fnc => fail "no equality hypothesis found")\
-            /
+               fail "no equality hypothesis found"
+               ]
          end
 
       val substPriority = substFlexPriority false
@@ -1395,9 +1398,9 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       val substAll =
          repeat $
-         goalContextCaseT
-         / $anyhyp ($tm (\Prim.eq\ _ var? _ | \Prim.eq\ _ _ var?) =>
-                    \(fnc x => fn _ => subst (Hyp.NUMBER x))\)
+         goalContextnCaseT
+         / $tm (\Prim.eq\ _ var? _ | \Prim.eq\ _ _ var?) =>
+           \(fnc _ x => subst (Hyp.NUMBER x))\
          /
 
 
@@ -1432,8 +1435,8 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       (* i : M = N : bool *)
       fun injectionBool i =
-         goalContextCaseT
-         / $hyp \i\ $tm \Prim.eq\ @ $ap \Prim.bool\
+         goalHypCaseT i
+         / $tm \Prim.eq\ @ $ap \Prim.bool\
            (
               $ap \Prim.tru\ $ap \Prim.fals\ $nil =>
               \(fnc =>
@@ -1502,8 +1505,8 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       (* i : M = N : nat *)
       fun injectionNat i =
-         goalContextCaseT
-         / $hyp \i\ $tm \Prim.eq\ @ $ap \Prim.nat\
+         goalHypCaseT i
+         / $tm \Prim.eq\ @ $ap \Prim.nat\
            (
               $ap \Prim.zero\ $ap \Prim.zero\ $nil =>
               \(fnc => idtac)\
@@ -1543,8 +1546,8 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       (* i : M = N : A % B *)
       fun injectionSum i =
-         goalContextCaseT
-         / $hyp \i\ $tm \Prim.eq\ @ $ap (\Prim.sum\ ? ?)
+         goalHypCaseT i
+         / $tm \Prim.eq\ @ $ap (\Prim.sum\ ? ?)
            (
               $ap (\Prim.inl\ ?) $ap (\Prim.inl\ ?) $nil =>
               \(fnc a b m n =>
@@ -1593,8 +1596,8 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       (* i : M = N : exists A . B *)
       fun injectionExists i =
-         goalContextCaseT
-         /| $hyp \i\ $tm \Prim.eq\ (\Prim.exists\ ? (fn . ?)) ($as (? , ?)) ($as (? , ?)) =>
+         goalHypCaseT i
+         /| $tm \Prim.eq\ (\Prim.exists\ ? (fn . ?)) ($as (? , ?)) ($as (? , ?)) =>
             \(fnc a b m m1 m2 n n1 n2 =>
                  refine (Rule.assert (T.apply3 Prim.eq a m1 n1) (T.evar ()))
                  >>> [
@@ -1632,8 +1635,8 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       (* i : M = N : A & B *)
       fun injectionProd i =
-         goalContextCaseT
-         /| $hyp \i\ $tm \Prim.eq\ (\Prim.prod\ ? ?) ($as (? , ?)) ($as (? , ?)) =>
+         goalHypCaseT i
+         /| $tm \Prim.eq\ (\Prim.prod\ ? ?) ($as (? , ?)) ($as (? , ?)) =>
             \(fnc a b m m1 m2 n n1 n2 =>
                  refine (Rule.assert (T.apply3 Prim.eq a m1 n1) (T.evar ()))
                  >>> [
@@ -1674,8 +1677,8 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          let
             do (_, dir) = withgoal
          in
-            goalContextCaseT
-            /| $hyp \i\ $tm \Prim.eq\ (\Prim.set\ ? (fn . ?)) ? ? =>
+            goalHypCaseT i
+            /| $tm \Prim.eq\ (\Prim.set\ ? (fn . ?)) ? ? =>
                \(fnc a b m n =>
                     (* |- C *)
                     refine (Rule.assert (T.apply2 Prim.forall a (T.Lam (NONE, T.apply1 Prim.istp b))) (T.evar ()))
@@ -1767,8 +1770,8 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          let
             do (_, dir) = withgoal
          in
-            goalContextCaseT
-            /| $hyp \i\ $tm \Prim.eq\ (\Prim.quotient\ ? (fn . fn . ?)) ? ? =>
+            goalHypCaseT i
+            /| $tm \Prim.eq\ (\Prim.quotient\ ? (fn . fn . ?)) ? ? =>
                \(fnc a b m n =>
                     (* |- C *)
                     refine (Rule.quotientDescent a b (T.evar ()) m n)
