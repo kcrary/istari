@@ -35,4 +35,4 @@
 
 7. (Optional) If you want to receive occasional updates about Istari,
    submit your name and email address using the form
-   [here](https://forms.gle/ZuFkEEz29ZMQ9YDi9).
+   [here](https://mailman.srv.cs.cmu.edu/mailman/listinfo/istari-announce).
