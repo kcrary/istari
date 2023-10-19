@@ -56,7 +56,7 @@ instead of `Case`.
 
 ### A context example
 
-We can also case analyze the contents of the context, instead of the
+We can also case-analyze the contents of the context, instead of the
 conclusion.  Suppose we wish to find any ordinary hypothesis whose
 type is `forall` or `->`.  Then we write:
 
@@ -128,6 +128,13 @@ of the most important are:
   Like `goalContextCaseT`, but it will backtrack into other clauses if
   the tactic fails, or if some subsequent tactic fails.
 
+- `allGoalContextCase /[hyp matcher]/ [continuation]`
+
+  Matches against *all* hypotheses and passes, to its continuation, a
+  list containing the result from all successful matches.  The
+  matching process works as in `goalContextCaseT`.  The continuation
+  must return a tactic.
+
 
 ### Details
 
@@ -166,7 +173,8 @@ The most important combinators are:
   `f`.
 
 - `alt [m1, ..., mn]` tries each matcher `mi` in turn.  In the parser,
-  it is written `m1 | ... | mn`.
+  it is written `m1 | ... | mn`.  (An additional leading `|` is
+  optional.)
 
 
 ##### Matching term heads
@@ -286,7 +294,7 @@ The most important combinators are:
   `#prev m`.
 
 Suppose you want to match `arrow` applied to two arguments.  In IML
-syntax you were use the combinators thus:
+syntax you would use the combinators thus:
 
     elim (const (parseConstant /arrow/)) (app what (app what null))
 
@@ -326,13 +334,14 @@ In the parser they are written `$tm`, `$tml`, `$tmh`, `$tp`, `$tpl`,
 
 ##### Matching within contexts
 
-In all the entry points that match a hypothesis that appears within a
+In all the entry points that match a hypothesis extracted from a
 context (*i.e.,* `contextCase`, `contextnCase`, `contextCaseT`,
 `contextnCaseT`, `goalHypCaseT`, `goalContextCaseT`,
 `goalContextnCaseT`, `contextCaseB`, `contextnCaseB`, `goalHypCaseB`,
-`goalContextCaseB`, and `goalContextnCaseB`), the hypothesis is
-shifted into the scope of the full context before matching.  That is,
-hypothesis `i` is shifted by `i+1`.
+`goalContextCaseB`, `goalContextnCaseB`, `allContextCase`, and
+`allGoalContextCase`), the hypothesis is shifted into the scope of the
+full context before matching.  That is, hypothesis `i` is shifted by
+`i+1`.
 
 In the entry points that mention `context`, the name of the
 hypothesis that was matched is passed as the first binding.  In the
@@ -441,6 +450,12 @@ The full collection of entry points is:
     val goalContextCaseB  : (context, unit * Symbol.symbol, 'a tacticm) matcher -> 'a tacticm
     val goalContextnCaseB : (context, unit * int, 'a tacticm) matcher -> 'a tacticm
 
+    (* Returns (or passes to its continuation) a list containing the results for all
+       matching hypotheses.  Will not fail.  Will not try other matches if subsequent
+       tactics fail.
+    *)
+    val allContextCase : context -> Directory.directory -> (hyp, unit * Symbol.symbol, 'a) matcher -> 'a list
+    val allGoalContextCase : (hyp, unit * Symbol.symbol, 'a) matcher -> ('a list -> 'b tacticm) -> 'b tacticm
 
 ##### The matcher grammar
 

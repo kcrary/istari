@@ -71,6 +71,12 @@ goal, generating zero or more subgoals.
     the nth subgoal.
 
 
+- `andthenSeq : tactic list -> tactic`
+
+  Runs each of the tactics in the list in sequence, combined by `andthen`.
+  Similar to `foldr andthen idtac` but lazier.
+
+
 - `attempt : tactic -> tactic`
 
   The tactic `attempt tac` applies `tac`.  If `tac` fails, the tactic

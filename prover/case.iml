@@ -144,6 +144,15 @@ signature CASE =
       val goalContextnCaseB : (hyp, unit * int, 'a tacticm) matcher -> 'a tacticm
 
 
+      (* Returns (or passes to its continuation) a list containing the results for all
+         matching hypotheses.  Will not fail.  Will not try other matches if subsequent
+         tactics fail.
+      *)
+
+      val allContextCase : context -> Directory.directory -> (hyp, unit * Symbol.symbol, 'a) matcher -> 'a list
+      val allGoalContextCase : (hyp, unit * Symbol.symbol, 'a) matcher -> ('a list -> 'b tacticm) -> 'b tacticm
+
+
       (* Note on rationale:
          One may wonder why termCase, etc. are not just polymorphic instead.
          We want to preserve an invariant on terms (namely, simple form), and
@@ -721,7 +730,31 @@ structure Case :> CASE =
             (fn (tac, fk') => tac goal (fn _ => fk' ()) sk)
 
 
-      fun parseMatch x = x
+      fun allhypLoop f i l dir acc k =
+         (case (Seq.expose l, Directory.exposeOpt dir) of
+             (Seq.Cons (h, l'), SOME (sym, dir')) =>
+                f
+                   (J.subHyp h (T.Shift (i+1)))
+                   ((), sym)
+                   (fn () => allhypLoop f (i+1) l' dir' acc k)
+                   (fn (x, _) => allhypLoop f (i+1) l' dir' (x :: acc) k)
+
+           | _ =>
+                k (List.rev acc))
+
+      fun 'b allContextCase ctx dir (f : (hyp, unit * Symbol.symbol, 'b) matcher) : 'b list =
+         let
+            extension Answer of 'b list
+         in
+            (case allhypLoop f 0 ctx dir [] (fn l => Answer l) of
+                Answer l => l
+
+              | _ => raise (Fail "impossible"))
+         end
+
+      fun allGoalContextCase f tac (goal as (jud, dir)) fk sk =
+         allhypLoop f 0 (J.context jud) dir []
+            (fn l => tac l goal fk sk)
 
    end
 
@@ -761,6 +794,8 @@ structure CasePervasive =
       val goalHypCaseB = Case.goalHypCaseB
       val goalContextCaseB = Case.goalContextCaseB
       val goalContextnCaseB = Case.goalContextnCaseB
+      val allContextCase = Case.allContextCase
+      val allGoalContextCase = Case.allGoalContextCase
 
       fun parseMatch x = x
 
@@ -909,6 +944,8 @@ grammardef Case
    start goalHypCaseB _ Match
    start goalContextCaseB Match
    start goalContextnCaseB Match
+   start allContextCase _ _ Match
+   start allGoalContextCase Match
 
    start parseMatch Match
 

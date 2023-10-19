@@ -57,6 +57,8 @@ signature TACTIC =
       val andthenlPri : priority tacticm -> priority tacticm list -> priority tacticm
       val andthenlPadPri : priority tacticm -> priority tacticm list -> priority tacticm -> priority tacticm
 
+      val andthenSeq : tactic list -> tactic
+
       val attempt : tactic -> tactic
       val first : 'a tacticm list -> 'a tacticm
       val repeat : tactic -> tactic
@@ -473,7 +475,17 @@ structure TacticInternal :> TACTIC_INTERNAL =
             tacs
 
 
-      
+      fun andthenSeqLoop l () =
+         (case l of
+             [] => idtac
+
+           | tac :: rest =>
+                andthen tac (andthenSeq rest))
+
+      and andthenSeq l = lift (andthenSeqLoop l)
+
+
+
       fun attempt tac goal fk sk =
          let
             val mark = Trail.mark ()

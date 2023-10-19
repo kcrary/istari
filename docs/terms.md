@@ -165,20 +165,24 @@ Notes:
 - A hole (`__`) is a placeholder used by some tactics (*e.g.,* `so`).
   It is written as two consecutive underscores.
 
-- One can bind additional de Bruijn positions using the syntax
-  ``additional` OIdents . Term``.  For example, ``additional` x y . y``
-  resolves to index 0; and if `z` resolves to index 3, then
-  ``additional` x y . z`` resolves to index 5.
+- One can put multiple anonymous arguments into a `Bindings` or
+  `Bindingsn` by writing `_# Number`.  The multiplicity can be zero.
+  (The requirement that a `Bindingsn` be nonempty can be defeated
+  using a zero multiplicity.)
 
 - One can suppress the insertion of implicit arguments throughout an
   entire term using the syntax ``explicit` Term``.  The inner term
   should be parenthesized or otherwise syntactically atomic (that is,
   it should appear in the last grouping of `Term` syntax).
 
-- One can put multiple anonymous arguments into a `Bindings` or
-  `Bindingsn` by writing `_# Number`.  The multiplicity can be zero.
-  (The requirement that a `Bindingsn` be nonempty can be defeated
-  using a zero multiplicity.)
+- One can bind additional de Bruijn positions using the syntax
+  ``additional` OIdents . Term``.  For example, ``additional` x y . y``
+  resolves to index 0; and if `z` resolves to index 3, then
+  ``additional` x y . z`` resolves to index 5.
+
+- One can exclude a variable from appearing within a term using the
+  syntax ``exclude` Ident in Term``.  This is occasionally useful for
+  pruning evar dependencies, to assist unification.
 
 - The syntax for inductive functions appears
   [here](datatypes.html#inductive-functions).

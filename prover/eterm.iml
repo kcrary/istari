@@ -53,6 +53,9 @@ signature ETERM =
       (* subst M x N = [M/x] N *)
       val subst      : eterm -> symbol -> eterm -> eterm
 
+      (* resulting term cannot depend on the indicated variable *)
+      val exclude    : symbol -> eterm -> eterm
+
       (* raises Syntax using the given location if the eterm contains an unbound variable *)
       val withloc    : int * int -> eterm -> eterm
 
@@ -379,6 +382,39 @@ structure ETermInternal
             spine
 
 
+      fun excludeSub i =
+         if i = 0 then
+            Prune.Pundef (Prune.Pshift 1)
+         else
+            Prune.punder (excludeSub (i-1)) 
+
+      fun exclude sym em special dir imps spine =
+         (case D.lookupVarOpt dir sym of
+             NONE =>
+                raise (Syntax (String.concat
+                                  [
+                                  "unbound variable ",
+                                  Symbol.toValue sym,
+                                  " in exclusion."
+                                  ]))
+
+           | SOME i =>
+                let
+                   val m = em special dir imps []
+                in
+                   (case Prune.prune m (excludeSub i) of
+                       NONE =>
+                          raise (Syntax (String.concat
+                                            [
+                                            "term depends on excluded variable ",
+                                            Symbol.toValue sym,
+                                            "."
+                                            ]))
+
+                     | SOME m' => elim m' spine)
+                end)
+
+
       fun withloc (r, c) m special dir imps spine =
          try
             m special dir imps spine
@@ -607,6 +643,7 @@ structure ParseTerm =
 
       val triv = T.triv
 
+      val exclude = T.exclude
       val additional = T.additional 
 
       fun shortConstant sym = Namespace.resolve [sym]
@@ -1315,6 +1352,7 @@ grammardef Term
    rule Term(100) ::= "explicit`" Term(100) => explicit
 
    rule Term(0)   ::= "additional`" OIdents "." Term(0) => additional
+   rule Term(0)   ::= "exclude`" Ident "in" Term(0) => exclude
 
    rule Terms     ::= => null
    rule Terms     ::= Term(100) Terms => cons
