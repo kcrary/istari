@@ -33,7 +33,7 @@ signature FILE_INTERNAL =
 structure FileInternal :> FILE_INTERNAL =
    struct
 
-      val magicNumber = Bytestring.fromString "Ist0000H"
+      val magicNumber = Bytestring.fromString "Ist0000I"
 
       structure CR = CheckpointedRef
       structure D = DatabaseInternal
@@ -87,7 +87,7 @@ structure FileInternal :> FILE_INTERNAL =
 
       fun writeNamespace outs =
          (
-         N.appLocal
+         N.appExport
             (fn (addr, const) =>
                 P.pickle
                    (BinIO.output1 outs)
@@ -101,22 +101,35 @@ structure FileInternal :> FILE_INTERNAL =
          )
 
 
-      fun gotoModule old new =
+      fun gotoModule toplevel old new =
          (case (old, new) of
              ([], []) => ()
 
            | ([], _) =>
                 List.app N.beginModuleSym new
 
-           | (_, []) =>
-                List.app (fn _ => N.endModule ()) old
+           | (sym :: _, []) =>
+                (
+                List.app (fn _ => N.endModule ()) old;
+                
+                if toplevel then
+                   N.makeModuleLocal sym
+                else
+                   ()
+                )
 
            | (sym :: restold, sym' :: restnew) =>
                 if Symbol.eq (sym, sym') then
-                   gotoModule restold restnew
+                   gotoModule false restold restnew
                 else
                    (
                    List.app (fn _ => N.endModule ()) old;
+
+                   if toplevel then
+                      N.makeModuleLocal sym
+                   else
+                      ();
+
                    List.app N.beginModuleSym new
                    ))
 
@@ -128,7 +141,7 @@ structure FileInternal :> FILE_INTERNAL =
                 (P.option puNamespaceEntry)
           of
              NONE =>
-                gotoModule currModule []
+                gotoModule true currModule []
 
            | SOME (address, const) =>
                 let
@@ -139,9 +152,9 @@ structure FileInternal :> FILE_INTERNAL =
                         | sym :: revmodule =>
                              (List.rev revmodule, sym))
 
-                   val () = gotoModule currModule module
+                   val () = gotoModule true currModule module
                 in
-                   N.import sym const;
+                   N.aliasExport sym const;
 
                    readNamespaceLoop ins module
                 end)
@@ -161,7 +174,7 @@ structure FileInternal :> FILE_INTERNAL =
 
       fun writeRegistry outs =
          (
-         RR.appLocal
+         RR.appExport
             (fn entry => P.pickle (BinIO.output1 outs) puRegistryEntry (SOME entry));
 
          P.pickle (BinIO.output1 outs) puRegistryEntry NONE
@@ -188,13 +201,13 @@ structure FileInternal :> FILE_INTERNAL =
       (* Define *)
 
       fun writeReductions outs =
-         P.pickle (BinIO.output1 outs) (P.list R.puUreduction2) (DefineInternal.registered ())
+         P.pickle (BinIO.output1 outs) (P.list R.puReduction2) (DefineInternal.registered ())
 
       fun readReductions ins =
          (case
              P.unpickle
                 (fn () => input1 ins)
-                (P.option R.puUreduction2)
+                (P.option R.puReduction2)
           of
              NONE => ()
 

@@ -583,6 +583,8 @@ module Vector : VECTOR =
       let foldr f b a = Array.fold_right f a b
       let app = Array.iter
       let appi = Array.iteri
+      let map = Array.map
+      let mapi = Array.mapi
 
       let foldli f b a =
          let (_, y) = Array.fold_left (fun (i, y) x -> (i+1, f i x y)) (0, b) a

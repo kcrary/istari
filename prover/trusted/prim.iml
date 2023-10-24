@@ -129,7 +129,7 @@ functor PrimFun (structure Term : TERM
       (* visible: whether to place the constant into primitives
          and hence into the namespace.
       *)
-      fun declare visible str def =
+      fun declare visible str path def =
          let
             val i = !numPrimitives
             val sym = Symbol.fromValue str
@@ -140,7 +140,7 @@ functor PrimFun (structure Term : TERM
 
                  | SOME _ => Constant.HARD)
 
-            val const = Constant.declare false def [sym] opac
+            val const = Constant.declare false def (sym :: path) opac
          in
             numPrimitives := 1 + i;
 
@@ -153,10 +153,17 @@ functor PrimFun (structure Term : TERM
             const
          end
 
-      fun newconst str = declare true str NONE
-      fun newconstInvis str = declare false str NONE
-      fun defconst str m = declare true str (SOME m)
-      fun defconstInvis str m = declare false str (SOME m)
+      fun newconst str = declare true str [] NONE
+      fun newconstInvis str path = declare false str path NONE
+      fun defconst str m = declare true str [] (SOME m)
+      fun defconstInvis str path m = declare false str path (SOME m)
+
+      (* Anticipate where the invisible constants will eventually be made visible. *)
+      val intPath = List.map Symbol.fromValue ["Integer"]
+      val natPath = List.map Symbol.fromValue ["Nat"]
+      val symPath = List.map Symbol.fromValue ["Symbol"]
+      val intdefPath = List.map Symbol.fromValue ["Def", "Symbol"]
+      val intisoPath = List.map Symbol.fromValue ["Iso", "Symbol"]
 
 
       val bool = newconst "bool"
@@ -202,13 +209,13 @@ functor PrimFun (structure Term : TERM
       val univ = newconst "univ"
       val void = newconst "void"
 
-      val eqzb = newconstInvis "eqzb"
-      val leqzb = newconstInvis "leqzb"
-      val negz = newconstInvis "negz"
-      val plusz = newconstInvis "plusz"
-      val symbol = newconstInvis "symbol"
-      val symbol_eqb = newconstInvis "symbol_eqb"
-      val timesz = newconstInvis "timesz"
+      val eqzb = newconstInvis "eqzb" intPath
+      val leqzb = newconstInvis "leqzb" intPath
+      val negz = newconstInvis "negz" intPath
+      val plusz = newconstInvis "plusz" intPath
+      val symbol = newconstInvis "symbol" symPath
+      val symbol_eqb = newconstInvis "symbol_eqb" symPath
+      val timesz = newconstInvis "timesz" intPath
 
       val abort =
          defconst "abort"
@@ -353,7 +360,7 @@ functor PrimFun (structure Term : TERM
 
 
       val integer_to_nat =
-         defconstInvis "integer_to_nat"
+         defconstInvis "integer_to_nat" intPath
          (T.apply1 fix
              (T.Lam (NONE, 
                      T.Lam (SOME (Symbol.fromValue "a"),
@@ -365,7 +372,7 @@ functor PrimFun (structure Term : TERM
                                        (T.apply2 plusz (T.Native (T.Integer ~1I)) (T.Var 0))))))))
 
       val nat_to_integer =
-         defconstInvis "nat_to_integer"
+         defconstInvis "nat_to_integer" intPath
          (T.apply1 fix
              (T.Lam (NONE,
                      T.Lam (SOME (Symbol.fromValue "n"),
@@ -378,7 +385,7 @@ functor PrimFun (structure Term : TERM
                                           (T.app (T.Var 2) (T.Var 0))))))))
 
       val plus =
-         defconstInvis "plus"
+         defconstInvis "plus" natPath
          (T.apply1 fix
              (T.Lam (NONE,
                      T.Lam (NONE,
@@ -391,7 +398,7 @@ functor PrimFun (structure Term : TERM
                                               (T.app2 (T.Var 3) (T.Var 0) (T.Var 1)))))))))
 
       val times =
-         defconstInvis "times"
+         defconstInvis "times" natPath
          (T.apply1 fix
              (T.Lam (NONE,
                      T.Lam (NONE,
@@ -405,7 +412,7 @@ functor PrimFun (structure Term : TERM
                                               (T.app2 (T.Var 3) (T.Var 0) (T.Var 1)))))))))
 
       val eqb =
-         defconstInvis "eqb"
+         defconstInvis "eqb" natPath
          (T.apply1 fix
              (T.Lam (NONE,
                      T.Lam (NONE,
@@ -424,7 +431,7 @@ functor PrimFun (structure Term : TERM
                                                          T.app2 (T.Var 4) (T.Var 1) (T.Var 0))))))))))
 
       val cEqzb =
-         defconstInvis "Eqzb"
+         defconstInvis "Eqzb" intdefPath
          (T.Lam (NONE,
                  T.Lam (NONE,
                         T.apply2 eqb
@@ -432,7 +439,7 @@ functor PrimFun (structure Term : TERM
                            (T.apply2 plus (T.Elim (T.Var 1, [T.Pi2])) (T.Elim (T.Var 0, [T.Pi1]))))))
          
       val cInteger =
-         defconstInvis "Integer"
+         defconstInvis "Integer" intdefPath
          (T.apply2 quotient
               (T.apply2 prod (T.Const nat) (T.Const nat))
               (T.Lam (NONE,
@@ -443,14 +450,14 @@ functor PrimFun (structure Term : TERM
                                 (T.apply2 plus (T.Elim (T.Var 1, [T.Pi2])) (T.Elim (T.Var 0, [T.Pi1])))))))
  
       val integer_from_Integer =
-         defconstInvis "integer_from_Integer"
+         defconstInvis "integer_from_Integer" intisoPath
          (T.Lam (NONE,
                  T.apply2 plusz
                      (T.apply1 nat_to_integer (T.pi1 (T.Var 0)))
                      (T.apply1 negz (T.apply1 nat_to_integer (T.pi2 (T.Var 0))))))
 
       val integer_to_Integer =
-         defconstInvis "integer_to_Integer"
+         defconstInvis "integer_to_Integer" intisoPath
          (T.Lam (NONE,
                  T.apply3 ite
                      (T.apply2 leqzb (T.Native (T.Integer 0I)) (T.Var 0))
@@ -458,7 +465,7 @@ functor PrimFun (structure Term : TERM
                      (T.Pair (T.Const zero, T.apply1 integer_to_nat (T.apply1 negz (T.Var 0))))))
 
       val leqb =
-         defconstInvis "leqb"
+         defconstInvis "leqb" natPath
          (T.apply1 fix
              (T.Lam (NONE,
                      T.Lam (NONE,
@@ -474,7 +481,7 @@ functor PrimFun (structure Term : TERM
                                                          T.app2 (T.Var 4) (T.Var 1) (T.Var 0))))))))))
 
       val cLeqzb =
-         defconstInvis "Leqzb"
+         defconstInvis "Leqzb" intdefPath
          (T.Lam (NONE,
                  T.Lam (NONE,
                         T.apply2 leqb
@@ -482,12 +489,12 @@ functor PrimFun (structure Term : TERM
                            (T.apply2 plus (T.Elim (T.Var 1, [T.Pi2])) (T.Elim (T.Var 0, [T.Pi1]))))))
          
       val cNegz =
-         defconstInvis "Negz"
+         defconstInvis "Negz" intdefPath
          (T.Lam (NONE,
                  T.Pair (T.pi2 (T.Var 0), T.pi1 (T.Var 0))))
 
       val cPlusz =
-         defconstInvis "Plusz"
+         defconstInvis "Plusz" intdefPath
          (T.Lam (NONE,
                  T.Lam (NONE,
                         T.Pair (T.apply2 plus (T.pi1 (T.Var 1)) (T.pi1 (T.Var 0)),
@@ -495,7 +502,7 @@ functor PrimFun (structure Term : TERM
 
 
       val cTimesz =
-         defconstInvis "Timesz"
+         defconstInvis "Timesz" intdefPath
          (T.Lam (NONE,
                  T.Lam (NONE,
                         T.Pair (T.apply2 plus

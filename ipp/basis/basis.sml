@@ -274,6 +274,8 @@ signature Basis__VECTOR =
       val length : 'a vector -> int
       val sub : 'a vector -> int -> 'a
 
+      val map : ('a -> 'b) -> 'a vector -> 'b vector
+      val mapi : (int -> 'a -> 'b) -> 'a vector -> 'b vector
       val foldl : ('a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
       val foldli : (int -> 'a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
       val foldr : ('a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
@@ -968,6 +970,8 @@ structure Basis :> IML__BASIS =
                Vector.sub (a, n)
                handle Subscript => raise (Invalid "subscript")
 
+            val map = Vector.map
+            fun mapi f a = Vector.mapi (fn (i, x) => f i x) a
             fun foldl f z a = Vector.foldl (fn (x, y) => f x y) z a
             fun foldli f z a = Vector.foldli (fn (i, x, y) => f i x y) z a
             fun foldr f z a = Vector.foldr (fn (x, y) => f x y) z a

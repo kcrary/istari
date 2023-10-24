@@ -49,6 +49,7 @@ structure Token =
        | AS of span
        | BEGIN of span
        | CASE of span
+       | COLLAPSE of span
        | DATATYPE of span
        | DO of span
        | ELSE of span

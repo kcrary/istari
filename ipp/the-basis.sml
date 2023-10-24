@@ -233,6 +233,8 @@ functor TheBasis (datatype data =
           ("tabulate", E 0),
           ("length", E 0),
           ("sub", E 0),
+          ("map", E 0),
+          ("mapi", E 0),
           ("foldl", E 0),
           ("foldli", E 0),
           ("foldr", E 0),

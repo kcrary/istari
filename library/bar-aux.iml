@@ -2,11 +2,12 @@
 structure ParseBar =
    struct
 
+      structure R = CheckpointedRef
       structure T = ETerm
 
-      val bindbar = Susp.delay (fn () => parseConstant /Bar.bindbar/)
+      val bindbar : Constant.constant R.dest = R.dest ()
 
-      fun parseBind x m n = T.apply4 (Susp.force bindbar) T.evar T.evar m (T.lam (SOME x) n)
+      fun parseBind x m n = T.apply4 (R.read bindbar) T.evar T.evar m (T.lam (SOME x) n)
 
    end
 
@@ -23,7 +24,9 @@ end
 functor AfterBindbar () :> sig end =
    struct
 
-      val bindbar = parseConstant /Bar.bindbar/
+      val Collapse (bindbar) =
+         readRegistry /Bar.AfterBindbarEnv/
+            /[constant]/
 
       structure U = Show.Unparsing
 
@@ -47,5 +50,16 @@ functor AfterBindbar () :> sig end =
       val () =
          U.reserved :=
          SymbolSet.insert (!U.reserved) (Symbol.fromValue "bindbar")
+
+   end
+
+
+functor AfterBarAll () :> sig end =
+   struct
+
+      val () =
+         List.app Registry.delete
+            (parseLongidents
+                /Bar.AfterBindbarEnv/)
 
    end

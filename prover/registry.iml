@@ -2,22 +2,42 @@
 signature REGISTRY =
    sig
 
-      type item
+      type 'a key
 
       exception Registry of string
 
-      val write : Symbol.symbol -> item -> unit
-      val read : Symbol.symbol list -> item
+      val write  : Symbol.symbol -> 'a key -> 'a -> unit
+      val read   : Symbol.symbol list -> 'a key -> 'a
+      val delete : Symbol.symbol list -> unit
 
-      val toTerm : item -> Term.term
-      val toReduction : item -> Reduction.reduction
-      val toUreduction1 : item -> Reduction.ureduction1
-      val toUreduction2 : item -> Reduction.ureduction2
+      val unit   : unit key
+      val bool   : bool key
+      val int    : int key
+      val intInf : IntInf.int key
+      val string : string key
 
-      val fromTerm : Term.term -> item
-      val fromReduction : Reduction.reduction -> item
-      val fromUreduction1 : Reduction.ureduction1 -> item
-      val fromUreduction2 : Reduction.ureduction2 -> item
+      val symbol      : Symbol.symbol key
+      val constant    : Constant.constant key
+      val term        : Term.term key
+      val reduction   : Reduction.reduction key
+      val reduction1  : Reduction.reduction1 key
+      val reduction2  : Reduction.reduction2 key
+
+      val list    : 'a key -> 'a list key
+      val option  : 'a key -> 'a option key
+      val vector  : 'a key -> 'a Vector.vector key
+      val seq     : 'a key -> 'a Seq.seq key
+
+      val pair    : 'a key -> 'b key -> ('a * 'b) key
+      val tuple2  : 'a key -> 'b key -> ('a * 'b) key
+      val tuple3  : 'a key -> 'b key -> 'c key -> ('a * 'b * 'c) key
+      val tuple4  : 'a key -> 'b key -> 'c key -> 'd key -> ('a * 'b * 'c * 'd) key
+      val tuple5  : 'a key -> 'b key -> 'c key -> 'd key -> 'e key -> ('a * 'b * 'c * 'd * 'e) key
+      val tuple6  : 'a key -> 'b key -> 'c key -> 'd key -> 'e key -> 'f key -> ('a * 'b * 'c * 'd * 'e * 'f) key
+      val tuple7  : 'a key -> 'b key -> 'c key -> 'd key -> 'e key -> 'f key -> 'g key -> ('a * 'b * 'c * 'd * 'e * 'f * 'g) key
+      val tuple8  : 'a key -> 'b key -> 'c key -> 'd key -> 'e key -> 'f key -> 'g key -> 'h key -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) key
+      val tuple9  : 'a key -> 'b key -> 'c key -> 'd key -> 'e key -> 'f key -> 'g key -> 'h key -> 'i key -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i) key
+      val tuple10 : 'a key -> 'b key -> 'c key -> 'd key -> 'e key -> 'f key -> 'g key -> 'h key -> 'i key -> 'j key -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j) key
 
    end
 
@@ -27,11 +47,12 @@ signature REGISTRY_INTERNAL =
 
       include REGISTRY
 
+      type item
 
       val puItem : item Pickle.pu
 
-      (* Applies to all local items in the registry. *)
-      val appLocal : (Symbol.symbol list * item -> unit) -> unit
+      (* Applies to all exportable items in the registry. *)
+      val appExport : (Symbol.symbol list * item -> unit) -> unit
 
       val import : Symbol.symbol list -> item -> unit
 
@@ -42,17 +63,18 @@ signature REGISTRY_INTERNAL =
 structure RegistryInternal :> REGISTRY_INTERNAL =
    struct
 
-      structure C = CheckpointedRef
+      structure R = CheckpointedRef
       structure P = Pickle
-      structure R = ReductionInternal
+      structure PP = Pickling
 
-      datatype item =
-         Term of Term.term
-       | Reduction of Reduction.reduction
-       | Ureduction1 of Reduction.ureduction1
-       | Ureduction2 of Reduction.ureduction2
+      type symbol = Symbol.symbol
 
       exception Registry of string
+
+      val () =
+         Handler.customHandler
+         (fn Registry msg => (print msg; true)
+           | _ => false)
 
       fun signalError msg = raise (Registry 
                                       (String.concat
@@ -62,136 +84,357 @@ structure RegistryInternal :> REGISTRY_INTERNAL =
                                           ".\n"
                                           ]))
 
-      fun signalSortError () = signalError "item has the wrong sort"
 
-      val () =
-         Handler.customHandler
-         (fn Registry msg => (print msg; true)
-           | _ => false)
+      datatype item =
+         Unit
+       | Bool of bool
+       | Int of int
+       | IntInf of IntInf.int
+       | String of string
+       | Symbol of symbol
+       | Constant of Constant.constant
+       | Term of Term.term
+       | Reduction of Reduction.reduction
+       | Reduction1 of Reduction.reduction1
+       | Reduction2 of Reduction.reduction2
+       | Tuple2 of item * item
+       | Tuple3 of item * item * item
+       | Tuple4 of item * item * item * item
+       | Tuple5 of item * item * item * item * item
+       | Tuple6 of item * item * item * item * item * item
+       | Tuple7 of item * item * item * item * item * item * item
+       | Tuple8 of item * item * item * item * item * item * item * item
+       | Tuple9 of item * item * item * item * item * item * item * item * item
+       | Tuple10 of item * item * item * item * item * item * item * item * item * item
+       | List of item list
+       | Option of item option
+       | Vector of item Vector.vector
+       | Seq of item Seq.seq
+
+      type 'a key = ('a -> item) * (item -> 'a)
+
+      fun wrong () = signalError "wrong key for item"
+
+      val unit = ((fn () => Unit), (fn Unit => () | _ => wrong ()))
+      val bool = (Bool, (fn Bool x => x | _ => wrong ()))
+      val int = (Int, (fn Int x => x | _ => wrong ()))
+      val intInf = (IntInf, (fn IntInf x => x | _ => wrong ()))
+      val string = (String, (fn String x => x | _ => wrong ()))
+      val symbol = (Symbol, (fn Symbol x => x | _ => wrong ()))
+      val constant = (Constant, (fn Constant x => x | _ => wrong ()))
+      val term = (Term, (fn Term x => x | _ => wrong ()))
+      val reduction = (Reduction, (fn Reduction x => x | _ => wrong ()))
+      val reduction1 = (Reduction1, (fn Reduction1 x => x | _ => wrong ()))
+      val reduction2 = (Reduction2, (fn Reduction2 x => x | _ => wrong ()))
+
+      fun tuple2 (i1, o1) (i2, o2) = ((fn (x1, x2) => Tuple2 (i1 x1, i2 x2)), (fn Tuple2 (x1, x2) => (o1 x1, o2 x2) | _ => wrong ()))
+      fun tuple3 (i1, o1) (i2, o2) (i3, o3) = ((fn (x1, x2, x3) => Tuple3 (i1 x1, i2 x2, i3 x3)), (fn Tuple3 (x1, x2, x3) => (o1 x1, o2 x2, o3 x3) | _ => wrong ()))
+      fun tuple4 (i1, o1) (i2, o2) (i3, o3) (i4, o4) = ((fn (x1, x2, x3, x4) => Tuple4 (i1 x1, i2 x2, i3 x3, i4 x4)), (fn Tuple4 (x1, x2, x3, x4) => (o1 x1, o2 x2, o3 x3, o4 x4) | _ => wrong ()))
+      fun tuple5 (i1, o1) (i2, o2) (i3, o3) (i4, o4) (i5, o5) = ((fn (x1, x2, x3, x4, x5) => Tuple5 (i1 x1, i2 x2, i3 x3, i4 x4, i5 x5)), (fn Tuple5 (x1, x2, x3, x4, x5) => (o1 x1, o2 x2, o3 x3, o4 x4, o5 x5) | _ => wrong ()))
+      fun tuple6 (i1, o1) (i2, o2) (i3, o3) (i4, o4) (i5, o5) (i6, o6) = ((fn (x1, x2, x3, x4, x5, x6) => Tuple6 (i1 x1, i2 x2, i3 x3, i4 x4, i5 x5, i6 x6)), (fn Tuple6 (x1, x2, x3, x4, x5, x6) => (o1 x1, o2 x2, o3 x3, o4 x4, o5 x5, o6 x6) | _ => wrong ()))
+      fun tuple7 (i1, o1) (i2, o2) (i3, o3) (i4, o4) (i5, o5) (i6, o6) (i7, o7) = ((fn (x1, x2, x3, x4, x5, x6, x7) => Tuple7 (i1 x1, i2 x2, i3 x3, i4 x4, i5 x5, i6 x6, i7 x7)), (fn Tuple7 (x1, x2, x3, x4, x5, x6, x7) => (o1 x1, o2 x2, o3 x3, o4 x4, o5 x5, o6 x6, o7 x7) | _ => wrong ()))
+      fun tuple8 (i1, o1) (i2, o2) (i3, o3) (i4, o4) (i5, o5) (i6, o6) (i7, o7) (i8, o8) = ((fn (x1, x2, x3, x4, x5, x6, x7, x8) => Tuple8 (i1 x1, i2 x2, i3 x3, i4 x4, i5 x5, i6 x6, i7 x7, i8 x8)), (fn Tuple8 (x1, x2, x3, x4, x5, x6, x7, x8) => (o1 x1, o2 x2, o3 x3, o4 x4, o5 x5, o6 x6, o7 x7, o8 x8) | _ => wrong ()))
+      fun tuple9 (i1, o1) (i2, o2) (i3, o3) (i4, o4) (i5, o5) (i6, o6) (i7, o7) (i8, o8) (i9, o9) = ((fn (x1, x2, x3, x4, x5, x6, x7, x8, x9) => Tuple9 (i1 x1, i2 x2, i3 x3, i4 x4, i5 x5, i6 x6, i7 x7, i8 x8, i9 x9)), (fn Tuple9 (x1, x2, x3, x4, x5, x6, x7, x8, x9) => (o1 x1, o2 x2, o3 x3, o4 x4, o5 x5, o6 x6, o7 x7, o8 x8, o9 x9) | _ => wrong ()))
+      fun tuple10 (i1, o1) (i2, o2) (i3, o3) (i4, o4) (i5, o5) (i6, o6) (i7, o7) (i8, o8) (i9, o9) (i10, o10) = ((fn (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10) => Tuple10 (i1 x1, i2 x2, i3 x3, i4 x4, i5 x5, i6 x6, i7 x7, i8 x8, i9 x9, i10 x10)), (fn Tuple10 (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10) => (o1 x1, o2 x2, o3 x3, o4 x4, o5 x5, o6 x6, o7 x7, o8 x8, o9 x9, o10 x10) | _ => wrong ()))
+      val pair = tuple2
+
+      fun list (i, o) = ((fn l => List (List.map i l)), (fn List l => List.map o l | _ => wrong ()))
+      fun option (i, o) = ((fn l => Option (Option.map i l)), (fn Option l => Option.map o l | _ => wrong ()))
+      fun vector (i, o) = ((fn l => Vector (Vector.map i l)), (fn Vector l => Vector.map o l | _ => wrong ()))
+      fun seq (i, o) = ((fn l => Seq (Seq.map i l)), (fn Seq l => Seq.map o l | _ => wrong ()))
 
 
-      structure DL =
-         RedBlackDict (structure Key = ListOrdered (structure Ordered = SymbolOrdered))
+      structure DL = RedBlackDict (structure Key = ListOrdered (structure Ordered = SymbolOrdered))
 
+      (* bool indicates exportable *)
+      val theRegistry : (item * bool) DL.dict R.cref = R.new DL.empty
 
-      
-      (* bool=true indicates imported *)
-      val theRegistry : (item * bool) DL.dict C.cref = C.new DL.empty
-
-      fun writeFull address x =
+      fun writeFull address entry =
          (case address of
-             [] => signalError "empty address"
-          
+             [] =>
+                signalError "empty address"
+
            | _ =>
-                C.assign
-                   theRegistry
-                   (DL.insertMerge (C.deref theRegistry) address x
+                R.assign theRegistry
+                   (DL.insertMerge (R.deref theRegistry) address entry
                        (fn _ =>
                            (* already present *)
                            raise (Registry
                                      (String.concat
                                          [
                                          "Error: ",
-                                         String.concatWith "." 
-                                            (List.map Symbol.toValue address),
+                                         String.concatWith "." (List.map Symbol.toValue address),
                                          " is already present in the registry.\n"
                                          ])))))
-       
-      fun write name item =
-         writeFull (Namespace.currentModule () @ [name]) (item, false)
 
-      fun import fullname item =
-         writeFull fullname (item, true)
-       
-      fun read name =
-         (case name of
-             [] => signalError "empty address"
+      fun write name (into, _) x =
+         writeFull (Namespace.currentModule () @ [name]) (into x, true)
+
+
+      fun import address item =
+         writeFull address (item, false)
+
+
+      fun read address (_, out) =
+         (case address of
+             [] =>
+                signalError "empty address"
 
            | _ =>
-                (case DL.find (C.deref theRegistry) name of
+                (case DL.find (R.deref theRegistry) address of
                     NONE => 
                        raise (Registry
                                  (String.concat
                                      [
                                      "Error: ",
                                      String.concatWith "." 
-                                        (List.map Symbol.toValue name),
+                                        (List.map Symbol.toValue address),
                                      " is not present in the registry.\n"
                                      ]))
 
-                  | SOME (item, _) => item))
+                  | SOME (item, _) => out item))
 
-      fun toTerm item =
-         (case item of
-             Term x => x
-           | _ => signalSortError ())
 
-      fun toReduction item =
-         (case item of
-             Reduction x => x
-           | _ => signalSortError ())
+      fun delete address =
+         (case address of
+             [] =>
+                signalError "empty address"
 
-      fun toUreduction1 item =
-         (case item of
-             Ureduction1 x => x
-           | _ => signalSortError ())
+           | _ =>
+                let
+                   val (d, present) = DL.remove' (R.deref theRegistry) address
+                in
+                   if present then
+                      ()
+                   else
+                      raise (Registry
+                                (String.concat
+                                    [
+                                    "Error: ",
+                                    String.concatWith "." 
+                                       (List.map Symbol.toValue address),
+                                    " is not present in the registry.\n"
+                                    ]))
+                end)
+                      
 
-      fun toUreduction2 item =
-         (case item of
-             Ureduction2 x => x
-           | _ => signalSortError ())
+      fun appExport f =
+         DL.app
+            (fn (addr, (item, exportable)) =>
+                if exportable then
+                   f (addr, item)
+                else
+                   ())
+            (R.deref theRegistry)
 
-      val fromTerm = Term
-      val fromReduction = Reduction
-      val fromUreduction1 = Ureduction1
-      val fromUreduction2 = Ureduction2
 
+      val impossible = Fail "impossible"
 
       val puItem =
-         P.alt
-            (fn Term _ => 0
-              | Reduction _ => 1
-              | Ureduction1 _ => 2
-              | Ureduction2 _ => 3)
-            [
-            P.wrap
-               (fn Term t => t
-                 | _ => raise (Fail "impossible"))
-               Term
-               Pickling.puTerm,
+         P.fix
+            (fn puItem =>
+                P.alt
+                   (fn Unit => 0
+                     | Bool _ => 1
+                     | Int _ => 2
+                     | IntInf _ => 3
+                     | String _ => 4
+                     | Symbol _ => 5
+                     | Constant _ => 6
+                     | Term _ => 7
+                     | Reduction _ => 8
+                     | Reduction1 _ => 9
+                     | Reduction2 _ => 10
+                     | Tuple2 _ => 11
+                     | Tuple3 _ => 12
+                     | Tuple4 _ => 13
+                     | Tuple5 _ => 14
+                     | Tuple6 _ => 15
+                     | Tuple7 _ => 16
+                     | Tuple8 _ => 17
+                     | Tuple9 _ => 18
+                     | Tuple10 _ => 19
+                     | List _ => 20
+                     | Option _ => 21
+                     | Vector _ => 22
+                     | Seq _ => 23)
+                   
+                   [
+                   P.const Unit,
+                   
+                   P.wrap
+                      (fn Bool x => x | _ => raise impossible)
+                      Bool
+                      P.bool,
+       
+                   P.wrap
+                      (fn Int x => x | _ => raise impossible)
+                      Int
+                      P.int,
+       
+                   P.wrap
+                      (fn IntInf x => x | _ => raise impossible)
+                      IntInf
+                      P.intInf,
+       
+                   P.wrap
+                      (fn String x => x | _ => raise impossible)
+                      String
+                      P.string,
+       
+                   P.wrap
+                      (fn Symbol x => x | _ => raise impossible)
+                      Symbol
+                      PP.puSymbol,
+       
+                   P.wrap
+                      (fn Constant x => x | _ => raise impossible)
+                      Constant
+                      PP.puConstant,
+       
+                   P.wrap
+                      (fn Term x => x | _ => raise impossible)
+                      Term
+                      PP.puTerm,
+       
+                   P.wrap
+                      (fn Reduction x => x | _ => raise impossible)
+                      Reduction
+                      ReductionInternal.puReduction,
+       
+                   P.wrap
+                      (fn Reduction1 x => x | _ => raise impossible)
+                      Reduction1
+                      ReductionInternal.puReduction1,
+       
+                   P.wrap
+                      (fn Reduction2 x => x | _ => raise impossible)
+                      Reduction2
+                      ReductionInternal.puReduction2,
+       
+                   P.wrap
+                      (fn Tuple2 (a, b) => (a, b) | _ => raise impossible)
+                      Tuple2
+                      (P.tuple2 puItem puItem),
 
-            P.wrap
-               (fn Reduction r => r
-                 | _ => raise (Fail "impossible"))
-               Reduction
-               R.puReduction,
+                   P.wrap
+                      (fn Tuple3 (a, b, c) => (a, b, c) | _ => raise impossible)
+                      Tuple3
+                      (P.tuple3 puItem puItem puItem),
 
-            P.wrap
-               (fn Ureduction1 r => r
-                 | _ => raise (Fail "impossible"))
-               Ureduction1
-               R.puUreduction1,
+                   P.wrap
+                      (fn Tuple4 (a, b, c, d) => (a, b, c, d) | _ => raise impossible)
+                      Tuple4
+                      (P.tuple4 puItem puItem puItem puItem),
 
-            P.wrap
-               (fn Ureduction2 r => r
-                 | _ => raise (Fail "impossible"))
-               Ureduction2
-               R.puUreduction2
-            ]
+                   P.wrap
+                      (fn Tuple5 (a, b, c, d, e) => (a, b, c, d, e) | _ => raise impossible)
+                      Tuple5
+                      (P.tuple5 puItem puItem puItem puItem puItem),
 
-      fun appLocal f =
-         DL.app
-            (fn (addr, (item, imported)) =>
-                if imported then
-                   ()
-                else
-                   f (addr, item))
-            (C.deref theRegistry)
+                   P.wrap
+                      (fn Tuple6 (a, b, c, d, e, f) => (a, b, c, d, e, f) | _ => raise impossible)
+                      Tuple6
+                      (P.tuple6 puItem puItem puItem puItem puItem puItem),
+
+                   P.wrap
+                      (fn Tuple7 (a, b, c, d, e, f, g) => (a, b, c, d, e, f, g) | _ => raise impossible)
+                      Tuple7
+                      (P.tuple7 puItem puItem puItem puItem puItem puItem puItem),
+
+                   P.wrap
+                      (fn Tuple8 (a, b, c, d, e, f, g, h) => (a, b, c, d, e, f, g, h) | _ => raise impossible)
+                      Tuple8
+                      (P.tuple8 puItem puItem puItem puItem puItem puItem puItem puItem),
+
+                   P.wrap
+                      (fn Tuple9 (a, b, c, d, e, f, g, h, i) => (a, b, c, d, e, f, g, h, i) | _ => raise impossible)
+                      Tuple9
+                      (P.tuple9 puItem puItem puItem puItem puItem puItem puItem puItem puItem),
+
+                   P.wrap
+                      (fn Tuple10 (a, b, c, d, e, f, g, h, i, j) => (a, b, c, d, e, f, g, h, i, j) | _ => raise impossible)
+                      Tuple10
+                      (P.tuple10 puItem puItem puItem puItem puItem puItem puItem puItem puItem puItem),
+
+                   P.wrap
+                      (fn List x => x | _ => raise impossible)
+                      List
+                      (P.list puItem),
+       
+                   P.wrap
+                      (fn Option x => x | _ => raise impossible)
+                      Option
+                      (P.option puItem),
+       
+                   P.wrap
+                      (fn Vector x => x | _ => raise impossible)
+                      Vector
+                      (P.vector puItem),
+       
+                   P.wrap
+                      (fn Seq l => Seq.toList l | _ => raise impossible)
+                      (fn l => Seq (Seq.fromList l))
+                      (P.list puItem)
+                   ])
 
    end
 
 
 structure Registry 
-   :> REGISTRY where type item = RegistryInternal.item
+   :> REGISTRY where type 'a key = 'a RegistryInternal.key
    = RegistryInternal
 
+
+
+structure ParseRegistry =
+   struct
+
+      open Registry
+
+      fun id x = x
+
+   end
+
+
+grammardef Registry
+
+   open ParseRegistry
+
+   rule RegistryKey(2) ::= "unit" => unit
+   rule RegistryKey(2) ::= "bool" => bool
+   rule RegistryKey(2) ::= "int" => int
+   rule RegistryKey(2) ::= "intInf" => intInf
+   rule RegistryKey(2) ::= "string" => string
+   rule RegistryKey(2) ::= "symbol" => symbol
+   rule RegistryKey(2) ::= "term" => term
+   rule RegistryKey(2) ::= "constant" => constant
+   rule RegistryKey(2) ::= "reduction" => reduction
+   rule RegistryKey(2) ::= "reduction1" => reduction1
+   rule RegistryKey(2) ::= "reduction2" => reduction2
+
+   rule RegistryKey(2) ::= "(" RegistryKey(0) ")" => id
+   rule RegistryKey(2) ::= "[" RegistryKeys "]" => id
+
+   rule RegistryKey(1) ::= RegistryKey(1) "list" => list
+   rule RegistryKey(1) ::= RegistryKey(1) "option" => option
+   rule RegistryKey(1) ::= RegistryKey(1) "vector" => vector
+   rule RegistryKey(1) ::= RegistryKey(1) "seq" => seq
+
+   rule RegistryKey(0) ::= RegistryKey(1) "*" RegistryKey(1) => tuple2
+   rule RegistryKey(0) ::= RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) => tuple3
+   rule RegistryKey(0) ::= RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) => tuple4
+   rule RegistryKey(0) ::= RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) => tuple5
+   rule RegistryKey(0) ::= RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) => tuple6
+   rule RegistryKey(0) ::= RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) => tuple7
+   rule RegistryKey(0) ::= RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) => tuple8
+   rule RegistryKey(0) ::= RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) => tuple9
+   rule RegistryKey(0) ::= RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) "*" RegistryKey(1) => tuple10
+
+   rule RegistryKeys ::= => unit
+   rule RegistryKeys ::= RegistryKeys RegistryKey(2) => pair
+
+end
+
+
+grammaron Registry

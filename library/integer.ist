@@ -10,11 +10,11 @@ File.import "integer-aux.iml";
 Namespace.beginModule "Integer";
 
 
-Namespace.alias (parseIdent /eqzb/) Prim.eqzb;
-Namespace.alias (parseIdent /leqzb/) Prim.leqzb;
-Namespace.alias (parseIdent /negz/) Prim.negz;
-Namespace.alias (parseIdent /plusz/) Prim.plusz;
-Namespace.alias (parseIdent /timesz/) Prim.timesz;
+aliasExport /eqzb/ Prim.eqzb;
+aliasExport /leqzb/ Prim.leqzb;
+aliasExport /negz/ Prim.negz;
+aliasExport /plusz/ Prim.plusz;
+aliasExport /timesz/ Prim.timesz;
 
 
 (* Built-in:
@@ -37,8 +37,8 @@ definerecRaw /integer_to_nat x/
 
 *)
 
-Namespace.alias (parseIdent /nat_to_integer/) Prim.nat_to_integer;
-Namespace.alias (parseIdent /integer_to_nat/) Prim.integer_to_nat;
+aliasExport /nat_to_integer/ Prim.nat_to_integer;
+aliasExport /integer_to_nat/ Prim.integer_to_nat;
 
 
 
@@ -58,11 +58,15 @@ defineRaw /leqz x y/
   Bool.istrue (leqzb x y)
 /;
 
+val leqz = parseConstant /leqz/;
+
 
 defineRaw /ltz x y/
 /
   leqz (plusz z`1 x) y
 /;
+
+val ltz = parseConstant /ltz/;
 
 
 defineRaw /minusz x y/
@@ -70,15 +74,20 @@ defineRaw /minusz x y/
   plusz x (negz y)
 /;
 
+val minusz = parseConstant /minusz/;
 
 
+
+writeRegistry /AfterLtzEnv/
+  /[constant constant constant]/
+  (Collapse (leqz, ltz, minusz));
 structure Nothing = AfterLtz ();
 
 
 
 (* Integers defined as a quotient over products of natural numbers *)
 
-Namespace.beginModule "Def";
+beginModule "Def";
 
 
 
@@ -92,7 +101,7 @@ define /Integer/
 /;
 *)
 
-Namespace.alias (parseIdent /Integer/) Prim.cInteger;
+aliasExport /Integer/ Prim.cInteger;
 
 
 
@@ -106,7 +115,7 @@ define /Plusz a b/
 /;
 *)
 
-Namespace.alias (parseIdent /Plusz/) Prim.cPlusz;
+aliasExport /Plusz/ Prim.cPlusz;
 
 
 
@@ -120,7 +129,7 @@ define /Negz a/
 /;
 *)
 
-Namespace.alias (parseIdent /Negz/) Prim.cNegz;
+aliasExport /Negz/ Prim.cNegz;
 
 
 
@@ -134,7 +143,7 @@ define /Timesz a b/
 /;
 *)
 
-Namespace.alias (parseIdent /Timesz/) Prim.cTimesz;
+aliasExport /Timesz/ Prim.cTimesz;
 
 
 
@@ -148,7 +157,7 @@ define /Eqzb a b/
 /;
 *)
 
-Namespace.alias (parseIdent /Eqzb/) Prim.cEqzb;
+Namespace.aliasExport (parseIdent /Eqzb/) Prim.cEqzb;
 
 
 
@@ -162,11 +171,7 @@ define /Leqzb a b/
 /;
 *)
 
-Namespace.alias (parseIdent /Leqzb/) Prim.cLeqzb;
-
-
-
-structure Nothing = AfterLeqzbDef ();
+aliasExport /Leqzb/ Prim.cLeqzb;
 
 
 
@@ -1249,11 +1254,11 @@ qed ();
 
 
 
-Namespace.endModule ();
+endModule ();
 
-Namespace.openModule (parseLongident /Def/);
+openModule /Def/;
 
-Namespace.beginModule "Iso";
+beginModule "Iso";
 
 
 
@@ -1277,11 +1282,8 @@ defineRaw /integerToDef x/
 
 
 
-Namespace.alias (parseIdent /integer_from_Integer/) Prim.integer_from_Integer;
-Namespace.alias (parseIdent /integer_to_Integer/) Prim.integer_to_Integer;
-
-
-structure Nothing = AfterIntegerToDef ();
+aliasExport /integer_from_Integer/ Prim.integer_from_Integer;
+aliasExport /integer_to_Integer/ Prim.integer_to_Integer;
 
 
 Database.setUnroll Prim.nat_to_integer
@@ -2031,6 +2033,8 @@ intro /a b Hle/.
 typecheck.
 qed ();
 
+val leqz_inhabitant = parseConstant /leqz_inhabitant/;
+
 
 
 lemma "ltz_inhabitant"
@@ -2044,8 +2048,13 @@ intro /a b Hlt/.
 apply /leqz_inhabitant/ >> auto.
 qed ();
 
+val ltz_inhabitant = parseConstant /ltz_inhabitant/;
 
 
+
+writeRegistry /AfterLeqzInhabitantEnv/
+  /[constant constant constant constant]/
+  (Collapse (leqz, ltz, leqz_inhabitant, ltz_inhabitant));
 structure Nothing = AfterLeqzInhabitant ();
 
 
@@ -2109,6 +2118,8 @@ rewrite /-> leqz_spec/.
 apply /Leqz_refl/.
 qed ();
 
+val leqz_refl = parseConstant /leqz_refl/;
+
 
 
 lemma "leqz_refl_eq"
@@ -2134,6 +2145,8 @@ intro /a b c Hab Hbc/.
 rewrite /-> leqz_spec in Hab in Hbc in concl/.
 apply /Leqz_trans/ >> auto.
 qed ();
+
+val leqz_trans = parseConstant /leqz_trans/;
 
 
 
@@ -2164,6 +2177,8 @@ rewrite /-> plusz_spec at all/.
 rewrite /-> Integer_isomorphism at all/.
 apply /Plusz_Leqz/ >> auto.
 qed ();
+
+val plusz_leqz = parseConstant /plusz_leqz/;
 
 
 
@@ -2206,6 +2221,8 @@ intro /a a' b b' Ha Hb Hab/.
 apply /leqz_trans/ >> auto.
 apply /leqz_trans/ >> auto.
 qed ();
+
+val leqz_implication = parseConstant /leqz_implication/;
 
 
 
@@ -2598,6 +2615,8 @@ rewrite /<- leqz_spec/.
 hyp /H/.
 qed ();
 
+val negz_leqz = parseConstant /negz_leqz/;
+
 
 
 lemma "negz_leqz'"
@@ -2795,6 +2814,8 @@ split.
   }
 qed ();
 
+val istrue_eqzb = parseConstant /istrue_eqzb/;
+
 
 
 lemma "istrue_leqzb"
@@ -2807,6 +2828,8 @@ intro /a b/.
 unfold /leqz/.
 reflexivity.
 qed ();
+
+val istrue_leqzb = parseConstant /istrue_leqzb/;
 
 
 
@@ -2821,6 +2844,8 @@ unfold /ltzb/.
 typecheck.
 qed ();
 
+val ltzb = parseConstant /ltzb/;
+
 
 
 lemma "istrue_ltzb"
@@ -2834,6 +2859,8 @@ unfold /ltzb , ltz/.
 rewrite /-> istrue_leqzb/.
 qed ();
 
+val istrue_ltzb = parseConstant /istrue_ltzb/;
+
 
 
 define /neqzb a b/
@@ -2846,6 +2873,8 @@ define /neqzb a b/
 unfold /neqzb/.
 typecheck.
 qed ();
+
+val neqzb = parseConstant /neqzb/;
 
 
 
@@ -2862,8 +2891,15 @@ rewrite /-> Bool.istrue_notb/.
 rewrite /-> istrue_eqzb/.
 qed ();
 
+val istrue_neqzb = parseConstant /istrue_neqzb/;
 
+
+
+writeRegistry /AfterIstrueNeqzbEnv/
+  /[constant constant constant constant constant constant]/
+  (Collapse (ltzb, neqzb, istrue_eqzb, istrue_leqzb, istrue_ltzb, istrue_neqzb));
 structure Nothing = AfterIstrueNeqzb ();
+
 
 
 lemma "notb_eqzb"
@@ -3050,9 +3086,11 @@ destruct /Hba/ /Hab Hneg | Hba Hpos/.
   }
 qed ();
 
+val smaller_well_founded = parseConstant /smaller_well_founded/;
 
 
-Constant.setOpacity (parseConstant /Integer.smaller/) Constant.FIRM;
+
+Constant.setOpacity (parseConstant /smaller/) Constant.FIRM;
 
 
 
@@ -3151,8 +3189,13 @@ boolCase /leqzb z`0 a/ /Heq/.
   }
 qed ();
 
+val integer_iter = parseConstant /integer_iter/;
 
 
+
+writeRegistry /AfterIntegerIterEnv/
+  /[constant constant]/
+  (Collapse (smaller_well_founded, integer_iter));
 structure Nothing = AfterIntegerIter ();
 
 
@@ -4077,7 +4120,7 @@ qed ();
 
 
 
-Namespace.alias (parseIdent /timesz_leqz_pos_pos/) (parseConstant /timesz_leqz/);
+aliasExport /timesz_leqz_pos_pos/ /timesz_leqz/;
 
 
 lemma "timesz_leqz_neg_neg"
@@ -4309,7 +4352,7 @@ qed ();
 
 
 
-Namespace.alias (parseIdent /timesz_ltz_zero_pos_pos/) (parseConstant /timesz_ltz_zero/);
+aliasExport /timesz_ltz_zero_pos_pos/ /timesz_ltz_zero/;
 
 
 
@@ -5199,3 +5242,12 @@ rewrite /-> maxz_commute/.
 rewrite /-> Nat.max_commute/.
 apply /H/ >> auto.
 qed ();
+
+
+
+writeRegistry /AfterIntegerAllEnv/
+  /[constant constant constant constant constant constant]/
+  (Collapse (leqz, leqz_refl, leqz_trans, plusz_leqz, negz_leqz, leqz_implication));
+
+
+endModule ();

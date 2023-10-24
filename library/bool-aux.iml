@@ -2,9 +2,13 @@
 functor AfterIstrue () :> sig end =
    struct
 
+      val Collapse (istrue, istrue_inhabitant) =
+         readRegistry /Bool.AfterIstrueEnv/
+            /[constant constant]/
+
       val () =
-         ConstantTable.insert TypecheckInternal.trivialIntroTactics (parseConstant /Bool.istrue/)
-            (Backchain.applyPriority /Bool.istrue_inhabitant/)
+         ConstantTable.insert TypecheckInternal.trivialIntroTactics istrue
+            (Backchain.applyPriority /\Term.Const istrue_inhabitant\/)
 
    end
 
@@ -28,6 +32,10 @@ signature BOOL_TACTIC =
 
 functor BoolTacticFun () :> BOOL_TACTIC =
    struct
+
+      val Collapse (istrue_iff_eq_true, not_istrue_iff_eq_false) =
+         readRegistry /Bool.BoolTacticFunEnv/
+            /[constant constant]/
 
       structure D = Directory
       structure H = ConstantTable
@@ -111,3 +119,16 @@ grammardef BoolTactic
    start boolCaseRaw Term OIdent
 
 end
+
+
+
+functor AfterBoolAll () :> sig end =
+   struct
+
+      val () =
+         List.app Registry.delete
+            (parseLongidents
+                /Bool.AfterIstrueEnv
+                 Bool.BoolTacticFunEnv/)
+
+   end

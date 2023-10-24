@@ -18,9 +18,20 @@ accessed by a compound name (*e.g.,* `Nat.plus`).
   Make the contents of `M` available without using a compound name.
   For example, opening `Nat` makes `Nat.plus` accessible by `plus`.
 
-- `Namespace.alias (parseConstant /[constant]/)`
+- `alias /[new name]/ /[constant]/`
 
-  Make the constant part of the current module.
+  Create an alias to an existing constant.  The name will not become
+  part of the current module.
+
+- `aliasExport /[new name]/ /[constant]/`
+
+  Create an alias to an existing constant.  The name *will* become
+  part of the current module.
+
+- `aliasModule /[new name]/ /[compound module name]/`
+
+  Create an alias to an existing module.  The name will not become
+  part of the current module.
 
 - `Namespace.currentModule ()`
 

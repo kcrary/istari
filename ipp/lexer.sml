@@ -108,6 +108,7 @@ structure Lexer :> LEXER =
          ("as", AS),
          ("begin", BEGIN),
          ("case", CASE),
+         ("Collapse", COLLAPSE),
          ("datatype", DATATYPE),
          ("do", DO),
          ("else", ELSE),

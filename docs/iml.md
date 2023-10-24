@@ -92,17 +92,38 @@ This is equivalent to:
 
     fn x => fn y => fn z => [body]
 
-There is also special syntax for a function taking an iterated pair:
+Unlike `fn`, neither `fns` cannot accept multiple clauses.
+
+
+
+### Collapsed tuples
+
+A left-associated iterated pair can be written using the
+quasi-constructor `Collapse`:
+
+    Collapse (1, 2, 3)
+
+is equivalent to:
+
+    ((((), 1), 2), 3)
+
+This can be used with patterns as well.
+
+There is also special syntax for a function taking a collapsed tuple:
 
     fnc x y z => [body]
 
 is equivalent to:
 
+    fn (Collapse (x, y, z)) => [body]
+
+which in turns means:
+
     fn ((((), x), y), z) => [body]
 
 The `fnc` form is mainly used to interact with Istari's case-analysis
-module [`Case`](case.html).  Unlike `fn`, neither `fns` nor `fnc` can
-accept multiple clauses.
+module [`Case`](case.html).  Unlike `fn`, `fnc` cannot accept multiple
+clauses.
 
 
 

@@ -3,18 +3,18 @@ structure ParseNat =
    struct
 
       structure T = ETerm
+      structure R = CheckpointedRef
+      type constant = Constant.constant
 
-      val leq = Susp.delay (fn () => parseConstant /Nat.leq/)
-      val lt = Susp.delay (fn () => parseConstant /Nat.lt/)
-      val plus = Susp.delay (fn () => parseConstant /Nat.plus/)
-      val minus = Susp.delay (fn () => parseConstant /Nat.minus/)
-      val times = Susp.delay (fn () => parseConstant /Nat.times/)
+      val leq : constant R.dest = R.dest ()
+      val lt : constant R.dest = R.dest ()
+      val minus : constant R.dest = R.dest ()
 
-      fun parseLeq m n = T.apply2 (Susp.force leq) m n
-      fun parseLt m n = T.apply2 (Susp.force lt) m n
-      fun parsePlus m n = T.apply2 (Susp.force plus) m n
-      fun parseMinus m n = T.apply2 (Susp.force minus) m n
-      fun parseTimes m n = T.apply2 (Susp.force times) m n
+      fun parseLeq m n = T.apply2 (R.read leq) m n
+      fun parseLt m n = T.apply2 (R.read lt) m n
+      fun parsePlus m n = T.apply2 Prim.plus m n
+      fun parseMinus m n = T.apply2 (R.read minus) m n
+      fun parseTimes m n = T.apply2 Prim.times m n
 
    end
 
@@ -50,6 +50,11 @@ functor AfterNat () :>
 
       open Tactic
       open CasePervasive
+
+
+      val Collapse (nat_iter) = 
+         readRegistry /Nat.AfterNatEnv/
+            /[constant]/
 
 
       val natPrimInductionPriority =
@@ -150,7 +155,7 @@ functor AfterNat () :>
 
       val () =
          ConstantTable.insert InductionInternal.iterators Prim.nat 
-            (parseConstant /Nat.nat_iter/, 0, 0)
+            (nat_iter, 0, 0)
 
    end
 
@@ -159,8 +164,15 @@ functor AfterNat () :>
 functor AfterLeq () :> sig end =
    struct
 
-      val leq = parseConstant /Nat.leq/
-      val lt = parseConstant /Nat.lt/
+      structure CR = CheckpointedRef
+
+      val Collapse (leq, lt) =
+         readRegistry /Nat.AfterLeqEnv/
+            /[constant constant]/
+
+
+      val () = CR.write ParseNat.leq leq
+      val () = CR.write ParseNat.lt lt
 
 
       structure U = Show.Unparsing
@@ -190,16 +202,19 @@ functor AfterLeq () :> sig end =
 functor AfterLeqInhabitant () :> sig end =
    struct
 
-      val leq = parseConstant /Nat.leq/
-      val lt = parseConstant /Nat.lt/
+      structure T = Term
+
+      val Collapse (leq, lt, leq_inhabitant, lt_inhabitant) =
+         readRegistry /Nat.AfterLeqInhabitantEnv/
+            /[constant constant constant constant]/
 
       val () =
          ConstantTable.insert TypecheckInternal.trivialIntroTactics leq
-            (Backchain.applyPriority /Nat.leq_inhabitant/)
+            (Backchain.applyPriority /\T.Const leq_inhabitant\/)
 
       val () =
          ConstantTable.insert TypecheckInternal.trivialIntroTactics lt
-            (Backchain.applyPriority /Nat.lt_inhabitant/)
+            (Backchain.applyPriority /\T.Const lt_inhabitant\/)
 
    end
 
@@ -213,7 +228,9 @@ functor AfterLtWellFounded () :> sig end =
       
       open Tactic
 
-      val lt_well_founded = parseConstant /Nat.lt_well_founded/
+      val Collapse (lt_well_founded) =
+         readRegistry /Nat.AfterLtWellFoundedEnv/
+            /[constant]/
 
 
       val natInduction =
@@ -245,13 +262,17 @@ functor AfterLtWellFounded () :> sig end =
 functor AfterTimes () :> sig end =
    struct
 
-      val () = ConstantInternal.setPath Prim.plus [`"plus", `"Nat"]
-      val () = ConstantInternal.setPath Prim.times [`"times", `"Nat"]
-
+      structure CR = CheckpointedRef
 
       val plus = Prim.plus
-      val minus = parseConstant /Nat.minus/
       val times = Prim.times
+
+      val Collapse (minus) =
+         readRegistry /Nat.AfterTimesEnv/
+            /[constant]/
+
+
+      val () = CR.write ParseNat.minus minus
 
 
       structure U = Show.Unparsing
@@ -285,37 +306,27 @@ functor AfterTimes () :> sig end =
 
 
 
-functor AfterLeqb () :> sig end =
-   struct
-
-      val () = ConstantInternal.setPath Prim.eqb [`"eqb", `"Nat"]
-      val () = ConstantInternal.setPath Prim.leqb [`"leqb", `"Nat"]
-
-   end
-
-
 functor AfterIstrueNeqb () :> sig end =
    struct
 
-      val () =
-         ConstantTable.insert BoolTactic.booleanTests
-            (parseConstant /Nat.eqb/)
-            (parseConstant /Nat.istrue_eqb/)
+      val eqb = Prim.eqb
+      val leqb = Prim.leqb
+
+      val Collapse (ltb, neqb, istrue_eqb, istrue_leqb, istrue_ltb, istrue_neqb) =
+         readRegistry /Nat.AfterIstrueNeqbEnv/
+            /[constant constant constant constant constant constant]/
 
       val () =
-         ConstantTable.insert BoolTactic.booleanTests
-            (parseConstant /Nat.leqb/)
-            (parseConstant /Nat.istrue_leqb/)
+         ConstantTable.insert BoolTactic.booleanTests eqb istrue_eqb
 
       val () =
-         ConstantTable.insert BoolTactic.booleanTests
-            (parseConstant /Nat.ltb/)
-            (parseConstant /Nat.istrue_ltb/)
+         ConstantTable.insert BoolTactic.booleanTests leqb istrue_leqb
 
       val () =
-         ConstantTable.insert BoolTactic.booleanTests
-            (parseConstant /Nat.neqb/)
-            (parseConstant /Nat.istrue_neqb/)
+         ConstantTable.insert BoolTactic.booleanTests ltb istrue_ltb
+
+      val () =
+         ConstantTable.insert BoolTactic.booleanTests neqb istrue_neqb
 
    end
 
@@ -325,21 +336,36 @@ functor AfterNatAll () :> sig end =
 
       structure B = BackchainInternal
       structure H = ConstantTable
+      structure T = Term
       
-      val leq = parseConstant /Nat.leq/
-      val plus = parseConstant /Nat.plus/
-      val minus = parseConstant /Nat.minus/
-      val times = parseConstant /Nat.times/
-      val min = parseConstant /Nat.min/
-      val max = parseConstant /Nat.max/
-      
+      val Collapse (leq, minus, min, max, leq_refl, leq_trans, leq_succ_succ, plus_leq, minus_leq, times_leq, min_leq, max_leq, leq_implication) =
+         readRegistry /Nat.AfterNatAllEnv/
+            /[constant constant constant constant constant constant constant constant constant constant constant constant constant]/
+
+      (* Reclaim the space spent on environments. *)
+      val () =
+         List.app Registry.delete
+            (parseLongidents
+                /Nat.AfterNatEnv 
+                 Nat.AfterLeqEnv 
+                 Nat.AfterLeqInhabitantEnv
+                 Nat.AfterLtWellFoundedEnv
+                 Nat.AfterTimesEnv
+                 Nat.AfterIstrueNeqbEnv
+                 Nat.AfterNatAllEnv/)
+
+      val plus = Prim.plus
+      val times = Prim.times
+
+
+
       val () =
          H.insert EqualityTacticInternal.reflexivityTactics leq
-         (B.witnessPriority /Nat.leq_refl _/)
+         (B.witnessPriority /\T.Const leq_refl\ _/)
       
       val () =
          H.insert EqualityTacticInternal.transitivityTactics leq
-         (fn n => B.witnessPriority /Nat.leq_trans _ \n\ _ __ __/)
+         (fn n => B.witnessPriority /\T.Const leq_trans\ _ \n\ _ __ __/)
 
       val () =
          List.app 
@@ -347,43 +373,43 @@ functor AfterNatAll () :> sig end =
                RewriteInternal.CICTable.insert RewriteInternal.compatibilityTable (hconst, i, const1) (const2, cov, tacfn))
             [
             (Prim.succ, 0, leq, leq, true,
-             andthenOn 0 (B.witnessPriority /Nat.plus_succ_succ _ _ __/)),
+             andthenOn 0 (B.witnessPriority /\T.Const leq_succ_succ\ _ _ __/)),
           
             (plus, 0, leq, leq, true,
-             andthenOn 0 (B.witnessPriority /Nat.plus_leq _ _ _ _ __ __/)),
+             andthenOn 0 (B.witnessPriority /\T.Const plus_leq\ _ _ _ _ __ __/)),
           
             (plus, 1, leq, leq, true,
-             andthenOn 1 (B.witnessPriority /Nat.plus_leq _ _ _ _ __ __/)),
+             andthenOn 1 (B.witnessPriority /\T.Const plus_leq\ _ _ _ _ __ __/)),
           
             (minus, 0, leq, leq, true,
-             andthenOn 0 (B.witnessPriority /Nat.minus_leq _ _ _ _ __ __/)),
+             andthenOn 0 (B.witnessPriority /\T.Const minus_leq\ _ _ _ _ __ __/)),
           
             (minus, 1, leq, leq, false,
-             andthenOn 1 (B.witnessPriority /Nat.plus_leq _ _ _ _ __ __/)),
+             andthenOn 1 (B.witnessPriority /\T.Const minus_leq\ _ _ _ _ __ __/)),
 
             (times, 0, leq, leq, true,
-             andthenOn 0 (B.witnessPriority /Nat.times_leq _ _ _ _ __ __/)),
+             andthenOn 0 (B.witnessPriority /\T.Const times_leq\ _ _ _ _ __ __/)),
           
             (times, 1, leq, leq, true,
-             andthenOn 1 (B.witnessPriority /Nat.times_leq _ _ _ _ __ __/)),
+             andthenOn 1 (B.witnessPriority /\T.Const times_leq\ _ _ _ _ __ __/)),
           
             (min, 0, leq, leq, true,
-             andthenOn 0 (B.witnessPriority /Nat.min_leq _ _ _ _ __ __/)),
+             andthenOn 0 (B.witnessPriority /\T.Const min_leq\ _ _ _ _ __ __/)),
           
             (min, 1, leq, leq, true,
-             andthenOn 1 (B.witnessPriority /Nat.min_leq _ _ _ _ __ __/)),
+             andthenOn 1 (B.witnessPriority /\T.Const min_leq\ _ _ _ _ __ __/)),
           
             (max, 0, leq, leq, true,
-             andthenOn 0 (B.witnessPriority /Nat.max_leq _ _ _ _ __ __/)),
+             andthenOn 0 (B.witnessPriority /\T.Const max_leq\ _ _ _ _ __ __/)),
           
             (max, 1, leq, leq, true,
-             andthenOn 1 (B.witnessPriority /Nat.max_leq _ _ _ _ __ __/)),
+             andthenOn 1 (B.witnessPriority /\T.Const max_leq\ _ _ _ _ __ __/)),
           
             (leq, 0, leq, Prim.arrow, false,
-             andthenOn 0 (B.witnessPriority /Nat.leq_implication _ _ _ _ __ __/)),
+             andthenOn 0 (B.witnessPriority /\T.Const leq_implication\ _ _ _ _ __ __/)),
           
             (leq, 1, leq, Prim.arrow, true,
-             andthenOn 1 (B.witnessPriority /Nat.leq_implication _ _ _ _ __ __/)),
+             andthenOn 1 (B.witnessPriority /\T.Const leq_implication\ _ _ _ _ __ __/)),
             ]
 
   end

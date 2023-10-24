@@ -2,21 +2,20 @@
 structure ParseInteger =
    struct
 
+      structure R = CheckpointedRef
       structure T = ETerm
+      type constant = Constant.constant
 
-      val plusz = Susp.delay (fn () => Prim.plusz)
-      val negz = Susp.delay (fn () => Prim.negz)
-      val minusz = Susp.delay (fn () => parseConstant /Integer.minusz/)
-      val timesz = Susp.delay (fn () => Prim.timesz)
-      val leqz = Susp.delay (fn () => parseConstant /Integer.leqz/)
-      val ltz = Susp.delay (fn () => parseConstant /Integer.ltz/)
+      val minusz : constant R.dest = R.dest ()
+      val leqz : constant R.dest = R.dest ()
+      val ltz : constant R.dest = R.dest ()
 
-      fun parsePlus m n = T.apply2 (Susp.force plusz) m n
-      fun parseMinus m n = T.apply2 (Susp.force minusz) m n
-      fun parseTimes m n = T.apply2 (Susp.force timesz) m n
-      fun parseNeg m = T.apply1 (Susp.force negz) m
-      fun parseLeq m n = T.apply2 (Susp.force leqz) m n
-      fun parseLt m n = T.apply2 (Susp.force ltz) m n
+      fun parsePlus m n = T.apply2 Prim.plusz m n
+      fun parseMinus m n = T.apply2 (R.read minusz) m n
+      fun parseTimes m n = T.apply2 Prim.timesz m n
+      fun parseNeg m = T.apply1 Prim.negz m
+      fun parseLeq m n = T.apply2 (R.read leqz) m n
+      fun parseLt m n = T.apply2 (R.read ltz) m n
 
    end
 
@@ -41,13 +40,16 @@ grammaron Integer
 functor AfterLtz () :> sig end =
    struct
 
-      val () = ConstantInternal.setPath Prim.plusz [`"plusz", `"Integer"]
-      val () = ConstantInternal.setPath Prim.negz [`"negz", `"Integer"]
-      val () = ConstantInternal.setPath Prim.timesz [`"timesz", `"Integer"]
-      val () = ConstantInternal.setPath Prim.eqzb [`"eqzb", `"Integer"]
-      val () = ConstantInternal.setPath Prim.leqzb [`"leqzb", `"Integer"]
-      val () = ConstantInternal.setPath Prim.nat_to_integer [`"nat_to_integer", `"Integer"]
-      val () = ConstantInternal.setPath Prim.integer_to_nat [`"integer_to_nat", `"Integer"];
+      structure CR = CheckpointedRef
+
+      val Collapse (leqz, ltz, minusz) =
+         readRegistry /Integer.AfterLtzEnv/
+            /[constant constant constant]/
+
+
+      val () = CR.write ParseInteger.leqz leqz
+      val () = CR.write ParseInteger.ltz ltz
+      val () = CR.write ParseInteger.minusz minusz
 
 
       structure U = Show.Unparsing
@@ -57,13 +59,10 @@ functor AfterLtz () :> sig end =
 
 
       val plusz = Prim.plusz
-      val minusz = parseConstant /Integer.minusz/
       val timesz = Prim.timesz
       val negz = Prim.negz
-      val leqz = parseConstant /Integer.leqz/
-      val ltz = parseConstant /Integer.ltz/
 
-
+      
       structure U = Show.Unparsing
 
       val () =
@@ -110,41 +109,22 @@ functor AfterLtz () :> sig end =
    end
 
 
-functor AfterLeqzbDef () :> sig end =
-   struct
-
-      val () = ConstantInternal.setPath Prim.cInteger [`"Integer", `"Def", `"Integer"]
-      val () = ConstantInternal.setPath Prim.cPlusz [`"Plusz", `"Def", `"Integer"]
-      val () = ConstantInternal.setPath Prim.cNegz [`"Negz", `"Def", `"Integer"]
-      val () = ConstantInternal.setPath Prim.cTimesz [`"Timesz", `"Def", `"Integer"]
-      val () = ConstantInternal.setPath Prim.cEqzb [`"Eqzb", `"Def", `"Integer"]
-      val () = ConstantInternal.setPath Prim.cLeqzb [`"Leqzb", `"Def", `"Integer"]
-
-   end
-
-
-functor AfterIntegerToDef () :> sig end =
-   struct
-
-      val () = ConstantInternal.setPath Prim.integer_from_Integer [`"integer_from_Integer", `"Iso", `"Integer"];
-      val () = ConstantInternal.setPath Prim.integer_to_Integer [`"integer_to_Integer", `"Iso", `"Integer"];
-
-   end
-
-
 functor AfterLeqzInhabitant () :> sig end =
    struct
 
-      val leqz = parseConstant /Integer.leqz/
-      val ltz = parseConstant /Integer.ltz/
+      structure T = Term
+
+      val Collapse (leqz, ltz, leqz_inhabitant, ltz_inhabitant) =
+         readRegistry /Integer.AfterLeqzInhabitantEnv/
+            /[constant constant constant constant]/
 
       val () =
          ConstantTable.insert TypecheckInternal.trivialIntroTactics leqz
-            (Backchain.applyPriority /Integer.leqz_inhabitant/)
+            (Backchain.applyPriority /\T.Const leqz_inhabitant\/)
 
       val () =
          ConstantTable.insert TypecheckInternal.trivialIntroTactics ltz
-            (Backchain.applyPriority /Integer.ltz_inhabitant/)
+            (Backchain.applyPriority /\T.Const ltz_inhabitant\/)
    
    end
 
@@ -152,25 +132,24 @@ functor AfterLeqzInhabitant () :> sig end =
 functor AfterIstrueNeqzb () :> sig end =
    struct
 
-      val () =
-         ConstantTable.insert BoolTactic.booleanTests
-            (parseConstant /Integer.eqzb/)
-            (parseConstant /Integer.istrue_eqzb/)
+      val Collapse (ltzb, neqzb, istrue_eqzb, istrue_leqzb, istrue_ltzb, istrue_neqzb) =
+         readRegistry /Integer.AfterIstrueNeqzbEnv/
+            /[constant constant constant constant constant constant]/
+
+      val eqzb = Prim.eqzb
+      val leqzb = Prim.leqzb
 
       val () =
-         ConstantTable.insert BoolTactic.booleanTests
-            (parseConstant /Integer.leqzb/)
-            (parseConstant /Integer.istrue_leqzb/)
+         ConstantTable.insert BoolTactic.booleanTests eqzb istrue_eqzb
 
       val () =
-         ConstantTable.insert BoolTactic.booleanTests
-            (parseConstant /Integer.ltzb/)
-            (parseConstant /Integer.istrue_ltzb/)
+         ConstantTable.insert BoolTactic.booleanTests leqzb istrue_leqzb
 
       val () =
-         ConstantTable.insert BoolTactic.booleanTests
-            (parseConstant /Integer.neqzb/)
-            (parseConstant /Integer.istrue_neqzb/)
+         ConstantTable.insert BoolTactic.booleanTests ltzb istrue_ltzb
+
+      val () =
+         ConstantTable.insert BoolTactic.booleanTests neqzb istrue_neqzb
 
    end
 
@@ -178,12 +157,14 @@ functor AfterIstrueNeqzb () :> sig end =
 functor AfterIntegerIter () :> sig end =
    struct
 
+      val Collapse (smaller_well_founded, integer_iter) =
+         readRegistry /Integer.AfterIntegerIterEnv/
+            /[constant constant]/
+
       structure J = Judgement
       structure T = Term
       
       open Tactic
-
-      val smaller_well_founded = parseConstant /Integer.smaller_well_founded/
 
       val integerInduction =
          let
@@ -209,7 +190,7 @@ functor AfterIntegerIter () :> sig end =
 
       val () =
          ConstantTable.insert InductionInternal.iterators Prim.integer
-            (parseConstant /Integer.integer_iter/, 0, 0)
+            (integer_iter, 0, 0)
 
    end
 
@@ -217,20 +198,34 @@ functor AfterIntegerIter () :> sig end =
 functor AfterIntegerAll () :> sig end =
    struct
 
+      val Collapse (leqz, leqz_refl, leqz_trans, plusz_leqz, negz_leqz, leqz_implication) =
+         readRegistry /Integer.AfterIntegerAllEnv/
+            /[constant constant constant constant constant constant]/
+
+      val () =
+         List.app Registry.delete
+            (parseLongidents
+                /Integer.AfterLtzEnv
+                 Integer.AfterLeqzInhabitantEnv
+                 Integer.AfterIstrueNeqzbEnv
+                 Integer.AfterIntegerIterEnv
+                 Integer.AfterIntegerAllEnv/)
+
+      val plusz = Prim.plusz
+      val negz = Prim.negz
+
+
       structure B = BackchainInternal
       structure H = ConstantTable
-      
-      val leqz = parseConstant /Integer.leqz/
-      val plusz = parseConstant /Integer.plusz/
-      val negz = parseConstant /Integer.negz/
+      structure T = Term
       
       val () =
          H.insert EqualityTacticInternal.reflexivityTactics leqz
-         (B.witnessPriority /Integer.leqz_refl _/)
+         (B.witnessPriority /\T.Const leqz_refl\ _/)
       
       val () =
          H.insert EqualityTacticInternal.transitivityTactics leqz
-         (fn n => B.witnessPriority /Integer.leqz_trans _ \n\ _ __ __/)
+         (fn n => B.witnessPriority /\T.Const leqz_trans\ _ \n\ _ __ __/)
 
       val () =
          List.app 
@@ -238,19 +233,19 @@ functor AfterIntegerAll () :> sig end =
                RewriteInternal.CICTable.insert RewriteInternal.compatibilityTable (hconst, i, const1) (const2, cov, tacfn))
             [
             (plusz, 0, leqz, leqz, true,
-             andthenOn 0 (B.witnessPriority /Integer.plusz_leqz _ _ _ _ __ __/)),
+             andthenOn 0 (B.witnessPriority /\T.Const plusz_leqz\ _ _ _ _ __ __/)),
           
             (plusz, 1, leqz, leqz, true,
-             andthenOn 1 (B.witnessPriority /Integer.plusz_leqz _ _ _ _ __ __/)),
+             andthenOn 1 (B.witnessPriority /\T.Const plusz_leqz\ _ _ _ _ __ __/)),
           
             (negz, 0, leqz, leqz, false,
-             andthenOn 0 (B.witnessPriority /Integer.negz_leqz _ _ __/)),
+             andthenOn 0 (B.witnessPriority /\T.Const negz_leqz\ _ _ __/)),
 
             (leqz, 0, leqz, Prim.arrow, false,
-             andthenOn 0 (B.witnessPriority /Integer.leqz_implication _ _ _ _ __ __/)),
+             andthenOn 0 (B.witnessPriority /\T.Const leqz_implication\ _ _ _ _ __ __/)),
           
             (leqz, 1, leqz, Prim.arrow, true,
-             andthenOn 1 (B.witnessPriority /Integer.leqz_implication _ _ _ _ __ __/)),
+             andthenOn 1 (B.witnessPriority /\T.Const leqz_implication\ _ _ _ _ __ __/)),
             ]
 
    end

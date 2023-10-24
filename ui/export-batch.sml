@@ -39,15 +39,6 @@ open Pervasive;
 structure C = BatchCommandLine
 
 
-fun endAllModules () =
-   if
-      ((Namespace.endModule (); false) handle _ => true)
-   then
-      ()
-   else
-      endAllModules ()
-
-
 val exportPath = "bin/istari-heapimg"
 val exportPathNolib = "bin/istari-nolib-heapimg"
 val {system, version_id, date} = Compiler.version
@@ -94,11 +85,7 @@ fun go prelude (_, args) =
          (case C.outputFile () of
              NONE => ()
    
-           | SOME name => 
-                (
-                endAllModules ();
-                FileInternal.save name
-                ));
+           | SOME name => FileInternal.save name);
    
          OS.Process.success
          )

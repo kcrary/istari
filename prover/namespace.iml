@@ -18,11 +18,12 @@ signature NAMESPACE =
       val resolveOpt : address -> constant option
 
       val name : constant -> address
-      val fullname : constant -> address
+      val lastname : constant -> symbol  (* last symbol in the name *)
       val toString : constant -> string
       val dump : address -> (address * constant * Term.term option) list
 
       val moduleExists : address -> bool
+      val currentModule : unit -> address
 
       val beginModule : string -> unit
       val beginModuleSym : symbol -> unit
@@ -30,8 +31,8 @@ signature NAMESPACE =
       val openModule : address -> unit
 
       val alias : symbol -> constant -> unit
-
-      val currentModule : unit -> symbol list
+      val aliasModule : symbol -> address -> unit
+      val aliasExport : symbol -> constant -> unit  (* an alias to be exported *)
 
    end
 
@@ -53,11 +54,11 @@ signature NAMESPACE_INTERNAL =
       val reify : Symbol.symbol -> Judgement.judgement -> Refine.validation -> Term.constant * Judgement.judgement * Refine.validation
 
       
-      (* Apply to all local namespace entries. *)
-      val appLocal : (address * constant -> unit) -> unit
+      (* Apply to all exportable namespace entries. *)
+      val appExport : (address * constant -> unit) -> unit
 
-      (* Like alias, but marks the entry as imported. *)
-      val import : symbol -> constant -> unit
+      (* Remove module from exportable entities. *)
+      val makeModuleLocal : symbol -> unit
 
    end
 
@@ -70,11 +71,11 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
       structure R = CheckpointedRef
       structure T = Term
 
+      structure CD = RedBlackDict (structure Key = Constant.Ordered)
+
       type constant = C.constant
       type symbol = Symbol.symbol
       type address = symbol list
-
-
 
       exception Namespace of string
 
@@ -86,97 +87,60 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
            | _ => false)
 
 
-      (* In C (defs, mods):
-         defs maps symbols to constants (with a bool indicating if it was imported)
-         mods maps symbols to submodules
-      *)
-      datatype context = C of (constant * bool) D.dict * context D.dict
+      val zilch = Symbol.fromValue ""
+
+      datatype group = G of constant D.dict * group D.dict
       
-      fun union (C (c1, s1)) (C (c2, s2)) =
-         C (D.union c1 c2 (fn (_, _, x) => x), D.union s1 s2 (fn (_, _, x) => x))
+      val empty = G (D.empty, D.empty)
 
-      fun resolveMain (ctx as C (_, d)) address =
-         (case address of
-             nil => signalError "empty address"
+      datatype state =
+         ST of
+         {
+         (* the current module's name (this field is meaningless at the top level) *)
+         current : symbol,
 
-           | [sym] => SOME (ctx, sym)
+         (* the full path to the current module, reversed *)
+         path : symbol list,
 
-           | h :: t =>
-                (case D.find d h of
-                    NONE => NONE
+         (* everything in scope *)
+         env : group,               
 
-                  | SOME ctx' => resolveMain ctx' t))
+         (* the current working module: the contents of this will appear in the module when
+            the module is closed, and at the top level the contents will be exported
+         *)
+         working : group,
 
-      fun resolveMod ctx address =
-         (case resolveMain ctx address of
-             NONE => NONE
-
-           | SOME (C (_, d), sym) => D.find d sym)
-
-      fun resolveDec ctx address =
-         (case resolveMain ctx address of
-             NONE => NONE
-
-           | SOME (C (d, _), sym) =>
-                (case D.find d sym of
-                    NONE => NONE
-
-                  | SOME (const, _) => SOME const))
-      
-
-
-      val empty = C (D.empty, D.empty)
-
-      val initial =
-         C (List.foldl
-               (* view primitives as imported *)
-               (fns (sym, const) d => D.insert d sym (const, true))
+         (* lookup table to give names to constants, returns address in reverse,
+            the resulting address cannot be empty
+         *)
+         reverse : symbol list CD.dict
+         }
+           
+      val initialEnv =
+         G (List.foldl
+               (fns (sym, const) d => D.insert d sym const)
                D.empty
                PrimInternal.primitives,
             D.empty)
 
-      val theContext : context R.cref = R.new initial
-      val theModule : context R.cref = R.new initial
-      val thePath : symbol list R.cref = R.new []
-      val endFn : (unit -> unit) R.cref = R.new (fn () => signalError "not in module")
+      val initialReverse =
+         List.foldl
+            (fns (sym, const) d => CD.insert d const [sym])
+            CD.empty
+            PrimInternal.primitives
 
+      val theState : state R.cref =
+         R.new $
+         ST {
+            current = zilch,
+            path = [],
+            env = initialEnv,
+            working = empty,
+            reverse = initialReverse
+            }
+            
+      val theStack : state list R.cref = R.new []
 
-      
-
-      fun insertLoop (C (defs, mods)) path sym const =
-         C (D.insert defs sym const,
-            (case path of
-                [] => mods
-
-              | modsym :: rest =>
-                   let
-                      val (_, _, mods') =
-                         D.operate mods modsym
-                            (fn () => insertLoop (C (D.empty, D.empty)) rest sym const)
-                            (fn c => insertLoop c rest sym const)
-                   in
-                      mods'
-                   end))
-
-
-      fun insert sym f =
-         let
-            val C (defs, mods) = R.deref theModule
-            val context = R.deref theContext
-            val path = R.deref thePath
-         in
-            if D.member defs sym then
-               signalError (String.concat ["name ", Symbol.toValue sym, " is already declared"])
-            else
-               let
-                  val (entry, x) = f ()
-               in
-                  R.assign theModule (C (D.insert defs sym entry, mods));
-                  R.assign theContext (insertLoop context path sym entry);
-
-                  x
-               end
-         end
 
 
       (* the handler is in Prover *)
@@ -184,7 +148,7 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
 
       fun declare sym def =
          let
-            val path = R.deref thePath
+            val ST { current, path, env = G (envConsts, envMods), working = G (workingConsts, workingMods), reverse } = R.deref theState
 
             val opac =
                (case def of
@@ -192,216 +156,521 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
 
                  | SOME _ => C.HARD)
          in
-            try
-               insert sym 
-                  (fn () => 
-                      let
-                         val const = C.declare false def (sym :: List.rev path) opac
-                      in
-                         ((const, false), const)
-                      end)
-            with
-               ConstantInternal.DeclareUnclean prob =>
-                  (case def of
-                      NONE => raise (Fail "impossible")
+            if D.member workingConsts sym then
+               signalError (String.concat
+                               [
+                               "the name ",
+                               Symbol.toValue sym,
+                               " is already used in the current module"
+                               ])
+            else
+               let
+                  val const = 
+                     try
+                        C.declare false def (sym :: path) opac
+                     with
+                        ConstantInternal.DeclareUnclean prob =>
+                           (case def of
+                               NONE => raise (Fail "impossible")
 
-                    | SOME m => raise (Unclean (prob, m)))
+                             | SOME m => raise (Unclean (prob, m)))
+               in
+                  R.assign theState
+                     (ST {
+                         current = current,
+                         path = path,
+                         env = G (D.insert envConsts sym const, envMods),
+                         working = G (D.insert workingConsts sym const, workingMods),
+                         reverse = CD.insert reverse const [sym]
+                         });
+
+                  const
+               end
          end
+
 
 
       fun reify sym jud v =
          let
-            val path = R.deref thePath
+            val ST { current, path, env = G (envConsts, envMods), working = G (workingConsts, workingMods), reverse } = R.deref theState
          in
-            insert sym
-               (fn () =>
-                   let
-                      val all as (const, jud', v') = 
-                         Refine.reify jud v (sym :: List.rev path)
-                   in
-                      ((const, false), all)
-                   end)
+            if D.member workingConsts sym then
+               signalError (String.concat
+                               [
+                               "the name ",
+                               Symbol.toValue sym,
+                               " is already used in the current module"
+                               ])
+            else
+               let
+                  val result as (const, _, _) = Refine.reify jud v (sym :: path)
+               in
+                  R.assign theState
+                     (ST {
+                         current = current,
+                         path = path,
+                         env = G (D.insert envConsts sym const, envMods),
+                         working = G (D.insert workingConsts sym const, workingMods),
+                         reverse = CD.insert reverse const [sym]
+                         });
+
+                  result
+               end
          end
-         
-
-      fun alias sym const =
-         insert sym (fn () => ((const, false), ()))
-
-
-      fun import sym const =
-         insert sym (fn () => ((const, true), ()))
 
 
 
-      fun resolveOpt address = resolveDec (R.deref theContext) address
 
-      fun resolve address =
-         (case resolveDec (R.deref theContext) address of
-             SOME k => k
+      fun resolveMain (group as G (_, d)) address =
+         (case address of
+             nil => signalError "empty address"
+
+           | [sym] => SOME (group, sym)
+
+           | sym :: rest =>
+                (case D.find d sym of
+                    NONE => NONE
+
+                  | SOME group' => resolveMain group' rest))
+
+      fun resolveMod group address =
+         (case resolveMain group address of
+             NONE => NONE
+
+           | SOME (G (_, d), sym) => D.find d sym)
+
+      fun resolveConst group address =
+         (case resolveMain group address of
+             NONE => NONE
+
+           | SOME (G (d, _), sym) => D.find d sym)
+
+
+
+      fun resolveOpt addr =
+         let
+            val ST { env } = R.deref theState
+         in
+            resolveConst env addr
+         end
+
+      fun resolve addr =
+         (case resolveOpt addr of
+             SOME const => const
 
            | NONE =>
-                signalError ("no constant " ^ String.concatWith "." (map Symbol.toValue address)))
+                signalError (String.concat
+                                [
+                                "no constant ",
+                                String.concatWith "." (map Symbol.toValue addr),
+                                " exists"
+                                ]))
 
 
 
       val question = Symbol.fromValue "?"
 
-      fun nameloop const l address =
-         (case l of
-             nil =>
-                (* Didn't find it.  This is an orphaned constant (declared in a
-                   history that got unwound).  Name it "?.address".
-                *)
-                question :: address
-
-           | h :: t =>
-                let
-                   val address' = h :: address
-                in
-                   (case resolveOpt address' of
-                       NONE =>
-                          nameloop const t address'
-
-                     | SOME const' =>
-                          if Constant.eq (const, const') then
-                             address'
-                          else
-                             nameloop const t address')
-                end)
-
-      fun name const = nameloop const (C.path const) []
-
-      fun fullname const = 
+      fun name const =
          let
-            val address = List.rev (C.path const)
+            val ST { reverse } = R.deref theState
          in
-            if
-               (case resolveOpt address of
-                   NONE => false
-
-                 | SOME const' => Constant.eq (const, const'))
-            then
-               address
-            else
-               (* Didn't find it.  This is an orphaned constant (declared in a
-                  history that got unwound).  Name it "?.address".
-               *)
-               question :: address
+            (case CD.find reverse const of
+                NONE => question :: List.rev (C.path const)
+                
+              | SOME name => List.rev name)
          end
 
+      fun lastname const =
+         let
+            val ST { reverse } = R.deref theState
+         in
+            (case CD.find reverse const of
+                NONE => 
+                   (case C.path const of
+                       [] =>
+                          (* This shouldn't happen unless the user is misusing internal operations. *)
+                          raise (Fail "empty path in constant metadata")
+
+                     | name :: _ => name)
+                
+              | SOME [] => raise (Fail "invariant")
+
+              | SOME (name :: _) => name)
+         end
 
       fun toString const = String.concatWith "." (map Symbol.toValue (name const))
 
 
 
-      fun dumpContext (C (defs, submods)) path acc =
+      fun dumpGroup (G (defs, mods)) path acc =
          let
-            val acc' =
+            val acc =
                D.foldl
-                  (fn (sym, ctx, acc) =>
-                      dumpContext ctx (sym :: path) acc)
+                  (fn (sym, md, acc) => dumpGroup md (sym :: path) acc)
                   acc
-                  submods
+                  mods
 
-            val acc'' =
+            val acc =
                D.foldl
-                  (fn (sym, (const, _), acc) =>
+                  (fn (sym, const, acc) =>
                       (List.rev (sym :: path), const, C.definition const) :: acc)
-                  acc'
+                  acc
                   defs
          in
-            acc''
+            acc
          end
 
       fun dump address =
          let
-            val ctx =
-               (case address of
-                   [] => R.deref theContext
+            val ST { env } = R.deref theState
 
-                 | _ => 
-                      (case resolveMod (R.deref theContext) address of
-                          SOME ctx => ctx
+            val group =
+               (case address of
+                   [] => env
+
+                 | _ =>
+                      (case resolveMod env address of
+                          SOME group => group
 
                         | NONE => signalError "no such address"))
          in
-            dumpContext ctx [] []
+            dumpGroup group [] []
          end
-
-
-
-      fun appLocalLoop (C (defs, submods)) path f =
-         (
-         D.app
-            (fn (sym, ctx) => appLocalLoop ctx (sym :: path) f)
-            submods;
-
-         D.app
-            (fn (sym, (const, imported)) =>
-                if imported then
-                   ()
-                else
-                   f (List.rev (sym :: path), const))
-            defs
-         )
-
-      fun appLocal f = appLocalLoop (R.deref theContext) [] f
-
+         
 
 
       fun moduleExists address =
-         Option.isSome (resolveMod (R.deref theContext) address)
+         let
+            val ST { env } = R.deref theState
+         in
+            (case resolveMod env address of
+                SOME _ => true
+
+              | NONE => false)
+         end
+
+      fun currentModule () =
+         let
+            val ST { path } = R.deref theState
+         in
+            List.rev path
+         end
 
 
 
       fun beginModuleSym sym =
          let
-            val C (currDefs, currMods) = R.deref theModule
+            val st as ST { current, path, env, working = working as G (_, workingMods), reverse } = R.deref theState
          in
-            if D.member currMods sym then
+            if Symbol.eq (sym, zilch) then
+               signalError "bad module name"
+
+            else if D.member workingMods sym then
                signalError (String.concat
                                [
-                               "Error: name ",
+                               "the module name ",
                                Symbol.toValue sym,
-                               " is already declared"
+                               " is already used in the current module"
                                ])
+
             else
-               let
-                  val C (oldDefs, oldMods) = R.deref theContext
-                  val oldPath = R.deref thePath
-                  val oldEndFn = R.deref endFn
-               
-                  fun newEndFn () =
-                     let
-                        val this = R.deref theModule
-                     in
-                        R.assign theModule (C (currDefs, D.insert currMods sym this));
-                        R.assign theContext (C (oldDefs, D.insert oldMods sym this));
-                        R.assign thePath oldPath;
-                        R.assign endFn oldEndFn
-                     end
-               in
-                  R.assign theModule (C (D.empty, D.empty));
-                  R.assign thePath (oldPath @ [sym]);
-                  R.assign endFn newEndFn
-               end
+               (
+               R.assign theStack (st :: R.deref theStack);
+               R.assign theState
+                  (ST {
+                      current = sym,
+                      path = sym :: path,
+                      env = env,
+                      working = empty,
+                      reverse = reverse
+                      })
+               )
          end
 
-      fun beginModule name = beginModuleSym (Symbol.fromValue name)
+      fun beginModule str = beginModuleSym (Symbol.fromValue str)
 
-      fun endModule () = R.deref endFn ()
+      
 
-      fun openModule address =
-         (case resolveMod (R.deref theContext) address of
-             NONE => signalError "no such module"
+      (* populate prefer reverse revaddr group
 
-           | SOME (ctx as C (defs, _)) =>
-                R.assign theContext (union (R.deref theContext) ctx))
+         Populate the reverse-lookup table.
+         prefer: true if new names should be preferred to the old
+      *)
+      fun populate prefer reverse path (G (consts, mods)) =
+         let
+            val reverse =
+               D.foldl 
+                  (fn (name, group, reverse) =>
+                      populate prefer reverse (name :: path) group)
+                  reverse
+                  mods
 
-      fun currentModule () = R.deref thePath
+            val reverse =
+               D.foldl
+                  (fn (name, const, reverse) =>
+                      let
+                         val newpath = name :: path
+                      in
+                         CD.insertMerge reverse const newpath
+                            (fn oldpath =>
+                                if prefer then
+                                   newpath
+                                else
+                                   oldpath)
+                      end)
+                  reverse
+                  consts
+         in
+            reverse
+         end
+
+
+
+      fun endModuleMain closingName closingGroup state =
+         let
+            val ST { current, path, env = G (envConst, envMod), working = G (workingConst, workingMod), reverse } = state
+
+            val envMod' = D.insert envMod closingName closingGroup
+            val workingMod' = D.insert workingMod closingName closingGroup
+            val reverse' = populate false reverse [closingName] closingGroup
+         in
+            ST { 
+               current = current,
+               path = path,
+               env = G (envConst, envMod'),
+               working = G (workingConst, workingMod'),
+               reverse = reverse'
+               }
+         end
+
+      fun endModule () =
+         (case R.deref theStack of
+             [] =>
+               signalError "not in module"
+
+           | state :: rest =>
+                let
+                   val ST { current=closingName, working=closingGroup } = R.deref theState
+
+                   val state' = endModuleMain closingName closingGroup state
+                in
+                   R.assign theStack rest;
+                   R.assign theState state'
+                end)
+
+
+
+      (* always prefers the latter *)
+      fun union (G (consts1, mods1)) (G (consts2, mods2)) =
+         G (D.union consts1 consts2 (fn (_, _, x) => x),
+            D.union mods1 mods2 (fn (_, _, x) => x))
+
+
+
+      fun openModule addr =
+         let
+            val ST { current, path, env, working, reverse } = R.deref theState
+         in
+            (case resolveMod env addr of
+                NONE =>
+                   signalError (String.concat
+                                   [
+                                   "module ",
+                                   String.concatWith "." (map Symbol.toValue addr),
+                                   " does not exist"
+                                   ])
+
+              | SOME group =>
+                   let
+                      val env' = union env group
+                      val reverse' = populate true reverse [] group
+                   in
+                      R.assign theState
+                         (ST {
+                             current = current,
+                             path = path,
+                             env = env',
+                             working = working,
+                             reverse = reverse'
+                             })
+                   end)
+         end
+
+
+
+      fun alias sym const =
+         let
+            val ST { current, path, env = G (envConsts, envMods), working = working as G (workingConsts, _), reverse } = R.deref theState
+         in
+            if D.member workingConsts sym then
+               signalError (String.concat
+                               [
+                               "the name ",
+                               Symbol.toValue sym,
+                               " is already used in the current module"
+                               ])
+            else
+               R.assign theState
+                  (ST {
+                      current = current,
+                      path = path,
+                      env = G (D.insert envConsts sym const, envMods),
+                      working = working,
+                      reverse = CD.insert reverse const [sym],
+                      })
+         end
+
+
+
+      fun aliasExport sym const =
+         let
+            val ST { current, path, env = G (envConsts, envMods), working = working as G (workingConsts, workingMods), reverse } = R.deref theState
+         in
+            if D.member workingConsts sym then
+               signalError (String.concat
+                               [
+                               "the name ",
+                               Symbol.toValue sym,
+                               " is already used in the current module"
+                               ])
+            else
+               R.assign theState
+                  (ST {
+                      current = current,
+                      path = path,
+                      env = G (D.insert envConsts sym const, envMods),
+                      working = G (D.insert workingConsts sym const, workingMods),
+                      reverse = CD.insert reverse const [sym]
+                      })
+         end
+
+
+
+      fun aliasModule sym addr =
+         let
+            val ST { current, path, env = env as G (envConsts, envMods), working = working as G (_, workingMods), reverse } = R.deref theState
+         in
+            (case resolveMod env addr of
+                NONE =>
+                   signalError (String.concat
+                                   [
+                                   "module ",
+                                   String.concatWith "." (map Symbol.toValue addr),
+                                   " does not exist"
+                                   ])
+
+              | SOME group =>
+                   if D.member workingMods sym then
+                      signalError (String.concat
+                                      [
+                                      "the module name ",
+                                      Symbol.toValue sym,
+                                      " is already used in the current module"
+                                      ])
+                   else
+                      R.assign theState
+                         (ST {
+                             current = current,
+                             path = path,
+                             env = G (envConsts, D.insert envMods sym group),
+                             working = working,
+                             reverse = populate true reverse [sym] group
+                             }))
+         end
+
+
+
+      (* closeStack f g l
+
+         if    l = [state]
+         then  returns  f state
+
+         if    l = stack @ [state]
+         then  returns  g name group state
+               where    name is the oldest module name in stack
+               and      group is the group obtained by closing all of stack
+      *)
+
+      fun closeStackLoop g name group l =
+         (case l of
+             [] =>
+                raise (Fail "invariant")
+
+           | [state] =>
+                g name group state
+
+           | ST { current, working = G (consts, mods) } :: rest =>
+                closeStackLoop g current (G (consts, D.insert mods name group)) rest)
+
+      fun closeStack f g l =
+         (case l of
+             [] =>
+                raise (Fail "precondition")
+
+           | [state] => f state
+
+           | ST { current, working } :: rest =>
+                closeStackLoop g current working rest)
+                   
+             
+         
+      fun endAllModules () =
+         let
+            val newstate =
+               closeStack 
+                  (fn st => st)
+                  endModuleMain
+                  (R.deref theState :: R.deref theStack)
+         in
+            R.assign theState newstate;
+            R.assign theStack []
+         end
+
+
+
+      fun appGroup f (G (defs, mods)) path =
+         (
+         D.app
+            (fn (sym, md) => appGroup f md (sym :: path))
+            mods;
+
+         D.app
+            (fn (sym, const) => f (List.rev (sym :: path), const))
+            defs
+         )
+
+      fun appExport f =
+         let
+            val group =
+               closeStack
+                  (fn (ST { working }) => working)
+                  (fns name group (ST { working = G (consts, mods) }) =>
+                      G (consts, D.insert mods name group))
+                  (R.deref theState :: R.deref theStack)
+         in
+            appGroup f group []
+         end
+
+
+
+      fun makeModuleLocal sym =
+         let
+            val ST { current, path, env, working = G (workingConst, workingMod), reverse } = R.deref theState
+         in
+            if D.member workingMod sym then
+               R.assign theState
+                  (ST {
+                      current = current,
+                      path = path,
+                      env = env,
+                      reverse = reverse,
+                      working = G (workingConst, D.remove workingMod sym)
+                      })
+            else
+               raise (Fail "module absent in makeModuleLocal")
+         end
 
    end
 
 
 structure Namespace :> NAMESPACE = NamespaceInternal
-

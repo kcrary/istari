@@ -200,6 +200,19 @@ structure Parser :> PARSER =
                end
 
             fun record_pjuxta (longid as (_, l), fields, r) = (Jatom (Papprecord (longid, fields), join l r), join l r)
+
+            fun collapse_pjuxta (l as (_, l'), pats, r) =
+               let
+                  val (pat, _) =
+                     foldl
+                        (fn (p2 as (_, (_, r')), p1) =>
+                            (Ptuple [p1, p2], (l', r')))
+                        (Punit, (l', l'))
+                        pats
+               in
+                  (Jatom (pat, join l r), join l r)
+               end
+
             fun ref_pjuxta span = (Jatom (Pconstr ([refsym], span), span), span)
 
             val sing_pjuxtas = sing1_w_pos
@@ -264,7 +277,22 @@ structure Parser :> PARSER =
                end
 
             fun atom_ejuxta (exp as (_, r)) = (Jatom exp, r)
+
             fun record_ejuxta (longid as (_, l), fields, r) = (Jatom (Eapprecord (longid, fields), join l r), join l r)
+
+            fun collapse_ejuxta (l as (_, l'), exps, r) =
+               let
+                  val (exp, _) =
+                     foldl
+                        (fn (e2 as (_, (_, r')), e1) =>
+                            (Etuple [e1, e2], (l', r')))
+                        (Eunit, (l', l'))
+                        exps
+               in
+                  (Jatom (exp, join l r), join l r)
+               end
+               
+
             val sing_ejuxtas = sing1_w_pos
             val cons_ejuxtas = cons_w_pos
             val term_ident = Lident
@@ -547,6 +575,7 @@ structure Parser :> PARSER =
                  | AS span => span
                  | BEGIN span => span
                  | CASE span => span
+                 | COLLAPSE span => span
                  | DATATYPE span => span
                  | DO span => span
                  | ELSE span => span

@@ -2,11 +2,12 @@
 structure ParseWtype =
    struct
 
+      structure CR = CheckpointedRef
       structure T = ETerm
 
-      val wtype = Susp.delay (fn () => parseConstant /Wtype.wtype/)
+      val wtype : Constant.constant CR.dest = CR.dest ()
 
-      fun parseWtype x a b = T.apply2 (Susp.force wtype) a (T.lam (SOME x) b)
+      fun parseWtype x a b = T.apply2 (CR.read wtype) a (T.lam (SOME x) b)
 
    end
 
@@ -29,9 +30,15 @@ grammaron Wtype
 functor AfterWtype () :> sig end =
    struct
 
-      structure U = Show.Unparsing
+      val Collapse (wtype) =
+         readRegistry /Wtype.AfterWtypeEnv/
+            /[constant]/
 
-      val wtype = parseConstant /Wtype.wtype/
+      
+      val () = CheckpointedRef.write ParseWtype.wtype wtype
+
+
+      structure U = Show.Unparsing
 
       val () =
          ConstantTable.insert U.unparsingTable wtype
@@ -60,14 +67,14 @@ functor AfterWtype () :> sig end =
 functor AfterWtypeUnroll () :> sig end =
    struct
 
+      val Collapse (wtype, wtype_roll, wtype_unroll, wtype_eeqtp) =
+         readRegistry /Wtype.AfterWtypeUnrollEnv/
+            /[constant constant constant constant]/
+
       structure T = Term
 
       open Tactic
       open Case
-
-      val wtype = parseConstant /Wtype.wtype/
-      val wtype_roll = parseConstant /Wtype.wtype_roll/
-      val wtype_eeqtp = parseConstant /Wtype.wtype_eeqtp/
 
 
       fun unrolled binder a b =
@@ -106,10 +113,10 @@ functor AfterWtypeUnroll () :> sig end =
          ConstantTable.insert TypecheckInternal.introTactics wtype wtypeIntroOf;
 
          Constant2Table.insert TypecheckInternal.subtypeTactics (wtype, Prim.exists)
-            (applyRaw /Wtype.wtype_unroll/);
+            (applyRaw /T.Const wtype_unroll/);
 
          Constant2Table.insert TypecheckInternal.subtypeTactics (Prim.exists, wtype)
-            (applyRaw /Wtype.wtype_roll/)
+            (applyRaw /T.Const wtype_roll/)
          )
 
 
@@ -160,16 +167,25 @@ functor AfterWtypeUnroll () :> sig end =
 
 
 
-functor AfterWtypeIter () :> sig end =
+functor AfterWtypeAll () :> sig end =
    struct
+
+      val Collapse (wtype, wtype_iter, precedes_well_founded) =
+         readRegistry /Wtype.AfterWtypeAll/
+            /[constant constant constant]/
+
+      val () =
+         List.app Registry.delete
+            (parseLongidents
+                /Wtype.AfterWtypeEnv
+                 Wtype.AfterWtypeUnrollEnv
+                 Wtype.AfterWtypeAll/)
+            
 
       structure T = Term
 
       open Tactic
 
-      val wtype = parseConstant /Wtype.wtype/
-      val wtype_iter = parseConstant /Wtype.wtype_iter/
-      val precedes_well_founded = parseConstant /Wtype.precedes_well_founded/
 
       val () =
          ConstantTable.insert InductionInternal.iterators wtype (wtype_iter, 2, 0)

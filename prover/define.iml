@@ -25,14 +25,14 @@ signature DEFINE =
       val makeReduction1 : 
          ((constant * symbol option list * eterm)
           * constant list * constant list)
-         -> Reduction.ureduction1
+         -> Reduction.reduction1
 
       val makeReduction2 : 
          ((constant * symbol option list * constant * symbol option list * symbol option list * eterm)
           * constant list * constant list)
-         -> Reduction.ureduction2
+         -> Reduction.reduction2
 
-      val register : Reduction.ureduction2 -> unit
+      val register : Reduction.reduction2 -> unit
 
    end
 
@@ -46,9 +46,9 @@ signature DEFINE_INTERNAL =
       val recUnroller : Constant.constant -> Reduction.reduction
 
       (* Returns all reductions registered for normalization (except primitive or imported ones). *)
-      val registered : unit -> Reduction.ureduction2 list
+      val registered : unit -> Reduction.reduction2 list
 
-      val importReduction : Reduction.ureduction2 -> unit
+      val importReduction : Reduction.reduction2 -> unit
 
    end
 
@@ -414,7 +414,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
 
       (* All the registered reductions except primitive or imported ones. *)
-      val theRegistered : R.ureduction2 list C.cref = C.new []
+      val theRegistered : R.reduction2 list C.cref = C.new []
                           
       (* All the registered reductions, in a format for autoreduce. *)
       val theStrat : R.reduction list Dict.dict C.cref =
@@ -647,14 +647,15 @@ structure DefineInternal :> DEFINE_INTERNAL =
                    let
                       val red = makeReduction2 (pat, unf, unr)
    
-                      val name1 = Symbol.toValue (List.last (Namespace.fullname const1))
-                      val name2 = Symbol.toValue (List.last (Namespace.fullname const2))
+                      val name1 = Symbol.toValue (Namespace.lastname const1)
+                      val name2 = Symbol.toValue (Namespace.lastname const2)
                    in
                       register red;
                       
                       Registry.write 
                          (Symbol.fromValue (String.concat [name1, "_", name2]))
-                         (Registry.fromUreduction2 red)
+                         Registry.reduction2
+                         red
                    end)
                pats;
    

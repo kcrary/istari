@@ -3,14 +3,16 @@ structure ParseLogic =
    struct
 
       structure T = ETerm
+      structure R = CheckpointedRef
+      type constant = Constant.constant
 
-      val not = Susp.delay (fn () => parseConstant /Logic.not/)
-      val iff = Susp.delay (fn () => parseConstant /Logic.iff/)
-      val neq = Susp.delay (fn () => parseConstant /Logic.neq/)
+      val not : constant R.dest = R.dest ()
+      val iff : constant R.dest = R.dest ()
+      val neq : constant R.dest = R.dest ()
 
-      fun parseNot p = T.apply1 (Susp.force not) p
-      fun parseIff p q = T.apply2 (Susp.force iff) p q
-      fun parseNeq m n a = T.apply3 (Susp.force neq) a m n
+      fun parseNot p = T.apply1 (R.read not) p
+      fun parseIff p q = T.apply2 (R.read iff) p q
+      fun parseNeq m n a = T.apply3 (R.read neq) a m n
 
    end
 
@@ -31,14 +33,16 @@ grammaron Logic
 functor AfterIff () :> sig end =
    struct
 
-      structure B = BackchainInternal
-      structure H = ConstantTable
-      structure T = Term
+      val Collapse (not, iff) =
+         readRegistry /Logic.AfterIffEnv/
+            /[constant constant]/
 
-      val not = parseConstant /Logic.not/
-      val iff = parseConstant /Logic.iff/
-
+      structure CR = CheckpointedRef
       structure U = Show.Unparsing
+
+      val () = CR.write ParseLogic.not not
+      val () = CR.write ParseLogic.iff iff
+
 
       fun register k arity prec unp =
          ConstantTable.insert U.unparsingTable k (arity, prec, ref true, unp)
@@ -50,73 +54,86 @@ functor AfterIff () :> sig end =
              (U.apply2 iff U.show U.show)
              (fn (p, q) => U.append [p 6, U.break 1, U.string "<-> ", q 6]))
 
+   end
 
+
+functor AfterIffCompat () :> sig end =
+   struct
+
+      val Collapse (not, iff, not_inhabitant, iff_refl, iff_symm, iff_trans, iff_compat_1, iff_compat_2, not_compat_arrow, not_compat_iff, prod_compat_iff, sum_compat_iff) =
+         readRegistry /Logic.AfterIffCompatEnv/
+            /[constant constant constant constant constant constant constant constant constant constant constant constant]/
+
+      structure B = BackchainInternal
+      structure H = ConstantTable
+      structure T = Term
+      structure CR = CheckpointedRef
+
+      
       val () =
          ConstantTable.insert TypecheckInternal.semitrivialIntroTactics not
-            (Term.Lam (NONE, Term.Triv), Backchain.applyPriority /Logic.not_inhabitant/);
+            (Term.Lam (NONE, Term.Triv), Backchain.applyPriority /\T.Const not_inhabitant\/);
 
       val () =
          H.insert EqualityTacticInternal.reflexivityTactics iff
-         (B.witnessPriority /Logic.iff_refl _ _/)
+         (B.witnessPriority /\T.Const iff_refl\ _ _/)
       
       val () =
          H.insert EqualityTacticInternal.symmetryTactics iff
-         (andthenOn 0 (B.witnessPriority /Logic.iff_symm _ _ _ __/))
+         (andthenOn 0 (B.witnessPriority /\T.Const iff_symm\ _ _ _ __/))
 
       val () =
          H.insert EqualityTacticInternal.transitivityTactics iff
-         (fn n => B.witnessPriority /Logic.iff_trans _ _ \n\ _ __ __/)
+         (fn n => B.witnessPriority /\T.Const iff_trans\ _ _ \n\ _ __ __/)
 
       val () =
          RewriteInternal.CICTable.insert 
             RewriteInternal.compatibilityTable
             (iff, 0, iff)
-            (iff, true, andthenOn 0 (B.witnessPriority /Logic.iff_compat_1 _ _ _ _ __/))
+            (iff, true, andthenOn 0 (B.witnessPriority /\T.Const iff_compat_1\ _ _ _ _ __/))
 
       val () =
          RewriteInternal.CICTable.insert 
             RewriteInternal.compatibilityTable
             (iff, 1, iff)
-            (iff, true, andthenOn 0 (B.witnessPriority /Logic.iff_compat_2 _ _ _ _ __/))
+            (iff, true, andthenOn 0 (B.witnessPriority /\T.Const iff_compat_2\ _ _ _ _ __/))
 
       val () =
          RewriteInternal.CICTable.insert 
             RewriteInternal.compatibilityTable
             (not, 0, Prim.arrow)
-            (Prim.arrow, false, andthenOn 0 (B.witnessPriority /Logic.not_compat_arrow _ _ _ __/))
+            (Prim.arrow, false, andthenOn 0 (B.witnessPriority /\T.Const not_compat_arrow\ _ _ _ __/))
 
       val () =
          RewriteInternal.CICTable.insert 
             RewriteInternal.compatibilityTable
             (not, 0, iff)
-            (iff, true, andthenOn 0 (B.witnessPriority /Logic.not_compat_iff _ _ _ __/))
+            (iff, true, andthenOn 0 (B.witnessPriority /\T.Const not_compat_iff\ _ _ _ __/))
 
       val () =
          RewriteInternal.CICTable.insert 
             RewriteInternal.compatibilityTable
             (Prim.prod, 0, iff)
-            (iff, true, andthenOn 0 (Backchain.witnessPriority /prod_compat_iff _# 5 __ __/))
+            (iff, true, andthenOn 0 (Backchain.witnessPriority /\T.Const prod_compat_iff\ _# 5 __ __/))
 
       val () =
          RewriteInternal.CICTable.insert 
             RewriteInternal.compatibilityTable
             (Prim.prod, 1, iff)
-            (iff, true, andthenOn 1 (Backchain.witnessPriority /prod_compat_iff _# 5 __ __/))
+            (iff, true, andthenOn 1 (Backchain.witnessPriority /\T.Const prod_compat_iff\ _# 5 __ __/))
 
       val () =
          RewriteInternal.CICTable.insert 
             RewriteInternal.compatibilityTable
             (Prim.sum, 0, iff)
-            (iff, true, andthenOn 0 (Backchain.witnessPriority /sum_compat_iff _# 5 __ __/))
+            (iff, true, andthenOn 0 (Backchain.witnessPriority /\T.Const sum_compat_iff\ _# 5 __ __/))
 
       val () =
          RewriteInternal.CICTable.insert 
             RewriteInternal.compatibilityTable
             (Prim.sum, 1, iff)
-            (iff, true, andthenOn 1 (Backchain.witnessPriority /sum_compat_iff _# 5 __ __/))
+            (iff, true, andthenOn 1 (Backchain.witnessPriority /\T.Const sum_compat_iff\ _# 5 __ __/))
 
-
-            
          
       open Tactic
 
@@ -162,12 +179,25 @@ functor AfterIff () :> sig end =
    end
 
 
-functor AfterNeq () :> sig end =
+functor AfterLogicAll () :> sig end =
    struct
 
-      structure U = Show.Unparsing
+      val Collapse (neq) =
+         readRegistry /Logic.AfterLogicAllEnv/
+            /[constant]/
 
-      val neq = parseConstant /Logic.neq/
+      val () =
+         List.app Registry.delete
+            (parseLongidents
+                /Logic.AfterIffEnv
+                 Logic.AfterIffCompatEnv
+                 Logic.AfterLogicAllEnv/)
+
+
+      val () = CheckpointedRef.write ParseLogic.neq neq
+
+
+      structure U = Show.Unparsing
 
       fun register k arity prec unp =
          ConstantTable.insert U.unparsingTable k (arity, prec, ref true, unp)

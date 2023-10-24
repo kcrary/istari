@@ -271,6 +271,17 @@ signature CHECKPOINTED_REF =
       val deref : 'a cref -> 'a
       val assign : 'a cref -> 'a -> unit
 
+
+      type 'a dest
+
+      exception Destination
+
+      (* Write once checkpointed reference. *)
+      val dest : unit -> 'a dest
+
+      val read : 'a dest -> 'a           (* raises Destination if not written yet *)
+      val write : 'a dest -> 'a -> unit  (* raises Destination if already written *)
+
    end
 
 
@@ -306,6 +317,27 @@ structure CheckpointedRef :> CHECKPOINTED_REF =
          r := x;
          notify x
          )
+
+
+
+      type 'a dest = 'a option cref
+
+      exception Destination
+
+      fun dest () = new NONE
+
+      fun read r =
+         (case deref r of
+             SOME x => x
+
+           | NONE => raise Destination)
+
+      fun write r x =
+         (case deref r of
+             NONE =>
+                assign r (SOME x)
+
+           | SOME _ => raise Destination)
 
    end
 

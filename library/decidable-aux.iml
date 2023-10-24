@@ -1,15 +1,28 @@
 
-functor AfterDecidable () :> sig end =
+functor AfterDecidableCompat () :> sig end =
    struct
 
-      val decidable = parseConstant /Decidable.decidable/ 
+      val Collapse (decidable, decidable_compat_iff) =
+         readRegistry /Decidable.AfterDecidableCompatEnv/
+            /[constant constant]/
+
       val iff = parseConstant /Logic.iff/ 
 
       val () =
          RewriteInternal.CICTable.insert 
             RewriteInternal.compatibilityTable
             (decidable, 0, iff)
-            (iff, true, andthenOn 0 (Backchain.witnessPriority /decidable_compat_iff _# 3 __/))
+            (iff, true, andthenOn 0 (Backchain.witnessPriority /\Term.Const decidable_compat_iff\ _# 3 __/))
 
    end
 
+
+functor AfterDecidableAll () :> sig end =
+   struct
+
+      val () =
+         List.app Registry.delete
+            (parseLongidents
+                /Decidable.AfterDecidableCompatEnv/)
+
+   end

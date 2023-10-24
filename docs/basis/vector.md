@@ -10,6 +10,8 @@
           val length : 'a vector -> int
           val sub : 'a vector -> int -> 'a
     
+          val map : ('a -> 'b) -> 'a vector -> 'b vector
+          val mapi : (int -> 'a -> 'b) -> 'a vector -> 'b vector
           val foldl : ('a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
           val foldli : (int -> 'a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
           val foldr : ('a -> 'b -> 'b) -> 'b -> 'a vector -> 'b

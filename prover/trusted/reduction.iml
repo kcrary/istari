@@ -7,8 +7,8 @@ signature REDUCTION =
       type elim
 
       type reduction
-      type ureduction1
-      type ureduction2
+      type reduction1  (* user reduction involving one constant *)
+      type reduction2  (* user reduction involving two interacting constants *)
 
       val refl : reduction
       val trans : reduction list -> reduction
@@ -31,8 +31,8 @@ signature REDUCTION =
       (* reduces native operations *)
       val native : reduction
 
-      val user1 : ureduction1 -> reduction
-      val user2 : ureduction2 -> reduction
+      val user1 : reduction1 -> reduction
+      val user2 : reduction2 -> reduction
 
       (* within path red  follows path to a subterm, where red is applied
 
@@ -55,13 +55,13 @@ signature REDUCTION =
          if    0 <= n
          and   const n-1 ... 0  reduces to Q by red1
                P reduces to Q by red2
-         then  returns a ureduction that reduces
+         then  returns a reduction1 that reduces
                const Mn-1 ... M0
                to
                P [M0 ... Mn-1 . id]
          else  raises Reduce
       *)
-      val new1 : constant -> int -> term -> reduction -> reduction -> ureduction1
+      val new1 : constant -> int -> term -> reduction -> reduction -> reduction1
 
 
       (* new2 const l m const' n Q red1 red2
@@ -70,13 +70,13 @@ signature REDUCTION =
          if    0 <= l, m, n  
          and   const m+n+l-1 .. m+n+0 (const' m+n-1 ... m+0) m-1 ... 0  reduces to R by red1
                Q reduces to R by red2
-         then  returns a ureduction that reduces
+         then  returns a reduction2 that reduces
                const Pl-1 ... P0 (const' Nn-1 ... N0) Mm-1 ... M0
                to
                Q [M0 ... Mm-1 . N0 ... Nn-1 . P0 ... Pl-1 . id]
          else  raises Reduce
       *)
-      val new2 : constant -> int -> int -> constant -> int -> term -> reduction -> reduction -> ureduction2
+      val new2 : constant -> int -> int -> constant -> int -> term -> reduction -> reduction -> reduction2
 
    end
 
@@ -93,30 +93,30 @@ signature REDUCTION_INTERNAL =
          if    red = new1 const n p red1 red2
          then  returns const
       *)
-      val trigger : ureduction1 -> constant
+      val trigger : reduction1 -> constant
 
       (* triggers red
 
          if    red = new2 k l m k' n Q red1 red2
          then  returns (k, l, k')
       *)
-      val triggers : ureduction2 -> constant * int * constant
+      val triggers : reduction2 -> constant * int * constant
 
       (* ureduce1 red spine
          where trigger(red) = k
          applies red to k @ spine
       *)
-      val ureduce1 : ureduction1 -> elim list -> term
+      val ureduce1 : reduction1 -> elim list -> term
 
       (* ureduce2 red spine1 spine2 spine3
          where triggers(red) = (k1, l, k2)
          applies red to k1 @ spine1 (k2 @ spine2) spine3
       *)
-      val ureduce2 : ureduction2 -> elim list -> elim list -> elim list -> term
+      val ureduce2 : reduction2 -> elim list -> elim list -> elim list -> term
 
 
-      val puUreduction1 : ureduction1 Pickle.pu
-      val puUreduction2 : ureduction2 Pickle.pu
+      val puReduction1 : reduction1 Pickle.pu
+      val puReduction2 : reduction2 Pickle.pu
       val puReduction : reduction Pickle.pu
 
    end
@@ -129,8 +129,8 @@ signature REDUCTION_PRIV =
 
       include REDUCTION_INTERNAL
 
-      val backdoor1 : constant * int * term -> ureduction1
-      val backdoor2 : constant * int * int * constant * int * term -> ureduction2
+      val backdoor1 : constant * int * term -> reduction1
+      val backdoor2 : constant * int * int * constant * int * term -> reduction2
 
    end
 
@@ -162,8 +162,8 @@ functor ReductionFun (structure Term : TERM
 
       open Term
 
-      type ureduction1 = constant * int * term
-      type ureduction2 = constant * int * int * constant * int * term
+      type reduction1 = constant * int * term
+      type reduction2 = constant * int * int * constant * int * term
 
       datatype reduction =
          Trans of reduction list
@@ -172,8 +172,8 @@ functor ReductionFun (structure Term : TERM
        | Within of int list * reduction
        | Compat of reduction list
        | Nativered
-       | User1 of ureduction1
-       | User2 of ureduction2
+       | User1 of reduction1
+       | User2 of reduction2
 
       exception Reduce
 
@@ -543,7 +543,7 @@ functor ReductionFun (structure Term : TERM
                       pu2
                    ])
 
-      val puUreduction1 =
+      val puReduction1 =
          P.wrap
             (fn r => r)
             (fn r =>
@@ -553,7 +553,7 @@ functor ReductionFun (structure Term : TERM
                    r)
             pu1
 
-      val puUreduction2 =
+      val puReduction2 =
          P.wrap
             (fn r => r)
             (fn r =>
