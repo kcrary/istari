@@ -388,8 +388,10 @@ signature THE_RULES =
       val subtypeFormUniv : term -> term -> term -> rule
       val subtypeEqUniv : term -> term -> term -> term -> term -> rule
       val subtypeIntro : term -> term -> rule
+      val subtypeElim : term -> term -> term -> rule
       val subtypeExt : term -> term -> term -> term -> rule
       val subtypeLeft : int -> term -> term -> term -> rule
+      val subtypeEstablish : term -> term -> rule
       val subsumptionOf : term -> term -> term -> rule
       val subsumptionEq : term -> term -> term -> term -> rule
       val subsumption : term -> term -> rule
@@ -948,9 +950,11 @@ fun subtypeForm a b = Arg.make "subtypeForm" [] (Elim (const_istp, [App (Elim (c
 fun subtypeEq a b c d = Arg.make "subtypeEq" [] (Elim (const_eqtp, [App (Elim (const_subtype, [App (a), App (c), ])), App (Elim (const_subtype, [App (b), App (d), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (b), ])), (Arg.Unhide, [], Elim (const_eqtp, [App (c), App (d), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun subtypeFormUniv a b i = Arg.make "subtypeFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_subtype, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun subtypeEqUniv a b c d i = Arg.make "subtypeEqUniv" [] (Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (Elim (const_subtype, [App (a), App (c), ])), App (Elim (const_subtype, [App (b), App (d), ])), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (a), App (b), ])), (Arg.Unhide, [], Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (c), App (d), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
-fun subtypeIntro a b = Arg.make "subtypeIntro" [] (Elim (const_subtype, [App (a), App (b), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Sub (b, Shift 1)), App (Var 0), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun subtypeIntro a b = Arg.make "subtypeIntro" [] (Elim (const_of, [App (Elim (const_subtype, [App (a), App (b), ])), App (Triv), ])) [(Arg.Unhide, [], Elim (const_subtype, [App (a), App (b), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun subtypeElim a b p = Arg.make "subtypeElim" [] (Elim (const_subtype, [App (a), App (b), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_subtype, [App (a), App (b), ])), App (p), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun subtypeExt a b p q = Arg.make "subtypeExt" [] (Elim (const_eq, [App (Elim (const_subtype, [App (a), App (b), ])), App (p), App (q), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_subtype, [App (a), App (b), ])), App (p), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_subtype, [App (a), App (b), ])), App (q), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun subtypeLeft gsize a b c = Arg.lmake "subtypeLeft" [] gsize [J.Tm (Elim (const_subtype, [App (a), App (b), ])), ] (c) [(Arg.Nothing, [], SOME (Dot (Triv, Shift 0)), Sub (c, under gsize (Dot (Triv, Shift 0)))), ] (fn [m, ] => Sub (m, under gsize (Shift 1)) | _ => raise Arg.ExtractFailure)
+fun subtypeEstablish a b = Arg.make "subtypeEstablish" [] (Elim (const_subtype, [App (a), App (b), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Sub (b, Shift 1)), App (Var 0), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun subsumptionOf a b m = Arg.make "subsumptionOf" [] (Elim (const_of, [App (b), App (m), ])) [(Arg.Unhide, [], Elim (const_subtype, [App (a), App (b), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun subsumptionEq a b m n = Arg.make "subsumptionEq" [] (Elim (const_eq, [App (b), App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_subtype, [App (a), App (b), ])), (Arg.Unhide, [], Elim (const_eq, [App (a), App (m), App (n), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun subsumption a b = Arg.make "subsumption" [] (b) [(Arg.Unhide, [], Elim (const_subtype, [App (a), App (b), ])), (Arg.Nothing, [], a), ] (fn [_, m, ] => m | _ => raise Arg.ExtractFailure)

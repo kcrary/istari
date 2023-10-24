@@ -2595,11 +2595,15 @@ variables.  The official rules, using de Bruijn indices, are given
 
 - `subtypeIntro A B`
 
+      G |- () : A <: B
+      >>
+      G |- A <: B
+
+- `subtypeElim A B P`
+
       G |- A <: B
       >>
-      G |- A : type
-      G |- B : type
-      G, x : A |- x : B
+      G |- P : A <: B
 
 - `subtypeExt A B P Q`
 
@@ -2613,6 +2617,14 @@ variables.  The official rules, using de Bruijn indices, are given
       G1, x : (A <: B), G2 |- C ext M
       >>
       G1, [() / x]G2 |- [() / x]C ext M
+
+- `subtypeEstablish A B`
+
+      G |- A <: B
+      >>
+      G |- A : type
+      G |- B : type
+      G, x : A |- x : B
 
 - `subsumptionOf A B M`
 

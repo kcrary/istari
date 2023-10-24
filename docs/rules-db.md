@@ -2582,11 +2582,15 @@ Conventions:
 
 - `subtypeIntro A B`
 
+      G |- of (subtype A B) ()
+      >>
+      G |- subtype A B
+
+- `subtypeElim A B P`
+
       G |- subtype A B
       >>
-      G |- istp A
-      G |- istp B
-      G, A |- of B[^1] 0
+      G |- of (subtype A B) P
 
 - `subtypeExt A B P Q`
 
@@ -2600,6 +2604,14 @@ Conventions:
       G1, (subtype A B), G2 |- C ext M[under_n (^1)]
       >>
       G1, G2[() . id] |- C[under_n (() . id)] ext M
+
+- `subtypeEstablish A B`
+
+      G |- subtype A B
+      >>
+      G |- istp A
+      G |- istp B
+      G, A |- of B[^1] 0
 
 - `subsumptionOf A B M`
 

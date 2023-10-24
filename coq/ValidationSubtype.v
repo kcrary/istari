@@ -58,8 +58,16 @@ Qed.
 Lemma subtypeIntro_valid : subtypeIntro_obligation.
 Proof.
 prepare.
-intros G a b ext2 ext1 ext0 Ha Hb Hsub.
-eapply tr_subtype_intro; eauto.
+intros G a b ext0 H.
+auto.
+Qed.
+
+
+Lemma subtypeElim_valid : subtypeElim_obligation.
+Proof.
+prepare.
+intros G a b p ext0 H.
+auto.
 Qed.
 
 
@@ -93,6 +101,14 @@ prepare.
 intros G1 G2 a b c m H.
 unfold Defs.triv in H.
 apply tr_subtype_eta_hyp; auto.
+Qed.
+
+
+Lemma subtypeEstablish_valid : subtypeEstablish_obligation.
+Proof.
+prepare.
+intros G a b ext2 ext1 ext0 Ha Hb Hsub.
+eapply tr_subtype_intro; eauto.
 Qed.
 
 

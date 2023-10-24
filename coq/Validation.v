@@ -399,8 +399,10 @@ exact subtypeEq_valid.
 exact subtypeFormUniv_valid.
 exact subtypeEqUniv_valid.
 exact subtypeIntro_valid.
+exact subtypeElim_valid.
 exact subtypeExt_valid.
 exact subtypeLeft_valid.
+exact subtypeEstablish_valid.
 exact subsumptionOf_valid.
 exact subsumptionEq_valid.
 exact subsumption_valid.
