@@ -572,6 +572,15 @@ Conventions:
       G |- of (tarrow A B) N
       G, A |- eq B[^1] (M[^1] 0) (N[^1] 0)
 
+- `tarrowOfExt A A' B B' M`
+
+      G |- of (tarrow A B) M
+      >>
+      G |- istp A
+      G |- istp B
+      G |- of (forall A' (fn . B')) M
+      G, A |- of B[^1] (M[^1] 0)
+
 
 ### K-Functions
 
@@ -706,6 +715,15 @@ Conventions:
       G |- of (karrow A B) M
       G |- of (karrow A B) N
       G, A |- eq B[^1] (M[^1] 0) (N[^1] 0)
+
+- `karrowOfExt A A' B B' M`
+
+      G |- of (karrow A B) M
+      >>
+      G |- istp A
+      G |- istp B
+      G |- of (forall A' (fn . B')) M
+      G, A |- of B[^1] (M[^1] 0)
 
 
 ### Intersection types

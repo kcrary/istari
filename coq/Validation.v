@@ -106,6 +106,7 @@ exact tarrowElimEq_valid.
 exact tarrowElim_valid.
 exact tarrowEta_valid.
 exact tarrowExt_valid.
+exact tarrowOfExt_valid.
 exact karrowKind_valid.
 exact karrowKindEq_valid.
 exact karrowForm_valid.
@@ -124,6 +125,7 @@ exact karrowElimEq_valid.
 exact karrowElim_valid.
 exact karrowEta_valid.
 exact karrowExt_valid.
+exact karrowOfExt_valid.
 exact intersectForm_valid.
 exact intersectEq_valid.
 exact intersectFormUniv_valid.

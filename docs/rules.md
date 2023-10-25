@@ -585,6 +585,15 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- N : A -t> B
       G, x : A |- M x = N x : B
 
+- `tarrowOfExt A A' B B' M`
+
+      G |- M : A -t> B
+      >>
+      G |- A : type
+      G |- B : type
+      G |- M : forall (x : A') . B'
+      G, x : A |- M x : B
+
 
 ### K-Functions
 
@@ -719,6 +728,15 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- M : A -k> B
       G |- N : A -k> B
       G, x : A |- M x = N x : B
+
+- `karrowOfExt A A' B B' M`
+
+      G |- M : A -k> B
+      >>
+      G |- A : type
+      G |- B : type
+      G |- M : forall (x : A') . B'
+      G, x : A |- M x : B
 
 
 ### Intersection types

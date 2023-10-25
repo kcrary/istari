@@ -1059,6 +1059,19 @@ apply tr_pi_intro.
 Qed.
 
 
+Lemma tarrowOfExt_valid : tarrowOfExt_obligation.
+Proof.
+prepare.
+intros G a a' b b' M ext3 ext2 ext1 ext0 Ha Hb Halt Hof.
+apply (tr_eqtype_convert _#3 (pi a (subst sh1 b))).
+2:{
+  apply (tr_pi_ext _#5 a' a' b' b'); auto.  
+  }
+apply tr_eqtype_symmetry.
+apply tr_arrow_pi_equal; auto.
+Qed.
+
+
 Lemma karrowKind_valid : karrowKind_obligation.
   unfoldtop. autounfold with valid_hint.
   intros G a i k triv0 triv1 H1 H2.
@@ -1451,6 +1464,19 @@ apply tr_pi_intro.
   apply tr_equal_elim.
   eapply tr_equal_eta2; eauto.
   }
+Qed.
+
+
+Lemma karrowOfExt_valid : karrowOfExt_obligation.
+Proof.
+prepare.
+intros G a a' b b' M ext3 ext2 ext1 ext0 Ha Hb Halt Hof.
+apply (tr_eqtype_convert _#3 (pi a (subst sh1 b))).
+2:{
+  apply (tr_pi_ext _#5 a' a' b' b'); auto.  
+  }
+apply tr_eqtype_symmetry.
+apply tr_karrow_pi_equal; auto.
 Qed.
 
 
