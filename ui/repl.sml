@@ -665,7 +665,11 @@ functor ReplFun (structure Platform : PLATFORM
             if result then
                ()
             else
-               print "[exiting]\n";
+               (
+               print "[exiting ";
+               print filename;
+               print "]\n"
+               );
 
             result
          end
