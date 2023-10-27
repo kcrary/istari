@@ -3000,6 +3000,13 @@ Conventions:
       G1 |- istp A
       G1, (hidden) A, G2[() . ^1] |- C[under_n (() . ^1)] ext M
 
+- `squashSub A B`
+
+      G |- subtype (squash A) (squash B)
+      >>
+      G |- istp B
+      G |- arrow A B
+
 
 ### Quotient types
 

@@ -66,7 +66,10 @@ The monadic bind is `bindbar`:
 The syntactic sugar `bindbar x = m in n` is accepted for 
 `` ` bindbar _ _ m (fn x . n)``.
 
-   
+Bar is covariant:
+
+    bar_subtype : forall (i : level) (a b : U i) . a <: b -> bar a <: bar b
+
 
 Finally we can define a fixpoint operator on partial objects:
 

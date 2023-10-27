@@ -3013,6 +3013,13 @@ variables.  The official rules, using de Bruijn indices, are given
       G1 |- A : type
       G1, y (hidden) : A, [() / x]G2 |- [() / x]C ext M
 
+- `squashSub A B`
+
+      G |- {A} <: {B}
+      >>
+      G |- B : type
+      G |- A -> B
+
 
 ### Quotient types
 

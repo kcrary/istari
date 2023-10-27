@@ -456,6 +456,7 @@ exact squashIntro_valid.
 exact squashElim_valid.
 exact squashExt_valid.
 exact squashLeft_valid.
+exact squashSub_valid.
 exact quotientForm_valid.
 exact quotientEq_valid.
 exact quotientFormUniv_valid.

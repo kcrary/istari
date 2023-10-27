@@ -118,7 +118,7 @@ Lemmas:
 Lexicographic order on pairs.
 
     lexpair : intersect (i : level) .
-                 forall (a b : U i) (Q : a -> a -> U i) (R : b -> b -> U i) (x y : a & b) . U i
+                 forall (a b : U i) . (a -> a -> U i) -> (b -> b -> U i) -> a & b -> a & b -> U i
             = fn a b Q R x y . Q (x #1) (y #1) % x #1 = y #1 : a & R (x #2) (y #2)
 
     lexpair_well_founded : forall

@@ -79,6 +79,8 @@ unfoldHead /bar/.
 typecheck.
 qed ();
 
+val bar = parseConstant /bar/;
+
 
 
 lemma "bar_unroll" 
@@ -187,6 +189,39 @@ unrolling ffix
 
 
 
+lemma "bar_subtype"
+/
+  forall i (a b : U i) .
+    a <: b
+    -> bar a <: bar b
+/;
+
+inference.
+intro /i a b Hsub/.
+apply /ffix/.
+intro /Hsubbar x/.
+rewrite /-> bar_unroll in x in concl/.
+destruct /x/ /x | [x]/.
+  {
+  typecheck.
+  }
+
+  {
+  destruct /Hsubbar/ /[Hsubbar]/.
+  (* The typechecker won't find Hsubbar because it's in the future when we start.
+     We need to do this in two stages so it refreshes its table after moving into
+     the future.
+  *)
+  fold /manual x/.
+  typecheck.
+  typecheck.
+  }
+qed ();
+
+val bar_subtype = parseConstant /bar_subtype/;
+
+
+
 define /bfix {a} f/
 /
   ffix (bar a) (fn x . f (inr x))
@@ -214,5 +249,12 @@ qed ();
    above (bfix_type) does not have Smith's admissibility requirement.
    (See Smith [1988], theorem 60.)
 *)
+
+
+
+writeRegistry /AfterBarAllEnv/
+  /[constant constant]/
+  (Collapse (bar, bar_subtype));
+
 
 Namespace.endModule ();
