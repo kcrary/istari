@@ -115,7 +115,8 @@ signature TYPECHECK_INTERNAL =
 
    2. If M is unknown, defer.
 
-   3. If M has the form (manual M'), generate a subgoal and stop.
+   3. If M or A is marked manual (that is, it has the form (manual _)),
+      generate a subgoal and stop.
 
    4. If the goal matches a hypothesis in the table, use it.
 
@@ -153,7 +154,7 @@ signature TYPECHECK_INTERNAL =
 
    1. If A is unknown, defer.
 
-   2. If A has the form (manual A'), generate a subgoal and stop.
+   2. If A is marked manual generate a subgoal and stop.
 
    3. If the goal matches a hypothesis in the table, use it.
 
@@ -167,7 +168,9 @@ signature TYPECHECK_INTERNAL =
    V
    For goals of the form A <: B, put A and B in hard whnf.  Then:
 
-   1. If B is Ui, then:
+   1. If A or B is marked manual, generate a subgoal and stop.
+
+   2. If B is Ui, then:
 
       a. Attempt to unify A with Uj, for fresh j.
          If successful, prove j <l= i and i, j : level.
@@ -177,54 +180,60 @@ signature TYPECHECK_INTERNAL =
 
       c. Reject
 
-   2. Unify A and B if possible.  If successful, prove A : type.
+   3. Unify A and B if possible.  If successful, prove A : type.
 
-   3. If the goal matches a hypothesis in the table, use it.
+   4. If the goal matches a hypothesis in the table, use it.
 
-   4. Use any applicable subtyping rule.
+   5. Use any applicable subtyping rule.
 
-   5. Prove A = B : type.
+   6. Prove A = B : type.
 
 
    VI
    For goals of the form A = B : type, put A and B in hard whnf.
    Then:
 
-   1. Unify A and B if possible.  If successful, prove A : type.
+   1. If A or B is marked manual, generate a subgoal and stop.
 
-   2. If the goal matches a hypothesis in the table, use it.
+   2. Unify A and B if possible.  If successful, prove A : type.
 
-   3. Use any applicable type equality rule.
+   3. If the goal matches a hypothesis in the table, use it.
 
-   4. Prove A = B : Ui for unknown i.
+   4. Use any applicable type equality rule.
+
+   5. Prove A = B : Ui for unknown i.
 
 
    VII
    For goals of the form A = B : Ui, put A and B in hard whnf.  Then:
 
-   1. Unify A and B if possible.  If successful, prove A : Ui.
+   1. If A or B is marked manual, generate a subgoal and stop.
 
-   2. If the goal matches a hypothesis in the table, use it.
+   2. Unify A and B if possible.  If successful, prove A : Ui.
 
-   3. Use any applicable type equality rule.
+   3. If the goal matches a hypothesis in the table, use it.
 
-   4. Try compatibility.
+   4. Use any applicable type equality rule.
 
-   5. Reject.
+   5. Try compatibility.
+
+   6. Reject.
 
 
    VIII
    For goals of the form A = B : Ki, put A and B in hard whnf.  Then:
 
-   1. Unify A and B if possible.  If successful, prove A : Ki.
+   1. If A or B is marked manual, generate a subgoal and stop.
 
-   2. If the goal matches a hypothesis in the table, use it.
+   2. Unify A and B if possible.  If successful, prove A : Ki.
 
-   3. Use any applicable type equality rule.
+   3. If the goal matches a hypothesis in the table, use it.
 
-   4. Try compatibility.
+   4. Use any applicable type equality rule.
 
-   5. Reject.
+   5. Try compatibility.
+
+   6. Reject.
 
 *)
 
@@ -1086,7 +1095,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                \fnc _ =>
                    defer st (Of, table, goal, dest, history)\
 
-               (* 3. If M is marked manual, stop. *)
+               (* 3a. If M is marked manual, stop. *)
              | _ ; \Prim.manual\ _ =>
                \fnc =>
                    (
@@ -1096,6 +1105,22 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                       (
                       (* G |- manual M : A *)
                       refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 1])))
+                      >>
+                      (* G |- M : A *)
+                      idtacM (Message.fromString (attach "manual typing obligation" origin))
+                      )
+                   )\
+   
+               (* 3b. If A is marked manual, stop. *)
+             | \Prim.manual\ _ ; _ =>
+               \fnc =>
+                   (
+                   progress := true;
+                   
+                   dest :=
+                      (
+                      (* G |- M : manual A *)
+                      refine (Rule.reduce (R.within [1] (R.trans [R.unfold, R.beta 1])))
                       (* G |- M : A *)
                       >>
                       idtacM (Message.fromString (attach "manual typing obligation" origin))
@@ -1402,7 +1427,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Istp checking ***)
 
-      fun typecheckIstp (st as ST { progress }) table (goal as (jud, dir)) dest history =
+      fun typecheckIstp (st as ST { progress }) table (goal as (jud, dir)) dest (history as (origin, _)) =
          let
             val ctx = J.context jud
             val concl = J.concl jud
@@ -1427,9 +1452,13 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    progress := true;
                    
                    dest :=
+                      (
                       (* G |- manual A : type *)
                       refine (Rule.reduce (R.within [1] (R.trans [R.unfold, R.beta 1])))
+                      >>
                       (* G |- A : type *)
+                      idtacM (Message.fromString (attach "manual typing obligation" origin))
+                      )
                    )\
 
                (* 3. Look in the table. *)
@@ -1559,7 +1588,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Subtype checking ***)
                       
-      fun typecheckSubtype (st as ST { progress, constraints }) table (goal as (jud, dir)) dest history =
+      fun typecheckSubtype (st as ST { progress, constraints }) table (goal as (jud, dir)) dest (history as (origin, _)) =
          let
             val ctx = J.context jud
             val concl = J.concl jud
@@ -1572,7 +1601,39 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
          in
             term2Case a b
             /
-               (* 1. If B is Ui... *)
+               (* 1a. If A is marked manual, stop. *)
+             | \Prim.manual\ _ ; _ =>
+               \fnc =>
+                   (
+                   progress := true;
+                   
+                   dest :=
+                      (
+                      (* G |- manual A <: B *)
+                      refine (Rule.reduce (R.within [1] (R.trans [R.unfold, R.beta 1])))
+                      >>
+                      (* G |- A <: B *)
+                      idtacM (Message.fromString (attach "manual typing obligation" origin))
+                      )
+                   )\
+   
+               (* 1b. If B is marked manual, stop. *)
+             | _ ; \Prim.manual\ _ =>
+               \fnc =>
+                   (
+                   progress := true;
+                   
+                   dest :=
+                      (
+                      (* G |- A <: manual B *)
+                      refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 1])))
+                      >>
+                      (* G |- A <: B *)
+                      idtacM (Message.fromString (attach "manual typing obligation" origin))
+                      )
+                   )\
+   
+               (* 2. If B is Ui... *)
              | _ ; \Prim.univ\ ? =>
                \(fnc u =>
                     let
@@ -1639,7 +1700,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                                  ))
                     end)\
                              
-               (* 2. Unify A and B. *)
+               (* 3. Unify A and B. *)
              | _ =!>
                \(fnc =>
                     if U.unify1 a b then
@@ -1665,7 +1726,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                     else
                        raise Backtrack)\
 
-               (* 3. Look in the table. *)
+               (* 4. Look in the table. *)
              | _ =!>
                \fnc =>
                    if 
@@ -1702,7 +1763,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    else
                       raise Backtrack\
 
-               (* 4a. Use a subtyping rule. *)
+               (* 5a. Use a subtyping rule. *)
              | const? @ _ ; const? @ _ =!>
                \fnc const1 const2 =>
                    (case H2.find subtypeTactics (const1, const2) of
@@ -1720,7 +1781,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                      | NONE => raise Backtrack)\
 
-               (* 4b. Use a left-indexed subtyping rule. *)
+               (* 5b. Use a left-indexed subtyping rule. *)
              | const? @ _ ; _ =!>
                \(fnc const =>
                     (case H.find subtypeLeftTactics const of
@@ -1738,7 +1799,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
  
                       | NONE => raise Backtrack))\
 
-               (* 5. Try A = B : type *)
+               (* 6. Try A = B : type *)
              | _ =>
                \fnc =>
                    let
@@ -1766,7 +1827,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       (*** Eqtype checking ***)
                       
-      fun typecheckEqtp (st as ST { progress }) table (goal as (jud, dir)) dest history =
+      fun typecheckEqtp (st as ST { progress }) table (goal as (jud, dir)) dest (history as (origin, _)) =
          let
             val ctx = J.context jud
             val concl = J.concl jud
@@ -1779,7 +1840,39 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
          in
             term2Case a b
             /
-               (* 1. Unify A and B. *)
+               (* 1a. If A is marked manual, stop. *)
+             | \Prim.manual\ _ ; _ =>
+               \fnc =>
+                   (
+                   progress := true;
+                   
+                   dest :=
+                      (
+                      (* G |- manual A = B : type *)
+                      refine (Rule.reduce (R.within [1] (R.trans [R.unfold, R.beta 1])))
+                      >>
+                      (* G |- A = B : type *)
+                      idtacM (Message.fromString (attach "manual typing obligation" origin))
+                      )
+                   )\
+   
+               (* 1b. If B is marked manual, stop. *)
+             | _ ; \Prim.manual\ _ =>
+               \fnc =>
+                   (
+                   progress := true;
+                   
+                   dest :=
+                      (
+                      (* G |- A = manual B : type *)
+                      refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 1])))
+                      >>
+                      (* G |- A = B : type *)
+                      idtacM (Message.fromString (attach "manual typing obligation" origin))
+                      )
+                   )\
+   
+               (* 2. Unify A and B. *)
              | _ =!>
                \fnc =>
                    if U.unify1 a b then
@@ -1805,7 +1898,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    else
                       raise Backtrack\
 
-               (* 2. Look in the table. *)
+               (* 3. Look in the table. *)
              | _ =!>
                \fnc =>
                    if
@@ -1831,7 +1924,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    else
                       raise Backtrack\
 
-               (* 3. Use a type equality rule. *)
+               (* 4. Use a type equality rule. *)
              | const? @ _ ; const? @ _ =!>
                \fnc const1 const2 =>
                    (case H2.find eqtpTactics (const1, const2) of
@@ -1850,7 +1943,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                      | NONE => raise Backtrack)\
 
-               (* 4. Try A = B : Ui *)
+               (* 5. Try A = B : Ui *)
              | _ =>
                \fnc =>
                    let
@@ -1895,7 +1988,39 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
          in
             term2Case a b
             /
-               (* 1. Unify A and B. *)
+               (* 1a. If A is marked manual, stop. *)
+             | \Prim.manual\ _ ; _ =>
+               \fnc =>
+                   (
+                   progress := true;
+                   
+                   dest :=
+                      (
+                      (* G |- manual A = B : Class *)
+                      refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 1])))
+                      >>
+                      (* G |- A = B : Class *)
+                      idtacM (Message.fromString (attach "manual typing obligation" origin))
+                      )
+                   )\
+   
+               (* 1b. If B is marked manual, stop. *)
+             | _ ; \Prim.manual\ _ =>
+               \fnc =>
+                   (
+                   progress := true;
+                   
+                   dest :=
+                      (
+                      (* G |- A = manual B : Class *)
+                      refine (Rule.reduce (R.within [3] (R.trans [R.unfold, R.beta 1])))
+                      >>
+                      (* G |- A = B : Class *)
+                      idtacM (Message.fromString (attach "manual typing obligation" origin))
+                      )
+                   )\
+   
+               (* 2. Unify A and B. *)
              | _ =!>
                \fnc =>
                    if U.unify1 a b then
@@ -1921,7 +2046,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    else
                       raise Backtrack\
 
-               (* 2. Look in the table. *)
+               (* 3. Look in the table. *)
              | _ =!>
                \fnc =>
                    if
@@ -1934,7 +2059,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    else
                       raise Backtrack\
 
-               (* 3. Use a type equality rule. *)
+               (* 4. Use a type equality rule. *)
              | const? @ _ ; const? @ _ =!>
                \fnc const1 const2 =>
                    (case H2.find tactics (const1, const2) of
@@ -1953,7 +2078,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                      | NONE => raise Backtrack)\
 
-               (* 4. Compatibility *)
+               (* 5. Compatibility *)
              | _ =>
                \fnc =>
                    let

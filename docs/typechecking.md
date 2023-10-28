@@ -20,18 +20,28 @@ Proviso #4 requires some elaboration.  Ambiguous typing constraints
 will be avoided if all type arguments are supplied.  When type
 arguments are omitted, Istari will create evars for those arguments,
 and resolve them using higher-order unification.  To make higher-order
-unification practical, Istari employs the *pattern fragment*.  An evar
-is in the pattern fragment when it is applied to (or substituted into
-using) distinct variables.  For example, `E x y` is in the pattern
-fragment, but `E x x`, `E x (f x)` and `E x E'` are not.
+unification practical, Istari employs the *relaxed pattern fragment*.
+An evar is in the pattern fragment when it is applied to (or is
+substituted into by) distinct variables.  For example, `E x y` is in
+the pattern fragment, but `E x x`, `E x (f x)` and `E x E'` are not.
+In the *relaxed* pattern fragment, evars with non-variable
+arguments/substitutends are permitted, but those
+arguments/substitutends are ignored.  Thus `E x (f x)` and `E x E'`
+are permitted, but the solution for `E` will never use its second
+argument.
 
 Non-pattern evars arise most frequently when one substitutes into an
 evar.  For example, suppose `f : forall (x : A) . E` and `f M` is used
-where a `B` is expected.  This creates a constraint equating `[M / x]
-E` with `B`, but the former is not in the pattern fragment.  In such a
-case, the typechecker defers the constraint, in hopes that some other
-constraint will resolve `E`.  If that does not happen, an ambiguous
+where a `B` is expected.  This creates a constraint equating 
+`[M / x] E` with `B`, but the former is not in the pattern fragment.
+In such a situation, the typechecker may (depending on exactly what
+`M` is) ignore the dependency on `M`, or it may defer the entire
+constraint, in the hope that some other constraint will resolve `E`.
+In the latter case, if no other constraint resolves `E`, an ambiguous
 constraint is reported.
+
+Additional discussion of unification can be found
+[here](unification.html).
 
 
 ##### Coping strategies
@@ -52,8 +62,8 @@ employed.
 - Another way to deal with a recalcitrant subterm is to mark it for
   manual typechecking.  The constant `manual` is the identity (*i.e.,*
   `manual M` = `M`), but the typechecker sets aside any typechecking
-  obligation for a manual term.  Thus, if one wishes to leave `M` out
-  of typechecking, one can first run:
+  obligation for a manual expression.  Thus, if one wishes to leave
+  `M` out of typechecking, one can first run:
 
       fold /manual M/
 
@@ -121,14 +131,14 @@ The algorithm proceeds as follows:
 
 ##### Typing
 
-For goals of the form `M : A`, put `M` in basic whnf, and put `A` in
-hard whnf.  (See below.)  Then:
+For goals of the form `M : A`, put `M` in [basic whnf](#reduction-strategies),
+and put `A` in [hard whnf](#reduction-strategies).  Then:
 
 1. If `A` is `level` and `M` is an evar, set the goal aside for the level solver.
 
 2. If `M` is unknown, defer.
 
-3. If `M` has the form `manual M'`, generate a subgoal and stop.
+3. If `M` or `A` has the form `manual _`, generate a subgoal and stop.
 
 4. If the goal matches a hypothesis, use it.
 
@@ -166,11 +176,12 @@ hard whnf.  (See below.)  Then:
 
 ##### Type formation
 
-For goals of the form `A : type`, put `A` in basic whnf.  Then:
+For goals of the form `A : type`, put `A` in 
+[basic whnf](#reduction-strategies).  Then:
 
 1. If `A` is unknown, defer.
 
-2. If `A` has the form `manual A'`, generate a subgoal and stop.
+2. If `A` has the form `manual _`, generate a subgoal and stop.
 
 3. If the goal matches a hypothesis, use it.
 
@@ -183,9 +194,12 @@ For goals of the form `A : type`, put `A` in basic whnf.  Then:
 
 ##### Subtyping
 
-For goals of the form `A <: B`, put `A` and `B` in hard whnf.  Then:
+For goals of the form `A <: B`, put `A` and `B` in 
+[hard whnf](#reduction-strategies).  Then:
 
-1. If `B` is `U i`, then:
+1. If `A` or `B` has the form `manual _`, generate a subgoal and stop.
+
+2. If `B` is `U i`, then:
 
    a. Attempt to unify `A` with `U j`, for fresh `j`.  If successful,
       prove `j <l= i` and `i, j : level`.
@@ -195,47 +209,52 @@ For goals of the form `A <: B`, put `A` and `B` in hard whnf.  Then:
 
    c. Reject
 
-2. Unify `A` and `B` if possible.  If successful, prove `A : type`.
+3. Unify `A` and `B` if possible.  If successful, prove `A : type`.
 
    **Note:** This means subtyping is resolved using the "greedy
    algorithm" when possible.  This usually performs well in practice,
    but occasionally it can have unpredictable results.
 
-3. If the goal matches a hypothesis, use it.
+4. If the goal matches a hypothesis, use it.
 
-4. Use any applicable subtyping rule.
+5. Use any applicable subtyping rule.
 
-5. Prove `A = B : type`.
+6. Prove `A = B : type`.
 
 
 ##### Type equivalence
 
-For goals of the form `A = B : type`, put `A` and `B` in hard whnf.  Then:
+For goals of the form `A = B : type`, put `A` and `B` in 
+[hard whnf](#reduction-strategies).  Then:
 
-1. Unify `A` and `B` if possible.  If successful, prove `A : type`.
+1. If `A` or `B` has the form `manual _`, generate a subgoal and stop.
 
-2. If the goal matches a hypothesis, use it.
+2. Unify `A` and `B` if possible.  If successful, prove `A : type`.
 
-3. Use any applicable type equality rule.
+3. If the goal matches a hypothesis, use it.
 
-4. Prove `A = B : U i` for unknown `i`.
+4. Use any applicable type equality rule.
+
+5. Prove `A = B : U i` for unknown `i`.
 
 
 ##### Equality at a universe
 
 For goals of the form `A = B : U i` or `A = B : K i`, put `A` and `B`
-in hard whnf.  Then:
+in [hard whnf](#reduction-strategies).  Then:
 
-1. Unify `A` and `B` if possible.  If successful, prove `A : U i` or
+1. If `A` or `B` has the form `manual _`, generate a subgoal and stop.
+
+2. Unify `A` and `B` if possible.  If successful, prove `A : U i` or
 `A : K i`.
 
-2. If the goal matches a hypothesis, use it.
+3. If the goal matches a hypothesis, use it.
 
-3. Use any applicable type equality rule.
+4. Use any applicable type equality rule.
 
-4. Try compatibility.
+5. Try compatibility.
 
-5. Reject.
+6. Reject.
 
 
 ##### Reduction strategies

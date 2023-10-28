@@ -25,12 +25,13 @@ There are two exceptions [1] to this rule:
 
        E x = M x
 
-   where `E` cannot depend on `x`.  There are two solutions: 
-   `E := M` and `E := fn x . M x`.  These are eta equivalent, but
-   unification recognizes only beta equivalence.  (*Definitional
-   equality* recognizes a form of eta equivalence appropriate to the
-   type in question.)  Thus, the two solutions are not equivalent.  We
-   resolve the ambiguity in favor of the first solution.
+   where `E` cannot depend on `x`.  There are two solutions: `E := M`
+   and `E := fn x . M x`.  These are eta equivalent, but unification
+   recognizes only beta equivalence.  (*Definitional equality* does
+   recognize a form of eta equivalence appropriate to the type in
+   question, but it is not relevant to unification.)  Thus, the two
+   solutions are not equivalent.  We resolve the ambiguity in favor of
+   the first solution.
 
 2. Consider the equation:
 
