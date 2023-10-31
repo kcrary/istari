@@ -507,7 +507,12 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       val compatRaw = compatPriority >> idtac
 
       val compat =
+         (* The cut prevents bad explosion.  We only need to cut the first, but
+            compatPriority can't usefully backtrack, so it's more efficient to
+            cut the whole thing.
+         *)
          TC.withTypecheckSnd $
+         cut $
          compatPriority
          >>=
          (fn tc => first [reflexivityPriority, idtacM tc])

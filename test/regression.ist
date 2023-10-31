@@ -9,6 +9,35 @@ Ctrl.use "../library/integer-load.iml";
 fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
 
 
+
+lemma "backtrack_through_typecheck"
+/
+  forall i (a b c : U i) . (a -> c) -> (b -> c) -> b -> c
+/;
+
+inference.
+intro /i a b c Hac Hbc Hb/.
+shouldfail ((Typecheck.withTypecheck $ cut (first [witness /Hac __/, witness /Hbc __/])) >> auto >> done).
+(Typecheck.withTypecheck $ first [witness /Hac __/, witness /Hbc __/]) >> auto >> done.
+qed ();
+
+
+
+lemma "backtrack_through_apply"
+/
+  forall i (a : U i) (a1 a2 : a) (P : a -> U i) (R : a -> a -> U i) .
+    (forall x y . R x y -> P x & P y)
+    -> R a1 a2
+    -> P a2
+/;
+
+inference.
+intro /i a a1 a2 P R H1 H2/.
+apply /H1/ >> auto >> done.
+qed ();
+
+
+
 lemma "manual_subtype"
 /
   forall i (a b c : U i) . a <: b -> (b -> c) <: (a -> c)

@@ -314,7 +314,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
       *)
       fun applyMain a c tac fk sk =
          if Unify.unify1 a c then
-            sk tac
+            sk (tac, fk)
          else
             termCase (N.whnfHard a)
             /| \Prim.forall\ ? (fn . ?) =>
@@ -323,17 +323,17 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                        val e = T.evar ()
                     in
                        applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                       (refine (Rule.forallElim dom cod e) 
-                        >>> [tac, idtacM Secondary])
-                       fk sk
+                          (refine (Rule.forallElim dom cod e) 
+                           >>> [tac, idtacM Secondary])
+                          fk sk
                     end)\
  
              | \Prim.arrow\ ? ? =>
                \(fnc dom cod =>
                     applyMain cod c
-                    (refine (Rule.arrowElim dom cod) 
-                     >>> [tac, idtacM Primary])
-                    fk sk)\
+                       (refine (Rule.arrowElim dom cod) 
+                        >>> [tac, idtacM Primary])
+                       fk sk)\
  
              | \Prim.intersect\ ? (fn . ?) =>
                \(fnc dom cod =>
@@ -341,9 +341,9 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                        val e = T.evar ()
                     in
                        applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                       (refine (Rule.intersectElim dom cod e) 
-                        >>> [tac, idtacM Secondary])
-                       fk sk
+                          (refine (Rule.intersectElim dom cod e) 
+                           >>> [tac, idtacM Secondary])
+                          fk sk
                     end)\
  
              | \Prim.iforall\ ? ? (fn ? . ?) =>
@@ -352,20 +352,20 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                        val e = T.evar ()
                     in
                        applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                       (refine (Rule.iforallElim cod lev dom e)
-                        >>> [
-                            let
-                               do (_, dir) = withgoal
-                            in
-                               chdir (D.bindVary dir binder)
-                               >> idtacM Secondary
-                            end,
-
-                            tac,
-
-                            idtacM Secondary
-                            ])
-                       fk sk
+                          (refine (Rule.iforallElim cod lev dom e)
+                           >>> [
+                               let
+                                  do (_, dir) = withgoal
+                               in
+                                  chdir (D.bindVary dir binder)
+                                  >> idtacM Secondary
+                               end,
+   
+                               tac,
+   
+                               idtacM Secondary
+                               ])
+                          fk sk
                     end)\
 
              | \Prim.foralltp\ (fn ? . ?) =>
@@ -374,35 +374,35 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                        val e = T.evar ()
                     in
                        applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                       (refine (Rule.foralltpElim cod e)
-                        >>> [
-                            let
-                               do (_, dir) = withgoal
-                            in
-                               chdir (D.bindVary dir binder)
-                               >> idtacM Secondary
-                            end,
-
-                            tac,
-
-                            idtacM Secondary
-                            ])
-                       fk sk
+                          (refine (Rule.foralltpElim cod e)
+                           >>> [
+                               let
+                                  do (_, dir) = withgoal
+                               in
+                                  chdir (D.bindVary dir binder)
+                                  >> idtacM Secondary
+                               end,
+   
+                               tac,
+   
+                               idtacM Secondary
+                               ])
+                          fk sk
                     end)\
 
              | \Prim.tarrow\ ? ? =>
                \(fnc dom cod =>
                     applyMain cod c
-                    (refine (Rule.tarrowElim dom cod)
-                     >>> [tac, idtacM Primary])
-                    fk sk)\
+                       (refine (Rule.tarrowElim dom cod)
+                        >>> [tac, idtacM Primary])
+                       fk sk)\
  
              | \Prim.karrow\ ? ? =>
                \(fnc dom cod =>
                     applyMain cod c
-                    (refine (Rule.karrowElim dom cod)
-                     >>> [tac, idtacM Primary])
-                    fk sk)\
+                       (refine (Rule.karrowElim dom cod)
+                        >>> [tac, idtacM Primary])
+                       fk sk)\
  
              | \Prim.prod\ ? ? =>
                \(fnc a1 a2 =>
@@ -429,14 +429,19 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
             (* atac partially proves G |- A *)
 
             val c = J.concl jud
+
+            val mark = Trail.mark ()
+
+            fun tac goal fk sk =
+               applyMain a c
+                  atac
+                  (fn () => fk "lemma does not match goal")
+                  (fn (ctac, fk') =>
+                      ctac goal (fn _ => (Trail.rewind mark; fk' ())) sk)
          in
             Reorder.reorder
                (* applyMain has to return answer *)
-               (fns goal fk sk =>
-                   applyMain a c
-                      atac
-                      (fn () => fk "lemma does not match goal")
-                      (fn ctac => ctac goal fk sk))
+               tac
                (Reorder.sort priorityOrder)
          end
 

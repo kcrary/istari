@@ -12,11 +12,15 @@ signature REPORT =
       val insertApp : Namespace.address -> unit
       val insertIntros : unit -> unit
 
+      val introPrefixLength : int ref
+
    end
 
 
 structure Report :> REPORT =
    struct
+
+      structure T = Term
 
       open CasePervasive
 
@@ -178,6 +182,8 @@ structure Report :> REPORT =
 
 
 
+      val introPrefixLength = ref 4
+
       fun generateIntros dir a acc =
          termCase a
          /| ( \Prim.intersect\ _ (fn ? . ?)
@@ -191,12 +197,30 @@ structure Report :> REPORT =
                     generateIntros dir' b (sym :: acc)
                  end)\
 
-          | \Prim.arrow\ _ ? =>
-            \(fnc b =>
+          | \Prim.arrow\ ? ? =>
+            \(fnc dom cod =>
                  let
-                    val (sym, dir') = Directory.freshAndBind dir
+                    val binder =
+                       (case Normalize.simplify dom of
+                           T.Elim (T.Const const, _) =>
+                              let
+                                 val str = Symbol.toValue (Namespace.lastname const)
+
+                                 val str' =
+                                    String.substring
+                                       str
+                                       0
+                                       (Int.min (String.length str) (!introPrefixLength))
+                              in
+                                 SOME (Symbol.fromValue ("H" ^ str'))
+                              end
+
+                         | _ =>
+                              NONE)
+
+                    val (sym, dir') = Directory.varyAndBind dir binder
                  in
-                    generateIntros dir' b (sym :: acc)
+                    generateIntros dir' cod (sym :: acc)
                  end)\
 
           | _ =>

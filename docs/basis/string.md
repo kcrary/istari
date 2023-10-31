@@ -32,3 +32,8 @@
        end
     
     structure String : STRING where type string = Pervasive.string
+
+- `val substring : string -> int -> int -> string`
+
+  Given `s`, `i`, and `j`, returns the substring of `s` that starts at
+  position `i` and has length `j`.
