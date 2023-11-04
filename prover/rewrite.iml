@@ -4259,6 +4259,51 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                  ],
              ]
 
+      fun compatSubtypeSubtype1 tac =
+         (* tac proves A' <: A *)
+         (* A <: B -> A' <: B *)
+         refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+         >>> [
+             (* A <: B : type *)
+             idtacM Secondary,
+
+             (* A <: B |- A'[^] <: B[^] *)
+             refine (Rule.subtypeTrans (T.evar ()) (T.evar ()) (T.evar ()))
+             >>> [
+                 (* A <: B |- A'[^] <: A[^] *)
+                 refine (Rule.weaken 0 1)
+                 >>+
+                 (* A' <: A *)
+                 tac,
+
+                 (* A <: B |- A <: B *)
+                 refine (Rule.hypothesis 0) >> done
+                 ]
+             ]
+
+      fun compatSubtypeSubtype2 tac =
+         (* tac proves B <: B' *)
+         (* A <: B -> A <: B' *)
+         refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+         >>> [
+             (* A <: B : type *)
+             idtacM Secondary,
+
+             (* A <: B |- A[^] <: B'[^] *)
+             refine (Rule.subtypeTrans (T.evar ()) (T.evar ()) (T.evar ()))
+             >>> [
+                 (* A <: B |- A <: B *)
+                 refine (Rule.hypothesis 0) >> done,
+
+                 (* A <: B |- B[^] <: B'[^] *)
+                 refine (Rule.weaken 0 1)
+                 >>+
+                 (* B <: B' *)
+                 tac
+                 ]
+             ]
+
+
       val () = 
          List.app
             (fn (hconst, i, const1, const2, cov, tac) =>
@@ -4268,6 +4313,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             (Prim.eqtp, 1, Prim.eqtp, Prim.eqtp, true, compatEqtpEqtp1),
             (Prim.eq, 1, Prim.eqtp, Prim.eqtp, true, compatEqUnivEqtp1),
             (Prim.eq, 2, Prim.eqtp, Prim.eqtp, true, compatEqUnivEqtp2),
+            (Prim.subtype, 0, Prim.subtype, Prim.arrow, false, compatSubtypeSubtype1),
+            (Prim.subtype, 1, Prim.subtype, Prim.arrow, true, compatSubtypeSubtype2),
             ]
 
 
