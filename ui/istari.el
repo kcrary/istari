@@ -51,6 +51,8 @@
 (define-key istari-mode-map "\C-cra" 'istari-report-all)
 (define-key istari-mode-map "\C-crm" 'istari-report-module)
 (define-key istari-mode-map "\C-crs" 'istari-report-show)
+(define-key istari-mode-map "\C-crf" 'istari-report-search)
+(define-key istari-mode-map "\C-crs" 'istari-report-show)
 (define-key istari-mode-map "\C-crt" 'istari-report-type)
 (define-key istari-mode-map "\C-cia" 'istari-insert-application)
 (define-key istari-mode-map "\C-cii" 'istari-insert-intros)
@@ -492,6 +494,11 @@
   (interactive
    (list (read-from-minibuffer "Constant: " (thing-at-point 'longid))))
   (istari-interject (concat "Report.showType (parseLongident /" str "/);")))
+
+(defun istari-report-search (str)
+  "Report constants whose type mentions each target constant."
+  (interactive "MConstants: ")
+  (istari-interject (concat "Report.search (parseConstants /" str "/) [];")))
 
 (defun istari-show-implicits ()
   "Toggle showing implicit arguments."

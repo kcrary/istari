@@ -2,10 +2,14 @@
 signature REPORT =
    sig
 
+      val typeOf : Constant.constant -> Term.term option
+
       val showAll : unit -> unit
       val showModule : Namespace.address -> unit
       val show : Namespace.address -> unit
       val showType : Namespace.address -> unit
+
+      val search : Constant.constant list -> Namespace.address -> unit
 
       (* These require the UI. *)
 
@@ -23,6 +27,25 @@ structure Report :> REPORT =
       structure T = Term
 
       open CasePervasive
+
+
+      fun typeOf const =
+         (case Database.findType const of
+             NONE => NONE
+
+           | SOME (jud, _) =>
+                if Seq.null (Judgement.context jud) then
+                   termCase (Judgement.concl jud)
+                   /| \Prim.ov\ ? \const\ =>
+                      \(fnc a => SOME a)\
+
+                    | _ =>
+                      \(fnc => NONE)\
+                   /
+                else
+                   NONE)
+
+
 
       fun printAddress address =
          (case address of
@@ -108,22 +131,6 @@ structure Report :> REPORT =
            | SOME const =>
                 let
                    val implicits = Database.findImplicits const
-
-                   val topt =
-                      (case Database.findType const of
-                          NONE => NONE
-
-                        | SOME (jud, _) =>
-                             if Seq.null (Judgement.context jud) then
-                                termCase (Judgement.concl jud)
-                                /| \Prim.ov\ ? \const\ =>
-                                   \(fnc a => SOME a)\
-      
-                                 | _ =>
-                                   \(fnc => NONE)\
-                                /
-                             else
-                                NONE)
                 in
                    print "\n";
                    print (Namespace.toString const);
@@ -146,7 +153,7 @@ structure Report :> REPORT =
                    else
                       ();
 
-                   (case topt of
+                   (case typeOf const of
                        NONE =>
                           print " is untyped.\n"
 
@@ -252,5 +259,122 @@ structure Report :> REPORT =
                    endInsert ()
                    ))
          end
+
+
+      structure Set = RedBlackSet (structure Elem = Constant.Ordered)
+
+
+      exception Found
+
+
+      fun appearsLoop set m s =
+         (case m of
+             T.Var i =>
+                (case T.substVar i s of
+                    T.Idx _ => set
+
+                  | T.Term n =>
+                       appearsLoop set n T.id)
+
+           | T.Const const =>
+                let
+                   val set' = Set.remove set const
+                in
+                   if Set.isEmpty set' then
+                      raise Found
+                   else
+                      set'
+                end
+
+           | T.Elim (h, spine) =>
+                List.foldl
+                   (fns elim set =>
+                       (case elim of
+                           T.App n =>
+                              appearsLoop set n s
+  
+                         | _ => set))
+                   (appearsLoop set h s)
+                   spine
+
+           | T.Lam (_, n) =>
+                appearsLoop set n (T.under 1 s)
+
+           | T.Pair (m1, m2) =>
+                appearsLoop (appearsLoop set m1 s) m2 s
+
+           | T.Next n =>
+                appearsLoop set n s
+
+           | T.Triv => set
+
+           | T.Native _ => set
+
+           | T.Marker _ => set
+
+           | T.Sub (n, s') =>
+                appearsLoop set n (T.compose s' s)
+
+           | T.Evar eb =>
+                (case T.readEbind eb of
+                    SOME n => 
+                       appearsLoop set n s
+
+                  | NONE =>
+                       (* Free evars shouldn't appear in a constant's type unless the user
+                          is mucking about using internals.  We'll ignore this possibility.
+                       *)
+                       set))
+
+
+      fun appears set m =
+         try
+            (appearsLoop set m T.id; false)
+         with Found => true
+
+
+      fun search targets root =
+         (case targets of
+             [] =>
+                (* Don't dump the entire database if the user accidentally leaves targets empty. *)
+                print "\nEmpty target list.\n"
+
+           | _ =>
+                let
+                   val set =
+                      List.foldl
+                         (fns target set => Set.insert set target)
+                         Set.empty
+                         targets
+
+                   val () = print "\n"
+
+                   val found =
+                      List.foldl
+                         (fns (addr, const, _) found =>
+                             if Set.member found const then
+                                found
+                             else
+                                (case typeOf const of
+                                    NONE => found
+                
+                                  | SOME t =>
+                                       if appears set t then
+                                          (
+                                          printAddress addr;
+                                          print "\n";
+                                          Show.showPrefixed "  : " Directory.empty t;
+                                          Set.insert found const
+                                          )
+                                       else
+                                          found))
+                            Set.empty
+                            (Namespace.dump root)
+                in
+                   if Set.isEmpty found then
+                      print "No results found.\n"
+                   else
+                      ()
+                end)
 
    end

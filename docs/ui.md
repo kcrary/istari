@@ -74,6 +74,9 @@ environment:
 
 - `C-c r a` will list all the constants currently loaded.
 
+- `C-c r f` will find every constant whose type mentions
+  every constant in a list of targets, and give their types.
+
 By default, Istari will suppress displaying implicit arguments, and it
 will suppress displaying substitutions attached to evars.  These can
 be toggled using `C-c c i` and `C-c c s`, respectively.
@@ -134,6 +137,7 @@ must be done before starting the server.
 | `C-c r s`                        | give the type and definition of a constant |
 | `C-c r m`                        | list all constants in an Istari module     |
 | `C-c r a`                        | list all constants                         |
+| `C-c r f`                        | find all constants that mention targets    |
 |                                  |                                            |
 | `C-c i a`                        | insert applications for a constant         |
 | `C-c i i`                        | insert introductions for the current goal  |
