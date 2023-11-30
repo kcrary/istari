@@ -16,7 +16,7 @@ indices.
 
 The default grammar for terms is as follows.  Capitalized words are
 nonterminals; lower case words are keywords.  (**Exception:** `U` and
-`K` are keywords.)
+`Kind` are keywords.)
 
 Forms are listed in increasing order of precedence.  Grouped forms
 have the same precedence.  A subterm at the same level of precedence
@@ -90,7 +90,7 @@ cons is right associative.
       inr Term                                                       (sum intro)
       ~z Term                                                        (integer negation)
       U Level                                                        (universe)
-      K Level                                                        (kind)
+      Kind Level                                                     (kind)
       [Term] :> Term                                                 (type annotation)
       [Term] ap Term                                                 (visibilized application)
       [Term] _# Number                                               (application to multiple evars)
