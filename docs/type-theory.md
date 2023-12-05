@@ -291,7 +291,7 @@ connective.  (We reserve the operator `+` for addition.)  It contains
 
 The intersection type, written `intersect (x : A) . B`, is the
 intersection of `B` over all `x : A`.  Thus `N` belongs to 
-`intersect (x : A) . B` whenever there exists `M : A` such that `N :
+`intersect (x : A) . B` if for all `M : A` we have `N :
 [M / x]B`.
 
 The intersection type is much like a [dependent function](#functions)
@@ -320,6 +320,36 @@ instantiating `i` with `1`.  Nevertheless, both paths to `U 1` are the
 *same type.* In contrast, if instead `list` were a dependent function,
 then the two paths would result in two different types, `list 0 nat`
 and `list 1 nat`.
+
+
+#### Union types
+
+[[rules]](rules.html#union-types)
+
+The union type, written `union (x : A) . B`, is the
+union of `B` over all `x : A`.  Thus `N` belongs to 
+`union (x : A) . B` whenever there exists `M : A` such that 
+`N : [M / x]B`.
+
+The intersection is like a [dependent sum](#strong-sums-and-products)
+(a.k.a. `exists`) except that the first constituent of the pair is
+missing.  Only the second constituent is present.
+
+The missing first component cannot be recovered by an open scope
+elimination form.  Instead the elimination rule for union types
+requires that the union be opened for some closed scope.  Thus a union
+type is a form of what is called a *weak sum.* (In other settings,
+weak sums are sometimes referred to as existential types, but we will
+not use that terminology here, since we use strong sums for
+existential quantification).
+
+The practical impact of this is if `x` has a union type, `x` cannot be
+destructed if any other hypothesis refers to `x`.  This is necessary
+because the destruction tactic uses the conclusion as the closed scope
+for eliminating the union, but it cannot do so unless all uses of `x`
+are in the conclusion.
+
+
 
 
 #### Guarded types
@@ -738,8 +768,8 @@ types.  In Istari there is no such syntactic separation.)
 
 Similarly, the impredicative existential does not pair the witness `t`
 with the inhabitant of `B`.  Thus, the impredicative existential is a
-weak sum, while the predicative existential is a [strong
-sum](#strong-sums-and-products).
+weak sum, like [union types](#union-types), and is subject to the same
+limitations.
 
 A related type provides impredicative polymorphism:  The type
 `foralltp t . B` contains `M` if `M : [A / t]B` for every type `A`

@@ -10,6 +10,127 @@ fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
 
 
 
+lemma "iexists_dependency"
+/
+  forall i (a : kind i) (b : a -> U i) (y : iexists (x : a) . b x) . 
+    unit
+    -> y = y : (iexists (x : a) . b x) 
+    -> y : (iexists (x : a) . b x)
+/;
+
+inference.
+intro /i a b y H1 H2/.
+shouldfail (destruct /y/ /x y/).
+clear /H2/.
+shouldfail (destruct /y/ /x y/).
+Prover.abandon ();
+
+
+
+lemma "eliminate_iexists"
+/
+  forall i (a : kind i) (b : a -> U i) (y : iexists (x : a) . b x) . 
+    unit
+    -> { exists (x : a) . b x }
+/;
+
+inference.
+intro /i a b y H/.
+destruct /y/ /x y/.
+split.
+exists /x/.
+auto.
+qed ();
+
+
+
+lemma "union_dependency"
+/
+  forall i (a : U i) (b : a -> U i) (y : union (x : a) . b x) . 
+    unit
+    -> y = y : (union (x : a) . b x) 
+    -> y : (union (x : a) . b x)
+/;
+
+inference.
+intro /i a b y H1 H2/.
+shouldfail (destruct /y/ /x y/).
+clear /H2/.
+shouldfail (destruct /y/ /x y/).
+Prover.abandon ();
+
+
+
+lemma "eliminate_union"
+/
+  forall i (a : U i) (b : a -> U i) (y : union (x : a) . b x) . 
+    unit
+    -> { exists (x : a) . b x }
+/;
+
+inference.
+intro /i a b y H/.
+destruct /y/ /x y/.
+split.
+exists /x/.
+auto.
+qed ();
+
+
+
+lemma "inhabit_union"
+/
+  forall i (a : U i) (b : a -> U i) (x : a) (y : b x) .
+    union (z : a) . b z
+/;
+
+inference.
+intro /i a b x y/.
+exists /x/.
+hyp /y/.
+qed ();
+
+
+
+lemma "union_introduction"
+/
+  forall i (a : U i) (b : a -> U i) (x : a) (y : b x) .
+    y : (union (z : a) . b z)
+/;
+
+inference.
+intro /i a b x y/.
+typecheck.
+qed ();
+
+
+
+lemma "union_equality_transitive"
+/
+  forall i (a : U i) (b : a -> U i) (c : U i) (a1 a2 : a) (b1 : b a1) (b2 : c) (b3 : b a2) .
+    c <: b a1
+    -> c <: b a2
+    -> b1 = b2 : b a1
+    -> b2 = b3 : b a2
+    -> b1 = b3 : (union (x : a) . b x)
+/;
+
+inference.
+intro /i a b c a1 a2 b1 b2 b3 Hsub1 Hsub2 Heq12 Heq23/.
+transitivity /b2/.
+  {
+  RuleTactic.unionIntroEq >> auto.
+  typecheck.
+  }
+
+  {
+  RuleTactic.unionIntroEq >> auto.
+  typecheck.
+  }
+qed ();
+
+
+
 lemma "backtrack_through_typecheck"
 /
   forall i (a b c : U i) . (a -> c) -> (b -> c) -> b -> c

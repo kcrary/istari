@@ -833,6 +833,42 @@ apply star_refl.
 Qed.
 
 
+Lemma def_union :
+  forall a b,
+    equiv (app (app Defs.union a) (lam b)) (union a b).
+Proof.
+intros a m.
+unfold Defs.union.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app1.
+    apply step_app2.
+    }
+  simpsub.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+apply equiv_union; auto using equiv_refl.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl'.
+rewrite <- eqsub_expand_id.
+simpsub.
+reflexivity.
+Qed.
+
+
 Lemma def_univ :
   forall i,
     equiv (app Defs.univ i) (univ i).

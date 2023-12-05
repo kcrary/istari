@@ -1099,6 +1099,21 @@ cbn.
 reflexivity.
 }
 
+(* union *)
+{
+intros pg s i a b A B _ IH1 _ IH2 IHo h.
+so (IH1 IHo h) as (A' & ->).
+so (IH2 IHo (den A') (eq_refl _) h) as (B' & ->).
+clear IH1 IH2.
+exists (iuunion (cin pg) A' B').
+rewrite -> extend_iuunion; auto using le_ord_refl.
+f_equal.
+apply nearrow_extensionality.
+intro x.
+cbn.
+reflexivity.
+}
+
 (* prod *)
 {
 intros pg s i a b A B _ IH1 _ IH2 IHo h.
@@ -2005,6 +2020,7 @@ try (intros;
            |eapply interp_arrow
            |eapply interp_pi
            |eapply interp_intersect
+           |eapply interp_union
            |eapply interp_prod
            |eapply interp_sigma
            |eapply interp_set

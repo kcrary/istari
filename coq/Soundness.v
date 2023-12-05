@@ -92,6 +92,11 @@ intros; eapply sound_sigma_formation_invert1; eauto; done.
 intros; eapply sound_sigma_formation_invert2; eauto; done.
 intros; eapply sound_prod_formation_invert1; eauto; done.
 intros; eapply sound_prod_formation_invert2; eauto; done.
+intros; eapply sound_union_formation; eauto; done.
+intros; eapply sound_union_formation_univ; eauto; done.
+intros; eapply sound_union_intro; eauto; done.
+intros; eapply sound_union_elim; eauto; done.
+intros; eapply sound_union_elim_eqtype; eauto; done.
 intros; eapply sound_fut_kind_formation; eauto; done.
 intros; eapply sound_fut_formation; eauto; done.
 intros; eapply sound_fut_formation_univ; eauto; done.

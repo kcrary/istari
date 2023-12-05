@@ -182,6 +182,18 @@ signature THE_RULES =
       val prodLeft : int -> term -> term -> term -> rule
       val prodFormInv1 : term -> term -> rule
       val prodFormInv2 : term -> term -> rule
+      val unionForm : term -> term -> rule
+      val unionEq : term -> term -> term -> term -> rule
+      val unionFormUniv : term -> term -> term -> rule
+      val unionEqUniv : term -> term -> term -> term -> term -> rule
+      val unionIntroOf : term -> term -> term -> term -> rule
+      val unionIntroEq : term -> term -> term -> term -> term -> rule
+      val unionIntro : term -> term -> term -> rule
+      val unionElimOf : term -> term -> term -> term -> term -> rule
+      val unionElimEq : term -> term -> term -> term -> term -> term -> term -> rule
+      val unionElim : term -> term -> term -> term -> rule
+      val unionElimIstype : term -> term -> term -> term -> rule
+      val unionElimEqtype : term -> term -> term -> term -> term -> term -> rule
       val sumForm : term -> term -> rule
       val sumEq : term -> term -> term -> term -> rule
       val sumFormUniv : term -> term -> term -> rule
@@ -602,6 +614,7 @@ val const_symbol = Const Prim.symbol
 val const_symbol_eqb = Const Prim.symbol_eqb
 val const_tarrow = Const Prim.tarrow
 val const_timesz = Const Prim.timesz
+val const_union = Const Prim.union
 val const_unit = Const Prim.unit
 val const_univ = Const Prim.univ
 val const_void = Const Prim.void
@@ -748,6 +761,18 @@ fun prodExt a b m n = Arg.make "prodExt" [] (Elim (const_eq, [App (Elim (const_p
 fun prodLeft gsize a b c = Arg.lmake "prodLeft" [] gsize [J.Tm (Elim (const_prod, [App (a), App (b), ])), ] (c) [(Arg.Nothing, [J.Tm (Sub (b, Shift 1)), J.Tm (a), ], SOME (Dot (Pair (Var 1, Var 0), Shift 2)), Sub (c, under gsize (Dot (Pair (Var 1, Var 0), Shift 2)))), ] (fn [m, ] => Sub (m, under gsize (Dot (Elim (Var 0, [Pi2, ]), Dot (Elim (Var 0, [Pi1, ]), Shift 1)))) | _ => raise Arg.ExtractFailure)
 fun prodFormInv1 a b = Arg.make "prodFormInv1" [] (Elim (const_istp, [App (a), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_prod, [App (a), App (b), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun prodFormInv2 a b = Arg.make "prodFormInv2" [] (Elim (const_istp, [App (b), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_prod, [App (a), App (b), ])), ])), (Arg.Unhide, [], a), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun unionForm a b = Arg.make "unionForm" [] (Elim (const_istp, [App (Elim (const_union, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun unionEq a a' b b' = Arg.make "unionEq" [] (Elim (const_eqtp, [App (Elim (const_union, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_union, [App (a'), App (Lam (NONE, b')), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eqtp, [App (b), App (b'), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun unionFormUniv a b i = Arg.make "unionFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_union, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Elim (const_univ, [App (Sub (i, Shift 1)), ])), App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun unionEqUniv a a' b b' i = Arg.make "unionEqUniv" [] (Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (Elim (const_union, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_union, [App (a'), App (Lam (NONE, b')), ])), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eq, [App (Elim (const_univ, [App (Sub (i, Shift 1)), ])), App (b), App (b'), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun unionIntroOf a b m n = Arg.make "unionIntroOf" [] (Elim (const_of, [App (Elim (const_union, [App (a), App (Lam (NONE, b)), ])), App (n), ])) [(Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (Sub (b, Dot (m, Shift 0))), App (n), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun unionIntroEq a b m n n' = Arg.make "unionIntroEq" [] (Elim (const_eq, [App (Elim (const_union, [App (a), App (Lam (NONE, b)), ])), App (n), App (n'), ])) [(Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Unhide, [], Elim (const_eq, [App (Sub (b, Dot (m, Shift 0))), App (n), App (n'), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun unionIntro a b m = Arg.make "unionIntro" [] (Elim (const_union, [App (a), App (Lam (NONE, b)), ])) [(Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Nothing, [], Sub (b, Dot (m, Shift 0))), ] (fn [_, _, n, ] => n | _ => raise Arg.ExtractFailure)
+fun unionElimOf a b c m p = Arg.make "unionElimOf" [] (Elim (const_of, [App (c), App (Sub (p, Dot (m, Shift 0))), ])) [(Arg.Unhide, [J.Tm (b), J.Tm (a), ], Elim (const_of, [App (Sub (c, Shift 2)), App (Sub (p, Idot (0, Shift 2))), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_union, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun unionElimEq a b c m n p q = Arg.make "unionElimEq" [] (Elim (const_eq, [App (c), App (Sub (p, Dot (m, Shift 0))), App (Sub (q, Dot (n, Shift 0))), ])) [(Arg.Unhide, [J.Tm (b), J.Tm (a), ], Elim (const_eq, [App (Sub (c, Shift 2)), App (Sub (p, Idot (0, Shift 2))), App (Sub (q, Idot (0, Shift 2))), ])), (Arg.Unhide, [], Elim (const_eq, [App (Elim (const_union, [App (a), App (Lam (NONE, b)), ])), App (m), App (n), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun unionElim a b c m = Arg.make "unionElim" [m, ] (c) [(Arg.Nothing, [J.Tm (b), J.Tmh (a), ], Sub (c, Shift 2)), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_union, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [p, _, ] => Sub (p, Dot (m, Dot (Triv, Shift 0))) | _ => raise Arg.ExtractFailure)
+fun unionElimIstype a b c m = Arg.make "unionElimIstype" [] (Elim (const_istp, [App (Sub (c, Dot (m, Shift 0))), ])) [(Arg.Unhide, [J.Tm (b), J.Tm (a), ], Elim (const_istp, [App (Sub (c, Idot (0, Shift 2))), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_union, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun unionElimEqtype a b c d m n = Arg.make "unionElimEqtype" [] (Elim (const_eqtp, [App (Sub (c, Dot (m, Shift 0))), App (Sub (d, Dot (n, Shift 0))), ])) [(Arg.Unhide, [J.Tm (b), J.Tm (a), ], Elim (const_eqtp, [App (Sub (c, Idot (0, Shift 2))), App (Sub (d, Idot (0, Shift 2))), ])), (Arg.Unhide, [], Elim (const_eq, [App (Elim (const_union, [App (a), App (Lam (NONE, b)), ])), App (m), App (n), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun sumForm a b = Arg.make "sumForm" [] (Elim (const_istp, [App (Elim (const_sum, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun sumEq a a' b b' = Arg.make "sumEq" [] (Elim (const_eqtp, [App (Elim (const_sum, [App (a), App (b), ])), App (Elim (const_sum, [App (a'), App (b'), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (a'), ])), (Arg.Unhide, [], Elim (const_eqtp, [App (b), App (b'), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun sumFormUniv a b i = Arg.make "sumFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_sum, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)

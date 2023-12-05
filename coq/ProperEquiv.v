@@ -124,6 +124,7 @@ try (intros;
            |apply interp_con
            |apply interp_pi
            |apply interp_intersect
+           |apply interp_union
            |apply interp_sigma
            |apply interp_set
            |apply interp_iset

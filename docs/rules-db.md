@@ -24,6 +24,7 @@ Conventions:
 [Guarded types](#guarded-types)<br>
 [Strong sums](#strong-sums)<br>
 [Products](#products)<br>
+[Union types](#union-types)<br>
 [Disjoint sums](#disjoint-sums)<br>
 [Future modality](#future-modality)<br>
 [Recursive types](#recursive-types)<br>
@@ -1198,6 +1199,96 @@ Conventions:
       >>
       G |- istp (prod A B)
       G |- A
+
+
+### Union Types
+
+- `unionForm A B`
+
+      G |- istp (union A (fn . B))
+      >>
+      G |- istp A
+      G, A |- istp B
+
+- `unionEq A A' B B'`
+
+      G |- eqtp (union A (fn . B)) (union A' (fn . B'))
+      >>
+      G |- eqtp A A'
+      G, A |- eqtp B B'
+
+- `unionFormUniv A B I`
+
+      G |- of (univ I) (union A (fn . B))
+      >>
+      G |- of (univ I) A
+      G, A |- of (univ I[^1]) B
+
+- `unionEqUniv A A' B B' I`
+
+      G |- eq (univ I) (union A (fn . B)) (union A' (fn . B'))
+      >>
+      G |- eq (univ I) A A'
+      G, A |- eq (univ I[^1]) B B'
+
+- `unionIntroOf A B M N`
+
+      G |- of (union A (fn . B)) N
+      >>
+      G, A |- istp B
+      G |- of A M
+      G |- of B[M . id] N
+
+- `unionIntroEq A B M N N'`
+
+      G |- eq (union A (fn . B)) N N'
+      >>
+      G, A |- istp B
+      G |- of A M
+      G |- eq B[M . id] N N'
+
+- `unionIntro A B M`
+
+      G |- union A (fn . B) ext N
+      >>
+      G, A |- istp B
+      G |- of A M
+      G |- B[M . id] ext N
+
+- `unionElimOf A B C M P`
+
+      G |- of C P[M . id]
+      >>
+      G, A, B |- of C[^2] P[0 . ^2]
+      G |- of (union A (fn . B)) M
+
+- `unionElimEq A B C M N P Q`
+
+      G |- eq C P[M . id] Q[N . id]
+      >>
+      G, A, B |- eq C[^2] P[0 . ^2] Q[0 . ^2]
+      G |- eq (union A (fn . B)) M N
+
+- `unionElim A B C M`
+
+      G |- C ext P[M . () . id]
+      >>
+      G, (hidden) A, B |- C[^2] ext P
+      G |- of (union A (fn . B)) M
+
+- `unionElimIstype A B C M`
+
+      G |- istp C[M . id]
+      >>
+      G, A, B |- istp C[0 . ^2]
+      G |- of (union A (fn . B)) M
+
+- `unionElimEqtype A B C D M N`
+
+      G |- eqtp C[M . id] D[N . id]
+      >>
+      G, A, B |- eqtp C[0 . ^2] D[0 . ^2]
+      G |- eq (union A (fn . B)) M N
 
 
 ### Disjoint sums

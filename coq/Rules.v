@@ -329,6 +329,39 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deqtype (prod a b) (prod a' b'))
       -> tr (cons (hyp_tm a) G) (deqtype (subst sh1 b) (subst sh1 b'))
   
+(* Unions (weak sums) *)
+
+| tr_union_formation :
+    forall G a a' b b',
+      tr G (deqtype a a')
+      -> tr (cons (hyp_tm a) G) (deqtype b b')
+      -> tr G (deqtype (union a b) (union a' b'))
+
+| tr_union_formation_univ :
+    forall G lv a a' b b',
+      tr G (deq a a' (univ lv))
+      -> tr (cons (hyp_tm a) G) (deq b b' (univ (subst sh1 lv)))
+      -> tr G (deq (union a b) (union a' b') (univ lv))
+
+| tr_union_intro :
+    forall G a b p m n,
+      tr G (deq p p a)
+      -> tr G (deq m n (subst1 p b))
+      -> tr (cons (hyp_tm a) G) (deqtype b b)
+      -> tr G (deq m n (union a b))
+
+| tr_union_elim :
+    forall G a b c m n p q,
+      tr G (deq m n (union a b))
+      -> tr (cons (hyp_tm b) (cons (hyp_tm a) G)) (deq (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) q) (subst (sh 2) c))
+      -> tr G (deq (subst1 m p) (subst1 n q) c)
+  
+| tr_union_elim_eqtype :
+    forall G a b m n p q,
+      tr G (deq m n (union a b))
+      -> tr (cons (hyp_tm b) (cons (hyp_tm a) G)) (deqtype (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) q))
+      -> tr G (deqtype (subst1 m p) (subst1 n q))
+  
 (* Fut *)
 
 | tr_fut_kind_formation :

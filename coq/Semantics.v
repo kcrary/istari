@@ -247,6 +247,13 @@ with basicv : page -> bool -> nat -> sterm -> wiurel stop -> Prop :=
         -> functional pg s i (den A) b B
         -> basicv pg s i (intersect a b) (iuintersect stop i A B)
 
+| interp_union :
+    forall pg s i a b
+      (A : wiurel stop) (B : urelsp (den A) -n> wiurel_ofe stop),
+        basic pg s i a A
+        -> functional pg s i (den A) b B
+        -> basicv pg s i (union a b) (iuunion stop A B)
+
 | interp_prod :
     forall pg s i a b (A B : wiurel stop),
         basic pg s i a A

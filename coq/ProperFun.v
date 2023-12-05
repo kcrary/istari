@@ -823,6 +823,16 @@ so (IH2 _ Hb); subst B'.
 reflexivity.
 }
 
+(* union *)
+{
+intros pg s i a b A B _ IH1 _ IH2 X HX.
+invertc HX.
+intros A' B' Ha Hb <-.
+so (IH1 _ Ha); subst A'.
+so (IH2 _ Hb); subst B'.
+reflexivity.
+}
+
 (* sigma *)
 {
 intros pg s i a b A B _ IH1 _ IH2 X HX.

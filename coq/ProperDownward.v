@@ -506,6 +506,14 @@ apply interp_intersect; auto.
 apply IH2; auto.
 }
 
+(* union *)
+{
+intros pg s i a b A B Ha IH1 Hb IH2 j Hj.
+rewrite -> iutruncate_iuunion.
+apply interp_union; auto.
+apply IH2; auto.
+}
+
 (* prod *)
 {
 intros pg s i a b A B Ha IH1 Hb IH2 j Hj.

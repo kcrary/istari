@@ -242,6 +242,16 @@ prove_equiv_compat.
 Qed.
 
 
+Lemma equiv_union :
+  forall (a a' b b' : term object),
+    equiv a a'
+    -> equiv b b'
+    -> equiv (union a b) (union a' b').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
 Lemma equiv_ispositive :
   forall (m m' : term object),
     equiv m m'

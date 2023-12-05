@@ -37,6 +37,7 @@ variables.  The official rules, using de Bruijn indices, are given
 [Guarded types](#guarded-types)<br>
 [Strong sums](#strong-sums)<br>
 [Products](#products)<br>
+[Union types](#union-types)<br>
 [Disjoint sums](#disjoint-sums)<br>
 [Future modality](#future-modality)<br>
 [Recursive types](#recursive-types)<br>
@@ -1211,6 +1212,96 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- A & B : type
       G |- A
+
+
+### Union Types
+
+- `unionForm A B`
+
+      G |- (union (x : A) . B) : type
+      >>
+      G |- A : type
+      G, x : A |- B : type
+
+- `unionEq A A' B B'`
+
+      G |- (union (x : A) . B) = (union (x : A') . B') : type
+      >>
+      G |- A = A' : type
+      G, x : A |- B = B' : type
+
+- `unionFormUniv A B I`
+
+      G |- (union (x : A) . B) : univ I
+      >>
+      G |- A : univ I
+      G, x : A |- B : univ I
+
+- `unionEqUniv A A' B B' I`
+
+      G |- (union (x : A) . B) = (union (x : A') . B') : univ I
+      >>
+      G |- A = A' : univ I
+      G, x : A |- B = B' : univ I
+
+- `unionIntroOf A B M N`
+
+      G |- N : union (x : A) . B
+      >>
+      G, x : A |- B : type
+      G |- M : A
+      G |- N : [M / x]B
+
+- `unionIntroEq A B M N N'`
+
+      G |- N = N' : (union (x : A) . B)
+      >>
+      G, x : A |- B : type
+      G |- M : A
+      G |- N = N' : [M / x]B
+
+- `unionIntro A B M`
+
+      G |- union (x : A) . B ext N
+      >>
+      G, x : A |- B : type
+      G |- M : A
+      G |- [M / x]B ext N
+
+- `unionElimOf A B C M P`
+
+      G |- [M / y]P : C
+      >>
+      G, x : A, y : B |- P : C
+      G |- M : union (x : A) . B
+
+- `unionElimEq A B C M N P Q`
+
+      G |- [M / y]P = [N / y]Q : C
+      >>
+      G, x : A, y : B |- P = Q : C
+      G |- M = N : (union (x : A) . B)
+
+- `unionElim A B C M`
+
+      G |- C ext [(), M / x, y]P
+      >>
+      G, x (hidden) : A, y : B |- C ext P
+      G |- M : union (x : A) . B
+
+- `unionElimIstype A B C M`
+
+      G |- [M / y]C : type
+      >>
+      G, x : A, y : B |- C : type
+      G |- M : union (x : A) . B
+
+- `unionElimEqtype A B C D M N`
+
+      G |- [M / y]C = [N / y]D : type
+      >>
+      G, x : A, y : B |- C = D : type
+      G |- M = N : (union (x : A) . B)
 
 
 ### Disjoint sums

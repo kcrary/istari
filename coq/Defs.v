@@ -60,6 +60,7 @@ Definition guard : fterm := lam (lam (guard (var 1) (var 0))).
 Definition iexists : fterm := lam (lam (lam (exist (var 2) (var 1) (app (var 1) (var 0))))).
 Definition iforall : fterm := lam (lam (lam (all (var 2) (var 1) (app (var 1) (var 0))))).
 Definition intersect : fterm := lam (lam (intersect (var 1) (app (var 1) (var 0)))).
+Definition union : fterm := lam (lam (union (var 1) (app (var 1) (var 0)))).
 Definition istp : fterm := lam (eqtype (var 0) (var 0)).
 Definition ite : fterm := lam (lam (lam (bite (var 2) (var 1) (var 0)))).
 Definition karrow : fterm := lam (lam (karrow (var 1) (var 0))).

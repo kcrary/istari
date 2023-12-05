@@ -141,6 +141,7 @@ structure Webgen :> WEBGEN =
                          | "forall" => writeBinder "forall"
                          | "exists" => writeBinder "exists"
                          | "intersect" => writeBinder "intersect"
+                         | "union" => writeBinder "union"
                          | "wtype" => writeBinder "wtype"
                          | "iforall" => writeIBinder "iforall"
                          | "iexists" => writeIBinder "iexists"

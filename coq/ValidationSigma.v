@@ -882,3 +882,109 @@ cut (tr (hyp_tm a :: G) (deqtype (subst sh1 b) (subst sh1 b))).
   }
 eapply tr_prod_formation_invert2; eauto.
 Qed.
+
+
+Hint Rewrite def_union : prepare.
+
+
+Lemma unionForm_valid : unionForm_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+apply tr_union_formation; auto.
+Qed.
+
+
+Lemma unionEq_valid : unionEq_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext1 ext0 Ha Hb.
+apply tr_union_formation; auto.
+Qed.
+
+
+Lemma unionFormUniv_valid : unionFormUniv_obligation.
+Proof.
+prepare.
+intros G a b i ext1 ext0 Ha Hb.
+apply tr_union_formation_univ; auto.
+Qed.
+
+
+Lemma unionEqUniv_valid : unionEqUniv_obligation.
+Proof.
+prepare.
+intros G a a' b b' i ext1 ext0 Ha Hb.
+apply tr_union_formation_univ; auto.
+Qed.
+
+
+Lemma unionIntroOf_valid : unionIntroOf_obligation.
+Proof.
+prepare.
+intros G a b m n ext2 ext1 ext0 Hb Hm Hn.
+eapply tr_union_intro; eauto.
+Qed.
+
+
+Lemma unionIntroEq_valid : unionIntroEq_obligation.
+Proof.
+prepare.
+intros G a b m n n' ext2 ext1 ext0 Hb Hm Hn.
+eapply tr_union_intro; eauto.
+Qed.
+
+
+Lemma unionIntro_valid : unionIntro_obligation.
+Proof.
+prepare.
+intros G a b m ext1 ext0 n Hb Hm Hn.
+eapply tr_union_intro; eauto.
+Qed.
+
+
+Lemma unionElimOf_valid : unionElimOf_obligation.
+Proof.
+prepare.
+intros G a b c m p ext1 ext0 Hp Hm.
+eapply tr_union_elim; eauto.
+Qed.
+
+
+Lemma unionElimEq_valid : unionElimEq_obligation.
+Proof.
+prepare.
+intros G a b c m n p q ext1 ext0 Hp Hm.
+eapply tr_union_elim; eauto.
+Qed.
+
+
+Lemma unionElim_valid : unionElim_obligation.
+Proof.
+prepare.
+intros G a b c m p ext0 Hhyg Hp Hm.
+replace (subst (dot m (dot triv (sh 0))) p) with (subst1 m (subst (under 1 (dot triv id)) p)) by (simpsub; auto).
+eapply tr_union_elim; eauto.
+simpsub.
+so (subst_into_absent_single _ 1 p triv Hhyg) as H.
+simpsubin H.
+cbn [Nat.add] in H.
+rewrite -> H.
+auto.
+Qed.
+
+
+Lemma unionElimIstype_valid : unionElimIstype_obligation.
+Proof.
+prepare.
+intros G a b c m ext1 ext0 Hc Hm.
+eapply tr_union_elim_eqtype; eauto.
+Qed.
+
+
+Lemma unionElimEqtype_valid : unionElimEqtype_obligation.
+Proof.
+prepare.
+intros G a b c d m n ext1 ext0 Hcd Hmn.
+eapply tr_union_elim_eqtype; eauto.
+Qed.

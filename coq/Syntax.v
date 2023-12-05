@@ -34,6 +34,7 @@ Inductive operator : list nat -> Type :=
 | oper_app         : operator [0; 0]
 
 | oper_intersect   : operator [0; 1]
+| oper_union       : operator [0; 1]
 
 | oper_fut         : operator [0]
 | oper_cnext       : operator [0]
@@ -508,6 +509,7 @@ Definition ctapp {obj} m1 m2       : @term obj := oper _ (oper_ctapp _) (rw_cons
 Definition lam {obj} m             : @term obj := oper _ (oper_lam _) (rw_cons _ _ m rw_nil).
 Definition app {obj} m1 m2         : @term obj := oper _ (oper_app _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition intersect {obj} m1 m2   : @term obj := oper _ (oper_intersect _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
+Definition union {obj} m1 m2       : @term obj := oper _ (oper_union _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition fut {obj} m             : @term obj := oper _ (oper_fut _) (rw_cons _ _ m rw_nil).
 Definition cnext {obj} m           : @term obj := oper _ (oper_cnext _) (rw_cons _ _ m rw_nil).
 Definition cprev {obj} m           : @term obj := oper _ (oper_cprev _) (rw_cons _ _ m rw_nil).
@@ -604,6 +606,9 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 
 | same_intersect :
     same_operator [0; 1] [0; 1] (oper_intersect A) (oper_intersect B)
+
+| same_union :
+    same_operator [0; 1] [0; 1] (oper_union A) (oper_union B)
 
 | same_fut :
     same_operator [0] [0] (oper_fut A) (oper_fut B)

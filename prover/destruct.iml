@@ -267,6 +267,102 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                 fail "prod pattern expected")
 
 
+      fun destUnion i pat set =
+         (case pat of
+             And [p1, p2] =>
+                let
+                   do (jud, _) = withgoal
+                   val c = J.concl jud
+                in
+                   hypCaseT (J.subHyp (J.hyp jud i) (T.Shift (i+1)))
+                   /| $tm \Prim.union\ ? (fn . ?) =>
+                      \(fnc a b =>
+                           (* union A . B, ... |- C *)
+                           refine (Rule.unionElim a b c (T.Var i))
+                           >>>
+                              [
+                              (* union A . B, ..., hide A[^i+1], B[0 . ^i+2] |- C[^2] *)
+                              (cut $ setFailure "dependencies exist on union hypothesis being destructed" $
+                               refine (Rule.weaken (i+2) 1))
+                              >>+
+                              (* ..., hide A[^i], B[0 . ^i+1] |- C[^] *)
+                              refine (Rule.exchange 0 2 i)
+                              >>+
+                              (* hide A, B, ... |- C[something] *)
+                              let
+                                 do (vars1, set1) = andthenp S.empty $ dest (i+1) p1 set
+                                 do (vars2, set2) = andthenp vars1 $ dest i p2 set1
+                              in
+                                 idtacM (S.append vars1 vars2, Principal set2)
+                              end,
+
+                              (* union A . B, ... |- i : (union A . B)[^i+1] *)
+                              refine (Rule.hypothesisOf i) >> done
+                              ])\
+
+                    | _ =>
+                      \(fnc =>
+                           fail "improper hypothesis for union destruction")\
+                   /
+                end
+
+           | _ =>
+                fail "union pattern expected")
+
+
+      fun destIexists i pat set =
+         (case pat of
+             And [p1, p2] =>
+                let
+                   do (jud, _) = withgoal
+                   val c = J.concl jud
+                in
+                   hypCaseT (J.subHyp (J.hyp jud i) (T.Shift (i+1)))
+                   /| $tm \Prim.iexists\ ? ? (fn . ?) =>
+                      \(fnc lv k a =>
+                           (* iexists LV K . A, ... |- C *)
+                           refine (Rule.iexistsElim a c lv k (T.Var i))
+                           >>>
+                              [
+                              (* iexists LV K . A, ... |- K : type *)
+                              refine (Rule.weaken 0 (i+1))
+                              >>+
+                              idtacM (S.empty, Tertiary),
+
+                              (* iexists LV K . A, ..., K |- A : type *)
+                              refine (Rule.weaken 1 (i+1))
+                              >>+
+                              idtacM (S.cons (D.freshSet set) S.empty, Tertiary),
+
+                              (* iexists LV K . A, ..., hide K[^i+1], A[0 . ^i+2] |- C[^2] *)
+                              (cut $ setFailure "dependencies exist on iexists hypothesis being destructed" $
+                               refine (Rule.weaken (i+2) 1))
+                              >>+
+                              (* ..., hide K[^i], A[0 . ^i+1] |- C[^] *)
+                              refine (Rule.exchange 0 2 i)
+                              >>+
+                              (* hide A, B, ... |- C[something] *)
+                              let
+                                 do (vars1, set1) = andthenp S.empty $ dest (i+1) p1 set
+                                 do (vars2, set2) = andthenp vars1 $ dest i p2 set1
+                              in
+                                 idtacM (S.append vars1 vars2, Principal set2)
+                              end,
+
+                              (* iexists LV K . A, ... |- i : (iexists LV K . A)[^i+1] *)
+                              refine (Rule.hypothesisOf i) >> done
+                              ])\
+
+                    | _ =>
+                      \(fnc =>
+                           fail "improper hypothesis for iexists destruction")\
+                   /
+                end
+
+           | _ =>
+                fail "iexists pattern expected")
+
+
       fun destFuture i pat set =
          (case pat of
              And [p] =>
@@ -347,7 +443,6 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
 
            | _ =>
                 fail "set pattern expected")
-
 
 
       fun varyAndBindSetPat set p =
@@ -672,6 +767,8 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
          in
             insert Prim.exists destExists;
             insert Prim.prod destProd;
+            insert Prim.union destUnion;
+            insert Prim.iexists destIexists;
             insert Prim.future destFuture;
             insert Prim.void destVoid;
             insert Prim.unit (destUnit (fn i => RuleTactic.refine1 $ Rule.unitLeft i));
