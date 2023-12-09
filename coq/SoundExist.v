@@ -46,6 +46,7 @@ Require Import MapTerm.
 Require Import SoundAll.
 Require Import SoundUtil.
 Require Import Urelsp.
+Require Import ProperEquiv.
 
 
 Local Ltac prove_hygiene :=
@@ -54,6 +55,113 @@ Local Ltac prove_hygiene :=
                 ]);
   eauto using hygiene_weaken, clo_min, hygiene_shift', hygiene_subst1;
   try (apply hygiene_var; cbn; auto; done).
+
+
+Definition dyn_action : nat -> relation sterm
+  :=
+  fun i m m' =>
+    exists (A : siurel) a a' n n',
+      hygiene clo m
+      /\ hygiene clo m'
+      /\ star step m (ppair a n)
+      /\ star step m' (ppair a' n')
+      /\ interp toppg true i a A
+      /\ interp toppg false i a' A
+      /\ rel (den A) i n n'.
+
+
+Lemma dyn_uniform : uniform _ dyn_action.
+Proof.
+do2 3 split.
+
+(* closed *)
+{
+intros i m n Hmn.
+decompose Hmn.
+intros.
+auto.
+}
+
+(* equiv *)
+{
+intros i m m' n n' Hclm' Hcln' Hequivm Hequivn Hmn.
+decompose Hmn.
+intros A a b p q _ _ Hstepsm Hstepsn Ha Hb Hpq.
+so (equiv_eval _#4 Hequivm (conj Hstepsm value_ppair)) as (m'' & (Hstepsm' & _) & Hmc).
+invertc_mc Hmc.
+intros a' Hequiva p' Hequivp <-.
+fold (ppair a' p') in *.
+so (equiv_eval _#4 Hequivn (conj Hstepsn value_ppair)) as (n'' & (Hstepsn' & _) & Hmc).
+invertc_mc Hmc.
+intros b' Hequivb q' Hequivq <-.
+fold (ppair b' q') in *.
+so (hygiene_invert_auto _#5 (steps_hygiene _#4 Hstepsm' Hclm')) as H; cbn in H.
+destruct H as (Hclpa & Hclp' & _).
+so (hygiene_invert_auto _#5 (steps_hygiene _#4 Hstepsn' Hcln')) as H; cbn in H.
+destruct H as (Hclb' & Hclq' & _).
+exists A, a', b', p', q'.
+do2 6 split; auto.
+  {
+  eapply basic_equiv; eauto.
+  }
+
+  {
+  eapply basic_equiv; eauto.
+  }
+
+  {
+  eapply urel_equiv; eauto.
+  }
+}
+
+(* zigzag *)
+{
+intros i m n p q Hmn Hpn Hpq.
+decompose Hmn.
+intros A a b r t Hclm _ Hstepsm Hstepsn Ha Hb Hrt.
+decompose Hpn.
+intros A' c b' u t' _ _ Hstepsp Hstepsn' Hc Hb' Hut.
+decompose Hpq.
+intros A'' c' d u' v _ Hclq Hstepsp' Hstepsq Hc' Hd Huv.
+injection (determinism_eval _#4 (conj Hstepsn value_ppair) (conj Hstepsn' value_ppair)).
+intros <- <-.
+injection (determinism_eval _#4 (conj Hstepsp value_ppair) (conj Hstepsp' value_ppair)).
+intros <- <-.
+so (interp_fun _#7 Hb Hb').
+subst A'.
+so (interp_fun _#7 Hc Hc').
+subst A''.
+exists A, a, d, r, v.
+do2 6 split; eauto using urel_zigzag.
+}
+
+(* downward *)
+{
+intros i m n H.
+decompose H.
+intros A a b p q Hclm Hcln Hstepsm Hstepsn Ha Hb Hpq.
+exists (iutruncate (S i) A), a, b, p, q.
+do2 6 split; auto.
+  {
+  apply (basic_downward _#3 (S i)); auto.
+  }
+
+  {
+  apply (basic_downward _#3 (S i)); auto.
+  }
+
+  {
+  rewrite -> den_iutruncate.
+  split; auto.
+  apply urel_downward; auto.
+  }
+}
+Qed.
+
+
+Definition dyn_urel : wurel stop
+  :=
+  mk_urel dyn_action dyn_uniform.
 
 
 Lemma sound_exist_formation :
@@ -564,18 +672,166 @@ do2 4 split.
 Qed.
 
 
+Lemma extend_context_exist :
+  forall G i j s s' lv k a r t pg K (A : space K -n> wiurel_ofe stop) (x : spcar K) (h : level K <<= top),
+    j <= i
+    -> pwctx i s s' G
+    -> (forall j t t',
+          pwctx j t t' G
+          -> exists R,
+               interp toppg true j (subst t k) R
+               /\ interp toppg false j (subst t' k) R)
+    -> (forall j t t',
+          pwctx j t t' (hyp_tm k :: G)
+          -> exists R,
+               interp toppg true j (subst t a) R
+               /\ interp toppg false j (subst t' a) R)
+    -> pginterp (subst s lv) pg
+    -> kbasic the_system pg true i (subst s k) K
+    -> (forall j,
+          j <= i
+          -> forall (x : spcar (approx j K)),
+               basic the_system toppg true j
+                 (subst1
+                    (app (fromsp stop pg (approx j K))
+                       (ext
+                          (objin
+                             (objsome 
+                                (expair (approx j K) (std (S j) (approx j K) x))
+                                (le_ord_succ _ _
+                                   (le_ord_trans _#3
+                                      (approx_level j K) h))))))
+                    (subst (under 1 s) a))
+                 (iutruncate (S j) (pi1 A (std (S j) K (embed j K x)))))
+    -> rel (den (pi1 A (std (S j) K x))) j r t
+    -> pwctx j 
+         (dot r (dot (app 
+                        (fromsp stop pg (approx j K))
+                        (ext (objin (objsome 
+                                       (expair (approx j K) (std (S j) (approx j K) (proj j K x)))
+                                       (le_ord_succ _ _ 
+                                          (le_ord_trans _#3 (approx_level j K) h)))))) s))
+         (dot t (dot (app 
+                        (fromsp stop pg (approx j K))
+                        (ext (objin (objsome 
+                                       (expair (approx j K) (std (S j) (approx j K) (proj j K x)))
+                                       (le_ord_succ _ _ 
+                                          (le_ord_trans _#3 (approx_level j K) h)))))) s'))
+         (cons (hyp_tm a) (cons (hyp_tm k) G)).
+Proof.
+intros G i j s s' lv k a r t pg K A x h Hj Hs Hseqk Hseqa Hlvl Hk Ha Hrt.
+assert (pwctx j 
+        (dot (app 
+                (fromsp stop pg (approx j K))
+                (ext (objin (objsome 
+                               (expair (approx j K) (std (S j) (approx j K) (proj j K x)))
+                               (le_ord_succ _ _ 
+                                  (le_ord_trans _#3 (approx_level j K) h)))))) s)
+        (dot (app 
+                (fromsp stop pg (approx j K))
+                (ext (objin (objsome 
+                               (expair (approx j K) (std (S j) (approx j K) (proj j K x)))
+                               (le_ord_succ _ _ 
+                                  (le_ord_trans _#3 (approx_level j K) h)))))) s')
+        (cons (hyp_tm k) G)) as Hs'.
+  {
+  apply pwctx_cons_tm_seq; eauto using pwctx_downward.
+    {
+    so (Hseqk _#3 Hs) as (Kt & Hklt & Hkrt).
+    apply (seqhyp_tm _#5 (iutruncate (S j) Kt)).
+      {
+      eapply basic_downward; eauto.
+      }
+
+      {
+      eapply basic_downward; eauto.
+      }
+    so (spacify _#6 Hk Hklt) as (_ & _ & H & _).
+    so (H j j j Hj (le_refl _) (le_refl _)) as Hfrom; clear H.
+    split; [omega |].
+    refine (arrow_action_app _#9 Hfrom _).
+    exists (std (S j) (approx j K) (proj j K x)).
+    split.
+      {
+      apply cinterp_eval_refl.
+      relquest.
+        {
+        apply interp_ext.
+        cbn.
+        eapply le_ord_trans; eauto using approx_level.
+        eapply kinterp_level_bound; eauto.
+        }
+      change (projc j (stdc (S j) (stdc (S j) (projc j (expair K x)))) = stdc (S j) (projc j (expair K x))).
+      rewrite -> stdc_idem.
+      rewrite -> projc_stdc; auto.
+      rewrite -> projc_idem; auto.
+      }
+
+      {
+      apply cinterp_eval_refl.
+      relquest.
+        {
+        apply interp_ext.
+        cbn.
+        eapply le_ord_trans; eauto using approx_level.
+        eapply kinterp_level_bound; eauto.
+        }
+      change (projc j (stdc (S j) (stdc (S j) (projc j (expair K x)))) = stdc (S j) (projc j (expair K x))).
+      rewrite -> stdc_idem.
+      rewrite -> projc_stdc; auto.
+      rewrite -> projc_idem; auto.
+      }
+    }
+  }
+apply pwctx_cons_tm_seq; auto.
+  {
+  apply (seqhyp_tm _#5 (iutruncate (S j) (pi1 A (std (S j) K (embed j K (proj j K x)))))).
+    {
+    so (Ha j Hj (proj j K x)) as H.
+    simpsubin H.
+    exact H.
+    }
+
+    {
+    so (Ha j Hj (proj j K x)) as Hl.
+    simpsubin Hl.
+    so (Hseqa _#3 Hs') as (Q & Hl' & Hr).
+    so (basic_fun _#7 Hl Hl'); subst Q.
+    exact Hr.
+    }
+
+    {
+    split; auto.
+    refine (rel_from_dist _#6 _ Hrt).
+    apply den_nonexpansive.
+    apply (pi2 A).
+    apply std_nonexpansive.
+    apply dist_symm.
+    apply embed_proj.
+    }
+  }
+
+  {
+  intros j' u u' Hu.
+  so (Hseqa _#3 Hu) as H.
+  destruct H as (Q & Hl & Hr).
+  eauto.
+  }
+Qed.
+
+
 Lemma sound_exist_elim :
   forall G lv k a b m n p q,
     pseq G (deq m n (exist lv k a))
     -> pseq G (deqtype k k)
     -> pseq (cons (hyp_tm k) G) (deqtype a a)
-    -> pseq (cons (hyp_tm a) (cons (hyp_tm k) G)) (deq (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) q) (subst (sh 2) b))
-    -> pseq G (deq (subst1 m p) (subst1 n q) b).
+    -> pseq (cons (hyp_tm a) (cons (hyp_tm k) G)) (deq (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) q) (subst (dot (var 0) (sh 2)) b))
+    -> pseq G (deq (subst1 m p) (subst1 n q) (subst1 m b)).
 Proof.
-intros G lv k a b m n p q.
+intros G lv k a c m n p q.
 revert G.
-refine (seq_pseq 2 [hyp_emp] p [hyp_emp] q 4 [] _ [] _ [_] _ [_; _] _ _ _); cbn.
-intros G Hclp Hclq Hseqmn Hseqk Hseqa Hseqpq.
+refine (seq_pseq 3 [hyp_emp] p [hyp_emp] q [hyp_emp] c 4 [] _ [] _ [_] _ [_; _] _ _ _); cbn.
+intros G Hclp Hclq Hclc Hseqmn Hseqk Hseqa Hseqpq.
 rewrite -> seq_eqtype in Hseqa, Hseqk.
 rewrite -> seq_deq in Hseqmn, Hseqpq |- *.
 intros i s s' Hs.
@@ -601,201 +857,48 @@ assert (forall (x : spcar K) j r t,
                                              (expair (approx j K) (std (S j) (approx j K) (proj j K x)))
                                              (le_ord_succ _ _ 
                                                 (le_ord_trans _#3 (approx_level j K) h)))))) s'))
-               (cons (hyp_tm a) (cons (hyp_tm k) G))) as Hs'.
+               (cons (hyp_tm a) (cons (hyp_tm k) G))) as Hss.
   {
   intros x j r t Hj Hrt.
-  assert (pwctx j 
-          (dot (app 
-                  (fromsp stop pg (approx j K))
-                  (ext (objin (objsome 
-                                 (expair (approx j K) (std (S j) (approx j K) (proj j K x)))
-                                 (le_ord_succ _ _ 
-                                    (le_ord_trans _#3 (approx_level j K) h)))))) s)
-          (dot (app 
-                  (fromsp stop pg (approx j K))
-                  (ext (objin (objsome 
-                                 (expair (approx j K) (std (S j) (approx j K) (proj j K x)))
-                                 (le_ord_succ _ _ 
-                                    (le_ord_trans _#3 (approx_level j K) h)))))) s')
-          (cons (hyp_tm k) G)) as Hs'.
+  eapply extend_context_exist; eauto.
     {
-    apply pwctx_cons_tm_seq; eauto using pwctx_downward.
-      {
-      so (Hseqk _#3 Hs) as (Kt & Hklt & Hkrt & _).
-      apply (seqhyp_tm _#5 (iutruncate (S j) Kt)).
-        {
-        eapply basic_downward; eauto.
-        }
-
-        {
-        eapply basic_downward; eauto.
-        }
-      so (spacify _#6 Hkl Hklt) as (_ & _ & H & _).
-      so (H j j j Hj (le_refl _) (le_refl _)) as Hfrom; clear H.
-      split; [omega |].
-      refine (arrow_action_app _#9 Hfrom _).
-      exists (std (S j) (approx j K) (proj j K x)).
-      split.
-        {
-        apply cinterp_eval_refl.
-        relquest.
-          {
-          apply interp_ext.
-          cbn.
-          eapply le_ord_trans; eauto using approx_level.
-          eapply kinterp_level_bound; eauto.
-          }
-        change (projc j (stdc (S j) (stdc (S j) (projc j (expair K x)))) = stdc (S j) (projc j (expair K x))).
-        rewrite -> stdc_idem.
-        rewrite -> projc_stdc; auto.
-        rewrite -> projc_idem; auto.
-        }
-
-        {
-        apply cinterp_eval_refl.
-        relquest.
-          {
-          apply interp_ext.
-          cbn.
-          eapply le_ord_trans; eauto using approx_level.
-          eapply kinterp_level_bound; eauto.
-          }
-        change (projc j (stdc (S j) (stdc (S j) (projc j (expair K x)))) = stdc (S j) (projc j (expair K x))).
-        rewrite -> stdc_idem.
-        rewrite -> projc_stdc; auto.
-        rewrite -> projc_idem; auto.
-        }
-      }
-
-      {
-      intros j' u u' Hu.
-      so (Hseqk _#3 Hu) as (Q & Hl & Hr & _).
-      eauto.
-      }
-    }
-  apply pwctx_cons_tm_seq; auto.
-    {
-    apply (seqhyp_tm _#5 (iutruncate (S j) (pi1 A (std (S j) K (embed j K (proj j K x)))))).
-      {
-      so (Hactl j Hj (proj j K x)) as H.
-      simpsubin H.
-      exact H.
-      }
-
-      {
-      so (Hactl j Hj (proj j K x)) as Hl.
-      simpsubin Hl.
-      so (Hseqa _#3 Hs') as (Q & Hl' & Hr & _).
-      so (basic_fun _#7 Hl Hl'); subst Q.
-      exact Hr.
-      }
-
-      {
-      split; auto.
-      refine (rel_from_dist _#6 _ Hrt).
-      apply den_nonexpansive.
-      apply (pi2 A).
-      apply std_nonexpansive.
-      apply dist_symm.
-      apply embed_proj.
-      }
+    intros j' z z' Hz.
+    so (Hseqk _#3 Hz) as (R & Hl & Hr & _).
+    eauto.
     }
 
     {
-    intros j' u u' Hu.
-    so (Hseqa _#3 Hu) as H.
-    destruct H as (Q & Hl & Hr & _).
+    intros j' z z' Hz.
+    so (Hseqa _#3 Hz) as (R & Hl & Hr & _).
     eauto.
     }
   }
-assert (exists B,
-          interp toppg true i (subst s b) B
-          /\ interp toppg false i (subst s' b) B) as (B & Hbl & Hbr).
-  {
-  cbn in Hm.
-  destruct Hm as (_ & _ & H & _).
-  destruct H as (x & r & H).
-  rewrite -> std_arrow_is in H.
-  cbn in H.
-  fold (std (S i) (qtype stop)) in H.
-  change (rel (den (std (S i) (qtype stop) (pi1 A (std (S i) K x)))) i (subst s m) r) in H.
-  rewrite -> std_type_is in H.
-  destruct H as (_ & H).
-  so (Hs' _#4 (le_refl _) H) as H'; clear H.
-  so (Hseqpq _#3 H') as (B & Hbl & Hbr & _).
-  simpsubin Hbl.
-  simpsubin Hbr.
-  eauto.
-  }
-exists B.
-do2 2 split; auto.
-simpsub.
-revert m n p q Hclp Hclq Hseqpq Hm Hn Hmn.
-cut (forall m n p q,
-        hygiene (permit (ctxpred G)) p
-        -> hygiene (permit (ctxpred G)) q
-        -> (forall j s s',
-              pwctx j s s' (cons (hyp_tm a) (cons (hyp_tm k) G))
-              -> exists R,
-                   interp toppg true j (subst s (subst (sh 2) b)) R
-                   /\ interp toppg false j (subst s' (subst (sh 2) b)) R
-                   /\ rel (den R) j (subst s (subst (dot (var 0) (sh 2)) p)) (subst s' (subst (dot (var 0) (sh 2)) q)))
-        -> rel (den (iuexist stop K (std (S i) (qarrow K (qtype stop)) A))) i m n
-        -> rel (den B) i (subst (dot m s) p) (subst (dot n s') q)).
-  {
-  intro Hcond.
-  intros m n p q Hclp Hclq Hseq Hm Hn Hmn.
-  do2 2 split.
-    {
-    apply Hcond; auto.
-    intros j u u' Hu.
-    so (Hseq _#3 Hu) as (R & Hl & Hr & Hp & _).
-    eauto.
-    }
-
-    {
-    apply Hcond; auto.
-    intros j u u' Hu.
-    so (Hseq _#3 Hu) as (R & Hl & Hr & _ & Hq & _).
-    eauto.
-    }
-
-    {
-    apply Hcond; auto.
-    intros j u u' Hu.
-    so (Hseq _#3 Hu) as (R & Hl & Hr & _ & _ & Hpq).
-    eauto.
-    }
-  }
-intros m n p q Hclp Hclq Hseqpq Hmn.
-assert (forall (x : spcar K),
-          rel (arrow_urel stop i (ceiling (S i) (den (pi1 A (std (S i) K x)))) (den B)) i (subst s (lam p)) (subst s' (lam q))) as Hp.
+clear Hlvl Hkl Hactl Hexl Hexr.
+so Hm as (_ & _ & _ & _ & Hactm).
+exploit (Hactm i (subst s (lam (ppair c p))) (subst s' (lam (ppair c p))) dyn_urel (le_refl _)) as Hleft; clear Hactm.
   {
   intros x.
-  exists (subst (under 1 s) p), (subst (under 1 s') q).
-  do2 5 split; auto.
+  simpsub.
+  rewrite -> extend_urel_id.
+  apply arrow_action_lam; auto.
     {
-    eapply subst_closub; eauto.
-    apply hygiene_auto; cbn; auto.
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
     }
 
     {
-    eapply subst_closub; eauto.
-    apply hygiene_auto; cbn; auto.
-    }
-
-    {
-    simpsub; apply star_refl.
-    }
-
-    {
-    simpsub; apply star_refl.
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
     }
   intros j r t Hj Hrt.
-  destruct Hrt as (_ & Hrt).
   simpsub.
-  eassert _ as H; [refine (Hseqpq _#3 (Hs' x j r t Hj _)) |].
+  so (closub_dot _#4 Hcls (urel_closed _#5 Hrt andel)) as Hclsr.
+  so (closub_dot _#4 Hcls' (urel_closed _#5 Hrt ander)) as Hclst.
+  exploit (Hss (embed i K x) j r t) as Hss'; auto.
     {
+    rewrite -> std_arrow_is in Hrt.
+    change (rel (den (std (S i) (qtype stop) (pi1 A (std (S i) K (embed i K x))))) j r t) in Hrt.
+    rewrite -> std_type_is in Hrt.
+    rewrite -> den_iutruncate in Hrt.
+    destruct Hrt as (_ & Hrt).
     refine (rel_from_dist _#6 _ Hrt).
     apply den_nonexpansive.
     apply (pi2 A).
@@ -803,55 +906,203 @@ assert (forall (x : spcar K),
     apply std_dist.
     omega.
     }
-  simpsubin H.
-  destruct H as (B' & Hbl' & _ & Hp).
-  so (basic_fun _#7 (basic_downward _#7 Hj Hbl) Hbl'); subst B'.
-  destruct Hp; auto.
+  so (Hseqpq _ _ _ Hss') as (C & Hcl & Hcr & Hp & _).
+  simpsubin Hcl.
+  simpsubin Hcr.
+  simpsubin Hp.
+  exists C, (subst (dot r s) c), (subst (dot t s') c), (subst (dot r s) p), (subst (dot t s') p).
+  do2 6 split; auto using star_refl.
+    {
+    prove_hygiene; eapply subst_closub; eauto.
+    }
+
+    {
+    prove_hygiene; eapply subst_closub; eauto.
+    }
   }
-destruct Hmn as (Hclm & Hcln & _ & _ & Hact).
-so (Hact i (subst s (lam p)) (subst s' (lam q)) (den B) (le_refl _)) as H.
-lapply H; clear H.
-2:{
-  intro x.
+rewrite -> !extend_term_id in Hleft.
+so Hn as (_ & _ & _ & _ & Hactn).
+exploit (Hactn i (subst s (lam (ppair c q))) (subst s' (lam (ppair c q))) dyn_urel (le_refl _)) as Hright; clear Hactn.
+  {
+  intros x.
+  simpsub.
   rewrite -> extend_urel_id.
+  apply arrow_action_lam; auto.
+    {
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
+    }
+
+    {
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
+    }
+  intros j r t Hj Hrt.
   simpsub.
-  rewrite -> std_arrow_is.
-  change (rel (arrow_urel stop i (den (std (S i) (qtype stop) (pi1 A (std (S i) K (embed i K x))))) (den B)) i (lam (subst (under 1 s) p)) (lam (subst (under 1 s') q))).
-  rewrite -> std_type_is.
-  rewrite -> den_iutruncate.
-  so (Hp (embed i K x)) as H.
-  simpsubin H.
-  exact H.
-  }
-intros H.
-rewrite -> !extend_term_id in H.
-simpsubin H.
-refine (urel_equiv _#7 _ _ _ _ H); clear H.
-  {
-  eapply hygiene_subst; eauto.
-  intros j Hj.
-  destruct j as [| j]; simpsub; auto.
-  }
+  so (closub_dot _#4 Hcls (urel_closed _#5 Hrt andel)) as Hclsr.
+  so (closub_dot _#4 Hcls' (urel_closed _#5 Hrt ander)) as Hclst.
+  exploit (Hss (embed i K x) j r t) as Hss'; auto.
+    {
+    rewrite -> std_arrow_is in Hrt.
+    change (rel (den (std (S i) (qtype stop) (pi1 A (std (S i) K (embed i K x))))) j r t) in Hrt.
+    rewrite -> std_type_is in Hrt.
+    rewrite -> den_iutruncate in Hrt.
+    destruct Hrt as (_ & Hrt).
+    refine (rel_from_dist _#6 _ Hrt).
+    apply den_nonexpansive.
+    apply (pi2 A).
+    apply dist_symm.
+    apply std_dist.
+    omega.
+    }
+  so (Hseqpq _ _ _ Hss') as (C & Hcl & Hcr & _ & Hq & _).
+  simpsubin Hcl.
+  simpsubin Hcr.
+  simpsubin Hq.
+  exists C, (subst (dot r s) c), (subst (dot t s') c), (subst (dot r s) q), (subst (dot t s') q).
+  do2 6 split; auto using star_refl.
+    {
+    prove_hygiene; eapply subst_closub; eauto.
+    }
 
-  {
-  eapply hygiene_subst; eauto.
-  intros j Hj.
-  destruct j as [| j]; simpsub; auto.
+    {
+    prove_hygiene; eapply subst_closub; eauto.
+    }
   }
-
+rewrite -> !extend_term_id in Hright.
+so Hmn as (_ & _ & _ & _ & Hactmn).
+exploit (Hactmn i (subst s (lam (ppair c p))) (subst s' (lam (ppair c q))) dyn_urel (le_refl _)) as Hleftright; clear Hactmn.
   {
-  apply steps_equiv.
-  eapply star_step; [apply step_app2 |].
+  intros x.
+  simpsub.
+  rewrite -> extend_urel_id.
+  apply arrow_action_lam; auto.
+    {
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
+    }
+
+    {
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
+    }
+  intros j r t Hj Hrt.
+  simpsub.
+  so (closub_dot _#4 Hcls (urel_closed _#5 Hrt andel)) as Hclsr.
+  so (closub_dot _#4 Hcls' (urel_closed _#5 Hrt ander)) as Hclst.
+  exploit (Hss (embed i K x) j r t) as Hss'; auto.
+    {
+    rewrite -> std_arrow_is in Hrt.
+    change (rel (den (std (S i) (qtype stop) (pi1 A (std (S i) K (embed i K x))))) j r t) in Hrt.
+    rewrite -> std_type_is in Hrt.
+    rewrite -> den_iutruncate in Hrt.
+    destruct Hrt as (_ & Hrt).
+    refine (rel_from_dist _#6 _ Hrt).
+    apply den_nonexpansive.
+    apply (pi2 A).
+    apply dist_symm.
+    apply std_dist.
+    omega.
+    }
+  so (Hseqpq _ _ _ Hss') as (C & Hcl & Hcr & _ & _ & Hpq).
+  simpsubin Hcl.
+  simpsubin Hcr.
+  simpsubin Hpq.
+  exists C, (subst (dot r s) c), (subst (dot t s') c), (subst (dot r s) p), (subst (dot t s') q).
+  do2 6 split; auto using star_refl.
+    {
+    prove_hygiene; eapply subst_closub; eauto.
+    }
+
+    {
+    prove_hygiene; eapply subst_closub; eauto.
+    }
+  }
+rewrite -> !extend_term_id in Hleftright.
+destruct Hleft as (C & cl & cr & u & v & _ & _ & Hstepsl & Hstepsr & Hcml & Hcmr & Hp).
+simpsubin Hstepsl.
+eassert _ as H; [refine (determinism_eval _#4 (conj Hstepsl value_ppair) (conj _ value_ppair)) | ].
+  {
+  eapply star_step.
+    {
+    apply step_app2.
+    }
   simpsub.
   apply star_refl.
   }
-
+injectionc H.
+intros -> ->.
+clear Hstepsl.
+simpsubin Hstepsr.
+eassert _ as H; [refine (determinism_eval _#4 (conj Hstepsr value_ppair) (conj _ value_ppair)) | ].
   {
-  apply steps_equiv.
-  eapply star_step; [apply step_app2 |].
+  eapply star_step.
+    {
+    apply step_app2.
+    }
   simpsub.
   apply star_refl.
   }
+injectionc H.
+intros -> ->.
+clear Hstepsr.
+destruct Hright as (C' & cl & cr & u & v & _ & _ & Hstepsl & Hstepsr & Hcnl & Hcnr & Hq).
+simpsubin Hstepsl.
+eassert _ as H; [refine (determinism_eval _#4 (conj Hstepsl value_ppair) (conj _ value_ppair)) | ].
+  {
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+injectionc H.
+intros -> ->.
+clear Hstepsl.
+simpsubin Hstepsr.
+eassert _ as H; [refine (determinism_eval _#4 (conj Hstepsr value_ppair) (conj _ value_ppair)) | ].
+  {
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+injectionc H.
+intros -> ->.
+clear Hstepsr.
+destruct Hleftright as (C'' & cl & cr & u & v & _ & _ & Hstepsl & Hstepsr & Hcml' & Hcnr' & Hpq).
+simpsubin Hstepsl.
+eassert _ as H; [refine (determinism_eval _#4 (conj Hstepsl value_ppair) (conj _ value_ppair)) | ].
+  {
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+injectionc H.
+intros -> ->.
+clear Hstepsl.
+simpsubin Hstepsr.
+eassert _ as H; [refine (determinism_eval _#4 (conj Hstepsr value_ppair) (conj _ value_ppair)) | ].
+  {
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+injectionc H.
+intros -> ->.
+clear Hstepsr.
+so (interp_fun _#7 Hcml Hcml').
+subst C''.
+so (interp_fun _#7 Hcnr Hcnr').
+subst C'.
+exists C.
+simpsub.
+do2 4 split; auto.
 Qed.
 
 
@@ -896,107 +1147,16 @@ assert (forall (x : spcar K) j r t,
                (cons (hyp_tm a) (cons (hyp_tm k) G))) as Hs'.
   {
   intros x j r t Hj Hrt.
-  assert (pwctx j 
-          (dot (app 
-                  (fromsp stop pg (approx j K))
-                  (ext (objin (objsome 
-                                 (expair (approx j K) (std (S j) (approx j K) (proj j K x)))
-                                 (le_ord_succ _ _ 
-                                    (le_ord_trans _#3 (approx_level j K) h)))))) s)
-          (dot (app 
-                  (fromsp stop pg (approx j K))
-                  (ext (objin (objsome 
-                                 (expair (approx j K) (std (S j) (approx j K) (proj j K x)))
-                                 (le_ord_succ _ _ 
-                                    (le_ord_trans _#3 (approx_level j K) h)))))) s')
-          (cons (hyp_tm k) G)) as Hs'.
+  eapply extend_context_exist; eauto.
     {
-    apply pwctx_cons_tm_seq; eauto using pwctx_downward.
-      {
-      so (Hseqk _#3 Hs) as (Kt & Hklt & Hkrt & _).
-      apply (seqhyp_tm _#5 (iutruncate (S j) Kt)).
-        {
-        eapply basic_downward; eauto.
-        }
-
-        {
-        eapply basic_downward; eauto.
-        }
-      so (spacify _#6 Hkl Hklt) as (_ & _ & H & _).
-      so (H j j j Hj (le_refl _) (le_refl _)) as Hfrom; clear H.
-      split; [omega |].
-      refine (arrow_action_app _#9 Hfrom _).
-      exists (std (S j) (approx j K) (proj j K x)).
-      split.
-        {
-        apply cinterp_eval_refl.
-        relquest.
-          {
-          apply interp_ext.
-          cbn.
-          eapply le_ord_trans; eauto using approx_level.
-          eapply kinterp_level_bound; eauto.
-          }
-        change (projc j (stdc (S j) (stdc (S j) (projc j (expair K x)))) = stdc (S j) (projc j (expair K x))).
-        rewrite -> stdc_idem.
-        rewrite -> projc_stdc; auto.
-        rewrite -> projc_idem; auto.
-        }
-
-        {
-        apply cinterp_eval_refl.
-        relquest.
-          {
-          apply interp_ext.
-          cbn.
-          eapply le_ord_trans; eauto using approx_level.
-          eapply kinterp_level_bound; eauto.
-          }
-        change (projc j (stdc (S j) (stdc (S j) (projc j (expair K x)))) = stdc (S j) (projc j (expair K x))).
-        rewrite -> stdc_idem.
-        rewrite -> projc_stdc; auto.
-        rewrite -> projc_idem; auto.
-        }
-      }
-
-      {
-      intros j' u u' Hu.
-      so (Hseqk _#3 Hu) as (Q & Hl & Hr & _).
-      eauto.
-      }
-    }
-  apply pwctx_cons_tm_seq; auto.
-    {
-    apply (seqhyp_tm _#5 (iutruncate (S j) (pi1 A (std (S j) K (embed j K (proj j K x)))))).
-      {
-      so (Hactl j Hj (proj j K x)) as H.
-      simpsubin H.
-      exact H.
-      }
-
-      {
-      so (Hactl j Hj (proj j K x)) as Hl.
-      simpsubin Hl.
-      so (Hseqa _#3 Hs') as (Q & Hl' & Hr & _).
-      so (basic_fun _#7 Hl Hl'); subst Q.
-      exact Hr.
-      }
-
-      {
-      split; auto.
-      refine (rel_from_dist _#6 _ Hrt).
-      apply den_nonexpansive.
-      apply (pi2 A).
-      apply std_nonexpansive.
-      apply dist_symm.
-      apply embed_proj.
-      }
+    intros j' z z' Hz.
+    so (Hseqk _#3 Hz) as (R & Hl & Hr & _).
+    eauto.
     }
 
     {
-    intros j' u u' Hu.
-    so (Hseqa _#3 Hu) as H.
-    destruct H as (Q & Hl & Hr & _).
+    intros j' z z' Hz.
+    so (Hseqa _#3 Hz) as (R & Hl & Hr & _).
     eauto.
     }
   }
@@ -1388,16 +1548,121 @@ do2 4 split.
 Qed.
 
 
+Lemma extend_context_union :
+  forall G i j s s' a b m n p q A B (Hmn : rel (den A) j m n),
+    j <= i
+    -> pwctx i s s' G
+    -> (forall j t t',
+          pwctx j t t' G
+          -> exists R,
+               interp toppg true j (subst t (union a b)) R
+               /\ interp toppg false j (subst t' (union a b)) R)
+    -> interp toppg true i (subst s a) A
+    -> interp toppg false i (subst s' a) A
+    -> functional the_system toppg true i (den A) (subst (under 1 s) b) B
+    -> functional the_system toppg false i (den A) (subst (under 1 s') b) B
+    -> rel (den (pi1 B (urelspinj (den A) j m n Hmn))) j p q
+    -> pwctx j (dot p (dot m s)) (dot q (dot n s')) (cons (hyp_tm b) (cons (hyp_tm a) G)).
+Proof.
+intros G i j s s' a b m n p q A B Hmn Hj Hs Hseq Hal Har Hbl Hbr Hpq.
+apply pwctx_cons_tm_seq.
+  {
+  apply pwctx_cons_tm_seq; eauto using pwctx_downward.
+    {
+    eapply seqhyp_tm_leq; eauto using interp_increase, toppg_max.
+    }
+
+    {
+    intros j' t t' Ht.
+    so (Hseq _#3 Ht) as (R & Hl & Hr).
+    simpsubin Hl.
+    simpsubin Hr.
+    invert (basic_value_inv _#6 value_union Hl).
+    intros A' B' Hal' _ Heq1.
+    invert (basic_value_inv _#6 value_union Hr).
+    intros A'' B'' Har' _ Heq2.
+    so (eqtrans Heq1 (eqsymm Heq2)) as Heq.
+    so (iuunion_inj _#5 Heq) as H.
+    injectionT H.
+    intros <-.
+    exists toppg, A'.
+    auto.
+    }
+  }
+
+  {
+  eapply seqhyp_tm; eauto.
+    {
+    invert Hbl.
+    intros _ _ Hact.
+    so (Hact _ _ _ Hj Hmn) as H.
+    simpsubin H.
+    exact H.
+    }
+
+    {
+    invert Hbr.
+    intros _ _ Hact.
+    so (Hact _ _ _ Hj Hmn) as H.
+    simpsubin H.
+    exact H.
+    }
+  }
+
+  {
+  intros j' tt tt' Htt.
+  invert Htt.
+  intros u v t t' Ht Huv _ _ <- <-.
+  so (Hseq _#3 Ht) as (R & Hl & Hr).
+  simpsubin Hl.
+  simpsubin Hr.
+  invert (basic_value_inv _#6 value_union Hl).
+  intros A' B' Hal' Hbl' Heq1.
+  invert (basic_value_inv _#6 value_union Hr).
+  intros A'' B'' _ Hbr' Heq2.
+  so (eqtrans Heq1 (eqsymm Heq2)) as Heq.
+  clear Heq2.
+  subst R.
+  so (iuunion_inj _#5 Heq) as H.
+  injectionT H.
+  intros <-.
+  injectionT H.
+  intros <-.
+  invertc Huv.
+  intros A'' Hal'' _ Hx.
+  so (basic_fun _#7 Hal' Hal'').
+  subst A''.
+  exists toppg, (pi1 B' (urelspinj _ _ _ _ Hx)).
+  split.
+    {
+    invert Hbl'.
+    intros _ _ Hact.
+    so (Hact _ _ _ (le_refl _) Hx) as H.
+    simpsubin H.
+    exact H.
+    }
+
+    {
+    invert Hbr'.
+    intros _ _ Hact.
+    so (Hact _ _ _ (le_refl _) Hx) as H.
+    simpsubin H.
+    exact H.
+    }
+  }
+Qed.
+
+
 Lemma sound_union_elim :
   forall G a b c m n p q,
     pseq G (deq m n (union a b))
-    -> pseq (cons (hyp_tm b) (cons (hyp_tm a) G)) (deq (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) q) (subst (sh 2) c))
-    -> pseq G (deq (subst1 m p) (subst1 n q) c).
+    -> pseq (cons (hyp_tm b) (cons (hyp_tm a) G)) (deq (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) q) (subst (dot (var 0) (sh 2)) c))
+    -> pseq G (deq (subst1 m p) (subst1 n q) (subst1 m c)).
 Proof.
 intros G a b c m n p q.
 revert G.
-refine (seq_pseq 5 [hyp_emp] b [hyp_emp] p [hyp_emp] q [] m [] n 2 [] _ [_; _] _ _ _); cbn.
-intros G Hclb Hclp Hclq Hclm Hcln Hseqmn Hseqpq.
+refine (seq_pseq 6 [hyp_emp] b [hyp_emp] p [hyp_emp] q [] m [] n [hyp_emp] c 2 [] _ [_; _] _ _ _); cbn.
+intros G Hclb Hclp Hclq Hclm Hcln Hclc Hseqmn Hseqpq.
 rewrite -> seq_deq in Hseqmn, Hseqpq |- *.
 intros i s s' Hs.
 so (Hseqmn i s s' Hs) as (R & Hl & Hr & Hm & Hn & Hmn).
@@ -1434,337 +1699,222 @@ assert (forall j r t u v (Hrt : rel (den A) j r t),
     destruct H.
     omega.
     }
-  apply pwctx_cons_tm_seq.
-    {
-    apply pwctx_cons_tm_seq; eauto using pwctx_downward.
-      {
-      eapply seqhyp_tm_leq; eauto using interp_increase, toppg_max.
-      }
-  
-      {
-      intros j' w w' Hw.
-      so (Hseqmn _#3 Hw) as (R & Hl & Hr & _).
-      simpsubin Hl.
-      simpsubin Hr.
-      invert (basic_value_inv _#6 value_union Hl).
-      intros A' B' Hal' _ Heq1.
-      invert (basic_value_inv _#6 value_union Hr).
-      intros A'' B'' Har' _ Heq2.
-      so (eqtrans Heq1 (eqsymm Heq2)) as Heq.
-      so (iuunion_inj _#5 Heq) as H.
-      injectionT H.
-      intros <-.
-      exists toppg, A'.
-      auto.
-      }
-    }
-
-    {
-    eapply seqhyp_tm; eauto.
-      {
-      invert Hbl.
-      intros _ _ Hact.
-      so (Hact _ _ _ Hj Hrt) as H.
-      simpsubin H.
-      exact H.
-      }
-
-      {
-      invert Hbr.
-      intros _ _ Hact.
-      so (Hact _ _ _ Hj Hrt) as H.
-      simpsubin H.
-      exact H.
-      }
-    }
-
-    {
-    intros j' w w' Hw.
-    invert Hw.
-    intros x x' y y' Hy Hx _ _ <- <-.
-    so (Hseqmn _#3 Hy) as (R & Hl & Hr & _).
-    simpsubin Hl.
-    simpsubin Hr.
-    invert (basic_value_inv _#6 value_union Hl).
-    intros A' B' Hal' Hbl' Heq1.
-    invert (basic_value_inv _#6 value_union Hr).
-    intros A'' B'' _ Hbr' Heq2.
-    so (eqtrans Heq1 (eqsymm Heq2)) as Heq.
-    clear Heq2.
-    subst R.
-    so (iuunion_inj _#5 Heq) as H.
-    injectionT H.
-    intros <-.
-    injectionT H.
-    intros <-.
-    invertc Hx.
-    intros A'' Hal'' _ Hx.
-    so (basic_fun _#7 Hal' Hal'').
-    subst A''.
-    exists toppg, (pi1 B' (urelspinj _ _ _ _ Hx)).
-    split.
-      {
-      invert Hbl'.
-      intros _ _ Hact.
-      so (Hact _ _ _ (le_refl _) Hx) as H.
-      simpsubin H.
-      exact H.
-      }
-
-      {
-      invert Hbr'.
-      intros _ _ Hact.
-      so (Hact _ _ _ (le_refl _) Hx) as H.
-      simpsubin H.
-      exact H.
-      }
-    }
+  eapply extend_context_union; eauto.
+  intros j' x x' Hx.
+  so (Hseqmn _#3 Hx) as (R & Hl & Hr & _).
+  eauto.
   }
-assert (exists C,
-          interp toppg true i (subst s c) C
-          /\ interp toppg false i (subst s' c) C) as (C & Hcl & Hcr).
+so Hm as (_ & _ & Hactm).
+exploit (Hactm i (subst s (lam (ppair c p))) (subst s' (lam (ppair c p))) dyn_urel (le_refl _)) as Hleft; clear Hactm.
   {
-  cbn in Hmn.
-  destruct Hmn as (H & _).
-  destruct H as (r & t & Hrt & u & Hmu).
-  so (Hseqpq _ _ _ (Hss i r t (subst s m) u Hrt Hmu)) as (C & Hcl & Hcr & _).
+  intros u v Huv.
+  rewrite -> extend_urel_id.
+  simpsub.
+  apply arrow_action_lam; auto.
+    {
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
+    }
+
+    {
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
+    }
+  intros j x y Hj Hxy.
+  simpsub.
+  so (closub_dot _#4 Hcls (urel_closed _#5 Hxy andel)) as Hclsx.
+  so (closub_dot _#4 Hcls' (urel_closed _#5 Hxy ander)) as Hclsy.
+  exploit (Hss j u v x y (urel_downward_leq _#6 Hj Huv)) as Hss'.
+    {
+    refine (rel_from_dist _#6 _ Hxy).
+    cbn -[dist].
+    apply (pi2 B).
+    apply dist_symm.
+    apply urelspinj_dist; auto.
+    }
+  so (Hseqpq _ _ _ Hss') as (C & Hcl & Hcr & Hp & _).
   simpsubin Hcl.
   simpsubin Hcr.
-  exists C.
-  auto.
+  simpsubin Hp.
+  exists C, (subst (dot x s) c), (subst (dot y s') c), (subst (dot x s) p), (subst (dot y s') p).
+  do2 6 split; auto using star_refl.
+    {
+    prove_hygiene; eapply subst_closub; eauto.
+    }
+
+    {
+    prove_hygiene; eapply subst_closub; eauto.
+    }
   }
+rewrite -> !extend_term_id in Hleft.
+so Hn as (_ & _ & Hactn).
+exploit (Hactn i (subst s (lam (ppair c q))) (subst s' (lam (ppair c q))) dyn_urel (le_refl _)) as Hright; clear Hactn.
+  {
+  intros u v Huv.
+  rewrite -> extend_urel_id.
+  simpsub.
+  apply arrow_action_lam; auto.
+    {
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
+    }
+
+    {
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
+    }
+  intros j x y Hj Hxy.
+  simpsub.
+  so (closub_dot _#4 Hcls (urel_closed _#5 Hxy andel)) as Hclsx.
+  so (closub_dot _#4 Hcls' (urel_closed _#5 Hxy ander)) as Hclsy.
+  exploit (Hss j u v x y (urel_downward_leq _#6 Hj Huv)) as Hss'.
+    {
+    refine (rel_from_dist _#6 _ Hxy).
+    cbn -[dist].
+    apply (pi2 B).
+    apply dist_symm.
+    apply urelspinj_dist; auto.
+    }
+  so (Hseqpq _ _ _ Hss') as (C & Hcl & Hcr & _ & Hq & _).
+  simpsubin Hcl.
+  simpsubin Hcr.
+  simpsubin Hq.
+  exists C, (subst (dot x s) c), (subst (dot y s') c), (subst (dot x s) q), (subst (dot y s') q).
+  do2 6 split; auto using star_refl.
+    {
+    prove_hygiene; eapply subst_closub; eauto.
+    }
+
+    {
+    prove_hygiene; eapply subst_closub; eauto.
+    }
+  }
+rewrite -> !extend_term_id in Hright.
+so Hmn as (_ & _ & Hactmn).
+exploit (Hactmn i (subst s (lam (ppair c p))) (subst s' (lam (ppair c q))) dyn_urel (le_refl _)) as Hleftright; clear Hactmn.
+  {
+  intros u v Huv.
+  rewrite -> extend_urel_id.
+  simpsub.
+  apply arrow_action_lam; auto.
+    {
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
+    }
+
+    {
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
+    }
+  intros j x y Hj Hxy.
+  simpsub.
+  so (closub_dot _#4 Hcls (urel_closed _#5 Hxy andel)) as Hclsx.
+  so (closub_dot _#4 Hcls' (urel_closed _#5 Hxy ander)) as Hclsy.
+  exploit (Hss j u v x y (urel_downward_leq _#6 Hj Huv)) as Hss'.
+    {
+    refine (rel_from_dist _#6 _ Hxy).
+    cbn -[dist].
+    apply (pi2 B).
+    apply dist_symm.
+    apply urelspinj_dist; auto.
+    }
+  so (Hseqpq _ _ _ Hss') as (C & Hcl & Hcr & _ & _ & Hpq).
+  simpsubin Hcl.
+  simpsubin Hcr.
+  simpsubin Hpq.
+  exists C, (subst (dot x s) c), (subst (dot y s') c), (subst (dot x s) p), (subst (dot y s') q).
+  do2 6 split; auto using star_refl.
+    {
+    prove_hygiene; eapply subst_closub; eauto.
+    }
+
+    {
+    prove_hygiene; eapply subst_closub; eauto.
+    }
+  }
+rewrite -> !extend_term_id in Hleftright.
+destruct Hleft as (C & cl & cr & u & v & _ & _ & Hstepsl & Hstepsr & Hcml & Hcmr & Hp).
+simpsubin Hstepsl.
+eassert _ as H; [refine (determinism_eval _#4 (conj Hstepsl value_ppair) (conj _ value_ppair)) | ].
+  {
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+injectionc H.
+intros -> ->.
+clear Hstepsl.
+simpsubin Hstepsr.
+eassert _ as H; [refine (determinism_eval _#4 (conj Hstepsr value_ppair) (conj _ value_ppair)) | ].
+  {
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+injectionc H.
+intros -> ->.
+clear Hstepsr.
+destruct Hright as (C' & cl & cr & u & v & _ & _ & Hstepsl & Hstepsr & Hcnl & Hcnr & Hq).
+simpsubin Hstepsl.
+eassert _ as H; [refine (determinism_eval _#4 (conj Hstepsl value_ppair) (conj _ value_ppair)) | ].
+  {
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+injectionc H.
+intros -> ->.
+clear Hstepsl.
+simpsubin Hstepsr.
+eassert _ as H; [refine (determinism_eval _#4 (conj Hstepsr value_ppair) (conj _ value_ppair)) | ].
+  {
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+injectionc H.
+intros -> ->.
+clear Hstepsr.
+destruct Hleftright as (C'' & cl & cr & u & v & _ & _ & Hstepsl & Hstepsr & Hcml' & Hcnr' & Hpq).
+simpsubin Hstepsl.
+eassert _ as H; [refine (determinism_eval _#4 (conj Hstepsl value_ppair) (conj _ value_ppair)) | ].
+  {
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+injectionc H.
+intros -> ->.
+clear Hstepsl.
+simpsubin Hstepsr.
+eassert _ as H; [refine (determinism_eval _#4 (conj Hstepsr value_ppair) (conj _ value_ppair)) | ].
+  {
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+injectionc H.
+intros -> ->.
+clear Hstepsr.
+so (interp_fun _#7 Hcml Hcml').
+subst C''.
+so (interp_fun _#7 Hcnr Hcnr').
+subst C'.
 exists C.
+simpsub.
 do2 4 split; auto.
-  {
-  simpsub.
-  destruct Hm as (_ & _ & Hact).
-  exploit (Hact i (subst s (lam p)) (subst s' (lam p)) (den C) (le_refl _)) as H.
-    {
-    intros r t Hrt.
-    simpsub.
-    apply arrow_action_lam; auto.
-      {
-      apply hygiene_auto; cbn.
-      split; auto.
-      eapply subst_closub_under_permit; eauto.
-      }
-
-      {
-      apply hygiene_auto; cbn.
-      split; auto.
-      eapply subst_closub_under_permit; eauto.
-      }
-    intros j u v Hj Huv.
-    simpsub.
-    exploit (Hss j r t u v (urel_downward_leq _#6 Hj Hrt)) as Hss'.
-      {
-      rewrite -> extend_urel_id in Huv.
-      refine (rel_from_dist _#6 _ Huv).
-      cbn -[dist].
-      apply den_nonexpansive.
-      apply (pi2 B).
-      apply dist_symm.
-      apply urelspinj_dist.
-      auto.
-      }
-    so (Hseqpq _#3 Hss') as (C' & Hcl' & _ & H & _).
-    simpsubin Hcl'.
-    simpsubin H.
-    so (basic_fun _#7 (basic_downward _#7 Hj Hcl) Hcl').
-    subst C'.
-    destruct H as (_ & H).
-    exact H.
-    }
-  simpsubin H.
-  cbn [Nat.add] in H.
-  rewrite -> !extend_term_id in H.
-  refine (urel_equiv _#7 _ _ _ _ H).
-    {
-    eapply subst_closub; eauto.
-    apply closub_dot; auto.
-    eapply subst_closub; eauto.
-    }
-
-    {
-    eapply subst_closub; eauto.
-    apply closub_dot; auto.
-    eapply subst_closub; eauto.
-    }
-
-    {
-    apply steps_equiv.
-    eapply star_step.
-      {
-      apply step_app2.
-      }
-    simpsub.
-    apply star_refl.
-    }
-
-    {
-    apply steps_equiv.
-    eapply star_step.
-      {
-      apply step_app2.
-      }
-    simpsub.
-    apply star_refl.
-    }
-  }
-
-  {
-  simpsub.
-  destruct Hn as (_ & _ & Hact).
-  exploit (Hact i (subst s (lam q)) (subst s' (lam q)) (den C) (le_refl _)) as H.
-    {
-    intros r t Hrt.
-    simpsub.
-    apply arrow_action_lam; auto.
-      {
-      apply hygiene_auto; cbn.
-      split; auto.
-      eapply subst_closub_under_permit; eauto.
-      }
-
-      {
-      apply hygiene_auto; cbn.
-      split; auto.
-      eapply subst_closub_under_permit; eauto.
-      }
-    intros j u v Hj Huv.
-    simpsub.
-    exploit (Hss j r t u v (urel_downward_leq _#6 Hj Hrt)) as Hss'.
-      {
-      rewrite -> extend_urel_id in Huv.
-      refine (rel_from_dist _#6 _ Huv).
-      cbn -[dist].
-      apply den_nonexpansive.
-      apply (pi2 B).
-      apply dist_symm.
-      apply urelspinj_dist.
-      auto.
-      }
-    so (Hseqpq _#3 Hss') as (C' & Hcl' & _ & _ & H & _).
-    simpsubin Hcl'.
-    simpsubin H.
-    so (basic_fun _#7 (basic_downward _#7 Hj Hcl) Hcl').
-    subst C'.
-    destruct H as (_ & H).
-    exact H.
-    }
-  simpsubin H.
-  cbn [Nat.add] in H.
-  rewrite -> !extend_term_id in H.
-  refine (urel_equiv _#7 _ _ _ _ H).
-    {
-    eapply subst_closub; eauto.
-    apply closub_dot; auto.
-    eapply subst_closub; eauto.
-    }
-
-    {
-    eapply subst_closub; eauto.
-    apply closub_dot; auto.
-    eapply subst_closub; eauto.
-    }
-
-    {
-    apply steps_equiv.
-    eapply star_step.
-      {
-      apply step_app2.
-      }
-    simpsub.
-    apply star_refl.
-    }
-
-    {
-    apply steps_equiv.
-    eapply star_step.
-      {
-      apply step_app2.
-      }
-    simpsub.
-    apply star_refl.
-    }
-  }
-
-  {
-  simpsub.
-  destruct Hmn as (_ & _ & Hact).
-  exploit (Hact i (subst s (lam p)) (subst s' (lam q)) (den C) (le_refl _)) as H.
-    {
-    intros r t Hrt.
-    simpsub.
-    apply arrow_action_lam; auto.
-      {
-      apply hygiene_auto; cbn.
-      split; auto.
-      eapply subst_closub_under_permit; eauto.
-      }
-
-      {
-      apply hygiene_auto; cbn.
-      split; auto.
-      eapply subst_closub_under_permit; eauto.
-      }
-    intros j u v Hj Huv.
-    simpsub.
-    exploit (Hss j r t u v (urel_downward_leq _#6 Hj Hrt)) as Hss'.
-      {
-      rewrite -> extend_urel_id in Huv.
-      refine (rel_from_dist _#6 _ Huv).
-      cbn -[dist].
-      apply den_nonexpansive.
-      apply (pi2 B).
-      apply dist_symm.
-      apply urelspinj_dist.
-      auto.
-      }
-    so (Hseqpq _#3 Hss') as (C' & Hcl' & _ & _ & _ & H).
-    simpsubin Hcl'.
-    simpsubin H.
-    so (basic_fun _#7 (basic_downward _#7 Hj Hcl) Hcl').
-    subst C'.
-    destruct H as (_ & H).
-    exact H.
-    }
-  simpsubin H.
-  cbn [Nat.add] in H.
-  rewrite -> !extend_term_id in H.
-  refine (urel_equiv _#7 _ _ _ _ H).
-    {
-    eapply subst_closub; eauto.
-    apply closub_dot; auto.
-    eapply subst_closub; eauto.
-    }
-
-    {
-    eapply subst_closub; eauto.
-    apply closub_dot; auto.
-    eapply subst_closub; eauto.
-    }
-
-    {
-    apply steps_equiv.
-    eapply star_step.
-      {
-      apply step_app2.
-      }
-    simpsub.
-    apply star_refl.
-    }
-
-    {
-    apply steps_equiv.
-    eapply star_step.
-      {
-      apply step_app2.
-      }
-    simpsub.
-    apply star_refl.
-    }
-  }
 Qed.
 
 
@@ -1815,91 +1965,10 @@ assert (forall j r t u v (Hrt : rel (den A) j r t),
     destruct H.
     omega.
     }
-  apply pwctx_cons_tm_seq.
-    {
-    apply pwctx_cons_tm_seq; eauto using pwctx_downward.
-      {
-      eapply seqhyp_tm_leq; eauto using interp_increase, toppg_max.
-      }
-  
-      {
-      intros j' w w' Hw.
-      so (Hseqmn _#3 Hw) as (R & Hl & Hr & _).
-      simpsubin Hl.
-      simpsubin Hr.
-      invert (basic_value_inv _#6 value_union Hl).
-      intros A' B' Hal' _ Heq1.
-      invert (basic_value_inv _#6 value_union Hr).
-      intros A'' B'' Har' _ Heq2.
-      so (eqtrans Heq1 (eqsymm Heq2)) as Heq.
-      so (iuunion_inj _#5 Heq) as H.
-      injectionT H.
-      intros <-.
-      exists toppg, A'.
-      auto.
-      }
-    }
-
-    {
-    eapply seqhyp_tm; eauto.
-      {
-      invert Hbl.
-      intros _ _ Hact.
-      so (Hact _ _ _ Hj Hrt) as H.
-      simpsubin H.
-      exact H.
-      }
-
-      {
-      invert Hbr.
-      intros _ _ Hact.
-      so (Hact _ _ _ Hj Hrt) as H.
-      simpsubin H.
-      exact H.
-      }
-    }
-
-    {
-    intros j' w w' Hw.
-    invert Hw.
-    intros x x' y y' Hy Hx _ _ <- <-.
-    so (Hseqmn _#3 Hy) as (R & Hl & Hr & _).
-    simpsubin Hl.
-    simpsubin Hr.
-    invert (basic_value_inv _#6 value_union Hl).
-    intros A' B' Hal' Hbl' Heq1.
-    invert (basic_value_inv _#6 value_union Hr).
-    intros A'' B'' _ Hbr' Heq2.
-    so (eqtrans Heq1 (eqsymm Heq2)) as Heq.
-    clear Heq2.
-    subst R.
-    so (iuunion_inj _#5 Heq) as H.
-    injectionT H.
-    intros <-.
-    injectionT H.
-    intros <-.
-    invertc Hx.
-    intros A'' Hal'' _ Hx.
-    so (basic_fun _#7 Hal' Hal'').
-    subst A''.
-    exists toppg, (pi1 B' (urelspinj _ _ _ _ Hx)).
-    split.
-      {
-      invert Hbl'.
-      intros _ _ Hact.
-      so (Hact _ _ _ (le_refl _) Hx) as H.
-      simpsubin H.
-      exact H.
-      }
-
-      {
-      invert Hbr'.
-      intros _ _ Hact.
-      so (Hact _ _ _ (le_refl _) Hx) as H.
-      simpsubin H.
-      exact H.
-      }
-    }
+  eapply extend_context_union; eauto.
+  intros j' x x' Hx.
+  so (Hseqmn _#3 Hx) as (R & Hl & Hr & _).
+  eauto.
   }
 clear Hseqmn.
 revert m n p q Hclp Hclq Hclm Hcln Hseqpq Hm Hn Hmn.

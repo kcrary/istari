@@ -203,6 +203,9 @@ exact unionIntro_valid.
 exact unionElimOf_valid.
 exact unionElimEq_valid.
 exact unionElim_valid.
+exact unionElimOfDep_valid.
+exact unionElimEqDep_valid.
+exact unionElimDep_valid.
 exact unionElimIstype_valid.
 exact unionElimEqtype_valid.
 exact sumForm_valid.
@@ -517,6 +520,9 @@ exact iexistsIntro_valid.
 exact iexistsElimOf_valid.
 exact iexistsElimEq_valid.
 exact iexistsElim_valid.
+exact iexistsElimOfDep_valid.
+exact iexistsElimEqDep_valid.
+exact iexistsElimDep_valid.
 exact iexistsElimIstype_valid.
 exact iexistsElimEqtype_valid.
 exact substitution_valid.

@@ -344,11 +344,10 @@ not use that terminology here, since we use strong sums for
 existential quantification).
 
 The practical impact of this is if `x` has a union type, `x` cannot be
-destructed if any other hypothesis or the conclusion refers to `x`.
-This is necessary because the destruction tactic uses the conclusion
-as the closed scope for eliminating the union.
-
-
+destructed if any other hypothesis refers to `x`.  (This condition can
+be obtained by reverting hypotheses if necessary.)  This is necessary
+because the destruction tactic uses the conclusion as the closed scope
+for eliminating the union.
 
 
 #### Guarded types

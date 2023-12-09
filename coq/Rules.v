@@ -353,8 +353,8 @@ Inductive tr : @context obj -> judgement -> Prop :=
 | tr_union_elim :
     forall G a b c m n p q,
       tr G (deq m n (union a b))
-      -> tr (cons (hyp_tm b) (cons (hyp_tm a) G)) (deq (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) q) (subst (sh 2) c))
-      -> tr G (deq (subst1 m p) (subst1 n q) c)
+      -> tr (cons (hyp_tm b) (cons (hyp_tm a) G)) (deq (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) q) (subst (dot (var 0) (sh 2)) c))
+      -> tr G (deq (subst1 m p) (subst1 n q) (subst1 m c))
   
 | tr_union_elim_eqtype :
     forall G a b m n p q,
@@ -654,8 +654,8 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deq m n (exist lv k a))
       -> tr G (deqtype k k)
       -> tr (cons (hyp_tm k) G) (deqtype a a)
-      -> tr (cons (hyp_tm a) (cons (hyp_tm k) G)) (deq (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) q) (subst (sh 2) b))
-      -> tr G (deq (subst1 m p) (subst1 n q) b)
+      -> tr (cons (hyp_tm a) (cons (hyp_tm k) G)) (deq (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) q) (subst (dot (var 0) (sh 2)) b))
+      -> tr G (deq (subst1 m p) (subst1 n q) (subst1 m b))
 
 | tr_exist_elim_eqtype :
     forall G lv k a m n p q,

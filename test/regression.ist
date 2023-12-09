@@ -10,32 +10,18 @@ fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
 
 
 
-lemma "iexists_dependency"
+lemma "eliminate_iexists"
 /
   forall i (a : kind i) (b : a -> U i) (y : iexists (x : a) . b x) . 
     unit
-    -> y = y : (iexists (x : a) . b x) 
-    -> y : (iexists (x : a) . b x)
+    -> y = y : (iexists (x : a) . b x)
+    -> { exists (x : a) . b x }
 /;
 
 inference.
 intro /i a b y H1 H2/.
 shouldfail (destruct /y/ /x y/).
 clear /H2/.
-shouldfail (destruct /y/ /x y/).
-Prover.abandon ();
-
-
-
-lemma "eliminate_iexists"
-/
-  forall i (a : kind i) (b : a -> U i) (y : iexists (x : a) . b x) . 
-    unit
-    -> { exists (x : a) . b x }
-/;
-
-inference.
-intro /i a b y H/.
 destruct /y/ /x y/.
 split.
 exists /x/.
@@ -44,20 +30,21 @@ qed ();
 
 
 
-lemma "union_dependency"
+lemma "eliminate_iexists_dependent"
 /
-  forall i (a : U i) (b : a -> U i) (y : union (x : a) . b x) . 
+  forall i (a : kind i) (b : a -> U i) (y : iexists (x : a) . b x) . 
     unit
-    -> y = y : (union (x : a) . b x) 
-    -> y : (union (x : a) . b x)
+    -> y = y : (iexists (x : a) . b x)
+    -> y : (iexists (x : a) . b x)
 /;
 
 inference.
 intro /i a b y H1 H2/.
 shouldfail (destruct /y/ /x y/).
 clear /H2/.
-shouldfail (destruct /y/ /x y/).
-Prover.abandon ();
+destruct /y/ /x y/.
+typecheck.
+qed ();
 
 
 
@@ -65,15 +52,36 @@ lemma "eliminate_union"
 /
   forall i (a : U i) (b : a -> U i) (y : union (x : a) . b x) . 
     unit
+    -> y = y : (union (x : a) . b x) 
     -> { exists (x : a) . b x }
 /;
 
 inference.
-intro /i a b y H/.
+intro /i a b y H1 H2/.
+shouldfail (destruct /y/ /x y/).
+clear /H2/.
 destruct /y/ /x y/.
 split.
 exists /x/.
 auto.
+qed ();
+
+
+
+lemma "eliminate_union_dependent"
+/
+  forall i (a : U i) (b : a -> U i) (y : union (x : a) . b x) . 
+    unit
+    -> y = y : (union (x : a) . b x) 
+    -> y : union (x : a) . b x
+/;
+
+inference.
+intro /i a b y H1 H2/.
+shouldfail (destruct /y/ /x y/).
+clear /H2/.
+destruct /y/ /x y/.
+typecheck.
 qed ();
 
 

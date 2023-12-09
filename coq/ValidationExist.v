@@ -83,10 +83,27 @@ eapply tr_exist_intro; eauto.
 Qed.
 
 
+Lemma iexistsElimOfDep_valid : iexistsElimOfDep_obligation.
+Proof.
+prepare.
+intros G a b i k m p ext3 ext2 ext1 ext0 Hk Ha Hp Hm.
+eapply tr_exist_elim; eauto.
+Qed.
+
+
 Lemma iexistsElimOf_valid : iexistsElimOf_obligation.
 Proof.
 prepare.
 intros G a b i k m p ext3 ext2 ext1 ext0 Hk Ha Hp Hm.
+replace b with (subst1 m (subst sh1 b)) by (simpsub; reflexivity).
+eapply tr_exist_elim; simpsub; eauto.
+Qed.
+
+
+Lemma iexistsElimEqDep_valid : iexistsElimEqDep_obligation.
+Proof.
+prepare.
+intros G a b i k m n p q ext3 ext2 ext1 ext0 Hk Ha Hpq Hmn.
 eapply tr_exist_elim; eauto.
 Qed.
 
@@ -95,7 +112,23 @@ Lemma iexistsElimEq_valid : iexistsElimEq_obligation.
 Proof.
 prepare.
 intros G a b i k m n p q ext3 ext2 ext1 ext0 Hk Ha Hpq Hmn.
+replace b with (subst1 m (subst sh1 b)) by (simpsub; reflexivity).
+eapply tr_exist_elim; simpsub; eauto.
+Qed.
+
+
+Lemma iexistsElimDep_valid : iexistsElimDep_obligation.
+Proof.
+prepare.
+intros G a b i k m ext2 ext1 p ext0 Hhyg Hk Ha Hp Hm.
+replace (subst (dot m (dot triv (sh 0))) p) with (subst1 m (subst (under 1 (dot triv id)) p)) by (simpsub; auto).
 eapply tr_exist_elim; eauto.
+simpsub.
+so (subst_into_absent_single _ 1 p triv Hhyg) as H.
+simpsubin H.
+cbn [Nat.add] in H.
+rewrite -> H.
+auto.
 Qed.
 
 
@@ -103,6 +136,7 @@ Lemma iexistsElim_valid : iexistsElim_obligation.
 Proof.
 prepare.
 intros G a b i k m ext2 ext1 p ext0 Hhyg Hk Ha Hp Hm.
+replace b with (subst1 m (subst sh1 b)) by (simpsub; reflexivity).
 replace (subst (dot m (dot triv (sh 0))) p) with (subst1 m (subst (under 1 (dot triv id)) p)) by (simpsub; auto).
 eapply tr_exist_elim; eauto.
 simpsub.

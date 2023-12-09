@@ -1289,6 +1289,27 @@ variables.  The official rules, using de Bruijn indices, are given
       G, x (hidden) : A, y : B |- C ext P
       G |- M : union (x : A) . B
 
+- `unionElimOfDep A B C M P`
+
+      G |- [M / y]P : [M / y]C
+      >>
+      G, x : A, y : B |- P : C
+      G |- M : union (x : A) . B
+
+- `unionElimEqDep A B C M N P Q`
+
+      G |- [M / y]P = [N / y]Q : [M / y]C
+      >>
+      G, x : A, y : B |- P = Q : C
+      G |- M = N : (union (x : A) . B)
+
+- `unionElimDep A B C M`
+
+      G |- [M / y]C ext [(), M / x, y]P
+      >>
+      G, x (hidden) : A, y : B |- C ext P
+      G |- M : union (x : A) . B
+
 - `unionElimIstype A B C M`
 
       G |- [M / y]C : type

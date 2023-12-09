@@ -943,10 +943,27 @@ eapply tr_union_intro; eauto.
 Qed.
 
 
+Lemma unionElimOfDep_valid : unionElimOfDep_obligation.
+Proof.
+prepare.
+intros G a b c m p ext1 ext0 Hp Hm.
+eapply tr_union_elim; eauto.
+Qed.
+
+
 Lemma unionElimOf_valid : unionElimOf_obligation.
 Proof.
 prepare.
 intros G a b c m p ext1 ext0 Hp Hm.
+replace c with (subst1 m (subst sh1 c)) by (simpsub; reflexivity).
+eapply tr_union_elim; simpsub; eauto.
+Qed.
+
+
+Lemma unionElimEqDep_valid : unionElimEqDep_obligation.
+Proof.
+prepare.
+intros G a b c m n p q ext1 ext0 Hp Hm.
 eapply tr_union_elim; eauto.
 Qed.
 
@@ -955,7 +972,23 @@ Lemma unionElimEq_valid : unionElimEq_obligation.
 Proof.
 prepare.
 intros G a b c m n p q ext1 ext0 Hp Hm.
+replace c with (subst1 m (subst sh1 c)) by (simpsub; reflexivity).
+eapply tr_union_elim; simpsub; eauto.
+Qed.
+
+
+Lemma unionElimDep_valid : unionElimDep_obligation.
+Proof.
+prepare.
+intros G a b c m p ext0 Hhyg Hp Hm.
+replace (subst (dot m (dot triv (sh 0))) p) with (subst1 m (subst (under 1 (dot triv id)) p)) by (simpsub; auto).
 eapply tr_union_elim; eauto.
+simpsub.
+so (subst_into_absent_single _ 1 p triv Hhyg) as H.
+simpsubin H.
+cbn [Nat.add] in H.
+rewrite -> H.
+auto.
 Qed.
 
 
@@ -963,6 +996,7 @@ Lemma unionElim_valid : unionElim_obligation.
 Proof.
 prepare.
 intros G a b c m p ext0 Hhyg Hp Hm.
+replace c with (subst1 m (subst sh1 c)) by (simpsub; reflexivity).
 replace (subst (dot m (dot triv (sh 0))) p) with (subst1 m (subst (under 1 (dot triv id)) p)) by (simpsub; auto).
 eapply tr_union_elim; eauto.
 simpsub.

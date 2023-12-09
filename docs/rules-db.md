@@ -1276,6 +1276,27 @@ Conventions:
       G, (hidden) A, B |- C[^2] ext P
       G |- of (union A (fn . B)) M
 
+- `unionElimOfDep A B C M P`
+
+      G |- of C[M . id] P[M . id]
+      >>
+      G, A, B |- of C[0 . ^2] P[0 . ^2]
+      G |- of (union A (fn . B)) M
+
+- `unionElimEqDep A B C M N P Q`
+
+      G |- eq C[M . id] P[M . id] Q[N . id]
+      >>
+      G, A, B |- eq C[0 . ^2] P[0 . ^2] Q[0 . ^2]
+      G |- eq (union A (fn . B)) M N
+
+- `unionElimDep A B C M`
+
+      G |- C[M . id] ext P[M . () . id]
+      >>
+      G, (hidden) A, B |- C[0 . ^2] ext P
+      G |- of (union A (fn . B)) M
+
 - `unionElimIstype A B C M`
 
       G |- istp C[M . id]
@@ -3490,6 +3511,33 @@ Conventions:
       G |- istp K
       G, K |- istp A
       G, (hidden) K, A |- B[^2] ext P
+      G |- of (iexists I K (fn . A)) M
+
+- `iexistsElimOfDep A B I K M P`
+
+      G |- of B[M . id] P[M . id]
+      >>
+      G |- istp K
+      G, K |- istp A
+      G, K, A |- of B[0 . ^2] P[0 . ^2]
+      G |- of (iexists I K (fn . A)) M
+
+- `iexistsElimEqDep A B I K M N P Q`
+
+      G |- eq B[M . id] P[M . id] Q[N . id]
+      >>
+      G |- istp K
+      G, K |- istp A
+      G, K, A |- eq B[0 . ^2] P[0 . ^2] Q[0 . ^2]
+      G |- eq (iexists I K (fn . A)) M N
+
+- `iexistsElimDep A B I K M`
+
+      G |- B[M . id] ext P[M . () . id]
+      >>
+      G |- istp K
+      G, K |- istp A
+      G, (hidden) K, A |- B[0 . ^2] ext P
       G |- of (iexists I K (fn . A)) M
 
 - `iexistsElimIstype A B I K M`

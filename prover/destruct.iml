@@ -270,25 +270,30 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
       fun destUnion i pat set =
          (case pat of
              And [p1, p2] =>
+                (cut $ setFailure "hypotheses depend on union hypothesis being destructed" $
+                 refine (Rule.exchange 0 i 1))
+                >>+
                 let
                    do (jud, _) = withgoal
                    val c = J.concl jud
                 in
-                   hypCaseT (J.subHyp (J.hyp jud i) (T.Shift (i+1)))
+                   hypCaseT (J.hyp jud 0)
                    /| $tm \Prim.union\ ? (fn . ?) =>
                       \(fnc a b =>
-                           (* union A . B, ... |- C *)
-                           refine (Rule.unionElim a b c (T.Var i))
-                           >>>
+                           (* ..., union A . B |- C
+                                                = C[0 . ^2][0 . id]
+                           *)
+                           refine (Rule.unionElimDep (T.Sub (a, T.Shift 1)) (T.Sub (b, T.underShift 1 1)) (T.Sub (c, T.underShift 1 1)) (T.Var 0))
+                           >>> 
                               [
-                              (* union A . B, ..., hide A[^i+1], B[0 . ^i+2] |- C[^2] *)
-                              (cut $ setFailure "dependencies exist on union hypothesis being destructed" $
-                               refine (Rule.weaken (i+2) 1))
+                              (* ..., union A . B, A[^], B[0 . ^2] |- C[0 . ^2][0 . ^2]
+                                                                    = C[0 . ^3]
+                              *)
+                              refine (Rule.weaken 2 1)
                               >>+
-                              (* ..., hide A[^i], B[0 . ^i+1] |- C[^] *)
+                              (* ..., A, B |- C[0 . ^2] *)
                               refine (Rule.exchange 0 2 i)
                               >>+
-                              (* hide A, B, ... |- C[something] *)
                               let
                                  do (vars1, set1) = andthenp S.empty $ dest (i+1) p1 set
                                  do (vars2, set2) = andthenp vars1 $ dest i p2 set1
@@ -296,10 +301,10 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                                  idtacM (S.append vars1 vars2, Principal set2)
                               end,
 
-                              (* union A . B, ... |- i : (union A . B)[^i+1] *)
-                              refine (Rule.hypothesisOf i) >> done
+                              (* ..., union A . B |- 0 : union A[^] . B[0 . ^2] *)
+                              refine (Rule.hypothesisOf 0) >> done
                               ])\
-
+   
                     | _ =>
                       \(fnc =>
                            fail "improper hypothesis for union destruction")\
@@ -313,35 +318,45 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
       fun destIexists i pat set =
          (case pat of
              And [p1, p2] =>
+                (cut $ setFailure "hypotheses depend on iexists hypothesis being destructed" $
+                 refine (Rule.exchange 0 i 1))
+                >>+
                 let
                    do (jud, _) = withgoal
                    val c = J.concl jud
                 in
-                   hypCaseT (J.subHyp (J.hyp jud i) (T.Shift (i+1)))
+                   hypCaseT (J.hyp jud 0)
                    /| $tm \Prim.iexists\ ? ? (fn . ?) =>
                       \(fnc lv k a =>
-                           (* iexists LV K . A, ... |- C *)
-                           refine (Rule.iexistsElim a c lv k (T.Var i))
+                           (* ..., iexists LV K . A |- C
+                                                     = C[0 . ^2][0 . id]
+                           *)
+                           refine (Rule.iexistsElimDep 
+                                      (T.Sub (a, T.underShift 1 1))
+                                      (T.Sub (c, T.underShift 1 1))
+                                      (T.Sub (lv, T.Shift 1))
+                                      (T.Sub (k, T.Shift 1))
+                                      (T.Var 0))
                            >>>
                               [
-                              (* iexists LV K . A, ... |- K : type *)
+                              (* ..., iexists LV K . A |- K[^] : type *)
                               refine (Rule.weaken 0 (i+1))
                               >>+
                               idtacM (S.empty, Tertiary),
 
-                              (* iexists LV K . A, ..., K |- A : type *)
+                              (* ..., iexists LV K . A, K[^] |- A[0 . ^2] : type *)
                               refine (Rule.weaken 1 (i+1))
                               >>+
                               idtacM (S.cons (D.freshSet set) S.empty, Tertiary),
 
-                              (* iexists LV K . A, ..., hide K[^i+1], A[0 . ^i+2] |- C[^2] *)
-                              (cut $ setFailure "dependencies exist on iexists hypothesis being destructed" $
-                               refine (Rule.weaken (i+2) 1))
+                              (* ..., iexists LV K . A, K[^], A[0 . ^2] |- C[0 . ^2][0 . ^2]
+                                                                         = C[0 . ^3]
+                              *)
+                              refine (Rule.weaken 2 1)
                               >>+
-                              (* ..., hide K[^i], A[0 . ^i+1] |- C[^] *)
+                              (* ..., K, A |- C[0 . ^2] *)
                               refine (Rule.exchange 0 2 i)
                               >>+
-                              (* hide A, B, ... |- C[something] *)
                               let
                                  do (vars1, set1) = andthenp S.empty $ dest (i+1) p1 set
                                  do (vars2, set2) = andthenp vars1 $ dest i p2 set1
@@ -349,8 +364,8 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                                  idtacM (S.append vars1 vars2, Principal set2)
                               end,
 
-                              (* iexists LV K . A, ... |- i : (iexists LV K . A)[^i+1] *)
-                              refine (Rule.hypothesisOf i) >> done
+                              (* ..., iexists LV K . A |- 0 : iexists LV[^] K[^] . A[0 . ^2] *)
+                              refine (Rule.hypothesisOf 0) >> done
                               ])\
 
                     | _ =>
