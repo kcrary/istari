@@ -1600,6 +1600,14 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- M = N : future A
       G, x (later) : A |- P = Q : B
 
+- `futureElim A B M`
+
+      G |- [M #prev / x]B ext [M #prev / x]P
+      >>
+      promote(G) |- A : type
+      G |- M : future A
+      G, x (later) : A |- B ext P
+
 - `futureElimIstype A B M`
 
       G |- [M #prev / x]B : type
@@ -1644,6 +1652,13 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       promote(G1) |- A : type
       G1, y (later) : A, [next y / x]G2 |- [next y / x]B ext M
+
+- `futureInjection A M N`
+
+      G |- future (M = N : A) ext next ()
+      >>
+      promote(G) |- A : type
+      G |- next M = next N : future A
 
 
 ### Recursive types

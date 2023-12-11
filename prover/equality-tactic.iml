@@ -1805,6 +1805,31 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          end
 
 
+      (* i : next M = next N : future A *)
+      fun injectionFuture i =
+         goalHypCaseT i
+         /| $tm \Prim.eq\ (\Prim.future\ ?) (next ?) (next ?) =>
+            \(fnc a m n =>
+                 refine (Rule.assert (T.apply1 Prim.future (T.apply3 Prim.eq a m n)) (T.evar ()))
+                 >>>
+                    [
+                    (* future (M = N : A) *)
+                    refine (Rule.futureInjection a m n)
+                    >>>
+                       [
+                       (* promote |- A : type *)
+                       idtacM Secondary,
+
+                       (* next M = next N : future A *)
+                       refine (Rule.hypothesis i) >> done
+                       ],
+
+                    withgoal (fn (_, dir) => chdir (D.bind0 dir) >> idtacM Primary)
+                    ])\
+
+          | _ => \(fnc => fail "not an injection expression")\
+         /
+
       val () =
          List.app (fn (const, tac) => H.insert injectionTactics const (fn hyp => tac hyp >> idtacM Primary))
          [
@@ -1819,7 +1844,8 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          List.app (fn (const, tac) => H.insert injectionTactics const tac)
          [
          (Prim.set, injectionSet),
-         (Prim.quotient, injectionQuotient)
+         (Prim.quotient, injectionQuotient),
+         (Prim.future, injectionFuture)
          ]
 
    end

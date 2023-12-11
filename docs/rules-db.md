@@ -1587,6 +1587,14 @@ Conventions:
       G |- eq (future A) M N
       G, (later) A |- eq B P Q
 
+- `futureElim A B M`
+
+      G |- B[M #prev . id] ext P[M #prev . id]
+      >>
+      promote(G) |- istp A
+      G |- of (future A) M
+      G, (later) A |- B ext P
+
 - `futureElimIstype A B M`
 
       G |- istp B[M #prev . id]
@@ -1631,6 +1639,13 @@ Conventions:
       >>
       promote(G1) |- istp A
       G1, (later) A, G2[next 0 . ^1] |- B[under_n (next 0 . ^1)] ext M
+
+- `futureInjection A M N`
+
+      G |- future (eq A M N) ext next ()
+      >>
+      promote(G) |- istp A
+      G |- eq (future A) (next M) (next N)
 
 
 ### Recursive types

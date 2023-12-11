@@ -15,9 +15,15 @@ Require Defs.
 Require Import Obligations.
 Require Import Morphism.
 Require Import DefsEquiv.
-Require Import Equivalence.
 
 Require Import ValidationUtil.
+Require Import Relation.
+Require Import Equivalence.
+Require Import Equivalences.
+Require Import Dynamic.
+
+
+Hint Rewrite def_fut def_eq def_letnext : prepare.
 
 
 Lemma futureKind_valid : futureKind_obligation.
@@ -104,6 +110,15 @@ Lemma futureElimEq_valid : futureElimEq_obligation.
   constructor.
   eapply tr_fut_elim; eauto using deq_intro; eauto using deqtype_intro.
 Qed.
+
+
+Lemma futureElim_valid : futureElim_obligation.
+Proof.
+prepare.
+intros G a b m ext1 ext0 p Ha Hm Hp.
+eapply tr_fut_elim; eauto.
+Qed.
+
 
 Lemma futureElimIstype_valid : futureElimIstype_obligation. 
  unfoldtop. autounfold with valid_hint.
@@ -246,9 +261,6 @@ apply (tr_subtype_elim _ (subst sh1 a)).
 Qed.
  
 
-Hint Rewrite def_fut def_letnext : prepare.
-
-
 Lemma futureSub_valid : futureSub_obligation.
 Proof.
 prepare.
@@ -288,4 +300,168 @@ prepare.
 intros G a m n ext2 ext1 ext0 Hm Hn Hmn.
 eapply tr_fut_ext; eauto.
 apply tr_fut_intro; auto.
+Qed.
+
+
+Lemma futureInjection_valid : futureInjection_obligation.
+Proof.
+prepare.
+intros G a m n ext1 ext0 Ha Hmn.
+assert (equiv m (prev (next m))) as Hequivm.
+  {
+  apply equiv_symm.
+  apply steps_equiv.
+  apply star_one.
+  apply step_prev2.
+  }
+assert (equiv n (prev (next n))) as Hequivn.
+  {
+  apply equiv_symm.
+  apply steps_equiv.
+  apply star_one.
+  apply step_prev2.
+  }
+apply (tr_eqtype_convert _ _ _ (fut (equal a m m))).
+  {
+  unfold deqtype.
+  apply (tr_compute _ _ (eqtype (fut (equal a (prev (next m)) (prev (next m)))) (fut (equal a (prev (next m)) (prev (next n))))) _ triv _ triv); auto using equiv_refl.
+    {
+    apply equiv_eqtype.
+      {
+      apply equiv_fut.
+      apply equiv_equal; auto using equiv_refl.
+      }
+
+      {
+      apply equiv_fut.
+      apply equiv_equal; auto using equiv_refl.
+      }
+    }
+  fold (deqtype (fut (equal a (prev (next m)) (prev (next m)))) (fut (equal a (prev (next m)) (prev (next n))))).
+  cut (tr G (deqtype (subst (dot (prev (next m)) id) (subst (dot (prev (next (subst sh1 m))) id) (fut (equal (subst (sh 2) a) (var 0) (var 1))))) (subst (dot (prev (next n)) id) (subst (dot (prev (next (subst sh1 m))) id) (fut (equal (subst (sh 2) a) (var 0) (var 1))))))).
+    {
+    simpsub.
+    auto.
+    }
+  apply (tr_fut_elim_eqtype _ _ _ a); auto.
+  apply (tr_fut_elim_eqtype _ _ _ (subst sh1 a)); auto.
+    {
+    apply (weakening _ [_] []).
+      {
+      cbn [length].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length Dots.unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length Dots.unlift].
+    simpsub.
+    cbn [List.app].
+    apply (tr_transitivity _ _ (next n)).
+      {
+      exact Hmn.
+      }
+      
+      {
+      apply tr_symmetry.
+      exact Hmn.
+      }
+    }
+
+    {
+    cbn.
+    apply (weakening _ [_] []).
+      {
+      cbn [length].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length Dots.unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length Dots.unlift].
+    simpsub.
+    cbn [List.app].
+    exact Ha.
+    }
+  
+    {
+    apply tr_fut_formation.
+    cbn.
+    fold (promote G).
+    apply tr_equal_formation.
+      {
+      apply (weakening _ [_; _] []).
+        {
+        cbn [length].
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length Dots.unlift].
+        simpsub.
+        auto.
+        }
+      cbn [length Dots.unlift].
+      simpsub.
+      cbn [List.app].
+      exact Ha.
+      }
+
+      {
+      eapply hypothesis; eauto using index_0.
+      simpsub.
+      auto.
+      }
+
+      {
+      eapply hypothesis; eauto using index_S, index_0.
+      }
+    }
+  }
+
+  {
+  apply (tr_compute _ _ (fut (equal a (prev (next m)) (prev (next m)))) _ (next triv) _ (next triv)); auto using equiv_refl.
+    {
+    apply equiv_fut.
+    apply equiv_equal; auto using equiv_refl.
+    }
+  cut (tr G (deq (subst (dot (prev (next m)) id) (next triv)) (subst (dot (prev (next m)) id) (next triv)) (subst (dot (prev (next m)) id) (fut (equal (subst sh1 a) (var 0) (var 0)))))).
+    {
+    simpsub.
+    auto.
+    }
+  apply (tr_fut_elim _ _ _ a).
+    {
+    apply (tr_transitivity _ _ (next n)).
+      {
+      exact Hmn.
+      }
+      
+      {
+      apply tr_symmetry.
+      exact Hmn.
+      }
+    }
+
+    {
+    exact Ha.
+    }
+
+    {
+    apply tr_fut_intro.
+    cbn.
+    fold (promote G).
+    apply tr_equal_intro.
+    eapply hypothesis; eauto using index_0.
+    }
+  }
 Qed.

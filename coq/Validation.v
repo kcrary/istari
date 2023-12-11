@@ -246,12 +246,14 @@ exact futureElimOf_valid.
 exact futureElimOfLetnext_valid.
 exact futureElimOfLetnextNondep_valid.
 exact futureElimEq_valid.
+exact futureElim_valid.
 exact futureElimIstype_valid.
 exact futureElimIstypeLetnext_valid.
 exact futureElimEqtype_valid.
 exact futureEta_valid.
 exact futureExt_valid.
 exact futureLeft_valid.
+exact futureInjection_valid.
 exact recKind_valid.
 exact recKindEq_valid.
 exact recForm_valid.
