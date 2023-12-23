@@ -62,6 +62,7 @@ signature TACTIC =
       val attempt : tactic -> tactic
       val first : 'a tacticm list -> 'a tacticm
       val repeat : tactic -> tactic
+      val repeatPri : priority tacticm -> priority tacticm
       val repeatCount : tactic -> int tacticm
       val repeatn : int -> tactic -> tactic
       val orthen : 'a tacticm -> (unit -> 'a tacticm) -> 'a tacticm
@@ -582,6 +583,14 @@ structure TacticInternal :> TACTIC_INTERNAL =
 
       fun repeat tac goal fk sk =
          ifthen tac (repeat tac) idtac goal fk sk
+
+      fun repeatPri tac goal fk sk =
+         ifthenM 
+            tac
+            (fn Primary => repeatPri tac
+              | Secondary => idtacM Secondary)
+            (idtacM Primary)
+            goal fk sk
 
 
       fun withgoal tac goal fk sk = tac goal goal fk sk

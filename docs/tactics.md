@@ -1091,6 +1091,14 @@ To lessen the likelihood of this, `omega` (but not `omegaRaw`) runs
 the `inference` tactic first to attempt to resolve evars.
 Nevertheless, it is possible for evars to leak through inference.
 
+Some forms require Omega to search multiple possibilities.  This
+includes `prod` in a positive position, `sum` or `arrow` in a negative
+position, and any function that is defined by cases (`minus`, `pred`,
+`min`, `max`, and `integer_to_nat`).  Each appearance of such a form
+doubles the effective size of the constraint, which will affect
+performance.  However, multiple occurrences of the same expression
+will not double the size multiple times.
+
 
 
 ### Miscellaneous tactics
