@@ -91,29 +91,49 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
 
 
 
-      fun findIntroTactic a =
+      (* n: number of unfolds already *)
+      fun findIntroTactic n a =
          let
             val a' = N.whnf a
          in
-            (case
-                (case a' of
-                    T.Elim (T.Const const, _) => H.find introTactics const
-                  | _ => NONE)
-             of
-                SOME (tac, binder) => SOME (tac, binder, a')
+            (case a' of
+                T.Elim (T.Const const, spine) =>
+                   (case H.find introTactics const of
+                       SOME (tac, binder) =>
+                          let
+                             val tac' =
+                                if n = 0 then
+                                   tac
+                                else
+                                   refine (Rule.reduce 
+                                              (R.trans
+                                                  (Int.natrecUp 
+                                                      (fns _ l => R.unfold :: l)
+                                                      [] n)))
+                                   >>+
+                                   tac
+                          in
+                             SOME (tac', binder, a')
+                          end
 
-              | NONE =>
-                   (case N.whnfHard a' of
-                       a'' as T.Elim (T.Const const, _) =>
-                          (case H.find introTactics const of
-                              SOME (tac, binder) => SOME (tac, binder, a'')
+                     | NONE =>
+                          (case Constant.definition const of
+                              SOME m => 
+                                 findIntroTactic 
+                                    (case Constant.opacity const of
+                                        Constant.HARD => n+1
 
-                            | NONE => NONE)
+                                      | _ =>
+                                           (* by construction, can't be opaque *)
+                                           n)
+                                    (T.Elim (m, spine))
 
-                     | _ => NONE))
+                            | NONE => NONE))
+
+              | _ => NONE)
          end
-             
-      
+
+
       fun introPriority pats =
          (case pats of
              nil => idtacM Primary
@@ -123,7 +143,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                    do (jud, dir) = withgoal
                    val a = Judgement.concl jud
                 in
-                   (case findIntroTactic a of
+                   (case findIntroTactic 0 a of
                        SOME (tac, binder, a') =>
                           let
                              val pat' =
