@@ -501,25 +501,27 @@ which appears in the `Hyp` structure.
     As `substitution` but does not invoke the typechecker.
 
 
-- `subst /[hyp x]/`
+- `subst /[hyps]/`
 
-  When there exists another hypothesis with type `x = M : A` or 
-  `M = x : A`, replaces occurrences of `x` with `M`.
+  For each hypothesis `x` in the list: when there exists another
+  hypothesis with type `x = M : A` or `M = x : A`, replaces
+  occurrences of `x` with `M`.
 
-  + `substRaw /[hyp x]/`
+  + `substRaw /[hyps]/`
 
     As `subst` but does not invoke the typechecker.
 
-  + `substStrict /[hyp x]/`
+  + `substStrict /[hyps]/`
 
     As `subst` but will not move hypotheses to make substitution
-    possible.  Thus `M` must not refer to hypotheses after `x`.
+    possible.  Thus when substituting `M` for `x`, `M` must not refer
+    to hypotheses after `x`.
 
     On rare occasions `substStrict` might work when `subst` fails,
     because `subst` might fail due to a spurious cyclic dependency
     (one that could be eliminated pruning an evar dependency).
 
-  + `substStrictRaw /[hyp x]/`
+  + `substStrictRaw /[hyps]/`
 
     As `substStrict` but does not invoke the typechecker.
 
