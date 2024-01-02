@@ -600,37 +600,29 @@ module Word8ArraySlice : MONO_ARRAY_SLICE with type elem = Word8.word with type 
    end
 
 
-(* Before Array so as not to have the primitive Array library shadowed yet. *)
-module Vector : VECTOR =
+module Vector : VECTOR with type 'a vector = 'a Basis.Vector.vector =
    struct
 
-      type nonrec 'a vector = 'a array
+      type nonrec 'a vector = 'a Basis.Vector.vector
 
-      let fromList = Array.of_list
+      let fromList = Basis.Vector.fromList
       
-      let tabulate (n, f) = Array.init n f
+      let tabulate (n, f) = Basis.Vector.tabulate n f
 
-      let length = Array.length
+      let length = Basis.Vector.length
 
       let sub (a, i) =
          try
-            Array.get a i
+            Basis.Vector.sub a i
          with Invalid_argument _ -> raise Subscript
          
-      let foldl f b a = Array.fold_left (fun y x -> f (x, y)) b a
-      let foldr f b a = Array.fold_right (fun x y -> f (x, y)) a b
-      let app = Array.iter
-      let appi f a = Array.iteri (fun i x -> f (i, x)) a
+      let foldl f b a = Basis.Vector.foldl (fun x y -> f (x, y)) b a
+      let foldr f b a = Basis.Vector.foldr (fun x y -> f (x, y)) b a
+      let app = Basis.Vector.app
+      let appi f a = Basis.Vector.appi (fun i x -> f (i, x)) a
 
-      let foldli f b a =
-         let (_, y) = Array.fold_left (fun (i, y) x -> (i+1, f (i, x, y))) (0, b) a
-         in
-            y
-
-      let foldri f b a =
-         let (_, y) = Array.fold_right (fun x (i, y) -> (i-1, f (i, x, y))) a (Array.length a - 1, b)
-         in
-            y
+      let foldli f b a = Basis.Vector.foldli (fun i x y -> f (i, x, y)) b a
+      let foldri f b a = Basis.Vector.foldri (fun i x y -> f (i, x, y)) b a
 
    end
 

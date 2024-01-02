@@ -31,7 +31,7 @@ module List : LIST with type 'a list = 'a list
 module ListPair : LIST_PAIR
 module Option : OPTION with type 'a option = 'a option
 module Array : ARRAY with type 'a array = 'a array
-module Vector : VECTOR
+module Vector : VECTOR with type 'a vector = 'a Basis.Vector.vector
 module Word8Array : MONO_ARRAY with type elem = Word8.word with type array = Word8.word array
 module Word8ArraySlice : MONO_ARRAY_SLICE with type elem = Word8.word with type array = Word8.word array with type slice = (Word8.word array * int * int)
 module IO : IO
