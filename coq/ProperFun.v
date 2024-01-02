@@ -350,6 +350,59 @@ apply interp_sigma; eauto.
 exact (raise_robust_functional_ih _#14 Hv Hw HeqXY IH2 Hb).
 }
 
+(* fut *)
+{
+intros k a _ IH1 i s R Hint.
+simpsub.
+simpsubin Hint.
+invert (basic_value_inv _#6 value_fut Hint).
+  {
+  intros Hhyg <- <-.
+  apply interp_eval_refl.
+  apply interp_fut_zero; auto.
+  rewrite -> subst_compose in Hhyg.
+  so (hygiene_subst_invert _#4 Hhyg) as Hhyg'.
+  so (hygiene_subst_under_invert _#5 Hhyg') as Hhyg''.
+  eapply hygiene_subst; eauto.
+  cbn.
+  intros i Hi.
+  destruct Hi as [(Hlt & Hi) | (Hi & H)].
+    {
+    rewrite -> project_compose.
+    rewrite -> project_under_lt; auto.
+    simpsub.
+    exact Hi.
+    }
+
+    {
+    rewrite -> project_compose.
+    rewrite -> project_under_geq; auto.
+    remember (i - k) as j in H |- *.
+    destruct j as [| j].
+      {
+      simpsub.
+      apply hygiene_auto; cbn.
+      trivial.
+      }
+    simpsub.
+    simpsubin H.
+    cbn [Nat.add] in H.
+    invert H.
+    intro H'.
+    force_exact H'.
+    f_equal.
+    f_equal.
+    omega.
+    }
+  }
+
+  {
+  intros i' A Ha <- <-.
+  apply interp_eval_refl.
+  apply interp_fut; eauto.
+  }
+}
+
 (* mu *)
 {
 intros j a _ IH i s R Hint.

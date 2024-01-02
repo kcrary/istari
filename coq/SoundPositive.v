@@ -245,6 +245,12 @@ intros i a b _ IH1 _ IH2.
 apply positive_sigma; auto.
 }
 
+(* fut *)
+{
+intros i a _ IH.
+apply positive_fut; auto.
+}
+
 (* mu *)
 {
 intros i a _ IH.
@@ -294,6 +300,12 @@ apply negative_pi; auto.
 {
 intros i a b _ IH1 _ IH2.
 apply negative_sigma; auto.
+}
+
+(* fut *)
+{
+intros i a _ IH.
+apply negative_fut; auto.
 }
 
 (* mu *)
@@ -429,6 +441,13 @@ simpsubin H.
 exact H.
 }
 
+(* fut *)
+{
+intros i a _ IH s.
+simpsub.
+apply hpositive_fut; eauto.
+}
+
 (* mu *)
 {
 intros i a _ IH s.
@@ -511,6 +530,13 @@ apply hnegative_sigma.
 so (IH2 s) as H.
 simpsubin H.
 exact H.
+}
+
+(* prod *)
+{
+intros i a _ IH s.
+simpsub.
+apply hnegative_fut; eauto.
 }
 
 (* mu *)

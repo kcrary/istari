@@ -40,6 +40,11 @@ Inductive robust {object} : nat -> term object -> Prop :=
       -> robust (S i) b
       -> robust i (sigma a b)
 
+| robust_fut :
+    forall i a,
+      robust i a
+      -> robust i (fut a)
+
 | robust_mu :
     forall i a,
       robust (S i) a
@@ -146,6 +151,13 @@ apply robust_sigma.
 so (IH2 s) as H.
 simpsubin H.
 exact H.
+}
+
+(* fut *)
+{
+intros i a _ IH s.
+simpsub.
+apply robust_fut; eauto.
 }
 
 (* mu *)
@@ -257,6 +269,19 @@ invertc Hr3.
 intros <-.
 fold (sigma a' b').
 apply robust_sigma; auto.
+}
+
+(* fut *)
+{
+intros i a _ IH n Hred.
+invert Hred.
+intros r1 Hr1 <-.
+invertc Hr1.
+intros a' r2 Ha Hr2 <-.
+invertc Hr2.
+intros <-.
+fold (fut a').
+apply robust_fut; auto.
 }
 
 (* mu *)
@@ -372,7 +397,7 @@ intros A B i f m Hrobust.
 induct Hrobust;
 try (intros;
      simpmap;
-     first [apply robust_var | apply robust_const | apply robust_prod | apply robust_pi | apply robust_sigma | apply robust_mu | apply robust_weaken | apply robust_bite];
+     first [apply robust_var | apply robust_const | apply robust_prod | apply robust_pi | apply robust_sigma | apply robust_fut | apply robust_mu | apply robust_weaken | apply robust_bite];
      auto;
      done).
 (* reduce *)
@@ -457,6 +482,21 @@ intros Heqa Heqb.
 apply robust_sigma; auto.
 }
 
+(* fut *)
+{
+intros i a _ IH c Heq.
+so (map_eq_oper_invert _#7 Heq) as (th & r & -> & Heqth & Heqr).
+so (map_operator_same _#6 Heqth) as H.
+invertc H.
+intros <-.
+so (row_invert_auto _ _ r) as H; cbn in H.
+destruct H as (a' & ->).
+fold (fut a').
+invertc Heqr.
+intros <-.
+apply robust_fut; auto.
+}
+
 (* mu *)
 {
 intros i a _ IH c Heq.
@@ -531,6 +571,11 @@ Inductive positive {object} : nat -> term object -> Prop :=
       -> positive (S i) b
       -> positive i (sigma a b)
 
+| positive_fut :
+    forall i a,
+      positive i a
+      -> positive i (fut a)
+
 | positive_mu :
     forall i a,
       positive (S i) a
@@ -578,6 +623,11 @@ with negative {object} : nat -> term object -> Prop :=
       negative i a
       -> negative (S i) b
       -> negative i (sigma a b)
+
+| negative_fut :
+    forall i a,
+      negative i a
+      -> negative i (fut a)
 
 | negative_mu :
     forall i a,
@@ -679,6 +729,13 @@ simpsubin H.
 exact H.
 }
 
+(* fut *)
+{
+intros i a _ IH s.
+simpsub.
+apply positive_fut; eauto.
+}
+
 (* mu *)
 {
 intros i a _ IH s.
@@ -760,6 +817,13 @@ apply negative_sigma.
 so (IH2 s) as H.
 simpsubin H.
 exact H.
+}
+
+(* fut *)
+{
+intros i a _ IH s.
+simpsub.
+apply negative_fut; eauto.
 }
 
 (* mu *)
@@ -869,6 +933,12 @@ intros i a b _ IH1 _ IH2.
 apply robust_sigma; auto.
 }
 
+(* fut *)
+{
+intros i a _ IH.
+apply robust_fut; auto.
+}
+
 (* mu *)
 {
 intros i a _ IH.
@@ -915,6 +985,12 @@ apply robust_pi; auto.
 {
 intros i a b _ IH1 _ IH2.
 apply robust_sigma; auto.
+}
+
+(* fut *)
+{
+intros i a _ IH.
+apply robust_fut; auto.
 }
 
 (* mu *)
@@ -1018,6 +1094,19 @@ invertc Hr3.
 intros <-.
 fold (sigma a' b').
 apply positive_sigma; auto.
+}
+
+(* fut *)
+{
+intros i a _ IH n Hred.
+invert Hred.
+intros r1 Hr1 <-.
+invertc Hr1.
+intros a' r2 Ha Hr2 <-.
+invertc Hr2.
+intros <-.
+fold (fut a').
+apply positive_fut; auto.
 }
 
 (* mu *)
@@ -1128,6 +1217,19 @@ invertc Hr3.
 intros <-.
 fold (sigma a' b').
 apply negative_sigma; auto.
+}
+
+(* fut *)
+{
+intros i a _ IH n Hred.
+invert Hred.
+intros r1 Hr1 <-.
+invertc Hr1.
+intros a' r2 Ha Hr2 <-.
+invertc Hr2.
+intros <-.
+fold (fut a').
+apply negative_fut; auto.
 }
 
 (* mu *)
@@ -1321,7 +1423,7 @@ exploit (positive_negative_ind A
            (fun i m => negative i (map_term f m))) as Hind;
 try (intros;
      simpmap;
-     first [apply positive_var | apply positive_const | apply positive_prod | apply positive_pi | apply positive_sigma | apply positive_mu | apply positive_weaken | apply positive_bite | apply negative_const | apply negative_prod | apply negative_pi | apply negative_sigma | apply negative_mu | apply negative_weaken | apply negative_bite];
+     first [apply positive_var | apply positive_const | apply positive_prod | apply positive_pi | apply positive_sigma | apply positive_fut | apply positive_mu | apply positive_weaken | apply positive_bite | apply negative_const | apply negative_prod | apply negative_pi | apply negative_sigma | apply negative_fut | apply negative_mu | apply negative_weaken | apply negative_bite];
      auto;
      done).
 
@@ -1448,6 +1550,21 @@ intros Heqa Heqb.
 apply positive_sigma; auto.
 }
 
+(* fut *)
+{
+intros i a _ IH c Heq.
+so (map_eq_oper_invert _#7 Heq) as (th & r & -> & Heqth & Heqr).
+so (map_operator_same _#6 Heqth) as H.
+invertc H.
+intros <-.
+so (row_invert_auto _ _ r) as H; cbn in H.
+destruct H as (a' & ->).
+fold (fut a').
+invertc Heqr.
+intros <-.
+apply positive_fut; auto.
+}
+
 (* mu *)
 {
 intros i a _ IH c Heq.
@@ -1543,6 +1660,21 @@ fold (sigma a' b').
 invertc Heqr.
 intros Heqa Heqb.
 apply negative_sigma; auto.
+}
+
+(* fut *)
+{
+intros i a _ IH c Heq.
+so (map_eq_oper_invert _#7 Heq) as (th & r & -> & Heqth & Heqr).
+so (map_operator_same _#6 Heqth) as H.
+invertc H.
+intros <-.
+so (row_invert_auto _ _ r) as H; cbn in H.
+destruct H as (a' & ->).
+fold (fut a').
+invertc Heqr.
+intros <-.
+apply negative_fut; auto.
 }
 
 (* mu *)

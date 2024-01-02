@@ -51,6 +51,11 @@ Inductive hpositive {object} (P N : list (term object)) : nat -> term object -> 
       -> hpositive P N (S i) b
       -> hpositive P N i (sigma a b)
 
+| hpositive_fut :
+    forall i a,
+      hpositive P N i a
+      -> hpositive P N i (fut a)
+
 | hpositive_mu :
     forall i a,
       hpositive P N (S i) a
@@ -95,6 +100,11 @@ with hnegative {object} (P N : list (term object)) : nat -> term object -> Prop 
       hnegative P N i a
       -> hnegative P N (S i) b
       -> hnegative P N i (sigma a b)
+
+| hnegative_fut :
+    forall i a,
+      hnegative P N i a
+      -> hnegative P N i (fut a)
 
 | hnegative_mu :
     forall i a,

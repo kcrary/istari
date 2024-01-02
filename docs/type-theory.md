@@ -493,6 +493,7 @@ grammar:
         | N -> P
         | forall (x : N) . P
         | exists (x : P) . P
+        | future P
         | mu x . P
         | if M then P else P
 
@@ -502,6 +503,7 @@ grammar:
         | P -> N
         | forall (x : P) . N
         | exists (x : N) . N
+        | future N
         | mu x . N
         | if M then N else N
 

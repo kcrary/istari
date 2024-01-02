@@ -269,6 +269,31 @@ so (IH2 _#6 HintBXmp HintBYmp) as HinclB.
 apply HinclB; auto.
 }
 
+(* fut *)
+{
+intros n a _ IH s pg z i FAX FAY HintX HintY.
+simpsubin HintX.
+simpsubin HintY.
+invert (basic_value_inv _#6 value_fut HintX).
+  {
+  intros _ <- <-.
+  invert (basic_value_inv _#6 value_fut HintY).
+  intros _ <-.
+  apply incl_refl.
+  }
+intros i' AX HintAX <- <-.
+invert (basic_value_inv _#6 value_fut HintY).
+intros AY HintAY <-.
+cbn.
+so (IH _#6 HintAX HintAY) as HinclA.
+intros j m p Hmp.
+cbn in Hmp.
+decompose Hmp.
+intros m' p' Hj Hclm Hclp Hstepsm Hstepsp Hact.
+exists m', p'.
+do2 5 split; auto.
+}
+
 (* mu *)
 {
 rename Hincl into HinclXY.
@@ -600,6 +625,31 @@ replace (subst (dot mp (compose (under n (dot (exttin w Y h) id)) s)) b)
    with (subst (compose (under (S n) (dot (exttin w Y h) id)) (dot mp s)) b) in HintBYmp by (simpsub; auto).
 so (IH2 _#6 HintBXmp HintBYmp) as HinclB.
 apply HinclB; auto.
+}
+
+(* fut *)
+{
+intros n a _ IH s pg z i FAX FAY HintX HintY.
+simpsubin HintX.
+simpsubin HintY.
+invert (basic_value_inv _#6 value_fut HintX).
+  {
+  intros _ <- <-.
+  invert (basic_value_inv _#6 value_fut HintY).
+  intros _ <-.
+  apply incl_refl.
+  }
+intros i' AX HintAX <- <-.
+invert (basic_value_inv _#6 value_fut HintY).
+intros AY HintAY <-.
+cbn.
+so (IH _#6 HintAX HintAY) as HinclA.
+intros j m p Hmp.
+cbn in Hmp.
+decompose Hmp.
+intros m' p' Hj Hclm Hclp Hstepsm Hstepsp Hact.
+exists m', p'.
+do2 5 split; auto.
 }
 
 (* mu *)
