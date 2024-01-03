@@ -237,6 +237,16 @@ which appears in the `Hyp` structure.
     As `introOf` but does not invoke the typechecker.
 
 
+- `existsOf /[term M]/`
+
+  Proves a goal of the form `M : A` where `A` is either a `union` or
+  `iexists`, using `M` as the witness.
+  
+  + `existsOfRaw /[term M]/`
+
+    AS `existsOf` but does not invoke the typechecker.
+
+
 - `contrapositive /[hyp h]/`
 
   If `h`'s type is `A -> C` and the conclusion is `B -> C`, replaces `h`
@@ -447,16 +457,27 @@ which appears in the `Hyp` structure.
   The type `B` must be appropriate to `A` and `spine`.
 
 
+- `univIntroEqtype`
+
+  Proves a goal of the form `A = B : U i`, generating subgoals 
+  `A = B : type`, `A : U i`, and `B : U i`.
+
+
 - `extensionality /[name option] ... [name option]/`
 
-  Proves a goal of the form `M = N : A`, for most types `A`,
-  decomposing one layer of `A` for each argument given.  The name is
-  used if decomposing `A` generates a hypothesis; otherwise the name
-  is ignored.
+  Proves a goal of the form `M = N : A`, for many primitive types
+  `A`, decomposing one layer of `A` for each argument given.  The name
+  is used if decomposing `A` generates a hypothesis; otherwise the
+  name is ignored.
 
   This tactic establishes `M : A` and `N : A` first, before proceeding
-  to extensionality.  It does not work with quotient types; for
-  quotients use `extensionalityOf`.
+  to extensionality.  For some types (*e.g.,* `future`), `M : A` and
+  `N : A` cannot be reestablished in a uniform manner after
+  extensionality.  For such types, the tactic stops after that layer,
+  ignoring any additional names in the argument.
+
+  The tactic does not work with some types (notably quotients).  For
+  such types, `extensionalityOf` may work.
 
   + `extensionalityRaw /[name option] ... [name option]/`
 
@@ -465,8 +486,8 @@ which appears in the `Hyp` structure.
 
 - `extensionalityOf`
 
-   Proves a goal of the form `M = N : A`, for certain types `A` (sets
-   and quotients).  Unlike `extensionality`, it does not establish 
+   Proves a goal of the form `M = N : A`, for some primitive types
+   `A`.  Unlike `extensionality`, it does not establish 
    `M : A` and `N : A` first, which may result in fewer or better
    subgoals if those typings are not already known.
 

@@ -10,6 +10,50 @@ fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
 
 
 
+lemma "iforall_extensionality"
+/
+  forall i (k : kind i) (b : k -> U i) (m n : iforall (x : k) . b x) .
+    (forall (x : k) . m = n : b x)
+    -> m = n : (iforall (x : k) . b x)
+/;
+
+inference.
+intro /i k b m n Heq/.
+extensionalityOf.
+apply /Heq/.
+qed ();
+
+
+
+lemma "intersect_extensionality"
+/
+  forall i (a : U i) (b : a -> U i) (m n : intersect (x : a) . b x) .
+    (forall (x : a) . m = n : b x)
+    -> m = n : (intersect (x : a) . b x)
+/;
+
+inference.
+intro /i a b m n Heq/.
+extensionality /x/.
+apply /Heq/.
+qed ();
+
+
+
+lemma "univIntroEqtype"
+/
+  forall i (a b : U i) .
+    a = b : type
+    -> a = b : U i
+/;
+
+inference.
+intro /i a b H/.
+univIntroEqtype >> typecheck.
+qed ();
+
+
+
 lemma "positive_under_binder"
 /
   forall i (a b : U i) .
@@ -141,7 +185,7 @@ qed ();
 
 
 
-lemma "union_introduction"
+lemma "union_introduction_auto"
 /
   forall i (a : U i) (b : a -> U i) (x : a) (y : b x) .
     y : (union (z : a) . b z)
@@ -150,6 +194,47 @@ lemma "union_introduction"
 inference.
 intro /i a b x y/.
 typecheck.
+qed ();
+
+
+
+lemma "union_introduction_manual"
+/
+  forall i (a : U i) (b : a -> U i) (x : a) (y : b x) .
+    y : (union (z : a) . b z)
+/;
+
+inference.
+intro /i a b x y/.
+existsOf /x/.
+hypof.
+qed ();
+
+
+
+lemma "iexists_introdution_auto"
+/
+  forall i (k : kind i) (b : k -> U i) (x : k) (y : b x) .
+    y : (iexists (z : k) . b z)
+/;
+
+inference.
+intro /i k b x y/.
+typecheck.
+qed ();
+
+
+
+lemma "iexists_introdution_manual"
+/
+  forall i (k : kind i) (b : k -> U i) (x : k) (y : b x) .
+    y : (iexists (z : k) . b z)
+/;
+
+inference.
+intro /i k b x y/.
+existsOf /x/.
+hypof.
 qed ();
 
 
@@ -3079,6 +3164,38 @@ whreduce /H2/.
 destruct /H2/ /[H3]/.
 extensionality /_/.
 hyp /H3/.
+qed ();
+
+
+
+lemma "extensionality_future_then_more"
+/
+  forall i (a b c : U i) (m n : a -> future (b -> c)) .
+    (forall x .
+       let next z = m x
+       in
+       let next z' = n x
+       in
+         future (forall y . z y = z' y : c))
+    -> m = n : (a -> future (b -> c))
+/;
+
+inference.
+intro /i a b c m n Heq/.
+extensionality /x/.
+so /Heq x/ /H1/.
+revert /H1/.
+generalize /m x/ /_/ /m'/.
+generalize /n x/ /_/ /n'/.
+intro /H1/.
+destruct /m'/ /[m'']/.
+destruct /n'/ /[n'']/.
+reduce /H1/.
+destruct /H1/ /[H2]/.
+extensionality /_/.
+reduce //.
+extensionality /y/.
+apply /H2/.
 qed ();
 
 

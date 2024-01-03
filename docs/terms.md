@@ -258,9 +258,13 @@ Constants have one of four levels of opacity: soft, firm, hard, or
 opaque:
 
 - Hard: the default opacity for a constant with a definition.  The
-  constant can be unfolded, and a few tactics will unfold it
-  automatically.  It is never unfolded automatically by unification or
-  typechecking.
+  constant can be unfolded, and a few tactics (notably `intro` and
+  `destruct`) will unfold it automatically.  It is never unfolded
+  automatically by unification.  It is not unfolded in typechecking,
+  except that it *is* unfolded when necessary to infer the type of a
+  spine.  For instance, when inferring the type of `f x y`, if the
+  type of `f x` is a hard constant, that constant will be unfolded so
+  inference can continue with the next argument.
 
 - Opaque: the constant cannot be unfolded.  Any constant without a
   definition is opaque, but opaque constants can have definitions.

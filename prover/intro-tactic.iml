@@ -38,6 +38,10 @@ signature INTRO_TACTIC =
       val introOfRaw : IntroPattern.ipattern list -> tactic
       val introOf : IntroPattern.ipattern list -> tactic
 
+      val existsOfPriority : ETerm.eterm -> priority tacticm
+      val existsOfRaw : ETerm.eterm -> tactic
+      val existsOf : ETerm.eterm -> tactic
+
       val contrapositivePriority : Hyp.hypothesis -> priority tacticm
       val contrapositiveRaw : Hyp.hypothesis -> tactic
       val contrapositive : Hyp.hypothesis -> tactic
@@ -88,6 +92,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
       val introTactics : (priority tacticm * (T.term -> T.binder)) H.table = H.table ()
       val splitTactics : tactic H.table = H.table ()
       val existsTactics : (term -> priority tacticm) H.table = H.table ()
+      val existsOfTactics : (term -> priority tacticm) H.table = H.table ()
 
 
 
@@ -253,6 +258,8 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                (introLet, RT.binder [1])
          end
 
+
+
       val split =
          let
             do const = withHeadConst "conclusion not splitable"
@@ -268,6 +275,8 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
             idtac
           else
             split >>> [idtac, splitn (n-1)]
+
+
 
       val leftPriority =
          let
@@ -298,6 +307,8 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
       val rightRaw = rightPriority >> idtac
 
       val right = Typecheck.withTypecheckSnd rightPriority
+
+
 
       fun existsPriority em =
          let
@@ -365,6 +376,66 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                    refine (Rule.unionIntro (evar ()) (evar ()) m)
                    >>> [addbind >> idtacM Secondary, idtacM Secondary, idtacM Primary])
          end
+
+
+
+      fun existsOfPriority em =
+         let
+            do m = withterm em
+         in
+            goalCaseT
+            /| \Prim.ov\ ? _ =>
+               \(fnc a =>
+                    termCaseT (N.whnfHard a)
+                    /| \Prim.union\ _ (fn ? . _) =>
+                       \(fnc binder =>
+                            refine (Rule.unionIntroOf (T.evar ()) (T.evar ()) m (T.evar ()))
+                            >>> [
+                                (* A |- B : type *)
+                                withgoal
+                                (fn (_, dir) => chdir (DI.bindVary dir binder) >>+ idtacM Secondary),
+
+                                (* M : A *)
+                                idtacM Secondary,
+
+                                (* N : B[M . id] *)
+                                idtacM Primary
+                                ])\
+
+                     | \Prim.iexists\ _ _ (fn ? . _) =>
+                       \(fnc binder =>
+                            refine (Rule.iexistsIntroOf (T.evar ()) m (T.evar ()) (T.evar ()) (T.evar ()))
+                            >>> [
+                                (* K : kind i *)
+                                idtacM Secondary,
+
+                                (* K |- A : type *)
+                                withgoal
+                                (fn (_, dir) => chdir (DI.bindVary dir binder) >>+ idtacM Secondary),
+
+                                (* M : K *)
+                                idtacM Secondary,
+
+                                (* M : A[M . id] *)
+                                idtacM Primary
+                                ])\
+
+                     | _ =>
+                       \(fnc =>
+                            fail "existsOf is not supported for this type")\
+                    /)\
+
+             | _ =>
+               \(fnc =>
+                    fail "not a conclusion for existsOf")\
+            /
+         end
+
+      fun existsOfRaw em = existsOfPriority em >> idtac
+
+      fun existsOf em = Typecheck.withTypecheckSnd (existsOfPriority em)
+
+
 
       fun exactRaw em =
          let
@@ -612,7 +683,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                                   
                            | _ =>
                              \(fnc =>
-                                  fail "not a conclusion for introOf")\
+                                  fail "introOf is not supported for this type")\
                           /)\
 
                  | _ =>

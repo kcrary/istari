@@ -38,6 +38,8 @@ signature EQUALITY_TACTIC =
       val extensionalityOfRaw : tactic
       val extensionalityOf : tactic
 
+      val univIntroEqtype : tactic
+
       val substitutionLiteralPriority : int -> Term.term -> priority tacticm
       val substitutionLiteral : int -> Term.term -> tactic
 
@@ -95,16 +97,17 @@ signature EQUALITY_TACTIC_INTERNAL =
       (* take the hypothesis number to inject as its argument *)
       val injectionTactics : (int -> priority tacticm) ConstantTable.table
 
-      (* for each (const, tacfn) in the table
+      (* for each (const, (tacfn, reestablish)) in the table
 
          if    the goal is ... (M : A), (N : A) |- M = N : A
                the head constant of A is const
                the directory matches the goal if the known hyps are removed
                ident is a optional ident to use for any bound variable
 
-         and   if    a subgoal is ... (M' : A'), (N' : A') |- M' = N' : A', and
-               then  tac partially proves the subgoal,
-                     leaving the directory matching the new subgoals
+         and   for all  tac
+               if       a subgoal is ... (M' : A'), (N' : A') |- M' = N' : A', and
+               then     tac partially proves the subgoal,
+                        leaving the directory matching the new subgoals
 
          then  tacfn ident tac  partially proves the goal (using tac on the primary subgoal),
                leaving the directory matching the new subgoals
@@ -155,13 +158,13 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       val () =
          (
          H.insert reflexivityTactics Prim.eq 
-            (setFailure "terms do not unify" RuleTactic.eqRefl >> idtacM Secondary);
+            (cut (setFailure "terms do not unify" RuleTactic.eqRefl) >> idtacM Secondary);
 
          H.insert reflexivityTactics Prim.eqtp 
-            (setFailure "types do not unify" RuleTactic.eqtpRefl >> idtacM Secondary);
+            (cut (setFailure "types do not unify" RuleTactic.eqtpRefl) >> idtacM Secondary);
 
          H.insert reflexivityTactics Prim.subtype
-            (setFailure "types do not unify" RuleTactic.subtypeRefl >> idtacM Secondary)
+            (cut (setFailure "types do not unify" RuleTactic.subtypeRefl) >> idtacM Secondary)
          )
          
 
@@ -672,7 +675,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                                tacfn ident (extensionalityLoop rest)
                                
                           | NONE =>
-                               fail "not an extensionality goal"))\
+                               fail "extensionality is not supported for this type"))\
 
                  | _ =>
                    \(fnc =>
@@ -714,7 +717,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                         tac
                         
                    | NONE =>
-                        fail "not an extensionalityOf goal"))\
+                        fail "extensionalityOf is not supported for this type"))\
 
           | _ =>
             \(fnc =>
@@ -829,6 +832,84 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                  ]
              ]
                  
+
+      fun intersectExt ident tac =
+         goalCaseT
+         /
+         \Prim.eq\ (\Prim.intersect\ ? (fn . ?)) ? ? =>
+         \(fnc a b m n =>
+           refine (Rule.intersectIntroEq a b m n)
+           >>> [
+               (* ... |- A : type *)
+               refine (Rule.intersectFormInv1 a b)
+               >>+
+               (* ... |- intersect A . B : type *)
+               refine (Rule.inhabitedForm (T.evar ()))
+               >>+
+               (* ... |- intersect A . B *)
+               refine (Rule.inhabitant (T.evar ()) n)
+               >>+
+               (* ... |- N : intersect A . B *)
+               refine (Rule.hypothesis 0) >> done,
+               
+               (* ..., A |- M[^] = N[^] : B *)
+               assert2
+                  (T.apply2 Prim.ov b (T.Sub (m, T.shift1)))
+                  (T.apply2 Prim.ov b (T.Sub (n, T.shift1)))
+               >>> [
+                   (* ..., A |- M[^] : B = B[0 . ^2][0 . id] *)
+                   refine (Rule.intersectElimOf
+                              (T.Sub (a, T.shift1))
+                              (T.Sub (b, T.underShift 1 1))
+                              (T.Sub (m, T.shift1))
+                              T.zero)
+                   >>> [
+                       (* ..., A |- M[^] : intersect A[^] . B[0 . ^2] *)
+                       refine (Rule.hypothesis 2) >> done,
+
+                       (* ..., A |- 0 : A[^] *)
+                       refine (Rule.hypothesisOf 0) >> done
+                       ],
+
+                   (* ..., A |- N[^] : B = B[0 . ^2][0 . id] *)
+                   refine (Rule.intersectElimOf
+                              (T.Sub (a, T.shift1))
+                              (T.Sub (b, T.underShift 1 1))
+                              (T.Sub (n, T.shift1))
+                              T.zero)
+                   >>> [
+                       (* ..., A |- N[^] : intersect A[^] . B[0 . ^2] *)
+                       refine (Rule.hypothesis 1) >> done,
+
+                       (* ..., A |- 0 : A[^] *)
+                       refine (Rule.hypothesisOf 0) >> done
+                       ],
+
+                   (* ..., A, (M[^] : B), (N[^2] : B[0 . ^2]) |- ... *)
+                   withgoal
+                   (fn (_, dir) =>
+                       chdir (D.bindh dir ident)
+                       >>+ refine (Rule.weaken 3 2)
+                       >>+ tac)
+                   ]
+               ])\
+         /
+
+
+      val iforallExtOf =
+         goalCaseT
+         /
+         \Prim.eq\ (\Prim.iforall\ ? ? (fn ? . ?)) ? ? =>
+         \(fnc i k binder a m n =>
+              refine (Rule.iforallIntroEq a i k m n)
+              >>> [
+                  idtacM Secondary,
+
+                  withgoal
+                  (fn (_, dir) => chdir (D.bindVary dir binder) >> idtacM Primary)
+                  ])\
+         /
+
 
       fun existsExt ident tac =
          goalCaseT
@@ -1192,6 +1273,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             (Prim.arrow, arrowExt),
             (Prim.tarrow, tkarrowExt Rule.tarrowExt Rule.tarrowElimOf),
             (Prim.karrow, tkarrowExt Rule.karrowExt Rule.karrowElimOf),
+            (Prim.intersect, intersectExt),
             (Prim.exists, existsExt),
             (Prim.set, setExt),
             (Prim.iset, isetExt),
@@ -1210,10 +1292,14 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          List.app
             (fn (const, tac) => H.insert extensionalityOfTactics const tac)
             [
+            (Prim.iforall, iforallExtOf),
             (Prim.set, setExtOf),
             (Prim.iset, isetExtOf),
             (Prim.quotient, quotientExtOf)
             ]
+
+
+      val univIntroEqtype = RuleTactic.univIntroEqtype
 
 
       fun substitutionLiteralPriority i m =
@@ -1277,7 +1363,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             val m' = T.evar ()
 
             val eqgoal =
-               setFailure "type mismatch in substitution" $ cut $
+               cut $ setFailure "type mismatch in substitution" $
                   (if reverse then
                       refine (Rule.eqSymm (T.evar ()) (T.evar ()) (T.evar ()))
                       >> refine (Rule.hypothesis j) >> done
