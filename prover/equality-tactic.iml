@@ -30,13 +30,20 @@ signature EQUALITY_TACTIC =
 
       val decompEq : int -> ETerm.eterm -> tactic
 
-      val extensionalityPriority : Symbol.symbol option list -> priority tacticm
-      val extensionalityRaw : Symbol.symbol option list -> tactic
-      val extensionality : Symbol.symbol option list -> tactic
+      val extensionalityPriority : priority tacticm
+      val extensionalityRaw : tactic
+      val extensionality : tactic
 
-      val extensionalityOfPriority : priority tacticm
-      val extensionalityOfRaw : tactic
-      val extensionalityOf : tactic
+      val introEqPriority : Symbol.symbol option list -> priority tacticm
+      val introEqRaw : Symbol.symbol option list -> tactic
+      val introEq : Symbol.symbol option list -> tactic
+
+      val extensionalityAutoRaw : tactic
+      val extensionalityAuto : tactic
+
+      val existsEqPriority : ETerm.eterm -> priority tacticm
+      val existsEqRaw : ETerm.eterm -> tactic
+      val existsEq : ETerm.eterm -> tactic
 
       val univIntroEqtype : tactic
 
@@ -97,24 +104,7 @@ signature EQUALITY_TACTIC_INTERNAL =
       (* take the hypothesis number to inject as its argument *)
       val injectionTactics : (int -> priority tacticm) ConstantTable.table
 
-      (* for each (const, (tacfn, reestablish)) in the table
-
-         if    the goal is ... (M : A), (N : A) |- M = N : A
-               the head constant of A is const
-               the directory matches the goal if the known hyps are removed
-               ident is a optional ident to use for any bound variable
-
-         and   for all  tac
-               if       a subgoal is ... (M' : A'), (N' : A') |- M' = N' : A', and
-               then     tac partially proves the subgoal,
-                        leaving the directory matching the new subgoals
-
-         then  tacfn ident tac  partially proves the goal (using tac on the primary subgoal),
-               leaving the directory matching the new subgoals
-      *)
-      val extensionalityTactics : (Symbol.symbol option -> priority tacticm -> priority tacticm) ConstantTable.table
-
-      val extensionalityOfTactics : priority tacticm ConstantTable.table
+      val extensionalityTactics : priority tacticm ConstantTable.table
 
    end
 
@@ -127,6 +117,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       structure H = ConstantTable
       structure J = Judgement
       structure N = Normalize
+      structure R = Reduction
       structure T = Term
       structure TC = Typecheck
 
@@ -256,10 +247,10 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                     tac,
 
                     (* A <:> B |- B[^] <:> A[^] *)
-                    refine (Rule.reduceHyp 0 Reduction.unfold)
+                    refine (Rule.reduceHyp 0 R.unfold)
                     >>
                     (* A <: B & B <: A |- B[^] <:> A[^] *)
-                    refine (Rule.reduce Reduction.unfold)
+                    refine (Rule.reduce R.unfold)
                     >>
                     (* A <: B & B <: A |- B[^] <: A[^] & A[^] <: B[^] *)
                     refine (Rule.prodIntro (T.evar ()) (T.evar ()))
@@ -654,190 +645,351 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                  ]
              ]
 
-      fun eassert () = refine (Rule.assert (T.evar ()) (T.evar ()))
-      fun eassert2 () = assert2 (T.evar ()) (T.evar ())
 
 
-
-      val extensionalityTactics : (Symbol.symbol option -> priority tacticm -> priority tacticm) H.table = H.table ()
+      val extensionalityTactics : priority tacticm H.table = H.table ()
          
-      fun extensionalityLoop l =
-         (case l of
-             [] =>
-                refine (Rule.weaken 0 2) >> idtacM Primary
-
-           | ident :: rest =>
-                goalCaseT
-                /| \Prim.eq\ (const? @ _) _ _ =>
-                   \(fnc const =>
-                        (case H.find extensionalityTactics const of
-                            SOME tacfn =>
-                               tacfn ident (extensionalityLoop rest)
-                               
-                          | NONE =>
-                               fail "extensionality is not supported for this type"))\
-
-                 | _ =>
-                   \(fnc =>
-                        fail "not an extensionality goal")\
-                /)
-
-      fun extensionalityPriority l =
+      val extensionalityPriority =
          goalCaseT
-         /| \Prim.eq\ ? ? ? =>
-            \(fnc a m n =>
-                 assert2
-                    (T.apply2 Prim.ov a m)
-                    (T.apply2 Prim.ov a n)
-                 >>> [
-                     idtacM Secondary,
-                     idtacM Secondary,
-                     extensionalityLoop l
-                     ])\
+         /| \Prim.eq\ (const? @ _) _ _ =>
+            \(fnc const =>
+                 (case H.find extensionalityTactics const of
+                     SOME tac =>
+                        tac
+                        
+                   | NONE =>
+                        fail "extensionality is not supported for this type"))\
 
           | _ =>
             \(fnc =>
                  fail "not an extensionality goal")\
          /
 
-      fun extensionalityRaw l = extensionalityPriority l >> idtac
+      val extensionalityRaw = extensionalityPriority >> idtac
 
-      fun extensionality l = TC.withTypecheckSnd $ extensionalityPriority l
+      val extensionality = TC.withTypecheckSnd $ extensionalityPriority
 
 
 
-      val extensionalityOfTactics : priority tacticm H.table = H.table ()
-         
-      val extensionalityOfPriority =
+      val forallExt =
          goalCaseT
-         /| \Prim.eq\ (const? @ _) _ _ =>
-            \(fnc const =>
-                 (case H.find extensionalityOfTactics const of
-                     SOME tac =>
-                        tac
-                        
-                   | NONE =>
-                        fail "extensionalityOf is not supported for this type"))\
+         /
+         \Prim.eq\ ($as (\Prim.forall\ ? (fn ? . ?))) ? ? =>
+         \(fnc ab a binder b m n =>
+              refine (Rule.forallExt a b m n)
+              >>> [
+                  replaceConcl (T.apply2 Prim.ov ab m) >>+ idtacM Secondary,
+                  replaceConcl (T.apply2 Prim.ov ab n) >>+ idtacM Secondary,
 
-          | _ =>
-            \(fnc =>
-                 fail "not an extensionalityOf goal")\
+                  withgoal
+                  (fn (_, dir) => chdir (D.bindVary dir binder) >>+ idtacM Primary)
+                  ])\
          /
 
-      val extensionalityOfRaw = extensionalityOfPriority >> idtac
-
-      val extensionalityOf = TC.withTypecheckSnd $ extensionalityOfPriority
-
-
-
-      fun forallExt ident tac =
+      val arrowExt =
          goalCaseT
-         / \Prim.eq\ (\Prim.forall\ ? (fn . ?)) ? ? =>
-           \(fnc a b m n =>
-                refine (Rule.forallExt a b m n)
+         /
+         \Prim.eq\ (\Prim.arrow\ ? ?) ? ? =>
+         \(fnc a b m n =>
+              refine (Rule.arrowExt a b m n)
+              >>> [
+                  idtacM Secondary,
+                  idtacM Secondary,
+
+                  withgoal
+                  (fn (_, dir) => chdir (D.bind0 dir) >>+ idtacM Primary)
+                  ])\
+         /
+
+      fun tkarrowExt rule =
+         goalCaseT
+         /
+         \Prim.eq\ (\Prim.arrow\ ? ?) ? ? =>
+         \(fnc a b m n =>
+              refine (rule a b m n)
+              >>> [
+                  idtacM Secondary,
+                  idtacM Secondary,
+                  idtacM Secondary,
+
+                  withgoal
+                  (fn (_, dir) => chdir (D.bind0 dir) >>+ idtacM Primary)
+                  ])\
+         /
+
+      val intersectExt =
+         goalCaseT
+         /
+         \Prim.eq\ (\Prim.intersect\ ? (fn ? . ?)) ? ? =>
+         \(fnc a binder b m n =>
+              refine (Rule.intersectIntroEq a b m n)
+              >>> [
+                  idtacM Secondary,
+
+                  withgoal
+                  (fn (_, dir) => chdir (D.bindVary dir binder) >>+ idtacM Primary)
+                  ])\
+         /
+
+      val iforallExt =
+         goalCaseT
+         /
+         \Prim.eq\ (\Prim.iforall\ ? ? (fn ? . ?)) ? ? =>
+         \(fnc i k binder a m n =>
+              refine (Rule.iforallIntroEq a i k m n)
+              >>> [
+                  idtacM Secondary,
+
+                  withgoal
+                  (fn (_, dir) => chdir (D.bindVary dir binder) >>+ idtacM Primary)
+                  ])\
+         /
+
+      val existsExt =
+         goalCaseT
+         /
+         \Prim.eq\ ($as (\Prim.exists\ ? (fn ? . ?))) ? ? =>
+         \(fnc ab a binder b m n =>
+              refine (Rule.existsExt a b m n)
+              >>> [
+                  replaceConcl (T.apply2 Prim.ov ab m) >>+ idtacM Secondary,
+                  replaceConcl (T.apply2 Prim.ov ab n) >>+ idtacM Secondary,
+
+                  idtacM Primary,
+                  idtacM Primary
+                  ])\
+         /
+
+      val prodExt =
+         goalCaseT
+         /
+         \Prim.eq\ ($as (\Prim.prod\ ? ?)) ? ? =>
+         \(fnc ab a b m n =>
+              refine (Rule.prodExt a b m n)
+              >>> [
+                  replaceConcl (T.apply2 Prim.ov ab m) >>+ idtacM Secondary,
+                  replaceConcl (T.apply2 Prim.ov ab n) >>+ idtacM Secondary,
+
+                  idtacM Primary,
+                  idtacM Primary
+                  ])\
+         /
+
+      val futureExt =
+         let
+            do () = lift
+         in
+            refine (Rule.futureExt (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtacM Secondary,
+                idtacM Secondary,
+   
+                idtacM Primary
+                ]
+         end
+
+      val setExt =
+         goalCaseT
+         / \Prim.eq\ (\Prim.set\ ? (fn ? . ?)) ? ? =>
+           \(fnc a binder b m n =>
+                refine (Rule.setIntroEq a b m n)
                 >>> [
-                    refine (Rule.hypothesis 1) >> done,
-                    refine (Rule.hypothesis 0) >> done,
-                    
-                    assert2 
-                       (T.apply2 Prim.ov b (T.app (T.Sub (m, T.shift1)) T.zero))
-                       (T.apply2 Prim.ov b (T.app (T.Sub (n, T.shift1)) T.zero))
-                    >>> [
-                        refine (Rule.forallElimOf 
-                                   (T.Sub (a, T.shift1))
-                                   (T.Sub (b, T.under 1 T.shift1))
-                                   (T.Sub (m, T.shift1))
-                                   T.zero)
-                        >>> [
-                            refine (Rule.hypothesis 2) >> done,
-                            refine (Rule.hypothesisOf 0) >> done
-                            ],
-       
-                        refine (Rule.forallElimOf 
-                                   (T.Sub (a, T.shift1))
-                                   (T.Sub (b, T.under 1 T.shift1))
-                                   (T.Sub (n, T.shift1))
-                                   T.zero)
-                        >>> [
-                            refine (Rule.hypothesis 1) >> done,
-                            refine (Rule.hypothesisOf 0) >> done
-                            ],
-                        
-                        withgoal
-                        (fn (_, dir) =>
-                            chdir (D.bindh dir ident)
-                            >> refine (Rule.weaken 3 2) 
-                            >> tac)
-                        ]
+                    withgoal
+                    (fn (_, dir) => chdir (D.bindVary dir binder) >> idtacM Secondary),
+
+                    idtacM Primary,
+
+                    idtacM Primary
                     ])\
          /
 
-
-      fun arrowExt ident tac =
-         refine (Rule.arrowExt (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
-         >>> [
-             refine (Rule.hypothesis 1) >> done,
-             refine (Rule.hypothesis 0) >> done,
-             
-             eassert2 ()
-             >>> [
-                 refine (Rule.arrowElimOf (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
-                 >>> [
-                     refine (Rule.hypothesis 2) >> done,
-                     refine (Rule.hypothesisOf 0) >> done
-                     ],
-
-                 refine (Rule.arrowElimOf (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
-                 >>> [
-                     refine (Rule.hypothesis 1) >> done,
-                     refine (Rule.hypothesisOf 0) >> done
-                     ],
-                 
-                 withgoal
-                 (fn (_, dir) =>
-                     chdir (D.bindh dir ident)
-                     >> refine (Rule.weaken 3 2) 
-                     >> tac)
-                 ]
-             ]
-                 
-
-      fun tkarrowExt extrule elimrule ident tac =
-         refine (extrule (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
-         >>> [
-             refine (Rule.weaken 0 2) >> idtacM Secondary,
-
-             refine (Rule.hypothesis 1) >> done,
-             refine (Rule.hypothesis 0) >> done,
-             
-             eassert2 ()
-             >>> [
-                 refine (elimrule (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
-                 >>> [
-                     refine (Rule.hypothesis 2) >> done,
-                     refine (Rule.hypothesisOf 0) >> done
-                     ],
-
-                 refine (elimrule (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
-                 >>> [
-                     refine (Rule.hypothesis 1) >> done,
-                     refine (Rule.hypothesisOf 0) >> done
-                     ],
-                 
-                 withgoal
-                 (fn (_, dir) =>
-                     chdir (D.bindh dir ident)
-                     >> refine (Rule.weaken 3 2) 
-                     >> tac)
-                 ]
-             ]
-                 
-
-      fun intersectExt ident tac =
+      val isetExt =
          goalCaseT
+         / \Prim.eq\ (\Prim.iset\ ? (fn ? . ?)) ? ? =>
+           \(fnc a binder b m n =>
+                refine (Rule.isetIntroEq a b m n)
+                >>> [
+                    withgoal
+                    (fn (_, dir) => chdir (D.bindVary dir binder) >> idtacM Secondary),
+
+                    idtacM Primary,
+
+                    idtacM Primary
+                    ])\
          /
-         \Prim.eq\ (\Prim.intersect\ ? (fn . ?)) ? ? =>
-         \(fnc a b m n =>
+
+      val quotientExt =
+         goalCaseT
+         / \Prim.eq\ ($as (\Prim.quotient\ ? (fn . fn . ?))) ? ? =>
+           \(fnc q a b m n =>
+                refine (Rule.quotientIntroEq a b m n)
+                >>> [
+                    replaceConcl (T.apply1 Prim.istp q)
+                    >> idtacM Secondary,
+
+                    idtacM Secondary,
+                    idtacM Secondary,
+                    idtacM Primary
+                    ])\
+         /
+
+      fun unitExt tac = tac >> idtacM Secondary
+             
+      structure RT = RuleTactic
+
+      val () =
+         List.app
+            (fn (const, tac) => H.insert extensionalityTactics const tac)
+            [
+            (Prim.forall, forallExt),
+            (Prim.arrow, arrowExt),
+            (Prim.tarrow, tkarrowExt Rule.tarrowExt),
+            (Prim.karrow, tkarrowExt Rule.karrowExt),
+            (Prim.intersect, intersectExt),
+            (Prim.iforall, iforallExt),
+            (Prim.exists, existsExt),
+            (Prim.prod, prodExt),
+            (Prim.future, futureExt),
+            (Prim.set, setExt),
+            (Prim.iset, isetExt),
+            (Prim.quotient, quotientExt),
+            (Prim.unit, unitExt RT.unitExt),
+            (Prim.eq, unitExt RT.eqExt),
+            (Prim.ov, unitExt RT.ofExt),
+            (Prim.eqtp, unitExt RT.eqtpExt),
+            (Prim.istp, unitExt RT.istpExt),
+            (Prim.subtype, unitExt RT.subtypeExt),
+            (Prim.squash, unitExt RT.squashExt),
+            ]
+
+
+
+      (* Each ExtAuto tactic expects a goal of the form
+         ..., (M : A), (N : A) |- M = N : A (ignoring shifts),
+         and a directory that is missing those last two hypotheses.
+         It calls tac(s) on the primary subgoal(s), which will look similar.
+      *)
+
+      fun forallExtAuto binder a b m n tac =
+         refine (Rule.forallExt a b m n)
+         >>> [
+             refine (Rule.hypothesis 1) >> done,
+             refine (Rule.hypothesis 0) >> done,
+             
+             assert2 
+                (T.apply2 Prim.ov b (T.app (T.Sub (m, T.shift1)) T.zero))
+                (T.apply2 Prim.ov b (T.app (T.Sub (n, T.shift1)) T.zero))
+             >>> [
+                 refine (Rule.forallElimOf 
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.under 1 T.shift1))
+                            (T.Sub (m, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 2) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+
+                 refine (Rule.forallElimOf 
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.under 1 T.shift1))
+                            (T.Sub (n, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 1) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+                 
+                 withgoal
+                 (fn (_, dir) =>
+                     chdir (D.bindh dir binder)
+                     >>+ refine (Rule.weaken 3 2) 
+                     >>+ tac)
+                 ]
+             ]
+
+
+      fun arrowExtAuto binder a b m n tac =
+         refine (Rule.arrowExt a b m n)
+         >>> [
+             refine (Rule.hypothesis 1) >> done,
+             refine (Rule.hypothesis 0) >> done,
+             
+             assert2
+                (T.apply2 Prim.ov (T.Sub (b, T.shift1)) (T.app (T.Sub (m, T.shift1)) T.zero))
+                (T.apply2 Prim.ov (T.Sub (b, T.shift1)) (T.app (T.Sub (n, T.shift1)) T.zero))
+             >>> [
+                 refine (Rule.arrowElimOf
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.shift1))
+                            (T.Sub (m, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 2) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+
+                 refine (Rule.arrowElimOf
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.shift1))
+                            (T.Sub (n, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 1) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+                 
+                 withgoal
+                 (fn (_, dir) =>
+                     chdir (D.bindh dir binder)
+                     >>+ refine (Rule.weaken 3 2) 
+                     >>+ tac)
+                 ]
+             ]
+
+
+      fun tkarrowExtAuto extrule elimrule binder a b m n tac =
+         refine (extrule a b m n)
+         >>> [
+             refine (Rule.weaken 0 2) >>+ idtacM Secondary,
+
+             refine (Rule.hypothesis 1) >> done,
+             refine (Rule.hypothesis 0) >> done,
+             
+             assert2
+                (T.apply2 Prim.ov (T.Sub (b, T.shift1)) (T.app (T.Sub (m, T.shift1)) T.zero))
+                (T.apply2 Prim.ov (T.Sub (b, T.shift1)) (T.app (T.Sub (n, T.shift1)) T.zero))
+             >>> [
+                 refine (elimrule
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.shift1))
+                            (T.Sub (m, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 2) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+
+                 refine (elimrule
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.shift1))
+                            (T.Sub (n, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 1) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+                 
+                 withgoal
+                 (fn (_, dir) =>
+                     chdir (D.bindh dir binder)
+                     >>+ refine (Rule.weaken 3 2) 
+                     >>+ tac)
+                 ]
+             ]
+
+
+        fun intersectExtAuto binder a b m n tac =
            refine (Rule.intersectIntroEq a b m n)
            >>> [
                (* ... |- A : type *)
@@ -866,11 +1018,11 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                    >>> [
                        (* ..., A |- M[^] : intersect A[^] . B[0 . ^2] *)
                        refine (Rule.hypothesis 2) >> done,
-
+ 
                        (* ..., A |- 0 : A[^] *)
                        refine (Rule.hypothesisOf 0) >> done
                        ],
-
+ 
                    (* ..., A |- N[^] : B = B[0 . ^2][0 . id] *)
                    refine (Rule.intersectElimOf
                               (T.Sub (a, T.shift1))
@@ -880,382 +1032,339 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                    >>> [
                        (* ..., A |- N[^] : intersect A[^] . B[0 . ^2] *)
                        refine (Rule.hypothesis 1) >> done,
-
+ 
                        (* ..., A |- 0 : A[^] *)
                        refine (Rule.hypothesisOf 0) >> done
                        ],
-
+ 
                    (* ..., A, (M[^] : B), (N[^2] : B[0 . ^2]) |- ... *)
                    withgoal
                    (fn (_, dir) =>
-                       chdir (D.bindh dir ident)
+                       chdir (D.bindh dir binder)
                        >>+ refine (Rule.weaken 3 2)
                        >>+ tac)
                    ]
-               ])\
-         /
+               ]
+ 
 
+      fun existsExtAuto a b m n tac1 tac2 =
+         assert (T.apply3 Prim.eq a (T.pi1 m) (T.pi1 n))
+         >>> [
+             (* M #1 = N #1 : A *)
+             assert2
+                (T.apply2 Prim.ov a (T.pi1 m))
+                (T.apply2 Prim.ov a (T.pi1 n))
+             >>> [
+                 (* M #1 : A *)
+                 refine (Rule.existsElim1Of a b m)
+                 >>+
+                 (* M : exists A . B *)
+                 refine (Rule.hypothesis 1) >> done,
 
-      val iforallExtOf =
-         goalCaseT
-         /
-         \Prim.eq\ (\Prim.iforall\ ? ? (fn ? . ?)) ? ? =>
-         \(fnc i k binder a m n =>
-              refine (Rule.iforallIntroEq a i k m n)
-              >>> [
-                  idtacM Secondary,
+                 (* N #1 : A *)
+                 refine (Rule.existsElim1Of a b n)
+                 >>+
+                 refine (Rule.hypothesis 0) >> done,
 
-                  withgoal
-                  (fn (_, dir) => chdir (D.bindVary dir binder) >> idtacM Primary)
-                  ])\
-         /
+                 refine (Rule.weaken 2 2)
+                 >>+
+                 tac1,
+                 ],
 
+             refine (Rule.existsExt 
+                        (T.Sub (a, T.shift1))
+                        (T.Sub (b, T.under 1 T.shift1))
+                        (T.Sub (m, T.shift1))
+                        (T.Sub (n, T.shift1)))
+             >>> [
+                 refine (Rule.hypothesis 2) >> done,
+                 refine (Rule.hypothesis 1) >> done,
+                 refine (Rule.hypothesis 0) >> done,
 
-      fun existsExt ident tac =
-         goalCaseT
-         / \Prim.eq\ (\Prim.exists\ ? (fn . ?)) ? ? =>
-           \(fnc a b m n =>
-                assert (T.apply3 Prim.eq a (T.pi1 m) (T.pi1 n))
-                >>> [
-                    refine (Rule.weaken 0 2) >> idtacM Primary,
-       
-                    refine (Rule.existsExt 
-                               (T.Sub (a, T.shift1))
-                               (T.Sub (b, T.under 1 T.shift1))
-                               (T.Sub (m, T.shift1))
-                               (T.Sub (n, T.shift1)))
-                    >>> [
-                        refine (Rule.hypothesis 2) >> done,
-                        refine (Rule.hypothesis 1) >> done,
-                        refine (Rule.hypothesis 0) >> done,
-       
-                        assert2
-                           (T.apply2 
-                               Prim.ov
-                               (T.Sub (b, T.Dot (T.pi1 (T.Sub (m, T.shift1)), T.shift1)))
-                               (T.pi2 (T.Sub (m, T.shift1))))
-                           (T.apply2 
-                               Prim.ov
-                               (T.Sub (b, T.Dot (T.pi1 (T.Sub (m, T.shift1)), T.shift1)))
-                               (T.pi2 (T.Sub (n, T.shift1))))
-                        >>> [
-                            (* M[^] #2 : B[M[^] #1 . ^] *)
-                            refine (Rule.existsElim2Of 
-                                       (T.Sub (a, T.shift1))
-                                       (T.Sub (b, T.under 1 T.shift1))
-                                       (T.Sub (m, T.shift1)))
-                            >> refine (Rule.hypothesis 2)
-                            >> done,
-       
-                            (* N[^] #2 : B[M[^] #1 . ^] *)
-                            refine (Rule.equivalenceOf
-                                       (T.Sub (b, T.Dot (T.pi1 (T.Sub (n, T.shift1)), T.shift1)))
-                                       (T.Sub (b, T.Dot (T.pi1 (T.Sub (m, T.shift1)), T.shift1)))
-                                       (T.pi2 (T.Sub (n, T.shift1))))
-                            >>> [
-                                refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))
-                                >>
-                                (* B[M[^] #1 . ^] = B[N[^] #1 . ^] : type *)
-                                refine (Rule.existsFormInv2Eq
-                                           (T.Sub (a, T.shift1))
-                                           (T.Sub (b, T.under 1 T.shift1))
-                                           (T.pi1 (T.Sub (m, T.shift1)))
-                                           (T.pi1 (T.Sub (n, T.shift1))))
-                                >>> [
-                                    (* exists A[^] . B[0 . ^2] : type *)
-                                    refine (Rule.inhabitedForm (T.evar ()))
-                                    >> refine (Rule.inhabitant (T.evar ()) (T.evar ()))
-                                    >> refine (Rule.hypothesis 2)
-                                    >> done,
-   
-                                    refine (Rule.hypothesis 0) >> done
-                                    ],
-   
-                                refine (Rule.existsElim2Of 
-                                           (T.Sub (a, T.shift1))
-                                           (T.Sub (b, T.under 1 T.shift1))
-                                           (T.Sub (n, T.shift1)))
-                                >> refine (Rule.hypothesis 1)
-                                >> done
-                                ],
-   
-                            withgoal
-                            (fn (_, dir) =>
-                                chdir (D.bindh dir ident)
-                                >> refine (Rule.weaken 3 2) 
-                                >> tac)
-                            ]
-                        ]
-                    ])\
-         /
-    
+                 assert2
+                    (T.apply2 
+                        Prim.ov
+                        (T.Sub (b, T.Dot (T.pi1 (T.Sub (m, T.shift1)), T.shift1)))
+                        (T.pi2 (T.Sub (m, T.shift1))))
+                    (T.apply2 
+                        Prim.ov
+                        (T.Sub (b, T.Dot (T.pi1 (T.Sub (m, T.shift1)), T.shift1)))
+                        (T.pi2 (T.Sub (n, T.shift1))))
+                 >>> [
+                     (* M[^] #2 : B[M[^] #1 . ^] *)
+                     refine (Rule.existsElim2Of 
+                                (T.Sub (a, T.shift1))
+                                (T.Sub (b, T.under 1 T.shift1))
+                                (T.Sub (m, T.shift1)))
+                     >>+ refine (Rule.hypothesis 2)
+                     >> done,
 
-      fun setExt _ tac =
-         goalCaseT
-         / \Prim.eq\ (\Prim.set\ ? (fn . ?)) ? ? =>
-           \(fnc a b m n =>
-                (* ... |- m = n : set a . b *)
-                eassert ()
-                >>> [
-                    (* ... |- forall a . (b : type) *)
-                    refine (Rule.forallIntro a (T.apply1 Prim.istp b))
-                    >>> [
-                        (* ... |- a : type *)
-                        refine (Rule.setFormInv a b)
-                        >>
-                        (* ... |- set a . b : type *)
-                        refine (Rule.inhabitedForm (T.evar ()))
-                        >>
-                        (* ... |- set a . b *)
-                        refine (Rule.inhabitant (T.evar ()) m)
-                        >>
-                        (* ... |- m : set a . b *)
-                        refine (Rule.hypothesis 1) >> done,
-   
-                        (* a |- b : type *)
-                        withgoal
-                        (fn (_, dir) =>
-                            chdir (D.bind0 dir)
-                            >>
-                            refine (Rule.weaken 1 2)
-                            >>
-                            idtacM Secondary),
-                        ],
-   
-                    (* ... forall a . (b : type) |- m[^] = n[^] : set a[^] . b[0 . ^2] *)
-                    refine (Rule.setElim
-                               (T.Sub (a, T.shift1))
-                               (T.Sub (b, T.under 1 T.shift1))
-                               (T.evar ())
-                               (T.Sub (m, T.shift1)))
-                    >>> [
-                        (* ... forall a . (b : type), a[^] |- b[0 . ^2] *)
-                        refine (Rule.forallElim 
-                                   (T.Sub (a, T.Shift 2))
-                                      (T.apply1 Prim.istp (T.Sub (b, T.under 1 (T.Shift 2))))
-                                   T.zero)
-                        >>> [
-                            (* ... forall a . (b : type), a[^] |- forall a[^2] . (b[0 . ^3] : type) *)
-                            refine (Rule.hypothesis 1) >> done,
-   
-                            (* ... forall a . (b : type), a[^] |- 0 : a[^2] *)
-                            refine (Rule.hypothesisOf 0) >> done,
-                            ],
-   
-                        (* ... forall a . (b : type) |- m[^] : set a[^] . b[0 . ^2] *)
-                        refine (Rule.hypothesis 2) >> done,
-   
-                        (* ... forall a . (b : type), b[0 . ^2][m[^] . id] (hidden) |- m[^2] = n[^2] : set a[^2] . b[0 . ^3]
-                           ... forall a . (b : type), b[m[^] . ^] (hidden) |- m[^2] = n[^2] : set a[^2] . b[0 . ^3]
-                        *)
-                        refine (Rule.setIntroEq 
-                                   (T.Sub (a, T.Shift 2))
-                                   (T.Sub (b, T.under 1 (T.Shift 2)))
-                                   (T.Sub (m, T.Shift 2))
-                                   (T.Sub (n, T.Shift 2)))
-                        >>> [
-                            (* ... forall a . (b : type), __, a[^2] |- b[0 . ^3] : type 
-                                                                     = b[0 . ^4][0 . id]
-                            *)
-                            refine (Rule.forallElim 
-                                       (T.Sub (a, T.Shift 3))
-                                       (T.apply1 Prim.istp (T.Sub (b, T.under 1 (T.Shift 3))))
-                                       T.zero)
-                            >>> [
-                                (* ... forall a . (b : type), __, a[^2] |- forall a[^3] . (b[0 . ^4] : type) *)
-                                refine (Rule.hypothesis 2) >> done,
-       
-                                (* ... forall a . (b : type), __, a[^2] |- 0 : a[^3] *)
-                                refine (Rule.hypothesisOf 0) >> done
-                                ],
-   
-                            (* ... __, __ |- m[^2] = n[^2] : a[^2] *)
-                            eassert2 ()
-                            >>> [
-                                refine (Rule.setWeakenOf 
-                                           (T.Sub (a, T.Shift 2))
-                                           (T.Sub (b, T.under 1 (T.Shift 2)))
-                                           (T.Sub (m, T.Shift 2)))
-                                >>
-                                refine (Rule.hypothesis 3) >> done,
-       
-                                refine (Rule.setWeakenOf 
-                                           (T.Sub (a, T.Shift 2))
-                                           (T.Sub (b, T.under 1 (T.Shift 2)))
-                                           (T.Sub (n, T.Shift 2)))
-                                >>
-                                refine (Rule.hypothesis 2) >> done,
-       
-                                refine (Rule.weaken 2 4)
-                                >>
-                                tac
-                                ],
-   
-                            (* ... forall a . (b : type), b[m[^] . ^] |- b[0 . ^3][m[^2] . id]
-                                                                       = b[m[^2] . ^2]
-                            *)
-                            refine (Rule.hypothesis 0) >> done
-                            ]
-                        ]
-                    ])\
-         /
+                     (* N[^] #2 : B[M[^] #1 . ^] *)
+                     refine (Rule.equivalenceOf
+                                (T.Sub (b, T.Dot (T.pi1 (T.Sub (n, T.shift1)), T.shift1)))
+                                (T.Sub (b, T.Dot (T.pi1 (T.Sub (m, T.shift1)), T.shift1)))
+                                (T.pi2 (T.Sub (n, T.shift1))))
+                     >>> [
+                         refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))
+                         >>+
+                         (* B[M[^] #1 . ^] = B[N[^] #1 . ^] : type *)
+                         refine (Rule.existsFormInv2Eq
+                                    (T.Sub (a, T.shift1))
+                                    (T.Sub (b, T.under 1 T.shift1))
+                                    (T.pi1 (T.Sub (m, T.shift1)))
+                                    (T.pi1 (T.Sub (n, T.shift1))))
+                         >>> [
+                             (* exists A[^] . B[0 . ^2] : type *)
+                             refine (Rule.inhabitedForm (T.evar ()))
+                             >>+ refine (Rule.inhabitant (T.evar ()) (T.evar ()))
+                             >>+ refine (Rule.hypothesis 2)
+                             >> done,
 
+                             refine (Rule.hypothesis 0) >> done
+                             ],
 
-      fun isetExt _ tac =
-         goalCaseT
-         / \Prim.eq\ (\Prim.iset\ ? (fn . ?)) ? ? =>
-           \(fnc a b m n =>
-                (* ... |- m = n : iset a . b *)
-                refine (Rule.isetElim a b (T.evar ()) m)
-                >>> [
-                    (* ... |- m : set a . b *)
-                    refine (Rule.hypothesis 1) >> done,
+                         refine (Rule.existsElim2Of 
+                                    (T.Sub (a, T.shift1))
+                                    (T.Sub (b, T.under 1 T.shift1))
+                                    (T.Sub (n, T.shift1)))
+                         >>+ refine (Rule.hypothesis 1)
+                         >> done
+                         ],
 
-                    (* ... b[m . id] (hidden) |- m[^] = n[^] : set a[^] . b[0 . ^2] *)
-                    refine (Rule.isetIntroEq 
-                               (T.Sub (a, T.Shift 1))
-                               (T.Sub (b, T.under 1 (T.Shift 1)))
-                               (T.Sub (m, T.Shift 1))
-                               (T.Sub (n, T.Shift 1)))
-                    >>> [
-                        (* ... __, a[^] |- b[0 . ^2] : type *)
-                        refine (Rule.isetFormInv2
-                                   (T.Sub (a, T.Shift 2))
-                                   (T.Sub (b, T.under 1 (T.Shift 2)))
-                                   T.zero)
-                        >>> [
-                            (* ... __, a[^] |- iset a[^2] . b[0 . ^3] : type *)
-                            refine (Rule.weaken 0 2)
-                            >>+
-                            (* ... |- iset a . b : type *)
-                            refine (Rule.inhabitedForm (T.evar ()))
-                            >>+
-                            (* ... |- iset a . b *) 
-                            refine (Rule.inhabitant (T.evar ()) m)
-                            >>+
-                            (* ... |- m : iset a . b *)
-                            refine (Rule.hypothesis 1) >> done,
-                            
-                            (* ... __, a[^] |- 0 : a[^2] *)
-                            refine (Rule.hypothesisOf 0) >> done
-                            ],
+                     withgoal
+                     (fn (_, dir) =>
+                         chdir (D.bind0 dir)
+                         >>+ refine (Rule.weaken 3 2) 
+                         >>+ tac2)
+                     ]
+                 ]
+             ]
+             
 
-                        (* ... __ |- m[^] = n[^] : a[^] *)
-                        eassert2 ()
-                        >>> [
-                            (* ... __ |- m[^] : a[^] *)
-                            refine (Rule.isetWeakenOf 
-                                       (T.Sub (a, T.Shift 1))
-                                       (T.Sub (b, T.under 1 (T.Shift 1)))
-                                       (T.Sub (m, T.Shift 1)))
-                            >>
-                            (* ... __ |- m : iset a[^] . b[0 . ^2] *)
-                            refine (Rule.hypothesis 2) >> done,
-   
-                            (* ... __ |- n[^] : a[^] *)
-                            refine (Rule.isetWeakenOf 
-                                       (T.Sub (a, T.Shift 1))
-                                       (T.Sub (b, T.under 1 (T.Shift 1)))
-                                       (T.Sub (n, T.Shift 1)))
-                            >>
-                            (* ... __ |- n[^] : iset a[^] . b[0 . ^2] *)
-                            refine (Rule.hypothesis 1) >> done,
-   
-                            refine (Rule.weaken 2 3)
-                            >>
-                            tac
-                            ],
-
-                        (* ... b[m . id] |- b[0 . ^2][m[^] . id]
-                                          = b[m[^] . ^]
-                        *)
-                        refine (Rule.hypothesis 0) >> done
-                        ]
-                    ])\
-         /
-
-
-      val setExtOf =
-         goalCaseT
-         / \Prim.eq\ (\Prim.set\ ? (fn ? . ?)) ? ? =>
-           \(fnc a binder b m n =>
-                refine (Rule.setIntroEq a b m n)
-                >>> [
-                    withgoal
-                    (fn (_, dir) => chdir (D.bindVary dir binder) >> idtacM Secondary),
-
-                    idtacM Primary,
-
-                    idtacM Primary
-                    ])\
-         /
-
-
-      val isetExtOf =
-         goalCaseT
-         / \Prim.eq\ (\Prim.iset\ ? (fn ? . ?)) ? ? =>
-           \(fnc a binder b m n =>
-                refine (Rule.isetIntroEq a b m n)
-                >>> [
-                    withgoal
-                    (fn (_, dir) => chdir (D.bindVary dir binder) >> idtacM Secondary),
-
-                    idtacM Primary,
-
-                    idtacM Primary
-                    ])\
-         /
-
-
-      val quotientExtOf =
-         goalCaseT
-         / \Prim.eq\ ($as (\Prim.quotient\ ? (fn . fn . ?))) ? ? =>
-           \(fnc q a b m n =>
-                refine (Rule.quotientIntroEq a b m n)
-                >>> [
-                    replaceConcl (T.apply1 Prim.istp q)
-                    >> idtacM Secondary,
-
-                    idtacM Secondary,
-                    idtacM Secondary,
-                    idtacM Primary
-                    ])\
-         /
-
-         
-      fun prodExt _ tac =
-         refine (Rule.prodExt (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+      fun prodExtAuto a b m n tac1 tac2 =
+         refine (Rule.prodExt a b m n)
          >>> [
              refine (Rule.hypothesis 1) >> done,
              refine (Rule.hypothesis 0) >> done,
              
-             refine (Rule.weaken 0 2) >> idtacM Primary,
-
-             eassert2 ()
+             assert2
+                (T.apply2 Prim.ov a (T.pi1 m))
+                (T.apply2 Prim.ov a (T.pi1 n))
              >>> [
-                 refine (Rule.prodElim2Of (T.evar ()) (T.evar ()) (T.evar ()))
-                 >> refine (Rule.hypothesis 1) >> done,
+                 refine (Rule.prodElim1Of a b m)
+                 >>+
+                 refine (Rule.hypothesis 1) >> done,
 
-                 refine (Rule.prodElim2Of (T.evar ()) (T.evar ()) (T.evar ()))
-                 >> refine (Rule.hypothesis 0) >> done,
+                 refine (Rule.prodElim1Of a b n)
+                 >>+
+                 refine (Rule.hypothesis 0) >> done,
 
-                 refine (Rule.weaken 2 2) >> tac
+                 refine (Rule.weaken 2 2)
+                 >>+
+                 tac1
+                 ],
+
+             assert2
+                (T.apply2 Prim.ov b (T.pi2 m))
+                (T.apply2 Prim.ov b (T.pi2 n))
+             >>> [
+                 refine (Rule.prodElim2Of a b m)
+                 >>+
+                 refine (Rule.hypothesis 1) >> done,
+
+                 refine (Rule.prodElim2Of a b n)
+                 >>+
+                 refine (Rule.hypothesis 0) >> done,
+
+                 refine (Rule.weaken 2 2) 
+                 >>+ 
+                 tac2
                  ]
              ]
 
 
-      fun futureExt _ _ =
-         refine (Rule.futureExt (T.evar ()) (T.evar ()) (T.evar ()))
+      fun setExtAuto a b m n tac =
+         (* ... |- m = n : set a . b *)
+         assert (T.apply2 Prim.forall a (T.apply1 Prim.istp b))
          >>> [
-             refine (Rule.hypothesis 1) >> done,
-             refine (Rule.hypothesis 0) >> done,
+             (* ... |- forall a . (b : type) *)
+             refine (Rule.forallIntro a (T.apply1 Prim.istp b))
+             >>> [
+                 (* ... |- a : type *)
+                 refine (Rule.setFormInv a b)
+                 >>+
+                 (* ... |- set a . b : type *)
+                 refine (Rule.inhabitedForm (T.evar ()))
+                 >>+
+                 (* ... |- set a . b *)
+                 refine (Rule.inhabitant (T.evar ()) m)
+                 >>+
+                 (* ... |- m : set a . b *)
+                 refine (Rule.hypothesis 1) >> done,
 
-             (* cannot reestablish the invariant, so stop here *)
-             refine (Rule.weaken 0 2) >> idtacM Primary
+                 (* a |- b : type *)
+                 withgoal
+                 (fn (_, dir) =>
+                     chdir (D.bind0 dir)
+                     >>
+                     refine (Rule.weaken 1 2)
+                     >>
+                     idtacM Secondary),
+                 ],
+
+             (* ... forall a . (b : type) |- m[^] = n[^] : set a[^] . b[0 . ^2] *)
+             refine (Rule.setElim
+                        (T.Sub (a, T.shift1))
+                        (T.Sub (b, T.under 1 T.shift1))
+                        (T.evar ())
+                        (T.Sub (m, T.shift1)))
+             >>> [
+                 (* ... forall a . (b : type), a[^] |- b[0 . ^2] *)
+                 refine (Rule.forallElim 
+                            (T.Sub (a, T.Shift 2))
+                               (T.apply1 Prim.istp (T.Sub (b, T.under 1 (T.Shift 2))))
+                            T.zero)
+                 >>> [
+                     (* ... forall a . (b : type), a[^] |- forall a[^2] . (b[0 . ^3] : type) *)
+                     refine (Rule.hypothesis 1) >> done,
+
+                     (* ... forall a . (b : type), a[^] |- 0 : a[^2] *)
+                     refine (Rule.hypothesisOf 0) >> done,
+                     ],
+
+                 (* ... forall a . (b : type) |- m[^] : set a[^] . b[0 . ^2] *)
+                 refine (Rule.hypothesis 2) >> done,
+
+                 (* ... forall a . (b : type), b[0 . ^2][m[^] . id] (hidden) |- m[^2] = n[^2] : set a[^2] . b[0 . ^3]
+                    ... forall a . (b : type), b[m[^] . ^] (hidden) |- m[^2] = n[^2] : set a[^2] . b[0 . ^3]
+                 *)
+                 refine (Rule.setIntroEq 
+                            (T.Sub (a, T.Shift 2))
+                            (T.Sub (b, T.under 1 (T.Shift 2)))
+                            (T.Sub (m, T.Shift 2))
+                            (T.Sub (n, T.Shift 2)))
+                 >>> [
+                     (* ... forall a . (b : type), __, a[^2] |- b[0 . ^3] : type 
+                                                              = b[0 . ^4][0 . id]
+                     *)
+                     refine (Rule.forallElim 
+                                (T.Sub (a, T.Shift 3))
+                                (T.apply1 Prim.istp (T.Sub (b, T.under 1 (T.Shift 3))))
+                                T.zero)
+                     >>> [
+                         (* ... forall a . (b : type), __, a[^2] |- forall a[^3] . (b[0 . ^4] : type) *)
+                         refine (Rule.hypothesis 2) >> done,
+
+                         (* ... forall a . (b : type), __, a[^2] |- 0 : a[^3] *)
+                         refine (Rule.hypothesisOf 0) >> done
+                         ],
+
+                     (* ... __, __ |- m[^2] = n[^2] : a[^2] *)
+                     assert2
+                        (T.apply2 Prim.ov (T.Sub (a, T.Shift 2)) (T.Sub (m, T.Shift 2)))
+                        (T.apply2 Prim.ov (T.Sub (a, T.Shift 2)) (T.Sub (n, T.Shift 2)))
+                     >>> [
+                         refine (Rule.setWeakenOf 
+                                    (T.evar ())
+                                    (T.Sub (b, T.under 1 (T.Shift 2)))
+                                    (T.evar ()))
+                         >>+
+                         refine (Rule.hypothesis 3) >> done,
+
+                         refine (Rule.setWeakenOf 
+                                    (T.evar ())
+                                    (T.Sub (b, T.under 1 (T.Shift 2)))
+                                    (T.evar ()))
+                         >>+
+                         refine (Rule.hypothesis 2) >> done,
+
+                         refine (Rule.weaken 2 4)
+                         >>+
+                         tac
+                         ],
+
+                     (* ... forall a . (b : type), b[m[^] . ^] |- b[0 . ^3][m[^2] . id]
+                                                                = b[m[^2] . ^2]
+                     *)
+                     refine (Rule.hypothesis 0) >> done
+                     ]
+                 ]
              ]
 
 
-      fun unitExt exttac _ _ =
+      fun isetExtAuto a b m n tac =
+         (* ... |- m = n : iset a . b *)
+         refine (Rule.isetElim a b (T.evar ()) m)
+         >>> [
+             (* ... |- m : set a . b *)
+             refine (Rule.hypothesis 1) >> done,
+
+             (* ... b[m . id] (hidden) |- m[^] = n[^] : set a[^] . b[0 . ^2] *)
+             refine (Rule.isetIntroEq 
+                        (T.Sub (a, T.Shift 1))
+                        (T.Sub (b, T.under 1 (T.Shift 1)))
+                        (T.Sub (m, T.Shift 1))
+                        (T.Sub (n, T.Shift 1)))
+             >>> [
+                 (* ... __, a[^] |- b[0 . ^2] : type *)
+                 refine (Rule.isetFormInv2
+                            (T.Sub (a, T.Shift 2))
+                            (T.Sub (b, T.under 1 (T.Shift 2)))
+                            T.zero)
+                 >>> [
+                     (* ... __, a[^] |- iset a[^2] . b[0 . ^3] : type *)
+                     refine (Rule.weaken 0 2)
+                     >>+
+                     (* ... |- iset a . b : type *)
+                     refine (Rule.inhabitedForm (T.evar ()))
+                     >>+
+                     (* ... |- iset a . b *) 
+                     refine (Rule.inhabitant (T.evar ()) m)
+                     >>+
+                     (* ... |- m : iset a . b *)
+                     refine (Rule.hypothesis 1) >> done,
+                     
+                     (* ... __, a[^] |- 0 : a[^2] *)
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+
+                 (* ... __ |- m[^] = n[^] : a[^] *)
+                 assert2
+                    (T.apply2 Prim.ov (T.Sub (a, T.shift1)) (T.Sub (m, T.shift1)))
+                    (T.apply2 Prim.ov (T.Sub (a, T.shift1)) (T.Sub (n, T.shift1)))
+                 >>> [
+                     (* ... __ |- m[^] : a[^] *)
+                     refine (Rule.isetWeakenOf 
+                                (T.evar ())
+                                (T.Sub (b, T.under 1 (T.Shift 1)))
+                                (T.evar ()))
+                     >>+
+                     (* ... __ |- m : iset a[^] . b[0 . ^2] *)
+                     refine (Rule.hypothesis 2) >> done,
+
+                     (* ... __ |- n[^] : a[^] *)
+                     refine (Rule.isetWeakenOf 
+                                (T.evar ())
+                                (T.Sub (b, T.under 1 (T.Shift 1)))
+                                (T.evar ()))
+                     >>+
+                     (* ... __ |- n[^] : iset a[^] . b[0 . ^2] *)
+                     refine (Rule.hypothesis 1) >> done,
+
+                     refine (Rule.weaken 2 3)
+                     >>+
+                     tac
+                     ],
+
+                 (* ... b[m . id] |- b[0 . ^2][m[^] . id]
+                                   = b[m[^] . ^]
+                 *)
+                 refine (Rule.hypothesis 0) >> done
+                 ]
+             ]
+
+
+      fun unitExtAuto exttac =
          exttac
          >>> [
              refine (Rule.hypothesis 1) >> done,
@@ -1263,40 +1372,257 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
              ]
 
 
-      structure RT = RuleTactic
+      val squashExtAuto =
+         refine (Rule.squashExt (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             refine (Rule.hypothesis 1) >> done,
+             refine (Rule.hypothesis 0) >> done,
 
-      val () =
-         List.app
-            (fn (const, tacfn) => H.insert extensionalityTactics const tacfn)
-            [
-            (Prim.forall, forallExt),
-            (Prim.arrow, arrowExt),
-            (Prim.tarrow, tkarrowExt Rule.tarrowExt Rule.tarrowElimOf),
-            (Prim.karrow, tkarrowExt Rule.karrowExt Rule.karrowElimOf),
-            (Prim.intersect, intersectExt),
-            (Prim.exists, existsExt),
-            (Prim.set, setExt),
-            (Prim.iset, isetExt),
-            (Prim.prod, prodExt),
-            (Prim.future, futureExt),
-            (Prim.unit, unitExt RT.unitExt),
-            (Prim.eq, unitExt RT.eqExt),
-            (Prim.ov, unitExt RT.ofExt),
-            (Prim.eqtp, unitExt RT.eqtpExt),
-            (Prim.istp, unitExt RT.istpExt),
-            (Prim.subtype, unitExt RT.subtypeExt),
-            (Prim.squash, unitExt RT.squashExt),
-            ]
+             refine (Rule.weaken 0 2) >>+ idtacM Secondary
+             ]
 
-      val () =
-         List.app
-            (fn (const, tac) => H.insert extensionalityOfTactics const tac)
-            [
-            (Prim.iforall, iforallExtOf),
-            (Prim.set, setExtOf),
-            (Prim.iset, isetExtOf),
-            (Prim.quotient, quotientExtOf)
-            ]
+
+      fun introEqLoop l =
+         (case l of
+             [] =>
+                refine (Rule.weaken 0 2) >>+ idtacM Primary
+
+           | ident :: rest =>
+                goalCaseT
+                /| \Prim.eq\ ? ? ? =>
+                   \(fnc ab m n =>
+                        termCaseT (N.whnfHard ab)
+                        /| \Prim.forall\ ? (fn . ?) =>
+                           \(fnc a b =>
+                                forallExtAuto ident a b m n (introEqLoop rest))\
+
+                         | \Prim.arrow\ ? ? =>
+                           \(fnc a b =>
+                                arrowExtAuto ident a b m n (introEqLoop rest))\
+
+                         | \Prim.tarrow\ ? ? =>
+                           \(fnc a b =>
+                                tkarrowExtAuto Rule.tarrowExt Rule.tarrowElimOf ident a b m n (introEqLoop rest))\
+
+                         | \Prim.karrow\ ? ? =>
+                           \(fnc a b =>
+                                tkarrowExtAuto Rule.karrowExt Rule.karrowElimOf ident a b m n (introEqLoop rest))\
+
+                         | \Prim.intersect\ ? (fn . ?) =>
+                           \(fnc a b =>
+                                intersectExtAuto ident a b m n (introEqLoop rest))\
+
+                         | _ =>
+                           \(fnc => 
+                                fail "introEq is not supported for this type")\
+                        /)\
+
+                 | _ =>
+                   \(fnc =>
+                        fail "not an introEq goal")\
+                /)
+
+      fun introEqPriority l =
+         goalCaseT
+         /| \Prim.eq\ ? ? ? =>
+            \(fnc a m n =>
+                 assert2
+                    (T.apply2 Prim.ov a m)
+                    (T.apply2 Prim.ov a n)
+                 >>> [
+                     idtacM Secondary,
+                     idtacM Secondary,
+                     introEqLoop l
+                     ])\
+
+          | _ =>
+            \(fnc =>
+                 fail "not an introEq goal")\
+         /
+
+      fun introEqRaw l = introEqPriority l >> idtac
+
+      fun introEq l = TC.withTypecheckSnd $ introEqPriority l
+
+
+
+      fun extensionalityAutoMain () =
+         let
+            val loop = lift extensionalityAutoMain
+         in
+            goalCaseT
+            /| \Prim.eq\ ? ? ? =>
+               \(fnc ab m n =>
+                    termCaseT (N.whnf ab)
+                    /| \Prim.forall\ ? (fn . ?) =>
+                       \(fnc a b =>
+                            forallExtAuto NONE a b m n loop)\
+   
+                     | \Prim.arrow\ ? ? =>
+                       \(fnc a b =>
+                            arrowExtAuto NONE a b m n loop)\
+   
+                     | \Prim.tarrow\ ? ? =>
+                       \(fnc a b =>
+                            tkarrowExtAuto Rule.tarrowExt Rule.tarrowElimOf NONE a b m n loop)\
+   
+                     | \Prim.karrow\ ? ? =>
+                       \(fnc a b =>
+                            tkarrowExtAuto Rule.karrowExt Rule.karrowElimOf NONE a b m n loop)\
+   
+                     | \Prim.intersect\ ? (fn . ?) =>
+                       \(fnc a b =>
+                            intersectExtAuto NONE a b m n loop)\
+   
+                     | \Prim.exists\ ? (fn . ?) =>
+                       \(fnc a b =>
+                            existsExtAuto a b m n loop loop)\
+
+                     | \Prim.prod\ ? ? =>
+                       \(fnc a b =>
+                            prodExtAuto a b m n loop loop)\
+
+                     | \Prim.set\ ? (fn . ?) =>
+                       \(fnc a b =>
+                            setExtAuto a b m n loop)\
+
+                     | \Prim.iset\ ? (fn . ?) =>
+                       \(fnc a b =>
+                            setExtAuto a b m n loop)\
+
+                     | \Prim.unit\ =>
+                       \(fnc =>
+                            unitExtAuto RT.unitExt)\
+
+                     | \Prim.eq\ _ _ _ =>
+                       \(fnc =>
+                            unitExtAuto RT.eqExt)\
+
+                     | \Prim.ov\ _ _ =>
+                       \(fnc =>
+                            unitExtAuto RT.ofExt)\
+
+                     | \Prim.eqtp\ _ _ =>
+                       \(fnc =>
+                            unitExtAuto RT.eqtpExt)\
+
+                     | \Prim.istp\ _ =>
+                       \(fnc =>
+                            unitExtAuto RT.istpExt)\
+
+                     | \Prim.subtype\ _ _ =>
+                       \(fnc =>
+                            unitExtAuto RT.subtypeExt)\
+
+                     | \Prim.squash\ _ =>
+                       \(fnc =>
+                            squashExtAuto)\
+
+                     | (\Prim.manual\ _ | \Prim.manualf\ _ | \Prim.manuals\ _) =>
+                       \(fnc =>
+                            (* __, __ |- M = N : manual A *)
+                            refine (Rule.weaken 0 2)
+                            >>+
+                            refine (Rule.reduce
+                                       (R.within [1] (R.trans [R.unfold, R.beta 1])))
+                            >>+
+                            idtacM Primary)\
+
+                     | _ =>
+                       \(fnc =>
+                            (* __, __ |- M = N : A *)
+                            refine (Rule.weaken 0 2)
+                            >>+
+                            idtacM Primary)\
+                    /)\
+
+             | _ =>
+               \(fnc =>
+                    raise (Fail "unexpected goal in extensionalityAuto"))\
+            /
+         end
+
+
+      val extensionalityAutoPriority =
+         goalCaseT
+         /| \Prim.eq\ ? ? ? =>
+            \(fnc a m n =>
+                 assert2
+                    (T.apply2 Prim.ov a m)
+                    (T.apply2 Prim.ov a n)
+                 >>> [
+                     idtacM Secondary,
+                     idtacM Secondary,
+                     extensionalityAutoMain ()
+                     ])\
+
+          | _ =>
+            \(fnc =>
+                 fail "not an extensionalityAuto goal")\
+         /
+
+      val extensionalityAutoRaw = extensionalityAutoPriority >> idtac
+
+      val extensionalityAuto = TC.withTypecheckSnd extensionalityAutoPriority
+
+
+
+      fun existsEqPriority em =
+         let
+            do m = withterm em
+         in
+            goalCaseT
+            /| \Prim.eq\ ? _ _ =>
+               \(fnc a =>
+                    termCaseT (N.whnfHard a)
+                    /| \Prim.union\ _ (fn ? . _) =>
+                       \(fnc binder =>
+                            refine (Rule.unionIntroEq (T.evar ()) (T.evar ()) m (T.evar ()) (T.evar ()))
+                            >>> [
+                                (* A |- B : type *)
+                                withgoal
+                                (fn (_, dir) => chdir (D.bindVary dir binder) >>+ idtacM Secondary),
+
+                                (* M : A *)
+                                idtacM Secondary,
+
+                                (* N = N' : B[M . id] *)
+                                idtacM Primary
+                                ])\
+
+                     | \Prim.iexists\ _ _ (fn ? . _) =>
+                       \(fnc binder =>
+                            refine (Rule.iexistsIntroEq (T.evar ()) m (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                            >>> [
+                                (* K : kind i *)
+                                idtacM Secondary,
+
+                                (* K |- A : type *)
+                                withgoal
+                                (fn (_, dir) => chdir (D.bindVary dir binder) >>+ idtacM Secondary),
+
+                                (* M : K *)
+                                idtacM Secondary,
+
+                                (* M = N : A[M . id] *)
+                                idtacM Primary
+                                ])\
+
+                     | _ =>
+                       \(fnc =>
+                            fail "existsEq is not supported for this type")\
+                    /)\
+
+             | _ =>
+               \(fnc =>
+                    fail "not an existsEq goal")\
+            /
+         end
+
+      fun existsEqRaw em = existsEqPriority em >> idtac
+
+      fun existsEq em = Typecheck.withTypecheckSnd (existsEqPriority em)
+
 
 
       val univIntroEqtype = RuleTactic.univIntroEqtype

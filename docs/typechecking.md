@@ -67,6 +67,16 @@ employed.
 
       fold /manual M/
 
+  Note that `manual` is a [hard](terms.html#opacity) constant, which
+  means that it survives basic and hard reduction ([see
+  below](#reduction-strategies)).  In some cases the
+  [firm](terms.html#opacity) variant `manualf` is
+  preferred, which survives basic but not hard reduction.  For
+  example, when a manual subterm propagates into a type, we might not
+  want the occurrence in the type to be marked manual.  (A
+  [soft](terms.html#opacity) also exists, but it is not useful in
+  typechecking since typechecking always unfolds soft constants.)
+
 - To avoid ambiguous typing constraints, one sometimes needs to supply
   explicit arguments.  If the argument is explicit, this is just a
   matter of supplying it instead of using `_`.  If the argument is
@@ -138,7 +148,9 @@ and put `A` in [hard whnf](#reduction-strategies).  Then:
 
 2. If `M` is unknown, defer.
 
-3. If `M` or `A` has the form `manual _`, generate a subgoal and stop.
+3. If `M` or `A` is marked manual, generate a subgoal and stop.
+   (We say a term is marked manual when it has the form `manual _` or
+   `manualf _`.)
 
 4. If the goal matches a hypothesis, use it.
 
@@ -181,7 +193,7 @@ For goals of the form `A : type`, put `A` in
 
 1. If `A` is unknown, defer.
 
-2. If `A` has the form `manual _`, generate a subgoal and stop.
+2. If `A` is marked manual, generate a subgoal and stop.
 
 3. If the goal matches a hypothesis, use it.
 
@@ -197,7 +209,7 @@ For goals of the form `A : type`, put `A` in
 For goals of the form `A <: B`, put `A` and `B` in 
 [hard whnf](#reduction-strategies).  Then:
 
-1. If `A` or `B` has the form `manual _`, generate a subgoal and stop.
+1. If `A` or `B` is marked manual, generate a subgoal and stop.
 
 2. If `B` is `U i`, then:
 
@@ -227,7 +239,7 @@ For goals of the form `A <: B`, put `A` and `B` in
 For goals of the form `A = B : type`, put `A` and `B` in 
 [hard whnf](#reduction-strategies).  Then:
 
-1. If `A` or `B` has the form `manual _`, generate a subgoal and stop.
+1. If `A` or `B` is marked manual, generate a subgoal and stop.
 
 2. Unify `A` and `B` if possible.  If successful, prove `A : type`.
 
@@ -243,7 +255,7 @@ For goals of the form `A = B : type`, put `A` and `B` in
 For goals of the form `A = B : U i` or `A = B : K i`, put `A` and `B`
 in [hard whnf](#reduction-strategies).  Then:
 
-1. If `A` or `B` has the form `manual _`, generate a subgoal and stop.
+1. If `A` or `B` is marked manual, generate a subgoal and stop.
 
 2. Unify `A` and `B` if possible.  If successful, prove `A : U i` or
 `A : K i`.

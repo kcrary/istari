@@ -89,6 +89,11 @@ signature TYPECHECK_INTERNAL =
 (* The typechecking algorithm
    --------------------------
 
+   A term is marked manual if it has the form (manual M) or (manualf M).
+   (Note that the form (manuals M) is impossible when the term has been
+   put in basic or hard whnf.)
+
+
    I
    A _typecheckable proposition_ has the form:
    (M : C), (C : type), (C <: C'), (C = C' : type), (C = C' : Ui), or (C = C' : Ki).
@@ -115,8 +120,7 @@ signature TYPECHECK_INTERNAL =
 
    2. If M is unknown, defer.
 
-   3. If M or A is marked manual (that is, it has the form (manual _)),
-      generate a subgoal and stop.
+   3. If M or A is marked manual, generate a subgoal and stop.
 
    4. If the goal matches a hypothesis in the table, use it.
 
@@ -1096,7 +1100,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    defer st (Of, table, goal, dest, history)\
 
                (* 3a. If M is marked manual, stop. *)
-             | _ ; \Prim.manual\ _ =>
+             | _ ; (\Prim.manual\ _ | \Prim.manualf\ _) =>
                \fnc =>
                    (
                    progress := true;
@@ -1446,7 +1450,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    defer st (Istp, table, goal, dest, history)\
 
                (* 2. If A is marked manual, stop. *)
-             | \Prim.manual\ _ =>
+             | (\Prim.manual\ _ | \Prim.manualf\ _) =>
                \fnc =>
                    (
                    progress := true;

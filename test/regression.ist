@@ -10,6 +10,95 @@ fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
 
 
 
+lemma "extensionality_union"
+/
+  forall i (a : U i) (b : a -> U i) (m : a) (n p : b m) .
+    n = p : b m
+    -> n = p : (union (x : a) . b x)
+/;
+
+inference.
+intro /i a b m n p H/.
+existsEq /m/.
+hyp /H/.
+qed ();
+
+
+
+lemma "extensionality_iexists"
+/
+  forall i (a : kind i) (b : a -> U i) (m : a) (n p : b m) .
+    n = p : b m
+    -> n = p : (iexists (x : a) . b x)
+/;
+
+inference.
+intro /i a b m n p H/.
+existsEq /m/.
+hyp /H/.
+qed ();
+
+
+
+lemma "extensionalityAuto"
+/
+  forall i (a : U i) (b c : a -> U i) (d e : forall x . c x -> U i) .
+    (fn t .
+       forall (m n : t) .
+         (forall x y . m x y #1 = n x y #1 : c x)
+         -> (forall x y z . m x y #2 #1 z = n x y #2 #1 z : e x (m x y #1))
+         -> m = n : t)
+    (forall (x : a) . b x -> exists (z : c x) . (d x z -> e x z) & (x : a))
+/;
+
+reduce /concl/.
+inference.
+intro /i a b c d e m n H1 H2/.
+  {
+  reintro /x y z/.
+  symmetry.
+  apply /H1/.
+  }
+
+  {
+  reintro /x y z/.
+  apply /H1/.
+  }
+extensionalityAuto >> auto.
+qed ();
+
+
+
+lemma "extensionalityAuto_manual"
+/
+  forall i (a : U i) (b c : a -> U i) (d e : forall x . c x -> U i) .
+    (fn t .
+       forall (m n : t) .
+         (forall x y . m x y #1 = n x y #1 : c x)
+         -> (forall x y z . m x y #2 #1 z = n x y #2 #1 z : e x (m x y #1))
+         -> m = n : t)
+    (forall (x : a) . b x -> exists (z : c x) . (manuals (d x z -> e x z)) & (x : a))
+/;
+
+reduce /concl/.
+inference.
+intro /i a b c d e m n H1 H2/.
+  {
+  reintro /x y z/.
+  symmetry.
+  apply /H1/.
+  }
+
+  {
+  reintro /x y z/.
+  apply /H1/.
+  }
+extensionalityAuto >> auto.
+introEq /x/ >> auto.
+qed ();
+
+
+
 lemma "iforall_extensionality"
 /
   forall i (k : kind i) (b : k -> U i) (m n : iforall (x : k) . b x) .
@@ -19,7 +108,7 @@ lemma "iforall_extensionality"
 
 inference.
 intro /i k b m n Heq/.
-extensionalityOf.
+extensionality.
 apply /Heq/.
 qed ();
 
@@ -34,7 +123,7 @@ lemma "intersect_extensionality"
 
 inference.
 intro /i a b m n Heq/.
-extensionality /x/.
+introEq /x/.
 apply /Heq/.
 qed ();
 
@@ -572,19 +661,6 @@ qed ();
 
 lemma "extensionality_iset"
 /
-  forall i (a : U i) (b : a -> U i) (m n : iset (x : a) . b x) .
-    m = n : a
-    -> m = n : (iset (x : a) . b x)
-/;
-
-intro /i a b m n H/.
-extensionality /_/.
-hyp /H/.
-qed ();
-
-
-lemma "extensionalityOf_iset"
-/
   forall i (a : U i) (b : a -> U i) (m n : a) .
     b m
     -> m = n : a
@@ -592,7 +668,7 @@ lemma "extensionalityOf_iset"
 /;
 
 intro /i a b m n H Heq/.
-extensionalityOf.
+extensionality.
   {
   hyp /Heq/.
   }
@@ -2588,8 +2664,10 @@ lemma "set_extensionality"
       -> m = n : { x : a | b x } /;
 
 intro /i a b m n Heq/.
-extensionality /_/.
-hyp /Heq/.
+infer /m/ /Hofm/.
+destructSet /Hofm/ /H/.
+clear /Hofm/.
+extensionality >> auto.
 qed ();
 
 
@@ -3066,13 +3144,15 @@ qed ();
 
 
 lemma "extensionality"
-  / forall i (a : U i) (b c : a -> U i) (d : forall x . c x -> U i) .
-      (fn t .
-         forall (m n : t) .
-           (forall x y . m x y #1 = n x y #1 : c x)
-           -> (forall x y . m x y #2 #1 = n x y #2 #1 : d x (m x y #1))
-           -> m = n : t)
-      (forall (x : a) . b x -> exists (z : c x) . d x z & (x : a)) /;
+/
+  forall i (a : U i) (b c : a -> U i) (d : forall x . c x -> U i) .
+    (fn t .
+       forall (m n : t) .
+         (forall x y . m x y #1 = n x y #1 : c x)
+         -> (forall x y . m x y #2 #1 = n x y #2 #1 : d x (m x y #1))
+         -> m = n : t)
+    (forall (x : a) . b x -> exists (z : c x) . d x z & (x : a))
+/;
 
 reduce /concl/.
 intro /i a b c d m n H1 H2/.
@@ -3081,12 +3161,14 @@ intro /i a b c d m n H1 H2/.
   symmetry.
   apply /H1/.
   }
-extensionality /x y H _ _/.
+extensionalityAuto.
   {
+  reintro /x y/.
   apply /H1/.
   }
 
   {
+  reintro /x y Heq/.
   apply /H2/.
   }
 qed ();
@@ -3103,7 +3185,23 @@ lemma "extensionality_arrows"
 
 reduce /concl/.
 intro /i a b c d e m n H/.
-extensionality /x y z w/.
+introEq /x y z w/.
+apply /H/.
+qed ();
+
+
+
+lemma "extensionality_arrows_auto"
+  / forall i (a : U i) (b c d e : a -> U i) .
+      (fn t .
+         forall (m n : t) .
+           (forall x y z w . m x y z w = n x y z w : e x)
+           -> m = n : t)
+      (forall (x : a) . b x -> c x -t> d x -k> e x) /;
+
+reduce /concl/.
+intro /i a b c d e m n H/.
+extensionalityAuto.
 apply /H/.
 qed ();
 
@@ -3120,7 +3218,7 @@ lemma "extensionality_future"
       -> m = n : (a -> future b) /;
 
 intro /i a b m n H1/.
-extensionality /x/.
+introEq /x/.
 so /H1 x/ /H2/.
 clear /H1/.
 revert /H2/.
@@ -3132,7 +3230,7 @@ destruct /m'/ /[m'']/.
 destruct /n'/ /[n'']/.
 whreduce /H2/.
 destruct /H2/ /[H3]/.
-extensionality /_/.
+extensionality.
 hyp /H3/.
 qed ();
 
@@ -3150,7 +3248,7 @@ lemma "extensionality_future2"
         -> m = n : (forall (x : a) . b x -> future (c x)) /;
       
 intro /i a b c m n H1/.
-extensionality /x y/.
+introEq /x y/.
 so /H1 x y/ /H2/.
 clear /H1/.
 revert /H2/.
@@ -3162,7 +3260,7 @@ destruct /m'/ /[m'']/.
 destruct /n'/ /[n'']/.
 whreduce /H2/.
 destruct /H2/ /[H3]/.
-extensionality /_/.
+extensionality.
 hyp /H3/.
 qed ();
 
@@ -3182,7 +3280,7 @@ lemma "extensionality_future_then_more"
 
 inference.
 intro /i a b c m n Heq/.
-extensionality /x/.
+introEq /x/.
 so /Heq x/ /H1/.
 revert /H1/.
 generalize /m x/ /_/ /m'/.
@@ -3192,9 +3290,9 @@ destruct /m'/ /[m'']/.
 destruct /n'/ /[n'']/.
 reduce /H1/.
 destruct /H1/ /[H2]/.
-extensionality /_/.
+extensionality.
 reduce //.
-extensionality /y/.
+introEq /y/.
 apply /H2/.
 qed ();
 

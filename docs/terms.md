@@ -280,7 +280,7 @@ opaque:
   be given a type for the typechecker to use.  This is typically used
   for constants whose purpose is to give
   [assistance to the typechecker](typechecking.html#coping-strategies) 
-  (`ann`, `ap`, `fnann`, `manual`).
+  (`ann`, `ap`, `fnann`, `manualf`).
 
 A constant's opacity can be altered using the function `setOpacity`.
 Since opacities can be altered, an opaque constant is not entirely

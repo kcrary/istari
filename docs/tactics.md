@@ -239,12 +239,12 @@ which appears in the `Hyp` structure.
 
 - `existsOf /[term M]/`
 
-  Proves a goal of the form `M : A` where `A` is either a `union` or
+  Proves a goal of the form `N : A` where `A` is either a `union` or
   `iexists`, using `M` as the witness.
   
   + `existsOfRaw /[term M]/`
 
-    AS `existsOf` but does not invoke the typechecker.
+    As `existsOf` but does not invoke the typechecker.
 
 
 - `contrapositive /[hyp h]/`
@@ -463,37 +463,67 @@ which appears in the `Hyp` structure.
   `A = B : type`, `A : U i`, and `B : U i`.
 
 
-- `extensionality /[name option] ... [name option]/`
+- `introEq /[name option] ... [name option]/`
 
-  Proves a goal of the form `M = N : A`, for many primitive types
-  `A`, decomposing one layer of `A` for each argument given.  The name
-  is used if decomposing `A` generates a hypothesis; otherwise the
-  name is ignored.
+  Proves a goal of the form `M = N : A`, decomposing one layer of `A`
+  for each argument given, when `A` is `forall`, `->`, `-t>`,
+  `-k>`, or `intersect`.
 
-  This tactic establishes `M : A` and `N : A` first, before proceeding
-  to extensionality.  For some types (*e.g.,* `future`), `M : A` and
-  `N : A` cannot be reestablished in a uniform manner after
-  extensionality.  For such types, the tactic stops after that layer,
-  ignoring any additional names in the argument.
+  The tactic first establishes `M : A` and `N : A` and preserves that
+  fact throughout the process.  This can greatly reduce the number of
+  secondary subgoals.  However, if `M`, `N`, or `A` is not already
+  known to be well-formed, the `extensionality` tactic may be better
+  suited.
 
-  The tactic does not work with some types (notably quotients).  For
-  such types, `extensionalityOf` may work.
+  + `introEqRaw /[name option] ... [name option]/`
 
-  + `extensionalityRaw /[name option] ... [name option]/`
-
-    As `extensionality` but does not invoke the typechecker.
+    As `introEq` but does not invoke the typechecker.
 
 
-- `extensionalityOf`
+- `extensionalityAuto`
 
-   Proves a goal of the form `M = N : A`, for some primitive types
-   `A`.  Unlike `extensionality`, it does not establish 
-   `M : A` and `N : A` first, which may result in fewer or better
-   subgoals if those typings are not already known.
+  Proves a goal of the form `M = N : A`, repeatedly decomposing `A` as
+  long as it is `forall`, `->`, `-t>`, `-k>`, `intersect`, `exists`,
+  `&`, `set`, `iset`, or various flavors of unit.  The tactic stops
+  when it reaches an unsupported type, or when it reaches a type
+  marked manual.  (A type is marked manual when it has the form
+  `manuals _`.  The [other
+  variants](typechecking.html#coping-strategies) of manual can also be
+  used, but they are less useful here.)
 
-   + `extensionalityOfRaw`
+  In addition to automating extensionality, `extensionalityAuto` first
+  establishes `M : A` and `N : A` and preserves that fact throughout
+  the process.  This can greatly reduce the number of secondary
+  subgoals.  However, if `M`, `N`, or `A` is not already known to be
+  well-formed, the `extensionality` tactic may be better suited.
 
-     As `extensionalityOf` but does not invoke the typechecker.
+  + `extensionalityAutoRaw`
+
+     As `extensionalityAuto` but does not invoke the typechecker.
+
+
+- `extensionality`
+
+   Proves a goal of the form `M = N : A`, for many primitive types
+   `A`.  Unlike `introEq` or `extensionalityAuto`, it does not
+   establish `M : A` and `N : A` first, which may result in fewer or
+   better subgoals if those typings are not already known.
+
+   For equality at `union` or `iexists`, use `existsEq` instead.
+
+   + `extensionalityRaw`
+
+     As `extensionality` but does not invoke the typechecker.
+
+
+- `existsEq /[term M]/`
+
+  Proves a goal of the form `N = P : A` where `A` is either a `union`
+  or `iexists`, using `M` as the witness.
+
+  + `existsEqRaw /[term M]/`
+
+     As `existsEq` but does not invoke the typechecker.   
 
 
 - `injection /[hyp x]/`
