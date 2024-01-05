@@ -1,7 +1,7 @@
 
 (* Performance notes:
    1. There is no tail-call optimization when using Case.
-   2. Case tries each option in turn, it does not build a decision tree.
+   2. Case tries each option in turn; it does not build a decision tree.
 
    For these reasons, Case may be inappropriate for performance-critical code.
 *)
@@ -29,9 +29,8 @@ signature CASE =
       val wrap : ('a, 'b, 'c) matcher -> ('c -> 'd) -> ('a, 'b, 'd) matcher
       val alt : ('a, 'b, 'c) matcher list -> ('a, 'b, 'c) matcher
 
-      type ('a, 'c) rmatcher
-      val use : ('a, 'c) rmatcher -> ('a, 'b, 'b * 'c) matcher
-      val fix : (('a, 'c) rmatcher -> ('a, unit, 'c) matcher) -> ('a, 'b, 'b * 'c) matcher
+      val frame : ('a, unit, 'c) matcher -> ('a, 'b, 'b * 'c) matcher
+      val fix : (('a, unit, 'b) matcher -> ('a, unit, 'b) matcher) -> ('a, unit, 'b) matcher
 
       (* backtracks on NONE *)
       val cond : ('a, 'b, 'c option) matcher -> ('a, 'b, 'c) matcher
@@ -43,8 +42,10 @@ signature CASE =
       (* wrapk m f = cond (wrap m (tri f)) *)
       val wrapk : ('a, 'b, 'c) matcher -> ('c -> 'd) -> ('a, 'b, 'd) matcher
 
+      (* combine two case analyses into one *)
       val seq : ('a, 'c, 'd) matcher -> ('b, 'd, 'e) matcher -> ('a * 'b, 'c, 'e) matcher
 
+      (* choose a matcher based on what we've matched so far *)
       val discrim : ('b -> ('a, 'b, 'c) matcher) -> ('a, 'b, 'c) matcher
 
 
@@ -217,30 +218,15 @@ structure Case :> CASE =
                 f m x (fn () => alt rest m x fk sk) sk)
 
          
-      type ('a, 'b) rmatcher =
-         'a
-         -> (unit -> answer)
-         -> ('b * (unit -> answer) -> answer)
-         -> answer
-
-      fun use f m x fk sk =
+      fun frame f m x fk sk =
          let
-            do (y, fk') = f m fk
+            do (y, fk') = f m () fk
          in
             sk ((x, y), fk')
          end
 
-      (* fixr as an rmatcher
-         Just using fix would cause polymorphic recursion, plus this is simpler anyway.
-      *)
-      fun fixr f m fk sk = f (fixr f) m () fk sk
 
-      fun fix f m x fk sk =
-         let
-            do (y, fk') = f (fixr f) m () fk
-         in
-            sk ((x, y), fk')
-         end
+      fun fix f m () fk sk = f (fix f) m () fk sk
 
          
       fun cond f m x fk sk =
@@ -837,7 +823,6 @@ grammardef Case
    rule Match(3)      ::= "$lit" EMBED => id
    rule Match(3)      ::= "$as" Match(3) => az
    rule Match(3)      ::= "$az" Match(3) => az
-   rule Match(3)      ::= "$use" EMBED => use
 
    rule Match(2)      ::= Match(3) "=>" EMBED => wrap
    rule Match(2)      ::= Match(3) "=!>" EMBED => wrapk

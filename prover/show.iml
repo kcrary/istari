@@ -2,22 +2,23 @@
 signature UNPARSING =
    sig
 
-      (* Similar interface as a matcher, but not identical. *)
-
       type constant = Term.constant
       type content
       type 'a unparser
-      type 'a sunparser  (* spine unparser *)
+      type 'a sunparser  (* unparser for spines *)
 
       val string : string -> content
-      val break : int -> content
+      val break : int -> content               (* n spaces that may be replaced by a linebreak *)
       val append : content list -> content
-      val box : content -> content
-      val boxi : int -> content -> content   (* box with custom indentation *)
-      val vboxi : int -> content -> content  (* vertical box with custom indentation *)
-      val parens : bool -> content -> content
+      val box : content -> content             (* box with standard indentation (2) *)
+      val boxi : int -> content -> content     (* box with custom indentation *)
+      val vboxi : int -> content -> content    (* vertical box with custom indentation *)
+      val parens : bool -> content -> content  (* parenthesize the content if the boolean is true *)
 
-      (* will not match the entire term; returned content takes the precedence as an argument *)
+      (* 1. show will not match the entire term
+         2. the returned content takes the precedence as an argument
+         3. showterm returns both the content and the term itself
+      *)
       val show : (int -> content) unparser
       val showterm : ((int -> content) * Term.term) unparser
 
@@ -33,10 +34,12 @@ signature UNPARSING =
       
       val lift : (unit -> 'a unparser) -> 'a unparser
       val wrap : 'a unparser -> ('a -> 'b) -> 'b unparser
-      val wrapcond : 'a unparser -> ('a -> 'b option) -> 'b unparser
       val alt : 'a unparser list -> 'a unparser
       val fix : ('a unparser -> 'a unparser) -> 'a unparser
       val fail : 'a unparser
+
+      (* wrapcond fails if the wrapper returns NONE *)
+      val wrapcond : 'a unparser -> ('a -> 'b option) -> 'b unparser
 
       val apply1 : constant -> 'a unparser -> 'a unparser
       val apply2 : constant -> 'a unparser -> 'b unparser -> ('a * 'b) unparser
@@ -49,7 +52,7 @@ signature UNPARSING =
 
       (* Tables *)
 
-      (* arity, precedence, enabled, unparser *)
+      (* arity, precedence, whether it is enabled, the unparser *)
       val unparsingTable : (int * int * bool ref * content unparser) ConstantTable.table
 
       (* quote these constants *)

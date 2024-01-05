@@ -1357,6 +1357,12 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    in
                       try
                          let
+                            val () =
+                               if !trace then
+                                  showPrefixed "inferring " dir m
+                               else
+                                  ()
+
                             val (b, mbtac) =
                                (* may raise exceptions, handled below *)
                                Infer.infer ctx m prove
@@ -1365,6 +1371,12 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                             val () = enqueue st (List.rev (!r))
   
+                            val () =
+                               if !trace then
+                                  showPrefixed "inferred " dir b
+                               else
+                                  ()
+
                             val isuniv =
                                (case a of
                                    T.Elim (T.Const const, _) =>
@@ -1374,11 +1386,22 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                          in
                             if not isuniv andalso Unify.unify1 a b then
                                (
+                               if !trace then
+                                  print "inferred type unifies with goal\n"
+                               else
+                                  ();
+
                                progress := true;
                                dest := mbtac
                                )
                             else
                                let
+                                  val () =
+                                     if !trace then
+                                        print "inferred type does not unify with goal\n"
+                                     else
+                                        ()
+
                                   val dest' = newdest ()
      
                                   val goal' =

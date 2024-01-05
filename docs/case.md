@@ -384,26 +384,39 @@ that was matched is passed as the first binding.
 
 ##### Recursive matching
 
-    type ('a, 'c) rmatcher
-    val use : ('a, 'c) rmatcher -> ('a, 'b, 'b * 'c) matcher
-    val fix : (('a, 'c) rmatcher -> ('a, unit, 'c) matcher) -> ('a, 'b, 'b * 'c) matcher
+    val frame : ('a, unit, 'c) matcher -> ('a, 'b, 'b * 'c) matcher
+    val fix : (('a, unit, 'b) matcher -> ('a, unit, 'b) matcher) -> ('a, unit, 'b) matcher
 
-The `fix` combinator enables recursive matching.  Consider the two
-types:
+The `fix` combinator enables recursive matching, it returns the fixed
+point of the function given as its argument.  To understand its use,
+consider the two types:
 
-    ('a, 'b, 'b * 'c) matcher
     ('a, unit, 'c) matcher
+    ('a, 'b, 'b * 'c) matcher
 
 These types are isomorphic: they both represent a matcher that matches
-against `'a`, producing `'c`.  Then think of `('a, 'c) rmatcher` as a
-third type that is isomorphic to both of them.  The `use` combinator
-employs the isomorphism between the first type and the third.  The `fix`
-combinator employs all three; if we blur the distinction between the
-three isomorphic types and call them `T`, it has type `(T -> T) -> T`.
-Thus we can use it to build recursive matchers.
+against `'a`, producing `'c`.  The `frame` combinator coerces the
+former to the latter.  (The other direction is not often required, but
+can be accomplished by instantiating `'b` to `unit` and then wrapping.)
 
-In the parser `use x` is written `$use \ x \`, and `fix (fn x => m)` is
-written `$lit \(fix (fn x => m))\`.
+To use `fix`, you would write something like (with types added for
+clarity):
+
+    frame (fix (fn m => ... body ...))
+
+where the body calls `frame m` when it needs to call the matcher
+recursively.  If the recursive matcher is not part of the a larger
+matcher, the outer frame might be omitted.
+
+Here `m` is assumed to have type `(S, unit, T) matcher`, so `frame m`
+has the type `(S, 'b, 'b * T) matcher`.  The body has type 
+`(S, unit, T) matcher`.  (It will need to use a wrapper to get its
+result back to `T`.)  Thus, the fix also has that type.  Finally, the
+outer frame has the type `(S, 'b, 'b * T)`.
+
+In the parser, these combinators must be used with the `$lit` syntax.
+Thus `frame m` is written `$lit \frame m\`, and `frame (fix f)` is
+written `$lit \frame (fix f)\`.
 
 
 #####  Entry points
@@ -479,13 +492,12 @@ is given in brackets.  For example, `Match ; [Match]` indicates that
       $lit \ ... antiquoted matcher ... \
       $as [Match]                                        (az)
       $az [Match]                                        (az)
-      $use \ ... antiquoted rmatcher ... \               (use)
 
       ----------------   terms    ----------------
       Match @ [Match]                                    (elim)
-      Constant Spine                                     (elim/constant, length at least 1)
-      \ ... antiquoted constant ... \ Spine              (elim/constant, length at least 1)
-      $var \ ... antiquoted index ... \ Spine            (elim/var, length at least 1)
+      Constant Spine                                     (elim/constant, nonempty spine)
+      \ ... antiquoted constant ... \ Spine              (elim/constant, nonempty spine)
+      $var \ ... antiquoted index ... \ Spine            (elim/var, nonempty spine)
       fn . [Match]                                       (lam)
       fn ? . [Match]                                     (lamb)
       next [Match]                                       (next)
@@ -543,5 +555,4 @@ identity function, but IML is instructed to parse its argument using
 the `Match` grammar.  For example, one might write a recursive
 matcher:
 
-    $lit \(fix (fn x => parseMatch / ... body ... /))\
-
+    $lit \frame (fix (fn x => parseMatch / ... body ... /))\
