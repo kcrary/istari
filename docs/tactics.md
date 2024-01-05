@@ -1029,6 +1029,15 @@ The destruction tactics are:
     arguments.
 
 
+- `typecheckLet /[hyp x]/ /[term A]/ /[name option]/`
+
+  If `x` is a let-bound variable that unfolds to `M`, runs the
+  typechecker to prove `M : A`, and creates a new hypothesis of type
+  `x : A` with the given name.  (A name is invented if no name is
+  supplied.)  If `M` is a path, an underscore will usually suffice for
+  `A`.
+
+
 - `typechecker : unit -> unit`
 
   Runs the typechecker on all of the current goals.

@@ -201,6 +201,49 @@ structure Infer :> INFER =
                 (T.Sub (a, T.Shift (i+1)),
                  refine (Rule.hypothesisOf i))
 
+           | SOME (J.Let _) =>
+                let
+                   fun loop j seq =
+                      if j < i then
+                         (case Seq.expose seq of
+                             Seq.Nil =>
+                                (* This shouldn't happen unless someone is mucking around. *)
+                                NONE
+
+                           | Seq.Cons (J.Tm c, seq') =>
+                                (case N.simplify c of
+                                    T.Elim (T.Const const, [T.App a, T.App b]) =>
+                                       if Constant.eq (const, Prim.ov) then
+                                          (case N.simplify b of
+                                              T.Elim (T.Var i', []) =>
+                                                 if i = i' + j + 1 then
+                                                    SOME (j, a)
+                                                 else
+                                                    loop (j+1) seq'
+
+                                            | _ =>
+                                                 loop (j+1) seq')
+                                       else
+                                          loop (j+1) seq'
+
+                                  | _ =>
+                                       loop (j+1) seq')
+
+                           | Seq.Cons (_, seq') =>
+                                loop (j+1) seq')
+                      else
+                         NONE
+                in
+                   (case loop 0 ctx of
+                       NONE =>
+                          raise (InferError (T.Var i, NONE,
+                                             "head variable is let-bound and unsupported by a typing hypothesis"))
+
+                     | SOME (j, a) =>
+                          (T.Sub (a, T.Shift (j+1)),
+                           refine (Rule.hypothesis j)))
+                end
+
            | NONE =>
                 raise (InferError (T.Var i, NONE, "head variable is unbound"))
 

@@ -51,6 +51,9 @@ signature HYP =
 
       val set : symbol -> ETerm.eterm -> tactic
 
+      (* show that a let-bound variable has an indicated type *)
+      val typecheckLet : hypothesis -> ETerm.eterm -> Symbol.symbol option -> tactic
+
       val assumption : tactic
       val eassumption : tactic
 
@@ -640,6 +643,35 @@ structure Hyp :> HYP =
          in
             refine (Rule.letIntro 0 (ETerm.withdir dir em))
             >> chdir (D.bind dir sym)
+         end
+
+
+      fun typecheckLet hyp ea name =
+         let
+            do (jud, dir) = withgoal
+
+            do i = findhyp hyp
+
+            val a = ETerm.withdir dir ea
+         in
+            (case J.hyp jud i of
+                J.Let _ =>
+                   refine (Rule.assert 
+                              (T.apply2 Prim.ov a (T.Var i))
+                              (T.evar ()))
+                   >>> [
+                       (* i : A *)
+                       refine (Rule.letUnfold i
+                                  (T.apply2 Prim.ov (T.Sub (a, T.shift1)) T.zero))
+                       >>+
+                       (* M[i+1] : A *)
+                       Typecheck.typecheck,
+
+                       chdir (D.bindh dir name)
+                       ]
+
+              | _ =>
+                   fail "hypothesis is not let-bound")
          end
 
 
