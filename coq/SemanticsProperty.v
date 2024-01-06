@@ -217,6 +217,17 @@ pextensionality.
 Qed.
 
 
+Lemma property_action_triv :
+  forall (P : nat -> Prop) w i i',
+    i' <= i
+    -> P i'
+    -> property_action P w i i' triv triv.
+Proof.
+intros P w I i Hi HPi.
+do2 5 split; auto using star_refl; apply hygiene_auto; cbn; auto.
+Qed.    
+
+
 Definition triv_urel w i : wurel w := property_urel (fun _ => True) w i (fun _ x => x).
 
 
@@ -240,14 +251,3 @@ Proof.
 intros v w h I.
 apply extend_property; auto.
 Qed.
-
-
-Lemma property_action_triv :
-  forall (P : nat -> Prop) w i i',
-    i' <= i
-    -> P i'
-    -> property_action P w i i' triv triv.
-Proof.
-intros P w I i Hi HPi.
-do2 5 split; auto using star_refl; apply hygiene_auto; cbn; auto.
-Qed.    

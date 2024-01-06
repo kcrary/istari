@@ -52,6 +52,7 @@ Definition map_operator {A B : Type} (f : A -> B) (a : list nat) (th : operator 
   | oper_equal _ => oper_equal _
   | oper_triv _ => oper_triv _
   | oper_eqtype _ => oper_eqtype _
+  | oper_sequal _ => oper_sequal _
   | oper_subtype _ => oper_subtype _
   | oper_kuniv _ => oper_kuniv _
   | oper_all _ => oper_all _
@@ -291,6 +292,13 @@ auto.
 Qed.
 
 
+Lemma map_sequal :
+  forall A B (f : A -> B) m1 m2, map_term f (sequal m1 m2) = sequal (map_term f m1) (map_term f m2).
+Proof.
+auto.
+Qed.
+
+
 Lemma map_subtype :
   forall A B (f : A -> B) m1 m2, map_term f (subtype m1 m2) = subtype (map_term f m1) (map_term f m2).
 Proof.
@@ -487,7 +495,7 @@ auto.
 Qed.
 
 
-Hint Rewrite map_ext map_extt map_var map_univ map_cty map_con map_karrow map_arrow map_pi map_clam map_capp map_ctlam map_ctapp map_lam map_app map_intersect map_union map_fut map_cnext map_cprev map_next map_prev map_rec map_equal map_triv map_eqtype map_subtype map_kuniv map_all map_alltp map_exist map_mu map_ispositive map_isnegative map_voidtp map_unittp map_cunit map_booltp map_btrue map_bfalse map_bite map_prod map_sigma map_cpair map_cpi1 map_cpi2 map_ppair map_ppi1 map_ppi2 map_wt map_set map_iset map_quotient map_guard : map.
+Hint Rewrite map_ext map_extt map_var map_univ map_cty map_con map_karrow map_arrow map_pi map_clam map_capp map_ctlam map_ctapp map_lam map_app map_intersect map_union map_fut map_cnext map_cprev map_next map_prev map_rec map_equal map_triv map_eqtype map_sequal map_subtype map_kuniv map_all map_alltp map_exist map_mu map_ispositive map_isnegative map_voidtp map_unittp map_cunit map_booltp map_btrue map_bfalse map_bite map_prod map_sigma map_cpair map_cpi1 map_cpi2 map_ppair map_ppi1 map_ppi2 map_wt map_set map_iset map_quotient map_guard : map.
 
 
 Lemma map_sumbool :

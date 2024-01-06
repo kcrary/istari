@@ -71,6 +71,14 @@ exploit
   as Hind;
 eauto 6 using le_ord_trans, lt_le_ord_trans, le_ord_refl, str_mono, cex_mono, cin_mono, upd_cin_mono, le_page_trans with semantics.
 
+(* sequal *)
+{
+intros s i m n Hclm Hcln Hequiv pg' Hlt.
+so (le_page_antisymm _ _ Hlt (toppg_max _)) as H.
+subst pg'.
+apply interp_sequal; auto.
+}
+
 (* kuniv *)
 {
 intros pg s i m gpg h Hlv Hlt pg' Hlt'.
@@ -1319,6 +1327,14 @@ f_equal.
   }
 }
 
+(* sequal *)
+{
+intros s i m n Hclm Hcln Hequiv IHo h.
+exists (iubase (unit_urel top i)).
+rewrite -> extend_iubase.
+rewrite -> extend_unit; auto.
+}
+
 (* subtype *)
 {
 intros pg s i a b R R' _ IH1 _ IH2 IHo h.
@@ -2243,6 +2259,29 @@ end.
 apply interp_equal; auto.
 }
 
+(* sequal *)
+{
+intros s i m n Hclm Hln Hequiv mm Iho Hrest.
+invertc Hrest.
+intros r1 Hr1 <-.
+invertc Hr1.
+intros m' r2 Hm Hr2 <-.
+invertc Hr2.
+intros n' r3 Hn Hr3 <-.
+invertc Hr3.
+intros <-.
+fold (sequal m' n').
+so (restrict_restriction _#3 Hm) as H.
+cbn in H.
+rewrite -> !extend_term_id in H.
+subst m'.
+so (restrict_restriction _#3 Hn) as H.
+cbn in H.
+rewrite -> !extend_term_id in H.
+subst n'.
+apply interp_sequal; auto.
+}
+
 (* all *)
 {
 intros pg s i lv k a gpg K A h Hintlv _ IH1 Hle _ IH2 mm IHo Hrest.
@@ -2809,6 +2848,13 @@ end.
   }
 apply interp_equal.
 apply IH; auto.
+}
+
+(* sequal *)
+{
+intros s i m n Hclm Hcln Hequiv w IHo Hwc Hw.
+simpmap.
+apply interp_sequal; auto using map_hygiene, map_equiv.
 }
 
 (* all *)

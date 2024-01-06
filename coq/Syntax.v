@@ -45,9 +45,12 @@ Inductive operator : list nat -> Type :=
 | oper_rec         : operator [1]
  
 | oper_equal       : operator [0; 0; 0]
+
 | oper_triv        : operator nil
 
 | oper_eqtype      : operator [0; 0]
+
+| oper_sequal      : operator [0; 0]
 
 | oper_subtype     : operator [0; 0]
 
@@ -519,6 +522,7 @@ Definition rec {obj} m             : @term obj := oper _ (oper_rec _) (rw_cons _
 Definition equal {obj} m1 m2 m3    : @term obj := oper _ (oper_equal _) (rw_cons _ _ m1 (rw_cons _ _ m2 (rw_cons _ _ m3 rw_nil))).
 Definition triv {obj}              : @term obj := oper _ (oper_triv _) rw_nil.
 Definition eqtype {obj} m1 m2      : @term obj := oper _ (oper_eqtype _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
+Definition sequal {obj} m1 m2      : @term obj := oper _ (oper_sequal _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition subtype {obj} m1 m2     : @term obj := oper _ (oper_subtype _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition kuniv {obj} m           : @term obj := oper _ (oper_kuniv _) (rw_cons _ _ m rw_nil).
 Definition all {obj} m1 m2 m3      : @term obj := oper _ (oper_all _) (rw_cons _ _ m1 (rw_cons _ _ m2 (rw_cons _ _ m3 rw_nil))).
@@ -636,6 +640,9 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 
 | same_eqtype :
     same_operator [0; 0] [0; 0] (oper_eqtype A) (oper_eqtype B)
+
+| same_sequal :
+    same_operator [0; 0] [0; 0] (oper_sequal A) (oper_sequal B)
 
 | same_subtype :
     same_operator [0; 0] [0; 0] (oper_subtype A) (oper_subtype B)

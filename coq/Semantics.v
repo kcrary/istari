@@ -343,6 +343,13 @@ with basicv : page -> bool -> nat -> sterm -> wiurel stop -> Prop :=
       -> basic pg s i b R'
       -> basicv pg s i (eqtype a b) (iueqtype stop i R R')
 
+| interp_sequal :
+    forall s i m n,
+      hygiene clo m
+      -> hygiene clo n
+      -> equiv m n
+      -> basicv toppg s i (sequal m n) (iubase (unit_urel stop i))
+
 | interp_subtype :
     forall pg s i a b R R',
       basic pg s i a R

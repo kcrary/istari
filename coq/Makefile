@@ -88,6 +88,7 @@ UNITS = \
 	SoundPi \
 	SoundPositive \
 	SoundQuotient \
+	SoundSequal \
 	SoundSet \
 	SoundSigma \
 	SoundSimple \

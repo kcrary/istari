@@ -404,6 +404,16 @@ prove_equiv_compat.
 Qed.
 
 
+Lemma equiv_sequal :
+  forall (m m' n n' : @term object),
+    equiv m m'
+    -> equiv n n'
+    -> equiv (sequal m n) (sequal m' n').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
 
 End object.
 

@@ -346,6 +346,18 @@ destruct H as (Hcla' & Hclb' & _).
 apply interp_eqtype; auto.
 }
 
+(* sequal *)
+{
+intros s i m n _ _ Hequivmn aa Hclaa Hequiv.
+invertc_mc Hequiv.
+intros m' Hequivm n' Hequivn <-.
+fold (sequal m' n').
+so (hygiene_invert_auto _#5 Hclaa) as H; cbn in H.
+destruct H as (Hclm' & Hcln' & _).
+apply interp_sequal; auto.
+eauto using equiv_trans, equiv_symm.
+}
+
 (* subtype *)
 {
 intros pg s i a b R R' _ IH1 _ IH2 aa Hclaa Hequiv.

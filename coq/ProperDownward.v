@@ -665,6 +665,15 @@ rewrite -> !iutruncate_combine_le; try omega.
 reflexivity.
 }
 
+(* sequal *)
+{
+intros s i m n Hclm Hcln Hequiv j Hj.
+rewrite -> iutruncate_iubase.
+rewrite -> ceiling_unit.
+rewrite -> Nat.min_r; auto.
+apply interp_sequal; auto.
+}
+
 (* subtype *)
 {
 intros pg s i a b R R' _ IH1 _ IH2 j Hj.
