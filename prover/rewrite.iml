@@ -114,6 +114,9 @@ signature REWRITE_TYPES =
          *)
 
        | Seq of computational_rewrite * term * computational_rewrite
+         (* Seq red1 M2 red2 : M1 --> M3
+            where red1 : M1 --> M2 and red2 : M2 --> M3
+         *)
 
 
       type equality_rewrite = term * term * term * Term.elim list * priority tacticm
@@ -402,26 +405,20 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                 instantiateShift rest (T.Next m))
 
 
-      fun binders c dir acc k =
+      fun binders c acc k =
          (case c of
              [] => 
                 let
                    val bv = List.rev acc
-
-                   val dir =
-                      List.foldl
-                      (fns binder dir => D.bindVary dir binder)
-                      dir
-                      acc
                 in
-                   (dir, bv, k)
+                   (bv, k)
                 end
 
            | Flam binder :: rest =>
-                binders rest dir (binder :: acc) (k+1)
+                binders rest (binder :: acc) (k+1)
 
            | _ :: rest =>
-                binders rest dir acc k)
+                binders rest acc k)
 
 
 
@@ -662,14 +659,12 @@ structure RewriteInternal :> REWRITE_INTERNAL =
       (* close bv dir A M N tac
 
          if    tac partially proves M = N : A
-         then  dir' adds bv to dir
-               M' = \. ... \. M
+         then  M' = \. ... \. M
                N' = \. ... \. N
                A' = forall E1 ... forall Ek . A
-               dir' adds bv to dir
                tac' partially proves M' = N' : A'
                and
-               return (dir', A', M', N', tac')
+               return (A', M', N', tac')
 
          tac' sets up directories for all subgoals (and for tac), 
          assuming dir is the ambient directory.
@@ -680,20 +675,19 @@ structure RewriteInternal :> REWRITE_INTERNAL =
       fun close bv dir a m n tac =
          (case bv of
              [] => 
-                (dir, a, m, n, chdir dir >> tac)
+                (a, m, n, chdir dir >> tac)
 
            | binder :: rest =>
                 let
                    val dir' = D.bindVary dir binder
                 
-                   val (dir'', a', m', n', tac') = close rest dir' a m n tac
+                   val (a', m', n', tac') = close rest dir' a m n tac
 
                    (* tac' partially proves M' = N' : A' *)
 
                    val e = T.evar ()
                 in
-                   (dir'',
-                    T.Elim (T.Const Prim.forall, [T.App e, T.App (T.Lam (binder, a'))]),
+                   (T.Elim (T.Const Prim.forall, [T.App e, T.App (T.Lam (binder, a'))]),
                     T.Lam (binder, m'),
                     T.Lam (binder, n'),
                     
@@ -727,10 +721,9 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                k = |bv|
             *)
 
-            val (dir', a', p', q', tac') = close bv dir a p q tac
+            val (a', p', q', tac') = close bv dir a p q tac
 
-            (* dir' is the directory inside C
-               P' = \. ... \. P
+            (* P' = \. ... \. P
                Q' = \. ... \. Q
                A' = forall e1 . ... forall ek . A
                tac' partially proves P' = Q' : A'
@@ -1764,9 +1757,9 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                          want to rewrite C'{A'} to C'{B'}
                       *)
                       let
-                         val (dir', bv', k') = binders c' dir [] 0
+                         val (bv', k') = binders c' [] 0
                       in
-                         propagateEquality hypopt dir' a' b' bv' k' c' 
+                         propagateEquality hypopt dir a' b' bv' k' c' 
                             (T.apply1 Prim.univ univ) 
                             a' b' [] tac sequel
                       end)
