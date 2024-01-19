@@ -12,6 +12,8 @@
 
 ### If-and-only-if
 
+The `iff` type is primitive, but aliased in the `Logic` module:
+
     iff : intersect (i : level) . U i -> U i -> U i
         = fn P Q . (P -> Q) & (Q -> P)
 

@@ -108,7 +108,15 @@ Lemma eqtpFunct_valid : eqtpFunct_obligation.
 Proof.
 prepare.
 intros G a b m n ext1 ext0 Hb Hmn.
-eapply tr_functionality; eauto.
+eapply tr_functionality_type_term; eauto.
+Qed.
+
+
+Lemma eqtpFunctType_valid : eqtpFunctType_obligation.
+Proof.
+prepare.
+intros G A B B' ext1 ext0 Ha Hb.
+apply tr_functionality_type_type; auto.
 Qed.
 
 
@@ -226,6 +234,114 @@ rewrite -> !(subst_eqsub _#4 (eqsub_symm _#3 (eqsub_under _ k _ _ (eqsub_expand_
 simpsub.
 simpsubin Hm.
 exact Hm.
+Qed.
+
+
+Lemma equivalenceLeftAlt_valid : equivalenceLeftAlt_obligation.
+Proof.
+prepare.
+intros G1 G2 a b c ext m Heq Hc.
+rewrite -> substctx_id in Heq, Hc.
+cbn [Nat.add] in Heq, Hc.
+unfold deqtype in Heq.
+replace (deq m m c) with (substj (dot triv id) (deq (subst sh1 m) (subst sh1 m) (subst sh1 c))) by (simpsub; reflexivity).
+eapply tr_generalize; eauto.
+apply (exchange_1_n _ G2 _ nil).
+  {
+  simpsub.
+  rewrite <- !compose_assoc.
+  rewrite -> !compose_sh_unlift_ge; [| omega].
+  replace (S (length G2) - length G2) with 1 by omega.
+  simpsub.
+  reflexivity.
+  }
+simpsub.
+cbn [List.app].
+rewrite -> !compose_sh_unlift_ge; [| omega].
+replace (S (length G2) - length G2) with 1 by omega.
+simpsub.
+rewrite <- (compose_sh_sh _ 1 (length G2)).
+rewrite <- under_dots.
+apply exchange_1_1.
+  {
+  simpsub.
+  reflexivity.
+  }
+simpsub.
+rewrite -> length_substctx.
+rewrite <- compose_under.
+simpsub.
+apply (tr_eqtype_convert_hyp (hyp_tm (eqtype a b) :: G1) _ _ (subst sh1 b)).
+  {
+  unfold deqtype.
+  eapply tr_eqtype_eta2.
+  eapply hypothesis; eauto using index_0, index_S.
+  }
+
+  {
+  replace (substctx (dot (var 0) (sh 2)) G2 ++ hyp_tm (subst sh1 b) :: hyp_tm (eqtype a b) :: G1) with ((substctx (dot (var 0) (sh 2)) G2 ++ [hyp_tm (subst sh1 b)]) ++ [hyp_tm (eqtype a b)] ++ G1).
+  2:{
+    rewrite <- app_assoc.
+    cbn [List.app].
+    reflexivity.
+    }
+  apply weakening.
+    {
+    cbn [length].
+    rewrite -> !substctx_append.
+    rewrite <- substctx_compose.
+    cbn [length].
+    replace (dot (var 0) (sh 2)) with (@under obj 1 (sh 1)) by (simpsub; reflexivity).
+    rewrite <- compose_under.
+    rewrite <- compose_assoc.
+    rewrite -> compose_sh_unlift.
+    simpsub.
+    rewrite <- compose_assoc.
+    unfold sh1.
+    rewrite -> compose_sh_unlift.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length].
+    simpsub.
+    rewrite -> app_length.
+    cbn [length].
+    rewrite -> length_substctx.
+    replace (dot (var 0) (sh 2)) with (@under obj 1 (sh 1)) by (simpsub; reflexivity).
+    rewrite -> under_sum.
+    rewrite <- !compose_under.
+    rewrite <- compose_assoc.
+    rewrite -> compose_sh_unlift.
+    simpsub.
+    reflexivity.
+    }
+  cbn [length].
+  simpsub.
+  rewrite -> !substctx_append.
+  rewrite <- substctx_compose.
+  rewrite -> app_length.
+  cbn [length].
+  replace (dot (var 0) (sh 2)) with (@under obj 1 (sh 1)) by (simpsub; reflexivity).
+  rewrite -> under_sum.
+  rewrite -> length_substctx.
+  rewrite <- !compose_under.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  rewrite <- app_assoc.
+  cbn [List.app].
+  rewrite -> (substctx_eqsub _ _ id).
+    {
+    simpsub.
+    exact Hc.
+    }
+
+    {
+    apply eqsub_symm.
+    apply eqsub_expand_id.
+    }
+  }
 Qed.
 
 

@@ -64,7 +64,7 @@ variables.  The official rules, using de Bruijn indices, are given
 [Miscellaneous](#miscellaneous)<br>
 [Let hypotheses](#let-hypotheses)<br>
 [Integers](#integers)<br>
-
+[Rewriting](#rewriting)<br>
 
 
 ### Structural
@@ -770,6 +770,14 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- A = A' : univ I
       G, x : A |- B = B' : univ I
 
+- `intersectSub A A' B B'`
+
+      G |- (intersect (x : A) . B) <: (intersect (x : A') . B')
+      >>
+      G |- A' <: A
+      G, x : A' |- B <: B'
+      G, x : A |- B : type
+
 - `intersectIntroOf A B M`
 
       G |- M : intersect (x : A) . B
@@ -1251,6 +1259,14 @@ variables.  The official rules, using de Bruijn indices, are given
       G, x : A |- B : type
       G |- M : A
       G |- N : [M / x]B
+
+- `unionSub A A' B B'`
+
+      G |- (union (x : A) . B) <: (union (x : A') . B')
+      >>
+      G |- A <: A'
+      G, x : A |- B <: B'
+      G, x : A' |- B' : type
 
 - `unionIntroEq A B M N N'`
 
@@ -2602,6 +2618,13 @@ variables.  The official rules, using de Bruijn indices, are given
       G, x : A |- B : type
       G |- M = N : A
 
+- `eqtpFunctType A B B'`
+
+      G |- [B / x]A = [B' / x]A : type
+      >>
+      G, x : type |- A : type
+      G |- B = B' : type
+
 - `equivalenceOf A B M`
 
       G |- M : B
@@ -2628,6 +2651,13 @@ variables.  The official rules, using de Bruijn indices, are given
       G1, x : A, G2 |- C ext M
       >>
       G1, y : (A : type) |- A = B : type
+      G1, x : B, G2 |- C ext M
+
+- `equivalenceLeftAlt n A B C`
+
+      G1, x : A, G2 |- C ext M
+      >>
+      G1, x : A, G2 |- A = B : type
       G1, x : B, G2 |- C ext M
 
 - `eqtpRefl A`
@@ -2792,11 +2822,25 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- A <: B
       G |- A ext M
 
+- `subsumptionAlt A B`
+
+      G |- B ext M
+      >>
+      G |- eeqtp B A
+      G |- A ext M
+
 - `subsumptionLeft n A B C`
 
       G1, x : A, G2 |- C ext M
       >>
       G1, y : (A : type) |- eeqtp A B
+      G1, x : B, G2 |- C ext M
+
+- `subsumptionLeftAlt n A B C`
+
+      G1, x : A, G2 |- C ext M
+      >>
+      G1, x : A, G2 |- eeqtp A B
       G1, x : B, G2 |- C ext M
 
 - `subtypeRefl A`
@@ -3611,18 +3655,6 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- M : A
       G, x : A |- N : B
 
-- `eeqtpSymm A B`
-
-      G |- eeqtp A B ext (() , ())
-      >>
-      G |- eeqtp B A
-
-- `weakenEqtpEeqtp A B`
-
-      G |- eeqtp A B ext (() , ())
-      >>
-      G |- A = B : type
-
 - `accInd A B I M N R`
 
       G |- [M / w]B ext fix (fn g . fn x . [fn y . fn r . g y / z]P) M
@@ -3810,3 +3842,406 @@ defines the integers as a quotient over pairs of natural numbers
       >>
       G |- symbol_eqb M N = true : bool
 
+
+### Rewriting
+
+This rules are tailor made to justify certain transformations in the
+rewriter, since the underlying derivations are often quite large.
+
+- `eeqtpRefl A`
+
+      G |- eeqtp A A ext (() , ())
+      >>
+      G |- A : type
+
+- `eeqtpSymm A B`
+
+      G |- eeqtp A B ext (() , ())
+      >>
+      G |- eeqtp B A
+
+- `eeqtpTrans A B C`
+
+      G |- eeqtp A C ext (() , ())
+      >>
+      G |- eeqtp A B
+      G |- eeqtp B C
+
+- `weakenEqtpEeqtp A B`
+
+      G |- eeqtp A B ext (() , ())
+      >>
+      G |- A = B : type
+
+- `weakenSubtypeArrow A B`
+
+      G |- A -> B ext fn x . x
+      >>
+      G |- A <: B
+
+- `weakenEeqtpIff A B`
+
+      G |- iff A B ext (fn x . x , fn x . x)
+      >>
+      G |- eeqtp A B
+
+- `compatGuardIff0 A A' B`
+
+      G |- (A -g> B) = (A' -g> B) : type
+      >>
+      G |- iff A A'
+      G |- B : type
+
+- `compatSetEqtp0 A A' B`
+
+      G |- {x : A | B} = {x : A' | B} : type
+      >>
+      G |- A = A' : type
+      G, x : A |- B : type
+
+- `compatSetIff1 A B B'`
+
+      G |- {x : A | B} = {x : A | B'} : type
+      >>
+      G |- A : type
+      G, x : A |- iff B B'
+
+- `forallEeq A A' B B'`
+
+      G |- eeqtp (forall (x : A) . B) (forall (x : A') . B') ext (() , ())
+      >>
+      G |- eeqtp A A'
+      G, x : A |- eeqtp B B'
+
+- `existsEeq A A' B B'`
+
+      G |- eeqtp (exists (x : A) . B) (exists (x : A') . B') ext (() , ())
+      >>
+      G |- eeqtp A A'
+      G, x : A |- eeqtp B B'
+
+- `arrowEeq A A' B B'`
+
+      G |- eeqtp (A -> B) (A' -> B') ext (() , ())
+      >>
+      G |- eeqtp A A'
+      G |- eeqtp B B'
+
+- `prodEeq A A' B B'`
+
+      G |- eeqtp (A & B) (A' & B') ext (() , ())
+      >>
+      G |- eeqtp A A'
+      G |- eeqtp B B'
+
+- `sumEeq A A' B B'`
+
+      G |- eeqtp (A % B) (A' % B') ext (() , ())
+      >>
+      G |- eeqtp A A'
+      G |- eeqtp B B'
+
+- `futureEeq A A'`
+
+      G |- eeqtp (future A) (future A') ext (() , ())
+      >>
+      promote(G) |- eeqtp A A'
+
+- `intersectEeq A A' B B'`
+
+      G |- eeqtp (intersect (x : A) . B) (intersect (x : A') . B') ext (() , ())
+      >>
+      G |- eeqtp A A'
+      G, x : A |- eeqtp B B'
+
+- `unionEeq A A' B B'`
+
+      G |- eeqtp (union (x : A) . B) (union (x : A') . B') ext (() , ())
+      >>
+      G |- eeqtp A A'
+      G, x : A |- eeqtp B B'
+
+- `compatGuardEeq1 A B B'`
+
+      G |- eeqtp (A -g> B) (A -g> B') ext (() , ())
+      >>
+      G |- A : type
+      G |- eeqtp B B'
+
+- `compatSetEeq0 A A' B`
+
+      G |- eeqtp {x : A | B} {x : A' | B} ext (() , ())
+      >>
+      G |- eeqtp A A'
+      G, x : A |- B : type
+
+- `compatIsetEeq0 A A' B`
+
+      G |- eeqtp (iset A (fn x . B)) (iset A' (fn x . B)) ext (() , ())
+      >>
+      G |- eeqtp A A'
+      G, x : A |- B : type
+
+- `compatIsetIff1 A B B'`
+
+      G |- eeqtp (iset A (fn x . B)) (iset A (fn x . B')) ext (() , ())
+      >>
+      G |- A : type
+      G, x : A |- iff B B'
+
+- `compatForallSubtype0 A A' B`
+
+      G |- (forall (x : A) . B) <: (forall (x : A') . B)
+      >>
+      G |- A' <: A
+      G, x : A |- B : type
+
+- `compatForallSubtype1 A B B'`
+
+      G |- (forall (x : A) . B) <: (forall (x : A) . B')
+      >>
+      G |- A : type
+      G, x : A |- B <: B'
+
+- `compatExistsSubtype0 A A' B`
+
+      G |- (exists (x : A) . B) <: (exists (x : A') . B)
+      >>
+      G |- A <: A'
+      G, x : A' |- B : type
+
+- `compatExistsSubtype1 A B B'`
+
+      G |- (exists (x : A) . B) <: (exists (x : A) . B')
+      >>
+      G |- A : type
+      G, x : A |- B <: B'
+
+- `compatIntersectSubtype0 A A' B`
+
+      G |- (intersect (x : A) . B) <: (intersect (x : A') . B)
+      >>
+      G |- A' <: A
+      G, x : A |- B : type
+
+- `compatIntersectSubtype1 A B B'`
+
+      G |- (intersect (x : A) . B) <: (intersect (x : A) . B')
+      >>
+      G |- A : type
+      G, x : A |- B <: B'
+
+- `compatUnionSubtype0 A A' B`
+
+      G |- (union (x : A) . B) <: (union (x : A') . B)
+      >>
+      G |- A <: A'
+      G, x : A' |- B : type
+
+- `compatUnionSubtype1 A B B'`
+
+      G |- (union (x : A) . B) <: (union (x : A) . B')
+      >>
+      G |- A : type
+      G, x : A |- B <: B'
+
+- `compatGuardArrow0 A A' B`
+
+      G |- (A -g> B) <: (A' -g> B)
+      >>
+      G |- A : type
+      G |- B : type
+      G |- A' -> A
+
+- `compatGuardSubtype1 A B B'`
+
+      G |- (A -g> B) <: (A -g> B')
+      >>
+      G |- A : type
+      G |- B <: B'
+
+- `compatSetSubtype0 A A' B`
+
+      G |- {x : A | B} <: {x : A' | B}
+      >>
+      G |- A <: A'
+      G, x : A' |- B : type
+
+- `compatSetArrow1 A B B'`
+
+      G |- {x : A | B} <: {x : A | B'}
+      >>
+      G |- A : type
+      G, x : A |- B' : type
+      G, x : A |- B -> B'
+
+- `compatIsetSubtype0 A A' B`
+
+      G |- iset A (fn x . B) <: iset A' (fn x . B)
+      >>
+      G |- A <: A'
+      G, x : A' |- B : type
+
+- `compatIsetArrow1 A B B'`
+
+      G |- iset A (fn x . B) <: iset A (fn x . B')
+      >>
+      G |- A : type
+      G, x : A |- B' : type
+      G, x : A |- B -> B'
+
+- `compatForallIff1 A B B'`
+
+      G |- iff (forall (x : A) . B) (forall (x : A) . B') ext (fn f . fn x . M #1 (f x) , fn f . fn x . M #2 (f x))
+      >>
+      G |- A : type
+      G, x : A |- iff B B' ext M
+
+- `compatExistsIff1 A B B'`
+
+      G |- iff (exists (x : A) . B) (exists (x : A) . B') ext (fn p . (p #1 , [p #1 / x]M #1 (p #2)) , fn p . (p #1 , [p #1 / x]M #2 (p #2)))
+      >>
+      G |- A : type
+      G, x : A |- iff B B' ext M
+
+- `compatArrowIff0 A A' B`
+
+      G |- iff (A -> B) (A' -> B) ext (fn f . fn x . f (M #2 x) , fn f . fn x . f (M #1 x))
+      >>
+      G |- B : type
+      G |- iff A A' ext M
+
+- `compatArrowIff1 A B B'`
+
+      G |- iff (A -> B) (A -> B') ext (fn f . fn x . M #1 (f x) , fn f . fn x . M #2 (f x))
+      >>
+      G |- A : type
+      G |- iff B B' ext M
+
+- `compatProdIff0 A A' B`
+
+      G |- iff (A & B) (A' & B) ext (fn x . (M #1 (x #1) , x #2) , fn x . (M #2 (x #1) , x #2))
+      >>
+      G |- B : type
+      G |- iff A A' ext M
+
+- `compatProdIff1 A B B'`
+
+      G |- iff (A & B) (A & B') ext (fn x . (x #1 , M #1 (x #2)) , fn x . (x #1 , M #2 (x #2)))
+      >>
+      G |- A : type
+      G |- iff B B' ext M
+
+- `compatSumIff0 A A' B`
+
+      G |- iff (A % B) (A' % B) ext (fn x . sum_case x (fn y . inl (M #1 y)) (fn y . inr y) , fn x . sum_case x (fn y . inl (M #2 y)) (fn y . inr y))
+      >>
+      G |- B : type
+      G |- iff A A' ext M
+
+- `compatSumIff1 A B B'`
+
+      G |- iff (A % B) (A % B') ext (fn x . sum_case x (fn y . inl y) (fn y . inr (M #1 y)) , fn x . sum_case x (fn y . inl y) (fn y . inr (M #2 y)))
+      >>
+      G |- A : type
+      G |- iff B B' ext M
+
+- `compatFutureIff A A'`
+
+      G |- iff (future A) (future A') ext (fn x . letnext x (fn y . next (M #1 y)) , fn x . letnext x (fn y . next (M #2 y)))
+      >>
+      promote(G) |- iff A A' ext M
+
+- `compatForallArrow1 A B B'`
+
+      G |- (forall (x : A) . B) -> forall (x : A) . B' ext fn f . fn x . M (f x)
+      >>
+      G |- A : type
+      G, x : A |- B -> B' ext M
+
+- `compatExistsArrow1 A B B'`
+
+      G |- (exists (x : A) . B) -> exists (x : A) . B' ext fn p . (p #1 , [p #1 / x]M (p #2))
+      >>
+      G |- A : type
+      G, x : A |- B' : type
+      G, x : A |- B -> B' ext M
+
+- `compatArrowArrow0 A A' B`
+
+      G |- (A -> B) -> A' -> B ext fn f . fn x . f (M x)
+      >>
+      G |- A : type
+      G |- B : type
+      G |- A' -> A ext M
+
+- `compatArrowArrow1 A B B'`
+
+      G |- (A -> B) -> A -> B' ext fn f . fn x . M (f x)
+      >>
+      G |- A : type
+      G |- B -> B' ext M
+
+- `compatProdArrow0 A A' B`
+
+      G |- A & B -> A' & B ext fn x . (M (x #1) , x #2)
+      >>
+      G |- B : type
+      G |- A -> A' ext M
+
+- `compatProdArrow1 A B B'`
+
+      G |- A & B -> A & B' ext fn x . (x #1 , M (x #2))
+      >>
+      G |- A : type
+      G |- B -> B' ext M
+
+- `compatSumArrow0 A A' B`
+
+      G |- A % B -> A' % B ext fn x . sum_case x (fn y . inl (M y)) (fn y . inr y)
+      >>
+      G |- A' : type
+      G |- B : type
+      G |- A -> A' ext M
+
+- `compatSumArrow1 A B B'`
+
+      G |- A % B -> A % B' ext fn x . sum_case x (fn y . inl y) (fn y . inr (M y))
+      >>
+      G |- A : type
+      G |- B' : type
+      G |- B -> B' ext M
+
+- `compatFutureArrow A A'`
+
+      G |- future A -> future A' ext fn x . letnext x (fn y . next (M y))
+      >>
+      promote(G) |- A -> A' ext M
+
+- `compatForallEntails1 A B B'`
+
+      G |- forall (x : A) . B' ext fn x . [F x / y]M
+      >>
+      G, x : A, y : B |- B' ext M
+      G |- forall (x : A) . B ext F
+
+- `compatArrowEntails1 A B B'`
+
+      G |- A -> B' ext fn x . [F x / y]M
+      >>
+      G, y : B |- B' ext M
+      G |- A -> B ext F
+
+- `compatProdEntails0 A A' B`
+
+      G |- A' & B ext ([P #1 / x]M , P #2)
+      >>
+      G, x : A |- A' ext M
+      G |- A & B ext P
+
+- `compatProdEntails1 A B B'`
+
+      G |- A & B' ext (P #1 , [P #2 / x]M)
+      >>
+      G, x : B |- B' ext M
+      G |- A & B ext P

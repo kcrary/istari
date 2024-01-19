@@ -926,6 +926,19 @@ reflexivity.
 Qed.
 
 
+Lemma subst_var1_sh2 :
+  forall m,
+    subst (dot (var 1) (sh 2)) m = subst sh1 m.
+Proof.
+intros m.
+rewrite <- (subst_var0_sh1 m) at 2.
+rewrite <- subst_compose.
+rewrite -> compose_dot.
+unfold sh1.
+rewrite -> compose_sh_sh.
+reflexivity.
+Qed.
+
 
 (* Equivalent substitutions *)
 

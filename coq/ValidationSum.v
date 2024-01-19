@@ -84,11 +84,7 @@ Lemma sumForm_valid : sumForm_obligation.
 Proof.
 prepare.
 intros G a b ext1 ext0 Ha Hb.
-apply tr_sigma_formation.
-  {
-  apply tr_booltp_istype.
-  }
-apply sum_body_formation; auto.
+apply tr_sumtype_formation; auto.
 Qed.
 
 
@@ -96,11 +92,7 @@ Lemma sumEq_valid : sumEq_obligation.
 Proof.
 prepare.
 intros G a b c d ext1 ext0 Ha Hb.
-apply tr_sigma_formation.
-  {
-  apply tr_booltp_istype.
-  }
-apply sum_body_formation; auto.
+apply tr_sumtype_formation; auto.
 Qed.
 
 
@@ -108,68 +100,7 @@ Lemma sumFormUniv_valid : sumFormUniv_obligation.
 Proof.
 prepare.
 intros G a b i ext1 ext0 Ha Hb.
-apply tr_sigma_formation_univ.
-  {
-  apply (tr_univ_cumulative _ Defined.nzero); auto.
-    {
-    apply tr_booltp_formation_univ.
-    }
-
-    {
-    apply tr_univ_formation_invert.
-    eapply tr_inhabitation_formation; eauto.
-    }
-
-    {
-    rewrite -> leqpagetp_nzero_equiv.
-    apply tr_unittp_intro.
-    }
-  }
-replace (univ (subst sh1 i)) with (subst1 (var 0) (univ (subst (sh 2) i))) by (simpsub; auto).
-apply tr_booltp_elim.
-  {
-  eapply hypothesis; eauto using index_0.
-  }
-
-  {
-  simpsub.
-  eapply (weakening _ [_] []).
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  exact Ha.
-  }
-
-  {
-  simpsub.
-  eapply (weakening _ [_] []).
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  exact Hb.
-  }
+apply tr_sumtype_formation_univ; auto.
 Qed.
 
 
@@ -177,75 +108,17 @@ Lemma sumEqUniv_valid : sumEqUniv_obligation.
 Proof.
 prepare.
 intros G a b c d i ext1 ext0 Ha Hb.
-apply tr_sigma_formation_univ.
-  {
-  apply (tr_univ_cumulative _ Defined.nzero); auto.
-    {
-    apply tr_booltp_formation_univ.
-    }
-
-    {
-    apply tr_univ_formation_invert.
-    eapply tr_inhabitation_formation; eauto.
-    }
-
-    {
-    rewrite -> leqpagetp_nzero_equiv.
-    apply tr_unittp_intro.
-    }
-  }
-replace (univ (subst sh1 i)) with (subst1 (var 0) (univ (subst (sh 2) i))) by (simpsub; auto).
-apply tr_booltp_elim.
-  {
-  eapply hypothesis; eauto using index_0.
-  }
-
-  {
-  simpsub.
-  eapply (weakening _ [_] []).
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  exact Ha.
-  }
-
-  {
-  simpsub.
-  eapply (weakening _ [_] []).
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  exact Hb.
-  }
+apply tr_sumtype_formation_univ; auto.
 Qed.
 
 
-Lemma sumSub_valid : sumSub_obligation.
+Lemma tr_sum_sub :
+  forall G a a' b b',
+    tr G (dsubtype a a')
+    -> tr G (dsubtype b b')
+    -> tr G (dsubtype (sumtype a b) (sumtype a' b')).
 Proof.
-prepare.
-intros G a b c d ext1 ext0 Hab Hcd.
+intros G a a' b b' Ha Hb.
 apply tr_sigma_sub.
   {
   apply tr_subtype_intro; auto using tr_booltp_istype.
@@ -285,25 +158,19 @@ apply tr_sigma_sub.
 Qed.
 
 
+Lemma sumSub_valid : sumSub_obligation.
+Proof.
+prepare.
+intros G a b c d ext1 ext0 Hab Hcd.
+apply tr_sum_sub; auto.
+Qed.
+
+
 Lemma sumIntro1Of_valid : sumIntro1Of_obligation.
 Proof.
 prepare.
 intros G a b m ext1 ext0 Hb Hm.
-apply tr_sigma_intro.
-  {
-  apply tr_booltp_intro_btrue.
-  }
-
-  {
-  simpsub.
-  rewrite -> equiv_bite_l.
-  auto.
-  }
-
-  {
-  apply sum_body_formation; auto.
-  eapply tr_inhabitation_formation; eauto.
-  }
+apply tr_sumtype_intro1; auto.
 Qed.
 
 
@@ -311,21 +178,7 @@ Lemma sumIntro1Eq_valid : sumIntro1Eq_obligation.
 Proof.
 prepare.
 intros G a b m n ext1 ext0 Hb Hm.
-apply tr_sigma_intro.
-  {
-  apply tr_booltp_intro_btrue.
-  }
-
-  {
-  simpsub.
-  rewrite -> equiv_bite_l.
-  auto.
-  }
-
-  {
-  apply sum_body_formation; auto.
-  eapply tr_inhabitation_formation; eauto.
-  }
+apply tr_sumtype_intro1; auto.
 Qed.
 
 
@@ -333,21 +186,7 @@ Lemma sumIntro1_valid : sumIntro1_obligation.
 Proof.
 prepare.
 intros G a b ext0 m Hb Hm.
-apply tr_sigma_intro.
-  {
-  apply tr_booltp_intro_btrue.
-  }
-
-  {
-  simpsub.
-  rewrite -> equiv_bite_l.
-  auto.
-  }
-
-  {
-  apply sum_body_formation; auto.
-  eapply tr_inhabitation_formation; eauto.
-  }
+apply tr_sumtype_intro1; auto.
 Qed.
 
 
@@ -355,21 +194,7 @@ Lemma sumIntro2Of_valid : sumIntro2Of_obligation.
 Proof.
 prepare.
 intros G a b m ext1 ext0 Hb Hm.
-apply tr_sigma_intro.
-  {
-  apply tr_booltp_intro_bfalse.
-  }
-
-  {
-  simpsub.
-  rewrite -> equiv_bite_r.
-  auto.
-  }
-
-  {
-  apply sum_body_formation; auto.
-  eapply tr_inhabitation_formation; eauto.
-  }
+apply tr_sumtype_intro2; auto.
 Qed.
 
 
@@ -377,21 +202,7 @@ Lemma sumIntro2Eq_valid : sumIntro2Eq_obligation.
 Proof.
 prepare.
 intros G a b m n ext1 ext0 Hb Hm.
-apply tr_sigma_intro.
-  {
-  apply tr_booltp_intro_bfalse.
-  }
-
-  {
-  simpsub.
-  rewrite -> equiv_bite_r.
-  auto.
-  }
-
-  {
-  apply sum_body_formation; auto.
-  eapply tr_inhabitation_formation; eauto.
-  }
+apply tr_sumtype_intro2; auto.
 Qed.
 
 
@@ -399,21 +210,7 @@ Lemma sumIntro2_valid : sumIntro2_obligation.
 Proof.
 prepare.
 intros G a b ext0 m Hb Hm.
-apply tr_sigma_intro.
-  {
-  apply tr_booltp_intro_bfalse.
-  }
-
-  {
-  simpsub.
-  rewrite -> equiv_bite_r.
-  auto.
-  }
-
-  {
-  apply sum_body_formation; auto.
-  eapply tr_inhabitation_formation; eauto.
-  }
+apply tr_sumtype_intro2; auto.
 Qed.
 
 

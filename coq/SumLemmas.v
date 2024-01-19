@@ -477,7 +477,7 @@ replace (sumcase n d f) with (subst1 n (sumcase (var 0) (subst (dot (var 0) (sh 
   rewrite -> !subst_var0_sh1.
   auto.
   }
-eapply tr_functionality; eauto.
+eapply tr_functionality_type_term; eauto.
 apply (tr_sumtype_eta_hyp_triv _ []).
   {
   simpsub.

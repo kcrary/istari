@@ -7,11 +7,10 @@ structure ParseLogic =
       type constant = Constant.constant
 
       val not : constant R.dest = R.dest ()
-      val iff : constant R.dest = R.dest ()
       val neq : constant R.dest = R.dest ()
 
       fun parseNot p = T.apply1 (R.read not) p
-      fun parseIff p q = T.apply2 (R.read iff) p q
+      fun parseIff p q = T.apply2 Prim.iff p q
       fun parseNeq m n a = T.apply3 (R.read neq) a m n
 
    end
@@ -33,15 +32,14 @@ grammaron Logic
 functor AfterIff () :> sig end =
    struct
 
-      val Collapse (not, iff) =
+      val Collapse (not) =
          readRegistry /Logic.AfterIffEnv/
-            /[constant constant]/
+            /[constant]/
 
       structure CR = CheckpointedRef
       structure U = Show.Unparsing
 
       val () = CR.write ParseLogic.not not
-      val () = CR.write ParseLogic.iff iff
 
 
       fun register k arity prec unp =
@@ -49,9 +47,9 @@ functor AfterIff () :> sig end =
 
 
       val () =
-         register iff 2 5
+         register Prim.iff 2 5
          (U.wrap
-             (U.apply2 iff U.show U.show)
+             (U.apply2 Prim.iff U.show U.show)
              (fn (p, q) => U.append [p 6, U.break 1, U.string "<-> ", q 6]))
 
    end
@@ -60,9 +58,11 @@ functor AfterIff () :> sig end =
 functor AfterIffCompat () :> sig end =
    struct
 
-      val Collapse (not, iff, not_inhabitant, iff_refl, iff_symm, iff_trans, iff_compat_1, iff_compat_2, not_compat_arrow, not_compat_iff, prod_compat_iff, sum_compat_iff) =
+      val Collapse (not, not_inhabitant, iff_refl, iff_symm, iff_trans, iff_compat_1, iff_compat_2, not_compat_arrow, not_compat_iff, prod_compat_iff, sum_compat_iff) =
          readRegistry /Logic.AfterIffCompatEnv/
-            /[constant constant constant constant constant constant constant constant constant constant constant constant]/
+            /[constant constant constant constant constant constant constant constant constant constant constant]/
+
+      val iff = Prim.iff
 
       structure B = BackchainInternal
       structure H = ConstantTable
@@ -87,52 +87,26 @@ functor AfterIffCompat () :> sig end =
          (fn n => B.witnessPriority /\T.Const iff_trans\ _ _ \n\ _ __ __/)
 
       val () =
-         RewriteInternal.CICTable.insert 
-            RewriteInternal.compatibilityTable
-            (iff, 0, iff)
-            (iff, true, andthenOn 0 (B.witnessPriority /\T.Const iff_compat_1\ _ _ _ _ __/))
+         List.app
+            (fn (const, i, rconst, cov, tacfn) =>
+                RewriteInternal.CICTable.insert 
+                   RewriteInternal.compatibilityTable 
+                   (const, i, rconst)
+                   (RewriteTypes.General rconst, cov, 0, (fns _ _ tac => tacfn tac)))
+            [
+            (iff, 0, iff, true, 
+             andthenOn 0 (B.witnessPriority /\T.Const iff_compat_1\ _ _ _ _ __/)),
 
-      val () =
-         RewriteInternal.CICTable.insert 
-            RewriteInternal.compatibilityTable
-            (iff, 1, iff)
-            (iff, true, andthenOn 0 (B.witnessPriority /\T.Const iff_compat_2\ _ _ _ _ __/))
+            (iff, 1, iff, true,
+             andthenOn 0 (B.witnessPriority /\T.Const iff_compat_2\ _ _ _ _ __/)),
+            
+            (not, 0, iff, true,
+             andthenOn 0 (B.witnessPriority /\T.Const not_compat_iff\ _ _ _ __/)),
 
-      val () =
-         RewriteInternal.CICTable.insert 
-            RewriteInternal.compatibilityTable
-            (not, 0, Prim.arrow)
-            (Prim.arrow, false, andthenOn 0 (B.witnessPriority /\T.Const not_compat_arrow\ _ _ _ __/))
+            (not, 0, Prim.arrow, false,
+             andthenOn 0 (B.witnessPriority /\T.Const not_compat_arrow\ _ _ _ __/)),
+            ]
 
-      val () =
-         RewriteInternal.CICTable.insert 
-            RewriteInternal.compatibilityTable
-            (not, 0, iff)
-            (iff, true, andthenOn 0 (B.witnessPriority /\T.Const not_compat_iff\ _ _ _ __/))
-
-      val () =
-         RewriteInternal.CICTable.insert 
-            RewriteInternal.compatibilityTable
-            (Prim.prod, 0, iff)
-            (iff, true, andthenOn 0 (Backchain.witnessPriority /\T.Const prod_compat_iff\ _# 5 __ __/))
-
-      val () =
-         RewriteInternal.CICTable.insert 
-            RewriteInternal.compatibilityTable
-            (Prim.prod, 1, iff)
-            (iff, true, andthenOn 1 (Backchain.witnessPriority /\T.Const prod_compat_iff\ _# 5 __ __/))
-
-      val () =
-         RewriteInternal.CICTable.insert 
-            RewriteInternal.compatibilityTable
-            (Prim.sum, 0, iff)
-            (iff, true, andthenOn 0 (Backchain.witnessPriority /\T.Const sum_compat_iff\ _# 5 __ __/))
-
-      val () =
-         RewriteInternal.CICTable.insert 
-            RewriteInternal.compatibilityTable
-            (Prim.sum, 1, iff)
-            (iff, true, andthenOn 1 (Backchain.witnessPriority /\T.Const sum_compat_iff\ _# 5 __ __/))
 
          
       open Tactic
@@ -151,6 +125,7 @@ functor AfterIffCompat () :> sig end =
                 tac)\
          /
 
+
       fun weakenIffArrowContra tac =
          goalCaseT
          / \Prim.arrow\ ? ? =>
@@ -167,10 +142,12 @@ functor AfterIffCompat () :> sig end =
 
       val () = 
          List.app
-            (fn (const, const', cov, f) =>
-                H.insertMerge RewriteInternal.weakeningTable const 
-                   [(const', cov, f)]
-                   (fn l => (const', cov, f) :: l))
+            (fn (rconst, rconst', cov, tacfn) =>
+                let
+                   val entry = (rconst', cov, (fns _ _ tac => tacfn tac))
+                in
+                   H.insertMerge RewriteInternal.weakeningTable rconst [entry] (fn l => entry :: l)
+                end)
             [
             (iff, Prim.arrow, true, weakenIffArrow),
             (iff, Prim.arrow, false, weakenIffArrowContra)

@@ -654,6 +654,120 @@ apply (tr_pi_elim _ (subst sh1 a)).
 Qed.    
 
 
+Lemma tr_generalize :
+  forall G a m J,
+    tr G (deq m m a)
+    -> tr (cons (hyp_tm a) G) J
+    -> tr G (substj (dot m id) J).
+Proof.
+intros G a m J Hm HJ.
+destruct J as [p q b].
+simpsub.
+eapply tr_functionality_term_term; eauto.
+Qed.
+
+
+Lemma tr_generalize_tp :
+  forall G a J,
+    tr G (deqtype a a)
+    -> tr (cons hyp_tp G) J
+    -> tr G (substj (dot a id) J).
+Proof.
+intros G a J Ha HJ.
+destruct J as [p q b].
+simpsub.
+apply tr_functionality_term_type; auto.
+Qed.
+
+
+Lemma tr_generalize_eq :
+  forall G a b m n p q,
+    tr G (deq m n a)
+    -> tr (cons (hyp_tm a) G) (deq p q b)
+    -> tr G (deq (subst1 m p) (subst1 n q) (subst1 m b)).
+Proof.
+intros G a b m n p q Hmn Hpq.
+eapply tr_functionality_term_term; eauto.
+Qed.
+
+
+Lemma tr_generalize_eq_type :
+  forall G a b m n p q,
+    tr G (deq m n a)
+    -> tr (cons (hyp_tm a) G) (deq p q b)
+    -> tr G (deqtype (subst1 m b) (subst1 n b)).
+Proof.
+intros G a b m n p q Hmn Hpq.
+eapply tr_functionality_type_term; eauto.
+eapply tr_inhabitation_formation; eauto.
+Qed.
+
+
+Lemma tr_subtype_convert_hyp_last :
+  forall G a b J,
+    tr G (dsubtype a b)
+    -> tr (hyp_tm b :: G) J
+    -> tr (hyp_tm a :: G) J.
+Proof.
+intros G a b J Hsub HJ.
+replace J with (substj (dot (var 0) id) (substj (dot (var 0) (sh 2)) J)).
+2:{
+  destruct J as [m n c].
+  simpsub.
+  rewrite -> !subst_var0_sh1.
+  reflexivity.
+  }
+apply (tr_generalize _ (subst sh1 b) (var 0)).
+  {
+  apply (tr_subtype_elim _ (subst sh1 a)).
+    {
+    apply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    exact Hsub.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+  }
+
+  {
+  apply (weakening _ [_] [_]).
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  destruct J as [m n c].
+  simpsub.
+  rewrite -> !subst_var0_sh1.
+  exact HJ.
+  }
+Qed.
+
+
 Lemma tr_pi_elim' :
   forall G a b c m n p q,
     tr G (deq m n (pi a b))
@@ -1186,38 +1300,8 @@ apply tr_eqtype_symmetry; eauto.
 Qed.
 
 
-Lemma tr_functionality :
-  forall G a b c m n,
-    tr (hyp_tm a :: G) (deqtype b c)
-    -> tr G (deq m n a)
-    -> tr G (deqtype (subst1 m b) (subst1 n c)).
-Proof.
-intros G a b c m n Hbc Hmn.
-unfold deqtype in Hbc.
-apply (tr_eqtype_transitivity _ _ (subst1 n b)).
-  {
-  apply (tr_eqtype_formation_invert1 _ (subst1 m b) (subst1 n b) (subst1 m c) (subst1 n c)).
-  assert (tr G (deqtype (subst1 m (eqtype b c)) (subst1 n (eqtype b c)))) as H.
-    {
-    eapply tr_generalize_eq_type; eauto.
-    }
-  simpsubin H.
-  exact H.
-  }
 
-  {
-  unfold deqtype.
-  replace (@triv obj) with (subst1 n triv) by (simpsub; auto).
-  replace (eqtype (subst1 n b) (subst1 n c)) with (subst1 n (eqtype b c)) by (simpsub; auto).
-  eapply tr_generalize_eq; eauto.
-  apply (tr_transitivity _ _ m); auto.
-  apply tr_symmetry; auto.
-  }
-Qed.
-
-
-
-(* subtype *)
+(* Subtype *)
 
 Lemma tr_subtype_refl :
   forall G a,
@@ -1251,4 +1335,125 @@ intros G a b Hsub.
 eapply tr_subtype_formation_invert2.
 eapply tr_inhabitation_formation.
 exact Hsub.
+Qed.
+
+
+Lemma tr_subtype_trans :
+  forall G a b c,
+    tr G (dsubtype a b)
+    -> tr G (dsubtype b c)
+    -> tr G (dsubtype a c).
+Proof.
+intros G a b c Hab Hbc.
+apply tr_subtype_intro.
+  {
+  eapply tr_subtype_istype1; eauto.
+  }
+
+  {
+  eapply tr_subtype_istype2; eauto.
+  }
+
+  {
+  apply (tr_subtype_elim _ (subst sh1 b)).
+    {
+    apply (weakening _ [_] []).
+      {
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      cbn [length].
+      simpsub.
+      rewrite <- !compose_assoc.
+      unfold sh1.
+      rewrite -> !compose_sh_unlift.
+      simpsub.
+      reflexivity.
+      }
+    cbn [length].
+    simpsub.
+    cbn [List.app].
+    exact Hbc.
+    }
+  apply (tr_subtype_elim _ (subst sh1 a)).
+    {
+    apply (weakening _ [_] []).
+      {
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      cbn [length].
+      simpsub.
+      rewrite <- !compose_assoc.
+      unfold sh1.
+      rewrite -> !compose_sh_unlift.
+      simpsub.
+      reflexivity.
+      }
+    cbn [length].
+    simpsub.
+    cbn [List.app].
+    exact Hab.
+    }
+  eapply hypothesis; eauto using index_0.
+  }
+Qed.
+
+
+Lemma tr_subtype_convert_hyp' :
+  forall G1 G2 a b J,
+    tr G1 (dsubtype a b)
+    -> tr G1 (dsubtype b a)
+    -> tr (G2 ++ hyp_tm b :: G1) J
+    -> tr (G2 ++ hyp_tm a :: G1) J.
+Proof.
+intros G1 G2 a b J Hab Hba HJ.
+eapply tr_subtype_convert_hyp; eauto.
+  {
+  apply (weakening _ [_] []).
+    {
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length].
+    simpsub.
+    rewrite <- !compose_assoc.
+    unfold sh1.
+    rewrite -> !compose_sh_unlift.
+    simpsub.
+    reflexivity.
+    }
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  auto.
+  }
+
+  {
+  apply (weakening _ [_] []).
+    {
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length].
+    simpsub.
+    rewrite <- !compose_assoc.
+    unfold sh1.
+    rewrite -> !compose_sh_unlift.
+    simpsub.
+    reflexivity.
+    }
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  auto.
+  }
 Qed.

@@ -200,6 +200,7 @@ intros; eapply sound_quotient_hyp_eq; eauto; done.
 intros; eapply sound_quotient_hyp_eq_dep; eauto; done.
 intros; eapply sound_quotient_formation_invert; eauto; done.
 intros; eapply sound_guard_formation; eauto; done.
+intros; eapply sound_guard_formation_iff; eauto; done.
 intros; eapply sound_guard_formation_univ; eauto; done.
 intros; eapply sound_guard_sat_eq; eauto; done.
 intros; eapply sound_guard_intro; eauto; done.
@@ -237,10 +238,10 @@ intros; eapply sound_subtype_formation_invert2; eauto; done.
 intros; eapply sound_substitution; eauto; done.
 intros; eapply sound_substitution_simple; eauto; done.
 intros; eapply sound_strengthen_context; eauto; done.
-intros; eapply sound_generalize; eauto; done.
-intros; eapply sound_generalize_tp; eauto; done.
-intros; eapply sound_generalize_eq; eauto; done.
-intros; eapply sound_generalize_eq_type; eauto; done.
+intros; eapply sound_functionality_term_term; eauto; done.
+intros; eapply sound_functionality_term_type; eauto; done.
+intros; eapply sound_functionality_type_term; eauto; done.
+intros; eapply sound_functionality_type_type; eauto; done.
 intros; eapply sound_compute; eauto; done.
 intros; eapply sound_compute_hyp; eauto; done.
 intros; eapply sound_symmetry; eauto; done.

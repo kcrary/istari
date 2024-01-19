@@ -232,6 +232,28 @@ reflexivity.
 Qed.
 
 
+Lemma def_iff :
+  forall a b,
+    equiv (app (app Defs.iff a) b) (prod (pi a (subst sh1 b)) (pi b (subst sh1 a))).
+Proof.
+intros a b.
+unfold Defs.iff.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app1.
+  apply step_app2.
+  }
+simpsub.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl.
+Qed.
+
+
 Lemma def_iforall :
   forall i k a,
     equiv (app (app (app Defs.iforall i) k) (lam a)) (all i k a).
@@ -435,6 +457,16 @@ Qed.
 
 Lemma def_level : Defs.level = nattp.
 Proof.
+auto.
+Qed.
+
+
+Add Parametric Morphism object : (@lam object)
+  with signature equiv ==> equiv
+  as equiv_lam.
+Proof.
+intros m1 m1' H1.
+apply equiv_lam.
 auto.
 Qed.
 

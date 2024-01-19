@@ -1097,6 +1097,19 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr (cons (hyp_tm a) G) (deqtype (subst sh1 b) (subst sh1 b'))
       -> tr G (deqtype (guard a b) (guard a' b'))
   
+| tr_guard_formation_iff :
+    forall G a a' b b' mr ml,
+      tr G (deqtype a a)
+      -> tr G (deqtype a' a')
+      (* a implies a' *)
+      -> tr (hyp_tm a :: G)
+           (deq mr mr (subst sh1 a'))
+      (* a' implies a *)
+      -> tr (hyp_tm a' :: G)
+           (deq ml ml (subst sh1 a))
+      -> tr (cons (hyp_tm a) G) (deqtype (subst sh1 b) (subst sh1 b'))
+      -> tr G (deqtype (guard a b) (guard a' b'))
+
 | tr_guard_formation_univ :
     forall G lv a a' b b',
       tr G (deq a a' (univ lv))
@@ -1323,30 +1336,29 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr (G2 ++ hyp_tm a :: G1) J
       -> tr (G2 ++ hyp_tm b :: G1) J
 
-| tr_generalize :
-    forall G a m J,
-      tr G (deq m m a)
-      -> tr (cons (hyp_tm a) G) J
-      -> tr G (substj (dot m id) J)
-
-| tr_generalize_tp :
-    forall G a J,
-      tr G (deqtype a a)
-      -> tr (cons hyp_tp G) J
-      -> tr G (substj (dot a id) J)
-
-| tr_generalize_eq :
+| tr_functionality_term_term :
     forall G a b m n p q,
       tr G (deq m n a)
       -> tr (cons (hyp_tm a) G) (deq p q b)
       -> tr G (deq (subst1 m p) (subst1 n q) (subst1 m b))
 
-| tr_generalize_eq_type :
-    forall G a b m n p q,
-      tr G (deq m n a)
-      -> tr (cons (hyp_tm a) G) (deq p q b)
-      -> tr G (deqtype (subst1 m b) (subst1 n b))
+| tr_functionality_term_type :
+    forall G a b c p q,
+      tr G (deqtype b c)
+      -> tr (cons hyp_tp G) (deq p q a)
+      -> tr G (deq (subst1 b p) (subst1 c q) (subst1 b a))
 
+| tr_functionality_type_term :
+    forall G a b c m n,
+      tr G (deq m n a)
+      -> tr (cons (hyp_tm a) G) (deqtype b c)
+      -> tr G (deqtype (subst1 m b) (subst1 n c))
+
+| tr_functionality_type_type :
+    forall G a b c d,
+      tr G (deqtype a b)
+      -> tr (cons hyp_tp G) (deqtype c d)
+      -> tr G (deqtype (subst1 a c) (subst1 b d))
 
 (* Direct computation *)
 

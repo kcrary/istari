@@ -578,6 +578,14 @@ intersect {x : A} B = intersect {x : A'} B' : Ui
 x : A |- B = B' : Ui ;
 
 
+rule intersectSub
+intersect {x : A} B <: intersect {x : A'} B'
+>>
+|- A' <: A ;
+x : A' |- B <: B' ;
+x : A |- B : type ;
+
+
 rule intersectIntroOf
 M : intersect {x : A} B
 >>
@@ -1050,6 +1058,14 @@ union {x : A} B = union {x : A'} B' : Ui
 >>
 |- A = A' : Ui ;
 x : A |- B = B' : Ui ;
+
+
+rule unionSub
+union {x : A} B <: union {x : A'} B'
+>>
+|- A <: A' ;
+x : A |- B <: B' ;
+x : A' |- B' : type ;
 
 
 rule unionIntroOf
@@ -2441,6 +2457,13 @@ x : A |- B : type ;
 |- M = N : A ;
 
 
+rule eqtpFunctType
+A[B / x] = A[B' / x] : type
+>>
+x : type |- A : type ;
+|- B = B' : type ;
+
+
 rule equivalenceOf
 M : B
 >>
@@ -2466,6 +2489,13 @@ lrule equivalenceLeft
 x : A ... |- C ext M
 >>
 y : (A : type) |- A = B : type ;
+x : B ... |- C ext M ;
+
+
+lrule equivalenceLeftAlt
+x : A ... |- C ext M
+>>
+x : A ... |- A = B : type ;
 x : B ... |- C ext M ;
 
 
@@ -2631,11 +2661,25 @@ B ext M
 |- A ext M ;
 
 
+rule subsumptionAlt
+B ext M
+>>
+|- eeqtp B A ;
+|- A ext M ;
+
+
 lrule subsumptionLeft
 x : A ... |- C ext M
 >>
 y : (A : type) |- eeqtp A B ;
 x : B ... |- C ext M ;
+
+
+lrule subsumptionLeftAlt
+x : A ... |- C ext M
+>>
+x : A ... |- eeqtp A B ;
+x : B ... |- C ext M;
 
 
 rule subtypeRefl
@@ -3480,18 +3524,6 @@ let M (fn x . N) : B
 x : A |- N : B ;
 
 
-rule eeqtpSymm
-eeqtp A B ext ((), ())
->>
-|- eeqtp B A ;
-
-
-rule weakenEqtpEeqtp
-eeqtp A B ext ((), ())
->>
-|- A = B : type ;
-
-
 rule accInd
 B [M / w] ext fix (fn g x . P [(fn y r . $g $y) / z]) M
 >>
@@ -3500,6 +3532,407 @@ B [M / w] ext fix (fn g x . P [(fn y r . $g $y) / z]) M
 x : A, z : (forall {y : A} (arrow (R $y $x) B[$y / w])) |- B [$x / w] ext P ;
 |- M : A ;
 |- N : acc A R M ;
+
+
+
+(* Rewriting *)
+
+rule eeqtpRefl
+eeqtp A A ext ((), ())
+>>
+|- A : type ;
+
+
+rule eeqtpSymm
+eeqtp A B ext ((), ())
+>>
+|- eeqtp B A ;
+
+
+rule eeqtpTrans
+eeqtp A C ext ((), ())
+>>
+|- eeqtp A B ;
+|- eeqtp B C ;
+
+
+rule weakenEqtpEeqtp
+eeqtp A B ext ((), ())
+>>
+|- A = B : type ;
+
+
+rule weakenSubtypeArrow
+arrow A B ext (fn x . $x)
+>>
+|- A <: B ;
+
+
+rule weakenEeqtpIff
+iff A B ext ((fn x . $x), (fn x . $x))
+>>
+|- eeqtp A B ;
+
+
+rule compatGuardIff0
+guard A B = guard A' B : type
+>>
+|- iff A A' ;
+|- B : type ;
+
+
+rule compatSetEqtp0
+set A (fn x . B) = set A' (fn x . B) : type
+>>
+|- A = A' : type ;
+x : A |- B : type ;
+
+
+rule compatSetIff1
+set A (fn x . B) = set A (fn x . B') : type
+>>
+|- A : type ;
+x : A |- iff B B' ;
+
+
+rule forallEeq
+eeqtp (forall {x : A} B) (forall {x : A'} B') ext ((), ())
+>>
+|- eeqtp A A' ;
+x : A |- eeqtp B B' ;
+
+
+rule existsEeq
+eeqtp (exists {x : A} B) (exists {x : A'} B') ext ((), ())
+>>
+|- eeqtp A A' ;
+x : A |- eeqtp B B' ;
+
+
+rule arrowEeq
+eeqtp (arrow A B) (arrow A' B') ext ((), ())
+>>
+|- eeqtp A A' ;
+|- eeqtp B B' ;
+
+
+rule prodEeq
+eeqtp (prod A B) (prod A' B') ext ((), ())
+>>
+|- eeqtp A A' ;
+|- eeqtp B B' ;
+
+
+rule sumEeq
+eeqtp (sum A B) (sum A' B') ext ((), ())
+>>
+|- eeqtp A A' ;
+|- eeqtp B B' ;
+
+
+rule futureEeq
+eeqtp (future A) (future A') ext ((), ())
+>>
+promote |- eeqtp A A' ;
+
+
+rule intersectEeq
+eeqtp (intersect {x : A} B) (intersect {x : A'} B') ext ((), ())
+>>
+|- eeqtp A A' ;
+x : A |- eeqtp B B' ;
+
+
+rule unionEeq
+eeqtp (union {x : A} B) (union {x : A'} B') ext ((), ())
+>>
+|- eeqtp A A' ;
+x : A |- eeqtp B B' ;
+
+
+rule compatGuardEeq1
+eeqtp (guard A B) (guard A B') ext ((), ())
+>>
+|- A : type ;
+|- eeqtp B B' ;
+
+
+rule compatSetEeq0
+eeqtp (set {x : A} B) (set {x : A'} B) ext ((), ())
+>>
+|- eeqtp A A' ;
+x : A |- B : type ;
+
+
+rule compatIsetEeq0
+eeqtp (iset {x : A} B) (iset {x : A'} B) ext ((), ())
+>>
+|- eeqtp A A' ;
+x : A |- B : type ;
+
+
+rule compatIsetIff1
+eeqtp (iset {x : A} B) (iset {x : A} B') ext ((), ())
+>>
+|- A : type ;
+x : A |- iff B B' ;
+
+
+rule compatForallSubtype0
+forall {x : A} B <: forall {x : A'} B
+>>
+|- A' <: A ;
+x : A |- B : type ;
+
+
+rule compatForallSubtype1
+forall {x : A} B <: forall {x : A} B'
+>>
+|- A : type ;
+x : A |- B <: B' ;
+
+
+rule compatExistsSubtype0
+exists {x : A} B <: exists {x : A'} B
+>>
+|- A <: A' ;
+x : A' |- B : type ;
+
+
+rule compatExistsSubtype1
+exists {x : A} B <: exists {x : A} B'
+>>
+|- A : type ;
+x : A |- B <: B' ;
+
+
+rule compatIntersectSubtype0
+intersect {x : A} B <: intersect {x : A'} B
+>>
+|- A' <: A ;
+x : A |- B : type ;
+
+
+rule compatIntersectSubtype1
+intersect {x : A} B <: intersect {x : A} B'
+>>
+|- A : type ;
+x : A |- B <: B' ;
+
+
+rule compatUnionSubtype0
+union {x : A} B <: union {x : A'} B
+>>
+|- A <: A' ;
+x : A' |- B : type ;
+
+
+rule compatUnionSubtype1
+union {x : A} B <: union {x : A} B'
+>>
+|- A : type ;
+x : A |- B <: B' ;
+
+
+rule compatGuardArrow0
+guard A B <: guard A' B
+>>
+|- A : type ;
+|- B : type ;
+|- arrow A' A ;
+
+
+rule compatGuardSubtype1
+guard A B <: guard A B'
+>>
+|- A : type ;
+|- B <: B' ;
+
+
+rule compatSetSubtype0
+set {x : A} B <: set {x : A'} B
+>>
+|- A <: A' ;
+x : A' |- B : type ;
+
+
+rule compatSetArrow1
+set {x : A} B <: set {x : A} B'
+>>
+|- A : type ;
+x : A |- B' : type ;
+x : A |- arrow B B' ;
+
+
+rule compatIsetSubtype0
+iset {x : A} B <: iset {x : A'} B
+>>
+|- A <: A' ;
+x : A' |- B : type ;
+
+
+rule compatIsetArrow1
+iset {x : A} B <: iset {x : A} B'
+>>
+|- A : type ;
+x : A |- B' : type ;
+x : A |- arrow B B' ;
+
+
+rule compatForallIff1
+iff (forall {x : A} B) (forall {x : A} B') ext ((fn f x . M #1 ($f $x)), (fn f x . M #2 ($f $x)))
+>>
+|- A : type ;
+x : A |- iff B B' ext M ;
+
+
+rule compatExistsIff1
+iff (exists {x : A} B) (exists {x : A} B') ext ((fn p . ($p #1, M [$p #1 / x] #1 ($p #2))), (fn p . ($p #1, M [$p #1 / x] #2 ($p #2))))
+>>
+|- A : type ;
+x : A |- iff B B' ext M ;
+
+
+rule compatArrowIff0
+iff (arrow A B) (arrow A' B) ext ((fn f x . $f (M #2 $x)), (fn f x . $f (M #1 $x)))
+>>
+|- B : type ;
+|- iff A A' ext M ;
+
+
+rule compatArrowIff1
+iff (arrow A B) (arrow A B') ext ((fn f x . M #1 ($f $x)), (fn f x . M #2 ($f $x)))
+>>
+|- A : type ;
+|- iff B B' ext M ;
+
+
+rule compatProdIff0
+iff (prod A B) (prod A' B) ext ((fn x . (M #1 ($x #1), $x #2)), (fn x . (M #2 ($x #1), $x #2)))
+>>
+|- B : type ;
+|- iff A A' ext M ;
+
+
+rule compatProdIff1
+iff (prod A B) (prod A B') ext ((fn x . ($x #1, M #1 ($x #2))), (fn x . ($x #1, M #2 ($x #2))))
+>>
+|- A : type ;
+|- iff B B' ext M ;
+
+
+rule compatSumIff0
+iff (sum A B) (sum A' B) ext ((fn x . sum_case $x (fn y . inl (M #1 $y)) (fn y . inr $y)), (fn x . sum_case $x (fn y . inl (M #2 $y)) (fn y . inr $y)))
+>>
+|- B : type ;
+|- iff A A' ext M ;
+
+
+rule compatSumIff1
+iff (sum A B) (sum A B') ext ((fn x . sum_case $x (fn y . inl $y) (fn y . inr (M #1 $y))), (fn x . sum_case $x (fn y . inl $y) (fn y . inr (M #2 $y))))
+>>
+|- A : type ;
+|- iff B B' ext M ;
+
+
+rule compatFutureIff
+iff (future A) (future A') ext ((fn x . letnext $x (fn y . next (M #1 $y))), (fn x . letnext $x (fn y . next (M #2 $y))))
+>>
+promote |- iff A A' ext M ;
+
+
+rule compatForallArrow1
+arrow (forall {x : A} B) (forall {x : A} B') ext (fn f x . M ($f $x))
+>>
+|- A : type ;
+x : A |- arrow B B' ext M ;
+
+
+rule compatExistsArrow1
+arrow (exists {x : A} B) (exists {x : A} B') ext (fn p . ($p #1, M [$p #1 / x] ($p #2)))
+>>
+|- A : type ;
+x : A |- B' : type ;
+x : A |- arrow B B' ext M ;
+
+
+rule compatArrowArrow0
+arrow (arrow A B) (arrow A' B) ext (fn f x . $f (M $x))
+>>
+|- A : type ;
+|- B : type ;
+|- arrow A' A ext M ;
+
+
+rule compatArrowArrow1
+arrow (arrow A B) (arrow A B') ext (fn f x . M ($f $x))
+>>
+|- A : type ;
+|- arrow B B' ext M ;
+
+
+rule compatProdArrow0
+arrow (prod A B) (prod A' B) ext (fn x . (M ($x #1), $x #2))
+>>
+|- B : type ;
+|- arrow A A' ext M ;
+
+
+rule compatProdArrow1
+arrow (prod A B) (prod A B') ext (fn x . ($x #1, M ($x #2)))
+>>
+|- A : type ;
+|- arrow B B' ext M ;
+
+
+rule compatSumArrow0
+arrow (sum A B) (sum A' B) ext (fn x . sum_case $x (fn y . inl (M $y)) (fn y . inr $y))
+>>
+|- A' : type ;
+|- B : type ;
+|- arrow A A' ext M ;
+
+
+rule compatSumArrow1
+arrow (sum A B) (sum A B') ext (fn x . sum_case $x (fn y . inl $y) (fn y . inr (M $y)))
+>>
+|- A : type ;
+|- B' : type ;
+|- arrow B B' ext M ;
+
+
+rule compatFutureArrow
+arrow (future A) (future A') ext (fn x . letnext $x (fn y . next (M $y)))
+>>
+promote |- arrow A A' ext M ;
+
+
+rule compatForallEntails1
+forall {x : A} B' ext (fn x . M [F $x / y])
+>>
+x : A, y : B |- B' ext M ;
+|- forall {x : A} B ext F ;
+
+
+rule compatArrowEntails1
+arrow A B' ext (fn x . M [F $x / y])
+>>
+y : B |- B' ext M ;
+|- arrow A B ext F ;
+
+
+rule compatProdEntails0
+prod A' B ext (M [P #1 / x], P #2)
+>>
+x : A |- A' ext M ;
+|- prod A B ext P ;
+
+
+rule compatProdEntails1
+prod A B' ext (P #1, M [P #2 / x])
+>>
+x : B |- B' ext M ;
+|- prod A B ext P ;
 
 
 

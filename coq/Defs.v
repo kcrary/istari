@@ -58,6 +58,7 @@ Definition foralltp : fterm := lam (alltp (app (var 1) (var 0))).
 Definition future : fterm := lam (fut (var 0)).
 Definition guard : fterm := lam (lam (guard (var 1) (var 0))).
 Definition iexists : fterm := lam (lam (lam (exist (var 2) (var 1) (app (var 1) (var 0))))).
+Definition iff : fterm := lam (lam (prod (pi (var 1) (var 1)) (pi (var 0) (var 2)))).
 Definition iforall : fterm := lam (lam (lam (all (var 2) (var 1) (app (var 1) (var 0))))).
 Definition intersect : fterm := lam (lam (intersect (var 1) (app (var 1) (var 0)))).
 Definition union : fterm := lam (lam (union (var 1) (app (var 1) (var 0)))).

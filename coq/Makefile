@@ -115,6 +115,7 @@ UNITS = \
 	Validation \
 	ValidationAcc \
 	ValidationAll \
+	ValidationCompat \
 	ValidationEqtp \
 	ValidationEqual \
 	ValidationExist \

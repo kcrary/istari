@@ -136,6 +136,17 @@ eapply tr_subtype_elim; eauto.
 Qed.
 
 
+Lemma subsumptionAlt_valid : subsumptionAlt_obligation.
+Proof.
+prepare.
+intros G a b n m Heq Hm.
+rewrite -> def_eeqtp in Heq.
+apply (tr_subtype_elim _ a); auto.
+apply (tr_subtype_eta2 _ _ _ (ppi2 n) (ppi2 n)).
+eapply tr_prod_elim2; eauto.
+Qed.
+
+
 Lemma subsumptionLeft_valid : subsumptionLeft_obligation.
 Proof.
 prepare.
@@ -151,6 +162,128 @@ eapply tr_subtype_convert_hyp; eauto.
   {
   apply (tr_subtype_eta2 _ _ _ (ppi2 p) (ppi2 p)).
   eapply tr_prod_elim2; eauto.
+  }
+Qed.
+
+
+Lemma subsumptionLeftAlt_valid : subsumptionLeftAlt_obligation.
+Proof.
+prepare.
+intros G1 G2 a b c ext m Heq Hc.
+rewrite -> def_eeqtp in Heq.
+rewrite -> substctx_id in Heq, Hc.
+cbn [Nat.add] in Heq, Hc.
+replace (deq m m c) with (substj (dot ext id) (deq (subst sh1 m) (subst sh1 m) (subst sh1 c))) by (simpsub; reflexivity).
+eapply tr_generalize; eauto.
+apply (exchange_1_n _ G2 _ nil).
+  {
+  simpsub.
+  rewrite <- !compose_assoc.
+  rewrite -> !compose_sh_unlift_ge; [| omega].
+  replace (S (length G2) - length G2) with 1 by omega.
+  simpsub.
+  reflexivity.
+  }
+simpsub.
+cbn [List.app].
+rewrite -> !compose_sh_unlift_ge; [| omega].
+replace (S (length G2) - length G2) with 1 by omega.
+simpsub.
+rewrite <- (compose_sh_sh _ 1 (length G2)).
+rewrite <- under_dots.
+apply exchange_1_1.
+  {
+  simpsub.
+  reflexivity.
+  }
+simpsub.
+rewrite -> length_substctx.
+rewrite <- compose_under.
+simpsub.
+apply (tr_subtype_convert_hyp (hyp_tm (prod (subtype a b) (subtype b a)) :: G1) _ _ (subst sh1 b)).
+  {
+  simpsub.
+  unfold dsubtype.
+  apply (tr_subtype_eta2 _ _ _ (ppi1 (var 1)) (ppi1 (var 1))).
+  eapply tr_prod_elim1.
+  eapply hypothesis; eauto using index_0, index_S.
+  simpsub.
+  reflexivity.
+  }
+
+  {
+  simpsub.
+  unfold dsubtype.
+  apply (tr_subtype_eta2 _ _ _ (ppi2 (var 1)) (ppi2 (var 1))).
+  eapply tr_prod_elim2.
+  eapply hypothesis; eauto using index_0, index_S.
+  simpsub.
+  reflexivity.
+  }
+
+  {
+  replace (substctx (dot (var 0) (sh 2)) G2 ++ hyp_tm (subst sh1 b) :: hyp_tm (prod (subtype a b) (subtype b a)) :: G1) with ((substctx (dot (var 0) (sh 2)) G2 ++ [hyp_tm (subst sh1 b)]) ++ [hyp_tm (prod (subtype a b) (subtype b a))] ++ G1).
+  2:{
+    rewrite <- app_assoc.
+    cbn [List.app].
+    reflexivity.
+    }
+  apply weakening.
+    {
+    cbn [length].
+    rewrite -> !substctx_append.
+    rewrite <- substctx_compose.
+    cbn [length].
+    replace (dot (var 0) (sh 2)) with (@under obj 1 (sh 1)) by (simpsub; reflexivity).
+    rewrite <- compose_under.
+    rewrite <- compose_assoc.
+    rewrite -> compose_sh_unlift.
+    simpsub.
+    rewrite <- compose_assoc.
+    unfold sh1.
+    rewrite -> compose_sh_unlift.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length].
+    simpsub.
+    rewrite -> app_length.
+    cbn [length].
+    rewrite -> length_substctx.
+    replace (dot (var 0) (sh 2)) with (@under obj 1 (sh 1)) by (simpsub; reflexivity).
+    rewrite -> under_sum.
+    rewrite <- !compose_under.
+    rewrite <- compose_assoc.
+    rewrite -> compose_sh_unlift.
+    simpsub.
+    reflexivity.
+    }
+  cbn [length].
+  simpsub.
+  rewrite -> !substctx_append.
+  rewrite <- substctx_compose.
+  rewrite -> app_length.
+  cbn [length].
+  replace (dot (var 0) (sh 2)) with (@under obj 1 (sh 1)) by (simpsub; reflexivity).
+  rewrite -> under_sum.
+  rewrite -> length_substctx.
+  rewrite <- !compose_under.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  rewrite <- app_assoc.
+  cbn [List.app].
+  rewrite -> (substctx_eqsub _ _ id).
+    {
+    simpsub.
+    exact Hc.
+    }
+
+    {
+    apply eqsub_symm.
+    apply eqsub_expand_id.
+    }
   }
 Qed.
 

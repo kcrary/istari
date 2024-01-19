@@ -155,7 +155,10 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             (cut (setFailure "types do not unify" RuleTactic.eqtpRefl) >> idtacM Secondary);
 
          H.insert reflexivityTactics Prim.subtype
-            (cut (setFailure "types do not unify" RuleTactic.subtypeRefl) >> idtacM Secondary)
+            (cut (setFailure "types do not unify" RuleTactic.subtypeRefl) >> idtacM Secondary);
+
+         H.insert reflexivityTactics Prim.eeqtp 
+            (cut (setFailure "types do not unify" RuleTactic.eeqtpRefl) >> idtacM Secondary)
          )
          
 
@@ -237,49 +240,13 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
 
 
-      fun eeqtpSym tac =
-         goalCaseT
-         / \Prim.eeqtp\ ? ? =>
-           \(fnc b a =>
-                refine (Rule.assert (T.apply2 Prim.eeqtp a b) (T.evar ()))
-                >>> [
-                    (* A <:> B *)
-                    tac,
-
-                    (* A <:> B |- B[^] <:> A[^] *)
-                    refine (Rule.reduceHyp 0 R.unfold)
-                    >>
-                    (* A <: B & B <: A |- B[^] <:> A[^] *)
-                    refine (Rule.reduce R.unfold)
-                    >>
-                    (* A <: B & B <: A |- B[^] <: A[^] & A[^] <: B[^] *)
-                    refine (Rule.prodIntro (T.evar ()) (T.evar ()))
-                    >>> [
-                        (* A <: B & B <: A |- B[^] <: A[^] *)
-                        refine (Rule.prodElim2 (T.apply2 Prim.subtype (T.Sub (a, T.shift1)) (T.Sub (b, T.shift1))) (T.evar ()))
-                        >>
-                        (* A <: B & B <: A |- A[^] <: B[^] & B[^] <: A[^] *)
-                        refine (Rule.hypothesis 0)
-                        >> done,
-
-                        (* A <: B & B <: A |- A[^] <: B[^] *)
-                        refine (Rule.prodElim1 (T.evar ()) (T.apply2 Prim.subtype (T.Sub (b, T.shift1)) (T.Sub (a, T.shift1))))
-                        >>
-                        (* A <: B & B <: A |- A[^] <: B[^] & B[^] <: A[^] *)
-                        refine (Rule.hypothesis 0)
-                        >> done
-                        ]
-                    ])\
-         /
-
-
       val () =
          List.app
             (fn (const, f) => H.insert symmetryTactics const f)
             [
             (Prim.eq, (fn tac => RuleTactic.eqSymm >> tac)),
             (Prim.eqtp, (fn tac => RuleTactic.eqtpSymm >> tac)),
-            (Prim.eeqtp, eeqtpSym)
+            (Prim.eeqtp, (fn tac => RuleTactic.eeqtpSymm >> tac)),
             ]
 
 
@@ -322,9 +289,13 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          H.insert transitivityTactics Prim.subtype
             (fn m => 
                 refine (Rule.subtypeTrans (T.evar ()) m (T.evar ()))
+                >> idtacM Primary);
+
+         H.insert transitivityTactics Prim.eeqtp
+            (fn m => 
+                refine (Rule.eeqtpTrans (T.evar ()) m (T.evar ()))
                 >> idtacM Primary)
          )
-
 
 
 

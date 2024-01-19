@@ -69,6 +69,7 @@ signature TACTIC =
       val orthen : 'a tacticm -> (unit -> 'a tacticm) -> 'a tacticm
 
       val ifthen : 'a tacticm -> 'b tacticm -> 'b tacticm -> 'b tacticm
+      val ifthenl : 'a tacticm -> 'b tacticm list -> 'b tacticm -> 'b tacticm
       val ifthenM : 'a tacticm -> ('a -> 'b tacticm) -> 'b tacticm -> 'b tacticm
 
 
@@ -563,9 +564,26 @@ structure TacticInternal :> TACTIC_INTERNAL =
             do (subgoals, validate, _) =
                iftac goal (fn _ => (Trail.rewind mark; elsetac goal fk sk))
 
-            do (allgoals, subvalidate, fk'') = andthenloopM [] (fn _ => thentac) subgoals [] fk
+            do (allgoals, subvalidate, fk'') = andthenloop [] thentac subgoals [] fk
          in
             sk (allgoals, (fn vs => validate (subvalidate vs)), fk'')
+         end
+
+
+      fun ifthenl iftac thentacs elsetac goal fk sk =
+         let
+            val mark = Trail.mark ()
+
+            do (subgoals, validate, _) =
+               iftac goal (fn _ => (Trail.rewind mark; elsetac goal fk sk))
+
+            do (allgoals, subvalidate, fk') = 
+               andthenloop
+                  thentacs
+                  (fail "too few tactics in ifthenl")
+                  subgoals [] fk
+         in
+            sk (allgoals, (fn vs => validate (subvalidate vs)), fk')
          end
 
 

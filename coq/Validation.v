@@ -22,6 +22,7 @@ Require Import Dots.
 Require Import ValidationAcc.
 Require Import ValidationUtil.
 Require Import ValidationAll.
+Require Import ValidationCompat.
 Require Import ValidationEqtp.
 Require Import ValidationEqual.
 Require Import ValidationExist.
@@ -130,6 +131,7 @@ exact intersectForm_valid.
 exact intersectEq_valid.
 exact intersectFormUniv_valid.
 exact intersectEqUniv_valid.
+exact intersectSub_valid.
 exact intersectIntroOf_valid.
 exact intersectIntroEq_valid.
 exact intersectIntro_valid.
@@ -197,6 +199,7 @@ exact unionForm_valid.
 exact unionEq_valid.
 exact unionFormUniv_valid.
 exact unionEqUniv_valid.
+exact unionSub_valid.
 exact unionIntroOf_valid.
 exact unionIntroEq_valid.
 exact unionIntro_valid.
@@ -397,10 +400,12 @@ exact eqtpElim_valid.
 exact eqtpExt_valid.
 exact eqtpLeft_valid.
 exact eqtpFunct_valid.
+exact eqtpFunctType_valid.
 exact equivalenceOf_valid.
 exact equivalenceEq_valid.
 exact equivalence_valid.
 exact equivalenceLeft_valid.
+exact equivalenceLeftAlt_valid.
 exact eqtpRefl_valid.
 exact eqtpSymm_valid.
 exact eqtpTrans_valid.
@@ -425,7 +430,9 @@ exact subtypeEstablish_valid.
 exact subsumptionOf_valid.
 exact subsumptionEq_valid.
 exact subsumption_valid.
+exact subsumptionAlt_valid.
 exact subsumptionLeft_valid.
+exact subsumptionLeftAlt_valid.
 exact subtypeRefl_valid.
 exact subtypeReflEqtype_valid.
 exact subtypeTrans_valid.
@@ -534,9 +541,64 @@ exact assert_valid.
 exact assert'_valid.
 exact inhabitant_valid.
 exact letForm_valid.
-exact eeqtpSymm_valid.
-exact weakenEqtpEeqtp_valid.
 exact accInd_valid.
+exact eeqtpRefl_valid.
+exact eeqtpSymm_valid.
+exact eeqtpTrans_valid.
+exact weakenEqtpEeqtp_valid.
+exact weakenSubtypeArrow_valid.
+exact weakenEeqtpIff_valid.
+exact compatGuardIff0_valid.
+exact compatSetEqtp0_valid.
+exact compatSetIff1_valid.
+exact forallEeq_valid.
+exact existsEeq_valid.
+exact arrowEeq_valid.
+exact prodEeq_valid.
+exact sumEeq_valid.
+exact futureEeq_valid.
+exact intersectEeq_valid.
+exact unionEeq_valid.
+exact compatGuardEeq1_valid.
+exact compatSetEeq0_valid.
+exact compatIsetEeq0_valid.
+exact compatIsetIff1_valid.
+exact compatForallSubtype0_valid.
+exact compatForallSubtype1_valid.
+exact compatExistsSubtype0_valid.
+exact compatExistsSubtype1_valid.
+exact compatIntersectSubtype0_valid.
+exact compatIntersectSubtype1_valid.
+exact compatUnionSubtype0_valid.
+exact compatUnionSubtype1_valid.
+exact compatGuardArrow0_valid.
+exact compatGuardSubtype1_valid.
+exact compatSetSubtype0_valid.
+exact compatSetArrow1_valid.
+exact compatIsetSubtype0_valid.
+exact compatIsetArrow1_valid.
+exact compatForallIff1_valid.
+exact compatExistsIff1_valid.
+exact compatArrowIff0_valid.
+exact compatArrowIff1_valid.
+exact compatProdIff0_valid.
+exact compatProdIff1_valid.
+exact compatSumIff0_valid.
+exact compatSumIff1_valid.
+exact compatFutureIff_valid.
+exact compatForallArrow1_valid.
+exact compatExistsArrow1_valid.
+exact compatArrowArrow0_valid.
+exact compatArrowArrow1_valid.
+exact compatProdArrow0_valid.
+exact compatProdArrow1_valid.
+exact compatSumArrow0_valid.
+exact compatSumArrow1_valid.
+exact compatFutureArrow_valid.
+exact compatForallEntails1_valid.
+exact compatArrowEntails1_valid.
+exact compatProdEntails0_valid.
+exact compatProdEntails1_valid.
 Qed.
   
 
@@ -940,7 +1002,7 @@ Qed.
    equivalence classes in that type.  The correctness of the isomorphism code
    is apparent by inspection.
 
-   Like integers, the symbol rules cannot be proven correct because native integers
+   Like integers, the symbol rules cannot be proven correct because native symbols
    do not exist in the type theory.  However, the symbol rules are simple and it is
    easy to see they are correct.
 

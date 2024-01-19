@@ -293,8 +293,136 @@ Qed.
 
 
 
-Hint Rewrite def_sigma def_prod : prepare.
+Lemma tr_union_sub :
+  forall G a a' b b',
+    tr G (dsubtype a a')
+    -> tr (hyp_tm a :: G) (dsubtype b b')
+    -> tr (hyp_tm a' :: G) (deqtype b' b')
+    -> tr G (dsubtype (union a b) (union a' b')).
+Proof.
+intros G a a' b b' Ha Hb Hb'.
+apply tr_subtype_intro.
+  {
+  apply tr_union_formation.
+    {
+    eapply tr_subtype_istype1; eauto.
+    }
 
+    {
+    eapply tr_subtype_istype1; eauto.
+    }
+  }
+
+  {
+  apply tr_union_formation; auto.
+  eapply tr_subtype_istype2; eauto.
+  }
+simpsub.
+cbn [Nat.add].
+replace (var 0) with (@subst1 obj (var 0) (var 0)) at 1 2 by (simpsub; reflexivity).
+replace (union (subst sh1 a') (subst (dot (var 0) (sh 2)) b')) with (subst1 (var 0) (union (subst (sh 2) a') (subst (dot (var 0) (sh 3)) b'))) by (simpsub; reflexivity).
+apply (tr_union_elim _ (subst sh1 a) (subst (dot (var 0) (sh 2)) b)).
+  {
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  reflexivity.
+  }
+simpsub.
+cbn [Nat.add].
+eapply (tr_union_intro _ _ _ (var 1)).
+  {
+  apply (tr_subtype_elim _ (subst (sh 3) a)).
+    {
+    eapply (weakening _ [_; _; _] []).
+      {
+      cbn [unlift length].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [unlift length].
+      simpsub.
+      auto.
+      }
+    cbn [unlift length].
+    simpsub.
+    cbn [List.app].
+    exact Ha.
+    }
+  eapply hypothesis; eauto using index_S, index_0.
+  simpsub.
+  reflexivity.
+  }
+
+  {
+  simpsub.
+  apply (tr_subtype_elim _ (subst (dot (var 1) (sh 3)) b)).
+    {
+    eapply (weakening _ [_] []).
+      {
+      cbn [unlift length].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [unlift length].
+      simpsub.
+      auto.
+      }
+    cbn [unlift length].
+    simpsub.
+    cbn [List.app].
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [unlift length].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [unlift length].
+      simpsub.
+      auto.
+      }
+    cbn [unlift length].
+    simpsub.
+    cbn [List.app].
+    rewrite -> !subst_var0_sh1.
+    exact Hb.
+    }
+
+    {
+    eapply hypothesis; eauto using index_S, index_0.
+    simpsub.
+    reflexivity.
+    }
+  }
+
+  {
+  eapply (weakening _ [_; _; _] [_]).
+    {
+    cbn [unlift length].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [unlift length].
+    simpsub.
+    auto.
+    }
+  cbn [unlift length].
+  simpsub.
+  cbn [List.app].
+  rewrite -> subst_var0_sh1.
+  exact Hb'.
+  }
+Qed.
+
+
+Hint Rewrite def_sigma def_prod : prepare.
 
 
 Lemma existsForm_valid : existsForm_obligation.
@@ -916,6 +1044,14 @@ Proof.
 prepare.
 intros G a a' b b' i ext1 ext0 Ha Hb.
 apply tr_union_formation_univ; auto.
+Qed.
+
+
+Lemma unionSub_valid : unionSub_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext2 ext1 ext0 Ha Hb Hb'.
+apply tr_union_sub; auto.
 Qed.
 
 

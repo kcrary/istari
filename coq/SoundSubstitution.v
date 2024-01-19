@@ -958,6 +958,220 @@ Qed.
    than last.  If you want it earlier, you can move it up using exchange.
 *)
 
+Lemma sound_functionality_term_term :
+  forall G a b m n p q,
+    pseq G (deq m n a)
+    -> pseq (cons (hyp_tm a) G) (deq p q b)
+    -> pseq G (deq (subst1 m p) (subst1 n q) (subst1 m b)).
+Proof.
+intros G a b m n p q.
+revert G.
+refine (seq_pseq 0 2 [] _ [_] _ _ _).
+cbn.
+intros G Hseqmn Hseqpq.
+rewrite -> seq_deq in Hseqmn, Hseqpq |- *.
+intros i s s' Hs.
+so (Hseqmn _ _ _ Hs) as (A & Hal & Har & Hm & Hn & Hmn).
+assert (pwctx i (dot (subst s m) s) (dot (subst s' n) s') (cons (hyp_tm a) G)) as Hsmn.
+  {
+  apply pwctx_cons_tm_seq; auto.
+    {
+    eapply seqhyp_tm; eauto.
+    }
+    
+    {
+    intros j t t' Ht.
+    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
+    eauto.
+    }
+  }
+assert (pwctx i (dot (subst s m) s) (dot (subst s' m) s') (cons (hyp_tm a) G)) as Hsm.
+  {
+  apply pwctx_cons_tm_seq; auto.
+    {
+    eapply seqhyp_tm; eauto.
+    }
+    
+    {
+    intros j t t' Ht.
+    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
+    eauto.
+    }
+  }
+assert (pwctx i (dot (subst s n) s) (dot (subst s' n) s') (cons (hyp_tm a) G)) as Hsn.
+  {
+  apply pwctx_cons_tm_seq; auto.
+    {
+    eapply seqhyp_tm; eauto.
+    }
+    
+    {
+    intros j t t' Ht.
+    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
+    eauto.
+    }
+  }
+so (Hseqpq _ _ _ Hsm) as (R & Hbml & Hbmr & Hp & _).
+so (Hseqpq _ _ _ Hsn) as (R' & Hbnl & Hbnr & _ & Hq & _).
+so (Hseqpq _ _ _ Hsmn) as (R'' & Hbml' & Hbnr' & _ & _ & Hpq).
+so (interp_fun _#7 Hbml Hbml'); subst R''.
+so (interp_fun _#7 Hbnr Hbnr'); subst R'.
+exists R.
+simpsub.
+do2 4 split; auto.
+Qed.
+
+
+
+Lemma sound_functionality_term_type :
+  forall G a b c p q,
+    pseq G (deqtype b c)
+    -> pseq (cons hyp_tp G) (deq p q a)
+    -> pseq G (deq (subst1 b p) (subst1 c q) (subst1 b a)).
+Proof.
+intros G a b c p q.
+revert G.
+refine (seq_pseq 0 2 [] _ [_] _ _ _); cbn.
+intros G Hseqbc Hseqpq.
+rewrite -> seq_deq in Hseqpq |- *.
+rewrite -> seq_eqtype in Hseqbc.
+intros i s s' Hs.
+so (Hseqbc _ _ _ Hs) as (B & Hbl & Hbr & Hcl & Hcr).
+assert (pwctx i (dot (subst s b) s) (dot (subst s' c) s') (cons hyp_tp G)) as Hsbc.
+  {
+  apply pwctx_cons_tp; auto.
+  eapply seqhyp_tp; eauto.
+  }
+assert (pwctx i (dot (subst s b) s) (dot (subst s' b) s') (cons hyp_tp G)) as Hsb.
+  {
+  apply pwctx_cons_tp; auto.
+  eapply seqhyp_tp; eauto.
+  }
+assert (pwctx i (dot (subst s c) s) (dot (subst s' c) s') (cons hyp_tp G)) as Hsc.
+  {
+  apply pwctx_cons_tp; auto.
+  eapply seqhyp_tp; eauto.
+  }
+so (Hseqpq _ _ _ Hsb) as (R & Hbml & Hbmr & Hp & _).
+so (Hseqpq _ _ _ Hsc) as (R' & Hbnl & Hbnr & _ & Hq & _).
+so (Hseqpq _ _ _ Hsbc) as (R'' & Hbml' & Hbnr' & _ & _ & Hpq).
+so (interp_fun _#7 Hbml Hbml'); subst R''.
+so (interp_fun _#7 Hbnr Hbnr'); subst R'.
+exists R.
+simpsub.
+do2 4 split; auto.
+Qed.
+
+
+Lemma sound_functionality_type_term :
+  forall G a b c m n,
+    pseq G (deq m n a)
+    -> pseq (cons (hyp_tm a) G) (deqtype b c)
+    -> pseq G (deqtype (subst1 m b) (subst1 n c)).
+Proof.
+intros G a b c m n.
+revert G.
+refine (seq_pseq 0 2 [] _ [_] _ _ _); cbn.
+intros G Hseqmn Hseqbc.
+rewrite -> seq_deq in Hseqmn.
+rewrite -> seq_eqtype in Hseqbc |- *.
+intros i s s' Hs.
+so (Hseqmn _ _ _ Hs) as (A & Hal & Har & Hm & Hn & Hmn).
+assert (pwctx i (dot (subst s m) s) (dot (subst s' n) s') (cons (hyp_tm a) G)) as Hsmn.
+  {
+  apply pwctx_cons_tm_seq; auto.
+    {
+    eapply seqhyp_tm; eauto.
+    }
+    
+    {
+    intros j t t' Ht.
+    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
+    eauto.
+    }
+  }
+assert (pwctx i (dot (subst s m) s) (dot (subst s' m) s') (cons (hyp_tm a) G)) as Hsm.
+  {
+  apply pwctx_cons_tm_seq; auto.
+    {
+    eapply seqhyp_tm; eauto.
+    }
+    
+    {
+    intros j t t' Ht.
+    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
+    eauto.
+    }
+  }
+assert (pwctx i (dot (subst s n) s) (dot (subst s' n) s') (cons (hyp_tm a) G)) as Hsn.
+  {
+  apply pwctx_cons_tm_seq; auto.
+    {
+    eapply seqhyp_tm; eauto.
+    }
+    
+    {
+    intros j t t' Ht.
+    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
+    eauto.
+    }
+  }
+so (Hseqbc _ _ _ Hsm) as (B & Hbml & Hbmr & Hcml & Hcmr).
+so (Hseqbc _ _ _ Hsn) as (B' & Hbnl & Hbnr & Hcnl & Hcnr).
+so (Hseqbc _ _ _ Hsmn)  as (B'' & Hbml' & _ & _ & Hcnr').
+so (interp_fun _#7 Hbml Hbml').
+subst B''.
+so (interp_fun _#7 Hcnr Hcnr').
+subst B'.
+exists B.
+simpsub.
+do2 3 split; auto.
+Qed.
+
+
+Lemma sound_functionality_type_type :
+  forall G a b c d,
+    pseq G (deqtype a b)
+    -> pseq (cons hyp_tp G) (deqtype c d)
+    -> pseq G (deqtype (subst1 a c) (subst1 b d)).
+Proof.
+intros G a b c d.
+revert G.
+refine (seq_pseq 0 2 [] _ [_] _ _ _); cbn.
+intros G Hseqab Hseqcd.
+rewrite -> seq_eqtype in Hseqab, Hseqcd |- *.
+intros i s s' Hs.
+so (Hseqab _ _ _ Hs) as (A & Hal & Har & Hbl & Hbr).
+assert (pwctx i (dot (subst s a) s) (dot (subst s' b) s') (cons hyp_tp G)) as Hsab.
+  {
+  apply pwctx_cons_tp; auto.
+  eapply seqhyp_tp; eauto.
+  }
+assert (pwctx i (dot (subst s a) s) (dot (subst s' a) s') (cons hyp_tp G)) as Hsa.
+  {
+  apply pwctx_cons_tp; auto.
+  eapply seqhyp_tp; eauto.
+  }
+assert (pwctx i (dot (subst s b) s) (dot (subst s' b) s') (cons hyp_tp G)) as Hsb.
+  {
+  apply pwctx_cons_tp; auto.
+  eapply seqhyp_tp; eauto.
+  }
+so (Hseqcd _ _ _ Hsa) as (C & Hbal & Hbar & Hdal & Hdar).
+so (Hseqcd _ _ _ Hsb) as (C' & Hbbl & Hbbr & Hdbl & Hdbr).
+so (Hseqcd _ _ _ Hsab) as (C'' & Hbal' & _ & _ & Hdbr').
+so (interp_fun _#7 Hbal Hbal').
+subst C''.
+so (interp_fun _#7 Hdbr Hdbr').
+subst C'.
+exists C.
+simpsub.
+do2 3 split; auto.
+Qed.
+    
+
+
+
 Lemma sound_generalize_pre :
   forall G a m J,
     seq G (deq m m a)
@@ -1048,71 +1262,6 @@ cbn.
 intros G Hseqm HseqJ.
 eapply sound_generalize_tp_pre; eauto.
 Qed.
-
-
-Lemma sound_generalize_eq :
-  forall G a b m n p q,
-    pseq G (deq m n a)
-    -> pseq (cons (hyp_tm a) G) (deq p q b)
-    -> pseq G (deq (subst1 m p) (subst1 n q) (subst1 m b)).
-Proof.
-intros G a b m n p q.
-revert G.
-refine (seq_pseq 0 2 [] _ [_] _ _ _).
-cbn.
-intros G Hseqmn Hseqpq.
-rewrite -> seq_deq in Hseqmn, Hseqpq |- *.
-intros i s s' Hs.
-so (Hseqmn _ _ _ Hs) as (A & Hal & Har & Hm & Hn & Hmn).
-assert (pwctx i (dot (subst s m) s) (dot (subst s' n) s') (cons (hyp_tm a) G)) as Hsmn.
-  {
-  apply pwctx_cons_tm_seq; auto.
-    {
-    eapply seqhyp_tm; eauto.
-    }
-    
-    {
-    intros j t t' Ht.
-    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
-    eauto.
-    }
-  }
-assert (pwctx i (dot (subst s m) s) (dot (subst s' m) s') (cons (hyp_tm a) G)) as Hsm.
-  {
-  apply pwctx_cons_tm_seq; auto.
-    {
-    eapply seqhyp_tm; eauto.
-    }
-    
-    {
-    intros j t t' Ht.
-    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
-    eauto.
-    }
-  }
-assert (pwctx i (dot (subst s n) s) (dot (subst s' n) s') (cons (hyp_tm a) G)) as Hsn.
-  {
-  apply pwctx_cons_tm_seq; auto.
-    {
-    eapply seqhyp_tm; eauto.
-    }
-    
-    {
-    intros j t t' Ht.
-    so (Hseqmn _ _ _ Ht) as (R & Hl & Hr & _).
-    eauto.
-    }
-  }
-so (Hseqpq _ _ _ Hsm) as (R & Hbml & Hbmr & Hp & _).
-so (Hseqpq _ _ _ Hsn) as (R' & Hbnl & Hbnr & _ & Hq & _).
-so (Hseqpq _ _ _ Hsmn) as (R'' & Hbml' & Hbnr' & _ & _ & Hpq).
-so (interp_fun _#7 Hbml Hbml'); subst R''.
-so (interp_fun _#7 Hbnr Hbnr'); subst R'.
-exists R.
-simpsub.
-do2 4 split; auto.
-Qed.
-
 
 
 Lemma sound_generalize_eq_type :

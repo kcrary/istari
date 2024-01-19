@@ -97,7 +97,6 @@ prepare.
 intro G.
 rewrite -> def_intersect.
 rewrite -> def_intersect.
-rewrite -> def_univ.
 rewrite -> def_arrow.
 unfold Defs.void.
 unfold Defs.abort.

@@ -20,41 +20,6 @@ Require Import Dots.
 Require Import ValidationUtil.
 
 
-Hint Rewrite def_pi def_arrow def_tarrow def_karrow : prepare.
-
-
-Lemma forallForm_valid : forallForm_obligation.
-Proof.
-prepare.
-intros G a b m n Ha Hb.
-apply tr_pi_formation; auto.
-Qed.
-
-
-Lemma forallEq_valid: forallEq_obligation.
-  unfoldtop. autounfold with valid_hint.
-  intros G a a' b b' m n Ha Hb.
-  valid_rewrite.
-  apply tr_pi_formation; eauto using deqtype_intro.
-Qed.
-
-Lemma forallFormUniv_valid : forallFormUniv_obligation.
-Proof.
-prepare.
-intros G a b i ext1 ext0 Ha Hb.
-apply tr_pi_formation_univ; auto.
-Qed.
-
-
-Lemma forallEqUniv_valid : forallEqUniv_obligation.
-  unfoldtop. autounfold with valid_hint.
-  intros G a a' b b' i triv0 triv1 Ha Hb.
-  valid_rewrite.
-  constructor.
-  apply tr_pi_formation_univ; eauto using deq_intro.
-  Qed.
-
-
 Lemma tr_pi_sub :
   forall G a a' b b',
     tr G (dsubtype a' a)
@@ -177,6 +142,147 @@ eapply tr_pi_ext; eauto.
   }
 Qed.
 
+
+Lemma tr_intersect_sub :
+  forall G a a' b b',
+    tr G (dsubtype a' a)
+    -> tr (hyp_tm a' :: G) (dsubtype b b')
+    -> tr (hyp_tm a :: G) (deqtype b b)
+    -> tr G (dsubtype (intersect a b) (intersect a' b')).
+Proof.
+intros G a a' b b' Hsuba Hsubb Hb.
+apply tr_subtype_intro.
+  {
+  apply tr_intersect_formation; auto.
+  eapply tr_subtype_istype2; eauto.
+  }
+
+  {
+  apply tr_intersect_formation.
+    {
+    eapply tr_subtype_istype1; eauto.
+    }
+
+    {
+    eapply tr_subtype_istype2; eauto.
+    }
+  }
+simpsub.
+cbn [Nat.add].
+apply tr_intersect_intro.
+  {
+  apply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+  
+    {
+    simpsub.
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_subtype_istype1; eauto.
+  }
+
+  {
+  simpsub.
+  cbn [Nat.add].
+  apply (tr_subtype_elim _ (subst (dot (var 0) (sh 2)) b)).
+    {
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> !subst_var0_sh1; auto.
+    }
+
+    {
+    replace (subst (dot (var 0) (sh 2)) b) with (subst1 (var 0) (subst (dot (var 0) (sh 3)) b)) by (simpsub; reflexivity).
+    apply (tr_intersect_elim _ (subst (sh 2) a) _ _ _ (var 0) (var 0)).
+      {
+      eapply hypothesis; eauto using index_S, index_0.
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      eapply (tr_subtype_elim _ (subst (sh 2) a')).
+        {
+        eapply (weakening _ [_; _] []).
+          {
+          simpsub; auto.
+          }
+  
+          {
+          cbn [length unlift].
+          simpsub.
+          reflexivity.
+          }
+        cbn [length unlift].
+        simpsub.
+        cbn [List.app].
+        auto.
+        }
+  
+        {
+        eapply hypothesis; eauto using index_0.
+        simpsub; auto.
+        }
+      }
+    }
+  }
+Qed.
+
+
+Hint Rewrite def_pi def_arrow def_tarrow def_karrow : prepare.
+
+
+Lemma forallForm_valid : forallForm_obligation.
+Proof.
+prepare.
+intros G a b m n Ha Hb.
+apply tr_pi_formation; auto.
+Qed.
+
+
+Lemma forallEq_valid: forallEq_obligation.
+  unfoldtop. autounfold with valid_hint.
+  intros G a a' b b' m n Ha Hb.
+  valid_rewrite.
+  apply tr_pi_formation; eauto using deqtype_intro.
+Qed.
+
+Lemma forallFormUniv_valid : forallFormUniv_obligation.
+Proof.
+prepare.
+intros G a b i ext1 ext0 Ha Hb.
+apply tr_pi_formation_univ; auto.
+Qed.
+
+
+Lemma forallEqUniv_valid : forallEqUniv_obligation.
+  unfoldtop. autounfold with valid_hint.
+  intros G a a' b b' i triv0 triv1 Ha Hb.
+  valid_rewrite.
+  constructor.
+  apply tr_pi_formation_univ; eauto using deq_intro.
+  Qed.
 
 
 Lemma forallSub_valid : forallSub_obligation.
@@ -1480,6 +1586,9 @@ apply tr_karrow_pi_equal; auto.
 Qed.
 
 
+Hint Rewrite def_intersect : prepare.
+
+
 Lemma intersectForm_valid : intersectForm_obligation.
 Proof.
 unfoldtop.
@@ -1532,6 +1641,14 @@ apply tr_intersect_formation_univ; eauto using deq_intro.
 Qed.
 
 
+Lemma intersectSub_valid : intersectSub_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext2 ext1 ext0 Heqa Heqb Hb.
+apply tr_intersect_sub; auto.
+Qed.
+
+
 Lemma intersectIntroOf_valid : intersectIntroOf_obligation.
 Proof.
 unfoldtop.
@@ -1580,7 +1697,6 @@ Lemma intersectIntro_valid : intersectIntro_obligation.
 Proof.
 prepare.
 intros G a b ext m Hhyg Ha Hb.
-rewrite -> def_intersect.
 apply tr_intersect_intro; auto.
 simpsub.
 replace (subst (dot triv sh1) m) with m; auto.
@@ -1642,7 +1758,6 @@ Lemma intersectElim_valid : intersectElim_obligation.
 Proof.
 prepare.
 intros G a b p m ext Hm Hp.
-rewrite -> def_intersect in Hm.
 so (tr_intersect_elim _#7 Hm Hp) as H.
 simpsub.
 auto.
@@ -1653,7 +1768,6 @@ Lemma intersectFormInv1_valid : intersectFormInv1_obligation.
 Proof.
 prepare.
 intros G a b ext H.
-rewrite -> def_intersect in H.
 eapply tr_intersect_formation_invert1; eauto.
 Qed.
 
@@ -1662,7 +1776,6 @@ Lemma intersectFormInv2_valid : intersectFormInv2_obligation.
 Proof.
 prepare.
 intros G a b m ext1 ext0 Hpi Hm.
-rewrite -> def_intersect in Hpi.
 simpsub.
 cut (tr (hyp_tm a :: G) (deqtype b b)).
   {

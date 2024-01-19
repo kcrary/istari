@@ -91,6 +91,355 @@ apply interp_guard; auto.
 Qed.
 
 
+Lemma sound_guard_formation_iff :
+  forall G a a' b b' mr ml,
+    pseq G (deqtype a a)
+    -> pseq G (deqtype a' a')
+    (* a implies a' *)
+    -> pseq (hyp_tm a :: G)
+         (deq mr mr (subst sh1 a'))
+    (* a' implies a *)
+    -> pseq (hyp_tm a' :: G)
+         (deq ml ml (subst sh1 a))
+    -> pseq (cons (hyp_tm a) G) (deqtype (subst sh1 b) (subst sh1 b'))
+    -> pseq G (deqtype (guard a b) (guard a' b')).
+Proof.
+intros G a b c d x y.
+revert G.
+refine (seq_pseq 2 [] c [] d 5 [] _ [] _ [_] _ [_] _ [_] _ _ _); cbn.
+intros G Hclc Hcld Hseqa Hseqb Hseqab Hseqba Hseqcd.
+rewrite -> seq_eqtype in Hseqa, Hseqb, Hseqcd |- *.
+rewrite -> seq_deq in Hseqab, Hseqba.
+intros i s s' Hs.
+so (seqctx_impl_closub _#4 (pwctx_impl_seqctx _#4 Hs)) as (Hcls & Hcls').
+so (Hseqa _#3 Hs) as (A & Hal & Har & _).
+so (Hseqb _#3 Hs) as (B & Hbl & Hbr & _).
+assert (forall j m p,
+          j <= i
+          -> rel (den B) j m p
+          -> rel (den A) j (subst (dot m s) y) (subst (dot p s') y)) as Hba.
+  {
+  intros j m p Hj Hmp.
+  exploit (Hseqba j (dot m s) (dot p s')) as (R & Hrl & _ & Hy & _).
+    {
+    apply pwctx_cons_tm_seq.
+      {
+      apply (pwctx_downward i); auto.
+      }
+
+      {
+      apply (seqhyp_tm _#5 (iutruncate (S j) B)); auto.
+        {
+        apply (basic_downward _#3 i); auto.
+        }
+        
+        {
+        apply (basic_downward _#3 i); auto.
+        }
+
+        {
+        rewrite -> den_iutruncate.
+        split; auto.
+        }
+      }
+
+      {
+      intros i' t t' Ht.
+      so (Hseqb _ _ _ Ht) as (R & Hl & Hr & _).
+      exists toppg, R.
+      auto.
+      }
+    }
+  simpsubin Hrl.
+  so (interp_fun _#7 Hrl (basic_downward _#7 Hj Hal)) as H.
+  subst R.
+  rewrite -> den_iutruncate in Hy.
+  destruct Hy as (_ & Hy).
+  auto.
+  }
+assert (forall j m p,
+          j <= i
+          -> rel (den A) j m p
+          -> rel (den B) j (subst (dot m s) x) (subst (dot p s') x)) as Hab.
+  {
+  intros j m p Hj Hmp.
+  exploit (Hseqab j (dot m s) (dot p s')) as (R & Hrl & _ & Hy & _).
+    {
+    apply pwctx_cons_tm_seq.
+      {
+      apply (pwctx_downward i); auto.
+      }
+
+      {
+      apply (seqhyp_tm _#5 (iutruncate (S j) A)); auto.
+        {
+        apply (basic_downward _#3 i); auto.
+        }
+        
+        {
+        apply (basic_downward _#3 i); auto.
+        }
+
+        {
+        rewrite -> den_iutruncate.
+        split; auto.
+        }
+      }
+
+      {
+      intros i' t t' Ht.
+      so (Hseqa _ _ _ Ht) as (R & Hl & Hr & _).
+      exists toppg, R.
+      auto.
+      }
+    }
+  simpsubin Hrl.
+  so (interp_fun _#7 Hrl (basic_downward _#7 Hj Hbl)) as H.
+  subst R.
+  rewrite -> den_iutruncate in Hy.
+  destruct Hy as (_ & Hy).
+  auto.
+  }
+exploit (extract_functional_multi toppg i (squash_urel stop (den A) i) (subst sh1 (subst s c)) (subst sh1 (subst s' c)) (subst sh1 (subst s d)) (subst sh1 (subst s' d))) as (C & Hcl & Hcr & Hdl & Hdr); eauto; try (rewrite <- hygiene_shift_permit_iff; eauto using subst_closub; done).
+  {
+  rewrite -> ceiling_squash.
+  rewrite -> Nat.min_id.
+  reflexivity.
+  }
+
+  {
+  intros j m p Hmp.
+  cbn in Hmp.
+  decompose Hmp.
+  intros n q Hnq Hj _ _ _ _.
+  assert (pwctx j (dot n s) (dot q s') (cons (hyp_tm a) G)) as Hss.
+    {
+    apply pwctx_cons_tm_seq; eauto using pwctx_downward.
+      {
+      eapply seqhyp_tm_leq; eauto using interp_increase, toppg_max.
+      }
+
+      {
+      intros j' t t' Ht.
+      so (Hseqa _#3 Ht) as (R & Hl & Hr & _).
+      eauto.
+      }
+    }
+  so (Hseqcd _#3 Hss) as (R & Hcl & Hcr & Hdl & Hdr).
+  exists R.
+  simpsub.
+  simpsubin Hcl.
+  simpsubin Hcr.
+  simpsubin Hdl.
+  simpsubin Hdr.
+  auto.
+  }
+exploit (extract_functional_multi toppg i (squash_urel stop (den B) i) (subst sh1 (subst s c)) (subst sh1 (subst s' c)) (subst sh1 (subst s d)) (subst sh1 (subst s' d))) as (D & Hcl' & Hcr' & Hdl' & Hdr'); eauto; try (rewrite <- hygiene_shift_permit_iff; eauto using subst_closub; done).
+  {
+  rewrite -> ceiling_squash.
+  rewrite -> Nat.min_id.
+  reflexivity.
+  }
+
+  {
+  intros j m p Hmp.
+  cbn in Hmp.
+  decompose Hmp.
+  intros n q Hnq Hj _ _ _ _.
+  assert (pwctx j (dot (subst (dot n s) y) s) (dot (subst (dot q s') y) s') (cons (hyp_tm a) G)) as Hss.
+    {
+    apply pwctx_cons_tm_seq; eauto using pwctx_downward.
+      {
+      eapply seqhyp_tm_leq; eauto using interp_increase, toppg_max.
+      }
+
+      {
+      intros j' t t' Ht.
+      so (Hseqa _#3 Ht) as (R & Hl & Hr & _).
+      eauto.
+      }
+    }
+  so (Hseqcd _#3 Hss) as (R & Hcl' & Hcr' & Hdl' & Hdr').
+  exists R.
+  simpsub.
+  simpsubin Hcl'.
+  simpsubin Hcr'.
+  simpsubin Hdl'.
+  simpsubin Hdr'.
+  auto.
+  }
+exists (iuguard stop i A C).
+simpsub.
+do2 2 split.
+  {
+  apply interp_eval_refl.
+  apply interp_guard; auto.
+  }
+
+  {
+  apply interp_eval_refl.
+  apply interp_guard; auto.
+  }
+replace (iuguard stop i A C) with (iuguard stop i B D).
+  {
+  split.
+    {
+    apply interp_eval_refl.
+    apply interp_guard; auto.
+    }
+  
+    {
+    apply interp_eval_refl.
+    apply interp_guard; auto.
+    }
+  }
+symmetry.
+unfold iuguard.
+f_equal.
+  {
+  apply urel_extensionality.
+  fextensionality 3.
+  intros j m p.
+  pextensionality.
+    {
+    intro Hmp.
+    cbn in Hmp |- *.
+    decompose Hmp.
+    intros Hj Hclm Hclp Hact.
+    exists Hj.
+    do2 2 split; auto.
+    intros j' n q Hj' Hnq.
+    so (Hba _ _ _ (le_trans _#3 Hj' Hj) Hnq) as Hy.
+    so (Hact j' _ _ Hj' Hy) as Hcy.
+    invert Hcl.
+    intros _ _ Hactc.
+    invert Hcl'.
+    intros _ _ Hactd.
+    so (Hactd j' _ _ (le_trans _#3 Hj' Hj) (squash_intro stop (den B) i j' n q (le_trans _#3 Hj' Hj) Hnq)) as Hinterp.
+    so (Hactc j' _ _ (le_trans _#3 Hj' Hj) (squash_intro stop (den A) i j' (subst (dot n s) y) (subst (dot q s') y) (le_trans _#3 Hj' Hj) Hy)) as Hinterp'.
+    simpsubin Hinterp.
+    simpsubin Hinterp'.
+    so (interp_fun _#7 Hinterp Hinterp') as Heq.
+    so (f_equal (fun Z => rel (den Z) j' m p) Heq) as Heq'.
+    cbn in Heq'.
+    rewrite <- Heq' in Hcy.
+    exact Hcy.
+    }
+
+    {
+    intro Hmp.
+    cbn in Hmp |- *.
+    decompose Hmp.
+    intros Hj Hclm Hclp Hact.
+    exists Hj.
+    do2 2 split; auto.
+    intros j' n q Hj' Hnq.
+    so (Hab _ _ _ (le_trans _#3 Hj' Hj) Hnq) as Hx.
+    so (Hact j' _ _ Hj' Hx) as Hdx.
+    invert Hcl.
+    intros _ _ Hactc.
+    invert Hcl'.
+    intros _ _ Hactd.
+    so (Hactc j' _ _ (le_trans _#3 Hj' Hj) (squash_intro stop (den A) i j' n q (le_trans _#3 Hj' Hj) Hnq)) as Hinterp.
+    so (Hactd j' _ _ (le_trans _#3 Hj' Hj) (squash_intro stop (den B) i j' (subst (dot n s) x) (subst (dot q s') x) (le_trans _#3 Hj' Hj) Hx)) as Hinterp'.
+    simpsubin Hinterp.
+    simpsubin Hinterp'.
+    so (interp_fun _#7 Hinterp Hinterp') as Heq.
+    so (f_equal (fun Z => rel (den Z) j' m p) Heq) as Heq'.
+    cbn in Heq'.
+    rewrite <- Heq' in Hdx.
+    exact Hdx.
+    }
+  }
+
+  {
+  f_equal.
+  exploit (maximum_element (fun j => j <= i /\ exists m p, rel (den A) j m p)) as [Hnone | Hsome].
+    {
+    exists (S i).
+    intros j (H, _).
+    omega.
+    }
+
+    {
+    exploit (pi2 (unguard stop (den A) i C) andel 0) as Htrunc.
+      {
+      intros j m p Hk Hmp.
+      exfalso.
+      refine (Hnone j _).
+      eauto.
+      }
+    rewrite -> Htrunc; clear Htrunc.
+    exploit (pi2 (unguard stop (den B) i D) andel 0) as Htrunc.
+      {
+      intros j m p Hj Hmp.
+      exfalso.
+      refine (Hnone j _).
+      split; auto.
+      exists (subst (dot m s) y), (subst (dot p s') y).
+      apply Hba; auto.
+      }
+    rewrite -> Htrunc; clear Htrunc.
+    apply iutruncate_collapse.
+    apply dist_zero.
+    }
+
+    {
+    destruct Hsome as (j & (Hj & m & p & Hmp) & Hmax).
+    exploit (pi2 (unguard stop (den A) i C) andel (S j)) as Htrunc.
+      {
+      intros k n q Hk Hnq.
+      cut (k <= j).
+        {
+        omega.
+        }
+      refine (Hmax k _).
+      eauto.
+      }
+    rewrite -> Htrunc.
+    clear Htrunc.
+    exploit (pi2 (unguard stop (den B) i D) andel (S j)) as Htrunc.
+      {
+      intros k n q Hk Hnq.
+      cut (k <= j).
+        {
+        omega.
+        }
+      refine (Hmax k _).
+      split; auto.
+      exists (subst (dot n s) y), (subst (dot q s') y).
+      auto.
+      }
+    rewrite -> Htrunc.
+    clear Htrunc.
+    apply iutruncate_collapse.
+    clear Hmax.
+    eapply dist_trans.
+      {
+      exact (pi2 (unguard stop (den A) i C) ander j m p Hj Hmp).
+      }
+    eapply dist_trans.
+    2:{
+      apply dist_symm.
+      exact (pi2 (unguard stop (den B) i D) ander j (subst (dot m s) x) (subst (dot p s') x) Hj (Hab _#3 Hj Hmp)).
+      }
+    apply dist_refl'.
+
+    invert Hcl.
+    intros _ _ Hactc.
+    invert Hcl'.
+    intros _ _ Hactd.
+    so (Hactc j _ _ Hj (squash_intro stop (den A) i j m p Hj Hmp)) as Hinterp.
+    so (Hactd j _ _ Hj (squash_intro stop (den B) i j (subst (dot m s) x) (subst (dot p s') x) Hj (Hab _#3 Hj Hmp))) as Hinterp'.
+    simpsubin Hinterp.
+    simpsubin Hinterp'.
+    so (interp_fun _#7 Hinterp Hinterp') as Heq.
+    exact Heq.
+    }
+  }
+Qed.
+
+
 Lemma sound_guard_formation_univ :
   forall G lv a a' b b',
     pseq G (deq a a' (univ lv))

@@ -58,9 +58,9 @@ to be empty.
 - `-> [equation] within [captures]`
 
   The equation is a term (usually a hypothesis or lemma name) which,
-  after exploitation (see eexploit), has type `R M N` where R is a
-  relation.  (Often R is equality.)  Replaces M with N.  [Intermediate
-  matching](#matching).
+  after exploitation (see [eexploit](tactics.html#chaining)), has type
+  `R M N` where R is a relation.  (Often R is equality.)  Replaces M
+  with N.  [Intermediate matching](#matching).
 
   + `--> [equation] within [captures]`
 
@@ -82,6 +82,14 @@ to be empty.
 In the above rewrites, the term being replaced cannot have an evar
 head.  That is, it must not be an evar, nor an elim starting from an
 evar.
+
+Relations supported by unaugmented Istari include `eq` (`_ = _ : _`),
+`eqtp` (`_ = _ : type`), `eeqtp` (`<:>`), `subtype` (`<:`), `iff`
+(`<->`), and `arrow`.  Note that arrows in an equation are interpreted
+as antecedents for the relation, not as the relation itself.  Thus, to
+rewrite using arrow, one should use the synonym `implies`, which
+unfolds to `arrow`.  Other relations can be suppored by adding to the
+rewriter's weakening and compatibility tables.
 
 
 
@@ -266,3 +274,26 @@ explicitly, as in `-> Nat.plus_assoc 0 1 x`, but that is more verbose.
 Alternatively, `--> Nat.plus_assoc` works without explicit arguments.
 That is because it does not respect beta-equivalence, so each evar's
 binding is uniquely determined.
+
+
+### Delayed typechecking
+
+Note that rewriting takes place before typechecking.  This can affect
+what hits the rewriter finds.  For example, consider the lemma:
+
+    min_eq_l : forall (m n : nat) . m <= n -> min m n = m : nat
+
+Suppose `H : (x <= y)` and one rewrites using `-> min_eq_l _ _ H`.
+Istari generates evars to fill in the underscores, say `E1` and `E2`.
+Since typechecking has not taken place yet when the rewriter runs,
+those evars have not yet unified with `x` and `y`.  Thus, the rewriter
+looks for terms it can unify with `min E1 E2`, not with `min x y`.
+The former could easily hit more often than the latter.
+
+The user can account for this behavior by choosing an appropriate hit
+number, or by rewriting using `-> min_eq_l x y H`.
+
+(This behavior is intended because the user always has the option to
+deal with typechecking subgoals manually, using `rewriteRaw` for
+example.  It would be confusing if the rewriter behaved differently
+when doing so.)
