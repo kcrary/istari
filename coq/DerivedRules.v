@@ -1314,6 +1314,49 @@ eapply hypothesis; eauto using index_0.
 Qed.
 
 
+Lemma tr_subtype_refl' :
+  forall G a b,
+    tr G (deqtype a b)
+    -> tr G (dsubtype a b).
+Proof.
+intros G a b Ha.
+apply tr_subtype_intro.
+  {
+  eapply tr_eqtype_formation_left; eauto.
+  }
+
+  {
+  eapply tr_eqtype_formation_right; eauto.
+  }
+
+  {
+  apply (tr_eqtype_convert _ _ _ (subst sh1 a)).
+    {
+    apply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    exact Ha.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+  }
+Qed.
+
+
 Lemma tr_subtype_istype1 :
   forall G a b,
     tr G (dsubtype a b)

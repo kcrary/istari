@@ -548,9 +548,8 @@ exact eeqtpTrans_valid.
 exact weakenEqtpEeqtp_valid.
 exact weakenSubtypeArrow_valid.
 exact weakenEeqtpIff_valid.
-exact compatGuardIff0_valid.
+exact compatGuardEqtp1_valid.
 exact compatSetEqtp0_valid.
-exact compatSetIff1_valid.
 exact forallEeq_valid.
 exact existsEeq_valid.
 exact arrowEeq_valid.

@@ -272,102 +272,27 @@ apply tr_prod_intro.
 Qed.
 
 
-Lemma compatGuardIff0_valid : compatGuardIff0_obligation.
+Lemma compatGuardEqtp1_valid : compatGuardEqtp1_obligation.
 Proof.
 prepare.
-intros G a a' b m ext0 Ha Hb.
-apply (tr_guard_formation_iff _#5 (app (subst sh1 (ppi1 m)) (var 0)) (app (subst sh1 (ppi2 m)) (var 0))).
+intros G a b b' ext1 ext0 Ha Hb.
+apply tr_guard_formation; auto.
+simpsub.
+apply (weakening _ [_] []).
   {
-  eapply tr_pi_formation_invert1.
-  eapply tr_inhabitation_formation.
-  eapply tr_prod_elim1; eauto.
+  simpsub.
+  reflexivity.
   }
 
   {
-  eapply tr_pi_formation_invert1.
-  eapply tr_inhabitation_formation.
-  eapply tr_prod_elim2; eauto.
-  }
-
-  {
-  apply (tr_pi_elim' _ (subst sh1 a) (subst (sh 2) a')).
-    {
-    simpsub.
-    apply (weakening _ [_] []).
-      {
-      simpsub.
-      reflexivity.
-      }
-
-      {
-      cbn [length unlift].
-      simpsub.
-      reflexivity.
-      }
-    cbn [length unlift].
-    simpsub.
-    cbn [List.app].
-    eapply tr_prod_elim1; eauto.
-    }
-
-    {
-    eapply hypothesis; eauto using index_0.
-    }
-
-    {
-    simpsub.
-    reflexivity.
-    }
-  }
-
-  {
-  apply (tr_pi_elim' _ (subst sh1 a') (subst (sh 2) a)).
-    {
-    simpsub.
-    apply (weakening _ [_] []).
-      {
-      simpsub.
-      reflexivity.
-      }
-
-      {
-      cbn [length unlift].
-      simpsub.
-      reflexivity.
-      }
-    cbn [length unlift].
-    simpsub.
-    cbn [List.app].
-    eapply tr_prod_elim2; eauto.
-    }
-
-    {
-    eapply hypothesis; eauto using index_0.
-    }
-
-    {
-    simpsub.
-    reflexivity.
-    }
-  }
-
-  {
-  apply (weakening _ [_] []).
-    {
-    simpsub.
-    reflexivity.
-    }
-
-    {
-    cbn [length unlift].
-    simpsub.
-    reflexivity.
-    }
   cbn [length unlift].
   simpsub.
-  cbn [List.app].
-  exact Hb.
+  reflexivity.
   }
+cbn [length unlift].
+simpsub.
+cbn [List.app].
+exact Hb.
 Qed.
 
 
@@ -382,87 +307,6 @@ apply (tr_set_formation _#5 (var 0) (var 0)); auto.
 
   {
   eapply hypothesis; eauto using index_0.
-  }
-Qed.
-
-
-Lemma compatSetIff1_valid : compatSetIff1_obligation.
-Proof.
-prepare.
-intros G a b b' ext m Ha Hb.
-apply (tr_set_formation _#5 (app (subst sh1 (ppi1 m)) (var 0)) (app (subst sh1 (ppi2 m)) (var 0))); auto.
-  {
-  eapply tr_pi_formation_invert1.
-  eapply tr_inhabitation_formation.
-  eapply tr_prod_elim1; eauto.
-  }
-
-  {
-  eapply tr_pi_formation_invert1.
-  eapply tr_inhabitation_formation.
-  eapply tr_prod_elim2; eauto.
-  }
-
-  {
-  apply (tr_pi_elim' _ (subst sh1 b) (subst (sh 2) b')).
-    {
-    simpsub.
-    apply (weakening _ [_] []).
-      {
-      simpsub.
-      reflexivity.
-      }
-
-      {
-      cbn [length unlift].
-      simpsub.
-      reflexivity.
-      }
-    cbn [length unlift].
-    simpsub.
-    cbn [List.app].
-    eapply tr_prod_elim1; eauto.
-    }
-
-    {
-    eapply hypothesis; eauto using index_0.
-    }
-
-    {
-    simpsub.
-    reflexivity.
-    }
-  }
-
-  {
-  apply (tr_pi_elim' _ (subst sh1 b') (subst (sh 2) b)).
-    {
-    simpsub.
-    apply (weakening _ [_] []).
-      {
-      simpsub.
-      reflexivity.
-      }
-
-      {
-      cbn [length unlift].
-      simpsub.
-      reflexivity.
-      }
-    cbn [length unlift].
-    simpsub.
-    cbn [List.app].
-    eapply tr_prod_elim2; eauto.
-    }
-
-    {
-    eapply hypothesis; eauto using index_0.
-    }
-
-    {
-    simpsub.
-    reflexivity.
-    }
   }
 Qed.
 

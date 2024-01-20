@@ -23,7 +23,7 @@ Require Import ValidationUtil.
 Require Import Defined.
 
 
-Hint Rewrite def_set def_iset def_squash : prepare.
+Hint Rewrite def_iff def_set def_iset def_squash : prepare.
 
 
 Lemma subst_squash :
@@ -62,8 +62,85 @@ Qed.
 Lemma setEq_valid : setEq_obligation.
 Proof.
 prepare.
-intros G a b c d ext4 ext3 ext2 ext1 ext0 Hab Hc Hd Hcd Hdc.
-eapply tr_set_formation; eauto.
+intros G a b c d ext1 m Ha Hb.
+apply (tr_set_formation _#5 (app (subst sh1 (ppi1 m)) (var 0)) (app (subst sh1 (ppi2 m)) (var 0))); auto.
+  {
+  eapply tr_pi_formation_invert1.
+  eapply tr_inhabitation_formation.
+  eapply tr_prod_elim1; eauto.
+  }
+
+  {
+  eapply tr_pi_formation_invert1.
+  eapply tr_inhabitation_formation.
+  eapply tr_prod_elim2; eauto.
+  }
+
+  {
+  apply (tr_pi_elim' _ (subst sh1 c) (subst (sh 2) d)).
+    {
+    simpsub.
+    cbn [Nat.add].
+    apply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_prod_elim1; eauto.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
+
+  {
+  apply (tr_pi_elim' _ (subst sh1 d) (subst (sh 2) c)).
+    {
+    simpsub.
+    cbn [Nat.add].
+    apply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_prod_elim2; eauto.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
 Qed.
 
 
@@ -101,8 +178,73 @@ Qed.
 Lemma setEqUniv_valid : setEqUniv_obligation.
 Proof.
 prepare.
-intros G a b c d i ext4 ext3 ext2 ext1 ext0 Hab Hc Hd Hcd Hdc.
-eapply tr_set_formation_univ; eauto.
+intros G a b c d i ext3 ext2 ext1 m Hab Hc Hd Hcd.
+apply (tr_set_formation_univ _#6 (app (subst sh1 (ppi1 m)) (var 0)) (app (subst sh1 (ppi2 m)) (var 0))); auto.
+  {
+  apply (tr_pi_elim' _ (subst sh1 c) (subst (sh 2) d)).
+    {
+    simpsub.
+    cbn [Nat.add].
+    apply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_prod_elim1; eauto.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
+
+  {
+  apply (tr_pi_elim' _ (subst sh1 d) (subst (sh 2) c)).
+    {
+    simpsub.
+    cbn [Nat.add].
+    apply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_prod_elim2; eauto.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
 Qed.
 
 

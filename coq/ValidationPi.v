@@ -1807,19 +1807,206 @@ apply tr_guard_formation_univ; auto.
 Qed.
 
 
+Hint Rewrite def_iff : prepare.
+
+
 Lemma guardEq_valid : guardEq_obligation.
 Proof.
 prepare.
-intros G a a' b b' ext1 ext0 Ha Hb.
-apply tr_guard_formation; auto.
+intros G a a' b b' m ext0 Haa Hb.
+assert (tr G (deqtype a a)) as Ha.
+  {
+  eapply tr_pi_formation_invert1.
+  eapply tr_inhabitation_formation.
+  eapply tr_prod_elim1; eauto.
+  }
+assert (tr G (deqtype a' a')) as Ha'.
+  {
+  eapply tr_pi_formation_invert1.
+  eapply tr_inhabitation_formation.
+  eapply tr_prod_elim2; eauto.
+  }
+apply (tr_guard_formation_iff _#5 (app (subst sh1 (ppi1 m)) (var 0)) (app (subst sh1 (ppi2 m)) (var 0))); auto.
+  {
+  apply (tr_pi_elim' _ (subst sh1 a) (subst (sh 2) a')).
+    {
+    apply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_prod_elim1; eauto.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
+
+  {
+  apply (tr_pi_elim' _ (subst sh1 a') (subst (sh 2) a)).
+    {
+    apply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_prod_elim2; eauto.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
 Qed.
+
+
+Lemma tr_guard_formation_univ_iff :
+  forall G lv a a' b b' mr ml,
+    tr G (deq a a (univ lv))
+    -> tr G (deq a' a' (univ lv))
+    (* a implies a' *)
+    -> tr (hyp_tm a :: G)
+         (deq mr mr (subst sh1 a'))
+    (* a' implies a *)
+    -> tr (hyp_tm a' :: G)
+         (deq ml ml (subst sh1 a))
+    -> tr (cons (hyp_tm a) G) (deq (subst sh1 b) (subst sh1 b') (univ (subst sh1 lv)))
+    -> tr G (deq (guard a b) (guard a' b') (univ lv)).
+Proof.
+intros G lv a a' b b' mr ml Ha Ha' Hr Hl Hb.
+apply tr_formation_strengthen.
+  {
+  eapply tr_guard_formation_iff; eauto using tr_formation_weaken.
+  }
+
+  {
+  apply tr_guard_formation_univ; auto.
+  eapply tr_eq_reflexivity; eauto.
+  }
+
+  {
+  apply tr_guard_formation_univ; auto.
+  replace (deq (subst sh1 b') (subst sh1 b') (univ (subst sh1 lv))) with (substj (dot ml id) (deq (subst (sh 2) b') (subst (sh 2) b') (univ (subst (sh 2) lv)))) by (simpsub; reflexivity).
+  apply (tr_generalize _ (subst sh1 a)); auto.
+  apply (weakening _ [_] [_]).
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_eq_reflexivity.
+  apply tr_symmetry; eauto.
+  }
+Qed.
+
 
 
 Lemma guardEqUniv_valid : guardEqUniv_obligation.
 Proof.
 prepare.
-intros G a a' b b' lv ext1 ext0 Ha Hb.
-apply tr_guard_formation_univ; auto.
+intros G a a' b b' lv ext3 ext2 m ext0 Ha Ha' Haa Hb.
+apply (tr_guard_formation_univ_iff _#6 (app (subst sh1 (ppi1 m)) (var 0)) (app (subst sh1 (ppi2 m)) (var 0))); auto.
+  {
+  apply (tr_pi_elim' _ (subst sh1 a) (subst (sh 2) a')).
+    {
+    apply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_prod_elim1; eauto.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
+
+  {
+  apply (tr_pi_elim' _ (subst sh1 a') (subst (sh 2) a)).
+    {
+    apply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_prod_elim2; eauto.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
 Qed.
 
 

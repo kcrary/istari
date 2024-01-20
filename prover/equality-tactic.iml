@@ -960,63 +960,108 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
              ]
 
 
-        fun intersectExtAuto binder a b m n tac =
-           refine (Rule.intersectIntroEq a b m n)
-           >>> [
-               (* ... |- A : type *)
-               refine (Rule.intersectFormInv1 a b)
-               >>+
-               (* ... |- intersect A . B : type *)
-               refine (Rule.inhabitedForm (T.evar ()))
-               >>+
-               (* ... |- intersect A . B *)
-               refine (Rule.inhabitant (T.evar ()) n)
-               >>+
-               (* ... |- N : intersect A . B *)
-               refine (Rule.hypothesis 0) >> done,
-               
-               (* ..., A |- M[^] = N[^] : B *)
-               assert2
-                  (T.apply2 Prim.ov b (T.Sub (m, T.shift1)))
-                  (T.apply2 Prim.ov b (T.Sub (n, T.shift1)))
-               >>> [
-                   (* ..., A |- M[^] : B = B[0 . ^2][0 . id] *)
-                   refine (Rule.intersectElimOf
-                              (T.Sub (a, T.shift1))
-                              (T.Sub (b, T.underShift 1 1))
-                              (T.Sub (m, T.shift1))
-                              T.zero)
-                   >>> [
-                       (* ..., A |- M[^] : intersect A[^] . B[0 . ^2] *)
-                       refine (Rule.hypothesis 2) >> done,
- 
-                       (* ..., A |- 0 : A[^] *)
-                       refine (Rule.hypothesisOf 0) >> done
-                       ],
- 
-                   (* ..., A |- N[^] : B = B[0 . ^2][0 . id] *)
-                   refine (Rule.intersectElimOf
-                              (T.Sub (a, T.shift1))
-                              (T.Sub (b, T.underShift 1 1))
-                              (T.Sub (n, T.shift1))
-                              T.zero)
-                   >>> [
-                       (* ..., A |- N[^] : intersect A[^] . B[0 . ^2] *)
-                       refine (Rule.hypothesis 1) >> done,
- 
-                       (* ..., A |- 0 : A[^] *)
-                       refine (Rule.hypothesisOf 0) >> done
-                       ],
- 
-                   (* ..., A, (M[^] : B), (N[^2] : B[0 . ^2]) |- ... *)
-                   withgoal
-                   (fn (_, dir) =>
-                       chdir (D.bindh dir binder)
-                       >>+ refine (Rule.weaken 3 2)
-                       >>+ tac)
-                   ]
-               ]
- 
+      fun intersectExtAuto binder a b m n tac =
+         refine (Rule.intersectIntroEq a b m n)
+         >>> [
+             (* ... |- A : type *)
+             refine (Rule.intersectFormInv1 a b)
+             >>+
+             (* ... |- intersect A . B : type *)
+             refine (Rule.inhabitedForm (T.evar ()))
+             >>+
+             (* ... |- intersect A . B *)
+             refine (Rule.inhabitant (T.evar ()) n)
+             >>+
+             (* ... |- N : intersect A . B *)
+             refine (Rule.hypothesis 0) >> done,
+             
+             (* ..., A |- M[^] = N[^] : B *)
+             assert2
+                (T.apply2 Prim.ov b (T.Sub (m, T.shift1)))
+                (T.apply2 Prim.ov b (T.Sub (n, T.shift1)))
+             >>> [
+                 (* ..., A |- M[^] : B = B[0 . ^2][0 . id] *)
+                 refine (Rule.intersectElimOf
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.underShift 1 1))
+                            (T.Sub (m, T.shift1))
+                            T.zero)
+                 >>> [
+                     (* ..., A |- M[^] : intersect A[^] . B[0 . ^2] *)
+                     refine (Rule.hypothesis 2) >> done,
+
+                     (* ..., A |- 0 : A[^] *)
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+
+                 (* ..., A |- N[^] : B = B[0 . ^2][0 . id] *)
+                 refine (Rule.intersectElimOf
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.underShift 1 1))
+                            (T.Sub (n, T.shift1))
+                            T.zero)
+                 >>> [
+                     (* ..., A |- N[^] : intersect A[^] . B[0 . ^2] *)
+                     refine (Rule.hypothesis 1) >> done,
+
+                     (* ..., A |- 0 : A[^] *)
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+
+                 (* ..., A, (M[^] : B), (N[^2] : B[0 . ^2]) |- ... *)
+                 withgoal
+                 (fn (_, dir) =>
+                     chdir (D.bindh dir binder)
+                     >>+ refine (Rule.weaken 3 2)
+                     >>+ tac)
+                 ]
+             ]
+
+
+      fun guardExtAuto binder a b m n tac =
+         refine (Rule.guardIntroEq a b m n)
+         >>> [
+             (* ... |- A : type *)
+             refine (Rule.weaken 0 2)
+             >>+
+             idtacM Secondary,
+
+             (* ..., A |- M[^] = N[^] : B[^] *)
+             assert2 
+                (T.apply2 Prim.ov (T.Sub (b, T.shift1)) (T.Sub (m, T.shift1)))
+                (T.apply2 Prim.ov (T.Sub (b, T.shift1)) (T.Sub (n, T.shift1)))
+             >>> [
+                 (* ..., A |- M[^] : B[^] *)
+                 refine (Rule.guardElimOf (T.Sub (a, T.shift1)) (T.evar ()) (T.evar ()))
+                 >>> [
+                     (* ..., A |- M[^] : A[^] -g> B[^] *)
+                     refine (Rule.hypothesis 2) >> done,
+
+                     (* ..., A |- A[^] *)
+                     refine (Rule.hypothesis 0) >> done
+                     ],
+
+                 (* ..., A |- N[^] : B[^] *)
+                 refine (Rule.guardElimOf (T.Sub (a, T.shift1)) (T.evar ()) (T.evar ()))
+                 >>> [
+                     (* ..., A |- N[^] : A[^] -g> B[^] *)
+                     refine (Rule.hypothesis 1) >> done,
+
+                     (* ..., A |- A[^] *)
+                     refine (Rule.hypothesis 0) >> done
+                     ],
+
+                 (* ..., A, (M[^] : B[^]), (N[^2] : B[^2]) |- M[^3] = N[^3] : B[^3] *)
+                 withgoal
+                 (fn (_, dir) =>
+                     chdir (D.bindh dir binder)
+                     >>+
+                     refine (Rule.weaken 3 2)
+                     >>+
+                     tac)
+                 ]
+             ]
+
 
       fun existsExtAuto a b m n tac1 tac2 =
          assert (T.apply3 Prim.eq a (T.pi1 m) (T.pi1 n))
@@ -1382,6 +1427,10 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                          | \Prim.intersect\ ? (fn . ?) =>
                            \(fnc a b =>
                                 intersectExtAuto ident a b m n (introEqLoop rest))\
+
+                         | \Prim.guard\ ? ? =>
+                           \(fnc a b =>
+                                guardExtAuto ident a b m n (introEqLoop rest))\
 
                          | _ =>
                            \(fnc => 

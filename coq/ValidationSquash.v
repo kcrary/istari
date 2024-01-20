@@ -25,7 +25,7 @@ Require Import Defined.
 Require Import ValidationSet.
 
 
-Hint Rewrite def_set def_squash : prepare.
+Hint Rewrite def_iff def_set def_squash : prepare.
 
 
 
@@ -40,7 +40,19 @@ Qed.
 Lemma squashEq_valid : squashEq_obligation.
 Proof.
 prepare.
-intros G a b ext3 ext2 m n Ha Hb Hm Hn.
+intros G a b m Hab.
+assert (tr G (deqtype a a)) as Ha.
+  {
+  eapply tr_pi_formation_invert1.
+  eapply tr_inhabitation_formation.
+  eapply tr_prod_elim1; eauto.
+  }
+assert (tr G (deqtype b b)) as Hb.
+  {
+  eapply tr_pi_formation_invert1.
+  eapply tr_inhabitation_formation.
+  eapply tr_prod_elim2; eauto.
+  }
 assert (tr (hyp_tm unittp :: G) (deqtype (subst sh1 a) (subst sh1 a))) as Ha'.
   {
   eapply (weakening _ [_] []).
@@ -75,45 +87,71 @@ assert (tr (hyp_tm unittp :: G) (deqtype (subst sh1 b) (subst sh1 b))) as Hb'.
   simpsub.
   exact Hb.
   }
-apply (tr_set_formation _#5 (subst (under 1 sh1) m) (subst (under 1 sh1) n)); auto using tr_unittp_istype.
+apply (tr_set_formation _#5 (app (subst (sh 2) (ppi1 m)) (var 0)) (app (subst (sh 2) (ppi2 m)) (var 0))); auto using tr_unittp_istype.
   {
-  apply (weakening _ [_] [_]).
+  apply (tr_pi_elim' _ (subst (sh 2) a) (subst (sh 3) b)).
     {
+    apply (weakening _ [_; _] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+  
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
     cbn [length unlift].
     simpsub.
-    auto.
+    cbn [List.app].
+    eapply tr_prod_elim1; eauto.
     }
 
     {
-    cbn [length unlift].
+    eapply hypothesis; eauto using index_0.
     simpsub.
-    auto.
+    reflexivity.
     }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  rewrite -> subst_var0_sh1.
-  auto.
+    
+    {
+    simpsub.
+    reflexivity.
+    }
   }
 
   {
-  apply (weakening _ [_] [_]).
+  apply (tr_pi_elim' _ (subst (sh 2) b) (subst (sh 3) a)).
     {
+    apply (weakening _ [_; _] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+  
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
     cbn [length unlift].
     simpsub.
-    auto.
+    cbn [List.app].
+    eapply tr_prod_elim2; eauto.
     }
 
     {
-    cbn [length unlift].
+    eapply hypothesis; eauto using index_0.
     simpsub.
-    auto.
+    reflexivity.
     }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  rewrite -> subst_var0_sh1.
-  auto.
+    
+    {
+    simpsub.
+    reflexivity.
+    }
   }
 Qed.
 
@@ -227,9 +265,9 @@ Qed.
 Lemma squashEqUniv_valid : squashEqUniv_obligation.
 Proof.
 prepare.
-intros G a b i ext3 ext2 m n Ha Hb Hm Hn.
+intros G a b i ext2 ext1 m Ha Hb Hab.
 unfold squash.
-apply (tr_set_formation_univ _#6 (subst (under 1 sh1) m) (subst (under 1 sh1) n)).
+apply (tr_set_formation_univ _#6 (app (subst (sh 2) (ppi1 m)) (var 0)) (app (subst (sh 2) (ppi2 m)) (var 0))).
   {
   apply tr_unittp_formation_univ_gen.
   apply tr_univ_formation_invert.
@@ -275,41 +313,69 @@ apply (tr_set_formation_univ _#6 (subst (under 1 sh1) m) (subst (under 1 sh1) n)
   }
 
   {
-  apply (weakening _ [_] [_]).
+  apply (tr_pi_elim' _ (subst (sh 2) a) (subst (sh 3) b)).
     {
+    apply (weakening _ [_; _] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+  
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
     cbn [length unlift].
     simpsub.
-    auto.
+    cbn [List.app].
+    eapply tr_prod_elim1; eauto.
     }
 
     {
-    cbn [length unlift].
+    eapply hypothesis; eauto using index_0.
     simpsub.
-    auto.
+    reflexivity.
     }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  rewrite -> subst_var0_sh1; auto.
+    
+    {
+    simpsub.
+    reflexivity.
+    }
   }
 
   {
-  apply (weakening _ [_] [_]).
+  apply (tr_pi_elim' _ (subst (sh 2) b) (subst (sh 3) a)).
     {
+    apply (weakening _ [_; _] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+  
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
     cbn [length unlift].
     simpsub.
-    auto.
+    cbn [List.app].
+    eapply tr_prod_elim2; eauto.
     }
 
     {
-    cbn [length unlift].
+    eapply hypothesis; eauto using index_0.
     simpsub.
-    auto.
+    reflexivity.
     }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  rewrite -> subst_var0_sh1; auto.
+    
+    {
+    simpsub.
+    reflexivity.
+    }
   }
 Qed.
 

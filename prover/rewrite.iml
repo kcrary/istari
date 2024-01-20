@@ -3187,146 +3187,6 @@ structure RewriteInternal :> REWRITE_INTERNAL =
          tac
 
 
-      fun compatGuardIff0 a a' tac =
-         (* tac :: A <-> A'
-            A -g> B = A' -g> B : type
-         *)
-         refine (Rule.compatGuardIff0 (T.evar ()) (T.evar ()) (T.evar ()))
-         >>> [
-             (* A <-> A' *)
-             tac,
-
-             (* A |- B[^] : type *)
-             let
-                do (_, dir) = withgoal
-             in
-                chdir (D.bind0 dir) >>+ idtacM Secondary
-             end
-             ]
-
-
-      fun compatGuardEqtp1 b b' tac =
-         (* tac :: B = B' : type
-            A -g> B = A -g> B' : type
-         *)
-         refine (Rule.guardEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
-         >>> [
-             (* A = A : type *)
-             refine (Rule.eqtpRefl (T.evar ()))
-             >>+
-             (* A : type *)
-             idtacM Secondary,
-
-             (* A |- B[^] = B'[^] : type *)
-             refine (Rule.weaken 0 1)
-             >>+
-             (* B = B' : type *)
-             tac,
-             ]
-
-
-      fun compatSetEqtp0 a a' tac =
-         goalCaseT
-         /
-         \Prim.eqtp\ _ (\Prim.set\ _ (fn ? . _)) =>
-         \(fnc binder =>
-              let
-                 do (_, dir) = withgoal
-                 val dir' = D.bindVary dir binder
-              in
-                 (* tac :: A = A' : type
-                    { A | B } = { A' | B } : type
-                 *)
-                 refine (Rule.compatSetEqtp0 (T.evar ()) (T.evar ()) (T.evar ()))
-                 >>> [
-                     (* A = A' : type *)
-                     tac,
-        
-                     (* A |- B : type *)
-                     chdir dir' >>+ idtacM Secondary
-                     ]
-              end)\
-         /
-
-
-      fun compatSetIff1 b b' tac =
-         goalCaseT
-         /
-         \Prim.eqtp\ _ (\Prim.set\ _ (fn ? . _)) =>
-         \(fnc binder =>
-              let
-                 do (_, dir) = withgoal
-                 val dir' = D.bindVary dir binder
-              in
-                 (* tac :: A |- B <-> B'
-                    set A . B = set A . B' : type
-                 *)
-                 refine (Rule.compatSetIff1 (T.evar ()) (T.evar ()) (T.evar ()))
-                 >>> [
-                     (* A : type *)
-                     idtacM Secondary,
-        
-                     (* A |- B <-> B' *)
-                     chdir dir' >>+ tac
-                     ]
-              end)\
-         /
-
-
-      fun compatIsetEqtp0 a a' tac =
-         goalCaseT
-         /
-         \Prim.eqtp\ _ (\Prim.iset\ _ (fn ? . _)) =>
-         \(fnc binder =>
-              let
-                 do (_, dir) = withgoal
-                 val dir' = D.bindVary dir binder
-              in
-                 (* tac :: A = A' : type
-                    iset A . B = iset A' . B : type
-                 *)
-                 refine (Rule.isetEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
-                 >>> [
-                     (* A = A' : type *)
-                     tac,
-        
-                     (* A |- B = B : type *)
-                     refine (Rule.eqtpRefl (T.evar ()))
-                     >>+
-                     (* A |- B : type *)
-                     chdir dir' >>+ idtacM Secondary
-                     ]
-              end)\
-         /
-
-
-      fun compatIsetEqtp1 b b' tac =
-         goalCaseT
-         /
-         \Prim.eqtp\ _ (\Prim.iset\ _ (fn ? . _)) =>
-         \(fnc binder =>
-              let
-                 do (_, dir) = withgoal
-                 val dir' = D.bindVary dir binder
-              in
-                 (* tac :: A |- B = B' : type
-                    iset A . B = iset A . B' : type
-                 *)
-                 refine (Rule.isetEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
-                 >>> [
-                     (* A = A : type *)
-                     refine (Rule.eqtpRefl (T.evar ()))
-                     >>+
-                     (* A : type *)
-                     idtacM Secondary,
-        
-                     (* A |- B = B' : type *)
-                     chdir dir' >>+ tac
-                     ]
-              end)\
-         /
-
-
       fun compatIntersectEqtp0 a a' tac =
          goalCaseT
          /
@@ -3433,6 +3293,155 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                      ]
               end)\
          /
+
+
+      fun compatGuardIff0 a a' tac =
+         (* tac :: A <-> A'
+            A -g> B = A' -g> B : type
+         *)
+         refine (Rule.guardEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A <-> A' *)
+             tac,
+
+             (* A |- B[^] = B[^] : type *)
+             let
+                do (_, dir) = withgoal
+             in
+                refine (Rule.eqtpRefl (T.evar ()))
+                >>+
+                chdir (D.bind0 dir) >>+ idtacM Secondary
+             end
+             ]
+
+
+      fun compatGuardEqtp1 b b' tac =
+         (* tac :: B = B' : type
+            A -g> B = A -g> B' : type
+         *)
+         refine (Rule.compatGuardEqtp1 (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A : type *)
+             idtacM Secondary,
+
+             (* B = B' : type *)
+             tac,
+             ]
+
+
+      fun compatSetEqtp0 a a' tac =
+         goalCaseT
+         /
+         \Prim.eqtp\ _ (\Prim.set\ _ (fn ? . _)) =>
+         \(fnc binder =>
+              let
+                 do (_, dir) = withgoal
+                 val dir' = D.bindVary dir binder
+              in
+                 (* tac :: A = A' : type
+                    { A | B } = { A' | B } : type
+                 *)
+                 refine (Rule.compatSetEqtp0 (T.evar ()) (T.evar ()) (T.evar ()))
+                 >>> [
+                     (* A = A' : type *)
+                     tac,
+        
+                     (* A |- B : type *)
+                     chdir dir' >>+ idtacM Secondary
+                     ]
+              end)\
+         /
+
+
+      fun compatSetIff1 b b' tac =
+         goalCaseT
+         /
+         \Prim.eqtp\ _ (\Prim.set\ _ (fn ? . _)) =>
+         \(fnc binder =>
+              let
+                 do (_, dir) = withgoal
+                 val dir' = D.bindVary dir binder
+              in
+                 (* tac :: A |- B <-> B'
+                    set A . B = set A . B' : type
+                 *)
+                 refine (Rule.setEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                 >>> [
+                     (* A = A : type *)
+                     refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))
+                     >>+
+                     (* A : type *)
+                     idtacM Secondary,
+        
+                     (* A |- B <-> B' *)
+                     chdir dir' >>+ tac
+                     ]
+              end)\
+         /
+
+
+      fun compatIsetEqtp0 a a' tac =
+         goalCaseT
+         /
+         \Prim.eqtp\ _ (\Prim.iset\ _ (fn ? . _)) =>
+         \(fnc binder =>
+              let
+                 do (_, dir) = withgoal
+                 val dir' = D.bindVary dir binder
+              in
+                 (* tac :: A = A' : type
+                    iset A . B = iset A' . B : type
+                 *)
+                 refine (Rule.isetEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                 >>> [
+                     (* A = A' : type *)
+                     tac,
+        
+                     (* A |- B = B : type *)
+                     refine (Rule.eqtpRefl (T.evar ()))
+                     >>+
+                     (* A |- B : type *)
+                     chdir dir' >>+ idtacM Secondary
+                     ]
+              end)\
+         /
+
+
+      fun compatIsetEqtp1 b b' tac =
+         goalCaseT
+         /
+         \Prim.eqtp\ _ (\Prim.iset\ _ (fn ? . _)) =>
+         \(fnc binder =>
+              let
+                 do (_, dir) = withgoal
+                 val dir' = D.bindVary dir binder
+              in
+                 (* tac :: A |- B = B' : type
+                    iset A . B = iset A . B' : type
+                 *)
+                 refine (Rule.isetEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                 >>> [
+                     (* A = A : type *)
+                     refine (Rule.eqtpRefl (T.evar ()))
+                     >>+
+                     (* A : type *)
+                     idtacM Secondary,
+        
+                     (* A |- B = B' : type *)
+                     chdir dir' >>+ tac
+                     ]
+              end)\
+         /
+
+
+      fun compatSquashIff a a' tac =
+         (* tac :: A <-> A'
+            squash A = squash A' : type
+         *)
+         refine (Rule.squashEq (T.evar ()) (T.evar ()))
+         >>+
+         (* A <-> A' *)
+         tac
 
 
       fun compatEqtpEqtp0 _ _ tac =
@@ -4397,6 +4406,20 @@ structure RewriteInternal :> REWRITE_INTERNAL =
          /
 
 
+      fun compatSquashArrow a a' tac =
+         (* tac :: A -> A'
+            squash A <: squash A'
+         *)
+         refine (Rule.squashSub (T.evar ()) (T.evar ()))
+         >>> [
+             (* A' : type *)
+             idtacM Secondary,
+
+             (* A -> A' *)
+             tac
+             ]
+
+
       fun compatIsetArrow1 b b' tac =
          goalCaseT
          /
@@ -4882,6 +4905,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             (Prim.set, 1, 1, Prim.iff, Prim.eqtp, true, compatSetIff1),
             (Prim.iset, 0, 0, Prim.eqtp, Prim.eqtp, true, compatIsetEqtp0),
             (Prim.iset, 1, 1, Prim.eqtp, Prim.eqtp, true, compatIsetEqtp1),
+            (Prim.squash, 0, 0, Prim.iff, Prim.eqtp, true, compatSquashIff),
             (Prim.eqtp, 0, 0, Prim.eqtp, Prim.eqtp, true, compatEqtpEqtp0),
             (Prim.eqtp, 1, 0, Prim.eqtp, Prim.eqtp, true, compatEqtpEqtp1),
             (Prim.eq, 1, 0, Prim.eqtp, Prim.eqtp, true, compatEqUnivEqtp1),
@@ -4930,6 +4954,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             (Prim.set, 1, 1, Prim.arrow, Prim.subtype, true, compatSetArrow1),
             (Prim.iset, 0, 0, Prim.subtype, Prim.subtype, true, compatIsetSubtype0),
             (Prim.iset, 1, 1, Prim.arrow, Prim.subtype, true, compatIsetArrow1),
+            (Prim.squash, 0, 0, Prim.arrow, Prim.subtype, true, compatSquashArrow),
 
             (* iff *)
             (Prim.forall, 1, 1, Prim.iff, Prim.iff, true, compatForallIff1),

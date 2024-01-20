@@ -847,7 +847,7 @@ variables.  The official rules, using de Bruijn indices, are given
 
       G |- (A -g> B) = (A' -g> B') : type
       >>
-      G |- A = A' : type
+      G |- iff A A'
       G, x : A |- B = B' : type
 
 - `guardFormUniv A B I`
@@ -861,7 +861,9 @@ variables.  The official rules, using de Bruijn indices, are given
 
       G |- (A -g> B) = (A' -g> B') : univ I
       >>
-      G |- A = A' : univ I
+      G |- A : univ I
+      G |- A' : univ I
+      G |- iff A A'
       G, x : A |- B = B' : univ I
 
 - `guardIntroOf A B M`
@@ -2889,10 +2891,7 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- {x : A | B} = {x : A' | B'} : type
       >>
       G |- A = A' : type
-      G, x : A |- B : type
-      G, x : A |- B' : type
-      G, x : A, y : B |- B'
-      G, x : A, y : B' |- B
+      G, x : A |- iff B B'
 
 - `setFormUniv A B I`
 
@@ -2908,8 +2907,7 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- A = A' : univ I
       G, x : A |- B : univ I
       G, x : A |- B' : univ I
-      G, x : A, y : B |- B'
-      G, x : A, y : B' |- B
+      G, x : A |- iff B B'
 
 - `setWeakenOf A B M`
 
@@ -3129,10 +3127,7 @@ variables.  The official rules, using de Bruijn indices, are given
 
       G |- {A} = {B} : type
       >>
-      G |- A : type
-      G |- B : type
-      G, x : A |- B
-      G, x : B |- A
+      G |- iff A B
 
 - `squashFormUniv A I`
 
@@ -3146,8 +3141,7 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- A : univ I
       G |- B : univ I
-      G, x : A |- B
-      G, x : B |- A
+      G |- iff A B
 
 - `squashIntroOf A`
 
@@ -3845,8 +3839,9 @@ defines the integers as a quotient over pairs of natural numbers
 
 ### Rewriting
 
-This rules are tailor made to justify certain transformations in the
-rewriter, since the underlying derivations are often quite large.
+This rules are tailor-made to justify certain transformations in the
+rewriter, to improve performance and robustness.  (Some of the
+justifying derivations are quite large.)
 
 - `eeqtpRefl A`
 
@@ -3885,12 +3880,12 @@ rewriter, since the underlying derivations are often quite large.
       >>
       G |- eeqtp A B
 
-- `compatGuardIff0 A A' B`
+- `compatGuardEqtp1 A B B'`
 
-      G |- (A -g> B) = (A' -g> B) : type
+      G |- (A -g> B) = (A -g> B') : type
       >>
-      G |- iff A A'
-      G |- B : type
+      G |- A : type
+      G |- B = B' : type
 
 - `compatSetEqtp0 A A' B`
 
@@ -3898,13 +3893,6 @@ rewriter, since the underlying derivations are often quite large.
       >>
       G |- A = A' : type
       G, x : A |- B : type
-
-- `compatSetIff1 A B B'`
-
-      G |- {x : A | B} = {x : A | B'} : type
-      >>
-      G |- A : type
-      G, x : A |- iff B B'
 
 - `forallEeq A A' B B'`
 

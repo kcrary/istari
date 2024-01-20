@@ -835,7 +835,7 @@ Conventions:
 
       G |- eqtp (guard A B) (guard A' B')
       >>
-      G |- eqtp A A'
+      G |- iff A A'
       G, A |- eqtp B[^1] B'[^1]
 
 - `guardFormUniv A B I`
@@ -849,7 +849,9 @@ Conventions:
 
       G |- eq (univ I) (guard A B) (guard A' B')
       >>
-      G |- eq (univ I) A A'
+      G |- of (univ I) A
+      G |- of (univ I) A'
+      G |- iff A A'
       G, A |- eq (univ I[^1]) B[^1] B'[^1]
 
 - `guardIntroOf A B M`
@@ -2877,10 +2879,7 @@ Conventions:
       G |- eqtp (set A (fn . B)) (set A' (fn . B'))
       >>
       G |- eqtp A A'
-      G, A |- istp B
-      G, A |- istp B'
-      G, A, B |- B'[^1]
-      G, A, B' |- B[^1]
+      G, A |- iff B B'
 
 - `setFormUniv A B I`
 
@@ -2896,8 +2895,7 @@ Conventions:
       G |- eq (univ I) A A'
       G, A |- of (univ I[^1]) B
       G, A |- of (univ I[^1]) B'
-      G, A, B |- B'[^1]
-      G, A, B' |- B[^1]
+      G, A |- iff B B'
 
 - `setWeakenOf A B M`
 
@@ -3117,10 +3115,7 @@ Conventions:
 
       G |- eqtp (squash A) (squash B)
       >>
-      G |- istp A
-      G |- istp B
-      G, A |- B[^1]
-      G, B |- A[^1]
+      G |- iff A B
 
 - `squashFormUniv A I`
 
@@ -3134,8 +3129,7 @@ Conventions:
       >>
       G |- of (univ I) A
       G |- of (univ I) B
-      G, A |- B[^1]
-      G, B |- A[^1]
+      G |- iff A B
 
 - `squashIntroOf A`
 
@@ -3869,8 +3863,9 @@ Conventions:
 
 ### Rewriting
 
-This rules are tailor made to justify certain transformations in the
-rewriter, since the underlying derivations are often quite large.
+This rules are tailor-made to justify certain transformations in the
+rewriter, to improve performance and robustness.  (Some of the
+justifying derivations are quite large.)
 
 - `eeqtpRefl A`
 
@@ -3909,12 +3904,12 @@ rewriter, since the underlying derivations are often quite large.
       >>
       G |- eeqtp A B
 
-- `compatGuardIff0 A A' B`
+- `compatGuardEqtp1 A B B'`
 
-      G |- eqtp (guard A B) (guard A' B)
+      G |- eqtp (guard A B) (guard A B')
       >>
-      G |- iff A A'
-      G |- istp B
+      G |- istp A
+      G |- eqtp B B'
 
 - `compatSetEqtp0 A A' B`
 
@@ -3922,13 +3917,6 @@ rewriter, since the underlying derivations are often quite large.
       >>
       G |- eqtp A A'
       G, A |- istp B
-
-- `compatSetIff1 A B B'`
-
-      G |- eqtp (set A (fn . B)) (set A (fn . B'))
-      >>
-      G |- istp A
-      G, A |- iff B B'
 
 - `forallEeq A A' B B'`
 
