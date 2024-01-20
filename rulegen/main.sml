@@ -10,6 +10,7 @@ signature MAIN =
       val docgendb : unit -> unit
       val webgen : unit -> unit
       val webgendb : unit -> unit
+      val tacticgen : unit -> unit
       val gen : unit -> unit
 
    end
@@ -96,6 +97,16 @@ structure Main :> MAIN =
          in
             Finally.finally
                (fn () => WebgenDB.gen outs rules)
+               (fn () => TextIO.closeOut outs)
+         end
+
+      fun tacticgen () =
+         let
+            val rules = elaborate ()
+            val outs = TextIO.openOut "../prover/rule-tactic.iml"
+         in
+            Finally.finally
+               (fn () => Tacticgen.gen outs rules)
                (fn () => TextIO.closeOut outs)
          end
 

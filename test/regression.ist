@@ -9,6 +9,69 @@ Ctrl.use "../library/integer-load.iml";
 fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
 
 
+lemma "forallElimOf"
+/
+  forall i (a : U i) (b : a -> U i) (m : forall (x : a) . b x) (p : a) .
+    m p : b p
+/;
+
+inference.
+intro /i a b m p/.
+RuleTactic.forallElimOf (parseCurr /a/) (parseCurr /additional` x . b x/) (parseCurr /m/) (parseCurr /p/).
+  {
+  hypof.
+  }
+
+  {
+  hypof.
+  }
+qed ();
+
+
+
+lemma "forallSub"
+/
+  forall i (a a' : U i) (b : a -> U i) (b' : a' -> U i) .
+    a' <: a
+    -> (forall (x : a') . b x <: b' x)
+    -> (forall (x : a) . b x) <: (forall (x' : a') . b' x')
+/;
+
+inference.
+intro /i a a' b b' Ha Hb/.
+RuleTactic.forallSub.
+(* the point here is the variable names *)
+  {
+  hyp /Ha/.
+  }
+
+  {
+  infer /x'/ /Hof/.
+  auto.
+  }
+
+  {
+  infer /x/ /Hof/.
+  auto.
+  }
+qed ();
+
+
+
+lemma "prodLeft"
+/
+  forall i (a b c : U i) (x : a & b) (y : a -> b -> c) . c
+/;
+
+inference.
+intro /i a b c x v0/.
+RuleTactic.prodLeft 1.
+(* the point is v0 is undisturbed *)
+renameBefore /x y/ /v0/.
+exact /v0 x y/.
+qed ();
+
+
 
 lemma "extensionality_guard"
 /
@@ -383,12 +446,12 @@ inference.
 intro /i a b c a1 a2 b1 b2 b3 Hsub1 Hsub2 Heq12 Heq23/.
 transitivity /b2/.
   {
-  RuleTactic.unionIntroEq >> auto.
+  RuleTactic.unionIntroEq (Term.evar ()) >> auto.
   typecheck.
   }
 
   {
-  RuleTactic.unionIntroEq >> auto.
+  RuleTactic.unionIntroEq (Term.evar ()) >> auto.
   typecheck.
   }
 qed ();
