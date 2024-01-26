@@ -408,6 +408,7 @@
   (unless ist-running
     (error "Istari not running."))
   (interrupt-process ist-ml-proc)
+  (sleep-for 0 10) ;; on some platforms, SML needs time to deal with an interrupt before we send more code
   (ist-send-string "RecoverRepl.recover ();\n"))
 
 (defun istari-restart ()
