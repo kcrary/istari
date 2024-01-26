@@ -1,4 +1,6 @@
 
+include ../Makefile.inc
+
 IPP=../ipp/bin/ipp
 
 .PHONY : all smlnj ocaml ocaml-generated clean
@@ -7,7 +9,7 @@ all : smlnj ocaml
 
 smlnj :
 	$(IPP) -t sml -build -B ../ipp/basis cmlib.proj
-	echo 'val _ = CM.make "cmlib.cm"; val _ = OS.Process.exit OS.Process.success;' | sml
+	echo 'val _ = CM.make "cmlib.cm"; val _ = OS.Process.exit OS.Process.success;' | $(SMLNJ)
 
 ocaml-generated cmlib.make :
 	$(IPP) -t ocaml -build -B ../ipp/basis cmlib.proj
