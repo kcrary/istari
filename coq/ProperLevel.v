@@ -34,7 +34,7 @@ Require Import SemanticsMu.
 Require Import SemanticsUniv.
 Require Import SemanticsFut.
 Require Import SemanticsGuard.
-Require Import SemanticsKuniv.
+Require Import SemanticsKind.
 Require Import SemanticsQuotient.
 Require Import SemanticsSet.
 Require Import SemanticsSigma.
@@ -79,10 +79,10 @@ subst pg'.
 apply interp_sequal; auto.
 }
 
-(* kuniv *)
+(* kind *)
 {
 intros pg s i m gpg h Hlv Hlt pg' Hlt'.
-apply interp_kuniv; auto.
+apply interp_kind; auto.
 eapply lt_le_page_trans; eauto.
 }
 
@@ -1057,7 +1057,7 @@ f_equal.
 apply proof_irrelevance.
 }
 
-(* karrow_type *)
+(* karrow *)
 {
 intros pg s i a b A B _ IH1 _ IH2 IHo h.
 so (IH1 IHo h) as (A' & ->).
@@ -1067,7 +1067,7 @@ rewrite -> extend_iuarrow.
 reflexivity.
 }
 
-(* arrow *)
+(* tarrow *)
 {
 intros pg s i a b A B _ IH1 _ IH2 IHo h.
 so (IH1 IHo h) as (A' & ->).
@@ -1593,13 +1593,13 @@ pextensionality.
   }
 }
 
-(* kuniv *)
+(* kind *)
 {
 intros pg s i lv gpg hgt Hlv Hlt IHo h.
 set (wc := cin pg).
-exists ((extend_urel stop wc (kuniv_urel the_system i gpg hgt),
+exists ((extend_urel stop wc (kind_urel the_system i gpg hgt),
          meta_page gpg)).
-unfold iukuniv, extend_iurel.
+unfold iukind, extend_iurel.
 cbn.
 rewrite -> extend_meta_page.
 f_equal.
@@ -2017,8 +2017,8 @@ try (intros;
              end);
      subst;
      first [eapply interp_kunit
-           |eapply interp_type
-           |eapply interp_karrow
+           |eapply interp_kuniv
+           |eapply interp_kkarrow
            |eapply interp_ktarrow
            |eapply interp_kprod
            |eapply interp_kfut_zero
@@ -2032,8 +2032,8 @@ try (intros;
            |eapply interp_cnext
            |eapply interp_cprev
            |eapply interp_cty
-           |eapply interp_karrow_type
-           |eapply interp_arrow
+           |eapply interp_karrow
+           |eapply interp_tarrow
            |eapply interp_pi
            |eapply interp_intersect
            |eapply interp_union
@@ -2064,7 +2064,7 @@ intros lv' r2 Hlv' Hr2 <-.
 invertc Hr2.
 intros <-.
 fold (univ lv').
-apply interp_type.
+apply interp_kuniv.
 eapply pginterp_restriction; eauto.
 }
 
@@ -2474,7 +2474,7 @@ fold (univ lv').
 apply interp_univ; eauto using pginterp_restriction.
 }
 
-(* kuniv *)
+(* kind *)
 {
 intros pg s i lv gpg h Hintlv Hlt mm IHo Hrest.
 invertc Hrest.
@@ -2483,8 +2483,8 @@ invertc Hr1.
 intros lv' r2 Hlv' Hr2 <-.
 invertc Hr2.
 intros <-.
-fold (kuniv lv').
-apply interp_kuniv; eauto using pginterp_restriction.
+fold (kind lv').
+apply interp_kind; eauto using pginterp_restriction.
 }
 
 (* kinterp *)

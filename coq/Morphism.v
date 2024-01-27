@@ -416,12 +416,12 @@ Qed.
 
 
 
-Add Parametric Morphism object : (@arrow object)
+Add Parametric Morphism object : (@tarrow object)
   with signature equiv ==> equiv ==> equiv
-  as equiv_arrow.
+  as equiv_tarrow.
 Proof.
 intros m1 m1' H1 m2 m2' H2.
-unfold arrow.
+unfold tarrow.
 rewrite H1, H2.
 reflexivity.
 Qed.

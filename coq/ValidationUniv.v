@@ -235,7 +235,7 @@ Lemma kindForm_valid : kindForm_obligation.
 Proof.
 prepare.
 intros G i ext0 H.
-apply tr_kuniv_formation; auto.
+apply tr_kind_formation; auto.
 Qed.
 
 
@@ -243,7 +243,7 @@ Lemma kindEq_valid : kindEq_obligation.
 Proof.
 prepare.
 intros G i j ext0 H.
-apply tr_kuniv_formation; eauto.
+apply tr_kind_formation; eauto.
 Qed.
 
 
@@ -254,7 +254,7 @@ intros G i k ext0 Hleq.
 so (lleq_explode _#5 Hleq) as (H & Hssi & Hk).
 so (tr_nsucc_nattp_invert _#3 Hssi) as Hsi.
 so (tr_nsucc_nattp_invert _#3 Hsi) as Hi.
-apply tr_kuniv_formation_univ; auto.
+apply tr_kind_formation_univ; auto.
 unfold ltpagetp.
 rewrite -> equiv_lttp.
 eapply tr_leqtp_eta2; eauto.
@@ -266,7 +266,7 @@ Proof.
 prepare.
 intros G i j k ext1 ext0 Hij Hleq.
 so (lleq_explode _#5 Hleq) as (H & _ & Hk).
-apply tr_kuniv_formation_univ; auto.
+apply tr_kind_formation_univ; auto.
 unfold ltpagetp.
 rewrite -> equiv_lttp.
 eapply tr_leqtp_eta2; eauto.
@@ -280,7 +280,7 @@ Lemma kindForgetOf_valid : kindForgetOf_obligation.
 Proof.
 prepare.
 intros G a i ext0 H.
-apply tr_kuniv_weaken; auto.
+apply tr_kind_weaken; auto.
 Qed.
 
 
@@ -288,7 +288,7 @@ Lemma kindForgetEq_valid : kindForgetEq_obligation.
 Proof.
 prepare.
 intros G a b i ext0 H.
-apply tr_kuniv_weaken; auto.
+apply tr_kind_weaken; auto.
 Qed.
 
 
@@ -300,7 +300,7 @@ so (lleq_explode _#5 Hleq) as (H & Hsi & Hj).
 so (tr_nsucc_nattp_invert _#3 Hsi) as Hi.
 apply tr_subtype_intro.
   {
-  apply tr_kuniv_formation; eauto.
+  apply tr_kind_formation; eauto.
   }
 
   {
@@ -309,7 +309,7 @@ apply tr_subtype_intro.
 simpsub.
 apply (tr_univ_cumulative _ (nsucc (subst sh1 i))).
   {
-  apply tr_kuniv_weaken.
+  apply tr_kind_weaken.
   eapply hypothesis; eauto using index_0.
   }
 

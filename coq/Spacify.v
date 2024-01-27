@@ -440,7 +440,7 @@ so (kinterp_level_bound _#5 Hl) as HlevL.
 eexists.
 do2 4 split.
   {
-  apply interp_karrow_type; eauto.
+  apply interp_karrow; eauto.
   }
 
   (* karrow tosp *)
@@ -716,7 +716,7 @@ change (level K << stop) in kfit.
 eexists.
 do2 4 split.
   {
-  apply interp_arrow; eauto.
+  apply interp_tarrow; eauto.
   exact (interp_increase _#6 (toppg_max pg) Ha).
   }
 

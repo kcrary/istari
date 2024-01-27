@@ -25,7 +25,7 @@ Require Import Ceiling.
 Require Import Page.
 
 
-Definition kuniv_action (system : System) (i : nat) (pg : page) (h : lt_page pg toppg)
+Definition kind_action (system : System) (i : nat) (pg : page) (h : lt_page pg toppg)
   : nat -> relation sterm
   :=
   fun j a b =>
@@ -37,8 +37,8 @@ Definition kuniv_action (system : System) (i : nat) (pg : page) (h : lt_page pg 
          /\ sint system (succ_page pg h) false j b R.
 
 
-Lemma kuniv_uniform :
-  forall system i pg h, uniform _ (kuniv_action system i pg h).
+Lemma kind_uniform :
+  forall system i pg h, uniform _ (kind_action system i pg h).
 Proof.
 intros system i pg.
 do2 3 split.
@@ -96,41 +96,41 @@ auto.
 Qed.
 
 
-Definition kuniv_urel system i pg h : surel :=
-  mk_urel (kuniv_action system i pg h) (kuniv_uniform _ _ _ _).
+Definition kind_urel system i pg h : surel :=
+  mk_urel (kind_action system i pg h) (kind_uniform _ _ _ _).
 
 
-Definition iukuniv system i pg h : siurel :=
-  (kuniv_urel system i pg h,
+Definition iukind system i pg h : siurel :=
+  (kind_urel system i pg h,
    meta_page pg).
 
 
-Lemma den_iukuniv :
+Lemma den_iukind :
   forall system i pg h,
-    den (iukuniv system i pg h) = kuniv_urel system i pg h.
+    den (iukind system i pg h) = kind_urel system i pg h.
 Proof.
 reflexivity.
 Qed.
 
 
-Lemma iukuniv_inj :
+Lemma iukind_inj :
   forall system i i' pg pg' h h',
-    iukuniv system i pg h = iukuniv system i' pg' h'
+    iukind system i pg h = iukind system i' pg' h'
     -> pg = pg'.
 Proof.
 intros system i i' pg pg' h h' Heq.
-unfold iukuniv in Heq.
+unfold iukind in Heq.
 so (f_equal (fun z => snd z) Heq) as Heq'.
 cbn in Heq'.
 exact (meta_page_inj _#3 Heq').
 Qed.
 
 
-Lemma ceiling_kuniv_urel :
+Lemma ceiling_kind_urel :
   forall n system i pg h,
-    ceiling (S n) (kuniv_urel system i pg h)
+    ceiling (S n) (kind_urel system i pg h)
     =
-    kuniv_urel system (min i n) pg h.
+    kind_urel system (min i n) pg h.
 Proof.
 intros n system i pg h.
 apply urel_extensionality.
@@ -154,18 +154,18 @@ pextensionality.
 Qed.
 
 
-Lemma iutruncate_iukuniv :
+Lemma iutruncate_iukind :
   forall n system i pg h,
-    iutruncate (S n) (iukuniv system i pg h)
+    iutruncate (S n) (iukind system i pg h)
     =
-    iukuniv system (min i n) pg h.
+    iukind system (min i n) pg h.
 Proof.
 intros n system i pg h.
-unfold iukuniv, iutruncate.
+unfold iukind, iutruncate.
 cbn [fst snd].
 f_equal.
   {
-  apply ceiling_kuniv_urel.
+  apply ceiling_kind_urel.
   }
 
   {

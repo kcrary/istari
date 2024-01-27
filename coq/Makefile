@@ -58,7 +58,7 @@ UNITS = \
 	SemanticsEqtype \
 	SemanticsGuard \
 	SemanticsKnot \
-	SemanticsKuniv \
+	SemanticsKind \
 	SemanticsMu \
 	SemanticsPi \
 	SemanticsPositive \
@@ -81,7 +81,7 @@ UNITS = \
 	SoundFut \
 	SoundGuard \
 	SoundHyp \
-	SoundKuniv \
+	SoundKind \
 	SoundMisc \
 	SoundMu \
 	SoundRec \

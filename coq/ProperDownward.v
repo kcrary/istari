@@ -32,7 +32,7 @@ Require Import SemanticsAll.
 Require Import SemanticsExist.
 Require Import SemanticsMu.
 Require Import SemanticsGuard.
-Require Import SemanticsKuniv.
+Require Import SemanticsKind.
 Require Import SemanticsUniv.
 Require Import SemanticsFut.
 Require Import SemanticsQuotient.
@@ -472,20 +472,20 @@ apply interp_con; auto.
 apply IH; auto.
 }
 
-(* karrow_type *)
+(* karrow *)
 {
 intros pg s i a b A B Ha IH1 Hb IH2 j Hj.
 rewrite -> iutruncate_iuarrow.
 rewrite -> min_r; auto.
-apply interp_karrow_type; auto.
+apply interp_karrow; auto.
 }
 
-(* karrow_type *)
+(* tarrow *)
 {
 intros pg s i a b A B Ha IH1 Hb IH2 j Hj.
 rewrite -> iutruncate_iuarrow.
 rewrite -> min_r; auto.
-apply interp_arrow; auto.
+apply interp_tarrow; auto.
 }
 
 (* pi *)
@@ -910,12 +910,12 @@ rewrite -> Nat.min_r; auto.
 apply interp_univ; auto.
 }
 
-(* kuniv *)
+(* kind *)
 {
 intros pg s i m gpg h Hm Hlt j Hj.
-rewrite -> iutruncate_iukuniv.
+rewrite -> iutruncate_iukind.
 rewrite -> Nat.min_r; auto.
-apply interp_kuniv; auto.
+apply interp_kind; auto.
 }
 
 (* kbasic *)

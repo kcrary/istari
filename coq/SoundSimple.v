@@ -127,7 +127,7 @@ Qed.
 Lemma sound_unittp_kind_formation :
   forall G lv,
     pseq G (deq lv lv pagetp)
-    -> pseq G (deq unittp unittp (kuniv lv)).
+    -> pseq G (deq unittp unittp (kind lv)).
 Proof.
 intros G lv.
 revert G.

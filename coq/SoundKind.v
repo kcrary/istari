@@ -25,7 +25,7 @@ Require Import ProperClosed.
 Require Import ProperFun.
 Require Import Shut.
 
-Require Import SemanticsKuniv.
+Require Import SemanticsKind.
 Require Import SemanticsUniv.
 Require Import Defined.
 Require Import PageType.
@@ -33,10 +33,10 @@ Require Import ProperLevel.
 
 
 
-Lemma sound_kuniv_formation :
+Lemma sound_kind_formation :
   forall G lv lv',
     pseq G (deq lv lv' pagetp)
-    -> pseq G (deqtype (kuniv lv) (kuniv lv')).
+    -> pseq G (deqtype (kind lv) (kind lv')).
 Proof.
 intros G lv1 lv2.
 revert G.
@@ -53,10 +53,10 @@ so (pginterp_fun _#3 Hlv1l Hlv1l'); subst pg''.
 so (pginterp_fun _#3 Hlv2r Hlv2r'); subst pg'.
 so (pginterp_lt_top _ _ Hlv1l) as hl.
 so (pginterp_succ_lt_top _ _ hl Hlv1l) as hls.
-exists (iukuniv the_system i pg hl).
+exists (iukind the_system i pg hl).
 simpsub.
 do2 3 split;
-apply interp_eval_refl; apply interp_kuniv; eauto using pginterp_str_top, pginterp_cex_top.
+apply interp_eval_refl; apply interp_kind; eauto using pginterp_str_top, pginterp_cex_top.
 Qed.
 
 
@@ -104,12 +104,12 @@ exists (fin (S l)); do2 3 split; cbn; auto.
 Qed.
 
 
-Lemma sound_kuniv_formation_univ :
+Lemma sound_kind_formation_univ :
   forall G lv lv1 lv2,
     pseq G (deq lv1 lv2 pagetp)
     -> pseq G (deq lv lv pagetp)
     -> pseq G (deq triv triv (ltpagetp (nsucc lv1) lv))
-    -> pseq G (deq (kuniv lv1) (kuniv lv2) (univ lv)).
+    -> pseq G (deq (kind lv1) (kind lv2) (univ lv)).
 Proof.
 intros G lv lv1 lv2.
 revert G.
@@ -138,43 +138,43 @@ destruct Hlt as (Hltstr & Hltcex).
 destruct Hlt' as (Hltstr' & Hltcex').
 exists (iuuniv the_system i pg').
 simpsub.
-assert (sint the_system pg' true i (kuniv (subst s lv1)) (iukuniv the_system i pg hl)) as Hintlv1l.
+assert (sint the_system pg' true i (kind (subst s lv1)) (iukind the_system i pg hl)) as Hintlv1l.
   {
   rewrite -> sint_unroll.
   apply interp_eval_refl.
-  apply interp_kuniv; auto.
+  apply interp_kind; auto.
   split; auto.
   }
-assert (sint the_system pg' false i (kuniv (subst s' lv1)) (iukuniv the_system i pg hl)) as Hintlv1r.
+assert (sint the_system pg' false i (kind (subst s' lv1)) (iukind the_system i pg hl)) as Hintlv1r.
   {
   rewrite -> sint_unroll.
   apply interp_eval_refl.
-  apply interp_kuniv; auto.
+  apply interp_kind; auto.
   split; auto.
   }
-assert (sint the_system pg' true i (kuniv (subst s lv2)) (iukuniv the_system i pg hl)) as Hintlv2l.
+assert (sint the_system pg' true i (kind (subst s lv2)) (iukind the_system i pg hl)) as Hintlv2l.
   {
   rewrite -> sint_unroll.
   apply interp_eval_refl.
-  apply interp_kuniv; auto.
+  apply interp_kind; auto.
   split; auto.
   }
-assert (sint the_system pg' false i (kuniv (subst s' lv2)) (iukuniv the_system i pg hl)) as Hintlv2r.
+assert (sint the_system pg' false i (kind (subst s' lv2)) (iukind the_system i pg hl)) as Hintlv2r.
   {
   rewrite -> sint_unroll.
   apply interp_eval_refl.
-  apply interp_kuniv; auto.
+  apply interp_kind; auto.
   split; auto.
   }
 do2 4 split;
 try (apply interp_eval_refl; apply interp_univ; eauto using pginterp_str_top, pginterp_cex_top; done);
-try (cbn; split; auto; exists (iukuniv the_system i pg hl); auto).
+try (cbn; split; auto; exists (iukind the_system i pg hl); auto).
 Qed.
 
 
-Lemma sound_kuniv_weaken :
+Lemma sound_kind_weaken :
   forall G lv a b,
-    pseq G (deq a b (kuniv lv))
+    pseq G (deq a b (kind lv))
     -> pseq G (deq a b (univ (nsucc lv))).
 Proof.
 intros G lv a b.
@@ -199,9 +199,9 @@ do2 5 split; auto.
 Qed.
 
 
-Lemma sound_kuniv_formation_invert :
+Lemma sound_kind_formation_invert :
   forall G lv lv',
-    pseq G (deqtype (kuniv lv) (kuniv lv'))
+    pseq G (deqtype (kind lv) (kind lv'))
     -> pseq G (deq lv lv' pagetp).
 Proof.
 intros G l m.
@@ -216,21 +216,21 @@ simpsubin Hll.
 simpsubin Hlr.
 simpsubin Hml.
 simpsubin Hmr.
-invert (basic_value_inv _#6 value_kuniv Hll).
+invert (basic_value_inv _#6 value_kind Hll).
 intros pg h Hpgll _ Heq.
-invert (basic_value_inv _#6 value_kuniv Hlr).
+invert (basic_value_inv _#6 value_kind Hlr).
 intros pg' h' Hpglr _ Heq'.
-so (iukuniv_inj _#7 (eqtrans Heq (eqsymm Heq'))); subst pg'.
+so (iukind_inj _#7 (eqtrans Heq (eqsymm Heq'))); subst pg'.
 clear Heq'.
 so (proof_irrelevance _ h h'); subst h'.
-invert (basic_value_inv _#6 value_kuniv Hml).
+invert (basic_value_inv _#6 value_kind Hml).
 intros pg' h' Hpgml _ Heq'.
-so (iukuniv_inj _#7 (eqtrans Heq (eqsymm Heq'))); subst pg'.
+so (iukind_inj _#7 (eqtrans Heq (eqsymm Heq'))); subst pg'.
 clear Heq'.
 so (proof_irrelevance _ h h'); subst h'.
-invert (basic_value_inv _#6 value_kuniv Hmr).
+invert (basic_value_inv _#6 value_kind Hmr).
 intros pg' h' Hpgmr _ Heq'.
-so (iukuniv_inj _#7 (eqtrans Heq (eqsymm Heq'))); subst pg'.
+so (iukind_inj _#7 (eqtrans Heq (eqsymm Heq'))); subst pg'.
 clear Heq Heq'.
 so (proof_irrelevance _ h h'); subst h'.
 exists (nattp_def top i).

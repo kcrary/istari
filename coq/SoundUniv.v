@@ -35,7 +35,7 @@ Lemma sound_univ_kind_formation :
   forall G lv lv1 lv2,
     pseq G (deq lv1 lv2 pagetp)
     -> pseq G (deq lv1 lv pagetp)
-    -> pseq G (deq (univ lv1) (univ lv2) (kuniv lv)).
+    -> pseq G (deq (univ lv1) (univ lv2) (kind lv)).
 Proof.
 intros G lv3 lv1 lv2.
 revert G.
@@ -61,7 +61,7 @@ so (pginterp_lt_top _ _ Hlv1l) as h.
 exists pg, (qtype (cin pg)), (iuuniv the_system i pg), h.
 simpsub.
 do2 9 split; auto;
-try (apply kinterp_eval_refl; apply interp_type; auto);
+try (apply kinterp_eval_refl; apply interp_kuniv; auto);
 try (apply interp_eval_refl; apply interp_univ; eauto using pginterp_str_top, pginterp_cex_top);
 cbn; try apply succ_increase.
 Qed.

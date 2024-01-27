@@ -30,7 +30,7 @@ Inductive tr : @context obj -> judgement -> Prop :=
       index i G hyp_tp
       -> tr G (deqtype (var i) (var i)) 
   
-(* Pi/Arrow/Karrow/Intersect *)
+(* Pi/Tarrow/Karrow/Intersect *)
 
 | tr_pi_formation :
     forall G a a' b b',
@@ -73,46 +73,46 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr G (deq n n (pi a'' b''))
       -> tr G (deq m n (pi a b))
 
-| tr_arrow_kind_formation :
+| tr_tarrow_kind_formation :
     forall G lv a b k l,
       tr G (deq a b (univ lv))
-      -> tr G (deq k l (kuniv lv))
-      -> tr G (deq (arrow a k) (arrow b l) (kuniv lv))
+      -> tr G (deq k l (kind lv))
+      -> tr G (deq (tarrow a k) (tarrow b l) (kind lv))
   
-| tr_arrow_formation :
+| tr_tarrow_formation :
     forall G a a' b b',
       tr G (deqtype a a')
       -> tr G (deqtype b b')
-      -> tr G (deqtype (arrow a b) (arrow a' b'))
+      -> tr G (deqtype (tarrow a b) (tarrow a' b'))
   
-| tr_arrow_formation_univ :
+| tr_tarrow_formation_univ :
     forall G lv a a' b b',
       tr G (deq a a' (univ lv))
       -> tr G (deq b b' (univ lv))
-      -> tr G (deq (arrow a b) (arrow a' b') (univ lv))
+      -> tr G (deq (tarrow a b) (tarrow a' b') (univ lv))
   
-| tr_arrow_pi_equal :
+| tr_tarrow_pi_equal :
     forall G a b,
       tr G (deqtype a a)
       -> tr G (deqtype b b)
-      -> tr G (deqtype (arrow a b) (pi a (subst sh1 b)))
+      -> tr G (deqtype (tarrow a b) (pi a (subst sh1 b)))
   
-| tr_arrow_pi_equal_univ :
+| tr_tarrow_pi_equal_univ :
     forall G lv a b,
       tr G (deq a a (univ lv))
       -> tr G (deq b b (univ lv))
-      -> tr G (deq (arrow a b) (pi a (subst sh1 b)) (univ lv))
+      -> tr G (deq (tarrow a b) (pi a (subst sh1 b)) (univ lv))
   
-| tr_arrow_eta :
+| tr_tarrow_eta :
     forall G a b m,
-      tr G (deq m m (arrow a b))
-      -> tr G (deq m (lam (app (subst sh1 m) (var 0))) (arrow a b))
+      tr G (deq m m (tarrow a b))
+      -> tr G (deq m (lam (app (subst sh1 m) (var 0))) (tarrow a b))
 
 | tr_karrow_kind_formation :
     forall G lv k k' l l',
-      tr G (deq k k' (kuniv lv))
-      -> tr G (deq l l' (kuniv lv))
-      -> tr G (deq (karrow k l) (karrow k' l') (kuniv lv))
+      tr G (deq k k' (kind lv))
+      -> tr G (deq l l' (kind lv))
+      -> tr G (deq (karrow k l) (karrow k' l') (kind lv))
   
 | tr_karrow_formation :
     forall G k k' l l',
@@ -138,17 +138,17 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr G (deq b b (univ lv))
       -> tr G (deq (karrow a b) (pi a (subst sh1 b)) (univ lv))
   
-| tr_arrow_karrow_equal :
+| tr_tarrow_karrow_equal :
     forall G a b,
       tr G (deqtype a a)
       -> tr G (deqtype b b)
-      -> tr G (deqtype (arrow a b) (karrow a b))
+      -> tr G (deqtype (tarrow a b) (karrow a b))
   
-| tr_arrow_karrow_equal_univ :
+| tr_tarrow_karrow_equal_univ :
     forall G lv a b,
       tr G (deq a a (univ lv))
       -> tr G (deq b b (univ lv))
-      -> tr G (deq (arrow a b) (karrow a b) (univ lv))
+      -> tr G (deq (tarrow a b) (karrow a b) (univ lv))
   
 | tr_karrow_eta :
     forall G a b m,
@@ -165,14 +165,14 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deqtype (pi a b) (pi a' b'))
       -> tr (cons (hyp_tm a) G) (deqtype b b')
 
-| tr_arrow_formation_invert1 :
+| tr_tarrow_formation_invert1 :
     forall G a a' b b',
-      tr G (deqtype (arrow a b) (arrow a' b'))
+      tr G (deqtype (tarrow a b) (tarrow a' b'))
       -> tr G (deqtype a a')
 
-| tr_arrow_formation_invert2 :
+| tr_tarrow_formation_invert2 :
     forall G a a' b b',
-      tr G (deqtype (arrow a b) (arrow a' b'))
+      tr G (deqtype (tarrow a b) (tarrow a' b'))
       -> tr (cons (hyp_tm a) G) (deqtype (subst sh1 b) (subst sh1 b'))
   
 | tr_karrow_formation_invert1 :
@@ -271,9 +271,9 @@ Inductive tr : @context obj -> judgement -> Prop :=
 
 | tr_prod_kind_formation :
     forall G lv k k' l l',
-      tr G (deq k k' (kuniv lv))
-      -> tr G (deq l l' (kuniv lv))
-      -> tr G (deq (prod k l) (prod k' l') (kuniv lv))
+      tr G (deq k k' (kind lv))
+      -> tr G (deq l l' (kind lv))
+      -> tr G (deq (prod k l) (prod k' l') (kind lv))
   
 | tr_prod_formation :
     forall G k k' l l',
@@ -366,9 +366,9 @@ Inductive tr : @context obj -> judgement -> Prop :=
 
 | tr_fut_kind_formation :
     forall G lv k k',
-      tr (promote G) (deq k k' (kuniv lv))
+      tr (promote G) (deq k k' (kind lv))
       -> tr G (deq lv lv pagetp)
-      -> tr G (deq (fut k) (fut k') (kuniv lv))
+      -> tr G (deq (fut k) (fut k') (kind lv))
   
 | tr_fut_formation :
     forall G a b,
@@ -422,9 +422,9 @@ Inductive tr : @context obj -> judgement -> Prop :=
 
 | tr_rec_kind_formation :
     forall G lv k k',
-      tr (cons (hyp_tml (kuniv lv)) G) (deq k k' (kuniv (subst sh1 lv)))
+      tr (cons (hyp_tml (kind lv)) G) (deq k k' (kind (subst sh1 lv)))
       -> tr G (deq lv lv pagetp)
-      -> tr G (deq (rec k) (rec k') (kuniv lv))
+      -> tr G (deq (rec k) (rec k') (kind lv))
 
 | tr_rec_formation :
     forall G a b,
@@ -470,7 +470,7 @@ Inductive tr : @context obj -> judgement -> Prop :=
 | tr_unittp_kind_formation :
     forall G lv,
       tr G (deq lv lv pagetp)
-      -> tr G (deq unittp unittp (kuniv lv))
+      -> tr G (deq unittp unittp (kind lv))
 
 | tr_unittp_formation_univ :
     forall G,
@@ -552,7 +552,7 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr
            (cons 
               (hyp_tm (pi (subst sh1 b) (subst (dot (app (var 1) (var 0)) (sh 3)) c)))
-              (cons (hyp_tm (arrow b (subst sh1 (wt a b)))) (cons (hyp_tm a) G)))
+              (cons (hyp_tm (tarrow b (subst sh1 (wt a b)))) (cons (hyp_tm a) G)))
            (deq n n' (subst (dot (ppair (var 2) (var 1)) (sh 3)) c))
       -> tr G (deq (app (wind (lam (lam (lam n)))) m) (app (wind (lam (lam (lam n')))) m') (subst1 m c))
 
@@ -560,13 +560,13 @@ Inductive tr : @context obj -> judgement -> Prop :=
     forall G a b,
       tr G (deqtype a a)
       -> tr (cons (hyp_tm a) G) (deqtype b b)
-      -> tr G (dsubtype (wt a b) (sigma a (arrow b (subst sh1 (wt a b)))))
+      -> tr G (dsubtype (wt a b) (sigma a (tarrow b (subst sh1 (wt a b)))))
 
 | tr_wt_sigma_subtype :
     forall G a b,
       tr G (deqtype a a)
       -> tr (cons (hyp_tm a) G) (deqtype b b)
-      -> tr G (dsubtype (sigma a (arrow b (subst sh1 (wt a b)))) (wt a b))
+      -> tr G (dsubtype (sigma a (tarrow b (subst sh1 (wt a b)))) (wt a b))
 
 | tr_wt_formation_inv1 :
     forall G a b,
@@ -583,13 +583,13 @@ Inductive tr : @context obj -> judgement -> Prop :=
 
 | tr_all_formation :
     forall G glv k l a b,
-      tr G (deq k l (kuniv glv))
+      tr G (deq k l (kind glv))
       -> tr (cons (hyp_tm k) G) (deqtype a b)
       -> tr G (deqtype (all glv k a) (all glv l b))
 
 | tr_all_formation_univ :
     forall G glv lv k l a b,
-      tr G (deq k l (kuniv glv))
+      tr G (deq k l (kind glv))
       -> tr (cons (hyp_tm k) G) (deq a b (univ (subst sh1 lv)))
       -> tr G (deq lv lv pagetp)
       -> tr G (deq triv triv (leqpagetp glv lv))
@@ -597,7 +597,7 @@ Inductive tr : @context obj -> judgement -> Prop :=
   
 | tr_all_intro :
     forall G lv k a m n,
-      tr G (deq k k (kuniv lv))
+      tr G (deq k k (kind lv))
       -> tr (cons (hyp_tm k) G) (deq (subst sh1 m) (subst sh1 n) a)
       -> tr G (deq m n (all lv k a))
   
@@ -629,13 +629,13 @@ Inductive tr : @context obj -> judgement -> Prop :=
 
 | tr_exist_formation :
     forall G glv k l a b,
-      tr G (deq k l (kuniv glv))
+      tr G (deq k l (kind glv))
       -> tr (cons (hyp_tm k) G) (deqtype a b)
       -> tr G (deqtype (exist glv k a) (exist glv l b))
   
 | tr_exist_formation_univ :
     forall G glv lv k l a b,
-      tr G (deq k l (kuniv glv))
+      tr G (deq k l (kind glv))
       -> tr (cons (hyp_tm k) G) (deq a b (univ (subst sh1 lv)))
       -> tr G (deq lv lv pagetp)
       -> tr G (deq triv triv (leqpagetp glv lv))
@@ -643,7 +643,7 @@ Inductive tr : @context obj -> judgement -> Prop :=
   
 | tr_exist_intro :
     forall G lv k a b m n,
-      tr G (deq k k (kuniv lv))
+      tr G (deq k k (kind lv))
       -> tr G (deq b b k)
       -> tr G (deq m n (subst1 b a))
       -> tr (cons (hyp_tm k) G) (deqtype a a)
@@ -1140,7 +1140,7 @@ Inductive tr : @context obj -> judgement -> Prop :=
     forall G lv lv1 lv2,
       tr G (deq lv1 lv2 pagetp)
       -> tr G (deq lv1 lv pagetp)
-      -> tr G (deq (univ lv1) (univ lv2) (kuniv lv))
+      -> tr G (deq (univ lv1) (univ lv2) (kind lv))
 
 | tr_univ_formation :
     forall G lv lv',
@@ -1180,26 +1180,26 @@ Inductive tr : @context obj -> judgement -> Prop :=
 
 (* Kind universes *)
 
-| tr_kuniv_formation :
+| tr_kind_formation :
     forall G lv lv',
       tr G (deq lv lv' pagetp)
-      -> tr G (deqtype (kuniv lv) (kuniv lv'))
+      -> tr G (deqtype (kind lv) (kind lv'))
   
-| tr_kuniv_formation_univ :
+| tr_kind_formation_univ :
     forall G lv lv1 lv2,
       tr G (deq lv1 lv2 pagetp)
       -> tr G (deq lv lv pagetp)
       -> tr G (deq triv triv (ltpagetp (nsucc lv1) lv))
-      -> tr G (deq (kuniv lv1) (kuniv lv2) (univ lv))
+      -> tr G (deq (kind lv1) (kind lv2) (univ lv))
   
-| tr_kuniv_weaken :
+| tr_kind_weaken :
     forall G lv a b,
-      tr G (deq a b (kuniv lv))
+      tr G (deq a b (kind lv))
       -> tr G (deq a b (univ (nsucc lv)))
 
-| tr_kuniv_formation_invert :
+| tr_kind_formation_invert :
     forall G lv lv',
-      tr G (deqtype (kuniv lv) (kuniv lv'))
+      tr G (deqtype (kind lv) (kind lv'))
       -> tr G (deq lv lv' pagetp)
 
 (* Type equality *)

@@ -32,7 +32,7 @@ Require Import SemanticsUniv.
 Require Import SemanticsProperty.
 Require Import SemanticsEqtype.
 Require Import SemanticsSubtype.
-Require Import SemanticsKuniv.
+Require Import SemanticsKind.
 Require Import ProperFun.
 Require Import ProperLevel.
 Require Import Equivalence.
@@ -1743,7 +1743,7 @@ Qed.
 
 Lemma seq_eqkind :
   forall G k l lv,
-    seq G (deq k l (kuniv lv))
+    seq G (deq k l (kind lv))
     <->
     (forall i s s',
        pwctx i s s' G
@@ -1771,14 +1771,14 @@ intros i s s' Hs.
 so (Hseq i s s' Hs) as (R & Hintl & Hintr & Hk & Hl & Hk_l); clear Hseq.
 simpsubin Hintl.
 simpsubin Hintr.
-invert (basic_value_inv _#6 value_kuniv Hintl).
+invert (basic_value_inv _#6 value_kind Hintl).
 intros pg h Hlvl Hlt Heq1.
-invert (basic_value_inv _#6 value_kuniv Hintr).
+invert (basic_value_inv _#6 value_kind Hintr).
 intros pg' h' Hlvr _ Heq2.
 so (eqtrans Heq1 (eqsymm Heq2)) as Heq.
 clear Heq2.
 subst R.
-so (iukuniv_inj _#7 Heq); subst pg'; clear Heq.
+so (iukind_inj _#7 Heq); subst pg'; clear Heq.
 so (proof_irrelevance _ h h'); subst h'.
 cbn in Hk, Hl, Hk_l.
 destruct Hk as (_ & K & R & Hkl & Hkr & Hklt & Hkrt).
@@ -1803,17 +1803,17 @@ so (Hseq i s s' Hs) as (pg & K & R & Hlt & Hlvl & Hlvr & Hkl & Hkr & Hll & Hlr &
 so (pginterp_succ_lt_top _ _ Hlt Hlvl) as Hlt'.
 so (kinterp_level_bound _#5 Hkl) as Hlev.
 set (h := le_ord_succ _ _ (cin_top pg)).
-exists (iukuniv the_system i pg Hlt).
+exists (iukind the_system i pg Hlt).
 simpsub.
 do2 4 split.
   {
   apply interp_eval_refl.
-  apply interp_kuniv; eauto using toppg_max, pginterp_cin_top.
+  apply interp_kind; eauto using toppg_max, pginterp_cin_top.
   }
 
   {
   apply interp_eval_refl.
-  apply interp_kuniv; eauto using toppg_max, pginterp_cin_top.
+  apply interp_kind; eauto using toppg_max, pginterp_cin_top.
   }
 
   {

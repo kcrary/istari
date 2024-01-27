@@ -232,7 +232,7 @@ Local Ltac prove_hygiene :=
 Lemma sound_wt_intro :
   forall G m n p q a b,
     pseq G (deq m n a)
-    -> pseq G (deq p q (arrow (subst1 m b) (wt a b)))
+    -> pseq G (deq p q (tarrow (subst1 m b) (wt a b)))
     -> pseq (cons (hyp_tm a) G) (deqtype b b)
     -> pseq G (deq (ppair m p) (ppair n q) (wt a b)).
 Proof.
@@ -282,9 +282,9 @@ destruct H as (B & Hbl & Hbr).
 so (Hseqpq _#3 Hs) as (R & Habl & Habr & Hp & Hq & Hpq); clear Hseqpq.
 simpsubin Habl.
 simpsubin Habr.
-invert (basic_value_inv _#6 value_arrow Habl).
+invert (basic_value_inv _#6 value_tarrow Habl).
 intros Bm C Hbml Hcl Heq1.
-invert (basic_value_inv _#6 value_arrow Habr).
+invert (basic_value_inv _#6 value_tarrow Habr).
 intros Bm' C' _ Hcr Heq2.
 so (eqtrans Heq1 (eqsymm Heq2)) as Heq.
 clear Heq2.
@@ -677,14 +677,14 @@ Lemma sound_wt_elim :
     -> pseq
          (cons 
             (hyp_tm (pi (subst sh1 b) (subst (dot (app (var 1) (var 0)) (sh 3)) c)))
-            (cons (hyp_tm (arrow b (subst sh1 (wt a b)))) (cons (hyp_tm a) G)))
+            (cons (hyp_tm (tarrow b (subst sh1 (wt a b)))) (cons (hyp_tm a) G)))
          (deq n n' (subst (dot (ppair (var 2) (var 1)) (sh 3)) c))
     -> pseq G (deq (app (wind (lam (lam (lam n)))) m) (app (wind (lam (lam (lam n')))) m') (subst1 m c)).
 Proof.
 intros G a b c m n p q.
 revert G.
 (* why necessary? *)
-set (X := hyp_tm (arrow b (subst sh1 (wt a b)))).
+set (X := hyp_tm (tarrow b (subst sh1 (wt a b)))).
 refine (seq_pseq 5 [hyp_emp] c [] m [] n [hyp_emp; hyp_emp; hyp_emp] p [hyp_emp; hyp_emp; hyp_emp] q 2 [] _ [_; _; _] _ _ _); cbn.
 subst X.
 intros G Hclc Hclm Hcln Hclp Hclq Hseqmn Hseqpq.
@@ -1004,7 +1004,7 @@ assert (forall pp qq,
                 (dot n2 (dot n1 s')))
              (cons 
                 (hyp_tm (pi (subst sh1 b) (subst (dot (app (var 1) (var 0)) (sh 3)) c)))
-                (cons (hyp_tm (arrow b (subst sh1 (wt a b))))
+                (cons (hyp_tm (tarrow b (subst sh1 (wt a b))))
                    (cons (hyp_tm a) G)))) as Hs'.
   {
   intros pp qq Hpp Hqq.
@@ -1058,7 +1058,7 @@ assert (forall pp qq,
       apply (seqhyp_tm _#5 (iuarrow stop i (pi1 B (urelspinj (den A) _#3 Hm1n1)) (iutruncate (S i) (iuwt stop A B)))).
         {
         apply interp_eval_refl.
-        apply interp_arrow.
+        apply interp_tarrow.
           {
           invert Hbl.
           intros _ _ Hact.
@@ -1076,7 +1076,7 @@ assert (forall pp qq,
 
         {
         apply interp_eval_refl.
-        apply interp_arrow.
+        apply interp_tarrow.
           {
           invert Hbr.
           intros _ _ Hact.
@@ -1124,7 +1124,7 @@ assert (forall pp qq,
       split.
         {
         apply interp_eval_refl.
-        apply interp_arrow.
+        apply interp_tarrow.
           {
           invert Hbtl.
           intros _ _ H.
@@ -1141,7 +1141,7 @@ assert (forall pp qq,
 
         {
         apply interp_eval_refl.
-        apply interp_arrow.
+        apply interp_tarrow.
           {
           invert Hbtr.
           intros _ _ H.
@@ -1294,7 +1294,7 @@ assert (forall pp qq,
       refine (basic_fun _#7 Hwl _).
       apply (basic_downward _#3 i); auto.
       apply interp_eval_refl.
-      apply interp_arrow.
+      apply interp_tarrow.
         {
         invert Hbl.
         intros _ _ H.
@@ -1426,7 +1426,7 @@ assert (forall pp qq,
       refine (basic_fun _#7 Hwr _).
       apply (basic_downward _#3 i); auto.
       apply interp_eval_refl.
-      apply interp_arrow.
+      apply interp_tarrow.
         {
         invert Hbr.
         intros _ _ H.
@@ -1836,7 +1836,7 @@ Qed.
 Lemma sound_wt_elim_pi2 :
   forall G a b m n,
     pseq G (deq m n (wt a b))
-    -> pseq G (deq (ppi2 m) (ppi2 n) (arrow (subst1 (ppi1 m) b) (wt a b))).
+    -> pseq G (deq (ppi2 m) (ppi2 n) (tarrow (subst1 (ppi1 m) b) (wt a b))).
 Proof.
 intros G a b m n.
 revert G.
@@ -1905,7 +1905,7 @@ do2 4 split.
   {
   simpsub.
   apply interp_eval_refl.
-  apply interp_arrow; auto.
+  apply interp_tarrow; auto.
   invert Hbl.
   intros _ _ Hact.
   so (Hact _ _ _ (le_refl _) Hm1) as H.
@@ -1943,7 +1943,7 @@ do2 4 split.
   {
   simpsub.
   apply interp_eval_refl.
-  apply interp_arrow; auto.
+  apply interp_tarrow; auto.
   invert Hbr.
   intros _ _ Hact.
   so (Hact _ _ _ (le_refl _) Hm1) as H.
@@ -2568,7 +2568,7 @@ Lemma interp_wt_exploded :
   forall s i a b A B,
     interp toppg s i a A
     -> functional the_system toppg s i (den A) b B
-    -> interp toppg s i (sigma a (arrow b (subst sh1 (wt a b))))
+    -> interp toppg s i (sigma a (tarrow b (subst sh1 (wt a b))))
          (iusigma stop A (entrunc stop (den A) (iuarrow_ne1 stop (den A) B (iuwt stop A B)))).
 Proof.
 intros s i a b A B Ha Hb.
@@ -2591,7 +2591,7 @@ rewrite -> iutruncate_iuarrow.
 rewrite -> Nat.min_id.
 simpsub.
 apply interp_eval_refl.
-apply interp_arrow.
+apply interp_tarrow.
   {
   apply (basic_downward _#3 j); auto.
   }
@@ -2710,11 +2710,11 @@ Lemma sound_wt_subtype_sigma :
   forall G a b,
     pseq G (deqtype a a)
     -> pseq (cons (hyp_tm a) G) (deqtype b b)
-    -> pseq G (dsubtype (wt a b) (sigma a (arrow b (subst sh1 (wt a b))))).
+    -> pseq G (dsubtype (wt a b) (sigma a (tarrow b (subst sh1 (wt a b))))).
 Proof.
 intros G a b.
 revert G.
-set (X := (sigma a (arrow b (subst sh1 (wt a b))))).
+set (X := (sigma a (tarrow b (subst sh1 (wt a b))))).
 refine (seq_pseq 1 [hyp_emp] b 2 [] _ [_] _ _ _); cbn.
 subst X.
 intros G Hclb Hseqa Hseqb.
@@ -2792,11 +2792,11 @@ Lemma sound_wt_sigma_subtype :
   forall G a b,
     pseq G (deqtype a a)
     -> pseq (cons (hyp_tm a) G) (deqtype b b)
-    -> pseq G (dsubtype (sigma a (arrow b (subst sh1 (wt a b)))) (wt a b)).
+    -> pseq G (dsubtype (sigma a (tarrow b (subst sh1 (wt a b)))) (wt a b)).
 Proof.
 intros G a b.
 revert G.
-set (X := (sigma a (arrow b (subst sh1 (wt a b))))).
+set (X := (sigma a (tarrow b (subst sh1 (wt a b))))).
 refine (seq_pseq 1 [hyp_emp] b 2 [] _ [_] _ _ _); cbn.
 subst X.
 intros G Hclb Hseqa Hseqb.

@@ -16,7 +16,7 @@ Require Import SoundExist.
 Require Import SoundFut.
 Require Import SoundGuard.
 Require Import SoundHyp.
-Require Import SoundKuniv.
+Require Import SoundKind.
 Require Import SoundMisc.
 Require Import SoundMu.
 Require Import SoundPi.
@@ -47,24 +47,24 @@ intros; eapply sound_pi_intro; eauto; done.
 intros; eapply sound_pi_elim; eauto; done.
 intros; eapply sound_pi_eta; eauto; done.
 intros; eapply sound_pi_ext; eauto; done.
-intros; eapply sound_arrow_kind_formation; eauto; done.
-intros; eapply sound_arrow_formation; eauto; done.
-intros; eapply sound_arrow_formation_univ; eauto; done.
-intros; eapply sound_arrow_pi_equal; eauto; done.
-intros; eapply sound_arrow_pi_equal_univ; eauto; done.
-intros; eapply sound_arrow_eta; eauto; done.
+intros; eapply sound_tarrow_kind_formation; eauto; done.
+intros; eapply sound_tarrow_formation; eauto; done.
+intros; eapply sound_tarrow_formation_univ; eauto; done.
+intros; eapply sound_tarrow_pi_equal; eauto; done.
+intros; eapply sound_tarrow_pi_equal_univ; eauto; done.
+intros; eapply sound_tarrow_eta; eauto; done.
 intros; eapply sound_karrow_kind_formation; eauto; done.
 intros; eapply sound_karrow_formation; eauto; done.
 intros; eapply sound_karrow_formation_univ; eauto; done.
 intros; eapply sound_karrow_pi_equal; eauto; done.
 intros; eapply sound_karrow_pi_equal_univ; eauto; done.
-intros; eapply sound_arrow_karrow_equal; eauto; done.
-intros; eapply sound_arrow_karrow_equal_univ; eauto; done.
+intros; eapply sound_tarrow_karrow_equal; eauto; done.
+intros; eapply sound_tarrow_karrow_equal_univ; eauto; done.
 intros; eapply sound_karrow_eta; eauto; done.
 intros; eapply sound_pi_formation_invert1; eauto; done.
 intros; eapply sound_pi_formation_invert2; eauto; done.
-intros; eapply sound_arrow_formation_invert1; eauto; done.
-intros; eapply sound_arrow_formation_invert2; eauto; done.
+intros; eapply sound_tarrow_formation_invert1; eauto; done.
+intros; eapply sound_tarrow_formation_invert2; eauto; done.
 intros; eapply sound_karrow_formation_invert1; eauto; done.
 intros; eapply sound_karrow_formation_invert2; eauto; done.
 intros; eapply sound_intersect_formation; eauto; done.
@@ -212,10 +212,10 @@ intros; eapply sound_univ_cumulative; eauto; done.
 intros; eapply sound_formation_weaken; eauto; done.
 intros; eapply sound_formation_strengthen; eauto; done.
 intros; eapply sound_univ_formation_invert; eauto; done.
-intros; eapply sound_kuniv_formation; eauto; done.
-intros; eapply sound_kuniv_formation_univ; eauto; done.
-intros; eapply sound_kuniv_weaken; eauto; done.
-intros; eapply sound_kuniv_formation_invert; eauto; done.
+intros; eapply sound_kind_formation; eauto; done.
+intros; eapply sound_kind_formation_univ; eauto; done.
+intros; eapply sound_kind_weaken; eauto; done.
+intros; eapply sound_kind_formation_invert; eauto; done.
 intros; eapply sound_eqtype_formation; eauto; done.
 intros; eapply sound_eqtype_formation_univ; eauto; done.
 intros; eapply sound_eqtype_convert; eauto; done.

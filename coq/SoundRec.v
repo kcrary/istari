@@ -29,7 +29,7 @@ Require Import Model.
 Require Import Truncate.
 Require Import ProperDownward.
 Require Import ProperLevel.
-Require Import SemanticsKuniv.
+Require Import SemanticsKind.
 Require Import SemanticsUniv.
 Require Import SoundFut.
 Require Import Defined.
@@ -78,9 +78,9 @@ Qed.
 
 Lemma sound_rec_kind_formation :
   forall G lv k k',
-    pseq (cons (hyp_tml (kuniv lv)) G) (deq k k' (kuniv (subst sh1 lv)))
+    pseq (cons (hyp_tml (kind lv)) G) (deq k k' (kind (subst sh1 lv)))
     -> pseq G (deq lv lv pagetp)
-    -> pseq G (deq (rec k) (rec k') (kuniv lv)).
+    -> pseq G (deq (rec k) (rec k') (kind lv)).
 Proof.
 intros G lv k l.
 revert G.
@@ -102,19 +102,19 @@ induct i.
 {
 intros s s' Hs.
 so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
-assert (pwctx 0 (dot (rec (subst (under 1 s) k)) s) (dot (rec (subst (under 1 s') k)) s') (cons (hyp_tml (kuniv lv)) G)) as Hsk.
+assert (pwctx 0 (dot (rec (subst (under 1 s) k)) s) (dot (rec (subst (under 1 s') k)) s') (cons (hyp_tml (kind lv)) G)) as Hsk.
   {
   apply pwctx_cons_tml; auto; try omega;
   try (prove_hygiene; eapply subst_closub_under_permit; eauto; done);
   intros; try omega.
   }
-assert (pwctx 0 (dot (rec (subst (under 1 s) l)) s) (dot (rec (subst (under 1 s') l)) s') (cons (hyp_tml (kuniv lv)) G)) as Hsl.
+assert (pwctx 0 (dot (rec (subst (under 1 s) l)) s) (dot (rec (subst (under 1 s') l)) s') (cons (hyp_tml (kind lv)) G)) as Hsl.
   {
   apply pwctx_cons_tml; auto; try omega;
   try (prove_hygiene; eapply subst_closub_under_permit; eauto; done);
   intros; try omega.
   }
-assert (pwctx 0 (dot (rec (subst (under 1 s) k)) s) (dot (rec (subst (under 1 s') l)) s') (cons (hyp_tml (kuniv lv)) G)) as Hskl.
+assert (pwctx 0 (dot (rec (subst (under 1 s) k)) s) (dot (rec (subst (under 1 s') l)) s') (cons (hyp_tml (kind lv)) G)) as Hskl.
   {
   apply pwctx_cons_tml; auto; try omega;
   try (prove_hygiene; eapply subst_closub_under_permit; eauto; done);
@@ -159,64 +159,64 @@ simpsubin Hlrit.
 assert (forall j u,
           j < S i
           -> pwctx j s u G 
-          -> relhyp j false (hyp_tm (subst s' (kuniv lv))) (hyp_tm (subst u (kuniv lv)))) as Hleft.
+          -> relhyp j false (hyp_tm (subst s' (kind lv))) (hyp_tm (subst u (kind lv)))) as Hleft.
   {
   intros j u Hj Hu.
   so (Hlv _#3 Hu) as (pg' & Hl & Hr).
   so (pginterp_fun _#3 Hlvl Hl); subst pg'.
   simpsub.
-  apply (relhyp_tm _#4 (iukuniv the_system j pg (pginterp_lt_top _ _ Hlvl))).
+  apply (relhyp_tm _#4 (iukind the_system j pg (pginterp_lt_top _ _ Hlvl))).
     {
     apply interp_eval_refl.
-    apply interp_kuniv; auto.
+    apply interp_kind; auto.
     eapply pginterp_succ_lt_top; eauto.
     }
 
     {
     apply interp_eval_refl.
-    apply interp_kuniv; auto.
+    apply interp_kind; auto.
     eapply pginterp_succ_lt_top; eauto.
     }
   }
 assert (forall j u,
           j < S i
           -> pwctx j u s' G 
-          -> relhyp j true (hyp_tm (subst s (kuniv lv))) (hyp_tm (subst u (kuniv lv)))) as Hright.
+          -> relhyp j true (hyp_tm (subst s (kind lv))) (hyp_tm (subst u (kind lv)))) as Hright.
   {
   intros j u Hj Hu.
   so (Hlv _#3 Hu) as (pg' & Hl & Hr).
   so (pginterp_fun _#3 Hlvr Hr); subst pg'.
   simpsub.
-  apply (relhyp_tm _#4 (iukuniv the_system j pg (pginterp_lt_top _ _ Hlvl))).
+  apply (relhyp_tm _#4 (iukind the_system j pg (pginterp_lt_top _ _ Hlvl))).
     {
     apply interp_eval_refl.
-    apply interp_kuniv; auto.
+    apply interp_kind; auto.
     eapply pginterp_succ_lt_top; eauto.
     }
 
     {
     apply interp_eval_refl.
-    apply interp_kuniv; auto.
+    apply interp_kind; auto.
     eapply pginterp_succ_lt_top; eauto.
     }
   }
-assert (pwctx (S i) (dot (rec (subst (under 1 s) k)) s) (dot (rec (subst (under 1 s') k)) s') (cons (hyp_tml (kuniv lv)) G)) as Hsk.
+assert (pwctx (S i) (dot (rec (subst (under 1 s) k)) s) (dot (rec (subst (under 1 s') k)) s') (cons (hyp_tml (kind lv)) G)) as Hsk.
   {
   apply pwctx_cons_tml; auto;
   try (prove_hygiene; eapply subst_closub_under_permit; eauto; done).
   intros _.
   cbn [pred].
   simpsub.
-  apply (seqhyp_tm _#5 (iukuniv the_system i pg hl)).
+  apply (seqhyp_tm _#5 (iukind the_system i pg hl)).
     {
     apply interp_eval_refl.
-    apply interp_kuniv; auto.
+    apply interp_kind; auto.
     eapply pginterp_succ_lt_top; eauto.
     }
 
     {
     apply interp_eval_refl.
-    apply interp_kuniv; auto.
+    apply interp_kind; auto.
     eapply pginterp_succ_lt_top; eauto.
     }
 
@@ -228,23 +228,23 @@ assert (pwctx (S i) (dot (rec (subst (under 1 s) k)) s) (dot (rec (subst (under 
     auto.
     }
   }
-assert (pwctx (S i) (dot (rec (subst (under 1 s) l)) s) (dot (rec (subst (under 1 s') l)) s') (cons (hyp_tml (kuniv lv)) G)) as Hsl.
+assert (pwctx (S i) (dot (rec (subst (under 1 s) l)) s) (dot (rec (subst (under 1 s') l)) s') (cons (hyp_tml (kind lv)) G)) as Hsl.
   {
   apply pwctx_cons_tml; auto;
   try (prove_hygiene; eapply subst_closub_under_permit; eauto; done).
   intros _.
   cbn [pred].
   simpsub.
-  apply (seqhyp_tm _#5 (iukuniv the_system i pg hl)).
+  apply (seqhyp_tm _#5 (iukind the_system i pg hl)).
     {
     apply interp_eval_refl.
-    apply interp_kuniv; auto.
+    apply interp_kind; auto.
     eapply pginterp_succ_lt_top; eauto.
     }
 
     {
     apply interp_eval_refl.
-    apply interp_kuniv; auto.
+    apply interp_kind; auto.
     eapply pginterp_succ_lt_top; eauto.
     }
 
@@ -256,23 +256,23 @@ assert (pwctx (S i) (dot (rec (subst (under 1 s) l)) s) (dot (rec (subst (under 
     auto.
     }
   }
-assert (pwctx (S i) (dot (rec (subst (under 1 s) k)) s) (dot (rec (subst (under 1 s') l)) s') (cons (hyp_tml (kuniv lv)) G)) as Hskl.
+assert (pwctx (S i) (dot (rec (subst (under 1 s) k)) s) (dot (rec (subst (under 1 s') l)) s') (cons (hyp_tml (kind lv)) G)) as Hskl.
   {
   apply pwctx_cons_tml; auto;
   try (prove_hygiene; eapply subst_closub_under_permit; eauto; done).
   intros _.
   cbn [pred].
   simpsub.
-  apply (seqhyp_tm _#5 (iukuniv the_system i pg hl)).
+  apply (seqhyp_tm _#5 (iukind the_system i pg hl)).
     {
     apply interp_eval_refl.
-    apply interp_kuniv; auto.
+    apply interp_kind; auto.
     eapply pginterp_succ_lt_top; eauto.
     }
 
     {
     apply interp_eval_refl.
-    apply interp_kuniv; auto.
+    apply interp_kind; auto.
     eapply pginterp_succ_lt_top; eauto.
     }
 

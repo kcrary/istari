@@ -22,7 +22,7 @@ Inductive canon : forall {a}, @operator object a -> Prop :=
 | canon_cty            : canon (oper_cty _)
 | canon_con            : canon (oper_con _)
 | canon_karrow         : canon (oper_karrow _)
-| canon_arrow          : canon (oper_arrow _)
+| canon_tarrow          : canon (oper_tarrow _)
 | canon_pi             : canon (oper_pi _)
 | canon_clam           : canon (oper_clam _)
 | canon_capp           : canon (oper_capp _)
@@ -41,7 +41,7 @@ Inductive canon : forall {a}, @operator object a -> Prop :=
 | canon_eqtype         : canon (oper_eqtype _)
 | canon_sequal         : canon (oper_sequal _)
 | canon_subtype        : canon (oper_subtype _)
-| canon_kunit          : canon (oper_kuniv _)
+| canon_kunit          : canon (oper_kind _)
 | canon_all            : canon (oper_all _)
 | canon_alltp          : canon (oper_alltp _)
 | canon_exist          : canon (oper_exist _)
@@ -504,7 +504,7 @@ intros; apply value_i; eauto with dynamic.
 Qed.
 
 
-Lemma value_arrow : forall {m1 m2}, value (arrow m1 m2).
+Lemma value_tarrow : forall {m1 m2}, value (tarrow m1 m2).
 Proof.
 intros; apply value_i; eauto with dynamic.
 Qed.
@@ -618,7 +618,7 @@ intros; apply value_i; eauto with dynamic.
 Qed.
 
 
-Lemma value_kuniv : forall {m1}, value (kuniv m1).
+Lemma value_kind : forall {m1}, value (kind m1).
 Proof.
 intros; apply value_i; eauto with dynamic.
 Qed.
@@ -787,7 +787,7 @@ Arguments value_univ {object m1}.
 Arguments value_cty {object m1}.
 Arguments value_con {object m1 m2}.
 Arguments value_karrow {object m1 m2}.
-Arguments value_arrow {object m1 m2}.
+Arguments value_tarrow {object m1 m2}.
 Arguments value_pi {object m1 m2}.
 Arguments value_clam {object m1 m2}.
 Arguments value_capp {object m1 m2}.
@@ -806,7 +806,7 @@ Arguments value_triv {object}.
 Arguments value_eqtype {object m1 m2}.
 Arguments value_sequal {object m1 m2}.
 Arguments value_subtype {object m1 m2}.
-Arguments value_kuniv {object m1}.
+Arguments value_kind {object m1}.
 Arguments value_all {object m1 m2 m3}.
 Arguments value_alltp {object m1}.
 Arguments value_exist {object m1 m2 m3}.
@@ -837,7 +837,7 @@ Arguments value_extt {object x}.
 Hint Constructors canon : dynamic.
 
 
-Hint Resolve value_univ value_cty value_con value_karrow value_arrow value_pi value_clam value_capp value_ctlam value_ctapp value_lam value_intersect value_union value_fut value_cnext value_cprev value_next value_rec value_equal value_triv value_eqtype value_sequal value_subtype value_kuniv value_all value_alltp value_exist value_mu value_ispositive value_isnegative value_voidtp value_unittp value_cunit value_booltp value_btrue value_bfalse value_prod value_sigma value_cpair value_cpi1 value_cpi2 value_ppair value_set value_iset value_quotient value_guard value_wt value_ext value_extt : dynamic.
+Hint Resolve value_univ value_cty value_con value_karrow value_tarrow value_pi value_clam value_capp value_ctlam value_ctapp value_lam value_intersect value_union value_fut value_cnext value_cprev value_next value_rec value_equal value_triv value_eqtype value_sequal value_subtype value_kind value_all value_alltp value_exist value_mu value_ispositive value_isnegative value_voidtp value_unittp value_cunit value_booltp value_btrue value_bfalse value_prod value_sigma value_cpair value_cpi1 value_cpi2 value_ppair value_set value_iset value_quotient value_guard value_wt value_ext value_extt : dynamic.
 
 
 Hint Resolve var_normal value_normal : dynamic.

@@ -248,9 +248,9 @@ Qed.
 
 Lemma sound_fut_kind_formation :
   forall G lv k k',
-    pseq (promote G) (deq k k' (kuniv lv))
+    pseq (promote G) (deq k k' (kind lv))
     -> pseq G (deq lv lv pagetp)
-    -> pseq G (deq (fut k) (fut k') (kuniv lv)).
+    -> pseq G (deq (fut k) (fut k') (kind lv)).
 Proof.
 intros G lv k l.
 revert G.

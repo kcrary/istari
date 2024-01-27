@@ -441,7 +441,7 @@ Qed.
 
 Lemma def_kind :
   forall i,
-    equiv (app Defs.kind i) (kuniv i).
+    equiv (app Defs.kind i) (kind i).
 Proof.
 intros i.
 unfold Defs.kind.
@@ -845,7 +845,7 @@ Qed.
 
 Lemma def_tarrow :
   forall a b,
-    equiv (app (app Defs.tarrow a) b) (arrow a b).
+    equiv (app (app Defs.tarrow a) b) (tarrow a b).
 Proof.
 intros a m.
 unfold Defs.arrow.
@@ -1051,7 +1051,7 @@ Qed.
 
 Lemma def_kindh_l: forall i,
     equivh (hyp_tml (app Defs.kind i))
-            (hyp_tml (kuniv i)).
+            (hyp_tml (kind i)).
   intros i.
   apply (equiv_to_equivh (def_kind i)).
 Qed.

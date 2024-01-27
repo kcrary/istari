@@ -47,9 +47,9 @@ Local Ltac prove_hygiene :=
 
 Lemma sound_karrow_kind_formation :
   forall G lv k k' l l',
-    pseq G (deq k k' (kuniv lv))
-    -> pseq G (deq l l' (kuniv lv))
-    -> pseq G (deq (karrow k l) (karrow k' l') (kuniv lv)).
+    pseq G (deq k k' (kind lv))
+    -> pseq G (deq l l' (kind lv))
+    -> pseq G (deq (karrow k l) (karrow k' l') (kind lv)).
 Proof.
 intros G lv k k' l l'.
 revert G.
@@ -66,16 +66,16 @@ so (proof_irrelevance _ h h'); subst h'.
 exists pg, (qarrow K L), (iuarrow stop i A B), h.
 simpsub.
 do2 9 split; auto;
-try (apply kinterp_eval_refl; apply interp_karrow; auto; done);
-apply interp_eval_refl; apply interp_karrow_type; auto.
+try (apply kinterp_eval_refl; apply interp_kkarrow; auto; done);
+apply interp_eval_refl; apply interp_karrow; auto.
 Qed.
 
 
-Lemma sound_arrow_kind_formation :
+Lemma sound_tarrow_kind_formation :
   forall G lv a b k l,
     pseq G (deq a b (univ lv))
-    -> pseq G (deq k l (kuniv lv))
-    -> pseq G (deq (arrow a k) (arrow b l) (kuniv lv)).
+    -> pseq G (deq k l (kind lv))
+    -> pseq G (deq (tarrow a k) (tarrow b l) (kind lv)).
 Proof.
 intros G lv a b k l.
 revert G.
@@ -97,7 +97,7 @@ so (lt_page_impl_le_page _ _ (lt_page_succ _ h)) as Hle.
 do2 9 split; auto;
 try (apply kinterp_eval_refl; apply interp_ktarrow; auto; done);
 apply interp_eval_refl;
-apply interp_arrow; auto;
+apply interp_tarrow; auto;
 eapply interp_increase; eauto using toppg_max.
 Qed.
 
@@ -121,7 +121,7 @@ exists (iuarrow stop i A B).
 simpsub.
 do2 3 split; auto;
 apply interp_eval_refl;
-apply interp_karrow_type; auto.
+apply interp_karrow; auto.
 Qed.
 
 
@@ -145,15 +145,15 @@ exists pg, (iuarrow stop i A B).
 simpsub.
 do2 5 split; auto;
 apply interp_eval_refl;
-apply interp_karrow_type; auto.
+apply interp_karrow; auto.
 Qed.
 
 
-Lemma sound_arrow_formation :
+Lemma sound_tarrow_formation :
   forall G a a' b b',
     pseq G (deqtype a a')
     -> pseq G (deqtype b b')
-    -> pseq G (deqtype (arrow a b) (arrow a' b')).
+    -> pseq G (deqtype (tarrow a b) (tarrow a' b')).
 Proof.
 intros G k1 k2 l1 l2.
 revert G.
@@ -168,15 +168,15 @@ exists (iuarrow stop i A B).
 simpsub.
 do2 3 split; auto;
 apply interp_eval_refl;
-apply interp_arrow; auto.
+apply interp_tarrow; auto.
 Qed.
 
 
-Lemma sound_arrow_formation_univ :
+Lemma sound_tarrow_formation_univ :
   forall G lv a a' b b',
     pseq G (deq a a' (univ lv))
     -> pseq G (deq b b' (univ lv))
-    -> pseq G (deq (arrow a b) (arrow a' b') (univ lv)).
+    -> pseq G (deq (tarrow a b) (tarrow a' b') (univ lv)).
 Proof.
 intros G lv k1 k2 l1 l2.
 revert G.
@@ -192,7 +192,7 @@ exists pg, (iuarrow stop i A B).
 simpsub.
 do2 5 split; auto;
 apply interp_eval_refl;
-apply interp_arrow; auto.
+apply interp_tarrow; auto.
 Qed.
 
 
@@ -330,7 +330,7 @@ assert (den A = ceiling (S i) (den A)) as HeqA.
   }
 do2 3 split; auto;
 apply interp_eval_refl;
-try (apply interp_karrow_type); auto.
+try (apply interp_karrow); auto.
   {
   rewrite -> iuarrow_eq_iupi.
   apply interp_pi; auto.
@@ -392,7 +392,7 @@ assert (den A = ceiling (S i) (den A)) as HeqA.
   }
 do2 5 split; auto;
 apply interp_eval_refl;
-try (apply interp_karrow_type); auto.
+try (apply interp_karrow); auto.
   {
   rewrite -> iuarrow_eq_iupi.
   apply interp_pi; auto.
@@ -429,11 +429,11 @@ try (apply interp_karrow_type); auto.
 Qed.
 
 
-Lemma sound_arrow_karrow_equal :
+Lemma sound_tarrow_karrow_equal :
   forall G a b,
     pseq G (deqtype a a)
     -> pseq G (deqtype b b)
-    -> pseq G (deqtype (arrow a b) (karrow a b)).
+    -> pseq G (deqtype (tarrow a b) (karrow a b)).
 Proof.
 intros G a b.
 revert G.
@@ -447,15 +447,15 @@ exists (iuarrow stop i A B).
 simpsub.
 do2 3 split; auto;
 apply interp_eval_refl;
-first [apply interp_karrow_type | apply interp_arrow]; auto.
+first [apply interp_karrow | apply interp_tarrow]; auto.
 Qed.
 
 
-Lemma sound_arrow_karrow_equal_univ :
+Lemma sound_tarrow_karrow_equal_univ :
   forall G lv a b,
     pseq G (deq a a (univ lv))
     -> pseq G (deq b b (univ lv))
-    -> pseq G (deq (arrow a b) (karrow a b) (univ lv)).
+    -> pseq G (deq (tarrow a b) (karrow a b) (univ lv)).
 Proof.
 intros G lv a b.
 revert G.
@@ -470,15 +470,15 @@ exists pg, (iuarrow stop i A B).
 simpsub.
 do2 5 split; auto;
 apply interp_eval_refl;
-first [apply interp_karrow_type | apply interp_arrow]; auto.
+first [apply interp_karrow | apply interp_tarrow]; auto.
 Qed.
 
 
-Lemma sound_arrow_pi_equal :
+Lemma sound_tarrow_pi_equal :
   forall G a b,
     pseq G (deqtype a a)
     -> pseq G (deqtype b b)
-    -> pseq G (deqtype (arrow a b) (pi a (subst sh1 b))).
+    -> pseq G (deqtype (tarrow a b) (pi a (subst sh1 b))).
 Proof.
 intros G a b.
 revert G.
@@ -498,7 +498,7 @@ assert (den A = ceiling (S i) (den A)) as HeqA.
   }
 do2 3 split; auto;
 apply interp_eval_refl;
-try (apply interp_arrow); auto.
+try (apply interp_tarrow); auto.
   {
   rewrite -> iuarrow_eq_iupi.
   apply interp_pi; auto.
@@ -535,11 +535,11 @@ try (apply interp_arrow); auto.
 Qed.
 
 
-Lemma sound_arrow_pi_equal_univ :
+Lemma sound_tarrow_pi_equal_univ :
   forall G lv a b,
     pseq G (deq a a (univ lv))
     -> pseq G (deq b b (univ lv))
-    -> pseq G (deq (arrow a b) (pi a (subst sh1 b)) (univ lv)).
+    -> pseq G (deq (tarrow a b) (pi a (subst sh1 b)) (univ lv)).
 Proof.
 intros G lv a b.
 revert G.
@@ -560,7 +560,7 @@ assert (den A = ceiling (S i) (den A)) as HeqA.
   }
 do2 5 split; auto;
 apply interp_eval_refl;
-try (apply interp_arrow); auto.
+try (apply interp_tarrow); auto.
   {
   rewrite -> iuarrow_eq_iupi.
   apply interp_pi; auto.
@@ -1007,10 +1007,10 @@ do2 2 split; auto.
 Qed.
 
 
-Lemma sound_arrow_eta :
+Lemma sound_tarrow_eta :
   forall G a b m,
-    pseq G (deq m m (arrow a b))
-    -> pseq G (deq m (lam (app (subst sh1 m) (var 0))) (arrow a b)).
+    pseq G (deq m m (tarrow a b))
+    -> pseq G (deq m (lam (app (subst sh1 m) (var 0))) (tarrow a b)).
 Proof.
 intros G a b m.
 revert G.
@@ -1022,7 +1022,7 @@ so (Hseqm _#3 Hs) as (R & Hpil & Hpir & Hm & _).
 exists R.
 do2 2 split; auto.
 simpsubin Hpil.
-invert (basic_value_inv _#6 value_arrow Hpil).
+invert (basic_value_inv _#6 value_tarrow Hpil).
 intros A B Hal Hbl <-.
 assert (exists l l', equiv (subst s m) (lam l) /\ equiv (subst s' m) (lam l')) as (l & l' & Hl & Hl').
   {
@@ -1247,9 +1247,9 @@ do2 2 split; auto.
 Qed.
 
 
-Lemma sound_arrow_formation_invert1 :
+Lemma sound_tarrow_formation_invert1 :
   forall G a a' b b',
-    pseq G (deqtype (arrow a b) (arrow a' b'))
+    pseq G (deqtype (tarrow a b) (tarrow a' b'))
     -> pseq G (deqtype a a').
 Proof.
 intros G a b c d.
@@ -1263,15 +1263,15 @@ simpsubin Hpil.
 simpsubin Hpir.
 simpsubin Hpil'.
 simpsubin Hpir'.
-invert (basic_value_inv _#6 value_arrow Hpil).
+invert (basic_value_inv _#6 value_tarrow Hpil).
 intros A B Hal Hbl Heql.
-invert (basic_value_inv _#6 value_arrow Hpir).
+invert (basic_value_inv _#6 value_tarrow Hpir).
 intros A' B' Har Hbr Heqr.
 so (iuarrow_inj _#7 (eqtrans Heql (eqsymm Heqr))) as (<- & _).
-invert (basic_value_inv _#6 value_arrow Hpil').
+invert (basic_value_inv _#6 value_tarrow Hpil').
 intros A' B'' Hal' Hbl' Heql'.
 so (iuarrow_inj _#7 (eqtrans Heql (eqsymm Heql'))) as (<- & _).
-invert (basic_value_inv _#6 value_arrow Hpir').
+invert (basic_value_inv _#6 value_tarrow Hpir').
 intros A' B''' Har' Hbr' Heqr'.
 so (iuarrow_inj _#7 (eqtrans Heql (eqsymm Heqr'))) as (<- & _).
 exists A.
@@ -1279,9 +1279,9 @@ auto.
 Qed.
 
 
-Lemma sound_arrow_formation_invert2 :
+Lemma sound_tarrow_formation_invert2 :
   forall G a a' b b',
-    pseq G (deqtype (arrow a b) (arrow a' b'))
+    pseq G (deqtype (tarrow a b) (tarrow a' b'))
     -> pseq (cons (hyp_tm a) G) (deqtype (subst sh1 b) (subst sh1 b')).
 Proof.
 intros G a b c d.
@@ -1300,18 +1300,18 @@ simpsubin Hpil.
 simpsubin Hpir.
 simpsubin Hpil'.
 simpsubin Hpir'.
-invert (basic_value_inv _#6 value_arrow Hpil).
+invert (basic_value_inv _#6 value_tarrow Hpil).
 intros A' B Hal' Hcl Heqacl.
 so (basic_fun _#7 Hal Hal'); subst A'.
-invert (basic_value_inv _#6 value_arrow Hpir).
+invert (basic_value_inv _#6 value_tarrow Hpir).
 intros A' B' Har' Hcr Heqacr.
 so (eqtrans Heqacl (eqsymm Heqacr)) as Heq.
 clear Heqacr.
-invert (basic_value_inv _#6 value_arrow Hpil').
+invert (basic_value_inv _#6 value_tarrow Hpil').
 intros A'' B'' Hbl Hdl Heqbdl.
 so (eqtrans Heqacl (eqsymm Heqbdl)) as Heq'.
 clear Heqbdl.
-invert (basic_value_inv _#6 value_arrow Hpir').
+invert (basic_value_inv _#6 value_tarrow Hpir').
 intros A''' B''' Hbr Hdr Heqbdr.
 so (eqtrans Heqacl (eqsymm Heqbdr)) as Heq''.
 clear Heqbdr.

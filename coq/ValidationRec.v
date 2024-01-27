@@ -26,7 +26,7 @@ Lemma recKind_valid : recKind_obligation.
   valid_rewrite. 
   constructor.
   assert (equivctx (hyp_tml (app Defs.kind i) :: G)
-                    (hyp_tml (kuniv i) :: G)) as Hctx.
+                    (hyp_tml (kind i) :: G)) as Hctx.
   {constructor. apply def_kindh_l. apply equivctx_refl. } 
   rewrite -> def_kind in * |- *.
   apply tr_rec_kind_formation; eauto using deq_intro.
@@ -38,7 +38,7 @@ Lemma recKindEq_valid : recKindEq_obligation.
   valid_rewrite. 
   constructor.
   assert (equivctx (hyp_tml (app Defs.kind i) :: G)
-                    (hyp_tml (kuniv i) :: G)) as Hctx.
+                    (hyp_tml (kind i) :: G)) as Hctx.
   {constructor. apply def_kindh_l. apply equivctx_refl. } 
   rewrite -> def_kind in * |- *.
   apply tr_rec_kind_formation; eauto using deq_intro.

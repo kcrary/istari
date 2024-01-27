@@ -107,7 +107,7 @@ try (intros;
      end;
      (* No way this should be necessary. *)
      first [apply interp_kunit
-           |apply interp_type
+           |apply interp_kuniv
            |apply interp_kprod
            |apply interp_kfut_zero
            |apply interp_kfut
@@ -130,8 +130,8 @@ try (intros;
            |apply interp_iset
            |apply interp_fut_zero
            |apply interp_fut
-           |apply interp_karrow_type
-           |apply interp_arrow
+           |apply interp_karrow
+           |apply interp_tarrow
            |apply interp_prod
            |apply interp_void
            |apply interp_unit
@@ -140,7 +140,7 @@ try (intros;
            |apply interp_guard
            |apply interp_wt
            |apply interp_univ
-           |apply interp_kuniv
+           |apply interp_kind
            ];
      eauto using equiv_funct1, pginterp_equiv with equiv_compat;
      apply hygiene_auto; cbn;
@@ -154,7 +154,7 @@ intros k1' Heqk1 k2' Heqk2 <-.
 so (hygiene_invert_auto _#5 Hhyg) as H; cbn in H.
 destruct H as (Hcl1 & Hcl2 & _).
 fold (pi k1' k2').
-apply interp_karrow; eauto.
+apply interp_kkarrow; eauto.
 }
 
 (* ktarrow *)
@@ -162,7 +162,7 @@ apply interp_karrow; eauto.
 intros pg s i a k A K _ IH1 _ IH2 aa Hhyg Hequiv.
 invertc_mc Hequiv.
 intros a' Ha k' Hk <-.
-fold (arrow a' k') in Hhyg |- *.
+fold (tarrow a' k') in Hhyg |- *.
 so (hygiene_invert_auto _#5 Hhyg) as H; cbn in H.
 destruct H as (Hcla & Hclk & _).
 apply interp_ktarrow; auto using map_hygiene, map_equiv.

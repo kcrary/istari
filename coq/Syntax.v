@@ -24,7 +24,7 @@ Inductive operator : list nat -> Type :=
 | oper_con         : operator [0; 0]
 
 | oper_karrow      : operator [0; 0]
-| oper_arrow       : operator [0; 0]
+| oper_tarrow      : operator [0; 0]
 | oper_pi          : operator [0; 1]
 | oper_clam        : operator [0; 1]
 | oper_capp        : operator [0; 0]
@@ -54,7 +54,7 @@ Inductive operator : list nat -> Type :=
 
 | oper_subtype     : operator [0; 0]
 
-| oper_kuniv       : operator [0]
+| oper_kind        : operator [0]
 
 | oper_all         : operator [0; 0; 1]
 | oper_alltp       : operator [1]
@@ -503,7 +503,7 @@ Definition univ {obj} m            : @term obj := oper _ (oper_univ _) (rw_cons 
 Definition cty {obj} m             : @term obj := oper _ (oper_cty _) (rw_cons _ _ m rw_nil).
 Definition con {obj} m1 m2         : @term obj := oper _ (oper_con _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition karrow {obj} m1 m2       : @term obj := oper _ (oper_karrow _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
-Definition arrow {obj} m1 m2       : @term obj := oper _ (oper_arrow _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
+Definition tarrow {obj} m1 m2       : @term obj := oper _ (oper_tarrow _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition pi {obj} m1 m2          : @term obj := oper _ (oper_pi _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition clam {obj} m1 m2        : @term obj := oper _ (oper_clam _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition capp {obj} m1 m2        : @term obj := oper _ (oper_capp _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
@@ -524,7 +524,7 @@ Definition triv {obj}              : @term obj := oper _ (oper_triv _) rw_nil.
 Definition eqtype {obj} m1 m2      : @term obj := oper _ (oper_eqtype _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition sequal {obj} m1 m2      : @term obj := oper _ (oper_sequal _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition subtype {obj} m1 m2     : @term obj := oper _ (oper_subtype _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
-Definition kuniv {obj} m           : @term obj := oper _ (oper_kuniv _) (rw_cons _ _ m rw_nil).
+Definition kind {obj} m           : @term obj := oper _ (oper_kind _) (rw_cons _ _ m rw_nil).
 Definition all {obj} m1 m2 m3      : @term obj := oper _ (oper_all _) (rw_cons _ _ m1 (rw_cons _ _ m2 (rw_cons _ _ m3 rw_nil))).
 Definition alltp {obj} m1          : @term obj := oper _ (oper_alltp _) (rw_cons _ _ m1 rw_nil).
 Definition exist {obj} m1 m2 m3    : @term obj := oper _ (oper_exist _) (rw_cons _ _ m1 (rw_cons _ _ m2 (rw_cons _ _ m3 rw_nil))).
@@ -584,8 +584,8 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 | same_karrow :
     same_operator [0; 0] [0; 0] (oper_karrow A) (oper_karrow B)
 
-| same_arrow :
-    same_operator [0; 0] [0; 0] (oper_arrow A) (oper_arrow B)
+| same_tarrow :
+    same_operator [0; 0] [0; 0] (oper_tarrow A) (oper_tarrow B)
 
 | same_pi :
     same_operator [0; 1] [0; 1] (oper_pi A) (oper_pi B)
@@ -647,8 +647,8 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 | same_subtype :
     same_operator [0; 0] [0; 0] (oper_subtype A) (oper_subtype B)
 
-| same_kuniv :
-    same_operator [0] [0] (oper_kuniv A) (oper_kuniv B)
+| same_kind :
+    same_operator [0] [0] (oper_kind A) (oper_kind B)
 
 | same_all :
     same_operator [0; 0; 1] [0; 0; 1] (oper_all A) (oper_all B)

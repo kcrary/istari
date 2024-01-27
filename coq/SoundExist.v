@@ -166,7 +166,7 @@ Definition dyn_urel : wurel stop
 
 Lemma sound_exist_formation :
   forall G glv k l a b,
-    pseq G (deq k l (kuniv glv))
+    pseq G (deq k l (kind glv))
     -> pseq (cons (hyp_tm k) G) (deqtype a b)
     -> pseq G (deqtype (exist glv k a) (exist glv l b)).
 Proof.
@@ -241,7 +241,7 @@ Qed.
 
 Lemma sound_exist_formation_univ :
   forall G glv lv k l a b,
-    pseq G (deq k l (kuniv glv))
+    pseq G (deq k l (kind glv))
     -> pseq (cons (hyp_tm k) G) (deq a b (univ (subst sh1 lv)))
     -> pseq G (deq lv lv pagetp)
     -> pseq G (deq triv triv (leqpagetp glv lv))
@@ -335,7 +335,7 @@ Qed.
 
 Lemma sound_exist_intro :
   forall G lv k a b m n,
-    pseq G (deq k k (kuniv lv))
+    pseq G (deq k k (kind lv))
     -> pseq G (deq b b k)
     -> pseq G (deq m n (subst1 b a))
     -> pseq (cons (hyp_tm k) G) (deqtype a a)

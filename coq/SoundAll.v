@@ -313,7 +313,7 @@ Qed.
 
 Lemma sound_all_formation :
   forall G glv k l a b,
-    pseq G (deq k l (kuniv glv))
+    pseq G (deq k l (kind glv))
     -> pseq (cons (hyp_tm k) G) (deqtype a b)
     -> pseq G (deqtype (all glv k a) (all glv l b)).
 Proof.
@@ -388,7 +388,7 @@ Qed.
 
 Lemma sound_all_formation_univ :
   forall G glv lv k l a b,
-    pseq G (deq k l (kuniv glv))
+    pseq G (deq k l (kind glv))
     -> pseq (cons (hyp_tm k) G) (deq a b (univ (subst sh1 lv)))
     -> pseq G (deq lv lv pagetp)
     -> pseq G (deq triv triv (leqpagetp glv lv))
@@ -485,7 +485,7 @@ Qed.
 
 Lemma sound_all_intro :
   forall G lv k a m n,
-    pseq G (deq k k (kuniv lv))
+    pseq G (deq k k (kind lv))
     -> pseq (cons (hyp_tm k) G) (deq (subst sh1 m) (subst sh1 n) a)
     -> pseq G (deq m n (all lv k a)).
 Proof.

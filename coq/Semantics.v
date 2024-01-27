@@ -34,7 +34,7 @@ Require Import SemanticsEqual.
 Require Import SemanticsExist.
 Require Import SemanticsFut.
 Require Import SemanticsGuard.
-Require Import SemanticsKuniv.
+Require Import SemanticsKind.
 Require Import SemanticsMu.
 Require Import SemanticsPi.
 Require Import SemanticsPositive.
@@ -77,12 +77,12 @@ Inductive kbasicv : page -> bool -> nat -> sterm -> qkind -> Prop :=
     forall pg s i,
       kbasicv pg s i unittp qone
 
-| interp_type :
+| interp_kuniv :
     forall pg s i lv,
       pginterp lv pg
       -> kbasicv pg s i (univ lv) (qtype (cin pg))
 
-| interp_karrow :
+| interp_kkarrow :
     forall pg s i k1 k2 K1 K2,
       kbasic pg s i k1 K1
       -> kbasic pg s i k2 K2
@@ -92,7 +92,7 @@ Inductive kbasicv : page -> bool -> nat -> sterm -> qkind -> Prop :=
     forall pg s i a k A K,
       basic pg s i a (extend_iurel (cin_stop pg) A)
       -> kbasic pg s i k K
-      -> kbasicv pg s i (arrow a k) (qtarrow (cin pg) (den A) K)
+      -> kbasicv pg s i (tarrow a k) (qtarrow (cin pg) (den A) K)
 
 | interp_kprod :
     forall pg s i k1 k2 K1 K2,
@@ -221,17 +221,17 @@ with basicv : page -> bool -> nat -> sterm -> wiurel stop -> Prop :=
       -> cbasic gpg s i a (expair (qtype (cin gpg)) R)
       -> basicv pg s i (con lv a) (extend_iurel (cin_stop gpg) R)
 
-| interp_karrow_type :
+| interp_karrow :
     forall pg s i a b (A B : wiurel stop),
         basic pg s i a A
         -> basic pg s i b B
         -> basicv pg s i (karrow a b) (iuarrow stop i A B)
 
-| interp_arrow :
+| interp_tarrow :
     forall pg s i a b (A B : wiurel stop),
         basic pg s i a A
         -> basic pg s i b B
-        -> basicv pg s i (arrow a b) (iuarrow stop i A B)
+        -> basicv pg s i (tarrow a b) (iuarrow stop i A B)
 
 | interp_pi :
     forall pg s i a b
@@ -453,11 +453,11 @@ with basicv : page -> bool -> nat -> sterm -> wiurel stop -> Prop :=
       -> cex gpg << cin pg
       -> basicv pg s i (univ m) (iuuniv system i gpg)
 
-| interp_kuniv :
+| interp_kind :
     forall pg s i m gpg (h : lt_page gpg toppg),
       pginterp m gpg
       -> lt_page (succ_page gpg h) pg
-      -> basicv pg s i (kuniv m) (iukuniv system i gpg h)
+      -> basicv pg s i (kind m) (iukind system i gpg h)
 
 
 

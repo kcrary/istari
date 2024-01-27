@@ -1579,9 +1579,9 @@ Qed.
 
 Lemma sound_prod_kind_formation :
   forall G lv k k' l l',
-    pseq G (deq k k' (kuniv lv))
-    -> pseq G (deq l l' (kuniv lv))
-    -> pseq G (deq (prod k l) (prod k' l') (kuniv lv)).
+    pseq G (deq k k' (kind lv))
+    -> pseq G (deq l l' (kind lv))
+    -> pseq G (deq (prod k l) (prod k' l') (kind lv)).
 Proof.
 intros G lv k1 k2 l1 l2.
 revert G.

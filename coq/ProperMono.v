@@ -10,7 +10,7 @@ Require Import Extend.
 Require Import System.
 Require Import Uniform.
 Require Import Ofe.
-Require Import SemanticsKuniv.
+Require Import SemanticsKind.
 Require Import SemanticsUniv.
 Require Import Page.
 Require Import Equality.
@@ -130,14 +130,14 @@ pextensionality.
   }
 }
 
-(* kuniv *)
+(* kind *)
 {
 intros pg s i lv gpg h Hlv Hlt Hincl.
-replace (iukuniv system i gpg h) with (iukuniv system' i gpg h).
+replace (iukind system i gpg h) with (iukind system' i gpg h).
   {
-  apply interp_kuniv; auto.
+  apply interp_kind; auto.
   }
-unfold iukuniv.
+unfold iukind.
 f_equal.
 apply urel_extensionality.
 fextensionality 3.

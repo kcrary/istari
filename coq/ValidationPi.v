@@ -787,7 +787,7 @@ Lemma tarrowKind_valid : tarrowKind_obligation.
 Proof.
 prepare.
 intros G a i k ext1 ext0 H0 H1.
-apply tr_arrow_kind_formation; auto.
+apply tr_tarrow_kind_formation; auto.
 Qed.
 
 
@@ -796,7 +796,7 @@ Lemma tarrowKindEq_valid : tarrowKindEq_obligation.
   intros G a a' i k k' triv0 triv1 H1 H2.
   valid_rewrite. 
   constructor.
-  apply tr_arrow_kind_formation; eauto using deq_intro.
+  apply tr_tarrow_kind_formation; eauto using deq_intro.
   Qed.
 
 Lemma tarrowForm_valid : tarrowForm_obligation.
@@ -818,7 +818,7 @@ Lemma tarrowFormUniv_valid : tarrowFormUniv_obligation.
   intros G a b i triv0 triv1 H1 H2.
   valid_rewrite. 
   constructor.
-  apply tr_arrow_formation_univ; eauto using deq_intro.
+  apply tr_tarrow_formation_univ; eauto using deq_intro.
   Qed.
 
 Lemma tarrowEqUniv_valid : tarrowEqUniv_obligation.
@@ -826,7 +826,7 @@ Lemma tarrowEqUniv_valid : tarrowEqUniv_obligation.
   intros G a a' b b' i triv0 triv1 H1 H2.
   valid_rewrite. 
   constructor.
-  apply tr_arrow_formation_univ; eauto using deq_intro.
+  apply tr_tarrow_formation_univ; eauto using deq_intro.
 Qed.
 
 
@@ -839,11 +839,11 @@ rewrite -> def_eqtp in Ha, Hb |- *.
 rewrite -> def_tarrow.
 rewrite -> def_arrow.
 unfold Defs.triv.
-apply (tr_eqtype_transitivity _ _ (arrow a' b')).
+apply (tr_eqtype_transitivity _ _ (tarrow a' b')).
   {
-  apply tr_arrow_formation; eapply tr_eqtype_eta2; eauto.
+  apply tr_tarrow_formation; eapply tr_eqtype_eta2; eauto.
   }
-apply tr_arrow_pi_equal.
+apply tr_tarrow_pi_equal.
   {
   apply (tr_eqtype_transitivity _ _ a); [apply tr_eqtype_symmetry |]; eapply tr_eqtype_eta2; eauto.
   }
@@ -864,11 +864,11 @@ rewrite -> def_tarrow.
 rewrite -> def_arrow.
 unfold Defs.triv.
 apply tr_equal_intro.
-apply (tr_transitivity _ _ (arrow a' b')).
+apply (tr_transitivity _ _ (tarrow a' b')).
   {
-  apply tr_arrow_formation_univ; apply tr_equal_elim; eapply tr_equal_eta2; eauto.
+  apply tr_tarrow_formation_univ; apply tr_equal_elim; eapply tr_equal_eta2; eauto.
   }
-apply tr_arrow_pi_equal_univ.
+apply tr_tarrow_pi_equal_univ.
   {
   apply (tr_transitivity _ _ a); [apply tr_symmetry |]; apply tr_equal_elim; eapply tr_equal_eta2; eauto.
   }
@@ -885,7 +885,7 @@ prepare.
 intros G a a' b b' ext2 ext1 ext0 Ha Hbb Hb.
 apply (tr_eqtype_transitivity _ _ (pi a (subst sh1 b))).
   {
-  apply tr_arrow_pi_equal; auto.
+  apply tr_tarrow_pi_equal; auto.
   eapply tr_eqtype_formation_left; eauto.
   }
 
@@ -901,7 +901,7 @@ prepare.
 intros G a a' b b' i ext2 ext1 ext0 Ha Hbb Hb.
 apply (tr_transitivity _ _ (pi a (subst sh1 b))).
   {
-  apply tr_arrow_pi_equal_univ; auto.
+  apply tr_tarrow_pi_equal_univ; auto.
   eapply tr_eq_reflexivity; eauto.
   }
 
@@ -918,7 +918,7 @@ Lemma tarrowIntroOf_valid: tarrowIntroOf_obligation.
   constructor.
   eapply tr_eqtype_convert.
   apply tr_eqtype_symmetry.
-  apply tr_arrow_pi_equal; eauto using deqtype_intro.
+  apply tr_tarrow_pi_equal; eauto using deqtype_intro.
   eapply tr_pi_intro; eauto using deq_intro, deqtype_intro. Qed.
 
 Lemma tarrowIntroEq_valid : tarrowIntroEq_obligation.
@@ -934,7 +934,7 @@ apply tr_equal_intro.
 apply (tr_eqtype_convert _#3 (pi a (subst sh1 b))).
   {
   apply tr_eqtype_symmetry.
-  apply tr_arrow_pi_equal; eapply tr_eqtype_eta2; eauto.
+  apply tr_tarrow_pi_equal; eapply tr_eqtype_eta2; eauto.
   }
 apply tr_pi_intro.
   {
@@ -957,7 +957,7 @@ rewrite -> def_tarrow.
 apply (tr_eqtype_convert _#3 (pi a (subst sh1 b))).
   {
   apply tr_eqtype_symmetry.
-  apply tr_arrow_pi_equal; eapply tr_eqtype_eta2; eauto.
+  apply tr_tarrow_pi_equal; eapply tr_eqtype_eta2; eauto.
   }
 apply tr_pi_intro; auto.
 eapply tr_eqtype_eta2; eauto.
@@ -975,9 +975,9 @@ unfold Defs.triv.
 apply tr_equal_intro.
 eapply tr_pi_elim'.
   {
-  apply (tr_eqtype_convert _#3 (arrow a b)).
+  apply (tr_eqtype_convert _#3 (tarrow a b)).
     {
-    apply tr_arrow_pi_equal.
+    apply tr_tarrow_pi_equal.
       {
       eapply tr_equal_formation_invert1.
       eapply tr_inhabitation_formation; eauto.
@@ -990,7 +990,7 @@ eapply tr_pi_elim'.
         apply tr_equal_elim.
         eapply tr_equal_eta2; eauto.
         }
-      apply (tr_arrow_formation_invert2 _ a a).
+      apply (tr_tarrow_formation_invert2 _ a a).
       eapply tr_equal_formation_invert1.
       eapply tr_inhabitation_formation; eauto.
       }
@@ -1024,9 +1024,9 @@ unfold Defs.triv.
 apply tr_equal_intro.
 eapply tr_pi_elim'.
   {
-  apply (tr_eqtype_convert _#3 (arrow a b)).
+  apply (tr_eqtype_convert _#3 (tarrow a b)).
     {
-    apply tr_arrow_pi_equal.
+    apply tr_tarrow_pi_equal.
       {
       eapply tr_equal_formation_invert1.
       eapply tr_inhabitation_formation; eauto.
@@ -1038,7 +1038,7 @@ eapply tr_pi_elim'.
         {
         apply (tr_transitivity _ _ q); [| apply tr_symmetry]; apply tr_equal_elim; eapply tr_equal_eta2; eauto.
         }
-      apply (tr_arrow_formation_invert2 _ a a).
+      apply (tr_tarrow_formation_invert2 _ a a).
       eapply tr_equal_formation_invert1.
       eapply tr_inhabitation_formation; eauto.
       }
@@ -1069,9 +1069,9 @@ intros G a b m p Hm Hp.
 rewrite -> def_tarrow in Hm.
 eapply tr_pi_elim'.
   {
-  apply (tr_eqtype_convert _#3 (arrow a b)).
+  apply (tr_eqtype_convert _#3 (tarrow a b)).
     {
-    apply tr_arrow_pi_equal.
+    apply tr_tarrow_pi_equal.
       {
       eapply tr_inhabitation_formation; eauto.
       }
@@ -1079,7 +1079,7 @@ eapply tr_pi_elim'.
       {
       replace (deqtype b b) with (substj (dot p id) (deqtype (subst sh1 b) (subst sh1 b))) by (simpsub; auto).
       eapply tr_generalize; eauto.
-      apply (tr_arrow_formation_invert2 _ a a).
+      apply (tr_tarrow_formation_invert2 _ a a).
       eapply tr_inhabitation_formation; eauto.
       }
     }
@@ -1109,7 +1109,7 @@ rewrite -> def_eq.
 rewrite -> def_tarrow in Hm |- *.
 unfold Defs.triv.
 apply tr_equal_intro.
-apply tr_arrow_eta.
+apply tr_tarrow_eta.
 apply tr_equal_elim.
 eapply tr_equal_eta2; eauto.
 Qed.
@@ -1128,21 +1128,21 @@ unfold Defs.triv.
 apply tr_equal_intro.
 eapply tr_transitivity.
   {
-  apply tr_arrow_eta.
+  apply tr_tarrow_eta.
   apply tr_equal_elim; eapply tr_equal_eta2; eauto.
   }
 eapply tr_transitivity.
 2:{
   apply tr_symmetry.
-  apply tr_arrow_eta.
+  apply tr_tarrow_eta.
   apply tr_equal_elim; eapply tr_equal_eta2; eauto.
   }
 apply (tr_eqtype_convert _#3 (pi a (subst sh1 b))).
   {
   apply tr_eqtype_symmetry.
-  apply tr_arrow_pi_equal.
+  apply tr_tarrow_pi_equal.
     {
-    apply (tr_arrow_formation_invert1 _ _ _ b b).
+    apply (tr_tarrow_formation_invert1 _ _ _ b b).
     eapply tr_equal_formation_invert1.
     eapply tr_inhabitation_formation; eauto.
     }
@@ -1153,7 +1153,7 @@ apply (tr_eqtype_convert _#3 (pi a (subst sh1 b))).
   }
 apply tr_pi_intro.
   {
-  apply (tr_arrow_formation_invert1 _ _ _ b b).
+  apply (tr_tarrow_formation_invert1 _ _ _ b b).
   eapply tr_equal_formation_invert1.
   eapply tr_inhabitation_formation; eauto.
   }
@@ -1174,7 +1174,7 @@ apply (tr_eqtype_convert _#3 (pi a (subst sh1 b))).
   apply (tr_pi_ext _#5 a' a' b' b'); auto.  
   }
 apply tr_eqtype_symmetry.
-apply tr_arrow_pi_equal; auto.
+apply tr_tarrow_pi_equal; auto.
 Qed.
 
 
