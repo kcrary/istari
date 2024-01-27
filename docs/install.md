@@ -3,9 +3,12 @@
 0. Ensure the prerequisites are installed:
 
    - Git
-   - Standard ML of New Jersey
+   - Standard ML of New Jersey (version 110.89 or later)
    - GNU Emacs
    - (if running on Windows) Cygwin
+
+   If you are building on Windows, do not use Standard ML of New
+   Jersey version 110.99.3 or 110.99.4.
 
 1. Obtain the distribution from Github:
 

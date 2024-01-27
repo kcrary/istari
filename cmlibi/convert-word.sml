@@ -1,7 +1,17 @@
 
-(* This should work with current versions of SML/NJ, both 32- and 64-bit:
+(* This should work with current versions of SML/NJ (version 110.89 or
+   later), both 32- and 64-bit:
+
    (1) LargeWord is now 64 bits, even on 32-bit SML/NJ.
-   (2) The Word8.toLarge bug is still not fixed on 32-bit SML/NU, but we work around it.
+   (2) The Word8.toLargeInt bug is still not fixed, but we work around it.
+
+   (With older versions of SML/NJ this can fail in a way that may be
+   surprising.  The typechecker complains that wordlg does not match
+   its specification, which is surprising because the specification
+   and implementation are identical (type wordlg = LargeWord.word).
+   However, this file is raw SML code so it uses the real SML basis,
+   while the signature is IPP-processed SML, so it uses IML's version
+   of the SML basis.  In the latter, LargeWord is Word64.)
 
    Code mostly borrowed from convert-word-nj64.sml.
 *)

@@ -20,3 +20,4 @@ ocaml : ocaml-generated cmlib.make
 clean :
 	rm -f *.iml.sml *.iml-ml *.sml.sml *.sml-ml *.cmi *.cmo *.ipds *.ipdo cmlib.cm cmlib.make cmlib.cma
 	rm -rf .cm
+	rm -rf ../cmlib/.cm
