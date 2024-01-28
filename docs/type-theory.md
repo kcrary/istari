@@ -192,9 +192,13 @@ For example, to quantify
 one might write `iforall 0 (a : U(0)) . whatever`.  This quantifies
 impredicatively at level `0`, since `U(0)` belongs to `K(0)`.  Thus,
 the resulting type belongs to `U(0)`, assuming that `whatever` also
-belongs to `U(0)`.  Thus, the quantifier in that type ranges over
-itself.  (In the implementation, the first `0` is suppressed, and
-inferred automatically.)
+belongs to `U(0)`.  Note that the quantifier in that type ranges over
+itself.
+
+(In the implementation, the impredicative quantifier's level (*e.g.,*
+the first `0` in the example) is kept implicit; it is not displayed
+and it is inferred automatically.  Thus impredicative quantifiers look
+similar to predicative ones.)
 
 In general, a type `A` is a kind when `A` is isomorphic to a space in
 Istari's metric-space semantics.  Such types include [function
@@ -209,6 +213,7 @@ Note that the indexing for kinds is off by one from the indexing for
 universes: `K(i)` (which contains `U(i)`) is a subset of `U(i+1)`.
 Unlike universes, kinds are not cumulative.  For example, `U(0)`
 belongs to `K(0)`, but not `K(1)`.
+
 
 
 
@@ -750,12 +755,12 @@ produces a `C` for every argument in `A`, but that it produces the
 
 Universal and existential quantification enjoy impredicative versions,
 which might be written `iforall i (t : A) . B` and 
-`iexistsi (t : A) . B`.  (In the implementation, the `i` is suppressed,
-and inferred automaticaly.)  In each, `A` must be a kind belonging to
-`K(i)` and `B` must be a type belonging to `U(i)`.  Then each belongs
-to `U(i)`.  In contrast, if the usual predicative quantification were
-used, then each would belong to `U(1 + i)`, since `A` would belong to
-`U(1 + i)`, not `U(i)`.
+`iexistsi (t : A) . B`.  (In the implementation, the `i` is kept
+implicit; it is not displayed and it is inferred automaticaly.)  In
+each, `A` must be a kind belonging to `K(i)` and `B` must be a type
+belonging to `U(i)`.  Then each belongs to `U(i)`.  In contrast, if
+the usual predicative quantification were used, then each would belong
+to `U(1 + i)`, since `A` would belong to `U(1 + i)`, not `U(i)`.
 
 The impredicative universal is like an intersection type in that the
 argument `t` is not passed as an argument to the "function."  This is
@@ -787,6 +792,13 @@ introducing impredicative existentials) requires generating a subgoal
 to establish that `B` is well-formed.  This makes impredicative
 quantification not useful for typing lemmas, as such lemmas could only
 be called when one knows the result already.
+
+Both a level and a kind are necessary to determine a space.  This is
+why the impredicative quantifiers need to mention a level, internally
+at least.  In normal cases, indeed in all non-degenerate cases, the
+level is uniquely determined by the kind, so it can be kept implicit.
+But the type theory must include them because it is difficult to
+exclude the degenerate cases, such as `rec t . future t`.
 
 
 #### Integers
