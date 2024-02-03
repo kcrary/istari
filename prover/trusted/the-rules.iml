@@ -421,11 +421,16 @@ signature THE_RULES =
       val subsumptionAlt : term -> term -> rule
       val subsumptionLeft : int -> term -> term -> term -> rule
       val subsumptionLeftAlt : int -> term -> term -> term -> rule
+      val subsumptionLast : int -> term -> term -> term -> rule
       val subtypeRefl : term -> rule
       val subtypeReflEqtype : term -> term -> rule
       val subtypeTrans : term -> term -> term -> rule
       val subtypeIstp1 : term -> term -> rule
       val subtypeIstp2 : term -> term -> rule
+      val eeqtpForm : term -> term -> rule
+      val eeqtpEq : term -> term -> term -> term -> rule
+      val eeqtpFormUniv : term -> term -> term -> rule
+      val eeqtpEqUniv : term -> term -> term -> term -> term -> rule
       val setForm : term -> term -> rule
       val setEq : term -> term -> term -> term -> rule
       val setFormUniv : term -> term -> term -> rule
@@ -1069,11 +1074,16 @@ fun subsumption a b = Arg.make "subsumption" [] (b) [(Arg.Unhide, [], Elim (cons
 fun subsumptionAlt a b = Arg.make "subsumptionAlt" [] (b) [(Arg.Unhide, [], Elim (const_eeqtp, [App (b), App (a), ])), (Arg.Nothing, [], a), ] (fn [_, m, ] => m | _ => raise Arg.ExtractFailure)
 fun subsumptionLeft gsize a b c = Arg.lmake "subsumptionLeft" [] gsize [J.Tm (a), ] (c) [(Arg.Unhide, [J.Tm (Elim (const_istp, [App (a), ])), ], NONE, Elim (const_eeqtp, [App (Sub (a, Shift 1)), App (Sub (b, Shift 1)), ])), (Arg.Nothing, [J.Tm (b), ], SOME (Shift 0), c), ] (fn [_, m, ] => m | _ => raise Arg.ExtractFailure)
 fun subsumptionLeftAlt gsize a b c = Arg.lmake "subsumptionLeftAlt" [] gsize [J.Tm (a), ] (c) [(Arg.Unhide, [J.Tm (a), ], SOME (Shift 0), Elim (const_eeqtp, [App (Sub (a, Shift (gsize + 1))), App (Sub (b, Shift (gsize + 1))), ])), (Arg.Nothing, [J.Tm (b), ], SOME (Shift 0), c), ] (fn [_, m, ] => m | _ => raise Arg.ExtractFailure)
+fun subsumptionLast gsize a b c = Arg.lmake "subsumptionLast" [] gsize [J.Tm (a), ] (Sub (c, Shift gsize )) [(Arg.Unhide, [J.Tm (a), ], NONE, Elim (const_subtype, [App (Sub (a, Shift 1)), App (Sub (b, Shift 1)), ])), (Arg.Nothing, [J.Tm (b), ], NONE, c), ] (fn [_, m, ] => Sub (m, Shift gsize ) | _ => raise Arg.ExtractFailure)
 fun subtypeRefl a = Arg.make "subtypeRefl" [] (Elim (const_subtype, [App (a), App (a), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun subtypeReflEqtype a b = Arg.make "subtypeReflEqtype" [] (Elim (const_subtype, [App (a), App (b), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (b), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun subtypeTrans a b c = Arg.make "subtypeTrans" [] (Elim (const_subtype, [App (a), App (c), ])) [(Arg.Unhide, [], Elim (const_subtype, [App (a), App (b), ])), (Arg.Unhide, [], Elim (const_subtype, [App (b), App (c), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun subtypeIstp1 a b = Arg.make "subtypeIstp1" [] (Elim (const_istp, [App (a), ])) [(Arg.Unhide, [], Elim (const_subtype, [App (a), App (b), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun subtypeIstp2 a b = Arg.make "subtypeIstp2" [] (Elim (const_istp, [App (b), ])) [(Arg.Unhide, [], Elim (const_subtype, [App (a), App (b), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun eeqtpForm a b = Arg.make "eeqtpForm" [] (Elim (const_istp, [App (Elim (const_eeqtp, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun eeqtpEq a b c d = Arg.make "eeqtpEq" [] (Elim (const_eqtp, [App (Elim (const_eeqtp, [App (a), App (c), ])), App (Elim (const_eeqtp, [App (b), App (d), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (b), ])), (Arg.Unhide, [], Elim (const_eqtp, [App (c), App (d), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun eeqtpFormUniv a b i = Arg.make "eeqtpFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_eeqtp, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun eeqtpEqUniv a b c d i = Arg.make "eeqtpEqUniv" [] (Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (Elim (const_eeqtp, [App (a), App (c), ])), App (Elim (const_eeqtp, [App (b), App (d), ])), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (a), App (b), ])), (Arg.Unhide, [], Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (c), App (d), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun setForm a b = Arg.make "setForm" [] (Elim (const_istp, [App (Elim (const_set, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun setEq a a' b b' = Arg.make "setEq" [] (Elim (const_eqtp, [App (Elim (const_set, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_set, [App (a'), App (Lam (NONE, b')), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_iff, [App (b), App (b'), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun setFormUniv a b i = Arg.make "setFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_set, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Elim (const_univ, [App (Sub (i, Shift 1)), ])), App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)

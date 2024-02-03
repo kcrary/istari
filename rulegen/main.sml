@@ -161,6 +161,14 @@ structure Main :> MAIN =
                Finally.finally
                   (fn () => WebgenDB.gen outs rules')
                   (fn () => TextIO.closeOut outs)
+            end;
+
+            let
+               val outs = TextIO.openOut "../prover/rule-tactic.iml"
+            in
+               Finally.finally
+                  (fn () => Tacticgen.gen outs rules')
+                  (fn () => TextIO.closeOut outs)
             end
          end
 

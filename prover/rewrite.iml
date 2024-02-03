@@ -83,11 +83,11 @@ signature REWRITE =
 
 (* The rewriting system
    ====================
-   There are two forms of rewrite: computational rewrites and relation rewrites.
+   There are two forms of rewrite: computation rewrites and relation rewrites.
 
    A rewrite is a function that takes the hypothesis being rewritten and the current goal,
    and returns a general rewrite, where a general rewrite is a *rewrite core* that carries
-   either a computational or relation rewrite.
+   either a computation or relation rewrite.
 
 
    Cores
@@ -110,7 +110,7 @@ signature REWRITE =
    current term, spine is the leftover spine, and method rewrites M into N.  Thus, if the
    current term is P, and the actor returns (M, N, spine, method), then P = M spine.
 
-   A computational rewrite always acts on an entire elim.  Thus, its actor always returns
+   A computation rewrite always acts on an entire elim.  Thus, its actor always returns
    (P, N, [], method) where P is the current term.
 
    The function *find* uses a rewrite core and finds the desired place in a term for the
@@ -119,9 +119,9 @@ signature REWRITE =
    should turn P into C{N}.
    
 
-   Computational rewrites
-   ----------------------
-   A computational rewrite that takes M to N consists a small program which shows how to
+   Computation rewrites
+   --------------------
+   A computation rewrite that takes M to N consists a small program which shows how to
    use direct computation rules to get from M to N.
 
 
@@ -174,8 +174,9 @@ signature REWRITE =
 
    If there are no successful compatibility or weakening rules, we backtrack.
 
-   When and if we reach the top level, we want R to be entailment (A |- B[^]) or
-   extensional type equality (A <:> B).  If R is anything else, we backtrack.
+   When and if we reach the top level, we want R to be entailment (A |- B[^]), extensional
+   type equality (A <:> B), or (in hypotheses) subtyping (A <: B).  If R is anything else,
+   we backtrack.
 
    NOTE: Entailment is treated if it is a relation, even though it does not actually have
    that form.
@@ -185,20 +186,27 @@ signature REWRITE =
 
    - In the conclusion:
 
-     + If R is eeqtp, we can replace A by B using symmetry.
+     + If R is eeqtp, we can replace A by B (using symmetry if the coercion is backward).
 
-     + If R is entailment (A entails B) then the coercion must be backward.  If so, we can
-       replace A by B.  Otherwise backtrack.
+     + If R is entailment, then the coercion must be backward.  If so, B entails A, so
+       we can replace A by B.  Otherwise backtrack.
+
+     (The first case is not strictly necessary, since eeqtp will eventually weaken to
+     entailment.)
 
    - In a hypothesis, first ensure that B can be written in the same hypothesis position.
      (That is, ensure B does not depend on any later hypothesis.)  Then:
 
-     + If R is eeqtp, we can replace A by B.
+     + If R is eeqtp, we can replace A by B (using symmetry if the coercion is backward).
 
-     + If R is entailment (A entails B) then the coercion must be forward, AND no
-       subsequent hypothesis or the conclusion may depend on A.  If both are the case, we
-       can replace A by B.  (Since we are not actually turning A into B, we are replacing
-       A by B, any dependencies would notice.)  Otherwise backtrack.
+     + If R is subtype, then the corecion must be forward (so A <: B), AND no subsequent
+       hypothesis may depend on the hypothesis.  If both are the case, we can replace A by
+       B.  Otherwise backtrack.
+
+     + If R is entailment, then the coercion must be forward (so A entails B), AND no
+       subsequent hypothesis NOR the conclusion may depend on the hypothesis.  If both are
+       the case, we can replace A by B.  (Since we are not actually turning A into B, we
+       are replacing A by B, any dependencies would notice.)  Otherwise backtrack.
 
 
    Compatibility rules
@@ -248,7 +256,7 @@ signature REWRITE_TYPES =
 
       (* All the type definitions are given here in case the user wants to craft a rewrite. *)
 
-      datatype computational_rewrite =
+      datatype computation_rewrite =
          Identity
 
        | Beta
@@ -270,7 +278,7 @@ signature REWRITE_TYPES =
             where i unfolds to N and rewriting is taking place under k bindings
          *)
 
-       | Seq of computational_rewrite * term * computational_rewrite
+       | Seq of computation_rewrite * term * computation_rewrite
          (* Seq red1 M2 red2 :: M1 --> M3
             where red1 :: M1 --> M2 and red2 :: M2 --> M3
          *)
@@ -319,7 +327,7 @@ signature REWRITE_TYPES =
 
 
       datatype general_rewrite =
-         Computational of computational_rewrite rewrite_core
+         Computation of computation_rewrite rewrite_core
        | Relation of relation_rewrite rewrite_core
 
 
@@ -344,14 +352,14 @@ structure RewriteTypes :> REWRITE_TYPES =
       type 'a rewrite_core =
          (int -> term -> bool) * (int -> term -> (term * term * Term.elim list * 'a) option)
 
-      datatype computational_rewrite =
+      datatype computation_rewrite =
          Identity
        | Beta
        | Reduce of Reduction.reduction
        | Unreduce of Reduction.reduction
        | LetFold of int * term
        | LetUnfold of int * term
-       | Seq of computational_rewrite * term * computational_rewrite
+       | Seq of computation_rewrite * term * computation_rewrite
 
       datatype relation =
          Equality of Term.term         (* the type at which terms are being compared *)
@@ -364,7 +372,7 @@ structure RewriteTypes :> REWRITE_TYPES =
       type relation_rewrite = relation * coercion
 
       datatype general_rewrite =
-         Computational of computational_rewrite rewrite_core
+         Computation of computation_rewrite rewrite_core
        | Relation of relation_rewrite rewrite_core
 
       exception RewriteFailure of string
@@ -759,7 +767,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                M is the ith hit within P
          then  P' = M spine
                returns (M, N, C{ {} spine }, method)
-         else  raises (RewriteFailure <message>)
+         else  raises (InsufficientHits <message>)
       *)
       fun find i p (test, act) =
          findMain i p 0 [] test act
@@ -802,9 +810,9 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
 
 
-      (* Computational rewrites *)
+      (* Computation rewrites *)
 
-      fun rewriteConclComputationalLoop m n c rew =
+      fun rewriteConclComputationLoop m n c rew =
          (case rew of
              Identity =>
                 idtac
@@ -834,10 +842,10 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                 refine (Rule.letUnfold j (instantiateShift c p))
 
            | Seq (rew1, p, rew2) =>
-                rewriteConclComputationalLoop m p c rew1 >>> [rewriteConclComputationalLoop p n c rew2])
+                rewriteConclComputationLoop m p c rew1 >>> [rewriteConclComputationLoop p n c rew2])
 
 
-      fun rewriteHypComputationalLoop hyp f m n c rew =
+      fun rewriteHypComputationLoop hyp f m n c rew =
          (case rew of
              Identity =>
                 idtac
@@ -866,10 +874,10 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                    raise (RewriteFailure "hypothesis is out of scope of let binding")
 
            | Seq (rew1, p, rew2) =>
-                rewriteHypComputationalLoop hyp f m p c rew1 >>> [rewriteHypComputationalLoop hyp f p n c rew2])
+                rewriteHypComputationLoop hyp f m p c rew1 >>> [rewriteHypComputationLoop hyp f p n c rew2])
 
 
-      fun rewriteComputational i core hypopt (goal as (jud, _)) =
+      fun rewriteComputation i core hypopt (goal as (jud, _)) =
          (case hypopt of
              NONE =>
                 (* concl *)
@@ -880,7 +888,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
                    (* rewriting C{M} into C{N} using cr *)
                 in
-                   rewriteConclComputationalLoop m n c cr
+                   rewriteConclComputationLoop m n c cr
                 end
 
            | SOME hyp =>
@@ -906,7 +914,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
                    (* rewriting C{M} into C{N} using cr *)
                 in
-                   rewriteHypComputationalLoop hyp f m n c cr
+                   rewriteHypComputationLoop hyp f m n c cr
                 end)
 
 
@@ -1199,6 +1207,16 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                 propagateGeneral dir c rconst m n coe fk sk)
 
 
+      (* if f raises RewriteFailure, handle it *)
+      fun liftRewrite f =
+         lift
+         (fn () =>
+             try
+                f ()
+             with
+                RewriteFailure msg => fail msg)
+
+
       fun rewriteRelation i core hypopt (jud, dir) sequel =
          (case hypopt of
              NONE =>
@@ -1310,17 +1328,43 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                           ]
                                    end
       
+                                else if Constant.eq (rconst, Prim.subtype) then
+                                   (case coe' of
+                                       Backward _ =>
+                                          (* wrong direction *)
+                                          fk ()
+
+                                     | Forward tac =>
+                                          (* tac :: A, ... |- A[^hyp+1] <: B[^hyp+1] *)
+                                          (* A, ... |- J *)
+                                          ifthen (refine (Rule.exchange 0 hyp 1))
+                                             (
+                                             (* ..., A[^hyp] |- J[..] *)
+                                             refine (Rule.subsumptionLast 0 (T.evar ()) (T.Sub (b, T.Shift hyp)) (T.evar ()))
+                                             >>> [
+                                                 (* ..., A[^hyp] |- A[^hyp+1] <: B[^hyp+1] *)
+                                                 refine (Rule.exchange 0 1 hyp)
+                                                 >>+
+                                                 (* A, ... |- A[^hyp+1] <: B[^hyp+1] *)
+                                                 tac >>= tryRefl,
+
+                                                 (* ..., B[^hyp] |- J[..] *)
+                                                 refine (Rule.exchange 0 1 hyp)
+                                                 >>+
+                                                 (* B, ... |- J *)
+                                                 sequel
+                                                 ]
+                                             )
+                                             (* If the exchange failed, try to propagate a different way, in hopes that we might get to eetp. *)
+                                             (liftRewrite fk))
+
                                 else if Constant.eq (rconst, Prim.entailment) then
-                                   (case
-                                       (case coe' of
-                                           Forward tac => SOME tac
-                                         | Backward _ => NONE)
-                                    of
-                                       NONE =>
+                                   (case coe' of
+                                       Backward _ =>
                                           (* wrong direction *)
                                           fk ()
       
-                                     | SOME tac =>
+                                     | Forward tac =>
                                           (* tac :: A, ..., A[^hyp+1] |- B[^hyp+2] *)
                                           ifthenl
                                              (* A, ... |- J *)
@@ -1355,7 +1399,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                              sequel
                                              ]
                                              (* If the weakening failed, try to propagate a different way, in hopes that we might get to eeqtp. *)
-                                             (lift fk))
+                                             (liftRewrite fk))
       
                                 else
                                    fk ()
@@ -1387,8 +1431,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
          in
             try
                (case rew hypopt goal of
-                   Computational core =>
-                      rewriteComputational i core hypopt goal
+                   Computation core =>
+                      rewriteComputation i core hypopt goal
                       >>+
                       sequel
 
@@ -1417,7 +1461,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
       fun loosen rew hyp l =
          (case rew hyp l of
-             Computational core => Computational (loosenCore core)
+             Computation core => Computation (loosenCore core)
            | Relation core => Relation (loosenCore core))
 
 
@@ -1518,7 +1562,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
    
                val (m, n, c) =
                   (case rew hyp goal of
-                      Computational core => find' i a core
+                      Computation core => find' i a core
                     | Relation core => find' i a core)
    
                val dir' =
@@ -1593,7 +1637,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             rews
                                      
 
-      fun identityRew _ _ = Computational ((fns _ _ => true), (fns _ m => SOME (m, m, [], Identity)))
+      fun identityRew _ _ = Computation ((fns _ _ => true), (fns _ m => SOME (m, m, [], Identity)))
 
       fun showPosition targets =
          List.app
@@ -1689,7 +1733,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
       (* Rewriters *)
 
       (* replace p with n, p in whnf *)
-      fun replaceComputational cond added m p crew =
+      fun replaceComputation cond added m p crew =
          let
             val cond' = cond p
 
@@ -1757,7 +1801,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                      NONE
                end
          in
-            Computational (test, act)
+            Computation (test, act)
          end
 
 
@@ -1775,7 +1819,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
 
       fun unreduceMain cond added m red =
-         replaceComputational cond added m 
+         replaceComputation cond added m 
             (try 
                 N.whnf (R.reduce red m)
              with
@@ -1788,7 +1832,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             
 
       fun letFoldMain cond added varglobal varlocal n spine =
-         replaceComputational cond added 
+         replaceComputation cond added 
             (T.Elim (T.Var varlocal, spine))
             (N.whnf (T.Elim (n, spine)))
             (fns s spine' =>
@@ -1802,7 +1846,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             
 
       fun letrecRollMain cond added varglobal varlocal body spine =
-         replaceComputational cond added
+         replaceComputation cond added
             (T.Elim (T.Var varlocal, spine))
             (N.whnf (T.Elim (T.Sub (body, T.Idot (varlocal, T.id)), spine)))
             (fns s spine' =>
@@ -1949,7 +1993,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
           
                                   | _ => NONE)
                           in
-                             Computational (test, act)
+                             Computation (test, act)
                           end
 
                      | _ => raise (RewriteFailure "variable is not let bound"))
@@ -1986,7 +2030,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
        
                                | _ => NONE)
                        in
-                          Computational (test, act)
+                          Computation (test, act)
                        end))
 
       val unfoldRew = unfoldMain true
@@ -2028,7 +2072,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                 with
                    Reduction.Reduce => NONE)
          in
-            Computational (test, act)
+            Computation (test, act)
          end
 
       fun reduceUsing aims =
@@ -2153,7 +2197,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
     
                                           | _ => NONE)
                                   in
-                                     Computational (test, act)
+                                     Computation (test, act)
                                   end)\
     
                            | _ =>
@@ -2204,7 +2248,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
        
                         | _ => NONE)
                 in
-                   Computational (test, act)
+                   Computation (test, act)
                 end)
 
       fun unroll aims =
@@ -2496,7 +2540,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                        | SOME spine => SOME (n, T.Elim (T.Sub (m, s), spine), [], Beta))
                   end
             in
-               Computational (test, act)
+               Computation (test, act)
             end
 
       fun convert aims =
@@ -2566,7 +2610,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
                     | _ => NONE)
          in
-            Computational (test, act)
+            Computation (test, act)
          end
 
       fun convertHead aims =
@@ -2584,7 +2628,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             fun act _ n =
                SOME (n, N.normalize n, [], Beta)
          in
-            Computational ((fns _ _ => true), act)
+            Computation ((fns _ _ => true), act)
          end
 
       fun whreduceRew _ _ =
@@ -2592,7 +2636,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             fun act _ n =
                SOME (n, N.whnf n, [], Beta)
          in
-            Computational ((fns _ _ => true), act)
+            Computation ((fns _ _ => true), act)
          end
 
       fun reduceHardRew _ _ =
@@ -2600,7 +2644,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             fun act _ n =
                SOME (n, N.normalizeHard n, [], Beta)
          in
-            Computational ((fns _ _ => true), act)
+            Computation ((fns _ _ => true), act)
          end
 
       fun whreduceHardRew _ _ =
@@ -2608,7 +2652,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             fun act _ n =
                SOME (n, N.whnfHard n, [], Beta)
          in
-            Computational ((fns _ _ => true), act)
+            Computation ((fns _ _ => true), act)
          end
 
       fun reduce targets = rewriteRaw [(reduceRew, targets)]

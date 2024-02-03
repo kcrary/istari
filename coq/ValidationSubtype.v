@@ -20,7 +20,7 @@ Require Import Dots.
 Require Import ValidationUtil.
 
 
-Hint Rewrite def_subtype : prepare.
+Hint Rewrite def_subtype def_eeqtp : prepare.
 
 
 Lemma subtypeForm_valid : subtypeForm_obligation.
@@ -140,7 +140,6 @@ Lemma subsumptionAlt_valid : subsumptionAlt_obligation.
 Proof.
 prepare.
 intros G a b n m Heq Hm.
-rewrite -> def_eeqtp in Heq.
 apply (tr_subtype_elim _ a); auto.
 apply (tr_subtype_eta2 _ _ _ (ppi2 n) (ppi2 n)).
 eapply tr_prod_elim2; eauto.
@@ -151,7 +150,6 @@ Lemma subsumptionLeft_valid : subsumptionLeft_obligation.
 Proof.
 prepare.
 intros G1 G2 a b c p m Hb Hm.
-rewrite -> def_eeqtp in Hb.
 simpsubin Hm.
 eapply tr_subtype_convert_hyp; eauto.
   {
@@ -170,7 +168,6 @@ Lemma subsumptionLeftAlt_valid : subsumptionLeftAlt_obligation.
 Proof.
 prepare.
 intros G1 G2 a b c ext m Heq Hc.
-rewrite -> def_eeqtp in Heq.
 rewrite -> substctx_id in Heq, Hc.
 cbn [Nat.add] in Heq, Hc.
 replace (deq m m c) with (substj (dot ext id) (deq (subst sh1 m) (subst sh1 m) (subst sh1 c))) by (simpsub; reflexivity).
@@ -284,6 +281,70 @@ apply (tr_subtype_convert_hyp (hyp_tm (prod (subtype a b) (subtype b a)) :: G1) 
     apply eqsub_symm.
     apply eqsub_expand_id.
     }
+  }
+Qed.
+
+
+Lemma subsumptionLast_valid : subsumptionLast_obligation.
+Proof.
+prepare.
+intros G1 G2 a b c ext0 m Hab Hc.
+cbn [Nat.add].
+apply (weakening _ G2 []).
+  {
+  simpsub.
+  reflexivity.
+  }
+
+  {
+  cbn [length].
+  simpsub.
+  rewrite <- !compose_assoc.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  reflexivity.
+  }
+cbn [length].
+simpsub.
+cbn [List.app].
+rewrite -> compose_sh_unlift.
+simpsub.
+replace (deq m m c) with (substj (dot (var 0) id) (substj (dot (var 0) (sh 2)) (deq m m c))).
+2:{
+  simpsub.
+  rewrite -> !subst_var0_sh1.
+  reflexivity.
+  }
+apply (tr_generalize _ (subst sh1 b) (var 0)).
+  {
+  apply (tr_subtype_elim _ (subst sh1 a)).
+    {
+    exact Hab.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+  }
+
+  {
+  apply (weakening _ [_] [_]).
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  rewrite -> !subst_var0_sh1.
+  exact Hc.
   }
 Qed.
 
@@ -408,4 +469,36 @@ prepare.
 intros G a b ext0 H.
 eapply tr_subtype_formation_invert2.
 eapply tr_inhabitation_formation; eauto.
+Qed.
+
+
+Lemma eeqtpForm_valid : eeqtpForm_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+apply tr_prod_formation; apply tr_subtype_formation; auto.
+Qed.
+
+
+Lemma eeqtpEq_valid : eeqtpEq_obligation.
+Proof.
+prepare.
+intros G a b c d ext1 ext0 Hab Hcd.
+apply tr_prod_formation; apply tr_subtype_formation; auto.
+Qed.
+
+
+Lemma eeqtpFormUniv_valid : eeqtpFormUniv_obligation.
+Proof.
+prepare.
+intros G a b i ext1 ext0 Ha Hb.
+apply tr_prod_formation_univ; apply tr_subtype_formation_univ; auto.
+Qed.
+
+
+Lemma eeqtpEqUniv_valid : eeqtpEqUniv_obligation.
+Proof.
+prepare.
+intros G a b c d i ext1 ext0 Hab Hcd.
+apply tr_prod_formation_univ; apply tr_subtype_formation_univ; auto.
 Qed.

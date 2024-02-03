@@ -2845,6 +2845,13 @@ variables.  The official rules, using de Bruijn indices, are given
       G1, x : A, G2 |- eeqtp A B
       G1, x : B, G2 |- C ext M
 
+- `subsumptionLast n A B C`
+
+      G1, x : A, G2 |- C ext M
+      >>
+      G1, x : A |- A <: B
+      G1, x : B |- C ext M
+
 - `subtypeRefl A`
 
       G |- A <: A
@@ -2875,6 +2882,37 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- B : type
       >>
       G |- A <: B
+
+
+### Extensional type equality
+
+- `eeqtpForm A B`
+
+      G |- eeqtp A B : type
+      >>
+      G |- A : type
+      G |- B : type
+
+- `eeqtpEq A B C D`
+
+      G |- eeqtp A C = eeqtp B D : type
+      >>
+      G |- A = B : type
+      G |- C = D : type
+
+- `eeqtpFormUniv A B I`
+
+      G |- eeqtp A B : univ I
+      >>
+      G |- A : univ I
+      G |- B : univ I
+
+- `eeqtpEqUniv A B C D I`
+
+      G |- eeqtp A C = eeqtp B D : univ I
+      >>
+      G |- A = B : univ I
+      G |- C = D : univ I
 
 
 ### Subset types

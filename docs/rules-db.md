@@ -2833,6 +2833,13 @@ Conventions:
       G1, A, G2 |- eeqtp A[(^1) o ^n] B[(^1) o ^n]
       G1, B, G2 |- C ext M
 
+- `subsumptionLast n A B C`
+
+      G1, A, G2 |- C[(id) o ^n] ext M[(id) o ^n]
+      >>
+      G1, A |- subtype A[^1] B[^1]
+      G1, B |- C ext M
+
 - `subtypeRefl A`
 
       G |- subtype A A
@@ -2863,6 +2870,37 @@ Conventions:
       G |- istp B
       >>
       G |- subtype A B
+
+
+### Extensional type equality
+
+- `eeqtpForm A B`
+
+      G |- istp (eeqtp A B)
+      >>
+      G |- istp A
+      G |- istp B
+
+- `eeqtpEq A B C D`
+
+      G |- eqtp (eeqtp A C) (eeqtp B D)
+      >>
+      G |- eqtp A B
+      G |- eqtp C D
+
+- `eeqtpFormUniv A B I`
+
+      G |- of (univ I) (eeqtp A B)
+      >>
+      G |- of (univ I) A
+      G |- of (univ I) B
+
+- `eeqtpEqUniv A B C D I`
+
+      G |- eq (univ I) (eeqtp A C) (eeqtp B D)
+      >>
+      G |- eq (univ I) A B
+      G |- eq (univ I) C D
 
 
 ### Subset types

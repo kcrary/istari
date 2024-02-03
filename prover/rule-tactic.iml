@@ -406,11 +406,16 @@ signature RULE_TACTIC =
       val subsumptionAlt : tactic1                (* A *)
       val subsumptionLeft : int -> tactic1        (* B *)
       val subsumptionLeftAlt : int -> tactic1     (* B *)
+      val subsumptionLast : int -> tactic2        (* B C *)
       val subtypeRefl : tactic
       val subtypeReflEqtype : tactic
       val subtypeTrans : tactic1                  (* B *)
       val subtypeIstp1 : tactic1                  (* B *)
       val subtypeIstp2 : tactic1                  (* A *)
+      val eeqtpForm : tactic
+      val eeqtpEq : tactic
+      val eeqtpFormUniv : tactic
+      val eeqtpEqUniv : tactic
       val setForm : tactic
       val setEq : tactic
       val setFormUniv : tactic
@@ -3967,6 +3972,20 @@ structure RuleTactic :> RULE_TACTIC =
                 ]
          end
 
+      fun subsumptionLast i xB xC =
+         let
+            do (jud, dir) = withgoal
+            val (right, dir') = D.split dir i
+            val left = D.shift dir' 1
+            val set = D.set dir
+         in
+            refine (Rule.subsumptionLast i (T.evar ()) xB xC)
+            >>> [
+                chdir (D.bindsVary left [NONE, ]),
+                chdir (D.bindsVary left [NONE, ]),
+                ]
+         end
+
       val subtypeRefl =
          let
             do () = lift
@@ -3997,6 +4016,34 @@ structure RuleTactic :> RULE_TACTIC =
          let
          in
             refine (Rule.subtypeIstp2 xA (T.evar ()))
+         end
+
+      val eeqtpForm =
+         let
+            do () = lift
+         in
+            refine (Rule.eeqtpForm (T.evar ()) (T.evar ()))
+         end
+
+      val eeqtpEq =
+         let
+            do () = lift
+         in
+            refine (Rule.eeqtpEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         end
+
+      val eeqtpFormUniv =
+         let
+            do () = lift
+         in
+            refine (Rule.eeqtpFormUniv (T.evar ()) (T.evar ()) (T.evar ()))
+         end
+
+      val eeqtpEqUniv =
+         let
+            do () = lift
+         in
+            refine (Rule.eeqtpEqUniv (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
          end
 
       val setForm =

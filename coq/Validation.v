@@ -433,11 +433,16 @@ exact subsumption_valid.
 exact subsumptionAlt_valid.
 exact subsumptionLeft_valid.
 exact subsumptionLeftAlt_valid.
+exact subsumptionLast_valid.
 exact subtypeRefl_valid.
 exact subtypeReflEqtype_valid.
 exact subtypeTrans_valid.
 exact subtypeIstp1_valid.
 exact subtypeIstp2_valid.
+exact eeqtpForm_valid.
+exact eeqtpEq_valid.
+exact eeqtpFormUniv_valid.
+exact eeqtpEqUniv_valid.
 exact setForm_valid.
 exact setEq_valid.
 exact setFormUniv_valid.

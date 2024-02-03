@@ -4,6 +4,150 @@ openModule /Logic/;
 
 
 
+fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
+
+
+define /myeeqtp a b/
+/
+  a <:> b
+//
+  intersect i . U i -> U i -> U i
+/;
+
+inference.
+unfold /myeeqtp/.
+typecheck.
+qed ();
+
+
+
+lemma "myeeqtp_impl_eeqtp"
+/
+  forall i (a b : U i) . myeeqtp a b -> a <:> b
+/;
+
+inference.
+intro /i a b H/.
+unfold /myeeqtp in H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "myeeqtp_impl_subtype"
+/
+  forall i (a b : U i) . myeeqtp a b -> a <: b
+/;
+
+inference.
+intro /i a b H/.
+destruct /H/ /H _/.
+hyp /H/.
+qed ();
+
+
+
+val myeeqtp = parseConstant /myeeqtp/;
+val myeeqtp_impl_eeqtp = parseConstant /myeeqtp_impl_eeqtp/;
+val myeeqtp_impl_subtype = parseConstant /myeeqtp_impl_subtype/;
+
+(* the order of weakenings here is contrived to test backtracking *)
+
+ConstantTable.insert RewriteInternal.weakeningTable
+  myeeqtp
+  [
+  (Prim.subtype, true, (fns _ _ tac => andthenOn 0 (Backchain.witnessPriority /\Term.Const myeeqtp_impl_subtype\ _ _ _ __/) tac)),
+  (Prim.eeqtp, true, (fns _ _ tac => andthenOn 0 (Backchain.witnessPriority /\Term.Const myeeqtp_impl_eeqtp\ _ _ _ __/) tac)),
+  ];
+
+
+
+lemma "hypothesis_backtrack_failure_subtype"
+/
+  forall i (a b : U i) (x : a) .
+    x = x : a
+    -> a <: b
+    -> unit
+/;
+
+inference.
+intro /i a b x H Hsub/.
+(* Test that propagation failure due to dependency on a hypothesis does not result in an uncaught exception. *)
+shouldfail (rewrite /-> Hsub in x/).
+split.
+qed ();
+
+
+
+lemma "hypothesis_backtrack_failure_entailment"
+/
+  forall i (a b : U i) (x : a) .
+    (a -> b)
+    -> x = x : a
+/;
+
+inference.
+intro /i a b x Himpl/.
+fold /implies _ _ in Himpl/.
+(* Test that propagation failure due to dependency on a hypothesis does not result in an uncaught exception. *)
+shouldfail (rewrite /-> Himpl in x/).
+reflexivity.
+qed ();
+
+
+
+lemma "hypothesis_backtrack_success_myeeqtp"
+/
+  forall i (a b : U i) (x : a) .
+    x = x : a
+    -> myeeqtp a b
+    -> x : b
+/;
+
+inference.
+intro /i a b x H Heq/.
+rewrite /-> Heq in x/.
+hypof.
+qed ();
+
+
+
+lemma "hypothesis_entailment"
+/
+  forall i (a b : U i) (x : a) .
+    a <: b
+    -> x : b
+/;
+
+inference.
+intro /i a b x Hsub/.
+infer /x/ /Hof/.
+infer /Hof/ /Hofof/.
+shouldfail (rewrite /-> Hsub in Hof/).
+clear /Hofof/.
+rewrite /-> Hsub in Hof/.
+hyp /Hof/.
+qed ();
+ 
+
+
+lemma "subtype_hypothesis"
+/
+  forall i (a b : U i) (P : b -> U i) (x : a) .
+    a <: { y : b | P y }
+    -> { P x }
+/;
+
+inference.
+intro /i a b P x Hsub/.
+rewrite /-> Hsub in x/.
+destruct /x/ /[x H]/.
+split.
+hyp /H/.
+qed ();
+
+
+
 lemma "iff_into_squash"
 /
   forall i (a a' b : U i) .
