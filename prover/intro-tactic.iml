@@ -95,8 +95,15 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
 
 
 
+      fun isSoft opac =
+         (case opac of
+             Constant.SOFT => true
+           | Constant.FIRM => true
+           | _ => false)
+
+
       (* n: number of unfolds already *)
-      fun findIntroTactic n a =
+      fun findIntroTactic unfold n a =
          let
             val a' = N.whnf a
          in
@@ -121,24 +128,27 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                           end
 
                      | NONE =>
-                          (case Constant.definition const of
-                              SOME m => 
-                                 findIntroTactic 
-                                    (case Constant.opacity const of
-                                        Constant.HARD => n+1
-
-                                      | _ =>
-                                           (* by construction, can't be opaque *)
-                                           n)
-                                    (T.Elim (m, spine))
-
-                            | NONE => NONE))
+                          if unfold orelse isSoft (Constant.opacity const) then
+                             (case Constant.definition const of
+                                 SOME m => 
+                                    findIntroTactic unfold
+                                       (case Constant.opacity const of
+                                           Constant.HARD => n+1
+   
+                                         | _ =>
+                                              (* by construction, can't be opaque *)
+                                              n)
+                                       (T.Elim (m, spine))
+   
+                               | NONE => NONE)
+                          else
+                             NONE)
 
               | _ => NONE)
          end
 
 
-      fun introPriority pats =
+      fun introMain unfold pats =
          (case pats of
              nil => idtacM Primary
 
@@ -147,7 +157,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                    do (jud, dir) = withgoal
                    val a = Judgement.concl jud
                 in
-                   (case findIntroTactic 0 a of
+                   (case findIntroTactic unfold 0 a of
                        SOME (tac, binder, a') =>
                           let
                              val pat' =
@@ -167,11 +177,13 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                                     idtacM Secondary
           
                                | Primary =>
-                                    D.destruct0 pat' (introPriority rest))
+                                    D.destruct0 pat' (introMain unfold rest))
                           end
           
                      | NONE => fail "conclusion not introable")
                 end)
+
+      fun introPriority pats = introMain true pats
 
       fun introRaw pats = introPriority pats >> idtac
 
@@ -179,7 +191,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
 
       fun introsPriority goal fk sk =
          ifthenM 
-            (introPriority [IntroPattern.Ident NONE])
+            (introMain false [IntroPattern.Ident NONE])
             (fn pri =>
                 (case pri of
                     Primary => introsPriority

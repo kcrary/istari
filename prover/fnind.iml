@@ -39,11 +39,23 @@ signature FNIND =
    end
 
 
-structure Fnind :> FNIND =
+signature FNIND_INTERNAL =
+   sig
+
+      include FNIND
+
+      (* takes the information that Datatype.info would return for a real datatype *)
+      val installFakeDatatype : Datatype.bundle -> unit
+
+   end
+
+
+structure FnindInternal :> FNIND_INTERNAL =
    struct
 
       structure D = Directory
       structure E = ETermInternal
+      structure H = ConstantTable
       structure N = Normalize
       structure R = Reduction
       structure SH = ShowInternal
@@ -91,7 +103,7 @@ structure Fnind :> FNIND =
          raise (Syntax (String.concat
                            ([
                             "In inductive function ",
-                            Symbol.toValue name,
+                            if Symbol.isGensym name then "<anonymous>" else Symbol.toValue name,
                             ", "
                             ] @ msgs)))
 
@@ -135,6 +147,8 @@ structure Fnind :> FNIND =
             Database.setImplicits const n
 
 
+      val fakeDatatypeTable : (int * Datatype.bundle) H.table = H.table ()
+        
 
       exception Recurse
 
@@ -194,8 +208,14 @@ structure Fnind :> FNIND =
                       with
                          Namespace.Namespace _ =>
                             signalError fname1 ["type ", addressToString dt1, " is unbound."]
+
+                   val info = 
+                      (case Datatype.info dt1const of
+                          NONE => H.find fakeDatatypeTable dt1const
+
+                        | info => info)
                 in
-                   (case Datatype.info dt1const of
+                   (case info of
                        NONE =>
                           signalError fname1 [addressToString dt1, " is not a datatype."]
    
@@ -839,17 +859,29 @@ structure Fnind :> FNIND =
 
 
       (* Set the function that Datatype will call to install iterator unparsers. *)
+
+      fun installDatatypeDisplay (i, bundle as (_, numberOfVisibleArgs, numberOfDatatypes, totalConstructors, dtinfo)) =
+         let
+            val (_, iterator, _, _, _) = Vector.sub dtinfo i
+            val arity = numberOfVisibleArgs + numberOfDatatypes + totalConstructors
+         in
+            ConstantTable.insert UP.unparsingTable iterator (arity, precMax, ref true, iteratorUnparser i bundle)
+         end
+
       val () =
          DatatypeInternal.install :=
-         (fn const =>
-             let
-                val (i, bundle as (_, numberOfVisibleArgs, numberOfDatatypes, totalConstructors, dtinfo)) = Option.valOf $ Datatype.info const
-                val (_, iterator, _, _, _) = Vector.sub dtinfo i
-                val arity = numberOfVisibleArgs + numberOfDatatypes + totalConstructors
-             in
-                ConstantTable.insert UP.unparsingTable iterator (arity, precMax, ref true, iteratorUnparser i bundle)
-             end)
+         (fn const => installDatatypeDisplay $ Option.valOf $ Datatype.info const)
 
+
+      fun installFakeDatatype (bundle as (_, _, _, _, dtinfo)) =
+         Vector.appi
+            (fns i (dt, _, _, _, _) =>
+                (
+                H.insert fakeDatatypeTable dt (i, bundle);
+                installDatatypeDisplay (i, bundle)
+                ))
+            dtinfo
+         
 
 
       open Tactic
@@ -1122,6 +1154,9 @@ structure Fnind :> FNIND =
    end
 
 
+structure Fnind :> FNIND = FnindInternal
+
+
 structure ParseFnind =
    struct
 
@@ -1138,7 +1173,16 @@ structure ParseFnind =
       fun fnind_arm constr args body = (SOME (constr, args), body)
       fun fnind_arm_default body = (NONE, body)
 
-      fun fnind_func fname (dt, pervs, indices, arg, rhs) arms = (fname, dt, pervs, indices, arg, rhs, arms)
+      fun fnind_func fname (dt, pervs, indices, arg, rhs) arms = 
+         let
+            val fname' =
+               (case fname of
+                   SOME sym => sym
+
+                 | NONE => Symbol.gensym ())
+         in
+            (fname', dt, pervs, indices, arg, rhs, arms)
+         end
 
       val fnind = Fnind.fnind
 
@@ -1166,7 +1210,7 @@ grammardef Fnind
    rule FnindArms      ::= => null
    rule FnindArms      ::= FnindArm FnindArms => cons
 
-   rule FnindFunc      ::= Ident ":" FnindHeader "of" FnindArms => fnind_func
+   rule FnindFunc      ::= OIdent ":" FnindHeader "of" FnindArms => fnind_func
    rule FnindFuncs     ::= FnindFunc => sing
    rule FnindFuncs     ::= FnindFunc "and" FnindFuncs => cons
    

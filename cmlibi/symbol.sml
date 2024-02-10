@@ -47,6 +47,8 @@ functor SymbolFun (structure Value : HASHABLE
             (n, v0)
          end
 
+      fun isGensym (n, _) = n < 0
+
    end
 
 

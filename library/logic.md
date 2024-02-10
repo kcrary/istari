@@ -84,3 +84,10 @@
     (* != *)
     neq : type:neq
         = def:neq
+
+
+### Constructive choice
+
+    function_description : type:function_description
+
+    function_description_nondep : type:function_description_nondep

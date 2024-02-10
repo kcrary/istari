@@ -251,7 +251,7 @@ which appears in the `Hyp` structure.
 
   If `h`'s type is `A -> C` and the conclusion is `B -> C`, replaces `h`
   with `B` and the conclusion with `A`.  This is particularly useful
-  when `C` is `void`, that is, when `h`'s type is `not A` and the
+  when `C` is `void`; that is, when `h`'s type is `not A` and the
   conclusion is `not B`.
 
   - `contrapositiveRaw /[hyp h]/`
@@ -669,7 +669,7 @@ For example:
 
 | Syntax              | Parses to:                              |
 | ------------------- | --------------------------------------- |
-| `p1 p2 p3`          | `And [p1, And [p2, p2]]`                |
+| `p1 p2 p3`          | `And [p1, And [p2, p3]]`                |
 | `[p1 p2 p3]`        | `And [p1, p2, p3]`                      |
 | <code>p1 p2 p3 &#124; p4 &#124; p5</code>  | `Or [And [p1, And [p2, p3]], Or [p4, p5]]`        |
 | <code>{p1 p2 p3 &#124; p4 &#124; p5}</code> | `Or [And [p1, p2, p3], And [p4], And [p5]]` |

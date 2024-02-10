@@ -88,7 +88,7 @@ Relations supported by unaugmented Istari include `eq` (`_ = _ : _`),
 (`<->`), and `arrow`.  Note that arrows in an equation are interpreted
 as antecedents for the relation, not as the relation itself.  Thus, to
 rewrite using arrow, one should use the synonym `implies`, which
-unfolds to `arrow`.  Other relations can be suppored by adding to the
+unfolds to `arrow`.  Other relations can be supported by adding to the
 rewriter's weakening and compatibility tables.
 
 

@@ -338,9 +338,12 @@ functor AfterNatAll () :> sig end =
       structure H = ConstantTable
       structure T = Term
       
-      val Collapse (leq, minus, min, max, leq_refl, leq_trans, leq_succ_succ, plus_leq, minus_leq, times_leq, min_leq, max_leq, leq_implication) =
+      val Collapse (nat_iter, leq, minus, min, max, leq_refl, leq_trans, leq_succ_succ, plus_leq, minus_leq, times_leq, min_leq, max_leq, leq_implication) =
          readRegistry /Nat.AfterNatAllEnv/
-            /[constant constant constant constant constant constant constant constant constant constant constant constant constant]/
+            /[constant constant constant constant constant constant constant constant constant constant constant constant constant constant]/
+
+      val nat_iter_zero = readRegistry /Nat.nat_iter_zero/ /reduction2/
+      val nat_iter_succ = readRegistry /Nat.nat_iter_succ/ /reduction2/
 
       (* Reclaim the space spent on environments. *)
       val () =
@@ -414,5 +417,33 @@ functor AfterNatAll () :> sig end =
             (leq, 1, leq, Prim.arrow, true,
              andthenOn 1 (B.witnessPriority /\T.Const leq_implication\ _ _ _ _ __ __/)),
             ]
+
+
+      (* make nat_iter parse and display as fnind *)
+      val () = 
+         FnindInternal.installFakeDatatype
+            (1,                         (* one invisible pervasive arg *)
+             0,                         (* no visible pervasive args *)
+             1,                         (* one mutually recursive datatype *)
+             2,                         (* two constructors total *)
+             Vector.fromList
+                [(Prim.nat,             (* the datatype *)
+                  nat_iter,             (* nat's iterator *)
+                  0,                    (* no index arguments *)
+                  2,                    (* two constructors *)
+                  Vector.fromList
+                     [
+                     (* zero *)
+                     (Prim.zero,
+                      0,                (* no arguments *)
+                      [],               (* no arguments *)
+                      nat_iter_zero),   (* nat_iter _ z _ (zero) --> z *)
+  
+                     (* succ *)
+                     (Prim.succ,
+                      1,                (* one argument *)
+                      [SOME 0],         (* the argument is internal, referring to datatype 0 *)
+                      nat_iter_succ)    (* nat_iter a z s (succ n) --> s n (nat_iter a z s n) *)
+                     ])])
 
   end

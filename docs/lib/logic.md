@@ -12,10 +12,8 @@
 
 ### If-and-only-if
 
-The `iff` type is primitive, but aliased in the `Logic` module:
-
     iff : intersect (i : level) . U i -> U i -> U i
-        = fn P Q . (P -> Q) & (Q -> P)
+        = fn v0 v1 . (v0 -> v1) & (v1 -> v0)
 
     iff_refl : forall (i : level) (P : U i) . P <-> P
 
@@ -88,3 +86,18 @@ The `iff` type is primitive, but aliased in the `Logic` module:
     (* != *)
     neq : intersect (i : level) . forall (a : U i) . a -> a -> U i
         = fn a m n . not (m = n : a)
+
+
+### Constructive choice
+
+    function_description : forall
+                              (i : level)
+                              (a : U i)
+                              (b : a -> U i)
+                              (P : forall (x : a) . b x -> U i) .
+                              (forall (x : a) . exists (y : b x) . P x y)
+                              -> exists (f : forall (x : a) . b x) . forall (x : a) . P x (f x)
+
+    function_description_nondep : forall (i : level) (a b : U i) (P : a -> b -> U i) .
+                                     (forall (x : a) . exists (y : b) . P x y)
+                                     -> exists (f : a -> b) . forall (x : a) . P x (f x)
