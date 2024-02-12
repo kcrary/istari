@@ -286,27 +286,28 @@ A simpler case-analysis operation:
 
 ### Nth
 
-    nth : intersect (lv : level) . forall (a : U lv) . list a -> nat -> option a
+    nth : intersect (lv : level) . forall (a : U lv) . list a -> nat -> Option.option a
         (1 implicit argument)
 
     nth a (nil _) _ --> None a
     nth a (cons _ h t) i --> nat_case i (Some a h) (fn i' . nth a t i')
 
     nth_within_length : forall (lv : level) (a : U lv) (l : list a) (i : nat) .
-                           i < length l <-> (exists (x : a) . nth l i = Some x : option a)
+                           i < length l
+                             <-> (exists (x : a) . nth l i = Option.Some x : Option.option a)
 
     nth_outside_length : forall (lv : level) (a : U lv) (l : list a) (i : nat) .
-                            length l <= i <-> nth l i = None : option a
+                            length l <= i <-> nth l i = Option.None : Option.option a
 
     nth_append_left : forall (lv : level) (a : U lv) (l1 l2 : list a) (i : nat) .
-                         i < length l1 -> nth (append l1 l2) i = nth l1 i : option a
+                         i < length l1 -> nth (append l1 l2) i = nth l1 i : Option.option a
 
     nth_append_right : forall (lv : level) (a : U lv) (l1 l2 : list a) (i : nat) .
                           length l1 <= i
-                          -> nth (append l1 l2) i = nth l2 (i - length l1) : option a
+                          -> nth (append l1 l2) i = nth l2 (i - length l1) : Option.option a
 
     nth_map : forall (lv : level) (a b : U lv) (f : a -> b) (l : list a) (i : nat) .
-                 nth (map f l) i = Option.map f (nth l i) : option b
+                 nth (map f l) i = Option.map f (nth l i) : Option.option b
 
     nth_In : forall (lv : level) (a : U lv) (l : list a) (i : nat) .
                 Option.option_case (nth l i) unit (fn x . In a x l)
@@ -361,9 +362,56 @@ A simpler case-analysis operation:
 
     nth_zip : forall (lv : level) (a b : U lv) (l1 : list a) (l2 : list b) (i : nat) .
                  nth (zip l1 l2) i
-                   = Option.bind (nth l1 i) (fn x . Option.bind (nth l2 i) (fn y . Some (x , y)))
-                   : option (a & b)
+                   = Option.bind
+                       (nth l1 i)
+                       (fn x . Option.bind (nth l2 i) (fn y . Option.Some (x , y)))
+                   : Option.option (a & b)
 
     nth_unzip : forall (lv : level) (a b : U lv) (l : list (a & b)) (i : nat) .
-                   nth (unzip l #1) i = Option.map (fn x . x #1) (nth l i) : option a
-                   & nth (unzip l #2) i = Option.map (fn x . x #2) (nth l i) : option b
+                   nth (unzip l #1) i = Option.map (fn x . x #1) (nth l i) : Option.option a
+                   & nth (unzip l #2) i = Option.map (fn x . x #2) (nth l i) : Option.option b
+
+
+### Drop
+
+    drop : intersect (i : level) . forall (a : U i) . nat -> list a -> list a
+         (1 implicit argument)
+
+Dropping too many elements is permitted, and results in the empty list.
+
+    drop _ zero l --> l
+    drop a (succ n) l --> list_case a (list a) l nil (fn _ l' . drop n l')
+
+    drop_nil : forall (i : level) (a : U i) (n : nat) . drop n nil = nil : list a
+
+    length_drop : forall (i : level) (a : U i) (n : nat) (l : list a) .
+                     length (drop n l) = length l - n : nat
+
+    drop_append_leq : forall (i : level) (a : U i) (n : nat) (l1 l2 : list a) .
+                         n <= length l1 -> drop n (append l1 l2) = append (drop n l1) l2 : list a
+
+    drop_append_geq : forall (i : level) (a : U i) (n : nat) (l1 l2 : list a) .
+                         length l1 <= n -> drop n (append l1 l2) = drop (n - length l1) l2 : list a
+
+    drop_append_eq : forall (i : level) (a : U i) (n : nat) (l1 l2 : list a) .
+                        n = length l1 : nat -> drop n (append l1 l2) = l2 : list a
+
+    drop_map : forall (i : level) (a b : U i) (n : nat) (f : a -> b) (l : list a) .
+                  drop n (map f l) = map f (drop n l) : list b
+
+    Forall_drop_weaken : forall (i : level) (a : U i) (P : a -> U i) (n : nat) (l : list a) .
+                            Forall P l -> Forall P (drop n l)
+
+    Exists_drop_weaken : forall (i : level) (a : U i) (P : a -> U i) (n : nat) (l : list a) .
+                            Exists P (drop n l) -> Exists P l
+
+    In_drop_weaken : forall (i : level) (a : U i) (x : a) (n : nat) (l : list a) .
+                        In a x (drop n l) -> In a x l
+
+    nth_drop : forall (i : level) (a : U i) (m n : nat) (l : list a) .
+                  nth (drop m l) n = nth l (m + n) : Option.option a
+
+    nth_as_drop : forall (i : level) (a : U i) (l : list a) (n : nat) .
+                     nth l n
+                       = list_case (drop n l) Option.None (fn h v0 . Option.Some h)
+                       : Option.option a

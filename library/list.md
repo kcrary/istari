@@ -274,3 +274,36 @@ A simpler case-analysis operation:
     nth_zip : type:nth_zip
 
     nth_unzip : type:nth_unzip
+
+
+### Drop
+
+    drop : type:drop
+         imp:drop
+
+Dropping too many elements is permitted, and results in the empty list.
+
+    drop _ zero l --> l
+    drop a (succ n) l --> list_case a (list a) l nil (fn _ l' . drop n l')
+
+    drop_nil : type:drop_nil
+
+    length_drop : type:length_drop
+
+    drop_append_leq : type:drop_append_leq
+
+    drop_append_geq : type:drop_append_geq
+
+    drop_append_eq : type:drop_append_eq
+
+    drop_map : type:drop_map
+
+    Forall_drop_weaken : type:Forall_drop_weaken
+
+    Exists_drop_weaken : type:Exists_drop_weaken
+
+    In_drop_weaken : type:In_drop_weaken
+
+    nth_drop : type:nth_drop
+
+    nth_as_drop : type:nth_as_drop

@@ -2053,4 +2053,237 @@ auto.
 qed ();
 
 
+
+(* Drop *)
+
+defineInd
+/
+  {a}
+//
+  drop : nat -> list a -> list a of
+  | zero . fn l . l
+
+  | succ n . fn l .
+      list_case l nil (fn _ l' . drop n l')
+//
+  intersect i . forall (a : U i) . nat -> list a -> list a
+/;
+
+
+
+lemma "drop_nil"
+/
+  forall i (a : U i) n .
+    drop n nil = nil : list a
+/;
+
+inference.
+intro /i a n/.
+induction /n/ >> auto.
+qed ();
+
+
+
+lemma "length_drop"
+/
+  forall i (a : U i) n (l : list a) .
+    length (drop n l) = length l - n : nat
+/;
+
+inference.
+intro /i a n/.
+induction /n/ >> auto.
+(* succ *)
+intro /n IH l/.
+destruct /l/ /| x l/ >> reduce // >> autoWith /Nat.minus_0_l/.
+qed ();
+
+
+
+lemma "drop_append_leq"
+/
+  forall i (a : U i) n (l1 l2 : list a) .
+    n <= length l1
+    -> drop n (append l1 l2) = append (drop n l1) l2 : list a
+/;
+
+inference.
+intro /i a n l1 l2/.
+revert /l1/.
+induction /n/ >> auto.
+(* succ *)
+intro /n IH l1 Hleq/.
+destruct /l1/ /| x l1/.
+  {
+  reduce /Hleq/.
+  so /Nat.leq_succ_0_not _ Hleq/ /0/.
+  }
+reduce //.
+apply /IH/.
+reduce /Hleq/.
+apply /Nat.leq_succ_invert/ >> auto.
+qed ();
+
+
+
+lemma "drop_append_geq"
+/
+  forall i (a : U i) n (l1 l2 : list a) .
+    length l1 <= n
+    -> drop n (append l1 l2) = drop (n - length l1) l2 : list a
+/;
+
+inference.
+intro /i a n l1 l2/.
+revert /n/.
+induction /l1/ >> auto.
+(* cons *)
+intro /x l1 IH n Hleq/.
+destruct /n/ /| n/.
+  {
+  so /Nat.leq_succ_0_not _ Hleq/ /0/.
+  }
+reduce //.
+apply /IH/.
+apply /Nat.leq_succ_invert/ >> auto.
+qed ();
+
+
+
+lemma "drop_append_eq"
+/
+  forall i (a : U i) n (l1 l2 : list a) .
+    n = length l1 : nat
+    -> drop n (append l1 l2) = l2 : list a
+/;
+
+inference.
+intro /i a n l1 l2 Heq/.
+subst /n/.
+rewrite /-> drop_append_geq/.
+rewrite /-> Nat.minus_self/.
+reflexivity.
+qed ();
+
+
+
+lemma "drop_map"
+/
+  forall i (a b : U i) n (f : a -> b) (l : list a) .
+    drop n (map f l) = map f (drop n l) : list b
+/;
+
+inference.
+intro /i a b n f/.
+induction /n/ >> auto.
+(* succ *)
+intro /n IH l/.
+destruct /l/ /| x l/ >> reduce // >> auto.
+qed ();
+
+
+
+lemma "Forall_drop_weaken"
+/
+  forall i (a : U i) (P : a -> U i) n (l : list a) .
+    Forall P l
+    -> Forall P (drop n l)
+/;
+
+inference.
+intro /i a P n/.
+induction /n/ >> reduce // >> auto.
+(* succ *)
+intro /n IH l Hall/.
+destruct /l/ /| x l/ >> reduce // >> auto.
+apply /IH/.
+inversion /Hall/ >> auto.
+qed ();
+
+
+
+lemma "Exists_drop_weaken"
+/
+  forall i (a : U i) (P : a -> U i) n (l : list a) .
+    Exists P (drop n l)
+    -> Exists P l
+/;
+
+inference.
+intro /i a P n/.
+induction /n/ >> reduce // >> auto.
+(* succ *)
+intro /n IH l Hex/.
+destruct /l/ /| x l/ >> reduce // >> auto.
+reduce /Hex/.
+apply /Exists_miss/ >> auto.
+qed ();
+
+
+
+lemma "In_drop_weaken"
+/
+  forall i (a : U i) x n (l : list a) .
+    In a x (drop n l)
+    -> In a x l
+/;
+
+inference.
+intro /i a x n/.
+induction /n/ >> reduce // >> auto.
+intro /n IH l Hin/.
+destruct /l/ /| y l/ >> reduce /Hin/.
+  {
+  destruct /Hin/ /0/.
+  }
+reduce //.
+right.
+apply /IH/ >> auto.
+qed ();
+
+
+
+lemma "nth_drop"
+/
+  forall i (a : U i) m n (l : list a) .
+    nth (drop m l) n = nth l (m + n) : option a
+/;
+
+inference.
+intro /i a m/.
+induction /m/ >> auto.
+(* succ *)
+intro /m IH n l/.
+destruct /l/ /| x l/ >> reduce // >> auto.
+qed ();
+
+
+
+lemma "nth_as_drop"
+/
+  forall i (a : U i) (l : list a) n .
+    nth l n = list_case (drop n l) None (fn h _ . Some h) : option a
+/;
+
+inference.
+intro /i a l n/.
+revert /n/.
+induction /l/.
+
+(* nil *)
+{
+intro /n/.
+rewrite /-> drop_nil/.
+reduce //.
+reflexivity.
+}
+
+(* cons *)
+{
+intro /x l IH n/.
+destruct /n/ /| n/ >> reduce // >> auto.
+}
+qed ();
+
+
 endModule ();
