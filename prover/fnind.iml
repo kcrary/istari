@@ -148,7 +148,14 @@ structure FnindInternal :> FNIND_INTERNAL =
 
 
       val fakeDatatypeTable : (int * Datatype.bundle) H.table = H.table ()
-        
+
+      fun findBundle const =
+         (case Datatype.info const of
+             NONE => H.find fakeDatatypeTable const
+
+           | info => info)
+
+
 
       exception Recurse
 
@@ -208,14 +215,8 @@ structure FnindInternal :> FNIND_INTERNAL =
                       with
                          Namespace.Namespace _ =>
                             signalError fname1 ["type ", addressToString dt1, " is unbound."]
-
-                   val info = 
-                      (case Datatype.info dt1const of
-                          NONE => H.find fakeDatatypeTable dt1const
-
-                        | info => info)
                 in
-                   (case info of
+                   (case findBundle dt1const of
                        NONE =>
                           signalError fname1 [addressToString dt1, " is not a datatype."]
    
@@ -913,9 +914,9 @@ structure FnindInternal :> FNIND_INTERNAL =
                      (fns (fname, dtname, _, _, _, _, _) ea =>
                          let
                             (* This shouldn't fail since the functions have been elaborated already.
-                               Still, ideally do this less clumsily.
+                               Still, it would be better to do this less clumsily.
                             *)
-                            val (n, _) = Option.valOf $ Datatype.info $ Namespace.resolve dtname
+                            val (n, _) = Option.valOf $ findBundle $ Namespace.resolve dtname
                             val (_, iterator, _, _, _) = Vector.sub dtinfo n
                          
                             val a = ETerm.closed ea
