@@ -15,6 +15,10 @@ signature AUTOTACTIC =
 
       val nautoWithRaw : int -> tool list -> tactic
 
+      val autoToolPriority : tool list -> Tactic.priority Tactic.tacticm
+      val autoToolRaw : tool list -> tactic
+      val autoTool : tool list -> tactic
+
    end
 
 
@@ -36,7 +40,7 @@ structure Autotactic :> AUTOTACTIC =
 
       fun apply const = Backchain.applyPriority (ETerm.literal (Term.Const const))
 
-      fun tryTools tools =
+      fun autoToolPriority tools =
          (case tools of
              [] => fail "autotactic: no more tools"
 
@@ -47,7 +51,7 @@ structure Autotactic :> AUTOTACTIC =
                        first
                           [
                           apply const,
-                          tryTools rest
+                          autoToolPriority rest
                           ]
 
                   | SOME l =>
@@ -55,7 +59,7 @@ structure Autotactic :> AUTOTACTIC =
                        first
                           [
                           first (List.map apply l),
-                          tryTools rest
+                          autoToolPriority rest
                           ]))
 
 
@@ -67,7 +71,7 @@ structure Autotactic :> AUTOTACTIC =
             Hyp.assumption >> done,
             EqualityTacticInternal.reflexivityPriority,
 
-            tryTools tools
+            autoToolPriority tools
             >>= autoCont n true tools,
    
             goalContextnCaseB
@@ -146,6 +150,11 @@ structure Autotactic :> AUTOTACTIC =
    
                idtac
                ]
+
+
+      fun autoToolRaw tools = autoToolPriority tools >> idtac
+
+      fun autoTool tools = Typecheck.withTypecheckSnd (autoToolPriority tools)
 
    end
 

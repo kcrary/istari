@@ -196,14 +196,23 @@ which appears in the `Hyp` structure.
     As `right` but does not invoke the typechecker.
 
 
-- `exists /[term M]/`
+- `exists /[term]/`
 
-  Introduces an existential in the conclusion, using `M` as the
+  Introduces an existential in the conclusion, using the term as the
   witness.
 
-  + `existsRaw /[term M]/`
+  + `existsRaw /[term]/`
 
     As `exists` but does not invoke the typechecker.
+
+  + `existses [/[term]/, ..., /[term]/]`
+
+    Introduces several existentials in sequence, using the terms as
+    the witnesses.
+
+  + `existsesRaw [/[term]/, ..., /[term]/]`
+
+    As `existses` but does not invoke the typechecker.
 
 
 - `exact /[term M]/`
@@ -921,6 +930,18 @@ The destruction tactics are:
     As `boolCase` but does not invoke the typechecker.
 
 
+- `boolEq [bool b] /[term M]/`
+
+  If `M : bool`, replaces all occurences of `M` in the conclusion with
+  `true` (if `b`) or `false` (if not `b`).  Generates the additional
+  subgoal `istrue M` (if `b`) or `not (istrue M)` (if not `b`) and
+  attempts to rewrite it into a useful form.
+
+  + `boolEqRaw [bool b] /[term M]/`
+
+    As `boolEq` but does not invoke the typechecker.
+
+
 
 ### Induction
 
@@ -1090,6 +1111,15 @@ The destruction tactics are:
     As `nautoWith` except that typechecking subgoals are set aside.
     The tactic succeds if only typechecking goals remain.  If
     primary goals would remain, the tactic does nothing.
+
+- `autoTool /[lemma name] ... [lemma name]/`
+
+  Backchain once, using one of the indicated lemmas.  The lemmas are
+  utilized in the same fashion as `auto`.  Fails if no lemma applies.
+
+  + `autoToolRaw /[lemma name] ... [lemma name]/`
+
+    As `autoTool` but does not invoke the typechecker.
 
 
 

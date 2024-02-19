@@ -94,6 +94,7 @@ cons is right associative.
       [Term] :> Term                                                 (type annotation)
       [Term] ap Term                                                 (visibilized application)
       [Term] _# Number                                               (application to multiple evars)
+      [Term] __# Number                                              (application to multiple holes)
 
       ( Term )
       ()                                                             (unit)

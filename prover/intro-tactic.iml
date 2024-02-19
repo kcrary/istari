@@ -30,6 +30,10 @@ signature INTRO_TACTIC =
       val existsRaw : ETerm.eterm -> tactic
       val exists : ETerm.eterm -> tactic
 
+      val existsesPriority : ETerm.eterm list -> priority tacticm
+      val existsesRaw : ETerm.eterm list -> tactic
+      val existses : ETerm.eterm list -> tactic
+
       val exactPriority : ETerm.eterm -> priority tacticm
       val exactRaw : ETerm.eterm -> tactic
       val exact : ETerm.eterm -> tactic
@@ -339,6 +343,21 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
       fun existsRaw m = existsPriority m >> idtac
 
       fun exists m = Typecheck.withTypecheckSnd $ existsPriority m
+
+
+      fun existsesPriority l =
+         (case l of
+             nil =>
+                idtacM Primary
+
+           | em :: rest =>
+                existsPriority em >>! lift (fn () => existsesPriority rest))
+
+      fun existsesRaw l = existsesPriority l >> idtac
+
+      fun existses l = Typecheck.withTypecheckSnd $ existsesPriority l
+
+
 
       val addbind =
          let

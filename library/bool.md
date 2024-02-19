@@ -23,6 +23,8 @@ The `bool` type is primitive, but aliased in the `Bool` module:
 
     not_istrue_iff_eq_false : type:not_istrue_iff_eq_false
 
+    not_not_istrue_iff_eq_true : type:not_not_istrue_iff_eq_true
+
     iff_eq_bool : type:iff_eq_bool
 
 

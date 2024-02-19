@@ -22,6 +22,8 @@ The `bool` type is primitive, but aliased in the `Bool` module:
 
     not_istrue_iff_eq_false : forall (b : bool) . not (istrue b) <-> b = false : bool
 
+    not_not_istrue_iff_eq_true : forall (b : bool) . not (not (istrue b)) <-> b = true : bool
+
     iff_eq_bool : forall (b c : bool) . (istrue b <-> istrue c) <-> b = c : bool
 
 

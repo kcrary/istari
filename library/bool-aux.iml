@@ -20,6 +20,10 @@ signature BOOL_TACTIC =
       val boolCaseRaw : ETerm.eterm -> Symbol.symbol option -> Tactic.tactic
       val boolCase : ETerm.eterm -> Symbol.symbol option -> Tactic.tactic
 
+      val boolEqPriority : bool -> ETerm.eterm -> Tactic.priority Tactic.tacticm
+      val boolEqRaw : bool -> ETerm.eterm -> Tactic.tactic
+      val boolEq : bool -> ETerm.eterm -> Tactic.tactic
+
       (* for each (const, const') in the table
 
          const is a boolean test
@@ -33,9 +37,9 @@ signature BOOL_TACTIC =
 functor BoolTacticFun () :> BOOL_TACTIC =
    struct
 
-      val Collapse (istrue_iff_eq_true, not_istrue_iff_eq_false) =
+      val Collapse (istrue_iff_eq_true, not_istrue_iff_eq_false, not_not_istrue_iff_eq_true) =
          readRegistry /Bool.BoolTacticFunEnv/
-            /[constant constant]/
+            /[constant constant constant]/
 
       structure D = Directory
       structure H = ConstantTable
@@ -45,8 +49,6 @@ functor BoolTacticFun () :> BOOL_TACTIC =
 
       open Tactic
 
-      val istrue_iff_eq_true = parseConstant /Bool.istrue_iff_eq_true/
-      val not_istrue_iff_eq_false = parseConstant /Bool.not_istrue_iff_eq_false/
 
       val pat = IP.Or [IP.And [], IP.And []]
 
@@ -60,55 +62,133 @@ functor BoolTacticFun () :> BOOL_TACTIC =
               [(Hyp.NAME hyp, SOME (false, [0]))])]
 
 
-      fun boolCasePriority em nameopt =
-         let
-            do (_, dir) = withgoal
-            val (varname, dir') = D.insistAndBind dir NONE
-            val (eqname, _) = D.insistAndBind dir' nameopt
-            val m = ETerm.withdir dir em
+      fun priorityOrder (pri1, _) (pri2, _) =
+         (case pri1 of
+             Primary => true
+      
+           | _ =>
+                (case pri2 of
+                    Secondary => true
+      
+                  | _ => false))
 
-            val rewtac =
+      val concl = Symbol.fromValue "concl"
+      
+
+      fun boolCaseMain em eqname tbranch fbranch reord =
+         let
+            do m = withterm em
+            val varname = Symbol.gensym ()
+
+            fun rewtac hyp =
                reduce /concl/
                >>+
                (case Normalize.simplify m of
                    T.Elim (T.Const const, _) =>
                       (case H.find booleanTests const of
                           SOME const' =>
-                             rew false const' eqname
+                             rew false const' hyp
 
                         | NONE => idtacM Primary)
 
                  | _ => idtacM Primary)
          in
-            Generalize.rememberPriority 
-               (ETerm.literal m)
-               (ETerm.literal (T.Const Prim.bool))
-               (SOME varname) 
-               (SOME eqname)
-            >>!
-            EqualityTactic.symmetryInPriority (Hyp.NAME eqname)
-            >>!
-            Destruct.destructPriority (Hyp.NAME varname) pat
-            >>>!
-               [
-               Tactic.refine Rule.normalizeConcl
-               >>+
-               rew true istrue_iff_eq_true eqname
-               >>!
-               rewtac,
-
-               Tactic.refine Rule.normalizeConcl
-               >>+
-               rew true not_istrue_iff_eq_false eqname
-               >>!
-               rewtac
-               ]
+            Reorder.reorder
+               (Generalize.rememberPriority 
+                   (ETerm.literal m)
+                   (ETerm.literal (T.Const Prim.bool))
+                   (SOME varname) 
+                   (SOME eqname)
+                >>!
+                EqualityTactic.symmetryInPriority (Hyp.NAME eqname)
+                >>!
+                Destruct.destructPriority (Hyp.NAME varname) pat
+                >>>!
+                   [
+                   Tactic.refine Rule.normalizeConcl
+                   >>+
+                   tbranch rewtac,
+    
+                   Tactic.refine Rule.normalizeConcl
+                   >>+
+                   fbranch rewtac
+                   ])
+               (Reorder.compose [Reorder.sort priorityOrder, reord])
          end
 
       
+      fun boolCasePriority em nameopt =
+         let
+            do (_, dir) = withgoal
+            val (eqname, _) = D.insistAndBind dir nameopt
+         in
+            boolCaseMain em eqname
+               (fn rewtac => 
+                   rew true istrue_iff_eq_true eqname
+                   >>!
+                   rewtac eqname)
+               (fn rewtac =>
+                   rew true not_istrue_iff_eq_false eqname
+                   >>!
+                   rewtac eqname)
+               Reorder.id
+         end
+
+
+      fun boolEqPriority b em =
+         let
+            val eqname = Symbol.gensym ()
+         in
+            if b then
+               boolCaseMain em eqname
+                  (fn _ =>
+                      clear [(Hyp.NAME eqname)]
+                      >>+
+                      idtacM Primary)
+                  (fn rewtac =>
+                      refine (Rule.voidElim (T.evar ()))
+                      >>+
+                      rew true not_istrue_iff_eq_false eqname
+                      >>!
+                      refine (Rule.arrowElim (T.evar ()) (T.evar ()))
+                      >>> [
+                          hyp (Hyp.NAME eqname) >> done,
+         
+                          clear [(Hyp.NAME eqname)]
+                          >>+
+                          rewtac concl
+                          ])
+                  (Reorder.swap 1 1)
+            else
+               boolCaseMain em eqname
+                  (fn rewtac =>
+                      refine (Rule.voidElim (T.evar ()))
+                      >>+
+                      rew true not_not_istrue_iff_eq_true eqname
+                      >>!
+                      refine (Rule.arrowElim (T.evar ()) (T.evar ()))
+                      >>> [
+                          hyp (Hyp.NAME eqname) >> done,
+         
+                          clear [(Hyp.NAME eqname)]
+                          >>+
+                          rewtac concl
+                          ])
+                  (fn _ =>
+                      clear [(Hyp.NAME eqname)]
+                      >>+
+                      idtacM Primary)
+                  Reorder.id
+         end
+         
+
       fun boolCaseRaw em nameopt = boolCasePriority em nameopt >> idtac
 
       fun boolCase em nameopt = Typecheck.withTypecheckSnd (boolCasePriority em nameopt)
+
+      fun boolEqRaw b em = boolEqPriority b em >> idtac
+
+      fun boolEq b em = Typecheck.withTypecheckSnd (boolEqPriority b em)
 
    end
 
@@ -117,9 +197,10 @@ grammardef BoolTactic
 
    start boolCase Term OIdent
    start boolCaseRaw Term OIdent
+   start boolEq _ Term
+   start boolEqRaw _ Term
 
 end
-
 
 
 functor AfterBoolAll () :> sig end =
