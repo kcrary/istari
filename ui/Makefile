@@ -34,6 +34,10 @@ procdoc :
 	echo "export ();" | $(SMLNJ) export-procdoc.sml
 	../ipp/bin/$(MKNJEXEC) $(SMLNJ) `pwd`/bin procdoc-heapimg procdoc
 
+istaritags :
+	$(SMLNJ) export-tags.sml
+	../ipp/bin/$(MKNJEXEC) $(SMLNJ) `pwd`/bin istaritags-heapimg istaritags
+
 .PHONY : install
 install :
 	cp bin/istari bin/istari-nolib $(INSTALLDIR)

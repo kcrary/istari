@@ -1,6 +1,5 @@
 
-ISTARI=../ui/bin/istari-nolib
-PROCDOC=../ui/bin/procdoc
+ISTARIBIN=../ui/bin
 
 DOCUNITS = acc bar bool decidable finite girard-paradox integer logic list nat option relations stable symbol wtype
 UNITS = $(DOCUNITS) datatype omega
@@ -10,10 +9,14 @@ all : $(foreach i, $(UNITS), $(i).isto)
 docs : $(foreach i, $(DOCUNITS), ../docs/lib/$(i).md)
 
 %.isto : %.ist %-aux.iml
-	$(ISTARI) $<
+	$(ISTARIBIN)/istari-nolib $<
 
 ../docs/lib/%.md : %.md
-	$(PROCDOC) $< $@
+	$(ISTARIBIN)/procdoc $< $@
+
+.PHONY : tags
+tags :
+	$(ISTARIBIN)/istaritags $(foreach i, $(UNITS), $(i).ist)
 
 DATATYPES = acc.isto nat.isto datatype.isto integer.isto
 
