@@ -5,6 +5,8 @@ File.import "logic-aux.iml";
 Namespace.beginModule "Logic";
 
 
+(* Negation *)
+
 define /not P/
 /
   P -> void
@@ -22,8 +24,8 @@ qed ();
 
 val not = parseConstant /not/;
 
+Constant.setOpacity not Constant.SOFT;
 
-Constant.setOpacity (parseConstant /not/) Constant.SOFT;
 
 
 lemma "not_inhabitant"
@@ -58,6 +60,8 @@ qed ();
 val not_compat_arrow = parseConstant /not_compat_arrow/;
 
 
+
+(* If-and-only-if *)
 
 Namespace.aliasExport (parseIdent /iff/) Prim.iff;
 (*
@@ -297,6 +301,8 @@ structure Nothing = AfterIffCompat ();
 
 
 
+(* Rewriting propositions *)
+
 lemma "prod_commute"
 /
   forall i (P Q : U i) . P & Q <-> Q & P
@@ -511,6 +517,8 @@ qed ();
 
 
 
+(* Equality *)
+
 lemma "eq_refl"
 /
   forall i (a : U i) (x : a) . x = x : a
@@ -557,6 +565,8 @@ qed ();
 
 
 
+(* Not equal *)
+
 define /neq a m n/
 /
   not (m = n : a)
@@ -572,7 +582,41 @@ qed ();
 
 val neq = parseConstant /neq/;
 
+Constant.setOpacity neq Constant.SOFT;
 
+
+
+lemma "neq_symm"
+/
+  forall i (a : U i) (x y : a) . neq a x y -> neq a y x
+/;
+
+inference.
+intro /i a x y H/.
+contrapositive /H/.
+symmetry.
+hyp /H/.
+qed ();
+
+val neq_symm = parseConstant /neq_symm/;
+
+
+
+lemma "neq_symm_iff"
+/
+  forall i (a : U i) (x y : a) . neq a x y <-> neq a y x
+/;
+
+inference.
+intro /i a x y/.
+symmetry.
+
+split >> intro /H/ >> apply /neq_symm/ >> auto.
+qed ();
+
+
+
+(* Constructive choice *)
 
 lemma "function_description"
 /
@@ -610,8 +654,8 @@ qed ();
 
 
 writeRegistry /AfterLogicAllEnv/
-  /[constant]/
-  (Collapse (neq));
+  /[constant constant]/
+  (Collapse (neq, neq_symm));
 
 
 endModule ();

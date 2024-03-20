@@ -87,6 +87,10 @@
     neq : intersect (i : level) . forall (a : U i) . a -> a -> U i
         = fn a m n . not (m = n : a)
 
+    neq_symm : forall (i : level) (a : U i) (x y : a) . x != y : a -> y != x : a
+
+    neq_symm_iff : forall (i : level) (a : U i) (x y : a) . x != y : a <-> y != x : a
+
 
 ### Constructive choice
 

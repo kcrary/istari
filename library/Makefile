@@ -2,7 +2,7 @@
 ISTARIBIN=../ui/bin
 
 DOCUNITS = acc bar bool decidable finite girard-paradox integer logic list nat option relations stable symbol wtype
-UNITS = $(DOCUNITS) datatype omega
+UNITS = $(DOCUNITS) datatype omega union
 
 all : $(foreach i, $(UNITS), $(i).isto)
 
@@ -37,6 +37,7 @@ option.isto : $(DATATYPES) integer.isto
 relations.isto : $(DATATYPES) acc.isto decidable.isto finite.isto
 stable.isto : decidable.isto logic.isto
 symbol.isto : logic.isto bool.isto
+union.isto : logic.isto
 wtype.isto : acc.isto
 
 clean :

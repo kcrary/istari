@@ -85,6 +85,10 @@
     neq : type:neq
         = def:neq
 
+    neq_symm : type:neq_symm
+
+    neq_symm_iff : type:neq_symm_iff
+
 
 ### Constructive choice
 

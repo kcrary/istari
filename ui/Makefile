@@ -40,7 +40,7 @@ istaritags :
 
 .PHONY : install
 install :
-	cp bin/istari bin/istari-nolib $(INSTALLDIR)
+	cp bin/istari bin/istari-nolib bin/istaritags $(INSTALLDIR)
 
 clean :
 	rm -rf .cm

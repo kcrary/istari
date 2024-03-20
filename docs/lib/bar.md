@@ -41,30 +41,40 @@ The partial type acts as a monad.  Its unit is `now`:
         = fn a x . inl x
         (1 implicit argument)
 
-Another intro form is `later`:
+Another intro form is `laterf`:
+
+    laterf : intersect (i : level) . forall (a : U i) . future (bar a) -> bar a
+           = fn a x . inr x
+           (1 implicit argument)
+
+The `laterf` form is mostly commonly used in a simpler form called
+`later`:
 
     later : intersect (i : level) . forall (a : U i) . bar a -> bar a
-          = fn a x . inr (next x)
+          = fn a x . laterf (next x)
           (1 implicit argument)
 
 The monadic bind is `bindbar`:
 
     bindbar : intersect (i : level) . forall (a b : U i) . bar a -> (a -> bar b) -> bar b
-            = fn a b x f .
-                 ffix
-                   (bar a -> bar b)
-                   (fn g x1 .
-                     (case x1 of
-                      | inl y . f y
-                      | inr y . let next g' = g in let next y' = y in inr (next (g' y'))))
-                   x
             (2 implicit arguments)
 
     bindbar _ _ (now _ x) f --> f x
     bindbar A B (later _ x) f --> later B (` bindbar A B x f)
+    bindbar A B (laterf _ x) f --> let next y = x in later B (` bindbar A B y f)
 
 The syntactic sugar `bindbar x = m in n` is accepted for 
 `` ` bindbar _ _ m (fn x . n)``.
+
+Observe that `bindbar` always produces an element of some `bar` type.  A
+variation on it, `bindbart`, produces a type instead:
+
+    bindbart : intersect (i : level) . forall (a : U i) . bar a -> (a -> U i) -> U i
+             (1 implicit argument)
+
+    bindbart _ (now _ x) B --> B x
+    bindbart A (later _ x) B --> future (` bindbart A x B)
+    bindbart A (laterf _ x) B --> let next y = x in future (` bindbart A y B)
 
 Bar is covariant:
 

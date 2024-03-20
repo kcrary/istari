@@ -39,7 +39,14 @@ The partial type acts as a monad.  Its unit is `now`:
         = def:now
         imp:now
 
-Another intro form is `later`:
+Another intro form is `laterf`:
+
+    laterf : type:laterf
+           = def:laterf
+           imp:laterf
+
+The `laterf` form is mostly commonly used in a simpler form called
+`later`:
 
     later : type:later
           = def:later
@@ -48,14 +55,24 @@ Another intro form is `later`:
 The monadic bind is `bindbar`:
 
     bindbar : type:bindbar
-            = def:bindbar
             imp:bindbar
 
     bindbar _ _ (now _ x) f --> f x
     bindbar A B (later _ x) f --> later B (` bindbar A B x f)
+    bindbar A B (laterf _ x) f --> let next y = x in later B (` bindbar A B y f)
 
 The syntactic sugar `bindbar x = m in n` is accepted for 
 `` ` bindbar _ _ m (fn x . n)``.
+
+Observe that `bindbar` always produces an element of some `bar` type.  A
+variation on it, `bindbart`, produces a type instead:
+
+    bindbart : type:bindbart
+             imp:bindbart
+
+    bindbart _ (now _ x) B --> B x
+    bindbart A (later _ x) B --> future (` bindbart A x B)
+    bindbart A (laterf _ x) B --> let next y = x in future (` bindbart A y B)
 
 Bar is covariant:
 

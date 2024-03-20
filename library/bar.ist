@@ -93,6 +93,8 @@ unrollType /bar/.
 reflexivity.
 qed ();
 
+val bar_unroll = parseConstant /bar_unroll/;
+
 
 
 define /now {a} x/
@@ -111,11 +113,33 @@ rewrite /-> bar_unroll/.
 typecheck.
 qed ();
 
+val now = parseConstant /now/;
+
+
+
+define /laterf {a} x/
+/
+  inr x
+//
+  intersect i .
+  forall (a : U i) .
+    future (bar a) -> bar a
+/;
+
+inference.
+introOf /i a x/.
+unfold /laterf/.
+rewrite /-> bar_unroll/.
+typecheck.
+qed ();
+
+val laterf = parseConstant /laterf/;
+
 
 
 define /later {a} x/
 /
-  inr (next x)
+  laterf (next x)
 //
   intersect i .
   forall (a : U i) .
@@ -125,13 +149,12 @@ define /later {a} x/
 inference.
 introOf /i a x/.
 unfold /later/.
-rewrite /-> bar_unroll/.
 typecheck.
 qed ();
 
 
 
-defineRaw /bindbar {a b} x f/
+define /bindbar {a b} x f/
 /
   ffix (bar a -> bar b)
     (fn g x .
@@ -144,23 +167,7 @@ defineRaw /bindbar {a b} x f/
             in
               inr (next (g' y'))))
     x
-/;
-
-val bindbar = parseConstant /bindbar/;
-
-
-
-writeRegistry /AfterBindbarEnv/
-  /[constant]/
-  (Collapse (bindbar));
-structure Nothing = AfterBindbar ();
-grammaron Bar;
-
-
-
-lemma "bindbar_type"
-/
-  ` bindbar :
+//
   intersect i .
   forall (a b : U i) .
     bar a
@@ -176,17 +183,84 @@ typecheck.
 unrollType /bar/.
 typecheck.
 qed ();
-recordTyping "bindbar_type";
+
+val bindbar = parseConstant /bindbar/;
 
 
 
 reductions 
 /
 bindbar _ _ (now _ x) f --> f x ;
-bindbar a b (later _ x) f --> later b (` bindbar a b x f) ;
-unfolding letnext bindbar now later
+bindbar a b (later _ x) f --> later b (bindbar a b x f) ;
+bindbar a b (laterf _ x) f --> let next y = x in later b (bindbar a b y f) ;
+unfolding letnext bindbar now later laterf
 unrolling ffix
 /;
+
+
+
+define /bindbart {a} x b/
+/
+  ffix bogus
+    (fn g x .
+       (case x of
+        | inl y . b y
+        | inr y .
+            let next g' = g
+            in
+            let next y' = y
+            in
+              future (g' y')))
+    x
+//
+  intersect i .
+  forall (a : U i) .
+    bar a 
+    -> (a -> U i)
+    -> U i
+/;
+
+inference.
+introOf /i a x b/.
+unfold /bindbart/.
+unfold /ffix/.
+fold /ffix 
+        (bar a -> U i)
+        (fn g x .
+           (case x of
+            | inl y . b y
+            | inr y .
+                let next g' = g
+                in
+                let next y' = y
+                in
+                  future (g' y')))
+        x/.
+typecheck.
+unrollType /bar/.
+typecheck.
+qed ();
+
+val bindbart = parseConstant /bindbart/;
+
+
+
+reductions
+/
+  bindbart _ (now _ x) b --> b x ;
+  bindbart a (later _ x) b --> future (bindbart a x b) ;
+  bindbart a (laterf _ x) b --> let next y = x in future (bindbart a y b) ;
+  unfolding letnext bindbart now later laterf
+  unrolling ffix
+/;
+
+
+
+writeRegistry /AfterBindbarEnv/
+  /[constant constant]/
+  (Collapse (bindbar, bindbart));
+structure Nothing = AfterBindbar ();
+grammaron Bar;
 
 
 
@@ -253,9 +327,44 @@ qed ();
 
 
 
+lemma "bar_induction"
+/
+  forall i (a : U i) (P : bar a -> U i) .
+    (forall (x : a) . P (now x))
+    -> (forall (xf : future (bar a)) .
+          let next x = xf
+          in
+            future (P x) -> P (laterf xf))
+    -> forall (x : bar a) . P x
+/;
+
+inference.
+intro /i a P Hbase Hind/.
+apply /ffix ap i/.
+intro /IH x/.
+unrollType /bar in x/.
+destruct /x/ /x | [x]/.
+  {
+  fold /now x/.
+  apply /Hbase/.
+  }
+
+  {
+  fold /laterf _/.
+  apply /Hind (next x)/.
+  destruct /IH/ /[IH]/.
+  split.
+  apply /IH/ >> auto.
+  }
+qed ();
+
+val bar_induction = parseConstant /bar_induction/;
+
+
+
 writeRegistry /AfterBarAllEnv/
-  /[constant constant]/
-  (Collapse (bar, bar_subtype));
+  /[constant constant constant constant constant constant]/
+  (Collapse (bar, bar_unroll, now, laterf, bar_subtype, bar_induction));
 
 
-Namespace.endModule ();
+endModule ();

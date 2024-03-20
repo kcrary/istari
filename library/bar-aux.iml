@@ -6,8 +6,10 @@ structure ParseBar =
       structure T = ETerm
 
       val bindbar : Constant.constant R.dest = R.dest ()
+      val bindbart : Constant.constant R.dest = R.dest ()
 
       fun parseBind x m n = T.apply4 (R.read bindbar) T.evar T.evar m (T.lam (SOME x) n)
+      fun parseBindT x m b = T.apply3 (R.read bindbart) T.evar m (T.lam (SOME x) b)
 
    end
 
@@ -15,6 +17,7 @@ structure ParseBar =
 grammardef Bar
 
    rule Term(0) ::= "bindbar" Ident "=" Term(1) "in" Term(0) => ParseBar.parseBind
+   rule Term(0) ::= "bindbart" Ident "=" Term(1) "in" Term(0) => ParseBar.parseBindT
 
    reserved "bindbar" : Ident
 
@@ -24,13 +27,14 @@ end
 functor AfterBindbar () :> sig end =
    struct
 
-      val Collapse (bindbar) =
+      val Collapse (bindbar, bindbart) =
          readRegistry /Bar.AfterBindbarEnv/
-            /[constant]/
+            /[constant constant]/
 
       structure U = Show.Unparsing
 
       val () = CheckpointedRef.write ParseBar.bindbar bindbar
+      val () = CheckpointedRef.write ParseBar.bindbart bindbart
 
       val () =
          ConstantTable.insert U.unparsingTable bindbar
@@ -38,20 +42,58 @@ functor AfterBindbar () :> sig end =
           U.wrap
              (U.apply4 bindbar U.wild U.wild U.show (U.lam U.show))
              (fn ((), (), m, (x, n)) =>
-                 U.append [
-                          U.string "bindbar ",
-                          U.string x,
-                          U.string " =",
-                          U.break 1,
-                          m 1,
-                          U.string " in",
-                          U.break 1,
-                          n 0
-                          ]))
+                 U.boxi 0 $
+                 U.append
+                    [
+                    U.box $ U.append
+                       [
+                       U.string "bindbar ",
+                       U.string x,
+                       U.string " =",
+                       U.break 1,
+                       U.box (m 1),
+                       ],
+                    U.break 1,
+                    U.box $ U.append
+                       [
+                       U.string "in",
+                       U.break 1,
+                       U.box (n 0)
+                       ]
+                    ]))
+
+      val () =
+         ConstantTable.insert U.unparsingTable bindbart
+         (3, 0, ref true,
+          U.wrap
+             (U.apply3 bindbart U.wild U.show (U.lam U.show))
+             (fn ((), m, (x, b)) =>
+                 U.boxi 0 $
+                 U.append
+                    [
+                    U.box $ U.append
+                       [
+                       U.string "bindbar ",
+                       U.string x,
+                       U.string " =",
+                       U.break 1,
+                       U.box (m 1),
+                       ],
+                    U.break 1,
+                    U.box $ U.append
+                       [
+                       U.string "in",
+                       U.break 1,
+                       U.box (b 0)
+                       ]
+                    ]))
 
       val () =
          U.reserved :=
-         SymbolSet.insert (!U.reserved) (Symbol.fromValue "bindbar")
+            List.foldl
+               (fns str set => SymbolSet.insert set (Symbol.fromValue str))
+               (!U.reserved)
+               ["bindbar", "bindbart"]
 
    end
 
@@ -59,9 +101,16 @@ functor AfterBindbar () :> sig end =
 functor AfterBarAll () :> sig end =
    struct
 
-      val Collapse (bar, bar_subtype) =
+      structure D = DestructInternal
+      structure R = Reduction
+      structure T = Term
+
+      open Tactic
+      open Case
+
+      val Collapse (bar, bar_unroll, now, laterf, bar_subtype, bar_induction) =
          readRegistry /Bar.AfterBarAllEnv/
-            /[constant constant]/
+            /[constant constant constant constant constant constant]/
 
       val () =
          List.app Registry.delete
@@ -72,5 +121,61 @@ functor AfterBarAll () :> sig end =
       val () =
          Constant2Table.insert TypecheckInternal.subtypeTactics (bar, bar)
             (Backchain.applyRaw /\Term.Const bar_subtype\/)
+
+      val () =
+         ConstantTable.insert InductionInternal.inductionTactics bar
+            (Hyp.revert0 true
+             >>+
+             Backchain.witnessPriority /bar_induction _ _ _ __ __/
+             >>! reduce // >>+ idtacM Tactic.Primary)
+
+      fun destBar i pat set =
+         (case pat of
+             IntroPattern.Or [p1, p2] =>
+                let
+                   do (jud, _) = withgoal
+
+                   val h = Judgement.hyp jud i
+                   val sym = Directory.freshSet set
+                in
+                   hypCaseT h
+                   /
+                   $tm \bar\ ? =>
+                   \(fnc a =>
+                        (* bar A, ... |- C *)
+                        refine (Rule.equivalenceLeftAlt i (T.evar ()) (T.evar ()) (T.evar ()))
+                        >>> [
+                            (* bar A, ... |- bar A = A % future (bar A) : type *)
+                            witnessRaw (ETerm.literal (T.apply2 bar_unroll (T.evar ()) (T.evar ())))
+                            >> idtacM (Seq.cons sym Seq.empty, D.Auxiliary),
+
+                            (* A & future (bar A), ... |- C *)
+                            refine (Rule.sumLeft i (T.evar ()) (T.evar ()) (T.evar ()))
+                            >>> [
+                                (* a, ...[inl 0 . ^] |- C[under_i (inl 0 . ^)] *)
+                                D.refold jud i 1 (T.apply2 now (T.Sub (a, T.shift1)) T.zero)
+                                   (* now A[^] 0 --> inl 0 *)
+                                   (R.trans [R.unfold, R.beta 2])
+                                >>+
+                                (* a, ...[now A[^] 0 . ^] |- C[under_i (now A[^] 0 . ^)] *)
+                                D.dest i p1 set,
+    
+                                (* future (bar A), ...[inr 0 . ^] |- C[under_i (inr 0 . ^)] *)
+                                D.refold jud i 1 (T.apply2 laterf (T.Sub (a, T.shift1)) T.zero)
+                                   (* laterf A[^] 0 --> inr 0 *)
+                                   (R.trans [R.unfold, R.beta 2])
+                                >>+
+                                (* future (bar A), ...[laterf A[^] 0 . ^] |- C[under_i (laterf A[^] 0 . ^)] *)
+                                D.dest i p2 set
+                                ]
+                            ])\
+                   /
+                end
+
+           | _ =>
+                fail "bar pattern expected")
+
+      val () =
+         ConstantTable.insert D.destructTactics bar destBar
 
    end
