@@ -20,15 +20,14 @@ recordTyping "pause_type";
 
 
 
-define /ffix a f/
+define /ffix f/
 /
   pause
     (fn x . f (let next x' = x in next (pause x' x)))
     (next
        (fn x . f (let next x' = x in next (pause x' x))))
 //
-  intersect (i : level) .
-  forall (a : U i) .
+  intersect (i : level) (a : U i) .
     (future a -> a) -> a
 /;
 
@@ -56,7 +55,7 @@ qed ();
 
 val unroll_ffix = makeReduction1
 /
-ffix a f --> f (next (ffix a f)) ;
+ffix f --> f (next (ffix f)) ;
 unfolding ffix letnext
 unrolling pause
 /;
@@ -97,12 +96,11 @@ val bar_unroll = parseConstant /bar_unroll/;
 
 
 
-define /now {a} x/
+define /now x/
 /
   inl x
 //
-  intersect i .
-  forall (a : U i) .
+  intersect i (a : U i) .
     a -> bar a
 /;
 
@@ -117,12 +115,11 @@ val now = parseConstant /now/;
 
 
 
-define /laterf {a} x/
+define /laterf x/
 /
   inr x
 //
-  intersect i .
-  forall (a : U i) .
+  intersect i (a : U i) .
     future (bar a) -> bar a
 /;
 
@@ -137,12 +134,11 @@ val laterf = parseConstant /laterf/;
 
 
 
-define /later {a} x/
+define /later x/
 /
   laterf (next x)
 //
-  intersect i .
-  forall (a : U i) .
+  intersect i (a : U i) .
     bar a -> bar a
 /;
 
@@ -152,11 +148,13 @@ unfold /later/.
 typecheck.
 qed ();
 
+Constant.setOpacity (parseConstant /later/) Constant.SOFT;
 
 
-define /bindbar {a b} x f/
+
+define /bindbar x f/
 /
-  ffix (bar a -> bar b)
+  ffix
     (fn g x .
        (case x of
         | inl y . f y
@@ -168,8 +166,7 @@ define /bindbar {a b} x f/
               inr (next (g' y'))))
     x
 //
-  intersect i .
-  forall (a b : U i) .
+  intersect i (a b : U i) .
     bar a
     -> (a -> bar b)
     -> bar b
@@ -178,6 +175,8 @@ define /bindbar {a b} x f/
 inference.
 introOf /i a b x f/.
 unfold /bindbar/.
+fold /ffix ap i/.
+fold /ffix ap i ap (bar a -> bar b)/.
 so /bar_unroll i a/ /Heq/.
 typecheck.
 unrollType /bar/.
@@ -190,18 +189,18 @@ val bindbar = parseConstant /bindbar/;
 
 reductions 
 /
-bindbar _ _ (now _ x) f --> f x ;
-bindbar a b (later _ x) f --> later b (bindbar a b x f) ;
-bindbar a b (laterf _ x) f --> let next y = x in later b (bindbar a b y f) ;
+bindbar (now x) f --> f x ;
+bindbar (laterf x) f --> let next y = x in later (bindbar y f) ;
+bindbar (later x) f --> later (bindbar x f) ;
 unfolding letnext bindbar now later laterf
 unrolling ffix
 /;
 
 
 
-define /bindbart {a} x b/
+define /bindbart x b/
 /
-  ffix bogus
+  ffix
     (fn g x .
        (case x of
         | inl y . b y
@@ -213,8 +212,7 @@ define /bindbart {a} x b/
               future (g' y')))
     x
 //
-  intersect i .
-  forall (a : U i) .
+  intersect i (a : U i) .
     bar a 
     -> (a -> U i)
     -> U i
@@ -223,19 +221,8 @@ define /bindbart {a} x b/
 inference.
 introOf /i a x b/.
 unfold /bindbart/.
-unfold /ffix/.
-fold /ffix 
-        (bar a -> U i)
-        (fn g x .
-           (case x of
-            | inl y . b y
-            | inr y .
-                let next g' = g
-                in
-                let next y' = y
-                in
-                  future (g' y')))
-        x/.
+fold /ffix ap (lsucc i)/.
+fold /ffix ap (lsucc i) ap (bar a -> U i)/.
 typecheck.
 unrollType /bar/.
 typecheck.
@@ -247,9 +234,9 @@ val bindbart = parseConstant /bindbart/;
 
 reductions
 /
-  bindbart _ (now _ x) b --> b x ;
-  bindbart a (later _ x) b --> future (bindbart a x b) ;
-  bindbart a (laterf _ x) b --> let next y = x in future (bindbart a y b) ;
+  bindbart (now x) b --> b x ;
+  bindbart (laterf x) b --> let next y = x in future (bindbart y b) ;
+  bindbart (later x) b --> future (bindbart x b) ;
   unfolding letnext bindbart now later laterf
   unrolling ffix
 /;
@@ -297,12 +284,11 @@ val bar_subtype = parseConstant /bar_subtype/;
 
 
 
-define /bfix {a} f/
+define /bfix f/
 /
-  ffix (bar a) (fn x . f (inr x))
+  ffix (fn x . f (laterf x))
 //
-  intersect i .
-  forall (a : U i) .
+  intersect i (a : U i) .
     (bar a -> bar a) -> bar a
 /;
 
@@ -310,9 +296,19 @@ inference.
 introOf /i a f/.
 unfold /bfix/.
 typecheck.
-unrollType /bar/.
-typecheck.
 qed ();
+
+
+
+val unroll_bfix = makeReduction1
+/
+bfix f --> f (later (bfix f)) ;
+unfolding bfix later
+unrolling ffix
+/;
+
+Database.setUnroll (parseConstant /bfix/) (Reduction.user1 unroll_bfix);
+writeRegistry /unroll_bfix/ /reduction1/ unroll_bfix;
 
 
 
@@ -327,44 +323,74 @@ qed ();
 
 
 
-lemma "bar_induction"
+define /bar_iter P hn hl y/
 /
-  forall i (a : U i) (P : bar a -> U i) .
+  ffix
+    (fn iterf y .
+       (case y of
+        | inl x . hn x
+ 
+        | inr xf .
+            let next iter = iterf
+            in
+            let next x = xf
+            in
+              hl (next x) (next (iter x))))
+    y
+//
+  intersect i (a : U i) .
+  forall (P : bar a -> U i) .
     (forall (x : a) . P (now x))
     -> (forall (xf : future (bar a)) .
           let next x = xf
           in
-            future (P x) -> P (laterf xf))
+            future (P x) -> P (later x))
     -> forall (x : bar a) . P x
 /;
 
 inference.
-intro /i a P Hbase Hind/.
-apply /ffix ap i/.
-intro /IH x/.
-unrollType /bar in x/.
-destruct /x/ /x | [x]/.
+introOf /i a P hn hl y/.
+unfold /bar_iter/.
+fold /ffix ap i/.
+fold /ffix ap i ap (forall (y : bar a) . P y)/.
+fold /manual (sum_case _ _ _) within _ _/.
+typecheck.
+reintro /_ IH z/.
+destruct /IH/ /[IH]/.
+unrollType /bar in z/.
+destruct /z/ /x | [x]/.
   {
-  fold /now x/.
-  apply /Hbase/.
+  reduce //.
+  typecheck.
+  fold /now _/.
+  reflexivity.
   }
 
   {
-  fold /laterf _/.
-  apply /Hind (next x)/.
-  destruct /IH/ /[IH]/.
-  split.
-  apply /IH/ >> auto.
+  reduce //.
+  fold /laterf (next x)/.
+  typecheck.
   }
 qed ();
 
-val bar_induction = parseConstant /bar_induction/;
+val bar_iter = parseConstant /bar_iter/;
+
+
+
+reductions
+/
+  bar_iter _ hn _ (now x) --> hn x ;
+  bar_iter P hn hl (laterf x) --> let next y = x in hl (next y) (next (bar_iter P hn hl y)) ;
+  bar_iter P hn hl (later x) --> hl (next x) (next (bar_iter P hn hl x)) ;
+  unfolding bar_iter now laterf later letnext
+  unrolling ffix
+/;
 
 
 
 writeRegistry /AfterBarAllEnv/
   /[constant constant constant constant constant constant]/
-  (Collapse (bar, bar_unroll, now, laterf, bar_subtype, bar_induction));
+  (Collapse (bar, bar_unroll, now, laterf, bar_subtype, bar_iter));
 
 
 endModule ();

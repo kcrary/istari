@@ -1,0 +1,250 @@
+
+File.import "logic-load.iml";
+
+File.import "union-aux.iml";
+
+beginModule "Union";
+
+
+(* Union *)
+
+define /unpack u f/
+/
+  f u
+//
+  intersect i (a : U i) (b : a -> U i) (c : U i) .
+    (union (x : a) . b x) 
+    -> (intersect (x : a) . b x -> c)
+    -> c
+/;
+
+inference.
+introOf /i a b c u f/.
+unfold /unpack/.
+destruct /u/ /x y/.
+fold /f ap x/.
+typecheck.
+qed ();
+
+val unpack = parseConstant /unpack/;
+
+
+
+define /unpack_dep c u f/
+/
+  f u
+//
+  intersect i (a : U i) (b : a -> U i) .
+  forall (c : intersect (x : a) . b x -> U i) (u : union (x : a) . b x) .
+    (intersect (x : a) . forall (y : b x) . c y)
+    -> c u
+/;
+
+inference.
+introOf /i a b c u f/.
+unfold /unpack_dep/.
+destruct /u/ /x y/.
+fold /f ap x/.
+fold /c ap x/.
+typecheck.
+qed ();
+
+
+
+define /unpackt a b c u/
+/
+  union (x : a) . exists (y : b x) .
+    y = u : (union (x : a) . b x)
+    & c x y
+//
+  intersect i .
+  forall (a : U i) (b : a -> U i) .
+    (forall (x : a) . b x -> U i)
+    -> (union (x : a) . b x)
+    -> U i
+/;
+
+inference.
+unfold /unpackt/.
+typecheck.
+qed ();
+
+val unpackt = parseConstant /unpackt/;
+
+
+
+define /unpackt_intro y z/
+/
+  (y , () , z)
+//
+  intersect i (a : U i) (b : a -> U i) (c : forall (x : a) . b x -> U i) (x : a) .
+  forall (y : b x) .
+    c x y
+    -> unpackt a b c y
+/;
+
+inference.
+introOf /i a b c x y z/.
+unfold /unpackt , unpackt_intro/.
+existsOf /x/.
+typecheck.
+qed ();
+
+
+
+define /unpackt_elim w f/
+/
+  f (w #1) (w #2 #2)
+//
+  intersect i (a : U i) (b : a -> U i) 
+    (c : forall (x : a) . b x -> U i) 
+    (d : (union (x : a) . b x) -> U i)
+    (u : union (x : a) . b x) .
+      unpackt a b c u
+      -> (intersect (x : a) . forall (y : b x) . c x y -> d y)
+      -> d u
+/;
+
+inference.
+introOf /i a b c d u w f/.
+unfold /unpackt in w/.
+unfold /unpackt_elim/.
+destruct /w/ /x y Heq z/.
+reduce //.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  unpackt_elim (unpackt_intro y z) f --> f y z ;
+  unfolding unpackt_elim unpackt_intro
+/;
+
+
+
+(* Iexists *)
+
+define /iunpack u f/
+/
+  f u
+//
+  intersect i (a : Kind i) (b : a -> U i) (c : U i) .
+    (iexists (x : a) . b x) 
+    -> (intersect (x : a) . b x -> c)
+    -> c
+/;
+
+inference.
+introOf /i a b c u f/.
+unfold /iunpack/.
+destruct /u/ /x y/.
+fold /f ap x/.
+typecheck.
+qed ();
+
+val iunpack = parseConstant /iunpack/;
+
+
+
+define /iunpack_dep c u f/
+/
+  f u
+//
+  intersect i (a : Kind i) (b : a -> U i) .
+  forall (c : intersect (x : a) . b x -> U i) (u : iexists (x : a) . b x) .
+    (intersect (x : a) . forall (y : b x) . c y)
+    -> c u
+/;
+
+inference.
+introOf /i a b c u f/.
+unfold /iunpack_dep/.
+destruct /u/ /x y/.
+fold /f ap x/.
+fold /c ap x/.
+typecheck.
+qed ();
+
+
+
+define /iunpackt {i} a b c u/
+/
+  iexists (x : a) . exists (y : b x) .
+    y = u : (iexists (x : a) . b x)
+    & c x y
+//
+  forall i (a : Kind i) (b : a -> U i) .
+    (forall (x : a) . b x -> U i)
+    -> (iexists (x : a) . b x)
+    -> U i
+/;
+
+inference.
+unfold /iunpackt/.
+typecheck.
+qed ();
+
+val iunpackt = parseConstant /iunpackt/;
+
+
+
+define /iunpackt_intro y z/
+/
+  (y , () , z)
+//
+  intersect i (a : Kind i) (b : a -> U i) (c : forall (x : a) . b x -> U i) (x : a) .
+  forall (y : b x) .
+    c x y
+    -> iunpackt a b c y
+/;
+
+inference.
+introOf /i a b c x y z/.
+unfold /iunpackt , iunpackt_intro/.
+existsOf /x/.
+typecheck.
+qed ();
+
+
+
+define /iunpackt_elim w f/
+/
+  f (w #1) (w #2 #2)
+//
+  intersect i (a : Kind i) (b : a -> U i) 
+    (c : forall (x : a) . b x -> U i) 
+    (d : (iexists (x : a) . b x) -> U i)
+    (u : iexists (x : a) . b x) .
+      iunpackt a b c u
+      -> (intersect (x : a) . forall (y : b x) . c x y -> d y)
+      -> d u
+/;
+
+inference.
+introOf /i a b c d u w f/.
+unfold /iunpackt in w/.
+unfold /iunpackt_elim/.
+destruct /w/ /x y Heq z/.
+reduce //.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  iunpackt_elim (iunpackt_intro y z) f --> f y z ;
+  unfolding iunpackt_elim iunpackt_intro
+/;
+
+
+
+writeRegistry /AfterUnionAllEnv/
+  /[constant constant constant constant]/
+  (Collapse (unpack, unpackt, iunpack, iunpackt));
+
+
+
+endModule ();

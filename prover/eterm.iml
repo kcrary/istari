@@ -41,6 +41,7 @@ signature ETERM =
       val apply2     : Constant.constant -> eterm -> eterm -> eterm
       val apply3     : Constant.constant -> eterm -> eterm -> eterm -> eterm
       val apply4     : Constant.constant -> eterm -> eterm -> eterm -> eterm -> eterm
+      val apply5     : Constant.constant -> eterm -> eterm -> eterm -> eterm -> eterm -> eterm
       val applyn     : Constant.constant -> eterm list -> eterm
       val appn       : eterm -> eterm list -> eterm
 
@@ -250,6 +251,15 @@ structure ETermInternal
                  :: T.App (m2 special dir imps []) 
                  :: T.App (m3 special dir imps []) 
                  :: T.App (m4 special dir imps []) 
+                 :: spine)
+
+      fun apply5 c m1 m2 m3 m4 m5 special dir imps spine =
+         T.Elim (T.Const c, 
+                 T.App (m1 special dir imps []) 
+                 :: T.App (m2 special dir imps []) 
+                 :: T.App (m3 special dir imps []) 
+                 :: T.App (m4 special dir imps []) 
+                 :: T.App (m5 special dir imps []) 
                  :: spine)
 
       fun applyn c l special dir imps spine =
@@ -889,27 +899,29 @@ structure ParseTerm =
       val () = registerBinary Prim.karrow "-k>" 0
       val () = registerBinary Prim.guard "-g>" 0
 
+      fun letContent str var m n =
+         U.boxi 0 $
+         U.append
+            [
+            U.box $ U.append
+               [
+               U.string str,
+               var,
+               U.string " =",
+               U.break 1,
+               U.box (m 1)
+               ],
+            U.break 1,
+            U.string "in",
+            U.break 1,
+            U.box (n 0)
+            ]
+
       fun registerLet const str =
          register const 2 0
          (U.wrap
              (U.apply2 const U.show (U.lam U.show))
-             (fn (m, (x, n)) =>
-                 U.boxi 0 $
-                 U.append [
-                          U.string str,
-                          U.box
-                             (U.append
-                                 [
-                                 U.string x,
-                                 U.string " =",
-                                 U.break 1,
-                                 U.box (m 1)
-                                 ]),
-                          U.break 1,
-                          U.string "in",
-                          U.break 1,
-                          U.box (n 0)
-                          ]))
+             (fn (m, (x, n)) => letContent str (U.string x) m n))
 
       val () = registerLet Prim.lett "let "
       val () = registerLet Prim.letnext "let next "

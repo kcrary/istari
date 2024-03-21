@@ -20,7 +20,7 @@ the future modality:
 
 The reduction for `ffix` is:
 
-    ffix A f --> f (next (ffix A f))
+    ffix f --> f (next (ffix f))
 
 It appears in the registry under the name `Bar.unroll_ffix`.  It can
 also be used through the `unroll` tactic.
@@ -37,42 +37,41 @@ The partial type acts as a monad.  Its unit is `now`:
 
     now : type:now
         = def:now
-        imp:now
 
 Another intro form is `laterf`:
 
     laterf : type:laterf
            = def:laterf
-           imp:laterf
 
-The `laterf` form is mostly commonly used in a simpler form called
-`later`:
+The `laterf` form is very often used with `next`, so we define:
 
     later : type:later
           = def:later
-          imp:later
 
 The monadic bind is `bindbar`:
 
     bindbar : type:bindbar
-            imp:bindbar
 
-    bindbar _ _ (now _ x) f --> f x
-    bindbar A B (later _ x) f --> later B (` bindbar A B x f)
-    bindbar A B (laterf _ x) f --> let next y = x in later B (` bindbar A B y f)
+    bindbar (now x) f --> f x ;
+    bindbar (laterf x) f --> let next y = x in later (`bindbar y f)
+    bindbar (later x) f --> later (`bindbar x f)
 
 The syntactic sugar `bindbar x = m in n` is accepted for 
-`` ` bindbar _ _ m (fn x . n)``.
+`` `bindbar m (fn x . n)``.
+
 
 Observe that `bindbar` always produces an element of some `bar` type.  A
 variation on it, `bindbart`, produces a type instead:
 
     bindbart : type:bindbart
-             imp:bindbart
 
-    bindbart _ (now _ x) B --> B x
-    bindbart A (later _ x) B --> future (` bindbart A x B)
-    bindbart A (laterf _ x) B --> let next y = x in future (` bindbart A y B)
+    bindbart (now x) b --> b x ;
+    bindbart (laterf x) b --> let next y = x in future (`bindbart y b) ;
+    bindbart (later x) b --> future (`bindbart x b) ;
+
+The syntactic sugar `bindbart x = m in b` is accepted for 
+`` `bindbart m (fn x . b)``.
+
 
 Bar is covariant:
 
@@ -83,7 +82,13 @@ Finally we can define a fixpoint operator on partial objects:
 
     bfix : type:bfix
          = def:bfix
-         imp:bfix
+
+The reduction for `bfix` is:
+
+    bfix f --> f (later (bfix f))
+
+It appears in the registry under the name `Bar.unroll_bfix`.  It can
+also be used through the `unroll` tactic.
 
 
 At this point we'd like to follow the development in Smith [2] and
@@ -92,6 +97,19 @@ step-indexed semantics is unable to express liveness properties such
 as termination.  If it could express termination, we would be able to
 draw a contradiction, because the type of `bfix` does not have Smith's
 admissibility requirement.  (See Smith [2], theorem 60.)
+
+
+We can iterate over partial objects using the `bar_iter` iterator.
+The cases are `now` and `later`:
+
+    bar_iter : type:bar_iter
+
+    bar_iter _ hn _ (now x) --> hn x
+    bar_iter P hn hl (laterf x) --> let next y = x in hl (next y) (next (bar_iter P hn hl y))
+    bar_iter P hn hl (later x) --> hl (next x) (next (bar_iter P hn hl x))
+
+This is employed automatically by the `induction` tactic on hypotheses
+of `bar` type.
 
 ---
 

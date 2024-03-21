@@ -8,8 +8,8 @@ structure ParseBar =
       val bindbar : Constant.constant R.dest = R.dest ()
       val bindbart : Constant.constant R.dest = R.dest ()
 
-      fun parseBind x m n = T.apply4 (R.read bindbar) T.evar T.evar m (T.lam (SOME x) n)
-      fun parseBindT x m b = T.apply3 (R.read bindbart) T.evar m (T.lam (SOME x) b)
+      fun parseBind x m n = T.apply2 (R.read bindbar) m (T.lam (SOME x) n)
+      fun parseBindT x m b = T.apply2 (R.read bindbart) m (T.lam (SOME x) b)
 
    end
 
@@ -19,7 +19,7 @@ grammardef Bar
    rule Term(0) ::= "bindbar" Ident "=" Term(1) "in" Term(0) => ParseBar.parseBind
    rule Term(0) ::= "bindbart" Ident "=" Term(1) "in" Term(0) => ParseBar.parseBindT
 
-   reserved "bindbar" : Ident
+   reserved "bindbar" "bindbart" : Ident
 
 end
 
@@ -36,57 +36,8 @@ functor AfterBindbar () :> sig end =
       val () = CheckpointedRef.write ParseBar.bindbar bindbar
       val () = CheckpointedRef.write ParseBar.bindbart bindbart
 
-      val () =
-         ConstantTable.insert U.unparsingTable bindbar
-         (4, 0, ref true,
-          U.wrap
-             (U.apply4 bindbar U.wild U.wild U.show (U.lam U.show))
-             (fn ((), (), m, (x, n)) =>
-                 U.boxi 0 $
-                 U.append
-                    [
-                    U.box $ U.append
-                       [
-                       U.string "bindbar ",
-                       U.string x,
-                       U.string " =",
-                       U.break 1,
-                       U.box (m 1),
-                       ],
-                    U.break 1,
-                    U.box $ U.append
-                       [
-                       U.string "in",
-                       U.break 1,
-                       U.box (n 0)
-                       ]
-                    ]))
-
-      val () =
-         ConstantTable.insert U.unparsingTable bindbart
-         (3, 0, ref true,
-          U.wrap
-             (U.apply3 bindbart U.wild U.show (U.lam U.show))
-             (fn ((), m, (x, b)) =>
-                 U.boxi 0 $
-                 U.append
-                    [
-                    U.box $ U.append
-                       [
-                       U.string "bindbar ",
-                       U.string x,
-                       U.string " =",
-                       U.break 1,
-                       U.box (m 1),
-                       ],
-                    U.break 1,
-                    U.box $ U.append
-                       [
-                       U.string "in",
-                       U.break 1,
-                       U.box (b 0)
-                       ]
-                    ]))
+      val () = ParseTerm.registerLet bindbar "bindbar "
+      val () = ParseTerm.registerLet bindbart "bindbart "
 
       val () =
          U.reserved :=
@@ -108,7 +59,7 @@ functor AfterBarAll () :> sig end =
       open Tactic
       open Case
 
-      val Collapse (bar, bar_unroll, now, laterf, bar_subtype, bar_induction) =
+      val Collapse (bar, bar_unroll, now, laterf, bar_subtype, bar_iter) =
          readRegistry /Bar.AfterBarAllEnv/
             /[constant constant constant constant constant constant]/
 
@@ -123,11 +74,7 @@ functor AfterBarAll () :> sig end =
             (Backchain.applyRaw /\Term.Const bar_subtype\/)
 
       val () =
-         ConstantTable.insert InductionInternal.inductionTactics bar
-            (Hyp.revert0 true
-             >>+
-             Backchain.witnessPriority /bar_induction _ _ _ __ __/
-             >>! reduce // >>+ idtacM Tactic.Primary)
+         ConstantTable.insert InductionInternal.iterators bar (bar_iter, 1, 0)
 
       fun destBar i pat set =
          (case pat of
@@ -153,19 +100,19 @@ functor AfterBarAll () :> sig end =
                             refine (Rule.sumLeft i (T.evar ()) (T.evar ()) (T.evar ()))
                             >>> [
                                 (* a, ...[inl 0 . ^] |- C[under_i (inl 0 . ^)] *)
-                                D.refold jud i 1 (T.apply2 now (T.Sub (a, T.shift1)) T.zero)
-                                   (* now A[^] 0 --> inl 0 *)
-                                   (R.trans [R.unfold, R.beta 2])
+                                D.refold jud i 1 (T.apply1 now T.zero)
+                                   (* now 0 --> inl 0 *)
+                                   (R.trans [R.unfold, R.beta 1])
                                 >>+
-                                (* a, ...[now A[^] 0 . ^] |- C[under_i (now A[^] 0 . ^)] *)
+                                (* a, ...[now 0 . ^] |- C[under_i (now 0 . ^)] *)
                                 D.dest i p1 set,
     
                                 (* future (bar A), ...[inr 0 . ^] |- C[under_i (inr 0 . ^)] *)
-                                D.refold jud i 1 (T.apply2 laterf (T.Sub (a, T.shift1)) T.zero)
-                                   (* laterf A[^] 0 --> inr 0 *)
-                                   (R.trans [R.unfold, R.beta 2])
+                                D.refold jud i 1 (T.apply1 laterf T.zero)
+                                   (* laterf 0 --> inr 0 *)
+                                   (R.trans [R.unfold, R.beta 1])
                                 >>+
-                                (* future (bar A), ...[laterf A[^] 0 . ^] |- C[under_i (laterf A[^] 0 . ^)] *)
+                                (* future (bar A), ...[laterf 0 . ^] |- C[under_i (laterf 0 . ^)] *)
                                 D.dest i p2 set
                                 ]
                             ])\

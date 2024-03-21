@@ -1,6 +1,95 @@
 
 openModule /List/;
 openModule /Bar/;
+openModule /Union/;
+
+
+
+lemma "iunpackt_implication"
+/
+  forall i (a : Kind i) (b : a -> U i) 
+    (c d : forall (x : a) . b x -> U i)
+    (u : iexists (x : a) . b x) .
+      (intersect (x : a) . forall (y : b x) . c x y -> d x y)
+      -> (iunpackt (x , y) = u in c x y)
+      -> (iunpackt (x , y) = u in d x y)
+/;
+
+inference.
+intro /i a b c d u Himpl Hu/.
+destruct /Hu/ /x y Heq Hy/.
+reduce /Hy/.
+subst /u/.
+apply /iunpackt_intro/.
+reduce //.
+apply /Himpl/ >> auto.
+qed ();
+
+
+
+lemma "unpackt_implication"
+/
+  forall i (a : U i) (b : a -> U i) 
+    (c d : forall (x : a) . b x -> U i)
+    (u : union (x : a) . b x) .
+      (intersect (x : a) . forall (y : b x) . c x y -> d x y)
+      -> (unpackt (x , y) = u in c x y)
+      -> (unpackt (x , y) = u in d x y)
+/;
+
+inference.
+intro /i a b c d u Himpl Hu/.
+destruct /Hu/ /x y Heq Hy/.
+reduce /Hy/.
+subst /u/.
+apply /unpackt_intro/.
+reduce //.
+apply /Himpl/ >> auto.
+qed ();
+
+
+
+lemma "destruct_unpackt"
+/
+  forall i (a : U i) (b : a -> U i) 
+    (c : forall (x : a) . b x -> U i) 
+    (d : (union (x : a) . b x) -> U i) 
+    (u : union (x : a) . b x) .
+      (intersect (x : a) . forall (y : b x) . c x y -> d y)
+      -> (unpackt (x , y) = u in c x y)
+      -> d u
+/;
+
+inference.
+intro /i a b c d u Himpl Hu/.
+destruct /Hu/ /x y Heq H/.
+reduce /H/.
+subst /u/.
+apply /Himpl/ >> auto.
+qed ();
+
+
+
+lemma "destruct_unpackt_squash"
+/
+  forall i (a : U i) (b : a -> U i) 
+    (c : forall (x : a) . b x -> U i) 
+    (d : (union (x : a) . b x) -> U i) 
+    (u : union (x : a) . b x) .
+      (forall (x : a) (y : b x) . c x y -> d y)
+      -> (unpackt (x , y) = u in c x y)
+      -> { d u }
+/;
+
+inference.
+intro /i a b c d u Himpl Hu/.
+destruct /Hu/ /x y Heq H/.
+reduce /H/.
+subst /u/.
+split.
+apply /Himpl/ >> auto.
+qed ();
+
 
 
 lemma "destruct_bar"
@@ -36,7 +125,7 @@ lemma "induct_on_bar"
 
 inference.
 intro /i a x/.
-sinduction /x/.
+induction /x/.
   {
   intro /x/.
   reflexivity.
@@ -46,6 +135,7 @@ sinduction /x/.
   intro /[x]/.
   reduce //.
   intro /[IH]/.
+  unfold /later at all/.
   compatRaw.
   2:{
     compatRaw.
@@ -53,6 +143,38 @@ sinduction /x/.
     }
   typechecker ();
   }
+qed ();
+
+
+
+lemma "bindbar_reduce"
+/
+  forall i (a b : U i) (m : Symbol.symbol -> a) (f : a -> bar b) .
+    (bindbar x = later (now (m sym`"The quick red fox jumped over the lazy brown cow.")) in f x) 
+    = 
+    later (f (m sym`"The quick red fox jumped over the lazy brown cow.")) : bar b
+/;
+
+inference.
+intro /i a b m f/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "bindbart_reduce"
+/
+  forall i (a b : U i) (m : Symbol.symbol -> a) (c : a -> U i) .
+    (bindbart x = later (now (m sym`"The quick red fox jumped over the lazy brown cow.")) in c x) 
+    = 
+    future (c (m sym`"The quick red fox jumped over the lazy brown cow.")) : U i
+/;
+
+inference.
+intro /i a b m c/.
+reduce //.
+reflexivity.
 qed ();
 
 

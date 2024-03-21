@@ -14,4 +14,5 @@
 - [`Relations`](lib/relations.html)
 - [`Stable`](lib/stable.html)
 - [`Symbol`](lib/symbol.html)
+- [`Union`](lib/union.html) (elimination forms for `union` and `iexists`)
 - [`Wtype`](lib/wtype.html) (well-founded types)

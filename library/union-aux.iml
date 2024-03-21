@@ -1,0 +1,81 @@
+structure ParseUnion =
+   struct
+
+      structure R = CheckpointedRef
+      structure T = ETerm
+
+      val unpack : Constant.constant R.dest = R.dest ()
+      val unpackt : Constant.constant R.dest = R.dest ()
+      val iunpack : Constant.constant R.dest = R.dest ()
+      val iunpackt : Constant.constant R.dest = R.dest ()
+
+      fun parseUnpack x m n = T.apply2 (R.read unpack) m (T.lam (SOME x) n)
+      fun parseUnpackt x y m b = T.apply4 (R.read unpackt) T.evar T.evar (T.lam (SOME x) (T.lam (SOME y) b)) m
+      fun parseIunpack x m n = T.apply2 (R.read iunpack) m (T.lam (SOME x) n)
+      fun parseIunpackt x y m b = T.apply5 (R.read iunpackt) T.evar T.evar T.evar (T.lam (SOME x) (T.lam (SOME y) b)) m
+
+   end
+
+
+grammardef Union
+
+   rule Term(0) ::= "unpack" Ident "=" Term(1) "in" Term(0) => ParseUnion.parseUnpack
+   rule Term(0) ::= "unpackt" "(" Ident "," Ident ")" "=" Term(1) "in" Term(0) => ParseUnion.parseUnpackt
+   rule Term(0) ::= "iunpack" Ident "=" Term(1) "in" Term(0) => ParseUnion.parseIunpack
+   rule Term(0) ::= "iunpackt" "(" Ident "," Ident ")" "=" Term(1) "in" Term(0) => ParseUnion.parseIunpackt
+
+   reserved "unpack" "unpackt" "iunpack" "iunpackt" : Ident
+
+end
+
+
+
+functor AfterUnionAll () :> sig end =
+   struct
+
+      structure U = Show.Unparsing
+
+      val Collapse (unpack, unpackt, iunpack, iunpackt) =
+         readRegistry /Union.AfterUnionAllEnv/
+            /[constant constant constant constant]/
+
+      val () = Registry.delete (parseLongident /Union.AfterUnionAllEnv/)
+
+      val () = CheckpointedRef.write ParseUnion.unpack unpack
+      val () = CheckpointedRef.write ParseUnion.unpackt unpackt
+      val () = CheckpointedRef.write ParseUnion.iunpack iunpack
+      val () = CheckpointedRef.write ParseUnion.iunpackt iunpackt
+
+      val () = ParseTerm.registerLet unpack "unpack "
+
+      val () =
+         ParseTerm.register unpackt 4 0
+         (U.wrap
+             (U.apply4 unpackt U.wild U.wild (U.lam $ U.lam $ U.show) U.show)
+             (fn ((), (), (x, (y, b)), m) => 
+                 ParseTerm.letContent 
+                    "unpackt " 
+                    (U.append [U.string "(", U.string x, U.string " , ", U.string y, U.string ")"])
+                    m b))
+
+      val () = ParseTerm.registerLet iunpack "iunpack "
+
+      val () =
+         ParseTerm.register iunpackt 5 0
+         (U.wrap
+             (U.apply5 iunpackt U.wild U.wild U.wild (U.lam $ U.lam $ U.show) U.show)
+             (fn ((), (), (), (x, (y, b)), m) => 
+                 ParseTerm.letContent 
+                    "iunpackt " 
+                    (U.append [U.string "(", U.string x, U.string " , ", U.string y, U.string ")"])
+                    m b))
+
+      val () =
+         U.reserved :=
+            List.foldl
+               (fns str set => SymbolSet.insert set (Symbol.fromValue str))
+               (!U.reserved)
+               ["unpack", "unpackt", "iunpack", "iunpackt"]
+
+   end
+

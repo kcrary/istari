@@ -1,8 +1,8 @@
 
 ISTARIBIN=../ui/bin
 
-DOCUNITS = acc bar bool decidable finite girard-paradox integer logic list nat option relations stable symbol wtype
-UNITS = $(DOCUNITS) datatype omega union
+DOCUNITS = acc bar bool decidable finite girard-paradox integer logic list nat option relations stable symbol union wtype
+UNITS = $(DOCUNITS) datatype omega
 
 all : $(foreach i, $(UNITS), $(i).isto)
 
