@@ -151,7 +151,6 @@ qed ();
 Constant.setOpacity (parseConstant /later/) Constant.SOFT;
 
 
-
 define /bindbar x f/
 /
   ffix
@@ -175,13 +174,24 @@ define /bindbar x f/
 inference.
 introOf /i a b x f/.
 unfold /bindbar/.
-fold /ffix ap i/.
-fold /ffix ap i ap (bar a -> bar b)/.
-so /bar_unroll i a/ /Heq/.
+rememberRaw /(fn g x1 .
+  (case x1 of
+   | inl y . f y
+   | inr y . let next g' = g in let next y' = y in inr (next (g' y'))))/ /forall (g : future (bar a -> bar b)) (x : bar a) . bar b/ /F/ /H/.
+{
+  typecheck1.
+  {typecheck.}
+  typecheck1.
+  {typecheck.}
+  unrollType /bar/.
+  unrollType /bar in x1/.
+  typecheck.
+  unrollType /bar at 0/.
+  auto.
+}
+remember /ffix F/ /bar a -> bar b/ /F'/ /H1/.
 typecheck.
-unrollType /bar/.
-typecheck.
-qed ();
+qed();
 
 val bindbar = parseConstant /bindbar/;
 
@@ -190,43 +200,35 @@ val bindbar = parseConstant /bindbar/;
 reductions 
 /
 bindbar (now x) f --> f x ;
-bindbar (laterf x) f --> let next y = x in later (bindbar y f) ;
 bindbar (later x) f --> later (bindbar x f) ;
+bindbar (laterf x) f --> let next y = x in later (bindbar y f) ;
+bindbar (inl x) f --> f x ;
+bindbar (inr x) f --> (let next y = x in later (bindbar y f)) ;
 unfolding letnext bindbar now later laterf
 unrolling ffix
 /;
 
 
 
-define /bindbart x b/
+define /bindbart/
 /
-  ffix
-    (fn g x .
-       (case x of
-        | inl y . b y
-        | inr y .
-            let next g' = g
-            in
-            let next y' = y
-            in
-              future (g' y')))
-    x
+  ffix (fn ff x P .
+    case x of
+    | inl y . P y
+    | inr zf . let next z = zf in let next f = ff in future (f z P)
+  )
 //
   intersect i (a : U i) .
     bar a 
     -> (a -> U i)
     -> U i
 /;
-
 inference.
-introOf /i a x b/.
 unfold /bindbart/.
-fold /ffix ap (lsucc i)/.
-fold /ffix ap (lsucc i) ap (bar a -> U i)/.
 typecheck.
 unrollType /bar/.
 typecheck.
-qed ();
+qed();
 
 val bindbart = parseConstant /bindbart/;
 
@@ -235,8 +237,10 @@ val bindbart = parseConstant /bindbart/;
 reductions
 /
   bindbart (now x) b --> b x ;
-  bindbart (laterf x) b --> let next y = x in future (bindbart y b) ;
   bindbart (later x) b --> future (bindbart x b) ;
+  bindbart (laterf x) b --> let next y = x in future (bindbart y b) ;
+  bindbart (inl x) f --> f x ;
+  bindbart (inr x) f --> let next y = x in future (bindbart y f) ;
   unfolding letnext bindbart now later laterf
   unrolling ffix
 /;
@@ -375,8 +379,6 @@ qed ();
 
 val bar_iter = parseConstant /bar_iter/;
 
-
-
 reductions
 /
   bar_iter _ hn _ (now x) --> hn x ;
@@ -386,7 +388,22 @@ reductions
   unrolling ffix
 /;
 
-
+lemma "bindbart_map"
+/
+  intersect i (A : U i) . forall (e : bar A) (P Q : A -> U i) .
+  (forall (x : A) . P x -> Q x) -> (bindbart x = e in P x) -> (bindbart x = e in Q x)
+/;
+inference.
+intro /i A e P Q f/.
+revert /e/.
+apply /bar_iter/ >> reduce // >> auto.
+{
+  intro /[e]/.
+  reduce //.
+  intro /[IH] [current]/.
+  auto.
+}
+qed();
 
 writeRegistry /AfterBarAllEnv/
   /[constant constant constant constant constant constant]/
