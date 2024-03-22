@@ -10,7 +10,9 @@ internal terms represent variables using de Bruijn indices, while
 external terms use explicit names.  (Istari's de Bruijn indices count
 from zero.)  External terms are converted to internal ones by
 supplying a data structure (called a *directory*) that maps names onto
-indices.
+indices.  (A few other things are done while converting external terms
+to internal ones as well.)
+
 
 #### The term grammar
 
@@ -31,6 +33,7 @@ cons is right associative.
       iforall Bindings . [Term]                                      (impredicative universal)
       iexists Bindings . [Term]                                      (impredicative existential)
       intersect Bindings . [Term]                                    (intersection type)
+      union Bindings . [Term]                                        (intersection type)
       foralltp OIdents . [Term]                                      (impredicative polymorphism)
       rec Ident . [Term]                                             (recursive type)
       mu Ident . [Term]                                              (inductive type)
@@ -157,8 +160,8 @@ Notes:
   token, rather than two, which will result in a syntax error.
 
 - A tick (`` ` ``) before an identifier suppresses the insertion of
-  implicit arguments.  It also allows the identifier to be any constant
-  name, even if the name collides with a keyword.
+  implicit arguments.  (See below.)  It also allows the identifier to
+  be any constant name, even if the name collides with a keyword.
 
 - An [antiquoted](iml.html#antiquote) internal term should have the
   type `Term.term`.
@@ -225,7 +228,7 @@ substitution.
       LTerm . [Sub]                                                  (substitution cons)
       Number . [Sub]                                                 (special case of cons)
       ^ Number                                                       (shift)
-      id                                                             (identity, same as ^0)
+      id                                                             (identity, same as ^ 0)
       ( Sub )
 
 Notes:
@@ -250,6 +253,64 @@ functions: `parseIdent`, `parseIdents`, `parseLongident`,
 
 These functions are all actually the identity function, but IML is
 instructed to parse their argument using the indicated nonterminal.
+
+
+
+#### Implicit and invisible arguments
+
+Some constants take implicit and/or invisible arguments:
+
+- Implicit arguments are not seen by the user, but they are present in
+  the real term "under the hood."  The process of converting external
+  terms to internal terms inserts evars for implicit arguments, which
+  are then usually resolved by unification.
+
+  If the user wants to suppress the insertion of implicit arguments
+  (for example, because one wants to give them explicitly), one can
+  precede the constant with a tick (`` ` ``).
+
+- Invisible arguments, on the other hand, are not present in the real
+  term at all, even "under the hood."  They arise when a function has
+  a type like `intersect (x : A) . B`.  Such a function has the type
+  `B` for any choice for `x` of type `A`, but that choice is not
+  passed in to the function at all.
+
+  Sometimes it is necessary to specify a function's invisible argument
+  because typechecking is unable to work it out itself.  To do so, one
+  employs visibilized application by writing `f ap m` to indicate that
+  the `f`'s invisible argument should be filled in with `m`.
+
+  Visibilized application is only a hint for the type checker; such
+  arguments are still not passed into the function.  Thus, `f ap m`
+  unfolds to just `f`.
+
+For example, `List.map` has type:
+
+    intersect i . forall (a b : U i) . (a -> b) -> list a -> list b
+
+and has two implicit arguments.  Thus, its first argument (`i`) is
+invisible, and its second and third arguments (`a` and `b`) are
+implicit.  Normally one calls `List.map` with just the explicit
+arguments; so `List.map F L` means:
+
+    `List.map _ _ F L
+
+If, instead, one wanted to supply all the arguments, one would write
+something like:
+
+    `List.map ap I A B F L
+
+The `ap I` fills in the invisible argument, while the starting tick
+suppresses the insertion of evars for implicit arguments, so `A` and
+`B` can be supplied.
+
+Note that implicit arguments are inserted first, so 
+`List.map ap I F L` would mean:
+
+    `List.map _ _ ap I F L`
+
+which is probably not desired.  But rarely would one want to give
+only the invisible arguments explicitly anyway.
 
 
 
