@@ -210,9 +210,9 @@ To perform strong induction over the subterm order using these tools:
 A worked example appears [here](datatype-induction.ist).  Note that
 this process is usually not necessary.  In the common case in which
 the conclusion is known *a priori* to be well-typed, and strong
-induction is not needed, the `iterate` tactic is sufficient and much
+induction is not needed, the `induction` tactic is sufficient and much
 simpler.  When the datatype definition is not mutually dependent, the
-`induct` tactic automates this process.  Thus, the long form is
+`sinduction` tactic automates this process.  Thus, the long form is
 necessary only for mutually dependent datatypes when the conclusion is
 not yet known to be well-typed or strong induction is required.
 
