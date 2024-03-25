@@ -19,6 +19,15 @@ Namespace.aliasExport (parseIdent /succ/) Prim.succ;
 Namespace.aliasExport (parseIdent /nat_case/) Prim.nat_case;
 
 
+grammardef NatLiteral
+
+   rule Term(100)  ::= NUMBER => ParseTerm.nat
+
+end;
+
+grammaron NatLiteral;
+
+
 
 lemma "nat_type"
 /
@@ -218,6 +227,48 @@ writeRegistry /AfterLeqEnv/
   /[constant constant]/
   (Collapse (leq, lt));
 structure Nothing = AfterLeq ();
+
+
+
+(* Set up parsing/unparsing just for this file.  AfterNatAll sets it up
+   for everyone else.
+*)
+
+structure ParseLeq =
+  struct
+
+    structure E = ETerm
+
+    fun parseLeq m n = E.apply2 leq m n
+    fun parseLt m n = E.apply2 lt m n
+
+  end
+
+grammardef NatLeq
+
+   rule Term(30)  ::= Term(31) "<=" Term(31) => ParseLeq.parseLeq
+   rule Term(30)  ::= Term(31) "<" Term(31) => ParseLeq.parseLt
+
+end;
+
+grammaron NatLeq;
+
+structure U = Show.Unparsing;
+
+fun registerBinaryLocal const prec lprec rprec str =
+   let
+      val unp =
+         U.wrap
+           (U.apply2 const U.show U.show)
+           (fn (a, b) =>
+               U.append [a lprec,
+                         U.break 1, U.string str, b rprec])
+   in
+      ConstantTable.insert U.unparsingTable const (2, prec, ref true, unp)
+   end;
+
+val () = registerBinaryLocal leq 30 31 31 "<= ";
+val () = registerBinaryLocal lt 30 31 31 "< ";
 
 
 
@@ -946,6 +997,36 @@ writeRegistry /AfterTimesEnv/
   /[constant]/
   (Collapse (minus));
 structure Nothing = AfterTimes ();
+
+
+
+(* Again, set up parsing/unparsing just for this file. *)
+
+structure ParseTimes =
+  struct
+
+    structure E = ETerm
+
+    fun parsePlus m n = E.apply2 Prim.plus m n
+    fun parseMinus m n = E.apply2 minus m n
+    fun parseTimes m n = E.apply2 Prim.times m n
+
+  end
+
+grammardef NatTimes
+
+   rule Term(50)  ::= Term(50) "+" Term(51) => ParseTimes.parsePlus
+   rule Term(50)  ::= Term(50) "-" Term(51) => ParseTimes.parseMinus
+   rule Term(60)  ::= Term(60) "*" Term(61) => ParseTimes.parseTimes
+
+end;
+
+grammaron NatTimes;
+
+val () = registerBinaryLocal Prim.plus 50 50 51 "+ ";
+val () = registerBinaryLocal minus 50 50 51 "- ";
+val () = registerBinaryLocal Prim.times 60 60 61 "* ";
+
 
 
 reductions
@@ -3739,8 +3820,8 @@ qed ();
 
 
 writeRegistry /AfterNatAllEnv/
-  /[constant constant constant constant constant constant constant constant constant constant constant constant constant constant]/
-  (Collapse (nat_iter, leq, minus, min, max, leq_refl, leq_trans, leq_succ_succ, plus_leq, minus_leq, times_leq, min_leq, max_leq, leq_implication));
+  /[constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant]/
+  (Collapse (nat_iter, leq, lt, minus, min, max, leq_refl, leq_trans, leq_succ_succ, plus_leq, minus_leq, times_leq, min_leq, max_leq, leq_implication));
 
 
 endModule ();

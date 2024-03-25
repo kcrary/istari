@@ -1,4 +1,24 @@
 
+structure SyntaxError =
+   struct
+
+      exception Syntax of string
+
+      val () = 
+         Handler.customHandler
+         (fn Syntax msg => 
+                (
+                print "Syntax error: ";
+                print msg; 
+                print "\n";
+                true
+                )
+
+           | _ => false)
+
+   end
+
+
 signature ETERM =
    sig
 
@@ -60,36 +80,63 @@ signature ETERM =
       (* raises Syntax using the given location if the eterm contains an unbound variable *)
       val withloc    : int * int -> eterm -> eterm
 
+      type overloads
+
+      val getOverloads : (overloads -> eterm) -> eterm
+      val setOverloads : overloads -> eterm -> eterm
+      val overloads    : overloads CheckpointedRef.cref
+
    end
 
 
-structure ETermInternal 
-   :> sig
-         include ETERM
+signature ETERM_INTERNAL =
+   sig
 
-         type eterm_ =
-            (Directory.idirectory -> Term.elim list -> Term.term) SymbolDict.dict
-            -> Directory.idirectory
-            -> bool
-            -> Term.elim list
-            -> Term.term
+      include ETERM
 
-         val expose : eterm -> eterm_
-         val hide : eterm_ -> eterm
-      end
+      type eterm_ =
+         (Directory.idirectory -> Term.elim list -> Term.term) SymbolDict.dict
+         -> Directory.idirectory
+         -> overloads
+         -> bool
+         -> Term.elim list
+         -> Term.term
+
+      val expose : eterm -> eterm_
+      val hide : eterm_ -> eterm
+
+   end
+
+
+signature OVERLOADS_TYPE =
+   sig
+
+      type overloads
+
+      val initial : overloads
+
+   end
+
+
+functor ETermFun (structure OverloadsType : OVERLOADS_TYPE)
+   :> ETERM_INTERNAL where type overloads = OverloadsType.overloads
    =
    struct
 
       structure D = Directory
       structure T = Term
       structure SD = SymbolDict
+      structure CR = CheckpointedRef
 
       type symbol = Symbol.symbol
       type binder = symbol option
 
+      type overloads = OverloadsType.overloads
+
       type eterm =
          (D.idirectory -> T.elim list -> T.term) SymbolDict.dict  (* special forms *)
          -> D.idirectory   (* identifers *)
+         -> overloads      (* to resolve overloaded operators *)
          -> bool           (* insert implicit arguments? *)
          -> T.elim list    (* delayed spine *)
          -> T.term
@@ -99,6 +146,9 @@ structure ETermInternal
 
       fun expose x = x
       fun hide x = x
+
+
+      val overloads : overloads CR.cref = CR.new OverloadsType.initial
 
 
       fun elim m spine =
@@ -118,7 +168,7 @@ structure ETermInternal
       exception Syntax = SyntaxError.Syntax
 
 
-      fun short sym special dir imps spine =
+      fun short sym special dir _ imps spine =
          (case D.lookupOpt dir sym of
              SOME (D.Hvar i) =>
                 elim (T.Var i) spine
@@ -144,7 +194,7 @@ structure ETermInternal
                   | SOME f => f dir spine))
          
 
-      fun var sym _ dir _ spine = elim (T.Var (D.lookupVar dir sym)) spine
+      fun var sym _ dir _ _ spine = elim (T.Var (D.lookupVar dir sym)) spine
          
       fun signalUnknownConstant syms = 
          raise (Syntax (String.concat
@@ -154,7 +204,7 @@ structure ETermInternal
                            "."
                            ]))
 
-      fun long syms _ _ imps spine =
+      fun long syms _ _ _ imps spine =
          (case Namespace.resolveOpt syms of
              NONE =>
                 signalUnknownConstant syms
@@ -168,136 +218,136 @@ structure ETermInternal
                        spine))
          
 
-      fun const const _ _ _ spine = elim (T.Const const) spine
+      fun const const _ _ _ _ spine = elim (T.Const const) spine
 
-      fun lam binder body special dir imps spine =
+      fun lam binder body special dir over imps spine =
          elim
             (case binder of
                 NONE =>
-                   T.Lam (NONE, body special (D.ibind0 dir) imps [])
+                   T.Lam (NONE, body special (D.ibind0 dir) over imps [])
    
               | SOME x =>
-                   T.Lam (binder, body special (D.ibind dir x) imps []))
+                   T.Lam (binder, body special (D.ibind dir x) over imps []))
             spine
 
-      fun lamann binder a body special dir imps spine =
+      fun lamann binder a body special dir over imps spine =
          elim
             (case binder of
                 NONE =>
                    T.apply2 Prim.fnann
-                      (a special dir imps [])
-                      (T.Lam (NONE, body special (D.ibind0 dir) imps []))
+                      (a special dir over imps [])
+                      (T.Lam (NONE, body special (D.ibind0 dir) over imps []))
    
               | SOME x =>
                    T.apply2 Prim.fnann
-                      (a special dir imps [])
-                      (T.Lam (binder, body special (D.ibind dir x) imps [])))
+                      (a special dir over imps [])
+                      (T.Lam (binder, body special (D.ibind dir x) over imps [])))
             spine
 
-      fun app m1 m2 special dir imps spine =
-         m1 special dir imps (T.App (m2 special dir imps []) :: spine)
+      fun app m1 m2 special dir over imps spine =
+         m1 special dir over imps (T.App (m2 special dir over imps []) :: spine)
 
-      fun pair m1 m2 special dir imps spine =
+      fun pair m1 m2 special dir over imps spine =
          elim
-            (T.Pair (m1 special dir imps [],
-                     m2 special dir imps []))
+            (T.Pair (m1 special dir over imps [],
+                     m2 special dir over imps []))
             spine
 
-      fun pi1 m special dir imps spine = m special dir imps (T.Pi1 :: spine)
+      fun pi1 m special dir over imps spine = m special dir over imps (T.Pi1 :: spine)
 
-      fun pi2 m special dir imps spine = m special dir imps (T.Pi2 :: spine)
+      fun pi2 m special dir over imps spine = m special dir over imps (T.Pi2 :: spine)
 
-      fun next m special dir imps spine =
+      fun next m special dir over imps spine =
          elim
-            (T.Next (m special dir imps []))
+            (T.Next (m special dir over imps []))
             spine
 
-      fun prev m special dir imps spine = m special dir imps (T.Prev :: spine)
+      fun prev m special dir over imps spine = m special dir over imps (T.Prev :: spine)
 
-      fun triv _ _ _ spine = elim T.Triv spine
+      fun triv _ _ _ _ spine = elim T.Triv spine
 
-      fun evar _ _ _ spine = elim (T.evar ()) spine
+      fun evar _ _ _ _ spine = elim (T.evar ()) spine
 
-      fun integer x _ _ _ spine = elim (T.Native (T.Integer x)) spine
+      fun integer x _ _ _ _ spine = elim (T.Native (T.Integer x)) spine
 
-      fun symbol x _ _ _ spine = elim (T.Native (T.Symbol x)) spine
+      fun symbol x _ _ _ _ spine = elim (T.Native (T.Symbol x)) spine
 
       val zilch = Symbol.fromValue ""
 
-      fun hole _ _ _ spine = elim (T.Marker zilch) spine
+      fun hole _ _ _ _ spine = elim (T.Marker zilch) spine
 
-      fun marker sym _ _ _ spine = elim (T.Marker sym) spine
+      fun marker sym _ _ _ _ spine = elim (T.Marker sym) spine
 
-      fun apply1 c m1 special dir imps spine =
-         T.Elim (T.Const c, T.App (m1 special dir imps []) :: spine)
+      fun apply1 c m1 special dir over imps spine =
+         T.Elim (T.Const c, T.App (m1 special dir over imps []) :: spine)
 
-      fun apply2 c m1 m2 special dir imps spine =
+      fun apply2 c m1 m2 special dir over imps spine =
          T.Elim (T.Const c, 
-                 T.App (m1 special dir imps []) 
-                 :: T.App (m2 special dir imps []) 
+                 T.App (m1 special dir over imps []) 
+                 :: T.App (m2 special dir over imps []) 
                  :: spine)
 
-      fun apply3 c m1 m2 m3 special dir imps spine =
+      fun apply3 c m1 m2 m3 special dir over imps spine =
          T.Elim (T.Const c, 
-                 T.App (m1 special dir imps []) 
-                 :: T.App (m2 special dir imps []) 
-                 :: T.App (m3 special dir imps []) 
+                 T.App (m1 special dir over imps []) 
+                 :: T.App (m2 special dir over imps []) 
+                 :: T.App (m3 special dir over imps []) 
                  :: spine)
 
 
-      fun apply4 c m1 m2 m3 m4 special dir imps spine =
+      fun apply4 c m1 m2 m3 m4 special dir over imps spine =
          T.Elim (T.Const c, 
-                 T.App (m1 special dir imps []) 
-                 :: T.App (m2 special dir imps []) 
-                 :: T.App (m3 special dir imps []) 
-                 :: T.App (m4 special dir imps []) 
+                 T.App (m1 special dir over imps []) 
+                 :: T.App (m2 special dir over imps []) 
+                 :: T.App (m3 special dir over imps []) 
+                 :: T.App (m4 special dir over imps []) 
                  :: spine)
 
-      fun apply5 c m1 m2 m3 m4 m5 special dir imps spine =
+      fun apply5 c m1 m2 m3 m4 m5 special dir over imps spine =
          T.Elim (T.Const c, 
-                 T.App (m1 special dir imps []) 
-                 :: T.App (m2 special dir imps []) 
-                 :: T.App (m3 special dir imps []) 
-                 :: T.App (m4 special dir imps []) 
-                 :: T.App (m5 special dir imps []) 
+                 T.App (m1 special dir over imps []) 
+                 :: T.App (m2 special dir over imps []) 
+                 :: T.App (m3 special dir over imps []) 
+                 :: T.App (m4 special dir over imps []) 
+                 :: T.App (m5 special dir over imps []) 
                  :: spine)
 
-      fun applyn c l special dir imps spine =
+      fun applyn c l special dir over imps spine =
          T.Elim (T.Const c, 
                  List.foldr
-                    (fns m rest => T.App (m special dir imps []) :: rest)
+                    (fns m rest => T.App (m special dir over imps []) :: rest)
                     spine
                     l)
 
-      fun appn m1 l special dir imps spine =
-         m1 special dir imps
+      fun appn m1 l special dir over imps spine =
+         m1 special dir over imps
             (List.foldr
-                (fns m rest => T.App (m special dir imps []) :: rest)
+                (fns m rest => T.App (m special dir over imps []) :: rest)
                 spine
                 l)
 
-      fun additional xs m special dir imps spine =
+      fun additional xs m special dir over imps spine =
          (case xs of
              [] =>
-                m special dir imps spine
+                m special dir over imps spine
 
            | NONE :: rest =>
-                additional rest m special (D.ibind0 dir) imps spine
+                additional rest m special (D.ibind0 dir) over imps spine
 
            | SOME x :: rest =>
-                additional rest m special (D.ibind dir x) imps spine)
+                additional rest m special (D.ibind dir x) over imps spine)
 
-      fun literal m _ _ _ spine = elim m spine
+      fun literal m _ _ _ _ spine = elim m spine
 
-      fun explicit m special dir _ spine = m special dir false spine
+      fun explicit m special dir over _ spine = m special dir over false spine
 
 
 
-      fun closed m = m SD.empty D.iempty true []
+      fun closed m = m SD.empty D.iempty (CR.deref overloads) true []
 
-      fun withidir idir m = m SD.empty idir true []
+      fun withidir idir m = m SD.empty idir (CR.deref overloads) true []
 
-      fun withdir dir m = m SD.empty (Directory.idir dir) true []
+      fun withdir dir m = m SD.empty (Directory.idir dir) (CR.deref overloads) true []
 
 
 
@@ -381,14 +431,14 @@ structure ETermInternal
                       absoluteSub from to depth (T.Idot (k, T.Shift (k+1)))
                 end)
 
-      fun absolute from m _ to _ spine =
+      fun absolute from m _ to _ _ spine =
          elim (absoluteMain from to 0 m) spine
 
 
-      fun subst em sym en special dir imps spine =
+      fun subst em sym en special dir over imps spine =
          elim
-            (T.Sub (en special (D.ibind dir sym) imps [],
-                    T.Dot (em special dir imps [], T.id)))
+            (T.Sub (en special (D.ibind dir sym) over imps [],
+                    T.Dot (em special dir over imps [], T.id)))
             spine
 
 
@@ -398,7 +448,7 @@ structure ETermInternal
          else
             Prune.punder (excludeSub (i-1)) 
 
-      fun exclude sym em special dir imps spine =
+      fun exclude sym em special dir over imps spine =
          (case D.lookupVarOpt dir sym of
              NONE =>
                 raise (Syntax (String.concat
@@ -410,7 +460,7 @@ structure ETermInternal
 
            | SOME i =>
                 let
-                   val m = em special dir imps []
+                   val m = em special dir over imps []
                 in
                    (case Prune.prune m (excludeSub i) of
                        NONE =>
@@ -425,9 +475,9 @@ structure ETermInternal
                 end)
 
 
-      fun withloc (r, c) m special dir imps spine =
+      fun withloc (r, c) m special dir over imps spine =
          try
-            m special dir imps spine
+            m special dir over imps spine
          with
             D.Unbound sym =>
                raise (Syntax (String.concat
@@ -441,979 +491,48 @@ structure ETermInternal
                                  "."
                                  ]))
 
+      fun getOverloads m special dir over imps spine =
+         m over special dir over imps spine
+
+      fun setOverloads over m special dir _ imps spine =
+         m special dir over imps spine
+
    end
 
 
-structure ETerm :> ETERM where type eterm = ETermInternal.eterm = ETermInternal
-
-
-structure ParseTerm =
+structure OverloadsType =
    struct
 
-      structure T = ETerm
-      exception Syntax = SyntaxError.Syntax
-
-
-      fun id x = x
-      val none = NONE
-      val some = SOME
-      val null = []
-      fun sing x = [x]
-      fun duo x y = [x, y]
-      fun cons x y = x :: y
-      fun append x y = x @ y
-
-      fun longid strs = map Symbol.fromValue strs
-
-      fun bindingBare x = [(x, NONE)]
-      fun bindingAnnot xl a = map (fn x => (x, SOME a)) xl
-
-      fun appendBlanks n l =
-         (case Int.compare n 0 of
-             LESS =>
-                raise (Syntax "negative repetition in bindings")
-
-           | EQUAL =>
-                l
-
-           | GREATER =>
-                appendBlanks (n-1) ((NONE, NONE) :: l))
-
-      val literal = T.literal
-
-      fun short pos sym = T.withloc pos (T.short sym)
-      fun shortExplicit pos sym = T.withloc pos (T.explicit (T.short sym))
-      fun long strs = T.long (map Symbol.fromValue strs)
-      fun longExplicit strs = T.explicit (T.long (map Symbol.fromValue strs))
-      fun var pos sym = T.withloc pos (T.var sym)
-
-
-      fun level_plus n m =
-         if n = 0 then
-            m
-         else
-            T.apply1 Prim.lsucc (level_plus (n-1) m)
-
-      fun level_max l =
-         (case l of
-             [] => raise (Syntax "bad level")
-
-           | [m] => m
-
-           | m1 :: rest =>
-                T.apply2 Prim.lmax m1 (level_max rest))
-
-      fun level_lit n =
-         if n = 0 then
-            T.const Prim.lzero
-         else
-            T.apply1 Prim.lsucc (level_lit (n-1))
-
-      fun univ m = T.apply1 Prim.univ m
-      fun kind m = T.apply1 Prim.kind m
-
-
-
-      fun lam x a m =
-         (case a of
-             NONE => T.lam x m
-           | SOME a' => T.lamann x a' m)
-
-      fun lams xl m = foldr (fns (x, a) n => lam x a n) m xl
-
-      fun instance b =
-         (case b of
-             NONE => T.evar
-           | SOME a => a)
-
-      fun forall x a b = T.apply2 Prim.forall (instance a) (T.lam x b)
-      fun foralls al b = foldr (fns (x, a) b => forall x a b) b al
-
-      fun exists x a b = T.apply2 Prim.exists (instance a) (T.lam x b)
-      fun existss al b = foldr (fns (x, a) b => exists x a b) b al
-
-      fun iforall x a b = T.apply3 Prim.iforall T.evar (instance a) (T.lam x b)
-      fun iforalls al b = foldr (fns (x, a) b => iforall x a b) b al
-
-      fun iexists x a b = T.apply3 Prim.iexists T.evar (instance a) (T.lam x b)
-      fun iexistss al b = foldr (fns (x, a) b => iexists x a b) b al
-
-      fun intersect x a b = T.apply2 Prim.intersect (instance a) (T.lam x b)
-      fun intersects al b = foldr (fns (x, a) b => intersect x a b) b al
-
-      fun union x a b = T.apply2 Prim.union (instance a) (T.lam x b)
-      fun unions al b = foldr (fns (x, a) b => union x a b) b al
-
-      fun foralltp x b = T.apply1 Prim.foralltp (T.lam x b)
-      fun foralltps xl b = foldr foralltp b xl
-
-
-      fun rec x a = T.apply1 Prim.rec (T.lam (SOME x) a)
-      fun mu x a = T.apply1 Prim.mu (T.lam (SOME x) a)
-
-      fun quotient x y a b = T.apply2 Prim.quotient a (T.lam (SOME x) (T.lam (SOME y) b))
-
-      val arrow = T.apply2 Prim.arrow
-      val tarrow = T.apply2 Prim.tarrow
-      val karrow = T.apply2 Prim.karrow
-      val guard = T.apply2 Prim.guard
-
-      fun lett x m n = T.apply2 Prim.lett m (T.lam (SOME x) n)
-      fun letnext x m n = T.apply2 Prim.letnext m (T.lam (SOME x) n)
-
-      fun sumcase m x n y p = T.apply3 Prim.sum_case m (T.lam x n) (T.lam y p)
-
-      fun ite b x y = T.apply3 Prim.ite b x y
-
-      val prod = T.apply2 Prim.prod
-      val sum = T.apply2 Prim.sum
-
-      val app = T.app
-      val pi1 = T.pi1
-      val pi2 = T.pi2
-      val prev = T.prev
-
-      fun proj m n =
-         if n = 0 then
-            T.pi1 m
-         else
-            proj (T.pi2 m) (n-1)
-
-      val next = T.next
-      fun inl m = T.apply1 Prim.inl m
-      fun inr m = T.apply1 Prim.inr m
-      fun ann m a = T.apply2 Prim.ann a m
-
-      fun ap m n = T.apply2 Prim.ap m n
-
-      fun set x a b = T.apply2 Prim.set a (T.lam (SOME x) b)
-
-      fun iset x a b = T.apply2 Prim.iset a (T.lam (SOME x) b)
-
-      val squash = T.apply1 Prim.squash
-
-      fun ov m a = T.apply2 Prim.ov a m
-
-      val istp = T.apply1 Prim.istp
-
-      fun eq m n a = T.apply3 Prim.eq a m n
-
-      val eqtp = T.apply2 Prim.eqtp
-      val subtype = T.apply2 Prim.subtype
-      val eeqtp = T.apply2 Prim.eeqtp
-      val lleq = T.apply2 Prim.lleq
-
-      fun tuple ms =
-         (case ms of
-             [] => raise (Fail "precondition")
-
-           | [m] => m
-
-           | m :: rest =>
-                T.pair m (tuple rest))
-
-      fun number n =
-         if n <= 0 then
-            T.const Prim.zero
-         else
-            T.apply1 Prim.succ (number (n-1))
-
-      fun integer n =
-         T.integer (IntInf.fromInt n)
-
-      fun integerLexeme str =
-         (case FromString.toIntInf str of
-             SOME x => T.integer x
-
-           | NONE => raise (Syntax ("invalid integer literal " ^ str)))
-
-      val integerEmbed = T.integer
-
-      fun symbol str =
-         T.symbol (Symbol.fromValue str)
-
-      val symbolEmbed = T.symbol
-
-
-
-      val evar = T.evar
-
-      fun appEvars m n =
-         (case Int.compare n 0 of
-             LESS =>
-                raise (Syntax "negative repetition in apply to evars")
-
-           | EQUAL =>
-                m
-
-           | GREATER =>
-                appEvars (T.app m T.evar) (n-1))
-
-      val zilch = Symbol.fromValue ""
-      val hole = T.marker zilch
-
-      fun appHoles m n =
-         (case Int.compare n 0 of
-             LESS =>
-                raise (Syntax "negative repetition in apply to holes")
-
-           | EQUAL =>
-                m
-
-           | GREATER =>
-                appHoles (T.app m hole) (n-1))
-
-      val triv = T.triv
-
-      val exclude = T.exclude
-      val additional = T.additional 
-
-      fun shortConstant sym = Namespace.resolve [sym]
-      fun longConstant address = Namespace.resolve address
-
-      fun explicit m = T.explicit m
-
-
-
-      structure U = Show.Unparsing
-
-      fun register k arity prec unp =
-         ConstantTable.insert U.unparsingTable k (arity, prec, ref true, unp)
-
-
-      fun idents args =
-         U.box $
-         U.append $
-         (case args of
-             [] =>
-                (* shouldn't happen *)
-                []
-
-           | arg :: rest =>
-                U.string arg
-                ::
-                List.foldr
-                   (fns argi l => U.string " " :: U.string argi :: l)
-                   []
-                   rest)
-
-      fun binderContent str (doms, cod) =
-         U.box $
-         U.append
-            [
-            U.box $
-            U.append
-               [
-               U.string str,
-               U.append
-                  (map 
-                      (fn (args, dom, _) => 
-                         U.append
-                            [
-                            U.break 1,
-                            U.string "(",
-                            U.box $ 
-                               U.append
-                               [
-                               idents args,
-                               U.break 1,
-                               U.string ": ",
-                               U.box $ dom 0
-                               ],
-                            U.string ")"
-                            ])
-                      doms),
-               U.string " ."
-               ],
-            U.break 1,
-            cod 0,
-            ]
-
-      fun registerBinder const str =
-         register const 2 0
-         (U.wrap
-             (U.fix
-                 (fn unp =>
-                     U.alt
-                        [
-                        U.wrap
-                           (U.apply2 const U.showterm (U.lam unp))
-                           (fn ((dom1, domt1), (arg, (doms, cod))) =>
-                               (case doms of
-                                   (args, dom2, domt2) :: rest =>
-                                      if Simplify.same (Term.Sub (domt1, Term.shift1)) domt2 then
-                                         ((arg :: args, dom2, domt1) :: rest, cod)
-                                      else
-                                         (([arg], dom1, domt1) :: doms, cod)
-
-                                 | _ =>
-                                      (([arg], dom1, domt1) :: doms, cod))),
-
-                        U.wrap
-                           U.show
-                           (fn cod => ([], cod)),
-                        ]))
-             (binderContent str))
-
-      fun registerIBinder const str =
-         register const 3 0
-         (U.ifNoImplicits $
-          U.wrap
-             (U.fix
-                 (fn unp =>
-                     U.alt
-                        [
-                        U.wrap
-                           (U.apply3 const U.wild U.showterm (U.lam unp))
-                           (fn ((), (dom1, domt1), (arg, (doms, cod))) =>
-                               (case doms of
-                                   (args, dom2, domt2) :: rest =>
-                                      if Simplify.same (Term.Sub (domt1, Term.shift1)) domt2 then
-                                         ((arg :: args, dom2, domt1) :: rest, cod)
-                                      else
-                                         (([arg], dom1, domt1) :: doms, cod)
-
-                                 | _ =>
-                                      (([arg], dom1, domt1) :: doms, cod))),
-
-                        U.wrap
-                           U.show
-                           (fn cod => ([], cod)),
-                        ]))
-             (binderContent str))
-
-      (* right associative *)
-      fun registerBinary const str prec =
-         register const 2 prec
-         (U.wrap
-             (U.fix
-                 (fn unp =>
-                     U.alt
-                        [
-                        U.wrap
-                           (U.apply2 const U.show unp)
-                           (fn (dom, (doms, cod)) => (dom :: doms, cod)),
-
-                        U.wrap
-                           U.show
-                           (fn cod => ([], cod)),
-                        ]))
-             (fn (doms, cod) =>
-                 U.boxi 0 $
-                 U.append
-                    [
-                    U.append
-                       (map
-                           (fn dom =>
-                               U.append
-                                  [
-                                  dom (prec+1),
-                                  U.break 1,
-                                  U.string str,
-                                  U.string " "
-                                  ])
-                           doms),
-                    cod prec
-                    ]))
-
-      val () = registerBinder Prim.fnann "fn"
-      val () = registerBinder Prim.forall "forall"
-      val () = registerBinder Prim.exists "exists"
-      val () = registerIBinder Prim.iforall "iforall"
-      val () = registerIBinder Prim.iexists "iexists"
-      val () = registerBinder Prim.intersect "intersect"
-      val () = registerBinder Prim.union "union"
-
-      val () =
-         register Prim.foralltp 1 0
-         (U.wrap
-             (U.fix
-                 (fn unp =>
-                     U.alt
-                        [
-                        U.wrap
-                           (U.apply1 Prim.foralltp (U.lam unp))
-                           (fn (arg, (args, cod)) => (arg :: args, cod)),
-
-                        U.wrap
-                           U.show
-                           (fn cod => ([], cod))
-                        ]))
-             (fns (doms, cod) =>
-                 U.box $
-                 U.append
-                    [
-                    U.box $
-                    U.append
-                       [
-                       U.string "foralltp",
-                       U.append
-                          (map 
-                              (fn arg => 
-                                 U.append
-                                    [
-                                    U.break 1,
-                                    U.string arg
-                                    ])
-                              doms),
-                       U.string " ."
-                       ],
-                    U.break 1,
-                    cod 0
-                    ]))
-
-      val () =
-         register Prim.rec 1 0
-         (U.wrap
-             (U.apply1 Prim.rec (U.lam U.show))
-             (fn (arg, body) =>
-                 U.append [U.string "rec ", U.string arg, U.string " .", U.break 1, body 1]))
-
-      val () =
-         register Prim.mu 1 0
-         (U.wrap
-             (U.apply1 Prim.mu (U.lam U.show))
-             (fn (arg, body) =>
-                 U.append [U.string "mu ", U.string arg, U.string " .", U.break 1, body 1]))
-
-      val () =
-         register Prim.quotient 2 0
-         (U.wrap
-             (U.apply2 Prim.quotient U.show (U.lam (U.lam U.show)))
-             (fn (a, (x, (y, b))) =>
-                 U.append [
-                          U.string "quotient (",
-                          U.string x,
-                          U.string " ",
-                          U.string y,
-                          U.break 1,
-                          U.string ": ",
-                          a 0,
-                          U.string ") .",
-                          U.break 1,
-                          b 1
-                          ]))
-
-      val () = registerBinary Prim.arrow "->" 0
-      val () = registerBinary Prim.tarrow "-t>" 0
-      val () = registerBinary Prim.karrow "-k>" 0
-      val () = registerBinary Prim.guard "-g>" 0
-
-      fun letContent str var m n =
-         U.boxi 0 $
-         U.append
-            [
-            U.box $ U.append
-               [
-               U.string str,
-               var,
-               U.string " =",
-               U.break 1,
-               U.box (m 1)
-               ],
-            U.break 1,
-            U.string "in",
-            U.break 1,
-            U.box (n 0)
-            ]
-
-      fun registerLet const str =
-         register const 2 0
-         (U.wrap
-             (U.apply2 const U.show (U.lam U.show))
-             (fn (m, (x, n)) => letContent str (U.string x) m n))
-
-      val () = registerLet Prim.lett "let "
-      val () = registerLet Prim.letnext "let next "
-
-      val () =
-         register Prim.sum_case 3 100
-         (U.wrap
-             (U.apply3 Prim.sum_case U.show (U.lam U.show) (U.lam U.show))
-             (fn (m, (x, n), (y, p)) =>
-                 U.append
-                    [
-                    U.string "(",
-
-                    U.boxi 0 $
-                    U.append [
-                             U.string "case ",
-                             U.box (m 1),
-                             U.string " of",
-                             U.break 1,
-                             U.string "| ",
-
-                             U.box $
-                                U.append
-                                   [
-                                   U.string "inl ",
-                                   U.string x,
-                                   U.string " .",
-                                   U.break 1,
-                                   U.box (n 0)
-                                   ],
-
-                             U.break 1,
-                             U.string "| ",
-
-                             U.box $
-                                U.append
-                                   [
-                                   U.string "inr ",
-                                   U.string y,
-                                   U.string " .",
-                                   U.break 1,
-                                   U.box (p 0)
-                                   ],
-
-                             U.string ")"
-                             ]
-                    ]))
-
-      val () =
-         register Prim.ite 3 2
-         (U.wrap
-             (U.apply3 Prim.ite U.show U.show U.show)
-             (fn (m, n, p) =>
-                 U.boxi 0 $
-                 U.append
-                    [
-                    U.string "if ",
-                    U.box (m 2),
-                    U.break 1,
-                    U.string "then ",
-                    U.box (n 2),
-                    U.break 1,
-                    U.string "else ",
-                    U.box (p 3)
-                    ]))
-
-      val () =
-         register Prim.inl 1 90
-         (U.wrap
-             (U.apply1 Prim.inl U.show)
-             (fn m => U.append [U.string "inl ", m 91]))
-   
-      val () =
-         register Prim.inr 1 90
-         (U.wrap
-             (U.apply1 Prim.inr U.show)
-             (fn m => U.append [U.string "inr ", m 91]))
-
-      val () =
-         register Prim.ann 2 90
-         (U.wrap
-             (U.apply2 Prim.ann U.show U.show)
-             (fn (a, m) =>
-                 U.append [U.box (m 90), U.break 1, U.string ":> ", U.box (a 91)]))
-   
-      val () =
-         register Prim.ap 2 90
-         (U.wrap
-             (U.apply2 Prim.ap U.show U.show)
-             (fn (f, a) =>
-                 (U.append
-                     [
-                     f 90,
-                     U.break 1,
-                     U.string "ap ",
-                     U.box (a 91)
-                     ])))
-   
-      val () = registerBinary Prim.sum "%" 15
-
-      val () = registerBinary Prim.prod "&" 20
-
-      val () =
-         register Prim.ov 2 0
-         (U.wrap
-             (U.apply2 Prim.ov U.show U.show)
-             (fn (a, m) => U.append [m 1,
-                                     U.break 1, U.string ": ", a 0]))
-
-      val () =
-         register Prim.istp 1 0
-         (U.wrap
-             (U.apply1 Prim.istp U.show)
-             (fn a => U.append [a 1,
-                                U.break 1, U.string ": type"]))
-
-      val () =
-         register Prim.eq 3 30
-         (U.wrap
-             (U.apply3 Prim.eq U.show U.show U.show)
-             (fn (a, m, n) => U.append [m 31, 
-                                        U.break 1, U.string "= ", n 31, 
-                                        U.break 1, U.string ": ", a 31]))
-
-      val () =
-         register Prim.eqtp 2 30
-         (U.wrap
-             (U.apply2 Prim.eqtp U.show U.show)
-             (fn (a, b) => U.append [a 31, 
-                                     U.break 1, U.string "= ", b 31, 
-                                     U.break 1, U.string ": type"]))
-
-      val () =
-         register Prim.subtype 2 30
-         (U.wrap
-             (U.apply2 Prim.subtype U.show U.show)
-             (fn (a, b) => U.append [a 31, 
-                                     U.break 1, U.string "<: ", b 31]))
-
-      val () =
-         register Prim.eeqtp 2 30
-         (U.wrap
-             (U.apply2 Prim.eeqtp U.show U.show)
-             (fn (a, b) => U.append [a 31, 
-                                     U.break 1, U.string "<:> ", b 31]))
-
-      val () =
-         register Prim.set 2 100
-         (U.wrap
-             (U.apply2 Prim.set U.show (U.lam U.show))
-             (fn (a, (arg, b)) =>
-                 U.boxi 0
-                    (U.append
-                        [
-                        U.string "{ ",
-                        U.box 
-                           (U.append
-                               [
-                               U.string arg,
-                               U.string " :",
-                               U.break 1,
-                               a 0
-                               ]),
-                        U.break 1,
-                        U.string "| ",
-                        U.box (b 0),
-                        U.string " }"
-                        ])))
-
-      val () =
-         register Prim.iset 2 0
-         (U.wrap
-             (U.apply2 Prim.iset U.show (U.lam U.show))
-             (fn (a, (arg, b)) =>
-                 U.box $
-                 U.append
-                    [
-                    U.string "iset",
-                    U.break 1,
-                    U.string "(",
-                    U.string arg,
-                    U.break 1,
-                    U.string ": ",
-                    U.box $ a 0,
-                    U.string ") .",
-                    U.break 1,
-                    b 0
-                    ]))
-
-      val () =
-         register Prim.squash 1 100
-         (U.wrap
-             (U.apply1 Prim.squash U.show)
-             (fn a => U.append [
-                               U.string "{ ",
-                               a 0,
-                               U.string " }"
-                               ]))
-
-      val () =
-         register Prim.zero 0 100
-         (U.wrap
-             (U.constant Prim.zero)
-             (fn () => U.string "0"))
-
-      val () =
-         register Prim.succ 1 100
-         (U.wrap
-             (U.fix
-                 (fn unp =>
-                     U.alt
-                        [
-                        U.wrap
-                           (U.constant Prim.zero)
-                           (fn () => 0),
-
-                        U.wrap
-                           (U.apply1 Prim.succ unp)
-                           (fn n => n + 1)
-                        ]))
-             (fn n => U.string (Int.toString n)))
-
-      datatype level_exp =
-         Literal of int
-       | Plus of int * level_exp
-       | Max of level_exp list
-       | Misc of U.content
-
-      fun lsucc e =
-         (case e of
-             Literal n => Literal (n+1)
-           | Plus (n, e') => Plus (n+1, e')
-           | _ => Plus (1, e))
-
-      fun lmax (e1, e2) =
-         (case e2 of
-             Max l => Max (e1 :: l)
-
-           | _ => Max [e1, e2])
-
-      fun showLevel e prec =
-         (case e of
-             Literal n =>
-                U.string (Int.toString n)
-
-           | Plus (n, e) =>
-                U.parens (prec > 0)
-                   (U.append
-                       [
-                       U.string (Int.toString n),
-                       U.break 1,
-                       U.string "+ ",
-                       showLevel e 0
-                       ])
-
-           | Max [] => raise (Fail "impossible")
-
-           | Max (e0 :: l) =>
-                U.append
-                   (
-                   U.string "[" ::
-                   showLevel e0 1 ::
-
-                   List.foldr
-                      (fns e c =>
-                          U.break 1 ::
-                          showLevel e 1 ::
-                          c)
-                      [U.string "]"]
-                      l
-                   )
-
-           | Misc c => c)
-
-      val unparseLevel =
-         U.wrap
-            (U.fix
-                (fn unp =>
-                    U.alt
-                       [
-                       U.wrap
-                          (U.constant Prim.lzero)
-                          (fn () => Literal 0),
-
-                       U.wrap
-                          (U.apply1 Prim.lsucc unp)
-                          lsucc,
-
-                       U.wrap
-                          (U.apply2 Prim.lmax unp unp)
-                          lmax,
-
-                       U.wrap
-                          U.show
-                          (fn c => Misc (c 100))
-                       ]))
-            (fns e prec =>
-                showLevel e (if prec > 0 then 1 else 0))
-
-      val () =
-         register Prim.univ 1 90
-         (U.wrap
-             (U.apply1 Prim.univ unparseLevel)
-             (fn c =>
-                 U.append
-                    [
-                    U.string "U",
-                    U.break 1,
-                    c 91
-                    ]))
-
-      val () =
-         register Prim.kind 1 90
-         (U.wrap
-             (U.apply1 Prim.kind unparseLevel)
-             (fn c =>
-                 U.append
-                    [
-                    U.string "Kind",
-                    U.break 1,
-                    c 91
-                    ]))
-
-      val () =
-         register Prim.lleq 2 30
-         (U.wrap
-             (U.apply2 Prim.lleq unparseLevel unparseLevel)
-             (fn (c, d) => U.append [c 31, 
-                                     U.break 1, U.string "<l= ", d 31]))
-
-      val () =
-         U.reserved :=
-         List.foldl
-            (fns str set => SymbolSet.insert set (Symbol.fromValue str))
-            SymbolSet.empty
-            ["Kind", "U", "ap", "case", "exists", "fn", "forall", "iexists", "iforall", "if", "in", "inl", "inr", "let", "mu", "next", "pi1", "pi2", "prev", "quotient", "rec", "then", "else"]
+      type constant = Constant.constant
+
+      datatype methods =
+         Methods of
+            {
+            literal : int -> Term.term,
+            leq : constant,
+            lt : constant,
+            plus : constant,
+            minus : constant,
+            times : constant,
+            neg : constant option,
+            }
+
+      type overloads = Symbol.symbol * methods option
+
+      val initial : overloads = (Symbol.fromValue "", NONE)
 
    end
 
 
-grammardef Term
-
-   open ParseTerm
-
-   rule Longident  ::= AnyIdent => sing
-   rule Longident  ::= LONGID => longid
-
-   rule Numbers    ::= => null
-   rule Numbers    ::= NUMBER Numbers => cons
-   rule Numbersn   ::= NUMBER Numbers => cons
-
-   rule Idents     ::= => null
-   rule Idents     ::= Ident Idents => cons
-
-   rule Longidents ::= => null
-   rule Longidents ::= Longident Longidents => cons
-
-   rule OIdent     ::= Ident => some
-   rule OIdent     ::= "_" => none
-
-   rule IdentPat   ::= Ident => some
-   rule IdentPat   ::= "?" => none
-
-   rule OIdents    ::= => null
-   rule OIdents    ::= OIdent OIdents => cons
-
-   rule OIdentsn   ::= OIdent OIdents => cons
-
-   rule Binding    ::= OIdent => bindingBare
-   rule Binding    ::= "(" OIdents ":" Term ")" => bindingAnnot
-
-   rule Bindings   ::= => null
-   rule Bindings   ::= Binding Bindings => append
-   rule Bindings   ::= "_#" NUMBER Bindings => appendBlanks
-
-   rule Bindingsn  ::= Binding Bindings => append
-   rule Bindingsn  ::= "_#" NUMBER Bindings => appendBlanks
-
-   rule Level(0)   ::= NUMBER "+" Level(0) => level_plus
-   rule Level(1)   ::= "[" Levels "]" => level_max
-   rule Level(1)   ::= NUMBER => level_lit
-   rule Level(1)   ::= LOCATION Ident => var
-   rule Level(1)   ::= "(" Level(0) ")" => id
-   rule Level(1)   ::= EMBED => id
-
-   rule Levels     ::= Level(1) => sing
-   rule Levels     ::= Level(1) Levels => cons
-
-   rule Term(0)    ::= "fn" Bindingsn "." Term(0) => lams
-
-   rule Term(0)    ::= "forall" Bindings "." Term(0) => foralls
-   rule Term(0)    ::= "exists" Bindings "." Term(0) => existss
-   rule Term(0)    ::= "iforall" Bindings "." Term(0) => iforalls
-   rule Term(0)    ::= "iexists" Bindings "." Term(0) => iexistss
-   rule Term(0)    ::= "intersect" Bindings "." Term(0) => intersects
-   rule Term(0)    ::= "union" Bindings "." Term(0) => unions
-   rule Term(0)    ::= "foralltp" OIdents "." Term(0) => foralltps
-
-   rule Term(0)    ::= "iset" "(" Ident ":" Term(0) ")" "." Term(0) => iset
-
-   rule Term(0)    ::= "rec" Ident "." Term(0) => rec
-   rule Term(0)    ::= "mu" Ident "." Term(0) => mu
-   rule Term(0)    ::= "quotient" "(" Ident Ident ":" Term(0) ")" "." Term(0) => quotient
-
-   rule Term(0)    ::= Term(1) "->" Term(0) => arrow
-   rule Term(0)    ::= Term(1) "-t>" Term(0) => tarrow
-   rule Term(0)    ::= Term(1) "-k>" Term(0) => karrow
-   rule Term(0)    ::= Term(1) "-g>" Term(0) => guard
-
-   rule Term(0)    ::= "let" Ident "=" Term(1) "in" Term(0) => lett
-   rule Term(0)    ::= "let" "next" Ident "=" Term(1) "in" Term(0) => letnext
-
-   rule Term(0)    ::= "case" Term(1) "of" "|" "inl" OIdent "." Term(0) "|" "inr" OIdent "." Term(0) => sumcase
-
-   (* NB: lower precedence than equality *)
-   rule Term(0)    ::= Term(1) ":" Term(0) => ov
-   rule Term(0)    ::= Term(1) ":" "type" => istp
-
-   rule Term(2)    ::= "if" Term(2) "then" Term(2) "else" Term(2) => ite
-
-   rule Term(15)   ::= Term(16) "%" Term(15) => sum
-
-   rule Term(20)   ::= Term(21) "&" Term(20) => prod
-
-   rule Term(30)   ::= Term(31) "=" Term(31) ":" Term(31) => eq
-   rule Term(30)   ::= Term(31) "=" Term(31) ":" "type" => eqtp
-   rule Term(30)   ::= Term(31) "<:" Term(31) => subtype
-   rule Term(30)   ::= Term(31) "<:>" Term(31) => eeqtp
-   rule Term(30)   ::= Term(31) "<l=" Term(31) => lleq
-
-   rule Term(90)   ::= Term(90) Term(91) => app
-   rule Term(90)   ::= Term(90) "#1" => pi1
-   rule Term(90)   ::= Term(90) "#2" => pi2
-   rule Term(90)   ::= Term(90) "#prev" => prev
-   rule Term(90)   ::= Term(90) "##" NUMBER => proj
-   rule Term(90)   ::= "pi1" Term(91) => pi1
-   rule Term(90)   ::= "pi2" Term(91) => pi2
-   rule Term(90)   ::= "prev" Term(91) => prev
-   rule Term(90)   ::= "next" Term(91) => next
-   rule Term(90)   ::= "inl" Term(91) => inl
-   rule Term(90)   ::= "inr" Term(91) => inr
-   rule Term(90)   ::= "U" Level(1) => univ
-   rule Term(90)   ::= "Kind" Level(1) => kind
-
-   rule Term(90)   ::= Term(90) ":>" Term(91) => ann
-   rule Term(90)   ::= Term(90) "ap" Term(91) => ap
-   rule Term(90)   ::= Term(90) "_#" NUMBER => appEvars
-   rule Term(90)   ::= Term(90) "__#" NUMBER => appHoles
-
-   rule Term(100)  ::= "(" Term ")" => id
-   rule Term(100)  ::= "(" TermList ")" => tuple
-   rule TermList   ::= Term(1) "," Term(1) => duo
-   rule TermList   ::= Term(1) "," TermList => cons
-
-   rule Term(100)  ::= "{" Ident ":" Term "|" Term "}" => set
-   rule Term(100)  ::= "{" Term "}" => squash
-
-   rule Term(100)  ::= EMBED => literal
-   rule Term(100)  ::= "e`" EMBED => id
-   rule Term(100)  ::= "l`" LTerm => literal
-   rule Term(100)  ::= LOCATION Ident => short
-   rule Term(100)  ::= "`" LOCATION AnyIdent => shortExplicit
-   rule Term(100)  ::= LONGID => long
-   rule Term(100)  ::= "`" LONGID => longExplicit
-   rule Term(100)  ::= NUMBER => number
-   rule Term(100)  ::= "z`" NUMBER => integer
-   rule Term(100)  ::= "z`" LEXEME => integerLexeme
-   rule Term(100)  ::= "z`" EMBED => integerEmbed
-   rule Term(100)  ::= "sym`" STRING => symbol
-   rule Term(100)  ::= "sym`" EMBED => symbolEmbed
-   rule Term(100)  ::= "_" => evar
-   rule Term(100)  ::= "__" => hole
-   rule Term(100)  ::= "(" ")" => triv
-   rule Term(100)  ::= "level`" Level(1) => id
-   rule Term(100)  ::= "explicit`" Term(100) => explicit
-
-   rule Term(0)    ::= "additional`" OIdents "." Term(0) => additional
-   rule Term(0)    ::= "exclude`" Ident "in" Term(0) => exclude
-
-   rule Terms      ::= => null
-   rule Terms      ::= Term(100) Terms => cons
-
-   rule Constant   ::= Longident => longConstant
-
-   rule Constants  ::= => null
-   rule Constants  ::= Constant Constants => cons
-
-   reserved "Kind" "U" "and" "ap" "case" "else" "exists" "fn" "forall" "iexists" "iforall" "if" "in" "inl" "inr" "let" "mu" "next" "pi1" "pi2" "prev" "quotient" "rec" "then" "type" : Ident
-
-   default Term
-
-end
+structure ETermInternal 
+   :> ETERM_INTERNAL 
+      where type overloads = OverloadsType.overloads
+   =
+   ETermFun (structure OverloadsType = OverloadsType)
 
 
-grammaron Term
+structure ETerm 
+   :> ETERM 
+      where type eterm = ETermInternal.eterm 
+      where type overloads = OverloadsType.overloads
+   = ETermInternal
