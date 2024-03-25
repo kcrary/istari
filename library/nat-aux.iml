@@ -9,17 +9,12 @@ structure ParseNat =
       val leq : constant R.dest = R.dest ()
       val lt : constant R.dest = R.dest ()
       val minus : constant R.dest = R.dest ()
-      val natOverload : OverloadsType.overloads R.dest = R.dest ()
 
       fun parseLeq m n = T.apply2 (R.read leq) m n
       fun parseLt m n = T.apply2 (R.read lt) m n
       fun parsePlus m n = T.apply2 Prim.plus m n
       fun parseMinus m n = T.apply2 (R.read minus) m n
       fun parseTimes m n = T.apply2 Prim.times m n
-
-      fun activate m =
-         T.getOverloads
-            (fn over => T.setOverloads (R.read natOverload) m)
 
    end
 
@@ -33,9 +28,26 @@ grammardef Nat
    rule Term(50)  ::= Term(50) "+n" Term(51) => parsePlus
    rule Term(50)  ::= Term(50) "-n" Term(51) => parseMinus
    rule Term(60)  ::= Term(60) "*n" Term(61) => parseTimes
-   rule Term(100) ::= "@nat`" Term(100) => activate
 
 end
+
+
+grammardef ArithmeticNat 
+
+   open ParseNat
+
+   rule Term(30)  ::= Term(31) "<=" Term(31) => parseLeq
+   rule Term(30)  ::= Term(31) "<" Term(31) => parseLt
+   rule Term(50)  ::= Term(50) "+" Term(51) => parsePlus
+   rule Term(50)  ::= Term(50) "-" Term(51) => parseMinus
+   rule Term(60)  ::= Term(60) "*" Term(61) => parseTimes
+   rule Term(100) ::= NUMBER => ParseTerm.nat
+
+end
+
+
+grammaron Nat
+grammaron ArithmeticNat
 
 
 functor AfterNat () :>
@@ -168,6 +180,7 @@ functor AfterLeq () :> sig end =
    struct
 
       structure CR = CheckpointedRef
+      structure U = Show.Unparsing
 
       val Collapse (leq, lt) =
          readRegistry /Nat.AfterLeqEnv/
@@ -176,6 +189,31 @@ functor AfterLeq () :> sig end =
 
       val () = CR.write ParseNat.leq leq
       val () = CR.write ParseNat.lt lt
+
+      val natSym = Symbol.fromValue "nat"
+
+      fun register const prec lprec rprec strpref str =
+         let
+            val unp =
+               U.wrap
+                 (U.apply2 const U.show U.show)
+                 (fn (a, b) =>
+                     U.append [a lprec,
+                               U.break 1, 
+                               
+                               U.string
+                                  (if Symbol.eq (CR.deref Show.arithmetic, natSym) then
+                                      strpref
+                                   else
+                                      str),
+
+                               b rprec])
+         in
+            ConstantTable.insert U.unparsingTable const (2, prec, ref true, unp)
+         end
+
+      val () = register leq 30 31 31 "<= " "<n= "
+      val () = register lt 30 31 31 "< " "<n "
 
    end
 
@@ -245,6 +283,7 @@ functor AfterTimes () :> sig end =
    struct
 
       structure CR = CheckpointedRef
+      structure U = Show.Unparsing
 
       val plus = Prim.plus
       val times = Prim.times
@@ -256,33 +295,31 @@ functor AfterTimes () :> sig end =
 
       val () = CR.write ParseNat.minus minus
 
+      val natSym = Symbol.fromValue "nat"
 
-      structure U = Show.Unparsing
+      fun register const prec lprec rprec strpref str =
+         let
+            val unp =
+               U.wrap
+                 (U.apply2 const U.show U.show)
+                 (fn (a, b) =>
+                     U.append [a lprec,
+                               U.break 1, 
+                               
+                               U.string
+                                  (if Symbol.eq (CR.deref Show.arithmetic, natSym) then
+                                      strpref
+                                   else
+                                      str),
 
-      fun register k arity prec unp =
-         ConstantTable.insert U.unparsingTable k (arity, prec, ref true, unp)
+                               b rprec])
+         in
+            ConstantTable.insert U.unparsingTable const (2, prec, ref true, unp)
+         end
 
-
-      val () =
-         register plus 2 50
-         (U.wrap
-             (U.apply2 plus U.show U.show)
-             (fn (a, b) => U.append [a 50, 
-                                     U.break 1, U.string "+ ", b 51]))
-
-      val () =
-         register minus 2 50
-         (U.wrap
-             (U.apply2 minus U.show U.show)
-             (fn (a, b) => U.append [a 50, 
-                                     U.break 1, U.string "- ", b 51]))
-
-      val () =
-         register times 2 60
-         (U.wrap
-             (U.apply2 times U.show U.show)
-             (fn (a, b) => U.append [a 60,
-                                     U.break 1, U.string "* ", b 61]))
+      val () = register plus 50 50 51 "+ " "+n "
+      val () = register minus 50 50 51 "- " "-n "
+      val () = register times 60 60 61 "* " "*n "
 
    end
 
@@ -313,11 +350,7 @@ functor AfterIstrueNeqb () :> sig end =
    end
 
 
-functor AfterNatAll () :> 
-   sig 
-      val setArithNat : unit -> unit
-   end 
-   =
+functor AfterNatAll () :> sig end =
    struct
 
       structure B = BackchainInternal
@@ -405,68 +438,6 @@ functor AfterNatAll () :>
             (leq, 1, leq, Prim.arrow, true,
              andthenOn 1 (B.witnessPriority /\T.Const leq_implication\ _ _ _ _ __ __/)),
             ]
-
-
-
-
-      (* install overloaded arithmetic operations *)
-
-      fun natTerm n =
-         if n <= 0 then
-            T.Const Prim.zero
-         else
-            T.apply1 Prim.succ (natTerm (n-1))
-
-      val natOverload = 
-         (Symbol.fromValue "nat",
-          SOME $
-          Overload.Methods
-             {
-             literal = natTerm,
-             leq = leq,
-             lt = lt,
-             plus = plus,
-             minus = minus,
-             times = times,
-             neg = NONE
-             })
-
-      val () = CR.write ParseNat.natOverload natOverload
-
-      fun setArithNat () = CR.assign E.overloads natOverload
-
-      val () = setArithNat ()
-
-      structure U = Show.Unparsing
-
-      fun register k arity prec unp =
-         ConstantTable.insert U.unparsingTable k (arity, prec, ref true, unp)
-
-      val natSym = Symbol.fromValue "nat"
-      val activateStr = "@nat`"
-
-      fun registerBinary const prec lprec rprec str =
-         register const 2 prec
-         (U.ensureOverload natSym
-             (fn act =>
-                 (U.wrap
-                     (U.apply2 const U.show U.show)
-                     (fn (a, b) =>
-                         U.append
-                            [
-                            U.stringif act activateStr,
-    
-                            U.parens act $
-                            U.append [a lprec,
-                                      U.break 1, U.string str, b rprec]
-                            ]))))
-
-      val () = registerBinary leq 30 31 31 "<= "
-      val () = registerBinary lt 30 31 31 "< "
-      val () = registerBinary plus 50 50 51 "+ "
-      val () = registerBinary minus 50 50 51 "- "
-      val () = registerBinary times 60 60 61 "* "
-
 
 
       (* make nat_iter parse and display as fnind *)

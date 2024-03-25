@@ -78,6 +78,7 @@ structure Syntax =
        | Llexeme of identifier
        | Lstring of string * span
        | Lnumber of int * symbol * span
+       | Lnnumber of int * symbol * span  (* negative number *)
        | Lembed of exp
 
       and dec_ =

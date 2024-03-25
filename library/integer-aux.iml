@@ -9,7 +9,6 @@ structure ParseInteger =
       val minusz : constant R.dest = R.dest ()
       val leqz : constant R.dest = R.dest ()
       val ltz : constant R.dest = R.dest ()
-      val integerOverload : OverloadsType.overloads R.dest = R.dest ()
 
       fun parsePlus m n = T.apply2 Prim.plusz m n
       fun parseMinus m n = T.apply2 (R.read minusz) m n
@@ -17,10 +16,6 @@ structure ParseInteger =
       fun parseNeg m = T.apply1 Prim.negz m
       fun parseLeq m n = T.apply2 (R.read leqz) m n
       fun parseLt m n = T.apply2 (R.read ltz) m n
-
-      fun activate m =
-         T.getOverloads
-            (fn over => T.setOverloads (R.read integerOverload) m)
 
    end
 
@@ -35,7 +30,22 @@ grammardef Integer
    rule Term(50)  ::= Term(50) "-z" Term(51) => parseMinus
    rule Term(60)  ::= Term(60) "*z" Term(61) => parseTimes
    rule Term(90)  ::= "~z" Term(91) => parseNeg
-   rule Term(100) ::= "@integer`" Term(100) => activate
+
+end
+
+
+grammardef ArithmeticInteger 
+
+   open ParseInteger
+
+   rule Term(30)  ::= Term(31) "<=" Term(31) => parseLeq
+   rule Term(30)  ::= Term(31) "<" Term(31) => parseLt
+   rule Term(50)  ::= Term(50) "+" Term(51) => parsePlus
+   rule Term(50)  ::= Term(50) "-" Term(51) => parseMinus
+   rule Term(60)  ::= Term(60) "*" Term(61) => parseTimes
+   rule Term(90)  ::= "~" Term(91) => parseNeg
+   rule Term(100) ::= NUMBER => ParseTerm.integer
+   rule Term(100) ::= NNUMBER => ParseTerm.integer
 
 end
 
@@ -47,7 +57,7 @@ functor AfterLtz () :> sig end =
    struct
 
       structure CR = CheckpointedRef
-      structure O = Overload
+      structure U = Show.Unparsing
 
       val Collapse (leqz, ltz, minusz) =
          readRegistry /Integer.AfterLtzEnv/
@@ -63,51 +73,54 @@ functor AfterLtz () :> sig end =
       val () = CR.write ParseInteger.minusz minusz
 
 
-      structure U = Show.Unparsing
-
-      fun register k arity prec unp =
-         ConstantTable.insert U.unparsingTable k (arity, prec, ref true, unp)
-
       val integerSym = Symbol.fromValue "integer"
-      val activateStr = "@integer`"
 
-      fun registerBinary const prec lprec rprec str =
-         register const 2 prec
-         (U.ensureOverload integerSym
-             (fn act =>
-                 (U.wrap
-                     (U.apply2 const U.show U.show)
-                     (fn (a, b) =>
-                         U.append
-                            [
-                            U.stringif act activateStr,
-    
-                            U.parens act $
-                            U.append [a lprec,
-                                      U.break 1, U.string str, b rprec]
-                            ]))))
+      fun register const prec lprec rprec strpref str =
+         let
+            val unp =
+               U.wrap
+                 (U.apply2 const U.show U.show)
+                 (fn (a, b) =>
+                     U.append [a lprec,
+                               U.break 1, 
+                               
+                               U.string
+                                  (if Symbol.eq (CR.deref Show.arithmetic, integerSym) then
+                                      strpref
+                                   else
+                                      str),
 
-      val () = registerBinary leqz 30 31 31 "<= "
-      val () = registerBinary ltz 30 31 31 "< "
-      val () = registerBinary plusz 50 50 51 "+ "
-      val () = registerBinary minusz 50 50 51 "- "
-      val () = registerBinary timesz 60 60 61 "* "
+                               b rprec])
+         in
+            ConstantTable.insert U.unparsingTable const (2, prec, ref true, unp)
+         end
+
+      val () = register leqz 30 31 31 "<= " "<z= "
+      val () = register ltz 30 31 31 "< " "<z "
+      val () = register plusz 50 50 51 "+ " "+z "
+      val () = register minusz 50 50 51 "- " "-z "
+      val () = register timesz 60 60 61 "* " "*z "
 
       val () =
-         register negz 1 90
-         (U.ensureOverload integerSym
-             (fn act =>
-                 (U.wrap
-                     (U.apply1 negz U.show)
-                     (fn a => 
-                         U.append
-                            [
-                            U.stringif act activateStr,
+         let
+            val unp =
+               U.wrap
+                  (U.apply1 negz U.show)
+                  (fn a => 
+                      U.append
+                         [
+                         U.string
+                            (if Symbol.eq (CR.deref Show.arithmetic, integerSym) then
+                                "~ "
+                             else
+                                "~z "),
 
-                            U.parens act $
-                            U.append [U.string "~ ", a 91]
-                            ]))))
-
+                         a 91
+                         ])
+         in
+            ConstantTable.insert U.unparsingTable negz (1, 90, ref true, unp)
+         end
+            
    end
 
 
@@ -197,11 +210,7 @@ functor AfterIntegerIter () :> sig end =
    end
 
 
-functor AfterIntegerAll () :>
-   sig
-      val setArithInteger : unit -> unit
-   end 
-   =
+functor AfterIntegerAll () :> sig end =
    struct
 
       structure E = ETerm
@@ -262,28 +271,5 @@ functor AfterIntegerAll () :>
             (leqz, 1, leqz, Prim.arrow, true,
              andthenOn 1 (B.witnessPriority /\T.Const leqz_implication\ _ _ _ _ __ __/)),
             ]
-
-
-      (* install overloaded arithmetic operations *)
-
-      fun integerTerm n = T.Native (T.Integer (IntInf.fromInt n))
-
-      val integerOverload =
-         (Symbol.fromValue "integer",
-          SOME $
-          Overload.Methods
-             {
-             literal = integerTerm,
-             leq = leqz,
-             lt = ltz,
-             plus = plusz,
-             minus = minusz,
-             times = timesz,
-             neg = SOME negz,
-             })
-
-      val () = CR.write ParseInteger.integerOverload integerOverload
-
-      fun setArithInteger () = CR.assign E.overloads integerOverload
 
    end

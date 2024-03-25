@@ -15,7 +15,6 @@ signature UNPARSING =
       val boxi : int -> content -> content      (* box with custom indentation *)
       val vboxi : int -> content -> content     (* vertical box with custom indentation *)
       val parens : bool -> content -> content   (* parenthesize the content if the boolean is true *)
-      val stringif : bool -> string -> content  (* display the string if the boolean is true *)
 
 
       (* 1. show will not match the entire term
@@ -52,16 +51,6 @@ signature UNPARSING =
 
       (* fails if Show.showImplicits is set *)
       val ifNoImplicits : 'a unparser -> 'a unparser
-
-      (* returns the name of the current overloading instance *)
-      val getOverload : (symbol -> 'a unparser) -> 'a unparser
-
-      (* ensureOverload instance unp
-         
-         Ensures that the current overloading instance is as given, activateing it if
-         necessary.  If it was necessary, passes true to unp, otherwise passes false.
-      *)
-      val ensureOverload : symbol -> (bool -> 'a unparser) -> 'a unparser
 
 
 
@@ -108,6 +97,9 @@ signature SHOW =
       val disableAll : bool ref
       val sugarFnind : bool ref
 
+      (* determines how certain arithmetic operations are displayed *)
+      val arithmetic : Symbol.symbol CheckpointedRef.cref
+
    end
 
 
@@ -115,7 +107,7 @@ structure ShowInternal
    :> sig
          include SHOW
 
-         type 'a unparser_ = bool -> int -> Directory.directory -> ETerm.overloads -> Term.term -> 'a
+         type 'a unparser_ = bool -> int -> Directory.directory -> Term.term -> 'a
 
          exception NoMatch
 
@@ -193,13 +185,15 @@ structure ShowInternal
                 ))
 
 
+      val arithmetic = CR.new (Symbol.fromValue "nat")
+
       val integerSym = Symbol.fromValue "integer"
 
-      fun showNative pp (currover, _) native =
+      fun showNative pp native =
          (case native of
              T.Integer x =>
                 (
-                if Symbol.eq (currover, integerSym) then
+                if Symbol.eq (CR.deref arithmetic, integerSym) then
                    ()
                 else
                    PP.print pp "z`";
@@ -226,8 +220,6 @@ structure ShowInternal
 
       val showLiteralBinders = ref false
       val showVeryLiteral = ref false
-
-      val nullOverloads : ETerm.overloads = (Symbol.fromValue "", NONE)
 
       (* if !showVeryLiteral then s = id
 
@@ -363,7 +355,7 @@ structure ShowInternal
 
            | T.Native x =>
                 showWithLiteralSpine pp evars prec
-                   (fn _ => showNative pp nullOverloads x)
+                   (fn _ => showNative pp x)
                    spine
 
            | T.Marker sym =>
@@ -545,14 +537,8 @@ structure ShowInternal
                                  *)
          -> int                  (* "margin": the index to start naming unnamed free variables at *)
          -> Directory.directory  (* the directory *)
-         -> ET.overloads         (* the overloading environment *)
          -> T.term               (* term to unparse *)
          -> 'a
-
-      (* For convenience we use the full overloading environment, but the option that holds
-         parsing methods are not used.  When the overloading environment is extended,
-         we will not bother to put in valid methods.
-      *)
 
       structure H = ConstantTable
 
@@ -620,17 +606,16 @@ structure ShowInternal
 
       (* margin: number to start naming unnamed free variables at 
          dir: names of free variables
-         over: the overloading environment
       *)
-      fun showMain pp margin dir over prec m s spine =
+      fun showMain pp margin dir prec m s spine =
          (case m of
              T.Var i =>
                 (case T.substVar i s of
                     T.Idx j =>
-                       showRootSpine pp margin dir over prec (T.Var j) T.id spine
+                       showRootSpine pp margin dir prec (T.Var j) T.id spine
 
                   | T.Term m' =>
-                       showMain pp margin dir over prec m' T.id spine)
+                       showMain pp margin dir prec m' T.id spine)
 
            | T.Const const =>
                 (case H.find unparsingTable const of
@@ -638,14 +623,14 @@ structure ShowInternal
                        if !enabled andalso not (!disableAll) then
                           (case List.splitOpt spine arity of
                               NONE =>
-                                 showRootSpine pp margin dir over prec m T.id spine
+                                 showRootSpine pp margin dir prec m T.id spine
    
                             | SOME (spine1, spine2) =>
                                  (try
                                      let
-                                        val c = unp true margin dir over (T.Elim (T.Const const, spine1))
+                                        val c = unp true margin dir (T.Elim (T.Const const, spine1))
                                      in
-                                        showWithSpine pp margin dir over prec spine2
+                                        showWithSpine pp margin dir prec spine2
                                         (fn prec' =>
                                             (
                                             lparen pp prec' kprec;
@@ -656,32 +641,32 @@ structure ShowInternal
                                             ))
                                      end
                                   with
-                                     NoMatch => showRootSpine pp margin dir over prec m T.id spine))
+                                     NoMatch => showRootSpine pp margin dir prec m T.id spine))
                        else
-                          showRootSpine pp margin dir over prec m T.id spine
+                          showRootSpine pp margin dir prec m T.id spine
 
                   | NONE =>
-                       showRootSpine pp margin dir over prec m T.id spine)
+                       showRootSpine pp margin dir prec m T.id spine)
 
            | T.Elim (m1, spine') =>
-                showMain pp margin dir over prec m1 s (T.ssubst spine' s @ spine)
+                showMain pp margin dir prec m1 s (T.ssubst spine' s @ spine)
 
            | T.Sub (m1, s') =>
-                showMain pp margin dir over prec m1 (T.compose s' s) spine
+                showMain pp margin dir prec m1 (T.compose s' s) spine
 
            | T.Evar eb =>
                 (case T.readEbind eb of
                     NONE =>
-                       showRootSpine pp margin dir over prec m s spine
+                       showRootSpine pp margin dir prec m s spine
 
                   | SOME m1 =>
-                       showMain pp margin dir over prec m1 s spine)
+                       showMain pp margin dir prec m1 s spine)
 
            | _ =>
-                showRootSpine pp margin dir over prec m s spine)
+                showRootSpine pp margin dir prec m s spine)
 
       (* m is an intro, or var/const and s=id, or a free evar *)
-      and showRootSpine pp margin dir over prec m s spine =
+      and showRootSpine pp margin dir prec m s spine =
          (case m of
              T.Const const =>
                 (* If a constant's name is a reserved word, quote it.
@@ -710,7 +695,7 @@ structure ShowInternal
                               | SOME spine' =>
                                    (false, spine'))
                 in
-                   showWithSpine pp margin dir over prec spine'
+                   showWithSpine pp margin dir prec spine'
                    (fn prec' =>
                        (
                        if quote' then
@@ -723,11 +708,11 @@ structure ShowInternal
                 end
 
            | _ =>
-                showWithSpine pp margin dir over prec spine
-                (fn prec' => showRoot pp margin dir over prec' m s))
+                showWithSpine pp margin dir prec spine
+                (fn prec' => showRoot pp margin dir prec' m s))
 
       (* m is an intro, or var and s=id, or a free evar *)
-      and showRoot pp margin dir over prec m s =
+      and showRoot pp margin dir prec m s =
          (case m of
              T.Var i =>
                 (* by precondition, s = id *)
@@ -749,7 +734,7 @@ structure ShowInternal
                 (
                 PP.print pp "E";
                 PP.print pp (Int.toString (T.ebindToInt e));
-                showSub pp margin dir over s
+                showSub pp margin dir s
                 )
 
            | T.Lam _ =>
@@ -778,7 +763,7 @@ structure ShowInternal
                    in
                       PP.print pp ".";
                       PP.break pp 1;
-                      showMain pp margin dir' over precLam m1 T.id [];
+                      showMain pp margin dir' precLam m1 T.id [];
                       rparen pp prec precLam;
                       PP.closeBox pp
                    end
@@ -788,7 +773,7 @@ structure ShowInternal
                 (
                 PP.print pp "(";
                 PP.openBox pp PP.Consistent 0;
-                showTuple pp margin dir over (N.simplify (T.Sub (m, s)));  (* prints the close parenthesis *)
+                showTuple pp margin dir (N.simplify (T.Sub (m, s)));  (* prints the close parenthesis *)
                 PP.closeBox pp
                 )
 
@@ -798,7 +783,7 @@ structure ShowInternal
                 lparen pp prec precApp;
                 PP.print pp "next";
                 PP.break pp 1;
-                showMain pp margin dir over (precApp+1) m1 s [];
+                showMain pp margin dir (precApp+1) m1 s [];
                 rparen pp prec precApp;
                 PP.closeBox pp
                 )
@@ -807,7 +792,7 @@ structure ShowInternal
                 PP.print pp "()"
 
            | T.Native x =>
-                showNative pp over x
+                showNative pp x
 
            | T.Marker sym =>
                 (
@@ -821,27 +806,27 @@ structure ShowInternal
            | T.Sub _ => raise (Fail "precondition"))
 
 
-      and showTuple pp margin dir over m =
+      and showTuple pp margin dir m =
          (case m of
              T.Pair (m1, m2) =>
                 (
                 PP.openBox pp PP.Consistent indent;
-                showMain pp margin dir over precConstituent m1 T.id [];
-                PP.print pp " ,";
+                showMain pp margin dir precConstituent m1 T.id [];
+                PP.print pp ",";
                 PP.closeBox pp;
                 PP.break pp 1;
-                showTuple pp margin dir over (N.simplify m2)
+                showTuple pp margin dir (N.simplify m2)
                 )
 
            | _ =>
                 (
                 PP.openBox pp PP.Consistent indent;
-                showMain pp margin dir over precConstituent m T.id [];
+                showMain pp margin dir precConstituent m T.id [];
                 PP.print pp ")";
                 PP.closeBox pp
                 ))
 
-      and showWithSpine pp margin dir over prec spine f =
+      and showWithSpine pp margin dir prec spine f =
          (case spine of
              [] => f prec
 
@@ -850,12 +835,12 @@ structure ShowInternal
                 lparen pp prec precApp;
                 PP.openBox pp PP.Consistent indent;
                 f precApp;
-                showSpine pp margin dir over spine;
+                showSpine pp margin dir spine;
                 PP.closeBox pp;
                 rparen pp prec precApp
                 ))
 
-      and showSpine pp margin dir over spine =
+      and showSpine pp margin dir spine =
          (case spine of
              [] => ()
 
@@ -865,16 +850,16 @@ structure ShowInternal
 
                 (case elim of
                     T.App m =>
-                       showMain pp margin dir over (precApp+1) m T.id []
+                       showMain pp margin dir (precApp+1) m T.id []
 
                   | T.Pi1 => PP.print pp "#1"
                   | T.Pi2 => PP.print pp "#2"
                   | T.Prev => PP.print pp "#prev");
 
-                showSpine pp margin dir over rest
+                showSpine pp margin dir rest
                 ))
 
-      and showSub pp margin dir _ s =
+      and showSub pp margin dir s =
          if !showSubstitutions then
             (case s of
                 T.Shift 0 => ()
@@ -888,10 +873,8 @@ structure ShowInternal
          else
             ()
 
-      fun overloads () = CR.deref ET.overloads
-
       fun showPP pp dir m =
-         showMain pp 0 dir (overloads ()) precMin m T.id []
+         showMain pp 0 dir precMin m T.id []
 
       fun showIndent indent dir m =
          showTop indent
@@ -915,7 +898,7 @@ structure ShowInternal
             type constant = T.constant
             type content = content
             type 'a unparser = 'a unparser
-            type 'a sunparser = int -> Directory.directory -> ET.overloads -> T.elim list -> 'a
+            type 'a sunparser = int -> Directory.directory -> T.elim list -> 'a
             type symbol = Symbol.symbol
 
             fun string str pp = PP.print pp str
@@ -967,26 +950,19 @@ structure ShowInternal
                   ()
                )
               
-            fun stringif b str pp =
-               if b then
-                  PP.print pp str
-               else
-                  ()
-
-
-            fun show entire margin dir over m =
+            fun show entire margin dir m =
                if entire then
                   raise NoMatch
                else
-                  (fns prec pp => showMain pp margin dir over prec m T.id [])
+                  (fns prec pp => showMain pp margin dir prec m T.id [])
 
-            fun showterm entire margin dir over m =
-               (show entire margin dir over m, m)
+            fun showterm entire margin dir m =
+               (show entire margin dir m, m)
 
 
-            fun wild _ _ _ _ _ = ()
+            fun wild _ _ _ _ = ()
 
-            fun variable i _ _ _ _ m =
+            fun variable i _ _ _ m =
                (case N.simplify m of
                    T.Elim (T.Var j, []) =>
                       if i = j then
@@ -996,7 +972,7 @@ structure ShowInternal
 
                  | _ => raise NoMatch)
 
-            fun constant const _ _ _ _ m =
+            fun constant const _ _ _ m =
                (case N.simplify m of
                    T.Elim (T.Const const', []) =>
                       if Constant.eq (const, const') then
@@ -1006,58 +982,58 @@ structure ShowInternal
 
                  | _ => raise NoMatch)
 
-            fun lam unp _ margin dir over m =
+            fun lam unp _ margin dir m =
                (case N.simplify m of
                    T.Lam (b, n) =>
                       let
                          val (sym, dir') = D.varyAndBind dir b
 
-                         val x = unp false margin dir' over n
+                         val x = unp false margin dir' n
                       in
                          (Symbol.toValue sym, x)
                       end
 
                  | _ => raise NoMatch)
 
-            fun path const unp _ margin dir over m =
+            fun path const unp _ margin dir m =
                (case N.simplify m of
                    T.Elim (T.Const const', spine) =>
                       if Constant.eq (const, const') then
-                         unp margin dir over spine
+                         unp margin dir spine
                       else
                          raise NoMatch
 
                  | _ => raise NoMatch)
 
-            fun null _ _ _ spine =
+            fun null _ _ spine =
                (case spine of
                    [] => ()
 
                  | _ :: _ => raise NoMatch)
 
-            fun app unp1 unp2 margin dir over spine =
+            fun app unp1 unp2 margin dir spine =
                (case spine of
                    T.App m :: rest =>
                       let
-                         val x = unp1 false margin dir over m
-                         val y = unp2 margin dir over rest
+                         val x = unp1 false margin dir m
+                         val y = unp2 margin dir rest
                       in
                          (x, y)
                       end
 
                  | _ => raise NoMatch)
 
-            fun lift f entire margin dir over m = f () entire margin dir over m
+            fun lift f entire margin dir m = f () entire margin dir m
                
-            fun wrap unp f entire margin dir over m = f (unp entire margin dir over m)
+            fun wrap unp f entire margin dir m = f (unp entire margin dir m)
 
-            fun wrapcond unp f entire margin dir over m =
-               (case f (unp entire margin dir over m) of
+            fun wrapcond unp f entire margin dir m =
+               (case f (unp entire margin dir m) of
                    NONE => raise NoMatch
 
                  | SOME x => x)
 
-            fun alt l entire margin dir over m =
+            fun alt l entire margin dir m =
                let
                   fun loop l =
                      (case l of
@@ -1065,16 +1041,16 @@ structure ShowInternal
 
                        | unp :: rest =>
                             (try
-                                unp entire margin dir over m
+                                unp entire margin dir m
                              with
                                 NoMatch => loop rest))
                in
                   loop l
                end
 
-            fun fix f entire margin dir over m = f (fix f) entire margin dir over m
+            fun fix f entire margin dir m = f (fix f) entire margin dir m
 
-            fun fail _ _ _ _ _ = raise NoMatch
+            fun fail _ _ _ _ = raise NoMatch
 
             fun apply1 const unp =
                wrap
@@ -1101,21 +1077,12 @@ structure ShowInternal
                (path const (app unp1 (app unp2 (app unp3 (app unp4 (app unp5 null))))))
                (fn (v, (w, (x, (y, (z, ()))))) => (v, w, x, y, z))
 
-            fun ifNoImplicits unp entire margin dir over m =
+            fun ifNoImplicits unp entire margin dir m =
                if !showImplicits then
                   raise NoMatch
                else
-                  unp entire margin dir over m
+                  unp entire margin dir m
 
-            fun getOverload unp entire margin dir (over as (sym, _)) m =
-               unp sym entire margin dir over m
-
-            fun ensureOverload instance unp entire margin dir (over as (sym, _)) m =
-               if Symbol.eq (sym, instance) then
-                  unp false entire margin dir over m
-               else
-                  unp true entire margin dir (instance, NONE) m
-                  
 
 
             val unparsingTable = unparsingTable
@@ -1128,13 +1095,13 @@ structure ShowInternal
       fun showHyp pp hyp margin dir =
          (case hyp of
              J.Tm a => 
-                showMain pp margin dir (overloads ()) precMin a T.id []
+                showMain pp margin dir precMin a T.id []
 
            | J.Tml a =>
-                showMain pp margin dir (overloads ()) precMin a T.id []
+                showMain pp margin dir precMin a T.id []
 
            | J.Tmh a =>
-                showMain pp margin dir (overloads ()) precMin a T.id []
+                showMain pp margin dir precMin a T.id []
 
            | J.Tp =>
                 PP.print pp "type"
@@ -1146,7 +1113,7 @@ structure ShowInternal
                 PP.print pp "type"
 
            | J.Let m =>
-                showMain pp margin dir (overloads ()) precMin m T.id [])
+                showMain pp margin dir precMin m T.id [])
 
 
       fun hypCategory hyp =
@@ -1252,7 +1219,7 @@ structure ShowInternal
              PP.print pp "|-";
              PP.newline pp;
              PP.openBox pp PP.Consistent indent;
-             showMain pp 0 dir (overloads ()) precMin (J.concl jud) T.id []
+             showMain pp 0 dir precMin (J.concl jud) T.id []
              ))
 
       val showGoal = showGoalIndent 0

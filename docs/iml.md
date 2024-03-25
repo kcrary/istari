@@ -49,19 +49,16 @@ grammar.
 The main rule is that tokens are separated by whitespace.  There are
 three exceptions:
 
-- A parenthesis is a complete token, even when adjacent to other text.
+- Some characters always form a complete token, even when adjacent to
+  other text: `(`, `)`, `,`.
 
-- A left delimiter other than a parenthesis (*i.e.,* `[` and `{`) or a
-  tick (`` ` ``) always appears at the end of a token, even when
-  adjacent to other text.  The tick form is normally used for parsing
-  directives.
+- Some characters always end a token: `[`, `{`, `` ` ``.
+  (The tick form is normally used for parsing directives.)
 
-- A right delimiter other than a parenthesis (*i.e.,* `]` and `}`)
-  always appears at the beginning of a token, even when adjacent to
-  other text.
+- Some characters always begin a new token: `]`, `}`.
 
-Thus, one should probably not write `(x, y)`, because the `x,` forms a
-single token.  Instead write `(x , y)`.
+Thus, one should probably not write `(x; y)`, because the `x;` forms a
+single token.  Instead write `(x ; y)`.
 
 
 

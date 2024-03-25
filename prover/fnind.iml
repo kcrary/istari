@@ -203,7 +203,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                                      "."]
 
 
-      fun elabFnind funcs special dir over imps =
+      fun elabFnind funcs special dir imps =
          (case funcs of
              [] => raise (Invalid "empty fnind")
 
@@ -231,7 +231,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                                          | (SOME l, NONE) => 
                                               if List.length l = nPerv then
                                                  SOME (List.map
-                                                          (fn em => T.App (E.expose em special dir over imps []))
+                                                          (fn em => T.App (E.expose em special dir imps []))
                                                           l)
                                               else
                                                  signalError fname [Int.toString nPerv,
@@ -344,7 +344,7 @@ structure FnindInternal :> FNIND_INTERNAL =
 
                                                  val rhs' =
                                                     let
-                                                       val t = Normalize.simplify $ E.expose rhs special dir' over imps []
+                                                       val t = Normalize.simplify $ E.expose rhs special dir' imps []
                                                     in
                                                        (case t of
                                                            T.Marker sym =>
@@ -362,7 +362,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                                    dtinfo
 
                              (* newspecials are things to be inserted into special, once given callname, corr, and depth
-                                recdir removes the recursive functions since dir takes priority over special
+                                recdir removes the recursive functions since dir takes priority special
                              *)
                              val (newspecials, recdir, _, i) =
                                 Vector.foldl
@@ -407,7 +407,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                                               let
                                                  val default' =
                                                     Option.map
-                                                       (fn e => E.expose e special dir over imps [])
+                                                       (fn e => E.expose e special dir imps [])
                                                        default
 
                                                  val (thesearms, armdict') =
@@ -471,7 +471,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                                                                               special
                                                                               newspecials
                                                                            
-                                                                        val body' = E.expose body special' dir' over imps []
+                                                                        val body' = E.expose body special' dir' imps []
                                                                      in
                                                                         (T.App
                                                                             (ListPair.foldr
@@ -545,9 +545,9 @@ structure FnindInternal :> FNIND_INTERNAL =
 
       fun fnind funcs =
          E.hide
-         (fns special dir over imps spine =>
+         (fns special dir imps spine =>
              let
-                val (n1, (_, _, _, _, dtinfo), _, pervs, preds, arms) = elabFnind funcs special dir over imps
+                val (n1, (_, _, _, _, dtinfo), _, pervs, preds, arms) = elabFnind funcs special dir imps
 
                 val (_, iterator, _, _, _) = Vector.sub dtinfo n1
              in
@@ -559,7 +559,7 @@ structure FnindInternal :> FNIND_INTERNAL =
 
       fun indcase obj dt result arms =
          E.hide
-         (fns special dir over imps spine =>
+         (fns special dir imps spine =>
              let
                 val fname = Symbol.gensym ()
 
@@ -574,7 +574,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                      | SOME ea => ea)
 
                 val (n1, (_, _, _, _, dtinfo), _, pervs, preds, arms') = 
-                   elabFnind [(fname, dt, NONE, NONE, NONE, result', arms)] special dir over imps
+                   elabFnind [(fname, dt, NONE, NONE, NONE, result', arms)] special dir imps
 
                 val (_, iterator, nIndex, _, _) = Vector.sub dtinfo n1
 
@@ -585,7 +585,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                       nIndex
              in
                 elim
-                   (T.Elim (T.Const iterator, pervs @ preds @ arms' @ indices @ [T.App (E.expose obj special dir over imps [])]))
+                   (T.Elim (T.Const iterator, pervs @ preds @ arms' @ indices @ [T.App (E.expose obj special dir imps [])]))
                    spine
              end)
 
@@ -607,7 +607,7 @@ structure FnindInternal :> FNIND_INTERNAL =
             val (_, iterator, _, _, _) = Vector.sub dtinfo n1
          in
             SH.hideUnparser
-            (fns _ margin dir over term =>
+            (fns _ margin dir term =>
                 if !Show.sugarFnind then
                    (case N.simplify term of
                        T.Elim (T.Const headconst, spine) =>
@@ -619,7 +619,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                                 val pervs =
                                    List.map
                                       (fn T.App m =>
-                                             SH.exposeUnparser UP.show false margin dir over m precMax
+                                             SH.exposeUnparser UP.show false margin dir m precMax
 
                                         | _ => raise SH.NoMatch)
                                       pervsElims
@@ -635,7 +635,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                                                     fun loop n dir acc m =
                                                        if n = 0 then
                                                           (acc,
-                                                           SH.exposeUnparser UP.show false margin dir over m precMin)
+                                                           SH.exposeUnparser UP.show false margin dir m precMin)
                                                        else
                                                           (case N.simplify m of
                                                               T.Lam (binder, m1) =>
@@ -692,7 +692,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                                                                 [] =>
                                                                    let
                                                                       val body =
-                                                                         SH.exposeUnparser UP.show false margin innerdir over (T.Sub (m, s)) precMin
+                                                                         SH.exposeUnparser UP.show false margin innerdir (T.Sub (m, s)) precMin
                                                                    in
                                                                       UP.append
                                                                          [
@@ -903,7 +903,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                   args
 
             val (_, (_, nVis, nDts, _, dtinfo), dict, pervs, preds, arms) =
-               elabFnind funcs SymbolDict.empty (D.idir dir) (CheckpointedRef.deref ETerm.overloads) true
+               elabFnind funcs SymbolDict.empty (D.idir dir) true
 
             val iterspine = pervs @ preds @ arms
 

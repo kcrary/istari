@@ -526,8 +526,21 @@ structure Lexer :> LEXER =
                    let
                       val str = implode match
                    in
-                      (case Int.fromString (implode match) of
+                      (case Int.fromString str of
                           SOME n => TNUMBER (n, Symbol.fromValue str, (pos, add pos len))
+   
+                        | NONE =>
+                             raise (SyntaxError ("illegal number", pos)))
+                   end)
+
+            val term_nnumber =
+               action
+               (fn (match, len, pos) =>
+                   let
+                      val str = implode match
+                   in
+                      (case Int.fromString (implode (List.tl match)) of
+                          SOME n => TNNUMBER (~ n, Symbol.fromValue str, (pos, add pos len))
    
                         | NONE =>
                              raise (SyntaxError ("illegal number", pos)))

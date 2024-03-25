@@ -92,6 +92,7 @@ structure Parse :> PARSE =
            | S.Llexeme (_, span) => span
            | S.Lstring (_, span) => span
            | S.Lnumber (_, _, span) => span
+           | S.Lnnumber (_, _, span) => span
            | S.Lembed (_, span) => span)
 
       (* |vec| > 0 and 0 <= i <= |vec| *)
@@ -153,6 +154,11 @@ structure Parse :> PARSE =
                 S.Lnumber (n, _, span) => SOME (S.Enumber n, span)
               | _ => NONE)
 
+         fun nnumber _ elem =
+            (case elem of
+                S.Lnnumber (n, _, span) => SOME (S.Enumber n, span)
+              | _ => NONE)
+
          fun embed _ elem =
             (case elem of
                 S.Lembed e => SOME e
@@ -185,6 +191,7 @@ structure Parse :> PARSE =
             [
             ("STRING", string),
             ("NUMBER", number),
+            ("NNUMBER", nnumber),
             ("EMBED", embed),
             ("IDENT",  ident),
             ("LONGID", longid),

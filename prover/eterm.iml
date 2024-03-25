@@ -80,46 +80,25 @@ signature ETERM =
       (* raises Syntax using the given location if the eterm contains an unbound variable *)
       val withloc    : int * int -> eterm -> eterm
 
-      type overloads
-
-      val getOverloads : (overloads -> eterm) -> eterm
-      val setOverloads : overloads -> eterm -> eterm
-      val overloads    : overloads CheckpointedRef.cref
-
    end
 
 
-signature ETERM_INTERNAL =
-   sig
+structure ETermInternal
+   :> sig
 
-      include ETERM
+         include ETERM
+   
+         type eterm_ =
+            (Directory.idirectory -> Term.elim list -> Term.term) SymbolDict.dict
+            -> Directory.idirectory
+            -> bool
+            -> Term.elim list
+            -> Term.term
+   
+         val expose : eterm -> eterm_
+         val hide : eterm_ -> eterm
 
-      type eterm_ =
-         (Directory.idirectory -> Term.elim list -> Term.term) SymbolDict.dict
-         -> Directory.idirectory
-         -> overloads
-         -> bool
-         -> Term.elim list
-         -> Term.term
-
-      val expose : eterm -> eterm_
-      val hide : eterm_ -> eterm
-
-   end
-
-
-signature OVERLOADS_TYPE =
-   sig
-
-      type overloads
-
-      val initial : overloads
-
-   end
-
-
-functor ETermFun (structure OverloadsType : OVERLOADS_TYPE)
-   :> ETERM_INTERNAL where type overloads = OverloadsType.overloads
+      end
    =
    struct
 
@@ -131,12 +110,9 @@ functor ETermFun (structure OverloadsType : OVERLOADS_TYPE)
       type symbol = Symbol.symbol
       type binder = symbol option
 
-      type overloads = OverloadsType.overloads
-
       type eterm =
          (D.idirectory -> T.elim list -> T.term) SymbolDict.dict  (* special forms *)
          -> D.idirectory   (* identifers *)
-         -> overloads      (* to resolve overloaded operators *)
          -> bool           (* insert implicit arguments? *)
          -> T.elim list    (* delayed spine *)
          -> T.term
@@ -146,9 +122,6 @@ functor ETermFun (structure OverloadsType : OVERLOADS_TYPE)
 
       fun expose x = x
       fun hide x = x
-
-
-      val overloads : overloads CR.cref = CR.new OverloadsType.initial
 
 
       fun elim m spine =
@@ -168,7 +141,7 @@ functor ETermFun (structure OverloadsType : OVERLOADS_TYPE)
       exception Syntax = SyntaxError.Syntax
 
 
-      fun short sym special dir _ imps spine =
+      fun short sym special dir imps spine =
          (case D.lookupOpt dir sym of
              SOME (D.Hvar i) =>
                 elim (T.Var i) spine
@@ -194,7 +167,7 @@ functor ETermFun (structure OverloadsType : OVERLOADS_TYPE)
                   | SOME f => f dir spine))
          
 
-      fun var sym _ dir _ _ spine = elim (T.Var (D.lookupVar dir sym)) spine
+      fun var sym _ dir _ spine = elim (T.Var (D.lookupVar dir sym)) spine
          
       fun signalUnknownConstant syms = 
          raise (Syntax (String.concat
@@ -204,7 +177,7 @@ functor ETermFun (structure OverloadsType : OVERLOADS_TYPE)
                            "."
                            ]))
 
-      fun long syms _ _ _ imps spine =
+      fun long syms _ _ imps spine =
          (case Namespace.resolveOpt syms of
              NONE =>
                 signalUnknownConstant syms
@@ -218,136 +191,136 @@ functor ETermFun (structure OverloadsType : OVERLOADS_TYPE)
                        spine))
          
 
-      fun const const _ _ _ _ spine = elim (T.Const const) spine
+      fun const const _ _ _ spine = elim (T.Const const) spine
 
-      fun lam binder body special dir over imps spine =
+      fun lam binder body special dir imps spine =
          elim
             (case binder of
                 NONE =>
-                   T.Lam (NONE, body special (D.ibind0 dir) over imps [])
+                   T.Lam (NONE, body special (D.ibind0 dir) imps [])
    
               | SOME x =>
-                   T.Lam (binder, body special (D.ibind dir x) over imps []))
+                   T.Lam (binder, body special (D.ibind dir x) imps []))
             spine
 
-      fun lamann binder a body special dir over imps spine =
+      fun lamann binder a body special dir imps spine =
          elim
             (case binder of
                 NONE =>
                    T.apply2 Prim.fnann
-                      (a special dir over imps [])
-                      (T.Lam (NONE, body special (D.ibind0 dir) over imps []))
+                      (a special dir imps [])
+                      (T.Lam (NONE, body special (D.ibind0 dir) imps []))
    
               | SOME x =>
                    T.apply2 Prim.fnann
-                      (a special dir over imps [])
-                      (T.Lam (binder, body special (D.ibind dir x) over imps [])))
+                      (a special dir imps [])
+                      (T.Lam (binder, body special (D.ibind dir x) imps [])))
             spine
 
-      fun app m1 m2 special dir over imps spine =
-         m1 special dir over imps (T.App (m2 special dir over imps []) :: spine)
+      fun app m1 m2 special dir imps spine =
+         m1 special dir imps (T.App (m2 special dir imps []) :: spine)
 
-      fun pair m1 m2 special dir over imps spine =
+      fun pair m1 m2 special dir imps spine =
          elim
-            (T.Pair (m1 special dir over imps [],
-                     m2 special dir over imps []))
+            (T.Pair (m1 special dir imps [],
+                     m2 special dir imps []))
             spine
 
-      fun pi1 m special dir over imps spine = m special dir over imps (T.Pi1 :: spine)
+      fun pi1 m special dir imps spine = m special dir imps (T.Pi1 :: spine)
 
-      fun pi2 m special dir over imps spine = m special dir over imps (T.Pi2 :: spine)
+      fun pi2 m special dir imps spine = m special dir imps (T.Pi2 :: spine)
 
-      fun next m special dir over imps spine =
+      fun next m special dir imps spine =
          elim
-            (T.Next (m special dir over imps []))
+            (T.Next (m special dir imps []))
             spine
 
-      fun prev m special dir over imps spine = m special dir over imps (T.Prev :: spine)
+      fun prev m special dir imps spine = m special dir imps (T.Prev :: spine)
 
-      fun triv _ _ _ _ spine = elim T.Triv spine
+      fun triv _ _ _ spine = elim T.Triv spine
 
-      fun evar _ _ _ _ spine = elim (T.evar ()) spine
+      fun evar _ _ _ spine = elim (T.evar ()) spine
 
-      fun integer x _ _ _ _ spine = elim (T.Native (T.Integer x)) spine
+      fun integer x _ _ _ spine = elim (T.Native (T.Integer x)) spine
 
-      fun symbol x _ _ _ _ spine = elim (T.Native (T.Symbol x)) spine
+      fun symbol x _ _ _ spine = elim (T.Native (T.Symbol x)) spine
 
       val zilch = Symbol.fromValue ""
 
-      fun hole _ _ _ _ spine = elim (T.Marker zilch) spine
+      fun hole _ _ _ spine = elim (T.Marker zilch) spine
 
-      fun marker sym _ _ _ _ spine = elim (T.Marker sym) spine
+      fun marker sym _ _ _ spine = elim (T.Marker sym) spine
 
-      fun apply1 c m1 special dir over imps spine =
-         T.Elim (T.Const c, T.App (m1 special dir over imps []) :: spine)
+      fun apply1 c m1 special dir imps spine =
+         T.Elim (T.Const c, T.App (m1 special dir imps []) :: spine)
 
-      fun apply2 c m1 m2 special dir over imps spine =
+      fun apply2 c m1 m2 special dir imps spine =
          T.Elim (T.Const c, 
-                 T.App (m1 special dir over imps []) 
-                 :: T.App (m2 special dir over imps []) 
+                 T.App (m1 special dir imps []) 
+                 :: T.App (m2 special dir imps []) 
                  :: spine)
 
-      fun apply3 c m1 m2 m3 special dir over imps spine =
+      fun apply3 c m1 m2 m3 special dir imps spine =
          T.Elim (T.Const c, 
-                 T.App (m1 special dir over imps []) 
-                 :: T.App (m2 special dir over imps []) 
-                 :: T.App (m3 special dir over imps []) 
+                 T.App (m1 special dir imps []) 
+                 :: T.App (m2 special dir imps []) 
+                 :: T.App (m3 special dir imps []) 
                  :: spine)
 
 
-      fun apply4 c m1 m2 m3 m4 special dir over imps spine =
+      fun apply4 c m1 m2 m3 m4 special dir imps spine =
          T.Elim (T.Const c, 
-                 T.App (m1 special dir over imps []) 
-                 :: T.App (m2 special dir over imps []) 
-                 :: T.App (m3 special dir over imps []) 
-                 :: T.App (m4 special dir over imps []) 
+                 T.App (m1 special dir imps []) 
+                 :: T.App (m2 special dir imps []) 
+                 :: T.App (m3 special dir imps []) 
+                 :: T.App (m4 special dir imps []) 
                  :: spine)
 
-      fun apply5 c m1 m2 m3 m4 m5 special dir over imps spine =
+      fun apply5 c m1 m2 m3 m4 m5 special dir imps spine =
          T.Elim (T.Const c, 
-                 T.App (m1 special dir over imps []) 
-                 :: T.App (m2 special dir over imps []) 
-                 :: T.App (m3 special dir over imps []) 
-                 :: T.App (m4 special dir over imps []) 
-                 :: T.App (m5 special dir over imps []) 
+                 T.App (m1 special dir imps []) 
+                 :: T.App (m2 special dir imps []) 
+                 :: T.App (m3 special dir imps []) 
+                 :: T.App (m4 special dir imps []) 
+                 :: T.App (m5 special dir imps []) 
                  :: spine)
 
-      fun applyn c l special dir over imps spine =
+      fun applyn c l special dir imps spine =
          T.Elim (T.Const c, 
                  List.foldr
-                    (fns m rest => T.App (m special dir over imps []) :: rest)
+                    (fns m rest => T.App (m special dir imps []) :: rest)
                     spine
                     l)
 
-      fun appn m1 l special dir over imps spine =
-         m1 special dir over imps
+      fun appn m1 l special dir imps spine =
+         m1 special dir imps
             (List.foldr
-                (fns m rest => T.App (m special dir over imps []) :: rest)
+                (fns m rest => T.App (m special dir imps []) :: rest)
                 spine
                 l)
 
-      fun additional xs m special dir over imps spine =
+      fun additional xs m special dir imps spine =
          (case xs of
              [] =>
-                m special dir over imps spine
+                m special dir imps spine
 
            | NONE :: rest =>
-                additional rest m special (D.ibind0 dir) over imps spine
+                additional rest m special (D.ibind0 dir) imps spine
 
            | SOME x :: rest =>
-                additional rest m special (D.ibind dir x) over imps spine)
+                additional rest m special (D.ibind dir x) imps spine)
 
-      fun literal m _ _ _ _ spine = elim m spine
+      fun literal m _ _ _ spine = elim m spine
 
-      fun explicit m special dir over _ spine = m special dir over false spine
+      fun explicit m special dir _ spine = m special dir false spine
 
 
 
-      fun closed m = m SD.empty D.iempty (CR.deref overloads) true []
+      fun closed m = m SD.empty D.iempty true []
 
-      fun withidir idir m = m SD.empty idir (CR.deref overloads) true []
+      fun withidir idir m = m SD.empty idir true []
 
-      fun withdir dir m = m SD.empty (Directory.idir dir) (CR.deref overloads) true []
+      fun withdir dir m = m SD.empty (Directory.idir dir) true []
 
 
 
@@ -431,14 +404,14 @@ functor ETermFun (structure OverloadsType : OVERLOADS_TYPE)
                       absoluteSub from to depth (T.Idot (k, T.Shift (k+1)))
                 end)
 
-      fun absolute from m _ to _ _ spine =
+      fun absolute from m _ to _ spine =
          elim (absoluteMain from to 0 m) spine
 
 
-      fun subst em sym en special dir over imps spine =
+      fun subst em sym en special dir imps spine =
          elim
-            (T.Sub (en special (D.ibind dir sym) over imps [],
-                    T.Dot (em special dir over imps [], T.id)))
+            (T.Sub (en special (D.ibind dir sym) imps [],
+                    T.Dot (em special dir imps [], T.id)))
             spine
 
 
@@ -448,7 +421,7 @@ functor ETermFun (structure OverloadsType : OVERLOADS_TYPE)
          else
             Prune.punder (excludeSub (i-1)) 
 
-      fun exclude sym em special dir over imps spine =
+      fun exclude sym em special dir imps spine =
          (case D.lookupVarOpt dir sym of
              NONE =>
                 raise (Syntax (String.concat
@@ -460,7 +433,7 @@ functor ETermFun (structure OverloadsType : OVERLOADS_TYPE)
 
            | SOME i =>
                 let
-                   val m = em special dir over imps []
+                   val m = em special dir imps []
                 in
                    (case Prune.prune m (excludeSub i) of
                        NONE =>
@@ -475,9 +448,9 @@ functor ETermFun (structure OverloadsType : OVERLOADS_TYPE)
                 end)
 
 
-      fun withloc (r, c) m special dir over imps spine =
+      fun withloc (r, c) m special dir imps spine =
          try
-            m special dir over imps spine
+            m special dir imps spine
          with
             D.Unbound sym =>
                raise (Syntax (String.concat
@@ -491,48 +464,9 @@ functor ETermFun (structure OverloadsType : OVERLOADS_TYPE)
                                  "."
                                  ]))
 
-      fun getOverloads m special dir over imps spine =
-         m over special dir over imps spine
-
-      fun setOverloads over m special dir _ imps spine =
-         m special dir over imps spine
-
    end
-
-
-structure OverloadsType =
-   struct
-
-      type constant = Constant.constant
-
-      datatype methods =
-         Methods of
-            {
-            literal : int -> Term.term,
-            leq : constant,
-            lt : constant,
-            plus : constant,
-            minus : constant,
-            times : constant,
-            neg : constant option,
-            }
-
-      type overloads = Symbol.symbol * methods option
-
-      val initial : overloads = (Symbol.fromValue "", NONE)
-
-   end
-
-
-structure ETermInternal 
-   :> ETERM_INTERNAL 
-      where type overloads = OverloadsType.overloads
-   =
-   ETermFun (structure OverloadsType = OverloadsType)
 
 
 structure ETerm 
-   :> ETERM 
-      where type eterm = ETermInternal.eterm 
-      where type overloads = OverloadsType.overloads
+   :> ETERM where type eterm = ETermInternal.eterm 
    = ETermInternal

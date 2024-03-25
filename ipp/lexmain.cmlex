@@ -61,7 +61,7 @@ function main : t =
 
 set left = (or '[ '{ '`)
 set right = (or '] '})
-set term_normal = (~ whitespace '( ') left right '/ '\ '")
+set term_normal = (~ whitespace '( ') ', left right '/ '\ '")
 
 /* a right delimiter can only appear at the beginning of a lexeme, and a left at the end */
 regexp lexeme = (or (seq (? right) (+ term_normal) (? left)) (seq right (? left)) left)
@@ -83,6 +83,7 @@ function grammar : t =
 
    (seq '" '( '") => grammar_string
    (seq '" ') '") => grammar_string
+   (seq '" ', '") => grammar_string
 
    (seq '" ident '") => grammar_ident_string
    (seq '" tlongident '") => error
@@ -99,10 +100,13 @@ function term : t =
    ident => term_ident
    tlongident => term_longid
    (+ digit) => term_number
+   (seq '- (+ digit)) => term_nnumber
+   (seq '~ (+ digit)) => term_nnumber
    lexeme => term_lexeme  /* previous arms take precedence over this */
    
    '( => term_lexeme
    ') => term_lexeme
+   ', => term_lexeme
 
    '/ => exit_term
    '\ => enter_main

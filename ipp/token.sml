@@ -104,6 +104,7 @@ structure Token =
 
        | TIDENT of symbol * span
        | TNUMBER of int * symbol * span
+       | TNNUMBER of int * symbol * span  (* negative number *)
        | LEXEME of symbol * span
        | LONGTIDENT of symbol list * span
 
