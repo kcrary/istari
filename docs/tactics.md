@@ -234,6 +234,18 @@ which appears in the `Hyp` structure.
     As `unhide` but does not invoke the typechecker.
 
 
+- `contrapositive /[hyp h]/`
+
+  If `h`'s type is `A -> C` and the conclusion is `B -> C`, replaces `h`
+  with `B` and the conclusion with `A`.  This is particularly useful
+  when `C` is `void`; that is, when `h`'s type is `not A` and the
+  conclusion is `not B`.
+
+  - `contrapositiveRaw /[hyp h]/`
+
+    As `contrapositive` but does not invoke the typechecker.
+
+
 - `introOf /[ipattern] ... [ipattern]/`
 
   Proves a goal of the form `M : A`, where `A` is a function type
@@ -256,16 +268,15 @@ which appears in the `Hyp` structure.
     As `existsOf` but does not invoke the typechecker.
 
 
-- `contrapositive /[hyp h]/`
+- `splitOf`
 
-  If `h`'s type is `A -> C` and the conclusion is `B -> C`, replaces `h`
-  with `B` and the conclusion with `A`.  This is particularly useful
-  when `C` is `void`; that is, when `h`'s type is `not A` and the
-  conclusion is `not B`.
+  Proves a goal of the form `M : A` where `A` is either a `set`,
+  `iset`, or `quotient`.  A little more streamlined than the action of
+  `typecheck1` on such a goal.
 
-  - `contrapositiveRaw /[hyp h]/`
+  + `splitOfRaw`
 
-    As `contrapositive` but does not invoke the typechecker.
+    As `splitOf` but does not invoke the typechecker.
 
 
 
@@ -459,17 +470,24 @@ which appears in the `Hyp` structure.
     As `compat` but does not invoke the typechecker.
 
 
+- `injection /[hyp x]/`
+
+  Uses injectivity on an equality in the type of `x`.  For
+  example, if `x` has type `inl M = inl N : A % B`, it
+  would generate the hypothesis `M = N : A`.  If the equality is
+  impossible (*e.g.,* `inl M = inr N : A % B`) then it discharges the
+  goal.
+
+  + `injectionRaw /[hyp x]/`
+
+    As `injection` but does not invoke the typechecker.
+
+
 - `decompEq [n] /[term A]/`
 
   Proves a goal of the form `M ..spine.. = N ..spine.. : B`, where
   both spines have length `n`, generating the subgoal `M = N : A`.
   The type `B` must be appropriate to `A` and `spine`.
-
-
-- `univIntroEqtype`
-
-  Proves a goal of the form `A = B : U i`, generating subgoals 
-  `A = B : type`, `A : U i`, and `B : U i`.
 
 
 - `introEq /[name option] ... [name option]/`
@@ -535,17 +553,10 @@ which appears in the `Hyp` structure.
      As `existsEq` but does not invoke the typechecker.   
 
 
-- `injection /[hyp x]/`
+- `univIntroEqtype`
 
-  Uses injectivity on an equality in the type of `x`.  For
-  example, if `x` has type `inl M = inl N : A % B`, it
-  would generate the hypothesis `M = N : A`.  If the equality is
-  impossible (*e.g.,* `inl M = inr N : A % B`) then it discharges the
-  goal.
-
-  + `injectionRaw /[hyp x]/`
-
-    As `injection` but does not invoke the typechecker.
+  Proves a goal of the form `A = B : U i`, generating subgoals 
+  `A = B : type`, `A : U i`, and `B : U i`.
 
 
 

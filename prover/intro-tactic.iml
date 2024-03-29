@@ -46,6 +46,10 @@ signature INTRO_TACTIC =
       val existsOfRaw : ETerm.eterm -> tactic
       val existsOf : ETerm.eterm -> tactic
 
+      val splitOfPriority : priority tacticm
+      val splitOfRaw : tactic
+      val splitOf : tactic
+
       val contrapositivePriority : Hyp.hypothesis -> priority tacticm
       val contrapositiveRaw : Hyp.hypothesis -> tactic
       val contrapositive : Hyp.hypothesis -> tactic
@@ -67,6 +71,8 @@ signature INTRO_TACTIC_INTERNAL =
       val splitTactics : tactic ConstantTable.table
 
       val existsTactics : (Term.term -> Tactic.priority Tactic.tacticm) ConstantTable.table
+
+      val splitOfTactics : Tactic.priority Tactic.tacticm ConstantTable.table
 
    end
 
@@ -96,7 +102,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
       val introTactics : (priority tacticm * (T.term -> T.binder)) H.table = H.table ()
       val splitTactics : tactic H.table = H.table ()
       val existsTactics : (term -> priority tacticm) H.table = H.table ()
-
+      val splitOfTactics : priority tacticm H.table = H.table ()
 
 
       fun isSoft opac =
@@ -297,6 +303,18 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
 
 
 
+      val () =
+         let
+            val insert = H.insert splitTactics
+         in
+            insert Prim.prod RuleTactic.prodIntro;
+            insert Prim.unit RuleTactic.unitIntro;
+            insert Prim.future RuleTactic.futureIntro;
+            insert Prim.squash RuleTactic.squashIntro
+         end
+
+
+
       val leftPriority =
          let
             do const = withHeadConst "conclusion not leftable"
@@ -364,16 +382,6 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
             do (_, dir) = withgoal
          in
             chdir (Directory.bind0 dir)
-         end
-
-      val () =
-         let
-            val insert = H.insert splitTactics
-         in
-            insert Prim.prod RuleTactic.prodIntro;
-            insert Prim.unit RuleTactic.unitIntro;
-            insert Prim.future RuleTactic.futureIntro;
-            insert Prim.squash RuleTactic.squashIntro
          end
 
       val () =
@@ -728,6 +736,45 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
       fun introOfRaw pats = introOfPriority pats >> idtac
 
       fun introOf pats = Typecheck.withTypecheckSnd $ introOfPriority pats
+
+
+
+      val splitOfPriority =
+         goalCaseT
+         /| \Prim.ov\ (const? @ _) _ =>
+            \(fnc const =>
+                 (case H.find splitOfTactics const of
+                     SOME tac => tac
+     
+                   | NONE => fail "conclusion not splitOfable"))\
+
+          | _ =>
+            \(fnc =>
+                 fail "conclusion not splitOfable")\
+         /
+
+      val splitOfRaw = splitOfPriority >> idtac
+
+      val splitOf = Typecheck.withTypecheckSnd $ splitOfPriority
+
+
+
+      val () =
+         let
+            val insert = H.insert splitOfTactics
+         in
+            insert Prim.set
+               (RT.setIntroOf >>> 
+                [idtacM Secondary, idtacM Primary, idtacM Primary]);
+
+            insert Prim.iset
+               (RT.isetIntroOf >>> 
+                [idtacM Secondary, idtacM Primary, idtacM Primary]);
+
+            insert Prim.quotient
+               (RT.quotientIntroOf >>> 
+                [idtacM Secondary, idtacM Primary, idtacM Primary])
+         end
 
 
 
