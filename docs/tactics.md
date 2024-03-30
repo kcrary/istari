@@ -490,6 +490,17 @@ which appears in the `Hyp` structure.
   The type `B` must be appropriate to `A` and `spine`.
 
 
+- `applyEq /[term F]/ /[term B]/ /[hyp x]/ /[name option y]/`
+
+  If `x` has type `M = N : A` and `F` has type `A -> B`, generates a
+  hypothesis `y` with type `F M = F N : B`.  (A name is invented if no
+  name is supplied.)  If `F` is a path, `B` can usually be omitted.
+
+  + `applyEqRaw /[term F]/ /[term B]/ /[hyp x]/ /[name option y]/`
+
+    As `applyEq` but does not invoke the typechecker.
+
+
 - `introEq /[name option] ... [name option]/`
 
   Proves a goal of the form `M = N : A`, decomposing one layer of `A`
@@ -880,7 +891,7 @@ The destruction tactics are:
 - `generalize /[term M]/ /[term A]/ /[name option x]/`
 
   If `M : A`, replaces all occurrences of `M` in the conclusion with
-  a new hypothesis`x`.  (A name is invented if no name is supplied.)
+  a new hypothesis `x`.  (A name is invented if no name is supplied.)
 
   + `generalizeRaw /[term M]/ /[term A]/ /[name option x]/`
 

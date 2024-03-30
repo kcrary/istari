@@ -34,6 +34,10 @@ signature EQUALITY_TACTIC =
 
       val decompEq : int -> ETerm.eterm -> tactic
 
+      val applyEqPriority : ETerm.eterm -> ETerm.eterm -> hypothesis -> Symbol.symbol option -> priority tacticm
+      val applyEqRaw : ETerm.eterm -> ETerm.eterm -> hypothesis -> Symbol.symbol option -> tactic
+      val applyEq : ETerm.eterm -> ETerm.eterm -> hypothesis -> Symbol.symbol option -> tactic
+
       val introEqPriority : Symbol.symbol option list -> priority tacticm
       val introEqRaw : Symbol.symbol option list -> tactic
       val introEq : Symbol.symbol option list -> tactic
@@ -600,6 +604,52 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             /
          end
 
+
+
+      fun applyEqPriority ef eb hyp symopt =
+         let
+            do i = Hyp.findhyp hyp
+            do (jud, dir) = withgoal
+            val f = ETerm.withdir dir ef
+            val b = ETerm.withdir dir eb
+         in
+            goalHypCaseT i
+            /| $tm \Prim.eq\ ? ? ? =>
+               \(fnc a m n =>
+                    refine (Rule.assert 
+                               (T.apply3 Prim.eq b (T.app f m) (T.app f n))
+                               (T.evar ()))
+                    >>> [
+                        (* F M = F N : B *)
+                        refine (Rule.arrowElimEq a b f f m n)
+                        >>> [
+                            (* F = F : A -> B *)
+                            refine (Rule.eqRefl (T.evar ()) (T.evar ()))
+                            >>+
+                            (* F : A -> B *)
+                            idtacM Secondary,
+
+                            (* M = N : A *)
+                            refine (Rule.hypothesis i) >> done
+                            ],
+
+                        (* F M = F N : B |- J *)
+                        chdir (D.bindh dir symopt) >> idtacM Primary
+                        ])\
+
+             | $tm _ =>
+               \(fnc =>
+                    fail "hypothesis does not contain an equality")\
+
+             | _ =>
+               \(fnc =>
+                    fail "hypothesis has the wrong sort")\
+            /
+         end
+
+      fun applyEqRaw ef eb hyp symopt = applyEqPriority ef eb hyp symopt >> idtac
+
+      fun applyEq ef eb hyp symopt = TC.withTypecheckSnd $ applyEqPriority ef eb hyp symopt
 
 
 
