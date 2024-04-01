@@ -13,17 +13,41 @@ signature CONSTANT =
       (* Opacity never matters to soundness; it's definitions that matter to soundness.
          Opacity may affect the behavior of the prover a lot, though.
 
-         - SOFT means the constant is automatically unfolded by unification, and other
-           tactics that choose to do it, including typechecking.
-         - FIRM is like soft, but not unfolded in typechecking in the subject position.
-         - HARD is normal for constants with a definition.
-         - OPAQUE means the constant cannot be unfolded, even explicitly.
-           (But opacity can still be changed. To make a constant permanently opaque,
-           call abstract.)
+                      OPAQUE
+                        |
+                       HARD
+                     /      \
+                FIRM          SOFT_STRICT
+                     \      /
+                       SOFT
 
-         Hard, firm, and soft constants always have definitions.
+         - SOFT means the constant is automatically unfolded by unification, 
+           and is also unfolded by a variety of tactics including typechecking.
+
+         - FIRM is like soft, but the constant is not unfolded in typechecking
+           when in the subject position.
+
+         - SOFT_STRICT is like soft, but when unification is presented with
+           c M1 ... Mk == c M1' ... Mk' where c is SOFT_STRICT, unification
+           will not unfold c, but instead will unify Mi == Mi' for each i.
+
+           Note that Istari does not check that this is correct.  Marking a
+           constant as SOFT_STRICT that is not actually strict will not 
+           compromise soundness, but it will cause unification to fail sometimes
+           when it need not fail.
+
+         - HARD is normal for constants with a definition.  A few tactics unfold
+           hard constants.
+
+         - OPAQUE means the constant cannot be unfolded, even explicitly.
+
+           Note that an opaque constant is not necessarily abstract, since a
+           constant's opacity can be changed.  To make a constant permanently
+           opaque, call abstract to remove its definition.
+
+         Non-opaque constants always have definitions.
       *)
-      datatype opacity = SOFT | FIRM | HARD | OPAQUE
+      datatype opacity = SOFT | FIRM | SOFT_STRICT | HARD | OPAQUE
 
       (* returns the constant's definition if the constant is not OPAQUE *)
       val definition : constant -> term option
@@ -123,7 +147,7 @@ functor ConstantFun (structure Term : TERM
          end
 
 
-      datatype opacity = SOFT | FIRM | HARD | OPAQUE
+      datatype opacity = SOFT | FIRM | SOFT_STRICT | HARD | OPAQUE
 
       val nextConstant = ref 0
 
@@ -324,11 +348,13 @@ functor ConstantFun (structure Term : TERM
          Pickle.alt
             (fn SOFT => 0
               | FIRM => 1
-              | HARD => 2
-              | OPAQUE => 3)
+              | SOFT_STRICT => 2
+              | HARD => 3
+              | OPAQUE => 4)
             [
             Pickle.const SOFT,
             Pickle.const FIRM,
+            Pickle.const SOFT_STRICT,
             Pickle.const HARD,
             Pickle.const OPAQUE
             ]

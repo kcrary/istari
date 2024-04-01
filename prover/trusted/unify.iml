@@ -52,8 +52,15 @@ functor UnifyFun (structure Term : TERM
          (case opacity of
              Constant.SOFT => true
            | Constant.FIRM => true
+           | Constant.SOFT_STRICT => true
            | _ => false)
-         
+
+      fun isSoftUnstrict opacity =
+         (case opacity of
+             Constant.SOFT => true
+           | Constant.FIRM => true
+           | _ => false)
+
 
 
       exception Different
@@ -71,13 +78,19 @@ functor UnifyFun (structure Term : TERM
 
            | (T.Elim (T.Const const, spine), T.Elim (T.Const const', spine')) =>
                 if Constant.eq (const, const') then
-                   sameSpineMain spine spine'
-                else if isSoft (Constant.opacity const) then
-                   sameWhnf (N.whnfHard m) n
-                else if isSoft (Constant.opacity const') then
-                   sameWhnf m (N.whnfHard n)
+                   if isSoftUnstrict (Constant.opacity const) then
+                      sameWhnf (N.whnfHard m) n
+                   else if isSoftUnstrict (Constant.opacity const') then
+                      sameWhnf m (N.whnfHard n)
+                   else
+                      sameSpineMain spine spine'
                 else
-                   raise Different
+                   if isSoft (Constant.opacity const) then
+                      sameWhnf (N.whnfHard m) n
+                   else if isSoft (Constant.opacity const') then
+                      sameWhnf m (N.whnfHard n)
+                   else
+                      raise Different
 
            | (T.Elim (T.Sub (T.Evar e1, s1), spine1), T.Elim (T.Sub (T.Evar e2, s2), spine2)) =>
                 if T.eqEbind e1 e2 then
@@ -459,19 +472,25 @@ functor UnifyFun (structure Term : TERM
 
            | (T.Elim (T.Const const, spine), T.Elim (T.Const const', spine')) =>
                 if Constant.eq (const, const') then
-                   (
-                   progress := true;
-                   solveSpine spine spine'
-                   )
-                else if isSoft (Constant.opacity const) then
-                   solveWhnf (N.whnfHard m) n
-                else if isSoft (Constant.opacity const') then
-                   solveWhnf m (N.whnfHard n)
+                   if isSoftUnstrict (Constant.opacity const) then
+                      solveWhnf (N.whnfHard m) n
+                   else if isSoftUnstrict (Constant.opacity const') then
+                      solveWhnf m (N.whnfHard n)
+                   else
+                      (
+                      progress := true;
+                      solveSpine spine spine'
+                      )
                 else
-                   (
-                   errorMessage := "clash";
-                   raise Unify
-                   )
+                   if isSoft (Constant.opacity const) then
+                      solveWhnf (N.whnfHard m) n
+                   else if isSoft (Constant.opacity const') then
+                      solveWhnf m (N.whnfHard n)
+                   else
+                      (
+                      errorMessage := "clash";
+                      raise Unify
+                      )
 
            | (T.Elim (T.Sub (T.Evar e1, s1), spine1), T.Elim (T.Sub (T.Evar e2, s2), spine2)) =>
                 if T.eqEbind e1 e2 then

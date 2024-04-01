@@ -215,12 +215,14 @@ rewriter's weakening and compatibility tables.
 
 - `reduceHard /[short-targets]/`
 
-  Puts the target term into normal form, unfolding soft and firm constants.
+  Puts the target term into normal form, unfolding soft, firm, and
+  soft-strict constants.
 
 
 - `whreduceHard /[short-targets]/`
 
-  Puts the target term into weak-head-normal form, unfolding soft and firm constants.
+  Puts the target term into weak-head-normal form, unfolding soft,
+  firm, and soft-strict constants.
 
 
 

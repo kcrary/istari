@@ -70,12 +70,12 @@ employed.
   Note that `manual` is a [hard](terms.html#opacity) constant, which
   means that it survives basic and hard reduction ([see
   below](#reduction-strategies)).  In some cases the
-  [firm](terms.html#opacity) variant `manualf` is
-  preferred, which survives basic but not hard reduction.  For
-  example, when a manual subterm propagates into a type, we might not
-  want the occurrence in the type to be marked manual.  (A
-  [soft](terms.html#opacity) also exists, but it is not useful in
-  typechecking since typechecking always unfolds soft constants.)
+  [firm](terms.html#opacity) variant `manualf` is preferred, which
+  survives basic but not hard reduction.  For example, when a manual
+  subterm propagates into a type, we might not want the occurrence in
+  the type to be marked manual.  (A [soft](terms.html#opacity) variant
+  also exists, but it is not useful in typechecking since typechecking
+  always unfolds soft constants.)
 
 - To avoid ambiguous typing constraints, one sometimes needs to supply
   explicit arguments.  If the argument is explicit, this is just a
@@ -276,23 +276,23 @@ Three strategies are used for normalization, depending on the context:
 1. Standard reduction (used by unification)
 
    - Utilizes user-defined reductions.
-   - Never unfolds soft or firm constants.
+   - Never unfolds soft, firm, or soft-strict constants.
 
 2. Hard reduction (used in some typechecking circumstances, and many tactics)
 
    - Utilizes user-defined reductions.
-   - Always unfolds soft or firm constants.
+   - Always unfolds soft, firm, and soft-strict constants.
 
 3. Basic reduction (used in some typchecking circumstances)
 
    - Never utilizes user-defined reductions.
-   - Always unfolds soft constants.
+   - Always unfolds soft and soft-strict constants.
    - Never unfolds firm constants.
 
-   In other words, basic reduction unfolds soft head constants, but
-   otherwise does only the minimum necessary to put a term into whnf.
-   To do more might remove vital type annotations expressed using firm
-   constants.
+   In other words, basic reduction unfolds soft/soft-strict head
+   constants, but otherwise does only the minimum necessary to put a
+   term into whnf.  To do more might remove vital type annotations
+   expressed using firm constants.
 
 
 ### Typechecker interface

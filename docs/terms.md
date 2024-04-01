@@ -316,8 +316,17 @@ only the invisible arguments explicitly anyway.
 
 #### Opacity
 
-Constants have one of four levels of opacity: soft, firm, hard, or
-opaque:
+Constants have one of five levels of opacity: soft, firm, soft-strict,
+hard, or opaque:
+
+                      OPAQUE
+                        |
+                       HARD
+                     /      \
+                FIRM          SOFT_STRICT
+                     \      /
+                       SOFT
+
 
 - Hard: the default opacity for a constant with a definition.  The
   constant can be unfolded, and a few tactics (notably `intro` and
@@ -329,7 +338,8 @@ opaque:
   inference can continue with the next argument.
 
 - Opaque: the constant cannot be unfolded.  Any constant without a
-  definition is opaque, but opaque constants can have definitions.
+  definition is opaque, but not vice versa; opaque constants can have
+  definitions.
 
 - Soft: the constant is automatically unfolded by unification,
   typechecking, and a variety of tactics.  Soft constants are best
@@ -344,6 +354,16 @@ opaque:
   [assistance to the typechecker](typechecking.html#coping-strategies) 
   (`ann`, `ap`, `fnann`, `manualf`).
 
+- Soft-strict: like a soft constant, except that when unification is
+  presented with a constraint equating two terms whose head are the
+  same soft-strict constant, unification will unify the corresponding
+  terms along the spine, rather than unfolding the constant.
+
+   Note that Istari does not check that this is correct.  Marking a
+   constant as soft-strict that is not actually strict will not
+   compromise soundness, but it will cause unification to fail
+   sometimes when it need not fail.
+
 A constant's opacity can be altered using the function `setOpacity`.
 Since opacities can be altered, an opaque constant is not entirely
 abstract.  To make a constant abstract, one may delete a constant's
@@ -355,7 +375,7 @@ function `abstract`.
        sig
           ...
 
-          datatype opacity = SOFT | FIRM | HARD | OPAQUE
+          datatype opacity = SOFT | FIRM | SOFT_STRICT | HARD | OPAQUE
     
           (* returns the constant's definition if the constant is not OPAQUE *)
           val definition : constant -> term option

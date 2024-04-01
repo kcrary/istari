@@ -186,6 +186,14 @@ functor NormalizeFun (structure Term : TERM
          (case opacity of
              Constant.SOFT => true
            | Constant.FIRM => true
+           | Constant.SOFT_STRICT => true
+           | _ => false)
+
+
+      fun isReallySoft opacity =
+         (case opacity of
+             Constant.SOFT => true
+           | Constant.SOFT_STRICT => true
            | _ => false)
 
 
@@ -233,17 +241,16 @@ functor NormalizeFun (structure Term : TERM
                              (Elim (Const const, spine))
 
                   | BASIC =>
-                       (case Constant.opacity const of
-                           Constant.SOFT =>
-                              (* unfold the soft constant regardless *)
-                              let
-                                 val n = Option.valOf (Constant.definition const)
-                              in
-                                 whnfMain BASIC n id spine
-                              end
+                       if isReallySoft (Constant.opacity const) then
+                          (* unfold the soft constant regardless *)
+                          let
+                             val n = Option.valOf (Constant.definition const)
+                          in
+                             whnfMain BASIC n id spine
+                          end
 
-                         | _ =>
-                              Elim (Const const, spine))
+                       else
+                          Elim (Const const, spine)
 
                   | STANDARD =>
                        reduceOper STANDARD const spine
