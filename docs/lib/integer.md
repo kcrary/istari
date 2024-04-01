@@ -249,8 +249,7 @@ positive case that works upwards.
 
     nat_to_integer_mono_lt : forall (m n : nat) . m < n -> nat_to_integer m <z nat_to_integer n
 
-    plus_to_integer : forall (m n : nat) .
-                         nat_to_integer (m + n) = nat_to_integer m +z nat_to_integer n : integer
+    integer_to_nat_zero : integer_to_nat z`0 = 0 : nat
 
     integer_to_nat_succ : forall (a : integer) .
                              z`0 <z= a -> integer_to_nat (z`1 +z a) = succ (integer_to_nat a) : nat
@@ -259,6 +258,9 @@ positive case that works upwards.
 
     integer_to_nat_mono_lt : forall (a b : integer) .
                                 z`0 <z= a -> a <z b -> integer_to_nat a < integer_to_nat b
+
+    plus_to_integer : forall (m n : nat) .
+                         nat_to_integer (m + n) = nat_to_integer m +z nat_to_integer n : integer
 
     plusz_to_nat : forall (a b : integer) .
                       z`0 <z= a
@@ -386,6 +388,11 @@ positive case that works upwards.
 
     times_to_integer : forall (m n : nat) .
                           nat_to_integer (m * n) = nat_to_integer m *z nat_to_integer n : integer
+
+    timesz_to_nat : forall (a b : integer) .
+                       z`0 <z= a
+                       -> z`0 <z= b
+                       -> integer_to_nat (a *z b) = integer_to_nat a * integer_to_nat b : nat
 
     timesz_ltz_l : forall (a b b' : integer) . z`0 <z a -> b <z b' -> a *z b <z a *z b'
 

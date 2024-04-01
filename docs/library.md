@@ -10,6 +10,7 @@
 - [`Logic`](lib/logic.html)
 - [`List`](lib/list.html)
 - [`Nat`](lib/nat.html)
+- [`Natural`](lib/nat.html) (natural numbers using "native" arithmetic)
 - [`Option`](lib/option.html)
 - [`Relations`](lib/relations.html)
 - [`Stable`](lib/stable.html)

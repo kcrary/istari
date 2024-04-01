@@ -1,0 +1,296 @@
+
+structure ParseNatural =
+   struct
+
+      structure CR = CheckpointedRef
+      structure T = ETerm
+      structure U = Show.Unparsing
+
+      type constant = Constant.constant
+
+      val leq : constant CR.dest = CR.dest ()
+      val lt : constant CR.dest = CR.dest ()
+      val plus : constant CR.dest = CR.dest ()
+      val minus : constant CR.dest = CR.dest ()
+      val times : constant CR.dest = CR.dest ()
+
+      fun parseLeq m n = T.apply2 (CR.read leq) m n
+      fun parseLt m n = T.apply2 (CR.read lt) m n
+      fun parsePlus m n = T.apply2 (CR.read plus) m n
+      fun parseMinus m n = T.apply2 (CR.read minus) m n
+      fun parseTimes m n = T.apply2 (CR.read times) m n
+
+   end
+
+
+grammardef Natural
+
+   open ParseNatural
+
+   rule Term(30)  ::= Term(31) "<N=" Term(31) => parseLeq
+   rule Term(30)  ::= Term(31) "<N" Term(31) => parseLt
+   rule Term(50)  ::= Term(50) "+N" Term(51) => parsePlus
+   rule Term(50)  ::= Term(50) "-N" Term(51) => parseMinus
+   rule Term(60)  ::= Term(60) "*N" Term(61) => parseTimes
+
+end
+
+
+grammardef ArithmeticNatural
+
+   open ParseNatural
+
+   rule Term(30)  ::= Term(31) "<=" Term(31) => parseLeq
+   rule Term(30)  ::= Term(31) "<" Term(31) => parseLt
+   rule Term(50)  ::= Term(50) "+" Term(51) => parsePlus
+   rule Term(50)  ::= Term(50) "-" Term(51) => parseMinus
+   rule Term(60)  ::= Term(60) "*" Term(61) => parseTimes
+   rule Term(100) ::= NUMBER => ParseTerm.integer
+
+end
+
+
+grammaron Natural
+
+
+functor AfterTimesn () :> sig end =
+   struct
+
+      structure CR = CheckpointedRef
+      structure R = Reduction
+      structure T = Term
+      structure U = Show.Unparsing
+
+      open Tactic
+
+      val Collapse (natural, leqn, ltn, plusn, minusn, timesn) =
+         readRegistry /Natural.AfterTimesnEnv/
+            /[constant constant constant constant constant constant]/
+
+
+      val () = CR.write ParseNatural.leq leqn
+      val () = CR.write ParseNatural.lt ltn
+      val () = CR.write ParseNatural.plus plusn
+      val () = CR.write ParseNatural.minus minusn
+      val () = CR.write ParseNatural.times timesn
+
+      val naturalSym = Symbol.fromValue "natural"
+
+      fun register const prec lprec rprec strpref str =
+         let
+            val unp =
+               U.wrap
+                 (U.apply2 const U.show U.show)
+                 (fn (a, b) =>
+                     U.append [a lprec,
+                               U.break 1, 
+                               
+                               U.string
+                                  (if Symbol.eq (CR.deref Show.arithmetic, naturalSym) then
+                                      strpref
+                                   else
+                                      str),
+
+                               b rprec])
+         in
+            ConstantTable.insert U.unparsingTable const (2, prec, ref true, unp)
+         end
+
+      val () = register leqn 30 31 31 "<= " "<N= "
+      val () = register ltn 30 31 31 "< " "<N "
+      val () = register plusn 50 50 51 "+ " "+N "
+      val () = register minusn 50 50 51 "- " "-N "
+      val () = register timesn 60 60 61 "* " "*N "
+
+
+      (* Extend typechecker to find native integers belong to natural. *)
+
+      val leqz = parseConstant /Integer.leqz/
+      val (leqz_dj, leqz_valid) = Option.valOf (Database.findType leqz)
+
+      val naturalIntroOf : tactic =
+         goalCaseT
+            /
+            \Prim.ov\ \natural\ integer? =>
+            \(fnc x =>
+                 if IntInf.< x 0I then
+                    fail "not a natural number"
+                 else
+                    (* X : natural *)
+                    refine (Rule.reduce (R.within [1] R.unfold))
+                    >>+
+                    (* X : { n : integer | z`0 <z= n } *)
+                    refine (Rule.setIntroOf (T.evar ()) (T.evar ()) (T.evar ()))
+                    >>> [
+                        (* integer |- z`0 <z= 0 : type *)
+                        refine (Rule.univForgetOf (T.evar ()) (T.Const Prim.lzero))
+                        >>+
+                        (* integer |- z`0 <z= 0 : U 0 *)
+                        refine (Rule.arrowElimOf 
+                                   (T.Const Prim.integer)
+                                   (T.evar ()) 
+                                   (T.apply1 leqz (T.Native (T.Integer 0I)))
+                                   T.zero)
+                        >>> [
+                            (* integer |- leqz z`0 : integer -> integer *)
+                            refine (Rule.arrowElimOf
+                                       (T.Const Prim.integer) 
+                                       (T.evar ())
+                                       (T.Const leqz)
+                                       (T.Native (T.Integer 0I)))
+                            >>> [
+                                (* integer |- leqz : integer -> integer -> integer *)
+                                cast leqz_dj leqz_valid >> done,
+                                
+                                (* integer |- z`0 : integer *)
+                                refine Rule.integerIntroOf >> done
+                                ],
+
+                            (* integer |- 0 : integer *)
+                            refine (Rule.hypothesisOf 0) >> done
+                            ],
+
+                        (* X : integer *)
+                        refine Rule.integerIntroOf >> done,
+
+                        (* z`0 <z= X *)
+                        refine (Rule.reduce 
+                                   (R.trans
+                                       [R.unfold, R.beta 2, R.unfold, R.beta 1]))
+                        >>+
+                        (* if leqzb z`0 X then unit else void *)
+                        refine Rule.whnfConcl
+                        >>+
+                        (* unit *)
+                        refine Rule.unitIntro >> done
+                        ])\
+            /
+
+      val () = ConstantTable.insert TypecheckInternal.introTactics natural naturalIntroOf
+
+   end
+
+
+functor AfterNaturalAll () :> sig end =
+   struct
+
+      structure B = BackchainInternal
+      structure H = ConstantTable
+      structure J = Judgement
+      structure T = Term
+
+      open Tactic
+
+      val Collapse (natural, natural_iter, ltn_well_founded, leqn, ltn, leqn_inhabitant, ltn_inhabitant, eqnb, leqnb, ltnb, neqnb, istrue_eqnb, istrue_leqnb, istrue_ltnb, istrue_neqnb, leqn_refl, leqn_trans, succn, plusn, minusn, timesn, minn, maxn, leqn_succn_succn, plusn_leqn, minusn_leqn, timesn_leqn, minn_leqn, maxn_leqn, leqn_implication) =
+         readRegistry /Natural.AfterNaturalAllEnv/
+            /[constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant]/
+
+      val () =
+         List.app Registry.delete
+            (parseLongidents
+                /Natural.AfterTimesnEnv
+                 Natural.AfterNaturalAllEnv/)
+
+      val () =
+         H.insert InductionInternal.iterators natural
+            (natural_iter, 0, 0)
+
+      val naturalInduction =
+         let
+            do (jud, dir) = withgoal
+
+            do (b, tac) =
+               BackchainInternal.soMain
+                  (J.context jud)
+                  (T.apply1 ltn_well_founded T.zero)
+                  (fn msg => fail msg)
+         in
+            refine (Rule.assert b (T.evar ()))
+            >>> [
+                tac,
+
+                chdir (Directory.bind0 dir)
+                >>
+                InductionInternal.accInduction
+                ]
+         end
+
+      val () = H.insert InductionInternal.inductionTactics natural naturalInduction
+
+      val () =
+         H.insert TypecheckInternal.trivialIntroTactics leqn
+            (Backchain.applyPriority /\T.Const leqn_inhabitant\/)
+
+      val () =
+         H.insert TypecheckInternal.trivialIntroTactics ltn
+            (Backchain.applyPriority /\T.Const ltn_inhabitant\/)
+
+      val () =
+         H.insert BoolTactic.booleanTests eqnb istrue_eqnb
+
+      val () =
+         H.insert BoolTactic.booleanTests leqnb istrue_leqnb
+
+      val () =
+         H.insert BoolTactic.booleanTests ltnb istrue_ltnb
+
+      val () =
+         H.insert BoolTactic.booleanTests neqnb istrue_neqnb
+
+      val () =
+         H.insert EqualityTacticInternal.reflexivityTactics leqn
+         (B.witnessPriority /\T.Const leqn_refl\ _/)
+      
+      val () =
+         H.insert EqualityTacticInternal.transitivityTactics leqn
+         (fn n => B.witnessPriority /\T.Const leqn_trans\ _ \n\ _ __ __/)
+
+      val () =
+         List.app 
+            (fn (const, i, rconst, rconst', cov, tacfn) => 
+               RewriteInternal.CICTable.insert 
+                  RewriteInternal.compatibilityTable
+                  (const, i, rconst) 
+                  (RewriteTypes.General rconst', cov, 0, (fns _ _ tac => tacfn tac)))
+            [
+            (succn, 0, leqn, leqn, true,
+             andthenOn 0 (B.witnessPriority /\T.Const leqn_succn_succn\ _ _ __/)),
+          
+            (plusn, 0, leqn, leqn, true,
+             andthenOn 0 (B.witnessPriority /\T.Const plusn_leqn\ _ _ _ _ __ __/)),
+          
+            (plusn, 1, leqn, leqn, true,
+             andthenOn 1 (B.witnessPriority /\T.Const plusn_leqn\ _ _ _ _ __ __/)),
+          
+            (minusn, 0, leqn, leqn, true,
+             andthenOn 0 (B.witnessPriority /\T.Const minusn_leqn\ _ _ _ _ __ __/)),
+          
+            (minusn, 1, leqn, leqn, false,
+             andthenOn 1 (B.witnessPriority /\T.Const minusn_leqn\ _ _ _ _ __ __/)),
+
+            (timesn, 0, leqn, leqn, true,
+             andthenOn 0 (B.witnessPriority /\T.Const timesn_leqn\ _ _ _ _ __ __/)),
+          
+            (timesn, 1, leqn, leqn, true,
+             andthenOn 1 (B.witnessPriority /\T.Const timesn_leqn\ _ _ _ _ __ __/)),
+          
+            (minn, 0, leqn, leqn, true,
+             andthenOn 0 (B.witnessPriority /\T.Const minn_leqn\ _ _ _ _ __ __/)),
+          
+            (minn, 1, leqn, leqn, true,
+             andthenOn 1 (B.witnessPriority /\T.Const minn_leqn\ _ _ _ _ __ __/)),
+          
+            (maxn, 0, leqn, leqn, true,
+             andthenOn 0 (B.witnessPriority /\T.Const maxn_leqn\ _ _ _ _ __ __/)),
+          
+            (maxn, 1, leqn, leqn, true,
+             andthenOn 1 (B.witnessPriority /\T.Const maxn_leqn\ _ _ _ _ __ __/)),
+          
+            (leqn, 0, leqn, Prim.arrow, false,
+             andthenOn 0 (B.witnessPriority /\T.Const leqn_implication\ _ _ _ _ __ __/)),
+          
+            (leqn, 1, leqn, Prim.arrow, true,
+             andthenOn 1 (B.witnessPriority /\T.Const leqn_implication\ _ _ _ _ __ __/)),
+            ]
+
+   end

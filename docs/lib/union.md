@@ -46,7 +46,7 @@ The `unpackt` type has an introduction and elimination form:
                        (c : forall (x : a) . b x -> U i)
                        (x : a) .
                        forall (y : b x) . c x y -> `unpackt a b c y
-                  = fn y z . (y , () , z)
+                  = fn y z . (y, (), z)
 
     unpackt_elim  : intersect
                        (i : level)
@@ -121,7 +121,7 @@ The syntactic sugar `iunpackt (x , y) = u in b` is accepted for
                         (c : forall (x : a) . b x -> U i)
                         (x : a) .
                         forall (y : b x) . c x y -> `iunpackt i a b c y
-                   = fn y z . (y , () , z)
+                   = fn y z . (y, (), z)
 
     iunpackt_elim  : intersect
                         (i : level)

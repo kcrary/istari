@@ -1,0 +1,3312 @@
+
+File.import "acc-load.iml";
+File.import "bool-load.iml";
+File.import "decidable-load.iml";
+File.import "integer-load.iml";
+File.import "nat-load.iml";
+File.import "logic-load.iml";
+
+File.import "natural-aux.iml";
+
+openModule /Integer/;
+
+beginModule "Natural";
+
+
+define /natural/
+/
+  { x : integer | z`0 <z= x }
+//
+  U 0
+/;
+
+unfold /natural/.
+typecheck.
+qed ();
+
+val natural = parseConstant /natural/;
+
+
+
+define /nat_to_natural n/
+/
+  nat_to_integer n
+//
+  nat -> natural
+/;
+
+introOf /n/.
+unfold /nat_to_natural , natural/.
+splitOf >> auto.
+apply /nat_to_integer_nonneg/.
+qed ();
+
+
+
+define /natural_to_nat n/
+/
+  integer_to_nat n
+//
+  natural -> nat
+/;
+
+introOf /n/.
+unfold /natural_to_nat , natural in n/.
+typecheck.
+qed ();
+
+
+
+lemma "nat_to_natural_inv"
+/
+  forall n .
+    natural_to_nat (nat_to_natural n) = n : nat
+/;
+
+inference.
+intro /n/.
+unfold /nat_to_natural , natural_to_nat/.
+apply /nat_to_integer_inv/.
+qed ();
+
+
+
+lemma "natural_to_nat_inv"
+/
+  forall n .
+    nat_to_natural (natural_to_nat n) = n : natural
+/;
+
+inference.
+intro /n/.
+unfold /nat_to_natural , natural_to_nat , natural/.
+unfold /natural in n/.
+destruct /n/ /[n Hn]/.
+unhide.
+symmetry.
+extensionality >> auto.
+symmetry.
+apply /integer_to_nat_inv/ >> auto.
+qed ();
+
+
+
+lemma "nat_eq_from_natural"
+/
+  forall m n .
+    nat_to_natural m = nat_to_natural n : natural
+    -> m = n : nat
+/;
+
+inference.
+intro /m n Heq/.
+rewrite /<- nat_to_natural_inv m , <- nat_to_natural_inv n/.
+compat >> auto.
+qed ();
+
+
+
+lemma "natural_eq_from_nat"
+/
+  forall m n .
+    natural_to_nat m = natural_to_nat n : nat
+    -> m = n : natural
+/;
+
+inference.
+intro /m n Heq/.
+rewrite /<- natural_to_nat_inv m , <- natural_to_nat_inv n/.
+compat >> auto.
+qed ();
+
+
+
+define /leqn m n/
+/
+  leqz m n
+//
+  natural -> natural -> U 0
+/;
+
+unfold /leqn , natural at all/.
+typecheck.
+qed ();
+
+val leqn = parseConstant /leqn/;
+
+
+
+lemma "nat_to_natural_mono"
+/
+  forall m n .
+    m <= n -> leqn (nat_to_natural m) (nat_to_natural n)
+/;
+
+inference.
+intro /m n H/.
+unfold /nat_to_natural at all/.
+unfold /leqn/.
+apply /nat_to_integer_mono/ >> auto.
+qed ();
+
+
+
+lemma "natural_to_nat_mono"
+/
+  forall m n .
+    leqn m n -> natural_to_nat m <= natural_to_nat n
+/;
+
+inference.
+intro /m n H/.
+unfold /natural_to_nat at all/.
+unfold /leqn in H/.
+unfold /natural in m in n/.
+apply /integer_to_nat_mono/ >> auto.
+qed ();
+
+
+
+lemma "leqn_from_nat"
+/
+  forall m n . natural_to_nat m <= natural_to_nat n -> leqn m n
+/;
+
+inference.
+intro /m n H/.
+rewrite /<- natural_to_nat_inv m , <- natural_to_nat_inv n/.
+apply /nat_to_natural_mono/ >> auto.
+qed ();
+
+
+
+lemma "leq_from_natural"
+/
+  forall m n . leqn (nat_to_natural m) (nat_to_natural n) -> m <= n
+/;
+
+inference.
+intro /m n H/.
+rewrite /<- nat_to_natural_inv m , <- nat_to_natural_inv n/.
+apply /natural_to_nat_mono/ >> auto.
+qed ();
+
+
+
+define /ltn m n/
+/
+  ltz m n
+//
+  natural -> natural -> U 0
+/;
+
+unfold /ltn , natural at all/.
+typecheck.
+qed ();
+
+val ltn = parseConstant /ltn/;
+
+
+
+lemma "nat_to_natural_mono_lt"
+/
+  forall m n .
+    m < n -> ltn (nat_to_natural m) (nat_to_natural n)
+/;
+
+inference.
+intro /m n H/.
+unfold /nat_to_natural at all/.
+unfold /ltn/.
+apply /nat_to_integer_mono_lt/ >> auto.
+qed ();
+
+
+
+lemma "natural_to_nat_mono_lt"
+/
+  forall m n .
+    ltn m n -> natural_to_nat m < natural_to_nat n
+/;
+
+inference.
+intro /m n H/.
+unfold /natural_to_nat at all/.
+unfold /ltn in H/.
+unfold /natural in m in n/.
+destruct /m/ /[m Hm]/.
+apply /integer_to_nat_mono_lt/ >> auto.
+unhide.
+auto.
+qed ();
+
+
+
+lemma "ltn_from_nat"
+/
+  forall m n . natural_to_nat m < natural_to_nat n -> ltn m n
+/;
+
+inference.
+intro /m n H/.
+rewrite /<- natural_to_nat_inv m , <- natural_to_nat_inv n/.
+apply /nat_to_natural_mono_lt/ >> auto.
+qed ();
+
+
+
+lemma "lt_from_natural"
+/
+  forall m n . ltn (nat_to_natural m) (nat_to_natural n) -> m < n
+/;
+
+inference.
+intro /m n H/.
+rewrite /<- nat_to_natural_inv m , <- nat_to_natural_inv n/.
+apply /natural_to_nat_mono_lt/ >> auto.
+qed ();
+
+
+
+define /plusn m n/
+/
+  m +z n
+//
+  natural -> natural -> natural
+/;
+
+unfold /natural at all/.
+unfold /plusn/.
+introOf /m n/.
+reduce //.
+typecheck.
+destruct /m/ /[m Hm]/.
+destruct /n/ /[n Hn]/.
+split.
+apply /plusz_leqz z`0 m z`0 n/ >> auto.
+qed ();
+
+val plusn = parseConstant /plusn/;
+
+
+
+lemma "plusn_to_nat"
+/
+  forall m n .
+    natural_to_nat (plusn m n) = natural_to_nat m + natural_to_nat n : nat
+/;
+
+inference.
+intro /m n/.
+unfold /natural_to_nat at all/.
+unfold /plusn/.
+destruct /m/ /[m Hm]/.
+destruct /n/ /[n Hn]/.
+unhide.
+apply /plusz_to_nat/ >> auto.
+qed ();
+
+
+
+lemma "plus_to_natural"
+/
+  forall m n .
+    nat_to_natural (m + n) = plusn (nat_to_natural m) (nat_to_natural n) : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> plusn_to_nat/.
+rewrite /-> nat_to_natural_inv at all/.
+reflexivity.
+qed ();
+
+
+
+define /minusn m n/
+/
+  if leqzb m n then
+    z`0
+  else
+    m +z ~z n
+//
+  natural -> natural -> natural
+/;
+
+unfold /natural at all/.
+unfold /minusn/.
+introOf /m n/.
+reduce //.
+boolCase /leqzb m n/ /Hleq/.
+  {
+  splitOf >> auto.
+  }
+
+  {
+  splitOf >> auto.
+  rewrite /-> not_leqz in Hleq/.
+  rewrite /<- plusz_shift_leqz_r/.
+  rewrite /-> plusz_id_l/.
+  apply /ltz_impl_leqz/ >> auto.
+  }
+qed ();
+
+val minusn = parseConstant /minusn/;
+
+
+
+lemma "minusn_to_nat"
+/
+  forall m n .
+    natural_to_nat (minusn m n) = natural_to_nat m - natural_to_nat n : nat
+/;
+
+inference.
+intro /m n/.
+unfold /natural_to_nat at all/.
+unfold /minusn/.
+destruct /m/ /[m Hm]/.
+destruct /n/ /[n Hn]/.
+unhide.
+boolCase /leqzb m n/ /Hleq/.
+  {
+  rewrite /-> integer_to_nat_zero/.
+  symmetry.
+  apply /Nat.minus_proper/.
+  apply /integer_to_nat_mono/ >> auto.
+  }
+
+  {
+  fold /minusz m n/.
+  rewrite /-> minusz_to_nat/ >> auto.
+  rewrite /-> not_leqz in Hleq/.
+  apply /ltz_impl_leqz/ >> auto.
+  }
+qed ();
+
+
+
+lemma "minus_to_natural"
+/
+  forall m n .
+    nat_to_natural (m - n) = minusn (nat_to_natural m) (nat_to_natural n) : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> minusn_to_nat/.
+rewrite /-> nat_to_natural_inv at all/.
+reflexivity.
+qed ();
+
+
+
+define /timesn m n/
+/
+  m *z n
+//
+  natural -> natural -> natural
+/;
+
+unfold /natural at all/.
+unfold /timesn/.
+introOf /m n/.
+reduce //.
+typecheck.
+destruct /m/ /[m Hm]/.
+destruct /n/ /[n Hn]/.
+split.
+apply /timesz_leqz z`0 m z`0 n/ >> auto.
+qed ();
+
+val timesn = parseConstant /timesn/;
+
+
+
+lemma "timesn_to_nat"
+/
+  forall m n .
+    natural_to_nat (timesn m n) = natural_to_nat m * natural_to_nat n : nat
+/;
+
+inference.
+intro /m n/.
+unfold /natural_to_nat at all/.
+unfold /timesn/.
+destruct /m/ /[m Hm]/.
+destruct /n/ /[n Hn]/.
+unhide.
+apply /timesz_to_nat/ >> auto.
+qed ();
+
+
+
+lemma "times_to_natural"
+/
+  forall m n .
+    nat_to_natural (m * n) = timesn (nat_to_natural m) (nat_to_natural n) : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> timesn_to_nat/.
+rewrite /-> nat_to_natural_inv at all/.
+reflexivity.
+qed ();
+
+
+
+define /minn m n/
+/
+  minz m n
+//
+  natural -> natural -> natural
+/;
+
+unfold /natural at all/.
+introOf /[m Hm] [n Hn]/.
+unfold /minn/.
+typecheck.
+split.
+apply /minz_glb/ >> auto.
+qed ();
+
+val minn = parseConstant /minn/;
+
+
+
+lemma "minn_to_nat"
+/
+  forall m n . natural_to_nat (minn m n) = Nat.min (natural_to_nat m) (natural_to_nat n) : nat
+/;
+
+inference.
+intro /[m _] [n _]/.
+unfold /minn , natural_to_nat at all/.
+apply /minz_to_nat/.
+qed ();
+
+
+
+lemma "min_to_natural"
+/
+  forall m n . nat_to_natural (Nat.min m n) = minn (nat_to_natural m) (nat_to_natural n) : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> minn_to_nat/.
+rewrite /-> nat_to_natural_inv at all/.
+reflexivity.
+qed ();
+
+
+
+define /maxn m n/
+/
+  maxz m n
+//
+  natural -> natural -> natural
+/;
+
+unfold /natural at all/.
+introOf /[m Hm] [n Hn]/.
+unfold /maxn/.
+typecheck.
+split.
+apply /leqz_trans _ m/ >> autoWith /maxz_leq_l/.
+qed ();
+
+val maxn = parseConstant /maxn/;
+
+
+
+lemma "maxn_to_nat"
+/
+  forall m n . natural_to_nat (maxn m n) = Nat.max (natural_to_nat m) (natural_to_nat n) : nat
+/;
+
+inference.
+intro /[m _] [n _]/.
+unfold /maxn , natural_to_nat at all/.
+apply /maxz_to_nat/.
+qed ();
+
+
+
+lemma "max_to_natural"
+/
+  forall m n . nat_to_natural (Nat.max m n) = maxn (nat_to_natural m) (nat_to_natural n) : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> maxn_to_nat/.
+rewrite /-> nat_to_natural_inv at all/.
+reflexivity.
+qed ();
+
+
+
+writeRegistry /AfterTimesnEnv/
+  /[constant constant constant constant constant constant]/
+  (Collapse (natural, leqn, ltn, plusn, minusn, timesn));
+structure Nothing = AfterTimesn ();
+
+
+
+(* Want decidable equality early *)
+
+define /eqnb m n/
+/
+  eqzb m n
+//
+  natural -> natural -> bool
+/;
+
+unfold /eqnb/.
+unfold /natural at all/.
+typecheck.
+qed ();
+
+val eqnb = parseConstant /eqnb/;
+
+
+
+lemma "istrue_eqnb"
+/
+  forall m n . Bool.istrue (eqnb m n) <-> m = n : natural
+/;
+
+inference.
+intro /m n/.
+unfold /eqnb , natural/.
+destruct /m/ /[m Hm]/.
+destruct /n/ /[n Hn]/.
+split.
+  {
+  intro /H/.
+  unhide.
+  extensionality >> auto.
+  apply /Integer.istrue_eqzb/ >> auto.
+  }
+
+  {
+  intro /H/ >> auto.
+  apply /Integer.istrue_eqzb/ >> auto.
+  RuleTactic.setWeakenEq (Term.evar ()).
+  hyp /H/.
+  }
+qed ();
+
+val istrue_eqnb = parseConstant /istrue_eqnb/;
+
+
+
+lemma "eq_natural_decide"
+/
+  forall (m n : natural) . Decidable.decidable (m = n : natural)
+/;
+
+intro /m n/.
+apply /Decidable.decidable_from_bool _ _ (eqnb m n)/.
+apply /istrue_eqnb/.
+qed ();
+
+
+
+(* Constructors *)
+
+lemma "zeron_to_natural"
+/
+  nat_to_natural 0 = z`0 : natural
+/;
+
+unfold /nat_to_natural , natural/.
+reflexivity.
+split.
+apply /leqz_refl/.
+qed ();
+
+
+
+lemma "zeron_to_nat"
+/
+  natural_to_nat z`0 = 0 : nat
+/;
+
+apply /nat_eq_from_natural/.
+rewrite /-> zeron_to_natural/.
+rewrite /-> natural_to_nat_inv/.
+reflexivity.
+qed ();
+
+
+
+lemma "onen_to_nat"
+/
+  natural_to_nat z`1 = 1 : nat
+/;
+
+apply /nat_eq_from_natural/.
+unfold /nat_to_natural at 1/.
+rewrite /-> natural_to_nat_inv/.
+reflexivity.
+qed ();
+
+
+
+lemma "onen_to_natural"
+/
+  nat_to_natural 1 = z`1 : natural
+/;
+
+unfold /nat_to_natural/.
+reflexivity.
+qed ();
+
+
+
+define /succn n/
+/
+  z`1 +N n
+//
+  natural -> natural
+/;
+
+unfold /succn/.
+typecheck.
+qed ();
+
+val succn = parseConstant /succn/;
+
+
+
+lemma "succ_to_natural"
+/
+  forall n .
+    nat_to_natural (succ n) = succn (nat_to_natural n) : natural
+/;
+
+inference.
+intro /n/.
+unfold /succn/.
+rewrite /-> plus_to_natural 1 n/.
+rewrite /-> onen_to_natural/.
+reflexivity.
+qed ();
+
+
+
+lemma "succn_to_nat"
+/
+  forall n .
+    natural_to_nat (succn n) = succ (natural_to_nat n) : nat
+/;
+
+inference.
+intro /n/.
+apply /nat_eq_from_natural/.
+rewrite /-> succ_to_natural/.
+rewrite /-> natural_to_nat_inv at all/.
+reflexivity.
+qed ();
+
+
+
+define /predn n/
+/
+  minusn n z`1
+//
+  natural -> natural
+/;
+
+unfold /predn/.
+typecheck.
+qed ();
+
+
+
+lemma "pred_to_natural"
+/
+  forall n .
+    nat_to_natural (Nat.pred n) = predn (nat_to_natural n) : natural
+/;
+
+inference.
+intro /n/.
+destruct /n/ /| n/.
+  {
+  reduce //.
+  rewrite /-> zeron_to_natural at all/.
+  unfold /predn , minusn , natural/.
+  extensionality >> auto.
+  }
+
+  {
+  reduce //.
+  rewrite /-> succ_to_natural/.
+  unfold /succn , predn , minusn , plusn at all , natural , nat_to_natural at all/.
+  extensionality.
+  1:{
+    apply /nat_to_integer_nonneg/.
+    }
+  boolCase /leqzb (z`1 +z nat_to_integer n) z`1/ /Hleq/.
+    {
+    apply /leqz_antisymm/.
+    1:{
+      apply /nat_to_integer_nonneg/.
+      }
+    exact /plusz_cancel_leqz_l _ _ z`1 Hleq/.
+    }
+
+    {
+    rewrite /-> plusz_commute/.
+    rewrite /<- plusz_assoc/.
+    reduce //.
+    rewrite /-> plusz_id_l/.
+    reflexivity.
+    }
+  }
+qed ();
+
+
+
+lemma "predn_to_nat"
+/
+  forall n .
+    natural_to_nat (predn n) = Nat.pred (natural_to_nat n) : nat
+/;
+
+inference.
+intro /n/.
+apply /nat_eq_from_natural/.
+rewrite /-> pred_to_natural/.
+rewrite /-> natural_to_nat_inv at all/.
+reflexivity.
+qed ();
+
+
+
+(* Iterator and Case *)
+
+define /natural_case n hz hs/
+/
+  if leqzb n z`0 then
+    hz
+  else
+    hs (z`-1 +z n)
+//
+  intersect i (a : U i) .
+    natural
+    -> a
+    -> (natural -> a)
+    -> a
+/;
+
+inference.
+unfold /natural at all/.
+introOf /i a n hz hs/.
+unfold /natural_case/.
+boolCase /leqzb n z`0/ /Hleq/.
+  {
+  typecheck.
+  }
+
+  {
+  typecheck.
+  destruct /n/ /n Hn/.
+  split.
+  rewrite /-> not_leqz in Hleq/.
+  rewrite /<- plusz_shift_leqz_lr z`1 z`0 n/.
+  unfold /ltz in Hleq/.
+  hyp /Hleq/.
+  }
+qed ();
+
+
+
+lemma "natural_case_zeron"
+/
+  forall i (a : U i) hz hs .
+    natural_case z`0 hz hs = hz : a
+/;
+
+inference.
+intro /i a hz hs/.
+unfold /natural_case/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "natural_case_succn"
+/
+  forall i (a : U i) hz hs (n : natural) .
+    natural_case (succn n) hz hs = hs n : a
+/;
+
+inference.
+intro /i a hz hs n/.
+unfold /succn/.
+unfold /natural_case/.
+destruct /n/ /[n Hn]/.
+unfold /plusn at all/.
+boolEq false /leqzb (z`1 +z n) z`0/.
+  {
+  apply /not_leqz/.
+  unfold /ltz/.
+  apply /plusz_leqz z`1 z`1 z`0 n/ >> auto.
+  }
+
+  {
+  compat.
+  unfold /natural/.
+  symmetry.
+  extensionality >> auto.
+  rewrite /<- plusz_assoc/.
+  reduce //.
+  rewrite /-> plusz_id_l/.
+  reflexivity.
+  }
+qed ();
+
+
+
+definerec /natural_iter P hz hs n/
+/
+  if leqzb n z`0 then
+    hz
+  else
+    hs (z`-1 +z n) (natural_iter P hz hs (z`-1 +z n))
+//
+  intersect i .
+    forall (P : natural -> U i) .
+      P z`0
+      -> (forall (n : natural) . P n -> P (succn n))
+      -> forall (n : natural) . P n
+/;
+
+inference.
+assert /forall n . not (n <z= z`0) -> z`0 <z= z`-1 +z n/ /Hinc/.
+  {
+  inference.
+  intro /n Hleq/.
+  rewrite /-> not_leqz in Hleq/.
+  rewrite /<- plusz_shift_leqz_lr z`1 z`0 n/.
+  unfold /ltz in Hleq/.
+  hyp /Hleq/.
+  }
+unfold /natural at all , succn/.
+unfold /plusn/.
+introOf /i P Hz Hs n/.
+  {
+  split.
+  apply /leqz_refl/.
+  }
+
+  {
+  reintro /n Hn/.
+  destruct /n/ /[n Hn']/.
+  split.
+  apply /leqz_trans/ >> autoWith /leqz_succ/.
+  }
+destruct /n/ /[n Hn]/.
+unhide.
+revert /Hn/.
+sinduction /n/.
+reintro /IH/.
+intro /Hn/.
+unroll /natural_iter/.
+boolCase /leqzb n z`0/ /Hleq/.
+  {
+  typecheck.
+  extensionality >> auto.
+  apply /leqz_antisymm/ >> auto.
+  }
+
+  {
+  typecheck >> auto.
+    {
+    extensionality.
+      {
+      rewrite /<- plusz_assoc/.
+      reduce //.
+      rewrite /-> plusz_id_l/.
+      reflexivity.
+      }
+
+      {
+      rewrite /<- plusz_assoc/.
+      reduce //.
+      rewrite /-> plusz_id_l/ >> auto.
+      }
+    }
+
+    {
+    apply /IH/ >> auto.
+    unfold /smaller/.
+    right.
+    split >> auto.
+    unfold /ltz/.
+    rewrite /<- plusz_assoc/.
+    reduce //.
+    rewrite /-> plusz_id_l/ >> auto.
+    }
+  }
+qed ();
+
+val natural_iter = parseConstant /natural_iter/;
+
+
+
+lemma "natural_iter_zeron"
+/
+  forall i (P : natural -> U i) (hz : P z`0) (hs : forall (n : natural) . P n -> P (succn n)) .
+    natural_iter P hz hs z`0 = hz : P z`0
+/;
+
+inference.
+intro /i P hz hs/.
+unroll /natural_iter/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "natural_iter_succn"
+/
+  forall i (P : natural -> U i) (hz : P z`0) (hs : forall (n : natural) . P n -> P (succn n)) .
+  forall (n : natural) .
+    natural_iter P hz hs (succn n) = hs n (natural_iter P hz hs n) : P (succn n)
+/;
+
+inference.
+intro /i P hz hs n/.
+unfold /succn at all/.
+unroll /natural_iter/.
+destruct /n/ /[n Hn]/.
+unfold /plusn at all/.
+boolEq false /leqzb (z`1 +z n) z`0/.
+  {
+  rewrite /-> not_leqz/.
+  unfold /ltz/.
+  apply /plusz_leqz z`1 z`1 z`0 n/ >> auto.
+  }
+unfold /succn in hs/.
+unfold /plusn in hs/.
+compat.
+  {
+  unfold /natural in hs in P in concl/.
+  symmetry.
+  extensionality.
+    {
+    rewrite /<- plusz_assoc at all/.
+    reduce //.
+    reflexivity.
+    }
+
+    {
+    apply /leqz_trans/ >> autoWith /leqz_succ/.
+    }
+  }
+
+  {
+  unfold /natural in hs in P in concl/.
+  symmetry.
+  extensionality >> auto.
+  rewrite /<- plusz_assoc at all/.
+  reduce //.
+  rewrite /-> plusz_id_l/ >> auto.
+  }
+
+  {
+  fold /natural_iter ap i/.
+  compatRaw >> auto.
+    {
+    unfold /succn/.
+    unfold /plusn/.
+    reflexivity.
+    }
+
+    {
+    unfold /natural/.
+    symmetry.
+    extensionality >> auto.
+    rewrite /<- plusz_assoc at all/.
+    reduce //.
+    rewrite /-> plusz_id_l/ >> auto.
+    }
+  }
+qed ();
+
+  
+
+(* Equality *)
+
+lemma "eq_0_succn_not"
+/
+  forall (n : natural) . z`0 = succn n : natural -> void
+/;
+
+intro /n H/.
+apply /Nat.eq_0_succ_not (natural_to_nat n)/.
+apply /nat_eq_from_natural/.
+rewrite /-> zeron_to_natural/.
+rewrite /-> succ_to_natural/.
+rewrite /-> natural_to_nat_inv/.
+hyp /H/.
+qed ();
+
+
+
+lemma "eq_succn_0_not"
+/
+  forall (n : natural) . succn n = z`0 : natural -> void
+/;
+
+intro /n H/.
+symmetryIn /H/.
+apply /eq_0_succn_not/ >> auto.
+qed ();
+
+
+
+lemma "succn_inj"
+/
+  forall m n . succn m = succn n : natural -> m = n : natural
+/;
+
+intro /m n H/.
+apply /natural_eq_from_nat/.
+apply /Nat.succ_inj/.
+rewrite /<- succn_to_nat at all/ >> auto.
+qed ();
+
+
+
+(* Inequalities *)
+
+lemma "leqn_inhabitant"
+/
+  forall m n . m <N= n -> () : m <N= n
+/;
+
+inference.
+intro /m n H/.
+unfold /natural in m in n , leqn in H in concl/.
+apply /leqz_inhabitant/ >> auto.
+qed ();
+
+val leqn_inhabitant = parseConstant /leqn_inhabitant/;
+
+
+
+lemma "ltn_inhabitant"
+/
+  forall m n . m <N n -> () : m <N n
+/;
+
+inference.
+intro /m n H/.
+unfold /natural in m in n , ltn in H in concl/.
+apply /ltz_inhabitant/ >> auto.
+qed ();
+
+val ltn_inhabitant = parseConstant /ltn_inhabitant/;
+
+
+
+lemma "leqn_0_min"
+/
+  forall n . z`0 <N= n
+/;
+
+inference.
+intro /n/.
+apply /leqn_from_nat/.
+rewrite /-> zeron_to_nat/.
+apply /Nat.leq_0_min/.
+qed ();
+
+
+
+lemma "leqn_succn_0_not"
+/
+  forall n . succn n <N= z`0 -> void
+/;
+
+inference.
+intro /n H/.
+apply /Nat.leq_succ_0_not (natural_to_nat n)/.
+apply /leq_from_natural/.
+rewrite /-> succ_to_natural/.
+rewrite /-> zeron_to_natural/.
+rewrite /-> natural_to_nat_inv/ >> auto.
+qed ();
+
+
+
+lemma "leqn_succn_succn"
+/
+  forall m n . m <N= n -> succn m <N= succn n
+/;
+
+inference.
+intro /m n H/.
+apply /leqn_from_nat/.
+rewrite /-> succn_to_nat at all/.
+apply /Nat.leq_succ_succ/.
+apply /natural_to_nat_mono/ >> auto.
+qed ();
+
+val leqn_succn_succn = parseConstant /leqn_succn_succn/;
+
+
+
+lemma "leqn_succn_invert"
+/
+  forall m n . succn m <N= succn n -> m <N= n
+/;
+
+inference.
+intro /m n H/.
+apply /leqn_from_nat/.
+apply /Nat.leq_succ_invert/.
+rewrite /<- succn_to_nat at all/.
+apply /natural_to_nat_mono/ >> auto.
+qed ();
+
+
+
+lemma "leqn_succn"
+/
+  forall n . n <N= succn n
+/;
+
+inference.
+intro /n/.
+apply /leqn_from_nat/.
+rewrite /-> succn_to_nat/.
+apply /Nat.leq_succ/.
+qed ();
+
+
+
+lemma "leqn_refl"
+/
+  forall n . n <N= n
+/;
+
+inference.
+intro /n/.
+apply /leqn_from_nat/.
+apply /Nat.leq_refl/.
+qed ();
+
+val leqn_refl = parseConstant /leqn_refl/;
+
+
+
+lemma "leqn_refl_eq"
+/
+  forall m n . m = n : natural -> m <N= n
+/;
+
+inference.
+intro /m n Heq/.
+subst /n/.
+apply /leqn_refl/.
+qed ();
+
+
+
+lemma "leqn_trans"
+/
+  forall m n p . m <N= n -> n <N= p -> m <N= p
+/;
+
+inference.
+intro /m n p Hmn Hnp/.
+apply /leqn_from_nat/.
+apply /Nat.leq_trans/ >> autoWith /natural_to_nat_mono/ >> done.
+qed ();
+
+val leqn_trans = parseConstant /leqn_trans/;
+
+
+
+lemma "leqn_antisymm"
+/
+  forall m n . m <N= n -> n <N= m -> m = n : natural
+/;
+
+inference.
+intro /m n Hmn Hnm/.
+apply /natural_eq_from_nat/.
+apply /Nat.leq_antisymm/ >> autoWith /natural_to_nat_mono/.
+qed ();
+
+
+
+lemma "leqn_implication"
+/
+  forall m m' n n' . 
+    m' <N= m
+    -> n <N= n'
+    -> m <N= n
+    -> m' <N= n'
+/;
+
+inference.
+intro /m m' n n' Hm Hn Hmn/.
+apply /leqn_from_nat/.
+apply /Nat.leq_implication/ >> autoWith /natural_to_nat_mono/ >> done.
+qed ();
+
+val leqn_implication = parseConstant /leqn_implication/;
+
+
+
+lemma "ltn_impl_leqn"
+/
+  forall m n . m <N n -> m <N= n
+/;
+
+inference.
+intro /m n H/.
+apply /leqn_from_nat/.
+apply /Nat.lt_impl_leq/.
+apply /natural_to_nat_mono_lt/ >> auto.
+qed ();
+
+
+
+lemma "ltn_succn_succn"
+/
+  forall m n . m <N n -> succn m <N succn n
+/;
+
+inference.
+intro /m n H/.
+apply /ltn_from_nat/.
+rewrite /-> succn_to_nat at all/.
+apply /Nat.lt_succ_succ/.
+apply /natural_to_nat_mono_lt/ >> auto.
+qed ();
+
+
+
+lemma "ltn_succn_invert"
+/
+  forall m n . succn m <N succn n -> m <N n
+/;
+
+inference.
+intro /m n H/.
+apply /ltn_from_nat/.
+apply /Nat.lt_succ_invert/.
+rewrite /<- succn_to_nat at all/.
+apply /natural_to_nat_mono_lt/ >> auto.
+qed ();
+
+
+
+lemma "ltn_succn"
+/
+  forall n . n <N succn n
+/;
+
+inference.
+intro /n/.
+apply /ltn_from_nat/.
+rewrite /-> succn_to_nat/.
+apply /Nat.lt_succ/.
+qed ();
+
+
+
+lemma "ltn_irrefl"
+/
+  forall n . n <N n -> void
+/;
+
+inference.
+intro /n H/.
+apply /Nat.lt_irrefl (natural_to_nat n)/.
+apply /natural_to_nat_mono_lt/ >> auto.
+qed ();
+
+
+
+lemma "ltn_trans"
+/
+  forall m n p . m <N n -> n <N p -> m <N p
+/;
+
+inference.
+intro /m n p Hmn Hnp/.
+apply /ltn_from_nat/.
+apply /Nat.lt_trans/ >> autoWith /natural_to_nat_mono_lt/ >> done.
+qed ();
+
+
+
+lemma "leqn_ltn_trans"
+/
+  forall m n p . m <N= n -> n <N p -> m <N p
+/;
+
+inference.
+intro /m n p Hmn Hnp/.
+apply /ltn_from_nat/.
+apply /Nat.leq_lt_trans/ >> autoWith /natural_to_nat_mono natural_to_nat_mono_lt/ >> done.
+qed ();
+
+
+
+lemma "ltn_leqn_trans"
+/
+  forall m n p . m <N n -> n <N= p -> m <N p
+/;
+
+inference.
+intro /m n p Hmn Hnp/.
+apply /ltn_from_nat/.
+apply /Nat.lt_leq_trans/ >> autoWith /natural_to_nat_mono natural_to_nat_mono_lt/ >> done.
+qed ();
+
+
+
+lemma "ltn_0_succn"
+/
+  forall n . z`0 <N succn n
+/;
+
+inference.
+intro /n/.
+apply /ltn_from_nat/.
+rewrite /-> zeron_to_nat/.
+rewrite /-> succn_to_nat/.
+apply /Nat.lt_0_succ/.
+qed ();
+
+
+
+lemma "ltn_0_not"
+/
+  forall n . n <N z`0 -> void
+/;
+
+inference.
+intro /n H/.
+apply /Nat.lt_0_not (natural_to_nat n)/.
+rewrite /<- zeron_to_nat/.
+apply /natural_to_nat_mono_lt/ >> auto.
+qed ();
+
+
+
+lemma "not_leqn"
+/
+  forall m n . not (m <N= n) <-> n <N m
+/;
+
+inference.
+intro /m n/.
+split >> intro /H/.
+  {
+  apply /ltn_from_nat/.
+  apply /Nat.not_leq/.
+  contrapositive /H/.
+  apply /leqn_from_nat/ >> auto.
+  }
+
+  {
+  intro /H'/.
+  apply /ltn_irrefl n/.
+  apply /ltn_leqn_trans/ >> auto.
+  }
+qed ();
+
+
+
+lemma "not_ltn"
+/
+  forall m n . not (m <N n) <-> n <N= m
+/;
+
+inference.
+intro /m n/.
+split >> intro /H/.
+  {
+  apply /leqn_from_nat/.
+  apply /Nat.not_lt/.
+  contrapositive /H/.
+  apply /ltn_from_nat/ >> auto.
+  }
+
+  {
+  intro /H'/.
+  apply /ltn_irrefl m/.
+  apply /ltn_leqn_trans/ >> auto.
+  }
+qed ();
+
+
+
+lemma "leqn_iff_ltn_succn"
+/
+  forall m n . m <N= n <-> m <N succn n
+/;
+
+inference.
+intro /m n/.
+split >> intro /H/.
+  {
+  apply /ltn_from_nat/.
+  rewrite /-> succn_to_nat/.
+  apply /Nat.leq_iff_lt_succ/.
+  apply /natural_to_nat_mono/ >> auto.
+  }
+  
+  {
+  apply /leqn_from_nat/.
+  apply /Nat.leq_iff_lt_succ/.
+  rewrite /<- succn_to_nat/.
+  apply /natural_to_nat_mono_lt/ >> auto.
+  }
+qed ();
+
+
+
+lemma "ltn_from_leqn_neq"
+/
+  forall m n .
+    m <N= n
+    -> not (m = n : natural)
+    -> m <N n
+/;
+
+inference.
+intro /m n H Hnot/.
+apply /not_leqn/.
+contrapositive /Hnot/.
+apply /leqn_antisymm/ >> auto.
+qed ();
+
+
+
+lemma "ltn_well_founded"
+/
+  forall n . Acc natural ltn n
+/;
+
+inference.
+apply /natural_iter/.
+
+(* 0 *)
+{
+apply /Acc.Acc_intro/.
+intro /n H/.
+so /ltn_0_not _ H/ /0/.
+}
+
+(* succ *)
+{
+intro /n IH/.
+apply /Acc.Acc_intro/.
+intro /m H/.
+so /eq_natural_decide m n/ /Heq | Hneq/.
+  {
+  subst /n/ >> auto.
+  }
+
+  {
+  witness /Acc.Acc_elim _# 5 IH __/.
+  apply /ltn_from_leqn_neq/ >> auto.
+  apply /leqn_from_nat/.
+  apply /Nat.leq_iff_lt_succ/.
+  rewrite /<- succn_to_nat/.
+  apply /natural_to_nat_mono_lt/ >> auto.
+  }
+}
+qed ();
+
+val ltn_well_founded = parseConstant /ltn_well_founded/;
+
+
+
+(* Addition *)
+
+lemma "plusn_zeron"
+/
+  forall n . plusn z`0 n = n : natural
+/;
+
+inference.
+intro /n/.
+apply /natural_eq_from_nat/.
+rewrite /-> plusn_to_nat/.
+rewrite /-> zeron_to_nat/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusn_succn"
+/
+  forall m n . plusn (succn m) n = succn (plusn m n) : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> plusn_to_nat/.
+rewrite /-> succn_to_nat at all/.
+rewrite /-> plusn_to_nat/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusn_commute"
+/
+  forall m n . m +N n = n +N m : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> plusn_to_nat at all/.
+apply /Nat.plus_commute/.
+qed ();
+
+
+
+aliasExport /plusn_0_l/ /plusn_zeron/;
+
+
+
+lemma "plusn_0_r"
+/
+  forall n . n +N z`0 = n : natural
+/;
+
+inference.
+intro /n/.
+rewrite /-> plusn_commute/.
+apply /plusn_0_l/.
+qed ();
+
+
+
+lemma "plusn_assoc"
+/
+  forall m n p . m +N n +N p = m +N (n +N p) : natural
+/;
+
+inference.
+intro /m n p/.
+apply /natural_eq_from_nat/.
+rewrite /-> plusn_to_nat at all/.
+apply /Nat.plus_assoc/.
+qed ();
+
+
+
+lemma "plusn_shift_r"
+/
+  forall m n . m +N succn n = succn (m +N n) : natural
+/;
+
+inference.
+intro /m n/.
+rewrite /-> plusn_commute at 0 1/.
+apply /plusn_succn/.
+qed ();
+
+
+
+lemma "plusn_leqn_l"
+/
+  forall m n . m <N= m +N n
+/;
+
+inference.
+intro /m n/.
+apply /leqn_from_nat/.
+rewrite /-> plusn_to_nat/.
+apply /Nat.plus_leq_l/.
+qed ();
+
+
+
+lemma "plusn_leqn_r"
+/
+  forall m n . n <N= m +N n
+/;
+
+inference.
+intro /m n/.
+rewrite /-> plusn_commute/.
+apply /plusn_leqn_l/.
+qed ();
+
+
+
+lemma "plusn_leqn"
+/
+  forall m m' n n' .
+    m <N= m'
+    -> n <N= n'
+    -> m +N n <N= m' +N n'
+/;
+
+inference.
+intro /m m' n n' Hm Hn/.
+apply /leqn_from_nat/.
+rewrite /-> plusn_to_nat at all/.
+apply /Nat.plus_leq/ >> autoWith /natural_to_nat_mono/.
+qed ();
+
+val plusn_leqn = parseConstant /plusn_leqn/;
+
+
+
+lemma "plusn_cancel_leqn_l"
+/
+  forall m n p . p +N m <N= p +N n -> m <N= n
+/;
+
+inference.
+intro /m n p H/.
+apply /leqn_from_nat/.
+apply /Nat.plus_cancel_leq_l _ _ (natural_to_nat p)/.
+rewrite /<- plusn_to_nat at all/.
+apply /natural_to_nat_mono/ >> auto.
+qed ();
+
+
+
+lemma "plusn_cancel_leqn_r"
+/
+  forall m n p . m +N p <N= n +N p -> m <N= n
+/;
+
+inference.
+intro /m n p H/.
+rewrite /-> plusn_commute in H at 0 1/.
+apply /plusn_cancel_leqn_l/ >> auto.
+qed ();
+
+
+
+lemma "plusn_cancel_leqn_leqn_l"
+/
+  forall m m' n n' . m +N n <N= m' +N n' -> m' <N= m -> n <N= n'
+/;
+
+inference.
+intro /m m' n n' Hplus Hm/.
+apply /leqn_from_nat/.
+apply /Nat.plus_cancel_leq_leq_l (natural_to_nat m) (natural_to_nat m')/.
+  {
+  rewrite /<- plusn_to_nat at all/.
+  apply /natural_to_nat_mono/ >> auto.
+  }
+
+  {
+  apply /natural_to_nat_mono/ >> auto.
+  }
+qed ();
+
+
+
+lemma "plusn_cancel_leqn_leqn_r"
+/
+  forall m m' n n' . m +N n <N= m' +N n' -> n' <N= n -> m <N= m'
+/;
+
+inference.
+intro /m m' n n' Hplus Hn/.
+rewrite /-> plusn_commute in Hplus at 0 1/.
+apply /plusn_cancel_leqn_leqn_l/ >> auto.
+qed ();
+
+
+
+lemma "plusn_ltn_r"
+/
+  forall m n . z`0 <N n -> m <N m +N n
+/;
+
+inference.
+intro /m n H/.
+apply /ltn_from_nat/.
+rewrite /-> plusn_to_nat/.
+apply /Nat.plus_lt_r/.
+apply /lt_from_natural/.
+rewrite /-> zeron_to_natural/.
+rewrite /-> natural_to_nat_inv/.
+hyp /H/.
+qed ();
+
+
+
+lemma "plusn_cancel_l"
+/
+  forall m n p . p +N m = p +N n : natural -> m = n : natural
+/;
+
+inference.
+intro /m n p H/.
+apply /natural_eq_from_nat/.
+apply /Nat.plus_cancel_l _ _ (natural_to_nat p)/.
+rewrite /<- plusn_to_nat at all/.
+compat >> auto.
+qed ();
+
+
+
+lemma "plusn_cancel_l_eq"
+/
+  forall m n p q . 
+    m +N n = p +N q : natural 
+    -> m = p : natural
+    -> n = q : natural 
+/;
+
+inference.
+intro /m n p q Hplus Hmp/.
+subst /p/.
+apply /plusn_cancel_l/ >> auto.
+qed ();
+
+
+
+lemma "plusn_cancel_r"
+/
+  forall m n p . m +N p = n +N p : natural -> m = n : natural
+/;
+
+inference.
+intro /m n p H/.
+rewrite /-> plusn_commute in H at 0 1/.
+apply /plusn_cancel_l/ >> auto.
+qed ();
+
+
+
+lemma "plusn_cancel_r_eq"
+/
+  forall m n p q . 
+    m +N n = p +N q : natural
+    -> n = q : natural
+    -> m = p : natural
+/;
+
+inference.
+intro /m n p q Hplus Hnq/.
+subst /q/.
+apply /plusn_cancel_r/ >> auto.
+qed ();
+
+
+
+lemma "plusn_compat"
+/
+  forall m m' n n' .
+    m = m' : natural
+    -> n = n' : natural
+    -> m +N n = m' +N n' : natural
+/;
+
+inference.
+intro /m m' n n' Heqm Heqn/.
+compat >> auto.
+qed ();
+
+
+
+(* Subtraction *)
+
+lemma "predn_zeron"
+/
+  predn z`0 = z`0 : natural
+/;
+
+unfold /predn , minusn , natural/.
+symmetry.
+extensionality >> auto.
+qed ();
+
+
+
+lemma "predn_succn"
+/
+  forall n . predn (succn n) = n : natural
+/;
+
+inference.
+intro /n/.
+apply /natural_eq_from_nat/.
+rewrite /-> predn_to_nat/.
+rewrite /-> succn_to_nat/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "minusn_zeron"
+/
+  forall n . minusn n z`0 = n : natural
+/;
+
+inference.
+intro /n/.
+apply /natural_eq_from_nat/.
+rewrite /-> minusn_to_nat/.
+rewrite /-> zeron_to_nat/.
+reflexivity.
+qed ();
+
+
+
+lemma "minusn_succn_r"
+/
+  forall m n . minusn m (succn n) = minusn (predn m) n : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> minusn_to_nat at all/.
+rewrite /-> predn_to_nat/.
+rewrite /-> succn_to_nat/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "plusn_minusn_cancel_l"
+/
+  forall m n . m +N n -N m = n : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> minusn_to_nat , -> plusn_to_nat/.
+apply /Nat.plus_minus_cancel_l/.
+qed ();
+
+
+
+lemma "plusn_minusn_cancel_r"
+/
+  forall m n . m +N n -N n = m : natural
+/;
+
+inference.
+intro /m n/.
+rewrite /-> plusn_commute/.
+apply /plusn_minusn_cancel_l/.
+qed ();
+
+
+
+lemma "minusn_swap"
+/
+  forall m n p . m -N n -N p = m -N p -N n : natural
+/;
+
+inference.
+intro /m n p/.
+apply /natural_eq_from_nat/.
+rewrite /-> minusn_to_nat at all/.
+apply /Nat.minus_swap/.
+qed ();
+
+
+
+lemma "minusn_plusn_cancel"
+/
+  forall m n .
+    n <N= m
+    -> m -N n +N n = m : natural
+/;
+
+inference.
+intro /m n H/.
+apply /natural_eq_from_nat/.
+rewrite /-> plusn_to_nat , -> minusn_to_nat/.
+apply /Nat.minus_plus_cancel/.
+apply /natural_to_nat_mono/ >> auto.
+qed ();
+
+
+
+lemma "minusn_0_l"
+/
+  forall n . z`0 -N n = z`0 : natural
+/;
+
+inference.
+intro /n/.
+apply /natural_eq_from_nat/.
+rewrite /-> minusn_to_nat , -> zeron_to_nat at all/.
+apply /Nat.minus_0_l/.
+qed ();
+
+
+
+aliasExport /minusn_0_r/ /minusn_zeron/;
+
+
+
+lemma "minusn_proper"
+/
+  forall m n .
+    m <N= n
+    -> m -N n = z`0 : natural
+/;
+
+inference.
+intro /m n H/.
+apply /natural_eq_from_nat/.
+rewrite /-> minusn_to_nat/.
+rewrite /-> zeron_to_nat/.
+apply /Nat.minus_proper/.
+apply /natural_to_nat_mono/ >> auto.
+qed ();
+
+
+
+lemma "minusn_assoc"
+/
+  forall m n p . m -N n -N p = m -N (n +N p) : natural
+/;
+
+inference.
+intro /m n p/.
+apply /natural_eq_from_nat/.
+rewrite /-> minusn_to_nat at all , -> plusn_to_nat/.
+apply /Nat.minus_assoc/.
+qed ();
+
+
+
+lemma "minusn_succn"
+/
+  forall m n . succn m -N succn n = m -N n : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> minusn_to_nat at all , -> succn_to_nat at all/.
+apply /Nat.minus_succ/.
+qed ();
+
+
+
+lemma "predn_leqn"
+/
+  forall n . predn n <N= n
+/;
+
+inference.
+intro /n/.
+apply /leqn_from_nat/.
+rewrite /-> predn_to_nat/.
+apply /Nat.pred_leq/.
+qed ();
+
+
+
+lemma "minusn_leqn_l"
+/
+  forall m n . m -N n <N= m
+/;
+
+inference.
+intro /m n/.
+apply /leqn_from_nat/.
+rewrite /-> minusn_to_nat/.
+apply /Nat.minus_leq_l/.
+qed ();
+
+
+
+lemma "minusn_leqn"
+/
+  forall m m' n n' .
+    m <N= m'
+    -> n' <N= n
+    -> m -N n <N= m' -N n'
+/;
+
+inference.
+intro /m m' n n' Hm Hn/.
+apply /leqn_from_nat/.
+rewrite /-> minusn_to_nat at all/.
+apply /Nat.minus_leq/ >> autoWith /natural_to_nat_mono/.
+qed ();
+
+val minusn_leqn = parseConstant /minusn_leqn/;
+
+
+
+lemma "minusn_self"
+/
+  forall n . n -N n = z`0 : natural
+/;
+
+inference.
+intro /n/.
+apply /natural_eq_from_nat/.
+rewrite /-> minusn_to_nat/.
+rewrite /-> zeron_to_nat/.
+apply /Nat.minus_self/.
+qed ();
+
+
+
+lemma "minusn_succn_l_leqn"
+/
+  forall m n . succn m -N n <N= succn (m -N n)
+/;
+
+inference.
+intro /m n/.
+apply /leqn_from_nat/.
+rewrite /-> minusn_to_nat , -> succn_to_nat at all , -> minusn_to_nat/.
+apply /Nat.minus_succ_l_leq/.
+qed ();
+
+
+
+lemma "minusn_succn_l_eq"
+/
+  forall m n .
+    n <N= m
+    -> succn m -N n = succn (m -N n) : natural
+/;
+
+inference.
+intro /m n H/.
+apply /natural_eq_from_nat/.
+rewrite /-> minusn_to_nat , -> succn_to_nat at all , -> minusn_to_nat/.
+apply /Nat.minus_succ_l_eq/.
+apply /natural_to_nat_mono/ >> auto.
+qed ();
+
+
+
+lemma "plusn_minusn_swap"
+/
+  forall m n p .
+    p <N= m
+    -> m +N n -N p = m -N p +N n : natural
+/;
+
+inference.
+intro /m n p H/.
+apply /natural_eq_from_nat/.
+rewrite /-> plusn_to_nat , -> minusn_to_nat at all , -> plusn_to_nat/.
+apply /Nat.plus_minus_swap/.
+apply /natural_to_nat_mono/ >> auto.
+qed ();
+
+
+
+lemma "plusn_minusn_assoc"
+/
+  forall m n p .
+    p <N= n
+    -> m +N n -N p = m +N (n -N p) : natural
+/;
+
+inference.
+intro /m n p Hpn/.
+rewrite /-> plusn_commute/.
+rewrite /-> plusn_minusn_swap/ >> auto.
+rewrite /-> plusn_commute/.
+reflexivity.
+qed ();
+
+
+
+
+lemma "plusn_minusn_assoc_swap"
+/
+  forall m n p .
+    n <N= p
+    -> m +N n -N p = m -N (p -N n) : natural
+/;
+
+inference.
+intro /m n p H/.
+apply /natural_eq_from_nat/.
+rewrite /-> minusn_to_nat at all , -> plusn_to_nat/.
+apply /Nat.plus_minus_assoc_swap/.
+apply /natural_to_nat_mono/ >> auto.
+qed ();
+
+
+
+lemma "minusn_plusn_assoc"
+/
+  forall m n p . 
+    p <N= n 
+    -> n <N= m
+    -> m -N n +N p = m -N (n -N p) : natural
+/;
+
+inference.
+intro /m n p Hpn Hnm/.
+rewrite /<- plusn_minusn_assoc_swap/ >> auto.
+symmetry.
+apply /plusn_minusn_swap/ >> auto.
+qed ();
+
+
+
+lemma "minusn_compat"
+/
+  forall m m' n n' .
+    m = m' : natural
+    -> n = n' : natural
+    -> m -N n = m' -N n' : natural
+/;
+
+inference.
+intro /m m' n n' Hm Hn/.
+compat >> auto.
+qed ();
+
+
+
+(* Multiplication *)
+
+lemma "timesn_zeron"
+/
+  forall n . timesn z`0 n = z`0 : natural
+/;
+
+inference.
+intro /n/.
+apply /natural_eq_from_nat/.
+rewrite /-> timesn_to_nat , -> zeron_to_nat at all/.
+reflexivity.
+qed ();
+
+
+
+lemma "timesn_succn"
+/
+  forall m n . timesn (succn m) n = plusn n (timesn m n) : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> timesn_to_nat/.
+rewrite /-> plusn_to_nat/.
+rewrite /-> timesn_to_nat/.
+rewrite /-> succn_to_nat/.
+reflexivity.
+qed ();
+
+
+
+aliasExport /timesn_0_l/ /timesn_zeron/;
+
+
+
+lemma "timesn_commute"
+/
+  forall m n . m *N n = n *N m : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> timesn_to_nat at all/.
+apply /Nat.times_commute/.
+qed ();
+
+
+
+lemma "timesn_0_r"
+/
+  forall n . n *N z`0 = z`0 : natural
+/;
+
+inference.
+intro /n/.
+rewrite /-> timesn_commute/.
+apply /timesn_0_l/.
+qed ();
+
+
+
+lemma "timesn_1_l"
+/
+  forall n . z`1 *N n = n : natural
+/;
+
+inference.
+intro /n/.
+apply /natural_eq_from_nat/.
+rewrite /-> timesn_to_nat/.
+rewrite /-> onen_to_nat/.
+apply /Nat.times_1_l/.
+qed ();
+
+
+
+lemma "timesn_1_r"
+/
+  forall n . n *N z`1 = n : natural
+/;
+
+inference.
+intro /n/.
+rewrite /-> timesn_commute/.
+apply /timesn_1_l/.
+qed ();
+
+
+
+lemma "timesn_assoc"
+/
+  forall m n p . (m *N n) *N p = m *N (n *N p) : natural
+/;
+
+inference.
+intro /m n p/.
+apply /natural_eq_from_nat/.
+rewrite /-> timesn_to_nat at all/.
+apply /Nat.times_assoc/.
+qed ();
+
+
+
+lemma "timesn_dist_succn_r"
+/
+  forall m n . m *N succn n = m +N m *N n : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> timesn_to_nat , -> succn_to_nat , -> plusn_to_nat , -> timesn_to_nat/.
+apply /Nat.times_dist_succ_r/.
+qed ();
+
+
+
+lemma "timesn_dist_plusn_l"
+/
+  forall m n p . (m +N n) *N p = m *N p +N n *N p : natural
+/;
+
+inference.
+intro /m n p/.
+apply /natural_eq_from_nat/.
+rewrite /-> timesn_to_nat , -> plusn_to_nat at all , -> timesn_to_nat at all/.
+apply /Nat.times_dist_plus_l/.
+qed ();
+
+
+
+lemma "timesn_dist_plusn_r"
+/
+  forall m n p . m *N (n +N p) = m *N n +N m *N p : natural
+/;
+
+inference.
+intro /m n p/.
+rewrite /-> timesn_commute at 0 1 2/.
+apply /timesn_dist_plusn_l/.
+qed ();
+
+
+
+lemma "timesn_leqn"
+/
+  forall m m' n n' .
+    m <N= m'
+    -> n <N= n'
+    -> m *N n <N= m' *N n'
+/;
+
+inference.
+intro /m m' n n' Hm Hn/.
+apply /leqn_from_nat/.
+rewrite /-> timesn_to_nat at all/.
+apply /Nat.times_leq/ >> autoWith /natural_to_nat_mono/.
+qed ();
+
+val timesn_leqn = parseConstant /timesn_leqn/;
+
+
+
+lemma "timesn_dist_predn_l"
+/
+  forall m n . predn m *N n = m *N n -N n : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> timesn_to_nat , -> minusn_to_nat , -> timesn_to_nat , -> predn_to_nat/.
+apply /Nat.times_dist_pred_l/.
+qed ();
+
+
+
+lemma "timesn_dist_predn_r"
+/
+  forall m n . m *N predn n = m *N n -N m : natural
+/;
+
+inference.
+intro /m n/.
+rewrite /-> timesn_commute at 0 1/.
+apply /timesn_dist_predn_l/.
+qed ();
+
+
+
+lemma "timesn_dist_minusn_l"
+/
+  forall m n p . (m -N n) *N p = m *N p -N n *N p : natural
+/;
+
+inference.
+intro /m n p/.
+apply /natural_eq_from_nat/.
+rewrite /-> timesn_to_nat , -> minusn_to_nat at all , -> timesn_to_nat at all/.
+apply /Nat.times_dist_minus_l/.
+qed ();
+
+
+
+lemma "timesn_dist_minusn_r"
+/
+  forall m n p . m *N (n -N p) = m *N n -N m *N p : natural
+/;
+
+inference.
+intro /m n p/.
+rewrite /-> timesn_commute at 0 1 2/.
+apply /timesn_dist_minusn_l/.
+qed ();
+
+
+
+lemma "natural_integral_domain"
+/
+  forall m n . 
+    m *N n = z`0 : natural
+    -> m = z`0 : natural % n = z`0 : natural
+/;
+
+inference.
+intro /m n H/.
+applyEq /natural_to_nat/ /_/ /H/ /H'/.
+rewrite /-> timesn_to_nat in H' , -> zeron_to_nat in H'/.
+so /Nat.nat_integral_domain _# 2 H'/ /Heq | Heq/.
+  {
+  left.
+  apply /natural_eq_from_nat/.
+  rewrite /-> zeron_to_nat/.
+  hyp /Heq/.
+  }
+
+  {
+  right.
+  apply /natural_eq_from_nat/.
+  rewrite /-> zeron_to_nat/.
+  hyp /Heq/.
+  }
+qed ();
+
+
+
+lemma "timesn_compat"
+/
+  forall m m' n n' .
+    m = m' : natural
+    -> n = n' : natural
+    -> m *N n = m' *N n' : natural
+/;
+
+inference.
+intro /m m' n n' Heqm Heqn/.
+compat >> auto.
+qed ();
+
+
+
+(* Minimum *)
+
+lemma "minn_commute"
+/
+  forall m n . minn m n = minn n m : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> minn_to_nat at all/.
+apply /Nat.min_commute/.
+qed ();
+
+
+
+lemma "minn_assoc"
+/
+  forall m n p . minn (minn m n) p = minn m (minn n p) : natural
+/;
+
+inference.
+intro /m n p/.
+apply /natural_eq_from_nat/.
+rewrite /-> minn_to_nat at all/.
+apply /Nat.min_assoc/.
+qed ();
+
+
+
+lemma "minn_ann_l"
+/
+  forall n . minn z`0 n = z`0 : natural
+/;
+
+inference.
+intro /n/.
+apply /natural_eq_from_nat/.
+rewrite /-> minn_to_nat , -> zeron_to_nat at all/.
+apply /Nat.min_ann_l/.
+qed ();
+
+
+
+lemma "minn_ann_r"
+/
+  forall n . minn n z`0 = z`0 : natural
+/;
+
+inference.
+intro /n/.
+rewrite /-> minn_commute/.
+apply /minn_ann_l/.
+qed ();
+
+
+
+lemma "minn_succn"
+/
+  forall m n . minn (succn m) (succn n) = succn (minn m n) : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> minn_to_nat , -> succn_to_nat at all , -> minn_to_nat/.
+apply /Nat.min_succ/.
+qed ();
+
+
+
+lemma "minn_leqn_l"
+/
+  forall m n . minn m n <N= m
+/;
+
+inference.
+intro /m n/.
+apply /leqn_from_nat/.
+rewrite /-> minn_to_nat/.
+apply /Nat.min_leq_l/.
+qed ();
+
+
+
+lemma "minn_leqn_r"
+/
+  forall m n . minn m n <N= n
+/;
+
+inference.
+intro /m n/.
+apply /leqn_from_nat/.
+rewrite /-> minn_to_nat/.
+apply /Nat.min_leq_r/.
+qed ();
+
+
+
+lemma "minn_glb"
+/
+  forall m n p .
+    p <N= m
+    -> p <N= n
+    -> p <N= minn m n
+/;
+
+inference.
+intro /m n p Hm Hn/.
+apply /leqn_from_nat/.
+rewrite /-> minn_to_nat/.
+apply /Nat.min_glb/ >> autoWith /natural_to_nat_mono/.
+qed ();
+
+
+
+lemma "minn_leqn"
+/
+  forall m m' n n' .
+    m <N= m'
+    -> n <N= n'
+    -> minn m n <N= minn m' n'
+/;
+
+inference.
+intro /m m' n n' Hm Hn/.
+apply /leqn_from_nat/.
+rewrite /-> minn_to_nat at all/.
+apply /Nat.min_leq/ >> autoWith /natural_to_nat_mono/.
+qed ();
+
+val minn_leqn = parseConstant /minn_leqn/;
+
+
+
+lemma "minn_eq_r"
+/
+  forall m n .
+    n <N= m
+    -> minn m n = n : natural
+/;
+
+inference.
+intro /m n H/.
+apply /natural_eq_from_nat/.
+rewrite /-> minn_to_nat/.
+apply /Nat.min_eq_r/.
+apply /natural_to_nat_mono/ >> auto.
+qed ();
+
+
+
+lemma "minn_eq_l"
+/
+  forall m n .
+    m <N= n
+    -> minn m n = m : natural
+/;
+
+inference.
+intro /m n Hmn/.
+rewrite /-> minn_commute/.
+apply /minn_eq_r/ >> auto.
+qed ();
+
+
+
+lemma "minn_idem"
+/
+  forall n . minn n n = n : natural
+/;
+
+inference.
+intro /n/.
+apply /minn_eq_l/.
+apply /leqn_refl/.
+qed ();
+
+
+
+lemma "plusn_dist_minn_r"
+/
+  forall m n p . m +N minn n p = minn (m +N n) (m +N p) : natural
+/;
+
+inference.
+intro /m n p/.
+apply /natural_eq_from_nat/.
+rewrite /-> plusn_to_nat , -> minn_to_nat at all , -> plusn_to_nat at all/.
+apply /Nat.plus_dist_min_r/.
+qed ();
+
+
+
+lemma "plusn_dist_minn_l"
+/
+  forall m n p . minn m n +N p = minn (m +N p) (n +N p) : natural
+/;
+
+inference.
+intro /m n p/.
+rewrite /-> plusn_commute at 0 1 2/.
+apply /plusn_dist_minn_r/.
+qed ();
+
+
+
+(* Maximum *)
+
+lemma "maxn_commute"
+/
+  forall m n . maxn m n = maxn n m : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> maxn_to_nat at all/.
+apply /Nat.max_commute/.
+qed ();
+
+
+
+lemma "maxn_assoc"
+/
+  forall m n p . maxn (maxn m n) p = maxn m (maxn n p) : natural
+/;
+
+inference.
+intro /m n p/.
+apply /natural_eq_from_nat/.
+rewrite /-> maxn_to_nat at all/.
+apply /Nat.max_assoc/.
+qed ();
+
+
+
+lemma "maxn_id_l"
+/
+  forall n . maxn z`0 n = n : natural
+/;
+
+inference.
+intro /n/.
+apply /natural_eq_from_nat/.
+rewrite /-> maxn_to_nat , -> zeron_to_nat/.
+apply /Nat.max_id_l/.
+qed ();
+
+
+
+lemma "maxn_id_r"
+/
+  forall n . maxn n z`0 = n : natural
+/;
+
+inference.
+intro /n/.
+rewrite /-> maxn_commute/.
+apply /maxn_id_l/.
+qed ();
+
+
+
+lemma "maxn_succn"
+/
+  forall m n . maxn (succn m) (succn n) = succn (maxn m n) : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> maxn_to_nat , -> succn_to_nat at all , -> maxn_to_nat/.
+apply /Nat.max_succ/.
+qed ();
+
+
+
+lemma "maxn_leqn_l"
+/
+  forall m n . m <N= maxn m n
+/;
+
+inference.
+intro /m n/.
+apply /leqn_from_nat/.
+rewrite /-> maxn_to_nat/.
+apply /Nat.max_leq_l/.
+qed ();
+
+
+
+lemma "maxn_leqn_r"
+/
+  forall m n . n <N= maxn m n
+/;
+
+inference.
+intro /m n/.
+apply /leqn_from_nat/.
+rewrite /-> maxn_to_nat/.
+apply /Nat.max_leq_r/.
+qed ();
+
+
+
+lemma "maxn_lub"
+/
+  forall m n p .
+    m <N= p
+    -> n <N= p
+    -> maxn m n <N= p
+/;
+
+inference.
+intro /m n p Hm Hn/.
+apply /leqn_from_nat/.
+rewrite /-> maxn_to_nat/.
+apply /Nat.max_lub/ >> autoWith /natural_to_nat_mono/.
+qed ();
+
+
+
+lemma "maxn_leqn"
+/
+  forall m m' n n' .
+    m <N= m'
+    -> n <N= n'
+    -> maxn m n <N= maxn m' n'
+/;
+
+inference.
+intro /m m' n n' Hm Hn/.
+apply /leqn_from_nat/.
+rewrite /-> maxn_to_nat at all/.
+apply /Nat.max_leq/ >> autoWith /natural_to_nat_mono/.
+qed ();
+
+val maxn_leqn = parseConstant /maxn_leqn/;
+
+
+
+lemma "maxn_eq_r"
+/
+  forall m n .
+    m <N= n
+    -> maxn m n = n : natural
+/;
+
+inference.
+intro /m n H/.
+apply /natural_eq_from_nat/.
+rewrite /-> maxn_to_nat/.
+apply /Nat.max_eq_r/.
+apply /natural_to_nat_mono/ >> auto.
+qed ();
+
+
+
+lemma "maxn_eq_l"
+/
+  forall m n .
+    n <N= m
+    -> maxn m n = m : natural
+/;
+
+inference.
+intro /m n Hmn/.
+rewrite /-> maxn_commute/.
+apply /maxn_eq_r/ >> auto.
+qed ();
+
+
+
+lemma "maxn_idem"
+/
+  forall n . maxn n n = n : natural
+/;
+
+inference.
+intro /n/.
+apply /maxn_eq_l/.
+apply /leqn_refl/.
+qed ();
+
+
+
+lemma "plusn_dist_maxn_r"
+/
+  forall m n p . m +N maxn n p = maxn (m +N n) (m +N p) : natural
+/;
+
+inference.
+intro /m n p/.
+apply /natural_eq_from_nat/.
+rewrite /-> plusn_to_nat , -> maxn_to_nat at all , -> plusn_to_nat at all/.
+apply /Nat.plus_dist_max_r/.
+qed ();
+
+
+
+lemma "plusn_dist_maxn_l"
+/
+  forall m n p . maxn m n +N p = maxn (m +N p) (n +N p) : natural
+/;
+
+inference.
+intro /m n p/.
+rewrite /-> plusn_commute at 0 1 2/.
+apply /plusn_dist_maxn_r/.
+qed ();
+
+
+
+lemma "minn_dist_maxn_r"
+/
+  forall m n p . minn m (maxn n p) = maxn (minn m n) (minn m p) : natural
+/;
+
+inference.
+intro /m n p/.
+apply /natural_eq_from_nat/.
+rewrite /-> minn_to_nat , -> maxn_to_nat at all , -> minn_to_nat at all/.
+apply /Nat.min_dist_max_r/.
+qed ();
+
+
+
+lemma "minn_dist_maxn_l"
+/
+  forall m n p . minn (maxn m n) p = maxn (minn m p) (minn n p) : natural
+/;
+
+inference.
+intro /m n p/.
+rewrite /-> minn_commute at 0 1 2/.
+apply /minn_dist_maxn_r/.
+qed ();
+
+
+
+lemma "maxn_dist_minn_r"
+/
+  forall m n p . maxn m (minn n p) = minn (maxn m n) (maxn m p) : natural
+/;
+
+inference.
+intro /m n p/.
+apply /natural_eq_from_nat/.
+rewrite /-> minn_to_nat , -> maxn_to_nat at all , -> minn_to_nat at all/.
+apply /Nat.max_dist_min_r/.
+qed ();
+
+
+
+lemma "maxn_dist_minn_l"
+/
+  forall m n p . maxn (minn m n) p = minn (maxn m p) (maxn n p) : natural
+/;
+
+inference.
+intro /m n p/.
+rewrite /-> maxn_commute at 0 1 2/.
+apply /maxn_dist_minn_r/.
+qed ();
+
+
+
+lemma "minn_maxn_same"
+/
+  forall m n . minn m (maxn m n) = m : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> minn_to_nat , -> maxn_to_nat/.
+apply /Nat.min_max_same/.
+qed ();
+
+
+
+lemma "maxn_minn_same"
+/
+  forall m n . maxn m (minn m n) = m : natural
+/;
+
+inference.
+intro /m n/.
+apply /natural_eq_from_nat/.
+rewrite /-> maxn_to_nat , -> minn_to_nat/.
+apply /Nat.max_min_same/.
+qed ();
+
+  
+
+(* Effective comparisons *)
+
+define /leqnb m n/
+/
+  leqzb m n
+//
+  natural -> natural -> bool
+/;
+
+unfold /leqnb/.
+unfold /natural at all/.
+typecheck.
+qed ();
+
+val leqnb = parseConstant /leqnb/;
+
+
+
+define /ltnb m n/
+/
+  ltzb m n
+//
+  natural -> natural -> bool
+/;
+
+unfold /ltnb/.
+unfold /natural at all/.
+typecheck.
+qed ();
+
+val ltnb = parseConstant /ltnb/;
+
+
+
+define /neqnb m n/
+/
+  Bool.notb (eqnb m n)
+//
+  natural -> natural -> bool
+/;
+
+unfold /neqnb/.
+typecheck.
+qed ();
+
+val neqnb = parseConstant /neqnb/;
+
+
+
+lemma "istrue_leqnb"
+/
+  forall m n . Bool.istrue (leqnb m n) <-> m <N= n
+/;
+
+inference.
+intro /m n/.
+unfold /leqnb , leqn/.
+destruct /m/ /[m _]/.
+destruct /n/ /[n _]/.
+apply /istrue_leqzb/.
+qed ();
+
+val istrue_leqnb = parseConstant /istrue_leqnb/;
+
+
+
+lemma "istrue_ltnb"
+/
+  forall m n . Bool.istrue (ltnb m n) <-> m <N n
+/;
+
+inference.
+intro /m n/.
+unfold /ltnb , ltn/.
+destruct /m/ /[m _]/.
+destruct /n/ /[n _]/.
+apply /istrue_ltzb/.
+qed ();
+
+val istrue_ltnb = parseConstant /istrue_ltnb/;
+
+
+
+lemma "istrue_neqnb"
+/
+  forall m n .
+    Bool.istrue (neqnb m n) <-> m != n : natural
+/;
+
+inference.
+intro /m n/.
+unfold /neqnb , neq/.
+rewrite /-> Bool.istrue_notb/.
+rewrite /-> istrue_eqnb/.
+reflexivity.
+qed ();
+
+val istrue_neqnb = parseConstant /istrue_neqnb/;
+
+
+
+lemma "notb_eqnb"
+/
+  forall m n . Bool.notb (eqnb m n) = neqnb m n : bool
+/;
+
+inference.
+intro /m n/.
+unfold /neqnb/.
+reflexivity.
+qed ();
+
+
+
+lemma "notb_neqnb"
+/
+  forall m n . Bool.notb (neqnb m n) = eqnb m n : bool
+/;
+
+inference.
+intro /m n/.
+unfold /neqnb/.
+apply /Bool.notb_invol/.
+qed ();
+
+
+
+lemma "notb_leqnb"
+/
+  forall m n . Bool.notb (leqnb m n) = ltnb n m : bool
+/;
+
+inference.
+intro /m n/.
+apply /Bool.iff_eq_bool/.
+rewrite /-> Bool.istrue_notb , -> istrue_leqnb , -> istrue_ltnb/.
+apply /not_leqn/.
+qed ();
+
+
+
+lemma "notb_ltnb"
+/
+  forall m n . Bool.notb (ltnb m n) = leqnb n m : bool
+/;
+
+inference.
+intro /m n/.
+rewrite /<- notb_leqnb/.
+apply /Bool.notb_invol/.
+qed ();
+
+
+
+(* Decidability *)
+
+lemma "neq_natural_decide"
+/
+  forall (m n : natural) . Decidable.decidable (m != n : natural)
+/;
+
+intro /m n/.
+unfold /neq/.
+apply /Decidable.decidable_not/.
+apply /Decidable.decidable_from_bool _ _ (eqnb m n)/.
+apply /istrue_eqnb/.
+qed ();
+
+
+
+lemma "leqn_decide"
+/
+  forall (m n : natural) . Decidable.decidable (m <N= n)
+/;
+
+intro /m n/.
+apply /Decidable.decidable_from_bool _ _ (leqnb m n)/.
+apply /istrue_leqnb/.
+qed ();
+
+  
+
+lemma "ltn_decide"
+/
+  forall (m n : natural) . Decidable.decidable (m <N n)
+/;
+
+intro /m n/.
+apply /Decidable.decidable_from_bool _ _ (ltnb m n)/.
+apply /istrue_ltnb/.
+qed ();
+
+
+
+lemma "eq_natural_stable"
+/
+  forall (m n : natural) . Stable.stable (m = n : natural)
+/;
+
+intro /m n/.
+apply /Stable.decidable_impl_stable/.
+apply /eq_natural_decide/.
+qed ();
+  
+
+
+lemma "neq_natural_stable"
+/
+  forall (m n : natural) . Stable.stable (m != n : natural)
+/;
+
+intro /m n/.
+apply /Stable.decidable_impl_stable/.
+apply /neq_natural_decide/.
+qed ();
+
+
+
+lemma "leqn_stable"
+/
+  forall (m n : natural) . Stable.stable (m <N= n)
+/;
+
+intro /m n/.
+apply /Stable.decidable_impl_stable/.
+apply /leqn_decide/.
+qed ();
+  
+
+
+lemma "ltn_stable"
+/
+  forall (m n : natural) . Stable.stable (m <N n)
+/;
+
+intro /m n/.
+apply /Stable.decidable_impl_stable/.
+apply /ltn_decide/.
+qed ();
+  
+
+
+lemma "leqn_iff_ltn_or_eq"
+/
+  forall m n . m <N= n <-> m <N n % m = n : natural
+/;
+
+inference.
+intro /m n/.
+split.
+  {
+  intro /Hleq/.
+  so /eq_natural_decide m n/ /Heq | Hneq/ >> auto.
+  left.
+  apply /ltn_from_leqn_neq/ >> auto.
+  }
+
+  {
+  intro /(Hlt | Heq)/.
+    {
+    apply /ltn_impl_leqn/ >> auto.
+    }
+
+    {
+    apply /leqn_refl_eq/ >> auto.
+    }
+  }
+qed ();
+
+
+
+lemma "natural_trichotomy"
+/
+  forall (m n : natural) . m <N n % m = n : natural % n <N m
+/;
+
+intro /m n/.
+so /Nat.nat_trichotomy (natural_to_nat m) (natural_to_nat n)/ /Hlt | Heq | Hgt/.
+  {
+  left.
+  apply /ltn_from_nat/ >> auto.
+  }
+
+  {
+  right >> left.
+  apply /natural_eq_from_nat/ >> auto.
+  }
+
+  {
+  right >> right.
+  apply /ltn_from_nat/ >> auto.
+  }
+qed ();
+
+
+
+lemma "natural_dichotomy"
+/
+  forall (m n : natural) . m <N= n % n <N m
+/;
+
+intro /m n/.
+so /natural_trichotomy m n/ /H | H | H/.
+  {
+  left.
+  apply /ltn_impl_leqn/ >> auto.
+  }
+
+  {
+  left.
+  apply /leqn_refl_eq/ >> auto.
+  }
+
+  {
+  right.
+  auto.
+  }
+qed ();
+
+
+
+lemma "natural_dichotomy_weak"
+/
+  forall (m n : natural) . m <N= n % n <N= m
+/;
+
+intro /m n/.
+so /natural_dichotomy m n/ /Hmn | Hnm/ >> autoWith /ltn_impl_leqn/.
+qed ();
+
+
+
+lemma "natural_dichotomy_neq"
+/
+  forall (m n : natural) .
+    m != n : natural
+    -> m <N n % n <N m
+/;
+
+intro /m n Hneq/.
+so /natural_trichotomy m n/ /H | H | H/ >> auto.
+so /Hneq __/ /0/.
+hyp /H/.
+qed ();
+
+
+
+writeRegistry /AfterNaturalAllEnv/
+  /[constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant]/
+  (Collapse (natural, natural_iter, ltn_well_founded, leqn, ltn, leqn_inhabitant, ltn_inhabitant, eqnb, leqnb, ltnb, neqnb, istrue_eqnb, istrue_leqnb, istrue_ltnb, istrue_neqnb, leqn_refl, leqn_trans, succn, plusn, minusn, timesn, minn, maxn, leqn_succn_succn, plusn_leqn, minusn_leqn, timesn_leqn, minn_leqn, maxn_leqn, leqn_implication));
+
+
+endModule ();

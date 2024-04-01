@@ -2,11 +2,74 @@
 openModule /List/;
 openModule /Bar/;
 openModule /Union/;
+openModule /Natural/;
+
 
 
 grammaroff ArithmeticNat;
+grammaron ArithmeticNatural;
+CheckpointedRef.assign Show.arithmetic (`"natural");
+
+
+
+lemma "rewrite_natural"
+/
+  forall a a' b c d e .
+    a <= a'
+    -> a' * b + c - d <= e
+    -> a * b + c - d <= e
+/;
+
+inference.
+intro /a a' b c d e H1 H2/.
+etransitivity.
+1:{
+  hyp /H2/.
+  }
+
+  typechecker ();
+rewrite /<- H1/.
+reflexivity.
+qed ();
+
+
+
+lemma "induction_natural"
+/
+  forall n . n + n = 2 * n : natural
+/;
+
+inference.
+intro /n/.
+induction /n/.
+  {
+  rewrite /-> timesn_0_r/.
+  rewrite /-> plusn_0_r/.
+  reflexivity.
+  }
+
+  {
+  intro /n IH/.
+  rewrite /-> plusn_succn/.
+  rewrite /-> plusn_commute/.
+  rewrite /-> plusn_succn/.
+  rewrite /-> timesn_dist_succn_r/.
+  unfold /succn at all/.
+  rewrite /-> IH/.
+  rewrite /<- plusn_assoc/.
+  compat.
+  unfold /plusn/.
+  reflexivity.
+  }
+qed ();
+
+
+
+grammaroff ArithmeticNatural;
 grammaron ArithmeticInteger;
 CheckpointedRef.assign Show.arithmetic (`"integer");
+
+
 
 lemma "overloading"
 /
@@ -16,9 +79,13 @@ lemma "overloading"
 omega.
 qed ();
 
+
+
 grammaroff ArithmeticInteger;
 grammaron ArithmeticNat;
 CheckpointedRef.assign Show.arithmetic (`"nat");
+
+
 
 lemma "overloading'"
 /

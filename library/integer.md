@@ -236,13 +236,15 @@ positive case that works upwards.
 
     nat_to_integer_mono_lt : type:nat_to_integer_mono_lt
 
-    plus_to_integer : type:plus_to_integer
+    integer_to_nat_zero : type:integer_to_nat_zero
 
     integer_to_nat_succ : type:integer_to_nat_succ
 
     integer_to_nat_mono : type:integer_to_nat_mono
 
     integer_to_nat_mono_lt : type:integer_to_nat_mono_lt
+
+    plus_to_integer : type:plus_to_integer
 
     plusz_to_nat : type:plusz_to_nat
 
@@ -346,6 +348,8 @@ positive case that works upwards.
     timesz_ltz_zero_invert : type:timesz_ltz_zero_invert
 
     times_to_integer : type:times_to_integer
+
+    timesz_to_nat : type:timesz_to_nat
 
     timesz_ltz_l : type:timesz_ltz_l
 

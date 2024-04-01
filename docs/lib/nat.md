@@ -88,6 +88,8 @@ This one gives transitivity in the form needed for rewriting:
 
     not_lt : forall (m n : nat) . not (m < n) <-> n <= m
 
+    leq_iff_lt_succ : forall (m n : nat) . m <= n <-> m < succ n
+
     lt_from_leq_neq : forall (m n : nat) . m <= n -> not (m = n : nat) -> m < n
 
 Strong induction for natural numbers:
@@ -339,8 +341,6 @@ Strong induction for natural numbers:
     notb_leqb : forall (m n : nat) . Bool.notb (leqb m n) = ltb n m : bool
 
     notb_ltb : forall (m n : nat) . Bool.notb (ltb m n) = leqb n m : bool
-
-
 
 
 ### Decidability

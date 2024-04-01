@@ -87,6 +87,8 @@ This one gives transitivity in the form needed for rewriting:
 
     not_lt : type:not_lt
 
+    leq_iff_lt_succ : type:leq_iff_lt_succ
+
     lt_from_leq_neq : type:lt_from_leq_neq
 
 Strong induction for natural numbers:
@@ -336,8 +338,6 @@ Strong induction for natural numbers:
     notb_leqb : type:notb_leqb
 
     notb_ltb : type:notb_ltb
-
-
 
 
 ### Decidability
