@@ -229,7 +229,7 @@ functor NormalizeFun (structure Term : TERM
                 (case strategy of
                     HARD =>
                        if isSoft (Constant.opacity const) then
-                          (* unfold the soft/firm constant regardless *)
+                          (* unfold the soft or firm constant regardless *)
                           let
                              val n = Option.valOf (Constant.definition const)
                           in
@@ -237,8 +237,12 @@ functor NormalizeFun (structure Term : TERM
                           end
 
                        else
-                          reduceOper HARD const spine 
-                             (Elim (Const const, spine))
+                          (case Redex.redex whnfHard const spine of
+                              NONE =>
+                                 Elim (m, spine)
+
+                            | SOME n =>
+                                 whnfMain HARD n id [])
 
                   | BASIC =>
                        if isReallySoft (Constant.opacity const) then
@@ -253,8 +257,12 @@ functor NormalizeFun (structure Term : TERM
                           Elim (Const const, spine)
 
                   | STANDARD =>
-                       reduceOper STANDARD const spine
-                          (Elim (Const const, spine)))
+                       (case Redex.redex whnfHard const spine of
+                           NONE =>
+                              Elim (m, spine)
+
+                         | SOME n =>
+                              whnfMain STANDARD n id []))
 
            | Elim (m1, spine') =>
                 whnfMain strategy m1 s (ssubstAppend spine' s spine)
@@ -286,45 +294,6 @@ functor NormalizeFun (structure Term : TERM
            | Marker _ => elim m spine)
 
          
-      (* Contract a user redex, if one exists.  Otherwise return default. *)
-      and reduceOper strategy const spine default =
-         (case Redex.redex const of
-             NONE => default
-
-           | SOME (i, binary, f) =>
-                (case List.splitOpt spine i of
-                    SOME (spine1, App arg :: spine2) =>
-                       let
-                          val arg' = whnfMain HARD arg id []
-                       in
-                          (* This is clunky and I wish it weren't necessary. *)
-                          if binary then
-                             (case spine2 of
-                                 App arg2 :: spine2' =>
-                                    let
-                                       val arg2' = whnfMain HARD arg2 id []
-                                    in
-                                       (case f spine1 arg' (App arg2' :: spine2') of
-                                           NONE => default
-
-                                         | SOME (m, _) =>
-                                              whnfMain strategy m id [])
-                                    end
-
-                               | _ =>
-                                    default)
-                          else
-                             (case f spine1 arg' spine2 of
-                                 NONE => default
-
-                               | SOME (m, _) =>
-                                    whnfMain strategy m id [])
-                       end
-
-                  | _ =>
-                       default))
-
-
       (* m is an intro *)
       and reduce strategy m spine =
          (case (m, spine) of
@@ -347,9 +316,10 @@ functor NormalizeFun (structure Term : TERM
                 Elim (m, spine))
 
 
+      and whnfHard m = whnfMain HARD m id []
+
 
       fun whnf m = whnfMain STANDARD m id []
-      fun whnfHard m = whnfMain HARD m id []
       fun whnfBasic m = whnfMain BASIC m id []
       
 

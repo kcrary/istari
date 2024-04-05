@@ -55,6 +55,8 @@ unfold /natural_to_nat , natural in n/.
 typecheck.
 qed ();
 
+val natural_to_nat = parseConstant /natural_to_nat/;
+
 
 
 lemma "nat_to_natural_inv"
@@ -371,7 +373,6 @@ destruct /n/ /[n Hn]/.
 unhide.
 boolCase /leqzb m n/ /Hleq/.
   {
-  rewrite /-> integer_to_nat_zero/.
   symmetry.
   apply /Nat.minus_proper/.
   apply /integer_to_nat_mono/ >> auto.
@@ -560,6 +561,27 @@ structure Nothing = AfterTimesn ();
 
 
 
+reductions
+/
+  nat_to_natural (zero) --> z`0 ;
+  nat_to_natural (succ n) --> plusn z`1 (nat_to_natural n) ;
+  unfolding nat_to_natural plusn
+/;
+
+Define.registerNativeUnary 0 (Define.unfold1 natural_to_nat 1);
+
+Define.registerNativeBinary 0 (Define.unfold1 plusn 2);
+
+Define.registerNativeBinary 0 (Define.unfold1 minusn 2);
+
+Define.registerNativeBinary 0 (Define.unfold1 timesn 2);
+
+Define.registerNativeBinary 0 (Define.unfold1 minn 2);
+
+Define.registerNativeBinary 0 (Define.unfold1 maxn 2);
+
+
+
 (* Want decidable equality early *)
 
 define /eqnb m n/
@@ -640,9 +662,7 @@ lemma "zeron_to_nat"
   natural_to_nat z`0 = 0 : nat
 /;
 
-apply /nat_eq_from_natural/.
-rewrite /-> zeron_to_natural/.
-rewrite /-> natural_to_nat_inv/.
+reduce //.
 reflexivity.
 qed ();
 
@@ -653,9 +673,6 @@ lemma "onen_to_nat"
   natural_to_nat z`1 = 1 : nat
 /;
 
-apply /nat_eq_from_natural/.
-unfold /nat_to_natural at 1/.
-rewrite /-> natural_to_nat_inv/.
 reflexivity.
 qed ();
 
@@ -666,7 +683,6 @@ lemma "onen_to_natural"
   nat_to_natural 1 = z`1 : natural
 /;
 
-unfold /nat_to_natural/.
 reflexivity.
 qed ();
 
@@ -684,6 +700,8 @@ typecheck.
 qed ();
 
 val succn = parseConstant /succn/;
+
+Define.registerNativeUnary 0 (Define.unfold1 succn 1);
 
 
 
@@ -743,15 +761,13 @@ intro /n/.
 destruct /n/ /| n/.
   {
   reduce //.
-  rewrite /-> zeron_to_natural at all/.
-  unfold /predn , minusn , natural/.
+  unfold /predn , natural/.
   extensionality >> auto.
   }
 
   {
   reduce //.
-  rewrite /-> succ_to_natural/.
-  unfold /succn , predn , minusn , plusn at all , natural , nat_to_natural at all/.
+  unfold /predn , minusn , plusn at all , natural , nat_to_natural at all/.
   extensionality.
   1:{
     apply /nat_to_integer_nonneg/.
@@ -829,6 +845,10 @@ boolCase /leqzb n z`0/ /Hleq/.
   }
 qed ();
 
+val natural_case = parseConstant /natural_case/;
+
+Define.registerNativeUnary 0 (Define.unfold1 natural_case 3);
+
 
 
 lemma "natural_case_zeron"
@@ -839,7 +859,6 @@ lemma "natural_case_zeron"
 
 inference.
 intro /i a hz hs/.
-unfold /natural_case/.
 reduce //.
 reflexivity.
 qed ();
@@ -964,6 +983,8 @@ qed ();
 
 val natural_iter = parseConstant /natural_iter/;
 
+Define.registerNativeUnary 3 (Define.unroll1 natural_iter 4);
+
 
 
 lemma "natural_iter_zeron"
@@ -974,7 +995,6 @@ lemma "natural_iter_zeron"
 
 inference.
 intro /i P hz hs/.
-unroll /natural_iter/.
 reduce //.
 reflexivity.
 qed ();
@@ -1409,7 +1429,7 @@ inference.
 intro /n H/.
 apply /Nat.lt_0_not (natural_to_nat n)/.
 rewrite /<- zeron_to_nat/.
-apply /natural_to_nat_mono_lt/ >> auto.
+apply /natural_to_nat_mono_lt n z`0/ >> auto.
 qed ();
 
 
@@ -1843,7 +1863,7 @@ lemma "predn_zeron"
   predn z`0 = z`0 : natural
 /;
 
-unfold /predn , minusn , natural/.
+unfold /predn , natural/.
 symmetry.
 extensionality >> auto.
 qed ();
@@ -2973,6 +2993,8 @@ qed ();
 
 val leqnb = parseConstant /leqnb/;
 
+Define.registerNativeBinary 0 (Define.unfold1 leqnb 2);
+
 
 
 define /ltnb m n/
@@ -2989,6 +3011,8 @@ qed ();
 
 val ltnb = parseConstant /ltnb/;
 
+Define.registerNativeBinary 0 (Define.unfold1 ltnb 2);
+
 
 
 define /neqnb m n/
@@ -3003,6 +3027,8 @@ typecheck.
 qed ();
 
 val neqnb = parseConstant /neqnb/;
+
+Define.registerNativeBinary 0 (Define.unfold1 neqnb 2);
 
 
 

@@ -31,6 +31,9 @@ signature REDUCTION =
       (* reduces native operations *)
       val native : reduction
 
+      (* does nothing on native terms, fails otherwise *)
+      val reflNative : reduction
+
       val user1 : reduction1 -> reduction
       val user2 : reduction2 -> reduction
 
@@ -162,6 +165,8 @@ functor ReductionFun (structure Term : TERM
 
       open Term
 
+      structure Table = HashTable (structure Key = Constant.Hashable)
+
       type reduction1 = constant * int * term
       type reduction2 = constant * int * int * constant * int * term
 
@@ -172,6 +177,7 @@ functor ReductionFun (structure Term : TERM
        | Within of int list * reduction
        | Compat of reduction list
        | Nativered
+       | ReflNative
        | User1 of reduction1
        | User2 of reduction2
 
@@ -185,6 +191,7 @@ functor ReductionFun (structure Term : TERM
       fun within p r = Within (p, r)
       fun compat l = Compat l
       val native = Nativered
+      val reflNative = ReflNative
       val user1 = User1
       val user2 = User2
 
@@ -234,6 +241,18 @@ functor ReductionFun (structure Term : TERM
 
 
       fun dec iopt = Option.map (fn i => i - 1) iopt
+
+
+
+      (* Put Native.operators into a form that can be searched efficiently. *)
+
+      val theOperators : Native.operator Table.table = Table.table 17
+
+      val () =
+         List.app
+            (fn (const, oper) => Table.insert theOperators const oper)
+            Native.operators
+
 
 
       fun reduceMain red m s spine =
@@ -338,14 +357,10 @@ functor ReductionFun (structure Term : TERM
            | Nativered =>
                 (case h of
                     Const const =>
-                       (case
-                           List.find 
-                              (fn (const', _) => Constant.eq (const, const'))
-                              Native.operators
-                        of
+                       (case Table.find theOperators const of
                            NONE => raise Reduce
 
-                         | SOME (_, Native.Unary f) =>
+                         | SOME (Native.Unary f) =>
                               (case spine of
                                   App arg :: spine' =>
                                      (case Simplify.simp arg id [] of
@@ -361,7 +376,7 @@ functor ReductionFun (structure Term : TERM
     
                                 | _ => raise Reduce)
 
-                         | SOME (_, Native.Binary f) =>
+                         | SOME (Native.Binary f) =>
                               (case spine of
                                   App arg1 :: App arg2 :: spine' =>
                                      (case (Simplify.simp arg1 id [], Simplify.simp arg2 id []) of
@@ -376,6 +391,12 @@ functor ReductionFun (structure Term : TERM
                                        | _ => raise Reduce)
     
                                 | _ => raise Reduce))
+
+                  | _ => raise Reduce)
+
+           | ReflNative =>
+                (case (h, spine) of
+                    (Native _, []) => Elim (h, spine)
 
                   | _ => raise Reduce))
 
@@ -500,7 +521,8 @@ functor ReductionFun (structure Term : TERM
                      | Compat _ => 4
                      | Nativered => 5
                      | User1 _ => 6
-                     | User2 _ => 7)
+                     | User2 _ => 7
+                     | ReflNative => 8)
                    [
                    P.wrap
                       (fn Trans l => l
@@ -540,7 +562,9 @@ functor ReductionFun (structure Term : TERM
                       (fn User2 r => r
                         | _ => raise impossible)
                       User2
-                      pu2
+                      pu2,
+
+                   P.const ReflNative
                    ])
 
       val puReduction1 =

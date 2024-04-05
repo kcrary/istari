@@ -6,9 +6,83 @@ openModule /Natural/;
 
 
 
+lemma "natural_iter_3"
+/
+  natural_iter (fn _ . nat) 1 (fn _ x . x +n x) z`3 = 8 : nat
+/;
+
+reduce //.
+reflexivity.
+qed ();
+
+
+
+define /zeron/
+/
+  z`0
+//
+  natural
+/;
+
+unfold /zeron/.
+typecheck.
+qed ();
+
+val _ =
+  makeReduction2
+    /
+    succn (zeron) --> z`1 ;
+    unfolding zeron
+    /;
+
+val _ =
+  makeReduction1
+    /
+    succn x --> plusn z`1 x ;
+    unfolding succn  (* fails without this *)
+    /;
+
+
+
 grammaroff ArithmeticNat;
 grammaron ArithmeticNatural;
 CheckpointedRef.assign Show.arithmetic (`"natural");
+
+
+
+lemma "one_plus_one"
+/
+  1 + 1 = 2 : natural
+/;
+
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "succ_one"
+/
+  succn 1 = 2 : natural
+/;
+
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "non_native_no_reduce"
+/
+  forall n . succn n = n + 1 : natural
+/;
+
+inference.
+intro /n/.
+reduce //.   (* should do nothing *)
+unfold /succn/.
+apply /plusn_commute/.
+qed ();
 
 
 
@@ -43,8 +117,6 @@ inference.
 intro /n/.
 induction /n/.
   {
-  rewrite /-> timesn_0_r/.
-  rewrite /-> plusn_0_r/.
   reflexivity.
   }
 
@@ -57,8 +129,7 @@ induction /n/.
   unfold /succn at all/.
   rewrite /-> IH/.
   rewrite /<- plusn_assoc/.
-  compat.
-  unfold /plusn/.
+  reduce //.
   reflexivity.
   }
 qed ();

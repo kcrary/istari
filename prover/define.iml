@@ -34,6 +34,18 @@ signature DEFINE =
 
       val register : Reduction.reduction2 -> unit
 
+      (* given i r, the active argument(s) are i and (if binary) i+1 *)
+      val registerNativeUnary : int -> Reduction.reduction1 -> unit
+      val registerNativeBinary : int -> Reduction.reduction1 -> unit
+
+      val reduction_to_reduction1 : constant -> int -> Reduction.reduction -> Reduction.reduction1
+
+      (* unfold1 const n = reduction_to_reduction1 const n (Reduction.trans [Reduction.unfold, Reduction.beta n]) *)
+      val unfold1 : constant -> int -> Reduction.reduction1
+
+      (* unfold1 const n = reduction_to_reduction1 const n (valOf (Database.findUnroll const)) *)
+      val unroll1 : constant -> int -> Reduction.reduction1
+
    end
 
 
@@ -45,10 +57,15 @@ signature DEFINE_INTERNAL =
 
       val recUnroller : Constant.constant -> Reduction.reduction
 
-      (* Returns all reductions registered for normalization (except primitive or imported ones). *)
-      val registered : unit -> Reduction.reduction2 list
+      datatype general_reduction =
+         Standard of Reduction.reduction2
+       | NativeUnary of int * Reduction.reduction1
+       | NativeBinary of int * Reduction.reduction1
 
-      val importReduction : Reduction.reduction2 -> unit
+      (* Returns all reductions registered for normalization (except primitive or imported ones). *)
+      val registered : unit -> general_reduction list
+
+      val importReduction : general_reduction -> unit
 
    end
 
@@ -60,6 +77,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
       structure C = CheckpointedRef
       structure D = Directory
       structure T = Term
+      structure N = Normalize
       structure P = ProverInternal
       structure R = ReductionInternal
       structure S = Seq
@@ -419,8 +437,14 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
 
 
+      datatype general_reduction =
+         Standard of R.reduction2
+       | NativeUnary of int * R.reduction1
+       | NativeBinary of int * R.reduction1
+
+
       (* All the registered reductions except primitive or imported ones. *)
-      val theRegistered : R.reduction2 list C.cref = C.new []
+      val theRegistered : general_reduction list C.cref = C.new []
                           
       (* All the registered reductions, in a format for autoreduce. *)
       val theStrat : R.reduction list Dict.dict C.cref =
@@ -439,40 +463,109 @@ structure DefineInternal :> DEFINE_INTERNAL =
                               [R.user2 r]
                               (fn l => R.user2 r :: l)
                         end)
-                    Dict.empty
+                    (List.foldl
+                        (fns (const, r) d => Dict.insert d const [r])
+                        Dict.empty
+                        PrimReductionInternal.hardcodes)
                     PrimReductionInternal.redices)
                 Native.operators)
 
 
-      fun register r =
+      fun registerMain exportable r =
          let
             val (const, _, _) = R.triggers r
          in
-            C.assign theRegistered (r :: C.deref theRegistered);
+            RedexInternal.register r;
+
+            if exportable then
+               C.assign theRegistered (Standard r :: C.deref theRegistered)
+            else
+               ();
 
             C.assign theStrat
                (Dict.insertMerge (C.deref theStrat) const
                    [R.user2 r]
-                   (fn l => R.user2 r :: l));
-
-            RedexInternal.register r
+                   (fn l => R.user2 r :: l))
          end
 
-      fun importReduction r =
+      fun registerNativeUnaryMain exportable i r =
          let
-            val (const, _, _) = R.triggers r
+            val const = R.trigger r
+            val r' = 
+               R.trans
+                  [R.compat (Int.natrecUp (fns _ l => R.refl :: l) [R.reflNative] i),
+                   R.user1 r]
          in
-            (* Don't put it into theRegistered, so it doesn't get written into the current file. *)
+            RedexInternal.registerNativeUnary i r;
+
+            if exportable then
+               C.assign theRegistered (NativeUnary (i, r) :: C.deref theRegistered)
+            else
+               ();
 
             C.assign theStrat
                (Dict.insertMerge (C.deref theStrat) const
-                   [R.user2 r]
-                   (fn l => R.user2 r :: l));
-
-            RedexInternal.register r
+                   [r']
+                   (fn l => r' :: l))
          end
+         
+      fun registerNativeBinaryMain exportable i r =
+         let
+            val const = R.trigger r
+            val r' = 
+               R.trans
+                  [R.compat (Int.natrecUp (fns _ l => R.refl :: l) [R.reflNative, R.reflNative] i),
+                   R.user1 r]
+         in
+            RedexInternal.registerNativeBinary i r;
+
+            if exportable then
+               C.assign theRegistered (NativeBinary (i, r) :: C.deref theRegistered)
+            else
+               ();
+
+            C.assign theStrat
+               (Dict.insertMerge (C.deref theStrat) const
+                   [r']
+                   (fn l => r' :: l))
+         end
+
+      val register = registerMain true
+      val registerNativeUnary = registerNativeUnaryMain true
+      val registerNativeBinary = registerNativeBinaryMain true
+         
+      fun importReduction gr =
+         (case gr of
+             Standard r => registerMain false r
+
+           | NativeUnary (i, r) => registerNativeUnaryMain false i r
+
+           | NativeBinary (i, r) => registerNativeBinaryMain false i r)
 
       fun registered () = C.deref theRegistered
+
+
+
+      fun reduction_to_reduction1 const n red =
+         let
+            val m =
+               T.Elim (T.Const const,
+                       Int.natrecUp
+                          (fns i l => T.App (T.Var i) :: l)
+                          []
+                          n)
+
+            val m' = R.reduce red m
+         in
+            R.new1 const n m' red R.refl
+         end
+
+      fun unfold1 const n =
+         reduction_to_reduction1 const n (R.trans [R.unfold, R.beta n])
+
+      fun unroll1 const n =
+         reduction_to_reduction1 const n (Option.valOf (Database.findUnroll const))
+
 
 
       fun makeReduction1 ((const, args, erhs), unf, unr) =

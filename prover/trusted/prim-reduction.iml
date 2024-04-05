@@ -35,6 +35,9 @@ signature PRIM_REDUCTION_INTERNAL =
 
       val redices : reduction2 list
 
+      type constant
+      val hardcodes : (constant * reduction) list
+
    end
 
 
@@ -49,6 +52,7 @@ functor PrimReductionFun (structure Term : TERM
                                                 where type elim = Term.elim)
    :> 
    PRIM_REDUCTION_INTERNAL
+   where type constant = Term.constant
    where type reduction = Reduction.reduction
    where type reduction1 = Reduction.reduction1
    where type reduction2 = Reduction.reduction2
@@ -148,14 +152,21 @@ functor PrimReductionFun (structure Term : TERM
 
       val () = theRedices := nat_case_zero :: nat_case_succ :: !theRedices
 
+      val redices = !theRedices
+      val () = theRedices := []
+
+
+
       val letnext_next =
          R.trans [R.unfold, R.beta 2, R.compat [R.beta 1]]
 
       val apply_fnann =
          R.trans [R.unfold, R.beta 3]
-   
 
-      val redices = !theRedices
-      val () = theRedices := []
+      type constant = T.constant
+
+      val hardcodes =
+         [(Prim.letnext, letnext_next),
+          (Prim.fnann, apply_fnann)]
 
    end

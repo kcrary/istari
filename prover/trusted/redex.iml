@@ -5,34 +5,16 @@ signature REDEX =
       type term
       type constant
       type elim
-      type reduction
 
 
-      (* redex const
+      (* redex whnf const spine
 
-         if    const has a reduction registered
-         then  returns SOME (i, binary, f)
-               where the (first) active argument of const is the ith
-               and for all spine1, m, spine2
-                   where |spine1| = i
-                         m is in simple form
-                   if    const spine1 m spine2 reduces
-                   then  f spine1 m spine2  returns  SOME (n, r)
-                         where  r : const spine1 m spine2 --> n
-                   else  f spine1 m spine2  returns  NONE
-         else  returns NONE
-
-         binary  iff  the const takes two active arguments
-         (the second always immediately follows the first)
-
-         if binary then i = 0
+         if    whnf computes the hard weak-head normal form of its input
+         then  if    const @ spine reduces to some M
+               then  returns SOME M
+               else  returns NONE
       *)
-      val redex : constant 
-                  -> (int * bool
-                      * (elim list
-                         -> term
-                         -> elim list
-                         -> (term * reduction) option)) option
+      val redex : (term -> term) -> constant -> elim list -> term option
 
    end
 
@@ -42,12 +24,15 @@ signature REDEX_INTERNAL =
 
       include REDEX
 
-
+      type reduction1
       type reduction2
 
-      (* You probably don't want this.  You probably want Define.register instead. *)
+      (* You probably don't want these.  You probably want Define.register, ... instead. *)
       val register : reduction2 -> unit
+      val registerNativeUnary : int -> reduction1 -> unit
+      val registerNativeBinary : int -> reduction1 -> unit
 
+      (* Returns true iff the constant has a reduction registered (including primitively). *)
       val registered : constant -> bool
 
    end
@@ -75,16 +60,19 @@ functor RedexFun (structure Term : TERM
    where type term = Term.term
    where type constant = Term.constant
    where type elim = Term.elim
-   where type reduction = Reduction.reduction
+   where type reduction1 = Reduction.reduction1
    where type reduction2 = Reduction.reduction2
    =
    struct
 
       structure R = Reduction
+      structure T = Term
 
-      open Term
+      type term = T.term
+      type constant = T.constant
+      type elim = T.elim
 
-      type reduction = Reduction.reduction
+      type reduction1 = Reduction.reduction1
       type reduction2 = Reduction.reduction2
 
       structure D = RedBlackDict (structure Key = Constant.Ordered)
@@ -95,131 +83,305 @@ functor RedexFun (structure Term : TERM
 
          The redex table directly implements redex (as above).
        
-         For user redices, we can have multiple reductions for a single constant.
-         The user table tracks all of those.  It returns a reference to a dictionary, 
-         and that reference is used in the reduction function we put into the redex 
-         table.
+         We use the user table for user-supppied redices, to prevent incompatible
+         reductions from being registered, and to combine compatible ones.
 
-         If triggers red = (const1, i, const2), then:
-         - the redex table maps const1 to (i, reduceUser i d), where !d maps const2 to red
-         - the user table maps const1 to (i, d)
+         If a reduction has been registered for const, then the userTable will map
+         const to a reduction sort.
+
+         - If the reduction is one or more standard reductions (i.e., reduction2s)
+           then the reduction sort will be STANDARD (i, d).
+
+           + i is the index of the constant's principal argument, which must agree
+             for all of const's redices
+
+           + d maps each reduction's second constant to the reduction
+
+           + Thus if red is a registered reduction2, and
+
+             triggers red = (const, i, const')
+
+             then the table will map const to NATIVE (i, d) where d maps const' to red.
+
+         - If the reduction is some other sort of reduction (unary native, binary native,
+           or hardcoded), the reduction sort will be OTHER.
       *)
 
-      val redexTable : (int * bool * (elim list -> term -> elim list -> (term * reduction) option)) H.table = H.table ()
+      val redexTable : ((term -> term) -> elim list -> term option) H.table = H.table ()
 
-      val userTable : (int * Reduction.reduction2 D.dict ref) H.table = H.table ()
+      datatype reduction_sort =
+         STANDARD of int * Reduction.reduction2 D.dict
+       | OTHER
 
-
-
-      fun redex const = H.find redexTable const
-
-
-
-      fun reduceUser d spine1 m spine3 =
-         (case m of
-             Elim (Const const', spine2) =>
-                (case D.find (!d) const' of
-                    NONE => NONE
-
-                  | SOME ured =>
-                       Option.map
-                          (fn n => (n, R.user2 ured))
-                          (try
-                              SOME (Reduction.ureduce2 ured spine1 spine2 spine3)
-                           with
-                              Reduction.Reduce => NONE))
-
-           | _ => NONE)
+      val userTable : reduction_sort H.table = H.table ()
 
 
-      fun register ured =
-         let
-            val (const, i, const') = Reduction.triggers ured
 
-            val ((i', d), old) =
-               H.lookupOrInsert' 
-                  userTable
-                  const
-                  (fn () => (i, ref (D.singleton const' ured)))
-         in
-            if i <> i' then
-               raise (Fail "incompatible arities in registered reductions")
-            else if old then
-               d := D.insert (!d) const' ured
-            else
-               H.insert redexTable const (i, false, reduceUser d)
-         end
+      fun redex whnf const spine =
+         (case H.find redexTable const of
+             NONE => NONE
+
+           | SOME f => f whnf spine)
 
       fun registered const = H.member redexTable const
 
 
-      
-      (* Register constants with primitive reductions. *)
+
+      (* standardRedex i d whnf spine
+
+         if    const's active argument has index i
+               forall all red in const's reductions, d maps red's second constant to red
+               whnf computes hard weak-head normal forms
+         then  if    const spine reduces to M
+               then  returns SOME M
+               else  returns NONE
+      *)
+      fun standardRedex i d whnf spine =
+         (case List.splitOpt spine i of
+             SOME (spine1, T.App arg :: spine3) =>
+                (case whnf arg of
+                    T.Elim (T.Const const', spine2) =>
+                       (case D.find d const' of
+                           SOME red =>
+                              (try
+                                  SOME (Reduction.ureduce2 red spine1 spine2 spine3)
+                               with
+                                  Reduction.Reduce => NONE)
+
+                         | NONE => NONE)
+
+                  | _ => NONE)
+
+           | _ => NONE)
+
+
+
+      (* nativeUnaryRedex i red whnf spine
+
+         if    const's active argument has index i
+               red is const's reduction
+               whnf computes hard weak-head normal forms
+         then  if    const spine reduces to M
+               then  returns SOME M
+               else  returns NONE
+      *)
+      fun nativeUnaryRedex i red whnf spine =
+         (case List.splitOpt spine i of
+             SOME (spine1, T.App arg :: spine2) =>
+                (case whnf arg of
+                    arg' as T.Native _ =>
+                       (try
+                           SOME (Reduction.ureduce1 red (spine1 @ T.App arg' :: spine2))
+                        with
+                           Reduction.Reduce => NONE)
+
+                  | _ => NONE)
+
+           | _ => NONE)
+
+
+
+      (* nativeBinaryRedex i red whnf spine
+
+         if    const's active arguments have indices i and i+1
+               red is const's reduction
+               whnf computes hard weak-head normal forms
+         then  if    const spine reduces to M
+               then  returns SOME M
+               else  returns NONE
+      *)
+      fun nativeBinaryRedex i red whnf spine =
+         (case List.splitOpt spine i of
+             SOME (spine1, T.App arg1 :: T.App arg2 :: spine2) =>
+                (case (whnf arg1, whnf arg2) of
+                    (arg1' as T.Native _, arg2' as T.Native _) =>
+                       (try
+                           SOME (Reduction.ureduce1 red (spine1 @ T.App arg1' :: T.App arg2' :: spine2))
+                        with
+                           Reduction.Reduce => NONE)
+
+                  | _ => NONE)
+
+           | _ => NONE)
+
+
+
+      fun register red =
+         let
+            val (const, i, const') = Reduction.triggers red
+
+            val (_, x) =
+               H.operate userTable const
+                  (fn () => STANDARD (i, D.singleton const' red))
+                  (fn STANDARD (i', d) =>
+                         if i <> i' then
+                            raise (Fail "inconsistent active argument in registered reductions")
+                         else
+                            let
+                               val (d', overlap) = D.insert' d const' red
+                            in
+                               if overlap then
+                                  raise (Fail "overlapping registered reductions")
+                               else
+                                  STANDARD (i, D.insert d const' red)
+                            end
+
+                    | OTHER =>
+                         raise (Fail "overlapping registered reductions"))
+         in
+            (case x of
+                STANDARD (_, d) =>
+                   H.insert redexTable const (standardRedex i d)
+
+              | OTHER =>
+                   raise (Fail "impossible"))
+         end
+
+
+
+      fun registerNativeUnary i red =
+         let
+            val const = Reduction.trigger red
+
+            val (_, old) =
+               H.operate userTable const
+                  (fn () =>
+                      (
+                      H.insert redexTable const (nativeUnaryRedex i red);
+                      OTHER
+                      ))
+                  (fn _ =>
+                      raise (Fail "overlapping registered reductions"))
+         in
+            ()
+         end
+             
+
+
+      fun registerNativeBinary i red =
+         let
+            val const = Reduction.trigger red
+
+            val (_, old) =
+               H.operate userTable const
+                  (fn () =>
+                      (
+                      H.insert redexTable const (nativeBinaryRedex i red);
+                      OTHER
+                      ))
+                  (fn _ =>
+                      raise (Fail "overlapping registered reductions"))
+         in
+            ()
+         end
+             
+
+
+      (* Primitive standard reductions *)
+
       val () = List.app register PrimReduction.redices
 
 
 
-      (* We have to hardcode letnext, rather than using the user reduction
-         mechanism, because its active argument expects an intro form
-         (Next) rather than a constant.
+      (* Primitive native reductions *)
+
+      (* primitiveNativeUnaryRedex f whnf spine
+
+         if    spine = Native(x) spine'
+               f x = SOME z
+         then  returns SOME (z @ spine')
+         else  returns NONE
       *)
+      fun primitiveNativeUnaryRedex f whnf spine =
+         (case spine of
+             T.App arg :: spine' =>
+                (case whnf arg of
+                    T.Native x =>
+                       (case f x of
+                           SOME z =>
+                              SOME (T.Elim (z, spine'))
 
-      fun reduceLetnext spine1 m spine2 =
-         (case (spine1, m, spine2) of
-             ([], Next arg, App body :: rest) =>
-                SOME (Elim (body, App arg :: rest), PrimReduction.letnext_next)
+                         | NONE => NONE)
 
-           | _ =>
-                NONE)
+                  | _ => NONE)
 
-      val () = H.insert redexTable Prim.letnext (0, false, reduceLetnext)
+           | _ => NONE)
+      
 
-      fun reduceFnann spine1 m spine2 =
-         (case (spine1, m, spine2) of
-             ([_], Lam (_, body), App arg :: rest) =>
-                SOME (Elim (Sub (body, Dot (arg, id)), rest), PrimReduction.apply_fnann)
+
+      (* primitiveNativeBinaryRedex f whnf spine
+
+         if    spine = Native(x) Native(y) spine'
+               f x y = SOME z
+         then  returns SOME (z @ spine')
+         else  returns NONE
+      *)
+      fun primitiveNativeBinaryRedex f whnf spine =
+         (case spine of
+             T.App arg1 :: T.App arg2 :: spine' =>
+                (case (whnf arg1, whnf arg2) of
+                    (T.Native x, T.Native y) =>
+                       (case f x y of
+                           SOME z =>
+                              SOME (T.Elim (z, spine'))
+
+                         | NONE => NONE)
+
+                  | _ => NONE)
 
            | _ => NONE)
 
-      val () = H.insert redexTable Prim.fnann (1, false, reduceFnann)
 
 
-      
-      (* Native reductions *)
-
-      fun reduceNative1 f spine1 m spine2 =
-         (case (spine1, m) of
-             ([], Native x) =>
-                (case f x of
-                    SOME y =>
-                       SOME (Elim (y, spine2), R.native)
-
-                  | NONE =>
-                       NONE)
-
-           | _ =>
-                NONE)
-
-      fun reduceNative2 f spine1 m spine2 =
-         (case (spine1, m, spine2) of
-             ([], Native x, App (Native y) :: rest) =>
-                (case f x y of
-                    SOME z =>
-                       SOME (Elim (z, rest), R.native)
-
-                  | NONE =>
-                       NONE)
-
-           | _ => 
-                NONE)
-             
       val () =
          List.app
             (fn (const, Native.Unary f) =>
-                   H.insert redexTable const (0, false, reduceNative1 f)
+                   (
+                   (* This happens at startup, so not bothering to check for overlapping. *)
+                   H.insert userTable const OTHER;
+                   H.insert redexTable const (primitiveNativeUnaryRedex f)
+                   )
 
               | (const, Native.Binary f) =>
-                   H.insert redexTable const (0, true, reduceNative2 f))
+                   (
+                   (* This happens at startup, so not bothering to check for overlapping. *)
+                   H.insert userTable const OTHER;
+                   H.insert redexTable const (primitiveNativeBinaryRedex f)
+                   ))
             Native.operators
+
+
+
+      (* Hardcoded primitive reductions *)
+
+      fun reduceLetnext whnf spine =
+         (case spine of
+             T.App arg :: T.App body :: spine' =>
+                (case whnf arg of
+                    T.Next arg' =>
+                       SOME (T.Elim (body, T.App arg' :: spine'))
+
+                  | _ => NONE)
+
+           | _ => NONE)
+
+      val () = H.insert userTable Prim.letnext OTHER
+      val () = H.insert redexTable Prim.letnext reduceLetnext
+                       
+
+
+      fun reduceFnann whnf spine =
+         (case spine of
+             _ :: T.App func :: T.App arg :: spine' =>
+                (case whnf func of
+                    T.Lam (_, body) =>
+                       SOME (T.Elim (T.Sub (body, T.Dot (arg, T.id)), spine'))
+
+                  | _ => NONE)
+
+           | _ => NONE)
+
+      val () = H.insert userTable Prim.fnann OTHER
+      val () = H.insert redexTable Prim.fnann reduceFnann
 
    end
