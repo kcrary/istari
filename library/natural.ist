@@ -3330,6 +3330,484 @@ qed ();
 
 
 
+(* Relation to integer *)
+
+define /natural_to_integer n/
+/
+  n
+//
+  natural -> integer
+/;
+
+unfold /natural_to_integer , natural/.
+typecheck.
+qed ();
+
+val natural_to_integer = parseConstant /natural_to_integer/;
+
+Define.registerNativeUnary 0 (Define.unfold1 natural_to_integer 1);
+
+
+
+define /integer_to_natural x/
+/
+  if leqzb x z`0 then z`0 else x
+//
+  integer -> natural
+/;
+
+introOf /x/.
+unfold /integer_to_natural/.
+unfold /natural/.
+typecheck.
+split.
+boolCase /leqzb x z`0/ /Hleq/ >> auto.
+rewrite /-> not_leqz in Hleq/.
+apply /ltz_impl_leqz/ >> auto.
+qed ();
+
+val integer_to_natural = parseConstant /integer_to_natural/;
+
+Define.registerNativeUnary 0 (Define.unfold1 integer_to_natural 1);
+
+
+
+lemma "natural_to_integer_inv"
+/
+  forall n . integer_to_natural (natural_to_integer n) = n : natural
+/;
+
+inference.
+intro /n/.
+symmetry.
+unfold /natural/.
+destruct /n/ /[n Hn]/.
+extensionality >> auto.
+unfold /natural_to_integer , integer_to_natural/.
+boolCase /leqzb n z`0/ /H/ >> auto.
+apply /leqz_antisymm/ >> auto.
+qed ();
+
+
+
+lemma "integer_to_natural_inv"
+/
+  forall a .
+    z`0 <z= a
+    -> natural_to_integer (integer_to_natural a) = a : integer
+/;
+
+inference.
+intro /a Hnonneg/.
+unfold /natural_to_integer , integer_to_natural/.
+boolCase /leqzb a z`0/ /H/ >> auto.
+apply /leqz_antisymm/ >> auto.
+qed ();
+
+
+
+lemma "natural_eq_from_integer"
+/
+  forall m n .
+    natural_to_integer m = natural_to_integer n : integer
+    -> m = n : natural
+/;
+
+inference.
+intro /m n Heq/.
+rewrite /<- natural_to_integer_inv m , <- natural_to_integer_inv n/.
+compat.
+auto.
+qed ();
+
+
+
+lemma "natural_to_integer_nonneg"
+/
+  forall n . z`0 <z= natural_to_integer n
+/;
+
+inference.
+intro /n/.
+destruct /n/ /[n Hn]/.
+unfold /natural_to_integer/.
+unhide.
+hyp /Hn/.
+qed ();
+
+
+
+lemma "natural_to_integer_mono"
+/
+  forall m n . m <N= n -> natural_to_integer m <z= natural_to_integer n
+/;
+
+inference.
+intro /m n H/.
+unfold /natural_to_integer at all/.
+unfold /leqn in H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "natural_to_integer_mono_lt"
+/
+  forall m n . m <N n -> natural_to_integer m <z natural_to_integer n
+/;
+
+inference.
+intro /m n H/.
+unfold /natural_to_integer at all/.
+unfold /ltn in H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "integer_to_natural_zero"
+/
+  integer_to_natural z`0 = z`0 : natural
+/;
+
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "integer_to_natural_succ"
+/
+  forall a . z`0 <z= a -> integer_to_natural (z`1 +z a) = succn (integer_to_natural a) : natural
+/;
+
+inference.
+intro /a Hnonneg/.
+unfold /natural/.
+extensionality.
+  {
+  unfold /succn/.
+  unfold /plusn/.
+  unfold /integer_to_natural at all/.
+  boolEq false /leqzb (z`1 +z a) z`0/.
+    {
+    rewrite /-> not_leqz/.
+    unfold /ltz/.
+    apply /plusz_leqz z`1 z`1 z`0 a/ >> auto.
+    }
+  boolCase /leqzb a z`0/ /H/.
+    {
+    so /leqz_antisymm _# 2 H Hnonneg/ /?/.
+    subst /a/.
+    reflexivity.
+    }
+
+    {
+    reflexivity.
+    }
+  }
+
+  {
+  unfold /integer_to_natural/.
+  boolCase /leqzb (z`1 +z a) z`0/ /H/ >> auto.
+  rewrite /-> not_leqz in H/.
+  apply /ltz_impl_leqz/ >> auto.
+  }
+qed ();
+
+
+
+lemma "integer_to_natural_mono"
+/
+  forall a b . a <z= b -> integer_to_natural a <N= integer_to_natural b
+/;
+
+inference.
+intro /a b Hab/.
+unfold /integer_to_natural at all/.
+boolCase /leqzb b z`0/ /Hb/.
+  {
+  boolEq true /leqzb a z`0/.
+    {
+    apply /leqz_trans/ >> auto.
+    }
+  apply /leqn_refl/.
+  }
+boolCase /leqzb a z`0/ /Ha/.
+  {
+  rewrite /-> not_leqz in Hb/.
+  unfold /leqn/.
+  apply /ltz_impl_leqz/ >> auto.
+  }
+
+  {
+  unfold /leqn/.
+  hyp /Hab/.
+  }
+qed ();
+
+
+
+lemma "integer_to_natural_mono_lt"
+/
+  forall a b .
+    z`0 <z= a
+    -> a <z b
+    -> integer_to_natural a <N integer_to_natural b
+/;
+
+inference.
+intro /a b Ha Hab/.
+unfold /ltn/.
+unfold /integer_to_natural at all/.
+boolEq false /leqzb b z`0/.
+  {
+  rewrite /-> not_leqz/.
+  apply /leqz_ltz_trans/ >> auto.
+  }
+boolCase /leqzb a z`0/ /Ha'/ >> auto.
+apply /leqz_ltz_trans/ >> auto.
+qed ();
+
+
+
+lemma "plusn_to_integer"
+/
+  forall m n . natural_to_integer (m +N n) = natural_to_integer m +z natural_to_integer n : integer
+/;
+
+inference.
+intro /m n/.
+unfold /plusn , natural_to_integer at all/.
+destruct /m/ /[m _]/.
+destruct /n/ /[n _]/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_to_natural"
+/
+  forall a b .
+    z`0 <z= a
+    -> z`0 <z= b
+    -> integer_to_natural (a +z b) = integer_to_natural a +N integer_to_natural b : natural
+/;
+
+inference.
+intro /a b Ha Hb/.
+apply /natural_eq_from_integer/.
+rewrite /-> plusn_to_integer at all/.
+rewrite /-> integer_to_natural_inv at all/ >> auto.
+apply /plusz_leqz z`0 _ z`0/ >> auto.
+qed ();
+
+
+
+lemma "predn_to_integer"
+/
+  forall n . 
+    z`0 <N n 
+    -> natural_to_integer (predn n) = z`-1 +z natural_to_integer n : integer
+/;
+
+inference.
+intro /n Hn/.
+destruct /n/ /[n _]/.
+unfold /predn , minusn , natural_to_integer at all/.
+unfold /ltn in Hn/.
+boolCase /leqzb n z`1/ /H/.
+  {
+  unfold /ltz in Hn/.
+  reduce /Hn/.
+  so /leqz_antisymm _ _ H Hn/ /?/.
+  subst /n/.
+  reduce //.
+  reflexivity.
+  }
+  
+  {
+  rewrite /-> plusz_commute/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "minusn_to_integer"
+/
+  forall m n .
+    n <N= m
+    -> natural_to_integer (m -N n) = natural_to_integer m -z natural_to_integer n : integer
+/;
+
+inference.
+intro /m n Hnm/.
+unfold /minusn , natural_to_integer at all/.
+destruct /m/ /[m Hm]/.
+destruct /n/ /[n Hn]/.
+unfold /leqn in Hnm/.
+boolCase /leqzb m n/ /Hmn/.
+  {
+  so /leqz_antisymm _ _ Hnm Hmn/ /?/.
+  subst /m/.
+  unfold /minusz/.
+  rewrite /-> plusz_inverse_r/.
+  reflexivity.
+  }
+
+  {
+  unfold /minusz/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "minusz_to_natural"
+/
+  forall a b .
+    z`0 <z= b
+    -> b <z= a
+    -> integer_to_natural (a -z b) = integer_to_natural a -N integer_to_natural b : natural
+/;
+
+inference.
+intro /a b Hb Hba/.
+apply /natural_eq_from_integer/.
+rewrite /-> minusn_to_integer/.
+  {
+  apply /integer_to_natural_mono/ >> auto.
+  }
+rewrite /-> integer_to_natural_inv at all/ >> auto.
+  {
+  unfold /minusz/.
+  apply /plusz_shift_leqz_r/.
+  rewrite /-> plusz_id_l/.
+  hyp /Hba/.
+  }
+
+  {
+  apply /leqz_trans/ >> auto.
+  }
+qed ();
+
+
+
+lemma "timesn_to_integer"
+/
+  forall m n .
+    natural_to_integer (m *N n) = natural_to_integer m *z natural_to_integer n : integer
+/;
+
+inference.
+intro /m n/.
+unfold /timesn , natural_to_integer at all/.
+destruct /m/ /[m _]/.
+destruct /n/ /[n _]/.
+reflexivity.
+qed ();
+
+
+
+lemma "timesz_to_natural"
+/
+  forall a b .
+    z`0 <z= a
+    -> z`0 <z= b
+    -> integer_to_natural (a *z b) = integer_to_natural a *N integer_to_natural b : natural
+/;
+
+inference.
+intro /a b Ha Hb/.
+apply /natural_eq_from_integer/.
+rewrite /-> timesn_to_integer/.
+rewrite /-> integer_to_natural_inv at all/ >> auto.
+apply /timesz_leqz z`0 _ z`0/ >> auto.
+qed ();
+
+
+
+lemma "minn_to_integer"
+/
+  forall m n .
+    natural_to_integer (minn m n) = minz (natural_to_integer m) (natural_to_integer n) : integer
+/;
+
+inference.
+intro /m n/.
+unfold /natural_to_integer at all/.
+unfold /minn/.
+unfold /natural in m in n/.
+reflexivity.
+qed ();
+
+
+
+lemma "maxn_to_integer"
+/
+  forall m n .
+    natural_to_integer (maxn m n) = maxz (natural_to_integer m) (natural_to_integer n) : integer
+/;
+
+inference.
+intro /m n/.
+unfold /natural_to_integer at all/.
+unfold /maxn/.
+unfold /natural in m in n/.
+reflexivity.
+qed ();
+
+
+
+lemma "minz_to_natural"
+/
+  forall a b .
+    integer_to_natural (minz a b) = minn (integer_to_natural a) (integer_to_natural b) : natural
+/;
+
+inference.
+assert /forall a b . a <z= b -> integer_to_natural (minz a b) = minn (integer_to_natural a) (integer_to_natural b) : natural/ /H/.
+  {
+  inference.
+  intro /a b Hab/.
+  rewrite /-> minz_eq_l/ >> auto.
+  rewrite /-> minn_eq_l/ >> auto.
+  apply /integer_to_natural_mono/ >> auto.
+  }
+intro /a b/.
+so /integer_dichotomy_weak a b/ /Hab | Hba/ >> auto.
+rewrite /-> minz_commute/.
+rewrite /-> minn_commute/.
+apply /H/ >> auto.
+qed ();
+
+
+
+lemma "maxz_to_natural"
+/
+  forall a b .
+    integer_to_natural (maxz a b) = maxn (integer_to_natural a) (integer_to_natural b) : natural
+/;
+
+inference.
+assert /forall a b . a <z= b -> integer_to_natural (maxz a b) = maxn (integer_to_natural a) (integer_to_natural b) : natural/ /H/.
+  {
+  inference.
+  intro /a b Hab/.
+  rewrite /-> maxz_eq_r/ >> auto.
+  rewrite /-> maxn_eq_r/ >> auto.
+  apply /integer_to_natural_mono/ >> auto.
+  }
+intro /a b/.
+so /integer_dichotomy_weak a b/ /Hab | Hba/ >> auto.
+rewrite /-> maxz_commute/.
+rewrite /-> maxn_commute/.
+apply /H/ >> auto.
+qed ();
+
+
+
 writeRegistry /AfterNaturalAllEnv/
   /[constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant constant]/
   (Collapse (natural, natural_iter, ltn_well_founded, leqn, ltn, leqn_inhabitant, ltn_inhabitant, eqnb, leqnb, ltnb, neqnb, istrue_eqnb, istrue_leqnb, istrue_ltnb, istrue_neqnb, leqn_refl, leqn_trans, succn, plusn, minusn, timesn, minn, maxn, leqn_succn_succn, plusn_leqn, minusn_leqn, timesn_leqn, minn_leqn, maxn_leqn, leqn_implication));

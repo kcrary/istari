@@ -155,6 +155,7 @@ Strong induction for natural numbers:
 ### Subtraction
 
     predn : type:predn
+          = def:predn
 
        predn_zeron : type:predn_zeron
 
@@ -424,3 +425,50 @@ Strong induction for natural numbers:
     maxn_to_nat : type:maxn_to_nat
 
     max_to_natural : type:max_to_natural
+
+
+### Relation to `integer`
+
+    natural_to_integer : type:natural_to_integer
+
+    integer_to_natural : type:integer_to_natural
+
+    natural_to_integer_inv : type:natural_to_integer_inv
+
+    integer_to_natural_inv : type:integer_to_natural_inv
+
+    natural_to_integer_nonneg : type:natural_to_integer_nonneg
+
+    natural_to_integer_mono : type:natural_to_integer_mono
+
+    natural_to_integer_mono_lt : type:natural_to_integer_mono_lt
+
+    integer_to_natural_zero : type:integer_to_natural_zero
+
+    integer_to_natural_succ : type:integer_to_natural_succ
+
+    integer_to_natural_mono : type:integer_to_natural_mono
+
+    integer_to_natural_mono_lt : type:integer_to_natural_mono_lt
+
+    plusn_to_integer : type:plusn_to_integer
+
+    plusz_to_natural : type:plusz_to_natural
+
+    predn_to_integer : type:predn_to_integer
+
+    minusn_to_integer : type:minusn_to_integer
+
+    minusz_to_natural : type:minusz_to_natural
+
+    timesn_to_integer : type:timesn_to_integer
+
+    timesz_to_natural : type:timesz_to_natural
+
+    minn_to_integer : type:minn_to_integer
+
+    maxn_to_integer : type:maxn_to_integer
+
+    minz_to_natural : type:minz_to_natural
+
+    maxz_to_natural : type:maxz_to_natural

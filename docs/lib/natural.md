@@ -183,6 +183,7 @@ Strong induction for natural numbers:
 ### Subtraction
 
     predn : natural -> natural
+          = fn n . n -N z`1
 
        predn_zeron : predn z`0 = z`0 : natural
 
@@ -486,3 +487,102 @@ Strong induction for natural numbers:
                         nat_to_natural (Nat.max m n)
                           = maxn (nat_to_natural m) (nat_to_natural n)
                           : natural
+
+
+### Relation to `integer`
+
+    natural_to_integer : natural -> integer
+
+    integer_to_natural : integer -> natural
+
+    natural_to_integer_inv : forall (n : natural) .
+                                integer_to_natural (natural_to_integer n) = n : natural
+
+    integer_to_natural_inv : forall (a : integer) .
+                                z`0 <z= a
+                                -> natural_to_integer (integer_to_natural a) = a : integer
+
+    natural_to_integer_nonneg : forall (n : natural) . z`0 <z= natural_to_integer n
+
+    natural_to_integer_mono : forall (m n : natural) .
+                                 m <N= n -> natural_to_integer m <z= natural_to_integer n
+
+    natural_to_integer_mono_lt : forall (m n : natural) .
+                                    m <N n -> natural_to_integer m <z natural_to_integer n
+
+    integer_to_natural_zero : integer_to_natural z`0 = z`0 : natural
+
+    integer_to_natural_succ : forall (a : integer) .
+                                 z`0 <z= a
+                                 -> integer_to_natural (z`1 +z a)
+                                      = succn (integer_to_natural a)
+                                      : natural
+
+    integer_to_natural_mono : forall (a b : integer) .
+                                 a <z= b -> integer_to_natural a <N= integer_to_natural b
+
+    integer_to_natural_mono_lt : forall (a b : integer) .
+                                    z`0 <z= a
+                                    -> a <z b
+                                    -> integer_to_natural a <N integer_to_natural b
+
+    plusn_to_integer : forall (m n : natural) .
+                          natural_to_integer (m +N n)
+                            = natural_to_integer m +z natural_to_integer n
+                            : integer
+
+    plusz_to_natural : forall (a b : integer) .
+                          z`0 <z= a
+                          -> z`0 <z= b
+                          -> integer_to_natural (a +z b)
+                               = integer_to_natural a +N integer_to_natural b
+                               : natural
+
+    predn_to_integer : forall (n : natural) .
+                          z`0 <N n
+                          -> natural_to_integer (predn n) = z`-1 +z natural_to_integer n : integer
+
+    minusn_to_integer : forall (m n : natural) .
+                           n <N= m
+                           -> natural_to_integer (m -N n)
+                                = natural_to_integer m -z natural_to_integer n
+                                : integer
+
+    minusz_to_natural : forall (a b : integer) .
+                           z`0 <z= b
+                           -> b <z= a
+                           -> integer_to_natural (a -z b)
+                                = integer_to_natural a -N integer_to_natural b
+                                : natural
+
+    timesn_to_integer : forall (m n : natural) .
+                           natural_to_integer (m *N n)
+                             = natural_to_integer m *z natural_to_integer n
+                             : integer
+
+    timesz_to_natural : forall (a b : integer) .
+                           z`0 <z= a
+                           -> z`0 <z= b
+                           -> integer_to_natural (a *z b)
+                                = integer_to_natural a *N integer_to_natural b
+                                : natural
+
+    minn_to_integer : forall (m n : natural) .
+                         natural_to_integer (minn m n)
+                           = Integer.minz (natural_to_integer m) (natural_to_integer n)
+                           : integer
+
+    maxn_to_integer : forall (m n : natural) .
+                         natural_to_integer (maxn m n)
+                           = Integer.maxz (natural_to_integer m) (natural_to_integer n)
+                           : integer
+
+    minz_to_natural : forall (a b : integer) .
+                         integer_to_natural (Integer.minz a b)
+                           = minn (integer_to_natural a) (integer_to_natural b)
+                           : natural
+
+    maxz_to_natural : forall (a b : integer) .
+                         integer_to_natural (Integer.maxz a b)
+                           = maxn (integer_to_natural a) (integer_to_natural b)
+                           : natural
