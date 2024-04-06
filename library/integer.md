@@ -244,6 +244,8 @@ positive case that works upwards.
 
     integer_to_nat_mono_lt : type:integer_to_nat_mono_lt
 
+    succ_to_integer : type:succ_to_integer
+
     plus_to_integer : type:plus_to_integer
 
     plusz_to_nat : type:plusz_to_nat

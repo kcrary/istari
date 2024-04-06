@@ -259,6 +259,9 @@ positive case that works upwards.
     integer_to_nat_mono_lt : forall (a b : integer) .
                                 z`0 <z= a -> a <z b -> integer_to_nat a < integer_to_nat b
 
+    succ_to_integer : forall (n : nat) .
+                         nat_to_integer (succ n) = z`1 +z nat_to_integer n : integer
+
     plus_to_integer : forall (m n : nat) .
                          nat_to_integer (m + n) = nat_to_integer m +z nat_to_integer n : integer
 

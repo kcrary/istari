@@ -1165,28 +1165,32 @@ The destruction tactics are:
 
 Omega understands the following constants in arithmetic expressions:
 
-- nat and integer literals,
+- nat and integer literals (integer literals also serve as the
+  literals for [natural](lib/natural.html)),
 
 - linear arithmetic (`succ`, `plus`, `pred`, `minus`, `plusz`, `negz`,
-  `minusz`),
+  `minusz`, `succn`, `plusn`, `predn`, `minusn`),
 
-- multiplication (`times`, `timesz`) in which at least one operand is
+- multiplication (`times`, `timesz`, `timesn`) in which at least one operand is
   a literal,
 
-- minimum and maximum (`min`, `max`, `minz`, `maxz`),
+- minimum and maximum (`min`, `max`, `minz`, `maxz`, `minn`, `maxn`),
 
-- `nat_to_integer`, and `integer_to_nat`.
+- conversions between `nat`, `integer`, and `natural`
+  (`nat_to_integer`, `integer_to_nat`, `nat_to_natural`,
+  `natural_to_nat`, `natural_to_integer`, `integer_to_nat`).
 
 Other expressions are uninterpreted and taken as additional variables.
 
 In propositions Omega understands:
 
-- equal and not-equal at `nat` or `integer`, 
+- equal and not-equal at `nat`, `integer`, or `natural`,
 
-- nat and integer inequalities (`leq`, `lt`, `leqz`, `ltz`),
+- nat, integer, and natural inequalities (`leq`, `lt`, `leqz`, `ltz`,
+  `leqn`, `ltn`),
 
 - the propositional connectives (`prod`, `sum`, `arrow`, `unit`,
-`void`).
+  `void`).
 
 Other propositions are treated as `void` in positive positions, and as
 `unit` in negative positions.
@@ -1207,9 +1211,9 @@ Nevertheless, it is possible for evars to leak through inference.
 
 Some forms require Omega to search multiple possibilities.  This
 includes `prod` in a positive position, `sum` or `arrow` in a negative
-position, and any function that is defined by cases (`minus`, `pred`,
-`min`, `max`, and `integer_to_nat`).  Each appearance of such a form
-doubles the effective size of the constraint, which will affect
+position, and any function that is defined by cases (*e.g.,* `minus`,
+`pred`, `min`, `max`, or `integer_to_nat`).  Each appearance of such
+a form doubles the effective size of the constraint, which will affect
 performance.  However, multiple occurrences of the same expression
 will not double the size multiple times.
 

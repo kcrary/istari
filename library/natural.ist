@@ -557,7 +557,7 @@ qed ();
 writeRegistry /AfterTimesnEnv/
   /[constant constant constant constant constant constant]/
   (Collapse (natural, leqn, ltn, plusn, minusn, timesn));
-structure Nothing = AfterTimesn ();
+structure NaturalTactic = AfterTimesn ();
 
 
 
@@ -3571,6 +3571,40 @@ qed ();
 
 
 
+lemma "integer_to_natural_nonpos"
+/
+  forall a .
+    a <z= z`0
+    -> integer_to_natural a = z`0 : natural
+/;
+
+inference.
+intro /a Ha/.
+unfold /integer_to_natural/.
+boolCase /leqzb a z`0/ /H/.
+  {
+  reflexivity.
+  }
+so /H Ha/ /0/.
+qed ();
+
+
+
+lemma "integer_to_natural_neg"
+/
+  forall a .
+    a <z z`0
+    -> integer_to_natural a = z`0 : natural
+/;
+
+inference.
+intro /a Ha/.
+apply /integer_to_natural_nonpos/.
+apply /ltz_impl_leqz/ >> auto.
+qed ();
+
+
+
 lemma "plusn_to_integer"
 /
   forall m n . natural_to_integer (m +N n) = natural_to_integer m +z natural_to_integer n : integer
@@ -3600,6 +3634,21 @@ apply /natural_eq_from_integer/.
 rewrite /-> plusn_to_integer at all/.
 rewrite /-> integer_to_natural_inv at all/ >> auto.
 apply /plusz_leqz z`0 _ z`0/ >> auto.
+qed ();
+
+
+
+lemma "succn_to_integer"
+/
+  forall n . natural_to_integer (succn n) = z`1 +z natural_to_integer n : integer
+/;
+
+inference.
+intro /n/.
+unfold /succn/.
+rewrite /-> plusn_to_integer/.
+reduce //.
+reflexivity.
 qed ();
 
 
@@ -3804,6 +3853,107 @@ so /integer_dichotomy_weak a b/ /Hab | Hba/ >> auto.
 rewrite /-> maxz_commute/.
 rewrite /-> maxn_commute/.
 apply /H/ >> auto.
+qed ();
+
+
+
+lemma "natural_to_nat_to_integer"
+/
+  forall n .
+    nat_to_integer (natural_to_nat n) = natural_to_integer n : integer
+/;
+
+inference.
+intro /n/.
+unfold /natural_to_nat , natural_to_integer/.
+destruct /n/ /[n Hn]/.
+unhide.
+apply /integer_to_nat_inv/.
+hyp /Hn/.
+qed ();
+
+
+
+lemma "integer_to_nat_to_natural"
+/
+  forall a .
+    nat_to_natural (integer_to_nat a) = integer_to_natural a : natural
+/;
+
+inference.
+intro /a/.
+apply /natural_eq_from_nat/.
+rewrite /-> nat_to_natural_inv/.
+unfold /natural_to_nat/.
+unfold /integer_to_natural/.
+boolCase /leqzb a z`0/ /H/.
+  {
+  apply /integer_to_nat_nonpos/ >> auto.
+  }
+  
+  {
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "nat_to_natural_to_integer"
+/
+  forall n .
+    natural_to_integer (nat_to_natural n) = nat_to_integer n : integer
+/;
+
+inference.
+intro /n/.
+rewrite /<- natural_to_nat_to_integer/.
+rewrite /-> nat_to_natural_inv/.
+reflexivity.
+qed ();
+
+
+
+lemma "integer_to_natural_to_nat"
+/
+  forall a .
+    natural_to_nat (integer_to_natural a) = integer_to_nat a : nat
+/;
+
+inference.
+intro /a/.
+rewrite /<- integer_to_nat_to_natural/.
+rewrite /-> nat_to_natural_inv/.
+reflexivity.
+qed ();
+
+
+
+lemma "nat_to_integer_to_natural"
+/
+  forall n .
+    integer_to_natural (nat_to_integer n) = nat_to_natural n : natural
+/;
+
+inference.
+intro /n/.
+rewrite /<- integer_to_nat_to_natural/.
+rewrite /-> nat_to_integer_inv/.
+reflexivity.
+qed ();
+
+
+
+lemma "natural_to_integer_to_nat"
+/
+  forall n .
+    integer_to_nat (natural_to_integer n) = natural_to_nat n : nat
+/;
+
+inference.
+intro /n/.
+rewrite /<- natural_to_nat_to_integer/.
+rewrite /-> nat_to_integer_inv/.
+reflexivity.
 qed ();
 
 

@@ -526,6 +526,12 @@ Strong induction for natural numbers:
                                     -> a <z b
                                     -> integer_to_natural a <N integer_to_natural b
 
+    integer_to_natural_nonpos : forall (a : integer) .
+                                   a <z= z`0 -> integer_to_natural a = z`0 : natural
+
+    integer_to_natural_neg : forall (a : integer) .
+                                a <z z`0 -> integer_to_natural a = z`0 : natural
+
     plusn_to_integer : forall (m n : natural) .
                           natural_to_integer (m +N n)
                             = natural_to_integer m +z natural_to_integer n
@@ -537,6 +543,9 @@ Strong induction for natural numbers:
                           -> integer_to_natural (a +z b)
                                = integer_to_natural a +N integer_to_natural b
                                : natural
+
+    succn_to_integer : forall (n : natural) .
+                          natural_to_integer (succn n) = z`1 +z natural_to_integer n : integer
 
     predn_to_integer : forall (n : natural) .
                           z`0 <N n
@@ -586,3 +595,33 @@ Strong induction for natural numbers:
                          integer_to_natural (Integer.maxz a b)
                            = maxn (integer_to_natural a) (integer_to_natural b)
                            : natural
+
+    natural_to_nat_to_integer : forall (n : natural) .
+                                   Integer.nat_to_integer (natural_to_nat n)
+                                     = natural_to_integer n
+                                     : integer
+
+    integer_to_nat_to_natural : forall (a : integer) .
+                                   nat_to_natural (Integer.integer_to_nat a)
+                                     = integer_to_natural a
+                                     : natural
+
+    nat_to_natural_to_integer : forall (n : nat) .
+                                   natural_to_integer (nat_to_natural n)
+                                     = Integer.nat_to_integer n
+                                     : integer
+
+    integer_to_natural_to_nat : forall (a : integer) .
+                                   natural_to_nat (integer_to_natural a)
+                                     = Integer.integer_to_nat a
+                                     : nat
+
+    nat_to_integer_to_natural : forall (n : nat) .
+                                   integer_to_natural (Integer.nat_to_integer n)
+                                     = nat_to_natural n
+                                     : natural
+
+    natural_to_integer_to_nat : forall (n : natural) .
+                                   Integer.integer_to_nat (natural_to_integer n)
+                                     = natural_to_nat n
+                                     : nat

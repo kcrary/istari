@@ -451,9 +451,15 @@ Strong induction for natural numbers:
 
     integer_to_natural_mono_lt : type:integer_to_natural_mono_lt
 
+    integer_to_natural_nonpos : type:integer_to_natural_nonpos
+
+    integer_to_natural_neg : type:integer_to_natural_neg
+
     plusn_to_integer : type:plusn_to_integer
 
     plusz_to_natural : type:plusz_to_natural
+
+    succn_to_integer : type:succn_to_integer
 
     predn_to_integer : type:predn_to_integer
 
@@ -472,3 +478,15 @@ Strong induction for natural numbers:
     minz_to_natural : type:minz_to_natural
 
     maxz_to_natural : type:maxz_to_natural
+
+    natural_to_nat_to_integer : type:natural_to_nat_to_integer
+
+    integer_to_nat_to_natural : type:integer_to_nat_to_natural
+
+    nat_to_natural_to_integer : type:nat_to_natural_to_integer
+
+    integer_to_natural_to_nat : type:integer_to_natural_to_nat
+
+    nat_to_integer_to_natural : type:nat_to_integer_to_natural
+
+    natural_to_integer_to_nat : type:natural_to_integer_to_nat
