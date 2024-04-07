@@ -198,12 +198,12 @@ unrolling ffix
 
 
 
-define /bindbart x b/
+define /bindbart x t/
 /
   ffix
     (fn g x .
        (case x of
-        | inl y . b y
+        | inl y . t y
         | inr y .
             let next g' = g
             in
@@ -219,7 +219,7 @@ define /bindbart x b/
 /;
 
 inference.
-introOf /i a x b/.
+introOf /i a x t/.
 unfold /bindbart/.
 fold /ffix ap (lsucc i)/.
 fold /ffix ap (lsucc i) ap (bar a -> U i)/.
@@ -234,9 +234,9 @@ val bindbart = parseConstant /bindbart/;
 
 reductions
 /
-  bindbart (now x) b --> b x ;
-  bindbart (laterf x) b --> let next y = x in future (bindbart y b) ;
-  bindbart (later x) b --> future (bindbart x b) ;
+  bindbart (now x) t --> t x ;
+  bindbart (laterf x) t --> let next y = x in future (bindbart y t) ;
+  bindbart (later x) t --> future (bindbart x t) ;
   unfolding letnext bindbart now later laterf
   unrolling ffix
 /;
@@ -323,7 +323,7 @@ writeRegistry /unroll_bfix/ /reduction1/ unroll_bfix;
 
 
 
-define /bar_iter P hn hl y/
+define /bar_iter hn hl y/
 /
   ffix
     (fn iterf y .
@@ -338,8 +338,7 @@ define /bar_iter P hn hl y/
               hl (next x) (next (iter x))))
     y
 //
-  intersect i (a : U i) .
-  forall (P : bar a -> U i) .
+  intersect i (a : U i) (P : bar a -> U i) .
     (forall (x : a) . P (now x))
     -> (forall (xf : future (bar a)) .
           let next x = xf
@@ -379,12 +378,122 @@ val bar_iter = parseConstant /bar_iter/;
 
 reductions
 /
-  bar_iter _ hn _ (now x) --> hn x ;
-  bar_iter P hn hl (laterf x) --> let next y = x in hl (next y) (next (bar_iter P hn hl y)) ;
-  bar_iter P hn hl (later x) --> hl (next x) (next (bar_iter P hn hl x)) ;
+  bar_iter hn _ (now x) --> hn x ;
+  bar_iter hn hl (laterf x) --> let next y = x in hl (next y) (next (bar_iter hn hl y)) ;
+  bar_iter hn hl (later x) --> hl (next x) (next (bar_iter hn hl x)) ;
   unfolding bar_iter now laterf later letnext
   unrolling ffix
 /;
+
+
+
+lemma "bindbar_id_left"
+/
+  forall i (a b : U i) (e : a) (f : a -> bar b) .
+    (bindbar x = now e in f x) = f e : bar b
+/;
+
+inference.
+intro /i a b e f/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "bindbar_id_right"
+/
+  forall i (a : U i) (m : bar a) .
+    (bindbar x = m in now x) = m : bar a
+/;
+
+inference.
+intro /i a/.
+apply /bar_iter/ >> reduce // >> auto.
+(* later *)
+intro /[x] [IH]/.
+unfold /later at 0 0/.
+compat.
+compat.
+hyp /IH/.
+qed ();
+
+
+
+lemma "bindbar_assoc"
+/
+  forall i (a b c : U i) (e : bar a) (f : a -> bar b) (g : b -> bar c) .
+    (bindbar y = (bindbar x = e in f x) in g y)
+    =
+    (bindbar x = e in bindbar y = f x in g y)
+    : bar c
+/;
+
+inference.
+intro /i a b c e f g/.
+revert /e/.
+apply /bar_iter/ >> reduce // >> auto.
+(* later *)
+intro /[x] [IH]/.
+unfold /later at 0 0/.
+compat.
+compat.
+hyp /IH/.
+qed ();
+
+
+
+lemma "bindbart_id_left"
+/
+  forall i (a : U i) (e : a) (t : a -> U i) .
+    bindbart x = now e in t x = t e : U i
+/;
+
+inference.
+intro /i a e t/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "bindbart_assoc"
+/
+  forall i (a b : U i) (e : bar a) (f : a -> bar b) (t : b -> U i) .
+    (bindbart y = (bindbar x = e in f x) in t y)
+    =
+    (bindbart x = e in bindbart y = f x in t y)
+    : U i
+/;
+
+inference.
+intro /i a b e f t/.
+revert /e/.
+apply /bar_iter/ >> reduce // >> auto.
+(* later *)
+intro /[x] [IH]/.
+RuleTactic.futureEqUniv >> auto.
+qed ();
+  
+  
+
+lemma "bindbart_map"
+/
+  forall i (a : U i) (b c : a -> U i) (e : bar a) .
+    (forall (x : a) . b x -> c x)
+    -> (bindbart x = e in b x)
+    -> (bindbart x = e in c x)
+/;
+
+inference.
+intro /i a b c e Himpl/.
+revert /e/.
+apply /bar_iter/ >> reduce // >> auto.
+(* later *)
+intro /[x] [IH] [H]/.
+split.
+apply /IH/ >> auto.
+qed ();
 
 
 

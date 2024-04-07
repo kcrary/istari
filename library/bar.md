@@ -52,12 +52,20 @@ The monadic bind is `bindbar`:
 
     bindbar : type:bindbar
 
-    bindbar (now x) f --> f x ;
-    bindbar (laterf x) f --> let next y = x in later (`bindbar y f)
-    bindbar (later x) f --> later (`bindbar x f)
+    `bindbar (now x) f --> f x ;
+    `bindbar (laterf x) f --> let next y = x in later (`bindbar y f)
+    `bindbar (later x) f --> later (`bindbar x f)
 
 The syntactic sugar `bindbar x = m in n` is accepted for 
 `` `bindbar m (fn x . n)``.
+
+The monad laws are respected:
+
+    bindbar_id_left : type:bindbar_id_left
+
+    bindbar_id_right : type:bindbar_id_right
+
+    bindbar_assoc : type:bindbar_assoc
 
 
 Observe that `bindbar` always produces an element of some `bar` type.  A
@@ -65,12 +73,18 @@ variation on it, `bindbart`, produces a type instead:
 
     bindbart : type:bindbart
 
-    bindbart (now x) b --> b x ;
-    bindbart (laterf x) b --> let next y = x in future (`bindbart y b) ;
-    bindbart (later x) b --> future (`bindbart x b) ;
+    `bindbart (now x) t --> t x ;
+    `bindbart (laterf x) t --> let next y = x in future (`bindbart y t) ;
+    `bindbart (later x) t --> future (`bindbart x t) ;
 
 The syntactic sugar `bindbart x = m in b` is accepted for 
 `` `bindbart m (fn x . b)``.
+
+The monad laws for `bindbart`:
+
+    bindbart_id_left : type:bindbart_id_left
+
+    bindbart_assoc : type:bindbart_assoc
 
 
 Bar is covariant:
@@ -104,12 +118,16 @@ The cases are `now` and `later`:
 
     bar_iter : type:bar_iter
 
-    bar_iter _ hn _ (now x) --> hn x
-    bar_iter P hn hl (laterf x) --> let next y = x in hl (next y) (next (bar_iter P hn hl y))
-    bar_iter P hn hl (later x) --> hl (next x) (next (bar_iter P hn hl x))
+    bar_iter hn _ (now x) --> hn x
+    bar_iter hn hl (laterf x) --> let next y = x in hl (next y) (next (bar_iter P hn hl y))
+    bar_iter hn hl (later x) --> hl (next x) (next (bar_iter P hn hl x))
 
 This is employed automatically by the `induction` tactic on hypotheses
 of `bar` type.
+
+A corollary of induction says we can map a function through `bindbart`:
+
+    bindbart_map : type:bindbart_map
 
 ---
 

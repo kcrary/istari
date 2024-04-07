@@ -54,12 +54,30 @@ The monadic bind is `bindbar`:
 
     bindbar : intersect (i : level) (a b : U i) . bar a -> (a -> bar b) -> bar b
 
-    bindbar (now x) f --> f x ;
-    bindbar (laterf x) f --> let next y = x in later (`bindbar y f)
-    bindbar (later x) f --> later (`bindbar x f)
+    `bindbar (now x) f --> f x ;
+    `bindbar (laterf x) f --> let next y = x in later (`bindbar y f)
+    `bindbar (later x) f --> later (`bindbar x f)
 
 The syntactic sugar `bindbar x = m in n` is accepted for 
 `` `bindbar m (fn x . n)``.
+
+The monad laws are respected:
+
+    bindbar_id_left : forall (i : level) (a b : U i) (e : a) (f : a -> bar b) .
+                         (bindbar x = now e in f x) = f e : bar b
+
+    bindbar_id_right : forall (i : level) (a : U i) (m : bar a) .
+                          (bindbar x = m in now x) = m : bar a
+
+    bindbar_assoc : forall
+                       (i : level)
+                       (a b c : U i)
+                       (e : bar a)
+                       (f : a -> bar b)
+                       (g : b -> bar c) .
+                       (bindbar y = (bindbar x = e in f x) in g y)
+                         = (bindbar x = e in bindbar y = f x in g y)
+                         : bar c
 
 
 Observe that `bindbar` always produces an element of some `bar` type.  A
@@ -67,12 +85,22 @@ variation on it, `bindbart`, produces a type instead:
 
     bindbart : intersect (i : level) (a : U i) . bar a -> (a -> U i) -> U i
 
-    bindbart (now x) b --> b x ;
-    bindbart (laterf x) b --> let next y = x in future (`bindbart y b) ;
-    bindbart (later x) b --> future (`bindbart x b) ;
+    `bindbart (now x) t --> t x ;
+    `bindbart (laterf x) t --> let next y = x in future (`bindbart y t) ;
+    `bindbart (later x) t --> future (`bindbart x t) ;
 
 The syntactic sugar `bindbart x = m in b` is accepted for 
 `` `bindbart m (fn x . b)``.
+
+The monad laws for `bindbart`:
+
+    bindbart_id_left : forall (i : level) (a : U i) (e : a) (t : a -> U i) .
+                          bindbart x = now e in t x = t e : U i
+
+    bindbart_assoc : forall (i : level) (a b : U i) (e : bar a) (f : a -> bar b) (t : b -> U i) .
+                        (bindbart y = (bindbar x = e in f x) in t y)
+                          = (bindbart x = e in bindbart y = f x in t y)
+                          : U i
 
 
 Bar is covariant:
@@ -104,19 +132,24 @@ admissibility requirement.  (See Smith [2], theorem 60.)
 We can iterate over partial objects using the `bar_iter` iterator.
 The cases are `now` and `later`:
 
-    bar_iter : intersect (i : level) (a : U i) .
-                  forall (P : bar a -> U i) .
-                    (forall (x : a) . P (now x))
-                    -> (forall (xf : future (bar a)) .
-                          let next x = xf in future (P x) -> P (later x))
-                    -> forall (x : bar a) . P x
+    bar_iter : intersect (i : level) (a : U i) (P : bar a -> U i) .
+                  (forall (x : a) . P (now x))
+                  -> (forall (xf : future (bar a)) . let next x = xf in future (P x) -> P (later x))
+                  -> forall (x : bar a) . P x
 
-    bar_iter _ hn _ (now x) --> hn x
-    bar_iter P hn hl (laterf x) --> let next y = x in hl (next y) (next (bar_iter P hn hl y))
-    bar_iter P hn hl (later x) --> hl (next x) (next (bar_iter P hn hl x))
+    bar_iter hn _ (now x) --> hn x
+    bar_iter hn hl (laterf x) --> let next y = x in hl (next y) (next (bar_iter P hn hl y))
+    bar_iter hn hl (later x) --> hl (next x) (next (bar_iter P hn hl x))
 
 This is employed automatically by the `induction` tactic on hypotheses
 of `bar` type.
+
+A corollary of induction says we can map a function through `bindbart`:
+
+    bindbart_map : forall (i : level) (a : U i) (b c : a -> U i) (e : bar a) .
+                      (forall (x : a) . b x -> c x)
+                      -> (bindbart x = e in b x)
+                      -> bindbart x = e in c x
 
 ---
 
