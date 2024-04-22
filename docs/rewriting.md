@@ -131,6 +131,14 @@ rewriter's weakening and compatibility tables.
     Folds the target term to become `M`.  (Finding hit numbers may be
     slow.)
 
+  + `folds [number n] /[term M] within [captures] [targets]/`
+
+    Folds the target term `n` times to become `M`.  The outermost form
+    of the target term must match precisely the outermost form of the
+    normal form of the `n`th unfolding of `M`.  Useful for adding
+    multiple `ap` annotations at once.  (Not very useful with multiple
+    terms at once, since each use must be folded *exactly* `n` times.)
+
 
 - `unfold /[constant/variable] [targets]/`
 
