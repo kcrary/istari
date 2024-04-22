@@ -9,6 +9,8 @@ signature DATATYPE =
       type typedef =
          (symbol * eterm) list               (* invisible pervasive arguments *)
          *
+         (symbol * eterm) list               (* intermediate pervasive arguments *)
+         *
          (symbol * eterm) list               (* visible pervasive arguments *)
          *
          eterm                               (* universe *)
@@ -43,6 +45,8 @@ signature DATATYPE =
 
       type bundle =
          int                          (* number of invisible pervasive arguments *)
+         *
+         int                          (* number of intermediate pervasive arguments *)
          *
          int                          (* number of visible pervasive arguments *)
          *
@@ -124,6 +128,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
+
       exception Datatype of string
 
       fun signalError msg = raise (Datatype
@@ -156,6 +161,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       type typedef =
          (symbol * eterm) list
          * (symbol * eterm) list
+         * (symbol * eterm) list
          * eterm
          * (symbol
             * (symbol option * eterm) list
@@ -165,10 +171,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          In the inner list, each element is (sym, conargs, indices).
 
          Note: all index arguments and internal arguments bind, even those arising from an arrow.
-         Invisible and pervasive arguments also always bind.  Internal arguments never bind.
+         Invisible, intermediate, and pervasive arguments also always bind.  Internal arguments
+         never bind.
       *)
       type rtypedef =
          (symbol * term) list
+         * (symbol * term) list
          * (symbol * term) list
          * term
          * (symbol
@@ -181,6 +189,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       (* Internal representation: as resolved, but with mxterms. *)
       type itypedef =
          (symbol * mxtype) list
+         * (symbol * mxtype) list
          * (symbol * mxtype) list
          * mxterm
          * (symbol
@@ -324,9 +333,15 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
       (* Turns the external syntax for datatypes into internal, resolving names. *)
-      fun resolve ((invis, pers, univ, dts) : typedef) : rtypedef =
+      fun resolve ((invis, inter, pers, univ, dts) : typedef) : rtypedef =
          try
             let
+               (* Invisible variables are available to each other, visible pervasive variables,
+                  and the universe, but nothing else.
+
+                  Intermediate and visible variables are available to everything.
+               *)
+   
                val (revinvis', invisdir) =
                   List.foldl
                      (fns (sym, em) (l, dir) =>
@@ -335,9 +350,14 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                      ([], D.iempty)
                      invis
    
-               (* Invisible variables are available to each other, visible pervasive variables,
-                  and the universe, but nothing else.
-               *)
+               val (revinter', interdir, fulldir) =
+                  List.foldl
+                     (fns (sym, em) (l, dir, fulldir) =>
+                         ((sym, ET.withidir fulldir em) :: l,
+                          D.ibind dir sym,
+                          D.ibind fulldir sym))
+                     ([], D.iempty, invisdir)
+                     inter
    
                val (revpers', visdir, fulldir) =
                   List.foldl
@@ -345,9 +365,13 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                          ((sym, ET.withidir fulldir em) :: l,
                           D.ibind dir sym,
                           D.ibind fulldir sym))
-                     ([], D.iempty, invisdir)
+                     ([], interdir, fulldir)
                      pers
    
+               (* fulldir contains all pervasives (invisible, intermediate, and visible);
+                  visdir contains intermediate and visible pervasives.
+               *)
+
                val univ' = ET.withidir fulldir univ
    
                val (bodydir, num, arities) =
@@ -489,7 +513,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                          end)
                      dts
             in
-               (List.rev revinvis', List.rev revpers', univ', dts')
+               (List.rev revinvis', List.rev revinter', List.rev revpers', univ', dts')
             end
          with
             D.Unbound sym =>
@@ -557,6 +581,19 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                  (g x1 x2 x3 x4, vs)
               end))
 
+      fun 'f joinres5 (g : 'a -> 'b -> 'c -> 'd -> 'e -> 'f) ((goals1, f1) : 'a res) ((goals2, f2) : 'b res) ((goals3, f3) : 'c res) ((goals4, f4) : 'd res) ((goals5, f5) : 'e res) : 'f res =
+         (goals1 @ goals2 @ goals3 @ goals4 @ goals5,
+          (fn vs =>
+              let
+                 val (x1, vs) = f1 vs
+                 val (x2, vs) = f2 vs
+                 val (x3, vs) = f3 vs
+                 val (x4, vs) = f4 vs
+                 val (x5, vs) = f5 vs
+              in
+                 (g x1 x2 x3 x4 x5, vs)
+              end))
+
       fun 'b mapres (g : 'a -> 'b res) (l : 'a list) : 'b list res =
          List.foldr
             (fns x res =>
@@ -589,7 +626,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          In the itypedef, each term comes with a tactic that proves it is well-formed 
          (using the validations from the typechecking goals).
       *)
-      fun reprocess ((invis, pers, univ, dts) : rtypedef) : (origin * goal) list * (validation list -> itypedef) =
+      fun reprocess ((invis, inter, pers, univ, dts) : rtypedef) : (origin * goal) list * (validation list -> itypedef) =
          let
             val ((invisdir, invisctx), invisres) =
                bifold
@@ -605,7 +642,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   invis
 
             
-            val ((fulldir, fullctx), persres) =
+            val ((interdir, interctx), interres) =
                bifold
                   (fns (sym, a) (dir, ctx) =>
                       ((D.bind dir sym,
@@ -616,6 +653,20 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                           (fns jud v => (sym, (a, jud, v)))))
                   (fn _ => nilres)
                   (invisdir, invisctx)
+                  inter
+
+            
+            val ((fulldir, fullctx), persres) =
+               bifold
+                  (fns (sym, a) (dir, ctx) =>
+                      ((D.bind dir sym,
+                        S.cons (J.Tm a) ctx),
+
+                       growres ("pervasive argument " ^ Symbol.toValue sym) dir ctx
+                          (T.apply1 Prim.istp a)
+                          (fns jud v => (sym, (a, jud, v)))))
+                  (fn _ => nilres)
+                  (interdir, interctx)
                   pers
 
             val univjud = J.make fullctx (T.apply2 Prim.ov (T.Const Prim.level) univ)
@@ -732,10 +783,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   dts
                   
             val (goals, f) =
-               joinres4
-                  (fns invis' pers' (univjud, univv) dts' => 
-                      (invis', pers', (univ, T.Const Prim.level, univjud, univv), dts'):itypedef)
-                  invisres persres univtacres dtsres
+               joinres5
+                  (fns invis' inter' pers' (univjud, univv) dts' => 
+                      (invis', inter', pers', (univ, T.Const Prim.level, univjud, univv), dts'):itypedef)
+                  invisres interres persres univtacres dtsres
          in
             (goals, (fn vs => 
                         (case f vs of 
@@ -1031,6 +1082,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          {
          invis : (symbol * mxtype) list,                         (* invisible pervasives *)
          invisnum : int,                                         (* number of invisible pervasives *)
+         inter : (symbol * mxtype) list,                         (* intermediate pervasives *)
+         internum : int,                                         (* number of intermediate pervasives *)
          pers : (symbol * mxtype) list,                          (* visible pervasives *)
          persnum : int,                                          (* number of visible pervasives *)
          univ : mxterm,                                          (* the universe *)
@@ -1114,21 +1167,23 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                
       val puEnv : environment P.pu =
          P.wrap
-            (fn ENV {invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions, totalConstructors} =>
-                (invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, (skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions, totalConstructors)))
-            (fn (invis, invisnum, pers, persnum, univ, a, dcons, tplist, conlist, (skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions, totalConstructors)) =>
-                ENV {invis=invis, invisnum=invisnum, pers=pers, persnum=persnum, univ=univ, a=a, dcons=dcons, tplist=tplist, conlist=conlist, skeleton=skeleton, subterm=subterm, subtermWf=subtermWf, discriminators=discriminators, extractorTypes=extractorTypes, extractors=extractors, discriminatorReductions=discriminatorReductions, extractorTypeReductions=extractorTypeReductions, extractorReductions=extractorReductions, totalConstructors=totalConstructors})
+            (fn ENV {invis, invisnum, inter, internum, pers, persnum, univ, a, dcons, tplist, conlist, skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, extractorTypeReductions, extractorReductions, totalConstructors} =>
+                (invis, invisnum, inter, internum, pers, persnum, univ, a, dcons, (tplist, conlist, skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, (extractorTypeReductions, extractorReductions, totalConstructors))))
+            (fn (invis, invisnum, inter, internum, pers, persnum, univ, a, dcons, (tplist, conlist, skeleton, subterm, subtermWf, discriminators, extractorTypes, extractors, discriminatorReductions, (extractorTypeReductions, extractorReductions, totalConstructors))) =>
+                ENV {invis=invis, invisnum=invisnum, inter=inter, internum=internum, pers=pers, persnum=persnum, univ=univ, a=a, dcons=dcons, tplist=tplist, conlist=conlist, skeleton=skeleton, subterm=subterm, subtermWf=subtermWf, discriminators=discriminators, extractorTypes=extractorTypes, extractors=extractors, discriminatorReductions=discriminatorReductions, extractorTypeReductions=extractorTypeReductions, extractorReductions=extractorReductions, totalConstructors=totalConstructors})
             (P.tuple10
                 (P.list (P.pair PP.puSymbol pumxt))
                 P.int
                 (P.list (P.pair PP.puSymbol pumxt))
                 P.int
+                (P.list (P.pair PP.puSymbol pumxt))
+                P.int
                 pumx
                 pumx
                 pumx
-                (P.list puTenv)
-                (P.list puCenv)
                 (P.tuple10
+                    (P.list puTenv)
+                    (P.list puCenv)
                     PP.puConstant
                     PP.puConstant
                     PP.puConstant
@@ -1136,9 +1191,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                     (P.vector PP.puConstant)
                     (P.vector PP.puConstant)
                     (P.vector R.puReduction2)
-                    (P.vector R.puReduction2)
-                    (P.vector R.puReduction2)
-                    P.int))
+                    (P.tuple3
+                        (P.vector R.puReduction2)
+                        (P.vector R.puReduction2)
+                        P.int)))
 
 
 
@@ -1150,7 +1206,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       *)
 
 
-      fun destructor (ENV {invis, pers, univ=univ_mobile, a=a_mobile, dcons=dcons_mobile, tplist, conlist}) =
+      fun destructor (ENV {invis, inter, pers, univ=univ_mobile, a=a_mobile, dcons=dcons_mobile, tplist, conlist}) =
          let
             val a = X.use a_mobile
             val dcons = X.use dcons_mobile
@@ -1222,19 +1278,23 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-            (* splitArgs cur hyp s persact pat set conargs
+            (* splitArgs cur hyp s actual pat set conargs
 
-               context looks like:
-               G, ..cur processed arguments.., <external>, <internal>, ..hyp..
+               actual contains the actual terms to instantiate intermediate and visible pervasives.
 
                G, ..processed arguments.. |- s : ..procesed external arguments..
-               G |- persact_i : pers_i[persact_i-1 ... persact_0 . id]
+               G |- actual_i : pers_i[persact_i-1 ... persact_0 . id]
                conargs still to examine
 
-               end with context looking like:
+               returns a tactic that takes a context looking like:
+
+               G, ..cur processed arguments.., <external>, <internal>, ..hyp..
+
+               to a context looking like:
+
                G, ..processed arguments.., ..hyp..
             *)
-            fun splitArgs cur hyp s persact conargs =
+            fun splitArgs cur hyp s actual conargs =
                (case conargs of
                    [] =>
                       refine (Rule.unitLeft hyp (T.evar ()))
@@ -1244,7 +1304,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                  | External _ :: rest =>
                       refine (Rule.existsLeft (hyp+1) (T.evar ()) (T.evar ()) (T.evar ()))
                       >>
-                      splitArgs (cur+1) hyp (T.under 1 s) persact rest
+                      splitArgs (cur+1) hyp (T.under 1 s) actual rest
 
                  | Internal (i, indices) :: rest =>
                       refine (Rule.prodLeft hyp (T.evar ()) (T.evar ()) (T.evar ()))
@@ -1259,7 +1319,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                         (T.Const const,
                                          List.map
                                             (fn m => T.App (T.Sub (m, T.Shift cur)))
-                                            persact
+                                            actual
                                          @
                                          List.map 
                                             (fn (m, _, _, _) => T.App (T.Sub (m, s)))
@@ -1267,7 +1327,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                     red)
                       end
                       >>
-                      splitArgs (cur+1) hyp (T.compose s T.shift1) persact rest)
+                      splitArgs (cur+1) hyp (T.compose s T.shift1) actual rest)
 
 
             fun destArgs hyp pats num set =
@@ -1300,7 +1360,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                    normalizeHyps max (i+1)) goal fk sk
 
 
-            fun destOne hyp persact origjud pat (CENV {tpnum=i, connum=j, args, numargs, indices}) set =
+            fun destOne hyp interact persact origjud pat (CENV {tpnum=i, connum=j, args, numargs, indices}) set =
                (case pat of
                    IP.And pats =>
                       let
@@ -1363,7 +1423,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                  refine (Rule.weaken 0 1)
                                  >>
                                  (* G, C, E ... <equalities> |- ... *)
-                                 splitArgs 0 (hyp+eqs) T.id persact args
+                                 splitArgs 0 (hyp+eqs) T.id (interact @ persact) args
                                  >>
                                  normalizeHyps eqs 0
                                  >>+
@@ -1405,7 +1465,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                  | _ => fail "datatype pattern expected")
 
 
-            fun destAll hyp persact origjud pats tpnum cons set =
+            fun destAll hyp interact persact origjud pats tpnum cons set =
                (case cons of
                    [] =>
                       (case pats of
@@ -1438,9 +1498,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       in
                          refine (Rule.sumLeft hyp (T.evar ()) (T.evar ()) (T.evar ()))
                          >>> [
-                             destOne hyp persact origjud pat con set,
+                             destOne hyp interact persact origjud pat con set,
    
-                             destAll hyp persact origjud pats' tpnum rest set
+                             destAll hyp interact persact origjud pats' tpnum rest set
                              ]
                       end)
 
@@ -1459,7 +1519,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                        val i = CD.lookup typeConstantsInvert const
                                        val TENV {red, args, adisj} = Vector.sub typeInfo i
                                        val sinvis = collectInvis invis X.id
-                                       val (s, persact, spine') = collectPers pers spine sinvis []
+                                       val (sinter, interact, spine') = collectPers inter spine sinvis []
+                                       val (s, persact, spine') = collectPers pers spine' sinter []
                                        val a_s = X.sub a s
                                     in
                                        (* G, const @ spine, G' |- C *)
@@ -1488,7 +1549,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                            >> idtacM (Seq.empty, DE.Tertiary),
                         
                                            (* G, unrolled, G' |- C *)
-                                           destAll hyp persact jud pats i conlist set
+                                           destAll hyp interact persact jud pats i conlist set
                                            ]
                                     end
                                  with
@@ -1509,7 +1570,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       val sym_s = Symbol.fromValue "s"
 
       fun inductor 
-         (ENV {invisnum=ninvis, persnum=nvis, skeleton=skeletonConst, subterm=subtermConst, subtermWf=subtermWfConst, tplist})
+         (ENV {invisnum=ninvis, internum=ninter, persnum=nvis, skeleton=skeletonConst, subterm=subtermConst, subtermWf=subtermWfConst, tplist})
          const nind stripConst
          =
          let
@@ -1524,16 +1585,34 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       val eindtp = ET.absolute dir indtp
                       val concl = ET.absolute dir (J.concl jud)
 
-                      do (visSpine, indVars, indTypes) =
+                      do (interSpine, visSpine, indVars, indTypes) =
                          tryf
                          (fn () =>
                              let
-                                val (visSpine, indSpine) =
-                                   (case List.splitOpt spine nvis of
+                                val (interSpine, spine') =
+                                   (case List.splitOpt spine ninter of
                                        NONE =>
                                           raise (Tryf "type error in hypothesis for induction")
 
                                      | SOME spines => spines)
+
+                                val (visSpine, indSpine) =
+                                   (case List.splitOpt spine' nvis of
+                                       NONE =>
+                                          raise (Tryf "type error in hypothesis for induction")
+
+                                     | SOME spines => spines)
+
+                                val interSpine' =
+                                   List.map
+                                      (fn elim =>
+                                          (case elim of
+                                              T.App m =>
+                                                 ET.absolute dir m
+
+                                            | _ =>
+                                                 raise (Tryf "type error in hypothesis for induction")))
+                                      interSpine
 
                                 val visSpine' =
                                    List.map
@@ -1575,7 +1654,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                       indSpine
                              in
                                 if nind' = nind then
-                                   (visSpine', indVars, indTypes)
+                                   (interSpine', visSpine', indVars, indTypes)
                                 else
                                    raise (Tryf "type error in hypothesis for induction")
                              end)
@@ -1583,9 +1662,11 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       val invisSpine =
                          natrecl ninvis (fns _ l => ET.evar :: l) []
 
-                      val pervSpine = invisSpine @ visSpine
+                      val interVisSpine = interSpine @ visSpine
 
-                      val skelTp = ET.applyn skeletonConst visSpine
+                      val pervSpine = invisSpine @ interVisSpine
+
+                      val skelTp = ET.applyn skeletonConst (interSpine @ visSpine)
 
                       val set = D.set dir
                       val (ih, set) = D.freshAndBindSet set
@@ -1612,6 +1693,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       val espine = visSpine @ List.map ET.var indVars
                       val espine' = visSpine @ List.map ET.var indVars'
 
+                      val dynspine = List.drop spine ninter
+
                       val newIH =
                          ET.subst (ET.app (ET.applyn stripConst espine) (ET.var indvar)) alt $
                          foldr2
@@ -1621,7 +1704,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                 (ET.lam (SOME indvar)
                                     (ET.apply2 Prim.arrow
                                         (ET.appn
-                                            (ET.applyn subtermConst visSpine)
+                                            (ET.applyn subtermConst interVisSpine)
                                             [ET.app (ET.applyn stripConst espine) (ET.var indvar),
                                              ET.var alt])
                                         concl)))
@@ -1630,7 +1713,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                    in
                       Generalize.setEqPriority
                          skel
-                         (ET.literal (T.app (T.Elim (T.Const stripConst, spine)) T.zero))  (* nothing has moved yet *)
+                         (ET.literal (T.app (T.Elim (T.Const stripConst, dynspine)) T.zero))  (* nothing has moved yet *)
                          skelTp
                          (SOME skelEq)
                       >>!
@@ -1676,7 +1759,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                                EqualityTactic.reflexivityPriority
                                ],
-                          
+
                           Hyp.clear [Hyp.NAME skel, Hyp.NAME h, Hyp.NAME skelEq]
                           >>
                           idtacM Primary
@@ -2019,6 +2102,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       type bundle =
          int                          (* number of invisible pervasive arguments *)
          *
+         int                          (* number of intermediate pervasive arguments *)
+         *
          int                          (* number of visible pervasive arguments *)
          *
          int                          (* number of mutually recursive datatypes *)
@@ -2054,7 +2139,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-      fun populate (env as ENV {invisnum=numberOfInvisibleArgs, persnum=numberOfVisibleArgs, tplist, conlist, discriminators, totalConstructors}) =
+      fun populate (env as ENV {invisnum=numberOfInvisibleArgs, internum=numberOfIntermediateArgs, persnum=numberOfVisibleArgs, tplist, conlist, discriminators, totalConstructors}) =
          let
             val destructor' = destructor env
             val injector' = injector env
@@ -2068,7 +2153,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
    
                       insert InductionInternal.inductionTactics const (inductor env const numberOfIndexArgs strip);
    
-                      insert InductionInternal.iterators const (iterator, numberOfVisibleArgs, numberOfIndexArgs);
+                      insert InductionInternal.iterators const (iterator, numberOfIntermediateArgs + numberOfVisibleArgs, numberOfIndexArgs);
    
                       insert EqualityTacticInternal.injectionTactics const injector'
                       ))
@@ -2105,6 +2190,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             val bundle =
                (numberOfInvisibleArgs,
+                numberOfIntermediateArgs,
                 numberOfVisibleArgs,
                 numberOfDatatypes,
                 totalConstructors,
@@ -2140,7 +2226,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
       (* Does the main work of building the datatypes. *)
-      fun makeDatatype (typedef as (invis, pers, univ_mobile, dts) : itypedef) =
+      fun makeDatatype (typedef as (invis, inter, pers, univ_mobile, dts) : itypedef) =
          let
             val mut = List.length dts
 
@@ -2158,7 +2244,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       (Seq.cons (J.Tm cterm) ctx,
                        X.tuse c :: xctx))
                   (Seq.empty, [])
-                  (invis @ pers)
+                  (invis @ inter @ pers)
 
 
             val univ = X.use univ_mobile
@@ -2345,57 +2431,81 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             (* 3. Useful definitions *)
 
-            fun wrap m =
+            (* swrap : invisible arguments are intersect, intermediate and visible arguments are forall
+               dwrap : invisible and intermediate arguments are intersect, visible arguments are forall
+               lwrap : all arguments are forall
+
+               The Xwraptp versions build a type rather than an xterm.  You can extract a type from an xterm,
+               and it will be equivalent to the one we want, but it won't look as nice.
+            *)
+
+            val interPers = inter @ pers
+            val invisInter = invis @ inter
+            val invisInterPers = invis @ interPers
+
+            fun swrap m =
+               List.foldr
+                  (fns (sym, d) n => X.lamInt (SOME sym) (X.tuse d) n)
+                  (List.foldr
+                      (fns (sym, d) n => X.lamAll (SOME sym) (X.tuse d) n)
+                      m
+                      interPers)
+                  invis
+
+            fun swraptp m =
+               List.foldr
+                  (fns (sym, (d, _, _)) n => T.apply2 Prim.intersect d (T.Lam (SOME sym, n)))
+                  (List.foldr
+                      (fns (sym, (d, _, _)) n => T.apply2 Prim.forall d (T.Lam (SOME sym, n)))
+                      m
+                      interPers)
+                  invis
+
+            fun dwrap m =
                List.foldr
                   (fns (sym, d) n => X.lamInt (SOME sym) (X.tuse d) n)
                   (List.foldr
                       (fns (sym, d) n => X.lamAll (SOME sym) (X.tuse d) n)
                       m
                       pers)
-                  invis
+                  invisInter
 
-            fun wraptp m =
+            fun dwraptp m =
                List.foldr
                   (fns (sym, (d, _, _)) n => T.apply2 Prim.intersect d (T.Lam (SOME sym, n)))
                   (List.foldr
                       (fns (sym, (d, _, _)) n => T.apply2 Prim.forall d (T.Lam (SOME sym, n)))
                       m
                       pers)
-                  invis
+                  invisInter
 
-            (* same as wrap/wraptp, but intersections replaced by forall *)
-
-            fun wrapLemma m =
+            fun lwrap m =
                List.foldr
                   (fns (sym, d) n => X.lamAll (SOME sym) (X.tuse d) n)
-                  (List.foldr
-                      (fns (sym, d) n => X.lamAll (SOME sym) (X.tuse d) n)
-                      m
-                      pers)
-                  invis
+                  m
+                  invisInterPers
 
-            fun wraptpLemma m =
+            fun lwraptp m =
                List.foldr
                   (fns (sym, (d, _, _)) n => T.apply2 Prim.forall d (T.Lam (SOME sym, n)))
-                  (List.foldr
-                      (fns (sym, (d, _, _)) n => T.apply2 Prim.forall d (T.Lam (SOME sym, n)))
-                      m
-                      pers)
-                  invis
+                  m
+                  invisInterPers
 
             (* to fill in pervasive arguments, when in the scope of pervasive arguments *)
             val (_, topargs) =
                List.foldr
                   (fns (_, c) (i, l) => (i+1, X.var i (X.tuse c) :: l))
                   (0, [])
-                  (invis @ pers)
+                  invisInterPers
 
             val numberOfInvisibleArgs = List.length invis
-            val numberOfVisibleArgs = List.length pers
-            val numberOfPervasiveArgs = numberOfInvisibleArgs + numberOfVisibleArgs
+            val numberOfIntermediateArgs = List.length inter
+            val numberOfDynVisibleArgs = List.length pers
+            val numberOfStatVisibleArgs = numberOfIntermediateArgs + numberOfDynVisibleArgs
+            val numberOfPervasiveArgs = numberOfInvisibleArgs + numberOfStatVisibleArgs
 
-            val topvisargsSpine =
-               natrecr numberOfVisibleArgs
+            val topstatvisargsSpine =
+               natrecr numberOfStatVisibleArgs
                   (fns i l => T.App (T.Var i) :: l)
                   []
 
@@ -2410,13 +2520,13 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             val skeletonConst =
                define
                   (Symbol.fromValue (firstName ^ "_skel"))
-                  (wrap (X.apps (xconstant constRep) [univ, a, dcons]))
-                  (wraptp (T.apply1 Prim.univ (X.term univ)))
+                  (swrap (X.apps (xconstant constRep) [univ, a, dcons]))
+                  (swraptp (T.apply1 Prim.univ (X.term univ)))
 
             val skel = tcompact ctxPers $ X.forget $ X.apps (xconstant constRep) [univ, a, dcons]
 
             val skeltp = 
-               T.Elim (T.Const skeletonConst, topvisargsSpine)
+               T.Elim (T.Const skeletonConst, topstatvisargsSpine)
 
             val subterm =
                compact ctxPers $
@@ -2431,10 +2541,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             val subtermConst =
                define
                   (Symbol.fromValue (firstName ^ "_subterm"))
-                  (wrap subterm)
-                  (wraptp (T.apply2 Prim.arrow skeltp
-                              (T.apply2 Prim.arrow skeltp
-                                  (T.apply1 Prim.univ (X.term univ)))))
+                  (swrap subterm)
+                  (swraptp (T.apply2 Prim.arrow skeltp
+                               (T.apply2 Prim.arrow skeltp
+                                   (T.apply1 Prim.univ (X.term univ)))))
 
             fun setImplicits const n =
                if n = 0 then
@@ -2443,10 +2553,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   Database.setImplicits const n
 
             val () = 
-               setImplicits subtermConst numberOfVisibleArgs
+               setImplicits subtermConst numberOfStatVisibleArgs
 
             val subtermtp =
-               T.Elim (T.Const subtermConst, topvisargsSpine)
+               T.Elim (T.Const subtermConst, topstatvisargsSpine)
 
             (* blah_subterm_trans *)
             val subtermTransConst =
@@ -2473,7 +2583,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                in
                   define
                      (Symbol.fromValue (firstName ^ "_subterm_trans"))
-                     (wrapLemma
+                     (lwrap
                          (X.lamAll NONE a1
                              (X.lamAll NONE a2
                                  (X.lamAll NONE a3
@@ -2490,7 +2600,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                  X.var 1 a4,
                                                  X.var 0 a5
                                                  ])))))))
-                     (wraptpLemma
+                     (lwraptp
                          (T.apply2 Prim.forall skeltp
                              (T.Lam (SOME xsym,
                                      T.apply2 Prim.forall (T.Sub (skeltp, T.shift1))
@@ -2512,7 +2622,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             val subtermWellFoundedConst =
                define
                   (Symbol.fromValue (firstName ^ "_subterm_well_founded"))
-                  (wrapLemma
+                  (lwrap
                       (X.lamAll NONE skel
                           (X.apps (xconstant constSubtermWellFounded)
                               [
@@ -2521,7 +2631,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                               X.weaken dcons 1,
                               X.var 0 skel
                               ])))
-                  (wraptpLemma
+                  (lwraptp
                       (T.apply2 Prim.forall skeltp
                           (T.Lam (SOME xsym,
                                   T.apply3 (Susp.force constAcc)
@@ -2541,7 +2651,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                          val d = X.use (Vector.sub indextps j)
 
                          val numberOfIndexArgs = List.length args
-                         val numberOfTotalArgs = numberOfVisibleArgs + numberOfIndexArgs
+                         val numberOfStaticArgs = numberOfStatVisibleArgs + numberOfIndexArgs
+                         val numberOfDynamicArgs = numberOfDynVisibleArgs + numberOfIndexArgs
 
                          fun makeType depth args' constituents =
                             (case args' of
@@ -2583,12 +2694,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                            T.apply2 Prim.arrow
                                               (T.Elim (T.Const const,
                                                        natrecr
-                                                          (numberOfVisibleArgs + depth)
+                                                          (numberOfStatVisibleArgs + depth)
                                                           (fns i l => T.App (T.Var i) :: l)
                                                           []))
                                               (T.Elim (T.Const skeletonConst,
                                                        natrecr
-                                                          numberOfVisibleArgs
+                                                          numberOfStatVisibleArgs
                                                           (fns i l => T.App (T.Var (i + depth)) :: l)
                                                           []))))
                                    end
@@ -2631,30 +2742,30 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                          val (ind, dt_def, dt_t, strip_def, strip_t) = makeType 0 args []
 
-                         val const = define dtsym (wrap dt_def) (wraptp dt_t)
+                         val const = define dtsym (swrap dt_def) (swraptp dt_t)
 
                          val red =
-                            R.trans [R.unfold, R.beta numberOfTotalArgs]
+                            R.trans [R.unfold, R.beta numberOfStaticArgs]
 
                          val red' =
                             (* This one will still work after const is made opaque. *)
                             R.user1 $
-                            R.new1 const numberOfTotalArgs
+                            R.new1 const numberOfStaticArgs
                                (R.reduce red (T.Elim (T.Const const,
-                                                      natrecr numberOfTotalArgs (fns i l => T.App (T.Var i) :: l) [])))
+                                                      natrecr numberOfStaticArgs (fns i l => T.App (T.Var i) :: l) [])))
                                red
                                R.refl
 
                          val stripConst =
                             define
                                (Symbol.fromValue (Symbol.toValue dtsym ^ "_strip"))
-                               (wrap strip_def) 
-                               (wraptp (strip_t const))
+                               (dwrap strip_def) 
+                               (dwraptp (strip_t const))
                       in
-                         if numberOfTotalArgs = 0 then
+                         if numberOfDynamicArgs = 0 then
                             ()
                          else
-                            setImplicits stripConst numberOfTotalArgs;
+                            setImplicits stripConst numberOfDynamicArgs;
 
                          print "Datatype ";
                          print (Symbol.toValue dtsym);
@@ -2705,6 +2816,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                                returns the constructor and its type in G, G1
                                and returns the subterm lemma and its type in G, G1
+                               (the subterm lemma's type is abstracted over the constructor's constant)
                             *)
                             (case conargs of
                                 [] =>
@@ -2716,8 +2828,15 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                                       val iconstituents' = map (xadjust depth) iconstituents
 
-                                      val conspine = 
-                                         natrecr numberOfVisibleArgs
+                                      val sconspine = 
+                                         natrecr numberOfStatVisibleArgs
+                                            (fns i l => T.App (T.Var (i+depth)) :: l)
+                                            (List.map 
+                                                (fn (m, _, _, _) => T.App (T.Sub (m, fst s)))
+                                                indices)
+
+                                      val dconspine = 
+                                         natrecr numberOfDynVisibleArgs
                                             (fns i l => T.App (T.Var (i+depth)) :: l)
                                             (List.map 
                                                 (fn (m, _, _, _) => T.App (T.Sub (m, fst s)))
@@ -2732,8 +2851,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                           xtuple
                                           (* relying on a nontrivial equality here *)
                                           (List.foldl X.pair X.triv iconstituents'),
-   
-                                       T.Elim (T.Const tpconst, conspine),
+
+                                       T.Elim (T.Const tpconst, sconspine),
    
                                        xsubtermcon
                                           (X.weaken univ depth)
@@ -2744,22 +2863,28 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                           xtuple
                                           (* relying on a nontrivial equality here *)
                                           (List.foldl X.pair X.triv iconstituents'),
-   
+
                                        (fn const =>
                                            let
-                                              val sp =
+                                              val ssp =
                                                  natrecr
-                                                    numberOfVisibleArgs
+                                                    numberOfStatVisibleArgs
+                                                    (fns i l => T.App (T.Var (i + depth)) :: l)
+                                                    []
+
+                                              val dsp =
+                                                 natrecr
+                                                    numberOfDynVisibleArgs
                                                     (fns i l => T.App (T.Var (i + depth)) :: l)
                                                     []
        
                                               val fullskel =
                                                  T.App $
                                                  T.Elim (T.Const stripconst,
-                                                         conspine
+                                                         dconspine
                                                          @ [T.App (T.Elim (T.Const const,
                                                                            natrecr
-                                                                              (numberOfVisibleArgs + depth)
+                                                                              (numberOfDynVisibleArgs + depth)
                                                                               (fns i l => T.App (T.Var i) :: l)
                                                                               []))])
                                            in
@@ -2767,17 +2892,17 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                  (fns (v, _, _) (stripconst', depth', indices') t =>
                                                      T.apply2 Prim.prod
                                                         (T.Elim (T.Const subtermConst,
-                                                                 sp @ [
-                                                                      T.App (T.Elim (T.Const stripconst',
-                                                                                     sp
-                                                                                     @ List.map
-                                                                                          (fn (m, _, _) => 
-                                                                                              T.App (T.Sub (m, T.Shift (depth-depth'))))
-                                                                                          indices'
-                                                                                     @ [T.App v])),
-
-                                                                      fullskel
-                                                                      ]))
+                                                                 ssp @ [
+                                                                       T.App (T.Elim (T.Const stripconst',
+                                                                                      dsp
+                                                                                      @ List.map
+                                                                                           (fn (m, _, _) => 
+                                                                                               T.App (T.Sub (m, T.Shift (depth-depth'))))
+                                                                                           indices'
+                                                                                      @ [T.App v])),
+ 
+                                                                       fullskel
+                                                                       ]))
                                                         t)
                                                  (T.Const Prim.unit)
                                                  iconstituents'
@@ -2853,27 +2978,27 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                          val (pre_def, pre_t, subtermcon_def, subtermcon_t) = makeCon 0 X.id conargs [] [] []
 
-                         val const = define consym (wrap pre_def) (wraptp pre_t)
+                         val const = define consym (dwrap pre_def) (dwraptp pre_t)
 
-                         val numberOfTotalArgs = numberOfVisibleArgs + List.length conargs
+                         val numberOfTotalDynArgs = numberOfDynVisibleArgs + List.length conargs
 
                          val red =
-                            R.trans [R.unfold, R.beta numberOfTotalArgs]
+                            R.trans [R.unfold, R.beta numberOfTotalDynArgs]
 
                          val red' =
                             (* This one will still work after const is made opaque. *)
                             R.user1 $
-                            R.new1 const numberOfTotalArgs
+                            R.new1 const numberOfTotalDynArgs
                                (R.reduce red (T.Elim (T.Const const,
-                                                      natrecr numberOfTotalArgs (fns i l => T.App (T.Var i) :: l) [])))
+                                                      natrecr numberOfTotalDynArgs (fns i l => T.App (T.Var i) :: l) [])))
                                red
                                R.refl
 
                          val subtermConConst =
                             define
                                (Symbol.fromValue (Symbol.toValue consym ^ "_subterm"))
-                               (wrapLemma subtermcon_def)
-                               (wraptpLemma (subtermcon_t const))
+                               (lwrap subtermcon_def)
+                               (lwraptp (subtermcon_t const))
                       in
                          print "Constructor ";
                          print (Symbol.toValue consym);
@@ -2982,7 +3107,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                   List.map (fn (m, _, _, _) => T.App (T.Sub (m, fst s))) indices
                                   @ [T.App $
                                      T.Elim (T.Const conConst,
-                                             natrecr numberOfVisibleArgs (fns h l => T.App (T.Var (h+depth)) :: l)
+                                             natrecr numberOfDynVisibleArgs (fns h l => T.App (T.Var (h+depth)) :: l)
                                                 (maprev 
                                                     (fn (depth', (m, _, _)) => 
                                                         T.App (T.Sub (m, T.Shift (depth-depth'))))
@@ -3021,7 +3146,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                          val dom_t =
                             T.Elim (T.Const this_const,
-                                    natrecr numberOfVisibleArgs (fns h l => T.App (T.Var (h+depth)) :: l)
+                                    natrecr numberOfStatVisibleArgs (fns h l => T.App (T.Var (h+depth)) :: l)
                                        (List.map (fn (m, _, _) => T.App m) indices'))
 
                          val k = predindex + numberOfTypes - this_i
@@ -3199,6 +3324,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                    val (def, t) =
                                       underIndexArguments false ctx depth 0 (X.shift depth) args
                                       (fns _ depth' numberOfArgs s =>
+                                          (* numberOfArgs is the number of index arguments *)
                                           let
                                              val (const, _, _, argtuple, _, _) = Vector.sub typeInfo k
                                           in
@@ -3214,7 +3340,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                     
                                               T.apply2 Prim.forall
                                                  (T.Elim (T.Const const,
-                                                          natrecr numberOfVisibleArgs (fns i l => T.App (T.Var (i + depth')) :: l)
+                                                          natrecr numberOfStatVisibleArgs (fns i l => T.App (T.Var (i + depth')) :: l)
                                                              (natmapr numberOfArgs (fn i => T.App (T.Var i)))))
                                                  (T.Lam (NONE,
                                                          T.Elim (T.Var (predindex + numberOfArgs + numberOfTypes - k),
@@ -3285,8 +3411,6 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                (T.Elim 
                                    (T.Const (Susp.force constCon),
                                     [
-                                    T.App (T.Sub (X.term a, T.Shift (depth+4))),
-                                    T.App (T.Sub (X.term dcons, T.Shift (depth+4))),
                                     T.App (natTerm j),
                                     T.App (T.Var 2),
                                     T.App (T.Var 1)
@@ -3423,7 +3547,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                          (natmapr numberOfArgs (fn i => xvar i ctx'))
 
                                    val spine = 
-                                      natrecr numberOfVisibleArgs
+                                      natrecr numberOfStatVisibleArgs
                                          (fns i l => T.App (T.Var (i + depth')) :: l)
                                          (natmapr numberOfArgs (fn i => T.App (T.Var i)))
                                 in
@@ -3457,8 +3581,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                          val const =
                             define
                                (Symbol.fromValue name)
-                               (wrap iter_def)
-                               (wraptp iter_t)
+                               (swrap iter_def)
+                               (swraptp iter_t)
                       in
                          print "Iterator ";
                          print name;
@@ -3489,8 +3613,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                          val (_, _, _, _, _, numberOfIndexArgs) = Vector.sub typeInfo i
                          val (conConst, _, _) = Vector.sub conInfo j
 
-                         val iterParams = numberOfVisibleArgs + numberOfTypes + numberOfConstructors + numberOfIndexArgs
-                         val conParams = numberOfVisibleArgs + numberOfConargs
+                         val iterParams = numberOfStatVisibleArgs + numberOfTypes + numberOfConstructors + numberOfIndexArgs
+                         val conParams = numberOfDynVisibleArgs + numberOfConargs
 
                          val dp = (conConst, [R.unfold]) :: reductions'
                          val dl = [(Susp.force constIter, Susp.force dt_iter_unroll)]
@@ -3509,7 +3633,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                              val (iterConst', _) = Vector.sub iterInfo i'
                                              val (_, _, _, _, _, numberOfIndexArgs') = Vector.sub typeInfo i'
 
-                                             val iterParamsBeforeIndex = numberOfVisibleArgs + numberOfTypes + numberOfConstructors
+                                             val iterParamsBeforeIndex = numberOfStatVisibleArgs + numberOfTypes + numberOfConstructors
 
                                              val recarg =
                                                 T.Elim (T.Const iterConst',
@@ -3665,9 +3789,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                          val r =
                             R.new2
                                discrimConst
-                               (numberOfVisibleArgs + numberOfIndexArgs) 0
+                               (numberOfStatVisibleArgs + numberOfIndexArgs) 0
                                conConst
-                               (numberOfVisibleArgs + numberOfArgs)
+                               (numberOfDynVisibleArgs + numberOfArgs)
                                (T.Native (T.Integer (IntInf.fromInt j)))
                                (R.trans [R.unfold, R.betas, R.user2 iterRed, R.betas])
                                R.refl
@@ -3700,6 +3824,18 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                         ([], (fn m => m))
                         invis
                         
+                  val (pervl, wrap) =
+                     List.foldl
+                        (fns (sym, dom) (pervl, wrap) =>
+                            let
+                               val dom = X.tuse dom
+                            in
+                               (dom :: pervl,
+                                (fn m => wrap (X.lamAll (SOME sym) dom m)))
+                            end)
+                        (pervl, wrap)
+                        inter
+      
                   val (pervl, wrap) =
                      List.foldl
                         (fns (sym, dom) (pervl, wrap) =>
@@ -3935,15 +4071,15 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                              pos consSoFar (consSoFar + numberOfConstructorsHere) [])
 
                                                    val res = 
-                                                      (* t lives in the context with the pervasives only *)
-                                                      T.Sub (X.term t, T.Shift (numberOfIndexArgs + numberOfVisibleArgs + numberOfArgs))
+                                                      (* t lives in the context with the static pervasives only *)
+                                                      T.Sub (X.term t, T.Shift (numberOfIndexArgs + numberOfDynVisibleArgs + numberOfArgs))
 
                                                    val r =
                                                       R.new2
                                                          exttpConst
-                                                         (numberOfVisibleArgs + numberOfIndexArgs) 0
+                                                         (numberOfStatVisibleArgs + numberOfIndexArgs) 0
                                                          conConst
-                                                         (numberOfVisibleArgs + numberOfArgs)
+                                                         (numberOfDynVisibleArgs + numberOfArgs)
                                                          res
                                                          pre
                                                          R.refl
@@ -4028,9 +4164,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                    val r =
                                                       R.new2
                                                          extConst
-                                                         (numberOfVisibleArgs + numberOfIndexArgs) 0
+                                                         (numberOfStatVisibleArgs + numberOfIndexArgs) 0
                                                          conConst
-                                                         (numberOfVisibleArgs + numberOfArgs)
+                                                         (numberOfDynVisibleArgs + numberOfArgs)
                                                          arm
                                                          pre
                                                          R.refl
@@ -4082,8 +4218,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                {
                invis = invis,
                invisnum = numberOfInvisibleArgs,
+               inter = inter,
+               internum = numberOfIntermediateArgs,
                pers = pers,
-               persnum = numberOfVisibleArgs,
+               persnum = numberOfDynVisibleArgs,
                univ = univ_mobile,
                a = a_mobile,
                dcons = dcons_mobile,
@@ -4232,10 +4370,7 @@ structure ParseDatatype =
 
       fun abindingAnnot xl a = map (fn x => (x, a)) xl
 
-      fun datatypeArgsIntersectForall args args' a = (args, args', a)
-      fun datatypeArgsIntersect args a = (args, [], a)
-      fun datatypeArgsForall args a = ([], args, a)
-      fun datatypeArgsNone m = ([], [], m)
+      fun datatypeArgs intersect intermediate forall lv = (intersect, intermediate, forall, lv)
 
       fun paramForall args rest =
          map (fn (x, a) => (SOME x, a)) args @ rest
@@ -4247,7 +4382,7 @@ structure ParseDatatype =
 
       fun dt name args dcons = (name, args, dcons)
 
-      fun datatypeDef (invis, args, univ) dts = (invis, args, univ, dts)
+      fun datatypeDef (intersect, intermediate, forall, univ) dts = (intersect, intermediate, forall, univ, dts)
 
    end
 
@@ -4258,17 +4393,32 @@ An example of the syntax:
 
 typedef
    intersect (i : level) .
-   forall (a : U i) .
+   intermediate (a : U i) .
+   forall (b : U i) .
    U i
 of
    tree : nat -> type =
    | Empty : tree 0
-   | Node : forall (n : nat) . a -> forest n -> tree (succ n)
+   | Node : forall (n : nat) . b -> forest n -> tree (succ n)
 
    and
    forest : nat -> type =
    | Nil : forest 0
+   | Sing : a -> forest 1
    | Cons : forall (m n : nat) . tree m -> forest n -> forest (m + n)
+
+
+Intermediate arguments are more-or-less an undocumented feature
+(except for this comment here).  The intermediate arguments are bound
+using forall in the type and in the iterator, but using intersect in
+the constructors.
+
+(Ideally, we would like intermediate arguments to be bound using
+intersect in the iterator as well, but that is not easy to do.  Unlike
+'con', 'dt_iter' actually depends on its dcons argument, so we can't
+make dt_iter take dcons invisibly.  We could program around that,
+since dt_iter only depends on the structure of dcons, but that would
+be messy.)
 
 *)
 
@@ -4282,10 +4432,16 @@ grammardef Datatype
    rule ABindings     ::= => null
    rule ABindings     ::= ABinding ABindings => append
 
-   rule DatatypeArgs  ::= "intersect" ABindings "." "forall" ABindings "." "U" Level(1) => datatypeArgsIntersectForall
-   rule DatatypeArgs  ::= "intersect" ABindings "." "U" Level(1) => datatypeArgsIntersect
-   rule DatatypeArgs  ::= "forall" ABindings "." "U" Level(1) => datatypeArgsForall
-   rule DatatypeArgs  ::= "U" Level(1) => datatypeArgsNone
+   rule DatatypeArgsIntersect    ::= "intersect" ABindings "." => id
+   rule DatatypeArgsIntersect    ::= => null
+
+   rule DatatypeArgsIntermediate ::= "intermediate" ABindings "." => id
+   rule DatatypeArgsIntermediate ::= => null
+
+   rule DatatypeArgsForall       ::= "forall" ABindings "." => id
+   rule DatatypeArgsForall       ::= => null
+
+   rule DatatypeArgs  ::= DatatypeArgsIntersect DatatypeArgsIntermediate DatatypeArgsForall "U" Level(1) => datatypeArgs
 
    rule DtType        ::= "type" => null
    rule DtType        ::= "forall" ABindings "." DtType => paramForall

@@ -220,8 +220,10 @@ structure FnindInternal :> FNIND_INTERNAL =
                        NONE =>
                           signalError fname1 [addressToString dt1, " is not a datatype."]
    
-                     | SOME (n1, bundle as (_, nPerv, nDts, _, dtinfo)) =>
+                     | SOME (n1, bundle as (_, nInter, nVis, nDts, _, dtinfo)) =>
                           let
+                             val nPerv = nInter + nVis
+
                              val pervs =
                                 List.foldl
                                    (fns (fname, _, pervs', _, _, _, _) pervs =>
@@ -547,7 +549,7 @@ structure FnindInternal :> FNIND_INTERNAL =
          E.hide
          (fns special dir imps spine =>
              let
-                val (n1, (_, _, _, _, dtinfo), _, pervs, preds, arms) = elabFnind funcs special dir imps
+                val (n1, (_, _, _, _, _, dtinfo), _, pervs, preds, arms) = elabFnind funcs special dir imps
 
                 val (_, iterator, _, _, _) = Vector.sub dtinfo n1
              in
@@ -573,7 +575,7 @@ structure FnindInternal :> FNIND_INTERNAL =
 
                      | SOME ea => ea)
 
-                val (n1, (_, _, _, _, dtinfo), _, pervs, preds, arms') = 
+                val (n1, (_, _, _, _, _, dtinfo), _, pervs, preds, arms') = 
                    elabFnind [(fname, dt, NONE, NONE, NONE, result', arms)] special dir imps
 
                 val (_, iterator, nIndex, _, _) = Vector.sub dtinfo n1
@@ -602,8 +604,10 @@ structure FnindInternal :> FNIND_INTERNAL =
       val precMin = 0
       val precMax = 100
 
-      fun iteratorUnparser n1 ((_, nPerv, nDts, _, dtinfo) : Datatype.bundle) : UP.content UP.unparser =
+      fun iteratorUnparser n1 ((_, nInter, nVis, nDts, _, dtinfo) : Datatype.bundle) : UP.content UP.unparser =
          let
+            val nPerv = nInter + nVis
+
             val (_, iterator, _, _, _) = Vector.sub dtinfo n1
          in
             SH.hideUnparser
@@ -861,10 +865,10 @@ structure FnindInternal :> FNIND_INTERNAL =
 
       (* Set the function that Datatype will call to install iterator unparsers. *)
 
-      fun installDatatypeDisplay (i, bundle as (_, numberOfVisibleArgs, numberOfDatatypes, totalConstructors, dtinfo)) =
+      fun installDatatypeDisplay (i, bundle as (_, numberOfIntermediateArgs, numberOfDynVisibleArgs, numberOfDatatypes, totalConstructors, dtinfo)) =
          let
             val (_, iterator, _, _, _) = Vector.sub dtinfo i
-            val arity = numberOfVisibleArgs + numberOfDatatypes + totalConstructors
+            val arity = numberOfIntermediateArgs + numberOfDynVisibleArgs + numberOfDatatypes + totalConstructors
          in
             ConstantTable.insert UP.unparsingTable iterator (arity, precMax, ref true, iteratorUnparser i bundle)
          end
@@ -874,7 +878,7 @@ structure FnindInternal :> FNIND_INTERNAL =
          (fn const => installDatatypeDisplay $ Option.valOf $ Datatype.info const)
 
 
-      fun installFakeDatatype (bundle as (_, _, _, _, dtinfo)) =
+      fun installFakeDatatype (bundle as (_, _, _, _, _, dtinfo)) =
          Vector.appi
             (fns i (dt, _, _, _, _) =>
                 (
@@ -886,6 +890,8 @@ structure FnindInternal :> FNIND_INTERNAL =
 
 
       open Tactic
+
+      (* We ought to make sure that the rhs(es) do not mention the iterator. If they do, antireduce will get confused. *)
 
       fun defineInd (impargs, expargs) funcs tps =
          let
@@ -902,8 +908,10 @@ structure FnindInternal :> FNIND_INTERNAL =
                   D.empty
                   args
 
-            val (_, (_, nVis, nDts, _, dtinfo), dict, pervs, preds, arms) =
+            val (_, (_, nInter, nVis, nDts, _, dtinfo), dict, pervs, preds, arms) =
                elabFnind funcs SymbolDict.empty (D.idir dir) true
+
+            val nPerv = nInter + nVis
 
             val iterspine = pervs @ preds @ arms
 
@@ -1003,7 +1011,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                               | SOME const' =>
                                    let
                                       val (spine', reds) =
-                                         antireduceSpine nIndex nConstrArgs depth (List.drop spine (nVis + nDts + nArms))
+                                         antireduceSpine nIndex nConstrArgs depth (List.drop spine (nPerv + nDts + nArms))
             
                                       val reds' =
                                          Int.natrecUp

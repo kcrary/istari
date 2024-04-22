@@ -3,33 +3,35 @@ typedef
 /
   datatype
     intersect (i : level) .
-    forall (a : U i) .
+    intermediate (a : U i) .
+    forall (b : U i) .
     U i
   of
     tree : nat -> type =
     | Empty : tree 0
-    | Node : forall (n : nat) . a -> forest n -> tree (succ n)
+    | Node : forall (n : nat) . b -> forest n -> tree (succ n)
     | One : forall (n : nat) . tree n -> tree n
   
     and
     forest : nat -> type =
     | Nil : forest 0
+    | Sing : a -> forest 1
     | Cons : forall (m n : nat) . tree m -> forest n -> forest (m + n)
 /;
 
 
 
-define /strange a/
+define /strange a b/
 /
-  fnind strange : tree [a] __ -> nat of
+  fnind strange : tree [a b] __ -> nat of
   | One _ _ . 1
   | Node n _ _ . succ n
   | _ . 0
 
-  and strange' : forall (x : forest n) . x = x : forest a n of
+  and strange' : forall (x : forest n) . x = x : forest a b n of
   | _ . ()
 //
-  intersect i .  forall (a : U i) n . tree a n -> nat
+  intersect i .  forall (a b : U i) n . tree a b n -> nat
 /;
 
 inference.
@@ -39,9 +41,9 @@ qed ();
 
 
 
-defineInd /a/
+defineInd /a b/
 /
-  treesize : tree [a] __ -> nat of
+  treesize : tree [a b] __ -> nat of
   | Empty . 0
   | Node _ x f . succ (forestsize f)
   | One _ t . treesize t
@@ -49,25 +51,26 @@ defineInd /a/
   and
   forestsize : forest __ -> nat of
   | Nil . 0
+  | Sing _ . 1
   | Cons _ _ t f . treesize t + forestsize f
 //
-  intersect i . forall (a : U i) n . tree a n -> nat
+  intersect i . forall (a b : U i) n . tree a b n -> nat
   and
-  intersect i . forall (a : U i) n . forest a n -> nat
+  intersect i . forall (a b : U i) n . forest a b n -> nat
 /;
 
 
 
 lemma "tree_case"
 /
-  forall i (a : U i) n (t : tree a (succ n)) .
+  forall i (a b : U i) n (t : tree a b (succ n)) .
     0 < (case t : tree of
          | Empty . 0
          | _ . 1)
 /;
 
 inference.
-intro /i a n t/.
+intro /i a b n t/.
 destruct /t/ /{}/.
   {
   omega.
@@ -88,14 +91,14 @@ qed ();
 
 lemma "tree_case_annot"
 /
-  forall i (a : U i) n (t : tree a (succ n)) .
+  forall i (a b : U i) n (t : tree a b (succ n)) .
     (case t : tree :> U i of
      | Empty . void
      | _ . unit)
 /;
 
 inference.
-intro /i a n t/.
+intro /i a b n t/.
 destruct /t/ /{}/.
   {
   omega.
@@ -116,12 +119,33 @@ qed ();
 
 lemma "destructThin"
 /
-  forall i (a : U i) n (t : tree a (succ n)) . t = t : tree a (succ n) -> unit
+  forall i (a b : U i) n (t : tree a b (succ n)) . t = t : tree a b (succ n) -> unit
 /;
 
 inference.
-intro /i a n t H/.
+intro /i a b n t H/.
 destructThin /t/ /{x f | t}/.
+  {
+  injection /H/.
+  split.
+  }
+
+  {
+  injection /H/.
+  split.
+  }
+qed ();
+
+
+
+lemma "destructThin'"
+/
+  forall i (a b : U i) n (t : forest a b (succ n)) . t = t : forest a b (succ n) -> unit
+/;
+
+inference.
+intro /i a b n f H/.
+destructThin /f/ /{x | n1 n2 t f'}/.
   {
   injection /H/.
   split.
@@ -137,11 +161,11 @@ qed ();
 
 lemma "inversion"
 /
-  forall i (a : U i) n (t : tree a (succ n)) . t = t : tree a (succ n) -> unit
+  forall i (a b : U i) n (t : tree a b (succ n)) . t = t : tree a b (succ n) -> unit
 /;
 
 inference.
-intro /i a n t H/.
+intro /i a b n t H/.
 inversion /t/.
   {
   reintro /x f/.
@@ -158,11 +182,11 @@ qed ();
 
 lemma "destructThin2"
 /
-  forall i (a : U i) n (t : tree a n) . t = t : tree a n -> unit
+  forall i (a b : U i) n (t : tree a b n) . t = t : tree a b n -> unit
 /;
 
 inference.
-intro /i a n t H/.
+intro /i a b n t H/.
 destructThin /t/ /{Heq | n' x f Heq | t}/.
   {
   split.
@@ -185,11 +209,11 @@ qed ();
 
 lemma "inversion2"
 /
-  forall i (a : U i) n (t : tree a n) . t = t : tree a n -> unit
+  forall i (a b : U i) n (t : tree a b n) . t = t : tree a b n -> unit
 /;
 
 inference.
-intro /i a n t H/.
+intro /i a b n t H/.
 inversion /t/.
   {
   reintro /Heq/.
@@ -211,13 +235,13 @@ qed ();
 
 lemma "reduce_iterator"
 /
-  forall (i : level) (a : U i) n (x : tree a n) .
-    treesize a n x = n : nat
+  forall (i : level) (a b : U i) n (x : tree a b n) .
+    treesize a b n x = n : nat
 /;
 
 inference.
-intro /i a n x/.
-apply /tree_iter _ (fn n x . treesize a n x = n : nat) (fn n x . forestsize a n x = n : nat)/ >> reduce // >> clear /n x/.
+intro /i a b n x/.
+apply /tree_iter _ _ (fn n x . treesize a b n x = n : nat) (fn n x . forestsize a b n x = n : nat)/ >> reduce // >> clear /n x/.
   {
   reflexivity.
   }
@@ -238,6 +262,11 @@ apply /tree_iter _ (fn n x . treesize a n x = n : nat) (fn n x . forestsize a n 
   }
 
   {
+  intro /x/.
+  reflexivity.
+  }
+
+  {
   intro /m n x IH1 y IH2/.
   compat.
     {
@@ -254,15 +283,15 @@ qed ();
 
 lemma "iterate_tree"
 /
-  forall (i : level) (a : U i) n (x : tree a n) (extra : a) .
-    x = x : tree a n
+  forall (i : level) (a b : U i) n (x : tree a b n) (extra : a) .
+    x = x : tree a b n
 /;
 
 inference.
-intro /i a n x extra/.
+intro /i a b n x extra/.
 induction /x/.
-5:{
-  change /concl/ /(fn n x . x = x : forest a n) : _/.
+6:{
+  change /concl/ /(fn n x . x = x : forest a b n) : _/.
   typecheck.
   }
 
@@ -286,6 +315,12 @@ induction /x/.
   }
 
   {
+  intro /x/.
+  reduce //.
+  reflexivity.
+  }
+
+  {
   intro /m n x IH1 y IH2/.
   reduce //.
   compat.
@@ -294,14 +329,15 @@ qed ();
 
 
 
+
 lemma "destruct_tree"
 /
-  forall (i : level) (a : U i) n (x : tree a n) (extra : a) .
-    x = x : tree a n
+  forall (i : level) (a b : U i) n (x : tree a b n) (extra : a) .
+    x = x : tree a b n
 /;
 
 inference.
-intro /i a n x extra/.
+intro /i a b n x extra/.
 sinduction /x/.
 reintro /IH/.
 destruct /x/ /{ Heq | m x y Heq | m x Heq}/.
@@ -327,13 +363,27 @@ qed ();
 
 lemma "inject_tree_no"
 /
-  forall (i : level) (a : U i) (n : nat) (x : a) (f : forest a n) .
-    Node _ _ x f = One _ _ (Node _ _ x f) : tree a (succ n)
+  forall (i : level) (a b : U i) (n : nat) (x : b) (f : forest a b n) .
+    Node _ _ x f = One _ _ (Node _ _ x f) : tree a b (succ n)
     -> void
 /;
 
 inference.
-intro /i a n x f H/.
+intro /i a b n x f H/.
+injection /H/.
+qed ();
+
+
+
+lemma "inject_forest_no"
+/
+  forall i (a b : U i) (x : a) t f .
+    Sing _ x = Cons _ 0 1 t f : forest a b 1
+    -> void
+/;
+
+inference.
+intro /i a b x t f H/.
 injection /H/.
 qed ();
 
@@ -341,15 +391,15 @@ qed ();
 
 lemma "no_fixpoint_One"
 /
-  forall (i : level) (a : U i) (n : nat) (t : tree a n) .
-    t = One _ _ t : tree a n
+  forall (i : level) (a b : U i) (n : nat) (t : tree a b n) .
+    t = One _ _ t : tree a b n
     -> void
 /;
 
 inference.
-intro /i a n t/.
+intro /i a b n t/.
 induction /t/.
-5:{
+6:{
   change /concl/ /(fn _ _ . unit) : _/.
   typecheck.
   }
@@ -380,20 +430,79 @@ induction /t/.
 
   {
   reduce //.
+  auto.
+  }
+
+  {
+  reduce //.
   nauto 6.
   }
 qed ();
 
 
 
-lemma "a_tree"
+lemma "no_fixpoint_Cons"
 /
-  forall (i : level) (a : U i) (x : a) .
-    One _ _ (Node _ _ x (Cons _ _ _ (Empty _) (Nil _))) : tree _ _
+  forall (i : level) (a b : U i) (n : nat) (t : tree a b 0) (f : forest a b n) .
+    f = Cons _ _ _ t f : forest a b n
+    -> void
 /;
 
 inference.
-intro /i a x/.
+intro /i a b n t f/.
+revert /t/.
+induction /f/.
+6:{
+  change /concl/ /(fn _ _ . unit) : _/.
+  typecheck.
+  }
+
+  {
+  reduce //.
+  split.
+  }
+
+  {
+  intros.
+  reduce //.
+  split.
+  }
+
+  {
+  intros.
+  reduce //.
+  split.
+  }
+
+  {
+  intro /t H/.
+  injection /H/.
+  }
+
+  {
+  intro /x t H/.
+  injection /H/.
+  }
+
+  {
+  intro /m n t _ f IH t' H/.
+  injection /H/.
+  reintro /Heqm _ Heqt' H'/.
+  subst /m t'/.
+  apply /IH/ >> auto.
+  }
+qed ();
+  
+
+
+lemma "a_tree"
+/
+  forall (i : level) (a b : U i) (x : a) (y : b) .
+    One _ _ (Node _ _ y (Cons _ _ _ (Empty _) (Sing _ x))) : tree _ _ _
+/;
+
+inference.
+intro /i a b x y/.
 typecheck.
 qed ();
 
@@ -522,4 +631,47 @@ apply /dof_app b/.
   {
   hyp /Hy/.
   }
+qed ();
+
+
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    intermediate (a : U i) .
+    U i
+  of
+    sing : a -> type =
+    | this : forall (x : a) . sing x
+/;
+
+
+
+lemma "sing_destruct"
+/
+  forall i (a : U i) (x : a) (y : sing a x) .
+    y = this x : sing a x
+/;
+    
+inference.
+intro /i a x y/.
+destruct /y/ /{y Heq}/.
+subst /y/.
+reflexivity.
+qed ();
+
+
+
+lemma "sing_induction"
+/
+  forall i (a : U i) x y .
+    y = this x : sing a x
+/;
+
+inference.
+intro /i a x y/.
+induction /y/.
+intro /x/.
+reflexivity.
 qed ();
