@@ -406,6 +406,18 @@ Strong induction for natural numbers:
 
     natural_to_nat_mono_lt : type:natural_to_nat_mono_lt
 
+    natural_eq_from_nat : type:natural_eq_from_nat
+
+    nat_eq_from_natural : type:nat_eq_from_natural
+
+    leqn_from_nat : type:leqn_from_nat
+
+    leq_from_natural : type:leq_from_natural
+
+    ltn_from_nat : type:ltn_from_nat
+
+    lt_from_natural : type:lt_from_natural
+
     plusn_to_nat : type:plusn_to_nat
 
     plus_to_natural : type:plus_to_natural
@@ -425,6 +437,22 @@ Strong induction for natural numbers:
     maxn_to_nat : type:maxn_to_nat
 
     max_to_natural : type:max_to_natural
+
+    eqnb_to_nat : type:eqnb_to_nat
+
+    eqb_to_natural : type:eqb_to_natural
+
+    leqnb_to_nat : type:leqnb_to_nat
+
+    leqb_to_natural : type:leqb_to_natural
+
+    ltnb_to_nat : type:ltnb_to_nat
+
+    ltb_to_natural : type:ltb_to_natural
+
+    neqnb_to_nat : type:neqnb_to_nat
+
+    neqb_to_natural : type:neqb_to_natural
 
 
 ### Relation to `integer`
@@ -478,6 +506,22 @@ Strong induction for natural numbers:
     minz_to_natural : type:minz_to_natural
 
     maxz_to_natural : type:maxz_to_natural
+
+    eqnb_to_integer : type:eqnb_to_integer
+
+    eqzb_to_natural : type:eqzb_to_natural
+
+    leqnb_to_integer : type:leqnb_to_integer
+
+    leqzb_to_natural : type:leqzb_to_natural
+
+    ltnb_to_integer : type:ltnb_to_integer
+
+    ltzb_to_natural : type:ltzb_to_natural
+
+    neqnb_to_integer : type:neqnb_to_integer
+
+    neqzb_to_natural : type:neqzb_to_natural
 
     natural_to_nat_to_integer : type:natural_to_nat_to_integer
 

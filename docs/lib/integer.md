@@ -284,6 +284,38 @@ positive case that works upwards.
                        -> b <z= a
                        -> integer_to_nat (a -z b) = integer_to_nat a - integer_to_nat b : nat
 
+    eqb_to_integer : forall (m n : nat) .
+                        Nat.eqb m n = eqzb (nat_to_integer m) (nat_to_integer n) : bool
+
+    eqzb_to_nat : forall (a b : integer) .
+                     z`0 <z= a
+                     -> z`0 <z= b
+                     -> eqzb a b = Nat.eqb (integer_to_nat a) (integer_to_nat b) : bool
+
+    leqb_to_integer : forall (m n : nat) .
+                         Nat.leqb m n = leqzb (nat_to_integer m) (nat_to_integer n) : bool
+
+    leqzb_to_nat : forall (a b : integer) .
+                      z`0 <z= a
+                      -> z`0 <z= b
+                      -> leqzb a b = Nat.leqb (integer_to_nat a) (integer_to_nat b) : bool
+
+    ltb_to_integer : forall (m n : nat) .
+                        Nat.ltb m n = ltzb (nat_to_integer m) (nat_to_integer n) : bool
+
+    ltzb_to_nat : forall (a b : integer) .
+                     z`0 <z= a
+                     -> z`0 <z= b
+                     -> ltzb a b = Nat.ltb (integer_to_nat a) (integer_to_nat b) : bool
+
+    neqb_to_integer : forall (m n : nat) .
+                         Nat.neqb m n = neqzb (nat_to_integer m) (nat_to_integer n) : bool
+
+    neqzb_to_nat : forall (a b : integer) .
+                      z`0 <z= a
+                      -> z`0 <z= b
+                      -> neqzb a b = Nat.neqb (integer_to_nat a) (integer_to_nat b) : bool
+
 
 ### Decidability
 

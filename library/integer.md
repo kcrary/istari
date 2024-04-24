@@ -256,6 +256,22 @@ positive case that works upwards.
 
     minusz_to_nat : type:minusz_to_nat
 
+    eqb_to_integer : type:eqb_to_integer
+
+    eqzb_to_nat : type:eqzb_to_nat
+
+    leqb_to_integer : type:leqb_to_integer
+
+    leqzb_to_nat : type:leqzb_to_nat
+
+    ltb_to_integer : type:ltb_to_integer
+
+    ltzb_to_nat : type:ltzb_to_nat
+
+    neqb_to_integer : type:neqb_to_integer
+
+    neqzb_to_nat : type:neqzb_to_nat
+
 
 ### Decidability
 
