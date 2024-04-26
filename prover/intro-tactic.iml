@@ -499,65 +499,73 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
          then  tactic attempts to prove M : A, possibly unfolding constants
       *)
       fun proveLambdaLoop ctx m arrtac =
-         termCase (N.whnf m)
-         /| fn . _ =>
-            \(fnc => arrtac)\
-
-          | \Prim.pause\ _ =>
-            \(fnc => 
-                 (* Don't unfold pause, to avoid looping. *)
-                 fail "not a lambda")\
-
-          | \Prim.fix\ @ $ap ? _ =>
-            \(fnc f =>
-                 (* Unroll fix explicitly, since we aren't unfolding pause. *)
-                 let
-                    val tac = proveLambdaLoop ctx (T.app f m) arrtac
-                 in
-                    Tactic.replaceConcl (T.apply2 Prim.ov (T.evar ()) m)
-                    >> refine (Rule.reduce (R.within [2] (R.user1 PrimReduction.unroll_fix)))
-                    >> tac
-                 end)\
-
-          | const? @ ? =>
-            \(fnc const spine =>
-                 (case Constant.definition const of
-                     NONE =>
-                        fail "not a lambda"
- 
-                   | SOME n =>
-                        let
-                           val tac = proveLambdaLoop ctx (T.Elim (n, spine)) arrtac
-                        in
-                           Tactic.replaceConcl (T.apply2 Prim.ov (T.evar ()) m)
-                           >> refine (Rule.reduce (R.within [2] R.unfold))
-                           >> tac
-                        end))\
-
-          | var? @ ? =>
-            \(fnc var spine =>
-                 (case S.nthOpt ctx var of
-                     SOME (J.Let n) =>
-                        let
-                           val tac =
-                              proveLambdaLoop ctx (T.Elim (T.Sub (n, T.Shift (var+1)), spine)) arrtac
-                        in
-                           refine (Rule.letUnfold var 
-                                      (T.apply2 Prim.ov 
-                                          (T.Sub (T.evar (), T.shift1))
-                                          (T.Elim (T.Var 0, T.ssubst spine T.shift1))))
-                           >> tac
-                        end
-
-                   | _ =>
-                        fail "not a lambda"))\
-
-          | _ =>
-            \(fnc =>
-                 fail "not a lambda")\
-         /
-              
-
+         let
+            val m = N.whnf m
+         in
+            termCase m
+            /| fn . _ =>
+               \(fnc => arrtac)\
+   
+             | \Prim.pause\ _ =>
+               \(fnc => 
+                    (* Don't unfold pause, to avoid looping. *)
+                    fail "not a lambda")\
+   
+             | \Prim.fix\ @ $ap ? ? =>
+               \(fnc f spine =>
+                    (* Unroll fix explicitly, since we aren't unfolding pause. *)
+                    let
+                       val tac =
+                          proveLambdaLoop 
+                             ctx
+                             (T.Elim (f, T.App (T.apply1 Prim.fix f) :: spine))
+                             arrtac
+                    in
+                       Tactic.replaceConcl (T.apply2 Prim.ov (T.evar ()) m)
+                       >> refine (Rule.reduce (R.within [2] (R.user1 PrimReduction.unroll_fix)))
+                       >> tac
+                    end)\
+   
+             | const? @ ? =>
+               \(fnc const spine =>
+                    (case Constant.definition const of
+                        NONE =>
+                           fail "not a lambda"
+    
+                      | SOME n =>
+                           let
+                              val tac = proveLambdaLoop ctx (T.Elim (n, spine)) arrtac
+                           in
+                              Tactic.replaceConcl (T.apply2 Prim.ov (T.evar ()) m)
+                              >> refine (Rule.reduce (R.within [2] R.unfold))
+                              >> tac
+                           end))\
+   
+             | var? @ ? =>
+               \(fnc var spine =>
+                    (case S.nthOpt ctx var of
+                        SOME (J.Let n) =>
+                           let
+                              val tac =
+                                 proveLambdaLoop ctx (T.Elim (T.Sub (n, T.Shift (var+1)), spine)) arrtac
+                           in
+                              refine (Rule.letUnfold var 
+                                         (T.apply2 Prim.ov 
+                                             (T.Sub (T.evar (), T.shift1))
+                                             (T.Elim (T.Var 0, T.ssubst spine T.shift1))))
+                              >> tac
+                           end
+   
+                      | _ =>
+                           fail "not a lambda"))\
+   
+             | _ =>
+               \(fnc =>
+                    fail "not a lambda")\
+            /
+         end
+                 
+   
       fun proveLambdaArrow ctx m =
          proveLambdaLoop ctx m
             (lift 

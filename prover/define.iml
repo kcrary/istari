@@ -14,6 +14,8 @@ signature DEFINE =
       val definerecRaw : (symbol * symbol option list * symbol option list) -> eterm -> unit
       val definerec : (symbol * symbol option list * symbol option list) -> eterm -> eterm -> unit
 
+      val definemutrecRaw : (symbol option list * symbol option list) -> (symbol * symbol option list * eterm) list -> unit
+
       val recordTyping : string -> unit
 
 
@@ -370,6 +372,258 @@ structure DefineInternal :> DEFINE_INTERNAL =
             P.setGoals [(Message.blank, goal)] cont
          end
              
+
+
+      fun projn i =
+         Int.natrecUp
+            (fns _ spine => T.Pi2 :: spine)
+            [T.Pi1]
+            i
+
+      fun lams args body =
+         List.foldr
+            (fns arg m => T.Lam (arg, m))
+            body
+            args
+         
+
+      fun definemutrecRaw (impargs, expargs) funcs =
+         let
+            val () = ProverInternal.checkpoint ()
+
+            val pervs = impargs @ expargs
+
+            val nPervsImplicit = List.length impargs
+            val nPervs = List.length expargs + nPervsImplicit
+            val nFuncs = List.length funcs
+         
+            val dir =
+               List.foldl
+                  (fns (name, _, _) dir => D.bind dir name)
+                  (List.foldl
+                      (fns arg dir => D.bindh dir arg)
+                      D.empty
+                      pervs)
+                  funcs
+
+            (* substitutes for the nFuncs innermost variables using projections from zero *)
+            val s =
+               Int.natrecUp
+                  (fns i s =>
+                      T.Dot (T.Elim (T.zero, projn i), s))
+                  T.shift1
+                  nFuncs
+
+            val funcs' =
+               List.map
+                  (fn (name, args, body) =>
+                      let
+                         val dir' =
+                            List.foldl
+                               (fns arg dir' => D.bindh dir' arg)
+                               dir
+                               args
+
+                         val func = lams args (ETerm.withdir dir' body)
+
+                      in
+                         (name, func, List.length args)
+                      end)
+                  funcs
+
+            val groupname =
+               (case funcs of
+                   (name, _, _) :: _ =>
+                      Symbol.fromValue (Symbol.toValue name ^ "_group")
+
+                 | _ => signalError "empty definemutRaw")
+
+            val groupbody = 
+               T.Lam (SOME groupname,
+                      List.foldr
+                         (fns (_, func, _) group => T.Pair (T.Sub (func, s), group))
+                         T.Triv
+                         funcs')
+
+            val fixgroupbody = T.apply1 Prim.fix groupbody
+
+            val group = lams pervs fixgroupbody
+
+            val groupconst = Namespace.declare groupname (SOME group)
+
+            val spine =
+               (* n-1 ... 0 *)
+               Int.natrecUp
+                  (fns i l => T.App (T.Var i) :: l)
+                  []
+                  nPervs
+
+            val groupconstInst = T.Elim (T.Const groupconst, spine)
+
+            val groupred =
+               let
+                  val r1 =
+                     R.trans
+                        [
+                        (* groupconst k-1 ... 0 *)
+                        R.unfold,
+      
+                        (* (fn ... fn . fix (fn . <func1[s], ..., funcn[s]>)) k-1 ... 0 *)
+                        R.beta nPervs,
+      
+                        (* fix (fn . <func1[s], ..., funcn[s]>) *)
+                        R.user1 PrimReduction.unroll_fix,
+      
+                        (* (fn . <func1[s], ..., funcn[s]>) (fix (fn . <func1[s], ..., funcn[s]>)) *)
+                        ]
+      
+                  val r2 =
+                     (* (fn . <func1[s], ..., funcn[s]>) (groupconst k-1 ... 0) *)
+                     R.within [1]
+                        (R.trans
+                            [
+                            (* groupconst k-1 ... 0 *)
+                            R.unfold,
+      
+                            (* (fn ... fn . fix (fn . <func1[s], ..., funcn[s]>)) k-1 ... 0 *)
+      
+                            R.beta nPervs,
+      
+                            (* fix (fn . <func1[s], ..., funcn[s]>) *)
+                            ])
+                     (* (fn . <func1[s], ..., funcn[s]>) (fix (fn . <func1[s], ..., funcn[s]>)) *)
+               in
+                  R.trans
+                     [
+                     (* groupconst k-1 ... 0 elims *)
+   
+                     R.user1
+                        (R.new1 groupconst nPervs
+                            (T.app groupbody groupconstInst)
+                            r1 r2),
+   
+                     (* (fn . <func1[s], ..., funcn[s]>) (groupconst k-1 ... 0) elims *)
+   
+                     R.beta 1,
+   
+                     (* <func1[s], ..., funcn[s]>[groupconst k-1 ... 0 . id] elims
+                        =
+                        <..., funci[(groupconst k-1 .. 0 ##n-1) .. (groupconst k-1 .. 0 ##0) . id], ...> elims
+                     *)
+                     ]
+               end
+                         
+            val allstuff =
+               List.mapi
+                  (fns i (name, func, nArgs) =>
+                      let
+                         val m = lams pervs (T.Elim (groupconstInst, projn i))
+   
+                         val const = Namespace.declare name (SOME m)
+                      in
+                         setImplicits const nPervsImplicit;
+   
+                         print "Constant ";
+                         print (Symbol.toValue name);
+                         print " defined.\n";
+
+                         (func, const, nArgs)
+                      end)
+                  funcs'
+
+            (* i doesn't actually matter here *)
+            val singlered =
+               R.trans
+                  [
+                  (* consti k-1 ... 0 *)
+
+                  R.unfold,
+
+                  (* (fn ... fn . groupconst k-1 ... 0 ##i) k-1 ... 0 *)
+                  
+                  R.beta nPervs,
+
+                  (* groupconst k-1 ... 0 ##i *)
+                  ]
+         in
+            List.appi
+               (fns i (func, const, nArgs) =>
+                   let
+                      val r1 =
+                         R.trans
+                            [
+                            (* const k-1 ... 0 *)
+                            R.unfold,
+  
+                            (* (fn ... fn . groupconst k-1 ... 0 ##i) k-1 ... 0 *)
+                            R.beta nPervs,
+  
+                            (* groupconst k-1 ... 0 ##i *)
+                            groupred,
+  
+                            (* <..., funci[(groupconst k-1 .. 0 ##n-1) .. (groupconst k-1 .. 0 ##0) . id], ...> ##i *)
+                            R.beta (i+1),
+  
+                            (* funci[(groupconst k-1 .. 0 ##n-1) .. (groupconst k-1 .. 0 ##0) . id] *)
+                            ]
+
+                      val r2 =
+                         R.trans
+                            [
+                            (* (fn ... fn . funci) (const0 k-1 ... 0) ... (constn-1 k-1 ... 0)
+                                    n
+                            *)
+
+                            R.compat
+                               (Int.natrecUp
+                                   (fns _ l => singlered :: l)
+                                   []
+                                   nFuncs),
+
+                            (* (fn ... fn . funci) (groupconst k-1 ... 0 ##0) ... (groupconst k-1 ... 0 ##n-1) *)
+
+                            R.beta nFuncs
+
+                            (* funci[(groupconst k-1 ... 0 ##n-1) .. (groupconst k-1 ... 0 ##0) . id] *)
+                            ]
+
+                      val red =
+                         R.trans
+                            [
+                            (* const k-1 ... 0 *)
+
+                            R.user1
+                               (R.new1 const nPervs
+                                   (T.Elim (Int.natrecUp (fns _ f => T.Lam (NONE, f)) func nFuncs,
+                                            List.map
+                                               (fn (_, constj, _) => T.App (T.Elim (T.Const constj, spine)))
+                                               allstuff))
+                                   r1 r2),
+
+                            (* (fn ... fn . funci) (const0 k-1 ... 0) ... (constn-1 k-1 ... 0) *)
+
+                            R.beta nFuncs
+                            
+                            (* funci[(constn-1 k-1 ... 0) .. (const0 k-1 ... 0) . id] *)
+                            ]
+
+                      val finalred =
+                         R.trans
+                            [
+                            (* compact red *)
+                            R.user1
+                               (R.new1 const nPervs 
+                                   (R.reduce red (T.Elim (T.Const const, spine)))
+                                   red R.refl),
+
+                            R.beta nArgs
+                            ]
+                   in
+                      Database.setUnroll const finalred
+                   end)
+               allstuff
+         end
+
 
 
       fun recordTyping name =
@@ -790,6 +1044,8 @@ structure ParseDefine =
 
       fun app x f = f x
 
+      fun mutFunc name args body = (name, args, body)
+
    end
 
 
@@ -818,6 +1074,11 @@ grammardef Define
    rule Reduce1Directive ::= Reduce1Pattern ReduceActions => app
    rule Reduce2Directive ::= Reduce2Pattern ReduceActions => app
    rule ReduceDirective  ::= ReducePatterns ReduceActions => app
+
+   rule MutFunc          ::= Ident OIdents "=" Term => mutFunc
+
+   rule MutFuncs         ::= MutFunc => sing
+   rule MutFuncs         ::= MutFunc "and" MutFuncs => cons
 
 end
 

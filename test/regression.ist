@@ -9,6 +9,69 @@ Ctrl.use "../library/integer-load.iml";
 fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
 
 
+structure P = ReductionProver;
+
+
+definemutrecRaw /x/
+/
+  snork1 y =
+    if Nat.eqb y 0 then
+      x
+    else
+      snork2 y
+
+  and
+  snork2 y = snork1 (y - 1) * 2
+/;
+
+
+
+lemma "snorkism"
+/
+  snork2 4 2 = 16 : nat
+/;
+
+unroll /snork2/.
+reduce //.
+unroll /snork1/.
+unroll /Nat.eqb/.
+reduce //.
+unroll /snork2/.
+reduce //.
+unroll /snork1/.
+unroll /Nat.eqb/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "snork1_type"
+/
+  snork1 : nat -> nat -> nat
+/;
+
+introOf /x y/.
+sinduction /y/.
+reintro /IH/.
+unroll /snork1/.
+destruct /y/ /| y/.
+  {
+  unroll /Nat.eqb/.
+  reduce //.
+  hypof.
+  }
+unroll /Nat.eqb/.
+reduce //.
+unroll /snork2/.
+reduce //.
+typecheck.
+apply /IH/.
+apply /Nat.lt_succ/.
+qed ();
+
+
+
 lemma "integer_to_nat_reduce"
 /
   Integer.integer_to_nat z`10 = 10 : nat

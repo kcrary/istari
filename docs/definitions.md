@@ -86,8 +86,46 @@ but using `unroll` results in a much cleaner term:
     list_case l 0 (fn h t . succ (` length a t))
 
 One can also make recursive definitions without a type using the
-command `definerecRaw`, subject to the same hazard discussed above.
+command `definerecRaw`, subject to the same free evar hazard discussed
+above.
 
+
+
+### Mutually recursive definitions
+
+One can define mutually recursive definitions using a recursive
+definition of a tuple, but again Istari offers a more convenient
+syntax:
+
+    definemutrecRaw /x/
+    /
+      snork1 y =
+        if Nat.eqb y 0 then
+          x
+        else
+          snork2 y
+    
+      and
+      snork2 y = snork1 (y - 1) * 2
+    /;
+
+Here, `x` is a pervasive argument that is available to all of the
+mutually defined functions.  Thus `snork1` and `snork2` have the type
+`nat -> nat -> nat` (although this has to be proven, of course).
+
+The definition also creates an appropriate unrolling rewrite.  If one
+uses `unfold /snork2/` on the goal:
+
+    snork2 4 2 = 16 : nat
+
+one obtains:
+
+    snork1 4 (2 - 1) * 2 = 16 : nat
+
+For mutually recursive definitions, there is only the raw version.  To
+give mutually recursive definitions a type, one must prove a typing
+lemma and then install it using `recordTyping`.  Again, this is
+subject to the free evar hazard.
 
 
 ### Datatype definitions

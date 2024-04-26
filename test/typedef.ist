@@ -61,6 +61,123 @@ defineInd /a b/
 
 
 
+definemutrecRaw /a b/
+/
+  treesize' m x =
+    (fnind _ : tree [a b] _ -> nat of
+     | Empty . 0
+     | Node n y f . succ (forestsize' n f)
+     | One n t . treesize' n t) m x
+
+  and
+  forestsize' m x =
+    (fnind _ : forest [a b] _ -> nat of
+     | Nil . 0
+     | Sing y . 1
+     | Cons n p t f . treesize' n t + forestsize' p f) m x
+/;
+
+
+
+lemma "treesize'_forestsize'_type"
+/
+  (treesize' : intersect i . forall (a b : U i) n . tree a b n -> nat)
+  &
+  (forestsize' : intersect i . forall (a b : U i) n . forest a b n -> nat)
+/;
+
+inference.
+assert 
+  /forall i (a b : U i) (x : tree_skel a b) .
+     (forall n (t : tree a b n) .
+        tree_strip t = x : tree_skel a b
+        -> treesize' a b n t : nat)
+     &
+     (forall n (f : forest a b n) .
+        forest_strip f = x : tree_skel a b
+        -> forestsize' a b n f : nat)
+  / /H/.
+  {
+  inference.
+  intro /i a b x/.
+  so /tree_subterm_well_founded _# 3 x/ /Hwf/.
+  sinduction /Hwf/.
+  reintro /IH/.
+  split.
+    {
+    intro /n t Heqx/.
+    destruct /t/ /{Heq | m y f Heq | m t Heq}/.
+      {
+      unroll /treesize'/.
+      reduce //.
+      typecheck.
+      }
+
+      {
+      unroll /treesize'/.
+      reduce //.
+      typecheck.
+      apply /IH/ >> auto.
+      subst /x n/.
+      apply /Node_subterm/.
+      }
+
+      {
+      unroll /treesize'/.
+      reduce //.
+      apply /IH/ >> auto.
+      subst /x n/.
+      apply /One_subterm/.
+      }
+    }
+
+    {
+    intro /n f Heqx/.
+    destruct /f/ /{Heq | m Heq | m p t f Heq}/.
+      {
+      unroll /forestsize'/.
+      reduce //.
+      typecheck.
+      }
+
+      {
+      unroll /forestsize'/.
+      reduce //.
+      typecheck.
+      }
+
+      {
+      unroll /forestsize'/.
+      reduce //.
+      typecheck.
+        {
+        apply /IH/ >> auto.
+        subst /x n/.
+        apply /Cons_subterm/.
+        }
+
+        {
+        apply /IH/ >> auto.
+        subst /x n/.
+        apply /Cons_subterm/.
+        }
+      }
+    }
+  }
+split.
+  {
+  introOf /i a b n t/.
+  apply /H/ >> auto.
+  }
+
+  {
+  introOf /i a b n f/.
+  apply /H/ >> auto.
+  }
+qed ();
+
+                           
+
 lemma "tree_case"
 /
   forall i (a b : U i) n (t : tree a b (succ n)) .
