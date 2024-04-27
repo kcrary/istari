@@ -129,3 +129,138 @@ structure Debugger :> DEBUGGER =
                 ))
 
    end
+
+
+signature SHOW_REDUCTION =
+   sig
+
+      val show : Reduction.reduction -> unit
+
+   end
+
+structure ShowReduction :> SHOW_REDUCTION =
+   struct
+
+      structure D = ReductionInternal.Detail
+      structure PP = PrettyPrint
+
+      val indent = 0
+      val width = 80
+
+      
+      fun appList pp f l =
+         (case l of
+             [] => ()
+             
+           | [x] => f x
+
+           | h :: t =>
+                (
+                f h;
+                PP.print pp ",";
+                PP.break pp 1;
+                appList pp f t
+                ))
+
+
+      fun showMain pp red =
+         (case red of
+             D.Trans [] =>
+                PP.print pp "refl"
+
+           | D.Trans l =>
+                (
+                PP.print pp "Trans [";
+                PP.openBox pp PP.Consistent 0;
+                appList pp (showMain pp) l;
+                PP.closeBox pp;
+                PP.print pp "]"
+                )
+
+           | D.Unfold =>
+                PP.print pp "unfold"
+
+           | D.Beta (SOME n) =>
+                (
+                PP.print pp "beta ";
+                PP.print pp (Int.toString n)
+                )
+
+           | D.Beta NONE =>
+                PP.print pp "betas"
+
+           | D.Within (l, r) =>
+                (
+                PP.print pp "within [";
+                PP.openBox pp PP.Consistent 0;
+                appList pp (fn i => PP.print pp (Int.toString i)) l;
+                PP.closeBox pp;
+                PP.print pp "] (";
+                showMain pp r;
+                PP.print pp ")"
+                )
+
+           | D.Compat l =>
+                (
+                PP.print pp "compat [";
+                PP.openBox pp PP.Consistent 0;
+                appList pp (showMain pp);
+                PP.print pp "]";
+                PP.closeBox pp
+                )
+
+           | D.Nativered =>
+                PP.print pp "native"
+
+           | D.ReflNative =>
+                PP.print pp "reflNative"
+
+           | D.User1 (const, i, m) =>
+                (
+                PP.print pp "user1 (";
+                PP.print pp (Namespace.toString const);
+                PP.print pp ", ";
+                PP.print pp (Int.toString i);
+                PP.print pp ", ";
+                PP.openBox pp PP.Consistent 0;
+                Show.showLiteralPP pp m;
+                PP.closeBox pp;
+                PP.print pp ")"
+                )
+
+           | D.User2 (const1, i, j, const2, k, m) =>
+                (
+                PP.print pp "user2 (";
+                PP.openBox pp PP.Freestyle 0;
+                PP.print pp (Namespace.toString const1);
+                PP.print pp ", ";
+                PP.print pp (Int.toString i);
+                PP.print pp ", ";
+                PP.print pp (Int.toString j);
+                PP.print pp ", ";
+                PP.print pp (Namespace.toString const2);
+                PP.print pp ", ";
+                PP.print pp (Int.toString k);
+                PP.print pp ",";
+                PP.break pp 1;
+                PP.openBox pp PP.Consistent 0;
+                Show.showLiteralPP pp m;
+                PP.closeBox pp;
+                PP.closeBox pp;
+                PP.print pp ")"
+                ))
+
+      fun show red =
+         let
+            val pp = PP.makeStreamIndent TextIO.stdOut width indent
+         in
+            PP.openBox pp PP.Consistent indent;
+
+            showMain pp (ReductionInternal.detail red);
+
+            PP.closeBox pp;
+            PP.flush pp;
+            print "\n"
+         end
+
+   end

@@ -122,6 +122,23 @@ signature REDUCTION_INTERNAL =
       val puReduction2 : reduction2 Pickle.pu
       val puReduction : reduction Pickle.pu
 
+
+      structure Detail :
+         sig
+            datatype reduction =
+               Trans of reduction list
+             | Unfold
+             | Beta of int option
+             | Within of int list * reduction
+             | Compat of reduction list
+             | Nativered
+             | ReflNative
+             | User1 of constant * int * term
+             | User2 of constant * int * int * constant * int * term
+         end
+
+      val detail : reduction -> Detail.reduction
+
    end
 
 
@@ -139,7 +156,7 @@ signature REDUCTION_PRIV =
 
 
 functor ReductionFun (structure Term : TERM
-                      structure Constant : CONSTANT
+                      structure Constant : CONSTANT_INTERNAL
                                            where type constant = Term.constant
                                            where type term = Term.term
                       structure Simplify : SIMPLIFY
@@ -170,16 +187,24 @@ functor ReductionFun (structure Term : TERM
       type reduction1 = constant * int * term
       type reduction2 = constant * int * int * constant * int * term
 
-      datatype reduction =
-         Trans of reduction list
-       | Unfold
-       | Beta of int option  (* nonnegative *)
-       | Within of int list * reduction
-       | Compat of reduction list
-       | Nativered
-       | ReflNative
-       | User1 of reduction1
-       | User2 of reduction2
+      (* it would be nice to have datatype copying *)
+      structure Detail =
+         struct
+
+            datatype reduction =
+               Trans of reduction list
+             | Unfold
+             | Beta of int option  (* nonnegative *)
+             | Within of int list * reduction
+             | Compat of reduction list
+             | Nativered
+             | ReflNative
+             | User1 of reduction1
+             | User2 of reduction2
+
+         end
+
+      open Detail
 
       exception Reduce
 
@@ -596,5 +621,7 @@ functor ReductionFun (structure Term : TERM
                 else
                    r)
             puRed
+
+      fun detail red = red
 
    end

@@ -124,12 +124,6 @@ structure FnindInternal :> FNIND_INTERNAL =
             (fn i => f (Vector.sub vec i))
 
 
-      fun appVectorAndList f vec l =
-         List.appi
-            (fns i y => f (Vector.sub vec i) y)
-            l
-
-
       fun elim m spine =
          (case spine of
              [] => m
@@ -957,9 +951,10 @@ structure FnindInternal :> FNIND_INTERNAL =
                         (fn (_, _, _, a, _) => ProverInternal.checkClean a)
                         defs
 
-                  val (constsRev, mapping) =
+                  (* mapping maps iterators to the fnind constants built using them *)
+                  val mapping =
                      ListPair.foldl
-                        (fns (fname, iterator, m, a, jud) v (constsRev, mapping) =>
+                        (fns (fname, iterator, m, a, jud) v mapping =>
                             let
                                val const = Namespace.declare fname (SOME m)
       
@@ -986,14 +981,14 @@ structure FnindInternal :> FNIND_INTERNAL =
                                       print (Symbol.toValue fname);
                                       print " defined.\n";
 
-                                      (const :: constsRev, CD.insert mapping iterator const)
+                                      CD.insert mapping iterator const
                                       )
       
                                  | Sum.INR _ =>
                                       (* This shouldn't happen. *)
                                       raise (Fail "internal definition error in fnindDef"))
                             end)
-                        ([], CD.empty)
+                        CD.empty
                         defs
                         vs
 
@@ -1097,56 +1092,63 @@ structure FnindInternal :> FNIND_INTERNAL =
                         ([], [])
                         spine
                in
-                  (* install reductions *)
-                  appVectorAndList
-                     (fns (_, _, nIndex, _, constrs) fconst =>
-                         Vector.app
-                            (fn (constr, nConstrArgs, args, ured) =>
-                                let
-                                   val lhs =
-                                      T.Elim (T.Const fconst,
-                                              Int.natrecUp
-                                                 (fns i l => T.App (T.Var (i + nVis + nConstrArgs)) :: l)
-                                                 [T.App
-                                                     (T.Elim (T.Const constr,
-                                                              Int.natrecUp
-                                                                 (fns i l => T.App (T.Var i) :: l)
-                                                                 []
-                                                                 (nVis + nConstrArgs)))]
-                                                 (nFnindArgs + nIndex))
-   
-                                   val nArmArgs =
-                                      List.foldl
-                                         (fns sort n =>
-                                             (case sort of
-                                                 NONE => n+1
-                                               | SOME _ => n+2))
-                                         0
-                                         args
+                  (* install reductions
+                     (It's easier to start with the datatype bundle and look up the functions than vice versa.)
+                  *)
+                  Vector.app
+                     (fn (_, iterator, nIndex, _, constrs) =>
+                         (case CD.find mapping iterator of
+                             NONE =>
+                                (* no function for this datatype, skip it *)
+                                ()
 
-                                   val red1 = R.trans [R.unfold, R.beta nFnindArgs, R.user2 ured, R.beta nArmArgs]
-   
-                                   val middle = R.reduce red1 lhs
-   
-                                   val (rhs, red2) =
-                                      (* in middle, replace calls to the iterators with calls to the induction functions *)
-                                      antireduce nIndex nConstrArgs 0 middle
-   
-                                   val ured' = R.new2 fconst (nFnindArgs + nIndex) 0 constr (nVis + nConstrArgs) rhs red1 red2
-
-                                   val name1 = Symbol.toValue (Namespace.lastname fconst)
-                                   val name2 = Symbol.toValue (Namespace.lastname constr)
-                                in
-                                   Define.register ured';
-
-                                   Registry.write
-                                      (Symbol.fromValue (String.concat [name1, "_", name2]))
-                                      Registry.reduction2
-                                      ured'
-                                end)
-                            constrs)
+                           | SOME fconst =>
+                                Vector.app
+                                   (fn (constr, nConstrArgs, args, ured) =>
+                                       let
+                                          val lhs =
+                                             T.Elim (T.Const fconst,
+                                                     Int.natrecUp
+                                                        (fns i l => T.App (T.Var (i + nVis + nConstrArgs)) :: l)
+                                                        [T.App
+                                                            (T.Elim (T.Const constr,
+                                                                     Int.natrecUp
+                                                                        (fns i l => T.App (T.Var i) :: l)
+                                                                        []
+                                                                        (nVis + nConstrArgs)))]
+                                                        (nFnindArgs + nIndex))
+          
+                                          val nArmArgs =
+                                             List.foldl
+                                                (fns sort n =>
+                                                    (case sort of
+                                                        NONE => n+1
+                                                      | SOME _ => n+2))
+                                                0
+                                                args
+       
+                                          val red1 = R.trans [R.unfold, R.beta nFnindArgs, R.user2 ured, R.beta nArmArgs]
+          
+                                          val middle = R.reduce red1 lhs
+          
+                                          val (rhs, red2) =
+                                             (* in middle, replace calls to the iterators with calls to the induction functions *)
+                                             antireduce nIndex nConstrArgs 0 middle
+          
+                                          val ured' = R.new2 fconst (nFnindArgs + nIndex) 0 constr (nVis + nConstrArgs) rhs red1 red2
+       
+                                          val name1 = Symbol.toValue (Namespace.lastname fconst)
+                                          val name2 = Symbol.toValue (Namespace.lastname constr)
+                                       in
+                                          Define.register ured';
+       
+                                          Registry.write
+                                             (Symbol.fromValue (String.concat [name1, "_", name2]))
+                                             Registry.reduction2
+                                             ured'
+                                       end)
+                                   constrs))
                      dtinfo
-                     (List.rev constsRev)
                end
          in
             (case goals of
