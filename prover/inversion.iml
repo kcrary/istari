@@ -11,9 +11,17 @@ signature INVERSION =
       val destructThinRaw : hypothesis -> IntroPattern.ipattern -> tactic
       val destructThin : hypothesis -> IntroPattern.ipattern -> tactic
 
+      val destructThinCautiousPriority : hypothesis -> IntroPattern.ipattern -> priority tacticm
+      val destructThinCautiousRaw : hypothesis -> IntroPattern.ipattern -> tactic
+      val destructThinCautious : hypothesis -> IntroPattern.ipattern -> tactic
+
       val inversionPriority : hypothesis -> priority tacticm
       val inversionRaw : hypothesis -> tactic
       val inversion : hypothesis -> tactic
+
+      val mimicPriority : hypothesis list -> priority tacticm
+      val mimicRaw : hypothesis list -> tactic
+      val mimic : hypothesis list -> tactic
 
    end
 
@@ -42,7 +50,7 @@ structure Inversion :> INVERSION =
          n down through stop (inclusive).  Only substitute for variables
          between stop and lid (inclusive).
       *)
-      fun injections lid stop n =
+      fun injections cautious lid stop n =
          if n < stop then
             idtacM Primary
          else
@@ -54,7 +62,7 @@ structure Inversion :> INVERSION =
                              Hyp.clear [Hyp.NUMBER n]
                              >>
                              (* one hypothesis deleted *)
-                             injections (lid-1) stop (n-1)
+                             injections cautious (lid-1) stop (n-1)
                           else if i <= lid then
                              (* Make sure the left-hand equand is a new variable (i.e.,
                                 introduced by destruction).  Note that stop <= n < i.
@@ -65,25 +73,29 @@ structure Inversion :> INVERSION =
                                 j for i.
                              *)
                              ifthenM
-                                (EqualityTacticInternal.substMain false i n (T.Var j))
+                                (EqualityTacticInternal.substMain false cautious i n (T.Var j))
 
                                 (* two hypotheses deleted: one equality, one variable *)
-                                (fn Primary => injections (lid-2) stop (n-1)
+                                (fn Primary => injections cautious (lid-2) stop (n-1)
                                   | pri => idtacM pri)
 
                                 (* substitution failed, skip it *)
-                                (lift (fn () => injections lid stop (n-1)))
+                                (lift (fn () => injections cautious lid stop (n-1)))
                           else
-                             injections lid stop (n-1))\
+                             injections cautious lid stop (n-1))\
                              
                    | \Prim.eq\ _ var? ? =>
                      \(fnc i m =>
                           if i <= lid then
-                             EqualityTacticInternal.substMain false i n m
+                             first
+                                [
+                                EqualityTacticInternal.substMain false cautious i n m,
+                                idtacM Primary
+                                ]
                              >>!
-                             injections (lid-2) stop (n-1)
+                             injections cautious (lid-2) stop (n-1)
                           else
-                             injections lid stop (n-1))\
+                             injections cautious lid stop (n-1))\
    
                    | \Prim.eq\ _ (const? @ _) (const? @ _) =>
                      \(fnc _ _ =>
@@ -103,17 +115,17 @@ structure Inversion :> INVERSION =
                                               >>
                                               Hyp.exchange 0 new n
                                               >>
-                                              injections (lid - 1 + new) stop (n - 1 + new)
+                                              injections cautious (lid - 1 + new) stop (n - 1 + new)
                                            end
       
                                       | _ => idtacM pri))
-                                (injections lid stop (n-1))
+                                (injections cautious lid stop (n-1))
                           end)\
                   )
 
              | _ =>
                \(fnc =>
-                    injections lid stop (n-1))\
+                    injections cautious lid stop (n-1))\
             /
          
 
@@ -136,7 +148,7 @@ structure Inversion :> INVERSION =
             end
 
 
-      fun destructThinMain n pat set =
+      fun destructThinMain cautious n pat set =
          (case pat of
              IP.Or pats =>
                 let
@@ -172,7 +184,7 @@ structure Inversion :> INVERSION =
                           do sz' = withsize
                           val first = n + sz' - sz
                        in
-                          injections first n first
+                          injections cautious first n first
                        end)
                       (List.map post pats)
                       (post (IP.And []))
@@ -182,18 +194,26 @@ structure Inversion :> INVERSION =
                 fail "inversion pattern expected")
 
 
-      fun destructThinPriority hyp pat =
+      fun destructThinGeneral cautious hyp pat =
          let
             do n = Hyp.findhyp hyp
             do (_, dir) = withgoal
             val set = D.removeSet (D.set dir) (D.name dir n)
          in
-            destructThinMain n pat set
+            destructThinMain cautious n pat set
          end
+
+      fun destructThinPriority hyp pat = destructThinGeneral false hyp pat
 
       fun destructThinRaw hyp pat = destructThinPriority hyp pat >> idtac
 
       fun destructThin hyp pat = Typecheck.withTypecheckSnd $ destructThinPriority hyp pat
+
+      fun destructThinCautiousPriority hyp pat = destructThinGeneral true hyp pat
+
+      fun destructThinCautiousRaw hyp pat = destructThinCautiousPriority hyp pat >> idtac
+
+      fun destructThinCautious hyp pat = Typecheck.withTypecheckSnd $ destructThinCautiousPriority hyp pat
 
 
       fun inversionPriority hyp =
@@ -202,11 +222,127 @@ structure Inversion :> INVERSION =
          in
             Hyp.copy hyp NONE
             >>
-            destructThinMain 0 (IP.Or []) (D.set dir)
+            destructThinMain false 0 (IP.Or []) (D.set dir)
          end
          
       fun inversionRaw hyp = inversionPriority hyp >> idtac
 
       fun inversion hyp = Typecheck.withTypecheckSnd $ inversionPriority hyp
+
+
+
+      (* heq : hyp = M : A *)
+      fun mimicMain hyp heq =
+         let
+            do i = Hyp.findhyp hyp
+         in
+            destructThinGeneral true hyp (IntroPattern.Or [])
+            >>!
+            let
+               do (jud, _) = withgoal
+               val oldsz = S.length (J.context jud)
+            in
+               EqualityTactic.injectionPriority heq
+               >>!
+               let
+                  do (jud, dir) = withgoal
+                  val newsz = S.length (J.context jud)
+                  val new = newsz - oldsz
+                  val newsyms = D.suffix dir new
+               in
+                  Hyp.exchange 0 new i
+                  >>+
+                  Hyp.clear [heq]
+                  >>+
+                  (* heq is definitely after where we just put the new stuff *)
+                  mimicLoop newsyms
+               end
+            end
+         end
+
+      and mimicLoop newsyms =
+         (case newsyms of
+             [] =>
+                idtacM Primary
+
+           | heq :: rest =>
+                let
+                   do (_, dir) = withgoal
+                   val j = D.lookupVar (D.idir dir) heq
+                in
+                   goalHypCaseT j
+                   /| $tm \Prim.eq\ _ var? (const? @ _) =>
+                      \(fnc i _ =>
+                           ifthenM
+                              (mimicMain (Hyp.NAME (D.name dir i)) (Hyp.NAME heq))
+                              (fn Primary => mimicLoop rest
+                                | Secondary => idtacM Secondary)
+                              (lift (fn () => mimicLoop rest)))\
+
+                    | _ =>
+                      \(fnc =>
+                           mimicLoop rest)\
+                   /
+                end)
+
+         
+      fun mimicPriority hyps =
+         (case hyps of
+             [] =>
+                idtacM Primary
+
+           | hyp :: rest =>
+                let
+                   do (_, dir) = withgoal
+
+                   do i = Hyp.findhyp hyp
+                in
+                   first
+                      [
+                      goalContextnCaseT
+                      /| $tm \Prim.eq\ _ ($var \i\) ? =>
+                         \(fnc j m =>
+                              first
+                                 [
+                                 (* might as well try this first *)
+                                 EqualityTacticInternal.substMain false true i j m,
+   
+                                 let
+                                    do (_, dir) = withgoal
+                                    val heq = Hyp.NAME (D.name dir j)
+                                 in
+                                    mimicMain hyp heq
+                                 end
+                                 ])\
+   
+                       | $tm \Prim.eq\ _ ? ($var \i\) =>
+                         \(fnc j m =>
+                              first
+                                 [
+                                 (* might as well try this first *)
+                                 EqualityTacticInternal.substMain true true i j m,
+   
+                                 let
+                                    do (_, dir) = withgoal
+                                    val heq = Hyp.NAME (D.name dir j)
+                                 in
+                                    EqualityTactic.symmetryInPriority heq
+                                    >>!
+                                    (* now heq : (hyp = M : A) *)
+                                    mimicMain hyp heq
+                                 end
+                                 ])\
+                      /,
+
+                      fail "no eligible equality hypothesis found"
+                      ]
+                   >>!
+                   mimicPriority rest
+                end)
+
+      fun mimicRaw hyps = mimicPriority hyps >> idtac
+
+      fun mimic hyps =
+         Typecheck.withTypecheckSnd $ mimicPriority hyps
 
    end

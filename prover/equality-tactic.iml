@@ -68,6 +68,12 @@ signature EQUALITY_TACTIC =
       val substStrictRaw : hypothesis list -> tactic
       val subst : hypothesis list -> tactic
       val substStrict : hypothesis list -> tactic
+      val substCautiousPriority : hypothesis list -> priority tacticm
+      val substCautiousStrictPriority : hypothesis list -> priority tacticm
+      val substCautiousRaw : hypothesis list -> tactic
+      val substCautiousStrictRaw : hypothesis list -> tactic
+      val substCautious : hypothesis list -> tactic
+      val substCautiousStrict : hypothesis list -> tactic
 
       val substAll : tactic
 
@@ -80,13 +86,14 @@ signature EQUALITY_TACTIC_INTERNAL =
       include EQUALITY_TACTIC
 
 
-      (* substMain reverse i j m
+      (* substMain reverse cautious i j m
 
-         hypothesis j has type (i = m : A), or the reverse
+         hypothesis j has type (i = m : A), or the reverse if reverse=true
 
          Will not move hypotheses to make substitution possible.
+         Will not substitute into the conclusion if cautious=true.
       *)
-      val substMain : bool -> int -> int -> Term.term -> priority tacticm
+      val substMain : bool -> bool -> int -> int -> Term.term -> priority tacticm
 
 
       val injectionSum : int -> tactic
@@ -1754,7 +1761,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
 
 
-      fun substMain reverse i j m =
+      fun substMain reverse cautious i j m =
          let
             val m' = T.evar ()
 
@@ -1805,18 +1812,21 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                       maingoal
                       ],
    
-                  refine (Rule.substitution i (T.evar ()) (T.evar ()) m')
-                  >>> [
-                      idtacM Secondary,
-                      eqgoal,
-                      maingoal
-                      ]
+                  if cautious then
+                     fail "in cautious substitution, variable appears in conclusion"
+                  else
+                     refine (Rule.substitution i (T.evar ()) (T.evar ()) m')
+                     >>> [
+                         idtacM Secondary,
+                         eqgoal,
+                         maingoal
+                         ]
                   ]
             else
                fail "substitutend depends on later hypotheses"
          end
 
-      fun substFlexPriority strict hyps =
+      fun substFlexPriority strict cautious hyps =
          (case hyps of
              [] =>
                 idtacM Primary
@@ -1844,7 +1854,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                       /| $tm \Prim.eq\ _ ($var \i\) ? =>
                          \(fnc j m =>
                               if strict then
-                                 substMain false i j m
+                                 substMain false cautious i j m
                               else
                                  Hyp.moveTermDeps m i
                                  >>+
@@ -1852,13 +1862,13 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                                  goalHypCaseT j
                                  / $tm \Prim.eq\ _ var? ? =>
                                    \(fnc i' m' =>
-                                        substMain false i' j m')\
+                                        substMain false cautious i' j m')\
                                  /)\
          
                        | $tm \Prim.eq\ _ ? ($var \i\) =>
                          \(fnc j m =>
                               if strict then
-                                 substMain true i j m
+                                 substMain true cautious i j m
                               else
                                  Hyp.moveTermDeps m i
                                  >>+
@@ -1866,29 +1876,43 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                                  goalHypCaseT j
                                  / $tm \Prim.eq\ _ ? var? =>
                                    \(fnc m' i' =>
-                                        substMain true i' j m')\
+                                        substMain true cautious i' j m')\
                                  /)\
                       /,
        
-                      fail "no equality hypothesis found"
+                      fail "no eligible equality hypothesis found"
                       ]
                    >>!
-                   substFlexPriority strict rest
+                   substFlexPriority strict cautious rest
                 end)
 
-      val substPriority = substFlexPriority false
+      val substPriority = substFlexPriority false false
 
       fun substRaw hyp = substPriority hyp >> idtac
 
       fun subst hyp =
          TC.withTypecheckSnd $ substPriority hyp
 
-      val substStrictPriority = substFlexPriority true
+      val substStrictPriority = substFlexPriority true false
 
       fun substStrictRaw hyp = substStrictPriority hyp >> idtac
 
       fun substStrict hyp =
          TC.withTypecheckSnd $ substStrictPriority hyp
+
+      val substCautiousPriority = substFlexPriority false true
+
+      fun substCautiousRaw hyp = substCautiousPriority hyp >> idtac
+
+      fun substCautious hyp =
+         TC.withTypecheckSnd $ substCautiousPriority hyp
+
+      val substCautiousStrictPriority = substFlexPriority true true
+
+      fun substCautiousStrictRaw hyp = substCautiousStrictPriority hyp >> idtac
+
+      fun substCautiousStrict hyp =
+         TC.withTypecheckSnd $ substCautiousStrictPriority hyp
 
       val substAll =
          repeat $

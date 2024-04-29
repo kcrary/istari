@@ -30,6 +30,7 @@ signature HYP =
 
       val reintro : IntroPattern.ipattern list -> tactic
       val renameBefore : IntroPattern.ipattern list -> hypothesis -> tactic
+      val renameAfter : IntroPattern.ipattern list -> hypothesis -> tactic
 
       val weaken : int -> int -> tactic
       val clear : hypothesis list -> tactic
@@ -372,6 +373,30 @@ structure Hyp :> HYP =
                       val (names, dir) = D.split dir (j+1)
                       
                       do dir' = andthenM $ reintroLoop (j+1) (List.rev pats) dir
+                   in
+                      chdir (D.binds dir' names)
+                   end)
+         end
+
+      fun renameAfter pats h =
+         let
+            do j = findhyp h
+
+            do (_, dir) = withgoal
+
+            val (n, revpats) =
+               List.foldl
+                  (fns pat (n, l) => (n+1, pat :: l))
+                  (0, [])
+                  pats
+         in
+            (case D.splitOpt dir (j-n) of
+                NONE =>
+                   fail "too many patterns specified"
+                   
+              | SOME (names, dir') =>
+                   let
+                      do dir' = andthenM $ reintroLoop (j-n) revpats dir'
                    in
                       chdir (D.binds dir' names)
                    end)

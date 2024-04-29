@@ -329,6 +329,11 @@ which appears in the `Hyp` structure.
 
     Equivalent to `reintro /[ipattern] ... [ipattern]/`.
 
+  + `renameAfter /[ipattern] ... [ipattern]/ /[hyp x]/`
+
+    As `reintro` except it operates on the hypotheses immediately
+    following `x`.
+
 
 - `clear /[hyp] ... [hyp]/`
 
@@ -585,9 +590,9 @@ which appears in the `Hyp` structure.
 
 - `subst /[hyps]/`
 
-  For each hypothesis `x` in the list: when there exists another
-  hypothesis with type `x = M : A` or `M = x : A`, replaces
-  occurrences of `x` with `M`.
+  For each hypothesis `x` in the list: finds another hypothesis with
+  type `x = M : A` or `M = x : A`, and replaces occurrences of `x`
+  with `M`.
 
   + `substRaw /[hyps]/`
 
@@ -612,6 +617,24 @@ which appears in the `Hyp` structure.
     Carry out all available substitutions, using `subst`.  Prefers
     left-to-right when either direction is possible.
 
+  + `substCautious /[hyps]/`
+
+    As `subst` but will not substitute into the conclusion, and will
+    never generate a proof obligation that the conclusion is
+    well-formed.
+
+  + `substCautiousRaw /[hyps]/`
+
+    As `substCautious` but will not invoke the typechecker.
+
+  + `substCautiousStrict /[hyps]/`
+
+    As `substStrict` but will not substitute into the conclusion.
+
+  + `substCautiousStrictRaw /[hyps]/`
+
+    As `substCautiousStrict` but will not invoke the typechecker.
+
 
 The substitution tactics above first attempt to use a substitution
 rule that does not allow the substitution variable (*i.e.,* the
@@ -621,8 +644,10 @@ is preferable, because it does not generate a proof obligation that
 the conclusion is well-formed.  However, in unusual circumstances this
 can result in a surprising behavior: if the conclusion mentions an
 evar that might or might not depend on the substitution variable, that
-possible dependency is pruned out.
-  
+possible dependency is pruned out.  More predictable behavior can be
+obtained using `substCautious`, which will always prune out any
+possible dependency in the conclusion.
+
 
 
 ### Type equality and subtyping tactics
@@ -811,11 +836,26 @@ The destruction tactics are:
   variable mentioned in the conclusion generates a proof obligation
   that the conclusion is well-formed.  Often this is fine, but it can
   be unfortunate when one cannot yet show that the conclusion is
-  well-formed, such as when one is proving a typing lemma.)
+  well-formed, such as when one is proving a typing lemma.  This
+  behavior can be prevented using `destructThinCautious`, which will
+  leave such equations unresolved instead.)
 
   + `destructThinRaw /[hyp x]/ /[ipattern]/`
 
     As `destructThin` but does not invoke the typechecker.
+
+  + `destructThinCautious /[hyp x]/ /[ipattern]/`
+
+    As `destructThin` but will not substitute into the conclusion in
+    the course of resolving index equations, and will never generate a
+    proof obligation that the conclusion is well-formed.  (The
+    replacement of `x` by its various cases still takes place, of
+    course.)
+
+  + `destructThinCautiousRaw /[hyp x]/ /[ipattern]/`
+
+    As `destructThinCautious` but does not invoke the typechecker.
+
 
 - `inversion /[hyp x]/`
 
@@ -827,6 +867,32 @@ The destruction tactics are:
   + `inversionRaw /[hyp x]/`
 
     As `inversion` but does not invoke the typechecker.
+
+
+- `mimic /[hyps]/`
+
+  An ersatz `subst`, suitable for when the conclusion is not yet known
+  to be well-formed.  For each hypothesis `x` in the list: finds
+  another hypothesis with type `x = M : A` or `M = x : A` where `M`'s
+  head is a constructor, and makes `x` look like `M` by destructing
+  `x` and discharging all the possibilities that don't look like `M`.
+  Will generate new variables for the subterms of `x`, and equalities
+  relating those variables to `M`'s subterms.
+
+  Mimic will substitute new variables away if they do not appear in
+  the conclusion, and if their equality hypothesis has the appropriate
+  type.  (The latter might fail because the types of the variable and
+  the equality might depend on equal but distinct indices and the
+  equality between those indices could not be substituted away.)
+
+  Mimic will never substitute for any variable that appears in the
+  conclusion.  Thus, it is suitable for situations in which the
+  conclusion is not yet known to be well-formed.  If the conclusion
+  *is* known to be well-formed, `subst` is always preferable.
+
+  + `mimicRaw /[hyps]/`
+
+    As `mimic` but does not invoke the typechecker.
 
 
 ### Chaining
