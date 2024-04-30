@@ -264,6 +264,11 @@ module type ARRAY =
       val app : ('a -> unit) -> 'a array -> unit
       val appi : (int -> 'a -> unit) -> 'a array -> unit
 
+      val find : ('a -> bool) -> 'a array -> 'a option
+      val findi : (int -> 'a -> bool) -> 'a array -> 'a option
+      val findmap : ('a -> 'b option) -> 'a array -> 'b option
+      val findmapi : (int -> 'a -> 'b option) -> 'a array -> 'b option
+
    end
 
 
@@ -285,6 +290,11 @@ module type VECTOR =
       val foldri : (int -> 'a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
       val app : ('a -> unit) -> 'a vector -> unit
       val appi : (int -> 'a -> unit) -> 'a vector -> unit
+
+      val find : ('a -> bool) -> 'a vector -> 'a option
+      val findi : (int -> 'a -> bool) -> 'a vector -> 'a option
+      val findmap : ('a -> 'b option) -> 'a vector -> 'b option
+      val findmapi : (int -> 'a -> 'b option) -> 'a vector -> 'b option
 
    end
 

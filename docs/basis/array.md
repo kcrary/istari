@@ -21,10 +21,31 @@
           val app : ('a -> unit) -> 'a array -> unit
           val appi : (int -> 'a -> unit) -> 'a array -> unit
     
-       end
+          val find : ('a -> bool) -> 'a array -> 'a option
+          val findi : (int -> 'a -> bool) -> 'a array -> 'a option
+          val findmap : ('a -> 'b option) -> 'a array -> 'b option
+          val findmapi : (int -> 'a -> 'b option) -> 'a array -> 'b option
+
+        end
     
     structure Array : ARRAY
 
 - `tabulate : int -> (int -> 'a) -> 'a array`
 
   Applies the initializer in order of increasing index.
+
+- `find : ('a -> bool) -> 'a array -> 'a option`
+
+  Applies the test in order of increasing index.
+
+- `findi : (int -> 'a -> bool) -> 'a array -> 'a option`
+
+  Applies the test in order of increasing index.
+
+- `findmap : ('a -> 'b option) -> 'a array -> 'b option`
+
+  Applies the function in order of increasing index.
+
+- `findmapi : (int -> 'a -> 'b option) -> 'a array -> 'b option`
+
+  Applies the function in order of increasing index.

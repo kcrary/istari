@@ -596,6 +596,41 @@ module Vector : VECTOR =
          in
             y
 
+      let findi f a =
+         let len = Array.length a
+         in
+         let rec loop i =
+            if i >= len then
+               None
+            else
+               let x = Array.get a i
+               in
+                  if f i x then
+                     Some x
+                  else
+                     loop (i+1)
+         in
+            loop 0
+
+      let find f a = findi (fun _ -> f) a
+
+      let findmapi f a =
+         let len = Array.length a
+         in
+         let rec loop i =
+            if i >= len then
+               None
+            else
+               (match f i (Array.get a i) with
+                   None ->
+                      loop (i+1)
+
+                 | Some _ as ans -> ans)
+         in
+            loop 0
+
+      let findmap f a = findmapi (fun _ -> f) a
+
    end
 
 
@@ -626,6 +661,41 @@ module Array : ARRAY with type 'a array = 'a array =
          let (_, y) = Array.fold_right (fun x (i, y) -> (i+1, f i x y)) a (0, b)
          in
             y
+
+      let findi f a =
+         let len = Array.length a
+         in
+         let rec loop i =
+            if i >= len then
+               None
+            else
+               let x = Array.get a i
+               in
+                  if f i x then
+                     Some x
+                  else
+                     loop (i+1)
+         in
+            loop 0
+
+      let find f a = findi (fun _ -> f) a
+
+      let findmapi f a =
+         let len = Array.length a
+         in
+         let rec loop i =
+            if i >= len then
+               None
+            else
+               (match f i (Array.get a i) with
+                   None ->
+                      loop (i+1)
+
+                 | Some _ as ans -> ans)
+         in
+            loop 0
+
+      let findmap f a = findmapi (fun _ -> f) a
 
    end
 

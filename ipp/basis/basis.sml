@@ -261,6 +261,11 @@ signature Basis__ARRAY =
       val app : ('a -> unit) -> 'a array -> unit
       val appi : (int -> 'a -> unit) -> 'a array -> unit
 
+      val find : ('a -> bool) -> 'a array -> 'a option
+      val findi : (int -> 'a -> bool) -> 'a array -> 'a option
+      val findmap : ('a -> 'b option) -> 'a array -> 'b option
+      val findmapi : (int -> 'a -> 'b option) -> 'a array -> 'b option
+
    end
 
 
@@ -282,6 +287,11 @@ signature Basis__VECTOR =
       val foldri : (int -> 'a -> 'b -> 'b) -> 'b -> 'a vector -> 'b
       val app : ('a -> unit) -> 'a vector -> unit
       val appi : (int -> 'a -> unit) -> 'a vector -> unit
+
+      val find : ('a -> bool) -> 'a vector -> 'a option
+      val findi : (int -> 'a -> bool) -> 'a vector -> 'a option
+      val findmap : ('a -> 'b option) -> 'a vector -> 'b option
+      val findmapi : (int -> 'a -> 'b option) -> 'a vector -> 'b option
 
    end
 
@@ -950,6 +960,47 @@ structure Basis :> IML__BASIS =
                end
                handle Subscript => raise (Invalid "subarray")
  
+            fun findi f a =
+               let
+                  val len = Array.length a
+
+                  fun loop i =
+                     if i >= len then
+                        NONE
+                     else
+                        let
+                           val x = Array.sub (a, i)
+                        in
+                           if f i x then
+                              SOME x
+                           else
+                              loop (i+1)
+                        end
+               in
+                  loop 0
+               end
+
+            fun find f a = findi (fn _ => f) a
+
+            fun findmapi f a =
+               let
+                  val len = Array.length a
+
+                  fun loop i =
+                     if i >= len then
+                        NONE
+                     else
+                        (case f i (Array.sub (a, i)) of
+                            NONE =>
+                               loop (i+1)
+
+                          | ans as SOME _ => ans)
+               in
+                  loop 0
+               end
+
+            fun findmap f a = findmapi (fn _ => f) a
+
          end
 
 
@@ -978,6 +1029,47 @@ structure Basis :> IML__BASIS =
             fun foldri f z a = Vector.foldri (fn (i, x, y) => f i x y) z a
             fun appi f a = Vector.appi (fn (i, x) => f i x) a
  
+            fun findi f a =
+               let
+                  val len = Vector.length a
+
+                  fun loop i =
+                     if i >= len then
+                        NONE
+                     else
+                        let
+                           val x = Vector.sub (a, i)
+                        in
+                           if f i x then
+                              SOME x
+                           else
+                              loop (i+1)
+                        end
+               in
+                  loop 0
+               end
+
+            fun find f a = findi (fn _ => f) a
+
+            fun findmapi f a =
+               let
+                  val len = Vector.length a
+
+                  fun loop i =
+                     if i >= len then
+                        NONE
+                     else
+                        (case f i (Vector.sub (a, i)) of
+                            NONE =>
+                               loop (i+1)
+
+                          | ans as SOME _ => ans)
+               in
+                  loop 0
+               end
+
+            fun findmap f a = findmapi (fn _ => f) a
+
          end
 
 

@@ -19,6 +19,11 @@
           val app : ('a -> unit) -> 'a vector -> unit
           val appi : (int -> 'a -> unit) -> 'a vector -> unit
     
+          val find : ('a -> bool) -> 'a vector -> 'a option
+          val findi : (int -> 'a -> bool) -> 'a vector -> 'a option
+          val findmap : ('a -> 'b option) -> 'a vector -> 'b option
+          val findmapi : (int -> 'a -> 'b option) -> 'a vector -> 'b option
+
        end
     
     structure Vector : VECTOR
@@ -26,3 +31,19 @@
 - `tabulate : int -> (int -> 'a) -> 'a vector`
 
   Applies the initializer in order of increasing index.
+
+- `find : ('a -> bool) -> 'a vector -> 'a option`
+
+  Applies the test in order of increasing index.
+
+- `findi : (int -> 'a -> bool) -> 'a vector -> 'a option`
+
+  Applies the test in order of increasing index.
+
+- `findmap : ('a -> 'b option) -> 'a vector -> 'b option`
+
+  Applies the function in order of increasing index.
+
+- `findmapi : (int -> 'a -> 'b option) -> 'a vector -> 'b option`
+
+  Applies the function in order of increasing index.

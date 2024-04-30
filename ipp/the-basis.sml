@@ -225,7 +225,11 @@ functor TheBasis (datatype data =
           ("foldr", E 0),
           ("foldri", E 0),
           ("app", E 0),
-          ("appi", E 0)]
+          ("appi", E 0),
+          ("find", E 0),
+          ("findi", E 0),
+          ("findmap", E 0),
+          ("findmapi", E 0)]
       
       val sig1_VECTOR =
          [("vector", T),
@@ -240,7 +244,11 @@ functor TheBasis (datatype data =
           ("foldr", E 0),
           ("foldri", E 0),
           ("app", E 0),
-          ("appi", E 0)]
+          ("appi", E 0),
+          ("find", E 0),
+          ("findi", E 0),
+          ("findmap", E 0),
+          ("findmapi", E 0)]
       
       val sig1_IO =
          [("ioerr", T), ("Io", E 1), ("ioerrToString", E 0)]

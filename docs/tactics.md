@@ -869,28 +869,26 @@ The destruction tactics are:
     As `inversion` but does not invoke the typechecker.
 
 
-- `mimic /[hyps]/`
+- `mimic /[hyp h]/ /[names]/`
 
-  An ersatz `subst`, suitable for when the conclusion is not yet known
-  to be well-formed.  For each hypothesis `x` in the list: finds
-  another hypothesis with type `x = M : A` or `M = x : A` where `M`'s
-  head is a constructor, and makes `x` look like `M` by destructing
-  `x` and discharging all the possibilities that don't look like `M`.
-  Will generate new variables for the subterms of `x`, and equalities
-  relating those variables to `M`'s subterms.
-
-  Mimic will substitute new variables away if they do not appear in
-  the conclusion, and if their equality hypothesis has the appropriate
-  type.  (The latter might fail because the types of the variable and
-  the equality might depend on equal but distinct indices and the
-  equality between those indices could not be substituted away.)
+  An ersatz substitution tactic suitable for when the conclusion is
+  not yet known to be well-formed.  If `h`'s type is `x = M : A` or 
+  `M = x : A` where `M`'s head is a constructor, the tactic makes `x`
+  look like `M` by destructing `x` and discharging all the
+  possibilities that don't look like `M`.  Will generate new variables
+  for the subterms of `x`, and new equations relating those new
+  variables to `M`'s subterms.  The subterm variables will be named
+  using the supplied names (additional names will be invented if not
+  enough are supplied) and will appear in the context where `x` was.
+  The equations' names will be invented, and will appear at the
+  bottom.
 
   Mimic will never substitute for any variable that appears in the
   conclusion.  Thus, it is suitable for situations in which the
   conclusion is not yet known to be well-formed.  If the conclusion
   *is* known to be well-formed, `subst` is always preferable.
 
-  + `mimicRaw /[hyps]/`
+  + `mimicRaw /[hyp]/ /[names]/`
 
     As `mimic` but does not invoke the typechecker.
 
