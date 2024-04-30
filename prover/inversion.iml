@@ -231,9 +231,30 @@ structure Inversion :> INVERSION =
 
 
 
-      fun findArity dt constr =
+      val dtpat = IP.Or []
+      val sumpat = IP.Or [IP.Ident NONE, IP.Ident NONE]
+      val natpat = IP.Or [IP.And [], IP.Ident NONE]
+
+      fun findInfo dt constr =
          (case Datatype.info dt of
-             NONE => NONE
+             NONE =>
+                (* make mimic work for nat and sum as special cases *)
+                if Constant.eq (dt, Prim.sum) then
+                   if Constant.eq (constr, Prim.inl) orelse Constant.eq (constr, Prim.inr) then
+                      SOME (1, sumpat)
+                   else
+                      NONE
+
+                else if Constant.eq (dt, Prim.nat) then
+                   if Constant.eq (constr, Prim.zero) then
+                      SOME (0, natpat)
+                   else if Constant.eq (constr, Prim.succ) then
+                      SOME (1, natpat)
+                   else
+                      NONE
+
+                else
+                   NONE
 
            | SOME (n, (_, _, _, _, _, dts)) =>
                 let
@@ -246,25 +267,28 @@ structure Inversion :> INVERSION =
                     of
                        NONE => NONE
    
-                     | SOME (_, arity, _, _) => SOME arity)
+                     | SOME (_, arity, _, _) => SOME (arity, dtpat))
                 end)
 
 
-      fun mimicOnce eqname sequel =
+      fun mimicOnce tolerant eqname sequel =
          let
             do (jud, dir) = withgoal
             val sz1 = S.length (J.context jud)
             val eq = D.lookupVar (D.idir dir) eqname
          in
             goalHypCaseT eq
-            /| $tm \Prim.eq\ (const? @ _) var? (const? @ ?) =>
+            /| $tm \Prim.eq\ ($whnfHard (const? @ _)) var? ($whnfHard (const? @ ?)) =>
                \(fnc dt h constr spine =>
-                    (case findArity dt constr of
+                    (case findInfo dt constr of
                         NONE =>
-                           sequel (0, 0, [])
+                           if tolerant then
+                              sequel (0, 0, [])
+                           else
+                              fail "hypothesis is not suitable for mimic"
    
-                      | SOME arity =>
-                           Destruct.destructPriority (Hyp.NUMBER h) (IntroPattern.Or [])
+                      | SOME (arity, pat) =>
+                           Destruct.destructPriority (Hyp.NUMBER h) pat
                            >>!
                            let
                               do (jud, _) = withgoal
@@ -299,12 +323,15 @@ structure Inversion :> INVERSION =
 
              | _ =>
                \(fnc =>
-                    sequel (0, 0, []))\
+                    if tolerant then
+                       sequel (0, 0, [])
+                    else
+                       fail "hypothesis is not suitable for mimic")\
             /
          end
             
 
-      fun mimicLoop syms h vars equations eqnames =
+      fun mimicLoop tolerant syms h vars equations eqnames =
          (case eqnames of
              [] =>
                 let
@@ -331,9 +358,9 @@ structure Inversion :> INVERSION =
 
            | eqname :: rest =>
                 let
-                   do (newvars, newequations, neweqnames) = mimicOnce eqname
+                   do (newvars, newequations, neweqnames) = mimicOnce tolerant eqname
                 in
-                   mimicLoop syms (h + newequations) (vars + newvars) (equations + newequations) (neweqnames @ rest)
+                   mimicLoop true syms (h + newequations) (vars + newvars) (equations + newequations) (neweqnames @ rest)
                 end)
                 
       
@@ -349,7 +376,7 @@ structure Inversion :> INVERSION =
                     (* put the equation at the bottom where it's expected *)
                     Hyp.exchange 0 j 1
                     >>+
-                    mimicLoop syms i 1 1 [eqname])\
+                    mimicLoop false syms i 1 1 [eqname])\
 
              | $tm \Prim.eq\ _ (const? @ _) var? =>
                \(fnc _ i =>
@@ -359,7 +386,7 @@ structure Inversion :> INVERSION =
                     (* put the equation in the expected form *)
                     EqualityTactic.symmetryInPriority (Hyp.NUMBER 0)
                     >>!
-                    mimicLoop syms i 1 1 [eqname])\
+                    mimicLoop false syms i 1 1 [eqname])\
 
              | _ =>
                \(fnc =>

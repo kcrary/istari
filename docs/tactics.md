@@ -575,6 +575,13 @@ which appears in the `Hyp` structure.
   `A = B : type`, `A : U i`, and `B : U i`.
 
 
+- `ofEquands /[hyp h]/ /[name] [name]/`
+
+  If `h` has the type `M = N : A`, generates hypotheses with the types
+  `M : A` and `N : A` using the supplied names.  The second argument
+  is an intro pattern, so either name can be replaced with `_` or `?`.
+
+
 
 ### Substitution
 

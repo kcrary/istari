@@ -12,6 +12,92 @@ fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
 structure P = ReductionProver;
 
 
+lemma "of_equands"
+/
+  forall i (a : U i) (m n : a) .
+    m = n : a
+    -> (m : a) & (n : a)
+/;
+
+inference.
+intro /i a m n Heq/.
+ofEquands /Heq/ /Hof Hof'/.
+clear /Hof Hof'/.
+split.
+  {
+  ofEquands /Heq/ /? _/.
+  assumption.
+  }
+
+  {
+  ofEquands /Heq/ /_ ?/.
+  assumption.
+  }
+qed ();
+
+
+
+lemma "mimic_sum"
+/
+  forall i (a b : U i) (P : (a % b) -> U i) x1 x2 y1 y2 .
+    x1 = inl y1 : (a % b)
+    -> x2 = inr y2 : (a % b)
+    -> P (inl y1)
+    -> P (inr y2)
+    -> P x1 & P x2
+/;
+
+inference.
+intro /i a b P x1 x2 y1 y2 Heq1 Heq2 H1 H2/.
+split.
+  {
+  mimic /Heq1/ /y1'/.
+  forceExact /H1/.
+  compat.
+  compat.
+  auto.
+  }
+
+  {
+  mimic /Heq2/ /y2'/.
+  forceExact /H2/.
+  compat.
+  compat.
+  auto.
+  }
+qed ();
+
+
+
+lemma "mimic_nat"
+/
+  forall (P : nat -> U 0) x1 x2 y2 .
+    x1 = zero : nat
+    -> x2 = succ y2 : nat
+    -> P zero
+    -> P (succ y2)
+    -> P x1 & P x2
+/;
+
+inference.
+intro /P x1 x2 y2 Heq1 Heq2 H1 H2/.
+split.
+  {
+  mimic /Heq1/ //.
+  hyp /H1/.
+  }
+
+  {
+  mimic /Heq2/ /y2'/.
+  forceExact /H2/.
+  compat.
+  compat.
+  auto.
+  }
+qed ();
+
+
+
 lemma "cautious_substitution"
 /
   forall (P : nat -> U 0) (Q : U 0) (x y : nat) .

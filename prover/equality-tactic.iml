@@ -77,6 +77,8 @@ signature EQUALITY_TACTIC =
 
       val substAll : tactic
 
+      val ofEquands : hypothesis -> IntroPattern.ipattern -> tactic
+
    end
 
 
@@ -126,6 +128,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       structure D = Directory
       structure H = ConstantTable
+      structure IP = IntroPattern
       structure J = Judgement
       structure N = Normalize
       structure R = Reduction
@@ -1920,6 +1923,83 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          / $tm (\Prim.eq\ _ var? _ | \Prim.eq\ _ _ var?) =>
            \(fnc _ x => subst [Hyp.NUMBER x])\
          /
+
+
+      fun ofEquands hyp pat =
+         let
+            do i = Hyp.findhyp hyp
+            do (_, dir) = withgoal
+         in
+            (case pat of
+                IP.And [pat1, pat2] =>
+                   goalHypCaseT i
+                   /| $tm \Prim.eq\ ? ? ? =>
+                      \(fnc a m n =>
+                           let
+                              do (do1, i', s, dir1) =
+                                 tryf
+                                 (fn () =>
+                                     (case pat1 of
+                                         IP.Wild => 
+                                            (false, i, T.id, dir)
+    
+                                       | IP.Ident symopt =>
+                                            (true, i+1, T.shift1, D.bindh dir symopt)
+    
+                                       | _ =>
+                                            raise (Tryf "unexpected pattern for ofEquands")))
+
+                              do (do2, dir2) =
+                                 tryf
+                                 (fn () =>
+                                     (case pat2 of
+                                         IP.Wild =>
+                                            (false, dir1)
+    
+                                       | IP.Ident symopt =>
+                                            (true, D.bindh dir1 symopt)
+    
+                                       | _ =>
+                                            raise (Tryf "unexpected pattern for ofEquands")))
+                           in
+                              (if do1 then
+                                  refine (Rule.assert (T.apply2 Prim.ov a m) (T.evar ()))
+                                  >>> [
+                                      (* M : A *)
+                                      refine (Rule.ofEquand1 (T.evar ()) (T.evar ()) (T.evar ()))
+                                      >>+
+                                      (* M = N : A *)
+                                      refine (Rule.hypothesis i) >> done,
+ 
+                                      idtac
+                                      ]
+                               else
+                                  idtac)
+                              >>+
+                              (if do2 then
+                                  refine (Rule.assert (T.Sub (T.apply2 Prim.ov a n, s)) (T.evar ()))
+                                  >>> [
+                                      refine (Rule.ofEquand2 (T.evar ()) (T.evar ()) (T.evar ()))
+                                      >>+
+                                      refine (Rule.hypothesis i') >> done,
+ 
+                                      idtac
+                                      ]
+                               else
+                                  idtac)
+                              >>+
+                              chdir dir2
+                           end)\
+
+                    | _ =>
+                      \(fnc =>
+                           fail "not an equality hypothesis")\
+                   /
+
+              | _ =>
+                   fail "unexpected pattern for ofEquands")
+         end
+
 
 
       val injectionTactics : (int -> priority tacticm) H.table = H.table ()
