@@ -9,12 +9,18 @@ structure ParseNat =
       val leq : constant R.dest = R.dest ()
       val lt : constant R.dest = R.dest ()
       val minus : constant R.dest = R.dest ()
+      val ltb : constant R.dest = R.dest ()
+      val neqb : constant R.dest = R.dest ()
 
       fun parseLeq m n = T.apply2 (R.read leq) m n
       fun parseLt m n = T.apply2 (R.read lt) m n
       fun parsePlus m n = T.apply2 Prim.plus m n
       fun parseMinus m n = T.apply2 (R.read minus) m n
       fun parseTimes m n = T.apply2 Prim.times m n
+      fun parseEqb m n = T.apply2 Prim.eqb m n
+      fun parseLeqb m n = T.apply2 Prim.leqb m n
+      fun parseLtb m n = T.apply2 (R.read ltb) m n
+      fun parseNeqb m n = T.apply2 (R.read neqb) m n
 
    end
 
@@ -25,8 +31,15 @@ grammardef Nat
 
    rule Term(30)  ::= Term(31) "<n=" Term(31) => parseLeq
    rule Term(30)  ::= Term(31) "<n" Term(31) => parseLt
+
+   rule Term(40)  ::= Term(40) "=n?" Term(41) => parseEqb
+   rule Term(40)  ::= Term(40) "<n=?" Term(41) => parseLeqb
+   rule Term(40)  ::= Term(40) "<n?" Term(41) => parseLtb
+   rule Term(40)  ::= Term(40) "!=n?" Term(41) => parseNeqb
+
    rule Term(50)  ::= Term(50) "+n" Term(51) => parsePlus
    rule Term(50)  ::= Term(50) "-n" Term(51) => parseMinus
+
    rule Term(60)  ::= Term(60) "*n" Term(61) => parseTimes
 
 end
@@ -38,9 +51,17 @@ grammardef ArithmeticNat
 
    rule Term(30)  ::= Term(31) "<=" Term(31) => parseLeq
    rule Term(30)  ::= Term(31) "<" Term(31) => parseLt
+
+   rule Term(40)  ::= Term(40) "=?" Term(41) => parseEqb
+   rule Term(40)  ::= Term(40) "<=?" Term(41) => parseLeqb
+   rule Term(40)  ::= Term(40) "<?" Term(41) => parseLtb
+   rule Term(40)  ::= Term(40) "!=?" Term(41) => parseNeqb
+
    rule Term(50)  ::= Term(50) "+" Term(51) => parsePlus
    rule Term(50)  ::= Term(50) "-" Term(51) => parseMinus
+
    rule Term(60)  ::= Term(60) "*" Term(61) => parseTimes
+
    rule Term(100) ::= NUMBER => ParseTerm.nat
 
 end
@@ -48,6 +69,38 @@ end
 
 grammaron Nat
 grammaron ArithmeticNat
+
+
+structure RegisterNat =
+   struct
+
+      structure CR = CheckpointedRef
+      structure U = Show.Unparsing
+
+      val natSym = Symbol.fromValue "nat"
+
+      fun register const prec lprec rprec strpref str =
+         let
+            val unp =
+               U.wrap
+                 (U.apply2 const U.show U.show)
+                 (fn (a, b) =>
+                     U.append [a lprec,
+                               U.break 1, 
+                               
+                               U.string
+                                  (if Symbol.eq (CR.deref Show.arithmetic, natSym) then
+                                      strpref
+                                   else
+                                      str),
+
+                               b rprec])
+         in
+            ConstantTable.insert U.unparsingTable const (2, prec, ref true, unp)
+         end
+
+   end
+
 
 
 functor AfterNat () :>
@@ -180,7 +233,6 @@ functor AfterLeq () :> sig end =
    struct
 
       structure CR = CheckpointedRef
-      structure U = Show.Unparsing
 
       val Collapse (leq, lt) =
          readRegistry /Nat.AfterLeqEnv/
@@ -190,30 +242,8 @@ functor AfterLeq () :> sig end =
       val () = CR.write ParseNat.leq leq
       val () = CR.write ParseNat.lt lt
 
-      val natSym = Symbol.fromValue "nat"
-
-      fun register const prec lprec rprec strpref str =
-         let
-            val unp =
-               U.wrap
-                 (U.apply2 const U.show U.show)
-                 (fn (a, b) =>
-                     U.append [a lprec,
-                               U.break 1, 
-                               
-                               U.string
-                                  (if Symbol.eq (CR.deref Show.arithmetic, natSym) then
-                                      strpref
-                                   else
-                                      str),
-
-                               b rprec])
-         in
-            ConstantTable.insert U.unparsingTable const (2, prec, ref true, unp)
-         end
-
-      val () = register leq 30 31 31 "<= " "<n= "
-      val () = register lt 30 31 31 "< " "<n "
+      val () = RegisterNat.register leq 30 31 31 "<= " "<n= "
+      val () = RegisterNat.register lt 30 31 31 "< " "<n "
 
    end
 
@@ -283,7 +313,6 @@ functor AfterTimes () :> sig end =
    struct
 
       structure CR = CheckpointedRef
-      structure U = Show.Unparsing
 
       val plus = Prim.plus
       val times = Prim.times
@@ -295,31 +324,9 @@ functor AfterTimes () :> sig end =
 
       val () = CR.write ParseNat.minus minus
 
-      val natSym = Symbol.fromValue "nat"
-
-      fun register const prec lprec rprec strpref str =
-         let
-            val unp =
-               U.wrap
-                 (U.apply2 const U.show U.show)
-                 (fn (a, b) =>
-                     U.append [a lprec,
-                               U.break 1, 
-                               
-                               U.string
-                                  (if Symbol.eq (CR.deref Show.arithmetic, natSym) then
-                                      strpref
-                                   else
-                                      str),
-
-                               b rprec])
-         in
-            ConstantTable.insert U.unparsingTable const (2, prec, ref true, unp)
-         end
-
-      val () = register plus 50 50 51 "+ " "+n "
-      val () = register minus 50 50 51 "- " "-n "
-      val () = register times 60 60 61 "* " "*n "
+      val () = RegisterNat.register plus 50 50 51 "+ " "+n "
+      val () = RegisterNat.register minus 50 50 51 "- " "-n "
+      val () = RegisterNat.register times 60 60 61 "* " "*n "
 
    end
 
@@ -328,12 +335,24 @@ functor AfterTimes () :> sig end =
 functor AfterIstrueNeqb () :> sig end =
    struct
 
+      structure CR = CheckpointedRef
+
       val eqb = Prim.eqb
       val leqb = Prim.leqb
 
       val Collapse (ltb, neqb, istrue_eqb, istrue_leqb, istrue_ltb, istrue_neqb) =
          readRegistry /Nat.AfterIstrueNeqbEnv/
             /[constant constant constant constant constant constant]/
+
+
+      val () = CR.write ParseNat.ltb ltb
+      val () = CR.write ParseNat.neqb neqb
+
+      val () = RegisterNat.register eqb 40 40 41 "=? " "=n? "
+      val () = RegisterNat.register leqb 40 40 41 "<=? " "<n=? "
+      val () = RegisterNat.register ltb 40 40 41 "<? " "<n? "
+      val () = RegisterNat.register neqb 40 40 41 "!=? " "!=n? "
+
 
       val () =
          ConstantTable.insert BoolTactic.booleanTests eqb istrue_eqb

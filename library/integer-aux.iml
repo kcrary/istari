@@ -9,6 +9,8 @@ structure ParseInteger =
       val minusz : constant R.dest = R.dest ()
       val leqz : constant R.dest = R.dest ()
       val ltz : constant R.dest = R.dest ()
+      val ltzb : constant R.dest = R.dest ()
+      val neqzb : constant R.dest = R.dest ()
 
       fun parsePlus m n = T.apply2 Prim.plusz m n
       fun parseMinus m n = T.apply2 (R.read minusz) m n
@@ -16,6 +18,10 @@ structure ParseInteger =
       fun parseNeg m = T.apply1 Prim.negz m
       fun parseLeq m n = T.apply2 (R.read leqz) m n
       fun parseLt m n = T.apply2 (R.read ltz) m n
+      fun parseEqzb m n = T.apply2 Prim.eqzb m n
+      fun parseLeqzb m n = T.apply2 Prim.leqzb m n
+      fun parseLtzb m n = T.apply2 (R.read ltzb) m n
+      fun parseNeqzb m n = T.apply2 (R.read neqzb) m n
 
    end
 
@@ -26,9 +32,17 @@ grammardef Integer
 
    rule Term(30)  ::= Term(31) "<z=" Term(31) => parseLeq
    rule Term(30)  ::= Term(31) "<z" Term(31) => parseLt
+
+   rule Term(40)  ::= Term(40) "=z?" Term(41) => parseEqzb
+   rule Term(40)  ::= Term(40) "<z=?" Term(41) => parseLeqzb
+   rule Term(40)  ::= Term(40) "<z?" Term(41) => parseLtzb
+   rule Term(40)  ::= Term(40) "!z=?" Term(41) => parseNeqzb
+
    rule Term(50)  ::= Term(50) "+z" Term(51) => parsePlus
    rule Term(50)  ::= Term(50) "-z" Term(51) => parseMinus
+
    rule Term(60)  ::= Term(60) "*z" Term(61) => parseTimes
+
    rule Term(90)  ::= "~z" Term(91) => parseNeg
 
 end
@@ -40,10 +54,19 @@ grammardef ArithmeticInteger
 
    rule Term(30)  ::= Term(31) "<=" Term(31) => parseLeq
    rule Term(30)  ::= Term(31) "<" Term(31) => parseLt
+
+   rule Term(40)  ::= Term(40) "=?" Term(41) => parseEqzb
+   rule Term(40)  ::= Term(40) "<=?" Term(41) => parseLeqzb
+   rule Term(40)  ::= Term(40) "<?" Term(41) => parseLtzb
+   rule Term(40)  ::= Term(40) "!=?" Term(41) => parseNeqzb
+
    rule Term(50)  ::= Term(50) "+" Term(51) => parsePlus
    rule Term(50)  ::= Term(50) "-" Term(51) => parseMinus
+
    rule Term(60)  ::= Term(60) "*" Term(61) => parseTimes
+
    rule Term(90)  ::= "~" Term(91) => parseNeg
+
    rule Term(100) ::= NUMBER => ParseTerm.integer
    rule Term(100) ::= NNUMBER => ParseTerm.integer
 
@@ -53,25 +76,11 @@ end
 grammaron Integer
 
 
-functor AfterLtz () :> sig end =
+structure RegisterInteger =
    struct
 
       structure CR = CheckpointedRef
       structure U = Show.Unparsing
-
-      val Collapse (leqz, ltz, minusz) =
-         readRegistry /Integer.AfterLtzEnv/
-            /[constant constant constant]/
-
-      val plusz = Prim.plusz
-      val timesz = Prim.timesz
-      val negz = Prim.negz
-
-
-      val () = CR.write ParseInteger.leqz leqz
-      val () = CR.write ParseInteger.ltz ltz
-      val () = CR.write ParseInteger.minusz minusz
-
 
       val integerSym = Symbol.fromValue "integer"
 
@@ -95,11 +104,36 @@ functor AfterLtz () :> sig end =
             ConstantTable.insert U.unparsingTable const (2, prec, ref true, unp)
          end
 
-      val () = register leqz 30 31 31 "<= " "<z= "
-      val () = register ltz 30 31 31 "< " "<z "
-      val () = register plusz 50 50 51 "+ " "+z "
-      val () = register minusz 50 50 51 "- " "-z "
-      val () = register timesz 60 60 61 "* " "*z "
+   end
+
+
+functor AfterLtz () :> sig end =
+   struct
+
+      structure CR = CheckpointedRef
+      structure U = Show.Unparsing
+
+      val Collapse (leqz, ltz, minusz) =
+         readRegistry /Integer.AfterLtzEnv/
+            /[constant constant constant]/
+
+      val plusz = Prim.plusz
+      val timesz = Prim.timesz
+      val negz = Prim.negz
+
+
+      val () = CR.write ParseInteger.leqz leqz
+      val () = CR.write ParseInteger.ltz ltz
+      val () = CR.write ParseInteger.minusz minusz
+
+
+      val () = RegisterInteger.register leqz 30 31 31 "<= " "<z= "
+      val () = RegisterInteger.register ltz 30 31 31 "< " "<z "
+      val () = RegisterInteger.register plusz 50 50 51 "+ " "+z "
+      val () = RegisterInteger.register minusz 50 50 51 "- " "-z "
+      val () = RegisterInteger.register timesz 60 60 61 "* " "*z "
+
+      val integerSym = Symbol.fromValue "integer"
 
       val () =
          let
@@ -147,12 +181,24 @@ functor AfterLeqzInhabitant () :> sig end =
 functor AfterIstrueNeqzb () :> sig end =
    struct
 
+      structure CR = CheckpointedRef
+
       val Collapse (ltzb, neqzb, istrue_eqzb, istrue_leqzb, istrue_ltzb, istrue_neqzb) =
          readRegistry /Integer.AfterIstrueNeqzbEnv/
             /[constant constant constant constant constant constant]/
 
       val eqzb = Prim.eqzb
       val leqzb = Prim.leqzb
+
+
+      val () = CR.write ParseInteger.ltzb ltzb
+      val () = CR.write ParseInteger.neqzb neqzb
+
+      val () = RegisterInteger.register eqzb 40 40 41 "=? " "=z? "
+      val () = RegisterInteger.register leqzb 40 40 41 "<=? " "<z=? "
+      val () = RegisterInteger.register ltzb 40 40 41 "<? " "<z? "
+      val () = RegisterInteger.register neqzb 40 40 41 "!=? " "!z=? "
+
 
       val () =
          ConstantTable.insert BoolTactic.booleanTests eqzb istrue_eqzb

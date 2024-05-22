@@ -168,6 +168,8 @@ Strong induction for natural numbers:
 
        minusn_succn_r : type:minusn_succn_r
 
+    succn_predn : type:succn_predn
+
     plusn_minusn_cancel_l : type:plusn_minusn_cancel_l
 
     plusn_minusn_cancel_r : type:plusn_minusn_cancel_r
@@ -333,12 +335,16 @@ Strong induction for natural numbers:
 
 ### Effective comparisons
 
+    (* =N? *)
     eqnb : type:eqnb
 
+    (* <N=? *)
     leqnb : type:leqnb
 
+    (* <N? *)
     ltnb : type:ltnb
 
+    (* !N=? *)
     neqnb : type:neqnb
          = def:neqnb
 
@@ -386,6 +392,8 @@ Strong induction for natural numbers:
     natural_dichotomy_weak : type:natural_dichotomy_weak
 
     natural_dichotomy_neq : type:natural_dichotomy_neq
+
+    natural_cases : type:natural_cases
 
 
 ### Relation to `nat`

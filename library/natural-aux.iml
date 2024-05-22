@@ -13,12 +13,20 @@ structure ParseNatural =
       val plus : constant CR.dest = CR.dest ()
       val minus : constant CR.dest = CR.dest ()
       val times : constant CR.dest = CR.dest ()
+      val eqnb : constant CR.dest = CR.dest ()
+      val leqnb : constant CR.dest = CR.dest ()
+      val ltnb : constant CR.dest = CR.dest ()
+      val neqnb : constant CR.dest = CR.dest ()
 
       fun parseLeq m n = T.apply2 (CR.read leq) m n
       fun parseLt m n = T.apply2 (CR.read lt) m n
       fun parsePlus m n = T.apply2 (CR.read plus) m n
       fun parseMinus m n = T.apply2 (CR.read minus) m n
       fun parseTimes m n = T.apply2 (CR.read times) m n
+      fun parseEqb m n = T.apply2 (CR.read eqnb) m n
+      fun parseLeqb m n = T.apply2 (CR.read leqnb) m n
+      fun parseLtb m n = T.apply2 (CR.read ltnb) m n
+      fun parseNeqb m n = T.apply2 (CR.read neqnb) m n
 
    end
 
@@ -29,8 +37,15 @@ grammardef Natural
 
    rule Term(30)  ::= Term(31) "<N=" Term(31) => parseLeq
    rule Term(30)  ::= Term(31) "<N" Term(31) => parseLt
+
+   rule Term(40)  ::= Term(40) "=N?" Term(41) => parseEqb
+   rule Term(40)  ::= Term(40) "<N=?" Term(41) => parseLeqb
+   rule Term(40)  ::= Term(40) "<N?" Term(41) => parseLtb
+   rule Term(40)  ::= Term(40) "!N=?" Term(41) => parseNeqb
+
    rule Term(50)  ::= Term(50) "+N" Term(51) => parsePlus
    rule Term(50)  ::= Term(50) "-N" Term(51) => parseMinus
+
    rule Term(60)  ::= Term(60) "*N" Term(61) => parseTimes
 
 end
@@ -42,15 +57,55 @@ grammardef ArithmeticNatural
 
    rule Term(30)  ::= Term(31) "<=" Term(31) => parseLeq
    rule Term(30)  ::= Term(31) "<" Term(31) => parseLt
+
+   rule Term(40)  ::= Term(40) "=?" Term(41) => parseEqb
+   rule Term(40)  ::= Term(40) "<=?" Term(41) => parseLeqb
+   rule Term(40)  ::= Term(40) "<?" Term(41) => parseLtb
+   rule Term(40)  ::= Term(40) "!=?" Term(41) => parseNeqb
+
    rule Term(50)  ::= Term(50) "+" Term(51) => parsePlus
    rule Term(50)  ::= Term(50) "-" Term(51) => parseMinus
+
    rule Term(60)  ::= Term(60) "*" Term(61) => parseTimes
+
    rule Term(100) ::= NUMBER => ParseTerm.integer
 
 end
 
 
 grammaron Natural
+
+
+structure RegisterNatural =
+   struct
+
+      structure CR = CheckpointedRef
+      structure U = Show.Unparsing
+
+      val naturalSym = Symbol.fromValue "natural"
+
+      fun register const prec lprec rprec strpref str =
+         let
+            val unp =
+               U.wrap
+                 (U.apply2 const U.show U.show)
+                 (fn (a, b) =>
+                     U.append [a lprec,
+                               U.break 1, 
+                               
+                               U.string
+                                  (if Symbol.eq (CR.deref Show.arithmetic, naturalSym) then
+                                      strpref
+                                   else
+                                      str),
+
+                               b rprec])
+         in
+            ConstantTable.insert U.unparsingTable const (2, prec, ref true, unp)
+         end
+
+   end
+
 
 
 (* NATURAL_TACTIC is defined in prover/omega.iml. *)
@@ -76,33 +131,11 @@ functor AfterTimesn () :> NATURAL_TACTIC =
       val () = CR.write ParseNatural.minus minusn
       val () = CR.write ParseNatural.times timesn
 
-      val naturalSym = Symbol.fromValue "natural"
-
-      fun register const prec lprec rprec strpref str =
-         let
-            val unp =
-               U.wrap
-                 (U.apply2 const U.show U.show)
-                 (fn (a, b) =>
-                     U.append [a lprec,
-                               U.break 1, 
-                               
-                               U.string
-                                  (if Symbol.eq (CR.deref Show.arithmetic, naturalSym) then
-                                      strpref
-                                   else
-                                      str),
-
-                               b rprec])
-         in
-            ConstantTable.insert U.unparsingTable const (2, prec, ref true, unp)
-         end
-
-      val () = register leqn 30 31 31 "<= " "<N= "
-      val () = register ltn 30 31 31 "< " "<N "
-      val () = register plusn 50 50 51 "+ " "+N "
-      val () = register minusn 50 50 51 "- " "-N "
-      val () = register timesn 60 60 61 "* " "*N "
+      val () = RegisterNatural.register leqn 30 31 31 "<= " "<N= "
+      val () = RegisterNatural.register ltn 30 31 31 "< " "<N "
+      val () = RegisterNatural.register plusn 50 50 51 "+ " "+N "
+      val () = RegisterNatural.register minusn 50 50 51 "- " "-N "
+      val () = RegisterNatural.register timesn 60 60 61 "* " "*N "
 
 
       (* Extend typechecker to find native integers belong to natural. *)
@@ -179,6 +212,7 @@ functor AfterNaturalAll () :> sig end =
    struct
 
       structure B = BackchainInternal
+      structure CR = CheckpointedRef
       structure H = ConstantTable
       structure J = Judgement
       structure T = Term
@@ -195,6 +229,18 @@ functor AfterNaturalAll () :> sig end =
                 /Natural.AfterTimesnEnv
                  Natural.AfterNaturalAllEnv/)
 
+
+      val () = CR.write ParseNatural.eqnb eqnb
+      val () = CR.write ParseNatural.leqnb leqnb
+      val () = CR.write ParseNatural.ltnb ltnb
+      val () = CR.write ParseNatural.neqnb neqnb
+
+      val () = RegisterNatural.register eqnb 40 40 41 "=? " "=N? "
+      val () = RegisterNatural.register leqnb 40 40 41 "<=? " "<N=? "
+      val () = RegisterNatural.register ltnb 40 40 41 "<? " "<N? "
+      val () = RegisterNatural.register neqnb 40 40 41 "!=? " "!N=? "
+      
+            
       val () =
          H.insert InductionInternal.iterators natural
             (natural_iter, 0, 0)

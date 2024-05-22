@@ -173,6 +173,8 @@ Strong induction for natural numbers:
 
     pred_leq : forall (n : nat) . pred n <= n
 
+    succ_pred : forall (n : nat) . 0 < n -> succ (pred n) = n : nat
+
     minus_leq_l : forall (m n : nat) . m - n <= m
 
     minus_leq : forall (m m' n n' : nat) . m <= m' -> n' <= n -> m - n <= m' - n'
@@ -316,31 +318,35 @@ Strong induction for natural numbers:
 
 ### Effective comparisons
 
+    (* =? *)
     eqb : nat -> nat -> bool
 
+    (* <=? *)
     leqb : nat -> nat -> bool
 
+    (* <? *)
     ltb : nat -> nat -> bool
-        = fn m n . leqb (succ m) n
+        = fn m n . succ m <=? n
 
+    (* !=? *)
     neqb : nat -> nat -> bool
-         = fn m n . Bool.notb (eqb m n)
+         = fn m n . Bool.notb (m =? n)
 
-    istrue_eqb : forall (m n : nat) . Bool.istrue (eqb m n) <-> m = n : nat
+    istrue_eqb : forall (m n : nat) . Bool.istrue (m =? n) <-> m = n : nat
 
-    istrue_neqb : forall (m n : nat) . Bool.istrue (neqb m n) <-> m != n : nat
+    istrue_neqb : forall (m n : nat) . Bool.istrue (m !=? n) <-> m != n : nat
 
-    istrue_leqb : forall (m n : nat) . Bool.istrue (leqb m n) <-> m <= n
+    istrue_leqb : forall (m n : nat) . Bool.istrue (m <=? n) <-> m <= n
 
-    istrue_ltb : forall (m n : nat) . Bool.istrue (ltb m n) <-> m < n
+    istrue_ltb : forall (m n : nat) . Bool.istrue (m <? n) <-> m < n
 
-    notb_eqb : forall (m n : nat) . Bool.notb (eqb m n) = neqb m n : bool
+    notb_eqb : forall (m n : nat) . Bool.notb (m =? n) = m !=? n : bool
 
-    notb_neqb : forall (m n : nat) . Bool.notb (neqb m n) = eqb m n : bool
+    notb_neqb : forall (m n : nat) . Bool.notb (m !=? n) = m =? n : bool
 
-    notb_leqb : forall (m n : nat) . Bool.notb (leqb m n) = ltb n m : bool
+    notb_leqb : forall (m n : nat) . Bool.notb (m <=? n) = n <? m : bool
 
-    notb_ltb : forall (m n : nat) . Bool.notb (ltb m n) = leqb n m : bool
+    notb_ltb : forall (m n : nat) . Bool.notb (m <? n) = n <=? m : bool
 
 
 ### Decidability

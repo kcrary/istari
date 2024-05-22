@@ -172,6 +172,8 @@ Strong induction for natural numbers:
 
     pred_leq : type:pred_leq
 
+    succ_pred : type:succ_pred
+
     minus_leq_l : type:minus_leq_l
 
     minus_leq : type:minus_leq
@@ -313,13 +315,17 @@ Strong induction for natural numbers:
 
 ### Effective comparisons
 
+    (* =? *)
     eqb : type:eqb
 
+    (* <=? *)
     leqb : type:leqb
 
+    (* <? *)
     ltb : type:ltb
         = def:ltb
 
+    (* !=? *)
     neqb : type:neqb
          = def:neqb
 

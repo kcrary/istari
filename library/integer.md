@@ -167,13 +167,17 @@ This one gives transitivity in the form needed for rewriting:
 
 ### Effective comparisons
 
+    (* =z? *)
     eqzb : type:eqzb
 
+    (* <z=? *)
     leqzb : type:leqzb
 
+    (* <z? *)
     ltzb : type:ltzb
          = def:ltzb
 
+    (* !z=? *)
     neqzb : type:neqzb
           = def:neqzb
 

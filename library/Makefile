@@ -33,7 +33,7 @@ girard-paradox.isto : $(DATATYPES) logic.isto nat.isto
 integer.isto : nat.isto acc.isto bool.isto decidable.isto stable.isto
 list.isto : $(DATATYPES) nat.isto  option.isto integer.isto
 nat.isto : acc.isto bool.isto decidable.isto stable.isto
-natural : bool.isto integer.isto nat.isto logic.isto
+natural.isto : bool.isto integer.isto nat.isto logic.isto
 omega.isto : $(DATATYPES) logic.isto bool.isto nat.isto integer.isto list.isto natural.isto
 option.isto : $(DATATYPES) integer.isto
 relations.isto : $(DATATYPES) acc.isto decidable.isto finite.isto

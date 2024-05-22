@@ -196,6 +196,8 @@ Strong induction for natural numbers:
 
        minusn_succn_r : forall (m n : natural) . m -N succn n = predn m -N n : natural
 
+    succn_predn : forall (n : natural) . z`0 <N n -> succn (predn n) = n : natural
+
     plusn_minusn_cancel_l : forall (m n : natural) . m +N n -N m = n : natural
 
     plusn_minusn_cancel_r : forall (m n : natural) . m +N n -N n = m : natural
@@ -376,30 +378,34 @@ Strong induction for natural numbers:
 
 ### Effective comparisons
 
+    (* =N? *)
     eqnb : natural -> natural -> bool
 
+    (* <N=? *)
     leqnb : natural -> natural -> bool
 
+    (* <N? *)
     ltnb : natural -> natural -> bool
 
+    (* !N=? *)
     neqnb : natural -> natural -> bool
-         = fn m n . Bool.notb (eqnb m n)
+         = fn m n . Bool.notb (m =N? n)
 
-    istrue_eqnb : forall (m n : natural) . Bool.istrue (eqnb m n) <-> m = n : natural
+    istrue_eqnb : forall (m n : natural) . Bool.istrue (m =N? n) <-> m = n : natural
 
-    istrue_neqnb : forall (m n : natural) . Bool.istrue (neqnb m n) <-> m != n : natural
+    istrue_neqnb : forall (m n : natural) . Bool.istrue (m !N=? n) <-> m != n : natural
 
-    istrue_leqnb : forall (m n : natural) . Bool.istrue (leqnb m n) <-> m <N= n
+    istrue_leqnb : forall (m n : natural) . Bool.istrue (m <N=? n) <-> m <N= n
 
-    istrue_ltnb : forall (m n : natural) . Bool.istrue (ltnb m n) <-> m <N n
+    istrue_ltnb : forall (m n : natural) . Bool.istrue (m <N? n) <-> m <N n
 
-    notb_eqnb : forall (m n : natural) . Bool.notb (eqnb m n) = neqnb m n : bool
+    notb_eqnb : forall (m n : natural) . Bool.notb (m =N? n) = m !N=? n : bool
 
-    notb_neqnb : forall (m n : natural) . Bool.notb (neqnb m n) = eqnb m n : bool
+    notb_neqnb : forall (m n : natural) . Bool.notb (m !N=? n) = m =N? n : bool
 
-    notb_leqnb : forall (m n : natural) . Bool.notb (leqnb m n) = ltnb n m : bool
+    notb_leqnb : forall (m n : natural) . Bool.notb (m <N=? n) = n <N? m : bool
 
-    notb_ltnb : forall (m n : natural) . Bool.notb (ltnb m n) = leqnb n m : bool
+    notb_ltnb : forall (m n : natural) . Bool.notb (m <N? n) = n <N=? m : bool
 
 
 ### Decidability
@@ -429,6 +435,9 @@ Strong induction for natural numbers:
     natural_dichotomy_weak : forall (m n : natural) . m <N= n % n <N= m
 
     natural_dichotomy_neq : forall (m n : natural) . m != n : natural -> m <N n % n <N m
+
+    natural_cases : forall (n : natural) .
+                       n = z`0 : natural % (exists (n' : natural) . n = succn n' : natural)
 
 
 ### Relation to `nat`
@@ -502,29 +511,23 @@ Strong induction for natural numbers:
                           = maxn (nat_to_natural m) (nat_to_natural n)
                           : natural
 
-    eqnb_to_nat : forall (m n : natural) .
-                     eqnb m n = Nat.eqb (natural_to_nat m) (natural_to_nat n) : bool
+    eqnb_to_nat : forall (m n : natural) . m =N? n = natural_to_nat m =? natural_to_nat n : bool
 
-    eqb_to_natural : forall (m n : nat) .
-                        Nat.eqb m n = eqnb (nat_to_natural m) (nat_to_natural n) : bool
+    eqb_to_natural : forall (m n : nat) . m =? n = nat_to_natural m =N? nat_to_natural n : bool
 
     leqnb_to_nat : forall (m n : natural) .
-                      leqnb m n = Nat.leqb (natural_to_nat m) (natural_to_nat n) : bool
+                      m <N=? n = natural_to_nat m <=? natural_to_nat n : bool
 
-    leqb_to_natural : forall (m n : nat) .
-                         Nat.leqb m n = leqnb (nat_to_natural m) (nat_to_natural n) : bool
+    leqb_to_natural : forall (m n : nat) . m <=? n = nat_to_natural m <N=? nat_to_natural n : bool
 
-    ltnb_to_nat : forall (m n : natural) .
-                     ltnb m n = Nat.ltb (natural_to_nat m) (natural_to_nat n) : bool
+    ltnb_to_nat : forall (m n : natural) . m <N? n = natural_to_nat m <? natural_to_nat n : bool
 
-    ltb_to_natural : forall (m n : nat) .
-                        Nat.ltb m n = ltnb (nat_to_natural m) (nat_to_natural n) : bool
+    ltb_to_natural : forall (m n : nat) . m <? n = nat_to_natural m <N? nat_to_natural n : bool
 
     neqnb_to_nat : forall (m n : natural) .
-                      neqnb m n = Nat.neqb (natural_to_nat m) (natural_to_nat n) : bool
+                      m !N=? n = natural_to_nat m !=? natural_to_nat n : bool
 
-    neqb_to_natural : forall (m n : nat) .
-                         Nat.neqb m n = neqnb (nat_to_natural m) (nat_to_natural n) : bool
+    neqb_to_natural : forall (m n : nat) . m !=? n = nat_to_natural m !N=? nat_to_natural n : bool
 
 
 ### Relation to `integer`
@@ -635,52 +638,36 @@ Strong induction for natural numbers:
                            : natural
 
     eqnb_to_integer : forall (m n : natural) .
-                         eqnb m n
-                           = Integer.eqzb (natural_to_integer m) (natural_to_integer n)
-                           : bool
+                         m =N? n = natural_to_integer m =z? natural_to_integer n : bool
 
     eqzb_to_natural : forall (a b : integer) .
                          z`0 <z= a
                          -> z`0 <z= b
-                         -> Integer.eqzb a b
-                              = eqnb (integer_to_natural a) (integer_to_natural b)
-                              : bool
+                         -> a =z? b = integer_to_natural a =N? integer_to_natural b : bool
 
     leqnb_to_integer : forall (m n : natural) .
-                          leqnb m n
-                            = Integer.leqzb (natural_to_integer m) (natural_to_integer n)
-                            : bool
+                          m <N=? n = natural_to_integer m <z=? natural_to_integer n : bool
 
     leqzb_to_natural : forall (a b : integer) .
                           z`0 <z= a
                           -> z`0 <z= b
-                          -> Integer.leqzb a b
-                               = leqnb (integer_to_natural a) (integer_to_natural b)
-                               : bool
+                          -> a <z=? b = integer_to_natural a <N=? integer_to_natural b : bool
 
     ltnb_to_integer : forall (m n : natural) .
-                         ltnb m n
-                           = Integer.ltzb (natural_to_integer m) (natural_to_integer n)
-                           : bool
+                         m <N? n = natural_to_integer m <z? natural_to_integer n : bool
 
     ltzb_to_natural : forall (a b : integer) .
                          z`0 <z= a
                          -> z`0 <z= b
-                         -> Integer.ltzb a b
-                              = ltnb (integer_to_natural a) (integer_to_natural b)
-                              : bool
+                         -> a <z? b = integer_to_natural a <N? integer_to_natural b : bool
 
     neqnb_to_integer : forall (m n : natural) .
-                          neqnb m n
-                            = Integer.neqzb (natural_to_integer m) (natural_to_integer n)
-                            : bool
+                          m !N=? n = natural_to_integer m !z=? natural_to_integer n : bool
 
     neqzb_to_natural : forall (a b : integer) .
                           z`0 <z= a
                           -> z`0 <z= b
-                          -> Integer.neqzb a b
-                               = neqnb (integer_to_natural a) (integer_to_natural b)
-                               : bool
+                          -> a !z=? b = integer_to_natural a !N=? integer_to_natural b : bool
 
     natural_to_nat_to_integer : forall (n : natural) .
                                    Integer.nat_to_integer (natural_to_nat n)

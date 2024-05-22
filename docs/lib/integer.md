@@ -169,31 +169,35 @@ This one gives transitivity in the form needed for rewriting:
 
 ### Effective comparisons
 
+    (* =z? *)
     eqzb : integer -> integer -> bool
 
+    (* <z=? *)
     leqzb : integer -> integer -> bool
 
+    (* <z? *)
     ltzb : integer -> integer -> bool
-         = fn a b . leqzb (z`1 +z a) b
+         = fn a b . z`1 +z a <z=? b
 
+    (* !z=? *)
     neqzb : integer -> integer -> bool
-          = fn a b . Bool.notb (eqzb a b)
+          = fn a b . Bool.notb (a =z? b)
 
-    istrue_eqzb : forall (a b : integer) . Bool.istrue (eqzb a b) <-> a = b : integer
+    istrue_eqzb : forall (a b : integer) . Bool.istrue (a =z? b) <-> a = b : integer
 
-    istrue_neqzb : forall (a b : integer) . Bool.istrue (neqzb a b) <-> a != b : integer
+    istrue_neqzb : forall (a b : integer) . Bool.istrue (a !z=? b) <-> a != b : integer
 
-    istrue_leqzb : forall (a b : integer) . Bool.istrue (leqzb a b) <-> a <z= b
+    istrue_leqzb : forall (a b : integer) . Bool.istrue (a <z=? b) <-> a <z= b
 
-    istrue_ltzb : forall (a b : integer) . Bool.istrue (ltzb a b) <-> a <z b
+    istrue_ltzb : forall (a b : integer) . Bool.istrue (a <z? b) <-> a <z b
 
-    notb_eqzb : forall (a b : integer) . Bool.notb (eqzb a b) = neqzb a b : bool
+    notb_eqzb : forall (a b : integer) . Bool.notb (a =z? b) = a !z=? b : bool
 
-    notb_neqzb : forall (a b : integer) . Bool.notb (neqzb a b) = eqzb a b : bool
+    notb_neqzb : forall (a b : integer) . Bool.notb (a !z=? b) = a =z? b : bool
 
-    notb_leqzb : forall (a b : integer) . Bool.notb (leqzb a b) = ltzb b a : bool
+    notb_leqzb : forall (a b : integer) . Bool.notb (a <z=? b) = b <z? a : bool
 
-    notb_ltzb : forall (a b : integer) . Bool.notb (ltzb a b) = leqzb b a : bool
+    notb_ltzb : forall (a b : integer) . Bool.notb (a <z? b) = b <z=? a : bool
 
 
 ### Induction
@@ -220,9 +224,9 @@ positive case that works upwards.
                         -> (forall (a : integer) . z`0 <z= a -> P a -> P (z`1 +z a))
                         -> forall (a : integer) . P a
                  =rec= fn P hz hm hp a .
-                          if eqzb z`0 a
+                          if z`0 =z? a
                           then hz
-                          else (if leqzb z`0 a
+                          else (if z`0 <z=? a
                                 then hp (z`-1 +z a) () (integer_iter P hz hm hp (z`-1 +z a))
                                 else hm (z`1 +z a) () (integer_iter P hz hm hp (z`1 +z a)))
 
@@ -236,7 +240,7 @@ positive case that works upwards.
     nat_to_integer (succ n) --> plusz z`1 (nat_to_integer n)
 
     integer_to_nat : integer -> nat
-                   =rec= fn a . if leqzb a z`0 then 0 else succ (integer_to_nat (z`-1 +z a))
+                   =rec= fn a . if a <z=? z`0 then 0 else succ (integer_to_nat (z`-1 +z a))
 
     nat_to_integer_inv : forall (n : nat) . integer_to_nat (nat_to_integer n) = n : nat
 
@@ -284,37 +288,33 @@ positive case that works upwards.
                        -> b <z= a
                        -> integer_to_nat (a -z b) = integer_to_nat a - integer_to_nat b : nat
 
-    eqb_to_integer : forall (m n : nat) .
-                        Nat.eqb m n = eqzb (nat_to_integer m) (nat_to_integer n) : bool
+    eqb_to_integer : forall (m n : nat) . m =? n = nat_to_integer m =z? nat_to_integer n : bool
 
     eqzb_to_nat : forall (a b : integer) .
                      z`0 <z= a
                      -> z`0 <z= b
-                     -> eqzb a b = Nat.eqb (integer_to_nat a) (integer_to_nat b) : bool
+                     -> a =z? b = integer_to_nat a =? integer_to_nat b : bool
 
-    leqb_to_integer : forall (m n : nat) .
-                         Nat.leqb m n = leqzb (nat_to_integer m) (nat_to_integer n) : bool
+    leqb_to_integer : forall (m n : nat) . m <=? n = nat_to_integer m <z=? nat_to_integer n : bool
 
     leqzb_to_nat : forall (a b : integer) .
                       z`0 <z= a
                       -> z`0 <z= b
-                      -> leqzb a b = Nat.leqb (integer_to_nat a) (integer_to_nat b) : bool
+                      -> a <z=? b = integer_to_nat a <=? integer_to_nat b : bool
 
-    ltb_to_integer : forall (m n : nat) .
-                        Nat.ltb m n = ltzb (nat_to_integer m) (nat_to_integer n) : bool
+    ltb_to_integer : forall (m n : nat) . m <? n = nat_to_integer m <z? nat_to_integer n : bool
 
     ltzb_to_nat : forall (a b : integer) .
                      z`0 <z= a
                      -> z`0 <z= b
-                     -> ltzb a b = Nat.ltb (integer_to_nat a) (integer_to_nat b) : bool
+                     -> a <z? b = integer_to_nat a <? integer_to_nat b : bool
 
-    neqb_to_integer : forall (m n : nat) .
-                         Nat.neqb m n = neqzb (nat_to_integer m) (nat_to_integer n) : bool
+    neqb_to_integer : forall (m n : nat) . m !=? n = nat_to_integer m !z=? nat_to_integer n : bool
 
     neqzb_to_nat : forall (a b : integer) .
                       z`0 <z= a
                       -> z`0 <z= b
-                      -> neqzb a b = Nat.neqb (integer_to_nat a) (integer_to_nat b) : bool
+                      -> a !z=? b = integer_to_nat a !=? integer_to_nat b : bool
 
 
 ### Decidability
@@ -447,10 +447,10 @@ positive case that works upwards.
 ### Minimum/Maximum
 
     minz : integer -> integer -> integer
-         = fn a b . if leqzb a b then a else b
+         = fn a b . if a <z=? b then a else b
 
     maxz : integer -> integer -> integer
-         = fn a b . if leqzb a b then b else a
+         = fn a b . if a <z=? b then b else a
 
     negz_minz : forall (a b : integer) . ~z (minz a b) = maxz (~z a) (~z b) : integer
 
