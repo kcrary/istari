@@ -1,0 +1,103 @@
+
+(* Syntactic equality
+
+   This is semi-deprecated.  It's necessary for a few things, but it's not wise to
+   depend on it overly much.
+
+   The issue is that in the presence of syntactic equality, some types have a stronger
+   equality than others (in the sense that their equality implies syntactic equality).
+   We don't want to build developments that rely on the stronger equality because such
+   a development would lose access to a lot of types.
+*)
+
+File.import "nat-load.iml";
+File.import "integer-load.iml";
+File.import "symbol-load.iml";
+File.import "syntactic-equality-aux.iml";
+
+beginModule "SyntacticEquality";
+
+
+aliasExport /sequal/ Prim.sequal;
+
+
+structure Nothing = AfterSyntacticEquality ();
+
+
+lemma "unit_sequal"
+/
+  forall (x y : unit) . sequal x y
+/;
+
+intro /x y/.
+destruct /x/ //.
+destruct /y/ //.
+reflexivity.
+qed ();
+
+
+
+lemma "bool_eq_impl_sequal"
+/
+  forall x y . x = y : bool -> sequal x y
+/;
+
+inference.
+intro /x y Heq/.
+destruct /x/ /|/ >> destruct /y/ /|/ >> attempt (injection /Heq/) >> reflexivity.
+qed ();
+
+
+
+lemma "nat_eq_impl_sequal"
+/
+  forall x y . x = y : nat -> sequal x y
+/;
+
+inference.
+intro /m/.
+sinduction /m/.
+reintro /IH/.
+intro /n Heq/.
+destruct /m/ /| m'/.
+  {
+  mimic /Heq/ //.
+  reflexivity.
+  }
+
+  {
+  mimic /Heq/ /n'/.
+  reintro /Heq'/.
+  symmetryIn /Heq'/.
+  RuleTactic.sequalCompat (parseCurr /m'/) (parseCurr /n'/) (parseCurr /additional` x . succ x/).
+  apply /IH/ >> auto.
+  apply /Nat.lt_succ/.
+  }
+qed ();
+
+
+
+lemma "integer_eq_impl_sequal"
+/
+  forall x y . x = y : integer -> sequal x y
+/;
+
+inference.
+intro /x y Heq/.
+RuleTactic.integerSequal >> auto.
+qed ();
+
+
+
+lemma "symbol_eq_impl_sequal"
+/
+  forall x y . x = y : Symbol.symbol -> sequal x y
+/;
+
+inference.
+intro /x y Heq/.
+RuleTactic.symbolSequal >> auto.
+qed ();
+
+
+endModule ();

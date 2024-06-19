@@ -35,9 +35,11 @@ Require Import ValidationMisc.
 Require Import ValidationMu.
 Require Import ValidationNat.
 Require Import ValidationOf.
+Require Import ValidationPartial.
 Require Import ValidationPi.
 Require Import ValidationQuotient.
 Require Import ValidationSet.
+Require Import ValidationSequal.
 Require Import ValidationSimple.
 Require Import ValidationSquash.
 Require Import ValidationSubtype.
@@ -434,6 +436,7 @@ exact subsumptionAlt_valid.
 exact subsumptionLeft_valid.
 exact subsumptionLeftAlt_valid.
 exact subsumptionLast_valid.
+exact tighten_valid.
 exact subtypeRefl_valid.
 exact subtypeReflEqtype_valid.
 exact subtypeTrans_valid.
@@ -547,6 +550,149 @@ exact assert'_valid.
 exact inhabitant_valid.
 exact letForm_valid.
 exact accInd_valid.
+exact sequalForm_valid.
+exact sequalIntroOf_valid.
+exact sequalIntro_valid.
+exact sequalTrivialize_valid.
+exact sequalExt_valid.
+exact sequalLeft_valid.
+exact sequalEq_valid.
+exact sequalEqtp_valid.
+exact sequivalence_valid.
+exact sequivalenceLeft_valid.
+exact substitutionSyntactic_valid.
+exact sequalSymm_valid.
+exact sequalTrans_valid.
+exact sequalCompat_valid.
+exact partialForm_valid.
+exact partialEq_valid.
+exact partialFormUniv_valid.
+exact partialEqUniv_valid.
+exact partialSub_valid.
+exact partialStrict_valid.
+exact partialStrictConverse_valid.
+exact partialIdem_valid.
+exact haltsForm_valid.
+exact haltsEq_valid.
+exact haltsFormUniv_valid.
+exact haltsEqUniv_valid.
+exact partialIntroBottomOf_valid.
+exact bottomDiverges_valid.
+exact partialExt_valid.
+exact partialElimEq_valid.
+exact partialElimOf_valid.
+exact haltsTrivialize_valid.
+exact haltsExt_valid.
+exact haltsLeft_valid.
+exact fixpointInductionEq_valid.
+exact fixpointInductionOf_valid.
+exact partialFormInv_valid.
+exact seqBind_valid.
+exact activeApp_valid.
+exact activeAppSeq_valid.
+exact appHaltsInv_valid.
+exact activePi1_valid.
+exact activePi1Seq_valid.
+exact pi1HaltsInv_valid.
+exact activePi2_valid.
+exact activePi2Seq_valid.
+exact pi2HaltsInv_valid.
+exact prevHaltsInv_valid.
+exact activeCase_valid.
+exact activeCaseSeq_valid.
+exact caseHaltsInv_valid.
+exact seqHaltsSequal_valid.
+exact seqHaltsInv_valid.
+exact totalStrict_valid.
+exact voidStrict_valid.
+exact unitTotal_valid.
+exact unitStrict_valid.
+exact boolTotal_valid.
+exact boolStrict_valid.
+exact forallTotal_valid.
+exact forallStrict_valid.
+exact arrowTotal_valid.
+exact arrowStrict_valid.
+exact intersectStrict_valid.
+exact existsTotal_valid.
+exact existsStrict_valid.
+exact prodTotal_valid.
+exact prodStrict_valid.
+exact sumTotal_valid.
+exact sumStrict_valid.
+exact futureTotal_valid.
+exact futureStrict_valid.
+exact setStrict_valid.
+exact isetStrict_valid.
+exact natTotal_valid.
+exact natStrict_valid.
+exact typeHalts_valid.
+exact uptypeForm_valid.
+exact uptypeEq_valid.
+exact uptypeFormUniv_valid.
+exact uptypeEqUniv_valid.
+exact uptypeTrivialize_valid.
+exact uptypeExt_valid.
+exact uptypeLeft_valid.
+exact uptypeEeqtp_valid.
+exact uptypeUnitary_valid.
+exact voidUptype_valid.
+exact unitUptype_valid.
+exact boolUptype_valid.
+exact forallUptype_valid.
+exact arrowUptype_valid.
+exact intersectUptype_valid.
+exact existsUptype_valid.
+exact prodUptype_valid.
+exact sumUptype_valid.
+exact futureUptype_valid.
+exact eqUptype_valid.
+exact ofUptype_valid.
+exact eqtpUptype_valid.
+exact istpUptype_valid.
+exact subtypeUptype_valid.
+exact setUptype_valid.
+exact isetUptype_valid.
+exact muUptype_valid.
+exact muUptypeUniv_valid.
+exact recUptype_valid.
+exact recUptypeUniv_valid.
+exact natUptype_valid.
+exact uptypeFormInv_valid.
+exact admissForm_valid.
+exact admissEq_valid.
+exact admissFormUniv_valid.
+exact admissEqUniv_valid.
+exact admissTrivialize_valid.
+exact admissExt_valid.
+exact admissLeft_valid.
+exact admissEeqtp_valid.
+exact uptypeAdmiss_valid.
+exact partialAdmiss_valid.
+exact voidAdmiss_valid.
+exact unitAdmiss_valid.
+exact boolAdmiss_valid.
+exact forallAdmiss_valid.
+exact arrowAdmiss_valid.
+exact intersectAdmiss_valid.
+exact existsAdmissUptype_valid.
+exact prodAdmiss_valid.
+exact sumAdmiss_valid.
+exact futureAdmiss_valid.
+exact eqAdmiss_valid.
+exact ofAdmiss_valid.
+exact eqtpAdmiss_valid.
+exact istpAdmiss_valid.
+exact subtypeAdmiss_valid.
+exact recAdmiss_valid.
+exact recAdmissUniv_valid.
+exact natAdmiss_valid.
+exact admissFormInv_valid.
+exact partialType_valid.
+exact haltsType_valid.
+exact admissType_valid.
+exact uptypeType_valid.
+exact seqType_valid.
 exact eeqtpRefl_valid.
 exact eeqtpSymm_valid.
 exact eeqtpTrans_valid.
@@ -978,36 +1124,48 @@ apply tr_booltp_eta_hyp.
 Qed.
 
 
-(* The remaining rules are:
+(* The remaining rules without validations above are:
 
    1. the reduction rules
+
+      The reduction rules follow immediately from tr_compute and tr_compute_hyp.
+
    2. checkPositive and checkNegative
+
+      The correctness of checkPositive and checkNegative follow immediately from
+      tr_positive_algorithm, and tr_negative_algorithm, assuming the checker is
+      implemented correctly with respect to the formal algorithm.
+
    3. the rules pertaining to let hypotheses
-   4. the rules pertaining to native integers
-   5. the rules pertaining to symbols
 
-   The reduction rules follow immediately from tr_compute and tr_compute_hyp.
+      The let-hypothesis rules pertain to a definition mechanism in the proof
+      assistant that does not exist in the type theory.  But the rules are simple
+      and it is easy to see they are correct.
 
-   The correctness of checkPositive and checkNegative follow immediately
-   from tr_positive_algorithm, and tr_negative_algorithm, assuming the checker
-   is implemented correctly with respect to the formal algorithm.
+   4. the rules pertaining to native data types (integers and symbols)
 
-   The let-hypothesis rules pertain to a definition mechanism in the proof
-   assistant that does not exist in the type theory.  But the rules are simple
-   and it is easy to see they are correct.
+      The native data type rules cannot be proven correct because the native data
+      types do not exist in the type theory.  These rules fall into several
+      categories:
 
-   The integer rules cannot be proven correct because native integers do not 
-   exist in the type theory.  However, all the integer rules do is either
-   (a) assert the existence of the integer type, (b) assert the membership of
-   native integer literals in the integer type, or (c) establish an isomorphism
-   between native integers and defined integers (as quotiented pairs of natural
-   numbers).  Thus, we can view the integer type as referring to the defined
-   integer type, and the integer literals as referring to representatives of
-   equivalence classes in that type.  The correctness of the isomorphism code
-   is apparent by inspection.
+      (a) the formation of the type
+      (b) the membership of literals in the type
+      (c) the flatness of the type
+      (d) in the case of integers, an isomorphism
 
-   Like integers, the symbol rules cannot be proven correct because native symbols
-   do not exist in the type theory.  However, the symbol rules are simple and it is
-   easy to see they are correct.
+      The correctness of each of these rules is apparent by inspection.
 
+      A flat type is one in which the elements are precisely a set of values without
+      any internal structure (in addition to expressions that are beta-equivalent to
+      such a value).  There are several consequences of flatness:
+
+      (i)   totality (by sound_total_flat)
+      (ii)  strictness (follows from totality by tr_total_strict)
+      (iii) upward closure (by sound_flat_upward)
+      (iv)  admissibility (follows from upward closure by tr_uptype_admiss)
+      (v)   equality implies syntactic equality (by sound_flat_sequal)
+
+      For integers, several rules establish an isomorphism between native integers
+      and defined integers (as quotiented pairs of natural numbers).  The
+      correctness of the isomorphism code is apparent by inspection.
 *)

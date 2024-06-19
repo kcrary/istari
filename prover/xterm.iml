@@ -145,6 +145,8 @@ signature XTERM =
       val reduce : Reduction.reduction -> xterm -> xterm
       val unreduce : xtype -> Reduction.reduction -> xterm -> xterm
 
+      val normalizeTp : xtype -> xtype
+
       val hole : term -> term -> xterm
       val inhabitant : xterm -> Tactic.tactic
       val compact : Judgement.context -> xterm -> xterm
@@ -1596,6 +1598,28 @@ structure XTerm :>
           (* M : A *)
           mtac)
          )
+
+
+      fun normalizeTp (a, atac) =
+         let
+            val a' = Normalize.normalize a
+         in
+            (a',
+
+             (* A' : type *)
+             refine (Rule.assert (T.apply1 Prim.istp a) (T.evar ()))
+             >>> [
+                 (* A : type *)
+                 atac,
+
+                 (* A : type |- A'[^] : type *)
+                 refine (Rule.normalizeHyp 0)
+                 >>+
+                 (* A' : type |- A'[^] : type *)
+                 refine (Rule.hypothesis 0)
+                 ])
+         end
+                 
 
 
       fun hole m a = (m, a, idtac)

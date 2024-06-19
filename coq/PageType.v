@@ -1396,27 +1396,6 @@ split.
 Qed.
 
 
-Lemma theta_fix :
-  forall object (m : term object),
-    star step (app theta m) (app m (app theta m)).
-Proof.
-intros object m.
-eapply star_step.
-  {
-  apply step_app1.
-  unfold theta.
-  apply step_app2.
-  }
-simpsub.
-eapply star_step.
-  {
-  apply step_app2.
-  }
-simpsub.
-apply star_refl.
-Qed.
-
-
 Lemma app_leqtp_equiv :
   forall object (m b p b' n c q c' : @term object),
     star step m (ppair b p)

@@ -881,6 +881,50 @@ reflexivity.
 Qed.
 
 
+Lemma pi_action_app :
+  forall w I A (B : urelsp_car A -> wurel w) i m n j p q (h : rel A j p q),
+    j <= i
+    -> pi_action w I A B i m n
+    -> rel (B (urelspinj A j p q h)) j (app m p) (app n q).
+Proof.
+intros w I A B i m n j p q Hpq Hj Hmn.
+decompose Hmn.
+intros m1 n1 _ Hclm Hcln Hstepsm Hstepsn Hact.
+so (urel_closed _#5 Hpq) as (Hclp & Hclq).
+apply (urel_equiv _#3 (subst1 p m1) _ (subst1 q n1)).
+  {
+  apply hygiene_auto; cbn; auto.
+  }
+
+  {
+  apply hygiene_auto; cbn; auto.
+  }
+
+  {
+  apply equiv_symm.
+  apply steps_equiv.
+  eapply star_trans.
+    {
+    apply (star_map' _ _ (fun z => app z _)); eauto using step_app1.
+    }
+  apply star_one.
+  apply step_app2.
+  }
+
+  {
+  apply equiv_symm.
+  apply steps_equiv.
+  eapply star_trans.
+    {
+    apply (star_map' _ _ (fun z => app z _)); eauto using step_app1.
+    }
+  apply star_one.
+  apply step_app2.
+  }
+apply Hact; auto.
+Qed.
+
+
 Lemma arrow_action_app :
   forall w I A B i m n p q,
     arrow_action w I A B i m n

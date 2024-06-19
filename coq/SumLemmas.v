@@ -497,3 +497,14 @@ apply (tr_sumtype_eta_hyp_triv _ []).
   auto.
   }
 Qed.
+
+
+Lemma tr_sum_total :
+  forall G a b m,
+    tr G (deq m m (sumtype a b))
+    -> tr G (deq triv triv (halts m)).
+Proof.
+intros G a b m H.
+unfold sumtype in H.
+eapply tr_sigma_total; eauto.
+Qed.

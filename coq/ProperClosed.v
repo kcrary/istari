@@ -23,6 +23,7 @@ Require Import Semantics.
 Require Import MapTerm.
 Require Import Model.
 Require Import SemanticsEqual.
+Require Import SemanticsPartial.
 
 
 Section semantics.

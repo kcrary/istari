@@ -1,7 +1,7 @@
 # The Istari Library
 
 - [`Acc`](lib/acc.html) (accessibility)
-- [`Bar`](lib/bar.html) (partial types)
+- [`Bar`](lib/bar.html) (simulated partial computable objects)
 - [`Bool`](lib/bool.html)
 - [`Decidable`](lib/decidable.html)
 - [`Finite`](lib/finite.html)
@@ -9,10 +9,13 @@
 - [`GirardParadox`](lib/girard-paradox.html) (type is not a type)
 - [`Logic`](lib/logic.html)
 - [`List`](lib/list.html)
+- [`Miscellaneous`](lib/miscellaneous.html)
 - [`Nat`](lib/nat.html)
 - [`Natural`](lib/nat.html) (natural numbers using "native" arithmetic)
 - [`Option`](lib/option.html)
+- [`Partial`](lib/partial.html) (partial computable objects)
 - [`Relations`](lib/relations.html)
+- [`SmithParadox`](lib/smith-paradox) (there exist inadmissible types)
 - [`Stable`](lib/stable.html)
 - [`Symbol`](lib/symbol.html)
 - [`Union`](lib/union.html) (elimination forms for `union` and `iexists`)

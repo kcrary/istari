@@ -1,0 +1,128 @@
+
+(* Partial types *)
+
+beginModule "Partial";
+
+
+aliasExport /partial/ Prim.partial;
+aliasExport /halts/ Prim.halts;
+aliasExport /admiss/ Prim.admiss;
+aliasExport /uptype/ Prim.uptype;
+aliasExport (Symbol.fromValue "seq") Prim.seq;
+aliasExport /bottom/ Prim.bottom;
+
+
+lemma "partial_type"
+/
+  partial : intersect i . U i -> U i
+/;
+
+inference.
+RuleTactic.partialType.
+qed ();
+recordTyping "partial_type";
+
+
+
+lemma "halts_type"
+/
+  halts : intersect i (a : U i) . partial a -> U 0
+/;
+
+inference.
+RuleTactic.haltsType.
+qed ();
+recordTyping "halts_type";
+
+
+
+lemma "admiss_type"
+/
+  admiss : intersect i . U i -> U i
+/;
+
+inference.
+RuleTactic.admissType.
+qed ();
+recordTyping "admiss_type";
+
+
+
+lemma "uptype_type"
+/
+  uptype : intersect i . U i -> U i
+/;
+
+inference.
+RuleTactic.uptypeType.
+qed ();
+recordTyping "uptype_type";
+
+
+
+lemma "seq_type"
+/
+  `seq : intersect i (a b : U i) . partial a -> (a -> partial b) -> partial b
+/;
+
+inference.
+RuleTactic.seqType.
+qed ();
+recordTyping "seq_type";
+
+
+
+lemma "bottom_type"
+/
+  bottom : intersect i (a : U i) . partial a
+/;
+
+inference.
+introOf /i a/.
+RuleTactic.partialIntroBottomOf.
+typecheck.
+qed ();
+recordTyping "bottom_type";
+
+
+
+lemma "partial_elim"
+/
+  forall i (a : U i) (x : partial a) . halts x -> x : a
+/;
+
+inference.
+intro /i a x H/.
+RuleTactic.partialElimOf >> auto.
+qed ();
+
+
+
+lemma "fixpoint_induction"
+/
+  forall i (a : U i) (f : partial a -> partial a) .
+    admiss a
+    -> fix f : partial a
+/;
+
+inference.
+intro /i a f Hadmiss/.
+RuleTactic.fixpointInductionOf >> auto.
+qed ();
+
+
+
+lemma "uptype_impl_admiss"
+/
+  forall i (a : U i) . uptype a -> admiss a
+/;
+
+inference.
+intro /i a H/.
+RuleTactic.uptypeAdmiss.
+hyp /H/.
+qed ();
+
+
+
+endModule ();

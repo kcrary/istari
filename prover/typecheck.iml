@@ -68,6 +68,7 @@ signature TYPECHECK_INTERNAL =
       val eqkindTactics : tactic Constant2Table.table
       val subtypeTactics : tactic Constant2Table.table
       val subtypeLeftTactics : tactic ConstantTable.table
+      val strictnessTactics : tactic ConstantTable.table
 
       (* Should not alter the context.
 
@@ -129,6 +130,8 @@ signature TYPECHECK_INTERNAL =
       (Not quite a special case of 8, since A might be intersect, etc.)
 
    6. If A is known, use any applicable intro or formation rule.
+      (If A = partial A', use any applicable intro rule for A' and check that
+      A' <: partial A'.)
 
    7a. If M is let, use the let rule.
        (We don't treat this as a normal constant because we don't want to
@@ -184,13 +187,16 @@ signature TYPECHECK_INTERNAL =
 
       c. Reject
 
-   3. Unify A and B if possible.  If successful, prove A : type.
+   3. Attempt to unify A and B.  If successful, prove A : type.
 
-   4. If the goal matches a hypothesis in the table, use it.
+   4. Attempt to unify B with partial A.  If successful, prove
+      A <: partial A using a strictness rule.
 
-   5. Use any applicable subtyping rule.
+   5. If the goal matches a hypothesis in the table, use it.
 
-   6. Prove A = B : type.
+   6. Use any applicable subtyping rule.
+
+   7. Prove A = B : type.
 
 
    VI
@@ -199,7 +205,7 @@ signature TYPECHECK_INTERNAL =
 
    1. If A or B is marked manual, generate a subgoal and stop.
 
-   2. Unify A and B if possible.  If successful, prove A : type.
+   2. Attempt to unify A and B.  If successful, prove A : type.
 
    3. If the goal matches a hypothesis in the table, use it.
 
@@ -213,7 +219,7 @@ signature TYPECHECK_INTERNAL =
 
    1. If A or B is marked manual, generate a subgoal and stop.
 
-   2. Unify A and B if possible.  If successful, prove A : Ui.
+   2. Attempt to unify A and B.  If successful, prove A : Ui.
 
    3. If the goal matches a hypothesis in the table, use it.
 
@@ -229,7 +235,7 @@ signature TYPECHECK_INTERNAL =
 
    1. If A or B is marked manual, generate a subgoal and stop.
 
-   2. Unify A and B if possible.  If successful, prove A : Ki.
+   2. Attempt to unify A and B.  If successful, prove A : Ki.
 
    3. If the goal matches a hypothesis in the table, use it.
 
@@ -278,6 +284,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       val eqkindTactics : tactic H2.table = H2.table ()
       val subtypeTactics : tactic H2.table = H2.table ()
       val subtypeLeftTactics : tactic H.table = H.table ()
+      val strictnessTactics : tactic H.table = H.table ()
 
 
 
@@ -1754,7 +1761,28 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                     else
                        raise Backtrack)\
 
-               (* 4. Look in the table. *)
+               (* 4. Unify B with partial A and try strictness. *)
+             | const? @ _ ; \Prim.partial\ @ _ =!>
+              \(fnc const =>
+                   if U.unify1 (T.apply1 Prim.partial a) b then
+                      (case H.find strictnessTactics const of
+                          SOME tac =>
+                             tryRule st table history tac goal dest
+                             (fn () =>
+                                 dest :=
+                                    error history "unexpected strictness failure"
+                                    (fn () =>
+                                        (
+                                        showPrefixed " first: " dir a;
+                                        showPrefixed "second: " dir b;
+                                        print "\n"
+                                        )))
+
+                        | NONE => raise Backtrack)
+                   else
+                      raise Backtrack)\
+
+               (* 5. Look in the table. *)
              | _ =!>
                \fnc =>
                    if 
@@ -1791,7 +1819,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    else
                       raise Backtrack\
 
-               (* 5a. Use a subtyping rule. *)
+               (* 6a. Use a subtyping rule. *)
              | const? @ _ ; const? @ _ =!>
                \fnc const1 const2 =>
                    (case H2.find subtypeTactics (const1, const2) of
@@ -1809,7 +1837,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
                      | NONE => raise Backtrack)\
 
-               (* 5b. Use a left-indexed subtyping rule. *)
+               (* 6b. Use a left-indexed subtyping rule. *)
              | const? @ _ ; _ =!>
                \(fnc const =>
                     (case H.find subtypeLeftTactics const of
@@ -1827,7 +1855,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
  
                       | NONE => raise Backtrack))\
 
-               (* 6. Try A = B : type *)
+               (* 7. Try A = B : type *)
              | _ =>
                \fnc =>
                    let
@@ -2772,7 +2800,37 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       fun only const =
          goalCaseT
          / \Prim.ov\ _ ($whnfBasic (\const\ @ _)) => \fnc => idtac\ /
-         
+
+      fun onEvar tac =
+         lift (fn () => tac (T.evar ()))
+
+
+      (* As an intro "rule" for partial A, use bottom as the intro if appropriate,
+         or else use an intro rule for A and leave as an obligation that A is strict.
+      *)
+      val partialIntro =
+         goalCaseT
+         /| \Prim.ov\ (\Prim.partial\ _) ($whnfBasic \Prim.bottom\) =>
+            \(fnc =>
+                 RT.partialIntroBottomOf)\
+
+          | \Prim.ov\ (\Prim.partial\ ($as (const? @ _))) _ =>
+            \(fnc a const =>
+                 (case H.find introTactics const of
+                     SOME tac =>
+                        refine (Rule.subsumptionOf a (T.evar ()) (T.evar ()))
+                        >>> [idtac, tac]
+
+                   | NONE =>
+                        (case H.find trivialIntroTactics const of
+                            SOME tac =>
+                               refine (Rule.subsumptionOf a (T.evar ()) (T.evar ()))
+                               >>> [idtac, tac >> idtac]
+
+                          | NONE =>
+                               fail "no intro rule for underlying type")))\
+         /
+
 
       val () =
          let
@@ -2797,7 +2855,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.bool (first [only Prim.tru >> RT.boolIntro1Of, only Prim.fals >> RT.boolIntro2Of]);
             insert Prim.sum (first [only Prim.inl >> RT.sumIntro1Of, only Prim.inr >> RT.sumIntro2Of]);
             insert Prim.integer RT.integerIntroOf;
-            insert Prim.symbol RT.symbolIntroOf
+            insert Prim.symbol RT.symbolIntroOf;
+            insert Prim.partial partialIntro
          end
 
 
@@ -2889,7 +2948,11 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.squash RT.squashForm;
             insert Prim.eeqtp eeqtpForm;
             insert Prim.integer RT.integerForm;
-            insert Prim.symbol RT.symbolForm
+            insert Prim.symbol RT.symbolForm;
+            insert Prim.partial RT.partialForm;
+            insert Prim.halts (onEvar RT.haltsForm);
+            insert Prim.admiss RT.admissForm;
+            insert Prim.uptype RT.uptypeForm
          end
 
       val () =
@@ -2927,7 +2990,11 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.lleq RT.lleqEq;
             insert Prim.squash RT.squashEq;
             insert Prim.integer RT.integerEq;
-            insert Prim.symbol RT.symbolEq
+            insert Prim.symbol RT.symbolEq;
+            insert Prim.partial RT.partialEq;
+            insert Prim.halts (onEvar RT.haltsEq);
+            insert Prim.admiss RT.admissEq;
+            insert Prim.uptype RT.uptypeEq
          end
 
       val () =
@@ -2992,7 +3059,11 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.lleq RT.lleqFormUniv;
             insert Prim.squash RT.squashFormUniv;
             insert Prim.integer RT.integerFormUniv;
-            insert Prim.symbol RT.symbolFormUniv
+            insert Prim.symbol RT.symbolFormUniv;
+            insert Prim.partial RT.partialFormUniv;
+            insert Prim.halts (onEvar RT.haltsFormUniv);
+            insert Prim.admiss RT.admissFormUniv;
+            insert Prim.uptype RT.uptypeFormUniv
          end
 
       val () =
@@ -3033,7 +3104,11 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.lleq RT.lleqEqUniv;
             insert Prim.squash RT.squashEqUniv;
             insert Prim.integer RT.integerEqUniv;
-            insert Prim.symbol RT.symbolEqUniv
+            insert Prim.symbol RT.symbolEqUniv;
+            insert Prim.partial RT.partialEqUniv;
+            insert Prim.halts (onEvar RT.haltsEqUniv);
+            insert Prim.admiss RT.admissEqUniv;
+            insert Prim.uptype RT.uptypeEqUniv
          end
 
       val () =
@@ -3100,7 +3175,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.exists Prim.prod RT.existsProdSub;
             insert Prim.future Prim.future RT.futureSub;
             insert Prim.sum Prim.sum RT.sumSub;
-            insert Prim.squash Prim.squash RT.squashSub
+            insert Prim.squash Prim.squash RT.squashSub;
+            insert Prim.partial Prim.partial RT.partialSub
          end
 
       val () =
@@ -3110,6 +3186,28 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.void RT.voidSub;
             insert Prim.set RT.setSubElim;
             insert Prim.iset RT.isetSubElim
+         end
+
+      val () =
+         let
+            fun insert const tac = H.insert strictnessTactics const tac
+         in
+            insert Prim.partial RT.partialStrict;
+            insert Prim.void RT.voidStrict;
+            insert Prim.unit RT.unitStrict;
+            insert Prim.bool RT.boolStrict;
+            insert Prim.forall RT.forallStrict;
+            insert Prim.arrow RT.arrowStrict;
+            insert Prim.intersect RT.intersectStrict;
+            insert Prim.exists RT.existsStrict;
+            insert Prim.prod RT.prodStrict;
+            insert Prim.sum RT.sumStrict;
+            insert Prim.future RT.futureStrict;
+            insert Prim.set RT.setStrict;
+            insert Prim.iset RT.isetStrict;
+            insert Prim.nat RT.natStrict;
+            insert Prim.integer RT.integerStrict;
+            insert Prim.symbol RT.symbolStrict
          end
 
 

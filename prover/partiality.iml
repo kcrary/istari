@@ -1,0 +1,476 @@
+
+signature PARTIALITY =
+   sig
+
+      type tactic = Tactic.tactic
+      type 'a tacticm = 'a Tactic.tacticm
+      type priority = Tactic.priority
+
+      val proveAdmiss1Raw : tactic
+      val proveAdmiss1 : tactic
+      val uptypeAdmiss : tactic
+
+      val proveAdmissPriority : priority tacticm
+      val proveAdmissRaw : tactic
+      val proveAdmiss : tactic
+
+      val establishUptype : Constant.constant -> unit
+
+      val admissTactics : tactic ConstantTable.table
+      val uptypeTactics : tactic ConstantTable.table
+
+   end
+
+
+structure Partiality :> PARTIALITY =
+   struct
+
+      structure H = ConstantTable
+      structure J = Judgement
+      structure RT = RuleTactic
+      structure T = Term
+      structure X = XTerm
+
+      open Tactic
+      open CasePervasive
+
+
+      exception Partiality of string
+
+      fun signalError msg = raise (Partiality
+                                      (String.concat
+                                          [
+                                          "Error: ",
+                                          msg,
+                                          ".\n"
+                                          ]))
+
+      val () =
+         Handler.customHandler
+         (fn Partiality msg => (print msg; true)
+           | _ => false)
+
+
+      val admissTactics : tactic H.table = H.table ()      
+      val uptypeTactics : tactic H.table = H.table ()      
+
+      
+      val proveAdmiss1Raw =
+         goalCaseT
+         /| \Prim.uptype\ (const? @ _) =>
+            \(fnc const =>
+                 (case H.find uptypeTactics const of
+                     SOME tac => tac
+
+                   | NONE => fail "no uptype rule for this type"))\
+
+          | \Prim.admiss\ (const? @ _) =>
+            \(fnc const =>
+                 (case H.find admissTactics const of
+                     SOME tac => tac
+
+                   | NONE => fail "no admissibility rule for this type"))\
+         /
+      
+
+      val proveAdmiss1 = Typecheck.withTypecheck proveAdmiss1Raw
+
+
+      val uptypeAdmiss = RuleTactic.uptypeAdmiss
+
+
+      fun proveAdmissMain assumtac =
+         cut $
+         first
+            [
+            assumtac >> done,
+
+            proveAdmiss1Raw >> lift (fn () => proveAdmissCont assumtac),
+
+            uptypeAdmiss >>+ lift (fn () => proveAdmissMain assumtac),
+
+            fail "could not prove admissibility"
+            ]
+
+      and proveAdmissCont assumtac =
+         let
+            do (jud, _) = withgoal
+         in
+            if TypecheckInternal.isTypecheckGoal jud then
+               idtacM Secondary
+            else
+               proveAdmissMain assumtac
+         end
+
+
+      val proveAdmissPriority : priority tacticm = lift (fn () => proveAdmissMain Hyp.assumption)
+
+      val proveAdmissRaw = proveAdmissPriority >> idtac
+
+      val proveAdmiss = Typecheck.withTypecheckSnd proveAdmissPriority
+
+
+      fun establishUptype const =
+         (case Datatype.info const of
+             NONE =>
+                signalError "not a datatype"
+
+           | SOME (_, bundle) =>
+                let
+                   val (_, _, _, _, _, dts) = bundle
+
+                   (* Do some ugly name manipulation to find the uptype condition lemma. *)
+                   val (firstconst, _, _, _, _) = Vector.sub dts 0
+                   val firstnamerev = List.rev (Namespace.name firstconst)  (* nonempty by invariant *)
+                   val conditionLemmaName =
+                      List.rev
+                         (Symbol.fromValue (Symbol.toValue (List.hd firstnamerev) ^ "_uptype_condition")
+                          :: List.tl firstnamerev)
+                   val conditionLemma = Namespace.resolve conditionLemmaName
+
+                   val conditionLemmaTp =
+                      (case Report.typeOf conditionLemma of
+                          NONE =>
+                             signalError "uptype condition lemma not found"
+
+                        | SOME t => t)
+
+                   (* Drop the condition part of the lemma, and add unknown proposition
+                      for each quantified variable.  That proposition will either become
+                      (uptype 0) or unit, depending on whether it's needed.
+                   *)
+                    
+                   fun makeLemma t =
+                      termCase t
+                      /| \Prim.forall\ ? (fn ? . ?) =>
+                         \(fnc dom binder cod =>
+                              T.apply2 Prim.forall dom
+                                 (T.Lam (binder, 
+                                         T.apply2 Prim.arrow 
+                                            (T.evar ())
+                                            (makeLemma cod))))\
+
+                       | \Prim.arrow\ _ ? =>
+                         \(fnc cod => cod)\
+                      /
+
+                   val lemmaTp = makeLemma conditionLemmaTp
+
+                   val jud = J.make Seq.empty lemmaTp
+
+                   val assumtac =
+                      goalCaseT
+                      /
+                      \Prim.uptype\ var? =>
+                      \(fnc i =>
+                           if i < 1 then
+                              fail ""
+                           else
+                              (* use the unknown proposition that should be positioned after the variable *)
+                              refine (Rule.hypothesis (i-1)))\
+                      /
+
+                   val tac =
+                      Typecheck.withTypecheckSnd
+                         (andthenM
+                             (IntroTactic.introsPriority >>!
+                              Backchain.applyPriority (ETerm.literal (T.Const conditionLemma)) >>!
+                              repeat IntroTactic.split >>
+                              lift (fn () => proveAdmissMain assumtac))
+
+                             (fn Primary =>
+                                    (* this shouldn't actually happen *)
+                                    idtacM Primary
+
+                               | Secondary => 
+                                    first
+                                       [
+                                       (* If the proposition is still unknown, set it to unit.
+                                          Need to do this before invoking the typechecker.
+                                       *)
+                                       refine Rule.unitForm >> done,
+
+                                       idtacM Secondary
+                                       ]))
+                in
+                   (case Tactic.execute (jud, Directory.empty) tac of
+                       Sum.INL v =>
+                          Vector.appi
+                             (fns (n : int) (dtconst, _, _, _, _) =>
+                                 let
+                                    (* makeLemmaN T s
+
+                                       if    s takes T into G
+                                       then  tac :: G, T[s] |- U[s o ^]
+                                             and
+                                             returns (U, tac)
+
+                                       This code is long because I don't want to generate extraneous typing goals.
+                                    *)
+                                    fun makeLemmaN t s =
+                                       termCase t
+                                       /| \Prim.forall\ ? (fn ? . ?) =>
+                                          \(fnc dom binder cod =>
+                                               let
+                                                  (* suppose G' |- forall Dom . Cod : type
+                                                     G |- s : G'
+                                                     so
+                                                     G', Dom |- Cod : type
+                                                     G, Dom[s] |- 0 . (s o ^) : G', Dom
+                                                  *)
+
+                                                  val (cod', tac) = makeLemmaN cod (T.under 1 s)
+                                               in
+                                                  (T.apply2 Prim.forall dom (T.Lam (binder, cod')),
+
+                                                   (* G, (forall Dom . Cod)[s] |- (forall Dom . Cod')[s o ^] *)
+                                                   refine (Rule.forallIntro (T.evar ()) (T.evar ()))
+                                                   >>> [
+                                                       (* G, (forall Dom . Cod)[s] |- Dom[s o ^] : type *)
+                                                       refine (Rule.forallFormInv1 (T.evar ()) (T.evar ()))
+                                                       >>+
+                                                       (* G, (forall Dom . Cod)[s] |- (forall Dom . _)[s o ^] : type *)
+                                                       refine (Rule.inhabitedForm (T.evar ()))
+                                                       >>+
+                                                       (* G, (forall Dom . Cod)[s] |- (forall Dom . _)[s o ^] *)
+                                                       refine (Rule.hypothesis 0),
+
+                                                       (* G, (forall Dom . Cod)[s], Dom[s o ^] |- Cod'[0 . s o ^2] *)
+                                                       refine (Rule.assert (T.Sub (cod, T.Idot (0, T.compose s (T.Shift 2)))) (T.evar ()))
+                                                       >>> [
+                                                           (* G, (forall Dom . Cod)[s], Dom[s o ^] |- Cod[0 . s o ^2]
+                                                                                                    = Cod[0 . s o ^3][0 . id]
+                                                           *)
+                                                           refine (Rule.forallElim
+                                                                      (T.Sub (dom, T.compose s (T.Shift 2)))
+                                                                      (T.Sub (cod, T.Idot (0, T.compose s (T.Shift 3))))
+                                                                      T.zero)
+                                                           >>> [
+                                                               (* G, (forall Dom . Cod)[s], Dom[s o ^] |- forall Dom[s o ^2] . Cod[0 . s o ^3] *)
+                                                               refine (Rule.hypothesis 1),
+
+                                                               (* G, (forall Dom . Cod)[s], Dom[s o ^] |- 0 : Dom[s o ^2] *)
+                                                               refine (Rule.hypothesisOf 0)
+                                                               ],
+
+                                                           (* G, (forall Dom . Cod)[s], Dom[s o ^], Cod[0 . s o ^2] |- Cod'[1 . s o ^3] *)
+                                                           refine (Rule.weaken 2 1)
+                                                           >>+
+                                                           (* G, Dom[s], Cod[0 . s o ^] |- Cod'[1 . s o ^2] *)
+                                                           tac
+                                                           ]
+                                                       ])
+                                               end)\
+
+                                        | \Prim.arrow\ \Prim.unit\ ? =>
+                                          \(fnc cod =>
+                                               let
+                                                  val (cod', tac) = makeLemmaN cod s
+                                               in
+                                                  (cod',
+
+                                                   (* (G, unit -> Cod)[s] |- Cod'[s o ^] *)
+                                                   refine (Rule.assert (T.Sub (cod, T.compose s T.shift1)) (T.evar ()))
+                                                   >>> [
+                                                       (* G, unit -> Cod[s] |- Cod[s o ^] *)
+                                                       refine (Rule.arrowElim (T.Const Prim.unit) (T.evar ()))
+                                                       >>> [
+                                                           (* G, unit -> Cod[s] |- unit -> Cod[s o ^] *)
+                                                           refine (Rule.hypothesis 0),
+
+                                                           (* G, unit -> Cod[s] |- unit *)
+                                                           refine Rule.unitIntro
+                                                           ],
+
+                                                       (* G, unit -> Cod[s], Cod[s o ^] |- Cod'[s o ^2] *)
+                                                       refine (Rule.weaken 1 1)
+                                                       >>+
+                                                       (* G, Cod[s] |- Cod'[s o ^] *)
+                                                       tac
+                                                       ])
+                                               end)\
+
+                                        | \Prim.arrow\ ? ? =>
+                                          \(fnc dom cod =>
+                                               let
+                                                  (* suppose G' |- Dom -> Cod : type
+                                                     G |- s : G'
+                                                     so
+                                                     G' |- Cod : type
+                                                     G, Dom[s] |- s o ^ : G'
+                                                  *)
+
+                                                  val (cod', tac) = makeLemmaN cod (T.compose s T.shift1)
+                                               in
+                                                  (T.apply2 Prim.arrow dom cod',
+
+                                                   (* G, (Dom -> Cod)[s] |- (Dom -> Cod')[s o ^] *)
+                                                   refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+                                                   >>> [
+                                                       (* G, (Dom -> Cod)[s] |- Dom[s o ^] : type *)
+                                                       refine (Rule.arrowFormInv1 (T.evar ()) (T.evar ()))
+                                                       >>+
+                                                       (* G, (Dom -> Cod)[s] |- (Dom -> _)[s o ^] : type *)
+                                                       refine (Rule.inhabitedForm (T.evar ()))
+                                                       >>+
+                                                       (* G, (Dom -> Cod)[s] |- (Dom -> _)[s o ^] *)
+                                                       refine (Rule.hypothesis 0),
+
+                                                       (* G, (Dom -> Cod)[s], Dom[s o ^] |- Cod'[s o ^2] *)
+                                                       refine (Rule.assert (T.Sub (cod, T.compose s (T.Shift 2))) (T.evar ()))
+                                                       >>> [
+                                                           (* G, (Dom -> Cod)[s], Dom[s o ^] |- Cod[s o ^2] *)
+                                                           refine (Rule.arrowElim (T.Sub (dom, T.compose s (T.Shift 2))) (T.evar ()))
+                                                           >>> [
+                                                               (* G, (Dom -> Cod)[s], Dom[s o ^] |- Dom[s o ^2] -> Cod[s o ^2] *)
+                                                               refine (Rule.hypothesis 1),
+
+                                                               (* G, (Dom -> Cod)[s], Dom[s o ^] |- Dom[s o ^2] *)
+                                                               refine (Rule.hypothesis 0)
+                                                               ],
+
+                                                           (* G, (Dom -> Cod)[s], Dom[s o ^], Cod[s o ^2] |- Cod'[s o ^3] *)
+                                                           refine (Rule.weaken 2 1)
+                                                           >>+
+                                                           (* G, Dom[s], Cod[s o ^] |- Cod'[s o ^2] *)
+                                                           tac
+                                                           ]
+                                                       ])
+                                               end)\
+
+                                        | \Prim.prod\ _ _ =>
+                                          \(fnc =>
+                                               let
+                                                  val (anetc, tac) =
+                                                     Int.natrecUp
+                                                        (fns _ (a, tac) =>
+                                                            (* tac :: G, A0 & ... & Ak-1 & unit |- A *)
+                                                            termCase a
+                                                            /
+                                                            \Prim.prod\ _ ? =>
+                                                            \(fnc c =>
+                                                                 (* tac :: G, A0 & ... & Ak-1 & unit |- B & C *)
+                                                                 (c,
+      
+                                                                  (* G, A0 & ... & Ak-1 & unit |- C *)
+                                                                  refine (Rule.prodElim2 (T.evar ()) (T.evar ()))
+                                                                  >>+
+                                                                  (* G, A0 & ... & Ak-1 & unit |- B & C *)
+                                                                  tac))\
+                                                            /)
+                                                        (t, refine (Rule.hypothesis 0))
+                                                        n
+
+                                                  val an =
+                                                     termCase anetc
+                                                     /
+                                                     \Prim.prod\ ? _ =>
+                                                     \(fnc b => b)\
+                                                     /
+                                               in
+                                                  (an,
+
+                                                   (* G, A0 & ... & Ak-1 & unit |- An *)
+                                                   refine (Rule.prodElim1 (T.evar ()) (T.evar ()))
+                                                   >>+
+                                                   (* G, A0 & ... & Ak-1 & unit |- An & ... & Ak-1 & unit *)
+                                                   tac)
+                                                end)\
+                                       /
+
+                                    val (lemmanTp, tacn) = makeLemmaN lemmaTp T.id
+
+                                    val judn = J.make Seq.empty lemmanTp
+
+                                    val fulltacn =
+                                       (* lemmanTp *)
+                                       refine (Rule.assert lemmaTp (T.evar ()))
+                                       >>> [
+                                           (* lemmaTp *)
+                                           cast jud v,
+
+                                           (* lemmaTp |- lemmanTp *)
+                                           tacn
+                                           ]
+                                 in
+                                    (case Tactic.execute (judn, Directory.empty) fulltacn of
+                                        Sum.INL vn =>
+                                           let
+                                              val lemmanName =
+                                                 Symbol.fromValue (Symbol.toValue (Namespace.lastname dtconst) ^ "_uptype")
+
+                                              val (lemman, judn', vn') = NamespaceInternal.reify lemmanName judn vn
+                                           in
+                                              Database.setType lemman judn' vn';
+                                              Constant.abstract lemman;
+
+                                              H.insert uptypeTactics dtconst
+                                                 (Backchain.applyRaw (ETerm.literal (T.Const lemman)))
+                                           end
+
+                                      | Sum.INR _ =>
+                                           signalError "unexpected failure in establishUptype")
+                                 end)
+                             dts
+
+                     | Sum.INR _ =>
+                          signalError "unable to establish the datatype is an uptype")
+                end)
+
+
+
+      val () =
+         List.app
+            (fn (const, tac) => H.insert admissTactics const tac)
+            [
+            (Prim.partial, RT.partialAdmiss),
+            (Prim.void, RT.voidAdmiss),
+            (Prim.unit, RT.unitAdmiss),
+            (Prim.bool, RT.boolAdmiss),
+            (Prim.forall, RT.forallAdmiss),
+            (Prim.arrow, RT.arrowAdmiss),
+            (Prim.intersect, RT.intersectAdmiss),
+            (Prim.exists, RT.existsAdmissUptype),
+            (Prim.prod, RT.prodAdmiss),
+            (Prim.sum, RT.sumAdmiss),
+            (Prim.future, RT.futureAdmiss),
+            (Prim.eq, RT.eqAdmiss),
+            (Prim.ov, RT.ofAdmiss),
+            (Prim.eqtp, RT.eqtpAdmiss),
+            (Prim.istp, RT.istpAdmiss),
+            (Prim.subtype, RT.subtypeAdmiss),
+            (Prim.rec, RT.recAdmiss),
+            (Prim.nat, RT.natAdmiss),
+            (Prim.integer, RT.integerAdmiss),
+            (Prim.symbol, RT.symbolAdmiss),
+            ]
+
+      val () =
+         List.app
+            (fn (const, tac) => H.insert uptypeTactics const tac)
+            [
+            (Prim.void, RT.voidUptype),
+            (Prim.unit, RT.unitUptype),
+            (Prim.bool, RT.boolUptype),
+            (Prim.forall, RT.forallUptype),
+            (Prim.arrow, RT.arrowUptype),
+            (Prim.intersect, RT.intersectUptype),
+            (Prim.exists, RT.existsUptype),
+            (Prim.prod, RT.prodUptype),
+            (Prim.sum, RT.sumUptype),
+            (Prim.future, RT.futureUptype),
+            (Prim.eq, RT.eqUptype),
+            (Prim.ov, RT.ofUptype),
+            (Prim.eqtp, RT.eqtpUptype),
+            (Prim.istp, RT.istpUptype),
+            (Prim.subtype, RT.subtypeUptype),
+            (Prim.set, RT.setUptype),
+            (Prim.iset, RT.isetUptype),
+            (Prim.mu, RT.muUptype),
+            (Prim.rec, RT.recUptype),
+            (Prim.nat, RT.natUptype),
+            (Prim.integer, RT.integerUptype),
+            (Prim.symbol, RT.symbolUptype),
+            ]
+
+   end

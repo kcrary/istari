@@ -5,8 +5,10 @@
 
 File.import "acc-load.iml";
 File.import "nat-load.iml";
-Namespace.openModule (parseLongident /Acc/);
-Namespace.openModule (parseLongident /Nat/);
+File.import "miscellaneous-load.iml";
+openModule /Acc/;
+openModule /Nat/;
+openModule /Miscellaneous/;
 
 File.import "datatype-local.iml";
 
@@ -3448,6 +3450,103 @@ destruct /x/ /x | x/.
 qed ();
 recordTyping "dt_iter_type";
 
+
+
+alias /halts/ Prim.halts;
+
+lemma "dt_total"
+/
+  forall (i : level) (a : U i) (dcons : schema i a) (ind : a) (x : dt a dcons ind) .
+    halts x
+/;
+
+intro /i a dcons ind x/.
+unfold /dt in x/.
+destruct /x/ /[x _]/.
+rewrite /-> rep_unroll in x/.
+unfold /repbody in x/.
+unfold /schema in dcons/.
+destruct /dcons/ /| dcon dcons/.
+  {
+  reduce /x/.
+  so /x/ /0/.
+  }
+
+  {
+  reduce /x/.
+  RuleTactic.sumTotal (Term.evar ()) (Term.evar ()) >> auto.
+  }
+qed ();
+
+
+
+alias /partial/ Prim.partial;
+
+lemma "dt_strict"
+/
+  forall (i : level) (a : U i) (dcons : schema i a) (ind : a) .
+    dt a dcons ind <: partial (dt a dcons ind)
+/;
+
+intro /i a dcons ind/.
+RuleTactic.totalStrict >> auto.
+apply /dt_total/ >> auto.
+qed ();
+
+
+
+alias /uptype/ Prim.uptype;
+
+lemma "dt_uptype"
+/
+  forall (i : level) (a : U i) (dcons : schema i a) .
+    list_iter _ (fn _ . U i) unit (fn b _ P . uptype (b #1) & P) dcons
+    -> forall (ind : a) . uptype (dt a dcons ind)
+/;
+
+inference.
+intro /i a dcons Hall ind/.
+unfold /dt/.
+RuleTactic.isetUptype >> auto.
+unfold /rep/.
+RuleTactic.muUptypeUniv (parseCurr /i/) >> auto.
+1:{
+  apply /repbody_positive/.
+  }
+reintro /r Hr/.
+unfold /repbody/.
+revert /Hall/.
+unfold /schema in dcons/.
+sinduction /dcons/.
+  {
+  intro /_/.
+  reduce //.
+  RuleTactic.voidUptype.
+  }
+reintro /u dcon dcons Hu IH/.
+intro /Hall/.
+reduce /Hall/.
+destruct /Hall/ /Hh Hall/.
+reduce //.
+RuleTactic.sumUptype.
+1:{
+  apply /IH/ >> auto.
+  }
+RuleTactic.prodUptype >> auto.
+clear /dcons Hu IH Hh Hall/.
+destruct /dcon/ /b ps p/.
+reduce //.
+clear /p/.
+sinduction /ps/.
+  {
+  reduce //.
+  RuleTactic.unitUptype.
+  }
+reintro /v p ps Hv IH/.
+reduce //.
+RuleTactic.prodUptype >> auto.
+qed ();
+      
 
 
 Constant.setOpacity (parseConstant /dt/) Constant.OPAQUE;

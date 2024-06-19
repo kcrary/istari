@@ -160,6 +160,9 @@ and put `A` in [hard whnf](#reduction-strategies).  Then:
 
 6. If `A` is known, use any applicable intro or formation rule.
 
+   If `A` = `partial A'`, use any applicable intro rule for `A'` and check that
+   `A' <: partial A'`.
+
 7. If `M` is `let`, use the let rule.  (We don't treat this as a
    normal constant because we don't want to require that the bound
    term's type belongs to a universe.)
@@ -221,17 +224,20 @@ For goals of the form `A <: B`, put `A` and `B` in
 
    c. Reject
 
-3. Unify `A` and `B` if possible.  If successful, prove `A : type`.
+3. Attempt to unify `A` and `B`.  If successful, prove `A : type`.
 
    **Note:** This means subtyping is resolved using the "greedy
    algorithm" when possible.  This usually performs well in practice,
    but occasionally it can have unpredictable results.
 
-4. If the goal matches a hypothesis, use it.
+4. Attempt to unify B with partial A.  If successful, prove
+   `A <: partial A` using a strictness rule.
 
-5. Use any applicable subtyping rule.
+5. If the goal matches a hypothesis, use it.
 
-6. Prove `A = B : type`.
+6. Use any applicable subtyping rule.
+
+7. Prove `A = B : type`.
 
 
 ##### Type equivalence
@@ -241,7 +247,7 @@ For goals of the form `A = B : type`, put `A` and `B` in
 
 1. If `A` or `B` is marked manual, generate a subgoal and stop.
 
-2. Unify `A` and `B` if possible.  If successful, prove `A : type`.
+2. Attempt to unify `A` and `B`.  If successful, prove `A : type`.
 
 3. If the goal matches a hypothesis, use it.
 
@@ -257,8 +263,8 @@ in [hard whnf](#reduction-strategies).  Then:
 
 1. If `A` or `B` is marked manual, generate a subgoal and stop.
 
-2. Unify `A` and `B` if possible.  If successful, prove `A : U i` or
-`A : K i`.
+2. Attempt to unify `A` and `B`.  If successful, prove `A : U i` or 
+   `A : K i`.
 
 3. If the goal matches a hypothesis, use it.
 

@@ -75,7 +75,6 @@ apply step_bite3.
 Qed.
 
 
-
 Lemma equiv_all :
   forall (a a' b b' c c' : term object),
     equiv a a'
@@ -413,6 +412,51 @@ Proof.
 prove_equiv_compat.
 Qed.
 
+
+Lemma equiv_partial :
+  forall (m m' : @term object),
+    equiv m m'
+    -> equiv (partial m) (partial m').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
+Lemma equiv_halts :
+  forall (m m' : @term object),
+    equiv m m'
+    -> equiv (halts m) (halts m').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
+Lemma equiv_admiss :
+  forall (m m' : @term object),
+    equiv m m'
+    -> equiv (admiss m) (admiss m').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
+Lemma equiv_uptype :
+  forall (m m' : @term object),
+    equiv m m'
+    -> equiv (uptype m) (uptype m').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
+Lemma equiv_seq :
+  forall (m m' n n' : @term object),
+    equiv m m'
+    -> equiv n n'
+    -> equiv (seq m n) (seq m' n').
+Proof.
+prove_equiv_compat.
+Qed.
 
 
 End object.

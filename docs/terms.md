@@ -46,6 +46,7 @@ cons is right associative.
       Term -g> [Term]                                                (guard)
       let Ident = Term in [Term]                                     (let)
       let next Ident = Term in [Term]                                (scoped future elim)
+      seq Ident = Term in [Term]                                     (eager let)
       case Term of | inl OIdent . [Term] | inr OIdent . [Term]       (sum elim)
       Term : [Term]                                                  (typing)
       Term : type                                                    (type formation)

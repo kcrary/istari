@@ -3,9 +3,11 @@ COQC = coqc
 COQDEP = coqdep
 
 UNITS = \
+	Approximation \
 	Axioms \
 	Candidate \
 	Ceiling \
+	Compactness \
 	Constructor \
 	ContextHygiene \
 	Defined \
@@ -60,6 +62,7 @@ UNITS = \
 	SemanticsKnot \
 	SemanticsKind \
 	SemanticsMu \
+	SemanticsPartial \
 	SemanticsPi \
 	SemanticsPositive \
 	SemanticsProperty \
@@ -74,6 +77,7 @@ UNITS = \
 	Shut \
 	Sigma \
 	SimpSub \
+	SoundAdmiss \
 	SoundAll \
 	SoundEqtype \
 	SoundEqual \
@@ -84,7 +88,10 @@ UNITS = \
 	SoundKind \
 	SoundMisc \
 	SoundMu \
+	SoundPartial \
+	SoundPartialUtil \
 	SoundRec \
+	SoundPartial \
 	SoundPi \
 	SoundPositive \
 	SoundQuotient \
@@ -126,9 +133,11 @@ UNITS = \
 	ValidationMu \
 	ValidationNat \
 	ValidationOf \
+	ValidationPartial \
 	ValidationPi \
 	ValidationQuotient \
 	ValidationRec \
+	ValidationSequal \
 	ValidationSet \
 	ValidationSigma \
 	ValidationSimple \

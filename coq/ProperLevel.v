@@ -49,6 +49,8 @@ Require Import Equivalence.
 Require Import ProperEquiv.
 Require Import ProperClosed.
 Require Import SemanticsPositive.
+Require Import SemanticsPartial.
+Require Import Approximation.
 
 
 
@@ -1672,6 +1674,46 @@ pextensionality.
   }
 }
 
+(* partial *)
+{
+intros pg s i a A _ IH IHo h.
+so (IH IHo h) as (A' & ->).
+exists (iupartial (cin pg) i A').
+rewrite -> extend_iupartial.
+reflexivity.
+}
+
+(* halts *)
+{
+intros pg s i m Hcl IHo h.
+exists (iubase (halts_urel (cin pg) i (map_term (extend stop (cin pg)) m))).
+rewrite -> extend_iubase.
+f_equal.
+unfold halts_urel.
+rewrite -> extend_property; auto.
+apply property_urel_extensionality; auto.
+intros j Hj.
+split; eauto using map_converges, anti_map_converges.
+}
+
+(* admiss *)
+{
+intros pg s i a A _ IH IHo h.
+so (IH IHo h) as (A' & ->).
+exists (iuadmiss (cin pg) i A').
+rewrite -> extend_iuadmiss.
+reflexivity.
+}  
+
+(* uptype *)
+{
+intros pg s i a A _ IH IHo h.
+so (IH IHo h) as (A' & ->).
+exists (iuuptype (cin pg) i A').
+rewrite -> extend_iuuptype.
+reflexivity.
+}  
+
 (* functional *)
 {
 intros pg s i A' b B Hcl Hcoarse Hint IH IHo A heq h.
@@ -2050,6 +2092,9 @@ try (intros;
            |eapply interp_wt
            |eapply interp_eqtype
            |eapply interp_subtype
+           |eapply interp_partial
+           |eapply interp_admiss
+           |eapply interp_uptype
            ];
      eauto using restriction_hygiene, restriction_decrease;
      done).
@@ -2487,6 +2532,33 @@ fold (kind lv').
 apply interp_kind; eauto using pginterp_restriction.
 }
 
+(* halts *)
+{
+intros pg s i m H mm IHo Hrest.
+invertc Hrest.
+intros r1 Hr1 <-.
+invertc Hr1.
+intros m' r2 Hm' Hr2 <-.
+invertc Hr2.
+intros <-.
+fold (halts m').
+so (le_ord_trans _#3 (cin_top pg) (succ_nodecrease _)) as h.
+replace (halts_urel stop i m) with (halts_urel stop i m').
+2:{
+  apply property_urel_extensionality; auto.
+  intros j Hj.
+  rewrite -> (map_converges_iff _ _ (extend stop (succ (cex pg))) m).
+  rewrite -> (map_converges_iff _ _ (extend stop (succ (cex pg))) m').
+  rewrite -> (restrict_restriction _ _ _ Hm').
+  reflexivity.
+  }
+apply interp_halts; auto.
+so (restrict_restriction _#3 Hm') as Heq.
+apply (map_hygiene_conv _ _ (extend stop (succ (cex pg)))).
+rewrite <- Heq.
+apply map_hygiene; auto.
+}
+
 (* kinterp *)
 {
 intros pg s i k k' K Hcl Hsteps _ IH l IHo Hrest.
@@ -2884,10 +2956,10 @@ rewrite <- restrict_ext.
 apply restriction_oper.
 apply restriction_cons.
   {
-  fold (restrict_term w (fromsp stop gpg (approx j K))).
+  fold (restrict_term w (fromsp stop gpg (Model.approx j K))).
   rewrite -> restrict_extend.
   so (kinterp_level_bound _#5 Hintk) as HlevK.
-  assert (level (approx j K) << w) as HlevKw.
+  assert (level (Model.approx j K) << w) as HlevKw.
     {
     eapply le_lt_ord_trans.
       {
@@ -2951,10 +3023,10 @@ rewrite <- restrict_ext.
 apply restriction_oper.
 apply restriction_cons.
   {
-  fold (restrict_term w (fromsp stop gpg (approx j K))).
+  fold (restrict_term w (fromsp stop gpg (Model.approx j K))).
   rewrite -> restrict_extend.
   so (kinterp_level_bound _#5 Hintk) as HlevK.
-  assert (level (approx j K) << w) as HlevKw.
+  assert (level (Model.approx j K) << w) as HlevKw.
     {
     eapply le_lt_ord_trans.
       {
@@ -3046,6 +3118,21 @@ apply interp_rec.
 so (IH _ IHo Hwc Hw) as H.
 simpmapin H.
 exact H.
+}
+
+(* halts *)
+{
+intros pg s i m Hcl w IHo Hwc Hw.
+simpmap.
+replace (halts_urel stop i m) with (halts_urel stop i (map_term (restrict w) m)).
+2:{
+  apply property_urel_extensionality; auto.
+  intros j Hj.
+  symmetry.
+  apply map_converges_iff.
+  }
+apply interp_halts.
+apply map_hygiene; auto.
 }
 
 (* kinterp *)

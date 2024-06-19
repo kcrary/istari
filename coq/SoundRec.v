@@ -34,6 +34,10 @@ Require Import SemanticsUniv.
 Require Import SoundFut.
 Require Import Defined.
 Require Import PageType.
+Require Import SemanticsPartial.
+Require Import SoundPartialUtil.
+Require Import SemanticsProperty.
+Require Import Ceiling.
 
 
 Local Ltac prove_hygiene :=
@@ -784,5 +788,703 @@ exists R.
 do2 3 split; auto; simpsub;
 apply interp_eval_refl;
 apply interp_rec; simpsub; auto.
+}
+Qed.
+
+
+Lemma sound_rec_uptype :
+  forall G a,
+    pseq (hyp_tml (uptype (var 0)) :: hyp_tpl :: G) (deq triv triv (uptype (subst sh1 a)))
+    -> pseq G (deq triv triv (uptype (rec a))).
+Proof.
+intros G a.
+revert G.
+refine (seq_pseq 1 [hyp_emp] a 1 [_; _] _ _ _); cbn.
+intros G Hcla Hseq.
+rewrite -> seq_uptype in Hseq |- *.
+intros i.
+induct i.
+
+(* 0 *)
+{
+intros s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+assert (pwctx 0 (dot triv (dot (rec (subst (under 1 s) a)) s)) (dot triv (dot (rec (subst (under 1 s') a)) s')) (hyp_tml (uptype (var 0)) :: hyp_tpl :: G)) as Hsa.
+  {
+  apply pwctx_cons_tml_seq; try prove_hygiene.
+    {
+    apply pwctx_cons_tpl; auto; try omega;
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
+    }
+  
+    {
+    omega.
+    }
+
+    {
+    intros i tt tt' Htt.
+    cbn in Htt.
+    invertc Htt.
+    intros b c t t' Ht Hmp _ _ <- <-.
+    simpsubin Hmp.
+    invertc Hmp.
+    intros R Hl Hr .
+    exists toppg, (iuuptype stop i R).
+    simpsub.
+    split; apply interp_eval_refl; apply interp_uptype; auto.
+    }
+  }
+so (Hseq _#3 Hsa) as (A & Hal & Har & Hupward).
+simpsubin Hal.
+simpsubin Har.
+exists A.
+simpsub.
+do2 2 split; auto.
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+}
+
+(* S *)
+{
+intros i IH s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (pwctx_downward _#5 (Nat.le_succ_diag_r i) Hs) as Hsi.
+so (IH _ _ Hsi) as (Ri & Hali & Hari & Hupwardi).
+clear IH.
+simpsubin Hali.
+simpsubin Hari.
+assert (pwctx (S i) (dot triv (dot (rec (subst (under 1 s) a)) s)) (dot triv (dot (rec (subst (under 1 s') a)) s')) (hyp_tml (uptype (var 0)) :: hyp_tpl :: G)) as Hsa.
+  {
+  apply pwctx_cons_tml_seq; try prove_hygiene.
+    {
+    apply pwctx_cons_tpl; auto;
+    try (prove_hygiene; eapply subst_closub_under_permit; eauto; done).
+    intros _.
+    cbn [pred].
+    apply (seqhyp_tp _#3 Ri); auto.
+    }
+  
+    {
+    intros _.
+    simpsub.
+    cbn.
+    apply (seqhyp_tm _#5 (iuuptype stop i Ri)).
+      {
+      apply interp_eval_refl; apply interp_uptype; auto.
+      }
+
+      {
+      apply interp_eval_refl; apply interp_uptype; auto.
+      }
+    cbn.
+    apply property_action_triv; auto.
+    }
+
+    {
+    intros j tt tt' Htt.
+    cbn in Htt.
+    invertc Htt.
+    intros b c t t' Ht Hmp _ _ <- <-.
+    simpsubin Hmp.
+    invertc Hmp.
+    intros R Hl Hr .
+    exists toppg, (iuuptype stop j R).
+    simpsub.
+    split; apply interp_eval_refl; apply interp_uptype; auto.
+    }
+  }
+so (Hseq _#3 Hsa) as (A & Hal & Har & Hupward).
+simpsubin Hal.
+simpsubin Har.
+exists A.
+simpsub.
+do2 2 split; auto.
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+}
+Qed.
+
+
+Lemma sound_rec_uptype_univ :
+  forall G lv a,
+    pseq G (deq lv lv pagetp)
+    -> pseq (hyp_tml (univ lv) :: G) (deq a a (univ (subst sh1 lv)))
+    -> pseq (hyp_tml (uptype (var 0)) :: hyp_tml (univ lv) :: G) (deq triv triv (uptype (subst sh1 a)))
+    -> pseq G (deq triv triv (uptype (rec a))).
+Proof.
+intros G lv a.
+revert G.
+refine (seq_pseq 2 [] lv [hyp_emp] a 3 [] _ [_] _ [_; _] _ _ _); cbn.
+intros G Hcllv Hcla Hseqlv Hseqa Hseq.
+rewrite -> seq_deq in Hseqlv.
+rewrite -> seq_univ in Hseqa.
+rewrite -> seq_uptype in Hseq |- *.
+eassert _ as Hlv; [refine (seq_pagetp_invert G lv _) |].
+  {
+  intros i t t' Ht.
+  so (Hseqlv _#3 Ht) as (R & Hl & _ & Hlv & _).
+  eauto.
+  }
+intros i.
+cut (forall s s',
+       pwctx i s s' G
+       -> exists pg A,
+            pginterp (subst s lv) pg
+            /\ pginterp (subst s' lv) pg
+            /\ interp pg true i (subst s (rec a)) A
+            /\ interp pg false i (subst s' (rec a)) A
+            /\ upward stop (ceiling (S i) (den A))).
+  {
+  intro H.
+  intros s s' Hs.
+  so (H _ _ Hs) as (pg & A & Hlvl & Hlvr & Hal & Har & Hupward).
+  exists A.
+  do2 2 split; auto.
+    {
+    eapply interp_increase; eauto.
+    apply toppg_max.
+    }
+
+    {
+    eapply interp_increase; eauto.
+    apply toppg_max.
+    }
+  }
+induct i.
+
+(* 0 *)
+{
+intros s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (Hlv _#3 Hs) as (pg & Hlvl & Hlvr).
+assert (pwctx 0 (dot (rec (subst (under 1 s) a)) s) (dot (rec (subst (under 1 s') a)) s') (cons (hyp_tml (univ lv)) G)) as Hss.
+  {
+  apply pwctx_cons_tml; auto; prove_hygiene; 
+  try (eapply subst_closub_under_permit; eauto);
+  intros; omega.
+  }
+assert (pwctx 0 (dot triv (dot (rec (subst (under 1 s) a)) s)) (dot triv (dot (rec (subst (under 1 s') a)) s')) (hyp_tml (uptype (var 0)) :: hyp_tml (univ lv) :: G)) as Hssa.
+  {
+  apply pwctx_cons_tml_seq; try prove_hygiene.
+    {
+    omega.
+    }
+
+    {
+    intros i tt tt' Htt.
+    cbn in Htt.
+    invertc Htt.
+    intros b c t t' Ht Hmp _ _ <- <-.
+    simpsubin Hmp.
+    invertc Hmp.
+    intros R Hunivl Hunivr Hbc.
+    simpsub.
+    invert (basic_value_inv _#6 value_univ Hunivl).
+    intros pg' Hlvl' _ _ <-.
+    cbn in Hbc.
+    invert Hbc.
+    intros _ (B & Hb & Hc).
+    rewrite -> sint_unroll in Hb, Hc.
+    exists pg', (iuuptype stop i B).
+    split; apply interp_eval_refl; apply interp_uptype; auto.
+    }
+  }
+so (Hseqa _#3 Hss) as (pg' & A & Hlvl' & _ & Hal & Har & _).
+simpsubin Hlvl'.
+so (pginterp_fun _#3 Hlvl Hlvl').
+subst pg'.
+simpsubin Hal.
+simpsubin Har.
+so (Hseq _#3 Hssa) as (A' & Hal' & _ & Hupward).
+simpsubin Hal'.
+so (interp_fun _#7 Hal Hal').
+subst A'.
+exists pg, A.
+simpsub.
+do2 4 split; auto.
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+}
+
+(* S *)
+{
+intros i IH s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (pwctx_downward _#5 (Nat.le_succ_diag_r i) Hs) as Hsi.
+so (IH _ _ Hsi) as (pg & Ri & Hlvl & Hlvr & Hali & Hari & Hupwardi).
+clear IH.
+simpsubin Hali.
+simpsubin Hari.
+assert (pwctx (S i) (dot (rec (subst (under 1 s) a)) s) (dot (rec (subst (under 1 s') a)) s') (cons (hyp_tml (univ lv)) G)) as Hss.
+  {
+  apply pwctx_cons_tml; auto;
+  try (prove_hygiene; eapply subst_closub_under_permit; eauto; done).
+    {
+    intros _.
+    cbn [pred].
+    apply (seqhyp_tm _#5 (iuuniv the_system i pg)); simpsub; auto;
+    try (apply interp_eval_refl; apply interp_univ; eauto using pginterp_str_top, pginterp_cex_top; done).
+    split; auto.
+    exists Ri.
+    rewrite -> sint_unroll; auto.
+    }
+
+    {
+    intros j u Hj Hu.
+    so (Hlv _#3 Hu) as (pg' & Hlvl' & Hlvu).
+    so (pginterp_fun _#3 Hlvl Hlvl'); subst pg'.
+    apply (relhyp_tm _#4 (iuuniv the_system j pg)); simpsub; auto;
+    apply interp_eval_refl; apply interp_univ; eauto using pginterp_str_top, pginterp_cex_top.
+    }
+
+    {
+    intros j u Hj Hu.
+    so (Hlv _#3 Hu) as (pg' & Hlvu & Hlvr').
+    so (pginterp_fun _#3 Hlvr Hlvr'); subst pg'.
+    apply (relhyp_tm _#4 (iuuniv the_system j pg)); simpsub; auto;
+    apply interp_eval_refl; apply interp_univ; eauto using pginterp_str_top, pginterp_cex_top.
+    }
+  }
+assert (pwctx (S i) (dot triv (dot (rec (subst (under 1 s) a)) s)) (dot triv (dot (rec (subst (under 1 s') a)) s')) (hyp_tml (uptype (var 0)) :: hyp_tml (univ lv) :: G)) as Hssa.
+  {
+  apply pwctx_cons_tml_seq; try prove_hygiene.
+    {
+    intros _.
+    simpsub.
+    cbn.
+    apply (seqhyp_tm _#5 (iuuptype stop i Ri)).
+      {
+      apply (interp_increase pg); auto using toppg_max.
+      apply interp_eval_refl; apply interp_uptype; auto.
+      }
+
+      {
+      apply (interp_increase pg); auto using toppg_max.
+      apply interp_eval_refl; apply interp_uptype; auto.
+      }
+    cbn.
+    apply property_action_triv; auto.
+    }
+
+    {
+    intros j tt tt' Htt.
+    cbn in Htt.
+    invertc Htt.
+    intros b c t t' Ht Hmp _ _ <- <-.
+    simpsubin Hmp.
+    invertc Hmp.
+    intros R Hunivl Hunivr Hbc.
+    simpsub.
+    invert (basic_value_inv _#6 value_univ Hunivl).
+    intros pg' Hlvl' _ _ <-.
+    cbn in Hbc.
+    invert Hbc.
+    intros _ (B & Hb & Hc).
+    rewrite -> sint_unroll in Hb, Hc.
+    exists pg', (iuuptype stop j B).
+    split; apply interp_eval_refl; apply interp_uptype; auto.
+    }
+  }
+so (Hseqa _#3 Hss) as (pg' & A & Hlvl' & _ & Hal & Har & _).
+simpsubin Hal.
+simpsubin Har.
+simpsubin Hlvl'.
+so (pginterp_fun _#3 Hlvl Hlvl').
+subst pg'.
+so (Hseq _#3 Hssa) as (A' & Hal' & _ & Hupward).
+simpsubin Hal'.
+so (interp_fun _#7 Hal Hal').
+subst A'.
+exists pg, A.
+simpsub.
+do2 4 split; auto.
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+}
+Qed.
+
+
+(* virtually identical to sound_rec_uptype *)
+Lemma sound_rec_admiss :
+  forall G a,
+    pseq (hyp_tml (admiss (var 0)) :: hyp_tpl :: G) (deq triv triv (admiss (subst sh1 a)))
+    -> pseq G (deq triv triv (admiss (rec a))).
+Proof.
+intros G a.
+revert G.
+refine (seq_pseq 1 [hyp_emp] a 1 [_; _] _ _ _); cbn.
+intros G Hcla Hseq.
+rewrite -> seq_admiss in Hseq |- *.
+intros i.
+induct i.
+
+(* 0 *)
+{
+intros s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+assert (pwctx 0 (dot triv (dot (rec (subst (under 1 s) a)) s)) (dot triv (dot (rec (subst (under 1 s') a)) s')) (hyp_tml (admiss (var 0)) :: hyp_tpl :: G)) as Hsa.
+  {
+  apply pwctx_cons_tml_seq; try prove_hygiene.
+    {
+    apply pwctx_cons_tpl; auto; try omega;
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
+    }
+  
+    {
+    omega.
+    }
+
+    {
+    intros i tt tt' Htt.
+    cbn in Htt.
+    invertc Htt.
+    intros b c t t' Ht Hmp _ _ <- <-.
+    simpsubin Hmp.
+    invertc Hmp.
+    intros R Hl Hr .
+    exists toppg, (iuadmiss stop i R).
+    simpsub.
+    split; apply interp_eval_refl; apply interp_admiss; auto.
+    }
+  }
+so (Hseq _#3 Hsa) as (A & Hal & Har & Hadmiss).
+simpsubin Hal.
+simpsubin Har.
+exists A.
+simpsub.
+do2 2 split; auto.
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+}
+
+(* S *)
+{
+intros i IH s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (pwctx_downward _#5 (Nat.le_succ_diag_r i) Hs) as Hsi.
+so (IH _ _ Hsi) as (Ri & Hali & Hari & Hadmissi).
+clear IH.
+simpsubin Hali.
+simpsubin Hari.
+assert (pwctx (S i) (dot triv (dot (rec (subst (under 1 s) a)) s)) (dot triv (dot (rec (subst (under 1 s') a)) s')) (hyp_tml (admiss (var 0)) :: hyp_tpl :: G)) as Hsa.
+  {
+  apply pwctx_cons_tml_seq; try prove_hygiene.
+    {
+    apply pwctx_cons_tpl; auto;
+    try (prove_hygiene; eapply subst_closub_under_permit; eauto; done).
+    intros _.
+    cbn [pred].
+    apply (seqhyp_tp _#3 Ri); auto.
+    }
+  
+    {
+    intros _.
+    simpsub.
+    cbn.
+    apply (seqhyp_tm _#5 (iuadmiss stop i Ri)).
+      {
+      apply interp_eval_refl; apply interp_admiss; auto.
+      }
+
+      {
+      apply interp_eval_refl; apply interp_admiss; auto.
+      }
+    cbn.
+    apply property_action_triv; auto.
+    }
+
+    {
+    intros j tt tt' Htt.
+    cbn in Htt.
+    invertc Htt.
+    intros b c t t' Ht Hmp _ _ <- <-.
+    simpsubin Hmp.
+    invertc Hmp.
+    intros R Hl Hr .
+    exists toppg, (iuadmiss stop j R).
+    simpsub.
+    split; apply interp_eval_refl; apply interp_admiss; auto.
+    }
+  }
+so (Hseq _#3 Hsa) as (A & Hal & Har & Hadmiss).
+simpsubin Hal.
+simpsubin Har.
+exists A.
+simpsub.
+do2 2 split; auto.
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+}
+Qed.
+
+
+(* virtually identical to sound_rec_uptype_univ *)
+Lemma sound_rec_admiss_univ :
+  forall G lv a,
+    pseq G (deq lv lv pagetp)
+    -> pseq (hyp_tml (univ lv) :: G) (deq a a (univ (subst sh1 lv)))
+    -> pseq (hyp_tml (admiss (var 0)) :: hyp_tml (univ lv) :: G) (deq triv triv (admiss (subst sh1 a)))
+    -> pseq G (deq triv triv (admiss (rec a))).
+Proof.
+intros G lv a.
+revert G.
+refine (seq_pseq 2 [] lv [hyp_emp] a 3 [] _ [_] _ [_; _] _ _ _); cbn.
+intros G Hcllv Hcla Hseqlv Hseqa Hseq.
+rewrite -> seq_deq in Hseqlv.
+rewrite -> seq_univ in Hseqa.
+rewrite -> seq_admiss in Hseq |- *.
+eassert _ as Hlv; [refine (seq_pagetp_invert G lv _) |].
+  {
+  intros i t t' Ht.
+  so (Hseqlv _#3 Ht) as (R & Hl & _ & Hlv & _).
+  eauto.
+  }
+intros i.
+cut (forall s s',
+       pwctx i s s' G
+       -> exists pg A,
+            pginterp (subst s lv) pg
+            /\ pginterp (subst s' lv) pg
+            /\ interp pg true i (subst s (rec a)) A
+            /\ interp pg false i (subst s' (rec a)) A
+            /\ admissible stop (ceiling (S i) (den A))).
+  {
+  intro H.
+  intros s s' Hs.
+  so (H _ _ Hs) as (pg & A & Hlvl & Hlvr & Hal & Har & Hupward).
+  exists A.
+  do2 2 split; auto.
+    {
+    eapply interp_increase; eauto.
+    apply toppg_max.
+    }
+
+    {
+    eapply interp_increase; eauto.
+    apply toppg_max.
+    }
+  }
+induct i.
+
+(* 0 *)
+{
+intros s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (Hlv _#3 Hs) as (pg & Hlvl & Hlvr).
+assert (pwctx 0 (dot (rec (subst (under 1 s) a)) s) (dot (rec (subst (under 1 s') a)) s') (cons (hyp_tml (univ lv)) G)) as Hss.
+  {
+  apply pwctx_cons_tml; auto; prove_hygiene; 
+  try (eapply subst_closub_under_permit; eauto);
+  intros; omega.
+  }
+assert (pwctx 0 (dot triv (dot (rec (subst (under 1 s) a)) s)) (dot triv (dot (rec (subst (under 1 s') a)) s')) (hyp_tml (admiss (var 0)) :: hyp_tml (univ lv) :: G)) as Hssa.
+  {
+  apply pwctx_cons_tml_seq; try prove_hygiene.
+    {
+    omega.
+    }
+
+    {
+    intros i tt tt' Htt.
+    cbn in Htt.
+    invertc Htt.
+    intros b c t t' Ht Hmp _ _ <- <-.
+    simpsubin Hmp.
+    invertc Hmp.
+    intros R Hunivl Hunivr Hbc.
+    simpsub.
+    invert (basic_value_inv _#6 value_univ Hunivl).
+    intros pg' Hlvl' _ _ <-.
+    cbn in Hbc.
+    invert Hbc.
+    intros _ (B & Hb & Hc).
+    rewrite -> sint_unroll in Hb, Hc.
+    exists pg', (iuadmiss stop i B).
+    split; apply interp_eval_refl; apply interp_admiss; auto.
+    }
+  }
+so (Hseqa _#3 Hss) as (pg' & A & Hlvl' & _ & Hal & Har & _).
+simpsubin Hlvl'.
+so (pginterp_fun _#3 Hlvl Hlvl').
+subst pg'.
+simpsubin Hal.
+simpsubin Har.
+so (Hseq _#3 Hssa) as (A' & Hal' & _ & Hupward).
+simpsubin Hal'.
+so (interp_fun _#7 Hal Hal').
+subst A'.
+exists pg, A.
+simpsub.
+do2 4 split; auto.
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+}
+
+(* S *)
+{
+intros i IH s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (pwctx_downward _#5 (Nat.le_succ_diag_r i) Hs) as Hsi.
+so (IH _ _ Hsi) as (pg & Ri & Hlvl & Hlvr & Hali & Hari & Hupwardi).
+clear IH.
+simpsubin Hali.
+simpsubin Hari.
+assert (pwctx (S i) (dot (rec (subst (under 1 s) a)) s) (dot (rec (subst (under 1 s') a)) s') (cons (hyp_tml (univ lv)) G)) as Hss.
+  {
+  apply pwctx_cons_tml; auto;
+  try (prove_hygiene; eapply subst_closub_under_permit; eauto; done).
+    {
+    intros _.
+    cbn [pred].
+    apply (seqhyp_tm _#5 (iuuniv the_system i pg)); simpsub; auto;
+    try (apply interp_eval_refl; apply interp_univ; eauto using pginterp_str_top, pginterp_cex_top; done).
+    split; auto.
+    exists Ri.
+    rewrite -> sint_unroll; auto.
+    }
+
+    {
+    intros j u Hj Hu.
+    so (Hlv _#3 Hu) as (pg' & Hlvl' & Hlvu).
+    so (pginterp_fun _#3 Hlvl Hlvl'); subst pg'.
+    apply (relhyp_tm _#4 (iuuniv the_system j pg)); simpsub; auto;
+    apply interp_eval_refl; apply interp_univ; eauto using pginterp_str_top, pginterp_cex_top.
+    }
+
+    {
+    intros j u Hj Hu.
+    so (Hlv _#3 Hu) as (pg' & Hlvu & Hlvr').
+    so (pginterp_fun _#3 Hlvr Hlvr'); subst pg'.
+    apply (relhyp_tm _#4 (iuuniv the_system j pg)); simpsub; auto;
+    apply interp_eval_refl; apply interp_univ; eauto using pginterp_str_top, pginterp_cex_top.
+    }
+  }
+assert (pwctx (S i) (dot triv (dot (rec (subst (under 1 s) a)) s)) (dot triv (dot (rec (subst (under 1 s') a)) s')) (hyp_tml (admiss (var 0)) :: hyp_tml (univ lv) :: G)) as Hssa.
+  {
+  apply pwctx_cons_tml_seq; try prove_hygiene.
+    {
+    intros _.
+    simpsub.
+    cbn.
+    apply (seqhyp_tm _#5 (iuadmiss stop i Ri)).
+      {
+      apply (interp_increase pg); auto using toppg_max.
+      apply interp_eval_refl; apply interp_admiss; auto.
+      }
+
+      {
+      apply (interp_increase pg); auto using toppg_max.
+      apply interp_eval_refl; apply interp_admiss; auto.
+      }
+    cbn.
+    apply property_action_triv; auto.
+    }
+
+    {
+    intros j tt tt' Htt.
+    cbn in Htt.
+    invertc Htt.
+    intros b c t t' Ht Hmp _ _ <- <-.
+    simpsubin Hmp.
+    invertc Hmp.
+    intros R Hunivl Hunivr Hbc.
+    simpsub.
+    invert (basic_value_inv _#6 value_univ Hunivl).
+    intros pg' Hlvl' _ _ <-.
+    cbn in Hbc.
+    invert Hbc.
+    intros _ (B & Hb & Hc).
+    rewrite -> sint_unroll in Hb, Hc.
+    exists pg', (iuadmiss stop j B).
+    split; apply interp_eval_refl; apply interp_admiss; auto.
+    }
+  }
+so (Hseqa _#3 Hss) as (pg' & A & Hlvl' & _ & Hal & Har & _).
+simpsubin Hal.
+simpsubin Har.
+simpsubin Hlvl'.
+so (pginterp_fun _#3 Hlvl Hlvl').
+subst pg'.
+so (Hseq _#3 Hssa) as (A' & Hal' & _ & Hupward).
+simpsubin Hal'.
+so (interp_fun _#7 Hal Hal').
+subst A'.
+exists pg, A.
+simpsub.
+do2 4 split; auto.
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
 }
 Qed.

@@ -9,6 +9,7 @@ Require Import SimpSub.
 Require Import Promote.
 Require Import Judgement.
 Require Import Hygiene.
+Require Import SoundAdmiss.
 Require Import SoundAll.
 Require Import SoundEqtype.
 Require Import SoundEqual.
@@ -19,10 +20,12 @@ Require Import SoundHyp.
 Require Import SoundKind.
 Require Import SoundMisc.
 Require Import SoundMu.
+Require Import SoundPartial.
 Require Import SoundPi.
 Require Import SoundPositive.
 Require Import SoundQuotient.
 Require Import SoundRec.
+Require Import SoundSequal.
 Require Import SoundSet.
 Require Import SoundSigma.
 Require Import SoundSimple.
@@ -233,6 +236,7 @@ intros; eapply sound_subtype_elim; eauto; done.
 intros; eapply sound_subtype_eta; eauto; done.
 intros; eapply sound_subtype_eta_hyp; eauto; done.
 intros; eapply sound_subtype_convert_hyp; eauto; done.
+intros; eapply sound_tighten; eauto; done.
 intros; eapply sound_subtype_formation_invert1; eauto; done.
 intros; eapply sound_subtype_formation_invert2; eauto; done.
 intros; eapply sound_substitution; eauto; done.
@@ -244,12 +248,83 @@ intros; eapply sound_functionality_type_term; eauto; done.
 intros; eapply sound_functionality_type_type; eauto; done.
 intros; eapply sound_compute; eauto; done.
 intros; eapply sound_compute_hyp; eauto; done.
+intros; eapply sound_sequal_formation; eauto; done.
+intros; eapply sound_sequal_intro; eauto; done.
+intros; eapply sound_sequal_eta; eauto; done.
+intros; eapply sound_sequal_eta_hyp; eauto; done.
+intros; eapply sound_sequal_equal; eauto; done.
+intros; eapply sound_sequal_eqtype; eauto; done.
+intros; eapply sound_syntactic_substitution; eauto; done.
+intros; eapply sound_sequal_symm; eauto; done.
+intros; eapply sound_sequal_trans; eauto; done.
+intros; eapply sound_sequal_compat; eauto; done.
 intros; eapply sound_symmetry; eauto; done.
 intros; eapply sound_transitivity; eauto; done.
 intros; eapply sound_weakening; eauto; done.
 intros; eapply sound_contraction; eauto; done.
 intros; eapply sound_exchange; eauto; done.
 intros; eapply sound_inhabitation_formation; eauto; done.
+intros; eapply sound_partial_formation; eauto; done.
+intros; eapply sound_partial_formation_univ; eauto; done.
+intros; eapply sound_partial_covariant; eauto; done.
+intros; eapply sound_partial_strict; eauto; done.
+intros; eapply sound_partial_strict_converse; eauto; done.
+intros; eapply sound_halts_formation; eauto; done.
+intros; eapply sound_halts_formation_univ; eauto; done.
+intros; eapply sound_bottom_partial_void; eauto; done.
+intros; eapply sound_partial_ext; eauto; done.
+intros; eapply sound_partial_elim; eauto; done.
+intros; eapply sound_halts_eta; eauto; done.
+intros; eapply sound_halts_eta_hyp; eauto; done.
+intros; eapply sound_fixpoint_induction; eauto; done.
+intros; eapply sound_partial_formation_invert; eauto; done.
+intros; eapply sound_seq_bind; eauto; done.
+intros; eapply sound_seq_active; eauto; done.
+intros; eapply sound_active_halts_invert; eauto; done.
+intros; eapply sound_seq_halts_sequal; eauto; done.
+intros; eapply sound_total_strict; eauto; done.
+intros; eapply sound_unittp_total; eauto; done.
+intros; eapply sound_booltp_total; eauto; done.
+intros; eapply sound_pi_total; eauto; done.
+intros; eapply sound_intersect_strict; eauto; done.
+intros; eapply sound_sigma_total; eauto; done.
+intros; eapply sound_fut_total; eauto; done.
+intros; eapply sound_set_strict; eauto; done.
+intros; eapply sound_iset_strict; eauto; done.
+intros; eapply sound_type_halt; eauto; done.
+intros; eapply sound_uptype_formation; eauto; done.
+intros; eapply sound_uptype_formation_univ; eauto; done.
+intros; eapply sound_uptype_eta; eauto; done.
+intros; eapply sound_uptype_eta_hyp; eauto; done.
+intros; eapply sound_uptype_eeqtp; eauto; done.
+intros; eapply sound_unitary_uptype; eauto; done.
+intros; eapply sound_booltp_uptype; eauto; done.
+intros; eapply sound_pi_uptype; eauto; done.
+intros; eapply sound_intersect_uptype; eauto; done.
+intros; eapply sound_sigma_uptype; eauto; done.
+intros; eapply sound_fut_uptype; eauto; done.
+intros; eapply sound_set_uptype; eauto; done.
+intros; eapply sound_iset_uptype; eauto; done.
+intros; eapply sound_mu_uptype; eauto; done.
+intros; eapply sound_mu_uptype_univ; eauto; done.
+intros; eapply sound_rec_uptype; eauto; done.
+intros; eapply sound_rec_uptype_univ; eauto; done.
+intros; eapply sound_uptype_formation_invert; eauto; done.
+intros; eapply sound_admiss_formation; eauto; done.
+intros; eapply sound_admiss_formation_univ; eauto; done.
+intros; eapply sound_admiss_eta; eauto; done.
+intros; eapply sound_admiss_eta_hyp; eauto; done.
+intros; eapply sound_admiss_eeqtp; eauto; done.
+intros; eapply sound_uptype_admiss; eauto; done.
+intros; eapply sound_partial_admiss; eauto; done.
+intros; eapply sound_pi_admiss; eauto; done.
+intros; eapply sound_intersect_admiss; eauto; done.
+intros; eapply sound_prod_admiss; eauto; done.
+intros; eapply sound_sigma_uptype_admiss; eauto; done.
+intros; eapply sound_fut_admiss; eauto; done.
+intros; eapply sound_rec_admiss; eauto; done.
+intros; eapply sound_rec_admiss_univ; eauto; done.
+intros; eapply sound_admiss_formation_invert; eauto; done.
 Qed.
 
 

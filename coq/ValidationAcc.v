@@ -155,7 +155,7 @@ eapply star_trans.
   eapply star_trans.
     {
     apply (star_map' _ _ (fun z => app z _)); auto using step_app1.
-    apply PageType.theta_fix.
+    apply PageCode.theta_fix.
     }
   eapply star_step.
     {

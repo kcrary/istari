@@ -42,6 +42,7 @@ Require Import SemanticsSigma.
 Require Import SemanticsSimple.
 Require Import SemanticsSubtype.
 Require Import SemanticsEqtype.
+Require Import SemanticsPartial.
 Require Import ExtSpace.
 Require Import PreSpacify.
 Require Import Lattice.
@@ -916,6 +917,41 @@ intros pg s i m gpg h Hm Hlt j Hj.
 rewrite -> iutruncate_iukind.
 rewrite -> Nat.min_r; auto.
 apply interp_kind; auto.
+}
+
+(* partial *)
+{
+intros pg s i a A _ IH j Hj.
+rewrite -> iutruncate_iupartial.
+setoid_rewrite <- (Nat.min_r i j) at 1; auto.
+apply interp_partial.
+rewrite -> Nat.min_r; auto.
+}
+
+(* halts *)
+{
+intros pg s i m Hclm j Hj.
+rewrite -> iutruncate_iubase.
+unfold halts_urel.
+rewrite -> ceiling_property.
+rewrite -> Nat.min_r; auto.
+apply interp_halts; auto.
+}
+
+(* admiss *)
+{
+intros pg s i a A _ IH j Hj.
+rewrite -> iutruncate_iuadmiss.
+rewrite -> Nat.min_r; auto.
+apply interp_admiss; auto.
+}
+
+(* uptype *)
+{
+intros pg s i a A _ IH j Hj.
+rewrite -> iutruncate_iuuptype.
+rewrite -> Nat.min_r; auto.
+apply interp_uptype; auto.
 }
 
 (* kbasic *)

@@ -46,6 +46,9 @@ Require Import PageType.
 Require Import SemanticsUniv.
 Require Import Lattice.
 Require Import SoundPositive.
+Require Import Approximation.
+Require Import SemanticsPartial.
+Require Import SoundPartialUtil.
 
 
 Lemma lfp_is_mu_urel :
@@ -3818,4 +3821,522 @@ so (interp_fun _#7 Hl' (basic_downward _#7 Hk Hl)); subst R''.
 so (interp_fun _#7 Hrt Hrt'); subst R'.
 do2 2 split; auto.
 apply (urel_downward_leq _#3 j); auto.
+Qed.
+
+
+Definition upcore_action w (A : wurel w) :=
+  fun i m p =>
+    hygiene clo m
+    /\ hygiene clo p
+    /\ forall m' p',
+         sapprox m m'
+         -> sapprox p p'
+         -> rel A i m' p'.
+
+
+Lemma upcore_uniform :
+  forall w A, uniform _ (upcore_action w A).
+Proof.
+intros w A.
+do2 3 split.
+
+(* closed *)
+{
+intros i m n H.
+destruct H as (Hcl & Hcl' & _).
+auto.
+}
+
+(* equiv *)
+{
+intros i m m' n n' Hclm' Hcln' Hequivm Hequivn (Hclm & Hcln & Hact).
+do2 2 split; auto.
+intros m'' p'' Happroxm Happroxp.
+apply Hact.
+  {
+  eapply sapprox_trans; eauto.
+  apply equiv_sapprox; auto.
+  }
+
+  {
+  eapply sapprox_trans; eauto.
+  apply equiv_sapprox; auto.
+  }
+}
+
+(* zigzag *)
+{
+intros i m p n q Hmp Hnp Hnq.
+destruct Hmp as (Hclm & Hclp & Hmp).
+destruct Hnp as (Hcln & _ & Hnp).
+destruct Hnq as (_ & Hclq & Hnq).
+do2 2 split; auto.
+intros m' q' Happroxm Happroxq.
+apply (urel_zigzag _ _ _ _ p n).
+  {
+  apply Hmp; auto using sapprox_refl.
+  }
+
+  {
+  apply Hnp; auto using sapprox_refl.
+  }
+
+  {
+  apply Hnq; auto using sapprox_refl.
+  }
+}
+
+(* downward *)
+{
+intros i m n (Hclm & Hcln & Hact).
+do2 2 split; auto.
+intros m' n' Happroxm Happroxn.
+apply urel_downward.
+apply Hact; auto.
+}
+Qed.
+
+
+Definition upcore w A := (mk_urel _ (upcore_uniform w A)).
+
+
+Lemma sound_mu_uptype :
+  forall G a,
+    pseq (cons hyp_tp G) (deqtype a a)
+    -> pseq G (deq triv triv (ispositive a))
+    -> pseq (hyp_tm (uptype (var 0)) :: hyp_tp :: G) (deq triv triv (uptype (subst sh1 a)))
+    -> pseq G (deq triv triv (uptype (mu a))).
+Proof.
+intros G a.
+revert G.
+refine (seq_pseq 1 [hyp_tp] a 3 [_] _ [] _ [_; _] _ _ _); cbn.
+intros G Hcla Hseqa Hisrob Hsequpward.
+rewrite -> seq_eqtype in Hseqa.
+rewrite -> seq_ispositive in Hisrob; auto.
+rewrite -> seq_uptype in Hsequpward |- *.
+intros i s s' Hs.
+simpsub.
+exploit (extract_ind toppg i (subst (under 1 s) a) (subst (under 1 s') a)) as H.
+  {
+  intros j X Y h Hj HXY.
+  so (pwctx_cons_exttin top j X Y h s s' G (le_ord_refl _) HXY (pwctx_downward _#5 Hj Hs)) as Hss.
+  so (Hseqa _ _ _ Hss) as (R & Hal & Har & _).
+  exists R.
+  simpsub.
+  auto.
+  }
+destruct H as (F & HF).
+assert (nonexpansive (fun X => den (pi1 F X))) as Hne.
+  {
+  apply compose_ne_ne; auto using den_nonexpansive.
+  exact (pi2 F).
+  }
+assert (monotone (fun X => den (pi1 F X))) as HmonoF.
+  {
+  refine (monotone_from_ispositive _#4 Hisrob _#3 Hs _).
+  intros X h h'.
+  so (HF X h h') as (H & _).
+  simpsubin H.
+  exact H.
+  }
+exists (iubase (extend_urel top stop (mu_urel top (fun X => den (pi1 F X))))).
+do2 2 split.
+  {
+  apply interp_eval_refl.
+  apply interp_mu; auto using le_ord_refl.
+    {
+    intros X h.
+    simpsub.
+    so (HF X h (lt_ord_impl_le_ord _ _ h)) as (H & _).
+    simpsubin H.
+    exact H.
+    }
+
+    {
+    exact (positive_impl_robust _#3 (Hisrob _#3 Hs andel)).
+    }
+  }
+
+  {
+  apply interp_eval_refl.
+  apply interp_mu; auto using le_ord_refl.
+    {
+    intros X h.
+    simpsub.
+    so (HF X h (lt_ord_impl_le_ord _ _ h)) as (_ & H).
+    simpsubin H.
+    exact H.
+    }
+
+    {
+    exact (positive_impl_robust _#3 (Hisrob _#3 Hs ander)).
+    }
+  }
+intros j m m' p p' Happroxm Happroxp Hmp.
+destruct Hmp as (Hj & Hmp).
+split; auto.
+cbn -[mu_urel] in Hmp |- *.
+exploit (Hmp (upcore top (mu_urel top (fun X => den (pi1 F X))))) as H.
+2:{
+  destruct H as (_ & _ & Hact).
+  apply Hact; auto using map_sapprox.
+  }
+clear j m m' p p' Happroxm Happroxp Hj Hmp.
+intros j m p Hmp.
+so (urel_closed _#5 Hmp) as (Hclm & Hclp).
+do2 2 split; auto.
+intros m' p' Happroxm Happroxp.
+apply mu_action_intro; auto.
+set (h := le_ord_refl stop).
+set (h' := lt_ord_impl_le_ord _ _ h).
+assert (pwctx i
+          (dot triv (dot (exttin top (upcore top (mu_urel top (fun X => den (pi1 F X)))) h) s)) 
+          (dot triv (dot (exttin top (upcore top (mu_urel top (fun X => den (pi1 F X)))) h) s')) 
+          (hyp_tm (uptype (var 0)) :: hyp_tp :: G)) as Hss.
+  {
+  cbn.
+  apply pwctx_cons_tm_seq.
+    {
+    apply pwctx_cons_exttin; auto using le_ord_refl.
+    apply dist_refl.
+    }
+
+    {
+    simpsub.
+    apply (seqhyp_tm _#5 (iuuptype stop i (extend_iurel h' (iutruncate (S i) (iubase (upcore top (mu_urel top (fun X => den (pi1 F X))))))))).
+      {
+      apply interp_eval_refl.
+      apply interp_uptype.
+      apply interp_eval_refl.
+      apply interp_extt.
+      apply le_ord_refl.
+      }
+
+      {
+      apply interp_eval_refl.
+      apply interp_uptype.
+      apply interp_eval_refl.
+      apply interp_extt.
+      apply le_ord_refl.
+      }
+
+      {
+      cbn.
+      apply property_action_triv; auto.
+      unfold uptype_property.
+      rewrite <- ceiling_extend_urel.
+      rewrite -> ceiling_idem.
+      intros j' x x' y y' Hx Hy Hxy.
+      destruct Hxy as (Hj' & Hxy).
+      split; auto.
+      cbn in Hxy |- *.
+      destruct Hxy as (_ & _ & Hxy).
+      do2 2 split; auto.
+        {
+        apply map_hygiene.
+        exact (sapprox_closed _#3 Hx ander).
+        }
+
+        {
+        apply map_hygiene.
+        exact (sapprox_closed _#3 Hy ander).
+        }
+      intros x'' y'' Hx'' Hy''.
+      apply Hxy.
+        {
+        eapply sapprox_trans; eauto.
+        apply map_sapprox; auto.
+        }
+
+        {
+        eapply sapprox_trans; eauto.
+        apply map_sapprox; auto.
+        }
+      }
+    }
+
+    {
+    intros j' tt tt' Htt.
+    invert (pwctx_impl_seqctx _#4 Htt).
+    intros b b' t t' Ht Hb <- <-.
+    simpsubin Hb.
+    invertc Hb.
+    intros B Hbl Hbr.
+    exists toppg, (iuuptype stop j' B).
+    simpsub.
+    split.
+      {
+      apply interp_eval_refl.
+      apply interp_uptype; auto.
+      }
+
+      {
+      apply interp_eval_refl.
+      apply interp_uptype; auto.
+      }
+    }
+  }
+cbn in Hss.
+so (Hsequpward _#3 Hss) as (R & Hl & _ & Hupward).
+simpsubin Hl.
+so (HF (upcore top (mu_urel top (fun X => den (pi1 F X)))) h h') as (Hl' & _).
+cbn in Hl'.
+simpsubin Hl'.
+so (basic_fun _#7 Hl Hl'); subst R.
+so (f_equal den (basic_impl_iutruncate _#6 Hl)) as Heq.
+rewrite -> den_iutruncate in Heq.
+rewrite <- Heq in Hupward.
+clear Hl Hl' Heq.
+rewrite -> den_extend_iurel in Hupward.
+exploit (Hupward j (map_term (extend top stop) m) (map_term (extend top stop) m') (map_term (extend top stop) p) (map_term (extend top stop) p')) as Hmp'; auto using map_sapprox.
+  {
+  cbn.
+  rewrite -> !extend_term_cancel; auto using h.
+  }
+cbn in Hmp'.
+rewrite -> !extend_term_cancel in Hmp'; auto using h.
+eapply HmonoF; eauto.
+intros k x y Hxy.
+destruct Hxy as (Hclx & Hcly & Hact).
+apply Hact; auto using sapprox_refl.
+Qed.
+
+
+Lemma sound_mu_uptype_univ :
+  forall G lv a,
+    pseq G (deq lv lv pagetp)
+    -> pseq (hyp_tm (univ lv) :: G) (deq a a (univ (subst sh1 lv)))
+    -> pseq G (deq triv triv (ispositive a))
+    -> pseq (hyp_tm (uptype (var 0)) :: hyp_tm (univ lv) :: G) (deq triv triv (uptype (subst sh1 a)))
+    -> pseq G (deq triv triv (uptype (mu a))).
+Proof.
+intros G lv a.
+revert G.
+refine (seq_pseq 1 [hyp_tp] a 4 [] _ [_] _ [] _ [_; _] _ _ _); cbn.
+intros G Hcla Hseqlv Hseqa Hisrob Hsequpward.
+rewrite -> seq_deq in Hseqlv.
+rewrite -> seq_univ in Hseqa.
+eassert _ as Hlv; [refine (seq_pagetp_invert G lv _) |].
+  {
+  intros i t t' Ht.
+  so (Hseqlv _#3 Ht) as (R & Hl & _ & Hlv & _).
+  eauto.
+  }
+rewrite -> seq_ispositive in Hisrob; auto.
+rewrite -> seq_uptype in Hsequpward |- *.
+intros i s s' Hs.
+simpsub.
+so (Hlv _#3 Hs) as (pg & Hlvl & Hlvr).
+set (w := cin pg).
+exploit (extract_ind pg i (subst (under 1 s) a) (subst (under 1 s') a)) as H.
+  {
+  intros j X Y h Hj HXY.
+  exploit (pwctx_cons_exttin_univ pg w j X Y h lv s s' G) as Hss; auto.
+    {
+    apply le_ord_refl.
+    }
+
+    {
+    intros k t t' Hk Ht.
+    so (Hseqlv _#3 Ht) as (R & Hl & _ & Hlvlr & _).
+    simpsubin Hl.
+    fold (@pagetp (obj stop)) in Hl.
+    exact (interp_pagetp_invert _#7 Hl Hlvlr).
+    }
+
+    {
+    eapply pwctx_downward; eauto.
+    }
+  so (Hseqa _ _ _ Hss) as (pg' & R & Hlvl' & _ & Hal & Har & _).
+  simpsubin Hlvl'.
+  so (pginterp_fun _#3 Hlvl Hlvl'); subst pg'.
+  exists R.
+  simpsub.
+  auto.
+  }
+destruct H as (F & HF).
+assert (nonexpansive (fun X => den (pi1 F X))) as Hne.
+  {
+  apply compose_ne_ne; auto using den_nonexpansive.
+  exact (pi2 F).
+  }
+assert (monotone (fun X => den (pi1 F X))) as HmonoF.
+  {
+  refine (monotone_from_ispositive _#4 Hisrob _#3 Hs _).
+  intros X h h'.
+  so (HF X h h') as (H & _).
+  simpsubin H.
+  exact H.
+  }
+exists (iubase (extend_urel w stop (mu_urel w (fun X => den (pi1 F X))))).
+do2 2 split.
+  {
+  apply interp_eval_refl.
+  apply interp_mu; auto using cin_top.
+    {
+    intros X h.
+    simpsub.
+    so (HF X h (lt_ord_impl_le_ord _ _ h)) as (H & _).
+    simpsubin H.
+    eapply interp_increase; eauto using toppg_max.
+    }
+
+    {
+    exact (positive_impl_robust _#3 (Hisrob _#3 Hs andel)).
+    }
+  }
+
+  {
+  apply interp_eval_refl.
+  apply interp_mu; auto using cin_top.
+    {
+    intros X h.
+    simpsub.
+    so (HF X h (lt_ord_impl_le_ord _ _ h)) as (_ & H).
+    simpsubin H.
+    eapply interp_increase; eauto using toppg_max.
+    }
+
+    {
+    exact (positive_impl_robust _#3 (Hisrob _#3 Hs ander)).
+    }
+  }
+intros j m m' p p' Happroxm Happroxp Hmp.
+destruct Hmp as (Hj & Hmp).
+split; auto.
+cbn -[mu_urel] in Hmp |- *.
+exploit (Hmp (upcore w (mu_urel w (fun X => den (pi1 F X))))) as H.
+2:{
+  destruct H as (_ & _ & Hact).
+  apply Hact; auto using map_sapprox.
+  }
+clear j m m' p p' Happroxm Happroxp Hj Hmp.
+intros j m p Hmp.
+so (urel_closed _#5 Hmp) as (Hclm & Hclp).
+do2 2 split; auto.
+intros m' p' Happroxm Happroxp.
+apply mu_action_intro; auto.
+set (h := le_ord_succ _ _ (cin_top pg)).
+set (h' := lt_ord_impl_le_ord _ _ h).
+assert (pwctx i
+          (dot triv (dot (exttin w (upcore w (mu_urel w (fun X => den (pi1 F X)))) h) s)) 
+          (dot triv (dot (exttin w (upcore w (mu_urel w (fun X => den (pi1 F X)))) h) s')) 
+          (hyp_tm (uptype (var 0)) :: hyp_tm (univ lv) :: G)) as Hss.
+  {
+  cbn.
+  apply pwctx_cons_tm_seq.
+    {
+    apply (pwctx_cons_exttin_univ pg); auto using le_ord_refl.
+      {
+      intros j' t t' Hj' Ht.
+      eapply Hlv; eauto.
+      }
+
+      {
+      apply dist_refl.
+      }
+    }
+
+    {
+    simpsub.
+    apply (seqhyp_tm _#5 (iuuptype stop i (extend_iurel h' (iutruncate (S i) (iubase (upcore w (mu_urel w (fun X => den (pi1 F X))))))))).
+      {
+      apply interp_eval_refl.
+      apply interp_uptype.
+      apply interp_eval_refl.
+      apply interp_extt.
+      apply cin_top.
+      }
+
+      {
+      apply interp_eval_refl.
+      apply interp_uptype.
+      apply interp_eval_refl.
+      apply interp_extt.
+      apply cin_top.
+      }
+
+      {
+      cbn.
+      apply property_action_triv; auto.
+      unfold uptype_property.
+      rewrite <- ceiling_extend_urel.
+      rewrite -> ceiling_idem.
+      intros j' x x' y y' Hx Hy Hxy.
+      destruct Hxy as (Hj' & Hxy).
+      split; auto.
+      cbn in Hxy |- *.
+      destruct Hxy as (_ & _ & Hxy).
+      do2 2 split; auto.
+        {
+        apply map_hygiene.
+        exact (sapprox_closed _#3 Hx ander).
+        }
+
+        {
+        apply map_hygiene.
+        exact (sapprox_closed _#3 Hy ander).
+        }
+      intros x'' y'' Hx'' Hy''.
+      apply Hxy.
+        {
+        eapply sapprox_trans; eauto.
+        apply map_sapprox; auto.
+        }
+
+        {
+        eapply sapprox_trans; eauto.
+        apply map_sapprox; auto.
+        }
+      }
+    }
+
+    {
+    intros j' tt tt' Htt.
+    invert (pwctx_impl_seqctx _#4 Htt).
+    intros b b' t t' Ht Hb <- <-.
+    simpsubin Hb.
+    invertc Hb.
+    intros R Huniv _ Hb.
+    invert (basic_value_inv _#6 value_univ Huniv).
+    intros pg' Hlv' _ _ <-.
+    destruct Hb as (_ & B & Hbl & Hbr).
+    rewrite -> sint_unroll in Hbl, Hbr.
+    exists pg', (iuuptype stop j' B).
+    simpsub.
+    split.
+      {
+      apply interp_eval_refl.
+      apply interp_uptype; auto.
+      }
+
+      {
+      apply interp_eval_refl.
+      apply interp_uptype; auto.
+      }
+    }
+  }
+cbn in Hss.
+so (Hsequpward _#3 Hss) as (R & Hl & _ & Hupward).
+simpsubin Hl.
+so (HF (upcore w (mu_urel w (fun X => den (pi1 F X)))) h h') as (Hl' & _).
+cbn in Hl'.
+simpsubin Hl'.
+so (interp_fun _#7 Hl Hl'); subst R.
+so (f_equal den (basic_impl_iutruncate _#6 Hl)) as Heq.
+rewrite -> den_iutruncate in Heq.
+rewrite <- Heq in Hupward.
+clear Hl Hl' Heq.
+rewrite -> den_extend_iurel in Hupward.
+exploit (Hupward j (map_term (extend (cin pg) stop) m) (map_term (extend (cin pg) stop) m') (map_term (extend (cin pg) stop) p) (map_term (extend (cin pg) stop) p')) as Hmp'; auto using map_sapprox.
+  {
+  cbn.
+  rewrite -> !extend_term_cancel; auto using h.
+  }
+cbn in Hmp'.
+rewrite -> !extend_term_cancel in Hmp'; auto using h.
+eapply HmonoF; eauto.
+intros k x y Hxy.
+destruct Hxy as (Hclx & Hcly & Hact).
+apply Hact; auto using sapprox_refl.
 Qed.

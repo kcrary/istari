@@ -33,6 +33,7 @@ Require Import SemanticsProperty.
 Require Import SemanticsEqtype.
 Require Import SemanticsSubtype.
 Require Import SemanticsKind.
+Require Import SemanticsPartial.
 Require Import ProperFun.
 Require Import ProperLevel.
 Require Import Equivalence.

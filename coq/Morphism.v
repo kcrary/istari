@@ -416,13 +416,35 @@ Qed.
 
 
 
-Add Parametric Morphism object : (@tarrow object)
+Add Parametric Morphism object : (@admiss object)
+  with signature equiv ==> equiv
+  as equiv_admiss.
+Proof.
+intros m1 m1' H1.
+unfold admiss.
+rewrite H1.
+reflexivity.
+Qed.
+
+
+Add Parametric Morphism object : (@app object)
   with signature equiv ==> equiv ==> equiv
-  as equiv_tarrow.
+  as equiv_app.
 Proof.
 intros m1 m1' H1 m2 m2' H2.
-unfold tarrow.
+unfold app.
 rewrite H1, H2.
+reflexivity.
+Qed.
+
+
+Add Parametric Morphism object : (@bite object)
+  with signature equiv ==> equiv ==> equiv ==> equiv
+  as equiv_bite.
+Proof.
+intros m1 m1' H1 m2 m2' H2 m3 m3' H3.
+unfold bite.
+rewrite H1, H2, H3.
 reflexivity.
 Qed.
 
@@ -471,6 +493,37 @@ apply equiv_deqtype; auto.
 Qed.
 
 
+Add Parametric Morphism object : (@halts object)
+  with signature equiv ==> equiv
+  as equiv_halts.
+Proof.
+intros m1 m1' H1.
+unfold halts.
+rewrite H1.
+reflexivity.
+Qed.
+
+
+Add Parametric Morphism object : (@intersect object)
+  with signature equiv ==> equiv ==> equiv
+  as equiv_intersect.
+Proof.
+intros m1 m1' H1 m2 m2' H2.
+unfold intersect.
+rewrite H1, H2.
+reflexivity.
+Qed.
+
+
+Add Parametric Morphism object : (@partial object)
+  with signature equiv ==> equiv
+  as equiv_partial.
+Proof.
+intros m1 m1' H1.
+apply equiv_partial; auto.
+Qed.
+
+
 Add Parametric Morphism object : (@pi object)
   with signature equiv ==> equiv ==> equiv
   as equiv_pi.
@@ -491,23 +544,23 @@ apply equiv_ppair; auto.
 Qed.
 
 
+Add Parametric Morphism object : (@seq object)
+  with signature equiv ==> equiv ==> equiv
+  as equiv_seq.
+Proof.
+intros m1 m1' H1 m2 m2' H2.
+unfold seq.
+rewrite H1, H2.
+reflexivity.
+Qed.
+
+
 Add Parametric Morphism object : (@set object)
   with signature equiv ==> equiv ==> equiv
   as equiv_set.
 Proof.
 intros m1 m1' H1 m2 m2' H2.
 unfold set.
-rewrite H1, H2.
-reflexivity.
-Qed.
-
-
-Add Parametric Morphism object : (@intersect object)
-  with signature equiv ==> equiv ==> equiv
-  as equiv_intersect.
-Proof.
-intros m1 m1' H1 m2 m2' H2.
-unfold intersect.
 rewrite H1, H2.
 reflexivity.
 Qed.
@@ -525,6 +578,86 @@ Qed.
 
 
 
+Lemma equiv_dsubtype :
+  forall object (a a' b b' : @term object),
+    equiv a a'
+    -> equiv b b'
+    -> equivj (dsubtype a b) (dsubtype a' b').
+Proof.
+intros.
+unfold dsubtype.
+apply equiv_deq; auto using equiv_refl.
+apply equiv_subtype; auto.
+Qed.
+
+
+Add Parametric Morphism object : (@dsubtype object)
+  with signature (@equiv object) ==> (@equiv object) ==> (@equivj object)
+  as dsubtype_mor.
+Proof.
+intros a a' Ha b b' Hb.
+apply equiv_dsubtype; auto.
+Qed.
+
+
+Add Parametric Morphism object : (@sumcase object)
+  with signature equiv ==> equiv ==> equiv ==> equiv
+  as equiv_sumcase.
+Proof.
+intros m1 m1' H1 m2 m2' H2 m3 m3' H3.
+unfold sumcase.
+apply equiv_bite.
+  {
+  apply equiv_ppi1.
+  rewrite H1.
+  reflexivity.
+  }
+
+  {
+  apply equiv_funct1; auto.
+  apply equiv_ppi2; auto.
+  }
+
+  {
+  apply equiv_funct1; auto.
+  apply equiv_ppi2; auto.
+  }
+Qed.
+
+
+Add Parametric Morphism object : (@sumleft object)
+  with signature equiv ==> equiv
+  as equiv_sumleft.
+Proof.
+intros m1 m1' H1.
+unfold sumleft.
+rewrite H1.
+reflexivity.
+Qed.
+
+
+Add Parametric Morphism object : (@sumright object)
+  with signature equiv ==> equiv
+  as equiv_sumright.
+Proof.
+intros m1 m1' H1.
+unfold sumright.
+rewrite H1.
+reflexivity.
+Qed.
+
+
+Add Parametric Morphism object : (@tarrow object)
+  with signature equiv ==> equiv ==> equiv
+  as equiv_tarrow.
+Proof.
+intros m1 m1' H1 m2 m2' H2.
+unfold tarrow.
+rewrite H1, H2.
+reflexivity.
+Qed.
+
+
 Add Parametric Morphism object : (@univ object)
   with signature equiv ==> equiv
   as equiv_univ.
@@ -536,13 +669,13 @@ reflexivity.
 Qed.
 
 
-Add Parametric Morphism object : (@app object)
-  with signature equiv ==> equiv ==> equiv
-  as equiv_app.
+Add Parametric Morphism object : (@uptype object)
+  with signature equiv ==> equiv
+  as equiv_uptype.
 Proof.
-intros m1 m1' H1 m2 m2' H2.
-unfold app.
-rewrite H1, H2.
+intros m1 m1' H1.
+unfold uptype.
+rewrite H1.
 reflexivity.
 Qed.
 
@@ -589,64 +722,6 @@ Add Parametric Morphism object : (@substctx object)
 Proof.
 intros s s' Hs G G' HG.
 apply equivctx_funct; auto.
-Qed.
-
-
-Add Parametric Morphism object : (@bite object)
-  with signature equiv ==> equiv ==> equiv ==> equiv
-  as equiv_bite.
-Proof.
-intros m1 m1' H1 m2 m2' H2 m3 m3' H3.
-unfold bite.
-rewrite H1, H2, H3.
-reflexivity.
-Qed.
-
-
-Add Parametric Morphism object : (@sumleft object)
-  with signature equiv ==> equiv
-  as equiv_sumleft.
-Proof.
-intros m1 m1' H1.
-unfold sumleft.
-rewrite H1.
-reflexivity.
-Qed.
-
-
-Add Parametric Morphism object : (@sumright object)
-  with signature equiv ==> equiv
-  as equiv_sumright.
-Proof.
-intros m1 m1' H1.
-unfold sumright.
-rewrite H1.
-reflexivity.
-Qed.
-
-
-Add Parametric Morphism object : (@sumcase object)
-  with signature equiv ==> equiv ==> equiv ==> equiv
-  as equiv_sumcase.
-Proof.
-intros m1 m1' H1 m2 m2' H2 m3 m3' H3.
-unfold sumcase.
-apply equiv_bite.
-  {
-  apply equiv_ppi1.
-  rewrite H1.
-  reflexivity.
-  }
-
-  {
-  apply equiv_funct1; auto.
-  apply equiv_ppi2; auto.
-  }
-
-  {
-  apply equiv_funct1; auto.
-  apply equiv_ppi2; auto.
-  }
 Qed.
 
 

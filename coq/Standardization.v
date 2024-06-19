@@ -61,6 +61,15 @@ apply (star_map' _ _ (fun z => ppi2 z)); auto using step_ppi21.
 Qed.
 
 
+Lemma steps_seq :
+  forall object (m1 m1' m2 : @term object),
+    star step m1 m1'
+    -> star step (seq m1 m2) (seq m1' m2).
+Proof.
+intros.
+apply (star_map' _ _ (fun z => seq z _)); auto using step_seq1.
+Qed.
+
 
 Section object.
 
@@ -99,6 +108,11 @@ Inductive ireduce : term object -> term object -> Prop :=
 | ireduce_ppi2 {m n} :
     ireduce m n
     -> ireduce (ppi2 m) (ppi2 n)
+
+| ireduce_seq {m1 n1 m2 n2} :
+    ireduce m1 n1
+    -> reduce m2 n2
+    -> ireduce (seq m1 m2) (seq n1 n2)
 .
 
 
@@ -106,7 +120,7 @@ Lemma ireduce_impl_mc_reduce :
   forall m n, ireduce m n -> mc reduce m n.
 Proof.
 intros m n H.
-induct H; eauto using mc_var, mc_oper, reducer_mcr, reduce_compat, mc_app, mc_prev, mc_bite, mc_ppi1, mc_ppi2.
+induct H; eauto using mc_var, mc_oper, reducer_mcr, reduce_compat, mc_app, mc_prev, mc_bite, mc_ppi1, mc_ppi2, mc_seq.
 Qed.
 
 
@@ -192,6 +206,19 @@ cases th; try (intros; apply ireduce_canon; auto using reducer_id with dynamic; 
   invertc IH.
   intros Hm1 _.
   apply ireduce_ppi2; auto using ireduce_impl_reduce.
+  }
+
+  (* seq *)
+  {
+  intros r IH.
+  so (row_invert_auto _ _ r) as H; cbn in H.
+  destruct H as (m1 & m2 & ->).
+  fold (seq m1 m2) in *.
+  invertc IH.
+  intros Hm1 Hr.
+  invertc Hr.
+  intros Hm2 _.
+  apply ireduce_seq; auto using ireduce_impl_reduce.
   }
 }
 Qed.
@@ -363,6 +390,31 @@ split.
 Qed.
 
 
+Lemma sreduce_seq :
+  forall m m' n n',
+    sreduce m m'
+    -> reduce n n'
+    -> sreduce (seq m n) (seq m' n').
+Proof.
+intros m m' n n' Hm Hn.
+destruct Hm as (Hm & p & Hmp & Hpm).
+split.
+  {
+  apply reduce_compat.
+  apply mc_seq; auto using reduce_id.
+  }
+exists (seq p n).
+split.
+  {
+  apply steps_seq; auto.
+  }
+
+  {
+  apply ireduce_seq; auto.
+  }
+Qed.
+
+
 Lemma canon_dec :
   forall a (th : @operator object a),
     decidable (canon _ th).
@@ -525,6 +577,28 @@ cases th; try (intros; destruct Hncanon; auto with dynamic; done).
   intros Hm1.
   apply sreduce_ppi2; auto.
   }
+
+  (* seq *)
+  {
+  intros r r' Hm IH _.
+  so (row_invert_auto _ _ r) as (m1 & m2 & ->).
+  so (row_invert_auto _ _ r') as (m1' & m2' & ->).
+  simpsub.
+  fold (seq (subst1 n m1) (subst (dot (var 0) (dot (subst sh1 n) sh1)) m2)).
+  fold (seq (subst1 n' m1') (subst (dot (var 0) (dot (subst sh1 n') sh1)) m2')).
+  invertc IH.
+  intros IH1 IH.
+  invertc IH.
+  intros IH2 _.
+  invertc Hm.
+    {
+    intros H  _.
+    invert H.
+    }
+  intros Hm1 Hm2.
+  apply sreduce_seq; auto.
+  apply (reduce_funct1_under _ 1); auto using sreduce_impl_reduce.
+  }
 }
 Qed.
 
@@ -657,6 +731,21 @@ cases th; try (intros; destruct Hncanon; auto with dynamic; done).
   intros IH1 _.
   apply sreduce_ppi2; auto.
   }
+
+  (* seq *)
+  {
+  intros r s Hrs IH Hncanon.
+  so (row_invert_auto _ _ r) as (m1 & m2 & ->).
+  so (row_invert_auto _ _ s) as (n1 & n2 & ->).
+  fold (seq m1 m2) in *.
+  fold (seq n1 n2) in *.
+  invertc IH.
+  intros IH1 IH.
+  invertc IH.
+  intros IH2 _.
+  apply sreduce_seq; auto.
+  apply sreduce_impl_reduce; auto.
+  }
 }
 
 (* app_beta *)
@@ -700,6 +789,14 @@ apply reduce_ppi1_beta; auto.
 intros m m' Hm IH1.
 eapply sreduce_extend; eauto using step_ppi22.
 apply reduce_ppi2_beta; auto.
+}
+
+(* seq_beta *)
+{
+intros m m' n n' Hval Hm IH1 Hn IH2.
+so (sreduce_funct _#4 IH2 IH1) as Hmn.
+eapply sreduce_extend; eauto using step_seq2.
+apply reduce_seq_beta; auto.
 }
 
 (* nil *)
@@ -1044,7 +1141,58 @@ invert Hmn.
     split; auto using step_ppi22.
     }
   }
-}
+
+  (* seq *)
+  {
+  intros m1 n1 m2 n2 H1 H2 <- Heq Heq' <-.
+  injectionT Heq.
+  intros <-.
+  injectionT Heq'.
+  intros <-.
+  fold (seq m1 m2) in *.
+  fold (seq n1 n2) in *.
+  invertc IH.
+  intros IH1 _.
+  invert Hnp.
+    {
+    intros p1 Hstep <-.
+    so (IH1 _ _ H1 Hstep) as (q & Hstep' & Hqp).
+    exists (seq q m2).
+    split.
+      {
+      apply step_seq1; auto.
+      }
+    
+      {
+      apply reduce_compat.
+      apply mc_seq; auto.
+      }
+    }
+
+    {
+    intros Hval <-.
+    invertc Hmn.
+      {
+      intros H _ _; invert H.
+      }
+    intros Hmn1 Hmn2.
+    exists (subst1 m1 m2).
+    split.
+      {
+      apply step_seq2.
+      invert H1; intros; subst; try (invert Hval; intro H; invert H; done).
+      invert Hval.
+      intro.
+      apply value_i; auto.
+      }
+
+      {
+      apply reduce_funct1; auto.
+      apply ireduce_impl_reduce; auto.
+      }
+    }
+  }
+} 
 Qed.
 
 

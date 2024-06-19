@@ -1,7 +1,31 @@
-# `Bar` (partial types)
+# `Bar` (simulated partial types)
 
-Inspired by the partial types ("bar types") of Constable and Smith [1],
-but weaker, because we cannot implement the termination predicate.
+This library simulates much of the [partial type
+mechanism](../type-theory.html#partial-types) using future and guarded
+recursive types.  Partial types over `A` (here called `bar A`) are
+simulated by a recursive type that either returns an `A` now or tries
+again one step in the future.
+
+The simulated version supports much of the functionality of partial
+types, including fixpoint induction, but notably it **cannot** support
+a halting predicate.  Since one cannot express halting in the first
+place, it is also impossible to convert partial objects that halt into
+total objects.
+
+Note that fixpoint induction over simulated partial types does not
+have an admissibility requirement, unlike what happens with true
+partial types.  It follows that it is fundamentally impossible to
+implement a halting predicate; were halting implementable, one could
+implement [Smith's paradox](smith-paradox.html) (which requires a
+halting predicate) and derive a contradiction.  (One can implement
+predicates that may naively appear to be a halting predicate, but they
+are true too often.)
+
+Thus there seems to be a tradeoff: simulated partial types avoid the
+complication of admissibiity but they cannot talk about termination,
+while true partial types provide the opposite.
+
+---
 
 Pause is just the identity, but we insert it in various places to
 break up redices so that accidental ill-typed terms don't result in
@@ -20,6 +44,11 @@ the future modality:
                 (fn x . f (let next x' = x in next (pause x' x)))
                 (next (fn x . f (let next x' = x in next (pause x' x))))
 
+Note that `ffix` provides an induction principle over time.  If `a` is
+true now assuming `a` is true one step in the future (and therefore one
+step closer to the semantics' step-indexed time horizon), then `a` is
+true always.
+
 The reduction for `ffix` is:
 
     ffix f --> f (next (ffix f))
@@ -28,14 +57,14 @@ It appears in the registry under the name `Bar.unroll_ffix`.  It can
 also be used through the `unroll` tactic.
 
 
-The partial type `bar A` provides an `A` now, or sometime later:
+The simulated partial type `bar A` provides an `A` now, or sometime later:
 
     bar : intersect (i : level) . U i -> U i
         = fn a . rec t . a % future t
 
     bar_unroll : forall (i : level) (a : U i) . bar a = (a % future (bar a)) : type
 
-The partial type acts as a monad.  Its unit is `now`:
+The type acts as a monad.  Its unit is `now`:
 
     now : intersect (i : level) (a : U i) . a -> bar a
         = fn x . inl x
@@ -108,7 +137,7 @@ Bar is covariant:
     bar_subtype : forall (i : level) (a b : U i) . a <: b -> bar a <: bar b
 
 
-Finally we can define a fixpoint operator on partial objects:
+Finally we can define a fixpoint operator on simulated partial objects:
 
     bfix : intersect (i : level) (a : U i) . (bar a -> bar a) -> bar a
          = fn f . ffix (fn x . f (laterf x))
@@ -121,15 +150,7 @@ It appears in the registry under the name `Bar.unroll_bfix`.  It can
 also be used through the `unroll` tactic.
 
 
-At this point we'd like to follow the development in Smith [2] and
-define a termination predicate.  Alas, we cannot.  Istari's
-step-indexed semantics is unable to express liveness properties such
-as termination.  If it could express termination, we would be able to
-draw a contradiction, because the type of `bfix` does not have Smith's
-admissibility requirement.  (See Smith [2], theorem 60.)
-
-
-We can iterate over partial objects using the `bar_iter` iterator.
+We can iterate over simulated partial objects using the `bar_iter` iterator.
 The cases are `now` and `later`:
 
     bar_iter : intersect (i : level) (a : U i) (P : bar a -> U i) .
@@ -150,11 +171,3 @@ A corollary of induction says we can map a function through `bindbart`:
                       (forall (x : a) . b x -> c x)
                       -> (bindbart x = e in b x)
                       -> bindbart x = e in c x
-
----
-
-[1] Robert L. Constable and Scott Fraser Smith.  Partial Objects in
-Constructive Type Theory.  In *Second IEEE Symposium on Logic on
-Computer Science,* 1987.
-
-[2] Scott Fraser Smith.  *Partial Objects in Type Theory*, 1988.

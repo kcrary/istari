@@ -1365,6 +1365,14 @@ destruct H as (Hm & Hn & _).
 apply IH; auto.
 }
 
+(* seq_beta *)
+{
+intros m m' n n' Hval _ IH1 _ IH2 P Hhyg.
+so (hygiene_invert_auto _#4 Hhyg) as H; cbn in H.
+destruct H as (Hm & Hn & _).
+apply hygiene_subst1; auto.
+}
+
 (* cons *)
 {
 intros i a m n r s _ IH1 _ IH2 P Hhyg.

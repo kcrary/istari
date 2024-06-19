@@ -1,5 +1,43 @@
 openModule /Nat/;
 openModule /Logic/;
+openModule /SyntacticEquality/;
+openModule /Partial/;
+
+
+lemma "reduce_seq"
+/
+  forall i (a b : U i) (m : partial a) (n : a -> partial b) .
+    halts m
+    -> (seq x = m in n x) = n m : partial b
+/;
+
+inference.
+intro /i a b m n Hhalt/.
+assert /sequal (seq x = m in n x) (n m)/ /H/.
+  {
+  RuleTactic.seqHaltsSequal.
+  hyp /Hhalt/.
+  }
+rewriteRaw /<- H/.
+typecheck.
+qed ();
+
+
+
+lemma "rewrite_sequal"
+/
+  forall (x y : nat) (P : nat -> U 0) . x = y : nat -> P x -> P y
+/;
+
+intro /x y P Heq Hx/.
+so /nat_eq_impl_sequal _# 2 Heq/ /Hseq/.
+rewriteRaw /-> Hseq in Hx/.
+rewriteRaw /<- Hseq in Hx/.
+rewriteRaw /<- Hseq/.
+rewriteRaw /-> Hseq/.
+rewriteRaw /<- Hseq/.
+hyp /Hx/.
+qed ();
 
 
 
@@ -16,6 +54,7 @@ intro /i a b c d e Hsub H/.
 rewrite /<- Hsub within x y in H/.
 hyp /H/.
 qed ();
+
 
 
 fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;

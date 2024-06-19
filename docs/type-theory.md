@@ -33,7 +33,7 @@ types.
 
 #### What is a type?
 
-Istari is a Martin-L&ouml;f-style type theory [2], which means (in
+Istari is a Martin-L&ouml;f-style type theory [4], which means (in
 part) that a type consists not only of a set of elements, but also an
 *equality* relation on its elements.  Two terms might be equal in one
 type but inequal in another.  (This is most obvious with [quotient
@@ -258,7 +258,7 @@ and `U(0) -t> U(1)` belongs to `K(1)`.
 
 [[rules]](rules.html#strong-sums)
 
-The strong sum, `exists (x : A) . B` is Istari's dependent type for
+The strong sum, `exists (x : A) . B`, is Istari's dependent type for
 pairs.  It contains pairs `(M , N)` such that `M : A` and 
 `N : [M / x]B`.  It also requires that `B : type` assuming `x : A`,
 since this does not follow from the substitution instance `[M / x]B`
@@ -458,14 +458,14 @@ Then the following ornamented Y combinator has the type
 Thus, to prove `A` it is sufficient to prove `A` assuming that `A` is
 true in the future.  This is tantamount to proving `A` by induction
 over time.  This is developed (with some minor differences) in the
-[partial types library](lib/bar.html) `Bar`.
+[simulated partial types library](lib/bar.html) `Bar`.
 
 One of the main features of the Istari type theory is that recursive
 types are not only legal types, but they are also
 [kinds](#universes-and-kinds), and are thus eligible for use as
 domains for impredicative quantification.  With some work, this makes
 it possible to express a store-passing transformation for imperative
-code [3].
+code [5].
 
 In a proof, one can unroll recursive types using the
 [rewrite](rewriting.html#rewriting-tactics) `unrollType`.
@@ -838,6 +838,71 @@ Symbol literals are written like ``sym`"foo"``, and the only operation
 on symbols is equality.
 
 
+#### Partial types
+
+[[rules]](rules.html#partial-types)
+
+Partial types make it possible to express possibly non-terminating
+computations [2, 6, 3].  We refer to such computations as *partial
+objects*. The partial type, `partial A`, contains all the elements of
+`A`, in addition to all divergent terms.  Two terms are equal at
+`partial A` if they have the same halting behavior, and if they are
+equal at `A` if they halt.
+
+There are three main ways to inhabit a partial type:
+
+- First, the canonical divergent term `bottom` (defined as 
+  `fix (fn x . x)`) inhabits every partial type.
+
+- Second, we say that a type `A` is *strict* if `A <: partial A`.
+  Since `partial A` contains all the members of `A`, the only fact we
+  need to say that `A` is strict is that the inclusion of `A` into
+  `partial A` preserves equality.  For that to be the case, we need
+  `A` not to equate any convergent term with any divergent term, since
+  in `partial A` terms with different halting behavior are never
+  equal.
+
+  Most types in Istari are strict.  Indeed, most types in Istari have
+  the stronger property of totality, meaning they contain *only*
+  convergent terms.  Thus one may usually take members of `A` to be
+  members of `partial A`.
+
+- Third, we can create a partial object by recursion, using the
+  *fixpoint induction* rule.
+
+Given a term `F` with type `partial A -> partial A`, fixpoint
+induction allows us to conclude (under certain circumstances) that
+`fix F : partial A`.  Alas, this principle is available only for types
+`A` that are **admissible**, and there do exist 
+[non-admissible types](lib/smith-paradox.html).
+
+Roughly speaking, a type `A` is semantically admissible if whenever
+`A` contains an infinite chain of approximations to some recursive
+computation `M`, it also contains `M`.  However, within the logic we
+cannot reason about such chains directly and we must instead rely on a
+set of rules for showing that types are admissible.  For example, 
+`A -> B` is admissible whenever `B` is admissible, and `A & B` is
+admissible whenever both `A` and `B` are admissible.
+
+One major device for showing that a type is admissible is
+upwards-closure.  We say that `A` is an *uptype* (short for
+"upwards-closed type") if whenever `M : A` and `M` computationally
+approximates `M'` then `M' : A`.  Every uptype is admissible since the
+members of a chain approximate their limit.
+
+Uptypes are a useful way to show admissibility because most types are
+uptypes.  The main exceptions are partial types (`bottom` approximates
+everything but partial types do not contain everything) and universes
+(which can talk about membership in a partial type).
+
+(Note that more admissibility and uptype rules could be added than
+Istari currently supports.)
+
+The type `halts M` expresses the fact that `M` halts; it is
+well-formed when `M` belongs to any partial type.  If 
+`M = N : partial A` and `halts M`, we can conclude that `M = N : A`.
+
+
 
 ## Additional topics
 
@@ -997,11 +1062,21 @@ J.F. Cremer, R.W. Harper, D.J. Howe, T.B. Knoblock, N.P. Mendler,
 P. Panangaden, J.T. Sasaki, and S.F. Smith. *Implementing Mathematics
 with the Nuprl Proof Development System.* Prentice-Hall, 1986.
 
-[2] Per Martin-L&ouml;f. Constructive mathematics and computer
+[2] Robert L Constable and Scott Fraser Smith. Partial Objects in
+Constructive Type Theory.  In *Second IEEE Symposium on Logic in
+Computer Science*. 1984.
+
+[3] Karl Crary. *Type-Theoretic Methodology for Practical Programming
+Languages*. Ph.D. dissertation, Cornell University, 1998.
+
+[4] Per Martin-L&ouml;f. Constructive mathematics and computer
 programming. In *Sixth International Congress of Logic Methodology and
 Philosophy of Science,* volume 104 of *Studies in
 Logic and the Foundations of Mathematics*. North-Holland, 1982.
 
-[3] Fran&ccedil;ois Pottier. A Typed Store-Passing Translation for
+[5] Fran&ccedil;ois Pottier. A Typed Store-Passing Translation for
 General References. In *Thirty-Eighth Symposium on Principles of
 Programming Languages,* 1996.
+
+[6] Scott Fraser Smith. *Partial Objects in Type Theory*.
+Ph.D. dissertation, Cornell University. 1989.

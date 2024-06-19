@@ -1,0 +1,34 @@
+
+functor AfterSyntacticEquality () :> sig end =
+   struct
+
+      structure H = ConstantTable
+      structure T = Term
+
+      open Tactic
+
+      val sequalRefl : priority tacticm =
+         lift (fn () =>
+                  refine (Rule.sequalIntro (T.evar ()))
+                  >> done)
+
+      fun sequalSymm tac =
+         refine (Rule.sequalSymm (T.evar ()) (T.evar ()))
+         >>+
+         tac
+
+      fun sequalTrans n =
+         refine (Rule.sequalTrans (T.evar ()) n (T.evar ()))
+         >> idtacM Primary
+             
+
+      val () =
+         H.insert EqualityTacticInternal.reflexivityTactics Prim.sequal sequalRefl
+
+      val () =
+         H.insert EqualityTacticInternal.symmetryTactics Prim.sequal sequalSymm
+
+      val () =
+         H.insert EqualityTacticInternal.transitivityTactics Prim.sequal sequalTrans
+
+   end

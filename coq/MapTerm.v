@@ -81,6 +81,11 @@ Definition map_operator {A B : Type} (f : A -> B) (a : list nat) (th : operator 
   | oper_quotient _ => oper_quotient _
   | oper_guard _ => oper_guard _
   | oper_wt _ => oper_wt _
+  | oper_partial _ => oper_partial _
+  | oper_halts _ => oper_halts _
+  | oper_admiss _ => oper_admiss _
+  | oper_uptype _ => oper_uptype _
+  | oper_seq _ => oper_seq _
   end.
 
 
@@ -495,7 +500,42 @@ auto.
 Qed.
 
 
-Hint Rewrite map_ext map_extt map_var map_univ map_cty map_con map_karrow map_tarrow map_pi map_clam map_capp map_ctlam map_ctapp map_lam map_app map_intersect map_union map_fut map_cnext map_cprev map_next map_prev map_rec map_equal map_triv map_eqtype map_sequal map_subtype map_kind map_all map_alltp map_exist map_mu map_ispositive map_isnegative map_voidtp map_unittp map_cunit map_booltp map_btrue map_bfalse map_bite map_prod map_sigma map_cpair map_cpi1 map_cpi2 map_ppair map_ppi1 map_ppi2 map_wt map_set map_iset map_quotient map_guard : map.
+Lemma map_partial :
+  forall A B (f : A -> B) m, map_term f (partial m) = partial (map_term f m).
+Proof.
+auto.
+Qed.
+
+
+Lemma map_halts :
+  forall A B (f : A -> B) m, map_term f (halts m) = halts (map_term f m).
+Proof.
+auto.
+Qed.
+
+
+Lemma map_admiss :
+  forall A B (f : A -> B) m, map_term f (admiss m) = admiss (map_term f m).
+Proof.
+auto.
+Qed.
+
+
+Lemma map_uptype :
+  forall A B (f : A -> B) m, map_term f (uptype m) = uptype (map_term f m).
+Proof.
+auto.
+Qed.
+
+
+Lemma map_seq :
+  forall A B (f : A -> B) m1 m2, map_term f (seq m1 m2) = seq (map_term f m1) (map_term f m2).
+Proof.
+auto.
+Qed.
+
+
+Hint Rewrite map_ext map_extt map_var map_univ map_cty map_con map_karrow map_tarrow map_pi map_clam map_capp map_ctlam map_ctapp map_lam map_app map_intersect map_union map_fut map_cnext map_cprev map_next map_prev map_rec map_equal map_triv map_eqtype map_sequal map_subtype map_kind map_all map_alltp map_exist map_mu map_ispositive map_isnegative map_voidtp map_unittp map_cunit map_booltp map_btrue map_bfalse map_bite map_prod map_sigma map_cpair map_cpi1 map_cpi2 map_ppair map_ppi1 map_ppi2 map_wt map_set map_iset map_quotient map_guard map_partial map_halts map_admiss map_uptype map_seq : map.
 
 
 Lemma map_sumbool :
@@ -1380,6 +1420,42 @@ f_equal; auto.
 Qed.
 
 
+Lemma map_value :
+  forall A B (f : A -> B) (m : term A),
+    value m
+    -> value (map_term f m).
+Proof.
+intros A B f m Hval.
+invert Hval.
+intros a th r Hcanon <-.
+apply value_i.
+cases Hcanon; cbn; auto using canon.
+Qed.
+
+
+Lemma anti_map_value :
+  forall A B (f : A -> B) (m : term A),
+    value (map_term f m)
+    -> value m.
+Proof.
+intros A B f m Hval.
+invert Hval.
+intros a th r Hcanon Heq.
+destruct m as [i | a' th' r'].
+  {
+  cbn in Heq.
+  discriminate Heq.
+  }
+cbn in Heq.
+injectionc Heq.
+intros _ Heq <-.
+injectionT Heq.
+intros ->.
+apply value_i.
+destruct th'; auto using canon; cbn in Hcanon; invert Hcanon.
+Qed.
+
+
 Lemma map_reduce :
   forall A B (f : A -> B) (m n : term A),
     reduce m n
@@ -1391,7 +1467,7 @@ induct Hmn using
      (fun a r s => reducer (map_row f r) (map_row f s)));
 try (intros; cbn; eauto using reduce_var, reduce_oper, reducer_nil, reducer_cons; done).
 
-(* tapp_beta *)
+(* app_beta *)
 {
 intros m m' n n' _ IH1 _ IH2.
 simpmap.
@@ -1432,6 +1508,14 @@ intros m m' n _ IH.
 simpmap.
 apply reduce_ppi2_beta; auto.
 }
+
+(* seq_beta *)
+{
+intros m m' n n' Hval _ IH1 _ IH2.
+simpmap.
+apply reduce_seq_beta; auto.
+apply map_value; auto.
+}
 Qed.
 
 
@@ -1452,7 +1536,7 @@ Lemma map_step :
 Proof.
 intros A B f m n Hmn.
 induct Hmn;
-try (intros; simpmap; eauto using step_app1, step_app2, step_prev1, step_prev2, step_bite1, step_bite2, step_bite3, step_ppi11, step_ppi12, step_ppi21, step_ppi22; done).
+try (intros; simpmap; eauto using step_app1, step_app2, step_prev1, step_prev2, step_bite1, step_bite2, step_bite3, step_ppi11, step_ppi12, step_ppi21, step_ppi22, step_seq1, step_seq2, map_value; done).
 Qed.
 
 
@@ -1463,6 +1547,15 @@ Lemma map_steps :
 Proof.
 intros A B f m n H.
 eapply star_map; eauto using map_step.
+Qed.
+
+
+Lemma map_eval :
+  forall A B (f : A -> B) (m v : @term A),
+    eval m v -> eval (map_term f m) (map_term f v).
+Proof.
+intros A B f m v (Hsteps & Hval).
+split; auto using map_steps, map_value.
 Qed.
 
 
@@ -1787,6 +1880,37 @@ split.
 Qed.
 
 
+Lemma map_eq_seq_invert :
+  forall A B (f : A -> B) m n p,
+    map_term f m = seq n p
+    -> exists n' p',
+         m = seq n' p'
+         /\ map_term f n' = n
+         /\ map_term f p' = p.
+Proof.
+intros A B f m n p Heq.
+so (map_eq_oper_invert _#7 Heq) as (th & r & -> & Heqth & Heqr).
+so (row_invert_auto _ _ r) as H; cbn in H.
+destruct H as (n' & p' & ->).
+exists n', p'.
+split.
+  {
+  unfold next.
+  f_equal.
+  so (map_operator_same _#6 Heqth) as H.
+  invert H.
+  intros <-.
+  auto.
+  }
+
+  {
+  cbn in Heqr.
+  injection Heqr.
+  auto.
+  }
+Qed.
+
+
 Lemma map_eq_ext_invert :
   forall A B (f : A -> B) m x,
     map_term f m = ext x
@@ -1821,7 +1945,7 @@ remember (map_term f m) as x eqn:Heqx.
 revert m Heqx.
 induct H.
 
-(* tapp1 *)
+(* app1 *)
 {
 intros m1 m1' m2 _ IH mm Heqx.
 so (map_eq_oper_invert _#7 (eqsymm Heqx)) as (th & r & -> & Heqth & Heqr).
@@ -1846,7 +1970,7 @@ split.
   }
 }
 
-(* tapp2 *)
+(* app2 *)
 {
 intros m1 m2 mm Heqx.
 so (map_eq_oper_invert _#7 (eqsymm Heqx)) as (th & r & -> & Heqth & Heqr).
@@ -1969,6 +2093,58 @@ exists q.
 split; auto.
 apply step_ppi22.
 }
+
+(* seq1 *)
+{
+intros m1 m1' m2 _ IH mm Heqx.
+so (map_eq_oper_invert _#7 (eqsymm Heqx)) as (th & r & -> & Heqth & Heqr).
+clear Heqx.
+revert Heqth.
+cases th; try (intros; discriminate Heqth).
+intros _.
+so (row_2_invert _#3 r) as (n1 & n2 & ->).
+cbn in Heqr.
+injectionc Heqr.
+intros <- <-.
+so (IH n1 (eq_refl _)) as (n1' & -> & Hstep).
+exists (seq n1' n2).
+split.
+  {
+  simpmap.
+  reflexivity.
+  }
+
+  {
+  apply step_seq1; auto.
+  }
+}
+
+(* seq2 *)
+{
+intros m1 m2 Hval mm Heqx.
+so (map_eq_oper_invert _#7 (eqsymm Heqx)) as (th & r & -> & Heqth & Heqr).
+clear Heqx.
+revert Heqth.
+cases th; try (intros; discriminate Heqth).
+intros _.
+so (row_2_invert _#3 r) as (m' & p' & ->).
+cbn in Heqr.
+injectionc Heqr.
+intros <- Heqa.
+fold (seq m' p').
+exists (subst1 m' p').
+subst m1.
+split.
+  {
+  simpmap.
+  reflexivity.
+  }
+
+  {
+  apply step_seq2.
+  eapply anti_map_value; eauto.
+  }
+}
 Qed.
 
 
@@ -2047,7 +2223,7 @@ split; auto.
 apply reduce_oper; auto.
 }
 
-(* tapp_beta *)
+(* app_beta *)
 {
 intros m n p q Hmn IH1 Hpq IH2 x Heqx.
 so (map_eq_oper_invert _#7 (eqsymm Heqx)) as (th & r & -> & Heqth & Heqr).
@@ -2129,6 +2305,25 @@ so (IH _ (eqsymm Hq)) as (p' & -> & Hp').
 exists p'.
 split; auto.
 apply reduce_ppi2_beta; auto.
+}
+
+(* seq_beta *)
+{
+intros m1 m1' m2 m2' Hval _ IH1 _ IH2 x Heqx.
+so (map_eq_seq_invert _#6 (eqsymm Heqx)) as (n1 & n2 & -> & <- & <-).
+so (IH1 _ (eq_refl _)) as (n' & -> & Hmn').
+so (IH2 _ (eq_refl _)) as (q' & -> & Hpq').
+exists (subst1 n' q').
+split.
+  {
+  symmetry.
+  apply map_subst.
+  }
+
+  {
+  apply reduce_seq_beta; auto.
+  eapply anti_map_value; eauto.
+  }
 }
 
 (* nil *)
@@ -2360,6 +2555,15 @@ exact (map_term_and_row_id _ andel).
 Qed.
 
 
+Lemma map_row_id :
+  forall (A : Type) a (r : @row A a),
+    map_row (fun z => z) r = r.
+Proof.
+intros A.
+exact (map_term_and_row_id _ ander).
+Qed.
+
+
 Lemma map_sub_id :
   forall (A : Type) (s : @sub A),
     map_sub (fun z => z) s = s.
@@ -2370,19 +2574,4 @@ intros m s IH.
 cbn.
 rewrite -> map_term_id.
 f_equal; auto.
-Qed.
-
-
-Lemma map_value :
-  forall A B (f : A -> B) m,
-    value m
-    -> value (map_term f m).
-Proof.
-intros A B f m H.
-invertc H.
-intros a th r Hcanon <-.
-cbn.
-apply value_i.
-clear r.
-cases Hcanon; intros; cbn; auto using canon.
 Qed.

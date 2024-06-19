@@ -1303,6 +1303,12 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr (G2 ++ hyp_tm b :: G1) J
       -> tr (G2 ++ hyp_tm a :: G1) J
 
+| tr_sound_tighten :
+    forall G1 G2 a b J,
+      tr G1 (dsubtype b a)
+      -> tr (G2 ++ hyp_tm (equal (subst sh1 b) (var 0) (var 0)) :: hyp_tm b :: G1) J
+      -> tr (G2 ++ hyp_tm (equal (subst sh1 b) (var 0) (var 0)) :: hyp_tm a :: G1) J
+
 | tr_subtype_formation_invert1 :
     forall G a a' b b',
       tr G (deqtype (subtype a b) (subtype a' b'))
@@ -1376,6 +1382,63 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr (G2 ++ cons h' G1) J
       -> tr (G2 ++ cons h G1) J
 
+(* Syntactic equality *)
+
+| tr_sequal_formation :
+    forall G m n,
+      tr G (deqtype (sequal m m) (sequal n n))
+  
+| tr_sequal_intro :
+    forall G m,
+      tr G (deq triv triv (sequal m m))
+  
+| tr_sequal_eta :
+    forall G m n p,
+      tr G (deq p p (sequal m n))
+      -> tr G (deq p triv (sequal m n))
+  
+| tr_sequal_eta_hyp :
+    forall G1 G2 p q m n b,
+      tr (substctx (dot triv id) G2 ++ G1) (deq m n (subst (under (length G2) (dot triv id)) b))
+      -> tr (G2 ++ hyp_tm (sequal p q) :: G1) (deq (subst (under (length G2) sh1) m) (subst (under (length G2) sh1) n) b)
+  
+| tr_sequal_equal :
+    forall G a m n,
+      tr G (deq triv triv (sequal m n))
+      -> tr G (deq m m a)
+      -> tr G (deq m n a)
+
+| tr_sequal_eqtype :
+    forall G a b,
+      tr G (deq triv triv (sequal a b))
+      -> tr G (deqtype a a)
+      -> tr G (deqtype a b)
+  
+| tr_syntactic_substitution :
+    forall G1 G2 a m n n' b,
+      tr 
+        (substctx (dot (var 0) (dot (subst (sh 2) m) (sh 2))) G2 ++ hyp_tm (sequal (var 0) (subst sh1 m)) :: hyp_tm a :: G1) 
+        (deq n n' (subst (under (length G2) (dot (var 0) (dot (subst (sh 2) m) (sh 2)))) b))
+      -> tr 
+           (G2 ++ hyp_tm (sequal (var 0) (subst sh1 m)) :: hyp_tm a :: G1)
+           (deq n n' b)
+  
+| tr_sequal_symm :
+    forall G m n,
+      tr G (deq triv triv (sequal m n))
+      -> tr G (deq triv triv (sequal n m))
+  
+| tr_sequal_trans :
+    forall G m n p,
+      tr G (deq triv triv (sequal m n))
+      -> tr G (deq triv triv (sequal n p))
+      -> tr G (deq triv triv (sequal m p))
+  
+| tr_sequal_compat :
+    forall G m n p,
+      tr G (deq triv triv (sequal m n))
+      -> tr G (deq triv triv (sequal (subst1 m p) (subst1 n p)))
+
 (* Structural rules *)
 
 | tr_symmetry :
@@ -1411,4 +1474,356 @@ Inductive tr : @context obj -> judgement -> Prop :=
     forall G m n a,
       tr G (deq m n a)
       -> tr G (deqtype a a)
+
+(* Partial types *)
+
+| tr_partial_formation :
+    forall G a a',
+      tr G (deqtype a a')
+      -> tr G (deqtype (partial a) (partial a'))
+  
+| tr_partial_formation_univ :
+  forall G lv a a',
+      tr G (deq a a' (univ lv))
+      -> tr G (deq (partial a) (partial a') (univ lv))
+  
+| tr_partial_covariant :
+    forall G a b,
+      tr G (dsubtype a b)
+      -> tr G (dsubtype (partial a) (partial b))
+  
+| tr_partial_strict :
+    forall G a,
+      tr G (deqtype a a)
+      -> tr G (dsubtype (partial a) (partial (partial a)))
+  
+| tr_partial_strict_converse :
+    forall G a,
+      tr G (deqtype a a)
+      -> tr G (dsubtype (partial (partial a)) (partial a))
+  
+| tr_halts_formation :
+    forall G a m m',
+      tr G (deq m m' (partial a))
+      -> tr G (deqtype (halts m) (halts m'))
+
+| tr_halts_formation_univ :
+    forall G a m m',
+      tr G (deq m m' (partial a))
+      -> tr G (deq (halts m) (halts m') (univ nzero))
+  
+| tr_bottom_partial_void :
+    forall G,
+      tr G (deq bottom bottom (partial voidtp))
+
+| tr_partial_ext :
+    forall G a m n,
+      tr G (deqtype a a)
+      -> tr G (deqtype (halts m) (halts m))
+      -> tr G (deqtype (halts n) (halts n))
+      -> tr (hyp_tm (halts m) :: G) (deq triv triv (halts (subst sh1 n)))
+      -> tr (hyp_tm (halts n) :: G) (deq triv triv (halts (subst sh1 m)))
+      -> tr (hyp_tm (halts m) :: G) (deq (subst sh1 m) (subst sh1 n) (subst sh1 a))
+      -> tr G (deq m n (partial a))
+
+| tr_partial_elim :
+    forall G a m m',
+      tr G (deq m m' (partial a))
+      -> tr G (deq triv triv (halts m))
+      -> tr G (deq m m' a)
+
+| tr_halts_eta :
+    forall G m p,
+      tr G (deq p p (halts m))
+      -> tr G (deq p triv (halts m))
+  
+| tr_halts_eta_hyp :
+    forall G1 G2 p m n b,
+      tr (substctx (dot triv id) G2 ++ G1) (deq m n (subst (under (length G2) (dot triv id)) b))
+      -> tr (G2 ++ hyp_tm (halts p) :: G1) (deq (subst (under (length G2) sh1) m) (subst (under (length G2) sh1) n) b)
+  
+| tr_fixpoint_induction :
+    forall G a m m',
+      tr G (deq triv triv (admiss a))
+      -> tr G (deq m m' (tarrow (partial a) (partial a)))
+      -> tr G (deq (app theta m) (app theta m') (partial a))
+  
+| tr_partial_formation_invert :
+    forall G a b,
+      tr G (deqtype (partial a) (partial b))
+      -> tr G (deqtype a b)
+  
+(* Seq *)
+
+| tr_seq_bind :
+    forall G a b m m' n n',
+      tr G (deq m m' (partial a))
+      -> tr (cons (hyp_tm a) G) (deq n n' (subst sh1 (partial b)))
+      -> tr G (deqtype b b)
+      -> tr G (deq (seq m n) (seq m' n') (partial b))
+  
+| tr_seq_active :
+    forall G a b m n,
+      tr G (deq m m (partial a))
+      -> tr (cons (hyp_tm a) G) (deq n n (subst sh1 (partial b)))
+      -> tr G (deqtype b b)
+      -> active n
+      -> tr G (deq (seq m n) (subst1 m n) (partial b))
+  
+| tr_active_halts_invert :
+    forall G m n,
+      tr G (deq triv triv (halts (subst1 m n)))
+      -> active n
+      -> tr G (deq triv triv (halts m))
+
+| tr_seq_halts_sequal :
+    forall G m n,
+      tr G (deq triv triv (halts m))
+      -> tr G (deq triv triv (sequal (seq m n) (subst1 m n)))
+  
+(* Totality/Strictness *)
+
+| tr_total_strict :
+    forall G a,
+      tr G (deqtype a a)
+      -> tr (cons (hyp_tm a) G) (deq triv triv (halts (var 0)))
+      -> tr G (dsubtype a (partial a))
+
+| tr_unittp_total :
+    forall G m,
+      tr G (deq m m unittp)
+      -> tr G (deq triv triv (halts m))
+  
+| tr_booltp_total :
+    forall G m,
+      tr G (deq m m booltp)
+      -> tr G (deq triv triv (halts m))
+  
+| tr_pi_total :
+    forall G a b m,
+      tr G (deq m m (pi a b))
+      -> tr G (deq triv triv (halts m))
+  
+| tr_intersect_strict :
+    forall G a b m,
+      tr G (deq m m a)
+      -> tr (cons (hyp_tm a) G) (dsubtype b (partial b))
+      -> tr G (dsubtype (intersect a b) (partial (intersect a b)))
+  
+| tr_sigma_total :
+    forall G a b m,
+      tr G (deq m m (sigma a b))
+      -> tr G (deq triv triv (halts m))
+  
+| tr_fut_total :
+    forall G a m,
+      tr G (deq m m (fut a))
+      -> tr G (deq triv triv (halts m))
+  
+| tr_set_strict :
+    forall G a b,
+      tr (hyp_tm a :: G) (deqtype b b)
+      -> tr G (dsubtype a (partial a))
+      -> tr G (dsubtype (set a b) (partial (set a b)))
+  
+| tr_iset_strict :
+    forall G a b,
+      tr (hyp_tm a :: G) (deqtype b b)
+      -> tr G (dsubtype a (partial a))
+      -> tr G (dsubtype (iset a b) (partial (iset a b)))
+  
+| tr_type_halt :
+    forall G a,
+      tr G (deqtype a a)
+      -> tr G (deq triv triv (halts a))
+  
+(* Uptype *)
+
+| tr_uptype_formation :
+    forall G a a',
+      tr G (deqtype a a')
+      -> tr G (deqtype (uptype a) (uptype a'))
+  
+| tr_uptype_formation_univ :
+    forall G lv a a',
+      tr G (deq a a' (univ lv))
+      -> tr G (deq (uptype a) (uptype a') (univ lv))
+  
+| tr_uptype_eta :
+    forall G a p,
+      tr G (deq p p (uptype a))
+      -> tr G (deq p triv (uptype a))
+  
+| tr_uptype_eta_hyp :
+    forall G1 G2 a m n b,
+      tr (substctx (dot triv id) G2 ++ G1) (deq m n (subst (under (length G2) (dot triv id)) b))
+      -> tr (G2 ++ hyp_tm (uptype a) :: G1) (deq (subst (under (length G2) sh1) m) (subst (under (length G2) sh1) n) b)
+  
+| tr_uptype_eeqtp :
+    forall G a b,
+      tr G (dsubtype a b)
+      -> tr G (dsubtype b a)
+      -> tr G (deq triv triv (uptype a))
+      -> tr G (deq triv triv (uptype b))
+  
+| tr_unitary_uptype :
+    forall G a,
+      tr G (dsubtype a unittp)
+      -> tr G (deq triv triv (uptype a))
+  
+| tr_booltp_uptype :
+    forall G,
+      tr G (deq triv triv (uptype booltp))
+  
+| tr_pi_uptype :
+    forall G a b,
+      tr G (deqtype a a)
+      -> tr (cons (hyp_tm a) G) (deq triv triv (uptype b))
+      -> tr G (deq triv triv (uptype (pi a b)))
+  
+| tr_intersect_uptype :
+    forall G a b,
+      tr G (deqtype a a)
+      -> tr (cons (hyp_tm a) G) (deq triv triv (uptype b))
+      -> tr G (deq triv triv (uptype (intersect a b)))
+  
+| tr_sigma_uptype :
+    forall G a b,
+      tr G (deq triv triv (uptype a))
+      -> tr (cons (hyp_tm a) G) (deq triv triv (uptype b))
+      -> tr G (deq triv triv (uptype (sigma a b)))
+  
+| tr_fut_uptype :
+    forall G a,
+      tr (promote G) (deq triv triv (uptype a))
+      -> tr G (deq triv triv (uptype (fut a)))
+
+| tr_set_uptype :
+    forall G a b,
+      tr G (deq triv triv (uptype a))
+      -> tr (hyp_tm a :: G) (deqtype b b)
+      -> tr G (deq triv triv (uptype (set a b)))
+  
+| tr_iset_uptype :
+    forall G a b,
+      tr G (deq triv triv (uptype a))
+      -> tr (hyp_tm a :: G) (deqtype b b)
+      -> tr G (deq triv triv (uptype (iset a b)))
+
+| tr_mu_uptype :
+    forall G a,
+      tr (cons hyp_tp G) (deqtype a a)
+      -> tr G (deq triv triv (ispositive a))
+      -> tr (hyp_tm (uptype (var 0)) :: hyp_tp :: G) (deq triv triv (uptype (subst sh1 a)))
+      -> tr G (deq triv triv (uptype (mu a)))
+  
+| tr_mu_uptype_univ :
+    forall G lv a,
+      tr G (deq lv lv pagetp)
+      -> tr (hyp_tm (univ lv) :: G) (deq a a (univ (subst sh1 lv)))
+      -> tr G (deq triv triv (ispositive a))
+      -> tr (hyp_tm (uptype (var 0)) :: hyp_tm (univ lv) :: G) (deq triv triv (uptype (subst sh1 a)))
+      -> tr G (deq triv triv (uptype (mu a)))
+  
+| tr_rec_uptype :
+    forall G a,
+      tr (hyp_tml (uptype (var 0)) :: hyp_tpl :: G) (deq triv triv (uptype (subst sh1 a)))
+      -> tr G (deq triv triv (uptype (rec a)))
+  
+| tr_rec_uptype_univ :
+    forall G lv a,
+      tr G (deq lv lv pagetp)
+      -> tr (hyp_tml (univ lv) :: G) (deq a a (univ (subst sh1 lv)))
+      -> tr (hyp_tml (uptype (var 0)) :: hyp_tml (univ lv) :: G) (deq triv triv (uptype (subst sh1 a)))
+      -> tr G (deq triv triv (uptype (rec a)))
+  
+| tr_uptype_formation_invert :
+    forall G a b,
+      tr G (deqtype (uptype a) (uptype b))
+      -> tr G (deqtype a b)
+  
+(* Admissibility *)
+
+| tr_admiss_formation :
+    forall G a a',
+      tr G (deqtype a a')
+      -> tr G (deqtype (admiss a) (admiss a'))
+  
+| tr_admiss_formation_univ :
+    forall G lv a a',
+      tr G (deq a a' (univ lv))
+      -> tr G (deq (admiss a) (admiss a') (univ lv))
+
+| tr_admiss_eta :
+    forall G a p,
+      tr G (deq p p (admiss a))
+      -> tr G (deq p triv (admiss a))
+
+| tr_admiss_eta_hyp :
+    forall G1 G2 a m n b,
+      tr (substctx (dot triv id) G2 ++ G1) (deq m n (subst (under (length G2) (dot triv id)) b))
+      -> tr (G2 ++ hyp_tm (admiss a) :: G1) (deq (subst (under (length G2) sh1) m) (subst (under (length G2) sh1) n) b)
+  
+| tr_admiss_eeqtp :
+    forall G a b,
+      tr G (dsubtype a b)
+      -> tr G (dsubtype b a)
+      -> tr G (deq triv triv (admiss a))
+      -> tr G (deq triv triv (admiss b))
+
+| tr_uptype_admiss :
+    forall G a,
+      tr G (deq triv triv (uptype a))
+      -> tr G (deq triv triv (admiss a))
+
+| tr_partial_admiss :
+    forall G a,
+      tr G (deq triv triv (admiss a))
+      -> tr G (deq triv triv (admiss (partial a)))
+
+| tr_pi_admiss :
+    forall G a b,
+      tr G (deqtype a a)
+      -> tr (cons (hyp_tm a) G) (deq triv triv (admiss b))
+      -> tr G (deq triv triv (admiss (pi a b)))
+  
+| tr_intersect_admiss :
+    forall G a b,
+      tr G (deqtype a a)
+      -> tr (cons (hyp_tm a) G) (deq triv triv (admiss b))
+      -> tr G (deq triv triv (admiss (intersect a b)))
+  
+| tr_prod_admiss :
+    forall G a b,
+      tr G (deq triv triv (admiss a))
+      -> tr G (deq triv triv (admiss b))
+      -> tr G (deq triv triv (admiss (prod a b)))
+  
+| tr_sigma_uptype_admiss :
+    forall G a b,
+      tr G (deq triv triv (uptype a))
+      -> tr (cons (hyp_tm a) G) (deq triv triv (admiss b))
+      -> tr G (deq triv triv (admiss (sigma a b)))
+  
+| tr_fut_admiss :
+    forall G a,
+      tr (promote G) (deq triv triv (admiss a))
+      -> tr G (deq triv triv (admiss (fut a)))
+  
+| tr_rec_admiss :
+    forall G a,
+      tr (hyp_tml (admiss (var 0)) :: hyp_tpl :: G) (deq triv triv (admiss (subst sh1 a)))
+      -> tr G (deq triv triv (admiss (rec a)))
+  
+| tr_rec_admiss_univ :
+    forall G lv a,
+      tr G (deq lv lv pagetp)
+      -> tr (hyp_tml (univ lv) :: G) (deq a a (univ (subst sh1 lv)))
+      -> tr (hyp_tml (admiss (var 0)) :: hyp_tml (univ lv) :: G) (deq triv triv (admiss (subst sh1 a)))
+      -> tr G (deq triv triv (admiss (rec a)))
+
+| tr_admiss_formation_invert :
+    forall G a b,
+      tr G (deqtype (admiss a) (admiss b))
+      -> tr G (deqtype a b)
 .

@@ -86,7 +86,6 @@ do2 3 split; auto.
 Qed.
 
 
-
 Lemma sound_sequal_intro :
   forall G m,
     pseq G (deq triv triv (sequal m m)).
@@ -127,7 +126,6 @@ do2 4 split; auto.
   apply equiv_refl.
   }
 Qed.
-
 
 
 Lemma sound_sequal_eta :
@@ -184,6 +182,73 @@ simpsubin H.
 invert (basic_value_inv _#6 value_sequal H).
 intros _ _ _ _ <-.
 do 3 eexists; reflexivity.
+Qed.
+
+
+Lemma sound_sequal_equal :
+  forall G a m n,
+    pseq G (deq triv triv (sequal m n))
+    -> pseq G (deq m m a)
+    -> pseq G (deq m n a).
+Proof.
+intros G a m n.
+revert G.
+refine (seq_pseq 0 2 [] _ [] _ _ _); cbn.
+intros G Hseqmn Hseqm.
+rewrite -> seq_deq in Hseqmn, Hseqm |- *.
+intros i s s' Hs.
+so (Hseqm _#3 Hs) as (A & Hal & Har & Hm & _).
+so (Hseqmn _#3 Hs) as (R & Hl & Hr & _).
+simpsubin Hl.
+simpsubin Hr.
+invert (basic_value_inv _#6 value_sequal Hl).
+intros Hclsm Hclsn Hequiv _.
+invert (basic_value_inv _#6 value_sequal Hr).
+intros Hclsm' Hclsn' Hequiv' _.
+exists A.
+simpsub.
+do2 4 split; auto.
+  {
+  eapply urel_equiv; eauto.
+  }
+
+  {
+  apply (urel_equiv_2 _#4 (subst s' m)); auto.
+  }
+Qed.
+
+
+Lemma sound_sequal_eqtype :
+  forall G a b,
+    pseq G (deq triv triv (sequal a b))
+    -> pseq G (deqtype a a)
+    -> pseq G (deqtype a b).
+Proof.
+intros G a b.
+revert G.
+refine (seq_pseq 0 2 [] _ [] _ _ _); cbn.
+intros G Hseqab Hseqa.
+rewrite -> seq_eqtype in Hseqa |- *.
+rewrite -> seq_deq in Hseqab.
+intros i s s' Hs.
+so (Hseqa _#3 Hs) as (A & Hal & Har & _).
+so (Hseqab _#3 Hs) as (R & Hl & Hr & _).
+simpsubin Hl.
+simpsubin Hr.
+invert (basic_value_inv _#6 value_sequal Hl).
+intros Hclsa Hclsb Hequiv _.
+invert (basic_value_inv _#6 value_sequal Hr).
+intros Hclsa' Hclsb' Hequiv' _.
+exists A.
+simpsub.
+do2 3 split; auto.
+  {
+  eapply basic_equiv; eauto.
+  }
+
+  {
+  eapply basic_equiv; eauto.
+  }
 Qed.
 
 
@@ -470,7 +535,6 @@ do2 4 split; auto.
   apply interp_sequal; auto using equiv_symm.
   }
 Qed.
-            
 
 
 Lemma sound_sequal_trans :
@@ -511,5 +575,203 @@ do2 4 split; auto.
   apply interp_eval_refl.
   simpsub.
   apply interp_sequal; eauto using equiv_trans.
+  }
+Qed.
+
+
+Lemma sound_sequal_compat :
+  forall G m n p,
+    pseq G (deq triv triv (sequal m n))
+    -> pseq G (deq triv triv (sequal (subst1 m p) (subst1 n p))).
+Proof.
+intros G m n p.
+revert G.
+refine (seq_pseq 1 [hyp_emp] p 1 [] _ _ _); cbn.
+intros G Hclp Hseq.
+rewrite -> seq_deq in Hseq |- *.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (Hseq _#3 Hs) as (R & Hl & Hr & _).
+simpsubin Hl.
+simpsubin Hr.
+invert (basic_value_inv _#6 value_sequal Hl).
+intros Hclsm Hclsn Hequiv _.
+invert (basic_value_inv _#6 value_sequal Hr).
+intros Hclsm' Hclsn' Hequiv' _.
+exists (iubase (unit_urel stop i)).
+simpsub.
+do2 4 split.
+  {
+  apply interp_eval_refl.
+  apply interp_sequal.
+    {
+    eapply hygiene_subst; eauto.
+    intros j Hj.
+    destruct j as [| j].
+      {
+      simpsub.
+      prove_hygiene.
+      }
+    cbn in Hj.
+    simpsub.
+    eapply project_closub; eauto.
+    }
+
+    {
+    eapply hygiene_subst; eauto.
+    intros j Hj.
+    destruct j as [| j].
+      {
+      simpsub.
+      prove_hygiene.
+      }
+    cbn in Hj.
+    simpsub.
+    eapply project_closub; eauto.
+    }
+
+    {
+    cut (equiv (subst1 (subst s m) (subst (under 1 s) p)) (subst1 (subst s n) (subst (under 1 s) p))).
+      {
+      simpsub.
+      auto.
+      }
+    apply equiv_funct1; auto using equiv_refl.
+    }
+  }
+
+  {
+  apply interp_eval_refl.
+  apply interp_sequal.
+    {
+    eapply hygiene_subst; eauto.
+    intros j Hj.
+    destruct j as [| j].
+      {
+      simpsub.
+      prove_hygiene.
+      }
+    cbn in Hj.
+    simpsub.
+    eapply project_closub; eauto.
+    }
+
+    {
+    eapply hygiene_subst; eauto.
+    intros j Hj.
+    destruct j as [| j].
+      {
+      simpsub.
+      prove_hygiene.
+      }
+    cbn in Hj.
+    simpsub.
+    eapply project_closub; eauto.
+    }
+
+    {
+    cut (equiv (subst1 (subst s' m) (subst (under 1 s') p)) (subst1 (subst s' n) (subst (under 1 s') p))).
+      {
+      simpsub.
+      auto.
+      }
+    apply equiv_funct1; auto using equiv_refl.
+    }
+  }
+
+  {
+  do2 5 split; auto using star_refl; prove_hygiene.
+  }
+
+  {
+  do2 5 split; auto using star_refl; prove_hygiene.
+  }
+
+  {
+  do2 5 split; auto using star_refl; prove_hygiene.
+  }
+Qed.
+
+
+Definition flat a :=
+  forall i j s A m p,
+    interp toppg true i (subst s a) A
+    -> rel (den A) j m p
+    -> exists th,
+         canon _ th
+         /\ star step m (oper [] th rw_nil)
+         /\ star step p (oper [] th rw_nil).
+    
+
+Theorem sound_flat_sequal :
+  forall G a m n,
+    flat a
+    -> pseq G (deq m n a)
+    -> pseq G (deq triv triv (sequal m n)).
+Proof.
+intros G a m n Hflat.
+revert G.
+refine (seq_pseq 0 1 [] _ _ _); cbn.
+intros G Hseq.
+rewrite -> seq_deq in Hseq |- *.
+intros i s s' Hs.
+so (Hseq i s s' Hs) as (A & Hal & _ & Hm & Hn & Hmn).
+exists (iubase (unit_urel stop i)).
+simpsub.
+assert (rel (unit_urel stop i) i triv triv) as Htriv.
+  {
+  do2 5 split; auto using star_refl.
+    {
+    apply hygiene_auto; cbn; auto.
+    }
+
+    {
+    apply hygiene_auto; cbn; auto.
+    }
+  }
+assert (forall p q, rel (den A) i p q -> equiv p q) as Hequiv.
+  {
+  clear m n Hseq Hm Hn Hmn Htriv.
+  intros p q Hpq.
+  so (Hflat _#6 Hal Hpq) as (th & _ & Hp & Hq).
+  apply (equiv_trans _ _ (oper [] th rw_nil)).
+    {
+    apply steps_equiv; auto.
+    }
+
+    {
+    apply equiv_symm.
+    apply steps_equiv; auto.
+    }
+  }
+so (urel_closed _#5 Hm) as (Hclsm & Hclsm').
+so (urel_closed _#5 Hn) as (Hclsn & Hclsn').
+do2 4 split; auto.
+  {
+  apply interp_eval_refl.
+  apply interp_sequal; auto.
+  apply (equiv_trans _ _ (subst s' n)).
+    {
+    apply Hequiv; auto.
+    }
+
+    {
+    apply equiv_symm.
+    apply Hequiv; auto.
+    }
+  }
+
+  {
+  apply interp_eval_refl.
+  apply interp_sequal; auto.
+  apply (equiv_trans _ _ (subst s m)).
+    {
+    apply equiv_symm.
+    apply Hequiv; auto.
+    }
+
+    {
+    apply Hequiv; auto.
+    }
   }
 Qed.

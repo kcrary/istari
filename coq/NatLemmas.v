@@ -21,7 +21,7 @@ Require Import Morphism.
 
 Require Import Defined.
 Require Import SumLemmas.
-Require Import PageType.
+Require Import PageCode.
 
 
 
@@ -1400,4 +1400,32 @@ intros m n p.
 unfold natcase, nsucc.
 rewrite -> sumcase_right.
 apply equiv_refl.
+Qed.
+
+
+Lemma tr_nat_total :
+  forall G m,
+    tr G (deq m m nattp)
+    -> tr G (deq triv triv (halts m)).
+Proof.
+intros G m Hm.
+apply (tr_sum_total _ unittp nattp).
+eapply tr_subtype_elim; eauto.
+replace (sumtype unittp nattp) with (@subst1 obj nattp (sumtype unittp (var 0))) by (simpsub; reflexivity).
+apply tr_mu_unroll.
+  {
+  apply tr_sumtype_formation.
+    {
+    apply tr_unittp_istype.
+    }
+  
+    {
+    apply tr_hyp_tp.
+    apply index_0.
+    }
+  }
+
+  {
+  apply tr_positive_nattp_body.
+  }
 Qed.

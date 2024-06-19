@@ -128,6 +128,36 @@ pextensionality.
 Qed.
 
 
+Lemma property_urel_eq_invert :
+  forall P Q w i H H',
+    property_urel P w i H = property_urel Q w i H'
+    -> (forall j, j <= i -> P j <-> Q j).
+Proof.
+intros P Q w i Hdown Hdown' Heq.
+intros j Hj.
+split.
+  {
+  intro HP.
+  assert (rel (property_urel P w i Hdown) j triv triv) as H.
+    {
+    do2 5 split; auto using star_refl; apply hygiene_auto; cbn; auto.
+    }
+  rewrite -> Heq in H.
+  exact (H andel).
+  }
+
+  {
+  intro HQ.
+  assert (rel (property_urel Q w i Hdown') j triv triv) as H.
+    {
+    do2 5 split; auto using star_refl; apply hygiene_auto; cbn; auto.
+    }
+  rewrite <- Heq in H.
+  exact (H andel).
+  }
+Qed.
+
+
 Lemma ceiling_property :
   forall P n w i Hdown,
     ceiling (S n) (property_urel P w i Hdown)

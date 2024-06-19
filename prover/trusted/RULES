@@ -2691,6 +2691,14 @@ x : A |- subtype A B ;
 x : B |- C ext M ;
 
 
+lrule tighten
+x : A ... |- C ext M
+>>
+x : A ... |- subtype B A ;
+x : A ... |- $x : B ;
+x : B ... |- C ext M ;
+
+
 rule subtypeRefl
 A <: A
 >>
@@ -3567,6 +3575,940 @@ x : A, z : (forall {y : A} (arrow (R $y $x) B[$y / w])) |- B [$x / w] ext P ;
 
 
 
+(* Syntactic equality *)
+
+rule sequalForm
+sequal M M : type
+>>
+
+
+rule sequalIntroOf
+() : sequal M M
+>>
+
+
+rule sequalIntro
+sequal M M
+>>
+
+
+rule sequalTrivialize
+sequal M N ext ()
+>>
+|- sequal M N ;
+
+
+rule sequalExt
+P = Q : sequal M N
+>>
+|- P : sequal M N ;
+|- Q : sequal M N ;
+
+
+lrule sequalLeft
+x : (sequal M N) ... |- C ext P
+>>
+...[() / x] |- C[() / x] ext P ;
+
+
+rule sequalEq
+M = N : A
+>>
+|- sequal M N ;
+|- M : A ;
+
+
+rule sequalEqtp
+A = B : type
+>>
+|- sequal A B ;
+|- A : type ;
+
+
+rule sequivalence
+B ext M
+>>
+|- sequal A B ;
+|- A ext M ;
+
+
+lrule sequivalenceLeft
+x : A ... |- C ext M
+>>
+x : A ... |- sequal A B ;
+x : B ... |- C ext M ;
+
+
+lrule substitutionSyntactic
+x : A ... |- B ext N
+>>
+x : A ... |- sequal $x M ;
+...[M / x] |- B[M / x] ext N ;
+
+
+rule sequalSymm
+sequal N M
+>>
+|- sequal M N ;
+
+
+rule sequalTrans
+sequal M P
+>>
+|- sequal M N ;
+|- sequal N P ;
+
+
+rule sequalCompat
+sequal P[M / x] P[N / x]
+>>
+|- sequal M N ;
+
+
+
+(* Partial types *)
+
+rule partialForm
+partial A : type
+>>
+|- A : type ;
+
+
+rule partialEq
+partial A = partial B : type
+>>
+|- A = B : type ;
+
+
+rule partialFormUniv
+partial A : Ui
+>>
+|- A : Ui ;
+
+
+rule partialEqUniv
+partial A = partial B : Ui
+>>
+|- A = B : Ui ;
+
+
+rule partialSub
+partial A <: partial B
+>>
+|- A <: B ;
+
+
+rule partialStrict
+partial A <: partial (partial A)
+>>
+|- A : type ;
+
+
+rule partialStrictConverse
+partial (partial A) <: partial A
+>>
+|- A : type ;
+
+
+rule partialIdem
+eeqtp (partial (partial A)) (partial A) ext ((), ())
+>>
+|- A : type ;
+
+
+rule haltsForm
+halts M : type
+>>
+|- M : partial A ;
+
+
+rule haltsEq
+halts M = halts N : type
+>>
+|- M = N : partial A ;
+
+
+rule haltsFormUniv
+halts M : Ui
+>>
+|- I : level ;
+|- M : partial A ;
+
+
+rule haltsEqUniv
+halts M = halts N : Ui
+>>
+|- I : level ;
+|- M = N : partial A ;
+
+
+rule partialIntroBottomOf
+bottom : partial A
+>>
+|- A : type ;
+
+
+rule bottomDiverges
+void
+>>
+|- halts bottom ;
+
+
+rule partialExt
+M = N : partial A
+>>
+|- A : type ;
+|- iff (halts M) (halts N) ;
+x : (halts M) |- M = N : A ;
+
+
+rule partialElimEq
+M = N : A
+>>
+|- M = N : partial A ;
+|- halts M ;
+
+
+rule partialElimOf
+M : A
+>>
+|- M : partial A ;
+|- halts M ;
+
+
+rule haltsTrivialize
+halts M ext ()
+>>
+|- halts M ;
+
+
+rule haltsExt
+N = P : halts M
+>>
+|- N : halts M ;
+|- P : halts M ;
+
+
+lrule haltsLeft
+x : (halts M) ... |- C ext N
+>>
+...[() / x] |- C[() / x] ext N ;
+
+
+rule fixpointInductionEq
+fix M = fix N : partial A
+>>
+|- M = N : arrow (partial A) (partial A) ;
+|- admiss A ;
+
+
+rule fixpointInductionOf
+fix M : partial A
+>>
+|- M : arrow (partial A) (partial A) ;
+|- admiss A ;
+
+
+rule partialFormInv
+A : type
+>>
+|- partial A : type ;
+
+
+
+(* Active positions *)
+
+rule seqBind
+seq M (fn x . N) = seq M' (fn x . N') : partial B
+>>
+|- M = M' : partial A ;
+x : A |- N = N' : partial B ;
+|- B : type ;
+
+
+rule activeApp
+M N : partial B
+>>
+|- M : partial A ;
+x : A |- $x N : partial B ;
+|- B : type ;
+
+
+rule activeAppSeq
+M N = seq M (fn x . $x N) : partial B
+>>
+|- M : partial A ;
+x : A |- $x N : partial B ;
+|- B : type ;
+
+
+rule appHaltsInv
+halts M
+>>
+|- halts (M N) ;
+
+
+rule activePi1
+M #1 : partial B
+>>
+|- M : partial A ;
+x : A |- $x #1 : partial B ;
+|- B : type ;
+
+
+rule activePi1Seq
+M #1 = seq M (fn x . $x #1) : partial B
+>>
+|- M : partial A ;
+x : A |- $x #1 : partial B ;
+|- B : type ;
+
+
+rule pi1HaltsInv
+halts M
+>>
+|- halts (M #1) ;
+
+
+rule activePi2
+M #2 : partial B
+>>
+|- M : partial A ;
+x : A |- $x #2 : partial B ;
+|- B : type ;
+
+
+rule activePi2Seq
+M #2 = seq M (fn x . $x #2) : partial B
+>>
+|- M : partial A ;
+x : A |- $x #2 : partial B ;
+|- B : type ;
+
+
+rule pi2HaltsInv
+halts M
+>>
+|- halts (M #2) ;
+
+
+rule prevHaltsInv
+halts M
+>>
+|- halts (M #prev) ;
+
+
+rule activeCase
+sum_case M (fn y . P) (fn y . R) : partial B
+>>
+|- M : partial A ;
+x : A |- sum_case $x (fn y . P) (fn y . R) : partial B ;
+|- B : type ;
+
+
+rule activeCaseSeq
+sum_case M (fn y . P) (fn y . R) = seq M (fn x . sum_case $x (fn y . P) (fn y . R)) : partial B
+>>
+|- M : partial A ;
+x : A |- sum_case $x (fn y . P) (fn y . R) : partial B ;
+|- B : type ;
+
+
+rule caseHaltsInv
+halts M
+>>
+|- halts (sum_case M (fn y . P) (fn y . R)) ;
+
+
+rule seqHaltsSequal
+sequal (seq M (fn x . N)) N[M / x]
+>>
+|- halts M ;
+
+
+rule seqHaltsInv
+halts M
+>>
+|- halts (seq M N) ;
+
+
+
+(* Totality / Strictness *)
+
+rule totalStrict
+A <: partial A
+>>
+|- A : type ;
+x : A |- halts $x ;
+
+
+rule voidStrict
+void <: partial void
+>>
+
+
+rule unitTotal
+halts M
+>>
+|- M : unit ;
+
+
+rule unitStrict
+unit <: partial unit
+>>
+
+
+rule boolTotal
+halts M
+>>
+|- M : bool ;
+
+
+rule boolStrict
+bool <: partial bool
+>>
+
+
+rule forallTotal
+halts M
+>>
+|- M : forall {x : A} B ;
+
+
+rule forallStrict
+forall {x : A} B <: partial (forall {x : A} B)
+>>
+|- A : type ;
+x : A |- B : type ;
+
+
+rule arrowTotal
+halts M
+>>
+|- M : arrow A B ;
+
+
+rule arrowStrict
+arrow A B <: partial (arrow A B)
+>>
+|- A : type ;
+|- B : type ;
+
+
+rule intersectStrict
+intersect {x : A} B <: partial (intersect {x : A} B)
+>>
+|- A ;
+x : A |- B <: partial B ;
+
+
+rule existsTotal
+halts M
+>>
+|- M : exists {x : A} B ;
+
+
+rule existsStrict
+exists {x : A} B <: partial (exists {x : A} B)
+>>
+|- A : type ;
+x : A |- B : type ;
+
+
+rule prodTotal
+halts M
+>>
+|- M : prod A B ;
+
+
+rule prodStrict
+prod A B <: partial (prod A B)
+>>
+|- A : type ;
+|- B : type ;
+
+
+rule sumTotal
+halts M
+>>
+|- M : sum A B ;
+
+
+rule sumStrict
+sum A B <: partial (sum A B)
+>>
+|- A : type ;
+|- B : type ;
+
+
+rule futureTotal
+halts M
+>>
+|- M : future A ;
+
+
+rule futureStrict
+future A <: partial (future A)
+>>
+promote |- A : type ;
+
+
+rule setStrict
+set {x : A} B <: partial (set {x : A} B)
+>>
+x : A |- B : type ;
+|- A <: partial A ;
+
+
+rule isetStrict
+iset {x : A} B <: partial (iset {x : A} B)
+>>
+x : A |- B : type ;
+|- A <: partial A ;
+
+
+rule natTotal
+halts M
+>>
+|- M : nat ;
+
+
+rule natStrict
+nat <: partial nat
+>>
+
+
+rule typeHalts
+halts A
+>>
+|- A : type ;
+
+
+
+(* Upward Closure *)
+
+rule uptypeForm
+uptype A : type
+>>
+|- A : type;
+
+
+rule uptypeEq
+uptype A = uptype B : type
+>>
+|- A = B : type ;
+
+
+rule uptypeFormUniv
+uptype A : Ui
+>>
+|- A : Ui ;
+
+
+rule uptypeEqUniv
+uptype A = uptype B : Ui
+>>
+|- A = B : Ui ;
+
+
+rule uptypeTrivialize
+uptype A ext ()
+>>
+|- uptype A ;
+
+
+rule uptypeExt
+M = N : uptype A
+>>
+|- M : uptype A ;
+|- N : uptype A ;
+
+
+lrule uptypeLeft
+x : (uptype A) ... |- B ext M
+>>
+...[() / x] |- B [() / x] ext M;
+
+
+rule uptypeEeqtp
+uptype B
+>>
+|- uptype A ;
+|- eeqtp A B ;
+
+
+rule uptypeUnitary
+uptype A
+>>
+|- A <: unit ;
+
+
+rule voidUptype
+uptype void
+>>
+
+
+rule unitUptype
+uptype unit
+>>
+
+
+rule boolUptype
+uptype bool
+>>
+
+
+rule forallUptype
+uptype (forall {x : A} B)
+>>
+|- A : type ;
+x : A |- uptype B ;
+
+
+rule arrowUptype
+uptype (arrow A B)
+>>
+|- A : type ;
+|- uptype B ;
+
+
+rule intersectUptype
+uptype (intersect {x : A} B)
+>>
+|- A : type ;
+x : A |- uptype B ;
+
+
+rule existsUptype
+uptype (exists {x : A} B)
+>>
+|- uptype A ;
+x : A |- uptype B ;
+
+
+rule prodUptype
+uptype (prod A B)
+>>
+|- uptype A ;
+|- uptype B ;
+
+
+rule sumUptype
+uptype (sum A B)
+>>
+|- uptype A ;
+|- uptype B ;
+
+
+rule futureUptype
+uptype (future A)
+>>
+promote |- uptype A ; 
+
+
+rule eqUptype
+uptype (M = N : A)
+>>
+|- M : A ;
+|- N : A ;
+
+
+rule ofUptype
+uptype (M : A)
+>>
+|- M : A ;
+
+
+rule eqtpUptype
+uptype (A = B : type)
+>>
+|- A : type ;
+|- B : type ;
+
+
+rule istpUptype
+uptype (A : type)
+>>
+|- A : type ;
+
+
+rule subtypeUptype
+uptype (A <: B)
+>>
+|- A : type ;
+|- B : type ;
+
+
+rule setUptype
+uptype (set {x : A} B)
+>>
+|- uptype A ;
+x : A |- istp B ;
+
+
+rule isetUptype
+uptype (iset {x : A} B)
+>>
+|- uptype A ;
+x : A |- istp B ;
+
+
+rule muUptype
+uptype (mu (fn t . A))
+>>
+t : type |- A : type ;
+t : type, x : (uptype $t) |- uptype A ;
+|- positive (fn t . A) ;
+
+
+rule muUptypeUniv
+uptype (mu (fn t . A))
+>>
+|- I : level ;
+t : Ui |- A : Ui ;
+t : Ui, x : (uptype $t) |- uptype A ;
+|- positive (fn t . A) ;
+
+
+rule recUptype
+uptype (rec (fn t . A))
+>>
+t : demote type |- A : type ;
+t : demote type, x : demote (uptype $t) |- uptype A ;
+
+
+rule recUptypeUniv
+uptype (rec (fn t . A))
+>>
+|- I : level ;
+t : demote Ui |- A : Ui ;
+t : demote Ui, x : demote (uptype $t) |- uptype A ;
+
+
+rule natUptype
+uptype nat
+>>
+
+
+rule uptypeFormInv
+A : type
+>>
+|- uptype A : type ;
+
+
+
+(* Admissibility *)
+
+rule admissForm
+admiss A : type
+>>
+|- A : type;
+
+
+rule admissEq
+admiss A = admiss B : type
+>>
+|- A = B : type ;
+
+
+rule admissFormUniv
+admiss A : Ui
+>>
+|- A : Ui ;
+
+
+rule admissEqUniv
+admiss A = admiss B : Ui
+>>
+|- A = B : Ui ;
+
+
+rule admissTrivialize
+admiss A ext ()
+>>
+|- admiss A ;
+
+
+rule admissExt
+M = N : admiss A
+>>
+|- M : admiss A ;
+|- N : admiss A ;
+
+
+lrule admissLeft
+x : (admiss A) ... |- B ext M
+>>
+...[() / x] |- B [() / x] ext M;
+
+
+rule admissEeqtp
+admiss B
+>>
+|- admiss A ;
+|- eeqtp A B ;
+
+
+rule uptypeAdmiss
+admiss A
+>>
+|- uptype A ;
+
+
+rule partialAdmiss
+admiss (partial A)
+>>
+|- admiss A ;
+
+
+rule voidAdmiss
+admiss void
+>>
+
+
+rule unitAdmiss
+admiss unit
+>>
+
+
+rule boolAdmiss
+admiss bool
+>>
+
+
+rule forallAdmiss
+admiss (forall {x : A} B)
+>>
+|- A : type ;
+x : A |- admiss B ;
+
+
+rule arrowAdmiss
+admiss (arrow A B)
+>>
+|- A : type ;
+|- admiss B ;
+
+
+rule intersectAdmiss
+admiss (intersect {x : A} B)
+>>
+|- A : type ;
+x : A |- admiss B ;
+
+
+rule existsAdmissUptype
+admiss (exists {x : A} B)
+>>
+|- uptype A ;
+x : A |- admiss B ;
+
+
+rule prodAdmiss
+admiss (prod A B)
+>>
+|- admiss A ;
+|- admiss B ;
+
+
+rule sumAdmiss
+admiss (sum A B)
+>>
+|- admiss A ;
+|- admiss B ;
+
+
+rule futureAdmiss
+admiss (future A)
+>>
+promote |- admiss A ;
+
+
+rule eqAdmiss
+admiss (M = N : A)
+>>
+|- M : A ;
+|- N : A ;
+
+
+rule ofAdmiss
+admiss (M : A)
+>>
+|- M : A ;
+
+
+rule eqtpAdmiss
+admiss (A = B : type)
+>>
+|- A : type ;
+|- B : type ;
+
+
+rule istpAdmiss
+admiss (A : type)
+>>
+|- A : type ;
+
+
+rule subtypeAdmiss
+admiss (A <: B)
+>>
+|- A : type ;
+|- B : type ;
+
+
+rule recAdmiss
+admiss (rec (fn t . A))
+>>
+t : demote type |- A : type ;
+t : demote type, x : demote (admiss $t) |- admiss A ;
+
+
+rule recAdmissUniv
+admiss (rec (fn t . A))
+>>
+|- I : level ;
+t : demote Ui |- A : Ui ;
+t : demote Ui, x : demote (admiss $t) |- admiss A ;
+
+
+rule natAdmiss
+admiss nat
+>>
+
+
+rule admissFormInv
+A : type
+>>
+|- admiss A : type ;
+
+
+rule partialType
+partial : intersect {i : level} (arrow (univ $i) (univ $i))
+>>
+
+
+rule haltsType
+halts : intersect {i : level} (intersect {a : (univ $i)} (arrow (partial $a) (univ lzero)))
+>>
+
+
+rule admissType
+admiss : intersect {i : level} (arrow (univ $i) (univ $i))
+>>
+
+
+rule uptypeType
+uptype : intersect {i : level} (arrow (univ $i) (univ $i))
+>>
+
+
+rule seqType
+seq : intersect {i : level} (intersect {a : (univ $i)} (intersect {b : (univ $i)} (arrow (partial $a) (arrow (arrow $a (partial $b)) (partial $b)))))
+>>
+
+
+
 (* Rewriting *)
 
 rule eeqtpRefl
@@ -4030,6 +4972,33 @@ timesz = (fn x y . integer_from_Integer (cTimesz (integer_to_Integer $x) (intege
 >>
 
 
+axiom integerTotal
+halts M
+>>
+|- M : integer ;
+
+
+axiom integerStrict
+integer <: partial integer
+>>
+
+
+axiom integerUptype
+uptype integer
+>>
+
+
+axiom integerAdmiss
+admiss integer
+>>
+
+
+axiom integerSequal
+sequal M N
+>>
+|- M = N : integer ;
+
+
 
 (* Symbols *)
 
@@ -4070,3 +5039,30 @@ axiom symbol_eqbSpec2
 M = N : symbol
 >>
 |- symbol_eqb M N = true : bool ;
+
+
+axiom symbolTotal
+halts M
+>>
+|- M : symbol ;
+
+
+axiom symbolStrict
+symbol <: partial symbol
+>>
+
+
+axiom symbolUptype
+uptype symbol
+>>
+
+
+axiom symbolAdmiss
+admiss symbol
+>>
+
+
+axiom symbolSequal
+sequal M N
+>>
+|- M = N : symbol ;

@@ -15,7 +15,7 @@ Require Import Morphism.
 Require Import Equivalence.
 Require Import Equivalences.
 Require Import Defined.
-Require Import PageType.
+Require Import PageCode.
 Require Import Dots.
 
 
@@ -44,7 +44,7 @@ eapply star_trans.
     apply (star_map' _ _ (fun z => app z _)); eauto using step_app1.
     eapply star_trans.
       {
-      apply PageType.theta_fix.
+      apply PageCode.theta_fix.
       }
       apply star_one.
     apply step_app2.
@@ -1499,4 +1499,21 @@ eapply tr_subtype_convert_hyp; eauto.
   cbn [List.app].
   auto.
   }
+Qed.
+
+
+Lemma tr_halts_eta2 :
+  forall G p q m,
+    tr G (deq p q (halts m))
+    -> tr G (deq triv triv (halts m)).
+Proof.
+intros G p q m Htr.
+assert (tr G (deq p triv (halts m))) as Htr'.
+  {
+  apply tr_halts_eta.
+  apply (tr_transitivity _ _ q); auto.
+  apply tr_symmetry; auto.
+  }
+apply (tr_transitivity _ _ p); auto.
+apply tr_symmetry; auto.
 Qed.

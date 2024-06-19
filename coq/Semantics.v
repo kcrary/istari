@@ -45,6 +45,7 @@ Require Import SemanticsSimple.
 Require Import SemanticsSubtype.
 Require Import SemanticsUniv.
 Require Import SemanticsWtype.
+Require Import SemanticsPartial.
 Require Import PreSpacify.
 
 
@@ -459,6 +460,25 @@ with basicv : page -> bool -> nat -> sterm -> wiurel stop -> Prop :=
       -> lt_page (succ_page gpg h) pg
       -> basicv pg s i (kind m) (iukind system i gpg h)
 
+| interp_partial :
+    forall pg s i a (A : wiurel stop),
+      basic pg s i a A
+      -> basicv pg s i (partial a) (iupartial stop i A)
+
+| interp_halts :
+    forall pg s i m,
+      hygiene clo m
+      -> basicv pg s i (halts m) (iubase (halts_urel stop i m))
+
+| interp_admiss :
+    forall pg s i a (A : wiurel stop),
+      basic pg s i a A
+      -> basicv pg s i (admiss a) (iuadmiss stop i A)
+
+| interp_uptype :
+    forall pg s i a (A : wiurel stop),
+      basic pg s i a A
+      -> basicv pg s i (uptype a) (iuuptype stop i A)
 
 
 with kbasic : page -> bool -> nat -> sterm -> qkind -> Prop :=

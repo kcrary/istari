@@ -848,3 +848,38 @@ unfold pagelit.
 rewrite -> Hstr.
 eapply lvinterp_levellit; eauto.
 Qed.
+
+
+
+(* Fix *)
+
+Lemma theta_fix' :
+  forall object (m : term object),
+    plus step (app theta m) (app m (app theta m)).
+Proof.
+intros object m.
+eexists.
+split.
+  {
+  apply step_app1.
+  unfold theta.
+  apply step_app2.
+  }
+simpsub.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl.
+Qed.
+
+
+Lemma theta_fix :
+  forall object (m : term object),
+    star step (app theta m) (app m (app theta m)).
+Proof.
+intros object m.
+apply plus_star.
+apply theta_fix'.
+Qed.

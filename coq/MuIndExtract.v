@@ -11,7 +11,7 @@ Require Import Syntax.
 Require Import SimpSub.
 Require Import Dynamic.
 Require Import Equivalence.
-Require Import PageType.
+Require Import PageCode.
 Require Import Equivalences.
 Require Import Rules.
 Require Import Defined.

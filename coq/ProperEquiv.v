@@ -23,6 +23,8 @@ Require Import SemanticsEqual.
 Require Import SemanticsMu.
 Require Import SemanticsProperty.
 Require Import SemanticsPositive.
+Require Import SemanticsPartial.
+Require Import Approximation.
 
 
 Section semantics.
@@ -502,6 +504,58 @@ destruct H as (Hhyg' & _).
 apply interp_rec; eauto.
 apply IH; eauto using equiv_funct1 with equiv_compat.
 apply hygiene_subst1; auto.
+}
+
+(* partial *)
+{
+intros pg s i a A _ IH aa Hclaa Hequiv.
+invertc_mc Hequiv.
+intros a' Ha.
+fold (partial a').
+intros <-.
+so (hygiene_invert_auto _#5 Hclaa) as H; cbn in H.
+destruct H as (Hcla' & _).
+apply interp_partial; auto.
+}
+
+(* halts *)
+{
+intros pg s i m _ aa Hclaa Hequiv.
+invertc_mc Hequiv.
+intros m' Hm.
+fold (halts m').
+intros <-.
+so (hygiene_invert_auto _#5 Hclaa) as H; cbn in H.
+destruct H as (Hclm' & _).
+replace (halts_urel stop i m) with (halts_urel stop i m').
+2:{
+  apply property_urel_extensionality; auto.
+  intros j Hj.
+  split; eauto using equiv_converges, equiv_symm.
+  }
+apply interp_halts; auto.
+}
+
+(* admiss *)
+{
+intros pg s i a A _ IH aa Hclaa Hequiv.
+invertc_mc Hequiv.
+intros a' Ha.
+fold (admiss a').
+intros <-.
+so (hygiene_invert_auto _#5 Hclaa) as (Hcla' & _).
+apply interp_admiss; auto.
+}
+
+(* uptype *)
+{
+intros pg s i a A _ IH aa Hclaa Hequiv.
+invertc_mc Hequiv.
+intros a' Ha.
+fold (uptype a').
+intros <-.
+so (hygiene_invert_auto _#5 Hclaa) as (Hcla' & _).
+apply interp_uptype; auto.
 }
 
 (* kbasic *)

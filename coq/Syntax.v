@@ -93,6 +93,12 @@ Inductive operator : list nat -> Type :=
 
 | oper_wt          : operator [0; 1]
 
+| oper_partial     : operator [0]
+| oper_halts       : operator [0]
+| oper_admiss      : operator [0]
+| oper_uptype      : operator [0]
+| oper_seq         : operator [0; 1]
+
 (* Candidates used for impredicative quantification. *)
 | oper_ext         : object -> operator nil
 
@@ -551,6 +557,11 @@ Definition iset {obj} m1 m2        : @term obj := oper _ (oper_iset _) (rw_cons 
 Definition quotient {obj} m1 m2    : @term obj := oper _ (oper_quotient _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition guard {obj} m1 m2       : @term obj := oper _ (oper_guard _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition wt {obj} m1 m2          : @term obj := oper _ (oper_wt _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
+Definition partial {obj} m         : @term obj := oper _ (oper_partial _) (rw_cons _ _ m rw_nil).
+Definition halts {obj} m           : @term obj := oper _ (oper_halts _) (rw_cons _ _ m rw_nil).
+Definition admiss {obj} m          : @term obj := oper _ (oper_admiss _) (rw_cons _ _ m rw_nil).
+Definition uptype {obj} m          : @term obj := oper _ (oper_uptype _) (rw_cons _ _ m rw_nil).
+Definition seq {obj} m1 m2         : @term obj := oper _ (oper_seq _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition ext {obj} x             : @term obj := oper _ (oper_ext _ x) rw_nil.
 Definition extt {obj} x            : @term obj := oper _ (oper_extt _ x) rw_nil.
 
@@ -727,6 +738,21 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 
 | same_wt :
     same_operator [0; 1] [0; 1] (oper_wt A) (oper_wt B)
+
+| same_partial :
+    same_operator [0] [0] (oper_partial A) (oper_partial B)
+
+| same_halts :
+    same_operator [0] [0] (oper_halts A) (oper_halts B)
+
+| same_admiss :
+    same_operator [0] [0] (oper_admiss A) (oper_admiss B)
+
+| same_uptype :
+    same_operator [0] [0] (oper_uptype A) (oper_uptype B)
+
+| same_seq :
+    same_operator [0; 1] [0; 1] (oper_seq A) (oper_seq B)
 
 | same_ext {x y} :
     same_operator nil nil (oper_ext A x) (oper_ext B y)

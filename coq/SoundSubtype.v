@@ -33,6 +33,7 @@ Require Import ContextHygiene.
 Require Import Truncate.
 Require Import ProperDownward.
 Require Import Subsumption.
+Require Import SemanticsEqual.
 
 
 Local Ltac prove_hygiene :=
@@ -670,6 +671,229 @@ do2 4 split.
     destruct Hmp as (_ & Hmp).
     split; auto.
     rewrite -> Heq; auto.
+    }
+  }
+Qed.
+
+
+Lemma sound_tighten :
+  forall G1 G2 a b J,
+    pseq G1 (dsubtype b a)
+    -> pseq (G2 ++ hyp_tm (equal (subst sh1 b) (var 0) (var 0)) :: hyp_tm b :: G1) J
+    -> pseq (G2 ++ hyp_tm (equal (subst sh1 b) (var 0) (var 0)) :: hyp_tm a :: G1) J.
+Proof.
+intros G1 G2 a b J.
+revert G1.
+refine (seq_pseq_hyp 0 2 [] [] _ _ [_; _] _ _ [_; _] _ _); cbn.
+intros G1 Hsub Hseq HclJ.
+rewrite -> seq_subtype in Hsub.
+replace J with (substj (under (length G2) id) J) in Hseq by (simpsub; reflexivity).
+replace G2 with (substctx id G2) in Hseq by (simpsub; reflexivity).
+refine (subsume_seq _ _ (under (length G2) id) _ _ HclJ _ Hseq).
+rewrite -> length_substctx.
+apply subsume_under.
+clear Hseq HclJ J G2.
+do2 2 split.
+  {
+  intros j.
+  split.
+    {
+    intro Hj.
+    cbn.
+    simpsub.
+    apply hygiene_var; auto.
+    }
+
+    {
+    intro Hj.
+    cbn.
+    simpsubin Hj.
+    invert Hj.
+    auto.
+    }
+  }
+
+  {
+  intros j.
+  split.
+    {
+    intro Hj.
+    cbn.
+    simpsub.
+    apply hygiene_var; auto.
+    }
+
+    {
+    intro Hj.
+    cbn.
+    simpsubin Hj.
+    invert Hj.
+    auto.
+    }
+  }
+intros i ss ss' Hss.
+invertc Hss.
+intros p q ss1 ss1' Hss1 Hpq Hleft1 Hright1 <- <-.
+invertc Hss1.
+intros m n s s' Hs Hmn Hleft Hright <- <-.
+simpsubin Hpq.
+simpsubin Hmn.
+invertc Hmn.
+intros A Hal Har _.
+invertc Hpq.
+intros R Hofl Hofr Hpq.
+invert (basic_value_inv _#6 value_equal Hofl).
+intros t t' B Hmt Hmt' Hbl Heq.
+invert (basic_value_inv _#6 value_equal Hofr).
+intros r r' B' Hrn Hrn' Hbr Heq'.
+rewrite -> iuequal_swap in Heq'.
+cbn [negb] in Heq'.
+so (iuequal_inj _#17 (eqtrans Heq (eqsymm Heq'))) as (<- & Hmn & _).
+unfold srel in Hmn.
+clear t t' Hmt Hmt' r r' Hrn Hrn' Heq Heq'.
+so (Hsub _#3 Hs) as (B' &  A' & Hbl' & _ & Hal' & _ & Hsubprop).
+so (basic_fun _#7 Hal Hal').
+so (basic_fun _#7 Hbl Hbl').
+subst A' B'.
+clear Hal' Hbl'.
+decompose Hsubprop.
+intro Hba.
+simpsub.
+do2 4 split; auto using equivsub_refl.
+  {
+  apply pwctx_cons_tm_seq.
+    {
+    apply pwctx_cons_tm_seq; auto.
+      {
+      apply (seqhyp_tm _#5 B); auto.
+      }
+
+      {
+      intros j t t' Ht.
+      so (Hsub _#3 Ht) as (B' & _ & Hl & Hr & _).
+      exists toppg, B'.
+      auto.
+      }
+    }
+
+    {
+    apply (seqhyp_tm _#5 R); simpsub; auto.
+    }
+
+    {
+    clear R Hofl Hofr Hpq.
+    intros j uu uu' Huu.
+    invertc Huu.
+    intros r t u u' Hu Hrt _ _ <- <-.
+    simpsubin Hrt.
+    invertc Hrt.
+    intros R Hl Hr Hrt.
+    exists toppg, (iuequal stop true j R r r t t Hrt Hrt).
+    simpsub.
+    split.
+      {
+      apply interp_eval_refl.
+      apply interp_equal; auto.
+      }
+
+      {
+      rewrite -> iuequal_swap.
+      cbn [negb].
+      apply interp_eval_refl.
+      apply interp_equal; auto.
+      }
+    }
+  }
+
+  {
+  intros j d uu Hsmall Huu.
+  so (smaller_impl_le _#3 Hsmall) as Hj.
+  simpsubin Huu.
+  simpsub.
+  rewrite -> qpromote_cons in Huu |- *.
+  rewrite -> qpromote_hyp_tm in Huu |- *.
+  rewrite -> qpromote_cons in Huu |- *.
+  rewrite -> qpromote_hyp_tm in Huu |- *.
+  invertc Huu.
+  intros r uu1 Huu1 Hrm <-.
+  invertc Huu1.
+  intros n' u Hu Hmn' <-.
+  apply seqctx_cons.
+  2:{
+    simpsub.
+    simpsubin Hrm.
+    auto.
+    }
+  apply seqctx_cons; auto.
+  simpsubin Hmn'.
+  simpsub.
+  invertc Hmn'.
+  intros B' Hbl' _ Hmn'.
+  so (basic_fun _#7 (basic_downward _#7 Hj Hbl) Hbl').
+  subst B'.
+  destruct Hmn' as (_ & Hmn').
+  apply (seqhyp_tm _#5 (iutruncate (S j) A)).
+    {
+    eapply basic_downward; eauto.
+    }
+
+    {
+    so (seqctx_pwctx_demote_left _#7 Hsmall Hs Hu) as Hu'.
+    so (Hsub _#3 Hu') as (_ & A' & _ & _ & Hal' & Har' & _).
+    so (basic_fun _#7 (basic_downward _#7 Hj Hal) Hal').
+    subst A'.
+    exact Har'.
+    }
+
+    {
+    split; [omega |].
+    apply Hba; auto.
+    }
+  }
+
+  {
+  intros j d uu Hsmall Huu.
+  so (smaller_impl_le _#3 Hsmall) as Hj.
+  simpsubin Huu.
+  simpsub.
+  rewrite -> qpromote_cons in Huu |- *.
+  rewrite -> qpromote_hyp_tm in Huu |- *.
+  rewrite -> qpromote_cons in Huu |- *.
+  rewrite -> qpromote_hyp_tm in Huu |- *.
+  invertc Huu.
+  intros r uu1 Huu1 Hnr <-.
+  invertc Huu1.
+  intros m' u Hu Hmn' <-.
+  apply seqctx_cons.
+  2:{
+    simpsub.
+    simpsubin Hnr.
+    auto.
+    }
+  apply seqctx_cons; auto.
+  simpsubin Hmn'.
+  simpsub.
+  invertc Hmn'.
+  intros B' _ Hbr' Hmn'.
+  so (basic_fun _#7 (basic_downward _#7 Hj Hbr) Hbr').
+  subst B'.
+  destruct Hmn' as (_ & Hmn').
+  apply (seqhyp_tm _#5 (iutruncate (S j) A)).
+    {
+    so (seqctx_pwctx_demote_right _#7 Hsmall Hs Hu) as Hu'.
+    so (Hsub _#3 Hu') as (_ & A' & _ & _ & Hal' & Har' & _).
+    so (basic_fun _#7 (basic_downward _#7 Hj Har) Har').
+    subst A'.
+    exact Hal'.
+    }
+
+    {
+    eapply basic_downward; eauto.
+    }
+
+    {
+    split; [omega |].
+    apply Hba; auto.
     }
   }
 Qed.

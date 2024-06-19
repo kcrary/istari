@@ -38,6 +38,24 @@ Ltac prove_the_hygiene :=
   first [apply hygiene_var | apply hygiene_shift' | idtac]; auto.
 
 
+Lemma def_admiss :
+  forall a, equiv (app Defs.admiss a) (admiss a).
+Proof.
+intros a.
+unfold Defs.admiss.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+
+  {
+  simpsub.
+  apply star_refl.
+  }
+Qed.
+
+
 Lemma def_alltp :
   forall a, equiv (app Defs.foralltp (lam a)) (alltp a).
 Proof.
@@ -186,6 +204,24 @@ eapply star_step.
   }
 simpsub.
 apply star_refl.
+Qed.
+
+
+Lemma def_halts :
+  forall m, equiv (app Defs.halts m) (halts m).
+Proof.
+intros m.
+unfold Defs.halts.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+
+  {
+  simpsub.
+  apply star_refl.
+  }
 Qed.
 
 
@@ -622,6 +658,24 @@ apply star_refl.
 Qed.
 
 
+Lemma def_partial :
+  forall a, equiv (app Defs.partial a) (partial a).
+Proof.
+intros a.
+unfold Defs.partial.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+
+  {
+  simpsub.
+  apply star_refl.
+  }
+Qed.
+
+
 Lemma def_pi :
   forall a b,
     equiv (app (app Defs.pi a) (lam b)) (pi a b).
@@ -689,6 +743,64 @@ eapply equiv_trans.
   rewrite -> subst_var0_sh1.
   apply star_refl.
   }
+Qed.
+
+
+Lemma def_seq :
+  forall m n,
+    equiv (app (app Defs.seq m) (lam n)) (seq m n).
+Proof.
+intros m n.
+unfold Defs.seq.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app1.
+    apply step_app2.
+    }
+  simpsub.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+apply equiv_seq; auto using equiv_refl.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl'.
+rewrite <- eqsub_expand_id.
+simpsub.
+reflexivity.
+Qed.
+
+
+Lemma def_sequal :
+  forall m n,
+    equiv (app (app Defs.sequal m) n) (sequal m n).
+Proof.
+intros m n.
+unfold Defs.sequal.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app1.
+  apply step_app2.
+  }
+simpsub.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl.
 Qed.
 
 
@@ -914,6 +1026,24 @@ eapply star_step.
   }
 simpsub.
 apply star_refl.
+Qed.
+
+
+Lemma def_uptype :
+  forall a, equiv (app Defs.uptype a) (uptype a).
+Proof.
+intros a.
+unfold Defs.uptype.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+
+  {
+  simpsub.
+  apply star_refl.
+  }
 Qed.
 
 

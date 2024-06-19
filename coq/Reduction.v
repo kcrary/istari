@@ -297,6 +297,18 @@ eauto using mcr.
 Qed.
 
 
+Lemma mc_seq :
+  forall (P : relation term) m m' n n',
+    P m m'
+    -> P n n'
+    -> mc P (seq m n) (seq m' n').
+Proof.
+intros.
+apply mc_oper.
+eauto using mcr.
+Qed.
+
+
 Lemma star_mcr :
   forall R a (r s : @row object a),
     star (mcr R) r s
@@ -369,6 +381,12 @@ Inductive reduce : @term object -> @term object -> Prop :=
 | reduce_ppi2_beta {n n' m} :
     reduce n n'
     -> reduce (ppi2 (ppair m n)) n'
+
+| reduce_seq_beta {m m' n n'} :
+    value m
+    -> reduce m m'
+    -> reduce n n'
+    -> reduce (seq m n) (subst1 m' n')
 
 
 with reducer : forall {a}, row a -> row a -> Prop :=
@@ -576,6 +594,20 @@ intros.
 apply reduce_ppi2_beta.
 apply reduce_id.
 }
+
+(* seq1 *)
+{
+intros.
+apply reduce_compat.
+apply mc_seq; auto.
+apply reduce_id.
+}
+
+(* seq2 *)
+{
+intros.
+eapply reduce_seq_beta; eauto using reduce_id.
+}
 Qed.
 
 
@@ -589,6 +621,7 @@ so (row_cons_invert _#3 r) as (m & r1 & ->).
 so (row_nil_invert _ r1); subst r1.
 eauto.
 Qed.
+
 
 Lemma row_2_invert :
   forall i j (r : @row object (cons i (cons j nil))),
@@ -676,6 +709,18 @@ simpsub.
 eapply reduce_ppi2_beta; auto.
 }
 
+(* seq_beta *)
+{
+intros.
+simpsub.
+relquest.
+  {
+  eapply reduce_seq_beta; eauto using subst_value.
+  }
+simpsub.
+reflexivity.
+}
+
 (* nil *)
 {
 intros s.
@@ -760,6 +805,20 @@ simpsub.
 reflexivity.
 }
 
+(* seq_beta *)
+{
+intros m m' p p' Hval _ IH1 _ IH2 i.
+simpsub.
+relquest.
+  {
+  eapply reduce_seq_beta; auto using subst_value.
+  rewrite <- under_succ.
+  apply IH2.
+  }
+simpsub.
+reflexivity.
+}
+
 (* wrapup *)
 {
 destruct Hind.
@@ -816,6 +875,79 @@ intros a n n' m m' Hn Hm.
 rewrite <- (under_zero _ (dot n id)).
 rewrite <- (under_zero _ (dot n' id)).
 apply reducer_funct1_under; auto.
+Qed.
+
+
+Lemma reduce_value :
+  forall m m',
+    reduce m m'
+    -> value m
+    -> value m'.
+Proof.
+intros m n Hred.
+induct Hred.
+
+(* var *)
+{
+auto.
+}
+
+(* oper *)
+{
+intros a th r s Hred Hval.
+invert Hval.
+intro Hcanon.
+apply value_i; auto.
+}
+
+(* app *)
+{
+intros m m' n n' _ _ _ _ Hval.
+invert Hval.
+intro H; invert H.
+}
+
+(* prev *)
+{
+intros m m' _ _ Hval.
+invert Hval.
+intro H; invert H.
+}
+
+(* bite2 *)
+{
+intros m m' p _ _ Hval.
+invert Hval.
+intro H; invert H.
+}
+
+(* bite3 *)
+{
+intros m m' p _ _ Hval.
+invert Hval.
+intro H; invert H.
+}
+
+(* ppi1 *)
+{
+intros m m' p _ _ Hval.
+invert Hval.
+intro H; invert H.
+}
+
+(* ppi2 *)
+{
+intros m m' p _ _ Hval.
+invert Hval.
+intro H; invert H.
+}
+
+(* seq *)
+{
+intros m m' p p' _ _ _ _ _ Hval.
+invert Hval.
+intro H; invert H.
+}
 Qed.
 
 
@@ -1120,6 +1252,42 @@ invertc Hmp.
   split; auto.
   apply reduce_ppi2_beta; auto.
   }
+
+  (* oper / seq_beta *)
+  {
+  intros m m2 n n2 Hval Hm2 Hn2 <- Heqth Heqr <-.
+  so (eq_dep_impl_eq_snd _#5 Heqth); subst th.
+  so (eq_dep_impl_eq_snd _#5 Heqr); subst r.
+  clear Heqth Heqr.
+  invertc Hrs.
+  intros m1 r1 Hm1 Hr1 <-.
+  invertc Hr1.
+  intros n1 r2 Hn1 Hr2 <-.
+  invertc Hr2.
+  intros <-.
+  fold (seq m1 n1) in *.
+  so (IH _ (reducer_cons Hm2 (reducer_cons Hn2 reducer_nil))) as (u & Hsu & Htu).
+  invertc Htu.
+  intros p r1 Hp Hr1 <-.
+  invertc Hr1.
+  intros q r2 Hq Hr2 <-.
+  invertc Hr2.
+  intros <-.
+  invertc Hsu.
+  intros Hp1 Hr1.
+  invertc Hr1.
+  intros Hq1 _.
+  exists (subst1 p q).
+  split.
+    {
+    apply reduce_seq_beta; auto.
+    eapply reduce_value; eauto.
+    }
+
+    {
+    apply reduce_funct1; auto.
+    }
+  }
 }
 
 (* app_beta *)
@@ -1335,6 +1503,51 @@ invertc Hmp.
   }
 }
 
+(* seq_beta *)
+{
+intros m m1 n n1 Hval Hm1 IH1 Hn1 IH2 p Hmp.
+invertc Hmp.
+  (* seq_beta / oper *)
+  {
+  intros r Hr <-.
+  invertc Hr.
+  intros m2 r1 Hm2 Hr1 <-.
+  invertc Hr1.
+  intros n2 r2 Hn2 Hr2 <-.
+  invertc Hr2.
+  intros <-.
+  fold (seq m2 n2).
+  so (IH1 _ Hm2) as (p & Hp1 & Hp2).
+  so (IH2 _ Hn2) as (q & Hq1 & Hq2).
+  exists (subst1 p q).
+  split.
+    {
+    apply reduce_funct1; auto.
+    }
+
+    {
+    apply reduce_seq_beta; auto.
+    eapply reduce_value; eauto.
+    }
+  }
+
+  (* seq_beta / seq_beta *)
+  {
+  intros m2 n2 _ Hm2 Hn2 <-.
+  so (IH1 _ Hm2) as (p & Hp1 & Hp2).
+  so (IH2 _ Hn2) as (q & Hq1 & Hq2).
+  exists (subst1 p q).
+  split.
+    {
+    apply reduce_funct1; auto.
+    }
+
+    {
+    apply reduce_funct1; auto.
+    }
+  }
+}
+
 (* nil *)
 {
 intros t H.
@@ -1495,6 +1708,14 @@ invert Hcanon.
 (* ppi2_beta *)
 {
 intros _ _ _ <- Heq _.
+injectionT Heq.
+intros <-.
+invert Hcanon.
+}
+
+(* seq_beta *)
+{
+intros _ _ _ _ _ _ _ <- Heq _ _.
 injectionT Heq.
 intros <-.
 invert Hcanon.

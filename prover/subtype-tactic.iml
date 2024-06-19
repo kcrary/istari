@@ -14,6 +14,10 @@ signature SUBTYPE_TACTIC =
       val forceExactRaw : ETerm.eterm -> tactic
       val forceExact : ETerm.eterm -> tactic
 
+      val tightenPriority : Hyp.hypothesis -> ETerm.eterm -> Tactic.priority Tactic.tacticm
+      val tightenRaw : Hyp.hypothesis -> ETerm.eterm -> tactic
+      val tighten : Hyp.hypothesis -> ETerm.eterm -> tactic
+
    end
 
 
@@ -89,5 +93,34 @@ structure SubtypeTactic :> SUBTYPE_TACTIC =
       fun forceExactRaw em = forceExactPriority em >> idtac
 
       fun forceExact em = Typecheck.withTypecheckSnd (forceExactPriority em)
+
+
+
+      fun tightenPriority hyp eb =
+         let
+            do i = Hyp.findhyp hyp
+            do bsh = withterm eb
+            val b = T.evar ()
+         in
+            if Unify.unify1 bsh (T.Sub (b, T.Shift (i+1))) then
+               (* A ... |- C *)
+               refine (Rule.tighten i (T.evar ()) b (T.evar ()))
+               >>> [
+                   (* A ... |- B[^i+1] <: A[^i+1] *)
+                   idtacM Secondary,
+
+                   (* A ... |- i : B[^i+1] *)
+                   idtacM Primary,
+
+                   (* B ... |- C *)
+                   idtacM Primary
+                   ]
+            else
+               fail "type depends on subsequent variables"
+         end
+
+      fun tightenRaw hyp eb = tightenPriority hyp eb >> idtac
+
+      fun tighten hyp eb = Typecheck.withTypecheckSnd (tightenPriority hyp eb)
 
    end

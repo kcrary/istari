@@ -612,8 +612,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
          if    binders is a list of binders (outermost first)
                tac :: M = N : A
-               k is the number of binders
-         then  M' = fn ... fn . M  (k times)
+         then  k is the number of binders
+               M' = fn ... fn . M  (k times)
                N' = fn ... fn . N  (k times)
                A' = forall E1 ... Ek . A
                tac' :: M' = N' : A'
@@ -811,6 +811,26 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                 tac)
 
 
+      fun eeqtpCoercionToTac coe =
+         (case coe of
+             Forward tac => tac
+
+           | Backward tac =>
+                refine (Rule.eeqtpSymm (T.evar ()) (T.evar ()))
+                >>+
+                tac)
+
+
+      fun sequalCoercionToTac coe =
+         (case coe of
+             Forward tac => tac
+
+           | Backward tac =>
+                refine (Rule.sequalSymm (T.evar ()) (T.evar ()))
+                >>+
+                tac)
+
+
 
       (* Computation rewrites *)
 
@@ -990,6 +1010,50 @@ structure RewriteInternal :> REWRITE_INTERNAL =
          end
 
 
+      (* propagateSyntacticEquality dir C M N tac =
+
+         if    dir is the outer context (i.e., not including C's bindings)
+               tac :: sequal M N
+         then  tac' :: sequal C{M} C{N}
+               and
+               returns SOME (sk tac')
+               OR
+               returns NONE
+      *)
+      fun propagateSyntacticEquality dir c m n tac =
+         if 
+            List.all
+               (fn Flam _ => false
+                 | _ => true)
+               c
+         then
+            (* C contains no bindings *)
+            let
+               val b = instantiateShift c T.zero
+
+               (* forall P, B[P . id] = C{ 0[P[^0] . id] } = C{ P }
+
+                  so  B[M . id] = C{ M }
+                  and B[N . id] = C{ N }
+               *)
+
+               val tac' =
+                  (* sequal C{M} C{N}
+                     that is:
+                     sequal B[M . id] B[N . id]
+                  *)
+                  refine (Rule.sequalCompat m n b)
+                  >>+
+                  (* sequal M N *)
+                  tac
+            in
+               SOME tac'
+            end
+         else
+            (* C contains bindings, can't use syntactic equality *)
+            NONE
+
+
       structure CICTable =
          CheckpointedHashTable 
          (structure Key =
@@ -1160,20 +1224,28 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                 in
                                    (case rel of
                                        General rconst' =>
-                                          propagateGeneral dir c'' rconst' m' n' coe'
-                                             (fn () =>
-                                                 (
-                                                 if !trace then
+                                          if Constant.eq (rconst', Prim.sequal) then
+                                             (case propagateSyntacticEquality dir c'' m' n' (sequalCoercionToTac coe') of
+                                                 SOME tac =>
+                                                    sk (Prim.sequal, Forward tac, fk)
+
+                                               | NONE =>
+                                                    fk ())
+                                          else
+                                             propagateGeneral dir c'' rconst' m' n' coe'
+                                                (fn () =>
                                                     (
-                                                    print "backtrack to ";
-                                                    diagnostic dir c rconst m n coe
-                                                    )
-                                                 else
-                                                    ();
-          
-                                                 tryWeakenings ()
-                                                 ))
-                                             sk
+                                                    if !trace then
+                                                       (
+                                                       print "backtrack to ";
+                                                       diagnostic dir c rconst m n coe
+                                                       )
+                                                    else
+                                                       ();
+             
+                                                    tryWeakenings ()
+                                                    ))
+                                                sk
                                              
                                      | Equality a =>
                                           (* by invariant, A is closed *)
@@ -1206,7 +1278,15 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                 end
 
            | General rconst =>
-                propagateGeneral dir c rconst m n coe fk sk)
+                if Constant.eq (rconst, Prim.sequal) then
+                   (case propagateSyntacticEquality dir c m n (sequalCoercionToTac coe) of
+                       SOME tac =>
+                          sk (Prim.sequal, Forward tac, fk)
+                          
+                     | NONE =>
+                          propagateGeneral dir c rconst m n coe fk sk)
+                else
+                   propagateGeneral dir c rconst m n coe fk sk)
 
 
       (* if f raises RewriteFailure, handle it *)
@@ -1237,14 +1317,9 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                 in
                    if Constant.eq (rconst, Prim.eeqtp) then
                       let
-                         val tac =
-                            (case coe' of
-                                Forward tac => tac
+                         val tac = eeqtpCoercionToTac coe'
 
-                              | Backward tac =>
-                                   refine (Rule.eeqtpSymm (T.evar ()) (T.evar ()))
-                                   >>+
-                                   tac)
+                         (* tac :: eeqtp C{M} C{N} = eeqtp A B *)
                       in
                          (* A *)
                          refine (Rule.subsumptionAlt b (T.evar ()))
@@ -1279,6 +1354,26 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                  tac >>= tryRefl
                                  ])
 
+                   else if Constant.eq (rconst, Prim.sequal) then
+                      let
+                         val tac = sequalCoercionToTac coe'
+
+                         (* tac :: sequal C{M} C{N} = sequal A B *)
+                      in
+                         (* A *)
+                         refine (Rule.sequivalence b (T.evar ()))
+                         >>> [
+                             (* sequal B A *)
+                             refine (Rule.sequalSymm (T.evar ()) (T.evar ()))
+                             >>+
+                             (* sequal A B *)
+                             tac >>= tryRefl,
+
+                             (* B *)
+                             sequel
+                             ]
+                      end
+
                    else
                       fk ()
                 end
@@ -1310,14 +1405,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                              in
                                 if Constant.eq (rconst, Prim.eeqtp) then
                                    let
-                                      val tac =
-                                         (case coe' of
-                                             Forward tac => tac
-      
-                                           | Backward tac =>
-                                                refine (Rule.eeqtpSymm (T.evar ()) (T.evar ()))
-                                                >>+
-                                                tac)
+                                      val tac = eeqtpCoercionToTac coe'
                                    in
                                       (* A, ... |- J *)
                                       refine (Rule.subsumptionLeftAlt hyp (T.evar ()) b (T.evar ()))
@@ -1403,6 +1491,23 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                              (* If the weakening failed, try to propagate a different way, in hopes that we might get to eeqtp. *)
                                              (liftRewrite fk))
       
+                                else if Constant.eq (rconst, Prim.sequal) then
+                                   let
+                                      val tac = sequalCoercionToTac coe'
+
+                                      (* tac :: sequal C{M} C{N} = sequal A[^hyp+1] B[^hyp+1] *)
+                                   in
+                                      (* A, ... |- J *)
+                                      refine (Rule.sequivalenceLeft hyp (T.evar ()) b (T.evar ()))
+                                      >>> [
+                                          (* A, ... |- sequal A[^hyp+1] B[^hyp+1] *)
+                                          tac >>= tryRefl,
+
+                                          (* B, ... |- J *)
+                                          sequel
+                                          ]
+                                   end
+
                                 else
                                    fk ()
                              end

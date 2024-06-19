@@ -243,6 +243,17 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
            | _ => raise (Fail "precondition"))
 
 
+      (* precondition: l1, l2, l3, and l4 have equal lengths *)
+      fun foldl4 f x l1 l2 l3 l4 =
+         (case (l1, l2, l3, l4) of
+             ([], [], [], []) => x
+
+           | (x1 :: rest1, x2 :: rest2, x3 :: rest3, x4 :: rest4) =>
+                foldl4 f (f x1 x2 x3 x4 x) rest1 rest2 rest3 rest4
+
+           | _ => raise (Fail "precondition"))
+
+
       (* precondition: l1 and l2 have equal lengths *)
       fun foldr2 f x l1 l2 =
          (case (l1, l2) of
@@ -275,6 +286,19 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   (fns x1 x2 x3 l => f x1 x2 x3 :: l)
                   []
                   l1 l2 l3
+         in
+            List.rev l
+         end
+
+
+      (* precondition: l1, l2, l3, and l4 have equal lengths *)
+      fun map4 f l1 l2 l3 l4 =
+         let
+            val l =
+               foldl4
+                  (fns x1 x2 x3 x4 l => f x1 x2 x3 x4 :: l)
+                  []
+                  l1 l2 l3 l4
          in
             List.rev l
          end
@@ -921,6 +945,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       val constStrip = loadSymbol datatypeSym "strip"
       val constSubtermCon = loadSymbol datatypeSym "subterm_con"
       val constIter = loadSymbol datatypeSym "dt_iter"
+      val constDtTotal = loadSymbol datatypeSym "dt_total"
+      val constDtStrict = loadSymbol datatypeSym "dt_strict"
+      val constDtUptype = loadSymbol datatypeSym "dt_uptype"
 
       val eqzbTac = Susp.delay (fn () => snd (Infer.inferConstant Prim.eqzb))
 
@@ -985,8 +1012,6 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
       fun define sym ((def, deft, deftac):X.xterm) t =
          let
-            val const = Namespace.declare sym (SOME (N.simplifyAll def))
-
 (* for debugging
             val () =
                if Unify.unify1 deft t then
@@ -998,18 +1023,16 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                   )
 *)
 
+            (* Have to do it this way so the constant has a definition even when extracts are disabled. *)
+
+            val const = Namespace.declare sym (SOME (N.simplifyAll def))
+
             val () = Constant.setOpacity const Constant.SOFT_STRICT  (* for now *)
 
             val (jud, v) =
                execute Seq.empty (T.apply2 Prim.ov t (T.Const const)) deftac
-
-            val typingName = Symbol.toValue sym ^ "_type"
-
-            val (typingConst, typingJud, typingV) =
-               NamespaceInternal.reify (Symbol.fromValue typingName) jud v
          in
-            Database.setType typingConst typingJud typingV;
-            Define.recordTyping typingName;
+            Database.setType const jud v;
             const
          end
 
@@ -1062,6 +1085,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          adisj : mxterm,                    (* the disjunct of "a" corresponding to this datatype *)
          iterator : constant,               (* the iterator constant *)
          strip : constant,                  (* the strip constant *)
+         strict : constant,                 (* the strictness constant *)
          }
 
       datatype con_environment =
@@ -1136,16 +1160,17 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
       val puTenv : type_environment P.pu =
          P.wrap
-            (fn TENV {const, red, args, numargs, adisj, iterator, strip} =>
-                (const, red, args, numargs, adisj, iterator, strip))
-            (fn (const, red, args, numargs, adisj, iterator, strip) =>
-                TENV {const=const, red=red, args=args, numargs=numargs, adisj=adisj, iterator=iterator, strip=strip})
-            (P.tuple7
+            (fn TENV {const, red, args, numargs, adisj, iterator, strip, strict} =>
+                (const, red, args, numargs, adisj, iterator, strip, strict))
+            (fn (const, red, args, numargs, adisj, iterator, strip, strict) =>
+                TENV {const=const, red=red, args=args, numargs=numargs, adisj=adisj, iterator=iterator, strip=strip, strict=strict})
+            (P.tuple8
                 PP.puConstant
                 R.puReduction
                 (P.list (P.pair (P.option PP.puSymbol) pumx))
                 P.int
                 pumx
+                PP.puConstant
                 PP.puConstant
                 PP.puConstant)
 
@@ -2151,7 +2176,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             val () =
                List.app
-                  (fn (TENV {const, iterator, numargs=numberOfIndexArgs, strip}) =>
+                  (fn (TENV {const, iterator, numargs=numberOfIndexArgs, strip, strict}) =>
                       (
                       insert DE.destructTactics const destructor';
    
@@ -2159,7 +2184,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
    
                       insert InductionInternal.iterators const (iterator, numberOfIntermediateArgs + numberOfVisibleArgs, numberOfIndexArgs);
    
-                      insert EqualityTacticInternal.injectionTactics const injector'
+                      insert EqualityTacticInternal.injectionTactics const injector';
+
+                      insert TypecheckInternal.strictnessTactics const (Backchain.applyRaw (ETerm.literal (T.Const strict)))
                       ))
                   tplist
 
@@ -4202,14 +4229,181 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
+            (* 11. Create the totality and strictness lemmas *)
 
-            (* 11. Populate the tables *)
+            val strictnessLemmas =
+               List.map
+                  (fn (const, _, _, ind, args, nargs) =>
+                      let
+                         (* within pervasive arguments *)
+
+                         val totaldef =
+                            List.foldr
+                               (fns (symopt, c) u =>
+                                   X.lamAll symopt (X.forget (X.use c)) u)
+                               (X.app
+                                   (X.weaken
+                                       (X.apps (xconstant constDtTotal)
+                                           [
+                                           univ,
+                                           a,
+                                           dcons
+                                           ])
+                                       nargs)
+                                   ind)
+                               args
+    
+                         val tp = 
+                            T.Elim (T.Const const,
+                                    Int.natrecUp
+                                       (fns i l => T.App (T.Var i) :: l)
+                                       []
+                                       (numberOfStatVisibleArgs + nargs))
+
+                         val totalt =
+                            List.foldr
+                               (fns (symopt, c) u =>
+                                   T.apply2 Prim.forall
+                                      (X.mterm c)
+                                      (T.Lam (symopt, u)))
+                               (T.apply2 Prim.forall
+                                   tp
+                                   (T.Lam (NONE, T.apply1 Prim.halts T.zero)))
+                               args
+
+                         val strictdef =
+                            List.foldr
+                               (fns (symopt, c) u =>
+                                   X.lamAll symopt (X.forget (X.use c)) u)
+                               (X.app
+                                   (X.weaken
+                                       (X.apps (xconstant constDtStrict)
+                                           [
+                                           univ,
+                                           a,
+                                           dcons
+                                           ])
+                                       nargs)
+                                   ind)
+                               args
+    
+                         val strictt =
+                            List.foldr
+                               (fns (symopt, c) u =>
+                                   T.apply2 Prim.forall
+                                      (X.mterm c)
+                                      (T.Lam (symopt, u)))
+                               (T.apply2 Prim.subtype
+                                   tp
+                                   (T.apply1 Prim.partial tp))
+                               args
+
+                         val name = Symbol.toValue (Namespace.lastname const)
+
+                         val total =
+                            define
+                               (Symbol.fromValue (name ^ "_total"))
+                               (lwrap totaldef)
+                               (lwraptp totalt)
+   
+                         val strict =
+                            define
+                               (Symbol.fromValue (name ^ "_strict"))
+                               (lwrap strictdef)
+                               (lwraptp strictt)
+                      in
+                         close total;
+                         close strict;
+
+                         strict
+                      end)
+                  typeInfoList
+
+
+
+            (* 12. Create the uptype lemma *)
+
+            val uptypeLemmaConst =
+               let
+                  (* within pervasive arguments *)
+
+                  val masterlem =
+                     X.apps (xconstant constDtUptype)
+                        [
+                        univ,
+                        a,
+                        dcons
+                        ]
+
+                  val mastercond =
+                     X.normalizeTp (X.arrowInv1 (X.inhabitedForm masterlem))
+
+                  val lem_def =
+                     X.lam NONE mastercond
+                        (X.tuple
+                            (List.map
+                                (fn (_, _, _, ind, args, _) =>
+                                    snd $
+                                    bifold
+                                       (fns (symopt, c) depth =>
+                                           (depth+1,
+
+                                            (fn t =>
+                                                X.lamAll
+                                                   symopt
+                                                   (X.tweakenUnder (X.forget (X.use c)) depth 1)
+                                                   t)))
+                                       (fn depth =>
+                                           X.apps 
+                                              (X.weaken masterlem (depth + 1))
+                                              [X.var depth mastercond, X.weakenUnder ind depth 1])
+                                       0
+                                       args)
+                                typeInfoList))
+
+                  val lem_t =
+                     T.apply2 Prim.arrow
+                        (X.typ mastercond)
+                        (List.foldr
+                            (fns (const, _, _, _, args, _) t =>
+                                T.apply2 Prim.prod
+                                   (snd
+                                       (bifold
+                                           (fns (symopt, c) depth =>
+                                               (depth+1,
+                                                
+                                                (fn u =>
+                                                    T.apply2 Prim.forall
+                                                       (X.mterm c)
+                                                       (T.Lam (symopt, u)))))
+                                           (fn depth =>
+                                               T.apply1 Prim.uptype
+                                                  (T.Elim (T.Const const,
+                                                           Int.natrecUp 
+                                                              (fns i l => T.App (T.Var i) :: l)
+                                                              []
+                                                              (numberOfStatVisibleArgs + depth))))
+                                           0
+                                           args))
+                                   t)
+                            (T.Const Prim.unit)
+                            typeInfoList)
+               in
+                  define
+                     (Symbol.fromValue (firstName ^ "_uptype_condition"))
+                     (lwrap lem_def)
+                     (lwraptp lem_t)
+               end
+
+
+
+            (* 13. Populate the tables *)
 
             val tplist =
-               map3
-                  (fns (const, red, stripConst, _, args, numberOfIndexArgs) afield (iterator, _) => 
-                      TENV {const=const, red=red, args=args, numargs=numberOfIndexArgs, adisj=afield, iterator=iterator, strip=stripConst})
-                  typeInfoList indextpsList iterInfoList
+               map4
+                  (fns (const, red, stripConst, _, args, numberOfIndexArgs) afield (iterator, _) strict => 
+                      TENV {const=const, red=red, args=args, numargs=numberOfIndexArgs, adisj=afield, iterator=iterator, strip=stripConst, strict=strict})
+                  typeInfoList indextpsList iterInfoList strictnessLemmas
 
             val conlist =
                map3
@@ -4249,12 +4443,13 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-            (* 12. Make all the contants opaque. *)
+            (* 14. Make all the contants opaque. *)
 
             close skeletonConst;
             close subtermConst;
             close subtermTransConst;
             close subtermWellFoundedConst;
+            close uptypeLemmaConst;
 
             List.app 
                (fn (const, _, stripConst, _, _, _) =>
@@ -4277,7 +4472,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             Vector.app (fn const => close const) discriminators;
             Vector.app (fn const => close const) extractorTypes;
             Vector.app (fn const => close const) extractors
-                   
+
          end
 
 
@@ -4299,6 +4494,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             ]
 
 
+
       fun typedefRaw typedef = 
          let
             val () = ProverInternal.checkpoint ()
@@ -4313,6 +4509,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          end
 
 
+
       fun typedef typedef = 
          let
             val () = ProverInternal.checkpoint ()
@@ -4324,8 +4521,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
             val (goals', g) = TypecheckInternal.multigoalTypecheck goals
          in
             (case goals' of
-                [] =>
-                   makeDatatype (f (g []))
+                [] => makeDatatype (f (g []))
 
               | _ =>
                    let
@@ -4334,6 +4530,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       makeDatatype (f (g vs))
                    end)
          end
+
 
 
       fun write outf =

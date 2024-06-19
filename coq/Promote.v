@@ -128,3 +128,39 @@ with hnegative {object} (P N : list (term object)) : nat -> term object -> Prop 
 Scheme hpositive_mut_ind := Minimality for hpositive Sort Prop
 with   hnegative_mut_ind := Minimality for hnegative Sort Prop.
 Combined Scheme hpositive_hnegative_ind from hpositive_mut_ind, hnegative_mut_ind.
+
+
+Inductive active {object} : @term object -> Prop :=
+| active_var :
+    active (var 0)
+
+| active_app :
+    forall m n,
+      active m
+      -> active (app m n)
+
+| active_prev :
+    forall m,
+      active m
+      -> active (prev m)
+
+| active_ppi1 :
+    forall m,
+      active m
+      -> active (ppi1 m)
+
+| active_ppi2 :
+    forall m,
+      active m
+      -> active (ppi2 m)
+
+| active_bite :
+    forall m n p,
+      active m
+      -> active (bite m n p)
+
+| active_seq :
+    forall m n,
+      active m
+      -> active (seq m n)
+.

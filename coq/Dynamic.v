@@ -65,6 +65,10 @@ Inductive canon : forall {a}, @operator object a -> Prop :=
 | canon_quotient       : canon (oper_quotient _)
 | canon_guard          : canon (oper_guard _)
 | canon_wt             : canon (oper_wt _)
+| canon_partial        : canon (oper_partial _)
+| canon_halts          : canon (oper_halts _)
+| canon_admiss         : canon (oper_admiss _)
+| canon_uptype         : canon (oper_uptype _)
 | canon_ext {x}        : canon (oper_ext _ x)
 | canon_extt {x}       : canon (oper_extt _ x)
 .
@@ -115,6 +119,14 @@ Inductive step : @term object -> term -> Prop :=
 
 | step_ppi22 {m1 m2} :
     step (ppi2 (ppair m1 m2)) m2
+
+| step_seq1 {m1 m1' m2} :
+    step m1 m1'
+    -> step (seq m1 m2) (seq m1' m2)
+
+| step_seq2 {m1 m2} :
+    value m1
+    -> step (seq m1 m2) (subst1 m1 m2)
 .
 
 
@@ -297,6 +309,36 @@ invertc Hstep; auto.
 intros m1' Hstep <-.
 invert Hstep.
 }
+
+(* seq1 *)
+{
+intros m1 m1' m2 Hstep1 IH n Hstep.
+invert Hstep.
+  {
+  intros m1'' Hstep1' <-.
+  f_equal; auto.
+  }
+
+  {
+  intros Hval <-.
+  destruct (determinism_value _ _ Hval Hstep1).
+  }
+}
+
+(* seq2 *)
+{
+intros m1 m2 Hval n Hstep.
+invert Hstep.
+  {
+  intros m1' Hstep1 <-.
+  destruct (determinism_value _ _ Hval Hstep1).
+  }
+
+  {
+  intros _ <-.
+  reflexivity.
+  }
+}
 Qed.
 
 
@@ -317,6 +359,22 @@ invert Hsteps.
   so (determinism_step _#3 Hstep Hstep').
   subst m''.
   split; auto.
+Qed.
+
+
+Lemma eval_first_steps :
+  forall m m' v,
+    star step m m'
+    -> eval m v
+    -> eval m' v.
+Proof.
+intros m m' v Hsteps Heval.
+revert Heval.
+induct Hsteps; auto.
+(* step *)
+intros m1 m2 m3 H12 _ IH Heval.
+apply IH.
+eapply eval_first_step; eauto.
 Qed.
 
 
@@ -429,28 +487,6 @@ apply value_normal; auto.
 Qed.
 
 
-Lemma subst_step :
-  forall s m m',
-    step m m'
-    -> step (subst s m) (subst s m').
-Proof.
-intros s m m' H.
-revert s.
-induct H; intros; simpsub; eauto using step;
-try (relquest; [eauto using step | simpsub; reflexivity]; done).
-Qed.
-
-
-Lemma subst_steps :
-  forall s m m',
-    star step m m'
-    -> star step (subst s m) (subst s m').
-Proof.
-intros s m m' H.
-induct H; eauto using star_refl, star_step, subst_step.
-Qed.
-
-
 Lemma subst_value :
   forall s v,
     value v
@@ -461,6 +497,28 @@ invertc H; [].
 intros a t r Hcanon <-.
 simpsub.
 apply value_i; auto.
+Qed.
+
+
+Lemma subst_step :
+  forall s m m',
+    step m m'
+    -> step (subst s m) (subst s m').
+Proof.
+intros s m m' H.
+revert s.
+induct H; intros; simpsub; eauto using step;
+try (relquest; [eauto using step, subst_value | simpsub; reflexivity]; done).
+Qed.
+
+
+Lemma subst_steps :
+  forall s m m',
+    star step m m'
+    -> star step (subst s m) (subst s m').
+Proof.
+intros s m m' H.
+induct H; eauto using star_refl, star_step, subst_step.
 Qed.
 
 
@@ -762,6 +820,30 @@ intros; apply value_i; eauto with dynamic.
 Qed.
 
 
+Lemma value_partial : forall {m1}, value (partial m1).
+Proof.
+intros; apply value_i; eauto with dynamic.
+Qed.
+
+
+Lemma value_admiss : forall {m1}, value (admiss m1).
+Proof.
+intros; apply value_i; eauto with dynamic.
+Qed.
+
+
+Lemma value_halts : forall {m1}, value (halts m1).
+Proof.
+intros; apply value_i; eauto with dynamic.
+Qed.
+
+
+Lemma value_uptype : forall {m1}, value (uptype m1).
+Proof.
+intros; apply value_i; eauto with dynamic.
+Qed.
+
+
 Lemma value_ext : forall {x}, value (ext x).
 Proof.
 intros; apply value_i; eauto with dynamic.
@@ -830,6 +912,10 @@ Arguments value_iset {object m1 m2}.
 Arguments value_quotient {object m1 m2}.
 Arguments value_guard {object m1 m2}.
 Arguments value_wt {object m1 m2}.
+Arguments value_partial {object m1}.
+Arguments value_halts {object m1}.
+Arguments value_admiss {object m1}.
+Arguments value_uptype {object m1}.
 Arguments value_ext {object x}.
 Arguments value_extt {object x}.
 
@@ -837,7 +923,7 @@ Arguments value_extt {object x}.
 Hint Constructors canon : dynamic.
 
 
-Hint Resolve value_univ value_cty value_con value_karrow value_tarrow value_pi value_clam value_capp value_ctlam value_ctapp value_lam value_intersect value_union value_fut value_cnext value_cprev value_next value_rec value_equal value_triv value_eqtype value_sequal value_subtype value_kind value_all value_alltp value_exist value_mu value_ispositive value_isnegative value_voidtp value_unittp value_cunit value_booltp value_btrue value_bfalse value_prod value_sigma value_cpair value_cpi1 value_cpi2 value_ppair value_set value_iset value_quotient value_guard value_wt value_ext value_extt : dynamic.
+Hint Resolve value_univ value_cty value_con value_karrow value_tarrow value_pi value_clam value_capp value_ctlam value_ctapp value_lam value_intersect value_union value_fut value_cnext value_cprev value_next value_rec value_equal value_triv value_eqtype value_sequal value_subtype value_kind value_all value_alltp value_exist value_mu value_ispositive value_isnegative value_voidtp value_unittp value_cunit value_booltp value_btrue value_bfalse value_prod value_sigma value_cpair value_cpi1 value_cpi2 value_ppair value_set value_iset value_quotient value_guard value_wt value_partial value_halts value_admiss value_uptype value_ext value_extt : dynamic.
 
 
 Hint Resolve var_normal value_normal : dynamic.

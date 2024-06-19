@@ -52,6 +52,8 @@ Definition wind {object} f : term object :=
                     (ppi2 (var 0)))
                  (lam (app (var 2) (app (ppi2 (var 1)) (var 0))))))).
 
+Definition bottom {object} : term object := app theta (lam (var 0)).
+
 Definition leqtp {object} : term object :=
   app theta
     (lam (lam (lam (sumcase 

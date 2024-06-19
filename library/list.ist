@@ -1,8 +1,10 @@
 
 Ctrl.use "datatypes.iml";
 File.import "logic-load.iml";
+File.import "miscellaneous-load.iml";
 File.import "nat-load.iml";
 File.import "option-load.iml";
+File.import "partial-load.iml";
 File.import "list-aux.iml";
 
 
@@ -21,7 +23,11 @@ typedef
     | cons : a -> list -> list
 /;
 
+establishUptype /list/;
+
+val list = parseConstant /list/;
 val cons = parseConstant /cons/;
+val list_uptype = parseConstant /list_uptype/;
 
 
 Database.setImplicits (parseConstant /nil/) 1;
@@ -758,6 +764,26 @@ typedef
     | Forall_cons : forall h t . P h -> Forall t -> Forall (h :: t)
 /;
 
+
+
+lemma "Forall_uptype"
+/
+  forall i (a : U i) (P : a -> U i) .
+    Partial.uptype a
+    -> (forall x . Partial.uptype (P x))
+    -> forall l . Partial.uptype (Forall a P l)
+/;
+
+inference.
+intro /i a P Ha HP/.
+apply /Forall_uptype_condition/.
+repeat split >> repeat Partiality.proveAdmiss1 >> auto.
+qed ();
+
+val cForall = parseConstant /Forall/;
+val cForall_uptype = parseConstant /Forall_uptype/;
+
+
 Database.setImplicits (parseConstant /Forall/) 1;
 Database.setImplicits (parseConstant /Forall_nil/) 1;
 Database.setImplicits (parseConstant /Forall_cons/) 1;
@@ -775,6 +801,25 @@ typedef
     | Exists_hit : forall h t . P h -> Exists (h :: t)
     | Exists_miss : forall h t . Exists t -> Exists (h :: t)
 /;
+
+
+lemma "Exists_uptype"
+/
+  forall i (a : U i) (P : a -> U i) .
+    Partial.uptype a
+    -> (forall x . Partial.uptype (P x))
+    -> forall l . Partial.uptype (Exists a P l)
+/;
+
+inference.
+intro /i a P Ha HP/.
+apply /Exists_uptype_condition/.
+repeat split >> repeat Partiality.proveAdmiss1 >> auto.
+qed ();
+
+val cExists = parseConstant /Exists/;
+val cExists_uptype = parseConstant /Exists_uptype/;
+
 
 Database.setImplicits (parseConstant /Exists/) 1;
 Database.setImplicits (parseConstant /Exists_hit/) 1;
@@ -856,7 +901,7 @@ qed ();
 
 definerec /In a x l/
 /
-  `list_case a bogus l void (fn h t . x = h : a % In a x t)
+  `list_case a Miscellaneous.bogus l void (fn h t . x = h : a % In a x t)
 //
   intersect i . forall (a : U i) . a -> list a -> U i
 /;
@@ -2284,6 +2329,11 @@ intro /x l IH n/.
 destruct /n/ /| n/ >> reduce // >> auto.
 }
 qed ();
+
+
+writeRegistry /AfterListAllEnv/
+  /[constant constant constant constant constant constant]/
+  (Collapse (list, list_uptype, cForall, cForall_uptype, cExists, cExists_uptype));
 
 
 endModule ();

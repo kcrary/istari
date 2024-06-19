@@ -49,6 +49,8 @@ Conventions:
 [Impredicative polymorphism](#impredicative-polymorphism)<br>
 [Impredicative existentials](#impredicative-existentials)<br>
 [Miscellaneous](#miscellaneous)<br>
+[Syntactic equality](#syntactic-equality)<br>
+[Partial types](#partial-types)<br>
 [Let hypotheses](#let-hypotheses)<br>
 [Integers](#integers)<br>
 [Rewriting](#rewriting)<br>
@@ -3725,6 +3727,908 @@ Conventions:
       G |- of (acc A R M) N
 
 
+### Syntactic equality
+
+- `sequalForm M`
+
+      G |- istp (sequal M M)
+
+- `sequalIntroOf M`
+
+      G |- of (sequal M M) ()
+
+- `sequalIntro M`
+
+      G |- sequal M M
+
+- `sequalTrivialize M N`
+
+      G |- sequal M N
+      >>
+      G |- sequal M N
+
+- `sequalExt M N P Q`
+
+      G |- eq (sequal M N) P Q
+      >>
+      G |- of (sequal M N) P
+      G |- of (sequal M N) Q
+
+- `sequalLeft n C M N`
+
+      G1, (sequal M N), G2 |- C ext P[under_n (^1)]
+      >>
+      G1, G2[() . id] |- C[under_n (() . id)] ext P
+
+- `sequalEq A M N`
+
+      G |- eq A M N
+      >>
+      G |- sequal M N
+      G |- of A M
+
+- `sequalEqtp A B`
+
+      G |- eqtp A B
+      >>
+      G |- sequal A B
+      G |- istp A
+
+- `sequivalence A B`
+
+      G |- B ext M
+      >>
+      G |- sequal A B
+      G |- A ext M
+
+- `sequivalenceLeft n A B C`
+
+      G1, A, G2 |- C ext M
+      >>
+      G1, A, G2 |- sequal A[(^1) o ^n] B[(^1) o ^n]
+      G1, B, G2 |- C ext M
+
+- `substitutionSyntactic n A B M`
+
+      G1, A, G2 |- B ext N[under_n (^1)]
+      >>
+      G1, A, G2 |- sequal 0+n M[(^1) o ^n]
+      G1, G2[M . id] |- B[under_n (M . id)] ext N
+
+- `sequalSymm M N`
+
+      G |- sequal N M
+      >>
+      G |- sequal M N
+
+- `sequalTrans M N P`
+
+      G |- sequal M P
+      >>
+      G |- sequal M N
+      G |- sequal N P
+
+- `sequalCompat M N P`
+
+      G |- sequal P[M . id] P[N . id]
+      >>
+      G |- sequal M N
+
+
+### Partial types
+
+- `partialForm A`
+
+      G |- istp (partial A)
+      >>
+      G |- istp A
+
+- `partialEq A B`
+
+      G |- eqtp (partial A) (partial B)
+      >>
+      G |- eqtp A B
+
+- `partialFormUniv A I`
+
+      G |- of (univ I) (partial A)
+      >>
+      G |- of (univ I) A
+
+- `partialEqUniv A B I`
+
+      G |- eq (univ I) (partial A) (partial B)
+      >>
+      G |- eq (univ I) A B
+
+- `partialSub A B`
+
+      G |- subtype (partial A) (partial B)
+      >>
+      G |- subtype A B
+
+- `partialStrict A`
+
+      G |- subtype (partial A) (partial (partial A))
+      >>
+      G |- istp A
+
+- `partialStrictConverse A`
+
+      G |- subtype (partial (partial A)) (partial A)
+      >>
+      G |- istp A
+
+- `partialIdem A`
+
+      G |- eeqtp (partial (partial A)) (partial A) ext (() , ())
+      >>
+      G |- istp A
+
+- `haltsForm A M`
+
+      G |- istp (halts M)
+      >>
+      G |- of (partial A) M
+
+- `haltsEq A M N`
+
+      G |- eqtp (halts M) (halts N)
+      >>
+      G |- eq (partial A) M N
+
+- `haltsFormUniv A I M`
+
+      G |- of (univ I) (halts M)
+      >>
+      G |- of level I
+      G |- of (partial A) M
+
+- `haltsEqUniv A I M N`
+
+      G |- eq (univ I) (halts M) (halts N)
+      >>
+      G |- of level I
+      G |- eq (partial A) M N
+
+- `partialIntroBottomOf A`
+
+      G |- of (partial A) bottom
+      >>
+      G |- istp A
+
+- `bottomDiverges`
+
+      G |- void
+      >>
+      G |- halts bottom
+
+- `partialExt A M N`
+
+      G |- eq (partial A) M N
+      >>
+      G |- istp A
+      G |- iff (halts M) (halts N)
+      G, (halts M) |- eq A[^1] M[^1] N[^1]
+
+- `partialElimEq A M N`
+
+      G |- eq A M N
+      >>
+      G |- eq (partial A) M N
+      G |- halts M
+
+- `partialElimOf A M`
+
+      G |- of A M
+      >>
+      G |- of (partial A) M
+      G |- halts M
+
+- `haltsTrivialize M`
+
+      G |- halts M
+      >>
+      G |- halts M
+
+- `haltsExt M N P`
+
+      G |- eq (halts M) N P
+      >>
+      G |- of (halts M) N
+      G |- of (halts M) P
+
+- `haltsLeft n C M`
+
+      G1, (halts M), G2 |- C ext N[under_n (^1)]
+      >>
+      G1, G2[() . id] |- C[under_n (() . id)] ext N
+
+- `fixpointInductionEq A M N`
+
+      G |- eq (partial A) (fix M) (fix N)
+      >>
+      G |- eq (arrow (partial A) (partial A)) M N
+      G |- admiss A
+
+- `fixpointInductionOf A M`
+
+      G |- of (partial A) (fix M)
+      >>
+      G |- of (arrow (partial A) (partial A)) M
+      G |- admiss A
+
+- `partialFormInv A`
+
+      G |- istp A
+      >>
+      G |- istp (partial A)
+
+- `seqBind A B M M' N N'`
+
+      G |- eq (partial B) (seq M (fn . N)) (seq M' (fn . N'))
+      >>
+      G |- eq (partial A) M M'
+      G, A |- eq (partial B[^1]) N N'
+      G |- istp B
+
+- `activeApp A B M N`
+
+      G |- of (partial B) (M N)
+      >>
+      G |- of (partial A) M
+      G, A |- of (partial B[^1]) (0 N[^1])
+      G |- istp B
+
+- `activeAppSeq A B M N`
+
+      G |- eq (partial B) (M N) (seq M (fn . 0 N[^1]))
+      >>
+      G |- of (partial A) M
+      G, A |- of (partial B[^1]) (0 N[^1])
+      G |- istp B
+
+- `appHaltsInv M N`
+
+      G |- halts M
+      >>
+      G |- halts (M N)
+
+- `activePi1 A B M`
+
+      G |- of (partial B) (M #1)
+      >>
+      G |- of (partial A) M
+      G, A |- of (partial B[^1]) (0 #1)
+      G |- istp B
+
+- `activePi1Seq A B M`
+
+      G |- eq (partial B) (M #1) (seq M (fn . 0 #1))
+      >>
+      G |- of (partial A) M
+      G, A |- of (partial B[^1]) (0 #1)
+      G |- istp B
+
+- `pi1HaltsInv M`
+
+      G |- halts M
+      >>
+      G |- halts (M #1)
+
+- `activePi2 A B M`
+
+      G |- of (partial B) (M #2)
+      >>
+      G |- of (partial A) M
+      G, A |- of (partial B[^1]) (0 #2)
+      G |- istp B
+
+- `activePi2Seq A B M`
+
+      G |- eq (partial B) (M #2) (seq M (fn . 0 #2))
+      >>
+      G |- of (partial A) M
+      G, A |- of (partial B[^1]) (0 #2)
+      G |- istp B
+
+- `pi2HaltsInv M`
+
+      G |- halts M
+      >>
+      G |- halts (M #2)
+
+- `prevHaltsInv M`
+
+      G |- halts M
+      >>
+      G |- halts (M #prev)
+
+- `activeCase A B M P R`
+
+      G |- of (partial B) (sum_case M (fn . P) (fn . R))
+      >>
+      G |- of (partial A) M
+      G, A |- of (partial B[^1]) (sum_case 0 (fn . P[0 . ^2]) (fn . R[0 . ^2]))
+      G |- istp B
+
+- `activeCaseSeq A B M P R`
+
+      G |- eq (partial B) (sum_case M (fn . P) (fn . R)) (seq M (fn . sum_case 0 (fn . P[0 . ^2]) (fn . R[0 . ^2])))
+      >>
+      G |- of (partial A) M
+      G, A |- of (partial B[^1]) (sum_case 0 (fn . P[0 . ^2]) (fn . R[0 . ^2]))
+      G |- istp B
+
+- `caseHaltsInv M P R`
+
+      G |- halts M
+      >>
+      G |- halts (sum_case M (fn . P) (fn . R))
+
+- `seqHaltsSequal M N`
+
+      G |- sequal (seq M (fn . N)) N[M . id]
+      >>
+      G |- halts M
+
+- `seqHaltsInv M N`
+
+      G |- halts M
+      >>
+      G |- halts (seq M N)
+
+- `totalStrict A`
+
+      G |- subtype A (partial A)
+      >>
+      G |- istp A
+      G, A |- halts 0
+
+- `voidStrict`
+
+      G |- subtype void (partial void)
+
+- `unitTotal M`
+
+      G |- halts M
+      >>
+      G |- of unit M
+
+- `unitStrict`
+
+      G |- subtype unit (partial unit)
+
+- `boolTotal M`
+
+      G |- halts M
+      >>
+      G |- of bool M
+
+- `boolStrict`
+
+      G |- subtype bool (partial bool)
+
+- `forallTotal A B M`
+
+      G |- halts M
+      >>
+      G |- of (forall A (fn . B)) M
+
+- `forallStrict A B`
+
+      G |- subtype (forall A (fn . B)) (partial (forall A (fn . B)))
+      >>
+      G |- istp A
+      G, A |- istp B
+
+- `arrowTotal A B M`
+
+      G |- halts M
+      >>
+      G |- of (arrow A B) M
+
+- `arrowStrict A B`
+
+      G |- subtype (arrow A B) (partial (arrow A B))
+      >>
+      G |- istp A
+      G |- istp B
+
+- `intersectStrict A B`
+
+      G |- subtype (intersect A (fn . B)) (partial (intersect A (fn . B)))
+      >>
+      G |- A
+      G, A |- subtype B (partial B)
+
+- `existsTotal A B M`
+
+      G |- halts M
+      >>
+      G |- of (exists A (fn . B)) M
+
+- `existsStrict A B`
+
+      G |- subtype (exists A (fn . B)) (partial (exists A (fn . B)))
+      >>
+      G |- istp A
+      G, A |- istp B
+
+- `prodTotal A B M`
+
+      G |- halts M
+      >>
+      G |- of (prod A B) M
+
+- `prodStrict A B`
+
+      G |- subtype (prod A B) (partial (prod A B))
+      >>
+      G |- istp A
+      G |- istp B
+
+- `sumTotal A B M`
+
+      G |- halts M
+      >>
+      G |- of (sum A B) M
+
+- `sumStrict A B`
+
+      G |- subtype (sum A B) (partial (sum A B))
+      >>
+      G |- istp A
+      G |- istp B
+
+- `futureTotal A M`
+
+      G |- halts M
+      >>
+      G |- of (future A) M
+
+- `futureStrict A`
+
+      G |- subtype (future A) (partial (future A))
+      >>
+      promote(G) |- istp A
+
+- `setStrict A B`
+
+      G |- subtype (set A (fn . B)) (partial (set A (fn . B)))
+      >>
+      G, A |- istp B
+      G |- subtype A (partial A)
+
+- `isetStrict A B`
+
+      G |- subtype (iset A (fn . B)) (partial (iset A (fn . B)))
+      >>
+      G, A |- istp B
+      G |- subtype A (partial A)
+
+- `natTotal M`
+
+      G |- halts M
+      >>
+      G |- of nat M
+
+- `natStrict`
+
+      G |- subtype nat (partial nat)
+
+- `typeHalts A`
+
+      G |- halts A
+      >>
+      G |- istp A
+
+- `uptypeForm A`
+
+      G |- istp (uptype A)
+      >>
+      G |- istp A
+
+- `uptypeEq A B`
+
+      G |- eqtp (uptype A) (uptype B)
+      >>
+      G |- eqtp A B
+
+- `uptypeFormUniv A I`
+
+      G |- of (univ I) (uptype A)
+      >>
+      G |- of (univ I) A
+
+- `uptypeEqUniv A B I`
+
+      G |- eq (univ I) (uptype A) (uptype B)
+      >>
+      G |- eq (univ I) A B
+
+- `uptypeTrivialize A`
+
+      G |- uptype A
+      >>
+      G |- uptype A
+
+- `uptypeExt A M N`
+
+      G |- eq (uptype A) M N
+      >>
+      G |- of (uptype A) M
+      G |- of (uptype A) N
+
+- `uptypeLeft n A B`
+
+      G1, (uptype A), G2 |- B ext M[under_n (^1)]
+      >>
+      G1, G2[() . id] |- B[under_n (() . id)] ext M
+
+- `uptypeEeqtp A B`
+
+      G |- uptype B
+      >>
+      G |- uptype A
+      G |- eeqtp A B
+
+- `uptypeUnitary A`
+
+      G |- uptype A
+      >>
+      G |- subtype A unit
+
+- `voidUptype`
+
+      G |- uptype void
+
+- `unitUptype`
+
+      G |- uptype unit
+
+- `boolUptype`
+
+      G |- uptype bool
+
+- `forallUptype A B`
+
+      G |- uptype (forall A (fn . B))
+      >>
+      G |- istp A
+      G, A |- uptype B
+
+- `arrowUptype A B`
+
+      G |- uptype (arrow A B)
+      >>
+      G |- istp A
+      G |- uptype B
+
+- `intersectUptype A B`
+
+      G |- uptype (intersect A (fn . B))
+      >>
+      G |- istp A
+      G, A |- uptype B
+
+- `existsUptype A B`
+
+      G |- uptype (exists A (fn . B))
+      >>
+      G |- uptype A
+      G, A |- uptype B
+
+- `prodUptype A B`
+
+      G |- uptype (prod A B)
+      >>
+      G |- uptype A
+      G |- uptype B
+
+- `sumUptype A B`
+
+      G |- uptype (sum A B)
+      >>
+      G |- uptype A
+      G |- uptype B
+
+- `futureUptype A`
+
+      G |- uptype (future A)
+      >>
+      promote(G) |- uptype A
+
+- `eqUptype A M N`
+
+      G |- uptype (eq A M N)
+      >>
+      G |- of A M
+      G |- of A N
+
+- `ofUptype A M`
+
+      G |- uptype (of A M)
+      >>
+      G |- of A M
+
+- `eqtpUptype A B`
+
+      G |- uptype (eqtp A B)
+      >>
+      G |- istp A
+      G |- istp B
+
+- `istpUptype A`
+
+      G |- uptype (istp A)
+      >>
+      G |- istp A
+
+- `subtypeUptype A B`
+
+      G |- uptype (subtype A B)
+      >>
+      G |- istp A
+      G |- istp B
+
+- `setUptype A B`
+
+      G |- uptype (set A (fn . B))
+      >>
+      G |- uptype A
+      G, A |- istp B
+
+- `isetUptype A B`
+
+      G |- uptype (iset A (fn . B))
+      >>
+      G |- uptype A
+      G, A |- istp B
+
+- `muUptype A`
+
+      G |- uptype (mu (fn . A))
+      >>
+      G, type |- istp A
+      G, type, (uptype 0) |- uptype A[^1]
+      G |- positive (fn . A)
+
+- `muUptypeUniv A I`
+
+      G |- uptype (mu (fn . A))
+      >>
+      G |- of level I
+      G, (univ I) |- of (univ I[^1]) A
+      G, (univ I), (uptype 0) |- uptype A[^1]
+      G |- positive (fn . A)
+
+- `recUptype A`
+
+      G |- uptype (rec (fn . A))
+      >>
+      G, (later) type |- istp A
+      G, (later) type, (later) (uptype 0) |- uptype A[^1]
+
+- `recUptypeUniv A I`
+
+      G |- uptype (rec (fn . A))
+      >>
+      G |- of level I
+      G, (later) (univ I) |- of (univ I[^1]) A
+      G, (later) (univ I), (later) (uptype 0) |- uptype A[^1]
+
+- `natUptype`
+
+      G |- uptype nat
+
+- `uptypeFormInv A`
+
+      G |- istp A
+      >>
+      G |- istp (uptype A)
+
+- `admissForm A`
+
+      G |- istp (admiss A)
+      >>
+      G |- istp A
+
+- `admissEq A B`
+
+      G |- eqtp (admiss A) (admiss B)
+      >>
+      G |- eqtp A B
+
+- `admissFormUniv A I`
+
+      G |- of (univ I) (admiss A)
+      >>
+      G |- of (univ I) A
+
+- `admissEqUniv A B I`
+
+      G |- eq (univ I) (admiss A) (admiss B)
+      >>
+      G |- eq (univ I) A B
+
+- `admissTrivialize A`
+
+      G |- admiss A
+      >>
+      G |- admiss A
+
+- `admissExt A M N`
+
+      G |- eq (admiss A) M N
+      >>
+      G |- of (admiss A) M
+      G |- of (admiss A) N
+
+- `admissLeft n A B`
+
+      G1, (admiss A), G2 |- B ext M[under_n (^1)]
+      >>
+      G1, G2[() . id] |- B[under_n (() . id)] ext M
+
+- `admissEeqtp A B`
+
+      G |- admiss B
+      >>
+      G |- admiss A
+      G |- eeqtp A B
+
+- `uptypeAdmiss A`
+
+      G |- admiss A
+      >>
+      G |- uptype A
+
+- `partialAdmiss A`
+
+      G |- admiss (partial A)
+      >>
+      G |- admiss A
+
+- `voidAdmiss`
+
+      G |- admiss void
+
+- `unitAdmiss`
+
+      G |- admiss unit
+
+- `boolAdmiss`
+
+      G |- admiss bool
+
+- `forallAdmiss A B`
+
+      G |- admiss (forall A (fn . B))
+      >>
+      G |- istp A
+      G, A |- admiss B
+
+- `arrowAdmiss A B`
+
+      G |- admiss (arrow A B)
+      >>
+      G |- istp A
+      G |- admiss B
+
+- `intersectAdmiss A B`
+
+      G |- admiss (intersect A (fn . B))
+      >>
+      G |- istp A
+      G, A |- admiss B
+
+- `existsAdmissUptype A B`
+
+      G |- admiss (exists A (fn . B))
+      >>
+      G |- uptype A
+      G, A |- admiss B
+
+- `prodAdmiss A B`
+
+      G |- admiss (prod A B)
+      >>
+      G |- admiss A
+      G |- admiss B
+
+- `sumAdmiss A B`
+
+      G |- admiss (sum A B)
+      >>
+      G |- admiss A
+      G |- admiss B
+
+- `futureAdmiss A`
+
+      G |- admiss (future A)
+      >>
+      promote(G) |- admiss A
+
+- `eqAdmiss A M N`
+
+      G |- admiss (eq A M N)
+      >>
+      G |- of A M
+      G |- of A N
+
+- `ofAdmiss A M`
+
+      G |- admiss (of A M)
+      >>
+      G |- of A M
+
+- `eqtpAdmiss A B`
+
+      G |- admiss (eqtp A B)
+      >>
+      G |- istp A
+      G |- istp B
+
+- `istpAdmiss A`
+
+      G |- admiss (istp A)
+      >>
+      G |- istp A
+
+- `subtypeAdmiss A B`
+
+      G |- admiss (subtype A B)
+      >>
+      G |- istp A
+      G |- istp B
+
+- `recAdmiss A`
+
+      G |- admiss (rec (fn . A))
+      >>
+      G, (later) type |- istp A
+      G, (later) type, (later) (admiss 0) |- admiss A[^1]
+
+- `recAdmissUniv A I`
+
+      G |- admiss (rec (fn . A))
+      >>
+      G |- of level I
+      G, (later) (univ I) |- of (univ I[^1]) A
+      G, (later) (univ I), (later) (admiss 0) |- admiss A[^1]
+
+- `natAdmiss`
+
+      G |- admiss nat
+
+- `admissFormInv A`
+
+      G |- istp A
+      >>
+      G |- istp (admiss A)
+
+- `partialType`
+
+      G |- of (intersect level (fn . arrow (univ 0) (univ 0))) partial
+
+- `haltsType`
+
+      G |- of (intersect level (fn . intersect (univ 0) (fn . arrow (partial 0) (univ lzero)))) halts
+
+- `admissType`
+
+      G |- of (intersect level (fn . arrow (univ 0) (univ 0))) admiss
+
+- `uptypeType`
+
+      G |- of (intersect level (fn . arrow (univ 0) (univ 0))) uptype
+
+- `seqType`
+
+      G |- of (intersect level (fn . intersect (univ 0) (fn . intersect (univ 1) (fn . arrow (partial 1) (arrow (arrow 1 (partial 0)) (partial 0)))))) seq
+
+
 ### Let hypotheses
 
 - `letIntro n M`
@@ -3849,6 +4753,30 @@ Conventions:
              timesz
              (fn . fn . integer_from_Integer (Timesz (integer_to_Integer 1) (integer_to_Integer 0)))
 
+- `integerTotal M`
+
+      G |- halts M
+      >>
+      G |- of integer M
+
+- `integerStrict`
+
+      G |- subtype integer (partial integer)
+
+- `integerUptype`
+
+      G |- uptype integer
+
+- `integerAdmiss`
+
+      G |- admiss integer
+
+- `integerSequal M N`
+
+      G |- sequal M N
+      >>
+      G |- eq integer M N
+
 
 ### Symbols
 
@@ -3897,6 +4825,30 @@ Conventions:
       G |- eq symbol M N
       >>
       G |- eq bool (symbol_eqb M N) true
+
+- `symbolTotal M`
+
+      G |- halts M
+      >>
+      G |- of symbol M
+
+- `symbolStrict`
+
+      G |- subtype symbol (partial symbol)
+
+- `symbolUptype`
+
+      G |- uptype symbol
+
+- `symbolAdmiss`
+
+      G |- admiss symbol
+
+- `symbolSequal M N`
+
+      G |- sequal M N
+      >>
+      G |- eq symbol M N
 
 
 ### Rewriting

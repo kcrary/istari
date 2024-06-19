@@ -1829,6 +1829,56 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                fail "substitutend depends on later hypotheses"
          end
 
+
+      fun synsubstMain reverse i j m =
+         let
+            val m' = T.evar ()
+
+            val eqgoal =
+               cut $ setFailure "type mismatch in substitution" $
+                  (if reverse then
+                      refine (Rule.sequalSymm (T.evar ()) (T.evar ()))
+                      >> refine (Rule.hypothesis j) >> done
+                   else
+                      refine (Rule.hypothesis j) >> done)
+
+            val maingoal =
+               let
+                  do (_, dir) = withgoal
+  
+                  (* We just used hypotheses i and j, so they have to be there.
+                     They also have to be in the directory unless it is corrupt.
+                     Moreover, j depends on i, so j < i
+                  *)
+                  val (d5, d1234) = D.split dir j
+                  val (d3, d12) = D.split (D.tl d1234) (i - j - 1)
+                  val d1 = D.tl d12
+  
+                  val dir' =
+                     List.foldl
+                        (fns sym d => D.bind d sym)
+                        (List.foldl 
+                            (fns sym d => D.bind d sym)
+                            d1
+                            d3)
+                        d5
+               in
+                  refine (Rule.weaken j 1)
+                  >> chdir dir'
+                  >> idtacM Primary
+               end
+         in
+            if Unify.unify1 m (T.Sub (m', T.Shift (i+1))) then
+               refine (Rule.substitutionSyntactic i (T.evar ()) (T.evar ()) m')
+               >>> [
+                   eqgoal,
+                   maingoal
+                   ]
+            else
+               fail "substitutend depends on later hypotheses"
+         end
+
+
       fun substFlexPriority strict cautious hyps =
          (case hyps of
              [] =>
@@ -1880,6 +1930,34 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                                  / $tm \Prim.eq\ _ ? var? =>
                                    \(fnc m' i' =>
                                         substMain true cautious i' j m')\
+                                 /)\
+
+                       | $tm \Prim.sequal\ ($var \i\) ? =>
+                         \(fnc j m =>
+                              if strict then
+                                 synsubstMain false i j m
+                              else
+                                 Hyp.moveTermDeps m i
+                                 >>+
+                                 (* j cannot have moved, but i and m are probably different now *)
+                                 goalHypCaseT j
+                                 / $tm \Prim.sequal\ var? ? =>
+                                   \(fnc i' m' =>
+                                        synsubstMain false i' j m')\
+                                 /)\
+
+                       | $tm \Prim.sequal\ ? ($var \i\) =>
+                         \(fnc j m =>
+                              if strict then
+                                 synsubstMain true i j m
+                              else
+                                 Hyp.moveTermDeps m i
+                                 >>+
+                                 (* j cannot have moved, but i and m are probably different now *)
+                                 goalHypCaseT j
+                                 / $tm \Prim.sequal\ ? var? =>
+                                   \(fnc m' i' =>
+                                        synsubstMain true i' j m')\
                                  /)\
                       /,
        

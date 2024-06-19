@@ -688,6 +688,16 @@ possible dependency in the conclusion.
 
     As `forceExact` but does not invoke the typechecker to prove `M : A`.
 
+- `tighten /[hyp x]/ /[term A]/`
+
+  If `x` is bound with type `B`, changes its binding to `A`, provided
+  `A <: B` and `x : A`.  Invokes the typechecker on the `A <: B`
+  subgoal.
+
+  + `tightenRaw /[hyp x]/ /[term A]/`
+
+    As `tighten` but does not invoke the typechecker.
+
 
 
 ### Destruction

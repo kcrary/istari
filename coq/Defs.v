@@ -49,7 +49,9 @@ Definition acc : fterm :=
                    (var 0))
                 (var 1))))).
 
+Definition admiss : fterm := lam (admiss (var 0)).
 Definition bool : fterm := booltp.
+Definition bottom : fterm := app theta (lam (var 0)).
 Definition eeqtp : fterm := lam (lam (prod (subtype (var 1) (var 0)) (subtype (var 0) (var 1)))).
 Definition eq : fterm := lam (lam (lam (equal (var 2) (var 1) (var 0)))).
 Definition eqtp : fterm := lam (lam (eqtype (var 1) (var 0))).
@@ -62,6 +64,7 @@ Definition iff : fterm := lam (lam (prod (pi (var 1) (var 1)) (pi (var 0) (var 2
 Definition iforall : fterm := lam (lam (lam (all (var 2) (var 1) (app (var 1) (var 0))))).
 Definition intersect : fterm := lam (lam (intersect (var 1) (app (var 1) (var 0)))).
 Definition union : fterm := lam (lam (union (var 1) (app (var 1) (var 0)))).
+Definition halts : fterm := lam (halts (var 0)).
 Definition istp : fterm := lam (eqtype (var 0) (var 0)).
 Definition ite : fterm := lam (lam (lam (bite (var 2) (var 1) (var 0)))).
 Definition karrow : fterm := lam (lam (karrow (var 1) (var 0))).
@@ -86,10 +89,13 @@ Definition mu : fterm := lam (mu (app (var 1) (var 0))).
 Definition nat : fterm := nattp.
 Definition negative : fterm := lam (isnegative (app (var 1) (var 0))).
 Definition of : fterm := lam (lam (equal (var 1) (var 0) (var 0))).
+Definition partial : fterm := lam (partial (var 0)).
 Definition prod : fterm := lam (lam (prod (var 1) (var 0))).
 Definition quotient : fterm := lam (lam (quotient (var 1) (app (app (var 2) (var 1)) (var 0)))).
 Definition rec : fterm := lam (rec (app (var 1) (var 0))).
 Definition positive : fterm := lam (ispositive (app (var 1) (var 0))).
+Definition seq : fterm := lam (lam (seq (var 1) (app (var 1) (var 0)))).
+Definition sequal : fterm := lam (lam (sequal (var 1) (var 0))).
 Definition squash : fterm := lam (set unittp (var 1)).
 Definition subtype : fterm := lam (lam (subtype (var 1) (var 0))).
 Definition succ : fterm := lam (app inr (var 0)).
@@ -132,6 +138,7 @@ Definition iset : fterm := lam (lam (iset (var 1) (app (var 1) (var 0)))).
 Definition sigma : fterm := lam (lam (sigma (var 1) (app (var 1) (var 0)))).
 Definition theta : fterm := theta.
 Definition triv : fterm := triv.
+Definition uptype : fterm := lam (uptype (var 0)).
 Definition wind : fterm := lam (wind (var 0)).
 
 Definition arrow : fterm := lam (lam (pi (var 1) (var 1))).

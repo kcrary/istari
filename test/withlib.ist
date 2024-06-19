@@ -3,6 +3,114 @@ openModule /List/;
 openModule /Bar/;
 openModule /Union/;
 openModule /Natural/;
+openModule /Partial/;
+openModule /SyntacticEquality/;
+openModule /Miscellaneous/;
+
+
+lemma "sequal_refl"
+/
+  sequal bogus bogus
+/;
+
+reflexivity.
+qed ();
+
+
+lemma "sequal_trans"
+/
+  forall x y z .
+    x = y : nat
+    -> y = z : nat
+    -> sequal x z
+/;
+
+inference.
+intro /x y z Hxy Hyz/.
+transitivity /y/.
+  {
+  apply /nat_eq_impl_sequal/ >> auto.
+  }
+
+  {
+  apply /nat_eq_impl_sequal/ >> auto.
+  }
+qed ();
+
+
+
+lemma "subst_sequal"
+/
+  forall x .
+    x = 4 : nat
+    -> nat_case x bogus (fn _ . ()) : unit
+/;
+
+inference.
+intro /x Heq/.
+so /nat_eq_impl_sequal _# 2 Heq/ /Heq'/.
+clear /Heq/.
+symmetryIn /Heq'/.
+subst /x/.
+reduce //.
+typecheck.
+qed ();
+
+
+
+lemma "Forall_Exists_admissible"
+/
+  forall i (a : U i) (P : a -> U i) (l : list a) .
+    uptype a
+    -> (forall x . uptype (P x))
+    -> admiss (Forall P l % Exists P l)
+/;
+
+inference.
+intros.
+Partiality.proveAdmiss.
+qed ();
+
+
+
+lemma "partial_void"
+/
+  partial void
+/;
+
+exactRaw /bottom/.
+typecheck.
+qed ();
+
+
+
+(* partial factorial *)
+definerec /factorial n/
+/
+  if n =z? z`0 then z`1 else (seq n' = factorial (n -z z`1) in n *z n')
+//
+  integer -> partial integer
+/;
+
+introOf /n/.
+RuleTactic.activeApp (parseCurr /integer -> partial integer/) (parseCurr /factorial/) (parseCurr /n/) >> auto.
+unfold /factorial/.
+clear /factorial n/.
+RuleTactic.fixpointInductionOf.
+1:{
+  Partiality.proveAdmiss.
+  }
+introOf /factorial/.
+reduce //.
+subsume /integer -> partial integer/.
+  {
+  typecheck.
+  }
+introOf /n/.
+reduce //.
+typecheck.
+RuleTactic.activeApp (parseCurr /integer -> partial integer/) (parseCurr /factorial/) (parseCurr /n -z z`1/) >> auto.
+qed ();
 
 
 
