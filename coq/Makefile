@@ -127,6 +127,7 @@ UNITS = \
 	ValidationEqual \
 	ValidationExist \
 	ValidationFuture \
+	ValidationGuard \
 	ValidationIstp \
 	ValidationLevel \
 	ValidationMisc \

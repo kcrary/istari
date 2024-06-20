@@ -90,6 +90,7 @@ Inductive operator : list nat -> Type :=
 | oper_quotient    : operator [0; 2]
 
 | oper_guard       : operator [0; 0]
+| oper_coguard     : operator [0; 0]
 
 | oper_wt          : operator [0; 1]
 
@@ -556,6 +557,7 @@ Definition set {obj} m1 m2         : @term obj := oper _ (oper_set _) (rw_cons _
 Definition iset {obj} m1 m2        : @term obj := oper _ (oper_iset _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition quotient {obj} m1 m2    : @term obj := oper _ (oper_quotient _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition guard {obj} m1 m2       : @term obj := oper _ (oper_guard _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
+Definition coguard {obj} m1 m2     : @term obj := oper _ (oper_coguard _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition wt {obj} m1 m2          : @term obj := oper _ (oper_wt _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition partial {obj} m         : @term obj := oper _ (oper_partial _) (rw_cons _ _ m rw_nil).
 Definition halts {obj} m           : @term obj := oper _ (oper_halts _) (rw_cons _ _ m rw_nil).
@@ -735,6 +737,9 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 
 | same_guard :
     same_operator [0; 0] [0; 0] (oper_guard A) (oper_guard B)
+
+| same_coguard :
+    same_operator [0; 0] [0; 0] (oper_coguard A) (oper_coguard B)
 
 | same_wt :
     same_operator [0; 1] [0; 1] (oper_wt A) (oper_wt B)

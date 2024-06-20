@@ -952,3 +952,560 @@ f_equal.
   auto.
   }
 Qed.
+
+
+Definition coguard_action
+  (w : ordinal) i (A : wurel w) (B : urelsp (squash_urel w A i) -n> wurel_ofe w)
+  : nat -> relation (wterm w)
+  :=
+  fun i' m n =>
+    exists p q (Hi' : i' <= i) (Hrel : rel A i' p q),
+      rel (pi1 B (urelspinj (squash_urel w A i) i' triv triv (squash_intro _#6 Hi' Hrel))) i' m n.
+
+
+Lemma coguard_uniform :
+  forall w i A B, uniform _ (coguard_action w i A B).
+Proof.
+intros w i A B.
+do2 3 split.
+  {
+  intros j m n Hmn.
+  decompose Hmn.
+  intros p q Hj Hpq Hmn.
+  eapply urel_closed; eauto.
+  }
+
+  {
+  intros j m m' n n' Hclm' Hcln' Hm Hn H.
+  decompose H.
+  intros p q Hj Hpq Hmn.
+  exists p, q, Hj, Hpq.
+  eapply urel_equiv; eauto.
+  }
+
+  {
+  intros j m p n q Hmp Hnp Hnq.
+  decompose Hmp.
+  intros r t Hj Hrt Hmp.
+  decompose Hnp.
+  intros r' t' Hj' Hrt' Hnp.
+  so (proof_irrelevance _ Hj Hj').
+  subst Hj'.
+  decompose Hnq.
+  intros r'' t'' Hj' Hrt'' Hnq.
+  so (proof_irrelevance _ Hj Hj').
+  subst Hj'.
+  exists r, t, Hj, Hrt.
+  apply (urel_zigzag _#4 p n); auto.
+    {
+    force_exact Hnp.
+    f_equal.
+    f_equal.
+    apply urelspinj_equal.
+    cbn.
+    apply property_action_triv; auto.
+    exists r, t.
+    auto.
+    }
+
+    {
+    force_exact Hnq.
+    f_equal.
+    f_equal.
+    apply urelspinj_equal.
+    cbn.
+    apply property_action_triv; auto.
+    exists r, t.
+    auto.
+    }
+  }
+
+  {
+  intros j m n Hmn.
+  decompose Hmn.
+  intros p q Hj Hpq Hmn.
+  assert (j <= i) as Hj' by omega.
+  exists p, q, Hj', (urel_downward _#5 Hpq).
+  refine (rel_from_dist _#6 _ (urel_downward _#5 Hmn)).
+  apply (pi2 B).
+  apply dist_symm.
+  apply urelspinj_dist.
+  omega.
+  }
+Qed.
+
+
+Definition coguard_urel w i A B :=
+  mk_urel (coguard_action w i A B) (coguard_uniform _ _ _ _).
+
+
+Lemma ceiling_coguard :
+  forall n w i (A : wurel w) (B : urelsp (squash_urel w A i) -n> wurel_ofe w) (h : n <= i),
+    ceiling (S n) (coguard_urel w i A B)
+    =
+    coguard_urel w n (ceiling (S n) A)
+      (nearrow_compose
+         (ceiling_ne (S n))
+         (nearrow_compose
+            B
+            (nearrow_compose
+               (embed_ceiling_ne (S n) (squash_urel w A i))
+               (transport_ne (ceiling_squash_both w A n i h) urelsp)))).
+Proof.
+intros n w i A B h.
+apply urel_extensionality.
+fextensionality 3.
+intros j m p.
+cbn.
+pextensionality.
+  {
+  intros (Hj_n & H).
+  decompose H.
+  intros q r Hj Hqr Hmp.
+  assert (j <= n) as Hj_n' by omega.
+  exists q, r, Hj_n', (conj Hj_n Hqr).
+  cbn.
+  split; auto.
+  eapply rel_from_dist; eauto.
+  apply (pi2 B).
+  cbn.
+  intros k Hk.
+  fextensionality 1.
+  intro t.
+  cbn.
+  rewrite -> (pi1_transport_lift _ _ urelsp_car_rhs _ _ (ceiling_squash_both w A n i h)).
+  pextensionality.
+    {
+    intros (Hk' & H).
+    cbn.
+    split; auto.
+    decompose H.
+    intros x y.
+    intros.
+    do2 5 split; auto.
+      {
+      exists x, y.
+      split; auto.
+      omega.
+      }
+
+      {
+      omega.
+      }
+    }
+
+    {
+    intros H.
+    cbn in H.
+    destruct H as (Hk' & H).
+    split; auto.
+    decompose H.
+    intros x y.
+    intros.
+    do2 5 split; auto.
+      {
+      exists x, y.
+      auto.
+      }
+
+      {
+      omega.
+      }
+    }
+  }
+
+  {
+  intro H.
+  decompose H.
+  intros q r Hj Hqr Hmp.
+  cbn in Hmp.
+  destruct Hmp as (Hj' & Hmp).
+  split; auto.
+  assert (j <= i) as Hj_i by omega.
+  exists q, r, Hj_i.
+  destruct Hqr as (Hj'' & Hqr).
+  exists Hqr.
+  eapply rel_from_dist; eauto.
+  apply (pi2 B).
+  cbn.
+  intros k Hk.
+  fextensionality 1.
+  intros t.
+  cbn.
+  rewrite -> (pi1_transport_lift _ _ urelsp_car_rhs _ _ (ceiling_squash_both w A n i h)).
+  pextensionality.
+    {
+    intro H.
+    cbn in H.
+    destruct H as (Hk' & H).
+    split; auto.
+    decompose H.
+    intros x y.
+    intros.
+    do2 5 split; auto.
+      {
+      exists x, y.
+      auto.
+      }
+
+      {
+      omega.
+      }
+    }
+
+    {
+    intros (Hk' & H).
+    decompose H.
+    intros x y.
+    intros.
+    cbn.
+    split; auto.
+    do2 5 split; auto.
+      {
+      exists x, y.
+      split; auto.
+      omega.
+      }
+
+      {
+      omega.
+      }
+    }
+  }
+Qed.
+
+
+Lemma extend_coguard :
+  forall v w (h : v <<= w) i A B,
+    extend_urel v w (coguard_urel v i A B)
+    =
+    coguard_urel w i (extend_urel v w A)
+      (nearrow_compose
+         (extend_urel_ne v w)
+         (nearrow_compose
+            B
+            (nearrow_compose
+               (deextend_urelsp_ne h (squash_urel v A i))
+               (transport_ne (eqsymm (extend_squash v w A i h)) urelsp)))).
+Proof.
+intros v w h i A B.
+apply urel_extensionality.
+fextensionality 3.
+intros j m p.
+cbn.
+pextensionality.
+  {
+  intros H.
+  decompose H.
+  intros q r Hj Hqr Hmp.
+  exists (map_term (extend v w) q), (map_term (extend v w) r), Hj.
+  cbn.
+  assert (rel A j (map_term (extend w v) (map_term (extend v w) q)) (map_term (extend w v) (map_term (extend v w) r))) as Hqr'.
+    {
+    rewrite -> !extend_term_cancel; auto.
+    }
+  exists Hqr'.
+  eapply rel_from_dist; eauto.
+  apply (pi2 B).
+  cbn.
+  intros k Hk.
+  fextensionality 1.
+  intros t.
+  cbn.
+  rewrite -> (pi1_transport_lift _ _ urelsp_car_rhs _ _ (eqsymm (extend_squash v w A i h))).
+  cbn.
+  pextensionality.
+    {
+    intros (Hk' & H).
+    split; auto.
+    decompose H.
+    intros x y.
+    intros.
+    do2 5 split; auto.
+      {
+      exists (map_term (extend v w) x), (map_term (extend v w) y).
+      rewrite -> !extend_term_cancel; auto.
+      }
+    
+      {
+      apply map_hygiene; auto.
+      }
+      
+      {
+      apply hygiene_auto; cbn.
+      auto.
+      }
+
+      {
+      replace triv with (map_term (extend v w) triv) by reflexivity.
+      apply map_steps; auto.
+      }
+
+      {
+      apply star_refl.
+      }
+    }
+
+    {
+    intros (Hk' & H).
+    split; auto.
+    decompose H.
+    intros x y.
+    intros.
+    do2 5 split; auto.
+      {
+      exists (map_term (extend w v) x), (map_term (extend w v) y).
+      auto.
+      }
+    
+      {
+      eapply map_hygiene_conv; eauto.
+      }
+      
+      {
+      apply hygiene_auto; cbn.
+      auto.
+      }
+
+      {
+      replace triv with (map_term (extend w v) triv) by reflexivity.
+      rewrite <- (extend_term_cancel _ _ h t).
+      apply map_steps; auto.
+      }
+
+      {
+      apply star_refl.
+      }
+    }
+  }
+
+  {
+  intros H.
+  decompose H.
+  intros q r Hj Hqr Hmp.
+  cbn in Hqr.
+  exists (map_term (extend w v) q), (map_term (extend w v) r), Hj, Hqr.
+  cbn in Hmp.
+  eapply rel_from_dist; eauto.
+  apply (pi2 B).
+  cbn.
+  intros k Hk.
+  fextensionality 1.
+  intros t.
+  cbn.
+  rewrite -> (pi1_transport_lift _ _ urelsp_car_rhs _ _ (eqsymm (extend_squash v w A i h))).
+  cbn.
+  pextensionality.
+    {
+    intros (Hk' & H).
+    split; auto.
+    decompose H.
+    intros x y.
+    intros.
+    do2 5 split; auto.
+      {
+      exists (map_term (extend w v) x), (map_term (extend w v) y); auto.
+      }
+    
+      {
+      eapply map_hygiene_conv; eauto.
+      }
+      
+      {
+      apply hygiene_auto; cbn.
+      auto.
+      }
+
+      {
+      replace triv with (map_term (extend w v) triv) by reflexivity.
+      rewrite <- (extend_term_cancel _ _ h t).
+      apply map_steps; auto.
+      }
+
+      {
+      apply star_refl.
+      }
+    }
+
+    {
+    intros (Hk' & H).
+    split; auto.
+    decompose H.
+    intros x y.
+    intros.
+    do2 5 split; auto.
+      {
+      exists (map_term (extend v w) x), (map_term (extend v w) y).
+      rewrite -> !extend_term_cancel; auto.
+      }
+    
+      {
+      eapply map_hygiene; eauto.
+      }
+      
+      {
+      apply hygiene_auto; cbn.
+      auto.
+      }
+
+      {
+      replace triv with (map_term (extend v w) triv) by reflexivity.
+      apply map_steps; auto.
+      }
+
+      {
+      apply star_refl.
+      }
+    }
+  }
+Qed.
+
+
+Definition iucoguard (w : ordinal) i (A : wiurel w) (B : urelsp (squash_urel w (den A) i) -n> wiurel_ofe w) : wiurel w
+  :=
+  (coguard_urel w i (den A) (nearrow_compose den_ne B),
+   snd (pi1 (unguard w (den A) i B))).
+
+
+Lemma iutruncate_iucoguard :
+  forall n w i (A : wiurel w) (B : urelsp (squash_urel w (den A) i) -n> wiurel_ofe w) (h : n <= i),
+    iutruncate (S n) (iucoguard w i A B)
+    =
+    iucoguard w n
+      (iutruncate (S n) A)
+      (nearrow_compose
+         (nearrow_compose (iutruncate_ne (S n)) B)
+         (embed_ceiling_squash_ne w n i (den A) h)).
+Proof.
+intros n w i A B h.
+unfold iucoguard.
+unfold iutruncate.
+cbn [den fst snd].
+f_equal.
+  {
+  rewrite -> (ceiling_coguard _#5 h); auto.
+  apply urel_extensionality.
+  fextensionality 3.
+  intros j m p.
+  cbn.
+  f_equal.
+  apply nearrow_extensionality.
+  intro x.
+  cbn.
+  reflexivity.
+  }
+
+  {
+  exact (f_equal snd (iutruncate_unguard n w i (den A) B h)).
+  }
+Qed.
+
+
+Lemma extend_iucoguard :
+  forall v w (h : v <<= w) i A B,
+    extend_iurel h (iucoguard v i A B)
+    =
+    iucoguard w i (extend_iurel h A)
+      (nearrow_compose (extend_iurel_ne h)
+         (nearrow_compose B
+            (nearrow_compose
+               (deextend_urelsp_ne h (squash_urel v (den A) i))
+               (transport_ne (eqsymm (extend_squash v w (den A) i h)) urelsp)))).
+Proof.
+intros v w h i A B.
+unfold iucoguard, extend_iurel.
+cbn.
+f_equal.  (* Why slow? *)
+  {
+  rewrite -> (extend_coguard _ _ h).
+  apply urel_extensionality.
+  fextensionality 3.
+  intros j m p.
+  cbn.
+  f_equal.
+  apply nearrow_extensionality.
+  intro x.
+  cbn.
+  reflexivity.
+  }
+
+  {
+  exact (f_equal snd (extend_unguard _ _ h i (den A) B)).
+  }
+Qed.
+
+
+Lemma coguard_urel_satisfied_eq :
+  forall w 
+    (A : wurel w) 
+    i 
+    (B : urelsp (squash_urel w A i) -n> wurel_ofe w)
+    j m p
+    (Hj : j <= i)
+    (Hmp : rel A j m p),
+      ceiling (S j) (pi1 B (urelspinj _#4 (squash_intro _#6 Hj Hmp)))
+      = 
+      ceiling (S j) (coguard_urel w i A B).
+Proof.
+intros w A i B j m p Hj Hmp.
+apply urel_extensionality.
+fextensionality 3.
+intros k n q.
+cbn.
+pextensionality.
+  {
+  intros (Hk & Hnq).
+  split; auto.
+  assert (k <= i) as Hki by omega.
+  assert (k <= j) as Hkj by omega.
+  exists m, p, Hki, (urel_downward_leq _#6 Hkj Hmp).
+  eapply rel_from_dist; eauto.
+  apply (pi2 B).
+  apply dist_symm.
+  apply urelspinj_dist; auto.
+  }
+
+  {
+  intros (Hk & Hnq).
+  split; auto.
+  decompose Hnq.
+  intros x y Hki Hxy Hnq.
+  eapply rel_from_dist; eauto.
+  apply (pi2 B).
+  apply urelspinj_dist.
+  omega.
+  }
+Qed.
+
+
+Lemma iucoguard_satisfied_eq :
+  forall w
+    (A : wiurel w)
+    i
+    (B : urelsp (squash_urel w (den A) i) -n> wiurel_ofe w)
+    j m p
+    (Hj : j <= i)
+    (Hmp : rel (den A) j m p),
+      iutruncate (S j) (pi1 B (urelspinj _#4 (squash_intro _#6 Hj Hmp)))
+      =
+      iutruncate (S j) (iucoguard w i A B).
+Proof.
+intros w A i B j m p Hj Hmp.
+unfold iutruncate, iucoguard.
+cbn [fst snd].
+f_equal.
+  {
+  rewrite <- (coguard_urel_satisfied_eq _ (den A) _ (nearrow_compose den_ne B) _#3 Hj Hmp).
+  reflexivity.
+  }
+
+  {
+  apply meta_truncate_collapse.
+  apply dist_prod_snd.
+  set (X := unguard w (den A) i B).
+  destruct X as (C & Htrunc & HC).
+  cbn [pi1].
+  apply dist_symm.
+  auto.
+  }
+Qed.

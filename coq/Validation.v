@@ -28,6 +28,7 @@ Require Import ValidationEqual.
 Require Import ValidationExist.
 Require Import ValidationSigma.
 Require Import ValidationFuture.
+Require Import ValidationGuard.
 Require Import ValidationIstp.
 Require Import ValidationRec.
 Require Import ValidationLevel.
@@ -153,6 +154,24 @@ exact guardElimOf_valid.
 exact guardElimEq_valid.
 exact guardElim_valid.
 exact guardSatEq_valid.
+exact guardSub_valid.
+exact guardSubIntro_valid.
+exact coguardForm_valid.
+exact coguardEq_valid.
+exact coguardFormUniv_valid.
+exact coguardEqUniv_valid.
+exact coguardIntroEq_valid.
+exact coguardIntroOf_valid.
+exact coguardIntroOfSquash_valid.
+exact coguardIntro_valid.
+exact coguardElim1_valid.
+exact coguardElim2Eq_valid.
+exact coguardElim2Of_valid.
+exact coguardElim2_valid.
+exact coguardLeft_valid.
+exact coguardSatEq_valid.
+exact coguardSub_valid.
+exact coguardSubElim_valid.
 exact existsForm_valid.
 exact existsEq_valid.
 exact existsFormUniv_valid.

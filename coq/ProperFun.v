@@ -939,6 +939,17 @@ f_equal.
 apply IH2; auto.
 }
 
+(* coguard *)
+{
+intros pg s i a b A B _ IH1 _ IH2 X HX.
+invertc HX.
+intros A' B' Ha Hb <-.
+so (IH1 _ Ha).
+subst A'.
+f_equal.
+apply IH2; auto.
+}
+
 (* wt *)
 {
 intros pg s i a b A B _ IH1 _ IH2 X HX.

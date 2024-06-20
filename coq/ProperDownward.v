@@ -575,6 +575,19 @@ apply transport_functional.
 exact Hfunc.
 }
 
+(* coguard *)
+{
+intros pg s i a b A B Ha IH1 Hb IH2 j Hj.
+rewrite -> (iutruncate_iucoguard _#5 Hj).
+apply interp_coguard; auto.
+so (IH2 _ Hj) as Hfunc.
+unfold fntruncate in Hfunc.
+unfold embed_ceiling_squash_ne.
+rewrite <- nearrow_compose_assoc.
+apply transport_functional.
+exact Hfunc.
+}
+
 (* fut zero *)
 {
 intros pg s a H j Hj.

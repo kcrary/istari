@@ -139,7 +139,6 @@ try (intros;
            |apply interp_unit
            |apply interp_bool
            |apply interp_extt
-           |apply interp_guard
            |apply interp_wt
            |apply interp_univ
            |apply interp_kind
@@ -301,6 +300,22 @@ fold (guard a' b') in *.
 so (hygiene_invert_auto _#5 Hcl) as H; cbn in H.
 destruct H as (Hcla' & Hclb' & _).
 apply interp_guard; auto.
+apply IH2.
+  {
+  apply hygiene_shift_permit; auto.
+  }
+apply equiv_subst; auto.
+}
+
+(* coguard *)
+{
+intros pg s i a b A B _ IH1 _ IH2 aa Hcl Hequiv.
+invertc_mc Hequiv.
+intros a' Hequiva b' Hequivb <-.
+fold (guard a' b') in *.
+so (hygiene_invert_auto _#5 Hcl) as H; cbn in H.
+destruct H as (Hcla' & Hclb' & _).
+apply interp_coguard; auto.
 apply IH2.
   {
   apply hygiene_shift_permit; auto.

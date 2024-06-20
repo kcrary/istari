@@ -38,6 +38,7 @@ variables.  The official rules, using de Bruijn indices, are given
 [Strong sums](#strong-sums)<br>
 [Products](#products)<br>
 [Union types](#union-types)<br>
+[Couarded types](#coguarded-types)<br>
 [Disjoint sums](#disjoint-sums)<br>
 [Future modality](#future-modality)<br>
 [Recursive types](#recursive-types)<br>
@@ -917,6 +918,23 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- B : type
       G |- A
 
+- `guardSub A A' B B'`
+
+      G |- (A -g> B) <: (A' -g> B')
+      >>
+      G |- A' -> A
+      G |- A : type
+      G, x : A' |- B <: B'
+      G, x : A |- B : type
+
+- `guardSubIntro A B C`
+
+      G |- C <: (A -g> B)
+      >>
+      G |- A : type
+      G, x : A |- C <: B
+      G |- C : type
+
 
 ### Strong sums
 
@@ -1343,6 +1361,124 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G, x : A, y : B |- C = D : type
       G |- M = N : (union (x : A) . B)
+
+
+### Coguarded types
+
+- `coguardForm A B`
+
+      G |- A &g B : type
+      >>
+      G |- A : type
+      G, x : A |- B : type
+
+- `coguardEq A A' B B'`
+
+      G |- (A &g B) = (A' &g B') : type
+      >>
+      G |- iff A A'
+      G, x : A |- B = B' : type
+
+- `coguardFormUniv A B I`
+
+      G |- A &g B : univ I
+      >>
+      G |- A : univ I
+      G, x : A |- B : univ I
+
+- `coguardEqUniv A A' B B' I`
+
+      G |- (A &g B) = (A' &g B') : univ I
+      >>
+      G |- A : univ I
+      G |- A' : univ I
+      G |- iff A A'
+      G, x : A |- B = B' : univ I
+
+- `coguardIntroEq A B M N`
+
+      G |- M = N : (A &g B)
+      >>
+      G |- A
+      G |- M = N : B
+
+- `coguardIntroOf A B M`
+
+      G |- M : A &g B
+      >>
+      G |- A
+      G |- M : B
+
+- `coguardIntroOfSquash A B M`
+
+      G |- M : A &g B
+      >>
+      G |- A : type
+      G |- {A}
+      G |- M : B
+
+- `coguardIntro A B`
+
+      G |- A &g B ext M
+      >>
+      G |- A
+      G |- B ext M
+
+- `coguardElim1 A B`
+
+      G |- {A}
+      >>
+      G |- A : type
+      G |- A &g B
+
+- `coguardElim2Eq A B M N`
+
+      G |- M = N : B
+      >>
+      G |- M = N : (A &g B)
+
+- `coguardElim2Of A B M`
+
+      G |- M : B
+      >>
+      G |- M : A &g B
+
+- `coguardElim2 A B`
+
+      G |- B ext M
+      >>
+      G |- A &g B ext M
+
+- `coguardLeft n A B C`
+
+      G1, x : (A &g B), G2 |- C ext [() / y]M
+      >>
+      G1 |- A : type
+      G1, x : B, y (hidden) : A, G2 |- C ext M
+
+- `coguardSatEq A B`
+
+      G |- B = (A &g B) : type
+      >>
+      G |- B : type
+      G |- A
+
+- `coguardSub A A' B B'`
+
+      G |- (A &g B) <: (A' &g B')
+      >>
+      G |- A -> A'
+      G |- A' : type
+      G, x : A |- B <: B'
+      G, x : A' |- B' : type
+
+- `coguardSubElim A B C`
+
+      G |- (A &g B) <: C
+      >>
+      G |- A : type
+      G, x : A |- B <: C
+      G |- C : type
 
 
 ### Disjoint sums

@@ -40,7 +40,7 @@ relations.isto : $(DATATYPES) acc.isto decidable.isto finite.isto
 smith-paradox.isto : logic.isto nat.isto omega.isto partial.isto syntactic-equality.isto
 stable.isto : decidable.isto logic.isto
 symbol.isto : logic.isto bool.isto
-syntactic-equality.isto : nat.isto
+syntactic-equality.isto : nat.isto integer.isto symbol.isto
 union.isto : logic.isto
 wtype.isto : acc.isto
 

@@ -25,6 +25,7 @@ Conventions:
 [Strong sums](#strong-sums)<br>
 [Products](#products)<br>
 [Union types](#union-types)<br>
+[Coguarded types](#coguarded-types)<br>
 [Disjoint sums](#disjoint-sums)<br>
 [Future modality](#future-modality)<br>
 [Recursive types](#recursive-types)<br>
@@ -905,6 +906,23 @@ Conventions:
       G |- istp B
       G |- A
 
+- `guardSub A A' B B'`
+
+      G |- subtype (guard A B) (guard A' B')
+      >>
+      G |- arrow A' A
+      G |- istp A
+      G, A' |- subtype B[^1] B'[^1]
+      G, A |- istp B[^1]
+
+- `guardSubIntro A B C`
+
+      G |- subtype C (guard A B)
+      >>
+      G |- istp A
+      G, A |- subtype C[^1] B[^1]
+      G |- istp C
+
 
 ### Strong sums
 
@@ -1331,6 +1349,124 @@ Conventions:
       >>
       G, A, B |- eqtp C[0 . ^2] D[0 . ^2]
       G |- eq (union A (fn . B)) M N
+
+
+### Coguarded types
+
+- `coguardForm A B`
+
+      G |- istp (coguard A B)
+      >>
+      G |- istp A
+      G, A |- istp B[^1]
+
+- `coguardEq A A' B B'`
+
+      G |- eqtp (coguard A B) (coguard A' B')
+      >>
+      G |- iff A A'
+      G, A |- eqtp B[^1] B'[^1]
+
+- `coguardFormUniv A B I`
+
+      G |- of (univ I) (coguard A B)
+      >>
+      G |- of (univ I) A
+      G, A |- of (univ I[^1]) B[^1]
+
+- `coguardEqUniv A A' B B' I`
+
+      G |- eq (univ I) (coguard A B) (coguard A' B')
+      >>
+      G |- of (univ I) A
+      G |- of (univ I) A'
+      G |- iff A A'
+      G, A |- eq (univ I[^1]) B[^1] B'[^1]
+
+- `coguardIntroEq A B M N`
+
+      G |- eq (coguard A B) M N
+      >>
+      G |- A
+      G |- eq B M N
+
+- `coguardIntroOf A B M`
+
+      G |- of (coguard A B) M
+      >>
+      G |- A
+      G |- of B M
+
+- `coguardIntroOfSquash A B M`
+
+      G |- of (coguard A B) M
+      >>
+      G |- istp A
+      G |- squash A
+      G |- of B M
+
+- `coguardIntro A B`
+
+      G |- coguard A B ext M
+      >>
+      G |- A
+      G |- B ext M
+
+- `coguardElim1 A B`
+
+      G |- squash A
+      >>
+      G |- istp A
+      G |- coguard A B
+
+- `coguardElim2Eq A B M N`
+
+      G |- eq B M N
+      >>
+      G |- eq (coguard A B) M N
+
+- `coguardElim2Of A B M`
+
+      G |- of B M
+      >>
+      G |- of (coguard A B) M
+
+- `coguardElim2 A B`
+
+      G |- B ext M
+      >>
+      G |- coguard A B ext M
+
+- `coguardLeft n A B C`
+
+      G1, (coguard A B), G2 |- C ext M[under_n (() . id)]
+      >>
+      G1 |- istp A
+      G1, B, (hidden) A[^1], G2[^1] |- C[under_n (^1)] ext M
+
+- `coguardSatEq A B`
+
+      G |- eqtp B (coguard A B)
+      >>
+      G |- istp B
+      G |- A
+
+- `coguardSub A A' B B'`
+
+      G |- subtype (coguard A B) (coguard A' B')
+      >>
+      G |- arrow A A'
+      G |- istp A'
+      G, A |- subtype B[^1] B'[^1]
+      G, A' |- istp B'[^1]
+
+- `coguardSubElim A B C`
+
+      G |- subtype (coguard A B) C
+      >>
+      G |- istp A
+      G, A |- subtype B[^1] C[^1]
+      G |- istp C
 
 
 ### Disjoint sums

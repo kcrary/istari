@@ -64,6 +64,7 @@ Inductive canon : forall {a}, @operator object a -> Prop :=
 | canon_iset           : canon (oper_iset _)
 | canon_quotient       : canon (oper_quotient _)
 | canon_guard          : canon (oper_guard _)
+| canon_coguard        : canon (oper_coguard _)
 | canon_wt             : canon (oper_wt _)
 | canon_partial        : canon (oper_partial _)
 | canon_halts          : canon (oper_halts _)
@@ -814,6 +815,12 @@ intros; apply value_i; eauto with dynamic.
 Qed.
 
 
+Lemma value_coguard : forall {m1 m2}, value (coguard m1 m2).
+Proof.
+intros; apply value_i; eauto with dynamic.
+Qed.
+
+
 Lemma value_wt : forall {m1 m2}, value (wt m1 m2).
 Proof.
 intros; apply value_i; eauto with dynamic.
@@ -911,6 +918,7 @@ Arguments value_set {object m1 m2}.
 Arguments value_iset {object m1 m2}.
 Arguments value_quotient {object m1 m2}.
 Arguments value_guard {object m1 m2}.
+Arguments value_coguard {object m1 m2}.
 Arguments value_wt {object m1 m2}.
 Arguments value_partial {object m1}.
 Arguments value_halts {object m1}.
@@ -923,7 +931,7 @@ Arguments value_extt {object x}.
 Hint Constructors canon : dynamic.
 
 
-Hint Resolve value_univ value_cty value_con value_karrow value_tarrow value_pi value_clam value_capp value_ctlam value_ctapp value_lam value_intersect value_union value_fut value_cnext value_cprev value_next value_rec value_equal value_triv value_eqtype value_sequal value_subtype value_kind value_all value_alltp value_exist value_mu value_ispositive value_isnegative value_voidtp value_unittp value_cunit value_booltp value_btrue value_bfalse value_prod value_sigma value_cpair value_cpi1 value_cpi2 value_ppair value_set value_iset value_quotient value_guard value_wt value_partial value_halts value_admiss value_uptype value_ext value_extt : dynamic.
+Hint Resolve value_univ value_cty value_con value_karrow value_tarrow value_pi value_clam value_capp value_ctlam value_ctapp value_lam value_intersect value_union value_fut value_cnext value_cprev value_next value_rec value_equal value_triv value_eqtype value_sequal value_subtype value_kind value_all value_alltp value_exist value_mu value_ispositive value_isnegative value_voidtp value_unittp value_cunit value_booltp value_btrue value_bfalse value_prod value_sigma value_cpair value_cpi1 value_cpi2 value_ppair value_set value_iset value_quotient value_guard value_coguard value_wt value_partial value_halts value_admiss value_uptype value_ext value_extt : dynamic.
 
 
 Hint Resolve var_normal value_normal : dynamic.

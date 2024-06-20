@@ -461,6 +461,29 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                 fail "set pattern expected")
 
 
+      fun destCoguard i pat set =
+         (case pat of
+             And [p1, p2] =>
+                refine (Rule.coguardLeft i (T.evar ()) (T.evar ()) (T.evar ()))
+                >>> [
+                    idtacM (S.empty, Tertiary),
+
+                    (* The rule puts the hypotheses backwards of the desired order. *)
+                    refine (Rule.exchange i 1 1)
+                    >>+
+                    let
+                       do (vars1, set1) = andthenp S.empty $ dest (i+1) p1 set
+                       do (vars2, set2) = andthenp vars1 $ dest i p2 set1
+                    in
+                       idtacM (S.append vars1 vars2, Principal set2)
+                    end
+                    ]
+
+           | _ =>
+                fail "coguard pattern expected")
+                
+
+
       fun varyAndBindSetPat set p =
          (case p of
              Ident symopt =>
@@ -794,6 +817,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
             insert Prim.ov (destUnit RT.ofLeft);
             insert Prim.set destSet;
             insert Prim.iset destIset;
+            insert Prim.coguard destCoguard;
             insert Prim.quotient destQuotient;
             insert Prim.eqtp (destUnit RT.eqtpLeft);
             insert Prim.istp (destUnit RT.istpLeft);

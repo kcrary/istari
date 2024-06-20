@@ -154,6 +154,14 @@ do2 2 split; auto.
 apply hygiene_shift_permit_iff; auto.
 }
 
+(* coguard *)
+{
+intros pg s i a b A B _ IH1 _ IH2.
+apply hygiene_auto; cbn.
+do2 2 split; auto.
+apply hygiene_shift_permit_iff; auto.
+}
+
 (* equal *)
 {
 intros pg s i a m n p q A Hmp Hnq _ IH.

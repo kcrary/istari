@@ -301,6 +301,14 @@ with basicv : page -> bool -> nat -> sterm -> wiurel stop -> Prop :=
         -> functional pg s i (squash_urel stop (den A) i) (subst sh1 b) B
         -> basicv pg s i (guard a b) (iuguard stop i A B)
 
+| interp_coguard :
+    forall pg s i a b 
+      (A : wiurel stop) 
+      (B : urelsp (squash_urel stop (den A) i) -n> wiurel_ofe stop),
+        basic pg s i a A
+        -> functional pg s i (squash_urel stop (den A) i) (subst sh1 b) B
+        -> basicv pg s i (coguard a b) (iucoguard stop i A B)
+
 | interp_fut_zero :
     forall pg s a,
       hygiene clo a

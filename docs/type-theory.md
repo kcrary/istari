@@ -370,6 +370,23 @@ inhabited, then `intersect (_ : A) . B` is extensionally equivalent to
 types.  However, if `A` is inhabited then `A -g> B` is *equal* to `B`.
 
 
+#### Coguarded types
+
+[[rules]](rules.html#coguarded-types)
+
+The coguarded type, written `A &g B`, is equivalent to `B` if `A` is
+true.  When showing membership or equality in `A &g B`, one must also
+prove `A`.  Conversely, from a proof of `A &g B` one may conclude that
+`A` is true; although that fact will be [hidden](#hypotheses) and thus
+not available to computational content.
+
+A guarded type is similar to a non-dependent [union
+type](#union-types), but not quite the same.  Since the union type is
+a weak sum, it has a limited destruction rule, but the only limitation
+when destructing a coguard is the hypothesis representing its
+left-hand-side is hidden.
+
+
 #### Future modality
 
 [[rules]](rules.html#future-modality)

@@ -1206,6 +1206,16 @@ rewrite -> extend_iuguard.
 reflexivity.
 }
 
+(* coguard *)
+{
+intros pg s i a b A B _ IH1 _ IH2 IHo h.
+so (IH1 IHo h) as (A' & ->).
+so (IH2 IHo (squash_urel (cin pg) (den A') i) (eqsymm (extend_squash _#4 h)) h) as (B' & ->).
+exists (iucoguard (cin pg) i A' B').
+rewrite -> extend_iucoguard.
+reflexivity.
+}
+
 (* fut zero *)
 {
 intros pg s a Hcla IHo h.
@@ -2089,6 +2099,7 @@ try (intros;
            |eapply interp_unit
            |eapply interp_bool
            |eapply interp_guard
+           |eapply interp_coguard
            |eapply interp_wt
            |eapply interp_eqtype
            |eapply interp_subtype
@@ -2258,6 +2269,21 @@ intros Ha Hr.
 invertc Hr.
 intros Hb _.
 apply interp_guard; auto using restriction_subst.
+}
+
+(* coguard *)
+{
+intros pg s i a b A B _ IH1 _ IH2 mm IHo Hrest.
+invertc Hrest.
+intros r Hr <-.
+so (row_invert_auto _ _ r) as H; cbn in H.
+destruct H as (a' & b' & ->).
+fold (coguard a' b') in *.
+invertc Hr.
+intros Ha Hr.
+invertc Hr.
+intros Hb _.
+apply interp_coguard; auto using restriction_subst.
 }
 
 (* equal *)
@@ -2880,6 +2906,16 @@ exact H.
 intros pg s i a b A B _ IH1 _ IH2 w IHo Hwc Hw.
 simpmap.
 apply interp_guard; auto.
+so (IH2 _ IHo Hwc Hw) as H.
+simpmapin H.
+exact H.
+}
+
+(* coguard *)
+{
+intros pg s i a b A B _ IH1 _ IH2 w IHo Hwc Hw.
+simpmap.
+apply interp_coguard; auto.
 so (IH2 _ IHo Hwc Hw) as H.
 simpmapin H.
 exact H.

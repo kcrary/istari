@@ -1134,6 +1134,56 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr G (deq p q a)
       -> tr G (deq m n b)
 
+(* Co-guarded types *)
+
+| tr_coguard_formation :
+    forall G a a' b b',
+      tr G (deqtype a a')
+      -> tr (cons (hyp_tm a) G) (deqtype (subst sh1 b) (subst sh1 b'))
+      -> tr G (deqtype (coguard a b) (coguard a' b'))
+  
+| tr_coguard_formation_iff :
+    forall G a a' b b' mr ml,
+      tr G (deqtype a a)
+      -> tr G (deqtype a' a')
+      (* a implies a' *)
+      -> tr (hyp_tm a :: G)
+           (deq mr mr (subst sh1 a'))
+      (* a' implies a *)
+      -> tr (hyp_tm a' :: G)
+           (deq ml ml (subst sh1 a))
+      -> tr (cons (hyp_tm a) G) (deqtype (subst sh1 b) (subst sh1 b'))
+      -> tr G (deqtype (coguard a b) (coguard a' b'))
+
+| tr_coguard_formation_univ :
+    forall G lv a a' b b',
+      tr G (deq a a' (univ lv))
+      -> tr (cons (hyp_tm a) G) (deq (subst sh1 b) (subst sh1 b') (univ (subst sh1 lv)))
+      -> tr G (deq (coguard a b) (coguard a' b') (univ lv))
+  
+| tr_coguard_sat_eq :
+    forall G a b m n,
+      tr G (deq m n a)
+      -> tr G (deqtype b b)
+      -> tr G (deqtype b (coguard a b))
+  
+| tr_coguard_intro :
+    forall G a b m n p q,
+      tr G (deq m n a)
+      -> tr G (deq p q b)
+      -> tr G (deq p q (coguard a b))
+  
+| tr_coguard_elim1 :
+    forall G a b m n,
+      tr G (deqtype a a)
+      -> tr G (deq m n (coguard a b))
+      -> tr G (deq triv triv (squash a))
+  
+| tr_coguard_elim2 :
+    forall G a b m n,
+      tr G (deq m n (coguard a b))
+      -> tr G (deq m n b)
+
 (* Universes *)
 
 | tr_univ_kind_formation :

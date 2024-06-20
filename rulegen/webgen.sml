@@ -152,6 +152,7 @@ structure Webgen :> WEBGEN =
                          | "tarrow" => writeInfixR 0 "-t>"
                          | "karrow" => writeInfixR 0 "-k>"
                          | "guard" => writeInfixR 0 "-g>"
+                         | "coguard" => writeInfixR 20 "&g"
                          | "sum" => writeInfixR 15 "%"
                          | "prod" => writeInfixR 20 "&"
                          | "subtype" => writeInfixN 30 "<:"

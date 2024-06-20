@@ -112,12 +112,12 @@ apply star_refl.
 Qed.
 
 
-Lemma def_guard :
+Lemma def_coguard :
   forall a b,
-    equiv (app (app Defs.guard a) b) (guard a b).
+    equiv (app (app Defs.coguard a) b) (coguard a b).
 Proof.
 intros a b.
-unfold Defs.guard.
+unfold Defs.coguard.
 apply steps_equiv.
 eapply star_step.
   {
@@ -191,6 +191,28 @@ Lemma def_eqtp :
 Proof.
 intros a b.
 unfold Defs.eqtp.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app1.
+  apply step_app2.
+  }
+simpsub.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl.
+Qed.
+
+
+Lemma def_guard :
+  forall a b,
+    equiv (app (app Defs.guard a) b) (guard a b).
+Proof.
+intros a b.
+unfold Defs.guard.
 apply steps_equiv.
 eapply star_step.
   {

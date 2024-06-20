@@ -52,6 +52,7 @@ Definition acc : fterm :=
 Definition admiss : fterm := lam (admiss (var 0)).
 Definition bool : fterm := booltp.
 Definition bottom : fterm := app theta (lam (var 0)).
+Definition coguard : fterm := lam (lam (coguard (var 1) (var 0))).
 Definition eeqtp : fterm := lam (lam (prod (subtype (var 1) (var 0)) (subtype (var 0) (var 1)))).
 Definition eq : fterm := lam (lam (lam (equal (var 2) (var 1) (var 0)))).
 Definition eqtp : fterm := lam (lam (eqtype (var 1) (var 0))).

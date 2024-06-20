@@ -208,6 +208,13 @@ intros; eapply sound_guard_formation_univ; eauto; done.
 intros; eapply sound_guard_sat_eq; eauto; done.
 intros; eapply sound_guard_intro; eauto; done.
 intros; eapply sound_guard_elim; eauto; done.
+intros; eapply sound_coguard_formation; eauto; done.
+intros; eapply sound_coguard_formation_iff; eauto; done.
+intros; eapply sound_coguard_formation_univ; eauto; done.
+intros; eapply sound_coguard_sat_eq; eauto; done.
+intros; eapply sound_coguard_intro; eauto; done.
+intros; eapply sound_coguard_elim1; eauto; done.
+intros; eapply sound_coguard_elim2; eauto; done.
 intros; eapply sound_univ_kind_formation; eauto; done.
 intros; eapply sound_univ_formation; eauto; done.
 intros; eapply sound_univ_formation_univ; eauto; done.
