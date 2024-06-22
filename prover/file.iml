@@ -33,7 +33,7 @@ signature FILE_INTERNAL =
 structure FileInternal :> FILE_INTERNAL =
    struct
 
-      val magicNumber = Bytestring.fromString "Ist0000N"
+      val magicNumber = Bytestring.fromString "Ist0000O"
 
       structure CR = CheckpointedRef
       structure D = DatabaseInternal
@@ -206,8 +206,7 @@ structure FileInternal :> FILE_INTERNAL =
       val puGeneralReduction =
          P.alt
             (fn De.Standard _ => 0
-              | De.NativeUnary _ => 1
-              | De.NativeBinary _ => 2)
+              | De.Native _ => 1)
             [
             P.wrap
                (fn De.Standard r => r
@@ -216,16 +215,10 @@ structure FileInternal :> FILE_INTERNAL =
                R.puReduction2,
 
             P.wrap
-               (fn De.NativeUnary (i, r) => (i, r)
+               (fn De.Native (i, n, r) => (i, n, r)
                  | _ => raise impossible)
-               De.NativeUnary
-               (P.pair P.int R.puReduction1),
-
-            P.wrap
-               (fn De.NativeBinary (i, r) => (i, r)
-                 | _ => raise impossible)
-               De.NativeBinary
-               (P.pair P.int R.puReduction1)
+               De.Native
+               (P.tuple3 P.int P.int R.puReduction1)
             ]
 
       fun writeReductions outs =

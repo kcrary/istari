@@ -29,8 +29,7 @@ signature REDEX_INTERNAL =
 
       (* You probably don't want these.  You probably want Define.register, ... instead. *)
       val register : reduction2 -> unit
-      val registerNativeUnary : int -> reduction1 -> unit
-      val registerNativeBinary : int -> reduction1 -> unit
+      val registerNative : int -> int -> reduction1 -> unit
 
       (* Returns true iff the constant has a reduction registered (including primitively). *)
       val registered : constant -> bool
@@ -156,47 +155,34 @@ functor RedexFun (structure Term : TERM
 
 
 
-      (* nativeUnaryRedex i red whnf spine
+      (* nativeRedex i n red whnf spine
 
-         if    const's active argument has index i
+         if    const's active arguments have index i ... i+n-1
                red is const's reduction
                whnf computes hard weak-head normal forms
          then  if    const spine reduces to M
                then  returns SOME M
                else  returns NONE
       *)
-      fun nativeUnaryRedex i red whnf spine =
+      fun nativeRedex i n red whnf spine =
          (case List.splitOpt spine i of
-             SOME (spine1, T.App arg :: spine2) =>
-                (case whnf arg of
-                    arg' as T.Native _ =>
+             SOME (spine1, spine23) =>
+                (case List.splitOpt spine23 n of
+                    SOME (spine2, spine3) =>
                        (try
-                           SOME (Reduction.ureduce1 red (spine1 @ T.App arg' :: spine2))
-                        with
-                           Reduction.Reduce => NONE)
-
-                  | _ => NONE)
-
-           | _ => NONE)
-
-
-
-      (* nativeBinaryRedex i red whnf spine
-
-         if    const's active arguments have indices i and i+1
-               red is const's reduction
-               whnf computes hard weak-head normal forms
-         then  if    const spine reduces to M
-               then  returns SOME M
-               else  returns NONE
-      *)
-      fun nativeBinaryRedex i red whnf spine =
-         (case List.splitOpt spine i of
-             SOME (spine1, T.App arg1 :: T.App arg2 :: spine2) =>
-                (case (whnf arg1, whnf arg2) of
-                    (arg1' as T.Native _, arg2' as T.Native _) =>
-                       (try
-                           SOME (Reduction.ureduce1 red (spine1 @ T.App arg1' :: T.App arg2' :: spine2))
+                           let
+                              val spine2' =
+                                 List.map
+                                    (fn T.App arg =>
+                                           (case whnf arg of
+                                               arg' as T.Native _ => T.App arg'
+                                             | _ => raise Reduction.Reduce)
+   
+                                      | _ => raise Reduction.Reduce)
+                                    spine2
+                           in
+                              SOME (Reduction.ureduce1 red (spine1 @ spine2' @ spine3))
+                           end
                         with
                            Reduction.Reduce => NONE)
 
@@ -239,42 +225,22 @@ functor RedexFun (structure Term : TERM
 
 
 
-      fun registerNativeUnary i red =
+      fun registerNative i n red =
          let
             val const = Reduction.trigger red
-
-            val (_, old) =
-               H.operate userTable const
-                  (fn () =>
-                      (
-                      H.insert redexTable const (nativeUnaryRedex i red);
-                      OTHER
-                      ))
-                  (fn _ =>
-                      raise (Fail "overlapping registered reductions"))
          in
+            H.operate userTable const
+               (fn () =>
+                   (
+                   H.insert redexTable const (nativeRedex i n red);
+                   OTHER
+                   ))
+               (fn _ =>
+                   raise (Fail "overlapping registered reductions"));
+
             ()
          end
-             
 
-
-      fun registerNativeBinary i red =
-         let
-            val const = Reduction.trigger red
-
-            val (_, old) =
-               H.operate userTable const
-                  (fn () =>
-                      (
-                      H.insert redexTable const (nativeBinaryRedex i red);
-                      OTHER
-                      ))
-                  (fn _ =>
-                      raise (Fail "overlapping registered reductions"))
-         in
-            ()
-         end
-             
 
 
       (* Primitive standard reductions *)

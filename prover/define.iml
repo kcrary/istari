@@ -36,10 +36,16 @@ signature DEFINE =
 
       val register : Reduction.reduction2 -> unit
 
-      (* given i r, the active argument(s) are i and (if binary) i+1 *)
-      val registerNativeUnary : int -> Reduction.reduction1 -> unit
-      val registerNativeBinary : int -> Reduction.reduction1 -> unit
+      (* given i n r, the active argument(s) are i ... i+n-1 *)
+      val registerNative : int -> int -> Reduction.reduction1 -> unit
 
+      (* reduction_to_redction1 const i red
+
+         if    red : const i-1 ... 0 --> M
+         then  red' does the same
+               and
+               returns red'
+      *)
       val reduction_to_reduction1 : constant -> int -> Reduction.reduction -> Reduction.reduction1
 
       (* unfold1 const n = reduction_to_reduction1 const n (Reduction.trans [Reduction.unfold, Reduction.beta n]) *)
@@ -61,8 +67,7 @@ signature DEFINE_INTERNAL =
 
       datatype general_reduction =
          Standard of Reduction.reduction2
-       | NativeUnary of int * Reduction.reduction1
-       | NativeBinary of int * Reduction.reduction1
+       | Native of int * int * Reduction.reduction1
 
       (* Returns all reductions registered for normalization (except primitive or imported ones). *)
       val registered : unit -> general_reduction list
@@ -693,8 +698,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
       datatype general_reduction =
          Standard of R.reduction2
-       | NativeUnary of int * R.reduction1
-       | NativeBinary of int * R.reduction1
+       | Native of int * int * R.reduction1
 
 
       (* All the registered reductions except primitive or imported ones. *)
@@ -742,18 +746,24 @@ structure DefineInternal :> DEFINE_INTERNAL =
                    (fn l => R.user2 r :: l))
          end
 
-      fun registerNativeUnaryMain exportable i r =
+      fun registerNativeMain exportable i n r =
          let
             val const = R.trigger r
             val r' = 
                R.trans
-                  [R.compat (Int.natrecUp (fns _ l => R.refl :: l) [R.reflNative] i),
+                  [R.compat (Int.natrecUp 
+                                (fns _ l => R.refl :: l) 
+                                (Int.natrecUp
+                                    (fns _ l => R.reflNative :: l)
+                                    []
+                                    n)
+                                i),
                    R.user1 r]
          in
-            RedexInternal.registerNativeUnary i r;
+            RedexInternal.registerNative i n r;
 
             if exportable then
-               C.assign theRegistered (NativeUnary (i, r) :: C.deref theRegistered)
+               C.assign theRegistered (Native (i, n, r) :: C.deref theRegistered)
             else
                ();
 
@@ -763,38 +773,14 @@ structure DefineInternal :> DEFINE_INTERNAL =
                    (fn l => r' :: l))
          end
          
-      fun registerNativeBinaryMain exportable i r =
-         let
-            val const = R.trigger r
-            val r' = 
-               R.trans
-                  [R.compat (Int.natrecUp (fns _ l => R.refl :: l) [R.reflNative, R.reflNative] i),
-                   R.user1 r]
-         in
-            RedexInternal.registerNativeBinary i r;
-
-            if exportable then
-               C.assign theRegistered (NativeBinary (i, r) :: C.deref theRegistered)
-            else
-               ();
-
-            C.assign theStrat
-               (Dict.insertMerge (C.deref theStrat) const
-                   [r']
-                   (fn l => r' :: l))
-         end
-
       val register = registerMain true
-      val registerNativeUnary = registerNativeUnaryMain true
-      val registerNativeBinary = registerNativeBinaryMain true
+      val registerNative = registerNativeMain true
          
       fun importReduction gr =
          (case gr of
              Standard r => registerMain false r
 
-           | NativeUnary (i, r) => registerNativeUnaryMain false i r
-
-           | NativeBinary (i, r) => registerNativeBinaryMain false i r)
+           | Native (i, n, r) => registerNativeMain false i n r)
 
       fun registered () = C.deref theRegistered
 

@@ -329,7 +329,49 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       fun seqOption l = List.findmap (fn z => z) l
              
 
-      fun compatPriorityLoop () =
+
+      fun sequalCompatLoop const prev spine1 spine2 =
+         (case (spine1, spine2) of
+             ([], []) =>
+                idtac
+
+           | (T.App m1 :: rest1, T.App m2 :: rest2) =>
+                if Unify.unify1 m1 m2 then
+                   sequalCompatLoop const (T.App m1 :: prev) rest1 rest2
+                else
+                   (* const @ rev prev :: m1 :: rest1 =sequal= const @ rev prev :: m2 :: rest2 *)
+                   refine (Rule.sequalTrans 
+                              (T.evar ())
+                              (T.Elim (T.Const const, 
+                                       List.revAppend prev (T.App m2 :: rest1)))
+                              (T.evar ()))
+                   >>> [
+                       (* const @ rev prev :: m1 :: rest1 =sequal= const @ rev prev :: m2 :: rest1 *)
+                       (* ssubst doesn't care that prev is backward *)
+                       refine (Rule.sequalCompat m1 m2
+                                  (T.Elim (T.Const const,
+                                           List.revAppend 
+                                              (T.ssubst prev T.shift1)
+                                              (T.App T.zero :: T.ssubst rest1 T.shift1)))),
+   
+                       (* const @ rev prev :: m2 :: rest1 =sequal= const @ rev prev :: m2 :: rest2 *)
+                       sequalCompatLoop const (T.App m2 :: prev) rest1 rest2
+                       ]
+
+           | (T.Pi1 :: rest1, T.Pi1 :: rest2) =>
+                sequalCompatLoop const (T.Pi1 :: prev) rest1 rest2
+
+           | (T.Pi2 :: rest1, T.Pi2 :: rest2) =>
+                sequalCompatLoop const (T.Pi2 :: prev) rest1 rest2
+
+           | (T.Prev :: rest1, T.Prev :: rest2) =>
+                sequalCompatLoop const (T.Prev :: prev) rest1 rest2
+
+           | _ =>
+                fail "incompatible paths")
+
+
+      fun compatPriorityMain () =
          let
             do (jud, dir) = withgoal
          in
@@ -468,20 +510,54 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
              | \Prim.eq\ _ _ _ =>
                \(fnc => fail "incompatible forms")\
 
+             | \Prim.sequal\ (const? @ ?) (const? @ ?) =>
+               \(fnc const spine const' spine' =>
+                    if Constant.eq (const, const') then
+                       sequalCompatLoop const [] spine spine'
+                       >> idtacM Primary
+                    else
+                       fail "incompatible paths")\
+
+             | \Prim.sequal\ (? , ?) (? , ?) =>
+               \(fnc m1 m2 n1 n2 =>
+                    (* (m1, m2) =sequal= (n1, n2) *)
+                    refine (Rule.sequalTrans
+                               (T.evar ())
+                               (T.Pair (n1, m2))
+                               (T.evar ()))
+                    >>> [
+                        (* (m1, m2) =sequal= (n1, m2) *)
+                        refine (Rule.sequalCompat m1 n1
+                                   (T.Pair (T.zero, T.Sub (m2, T.shift1))))
+                        >>+ idtacM Primary,
+
+                        (* (n1, m2) =sequal= (n1, n2) *)
+                        refine (Rule.sequalCompat m2 n2
+                                   (T.Pair (T.Sub (n1, T.shift1), T.zero)))
+                        >>+ idtacM Primary
+                        ])\
+
+             | \Prim.sequal\ (next ?) (next ?) =>
+               \(fnc m n =>
+                    refine (Rule.sequalCompat m n (T.Next T.zero))
+                    >>+ idtacM Primary)\
+
+               (* No sequal case for Lam *)
+
              | \Prim.eqtp\ ? ? =>
                \(fnc a b =>
                     (* G |- A = B : type *)
                     refine (Rule.univForgetEq a b (T.evar ()))
                     >>
                     (* G |- A = B : U i *)
-                    compatPriorityLoop ())\
+                    compatPriorityMain ())\
 
              | _ =>
                \(fnc => fail "not a compatibility goal")\
             /
          end
 
-      val compatPriority = lift compatPriorityLoop
+      val compatPriority = lift compatPriorityMain
 
       val compatRaw = compatPriority >> idtac
 
