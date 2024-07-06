@@ -121,12 +121,51 @@ functor ReplFun (structure Platform : PLATFORM
             val exceptionHandler : (exn -> bool) ref = ref (fn _ => false)
             val checkpoint = Memory.rewindHook
             val reset = Memory.resetHook
-            val onReady = Buffer.onReadyHook
+            val onReady = ref (fn () => ())
             val onRewind = ref (fn () => ())
 
          end
 
+
       val backtrace = ref false
+
+      fun displayUncaughtException exn =
+         (
+         print "Uncaught exception: ";
+         print (exnMessage exn);
+         print "\n";
+
+         if !backtrace then
+            (case Platform.exnHistory exn of
+                [] => ()
+              | l => 
+                   (
+                   print "\nBacktrace:\n";
+                   app (fn str => (print str; print "\n")) l
+                   ))
+         else
+            ()
+         )
+
+      fun onReady () =
+         (!Hooks.onReady ()
+          handle exn =>
+             (
+             displayUncaughtException exn;
+             print "\nFatal error: uncaught exception raised in ready information.\n";
+             raise Exit
+             ))
+
+      fun onRewind () =
+         (!Hooks.onRewind ()
+          handle exn =>
+             (
+             displayUncaughtException exn;
+             print "\nFatal error: uncaught exception raised in rewind information.\n";
+             raise Exit
+             ))
+
+      val () = Buffer.onReadyHook := onReady
 
 
 
@@ -204,7 +243,7 @@ functor ReplFun (structure Platform : PLATFORM
 
            | _ =>
                 (
-                !Hooks.onReady ();
+                onReady ();
                 print "\n";
 
                 if !Hooks.exceptionHandler exn then
@@ -214,20 +253,7 @@ functor ReplFun (structure Platform : PLATFORM
                    )
                 else
                    (
-                   print "Uncaught exception: ";
-                   print (exnMessage exn);
-                   print "\n";
-
-                   if !backtrace then
-                      (case Platform.exnHistory exn of
-                          [] => ()
-                        | l => 
-                             (
-                             print "\nBacktrace:\n";
-                             app (fn str => (print str; print "\n")) l
-                             ))
-                   else
-                      ();
+                   displayUncaughtException exn;
 
                    Incremental.undo ();
                    raise Exception
@@ -550,7 +576,7 @@ functor ReplFun (structure Platform : PLATFORM
                      val line = Int.min (b, n)
                   in
                      UI.moveCursor line;
-                     !Hooks.onRewind ();
+                     onRewind ();
                      replLoop a line
                   end
    
