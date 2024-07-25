@@ -65,7 +65,7 @@ signature CASE =
       val triv : (term, 'a, 'a) matcher
       val marker : Symbol.symbol -> (term, 'a, 'a) matcher
 
-      val notvar : (term, 'a, 'a * term) matcher
+      val whatNotvar : (term, 'a, 'a * term) matcher
 
       val unify : term -> (term, 'a, 'a) matcher
 
@@ -73,8 +73,13 @@ signature CASE =
       val whnfHard : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
       val whnfBasic : (term, 'a, 'b) matcher -> (term, 'a, 'b) matcher
 
-      val nat : (term, 'a, 'a * int) matcher
-      val integer : (term, 'a, 'a * IntInf.int) matcher
+      val nat : int -> (term, 'a, 'a) matcher
+      val integer : IntInf.int -> (term, 'a, 'a) matcher
+      val symbol : Symbol.symbol -> (term, 'a, 'a) matcher
+      val whatNat : (term, 'a, 'a * int) matcher
+      val whatInteger : (term, 'a, 'a * IntInf.int) matcher
+      val whatSymbol : (term, 'a, 'a * Symbol.symbol) matcher
+
 
 
       (* spines *)
@@ -376,7 +381,7 @@ structure Case :> CASE =
            | _ => fk ())
 
          
-      fun notvar m x fk sk =
+      fun whatNotvar m x fk sk =
          (case m of
              T.Var _ =>
                 fk ()
@@ -426,17 +431,54 @@ structure Case :> CASE =
 
            | _ => fk ())
 
-      fun nat m x fk sk = 
+      fun nat n m x fk sk =
+         let
+            do n' = natLoop 0 m fk
+         in
+            if n = n' then
+               sk (x, fk)
+            else
+               fk ()
+         end
+
+      fun whatNat m x fk sk = 
          let
             do n = natLoop 0 m fk
          in
             sk ((x, n), fk)
          end
-         
 
-      fun integer m x fk sk =
+         
+      fun integer y m x fk sk =
+         (case m of
+             T.Native (T.Integer y') => 
+                if IntInf.= y y' then
+                   sk (x, fk)
+                else
+                   fk ()
+
+           | _ => fk ())
+
+      fun whatInteger m x fk sk =
          (case m of
              T.Native (T.Integer y) => sk ((x, y), fk)
+
+           | _ => fk ())
+
+
+      fun symbol y m x fk sk =
+         (case m of
+             T.Native (T.Symbol y') => 
+                if Symbol.eq (y, y') then
+                   sk (x, fk)
+                else
+                   fk ()
+
+           | _ => fk ())
+
+      fun whatSymbol m x fk sk =
+         (case m of
+             T.Native (T.Symbol y) => sk ((x, y), fk)
 
            | _ => fk ())
 
@@ -841,12 +883,16 @@ grammardef Case
    rule Match(4)      ::= EMBED => constant
    rule Match(4)      ::= MatchConstant => constant
    rule Match(4)      ::= "$var" EMBED => variable
+   rule Match(4)      ::= "$nat" EMBED => nat
+   rule Match(4)      ::= "$integer" EMBED => integer
+   rule Match(4)      ::= "$symbol" EMBED => symbol
    rule Match(4)      ::= "const?" => whatConstant
    rule Match(4)      ::= "var?" => whatVar
    rule Match(4)      ::= "evar?" => whatEvar
-   rule Match(4)      ::= "nat?" => nat
-   rule Match(4)      ::= "integer?" => integer
-   rule Match(4)      ::= "notvar?" => notvar
+   rule Match(4)      ::= "nat?" => whatNat
+   rule Match(4)      ::= "integer?" => whatInteger
+   rule Match(4)      ::= "symbol?" => whatSymbol
+   rule Match(4)      ::= "notvar?" => whatNotvar
 
    rule Match(4)      ::= "(" Matches ")" => id
    rule Matches       ::= Match(0) "," Match(0) => pair

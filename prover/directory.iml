@@ -1,6 +1,18 @@
 
+signature DIRECTORY_ARG =
+   sig
+
+      type constant
+      val resolve : Symbol.symbol list -> constant
+      val resolveOpt : Symbol.symbol list -> constant option
+
+   end
+
+
 signature DIRECTORY =
    sig
+
+      type constant
 
       type symbol = Symbol.symbol
 
@@ -50,7 +62,7 @@ signature DIRECTORY =
       (* Signals Unbound if identifier is not in the directory
          (and not a constant either, when appropriate).
       *)
-      datatype head = Hvar of int | Hconst of Constant.constant
+      datatype head = Hvar of int | Hconst of constant
       val lookupVar           : idirectory -> symbol -> int
       val lookupVarOpt        : idirectory -> symbol -> int option
       val lookup              : idirectory -> symbol -> head
@@ -100,9 +112,13 @@ signature DIRECTORY =
 
 
 
-structure Directory :> DIRECTORY =
+functor DirectoryFun (structure Arg : DIRECTORY_ARG) 
+   :> DIRECTORY
+      where type constant = Arg.constant
+   =
    struct
 
+      type constant = Arg.constant
       type symbol = Symbol.symbol
 
       structure D = SymbolDict
@@ -163,7 +179,7 @@ structure Directory :> DIRECTORY =
       type set = int D.dict * int
 
 
-      fun isconst x = Option.isSome (Namespace.resolveOpt [x])
+      fun isconst x = Option.isSome (Arg.resolveOpt [x])
 
       fun anon d n = 
          let
@@ -391,7 +407,7 @@ structure Directory :> DIRECTORY =
 
 
 
-      datatype head = Hvar of int | Hconst of Constant.constant
+      datatype head = Hvar of int | Hconst of Arg.constant
 
       fun lookupVarOpt (d, i) x =
          (case D.find d x of
@@ -405,7 +421,7 @@ structure Directory :> DIRECTORY =
              SOME i => SOME (Hvar i)
 
            | NONE =>
-                (case Namespace.resolveOpt [x] of
+                (case Arg.resolveOpt [x] of
                     SOME const => SOME (Hconst const)
 
                   | NONE => NONE))
@@ -427,7 +443,7 @@ structure Directory :> DIRECTORY =
              [x] => lookupOpt dir x
 
            | _ :: _ =>
-                (case Namespace.resolveOpt longid of
+                (case Arg.resolveOpt longid of
                     NONE => NONE
 
                   | SOME const => SOME (Hconst const))
@@ -438,7 +454,7 @@ structure Directory :> DIRECTORY =
          (case longid of
              [x] => lookup dir x
 
-           | _ :: _ => Hconst (Namespace.resolve longid)
+           | _ :: _ => Hconst (Arg.resolve longid)
 
            | [] => raise (Invalid "empty longid"))
 
@@ -556,3 +572,11 @@ structure Directory :> DIRECTORY =
          (D.remove d sym, n)
 
    end
+
+
+structure Directory = DirectoryFun (structure Arg =
+                                       struct
+                                          type constant = Constant.constant
+                                          val resolve = Namespace.resolve
+                                          val resolveOpt = Namespace.resolveOpt
+                                       end)
