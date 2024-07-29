@@ -15,7 +15,7 @@ typedef
 /
   datatype
     intersect (i : level) .
-    forall (a : U i) .
+    intermediate (a : U i) .
     U i
   of
     list : type =
@@ -28,10 +28,6 @@ establishUptype /list/;
 val list = parseConstant /list/;
 val cons = parseConstant /cons/;
 val list_uptype = parseConstant /list_uptype/;
-
-
-Database.setImplicits (parseConstant /nil/) 1;
-Database.setImplicits (parseConstant /cons/) 1;
 
 
 
@@ -51,8 +47,8 @@ defineRaw /list_case {a b} l mnil mcons/
 
 reductions
 /
-  list_case _ _ (nil _) z _ --> z ;
-  list_case _ _ (cons _ h t) _ s --> s h t ;
+  list_case _ _ (nil) z _ --> z ;
+  list_case _ _ (cons h t) _ s --> s h t ;
   unfolding list_case
 /;
 
@@ -93,7 +89,7 @@ recordTyping "list_case_type";
 
 define /append {a} l1 l2/
 /
-  list_iter a (fn _ . list a) l2 (fn h _ t . ` cons a h t) l1
+  list_iter a (fn _ . list a) l2 (fn h _ t . cons h t) l1
 //
   intersect (i : level) .
   forall (a : U i) .
@@ -108,8 +104,8 @@ qed ();
 
 reductions
 /
-  append _ (nil _) l --> l ;
-  append a (cons _ h t) l --> cons a h (append a t l) ;
+  append _ (nil) l --> l ;
+  append a (cons h t) l --> cons h (append a t l) ;
   unfolding append
 /;
 
@@ -118,7 +114,7 @@ reductions
 lemma "append_id_l"
 /
   forall (i : level) (a : U i) (l : list a) .
-    ` append a (` nil a) l = l : list a
+    ` append a nil l = l : list a
 /;
 
 intro /i a l/.
@@ -181,7 +177,7 @@ qed ();
 lemma "append_cons_assoc"
 /
   forall i (a : U i) (x : a) (l1 l2 : list a) .
-    append (`cons a x l1) l2 = x :: append l1 l2 : list a
+    append (cons x l1) l2 = x :: append l1 l2 : list a
 /;
 
 inference.
@@ -277,8 +273,8 @@ qed ();
 
 reductions
 /
-  length _ (nil _) --> 0 ;
-  length a (cons _ _ t) --> succ (length a t) ;
+  length _ (nil) --> 0 ;
+  length a (cons _ t) --> succ (length a t) ;
   unrolling length
 /;
 
@@ -398,8 +394,8 @@ qed ();
 
 reductions
 /
-  foldr _ _ z _ (nil _) --> z ;
-  foldr a b z f (cons _ h t) --> f h (foldr a b z f t) ;
+  foldr _ _ z _ (nil) --> z ;
+  foldr a b z f (cons h t) --> f h (foldr a b z f t) ;
   unfolding foldr
 /;
 
@@ -444,8 +440,8 @@ qed ();
 
 reductions
 /
-  foldl _ _ z _ (nil _) --> z ;
-  foldl a b z f (cons _ h t) --> foldl a b (f h z) f t ;
+  foldl _ _ z _ (nil) --> z ;
+  foldl a b z f (cons h t) --> foldl a b (f h z) f t ;
   unrolling foldl
 /;
 
@@ -497,8 +493,8 @@ qed ();
 
 reductions
 /
-  map _ b _ (nil _) --> nil b ;
-  map a b f (cons _ h t) --> cons b (f h) (map a b f t) ;
+  map _ b _ (nil) --> nil ;
+  map a b f (cons h t) --> cons (f h) (map a b f t) ;
   unfolding map
 /;
 
@@ -601,8 +597,8 @@ qed ();
 
 reductions
 /
-  reverse a (nil _) --> nil a ;
-  reverse a (cons _ h t) --> append a (reverse a t) (cons a h (nil a)) ;
+  reverse a (nil) --> nil ;
+  reverse a (cons h t) --> append a (reverse a t) (cons h nil) ;
   unfolding reverse
 /;
 
@@ -924,8 +920,8 @@ qed ();
 
 reductions
 /
-  In _ _ (nil _) --> void ;
-  In a x (cons _ h t) --> x = h : a % In a x t ;
+  In _ _ (nil) --> void ;
+  In a x (cons h t) --> x = h : a % In a x t ;
   unrolling In
 /;
 
@@ -1499,8 +1495,8 @@ qed ();
 
 reductions
 /
-  nth a (nil _) _ --> None a ;
-  nth a (cons _ h t) i --> nat_case i (Some a h) (fn i' . nth a t i') ;
+  nth a (nil) _ --> None ;
+  nth a (cons h t) i --> nat_case i (Some h) (fn i' . nth a t i') ;
   unfolding nth
 /;
 
@@ -1782,11 +1778,11 @@ qed ();
 
 reductions
 /
-  zip a b (nil _) _ --> nil (a & b) ;
-  zip a b (cons _ h1 t1) l2 --> list_case b (list (a & b)) l2 (nil (a & b)) (fn h2 t2 . cons (a & b) (h1 , h2) (zip a b t1 t2)) ;
+  zip a b (nil) _ --> nil ;
+  zip a b (cons h1 t1) l2 --> list_case b (list (a & b)) l2 nil (fn h2 t2 . cons (h1 , h2) (zip a b t1 t2)) ;
 
-  unzip a b (nil _) --> (nil a , nil b) ;
-  unzip a b (cons _ h t) --> (cons a (h #1) (unzip a b t #1) , cons b (h #2) (unzip a b t #2)) ;
+  unzip a b (nil) --> (nil , nil) ;
+  unzip a b (cons h t) --> (cons (h #1) (unzip a b t #1) , cons (h #2) (unzip a b t #2)) ;
   
   unfolding zip unzip
 /;

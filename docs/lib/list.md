@@ -4,7 +4,7 @@ Lists are defined:
 
     datatype
       intersect (i : level) .
-      forall (a : U i) .
+      intermediate (a : U i) .
       U i
     of
       list : type =
@@ -15,13 +15,10 @@ Producing:
 
     list : intersect (i : level) . forall (a : U i) . U i
 
-    nil  : intersect (i : level) . forall (a : U i) . list a
-         (1 implicit argument)
+    nil  : intersect (i : level) (a : U i) . list a
 
-    cons : intersect (i : level) . forall (a : U i) . a -> list a -> list a
-         (1 implicit argument)
+    cons : intersect (i : level) (a : U i) . a -> list a -> list a
 
-The syntactic sugar `h :: t` is accepted for `` `cons _ h t ``, as usual.
 
 
 The iterator for lists:
@@ -334,7 +331,7 @@ A simpler case-analysis operation:
                    zip (unzip l #1) (unzip l #2) = l : list (a & b)
 
     unzip_zip : forall (i : level) (a b : U i) (l1 : list a) (l2 : list b) .
-                   length l1 = length l2 : nat -> unzip (zip l1 l2) = (l1 , l2) : (list a & list b)
+                   length l1 = length l2 : nat -> unzip (zip l1 l2) = (l1, l2) : (list a & list b)
 
     append_zip : forall (i : level) (a b : U i) (l1 l1' : list a) (l2 l2' : list b) .
                     length l1 = length l2 : nat
@@ -364,7 +361,7 @@ A simpler case-analysis operation:
                  nth (zip l1 l2) i
                    = Option.bind
                        (nth l1 i)
-                       (fn x . Option.bind (nth l2 i) (fn y . Option.Some (x , y)))
+                       (fn x . Option.bind (nth l2 i) (fn y . Option.Some (x, y)))
                    : Option.option (a & b)
 
     nth_unzip : forall (lv : level) (a b : U lv) (l : list (a & b)) (i : nat) .

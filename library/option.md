@@ -5,7 +5,7 @@ Options are defined:
 
     datatype
       intersect (i : level) .
-      forall (a : U i) .
+      intermediate (a : U i) .
       U i
     of
       option : type =
@@ -17,10 +17,8 @@ Producing:
     option : type:option
 
     None : type:None
-         imp:None
 
     Some : type:Some
-         imp:None
 
 The iterator for options:
 

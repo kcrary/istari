@@ -5,7 +5,7 @@ Lists are defined:
 
     datatype
       intersect (i : level) .
-      forall (a : U i) .
+      intermediate (a : U i) .
       U i
     of
       list : type =
@@ -17,12 +17,9 @@ Producing:
     list : type:list
 
     nil  : type:nil
-         imp:nil
 
     cons : type:cons
-         imp:cons
 
-The syntactic sugar `h :: t` is accepted for `` `cons _ h t ``, as usual.
 
 
 The iterator for lists:
