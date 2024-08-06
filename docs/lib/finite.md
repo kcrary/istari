@@ -4,6 +4,7 @@ A form of Kuratowski finiteness:
 
     finite : intersect (i : level) . forall (a : U i) . (a -> U i) -> U i
            = fn a P . exists (L : List.list a) . forall (x : a) . P x -> List.In a x L
+           (1 implicit argument)
 
 Note that the list may contain a superset of the elements satisfying
 `P`.  This makes the definition easier to work with.  For example, the

@@ -1195,25 +1195,45 @@ The destruction tactics are:
   subgoals until reaching the default maximum depth (5).  If `auto`
   cannot prove the goal completely, it does nothing.
 
-  - `nauto [n]`
+  + `nauto [n]`
 
-    As auto but uses `n` as the maximum depth.
+    As `auto` but uses `n` as the maximum depth.
 
-  - `autoWith /[lemma name] ... [lemma name]/`
+  + `autoWith /[lemma name] ... [lemma name]/`
 
     As `auto` but also backchains using the indicated lemmas.  If a
     "lemma" is a datatype, it backchains with all the datatype's
     constructors.
 
-  - `nautoWith [n] /[lemma name] ... [lemma name]/`
+  + `nautoWith [n] /[lemma name] ... [lemma name]/`
 
     Combines `nauto` and `autoWith`.
 
-  - `nautoWithRaw [n] /[lemma name] ... [lemma name]/`
+  + `nautoWithRaw [n] /[lemma name] ... [lemma name]/`
 
     As `nautoWith` except that typechecking subgoals are set aside.
     The tactic succeds if only typechecking goals remain.  If
     primary goals would remain, the tactic does nothing.
+
+
+- `existsAuto`
+
+  Similar to `auto` but instantiates existentials with evars.
+
+  + `existsAutoRaw`
+
+    As `existsAuto` but does not invoke the typechecker.
+
+  + `existsAutoWith /[lemma name] ... [lemma name]/`
+
+    As `existsAuto` but also backchains using the indicated lemmas.
+    If a "lemma" is a datatype, it backchains with all the datatype's
+    constructors.
+
+  + `existsAutoWithRaw /[lemma name] ... [lemma name]/`
+
+    As `existsAutoWith` but does not invoke the typechecker.
+  
 
 - `autoTool /[lemma name] ... [lemma name]/`
 

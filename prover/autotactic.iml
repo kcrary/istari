@@ -19,6 +19,14 @@ signature AUTOTACTIC =
       val autoToolRaw : tool list -> tactic
       val autoTool : tool list -> tactic
 
+      val existsAutoWithPriority : tool list -> Tactic.priority Tactic.tacticm
+      val existsAutoWithRaw : tool list -> tactic
+      val existsAutoWith : tool list -> tactic
+
+      val existsAutoPriority : Tactic.priority Tactic.tacticm
+      val existsAutoRaw : tactic
+      val existsAuto : tactic
+
    end
 
 
@@ -155,6 +163,39 @@ structure Autotactic :> AUTOTACTIC =
       fun autoToolRaw tools = autoToolPriority tools >> idtac
 
       fun autoTool tools = Typecheck.withTypecheckSnd (autoToolPriority tools)
+
+
+
+      fun existsAutoWithPriorityMain tools =
+         goalCaseT
+         /| \Prim.exists\ _ _ =>
+            \(fnc =>
+                 IntroTactic.existsPriority /_/
+                 >>!
+                 existsAutoWithPriorityMain tools)\
+      
+          | \Prim.prod\ _ _ =>
+            \(fnc =>
+                 IntroTactic.split
+                 >>
+                 existsAutoWithPriorityMain tools)\
+      
+          | _ =>
+            \(fnc =>
+                 first
+                    [
+                    autoLoop defaultDepth true tools,
+                    idtacM Primary
+                    ])\
+         /
+      
+      fun existsAutoWithPriority tools = lift (fn () => existsAutoWithPriorityMain tools)
+      fun existsAutoWithRaw tools = existsAutoWithPriority tools >> idtac
+      fun existsAutoWith tools = Typecheck.withTypecheckSnd (existsAutoWithPriority tools)
+
+      val existsAutoPriority = existsAutoWithPriority []
+      val existsAutoRaw = existsAutoWithRaw []
+      val existsAuto = existsAutoWith []
 
    end
 

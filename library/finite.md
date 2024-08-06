@@ -5,6 +5,7 @@ A form of Kuratowski finiteness:
 
     finite : type:finite
            = def:finite
+           imp:finite
 
 Note that the list may contain a superset of the elements satisfying
 `P`.  This makes the definition easier to work with.  For example, the
