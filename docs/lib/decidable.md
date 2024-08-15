@@ -40,3 +40,37 @@
 
     decidable_from_bool : forall (i : level) (P : U i) (b : bool) .
                              Bool.istrue b <-> P -> decidable P
+
+    decidable_eq_pair : forall (i : level) (a b : U i) .
+                           (forall (x y : a) . decidable (x = y : a))
+                           -> (forall (x y : b) . decidable (x = y : b))
+                           -> forall (x y : a & b) . decidable (x = y : (a & b))
+
+    decidable_forall_unique : forall (i : level) (a : U i) (P Q : a -> U i) .
+                                 decidable (exists (x : a) . P x)
+                                 -> (forall (x y : a) . P x -> P y -> x = y : a)
+                                 -> (forall (x : a) . decidable (Q x))
+                                 -> decidable (forall (x : a) . P x -> Q x)
+
+    decidable_exists_unique : forall (i : level) (a : U i) (P Q : a -> U i) .
+                                 decidable (exists (x : a) . P x)
+                                 -> (forall (x y : a) . P x -> P y -> x = y : a)
+                                 -> (forall (x : a) . P x -> decidable (Q x))
+                                 -> decidable (exists (x : a) . P x & Q x)
+
+    decidable_exists_unique2 : forall (i : level) (a b : U i) (P Q : a -> b -> U i) .
+                                  decidable (exists (x : a) (y : b) . P x y)
+                                  -> (forall (x x' : a) (y y' : b) .
+                                        P x y -> P x' y' -> x = x' : a & y = y' : b)
+                                  -> (forall (x : a) (y : b) . P x y -> decidable (Q x y))
+                                  -> decidable (exists (x : a) (y : b) . P x y & Q x y)
+
+    decidable_exists_unique3 : forall (i : level) (a b c : U i) (P Q : a -> b -> c -> U i) .
+                                  decidable (exists (x : a) (y : b) (z : c) . P x y z)
+                                  -> (forall (x x' : a) (y y' : b) (z z' : c) .
+                                        P x y z
+                                        -> P x' y' z'
+                                        -> x = x' : a & y = y' : b & z = z' : c)
+                                  -> (forall (x : a) (y : b) (z : c) .
+                                        P x y z -> decidable (Q x y z))
+                                  -> decidable (exists (x : a) (y : b) (z : c) . P x y z & Q x y z)

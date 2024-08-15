@@ -26,8 +26,8 @@ The iterator for lists:
 
     list_iter : type:list_iter
 
-    list_iter a P z s (nil _) --> z
-    list_iter a P z s (cons _ h t) --> s h t (list_iter a P z s t)
+    list_iter a P z s (nil) --> z
+    list_iter a P z s (cons h t) --> s h t (list_iter a P z s t)
 
 
 A simpler case-analysis operation:
@@ -36,8 +36,8 @@ A simpler case-analysis operation:
               = def:list_case
               imp:list_case
 
-    list_case _ _ (nil _) z _ --> z
-    list_case _ _ (cons _ h t) _ s --> s h t
+    list_case _ _ (nil) z _ --> z
+    list_case _ _ (cons h t) _ s --> s h t
 
 
 ### Append
@@ -46,8 +46,8 @@ A simpler case-analysis operation:
            = def:append
            imp:append
 
-    append _ (nil _) l --> l
-    append a (cons _ h t) l --> cons a h (append a t l)
+    append _ (nil) l --> l
+    append a (cons h t) l --> cons h (append a t l)
 
     append_id_l : type:append_id_l
 
@@ -68,8 +68,8 @@ A simpler case-analysis operation:
            =rec= defrec:length
            imp:length
 
-    length _ (nil _) --> 0
-    length a (cons _ _ t) --> succ (length a t)
+    length _ (nil) --> 0
+    length a (cons t) --> succ (length a t)
 
     length_append : type:length_append
 
@@ -84,14 +84,14 @@ A simpler case-analysis operation:
 
     foldr : type:foldr
           imp:foldr
-    foldr _ _ z _ (nil _) --> z
-    foldr a b z f (cons _ h t) --> f h (foldr a b z f t)
+    foldr _ _ z _ (nil) --> z
+    foldr a b z f (cons h t) --> f h (foldr a b z f t)
 
     foldl : type:foldl
           imp:foldl          
 
-    foldl _ _ z _ (nil _) --> z
-    foldl a b z f (cons _ h t) --> foldl a b (f h z) f t
+    foldl _ _ z _ (nil) --> z
+    foldl a b z f (cons h t) --> foldl a b (f h z) f t
 
     foldr_append : type:foldr_append
 
@@ -103,8 +103,8 @@ A simpler case-analysis operation:
     map : type:map
         imp:map
 
-    map _ b _ (nil _) --> nil b
-    map a b f (cons _ h t) --> cons b (f h) (map a b f t)
+    map _ b _ (nil) --> nil
+    map a b f (cons h t) --> cons (f h) (map a b f t)
 
     map_compose : type:map_compose
 
@@ -124,8 +124,8 @@ A simpler case-analysis operation:
     reverse : type:reverse
             imp:reverse
 
-    reverse a (nil _) --> nil a
-    reverse a (cons _ h t) --> append a (reverse a t) (cons a h (nil a))
+    reverse a (nil) --> nil
+    reverse a (cons h t) --> append a (reverse a t) (cons h nil)
 
     reverse_as_foldl : type:reverse_as_foldl
 
@@ -168,8 +168,8 @@ A simpler case-analysis operation:
 
     In : type:In
 
-    In _ _ (nil _) --> void
-    In a x (cons _ h t) --> x = h : a % In a x t
+    In _ _ (nil) --> void
+    In a x (cons h t) --> x = h : a % In a x t
 
     In_as_exists : type:In_as_exists
 
@@ -213,14 +213,24 @@ A simpler case-analysis operation:
 
     In_reverse : type:In_reverse
 
+    decidable_Forall_dep : type:decidable_Forall_dep
+
+    decidable_Forall : type:decidable_Forall
+
+    decidable_Exists_dep : type:decidable_Exists_dep
+
+    decidable_Exists : type:decidable_Exists
+
+    decidable_In : type:decidable_In
+
 
 ### Nth
 
     nth : type:nth
         imp:nth
 
-    nth a (nil _) _ --> None a
-    nth a (cons _ h t) i --> nat_case i (Some a h) (fn i' . nth a t i')
+    nth a (nil) _ --> None
+    nth a (cons h t) i --> nat_case i (Some h) (fn i' . nth a t i')
 
     nth_within_length : type:nth_within_length
 
@@ -240,17 +250,17 @@ A simpler case-analysis operation:
     zip : type:zip
         imp:zip
 
-    zip a b (nil _) _ --> nil (a & b)
-    zip a b (cons _ h1 t1) l2 --> list_case b (list (a & b)) 
-                                    l2 
-                                    (nil (a & b)) 
-                                    (fn h2 t2 . cons (a & b) (h1 , h2) (zip a b t1 t2))
+    zip a b (nil) _ --> nil
+    zip a b (cons h1 t1) l2 --> list_case b (list (a & b)) 
+                                  l2 
+                                  nil
+                                  (fn h2 t2 . cons (h1 , h2) (zip a b t1 t2))
 
     unzip : type:unzip
           imp:unzip
 
-    unzip a b (nil _) --> (nil a , nil b)
-    unzip a b (cons _ h t) --> (cons a (h #1) (unzip a b t #1) , cons b (h #2) (unzip a b t #2))
+    unzip a b (nil) --> (nil , nil)
+    unzip a b (cons h t) --> (cons (h #1) (unzip a b t #1) , cons (h #2) (unzip a b t #2))
 
     zip_unzip : type:zip_unzip
 
@@ -304,3 +314,16 @@ Dropping too many elements is permitted, and results in the empty list.
     nth_drop : type:nth_drop
 
     nth_as_drop : type:nth_as_drop
+
+
+### Map_flat
+
+    map_flat : type:map_flat
+             imp:map
+
+    map_flat _ b _ (nil) --> nil
+    map_flat a b f (cons h t) --> append b (f h) (map_flat a b f t)
+
+    In_map_flat : type:In_map_flat
+
+    map_flat_as_foldr : type:map_flat_as_foldr

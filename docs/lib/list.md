@@ -29,8 +29,8 @@ The iterator for lists:
                      -> (forall (v0 : a) (v1 : list a) . P v1 -> P (v0 :: v1))
                      -> forall (v0 : list a) . P v0
 
-    list_iter a P z s (nil _) --> z
-    list_iter a P z s (cons _ h t) --> s h t (list_iter a P z s t)
+    list_iter a P z s (nil) --> z
+    list_iter a P z s (cons h t) --> s h t (list_iter a P z s t)
 
 
 A simpler case-analysis operation:
@@ -42,8 +42,8 @@ A simpler case-analysis operation:
                                         | cons h t . mcons h t) l
               (2 implicit arguments)
 
-    list_case _ _ (nil _) z _ --> z
-    list_case _ _ (cons _ h t) _ s --> s h t
+    list_case _ _ (nil) z _ --> z
+    list_case _ _ (cons h t) _ s --> s h t
 
 
 ### Append
@@ -54,8 +54,8 @@ A simpler case-analysis operation:
                             | cons h v0 . h :: list_fn v0) l1
            (1 implicit argument)
 
-    append _ (nil _) l --> l
-    append a (cons _ h t) l --> cons a h (append a t l)
+    append _ (nil) l --> l
+    append a (cons h t) l --> cons h (append a t l)
 
     append_id_l : forall (i : level) (a : U i) (l : list a) . append nil l = l : list a
 
@@ -83,8 +83,8 @@ A simpler case-analysis operation:
            =rec= fn a l . list_case l 0 (fn v0 t . succ (length t))
            (1 implicit argument)
 
-    length _ (nil _) --> 0
-    length a (cons _ _ t) --> succ (length a t)
+    length _ (nil) --> 0
+    length a (cons t) --> succ (length a t)
 
     length_append : forall (i : level) (a : U i) (l1 l2 : list a) .
                        length (append l1 l2) = length l1 + length l2 : nat
@@ -104,14 +104,14 @@ A simpler case-analysis operation:
 
     foldr : intersect (i : level) . forall (a b : U i) . b -> (a -> b -> b) -> list a -> b
           (2 implicit arguments)
-    foldr _ _ z _ (nil _) --> z
-    foldr a b z f (cons _ h t) --> f h (foldr a b z f t)
+    foldr _ _ z _ (nil) --> z
+    foldr a b z f (cons h t) --> f h (foldr a b z f t)
 
     foldl : intersect (i : level) . forall (a b : U i) . b -> (a -> b -> b) -> list a -> b
           (2 implicit arguments)
 
-    foldl _ _ z _ (nil _) --> z
-    foldl a b z f (cons _ h t) --> foldl a b (f h z) f t
+    foldl _ _ z _ (nil) --> z
+    foldl a b z f (cons h t) --> foldl a b (f h z) f t
 
     foldr_append : forall (i : level) (a b : U i) (z : b) (f : a -> b -> b) (l1 l2 : list a) .
                       foldr z f (append l1 l2) = foldr (foldr z f l2) f l1 : b
@@ -125,8 +125,8 @@ A simpler case-analysis operation:
     map : intersect (i : level) . forall (a b : U i) . (a -> b) -> list a -> list b
         (2 implicit arguments)
 
-    map _ b _ (nil _) --> nil b
-    map a b f (cons _ h t) --> cons b (f h) (map a b f t)
+    map _ b _ (nil) --> nil
+    map a b f (cons h t) --> cons (f h) (map a b f t)
 
     map_compose : forall (i : level) (a b c : U i) (f : b -> c) (g : a -> b) (l : list a) .
                      map f (map g l) = map (fn x . f (g x)) l : list c
@@ -164,8 +164,8 @@ A simpler case-analysis operation:
     reverse : intersect (i : level) . forall (a : U i) . list a -> list a
             (1 implicit argument)
 
-    reverse a (nil _) --> nil a
-    reverse a (cons _ h t) --> append a (reverse a t) (cons a h (nil a))
+    reverse a (nil) --> nil
+    reverse a (cons h t) --> append a (reverse a t) (cons h nil)
 
     reverse_as_foldl : forall (i : level) (a : U i) (l : list a) .
                           reverse l = foldl nil (fn h t . h :: t) l : list a
@@ -216,8 +216,8 @@ A simpler case-analysis operation:
 
     In : intersect (i : level) . forall (a : U i) . a -> list a -> U i
 
-    In _ _ (nil _) --> void
-    In a x (cons _ h t) --> x = h : a % In a x t
+    In _ _ (nil) --> void
+    In a x (cons h t) --> x = h : a % In a x t
 
     In_as_exists : forall (i : level) (a : U i) (x : a) (l : list a) .
                       In a x l <-> Exists (fn y . x = y : a) l
@@ -280,14 +280,34 @@ A simpler case-analysis operation:
     In_reverse : forall (i : level) (a : U i) (x : a) (l : list a) .
                     In a x (reverse l) <-> In a x l
 
+    decidable_Forall_dep : forall (i : level) (a : U i) (P : a -> U i) (l : list a) .
+                              (forall (x : a) . In a x l -> Decidable.decidable (P x))
+                              -> Decidable.decidable (Forall P l)
+
+    decidable_Forall : forall (i : level) (a : U i) (P : a -> U i) .
+                          (forall (x : a) . Decidable.decidable (P x))
+                          -> forall (l : list a) . Decidable.decidable (Forall P l)
+
+    decidable_Exists_dep : forall (i : level) (a : U i) (P : a -> U i) (l : list a) .
+                              (forall (x : a) . In a x l -> Decidable.decidable (P x))
+                              -> Decidable.decidable (Exists P l)
+
+    decidable_Exists : forall (i : level) (a : U i) (P : a -> U i) .
+                          (forall (x : a) . Decidable.decidable (P x))
+                          -> forall (l : list a) . Decidable.decidable (Exists P l)
+
+    decidable_In : forall (i : level) (a : U i) .
+                      (forall (x y : a) . Decidable.decidable (x = y : a))
+                      -> forall (x : a) (l : list a) . Decidable.decidable (In a x l)
+
 
 ### Nth
 
     nth : intersect (lv : level) . forall (a : U lv) . list a -> nat -> Option.option a
         (1 implicit argument)
 
-    nth a (nil _) _ --> None a
-    nth a (cons _ h t) i --> nat_case i (Some a h) (fn i' . nth a t i')
+    nth a (nil) _ --> None
+    nth a (cons h t) i --> nat_case i (Some h) (fn i' . nth a t i')
 
     nth_within_length : forall (lv : level) (a : U lv) (l : list a) (i : nat) .
                            i < length l
@@ -315,17 +335,17 @@ A simpler case-analysis operation:
     zip : intersect (i : level) . forall (a b : U i) . list a -> list b -> list (a & b)
         (2 implicit arguments)
 
-    zip a b (nil _) _ --> nil (a & b)
-    zip a b (cons _ h1 t1) l2 --> list_case b (list (a & b)) 
-                                    l2 
-                                    (nil (a & b)) 
-                                    (fn h2 t2 . cons (a & b) (h1 , h2) (zip a b t1 t2))
+    zip a b (nil) _ --> nil
+    zip a b (cons h1 t1) l2 --> list_case b (list (a & b)) 
+                                  l2 
+                                  nil
+                                  (fn h2 t2 . cons (h1 , h2) (zip a b t1 t2))
 
     unzip : intersect (i : level) . forall (a b : U i) . list (a & b) -> list a & list b
           (2 implicit arguments)
 
-    unzip a b (nil _) --> (nil a , nil b)
-    unzip a b (cons _ h t) --> (cons a (h #1) (unzip a b t #1) , cons b (h #2) (unzip a b t #2))
+    unzip a b (nil) --> (nil , nil)
+    unzip a b (cons h t) --> (cons (h #1) (unzip a b t #1) , cons (h #2) (unzip a b t #2))
 
     zip_unzip : forall (i : level) (a b : U i) (l : list (a & b)) .
                    zip (unzip l #1) (unzip l #2) = l : list (a & b)
@@ -412,3 +432,18 @@ Dropping too many elements is permitted, and results in the empty list.
                      nth l n
                        = list_case (drop n l) Option.None (fn h v0 . Option.Some h)
                        : Option.option a
+
+
+### Map_flat
+
+    map_flat : intersect (i : level) . forall (a b : U i) . (a -> list b) -> list a -> list b
+             (2 implicit arguments)
+
+    map_flat _ b _ (nil) --> nil
+    map_flat a b f (cons h t) --> append b (f h) (map_flat a b f t)
+
+    In_map_flat : forall (i : level) (a b : U i) (f : a -> list b) (x : b) (l : list a) .
+                     In b x (map_flat f l) <-> (exists (y : a) . In a y l & In b x (f y))
+
+    map_flat_as_foldr : forall (i : level) (a b : U i) (f : a -> list b) (l : list a) .
+                           map_flat f l = foldr nil (fn h t . append (f h) t) l : list b

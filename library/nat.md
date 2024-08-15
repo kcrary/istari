@@ -267,6 +267,8 @@ Strong induction for natural numbers:
 
     plus_dist_min_r : type:plus_dist_min_r
 
+    minus_dist_min_l : type:minus_dist_min_l
+
 
 ### Maximum
 
@@ -299,6 +301,12 @@ Strong induction for natural numbers:
     plus_dist_max_l : type:plus_dist_max_l
 
     plus_dist_max_r : type:plus_dist_max_r
+
+    minus_dist_max_l : type:minus_dist_max_l
+
+    minus_dist_max_r : type:minus_dist_max_r
+
+    minus_dist_min_r : type:minus_dist_min_r
 
     min_dist_max_l : type:min_dist_max_l
 

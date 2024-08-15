@@ -270,6 +270,8 @@ Strong induction for natural numbers:
 
     plus_dist_min_r : forall (m n p : nat) . m + min n p = min (m + n) (m + p) : nat
 
+    minus_dist_min_l : forall (m n p : nat) . min m n - p = min (m - p) (n - p) : nat
+
 
 ### Maximum
 
@@ -302,6 +304,12 @@ Strong induction for natural numbers:
     plus_dist_max_l : forall (m n p : nat) . max m n + p = max (m + p) (n + p) : nat
 
     plus_dist_max_r : forall (m n p : nat) . m + max n p = max (m + n) (m + p) : nat
+
+    minus_dist_max_l : forall (m n p : nat) . max m n - p = max (m - p) (n - p) : nat
+
+    minus_dist_max_r : forall (m n p : nat) . m - max n p = min (m - n) (m - p) : nat
+
+    minus_dist_min_r : forall (m n p : nat) . m - min n p = max (m - n) (m - p) : nat
 
     min_dist_max_l : forall (m n p : nat) . min (max m n) p = max (min m p) (min n p) : nat
 

@@ -5,6 +5,7 @@ File.import "miscellaneous-load.iml";
 File.import "nat-load.iml";
 File.import "option-load.iml";
 File.import "partial-load.iml";
+File.import "decidable-load.iml";
 File.import "list-aux.iml";
 
 
@@ -1465,6 +1466,184 @@ qed ();
 
 
 
+lemma "decidable_Forall_dep"
+/
+  forall i (a : U i) (P : a -> U i) (l : list a) .
+    (forall x . In a x l -> Decidable.decidable (P x))
+    -> Decidable.decidable (Forall P l)
+/;
+
+inference.
+intro /i a P l/.
+induction /l/.
+
+(* nil *)
+{
+intro /_/.
+left.
+apply /Forall_nil/.
+}
+
+(* cons *)
+{
+intro /h t IH Hdec/.
+so /Hdec h (inl ())/ /Hh | Hno/.
+1:{
+  right.
+  contrapositive /Hno/.
+  inversion /Hno/.
+  auto.
+  }
+so /IH __/ /Ht | Hno/.
+  {
+  intro /x Hx/.
+  apply /Hdec/ >> auto.
+  }
+
+1:{
+  right.
+  contrapositive /Hno/.
+  inversion /Hno/.
+  auto.
+  }
+left.
+apply /Forall_cons/ >> auto.
+}
+qed ();
+
+
+
+lemma "decidable_Forall"
+/
+  forall i (a : U i) (P : a -> U i) .
+    (forall x . Decidable.decidable (P x))
+    -> forall (l : list a) .
+         Decidable.decidable (Forall P l)
+/;
+
+inference.
+intro /i a P Hdec l/.
+apply /decidable_Forall_dep/ >> auto.
+qed ();
+
+
+
+lemma "decidable_Exists_dep"
+/
+  forall i (a : U i) (P : a -> U i) (l : list a) .
+    (forall x . In a x l -> Decidable.decidable (P x))
+    -> Decidable.decidable (Exists P l)
+/;
+
+inference.
+intro /i a P l/.
+induction /l/.
+
+(* nil *)
+{
+intro /_/.
+right.
+intro /H/.
+inversion /H/.
+}
+
+(* cons *)
+{
+intro /h t IH Hdec/.
+so /Hdec h (inl ())/ /H | Hnoh/.
+  {
+  left.
+  apply /Exists_hit/ >> auto.
+  }
+so /IH __/ /H | Hnot/.
+  {
+  intro /x Hx/.
+  apply /Hdec/.
+  right >> auto.
+  }
+
+  {
+  left.
+  apply /Exists_miss/ >> auto.
+  }
+right.
+intro /H/.
+inversion /H/.
+  {
+  reintro /Hh/.
+  so /Hnoh Hh/ /0/.
+  }
+
+  {
+  reintro /Ht/.
+  so /Hnot Ht/ /0/.
+  }
+}
+qed ();
+
+
+
+lemma "decidable_Exists"
+/
+  forall i (a : U i) (P : a -> U i) .
+    (forall x . Decidable.decidable (P x))
+    -> forall (l : list a) .
+         Decidable.decidable (Exists P l)
+/;
+
+inference.
+intro /i a P Hdec l/.
+apply /decidable_Exists_dep/ >> auto.
+qed ();
+
+
+
+lemma "decidable_In"
+/
+  forall i (a : U i) .
+    (forall x y . Decidable.decidable (x = y : a))
+    -> forall (x : a) (l : list a) .
+         Decidable.decidable (In a x l)
+/;
+
+inference.
+intro /i a Hdec x l/.
+induction /l/.
+
+(* nil *)
+{
+apply /Decidable.decidable_false/.
+}
+
+(* cons *)
+{
+intro /h t IH/.
+so /Hdec x h/ /H | Hnoh/.
+  {
+  left.
+  left.
+  auto.
+  }
+so /IH/ /H | Hnot/.
+  {
+  left.
+  right.
+  auto.
+  }
+right.
+intro /(Hh | Ht)/.
+  {
+  so /Hnoh Hh/ /0/.
+  }
+
+  {
+  so /Hnot Ht/ /0/.
+  }
+}
+qed ();
+
+
+
 (* Nth *)
 
 alias /option/ /Option.option/;
@@ -2325,6 +2504,95 @@ intro /x l IH n/.
 destruct /n/ /| n/ >> reduce // >> auto.
 }
 qed ();
+
+
+
+(* Map_flat *)
+
+defineInd /{a b} f/
+/
+  map_flat : list [a] -> list b of
+  | nil . nil
+  | cons h t . append (f h) (map_flat t)
+//
+  intersect i .
+  forall (a b : U i) . (a -> list b) -> list a -> list b
+/;
+  
+
+
+lemma "In_map_flat"
+/
+  forall i (a b : U i) (f : a -> list b) (x : b) (l : list a) .
+    In b x (map_flat f l) <-> (exists y . In a y l & In b x (f y))
+/;
+
+inference.
+intro /i a b f x l/.
+induction /l/.
+
+(* nil *)
+{
+split.
+  {
+  intro /0/.
+  }
+
+  {
+  intro /(y 0 _)/.
+  }
+}
+
+(* cons *)
+{
+intro /h t IH/.
+split.
+  {
+  intro /Hin/.
+  rewrite /-> In_append in Hin/.
+  destruct /Hin/ /Hin | Hin/.
+    {
+    exists /h/ >> auto.
+    }
+
+    {
+    so /IH #1 Hin/ /y Hiny Hinx/.
+    exists /y/.
+    split >> auto.
+    }
+  }
+
+  {
+  intro /(y (Heq | Hiny) Hinx)/.
+    {
+    subst /y/.
+    rewrite /-> In_append/.
+    left >> auto.
+    }
+
+    {
+    rewrite /-> In_append/.
+    right.
+    apply /IH/.
+    existsAuto.
+    }
+  }
+}
+qed ();
+ 
+
+
+lemma "map_flat_as_foldr"
+/
+  forall i (a b : U i) (f : a -> list b) (l : list a) .
+    map_flat f l = foldr nil (fn h t . append (f h) t) l : list b
+/;
+
+inference.
+intro /i a b f l/.
+induction /l/ >> auto.
+qed ();
+
 
 
 writeRegistry /AfterListAllEnv/

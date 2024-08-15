@@ -5,6 +5,7 @@ File.import "list-load.iml";
 
 openModule /Logic/;
 openModule /Decidable/;
+openModule /List/;
 
 beginModule "Finite";
 
@@ -39,6 +40,98 @@ unfold /finite/.
 exists /L/.
 intro /x Hx/.
 auto.
+qed ();
+
+
+
+lemma "map_through_finite_gen"
+/
+  forall i (a b : U i) (P : a -> U i) (Q : b -> U i) (f : forall (x : a) . P x -> b) (g : b -> a) .
+    (forall (x : a) (h : P x) . Q (f x h))
+    -> (forall (x : a) (h : P x) . g (f x h) = x : a)
+    -> finite Q
+    -> finite P
+/;
+
+inference.
+unfold /finite at all/.
+intro /i a b P Q f g Hincl Hinv (L HL)/.
+exists /List.map g L/.
+intro /x Hx/.
+so /HL _ (Hincl _ Hx)/ /Hfx/.
+rewrite /-> List.In_map/.
+exists /f x Hx/.
+auto.
+qed ();
+
+
+
+lemma "map_through_finite"
+/
+  forall i (a b : U i) (P : a -> U i) (Q : b -> U i) (f : a -> b) (g : b -> a) .
+    (forall (x : a) . P x -> Q (f x))
+    -> (forall (x : a) . P x -> g (f x) = x : a)
+    -> finite Q
+    -> finite P
+/;
+
+inference.
+intro /i a b P Q f g Himpl Hinj Hfin/.
+apply /map_through_finite_gen i a b P Q (fn x _ . f x) g/ >> auto.
+qed ();
+
+
+
+lemma "finite_exists"
+/
+  forall i (a b : U i) (P : a -> U i) (Q : a -> b -> U i) .
+    finite P
+    -> (forall x . finite (Q x))
+    -> `finite b (fn y . exists (x : a) . P x & Q x y)
+/;
+
+inference.
+unfold /finite at all/.
+intro /i a b P Q HP HQ/.
+destruct /HP/ /L HL/.
+assert /exists L' . forall y . (exists x . List.In a x L & Q x y) -> List.In b y L'/ /H/ >>> [inference, idtac].
+1:{
+  destruct /H/ /L' HL'/.
+  exists /L'/.
+  reduce //.
+  intro /y (x Hx Hxy)/.
+  apply /HL'/.
+  existsAuto.
+  }
+clear /HL/.
+induction /L/.
+
+(* nil *)
+{
+exists /List.nil/.
+intro /x (y 0 _)/.
+}
+
+(* cons *)
+{
+intro /x L (M HM)/.
+so /HQ x/ /M' HM'/.
+exists /List.append M' M/.
+intro /y/.
+intro /(x' (Heq | Hin) Hx'y)/.
+  {
+  subst /x'/.
+  apply /List.In_append/.
+  left.
+  apply /HM'/ >> auto.
+  }
+
+  {
+  apply /List.In_append/.
+  right.
+  apply /HM/ >> existsAuto.
+  }
+}
 qed ();
 
 
@@ -200,7 +293,6 @@ qed ();
 
 
 
-
 lemma "decidable_exists_finite"
 /
   forall i (a : U i) (P Q : a -> U i) .
@@ -224,3 +316,194 @@ apply /decidable_exists_finite_simple _ _ (fn x . P x & Q x)/.
   apply /decidable_and_dep/ >> auto.
   }
 qed ();
+
+
+
+lemma "enumerate_finite"
+/
+  forall i (a : U i) (P : a -> U i) .
+    (forall x . decidable (P x))
+    -> finite P
+    -> exists L . (forall x . P x <-> In a x L)
+/;
+
+inference.
+intro /i a P Hdec (L HL)/.
+assert /exists L' . forall x . (P x & In a x L) <-> In a x L'/ /H/ >>> [inference, idtac].
+1:{
+  destruct /H/ /L' HL'/.
+  exists /L'/.
+  intro /x/.
+  split.
+    {
+    intro /Hx/.
+    apply /HL'/ >> auto.
+    }
+
+    {
+    intro /Hx/.
+    apply /HL'/ >> auto.
+    }
+  }
+clear /HL/.
+induction /L/.
+
+(* nil *)
+{
+exists /nil/.
+intro /x/.
+split.
+  {
+  intro /(_ 0)/.
+  }
+
+  {
+  intro /0/.
+  }
+}
+
+(* cons *)
+{
+intro /x L (L' HL')/.
+so /Hdec x/ /Hyes | Hno/.
+  {
+  exists /x :: L'/.
+  intro /y/.
+  split.
+    {
+    intro /(Hy (Heq | Hin))/ >> auto.
+    }
+
+    {
+    intro /(Heq | Hin)/ >> auto.
+    subst /y/.
+    split >> auto.
+    }
+  }
+
+  {
+  exists /L'/.
+  intro /y/.
+  split >> auto.
+  intro /(Hy (Heq | Hin))/ >> auto.
+  subst /y/.
+  so /Hno Hy/ /0/.
+  }
+}
+qed ();
+
+
+
+lemma "finite_function_dep"
+/
+  forall i (a : U i) (b P : a -> U i) (Q : forall (x : a) . b x -> U i) (g : forall (x : a) . b x) .
+    finite P
+    -> (forall x . decidable (P x))
+    -> (forall x . P x -> finite (Q x))
+    -> (forall x y . not (P x) -> Q x y -> y = g x : b x)
+    -> `finite (forall (x : a) . b x) (fn f . forall (x : a) . Q x (f x))
+/;
+
+inference.
+intro /i a b P Q g HfinP HdecP HfinQ Hg/.
+so /enumerate_finite _# 3 HdecP HfinP/ /L H/.
+assert /forall x . P x -> In a x L/ /HL/ >> auto.
+assert /forall x . In a x L -> P x/ /Hout/ >> auto.
+clear /H/.
+apply
+  /map_through_finite i 
+     (forall (x : a) . b x)
+     (forall (x : a) . In a x L -> b x)
+     _ 
+     (fn f . forall (x : a) (h : In a x L) . Q x (f x h))
+     (fn f x _ . f x)
+     (fn f x . case HdecP x of
+               | inl h . f x (HL x h)
+               | inr _ . g x)
+  / >> reduce // >> auto.
+  {
+  intro /f Hf/.
+  introEq /x/.
+  reduce //.
+  remember /HdecP x/ /_/ /X/ /Heq/.
+  destruct /X/ /Hyes | Hno/ >> auto.
+  }
+unfold /finite/.
+clear /HL g Hg/.
+revert /Hout/.
+induction /L/.
+
+(* nil *)
+{
+intro /_/.
+exists /(fn x h . abort h) :: nil/.
+reduce //.
+intro /f Hf /.
+left.
+introEq /x h/.
+destruct /h/ /0/.
+}
+
+(* cons *)
+{
+intro /x L IH Hout/.
+so /IH __/ /M HM/ >> auto.
+unfold /finite in HfinQ/.
+so /HfinQ x __/ /N HN/ >> auto.
+exists /`map_flat
+          (forall (x' : a) . In a x' L -> b x')
+          (forall (x' : a) . In a x' (x :: L) -> b x')
+          (fn f .
+             `map
+               (b x)
+               (forall (x' : a) . In a x' (x :: L) -> b x')
+               (fn y x' h .
+                  case h of
+                  | inl _ . y
+                  | inr h' . f x' h')
+               N)
+          M/ >> auto.
+intro /f Hf/.
+rewrite /-> In_map_flat/ >> auto.
+exists /(fn x' h . f x' (inr h))/ >> auto.
+so /HM (fn x' h . f x' (inr h)) __/ /Hin/.
+  {
+  intro /x' h/.
+  reduce //.
+  apply /Hf/.
+  }
+split >> auto.
+reduce //.
+rewrite /-> In_map/ >> auto.
+exists /f x (inl ())/ >> auto.
+split >> auto.
+reduce //.
+introEq /x' h/ >> auto.
+reduce //.
+destruct /h/ /h | h/ >> reduce // >> auto.
+copy /h/ /Heq/.
+destruct /h/ //.
+subst /x'/ >> auto.
+}
+qed ();
+
+
+
+lemma "finite_function"
+/
+  forall i (a b : U i) (P : a -> U i) (Q : a -> b -> U i) (g : a -> b) .
+    finite P
+    -> (forall x . decidable (P x))
+    -> (forall x . P x -> finite (Q x))
+    -> (forall x y . not (P x) -> Q x y -> y = g x : b)
+    -> `finite (a -> b) (fn f . forall (x : a) . Q x (f x))
+/;
+
+inference.
+intro /i a b P Q g HfinP HdecP HfinQ Hother/.
+unfold /arrow/.
+apply /finite_function_dep _ a (fn _ . b) P (fn x . Q x) (fn x . g x)/ >> auto.
+qed ();
+
+
+endModule ();

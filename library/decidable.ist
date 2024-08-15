@@ -331,4 +331,164 @@ typecheck.
 qed ();
 
 
+
+lemma "decidable_eq_pair"
+/
+  forall i (a b : U i) .
+    (forall x y . decidable (x = y : a))
+    -> (forall x y . decidable (x = y : b))
+    -> forall x y . decidable (x = y : (a & b))
+/;
+
+inference.
+intro /i a b Hdeca Hdecb (x y) (x' y')/.
+so /Hdeca x x'/ /? | Hneq/.
+1:{
+  right.
+  contrapositive /Hneq/.
+  injection /Hneq/ >> auto.
+  }
+subst /x'/.
+so /Hdecb y y'/ /? | Hneq/.
+1:{
+  right.
+  contrapositive /Hneq/.
+  injection /Hneq/ >> auto.
+  }
+subst /y'/.
+left.
+auto.
+qed ();
+
+
+
+lemma "decidable_forall_unique"
+/
+  forall i (a : U i) (P Q : a -> U i) .
+    decidable (exists (x : a) . P x)
+    -> (forall x y . P x -> P y -> x = y : a)
+    -> (forall x . decidable (Q x))
+    -> decidable (forall (x : a) . P x -> Q x)
+/;
+
+intro /i a P Q HdecP Hunique HdecQ/.
+destruct /HdecP/ /x Hx | Hno/.
+1:{
+  left.
+  intro /x H/.
+  so /Hno (x, H)/ /0/.
+  }
+so /HdecQ x/ /H | Hno/.
+1:{
+  right.
+  contrapositive /Hno/.
+  apply /Hno/ >> auto.
+  }
+left.
+intro /x' Hx'/.
+so /Hunique _ _ Hx Hx'/ /?/.
+subst /x'/.
+hyp /H/.
+qed ();
+
+
+
+lemma "decidable_exists_unique"
+/
+  forall i (a : U i) (P Q : a -> U i) .
+    decidable (exists (x : a) . P x)
+    -> (forall x y . P x -> P y -> x = y : a)
+    -> (forall x . P x -> decidable (Q x))
+    -> decidable (exists (x : a) . P x & Q x)
+/;
+
+intro /i a P Q HdecP Hunique HdecQ/.
+destruct /HdecP/ /x Hx | Hno/.
+1:{
+  right.
+  contrapositive /Hno/.
+  destruct /Hno/ /x H _/.
+  existsAuto.
+  }
+so /HdecQ x Hx/ /H | Hno/.
+1:{
+  right.
+  contrapositive /Hno/.
+  destruct /Hno/ /y Hy H/.
+  so /Hunique _ _ Hx Hy/ /?/.
+  subst /y/.
+  hyp /H/.
+  }
+left.
+existsAuto.
+qed ();
+
+
+
+lemma "decidable_exists_unique2"
+/
+  forall i (a b : U i) (P Q : a -> b -> U i) .
+    decidable (exists (x : a) (y : b) . P x y)
+    -> (forall x x' y y' . P x y -> P x' y' -> x = x' : a & y = y' : b)
+    -> (forall x y . P x y -> decidable (Q x y))
+    -> decidable (exists x y . P x y & Q x y)
+/;
+
+inference.
+intro /i a b P Q HdecP Hunique HdecQ/.
+destruct /HdecP/ /x y Hxy | Hno/.
+1:{
+  right.
+  contrapositive /Hno/.
+  destruct /Hno/ /x y H _/.
+  existsAuto.
+  }
+so /HdecQ x y Hxy/ /H | Hno/.
+1:{
+  right.
+  contrapositive /Hno/.
+  destruct /Hno/ /x' y' Hxy' H/.
+  so /Hunique _# 4 Hxy Hxy'/ /? ?/.
+  subst /x' y'/.
+  hyp /H/.
+  }
+left.
+existsAuto.
+qed ();
+
+
+
+lemma "decidable_exists_unique3"
+/
+  forall i (a b c : U i) (P Q : a -> b -> c -> U i) .
+    decidable (exists (x : a) (y : b) (z : c) . P x y z)
+    -> (forall x x' y y' z z' . P x y z -> P x' y' z' -> x = x' : a & y = y' : b & z = z' : c)
+    -> (forall x y z . P x y z -> decidable (Q x y z))
+    -> decidable (exists x y z . P x y z & Q x y z)
+/;
+
+inference.
+intro /i a b c P Q HdecP Hunique HdecQ/.
+destruct /HdecP/ /x y z Hxy | Hno/.
+1:{
+  right.
+  contrapositive /Hno/.
+  destruct /Hno/ /x y z H _/.
+  existsAuto.
+  }
+so /HdecQ x y z Hxy/ /H | Hno/.
+1:{
+  right.
+  contrapositive /Hno/.
+  destruct /Hno/ /x' y' z' Hxy' H/.
+  so /Hunique _# 6 Hxy Hxy'/ /? ? ?/.
+  subst /x' y' z'/.
+  hyp /H/.
+  }
+left.
+existsAuto.
+qed ();
+    
+
+
 endModule ();

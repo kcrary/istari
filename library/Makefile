@@ -31,7 +31,7 @@ decidable.isto : logic.isto bool.isto
 finite.isto : logic.isto decidable.isto list.isto
 girard-paradox.isto : $(DATATYPES) logic.isto nat.isto
 integer.isto : nat.isto acc.isto bool.isto decidable.isto stable.isto
-list.isto : $(DATATYPES) nat.isto option.isto partial.isto integer.isto
+list.isto : $(DATATYPES) decidable.isto logic.isto miscellaneous.isto nat.isto option.isto partial.isto
 nat.isto : acc.isto bool.isto decidable.isto stable.isto
 natural.isto : bool.isto integer.isto nat.isto logic.isto
 omega.isto : $(DATATYPES) logic.isto bool.isto nat.isto integer.isto list.isto natural.isto

@@ -33,3 +33,13 @@
     decidable_istrue : type:decidable_istrue
 
     decidable_from_bool : type:decidable_from_bool
+
+    decidable_eq_pair : type:decidable_eq_pair
+
+    decidable_forall_unique : type:decidable_forall_unique
+
+    decidable_exists_unique : type:decidable_exists_unique
+
+    decidable_exists_unique2 : type:decidable_exists_unique2
+
+    decidable_exists_unique3 : type:decidable_exists_unique3
