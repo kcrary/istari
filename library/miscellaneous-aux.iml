@@ -1,1 +1,42 @@
-(* empty *)
+
+functor AfterMiscellaneousAll () :> sig end =
+   struct
+
+      structure T = Term
+      structure R = Reduction
+      structure H = ConstantTable
+
+      open Tactic
+
+
+      val Collapse (nonsense) =
+         readRegistry /Miscellaneous.AfterMiscellaneousAllEnv/
+            /[constant]/
+
+      val () = Registry.delete (parseLongident /Miscellaneous.AfterMiscellaneousAllEnv/)
+
+      val nonsenseIntroOf =
+         let
+            do () = lift
+         in
+            (* M : nonsense *)
+            refine (Rule.reduce (R.compat [R.unfold]))
+            >>+
+            (* M : void -g> void *)
+            refine (Rule.guardIntroOf (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                (* void : type *)
+                refine Rule.voidForm,
+
+                (* void |- M : void *)
+                refine (Rule.voidElim (T.evar ()))
+                >>+
+                (* void |- void *)
+                refine (Rule.hypothesis 0)
+                ]
+         end
+                        
+      val () =
+         H.insert TypecheckInternal.introTactics nonsense nonsenseIntroOf
+
+   end

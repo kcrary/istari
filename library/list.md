@@ -21,14 +21,12 @@ Producing:
     cons : type:cons
 
 
-
 The iterator for lists:
 
     list_iter : type:list_iter
 
     list_iter a P z s (nil) --> z
     list_iter a P z s (cons h t) --> s h t (list_iter a P z s t)
-
 
 A simpler case-analysis operation:
 
@@ -38,6 +36,10 @@ A simpler case-analysis operation:
 
     list_case _ _ (nil) z _ --> z
     list_case _ _ (cons h t) _ s --> s h t
+
+Lists are covariant:
+
+    list_subtype : type:list_subtype
 
 
 ### Append

@@ -37,6 +37,10 @@ A simpler case-analysis operation:
     option_case _ _ (None _) n _ --> n
     option_case _ _ (Some _ x) _ s --> s x
 
+Options are covariant:
+
+    option_subtype : intersect (i : level) (a b : U i) . a <: b -> option a <: option b
+
 
 ### Operations
 

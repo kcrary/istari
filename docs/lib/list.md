@@ -20,7 +20,6 @@ Producing:
     cons : intersect (i : level) (a : U i) . a -> list a -> list a
 
 
-
 The iterator for lists:
 
     list_iter : intersect (i : level) .
@@ -31,7 +30,6 @@ The iterator for lists:
 
     list_iter a P z s (nil) --> z
     list_iter a P z s (cons h t) --> s h t (list_iter a P z s t)
-
 
 A simpler case-analysis operation:
 
@@ -44,6 +42,10 @@ A simpler case-analysis operation:
 
     list_case _ _ (nil) z _ --> z
     list_case _ _ (cons h t) _ s --> s h t
+
+Lists are covariant:
+
+    list_subtype : forall (i : level) (a b : U i) . a <: b -> list a <: list b
 
 
 ### Append
