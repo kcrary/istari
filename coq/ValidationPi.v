@@ -390,6 +390,14 @@ eapply tr_pi_ext; eauto.
 Qed.
 
 
+Lemma forallExt'_valid : forallExt'_obligation.
+Proof.
+prepare.
+intros G a a' a'' b b' b'' m n ext3 ext2 ext1 ext0 Ha Halt Halt' Hm.
+apply (tr_pi_ext _#5 a' a'' b' b''); auto.
+Qed.
+
+
 Lemma forallOfExt_valid : forallOfExt_obligation.
 Proof.
 unfoldtop.
@@ -720,6 +728,14 @@ apply (tr_pi_ext _#5 a a (subst sh1 b) (subst sh1 b)).
   apply tr_equal_elim.
   eapply tr_equal_eta2; eauto.
   }
+Qed.
+
+
+Lemma arrowExt'_valid : arrowExt'_obligation.
+Proof.
+prepare.
+intros G a a' a'' b b' b'' m n ext3 ext2 ext1 ext0 Ha Halt Halt' Hof.
+apply (tr_pi_ext _#5 a' a'' b' b''); auto.
 Qed.
 
 

@@ -69,6 +69,7 @@ exact forallElimEq_valid.
 exact forallElim_valid.
 exact forallEta_valid.
 exact forallExt_valid.
+exact forallExt'_valid.
 exact forallOfExt_valid.
 exact forallFormInv1_valid.
 exact forallFormInv2_valid.
@@ -89,6 +90,7 @@ exact arrowElimEq_valid.
 exact arrowElim_valid.
 exact arrowEta_valid.
 exact arrowExt_valid.
+exact arrowExt'_valid.
 exact arrowOfExt_valid.
 exact arrowFormInv1_valid.
 exact arrowFormInv2_valid.

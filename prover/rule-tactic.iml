@@ -39,6 +39,7 @@ signature RULE_TACTIC =
       val forallElim : tactic3                    (* A B P *)
       val forallEta : tactic
       val forallExt : tactic
+      val forallExt' : tactic4                    (* A' A'' B' B'' *)
       val forallOfExt : tactic2                   (* A' B' *)
       val forallFormInv1 : tactic1                (* B *)
       val forallFormInv2 : tactic3                (* A B M *)
@@ -59,6 +60,7 @@ signature RULE_TACTIC =
       val arrowElim : tactic1                     (* A *)
       val arrowEta : tactic
       val arrowExt : tactic
+      val arrowExt' : tactic4                     (* A' A'' B' B'' *)
       val arrowOfExt : tactic2                    (* A' B' *)
       val arrowFormInv1 : tactic1                 (* B *)
       val arrowFormInv2 : tactic2                 (* A M *)
@@ -1017,6 +1019,19 @@ structure RuleTactic :> RULE_TACTIC =
                 ]
          end
 
+      fun forallExt' xA' xA'' xB' xB'' =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.forallExt' (T.evar ()) xA' xA'' (T.evar ()) xB' xB'' (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
       fun forallOfExt xA' xB' =
          let
             do (jud, dir) = withgoal
@@ -1214,6 +1229,19 @@ structure RuleTactic :> RULE_TACTIC =
          in
             refine (Rule.arrowExt (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
             >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                ]
+         end
+
+      fun arrowExt' xA' xA'' xB' xB'' =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.arrowExt' (T.evar ()) xA' xA'' (T.evar ()) xB' xB'' (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
                 idtac,
                 idtac,
                 chdir (D.bindsVary dir [NONE, ]),

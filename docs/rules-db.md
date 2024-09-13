@@ -276,6 +276,15 @@ Conventions:
       G |- of (forall A (fn . B)) N
       G, A |- eq B (M[^1] 0) (N[^1] 0)
 
+- `forallExt' A A' A'' B B' B'' M N`
+
+      G |- eq (forall A (fn . B)) M N
+      >>
+      G |- istp A
+      G |- of (forall A' (fn . B')) M
+      G |- of (forall A'' (fn . B'')) N
+      G, A |- eq B (M[^1] 0) (N[^1] 0)
+
 - `forallOfExt A A' B B' M`
 
       G |- of (forall A (fn . B)) M
@@ -419,6 +428,15 @@ Conventions:
       >>
       G |- of (arrow A B) M
       G |- of (arrow A B) N
+      G, A |- eq B[^1] (M[^1] 0) (N[^1] 0)
+
+- `arrowExt' A A' A'' B B' B'' M N`
+
+      G |- eq (arrow A B) M N
+      >>
+      G |- istp A
+      G |- of (forall A' (fn . B')) M
+      G |- of (forall A'' (fn . B'')) N
       G, A |- eq B[^1] (M[^1] 0) (N[^1] 0)
 
 - `arrowOfExt A A' B B' M`

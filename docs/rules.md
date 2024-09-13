@@ -288,6 +288,15 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- N : forall (x : A) . B
       G, x : A |- M x = N x : B
 
+- `forallExt' A A' A'' B B' B'' M N`
+
+      G |- M = N : (forall (x : A) . B)
+      >>
+      G |- A : type
+      G |- M : forall (x : A') . B'
+      G |- N : forall (x : A'') . B''
+      G, x : A |- M x = N x : B
+
 - `forallOfExt A A' B B' M`
 
       G |- M : forall (x : A) . B
@@ -431,6 +440,15 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- M : A -> B
       G |- N : A -> B
+      G, x : A |- M x = N x : B
+
+- `arrowExt' A A' A'' B B' B'' M N`
+
+      G |- M = N : (A -> B)
+      >>
+      G |- A : type
+      G |- M : forall (x : A') . B'
+      G |- N : forall (x : A'') . B''
       G, x : A |- M x = N x : B
 
 - `arrowOfExt A A' B B' M`
