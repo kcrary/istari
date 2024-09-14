@@ -1,0 +1,1970 @@
+
+Ctrl.use "datatypes.iml";
+File.import "bool-load.iml";
+File.import "decidable-load.iml";
+File.import "list-load.iml";
+File.import "logic-load.iml";
+File.import "option-load.iml";
+
+openModule /Bool/;
+openModule /Option/;
+openModule /List/;
+
+beginModule "FiniteMap";
+
+
+(* Generic finite maps *)
+
+define /FiniteMap i A B T emp look upd rem/
+/
+  (forall f g .
+     (forall a . look f a = look g a : option B)
+     -> f = g : T)
+  &
+  (forall a a' . Decidable.decidable (a = a' : A))
+  &
+  (forall a . look emp a = None : option B)
+  &
+  (forall f a b . look (upd f a b) a = Some b : option B)
+  &
+  (forall f a b a' . a != a' : A -> look (upd f a b) a' = look f a' : option B)
+  &
+  (forall f a . look (rem f a) a = None : option B)
+  &
+  (forall f a a' . a != a' : A -> look (rem f a) a' = look f a' : option B)
+  &
+  unit
+//
+  forall i (A B : U i) (T : U i) .
+    T
+    -> (T -> A -> option B)
+    -> (T -> A -> B -> T)
+    -> (T -> A -> T)
+    -> U i
+/;
+
+unfold /FiniteMap/.
+inference.
+typecheck.
+qed ();
+
+
+
+lemma "FiniteMap_ext"
+/
+  forall i A B T emp look upd rem .
+    FiniteMap i A B T emp look upd rem
+    -> forall f g .
+         (forall a . look f a = look g a : option B)
+         -> f = g : T
+/;
+
+inference.
+intro /i A B T emp look upd rem H/.
+exact /H ## 0/.
+qed ();
+
+
+
+lemma "FiniteMap_eq_decidable"
+/
+  forall i A B T emp look upd rem .
+    FiniteMap i A B T emp look upd rem
+    -> forall a a' . Decidable.decidable (a = a' : A)
+/;
+
+inference.
+intro /i A B T emp look upd rem H/.
+exact /H ## 1/.
+qed ();
+
+
+
+lemma "FiniteMap_look_emp"
+/
+  forall i A B T emp look upd rem .
+    FiniteMap i A B T emp look upd rem
+    -> forall a . look emp a = None : option B
+/;
+
+inference.
+intro /i A B T emp look upd rem H/.
+exact /H ## 2/.
+qed ();
+
+
+
+lemma "FiniteMap_look_upd"
+/
+  forall i A B T emp look upd rem .
+    FiniteMap i A B T emp look upd rem
+    -> forall f a b . look (upd f a b) a = Some b : option B
+/;
+
+inference.
+intro /i A B T emp look upd rem H/.
+exact /H ## 3/.
+qed ();
+
+
+
+lemma "FiniteMap_look_upd_neq"
+/
+  forall i A B T emp look upd rem .
+    FiniteMap i A B T emp look upd rem
+    -> forall f a b a' . a != a' : A -> look (upd f a b) a' = look f a' : option B
+/;
+
+inference.
+intro /i A B T emp look upd rem H/.
+exact /H ## 4/.
+qed ();
+
+
+
+lemma "FiniteMap_look_rem"
+/
+  forall i A B T emp look upd rem .
+    FiniteMap i A B T emp look upd rem
+    -> forall f a . look (rem f a) a = None : option B
+/;
+
+inference.
+intro /i A B T emp look upd rem H/.
+exact /H ## 5/.
+qed ();
+
+
+
+lemma "FiniteMap_look_rem_neq"
+/
+  forall i A B T emp look upd rem .
+    FiniteMap i A B T emp look upd rem
+    -> forall f a a' . a != a' : A -> look (rem f a) a' = look f a' : option B
+/;
+
+inference.
+intro /i A B T emp look upd rem H/.
+exact /H ## 6/.
+qed ();
+
+
+
+lemma "FiniteMap_upd_upd"
+/
+  forall i A B T emp look upd rem .
+    FiniteMap i A B T emp look upd rem
+    -> forall f a b b' .
+         upd (upd f a b) a b' = upd f a b' : T
+/;
+
+inference.
+intro /i A B T emp look upd rem (ext dec _ look_upd look_upd_neq _) f a b b'/.
+apply /ext/.
+intro /x/.
+so /dec a x/ /Heq | Hneq/.
+  {
+  subst /x/.
+  rewrite /-> look_upd at 0 0/.
+  auto.
+  }
+
+  {
+  rewrite /-> look_upd_neq at 1 0/ >> auto.
+  }
+qed ();
+
+
+
+lemma "FiniteMap_upd_upd_neq"
+/
+  forall i A B T emp look upd rem .
+    FiniteMap i A B T emp look upd rem
+    -> forall f a b a' b' .
+         a != a' : A
+         -> upd (upd f a b) a' b' = upd (upd f a' b') a b : T
+/;
+
+inference.
+intro /i A B T emp look upd rem (ext dec _ look_upd look_upd_neq _) f a b a' b' Hneqa/.
+apply /ext/.
+intro /x/.
+so /dec a x/ /Heq | Hneq/ >> so /dec a' x/ /Heq' | Hneq'/.
+  {
+  subst /a a'/.
+  so /Hneqa ()/ /0/.
+  }
+
+  {
+  subst /x/.
+  rewrite /-> look_upd_neq/ >> auto.
+  rewrite /-> look_upd at 0 0/.
+  auto.
+  }
+
+  {
+  subst /x/.
+  rewrite /-> look_upd_neq at 1/ >> auto.
+  rewrite /-> look_upd at 0 0/.
+  auto.
+  }
+
+  {
+  rewrite /-> look_upd_neq at all/ >> auto.
+  }
+qed ();
+
+
+
+lemma "FiniteMap_rem_emp"
+/
+  forall i A B T emp look upd rem .
+    FiniteMap i A B T emp look upd rem
+    -> forall a . rem emp a = emp : T
+/;
+
+inference.
+intro /i A B T emp look upd rem (ext dec look_emp _ _ look_rem look_rem_neq _) a/.
+apply /ext/.
+intro /x/.
+so /dec a x/ /Heq | Hneq/.
+  {
+  subst /x/.
+  rewrite /-> look_rem/.
+  rewrite /-> look_emp/.
+  auto.
+  }
+
+  {
+  rewrite /-> look_rem_neq/ >> auto.
+  }
+qed ();
+
+
+
+lemma "FiniteMap_rem_upd"
+/
+  forall i A B T emp look upd rem .
+    FiniteMap i A B T emp look upd rem
+    -> forall f a b . rem (upd f a b) a = rem f a : T
+/;
+
+inference.
+intro /i A B T emp look upd rem (ext dec _ _ look_upd_neq look_rem look_rem_neq _) f a b/.
+apply /ext/.
+intro /x/.
+so /dec a x/ /Heq | Hneq/.
+  {
+  subst /x/.
+  rewrite /-> look_rem at 0 0/.
+  auto.
+  }
+
+  {
+  rewrite /-> look_rem_neq at 0 0/ >> auto.
+  }
+qed ();
+
+
+
+lemma "FiniteMap_rem_upd_neq"
+/
+  forall i A B T emp look upd rem .
+    FiniteMap i A B T emp look upd rem
+    -> forall f a b a' . a != a' : A -> rem (upd f a b) a' = upd (rem f a') a b : T
+/;
+
+inference.
+intro /i A B T emp look upd rem (ext dec _ look_upd look_upd_neq look_rem look_rem_neq _) f a b a' Hneqa/.
+apply /ext/.
+intro /x/.
+so /dec a x/ /Heq | Hneq/.
+  {
+  subst /x/.
+  rewrite /-> look_rem_neq/.
+    {
+    contrapositive /Hneqa/.
+    auto.
+    }
+  rewrite /-> look_upd at 0 0/.
+  auto.
+  }
+so /dec a' x/ /Heq | Hneq'/.
+  {
+  subst /x/.
+  rewrite /-> look_rem/.
+  rewrite /-> look_upd_neq/ >> auto.
+  }
+rewrite /-> look_rem_neq/ >> auto.
+rewrite /-> look_upd_neq at 0 0/ >> auto.
+qed ();
+
+
+
+lemma "FiniteMap_rem_absent"
+/
+  forall i A B T emp look upd rem .
+    FiniteMap i A B T emp look upd rem
+    -> forall f a .
+         look f a = None : option B
+         -> rem f a = f : T
+/;
+
+inference.
+intro /i A B T emp look upd rem (ext dec _ _ _ look_rem look_rem_neq _) f a Hnone/.
+apply /ext/.
+intro /x/.
+so /dec a x/ /Heq | Hneq/.
+  {
+  subst /x/.
+  rewrite /-> look_rem/.
+  rewrite /-> Hnone/.
+  auto.
+  }
+
+  {
+  rewrite /-> look_rem_neq/ >> auto.
+  }
+qed ();
+
+
+
+define /FiniteMapMerge i A B T emp look upd rem mer/
+/
+  FiniteMap i A B T emp look upd rem
+  &
+  (forall f g a b . look f a = Some b : option B -> look (mer f g) a = Some b : option B)
+  &
+  (forall f g a . look f a = None : option B -> look (mer f g) a = look g a : option B)
+  &
+  unit
+//
+  forall i (A B : U i) (T : U i) .
+    T
+    -> (T -> A -> option B)
+    -> (T -> A -> B -> T)
+    -> (T -> A -> T)
+    -> (T -> T -> T)
+    -> U i
+/;
+
+unfold /FiniteMapMerge/.
+inference.
+typecheck.
+qed ();
+
+
+
+lemma "FiniteMapMerge_look_mer_left"
+/
+  forall i A B T emp look upd rem mer .
+    FiniteMapMerge i A B T emp look upd rem mer
+    -> forall f g a b . look f a = Some b : option B -> look (mer f g) a = Some b : option B
+/;
+
+inference.
+intro /i A B T emp look upd rem mer H/.
+exact /H ## 1/.
+qed ();
+
+
+
+lemma "FiniteMapMerge_look_mer_right"
+/
+  forall i A B T emp look upd rem mer .
+    FiniteMapMerge i A B T emp look upd rem mer
+    -> forall f g a . look f a = None : option B -> look (mer f g) a = look g a : option B
+/;
+
+inference.
+intro /i A B T emp look upd rem mer H/.
+exact /H ## 2/.
+qed ();
+
+
+
+lemma "FiniteMapMerge_mer_emp_left"
+/
+  forall i A B T emp look upd rem mer .
+    FiniteMapMerge i A B T emp look upd rem mer
+    -> forall f . mer emp f = f : T
+/;
+
+inference.
+intro /i A B T emp look upd rem mer ((ext dec look_emp _) look_mer_left look_mer_right _) f/.
+apply /ext/.
+intro /x/.
+rewrite /-> look_mer_right/ >> auto.
+qed ();
+
+
+
+lemma "FiniteMapMerge_mer_emp_right"
+/
+  forall i A B T emp look upd rem mer .
+    FiniteMapMerge i A B T emp look upd rem mer
+    -> forall f . mer f emp = f : T
+/;
+
+inference.
+intro /i A B T emp look upd rem mer ((ext dec look_emp _) look_mer_left look_mer_right _) f/.
+apply /ext/.
+intro /x/.
+setEq /Z/ /look f x/ /_/ /HeqZ/.
+symmetryIn /HeqZ/.
+destruct /Z/ /{| b}/.
+  {
+  rewrite /-> look_mer_right/ >> auto.
+  rewrite /-> HeqZ/.
+  apply /look_emp/.
+  }
+
+  {
+  rewrite /-> look_mer_left _ _ x b/ >> auto.
+  }
+qed ();
+
+
+
+lemma "FiniteMapMerge_upd_mer_left"
+/
+  forall i A B T emp look upd rem mer .
+    FiniteMapMerge i A B T emp look upd rem mer
+    -> forall f g a b . 
+         upd (mer f g) a b = mer (upd f a b) g : T
+/;
+
+inference.
+intro /i A B T emp look upd rem mer ((ext dec _ look_upd look_upd_neq _) look_mer_left look_mer_right _) f g a b/.
+apply /ext/.
+intro /x/.
+so /dec a x/ /Heq | Hneq/.
+  {
+  subst /x/.
+  rewrite /-> look_upd/.
+  rewrite /-> look_mer_left _ _ a b/ >> auto.
+  }
+
+  {
+  rewrite /-> look_upd_neq/ >> auto.
+  setEq /Z/ /look f x/ /_/ /HeqZ/.
+  symmetryIn /HeqZ/.
+  destruct /Z/ /{| b'}/.
+    {
+    rewrite /-> look_mer_right at 0 0/ >> auto.
+    rewrite /-> look_upd_neq/ >> auto.
+    }
+
+    {
+    rewrite /-> look_mer_left _ _ x b' at 0 0/ >> auto.
+    rewrite /-> look_upd_neq/ >> auto.
+    }
+  }
+qed ();
+
+
+
+lemma "FiniteMapMerge_upd_mer_right"
+/
+  forall i A B T emp look upd rem mer .
+    FiniteMapMerge i A B T emp look upd rem mer
+    -> forall f g a b . 
+         look f a = None : option B
+         -> upd (mer f g) a b = mer f (upd g a b) : T
+/;
+
+inference.
+intro /i A B T emp look upd rem mer ((ext dec _ look_upd look_upd_neq _) look_mer_left look_mer_right _) f g a b Hmiss/.
+apply /ext/.
+intro /x/.
+so /dec a x/ /Heq | Hneq/.
+  {
+  subst /x/.
+  rewrite /-> look_mer_right/ >> auto.
+  rewrite /-> look_upd at 0 0/.
+  auto.
+  }
+
+  {
+  setEq /Z/ /look f x/ /_/ /HeqZ/.
+  symmetryIn /HeqZ/.
+  destruct /Z/ /{| b'}/.
+    {
+    rewrite /-> look_mer_right/ >> auto.
+    rewrite /-> look_upd_neq at 0 0/ >> auto.
+    }
+
+    {
+    rewrite /-> look_mer_left _ _ x b'/ >> auto.
+    rewrite /-> look_upd_neq/ >> auto.
+    }
+  }
+qed ();
+
+
+
+lemma "FiniteMapMerge_rem_mer"
+/
+  forall i A B T emp look upd rem mer .
+    FiniteMapMerge i A B T emp look upd rem mer
+    -> forall f g a .
+         rem (mer f g) a = mer (rem f a) (rem g a) : T
+/;
+
+inference.
+intro /i A B T emp look upd rem mer ((ext dec _ _ _ look_rem look_rem_neq _) look_mer_left look_mer_right _) f g a/.
+apply /ext/.
+intro /x/.
+so /dec a x/ /Heq | Hneq/.
+  {
+  subst /x/.
+  rewrite /-> look_rem/.
+  rewrite /-> look_mer_right/ >> auto.
+  }
+
+  {
+  rewrite /-> look_rem_neq/ >> auto.
+  setEq /Z/ /look f x/ /_/ /HeqZ/.
+  symmetryIn /HeqZ/.
+  destruct /Z/ /{| b}/.
+    {
+    rewrite /-> look_mer_right at 0 0/ >> auto.
+    rewrite /-> look_rem_neq/ >> auto.
+    }
+
+    {
+    rewrite /-> look_mer_left _ _ x b at 0 0/ >> auto.
+    rewrite /-> look_rem_neq/ >> auto.
+    }
+  }
+qed ();
+
+           
+
+(* Generic finite maps minus extensionality *)
+
+define /PreFiniteMap i A B T emp look upd rem/
+/
+  (forall a a' . Decidable.decidable (a = a' : A))
+  &
+  (forall a . look emp a = None : option B)
+  &
+  (forall f a b . look (upd f a b) a = Some b : option B)
+  &
+  (forall f a b a' . a != a' : A -> look (upd f a b) a' = look f a' : option B)
+  &
+  (forall f a . look (rem f a) a = None : option B)
+  &
+  (forall f a a' . a != a' : A -> look (rem f a) a' = look f a' : option B)
+  &
+  unit
+//
+  forall i (A B : U i) (T : U i) .
+    T
+    -> (T -> A -> option B)
+    -> (T -> A -> B -> T)
+    -> (T -> A -> T)
+    -> U i
+/;
+
+unfold /PreFiniteMap/.
+inference.
+typecheck.
+qed ();
+
+
+
+(* quotient pre-finite-map *)
+define /qpfm A B T look/
+/
+  quotient (f g : T) .
+  forall (a : A) . look f a = look g a : option B
+//
+  intersect i . forall (A B T : U i) . (T -> A -> option B) -> U i
+/;
+
+inference.
+introOf /i A B T look/.
+unfold /qpfm/.
+typecheck >> auto.
+reintro /f g h Hfg Hgh/.
+intro /a/.
+transitivity /look g a/ >> auto.
+qed ();
+
+
+
+lemma "quotient_emp"
+/
+  forall i A B T emp look upd rem .
+    PreFiniteMap i A B T emp look upd rem
+    -> emp : qpfm A B T look
+/;
+
+inference.
+intro /i A B T emp look upd rem _/.
+infer /qpfm A B T look/ /Hof/.
+unfold /qpfm in Hof in concl/.
+typecheck >> auto.
+qed ();
+
+
+
+lemma "quotient_look"
+/
+  forall i A B T emp look upd rem .
+    PreFiniteMap i A B T emp look upd rem
+    -> look : qpfm A B T look -> A -> option B
+/;
+
+inference.
+intro /i A B T emp look upd rem _/.
+introOf /f/.
+destruct /f/ /[f g Hfg]/.
+introEq /a/.
+apply /Hfg/.
+qed ();
+
+
+
+lemma "quotient_upd"
+/
+  forall i A B T emp look upd rem .
+    PreFiniteMap i A B T emp look upd rem
+    -> upd : qpfm A B T look -> A -> B -> qpfm A B T look
+/;
+
+inference.
+intro /i A B T emp look upd rem (dec _ look_upd look_upd_neq _)/.
+infer /qpfm A B T look/ /Hofq/.
+unfold /qpfm in Hofq/.
+assert /upd : T -> A -> B -> qpfm A B T look/ /Hof/.
+  {
+  introOf /f a b/.
+  infer /qpfm A B T look/ /Hof/.
+  unfold /qpfm/.
+  typecheck >> auto.
+  }
+introOf /f/.
+destruct /f/ /[f g Hfg]/.
+inferSpine /Hof/ /__ f/ /Hoff/.
+inferSpine /Hof/ /__ g/ /Hofg/.
+introEq /a b/.
+unfold /qpfm/.
+extensionality.
+intro /x/.
+so /dec a x/ /Heq | Hneq/.
+  {
+  subst /x/.
+  rewrite /-> look_upd at 0 0/.
+  auto.
+  }
+
+  {
+  rewrite /-> look_upd_neq at 0 0/ >> auto.
+  }
+qed ();
+
+
+
+lemma "quotient_rem"
+/
+  forall i A B T emp look upd rem .
+    PreFiniteMap i A B T emp look upd rem
+    -> rem : qpfm A B T look -> A -> qpfm A B T look
+/;
+
+inference.
+intro /i A B T emp look upd rem (dec _ _ _ look_rem look_rem_neq _)/.
+infer /qpfm A B T look/ /Hofq/.
+unfold /qpfm in Hofq/.
+assert /rem : T -> A -> qpfm A B T look/ /Hof/.
+  {
+  introOf /f a/.
+  infer /qpfm A B T look/ /Hof/.
+  unfold /qpfm/.
+  typecheck >> auto.
+  }
+introOf /f/.
+destruct /f/ /[f g Hfg]/.
+inferSpine /Hof/ /__ f/ /Hoff/.
+inferSpine /Hof/ /__ g/ /Hofg/.
+introEq /a/.
+unfold /qpfm/.
+extensionality.
+intro /x/.
+so /dec a x/ /Heq | Hneq/.
+  {
+  subst /x/.
+  rewrite /-> look_rem at 0 0/.
+  auto.
+  }
+
+  {
+  rewrite /-> look_rem_neq at 0 0/ >> auto.
+  }
+qed ();
+
+
+
+lemma "FiniteMap_qpfm"
+/
+  forall i A B T emp look upd rem .
+    PreFiniteMap i A B T emp look upd rem
+    -> FiniteMap i A B (qpfm A B T look) emp look upd rem
+/;
+
+inference.
+intro /i A B T emp look upd rem Hpfm/.
+so /Hpfm/ /dec look_emp look_upd look_upd_neq look_rem look_rem_neq _/.
+unfold /FiniteMap/.
+infer /qpfm A B T look/ /Hofq/.
+unfold /qpfm in Hofq/.
+so /quotient_look _# 8 Hpfm/ /Hoflook/.
+so /quotient_upd _# 8 Hpfm/ /Hofupd/.
+so /quotient_rem _# 8 Hpfm/ /Hofrem/.
+splitn 7.
+  {
+  intro /f g/.
+  introRaw /Hfg/.
+    {
+    typecheck1 >> auto.
+    reintro /a/.
+    inferSpine /Hoflook/ /__ f a/ /Hoflookfa/.
+    inferSpine /Hoflook/ /__ g a/ /Hoflookga/.
+    typecheck.
+    }
+  infer /f/ /Hoff/.
+  infer /g/ /Hofg/.
+  destruct /f/ /[f]/.
+  destruct /g/ /[g]/.
+  unfold /qpfm in concl in Hoff in Hofg/.
+  extensionality.
+  exact /Hfg/.
+  }
+
+  {
+  hyp /dec/.
+  }
+
+  {
+  intro /a/.
+  apply /look_emp/.
+  }
+
+  {
+  intro /f a b/.
+  inferSpine /Hofupd/ /__ f a b/ /Hofupdfab/.
+  inferSpineRaw /Hoflook/ /__ (upd f a b) a/ /Hoflookupd/ >> auto.
+  destruct /f/ /[f]/.
+  unhide.
+  apply /look_upd/.
+  }
+
+  {
+  intro /f a b a' Hneq/.
+  inferSpine /Hofupd/ /__ f a b/ /Hofupdfab/.
+  inferSpineRaw /Hoflook/ /__ (upd f a b) a'/ /Hoflookupd/ >> auto.
+  inferSpine /Hoflook/ /__ f a'/ /Hoflookfa'/.
+  destruct /f/ /[f]/.
+  unhide.
+  apply /look_upd_neq/ >> auto.
+  }
+
+  {
+  intro /f a/.
+  inferSpine /Hofrem/ /__ f a/ /Hofremfa/.
+  inferSpineRaw /Hoflook/ /__ (rem f a) a/ /Hoflookrem/ >> auto.
+  destruct /f/ /[f]/.
+  unhide.
+  apply /look_rem/.
+  }
+
+  {
+  intro /f a a' Hneq/.
+  inferSpine /Hofrem/ /__ f a/ /Hofremfa/.
+  inferSpineRaw /Hoflook/ /__ (rem f a) a'/ /Hoflookrem/ >> auto.
+  inferSpine /Hoflook/ /__ f a'/ /Hoflookfa'/.
+  destruct /f/ /[f]/.
+  unhide.
+  apply /look_rem_neq/ >> auto.
+  }
+
+  {
+  split.
+  }
+qed ();
+
+
+
+define /PreFiniteMapMerge i A B T emp look upd rem mer/
+/
+  PreFiniteMap i A B T emp look upd rem
+  &
+  (forall f g a b . look f a = Some b : option B -> look (mer f g) a = Some b : option B)
+  &
+  (forall f g a . look f a = None : option B -> look (mer f g) a = look g a : option B)
+  &
+  unit
+//
+  forall i (A B : U i) (T : U i) .
+    T
+    -> (T -> A -> option B)
+    -> (T -> A -> B -> T)
+    -> (T -> A -> T)
+    -> (T -> T -> T)
+    -> U i
+/;
+
+unfold /PreFiniteMapMerge/.
+inference.
+typecheck.
+qed ();
+
+
+
+lemma "quotient_mer"
+/
+  forall i A B T emp look upd rem mer .
+    PreFiniteMapMerge i A B T emp look upd rem mer
+    -> mer : qpfm A B T look -> qpfm A B T look -> qpfm A B T look
+/;
+
+inference.
+intro /i A B T emp look upd rem mer ((dec _) look_mer_left look_mer_right _)/.
+infer /qpfm A B T look/ /Hofq/.
+unfold /qpfm in Hofq/.
+introOf /f/.
+destruct /f/ /[f f' Hf]/.
+extensionality.
+reintro /g/.
+destruct /g/ /[g g' Hg]/.
+unfold /qpfm/.
+extensionality.
+intro /x/.
+setEq /Z/ /look f x/ /_/ /HeqZ/.
+symmetryIn /HeqZ/.
+destruct /Z/ /{| b}/.
+  {
+  rewrite /-> look_mer_right at 0 0/ >> auto.
+  rewrite /<- Hf/ >> auto.
+  }
+
+  {
+  rewrite /-> look_mer_left _ _ x b at 0 0/ >> auto.
+  rewrite /<- Hf/ >> auto.
+  }
+qed ();
+
+
+
+lemma "FiniteMapMerge_qpfm"
+/
+  forall i A B T emp look upd rem mer .
+    PreFiniteMapMerge i A B T emp look upd rem mer
+    -> FiniteMapMerge i A B (qpfm A B T look) emp look upd rem mer
+/;
+
+inference.
+intro /i A B T emp look upd rem mer Hpfmm/.
+so /Hpfmm/ /Hpfm look_mer_left look_mer_right _/.
+unfold /FiniteMapMerge/.
+infer /qpfm A B T look/ /Hofq/.
+unfold /qpfm in Hofq/.
+so /quotient_look _# 8 Hpfm/ /Hoflook/.
+so /quotient_mer _# 9 Hpfmm/ /Hofmer/.
+splitn 3 >> auto.
+  {
+  apply /FiniteMap_qpfm/ >> auto.
+  }
+
+  {
+  intro /f g a b/.
+  inferSpine /Hofmer/ /__ f g/ /Hofmerfg/.
+  inferSpineRaw /Hoflook/ /__ (mer f g) a/ /Hoflookmer/ >> auto.
+  inferSpine /Hoflook/ /__ f a/ /Hoflookfa/.
+  destruct /f/ /[f]/.
+  destruct /g/ /[g]/.
+  intro /Hlook/.
+  unhide.
+  apply /look_mer_left/ >> auto.
+  }
+
+  {
+  intro /f g a/.
+  inferSpine /Hofmer/ /__ f g/ /Hofmerfg/.
+  inferSpineRaw /Hoflook/ /__ (mer f g) a/ /Hoflookmer/ >> auto.
+  inferSpine /Hoflook/ /__ f a/ /Hoflookfa/.
+  inferSpine /Hoflook/ /__ g a/ /Hoflookga/.
+  destruct /f/ /[f]/.
+  destruct /g/ /[g]/.
+  intro /Hlook/.
+  unhide.
+  apply /look_mer_right/ >> auto.
+  }
+qed ();
+
+
+
+(* Simple finite maps *)
+
+define /eqtest A/
+/
+  { e : A -> A -> bool | forall (x y : A) . x = y : A <-> istrue (e x y) }
+//
+  intersect i . U i -> U i
+/;
+
+inference.
+unfold /eqtest/.
+typecheck.
+qed ();
+
+
+
+define /pre_finite_map A B/
+/
+  eqtest A & list (A & B)
+//
+  intersect i . U i -> U i -> U i
+/;
+
+inference.
+unfold /pre_finite_map/.
+typecheck.
+qed ();
+
+
+
+define /pre_empty A B e/
+/
+  (e, nil)
+//
+  intersect i . forall (A B : U i) . 
+    eqtest A -> pre_finite_map A B
+/;
+
+inference.
+unfold /pre_empty, pre_finite_map/.
+typecheck.
+qed ();
+
+
+
+define /pre_lookup A B f a/
+/
+  (fnind look : list [(A & B)] -> option B of
+   | nil . None
+   | cons h t . if f #1 a (h #1) then Some (h #2) else look t) (f #2)
+//
+  intersect i . forall (A B : U i) . pre_finite_map A B -> A -> option B
+/;
+
+inference.
+unfold /pre_lookup/.
+typecheck.
+qed ();
+
+
+
+define /pre_update A B f a b/
+/
+  (f #1, (a, b) :: f #2)
+//
+  intersect i . forall (A B : U i) . pre_finite_map A B -> A -> B -> pre_finite_map A B
+/;
+
+inference.
+unfold /pre_update/.
+unfold /pre_finite_map at all/.
+typecheck.
+qed ();
+
+
+
+define /pre_remove A B f a/
+/
+  (f #1,
+   (fnind rem : list [(A & B)] -> list (A & B) of
+    | nil . nil
+    | cons h t . if f #1 a (h #1) then rem t else h :: rem t) (f #2))
+//
+  intersect i . forall (A B : U i) . pre_finite_map A B -> A -> pre_finite_map A B
+/;
+
+inference.
+unfold /pre_remove, pre_finite_map at all/.
+typecheck.
+qed ();
+
+
+
+define /pre_merge A B f g/
+/
+  (f #1, append (f #2) (g #2))
+//
+  intersect i . forall (A B : U i) . pre_finite_map A B -> pre_finite_map A B -> pre_finite_map A B
+/;
+
+inference.
+unfold /pre_merge, pre_finite_map at all/.
+typecheck.
+qed ();
+
+
+
+lemma "PreFiniteMap_pre_finite_map"
+/
+  forall i (A B : U i) (e : eqtest A) .
+    PreFiniteMap i A B (pre_finite_map A B) 
+      (pre_empty A B e) 
+      (pre_lookup A B)
+      (pre_update A B)
+      (pre_remove A B)
+/;
+
+inference.
+intro /i A B e/.
+unfold /PreFiniteMap/.
+splitn 6 >> auto.
+  {
+  intro /a a'/.
+  destruct /e/ /[e He]/.
+  exactRaw /if e a a' then inl () else inr (fn _ . ())/.
+  boolCase /e a a'/ /Heq/ >> unfold /Decidable.decidable/.
+    {
+    typecheck.
+    apply /He/ >> auto.
+    }
+
+    {
+    rewrite /<- He in Heq/.
+    typecheck.
+    reintro /Heq'/.
+    so /Heq Heq'/ /0/.
+    }
+  }
+
+  {
+  intro /a/.
+  unfold /pre_empty, pre_lookup/.
+  auto.
+  }
+
+  {
+  intro /f a b/.
+  unfold /pre_update, pre_lookup/.
+  destruct /f/ /[e' He'] f/.
+  reduce //.
+  boolEq true /e' a a/ >> auto.
+  }
+
+  {
+  intro /f a b a' Hneq/.
+  unfold /pre_update, pre_lookup/.
+  infer /f/ /Hoff/.
+  destruct /f/ /[e' He'] f/.
+  reduce //.
+  fold /pre_lookup A B (e', f) a'/.
+  boolEq false /e' a' a/ >> auto.
+  contrapositive /Hneq/.
+  auto.
+  }
+
+  {
+  intro /f a/.
+  unfold /pre_remove, pre_lookup/.
+  destruct /f/ /[e' He'] f/.
+  reduce //.
+  induction /f/ >> auto.
+  intro /(a' b) f IH/.
+  reduce //.
+  boolCase /e' a a'/ /Heq/.
+    {
+    exact /IH/.
+    }
+  
+    {
+    boolEq false /e' a a'/ >> auto.
+    }
+  }
+
+  {
+  intro /f a a' Hneq/.
+  unfold /pre_remove, pre_lookup at all/.
+  destruct /f/ /[e' He'] f/.
+  reduce //.
+  unhide.
+  induction /f/ >> auto.
+  intro /(a'' b) f IH/.
+  reduce //.
+  boolCase /e' a a''/ /Heq/.
+    {
+    rewrite /<- He' in Heq/.
+    subst /a''/.
+    boolEq false /e' a' a/.
+      {
+      contrapositive /Hneq/ >> auto.
+      }
+    exact /IH/.
+    }
+  boolCase /e' a' a''/ /Heq'/ >> auto.
+  }
+qed ();
+
+
+
+lemma "PreFiniteMapMerge_pre_finite_map"
+/
+  forall i (A B : U i) (e : eqtest A) .
+    PreFiniteMapMerge i A B (pre_finite_map A B) 
+      (pre_empty A B e) 
+      (pre_lookup A B)
+      (pre_update A B)
+      (pre_remove A B)
+      (pre_merge A B)
+/;
+
+inference.
+intro /i A B e/.
+unfold /PreFiniteMapMerge/.
+splitn 3 >> auto.
+  {
+  apply /PreFiniteMap_pre_finite_map/.
+  }
+
+  {
+  intro /f g a b Hlook/.
+  destruct /f/ /[e' He'] f/.
+  destruct /g/ /[e'' He''] g/.
+  unfold /pre_merge/.
+  unfold /pre_lookup in Hlook in concl/.
+  reduce /Hlook concl/.
+  unhide.
+  revert /Hlook/.
+  induction /f/.
+    {
+    intro /H/.
+    injection /H/.
+    }
+ 
+    {
+    intro /(a' b') f IH/.
+    reduce //.
+    boolCase /e' a a'/ /Heq/ >> auto.
+    }
+  }
+
+  {
+  intro /f g a Hlook/.
+  destruct /f/ /[e' He'] f/.
+  destruct /g/ /[e'' He''] g/.
+  assert /e' = e'' : (A -> A -> bool)/ /Heqe/.
+    {
+    introEq /x y/.
+    apply /iff_eq_bool/.
+    auto.
+    }
+  unfold /pre_merge/.
+  unfold /pre_lookup in Hlook in concl at all/.
+  reduce /Hlook concl/.
+  unhide.
+  revert /Hlook/.
+  induction /f/.
+    {
+    intro /_/.
+    rewrite /<- Heqe/.
+    reflexivity.
+    }
+  
+    {
+    intro /(a' b') f IH/.
+    reduce //.
+    boolCase /e' a a'/ /Heq/ >> auto.
+    intro /H/.
+    injection /H/.
+    }
+  }
+qed ();
+
+
+
+
+define /finite_map A B/
+/
+  qpfm A B (pre_finite_map A B) (pre_lookup A B)
+//
+  intersect i . U i -> U i -> U i
+/;
+
+inference.
+unfold /finite_map/.
+typecheck.
+qed ();
+  
+
+
+lemma "finite_map_impl_eq_decidable"
+/
+  intersect i . forall (A B : U i) . finite_map A B -> forall a a' . Decidable.decidable (a = a' : A)
+/;
+
+inference.
+intro /i A B f/.
+assert /f #1 : { e : A -> A -> bool | forall (x y : A) . x = y : A <-> istrue (e x y) }/ /Hof/.
+  {
+  destruct /f/ /[f g Hfg]/.
+  destruct /f/ /[e He] f/.
+  destruct /g/ /[e' He'] g/.
+  reduce //.
+  unhide.
+  extensionality >> auto.
+  introEq /x y/.
+  apply /iff_eq_bool/.
+  auto.
+  }
+RuleTactic.setElim (Term.evar ()) (Term.evar ()) (parseCurr /f #1/).
+1:{
+  hyp /Hof/.
+  }
+typechecker ();
+reintro /Hf/.
+assert /f #1 : A -> A -> bool/ /Hof'/.
+  {
+  RuleTactic.setWeakenOf (Term.evar ()).
+  exact /Hof/.
+  }
+clear /Hof/.
+intro /a a'/.
+inferSpine /Hof'/ /__ a a'/ /Hof''/.
+exactRaw /if f #1 a a' then inl () else inr (fn _ . ())/.
+boolCase /f #1 a a'/ /Heq/.
+  {
+  unfold /Decidable.decidable/.
+  typecheck.
+  apply /Hf/ >> auto.
+  }
+
+  {
+  rewrite /<- Hf in Heq/.
+  unfold /Decidable.decidable/.
+  typecheck.
+  reintro /Heq'/.
+  so /Heq Heq'/ /0/.
+  }
+qed ();
+
+
+
+lemma "finite_map_impl_eqtest"
+/
+  intersect i . forall (A B : U i) .
+    finite_map A B -> eqtest A
+/;
+
+inference.
+intro /i A B f/.
+so /finite_map_impl_eq_decidable _# 2 f/ /dec/.
+unfold /eqtest/.
+exists /fn x y . (case dec x y of | inl _ . true | inr _ . false)/.
+intro /x y/.
+reduce //.
+generalize /dec x y/ /_/ /X/.
+destruct /X/ /Heq | Hneq/.
+  {
+  reduce //.
+  split >> autoWith /istrue_true/.
+  }
+
+  {
+  reduce //.
+  split.
+    {
+    intro /Heq/.
+    so /Hneq Heq/ /0/.
+    }
+
+    {
+    intro /Hfalse/.
+    so /not_istrue_false Hfalse/ /0/.
+    }
+  }
+qed ();
+
+
+
+define /empty/
+/
+  pre_empty
+//
+  intersect i . forall (A B : U i) . 
+    eqtest A -> finite_map A B
+/;
+
+inference.
+introOf /i A B e/.
+unfold /empty, finite_map/.
+exact /quotient_emp _# 8 (PreFiniteMap_pre_finite_map i A B e)/.
+qed ();
+
+Database.setImplicits (parseConstant /empty/) 2;
+
+
+
+define /lookup/
+/
+  pre_lookup
+//
+  intersect i . forall (A B : U i) . finite_map A B -> A -> option B
+/;
+
+inference.
+introOf /i A B f a/.
+so /finite_map_impl_eqtest A B f/ /e/.
+unfold /lookup, finite_map in f/.
+so /quotient_look _# 8 (PreFiniteMap_pre_finite_map i A B e)/ /Hof/.
+inferSpine /Hof/ /__ f a/ /Hof'/.
+hyp /Hof'/.
+qed ();
+
+Database.setImplicits (parseConstant /lookup/) 2;
+
+
+
+define /update/
+/
+  pre_update
+//
+  intersect i . forall (A B : U i) . finite_map A B -> A -> B -> finite_map A B
+/;
+
+inference.
+introOf /i A B f a b/.
+so /finite_map_impl_eqtest A B f/ /e/.
+unfold /update, finite_map in f in concl/.
+so /quotient_upd _# 8 (PreFiniteMap_pre_finite_map i A B e)/ /Hof/.
+inferSpine /Hof/ /__ f a b/ /Hof'/.
+hyp /Hof'/.
+qed ();
+
+Database.setImplicits (parseConstant /update/) 2;
+
+
+
+define /remove/
+/
+  pre_remove
+//
+  intersect i . forall (A B : U i) . finite_map A B -> A -> finite_map A B
+/;
+
+inference.
+introOf /i A B f a/.
+so /finite_map_impl_eqtest A B f/ /e/.
+unfold /remove, finite_map in f in concl/.
+so /quotient_rem _# 8 (PreFiniteMap_pre_finite_map i A B e)/ /Hof/.
+inferSpine /Hof/ /__ f a/ /Hof'/.
+hyp /Hof'/.
+qed ();
+
+Database.setImplicits (parseConstant /remove/) 2;
+
+
+
+lemma "FiniteMap_finite_map"
+/
+  forall i (A B : U i) (e : eqtest A) .
+    FiniteMap i A B (finite_map A B) 
+      (`empty A B e) 
+      (`lookup A B)
+      (`update A B)
+      (`remove A B)
+/;
+
+inference.
+intro /i A B e/.
+unfold /finite_map, empty, lookup, update, remove/.
+apply /FiniteMap_qpfm/.
+apply /PreFiniteMap_pre_finite_map/.
+qed ();
+
+
+
+lemma "FiniteMap_finite_map'"
+/
+  forall i (A B : U i) (f : finite_map A B) .
+    FiniteMap i A B (finite_map A B) 
+      (`empty A B (finite_map_impl_eqtest A B f))
+      (`lookup A B)
+      (`update A B)
+      (`remove A B)
+/;
+
+inference.
+intro /i A B f/.
+infer /finite_map_impl_eqtest A B f/ /Hof/.
+apply /FiniteMap_finite_map/.
+qed ();
+
+
+
+lemma "finite_map_ext"
+/
+  forall i (A B : U i) f g .
+    (forall (a : A) . lookup f a = lookup g a : option B)
+    -> f = g : finite_map A B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMap_ext _# 4 (empty _) lookup update remove (FiniteMap_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+lemma "lookup_empty"
+/
+  forall i (A B : U i) e (a : A) .
+    lookup (empty e) a = None : option B
+/;
+
+inference.
+intro /i A B e/.
+apply /FiniteMap_look_emp _# 4 (empty e) lookup update remove/.
+apply /FiniteMap_finite_map/.
+qed ();
+
+
+
+lemma "lookup_update"
+/
+  forall i (A B : U i) (f : finite_map A B) a b .
+    lookup (update f a b) a = Some b : option B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMap_look_upd _# 4 (empty _) lookup update remove (FiniteMap_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+lemma "lookup_update_neq"
+/
+  forall i (A B : U i) f a b a' .
+    a != a' : A -> lookup (update f a b) a' = lookup f a' : option B
+/;
+
+inference.
+intro /i A B f/.
+infer /finite_map_impl_eqtest A B f/ /Hof/.
+exact /FiniteMap_look_upd_neq _# 4 (empty _) lookup update remove (FiniteMap_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+lemma "lookup_remove"
+/
+  forall i (A B : U i) (f : finite_map A B) a .
+    lookup (remove f a) a = None : option B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMap_look_rem _# 4 (empty _) lookup update remove (FiniteMap_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+lemma "lookup_remove_neq"
+/
+  forall i (A B : U i) f a a' .
+    a != a' : A
+    -> lookup (remove f a) a' = lookup f a' : option B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMap_look_rem_neq _# 4 (empty _) lookup update remove (FiniteMap_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+lemma "update_update"
+/
+  forall i (A B : U i) f a b b' .
+    update (update f a b) a b' = update f a b' : finite_map A B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMap_upd_upd _# 4 (empty _) lookup update remove (FiniteMap_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+lemma "update_update_neq"
+/
+  forall i (A B : U i) f a b a' b' .
+    a != a' : A
+    -> update (update f a b) a' b' = update (update f a' b') a b : finite_map A B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMap_upd_upd_neq _# 4 (empty _) lookup update remove (FiniteMap_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+lemma "remove_empty"
+/
+  forall i (A B : U i) e a .
+    remove (empty e) a = empty e : finite_map A B
+/;
+
+inference.
+intro /i A B e/.
+exact /FiniteMap_rem_emp _# 4 (empty e) lookup update remove (FiniteMap_finite_map _# 3 e)/.
+qed ();
+
+
+
+lemma "remove_update"
+/
+  forall i (A B : U i) f a b .
+    remove (update f a b) a = remove f a : finite_map A B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMap_rem_upd _# 4 (empty _) lookup update remove (FiniteMap_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+lemma "remove_update_neq"
+/
+  forall i (A B : U i) f a b a' . 
+    a != a' : A 
+    -> remove (update f a b) a' = update (remove f a') a b : finite_map A B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMap_rem_upd_neq _# 4 (empty _) lookup update remove (FiniteMap_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+lemma "remove_absent"
+/
+  forall i (A B : U i) f a .
+    lookup f a = None : option B
+    -> remove f a = f : finite_map A B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMap_rem_absent _# 4 (empty _) lookup update remove (FiniteMap_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+define /merge/
+/
+  pre_merge
+//
+  intersect i . forall (A B : U i) . finite_map A B -> finite_map A B -> finite_map A B
+/;
+
+inference.
+introOf /i A B f g/.
+so /finite_map_impl_eqtest A B f/ /e/.
+unfold /merge, finite_map in f in g in concl/.
+so /quotient_mer _# 9 (PreFiniteMapMerge_pre_finite_map i A B e)/ /Hof/.
+inferSpine /Hof/ /__ f g/ /Hof'/.
+hyp /Hof'/.
+qed ();
+
+Database.setImplicits (parseConstant /merge/) 2;
+
+
+
+lemma "FiniteMapMerge_finite_map"
+/
+  forall i (A B : U i) (e : eqtest A) .
+    FiniteMapMerge i A B (finite_map A B) 
+      (`empty A B e) 
+      (`lookup A B)
+      (`update A B)
+      (`remove A B)
+      (`merge A B)
+/;
+
+inference.
+intro /i A B e/.
+unfold /finite_map, empty, lookup, update, remove, merge/.
+apply /FiniteMapMerge_qpfm/.
+apply /PreFiniteMapMerge_pre_finite_map/.
+qed ();
+
+
+
+lemma "FiniteMapMerge_finite_map'"
+/
+  forall i (A B : U i) (f : finite_map A B) .
+    FiniteMapMerge i A B (finite_map A B) 
+      (`empty A B (finite_map_impl_eqtest A B f))
+      (`lookup A B)
+      (`update A B)
+      (`remove A B)
+      (`merge A B)
+/;
+
+inference.
+intro /i A B f/.
+apply /FiniteMapMerge_finite_map/.
+qed ();
+
+
+
+lemma "lookup_merge_left"
+/
+  forall i (A B : U i) f g (a : A) b .
+    lookup f a = Some b : option B
+    -> lookup (merge f g) a = Some b : option B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMapMerge_look_mer_left _# 4 (empty _) lookup update remove merge (FiniteMapMerge_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+lemma "lookup_merge_right"
+/
+  forall i (A B : U i) f g (a : A) .
+    lookup f a = None : option B -> lookup (merge f g) a = lookup g a : option B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMapMerge_look_mer_right _# 4 (empty _) lookup update remove merge (FiniteMapMerge_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+lemma "merge_empty_left"
+/
+  forall i (A B : U i) e f . merge (empty e) f = f : finite_map A B
+/;
+
+inference.
+intro /i A B e/.
+exact /FiniteMapMerge_mer_emp_left _# 4 (empty e) lookup update remove merge (FiniteMapMerge_finite_map _# 4)/.
+qed ();
+
+
+
+lemma "merge_empty_right"
+/
+  forall i (A B : U i) e f . merge f (empty e) = f : finite_map A B
+/;
+
+inference.
+intro /i A B e/.
+exact /FiniteMapMerge_mer_emp_right _# 4 (empty e) lookup update remove merge (FiniteMapMerge_finite_map _# 4)/.
+qed ();
+
+
+
+lemma "update_merge_left"
+/
+  forall i (A B : U i) f g a b .
+    update (merge f g) a b = merge (update f a b) g : finite_map A B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMapMerge_upd_mer_left _# 4 (empty _) lookup update remove merge (FiniteMapMerge_finite_map' _# 3 f) f/.
+qed ();
+
+  
+
+lemma "update_merge_right"
+/
+  forall i (A B : U i) f g a b .
+    lookup f a = None : option B
+    -> update (merge f g) a b = merge f (update g a b) : finite_map A B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMapMerge_upd_mer_right _# 4 (empty _) lookup update remove merge (FiniteMapMerge_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+lemma "remove_merge"
+/
+  forall i (A B : U i) f g a .
+    remove (merge f g) a = merge (remove f a) (remove g a) : finite_map A B
+/;
+
+inference.
+intro /i A B f/.
+exact /FiniteMapMerge_rem_mer _# 4 (empty _) lookup update remove merge (FiniteMapMerge_finite_map' _# 3 f) f/.
+qed ();
+
+
+
+(* Membership *)
+
+define /member {A B} f a/
+/
+  exists (b : B) . lookup f a = Some b : option B
+//
+  intersect i . forall (A B : U i) . finite_map A B -> A -> U i
+/;
+
+inference.
+unfold /member/.
+typecheck.
+qed ();
+
+
+
+lemma "not_member_iff_lookup_none"
+/
+  forall i (A B : U i) (f : finite_map A B) a .
+    not (member f a) <-> lookup f a = None : option B
+/;
+
+inference.
+intro /i A B f a/.
+split.
+  {
+  intro /Hnotmem/.
+  unfold /member in Hnotmem/.
+  setEq /Z/ /lookup f a/ /_/ /Heq/.
+  symmetryIn /Heq/.
+  destruct /Z/ /{| b}/ >> auto.
+  so /Hnotmem __/ /0/.
+  exists /b/ >> auto.
+  }
+
+  {
+  intro /Hnone (b Heq)/.
+  rewrite /-> Hnone in Heq/.
+  injection /Heq/.
+  }
+qed ();
+
+
+
+lemma "remove_absent'"
+/
+  forall i (A B : U i) f a .
+    not (member f a)
+    -> remove f a = f : finite_map A B
+/;
+
+inference.
+intro /i A B f a Hnonmem/.
+apply /remove_absent/ >> auto.
+apply /not_member_iff_lookup_none/ >> auto.
+qed ();
+
+
+
+lemma "lookup_merge_left'"
+/
+  forall i (A B : U i) f g (a : A) .
+    member f a
+    -> lookup (merge f g) a = lookup f a : option B
+/;
+
+inference.
+intro /i A B f g a (b Heq)/.
+rewrite /-> Heq/.
+apply /lookup_merge_left/ >> auto.
+qed ();
+
+
+
+lemma "lookup_merge_right'"
+/
+  forall i (A B : U i) f g (a : A) .
+    not (member f a)
+    -> lookup (merge f g) a = lookup g a : option B
+/;
+
+inference.
+intro /i A B f g a Hnotmem/.
+rewrite /-> lookup_merge_right/ >> auto.
+apply /not_member_iff_lookup_none/ >> auto.
+qed ();
+
+
+
+(* Finite domain *)
+
+lemma "finite_map_domain_quotient"
+/
+  forall i (A B : U i) (f : finite_map A B) .
+    quotient
+      (L L' : { L : list A | forall (a : A) . member f a <-> In A a L }) .
+      forall (a : A) . In A a L <-> In A a L'
+/;
+
+inference.
+intro /i A B f/.
+exactRaw /map (fn x . x #1) (f #2)/.
+unfold /member, lookup/.
+destruct /f/ /[f g Hfg]/.
+  {
+  typecheck1 >> auto.
+  typecheck1 >> auto.
+  split.
+    {
+    intro /Hiff a/.
+    rewrite /<- Hiff/.
+    rewrite /-> Hfg/.
+    reflexivity.
+    }
+
+    {
+    intro /Hiff a/.
+    rewrite /<- Hiff/.
+    rewrite /-> Hfg/.
+    reflexivity.
+    }
+  }
+assert /forall (f : pre_finite_map A B) a . (exists (b : B) . pre_lookup A B f a = Some b : option B) <-> In A a (map (fn x . x #1) (f #2))/ /Hprop/.
+  {
+  clear /f g Hfg/.
+  inference.
+  intro /f a/.
+  split.
+    {
+    intro /(b Heq)/.
+    destruct /f/ /[e He] f/.
+    reduce //.
+    revert /Heq/.
+    unfold /pre_lookup/.
+    induction /f/.
+      {
+      intro /H/.
+      injection /H/.
+      }
+
+      {
+      intro /(a' b') f IH/.
+      reduce //.
+      boolCase /e a a'/ /Heq/.
+        {
+        intro /_/.
+        left.
+        unhide.
+        apply /He/ >> auto.
+        }
+
+        {
+        intro /H/.
+        right.
+        apply /IH/ >> auto.
+        }
+      }
+    }
+
+    {
+    destruct /f/ /[e He] f/.
+    unfold /pre_lookup/.
+    reduce //.
+    induction /f/.
+      {
+      intro /0/.
+      }
+
+      {
+      intro /(a' b') f IH/.
+      reduce //.
+      intro /(Heq | H)/.
+        {
+        subst /a'/.
+        boolEq true /e a a/ >> auto.
+        existsAuto.
+        }
+
+        {
+        boolCase /e a a'/ /Heq/.
+          {
+          existsAuto.
+          }
+          
+          {
+          apply /IH/ >> auto.
+          }
+        }
+      }
+    }
+  }
+extensionalityRaw.
+  {
+  typecheck.
+    {
+    intro /?/.
+    symmetry.
+    auto.
+    }
+
+    {
+    intro /?/.
+    transitivity /_/ >> auto.
+    }
+  }
+
+  {
+  typecheck.
+  split.
+  apply /Hprop/.
+  }
+
+  {
+  typecheck.
+  split.
+  rewrite /-> Hfg h within h _/.
+  apply /Hprop/.
+  }
+
+  {
+  intro /a/.
+  rewrite /<- Hprop f a/.
+  rewrite /<- Hprop g a/.
+  rewrite /-> Hfg/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "finite_map_domain_squash"
+/
+  forall i (A B : U i) (f : finite_map A B) .
+    { exists (L : list A) . forall (a : A) . member f a <-> In A a L }
+/;
+
+inference.
+intro /i A B f/.
+so /finite_map_domain_quotient _# 3 f/ /L/.
+destruct /L/ /[L]/.
+destruct /L/ /[L HL]/.
+split.
+existsAuto.
+qed ();
+
+
+
+endModule ();

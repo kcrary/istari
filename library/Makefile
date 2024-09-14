@@ -1,7 +1,7 @@
 
 ISTARIBIN=../ui/bin
 
-DOCUNITS = acc bar bool decidable finite girard-paradox integer logic list miscellaneous nat natural option partial relations smith-paradox stable symbol union wtype
+DOCUNITS = acc bar bool decidable finite finite-map girard-paradox integer logic list miscellaneous nat natural option partial relations smith-paradox stable symbol union wtype
 UNITS = $(DOCUNITS) datatype syntactic-equality omega
 
 
@@ -29,6 +29,7 @@ bool.isto : logic.isto
 datatype.isto : acc.isto miscellaneous.isto nat.isto
 decidable.isto : logic.isto bool.isto
 finite.isto : logic.isto decidable.isto list.isto
+finite-map.isto : $(DATATYPES) bool.isto decidable.isto list.isto logic.isto option.isto
 girard-paradox.isto : $(DATATYPES) logic.isto nat.isto
 integer.isto : nat.isto acc.isto bool.isto decidable.isto stable.isto
 list.isto : $(DATATYPES) decidable.isto logic.isto miscellaneous.isto nat.isto option.isto partial.isto
