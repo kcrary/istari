@@ -156,7 +156,7 @@ operation.
 
 ### Generic finite maps with merge
 
-The `FiniteMap` class does not include a merge option.  The
+The `FiniteMap` class does not include a merge operation.  The
 `FiniteMapMerge` class adds one:
 
     FiniteMapMerge : type:FiniteMapMerge
