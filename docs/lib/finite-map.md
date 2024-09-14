@@ -40,6 +40,11 @@ equality.  The equality test is supplied to the `empty` operation.
     eqtest : intersect (i : level) . U i -> U i
            = fn A . { e : A -> A -> bool | forall (x y : A) . x = y : A <-> Bool.istrue (e x y) }
 
+A recommended way to use `empty` is to define `eqt : eqtest A`, then
+define `myempty` to be `empty eqt`.  If `myempty` is then made a [soft
+constant](../terms.html#opacity), the lemmas that follow will work
+with `myempty` without any additional effort.
+
 Finite maps have extensional equality:
 
     finite_map_ext : forall (i : level) (A B : U i) (f g : finite_map A B) .

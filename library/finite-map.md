@@ -41,6 +41,11 @@ equality.  The equality test is supplied to the `empty` operation.
     eqtest : type:eqtest
            = def:eqtest
 
+A recommended way to use `empty` is to define `eqt : eqtest A`, then
+define `myempty` to be `empty eqt`.  If `myempty` is then made a [soft
+constant](../terms.html#opacity), the lemmas that follow will work
+with `myempty` without any additional effort.
+
 Finite maps have extensional equality:
 
     finite_map_ext : type:finite_map_ext

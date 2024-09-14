@@ -389,3 +389,7 @@ function `abstract`.
        end
 
     structure Constant : CONSTANT
+
+The `Constant.setOpacity` function is pervasive and it parses its
+first argument as a constant, so a constant's opacity can be easily
+set by executing `setOpacity /foo/ Constant.SOFT`, for example.
