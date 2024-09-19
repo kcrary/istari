@@ -2170,3 +2170,785 @@ rewrite -> def_nat.
 apply tr_uptype_admiss.
 apply tr_nattp_uptype.
 Qed.
+
+
+Lemma def_total :
+  forall a, equiv (app Defs.total a) (sigma (subtype a (partial a)) (pi (subst sh1 a) (halts (var 0)))).
+Proof.
+intro a.
+unfold Defs.total.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl.
+Qed.
+
+Hint Rewrite def_total : prepare.
+
+
+Lemma total_rhs_formation :
+  forall G a,
+    tr G (deqtype a a)
+    -> tr 
+         (hyp_tm (subtype a (partial a)) :: G)
+         (deqtype (pi (subst sh1 a) (halts (var 0))) (pi (subst sh1 a) (halts (var 0)))).
+Proof.
+intros G a Ha.
+apply tr_pi_formation.
+  {
+  eapply (weakening _ [_] []).
+    {
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length].
+    simpsub.
+    rewrite <- compose_assoc.
+    simpsub.
+    reflexivity.
+    }
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  exact Ha.
+  }
+
+  {
+  apply (tr_halts_formation _ (subst (sh 2) a)).
+  apply (tr_subtype_elim _ (subst (sh 2) a)).
+    {
+    apply (tr_subtype_eta2 _#3 (var 1) (var 1)).
+    eapply hypothesis; eauto using index_S, index_0.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    reflexivity.
+    }
+  }
+Qed.
+
+
+Lemma voidTotal'_valid : voidTotal'_obligation.
+Proof.
+prepare.
+intro G.
+unfold Defs.void.
+assert (tr (hyp_tm voidtp :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  eapply tr_voidtp_elim.
+  eapply hypothesis; eauto using index_0.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_voidtp_istype; auto.
+  }
+
+  {
+  simpsub.
+  apply tr_pi_intro; auto.
+  apply tr_voidtp_istype; auto.
+  }
+
+  {
+  apply total_rhs_formation.
+  apply tr_voidtp_istype.
+  }
+Qed.
+
+
+Lemma unitTotal'_valid : unitTotal'_obligation.
+Proof.
+prepare.
+intro G.
+unfold Defs.unit.
+assert (tr (hyp_tm unittp :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply tr_unittp_total.
+  eapply hypothesis; eauto using index_0.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_unittp_istype; auto.
+  }
+
+  {
+  simpsub.
+  apply tr_pi_intro; auto.
+  apply tr_unittp_istype; auto.
+  }
+
+  {
+  apply total_rhs_formation.
+  apply tr_unittp_istype.
+  }
+Qed.
+
+
+
+Lemma boolTotal'_valid : boolTotal'_obligation.
+Proof.
+prepare.
+intro G.
+unfold Defs.bool.
+assert (tr (hyp_tm booltp :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply tr_booltp_total.
+  eapply hypothesis; eauto using index_0.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_booltp_istype; auto.
+  }
+
+  {
+  apply tr_pi_intro; auto.
+  apply tr_booltp_istype; auto.
+  }
+
+  {
+  apply total_rhs_formation.
+  apply tr_booltp_istype.
+  }
+Qed.
+
+
+
+Hint Rewrite def_pi : prepare.
+
+Lemma forallTotal'_valid : forallTotal'_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+assert (tr (hyp_tm (pi a b) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply (tr_pi_total _ (subst sh1 a) (subst (under 1 sh1) b)).
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  reflexivity.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_pi_formation; auto.
+  }
+
+  {
+  simpsub.
+  rewrite -> subst_var0_sh1.
+  apply tr_pi_intro; auto.
+  apply tr_pi_formation; auto.
+  }
+
+  {
+  apply total_rhs_formation.
+  apply tr_pi_formation; auto.
+  }
+Qed.
+
+
+Hint Rewrite def_arrow : prepare.
+
+Lemma arrowTotal'_valid : arrowTotal'_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+assert (tr (hyp_tm (pi a (subst sh1 b)) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply (tr_pi_total _ (subst sh1 a) (subst (sh 2) b)).
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  reflexivity.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_pi_formation; auto.
+  }
+
+  {
+  simpsub.
+  apply tr_pi_intro; auto.
+  apply tr_pi_formation; auto.
+  }
+
+  {
+  apply total_rhs_formation.
+  apply tr_pi_formation; auto.
+  }
+Qed.
+
+
+Hint Rewrite def_sigma : prepare.
+
+Lemma existsTotal'_valid : existsTotal'_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+assert (tr (hyp_tm (sigma a b) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply (tr_sigma_total _ (subst sh1 a) (subst (under 1 sh1) b)).
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  reflexivity.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_sigma_formation; auto.
+  }
+
+  {
+  simpsub.
+  rewrite -> subst_var0_sh1.
+  apply tr_pi_intro; auto.
+  apply tr_sigma_formation; auto.
+  }
+
+  {
+  apply total_rhs_formation.
+  apply tr_sigma_formation; auto.
+  }
+Qed.
+
+
+Hint Rewrite def_prod : prepare.
+
+Lemma prodTotal'_valid : prodTotal'_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+assert (tr (hyp_tm (prod a b) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply (tr_prod_total _ (subst sh1 a) (subst sh1 b)).
+  eapply hypothesis; eauto using index_0.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_prod_formation; auto.
+  }
+
+  {
+  simpsub.
+  apply tr_pi_intro; auto.
+  apply tr_prod_formation; auto.
+  }
+
+  {
+  apply total_rhs_formation.
+  apply tr_prod_formation; auto.
+  }
+Qed.
+
+
+Hint Rewrite def_sum : prepare.
+
+Lemma sumTotal'_valid : sumTotal'_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+assert (tr (hyp_tm (sumtype a b) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply (tr_sum_total _ (subst sh1 a) (subst sh1 b)).
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  reflexivity.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_sumtype_formation; auto.
+  }
+
+  {
+  simpsub.
+  apply tr_pi_intro; auto.
+  apply tr_sumtype_formation; auto.
+  }
+
+  {
+  apply total_rhs_formation.
+  apply tr_sumtype_formation; auto.
+  }
+Qed.
+
+
+Hint Rewrite def_fut : prepare.
+
+Lemma futureTotal'_valid : futureTotal'_obligation.
+Proof.
+prepare.
+intros G a ext0 Ha.
+assert (tr (hyp_tm (fut a) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply (tr_fut_total _ (subst sh1 a)).
+  eapply hypothesis; eauto using index_0.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_fut_formation; auto.
+  }
+
+  {
+  simpsub.
+  apply tr_pi_intro; auto.
+  apply tr_fut_formation; auto.
+  }
+
+  {
+  apply total_rhs_formation.
+  apply tr_fut_formation; auto.
+  }
+Qed.
+
+
+Hint Rewrite def_nat : prepare.
+
+Lemma natTotal'_valid : natTotal'_obligation.
+Proof.
+prepare.
+intro G.
+assert (tr (hyp_tm nattp :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply tr_nat_total.
+  eapply hypothesis; eauto using index_0.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_nattp_formation; auto.
+  }
+
+  {
+  apply tr_pi_intro; auto.
+  apply tr_nattp_formation; auto.
+  }
+
+  {
+  apply total_rhs_formation.
+  apply tr_nattp_formation; auto.
+  }
+Qed.
+
+
+Hint Rewrite def_set : prepare.
+
+Lemma setTotal'_valid : setTotal'_obligation.
+Proof.
+prepare.
+intros G a b ext1 m Hb Htot.
+assert (tr (hyp_tm (set a b) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply (tr_halts_eta2 _ (app (ppi2 (subst sh1 m)) (var 0)) (app (ppi2 (subst sh1 m)) (var 0))).
+  apply (tr_pi_elim' _ (subst sh1 a) (halts (var 0))).
+    {
+    apply (tr_sigma_elim2' _ (subst sh1 (subtype a (partial a))) (subst (under 1 sh1) (pi (subst sh1 a) (halts (var 0))))).
+      {
+      eapply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+
+        {
+        cbn [length].
+        simpsub.
+        rewrite <- compose_assoc.
+        rewrite <- compose_assoc.
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      rewrite <- compose_assoc.
+      simpsub.
+      exact Htot.
+      }
+
+      {
+      simpsub.
+      reflexivity.
+      }
+    }
+    
+    {
+    apply (tr_set_elim1 _ _ (subst (under 1 sh1) b)).
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
+assert (tr G (deqtype a a)) as Ha.
+  {
+  apply (tr_subtype_formation_invert1 _#3 (partial a) (partial a)).
+  apply (tr_inhabitation_formation _ (ppi1 m) (ppi1 m)).
+  eapply tr_sigma_elim1; eauto.
+  }
+assert (tr G (deqtype (set a b) (set a b))) as Hset.
+  {
+  apply (tr_set_formation _#5 (var 0) (var 0)); auto.
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+  
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  }
+
+  {
+  simpsub.
+  rewrite -> subst_var0_sh1.
+  apply tr_pi_intro; auto.
+  }
+
+  {
+  apply total_rhs_formation; auto.
+  }
+Qed.
+
+
+Hint Rewrite def_iset : prepare.
+
+Lemma isetTotal'_valid : isetTotal'_obligation.
+Proof.
+prepare.
+intros G a b ext1 m Hb Htot.
+assert (tr (hyp_tm (iset a b) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply (tr_halts_eta2 _ (app (ppi2 (subst sh1 m)) (var 0)) (app (ppi2 (subst sh1 m)) (var 0))).
+  apply (tr_pi_elim' _ (subst sh1 a) (halts (var 0))).
+    {
+    apply (tr_sigma_elim2' _ (subst sh1 (subtype a (partial a))) (subst (under 1 sh1) (pi (subst sh1 a) (halts (var 0))))).
+      {
+      eapply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+
+        {
+        cbn [length].
+        simpsub.
+        rewrite <- compose_assoc.
+        rewrite <- compose_assoc.
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      rewrite <- compose_assoc.
+      simpsub.
+      exact Htot.
+      }
+
+      {
+      simpsub.
+      reflexivity.
+      }
+    }
+    
+    {
+    apply (tr_iset_elim1 _ _ (subst (under 1 sh1) b)).
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
+assert (tr G (deqtype a a)) as Ha.
+  {
+  apply (tr_subtype_formation_invert1 _#3 (partial a) (partial a)).
+  apply (tr_inhabitation_formation _ (ppi1 m) (ppi1 m)).
+  eapply tr_sigma_elim1; eauto.
+  }
+assert (tr G (deqtype (iset a b) (iset a b))) as Hset.
+  {
+  apply tr_iset_formation; auto.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  }
+
+  {
+  simpsub.
+  rewrite -> subst_var0_sh1.
+  apply tr_pi_intro; auto.
+  }
+
+  {
+  apply total_rhs_formation; auto.
+  }
+Qed.
+
+
+Hint Rewrite def_quotient : prepare.
+
+
+Lemma quotientTotal'_valid : quotientTotal'_obligation.
+Proof.
+prepare.
+intros G a b ext2 ext1 m Hquot Hb Htot.
+assert (tr (hyp_tm (quotient a b) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply (tr_quotient_hyp G [] a b triv triv).
+    {
+    cbn [List.app].
+    apply (tr_quotient_hyp_eqtype G [] a b); auto.
+    cbn [length].
+    simpsub.
+    cbn [List.app Nat.add].
+    apply (tr_halts_formation_iff _ (subst (sh 3) a)).
+      {
+      apply (tr_subtype_elim _ (subst (sh 3) a)).
+        {
+        apply (tr_subtype_eta2 _#3 (ppi1 (subst (sh 3) m)) (ppi1 (subst (sh 3) m))).
+        eapply (weakening _ [_; _; _] []).
+          {
+          simpsub.
+          reflexivity.
+          }
+  
+          {
+          cbn [length].
+          simpsub.
+          rewrite <- compose_assoc.
+          simpsub.
+          reflexivity.
+          }
+        cbn [length].
+        simpsub.
+        eapply tr_sigma_elim1; eauto.
+        }
+      eapply hypothesis; eauto using index_S, index_0.
+      }
+
+      {
+      apply (tr_subtype_elim _ (subst (sh 3) a)).
+        {
+        apply (tr_subtype_eta2 _#3 (ppi1 (subst (sh 3) m)) (ppi1 (subst (sh 3) m))).
+        eapply (weakening _ [_; _; _] []).
+          {
+          simpsub.
+          reflexivity.
+          }
+  
+          {
+          cbn [length].
+          simpsub.
+          rewrite <- compose_assoc.
+          simpsub.
+          reflexivity.
+          }
+        cbn [length].
+        simpsub.
+        eapply tr_sigma_elim1; eauto.
+        }
+      eapply hypothesis; eauto using index_S, index_0.
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      simpsub.
+      cbn [Nat.add].
+      apply (tr_halts_eta2 _ (app (ppi2 (subst (sh 4) m)) (var 2)) (app (ppi2 (subst (sh 4) m)) (var 2))).
+      apply (tr_pi_elim' _ (subst (sh 4) a) (halts (var 0))).
+        {
+        apply (tr_sigma_elim2' _ (subst (sh 4) (subtype a (partial a))) (subst (under 1 (sh 4)) (pi (subst sh1 a) (halts (var 0))))).
+          {
+          eapply (weakening _ [_; _; _; _] []).
+            {
+            simpsub.
+            reflexivity.
+            }
+    
+            {
+            cbn [length].
+            simpsub.
+            cbn [Nat.add].
+            rewrite <- compose_assoc.
+            simpsub.
+            rewrite <- compose_assoc.
+            simpsub.
+            reflexivity.
+            }
+          cbn [length].
+          simpsub.
+          exact Htot.
+          }
+    
+          {
+          simpsub.
+          reflexivity.
+          }
+        }
+  
+        {
+        eapply hypothesis; auto using index_S, index_0.
+        simpsub.
+        reflexivity.
+        }
+  
+        {
+        simpsub.
+        reflexivity.
+        }
+      }
+
+      {
+      simpsub.
+      cbn [Nat.add].
+      apply (tr_halts_eta2 _ (app (ppi2 (subst (sh 4) m)) (var 3)) (app (ppi2 (subst (sh 4) m)) (var 3))).
+      apply (tr_pi_elim' _ (subst (sh 4) a) (halts (var 0))).
+        {
+        apply (tr_sigma_elim2' _ (subst (sh 4) (subtype a (partial a))) (subst (under 1 (sh 4)) (pi (subst sh1 a) (halts (var 0))))).
+          {
+          eapply (weakening _ [_; _; _; _] []).
+            {
+            simpsub.
+            reflexivity.
+            }
+    
+            {
+            cbn [length].
+            simpsub.
+            cbn [Nat.add].
+            rewrite <- compose_assoc.
+            simpsub.
+            rewrite <- compose_assoc.
+            simpsub.
+            reflexivity.
+            }
+          cbn [length].
+          simpsub.
+          exact Htot.
+          }
+    
+          {
+          simpsub.
+          reflexivity.
+          }
+        }
+  
+        {
+        eapply hypothesis; auto using index_S, index_0.
+        }
+  
+        {
+        simpsub.
+        reflexivity.
+        }
+      }
+    }
+
+    {
+    simpsub.
+    cbn [List.app].
+    apply (tr_halts_eta2 _ (app (ppi2 (subst sh1 m)) (var 0)) (app (ppi2 (subst sh1 m)) (var 0))).
+    apply (tr_pi_elim' _ (subst sh1 a) (halts (var 0))).
+      {
+      apply (tr_sigma_elim2' _ (subst sh1 (subtype a (partial a))) (subst (under 1 sh1) (pi (subst sh1 a) (halts (var 0))))).
+        {
+        eapply (weakening _ [_] []).
+          {
+          simpsub.
+          reflexivity.
+          }
+  
+          {
+          cbn [length].
+          simpsub.
+          cbn [Nat.add].
+          rewrite <- compose_assoc.
+          simpsub.
+          rewrite <- compose_assoc.
+          simpsub.
+          reflexivity.
+          }
+        cbn [length].
+        simpsub.
+        exact Htot.
+        }
+  
+        {
+        simpsub.
+        reflexivity.
+        }
+      }
+
+      {
+      eapply hypothesis; auto using index_S, index_0.
+      }
+
+      {
+      simpsub.
+      reflexivity.
+      }
+    }
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  }
+
+  {
+  simpsub.
+  cbn [Nat.add].
+  simpsub.
+  rewrite -> subst_var01_sh2.
+  apply tr_pi_intro; auto.
+  }
+
+  {
+  apply total_rhs_formation; auto.
+  }
+Qed.
+
+
+Hint Rewrite def_sequal : prepare.
+
+Lemma reduceSeqTotal_valid : reduceSeqTotal_obligation.
+Proof.
+prepare.
+intros G a m n ext1 p Hm Ha.
+simpsub.
+apply tr_seq_halts_sequal.
+apply (tr_halts_eta2 _ (app (ppi2 p) m) (app (ppi2 p) m)).
+apply (tr_pi_elim' _ a (halts (var 0))); auto.
+  {
+  apply (tr_sigma_elim2' _ (subtype a (partial a)) (pi (subst sh1 a) (halts (var 0)))); auto.
+  simpsub.
+  reflexivity.
+  }
+
+  {
+  simpsub.
+  reflexivity.
+  }
+Qed.

@@ -3968,6 +3968,36 @@ Conventions:
       >>
       G |- sequal M N
 
+- `forallEtaSequal A B M`
+
+      G |- sequal M (fn . M[^1] 0)
+      >>
+      G |- of (forall A (fn . B)) M
+
+- `arrowEtaSequal A B M`
+
+      G |- sequal M (fn . M[^1] 0)
+      >>
+      G |- of (arrow A B) M
+
+- `existsEtaSequal A B M`
+
+      G |- sequal M (M #1 , M #2)
+      >>
+      G |- of (exists A (fn . B)) M
+
+- `prodEtaSequal A B M`
+
+      G |- sequal M (M #1 , M #2)
+      >>
+      G |- of (prod A B) M
+
+- `futureEtaSequal A M`
+
+      G |- sequal M (next (M #prev))
+      >>
+      G |- of (future A) M
+
 
 ### Partial types
 
@@ -4239,6 +4269,10 @@ Conventions:
       G |- istp A
       G, A |- halts 0
 
+- `voidTotal'`
+
+      G |- total void ext fn . ()
+
 - `voidStrict`
 
       G |- subtype void (partial void)
@@ -4248,6 +4282,10 @@ Conventions:
       G |- halts M
       >>
       G |- of unit M
+
+- `unitTotal'`
+
+      G |- total unit ext fn . ()
 
 - `unitStrict`
 
@@ -4259,6 +4297,10 @@ Conventions:
       >>
       G |- of bool M
 
+- `boolTotal'`
+
+      G |- total bool ext fn . ()
+
 - `boolStrict`
 
       G |- subtype bool (partial bool)
@@ -4268,6 +4310,13 @@ Conventions:
       G |- halts M
       >>
       G |- of (forall A (fn . B)) M
+
+- `forallTotal' A B`
+
+      G |- total (forall A (fn . B)) ext fn . ()
+      >>
+      G |- istp A
+      G, A |- istp B
 
 - `forallStrict A B`
 
@@ -4281,6 +4330,13 @@ Conventions:
       G |- halts M
       >>
       G |- of (arrow A B) M
+
+- `arrowTotal' A B`
+
+      G |- total (arrow A B) ext fn . ()
+      >>
+      G |- istp A
+      G, A |- istp B[^1]
 
 - `arrowStrict A B`
 
@@ -4302,6 +4358,13 @@ Conventions:
       >>
       G |- of (exists A (fn . B)) M
 
+- `existsTotal' A B`
+
+      G |- total (exists A (fn . B)) ext fn . ()
+      >>
+      G |- istp A
+      G, A |- istp B
+
 - `existsStrict A B`
 
       G |- subtype (exists A (fn . B)) (partial (exists A (fn . B)))
@@ -4314,6 +4377,13 @@ Conventions:
       G |- halts M
       >>
       G |- of (prod A B) M
+
+- `prodTotal' A B`
+
+      G |- total (prod A B) ext fn . ()
+      >>
+      G |- istp A
+      G |- istp B
 
 - `prodStrict A B`
 
@@ -4328,6 +4398,13 @@ Conventions:
       >>
       G |- of (sum A B) M
 
+- `sumTotal' A B`
+
+      G |- total (sum A B) ext fn . ()
+      >>
+      G |- istp A
+      G |- istp B
+
 - `sumStrict A B`
 
       G |- subtype (sum A B) (partial (sum A B))
@@ -4341,11 +4418,24 @@ Conventions:
       >>
       G |- of (future A) M
 
+- `futureTotal' A`
+
+      G |- total (future A) ext fn . ()
+      >>
+      promote(G) |- istp A
+
 - `futureStrict A`
 
       G |- subtype (future A) (partial (future A))
       >>
       promote(G) |- istp A
+
+- `setTotal' A B`
+
+      G |- total (set A (fn . B)) ext (() , fn . ())
+      >>
+      G, A |- istp B
+      G |- total A
 
 - `setStrict A B`
 
@@ -4354,6 +4444,13 @@ Conventions:
       G, A |- istp B
       G |- subtype A (partial A)
 
+- `isetTotal' A B`
+
+      G |- total (iset A (fn . B)) ext (() , fn . ())
+      >>
+      G, A |- istp B
+      G |- total A
+
 - `isetStrict A B`
 
       G |- subtype (iset A (fn . B)) (partial (iset A (fn . B)))
@@ -4361,11 +4458,23 @@ Conventions:
       G, A |- istp B
       G |- subtype A (partial A)
 
+- `quotientTotal' A B`
+
+      G |- total (quotient A (fn . fn . B)) ext (() , fn . ())
+      >>
+      G |- istp (quotient A (fn . fn . B))
+      G, A, A[^1] |- istp B
+      G |- total A
+
 - `natTotal M`
 
       G |- halts M
       >>
       G |- of nat M
+
+- `natTotal'`
+
+      G |- total nat ext fn . ()
 
 - `natStrict`
 
@@ -4376,6 +4485,13 @@ Conventions:
       G |- halts A
       >>
       G |- istp A
+
+- `reduceSeqTotal A M N`
+
+      G |- sequal (seq M (fn . N)) N[M . id]
+      >>
+      G |- of A M
+      G |- total A
 
 - `uptypeForm A`
 

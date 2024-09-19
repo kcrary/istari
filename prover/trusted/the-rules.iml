@@ -570,6 +570,11 @@ signature THE_RULES =
       val sequalSymm : term -> term -> rule
       val sequalTrans : term -> term -> term -> rule
       val sequalCompat : term -> term -> term -> rule
+      val forallEtaSequal : term -> term -> term -> rule
+      val arrowEtaSequal : term -> term -> term -> rule
+      val existsEtaSequal : term -> term -> term -> rule
+      val prodEtaSequal : term -> term -> term -> rule
+      val futureEtaSequal : term -> term -> rule
       val partialForm : term -> rule
       val partialEq : term -> term -> rule
       val partialFormUniv : term -> term -> rule
@@ -610,29 +615,43 @@ signature THE_RULES =
       val seqHaltsSequal : term -> term -> rule
       val seqHaltsInv : term -> term -> rule
       val totalStrict : term -> rule
+      val voidTotal' : rule
       val voidStrict : rule
       val unitTotal : term -> rule
+      val unitTotal' : rule
       val unitStrict : rule
       val boolTotal : term -> rule
+      val boolTotal' : rule
       val boolStrict : rule
       val forallTotal : term -> term -> term -> rule
+      val forallTotal' : term -> term -> rule
       val forallStrict : term -> term -> rule
       val arrowTotal : term -> term -> term -> rule
+      val arrowTotal' : term -> term -> rule
       val arrowStrict : term -> term -> rule
       val intersectStrict : term -> term -> rule
       val existsTotal : term -> term -> term -> rule
+      val existsTotal' : term -> term -> rule
       val existsStrict : term -> term -> rule
       val prodTotal : term -> term -> term -> rule
+      val prodTotal' : term -> term -> rule
       val prodStrict : term -> term -> rule
       val sumTotal : term -> term -> term -> rule
+      val sumTotal' : term -> term -> rule
       val sumStrict : term -> term -> rule
       val futureTotal : term -> term -> rule
+      val futureTotal' : term -> rule
       val futureStrict : term -> rule
+      val setTotal' : term -> term -> rule
       val setStrict : term -> term -> rule
+      val isetTotal' : term -> term -> rule
       val isetStrict : term -> term -> rule
+      val quotientTotal' : term -> term -> rule
       val natTotal : term -> rule
+      val natTotal' : rule
       val natStrict : rule
       val typeHalts : term -> rule
+      val reduceSeqTotal : term -> term -> term -> rule
       val uptypeForm : term -> rule
       val uptypeEq : term -> term -> rule
       val uptypeFormUniv : term -> term -> rule
@@ -869,6 +888,7 @@ val const_symbol = Const Prim.symbol
 val const_symbol_eqb = Const Prim.symbol_eqb
 val const_tarrow = Const Prim.tarrow
 val const_timesz = Const Prim.timesz
+val const_total = Const Prim.total
 val const_union = Const Prim.union
 val const_unit = Const Prim.unit
 val const_univ = Const Prim.univ
@@ -1405,6 +1425,11 @@ fun substitutionSyntactic gsize a b m = Arg.lmake "substitutionSyntactic" [] gsi
 fun sequalSymm m n = Arg.make "sequalSymm" [] (Elim (const_sequal, [App (n), App (m), ])) [(Arg.Unhide, [], Elim (const_sequal, [App (m), App (n), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun sequalTrans m n p = Arg.make "sequalTrans" [] (Elim (const_sequal, [App (m), App (p), ])) [(Arg.Unhide, [], Elim (const_sequal, [App (m), App (n), ])), (Arg.Unhide, [], Elim (const_sequal, [App (n), App (p), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun sequalCompat m n p = Arg.make "sequalCompat" [] (Elim (const_sequal, [App (Sub (p, Dot (m, Shift 0))), App (Sub (p, Dot (n, Shift 0))), ])) [(Arg.Unhide, [], Elim (const_sequal, [App (m), App (n), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun forallEtaSequal a b m = Arg.make "forallEtaSequal" [] (Elim (const_sequal, [App (m), App (Lam (NONE, Elim (Sub (m, Shift 1), [App (Var 0), ]))), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_forall, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun arrowEtaSequal a b m = Arg.make "arrowEtaSequal" [] (Elim (const_sequal, [App (m), App (Lam (NONE, Elim (Sub (m, Shift 1), [App (Var 0), ]))), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_arrow, [App (a), App (b), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun existsEtaSequal a b m = Arg.make "existsEtaSequal" [] (Elim (const_sequal, [App (m), App (Pair (Elim (m, [Pi1, ]), Elim (m, [Pi2, ]))), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_exists, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun prodEtaSequal a b m = Arg.make "prodEtaSequal" [] (Elim (const_sequal, [App (m), App (Pair (Elim (m, [Pi1, ]), Elim (m, [Pi2, ]))), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_prod, [App (a), App (b), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun futureEtaSequal a m = Arg.make "futureEtaSequal" [] (Elim (const_sequal, [App (m), App (Next (Elim (m, [Prev, ]))), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_future, [App (a), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun partialForm a = Arg.make "partialForm" [] (Elim (const_istp, [App (Elim (const_partial, [App (a), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun partialEq a b = Arg.make "partialEq" [] (Elim (const_eqtp, [App (Elim (const_partial, [App (a), ])), App (Elim (const_partial, [App (b), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (b), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun partialFormUniv a i = Arg.make "partialFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_partial, [App (a), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
@@ -1445,29 +1470,43 @@ fun caseHaltsInv m p r = Arg.make "caseHaltsInv" [] (Elim (const_halts, [App (m)
 fun seqHaltsSequal m n = Arg.make "seqHaltsSequal" [] (Elim (const_sequal, [App (Elim (const_seq, [App (m), App (Lam (NONE, n)), ])), App (Sub (n, Dot (m, Shift 0))), ])) [(Arg.Unhide, [], Elim (const_halts, [App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun seqHaltsInv m n = Arg.make "seqHaltsInv" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_halts, [App (Elim (const_seq, [App (m), App (n), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun totalStrict a = Arg.make "totalStrict" [] (Elim (const_subtype, [App (a), App (Elim (const_partial, [App (a), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_halts, [App (Var 0), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+val voidTotal' = Arg.make "voidTotal'" [] (Elim (const_total, [App (const_void), ])) [] (fn [] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 val voidStrict = Arg.make "voidStrict" [] (Elim (const_subtype, [App (const_void), App (Elim (const_partial, [App (const_void), ])), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 fun unitTotal m = Arg.make "unitTotal" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_unit), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+val unitTotal' = Arg.make "unitTotal'" [] (Elim (const_total, [App (const_unit), ])) [] (fn [] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 val unitStrict = Arg.make "unitStrict" [] (Elim (const_subtype, [App (const_unit), App (Elim (const_partial, [App (const_unit), ])), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 fun boolTotal m = Arg.make "boolTotal" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_bool), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+val boolTotal' = Arg.make "boolTotal'" [] (Elim (const_total, [App (const_bool), ])) [] (fn [] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 val boolStrict = Arg.make "boolStrict" [] (Elim (const_subtype, [App (const_bool), App (Elim (const_partial, [App (const_bool), ])), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 fun forallTotal a b m = Arg.make "forallTotal" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_forall, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun forallTotal' a b = Arg.make "forallTotal'" [] (Elim (const_total, [App (Elim (const_forall, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 fun forallStrict a b = Arg.make "forallStrict" [] (Elim (const_subtype, [App (Elim (const_forall, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_partial, [App (Elim (const_forall, [App (a), App (Lam (NONE, b)), ])), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun arrowTotal a b m = Arg.make "arrowTotal" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_arrow, [App (a), App (b), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun arrowTotal' a b = Arg.make "arrowTotal'" [] (Elim (const_total, [App (Elim (const_arrow, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (Sub (b, Shift 1)), ])), ] (fn [_, _, ] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 fun arrowStrict a b = Arg.make "arrowStrict" [] (Elim (const_subtype, [App (Elim (const_arrow, [App (a), App (b), ])), App (Elim (const_partial, [App (Elim (const_arrow, [App (a), App (b), ])), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun intersectStrict a b = Arg.make "intersectStrict" [] (Elim (const_subtype, [App (Elim (const_intersect, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_partial, [App (Elim (const_intersect, [App (a), App (Lam (NONE, b)), ])), ])), ])) [(Arg.Unhide, [], a), (Arg.Unhide, [J.Tm (a), ], Elim (const_subtype, [App (b), App (Elim (const_partial, [App (b), ])), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun existsTotal a b m = Arg.make "existsTotal" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_exists, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun existsTotal' a b = Arg.make "existsTotal'" [] (Elim (const_total, [App (Elim (const_exists, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 fun existsStrict a b = Arg.make "existsStrict" [] (Elim (const_subtype, [App (Elim (const_exists, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_partial, [App (Elim (const_exists, [App (a), App (Lam (NONE, b)), ])), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun prodTotal a b m = Arg.make "prodTotal" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_prod, [App (a), App (b), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun prodTotal' a b = Arg.make "prodTotal'" [] (Elim (const_total, [App (Elim (const_prod, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 fun prodStrict a b = Arg.make "prodStrict" [] (Elim (const_subtype, [App (Elim (const_prod, [App (a), App (b), ])), App (Elim (const_partial, [App (Elim (const_prod, [App (a), App (b), ])), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun sumTotal a b m = Arg.make "sumTotal" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_sum, [App (a), App (b), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun sumTotal' a b = Arg.make "sumTotal'" [] (Elim (const_total, [App (Elim (const_sum, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 fun sumStrict a b = Arg.make "sumStrict" [] (Elim (const_subtype, [App (Elim (const_sum, [App (a), App (b), ])), App (Elim (const_partial, [App (Elim (const_sum, [App (a), App (b), ])), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun futureTotal a m = Arg.make "futureTotal" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_future, [App (a), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun futureTotal' a = Arg.make "futureTotal'" [] (Elim (const_total, [App (Elim (const_future, [App (a), ])), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), ] (fn [_, ] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 fun futureStrict a = Arg.make "futureStrict" [] (Elim (const_subtype, [App (Elim (const_future, [App (a), ])), App (Elim (const_partial, [App (Elim (const_future, [App (a), ])), ])), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun setTotal' a b = Arg.make "setTotal'" [] (Elim (const_total, [App (Elim (const_set, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), (Arg.Unhide, [], Elim (const_total, [App (a), ])), ] (fn [_, _, ] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 fun setStrict a b = Arg.make "setStrict" [] (Elim (const_subtype, [App (Elim (const_set, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_partial, [App (Elim (const_set, [App (a), App (Lam (NONE, b)), ])), ])), ])) [(Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), (Arg.Unhide, [], Elim (const_subtype, [App (a), App (Elim (const_partial, [App (a), ])), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isetTotal' a b = Arg.make "isetTotal'" [] (Elim (const_total, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), (Arg.Unhide, [], Elim (const_total, [App (a), ])), ] (fn [_, _, ] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 fun isetStrict a b = Arg.make "isetStrict" [] (Elim (const_subtype, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_partial, [App (Elim (const_iset, [App (a), App (Lam (NONE, b)), ])), ])), ])) [(Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), (Arg.Unhide, [], Elim (const_subtype, [App (a), App (Elim (const_partial, [App (a), ])), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun quotientTotal' a b = Arg.make "quotientTotal'" [] (Elim (const_total, [App (Elim (const_quotient, [App (a), App (Lam (NONE, Lam (NONE, b))), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_quotient, [App (a), App (Lam (NONE, Lam (NONE, b))), ])), ])), (Arg.Unhide, [J.Tm (Sub (a, Shift 1)), J.Tm (a), ], Elim (const_istp, [App (b), ])), (Arg.Unhide, [], Elim (const_total, [App (a), ])), ] (fn [_, _, _, ] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 fun natTotal m = Arg.make "natTotal" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_nat), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+val natTotal' = Arg.make "natTotal'" [] (Elim (const_total, [App (const_nat), ])) [] (fn [] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 val natStrict = Arg.make "natStrict" [] (Elim (const_subtype, [App (const_nat), App (Elim (const_partial, [App (const_nat), ])), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 fun typeHalts a = Arg.make "typeHalts" [] (Elim (const_halts, [App (a), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun reduceSeqTotal a m n = Arg.make "reduceSeqTotal" [] (Elim (const_sequal, [App (Elim (const_seq, [App (m), App (Lam (NONE, n)), ])), App (Sub (n, Dot (m, Shift 0))), ])) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Unhide, [], Elim (const_total, [App (a), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun uptypeForm a = Arg.make "uptypeForm" [] (Elim (const_istp, [App (Elim (const_uptype, [App (a), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun uptypeEq a b = Arg.make "uptypeEq" [] (Elim (const_eqtp, [App (Elim (const_uptype, [App (a), ])), App (Elim (const_uptype, [App (b), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (b), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun uptypeFormUniv a i = Arg.make "uptypeFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_uptype, [App (a), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)

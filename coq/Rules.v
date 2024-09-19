@@ -1489,6 +1489,21 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deq triv triv (sequal m n))
       -> tr G (deq triv triv (sequal (subst1 m p) (subst1 n p)))
 
+| tr_pi_eta_sequal :
+    forall G a b m,
+      tr G (deq m m (pi a b))
+      -> tr G (deq triv triv (sequal m (lam (app (subst sh1 m) (var 0)))))
+
+| tr_sigma_eta_sequal :
+    forall G a b m,
+      tr G (deq m m (sigma a b))
+      -> tr G (deq triv triv (sequal m (ppair (ppi1 m) (ppi2 m))))
+
+| tr_fut_eta_sequal :
+    forall G a m,
+      tr G (deq m m (fut a))
+      -> tr G (deq triv triv (sequal m (next (prev m))))
+
 (* Structural rules *)
 
 | tr_symmetry :
@@ -1562,6 +1577,14 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deq m m' (partial a))
       -> tr G (deq (halts m) (halts m') (univ nzero))
   
+| tr_halts_formation_iff :
+    forall G a m m',
+      tr G (deq m m (partial a))
+      -> tr G (deq m' m' (partial a))
+      -> tr (hyp_tm (halts m) :: G) (deq triv triv (halts (subst sh1 m')))
+      -> tr (hyp_tm (halts m') :: G) (deq triv triv (halts (subst sh1 m)))
+      -> tr G (deqtype (halts m) (halts m'))
+
 | tr_bottom_partial_void :
     forall G,
       tr G (deq bottom bottom (partial voidtp))

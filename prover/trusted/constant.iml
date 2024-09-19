@@ -55,8 +55,24 @@ signature CONSTANT =
       val opacity : constant -> opacity
       val setOpacity : constant -> opacity -> unit
 
+      val valuability : constant -> int
+      val reduceValuability : constant -> int -> unit
+
       (* sets opacity to OPAQUE and deletes the definition (cannot be reversed) *)
       val abstract : constant -> unit
+
+   end
+
+
+signature VALUABILITY =
+   sig
+
+      type term
+
+      (* If valuability M > 0 then M is valuable.
+         If valuability M = succ n then M applied to up to n arguments is valuable.
+      *)
+      val valuability : term -> int
 
    end
 
@@ -96,12 +112,32 @@ signature CONSTANT_INTERNAL =
       *)
       val path : constant -> Symbol.symbol list
 
-
-      (* gives the definition if it exists, even if the constant is OPAQUE *)
-      val definitionTrue : constant -> term option
+   end
 
 
-      val puOpacity : opacity Pickle.pu
+signature CONSTANT_PRIV =
+   sig
+
+      include CONSTANT_INTERNAL
+
+
+      datatype constant_info =
+         CI of {
+               def : term option,
+               path : Symbol.symbol list,
+               opacity : opacity,
+               valu : int
+               }
+
+      val export : constant -> constant_info
+      val import : constant_info -> constant
+
+
+      (* Not actually privileged, but it's neater to exclude it from the public signature. *)
+      structure Valuability : VALUABILITY where type term = term
+
+      (* So we can backpatch the fixpoint constant for valuability computation. *)
+      val fix_constant : constant ref
 
    end
 
@@ -111,7 +147,7 @@ functor ConstantFun (structure Term : TERM
                      structure Trail : TRAIL_PRIV
                                        where type term = Term.term
                                        where type ebind = Term.ebind)
-   :> CONSTANT_INTERNAL
+   :> CONSTANT_PRIV
       where type constant = int
       where type term = Term.term
       where type problem = Term.problem
@@ -119,8 +155,6 @@ functor ConstantFun (structure Term : TERM
    struct
 
       type constant = int
-      type nonce = Word32.word
-      type luid = nonce * int
 
       structure T = Term
 
@@ -147,22 +181,37 @@ functor ConstantFun (structure Term : TERM
          end
 
 
+
       datatype opacity = SOFT | FIRM | SOFT_STRICT | HARD | OPAQUE
+
+      (* invariant: if def = NONE then opacity = OPAQUE *)
+      datatype constant_info =
+         CI of {
+               def : term option,
+               path : Symbol.symbol list,
+               opacity : opacity,
+               valu : int  (* valuability *)
+               }
+
+      val bogus =
+         CI {
+            def = NONE,
+            path = [],
+            opacity = OPAQUE,
+            valu = 0
+            }
 
       val nextConstant = ref 0
 
-      val bogus = (NONE, [], OPAQUE)
-
       (* NB:  We never rewind the constant table!   Constants are forever. *)
 
-      val theConstants : (term option * Symbol.symbol list * opacity) ArrayInf.array = ArrayInf.array bogus
+      val theConstants : constant_info ArrayInf.array = ArrayInf.array bogus
 
-      (* invariant: if there is no definition, the opacity is OPAQUE *)
 
 
       fun definition const =
          let
-            val (def, _, opac) = ArrayInf.sub (theConstants, const)
+            val CI {def, opacity=opac } = ArrayInf.sub (theConstants, const)
          in
             (case opac of
                 OPAQUE => NONE
@@ -171,18 +220,9 @@ functor ConstantFun (structure Term : TERM
          end
 
              
-      fun definitionTrue const =
-         let
-            val (def, _, _) = ArrayInf.sub (theConstants, const)
-         in
-            def
-         end
-
-             
-
       fun path const =
          let
-            val (_, p, _) = ArrayInf.sub (theConstants, const)
+            val CI { path=p } = ArrayInf.sub (theConstants, const)
          in
             p
          end
@@ -190,7 +230,7 @@ functor ConstantFun (structure Term : TERM
 
       fun opacity const =
          let
-            val (_, _, opac) = ArrayInf.sub (theConstants, const)
+            val CI { opacity=opac } = ArrayInf.sub (theConstants, const)
          in
             opac
          end
@@ -198,7 +238,8 @@ functor ConstantFun (structure Term : TERM
 
       fun setOpacity const opac =
          let
-            val (def, path, old) = ArrayInf.sub (theConstants, const)
+            val info = ArrayInf.sub (theConstants, const)
+            val CI { def, path, opacity=old, valu } = info
          in
             (case (def, opac) of
                 (NONE, OPAQUE) =>
@@ -210,22 +251,53 @@ functor ConstantFun (structure Term : TERM
 
               | (SOME _, _) =>
                    (
-                   ArrayInf.update (theConstants, const, (def, path, opac));
+                   ArrayInf.update (theConstants, const,
+                                    CI { def=def, path=path, opacity=opac, valu=valu });
                    Checkpoint.log 
                       (fn () =>
-                          ArrayInf.update (theConstants, const, (def, path, old)))
+                          ArrayInf.update (theConstants, const, info))
                    ))
+         end
+
+
+      fun valuability const =
+         let
+            val CI { valu } = ArrayInf.sub (theConstants, const)
+         in
+            valu
+         end
+
+
+      fun reduceValuability const n =
+         let
+            val info = ArrayInf.sub (theConstants, const)
+            val CI { def, path, opacity, valu } = info
+         in
+            if n < 0 then
+               raise (Fail "new valuability is negative")
+            else if n > valu then
+               raise (Fail "new valuability is not lower")
+            else
+               (
+               ArrayInf.update (theConstants, const,
+                                CI { def=def, path=path, opacity=opacity, valu=n });
+               Checkpoint.log
+                  (fn () =>
+                      ArrayInf.update (theConstants, const, info))
+               )
          end
 
 
       fun abstract const =
          let
-            val (def, path, old) = ArrayInf.sub (theConstants, const)
+            val info = ArrayInf.sub (theConstants, const)
+            val CI { def, path, opacity=old, valu } = info
          in
-            ArrayInf.update (theConstants, const, (NONE, path, OPAQUE));
+            ArrayInf.update (theConstants, const, 
+                             CI { def=NONE, path=path, opacity=OPAQUE, valu=valu });
             Checkpoint.log
                (fn () =>
-                   ArrayInf.update (theConstants, const, (def, path, old)))
+                   ArrayInf.update (theConstants, const, info))
          end
 
 
@@ -310,6 +382,90 @@ functor ConstantFun (structure Term : TERM
 
 
 
+      (* This will get filled in with fix. *)
+      val fix_constant = ref ~1
+
+      structure Valuability =
+         struct
+
+            type term = term
+
+
+            (* n >= 0 *)
+            fun subtract n spine =
+               if n = 0 then
+                  0
+               else
+                  (case spine of
+                      [] => n
+
+                    | T.App _ :: rest => subtract (n-1) rest
+
+                    | _ => 0)
+               
+
+            fun valuabilityMain m s spine =
+               (case m of
+                   T.Var i =>
+                      (case T.substVar i s of
+                          T.Idx _ => 0
+
+                        | T.Term m' => valuabilityMain m' T.id spine)
+
+                 | T.Const const =>
+                      if const = !fix_constant then
+                         (* Special case for fixpoints. Otherwise we would have to eta-expand all over the place. *)
+                         (case spine of
+                             [] => 1
+
+                           | T.App m' :: rest =>
+                                subtract (Int.max (valuabilityMain m' T.id [] - 1) 0) rest
+
+                           | _ => 0)
+                      else
+                         (* calling Const's version of valuability *)
+                         subtract (valuability const) spine
+
+                 | T.Evar eb =>
+                      (case T.readEbind eb of
+                          NONE => 0
+
+                        | SOME m' => valuabilityMain m' s spine)
+
+                 | T.Elim (m', spine') =>
+                      valuabilityMain m' s (T.ssubst spine' s @ spine)
+
+                 | T.Lam (_, m') =>
+                      (case spine of
+                          [] => 1 + valuabilityMain m' (T.under 1 s) []
+
+                        | _ => 0)
+
+                 | T.Pair _ =>
+                      (case spine of [] => 1 | _ => 0)
+
+                 | T.Next _ =>
+                      (case spine of [] => 1 | _ => 0)
+
+                 | T.Triv =>
+                      (case spine of [] => 1 | _ => 0)
+
+                 | T.Native _ =>
+                      (case spine of [] => 1 | _ => 0)
+
+                 | T.Sub (m', s') =>
+                      valuabilityMain m' (T.compose s' s) spine
+
+                 | T.Marker _ => 0)
+
+
+            (* Valuability's version of valuability *)
+            fun valuability m = valuabilityMain m T.id []
+
+         end
+
+
+
       exception DeclareUnclean of problem
 
       fun declare force def path opac =
@@ -328,6 +484,12 @@ functor ConstantFun (structure Term : TERM
                              NONE => def
 
                            | SOME prob => raise (DeclareUnclean prob)))
+
+            val valu =
+               (case def' of
+                   NONE => 0
+
+                 | SOME m => Valuability.valuability m)
          in
             (case (def', opac) of
                 (NONE, OPAQUE) => ()
@@ -338,25 +500,22 @@ functor ConstantFun (structure Term : TERM
               | (SOME _, _) => Trail.commit ());
 
             nextConstant := const + 1;
-            ArrayInf.update (theConstants, const, (def', path, opac));
+            ArrayInf.update (theConstants, const, 
+                             CI { def=def', path=path, opacity=opac, valu=valu });
             const
          end
 
 
 
-      val puOpacity =
-         Pickle.alt
-            (fn SOFT => 0
-              | FIRM => 1
-              | SOFT_STRICT => 2
-              | HARD => 3
-              | OPAQUE => 4)
-            [
-            Pickle.const SOFT,
-            Pickle.const FIRM,
-            Pickle.const SOFT_STRICT,
-            Pickle.const HARD,
-            Pickle.const OPAQUE
-            ]
+      fun export const = ArrayInf.sub (theConstants, const)
+
+      fun import info =
+         let
+            val const = !nextConstant
+         in
+            nextConstant := const + 1;
+            ArrayInf.update (theConstants, const, info);
+            const
+         end
 
    end

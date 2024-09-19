@@ -208,6 +208,210 @@ do2 5 split; auto using pginterp_nzero.
 Qed.
 
 
+Lemma halts_urel_iff :
+  forall w i (m n : wterm w),
+    (converges m <-> converges n)
+    -> halts_urel w i m = halts_urel w i n.
+Proof.
+intros w i m n Hiff.
+apply urel_extensionality.
+fextensionality 3.
+intros j p q.
+pextensionality.
+  {
+  intro Hpq.
+  cbn in Hpq.
+  decompose Hpq.
+  intros Hconvm Hj Hclp Hclq Hstepsp Hstepsq.
+  do2 5 split; auto.
+  apply Hiff; auto.
+  }
+
+  {
+  intro Hpq.
+  cbn in Hpq.
+  decompose Hpq.
+  intros Hconvm Hj Hclp Hclq Hstepsp Hstepsq.
+  do2 5 split; auto.
+  apply Hiff; auto.
+  }
+Qed.
+
+
+Lemma sound_halts_formation_iff :
+  forall G a m m',
+    pseq G (deq m m (partial a))
+    -> pseq G (deq m' m' (partial a))
+    -> pseq (hyp_tm (halts m) :: G) (deq triv triv (halts (subst sh1 m')))
+    -> pseq (hyp_tm (halts m') :: G) (deq triv triv (halts (subst sh1 m)))
+    -> pseq G (deqtype (halts m) (halts m')).
+Proof.
+intros G a m n.
+revert G.
+refine (seq_pseq 0 4 [] _ [] _ [_] _ [_] _ _ _); cbn.
+intros G Hseqm Hseqn Hseqmn Hseqnm.
+rewrite -> seq_eqtype.
+rewrite -> seq_deq in Hseqm, Hseqn, Hseqmn, Hseqnm.
+intros i s s' Hs.
+so (Hseqm i s s' Hs) as (R & Hpal & _ & Hm & _).
+simpsubin Hpal.
+so (Hseqn i s s' Hs) as (R' & Hpal' & _ & Hn & _).
+simpsubin Hpal'.
+so (interp_fun _#7 Hpal Hpal').
+subst R'.
+invert (basic_value_inv _#6 value_partial Hpal).
+intros A Hal <-.
+rewrite -> den_iupartial in Hm, Hn.
+cbn in Hm, Hn.
+decompose Hm.
+intros _ Hclsm Hclsm' Hiffsm _.
+decompose Hn.
+intros _ Hclsn Hclsn' Hiffsn _.
+assert (converges (subst s m) <-> converges (subst s n)) as Hiffsmn.
+  {
+  split.
+    {
+    intro Hconv.
+    assert (pwctx i (dot triv s) (dot triv s') (hyp_tm (halts m) :: G)) as Hs'.
+      {
+      apply pwctx_cons_tm_seq; auto.
+        {
+        simpsub.
+        apply (seqhyp_tm _#5 (iubase (halts_urel stop i (subst s m)))).
+          {
+          apply interp_eval_refl.
+          apply interp_halts; auto.
+          }
+
+          {
+          apply interp_eval_refl.
+          rewrite -> (halts_urel_iff _#4 Hiffsm).
+          apply interp_halts; auto.
+          }
+
+          {
+          cbn.
+          do2 5 split; auto using star_refl; prove_hygiene.
+          }
+        }
+
+        {
+        intros j t t' Ht.
+        so (Hseqm _#3 Ht) as (R & Hl & _ & H & _).
+        simpsubin Hl.
+        invert (basic_value_inv _#6 value_partial Hl).
+        intros A' _ <-.
+        cbn in H.
+        decompose H.
+        intros _ Hcltm Hcltm' Hiff _.
+        exists toppg, (iubase (halts_urel stop j (subst t m))).
+        split.
+          {
+          apply interp_eval_refl.
+          apply interp_halts; auto.
+          }
+
+          {
+          apply interp_eval_refl.
+          rewrite -> (halts_urel_iff _#4 Hiff).
+          apply interp_halts; auto.
+          }
+        }
+      }
+    so (Hseqmn _#3 Hs') as (R & Hl & _ & H & _).
+    simpsubin Hl.
+    invert (basic_value_inv _#6 value_halts Hl).
+    intros _ <-.
+    rewrite -> den_iubase in H.
+    destruct H as (Hconv' & _).
+    exact Hconv'.
+    }
+
+    {
+    intro Hconv.
+    assert (pwctx i (dot triv s) (dot triv s') (hyp_tm (halts n) :: G)) as Hs'.
+      {
+      apply pwctx_cons_tm_seq; auto.
+        {
+        simpsub.
+        apply (seqhyp_tm _#5 (iubase (halts_urel stop i (subst s n)))).
+          {
+          apply interp_eval_refl.
+          apply interp_halts; auto.
+          }
+
+          {
+          apply interp_eval_refl.
+          rewrite -> (halts_urel_iff _#4 Hiffsn).
+          apply interp_halts; auto.
+          }
+
+          {
+          cbn.
+          do2 5 split; auto using star_refl; prove_hygiene.
+          }
+        }
+
+        {
+        intros j t t' Ht.
+        so (Hseqn _#3 Ht) as (R & Hl & _ & H & _).
+        simpsubin Hl.
+        invert (basic_value_inv _#6 value_partial Hl).
+        intros A' _ <-.
+        cbn in H.
+        decompose H.
+        intros _ Hcltn Hcltn' Hiff _.
+        exists toppg, (iubase (halts_urel stop j (subst t n))).
+        split.
+          {
+          apply interp_eval_refl.
+          apply interp_halts; auto.
+          }
+
+          {
+          apply interp_eval_refl.
+          rewrite -> (halts_urel_iff _#4 Hiff).
+          apply interp_halts; auto.
+          }
+        }
+      }
+    so (Hseqnm _#3 Hs') as (R & Hl & _ & H & _).
+    simpsubin Hl.
+    invert (basic_value_inv _#6 value_halts Hl).
+    intros _ <-.
+    rewrite -> den_iubase in H.
+    destruct H as (Hconv' & _).
+    exact Hconv'.
+    }
+  }
+exists (iubase (halts_urel stop i (subst s m))).
+do2 3 split.
+  {
+  apply interp_eval_refl.
+  eapply interp_halts; eauto.
+  }
+
+  {
+  rewrite -> (halts_urel_iff _#4 Hiffsm).
+  apply interp_eval_refl.
+  eapply interp_halts; eauto.
+  }
+
+  {
+  rewrite -> (halts_urel_iff _#4 Hiffsmn).
+  apply interp_eval_refl.
+  eapply interp_halts; eauto.
+  }
+
+  {
+  rewrite -> (halts_urel_iff _#4 Hiffsmn).
+  rewrite -> (halts_urel_iff _#4 Hiffsn).
+  apply interp_eval_refl.
+  eapply interp_halts; eauto.
+  }
+Qed.
+
+
 Lemma sound_bottom_partial_void :
   forall G,
     pseq G (deq bottom bottom (partial voidtp)).

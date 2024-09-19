@@ -39,6 +39,7 @@ signature REWRITE =
       val whreduceRew       : rewrite
       val reduceHardRew     : rewrite
       val whreduceHardRew   : rewrite
+      val reduceSeqRew      : rewrite
 
 
       (* target: hypothesis and occurrences, where
@@ -77,6 +78,9 @@ signature REWRITE =
       val whreduce          : targets -> tactic
       val reduceHard        : targets -> tactic
       val whreduceHard      : targets -> tactic
+      val reduceSeqPriority : targets -> Tactic.priority Tactic.tacticm
+      val reduceSeqRaw      : targets -> tactic
+      val reduceSeq         : targets -> tactic
 
       val trace : bool ref
 
@@ -2712,6 +2716,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                 aims)
 
 
+
       fun convertHeadRew capture const em hyp (_, dir) =
          let
             val dir' =
@@ -3045,6 +3050,107 @@ structure RewriteInternal :> REWRITE_INTERNAL =
               | _ =>
                    raise (RewriteFailure "lemma conclusion does not have constant head"))
          end
+
+
+
+      fun reduceSeqRew hyp (jud, dir) =
+         let
+            fun test _ n =
+               (case n of
+                   T.Elim (T.Const const, spine) =>
+                      (Constant.eq (const, Prim.seq)
+                       orelse
+                       Constant.eq (const, Prim.seqt))
+                      andalso
+                      (case spine of
+                          T.App _ :: T.App bodylam :: _ =>
+                             (case N.whnf bodylam of
+                                 T.Lam _ => true
+                               | _ => false)
+
+                        | _ => false)
+
+                 | _ => false)
+
+            fun act _ n =
+               (case n of
+                   T.Elim (T.Const const, spine) =>
+                      if
+                         Constant.eq (const, Prim.seq)
+                         orelse
+                         Constant.eq (const, Prim.seqt)
+                      then
+                         (case spine of
+                             T.App arg :: T.App bodylam :: rest =>
+                                (case N.whnf bodylam of
+                                    T.Lam (_, body) =>
+                                       if Valuability.valuability arg > 0 then
+                                          let
+                                             val pretac =
+                                                if Constant.eq (const, Prim.seq) then
+                                                   idtac
+                                                else
+                                                   refine (Rule.reduce (R.within [1] R.unfold))
+
+                                             (* pretac turns seqt into seq, if necessary *)
+
+                                             val tac =
+                                                pretac
+                                                >>+
+                                                (* sequal (seq Arg (fn . Body)) (Body [Arg . id]) *)
+                                                (* since Arg is valuable, these will unify *)
+                                                refine (Rule.sequalIntro (T.evar ()))
+                                                >> done
+                                          in
+                                             SOME (T.Elim (T.Const const, [T.App arg, T.App bodylam]),
+                                                   T.Sub (body, T.Dot (arg, T.id)),
+                                                   rest,
+                                                   (General Prim.sequal, Forward tac))
+                                          end
+                                       else
+                                          let
+                                             val a = T.evar ()
+
+                                             val pretac =
+                                                if Constant.eq (const, Prim.seq) then
+                                                   idtac
+                                                else
+                                                   refine (Rule.reduce (R.within [1] R.unfold))
+
+                                             (* pretac turns seqt into seq, if necessary *)
+                                             val tac =
+                                                pretac
+                                                >>+
+                                                (* sequal (seq Arg (fn . Body)) (Body [Arg . id]) *)
+                                                refine (Rule.reduceSeqTotal a (T.evar ()) (T.evar ()))
+                                                >>> [
+                                                    (* Arg : A *)
+                                                    idtacM Secondary,
+
+                                                    (* total A *)
+                                                    idtacM Secondary
+                                                    ]
+                                          in
+                                             SOME (T.Elim (T.Const const, [T.App arg, T.App bodylam]),
+                                                   T.Sub (body, T.Dot (arg, T.id)),
+                                                   rest,
+                                                   (General Prim.sequal, Forward tac))
+                                          end
+
+                                  | _ => NONE)
+
+                           | _ => NONE)
+                      else
+                         NONE
+
+                 | _ => NONE)
+         in
+            Relation (test, act)
+         end
+
+      fun reduceSeqPriority targets = rewritePriority [(reduceSeqRew, targets)]
+      fun reduceSeqRaw targets = reduceSeqPriority targets >> idtac
+      fun reduceSeq targets = Typecheck.withTypecheckSnd $ reduceSeqPriority targets
 
 
 

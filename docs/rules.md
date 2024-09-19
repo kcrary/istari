@@ -3941,6 +3941,36 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- sequal M N
 
+- `forallEtaSequal A B M`
+
+      G |- sequal M (fn x . M x)
+      >>
+      G |- M : forall (x : A) . B
+
+- `arrowEtaSequal A B M`
+
+      G |- sequal M (fn x . M x)
+      >>
+      G |- M : A -> B
+
+- `existsEtaSequal A B M`
+
+      G |- sequal M (M #1 , M #2)
+      >>
+      G |- M : exists (x : A) . B
+
+- `prodEtaSequal A B M`
+
+      G |- sequal M (M #1 , M #2)
+      >>
+      G |- M : A & B
+
+- `futureEtaSequal A M`
+
+      G |- sequal M (next (M #prev))
+      >>
+      G |- M : future A
+
 
 ### Partial types
 
@@ -4212,6 +4242,10 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- A : type
       G, x : A |- halts x
 
+- `voidTotal'`
+
+      G |- total void ext fn x . ()
+
 - `voidStrict`
 
       G |- void <: partial void
@@ -4221,6 +4255,10 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- halts M
       >>
       G |- M : unit
+
+- `unitTotal'`
+
+      G |- total unit ext fn x . ()
 
 - `unitStrict`
 
@@ -4232,6 +4270,10 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- M : bool
 
+- `boolTotal'`
+
+      G |- total bool ext fn x . ()
+
 - `boolStrict`
 
       G |- bool <: partial bool
@@ -4241,6 +4283,13 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- halts M
       >>
       G |- M : forall (x : A) . B
+
+- `forallTotal' A B`
+
+      G |- total (forall (x : A) . B) ext fn x . ()
+      >>
+      G |- A : type
+      G, x : A |- B : type
 
 - `forallStrict A B`
 
@@ -4254,6 +4303,13 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- halts M
       >>
       G |- M : A -> B
+
+- `arrowTotal' A B`
+
+      G |- total (A -> B) ext fn x . ()
+      >>
+      G |- A : type
+      G, x : A |- B : type
 
 - `arrowStrict A B`
 
@@ -4275,6 +4331,13 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- M : exists (x : A) . B
 
+- `existsTotal' A B`
+
+      G |- total (exists (x : A) . B) ext fn x . ()
+      >>
+      G |- A : type
+      G, x : A |- B : type
+
 - `existsStrict A B`
 
       G |- (exists (x : A) . B) <: partial (exists (x : A) . B)
@@ -4287,6 +4350,13 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- halts M
       >>
       G |- M : A & B
+
+- `prodTotal' A B`
+
+      G |- total (A & B) ext fn x . ()
+      >>
+      G |- A : type
+      G |- B : type
 
 - `prodStrict A B`
 
@@ -4301,6 +4371,13 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- M : A % B
 
+- `sumTotal' A B`
+
+      G |- total (A % B) ext fn x . ()
+      >>
+      G |- A : type
+      G |- B : type
+
 - `sumStrict A B`
 
       G |- (A % B) <: partial (A % B)
@@ -4314,11 +4391,24 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- M : future A
 
+- `futureTotal' A`
+
+      G |- total (future A) ext fn x . ()
+      >>
+      promote(G) |- A : type
+
 - `futureStrict A`
 
       G |- future A <: partial (future A)
       >>
       promote(G) |- A : type
+
+- `setTotal' A B`
+
+      G |- total {x : A | B} ext (() , fn x . ())
+      >>
+      G, x : A |- B : type
+      G |- total A
 
 - `setStrict A B`
 
@@ -4327,6 +4417,13 @@ variables.  The official rules, using de Bruijn indices, are given
       G, x : A |- B : type
       G |- A <: partial A
 
+- `isetTotal' A B`
+
+      G |- total (iset A (fn x . B)) ext (() , fn x . ())
+      >>
+      G, x : A |- B : type
+      G |- total A
+
 - `isetStrict A B`
 
       G |- iset A (fn x . B) <: partial (iset A (fn x . B))
@@ -4334,11 +4431,23 @@ variables.  The official rules, using de Bruijn indices, are given
       G, x : A |- B : type
       G |- A <: partial A
 
+- `quotientTotal' A B`
+
+      G |- total (quotient (x y : A) . B) ext (() , fn x . ())
+      >>
+      G |- (quotient (x y : A) . B) : type
+      G, x : A, y : A |- B : type
+      G |- total A
+
 - `natTotal M`
 
       G |- halts M
       >>
       G |- M : nat
+
+- `natTotal'`
+
+      G |- total nat ext fn x . ()
 
 - `natStrict`
 
@@ -4349,6 +4458,13 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- halts A
       >>
       G |- A : type
+
+- `reduceSeqTotal A M N`
+
+      G |- sequal (seq M (fn x . N)) [M / x]N
+      >>
+      G |- M : A
+      G |- total A
 
 - `uptypeForm A`
 

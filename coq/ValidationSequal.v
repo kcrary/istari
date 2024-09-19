@@ -331,3 +331,77 @@ intros G m n p ext0 H.
 apply tr_sequal_compat.
 eapply tr_sequal_eta2; eauto.
 Qed.
+
+
+Hint Rewrite def_pi : prepare.
+
+Lemma forallEtaSequal_valid : forallEtaSequal_obligation.
+Proof.
+prepare.
+intros G a b m ext Hm.
+eapply tr_pi_eta_sequal; eauto.
+Qed.
+
+
+Hint Rewrite def_arrow : prepare.
+
+Lemma arrowEtaSequal_valid : arrowEtaSequal_obligation.
+Proof.
+prepare.
+intros G a b m ext Hm.
+eapply tr_pi_eta_sequal; eauto.
+Qed.
+
+
+Hint Rewrite def_sigma : prepare.
+
+Lemma existsEtaSequal_valid : existsEtaSequal_obligation.
+Proof.
+prepare.
+intros G a b m ext0 Hm.
+eapply tr_sigma_eta_sequal; eauto.
+Qed.
+
+
+Hint Rewrite def_prod : prepare.
+
+Lemma prodEtaSequal_valid : prodEtaSequal_obligation.
+Proof.
+prepare.
+intros G a b m ext0 Hm.
+apply (tr_sigma_eta_sequal _ a (subst sh1 b)).
+eapply tr_eqtype_convert; eauto.
+apply tr_prod_sigma_equal.
+  {
+  eapply tr_prod_formation_invert1.
+  eapply tr_inhabitation_formation; eauto.
+  }
+
+  {
+  replace (deqtype b b) with (substj (dot (ppi1 m) id) (deqtype (subst sh1 b) (subst sh1 b))).
+  2:{
+    simpsub.
+    reflexivity.
+    }
+  apply (tr_generalize _ a).
+    {
+    eapply tr_prod_elim1; eauto.
+    }
+
+    {
+    eapply tr_prod_formation_invert2.
+    eapply tr_inhabitation_formation; eauto.
+    }
+  }
+Qed.
+
+
+
+Hint Rewrite def_fut : prepare.
+
+Lemma futureEtaSequal_valid : futureEtaSequal_obligation.
+Proof.
+prepare.
+intros G a m ext0 Hm.
+eapply tr_fut_eta_sequal; eauto.
+Qed.

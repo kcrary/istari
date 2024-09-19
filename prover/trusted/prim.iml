@@ -87,6 +87,7 @@ signature PRIM =
       val nat_case : constant
       val ov : constant       (* of *)
       val pause : constant
+      val seqt : constant     (* same as seq, but we want to give it a different type *)
       val squash : constant
       val succ : constant
       val zero : constant
@@ -107,6 +108,7 @@ signature PRIM =
       val cPlusz : constant                (* Plusz *)
       val times : constant
       val cTimesz : constant               (* Timesz *)
+      val total : constant
 
    end
 
@@ -122,7 +124,7 @@ signature PRIM_INTERNAL =
 
 
 functor PrimFun (structure Term : TERM
-                 structure Constant : CONSTANT_INTERNAL
+                 structure Constant : CONSTANT_PRIV
                                       where type term = Term.term
                                       where type constant = Term.constant
                  structure Pickling : PICKLING_PRIV
@@ -143,7 +145,7 @@ functor PrimFun (structure Term : TERM
       (* visible: whether to place the constant into primitives
          and hence into the namespace.
       *)
-      fun declare visible str path def =
+      fun declare visible str path valu def =
          let
             val i = !numPrimitives
             val sym = Symbol.fromValue str
@@ -154,7 +156,7 @@ functor PrimFun (structure Term : TERM
 
                  | SOME _ => Constant.HARD)
 
-            val const = Constant.declare false def (sym :: path) opac
+            val const = Constant.import (Constant.CI { def=def, path=(sym :: path), opacity=opac, valu=valu })
          in
             numPrimitives := 1 + i;
 
@@ -167,10 +169,10 @@ functor PrimFun (structure Term : TERM
             const
          end
 
-      fun newconst str = declare true str [] NONE
-      fun newconstInvis str path = declare false str path NONE
-      fun defconst str m = declare true str [] (SOME m)
-      fun defconstInvis str path m = declare false str path (SOME m)
+      fun newconst str valu = declare true str [] valu NONE
+      fun newconstInvis str valu path = declare false str path valu NONE
+      fun defconst str m = declare true str [] (Constant.Valuability.valuability m) (SOME m)
+      fun defconstInvis str path m = declare false str path (Constant.Valuability.valuability m) (SOME m)
 
       (* Anticipate where the invisible constants will eventually be made visible. *)
       val intPath = List.map Symbol.fromValue ["Integer"]
@@ -182,65 +184,65 @@ functor PrimFun (structure Term : TERM
       val partialPath = List.map Symbol.fromValue ["Partial"]
       val sequalPath = List.map Symbol.fromValue ["SyntacticEquality"]
 
-      val bool = newconst "bool"
-      val coguard = newconst "coguard"
-      val eq = newconst "eq"
-      val eqtp = newconst "eqtp"
-      val exists = newconst "exists"
-      val fals = newconst "false"
-      val forall = newconst "forall"
-      val foralltp = newconst "foralltp"
-      val future = newconst "future"
-      val iexists = newconst "iexists"
-      val iforall = newconst "iforall"
-      val inl = newconst "inl"
-      val inr = newconst "inr"
-      val integer = newconst "integer"
-      val intersect = newconst "intersect"
-      val iset = newconst "iset"
-      val ite = newconst "ite"
-      val guard = newconst "guard"
-      val karrow = newconst "karrow"
-      val kind = newconst "Kind"
-      val level = newconst "level"
-      val lleq = newconst "lleq"
-      val lmax = newconst "lmax"
-      val lsucc = newconst "lsucc"
-      val lzero = newconst "lzero"
-      val mu = newconst "mu"
-      val partial = newconst "partial"
-      val prod = newconst "prod"
-      val quotient = newconst "quotient"
-      val rec = newconst "rec"
-      val seq = newconst "seq"
-      val set = newconst "set"
-      val subtype = newconst "subtype"
-      val sum = newconst "sum"
-      val sum_case = newconst "sum_case"
-      val tarrow = newconst "tarrow"
-      val tru = newconst "true"
-      val union = newconst "union"
-      val unit = newconst "unit"
-      val univ = newconst "univ"
-      val void = newconst "void"
+      val bool = newconst "bool" 1
+      val coguard = newconst "coguard" 3
+      val eq = newconst "eq" 4
+      val eqtp = newconst "eqtp" 3
+      val exists = newconst "exists" 3
+      val fals = newconst "false" 1
+      val forall = newconst "forall" 3
+      val foralltp = newconst "foralltp" 2
+      val future = newconst "future" 2
+      val iexists = newconst "iexists" 4
+      val iforall = newconst "iforall" 4
+      val inl = newconst "inl" 2
+      val inr = newconst "inr" 2
+      val integer = newconst "integer" 1
+      val intersect = newconst "intersect" 3
+      val iset = newconst "iset" 3
+      val ite = newconst "ite" 3
+      val guard = newconst "guard" 3
+      val karrow = newconst "karrow" 3
+      val kind = newconst "Kind" 1
+      val level = newconst "level" 1
+      val lleq = newconst "lleq" 3
+      val lmax = newconst "lmax" 2
+      val lsucc = newconst "lsucc" 2
+      val lzero = newconst "lzero" 1
+      val mu = newconst "mu" 2
+      val partial = newconst "partial" 2
+      val prod = newconst "prod" 3
+      val quotient = newconst "quotient" 3
+      val rec = newconst "rec" 2
+      val seq = newconst "seq" 2
+      val set = newconst "set" 3
+      val subtype = newconst "subtype" 3
+      val sum = newconst "sum" 3
+      val sum_case = newconst "sum_case" 3
+      val tarrow = newconst "tarrow" 3
+      val tru = newconst "true" 1
+      val union = newconst "union" 3
+      val unit = newconst "unit" 1
+      val univ = newconst "univ" 2
+      val void = newconst "void" 1
 
-      val admiss = newconstInvis "admiss" partialPath
-      val bogus = newconstInvis "bogus" miscPath
-      val entailment = newconstInvis "entailment" miscPath
-      val eqzb = newconstInvis "eqzb" intPath
-      val halts = newconstInvis "halts" partialPath
-      val leqzb = newconstInvis "leqzb" intPath
-      val magic = newconstInvis "magic" miscPath
-      val negative = newconstInvis "negative" miscPath
-      val negz = newconstInvis "negz" intPath
-      val orphan = newconstInvis "orphan" miscPath
-      val plusz = newconstInvis "plusz" intPath
-      val positive = newconstInvis "positive" miscPath
-      val sequal = newconstInvis "sequal" sequalPath
-      val symbol = newconstInvis "symbol" symPath
-      val symbol_eqb = newconstInvis "symbol_eqb" symPath
-      val timesz = newconstInvis "timesz" intPath
-      val uptype = newconstInvis "uptype" partialPath
+      val admiss = newconstInvis "admiss" 2 partialPath
+      val bogus = newconstInvis "bogus" 0 miscPath
+      val entailment = newconstInvis "entailment" 0 miscPath
+      val eqzb = newconstInvis "eqzb" 3 intPath
+      val halts = newconstInvis "halts" 2 partialPath
+      val leqzb = newconstInvis "leqzb" 3 intPath
+      val magic = newconstInvis "magic" 0 miscPath
+      val negative = newconstInvis "negative" 2 miscPath
+      val negz = newconstInvis "negz" 1 intPath
+      val orphan = newconstInvis "orphan" 0 miscPath
+      val plusz = newconstInvis "plusz" 2 intPath
+      val positive = newconstInvis "positive" 2 miscPath
+      val sequal = newconstInvis "sequal" 3 sequalPath
+      val symbol = newconstInvis "symbol" 1 symPath
+      val symbol_eqb = newconstInvis "symbol_eqb" 2 symPath
+      val timesz = newconstInvis "timesz" 2 intPath
+      val uptype = newconstInvis "uptype" 2 partialPath
 
       val abort =
          defconst "abort"
@@ -321,6 +323,10 @@ functor PrimFun (structure Term : TERM
          defconst "pause"
          (T.Lam (NONE, T.zero))
 
+      val seqt =
+         defconst "seqt"
+         (T.Const seq)
+
       val squash = 
          defconst "squash"
          (T.Lam (NONE, T.apply2 set (T.Const unit) (T.Lam (NONE, T.Var 1))))
@@ -349,6 +355,8 @@ functor PrimFun (structure Term : TERM
                             T.app
                                (T.Var 0)
                                (T.apply3 pause (T.Var 1) (T.Var 1) (T.Var 0))))))
+
+      val () = Constant.fix_constant := fix
 
       fun lamb str m = T.Lam (SOME (Symbol.fromValue str), m)
 
@@ -555,6 +563,14 @@ functor PrimFun (structure Term : TERM
                                 T.apply2 plus
                                    (T.apply2 times (T.pi1 (T.Var 1)) (T.pi2 (T.Var 0)))
                                    (T.apply2 times (T.pi2 (T.Var 1)) (T.pi1 (T.Var 0)))))))
+
+      val total =
+         defconstInvis "total" partialPath
+         (T.Lam (NONE,
+                 T.apply2 exists
+                    (T.apply2 subtype T.zero (T.apply1 partial T.zero))
+                    (T.Lam (NONE,
+                            T.apply2 forall (T.Var 1) (T.Lam (NONE, T.apply1 halts T.zero))))))
 
 
 

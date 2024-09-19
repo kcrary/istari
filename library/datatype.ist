@@ -4,8 +4,9 @@
 *)
 
 File.import "acc-load.iml";
-File.import "nat-load.iml";
 File.import "miscellaneous-load.iml";
+File.import "nat-load.iml";
+File.import "partial-load.iml";
 openModule /Acc/;
 openModule /Nat/;
 openModule /Miscellaneous/;
@@ -3453,8 +3454,12 @@ recordTyping "dt_iter_type";
 
 
 alias /halts/ Prim.halts;
+alias /partial/ Prim.partial;
+alias /uptype/ Prim.uptype;
 
-lemma "dt_total"
+
+
+lemma "dt_pretotal"
 /
   forall (i : level) (a : U i) (dcons : schema i a) (ind : a) (x : dt a dcons ind) .
     halts x
@@ -3480,8 +3485,6 @@ qed ();
 
 
 
-alias /partial/ Prim.partial;
-
 lemma "dt_strict"
 /
   forall (i : level) (a : U i) (dcons : schema i a) (ind : a) .
@@ -3490,12 +3493,31 @@ lemma "dt_strict"
 
 intro /i a dcons ind/.
 RuleTactic.totalStrict >> auto.
-apply /dt_total/ >> auto.
+apply /dt_pretotal/ >> auto.
 qed ();
 
 
 
-alias /uptype/ Prim.uptype;
+lemma "dt_total"
+/
+  forall (i : level) (a : U i) (dcons : schema i a) (ind : a) . Partial.total (dt a dcons ind)
+/;
+
+intro /i a dcons ind/.
+unfold /Partial.total/.
+existsRaw /()/ >> auto.
+  {
+  typecheck1.
+  apply /dt_strict/.
+  }
+
+  {
+  intro /x/.
+  apply /dt_pretotal/.
+  }
+qed ();
+
+
 
 lemma "dt_uptype"
 /

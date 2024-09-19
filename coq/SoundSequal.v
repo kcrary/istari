@@ -775,3 +775,295 @@ do2 4 split; auto.
     }
   }
 Qed.
+
+
+Require Import SemanticsPi.
+
+Lemma sound_pi_eta_sequal :
+  forall G a b m,
+    pseq G (deq m m (pi a b))
+    -> pseq G (deq triv triv (sequal m (lam (app (subst sh1 m) (var 0))))).
+Proof.
+intros G a b m.
+revert G.
+refine (seq_pseq 0 1 [] _ _ _); cbn.
+intros G Hseq.
+rewrite -> seq_deq in Hseq |- *.
+intros i s s' Hs.
+so (Hseq _#3 Hs) as (R & Hl & _ & Hm & _).
+simpsubin Hl.
+invert (basic_value_inv _#6 value_pi Hl).
+intros A B _ _ <-.
+cbn in Hm.
+decompose Hm.
+intros n n' _ Hclsm Hclsm' Hsteps Hsteps' _.
+exists (iubase (unit_urel stop i)).
+simpsub.
+do2 2 split.
+  {
+  apply interp_eval_refl.
+  apply interp_sequal; auto.
+    {
+    prove_hygiene.
+    rewrite -> subst_compose.
+    eapply hygiene_shift_permit; eauto.
+    }
+
+    {
+    apply (equiv_trans _ _ (lam n)).
+      {
+      apply steps_equiv; auto.
+      }
+
+      {
+      apply equiv_lam.
+      apply equiv_symm.
+      rewrite -> subst_compose.
+      apply steps_equiv.
+      eapply star_trans.
+        {
+        apply (star_map' _ _ (fun z => app z _)); eauto using step_app1.
+        apply subst_steps; eauto.
+        }
+      eapply star_step.
+        {
+        simpsub.
+        cbn [Nat.add].
+        apply step_app2.
+        }
+      simpsub.
+      rewrite -> subst_var0_sh1.
+      apply star_refl.
+      }
+    }
+  }
+
+  {
+  apply interp_eval_refl.
+  apply interp_sequal; auto.
+    {
+    prove_hygiene.
+    rewrite -> subst_compose.
+    eapply hygiene_shift_permit; eauto.
+    }
+
+    {
+    apply (equiv_trans _ _ (lam n')).
+      {
+      apply steps_equiv; auto.
+      }
+
+      {
+      apply equiv_lam.
+      apply equiv_symm.
+      rewrite -> subst_compose.
+      apply steps_equiv.
+      eapply star_trans.
+        {
+        apply (star_map' _ _ (fun z => app z _)); eauto using step_app1.
+        apply subst_steps; eauto.
+        }
+      eapply star_step.
+        {
+        simpsub.
+        cbn [Nat.add].
+        apply step_app2.
+        }
+      simpsub.
+      rewrite -> subst_var0_sh1.
+      apply star_refl.
+      }
+    }
+  }
+assert (rel (den (iubase (unit_urel stop i))) i triv triv); auto.
+do2 5 split; auto using star_refl; prove_hygiene.
+Qed.
+
+
+Require Import SemanticsSigma.
+
+Lemma sound_sigma_eta_sequal :
+  forall G a b m,
+    pseq G (deq m m (sigma a b))
+    -> pseq G (deq triv triv (sequal m (ppair (ppi1 m) (ppi2 m)))).
+Proof.
+intros G a b m.
+revert G.
+refine (seq_pseq 0 1 [] _ _ _); cbn.
+intros G Hseq.
+rewrite -> seq_deq in Hseq |- *.
+intros i s s' Hs.
+so (Hseq _#3 Hs) as (R & Hl & _ & Hm & _).
+simpsubin Hl.
+invert (basic_value_inv _#6 value_sigma Hl).
+intros A B _ _ <-.
+cbn in Hm.
+decompose Hm.
+intros m1 m1' m2 m2' _ Hclsm Hclsm' Hsteps Hsteps' _.
+exists (iubase (unit_urel stop i)).
+simpsub.
+do2 2 split.
+  {
+  apply interp_eval_refl.
+  apply interp_sequal; auto.
+    {
+    prove_hygiene.
+    }
+
+    {
+    apply (equiv_trans _ _ (ppair m1 m2)).
+      {
+      apply steps_equiv; auto.
+      }
+
+      {
+      apply equiv_ppair.
+        {
+        apply equiv_symm.
+        apply steps_equiv.
+        eapply star_trans.
+          {
+          apply (star_map' _ _ ppi1); auto using step_ppi11; eauto.
+          }
+        apply star_one.
+        apply step_ppi12.
+        }
+
+        {
+        apply equiv_symm.
+        apply steps_equiv.
+        eapply star_trans.
+          {
+          apply (star_map' _ _ ppi2); auto using step_ppi21; eauto.
+          }
+        apply star_one.
+        apply step_ppi22.
+        }
+      }
+    }
+  }
+
+  {
+  apply interp_eval_refl.
+  apply interp_sequal; auto.
+    {
+    prove_hygiene.
+    }
+
+    {
+    apply (equiv_trans _ _ (ppair m1' m2')).
+      {
+      apply steps_equiv; auto.
+      }
+
+      {
+      apply equiv_ppair.
+        {
+        apply equiv_symm.
+        apply steps_equiv.
+        eapply star_trans.
+          {
+          apply (star_map' _ _ ppi1); auto using step_ppi11; eauto.
+          }
+        apply star_one.
+        apply step_ppi12.
+        }
+
+        {
+        apply equiv_symm.
+        apply steps_equiv.
+        eapply star_trans.
+          {
+          apply (star_map' _ _ ppi2); auto using step_ppi21; eauto.
+          }
+        apply star_one.
+        apply step_ppi22.
+        }
+      }
+    }
+  }
+assert (rel (den (iubase (unit_urel stop i))) i triv triv); auto.
+do2 5 split; auto using star_refl; prove_hygiene.
+Qed.
+
+
+Require Import SemanticsFut.
+
+Lemma sound_fut_eta_sequal :
+  forall G a m,
+    pseq G (deq m m (fut a))
+    -> pseq G (deq triv triv (sequal m (next (prev m)))).
+Proof.
+intros G a m.
+revert G.
+refine (seq_pseq 0 1 [] _ _ _); cbn.
+intros G Hseq.
+rewrite -> seq_deq in Hseq |- *.
+intros i s s' Hs.
+so (Hseq _#3 Hs) as (R & Hl & _ & Hm & _).
+assert (rel (den (iubase (unit_urel stop i))) i triv triv) as Htriv.
+  {
+  do2 5 split; auto using star_refl; prove_hygiene.
+  }
+assert (forall (p q : wterm stop), star step p (next q) -> equiv p (next (prev p))) as Hequiv.
+  {
+  intros p q Hsteps.
+  apply (equiv_trans _ _ (next q)).
+    {
+    apply steps_equiv; auto.
+    }
+
+    {
+    apply equiv_next.
+    apply equiv_symm.
+    apply steps_equiv.
+    eapply star_trans.
+      {
+      apply (star_map' _ _ prev); auto using step_prev1; eauto.
+      }
+    apply star_one.
+    apply step_prev2.
+    }
+  }
+exists (iubase (unit_urel stop i)).
+simpsub.
+simpsubin Hl.
+invert (basic_value_inv _#6 value_fut Hl).
+  {
+  intros _ _ <-.
+  cbn in Hm.
+  decompose Hm.
+  intros n n' _ Hclsm Hclsm' Hsteps Hsteps' _.
+  do2 4 split; auto.
+    {
+    apply interp_eval_refl.
+    apply interp_sequal; eauto.
+    prove_hygiene.
+    }
+
+    {
+    apply interp_eval_refl.
+    apply interp_sequal; eauto.
+    prove_hygiene.
+    }
+  }
+
+  {
+  intros i' A _ _ <-.
+  cbn in Hm.
+  decompose Hm.
+  intros n n' _ Hclsm Hclsm' Hsteps Hsteps' _.
+  do2 4 split; auto.
+    {
+    apply interp_eval_refl.
+    apply interp_sequal; eauto.
+    prove_hygiene.
+    }
+
+    {
+    apply interp_eval_refl.
+    apply interp_sequal; eauto.
+    prove_hygiene.
+    }
+  }
+Qed.

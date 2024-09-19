@@ -265,6 +265,9 @@ intros; eapply sound_syntactic_substitution; eauto; done.
 intros; eapply sound_sequal_symm; eauto; done.
 intros; eapply sound_sequal_trans; eauto; done.
 intros; eapply sound_sequal_compat; eauto; done.
+intros; eapply sound_pi_eta_sequal; eauto; done.
+intros; eapply sound_sigma_eta_sequal; eauto; done.
+intros; eapply sound_fut_eta_sequal; eauto; done.
 intros; eapply sound_symmetry; eauto; done.
 intros; eapply sound_transitivity; eauto; done.
 intros; eapply sound_weakening; eauto; done.
@@ -278,6 +281,7 @@ intros; eapply sound_partial_strict; eauto; done.
 intros; eapply sound_partial_strict_converse; eauto; done.
 intros; eapply sound_halts_formation; eauto; done.
 intros; eapply sound_halts_formation_univ; eauto; done.
+intros; eapply sound_halts_formation_iff; eauto; done.
 intros; eapply sound_bottom_partial_void; eauto; done.
 intros; eapply sound_partial_ext; eauto; done.
 intros; eapply sound_partial_elim; eauto; done.

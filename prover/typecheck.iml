@@ -69,6 +69,7 @@ signature TYPECHECK_INTERNAL =
       val subtypeTactics : tactic Constant2Table.table
       val subtypeLeftTactics : tactic ConstantTable.table
       val strictnessTactics : tactic ConstantTable.table
+      val totalityTactics : tactic ConstantTable.table
 
       (* Should not alter the context.
 
@@ -285,6 +286,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       val subtypeTactics : tactic H2.table = H2.table ()
       val subtypeLeftTactics : tactic H.table = H.table ()
       val strictnessTactics : tactic H.table = H.table ()
+      val totalityTactics : tactic H.table = H.table ()
 
 
 
@@ -552,7 +554,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       val tabEquniv = 4
       val tabEqkind = 5
       val tabPositive = 6
-      val tabLleq = 7
+      val tabTotal = 7
+      val tabLleq = 8
 
 
       (* not checkpointed *)
@@ -596,7 +599,10 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                                  zilches in the term are not a problem.
                               *)
                               (tabPositive, T.Sub (a, T.Dot (zilch, T.id))))\
-                        /)
+                        /),
+
+            (Prim.total,
+             parseMatch /$ap ? $nil => \(fnc a => (tabTotal, a))\/)
             ]
                         
 
@@ -834,6 +840,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
        | Eqkind
        | Eqrefl
        | Positive
+       | Total
        | Lleq
 
       type obligation = problem * table * goal * destination * history
@@ -879,6 +886,10 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
           | \Prim.positive\ @
                ($ap (fn . _) $nil => \(fnc => YES Positive)\
+                | _ => \(fnc => BAD)\)
+
+          | \Prim.total\ @
+               ($ap _ $nil => \(fnc => YES Total)\
                 | _ => \(fnc => BAD)\)
 
           | _ => \(fnc => NO)\
@@ -2258,7 +2269,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
 
 
-      (*** Reflexivity equality (immediately hands of to Of checking) ***)
+      (*** Reflexive equality (immediately hands off to Of checking) ***)
 
       fun typecheckEqrefl st table (goal as (jud, dir)) dest history =
          let
@@ -2317,6 +2328,56 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                          dest := (refine Rule.checkPositive)
                       end\
             /
+         end
+
+
+
+
+      (*** Totality checking ***)
+
+      fun typecheckTotal (st as ST { progress }) table (goal as (jud, dir)) dest (history as (origin, hist)) =
+         let
+            val ctx = J.context jud
+            val concl = J.concl jud
+
+            val a =
+               (case N.simplify concl of
+                   T.Elim (_, [T.App a]) => N.whnfBasic a
+
+                 | _ => raise (Fail "precondition"))
+         in
+            if
+               immediate st table history tabTotal a ctx concl dir dest idtac
+            then
+               ()
+            else
+               termCase a
+               /| const? @ _ =>
+                  \(fnc const =>
+                       (case H.find totalityTactics const of
+                           SOME tac =>
+                              tryRule st table history tac goal dest
+                              (fn () =>
+                                  dest :=
+                                     error history "ill-formed type expression"
+                                     (fn () =>
+                                         (
+                                         print      "  expected: type\n";
+                                         showPrefixed "expression: " dir a;
+                                         print "\n"
+                                         )))
+
+                         | NONE =>
+                              dest :=
+                                 idtacM 
+                                    (Message.addDetail
+                                        (Message.fromString (attach "undischarged typing obligation" origin))
+                                        (errorDetail hist "Totality obligation" (fn () => ())))))\
+
+                | _ =>
+                  \(fnc =>   
+                       defer st (Total, table, goal, dest, history))\
+               /
          end
 
 
@@ -2487,6 +2548,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
               | Eqkind => typecheckEqkind st table goal dest history'
               | Eqrefl => typecheckEqrefl st table goal dest history'
               | Positive => typecheckPositive st table goal dest history'
+              | Total => typecheckTotal st table goal dest history'
 
               | Lleq =>
                    constraints := (table, goal, dest, history) :: !constraints)
@@ -3214,6 +3276,22 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.nat RT.natStrict;
             insert Prim.integer RT.integerStrict;
             insert Prim.symbol RT.symbolStrict
+         end
+
+      val () =
+         let
+            fun insert const tac = H.insert totalityTactics const tac
+         in
+            insert Prim.void RT.voidTotal';
+            insert Prim.unit RT.unitTotal';
+            insert Prim.bool RT.boolTotal';
+            insert Prim.forall RT.forallTotal';
+            insert Prim.arrow RT.arrowTotal';
+            insert Prim.exists RT.existsTotal';
+            insert Prim.prod RT.prodTotal';
+            insert Prim.sum RT.sumTotal';
+            insert Prim.future RT.futureTotal';
+            insert Prim.nat RT.natTotal'
          end
 
 

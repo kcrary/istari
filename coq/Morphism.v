@@ -471,6 +471,17 @@ reflexivity.
 Qed.
 
 
+Add Parametric Morphism object : (@sequal object)
+  with signature equiv ==> equiv ==> equiv
+  as equiv_sequal.
+Proof.
+intros m1 m1' H1 m2 m2' H2.
+unfold sequal.
+rewrite H1, H2.
+reflexivity.
+Qed.
+
+
 Lemma equiv_deqtype :
   forall object (a a' b b' : @term object),
     equiv a a'

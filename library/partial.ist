@@ -10,6 +10,7 @@ aliasExport /admiss/ Prim.admiss;
 aliasExport /uptype/ Prim.uptype;
 aliasExport (Symbol.fromValue "seq") Prim.seq;
 aliasExport /bottom/ Prim.bottom;
+aliasExport /total/ Prim.total;
 
 
 lemma "partial_type"
@@ -123,6 +124,70 @@ RuleTactic.uptypeAdmiss.
 hyp /H/.
 qed ();
 
+
+
+(*
+Built-in:
+
+defineRaw /total a/
+/
+  exists (_ : a <: partial a) . forall (x : a) . halts x
+/;
+
+The first conjunct is needed because we need to know
+that a is strict for halts x to be well-formed.
+*)
+
+
+lemma "total_type"
+/
+  total : intersect i . U i -> U i
+/;
+
+inference.
+unfold /total/.
+typecheck.
+qed ();
+recordTyping "total_type";
+
+
+
+alias /sequal/ Prim.sequal;
+
+lemma "seqt_type"
+/
+  `seqt : intersect i (a b : U i) . total a -g> a -> (a -> b) -> b
+/;
+
+inference.
+unfold /seqt/.
+introOf /i a b Htotal/.
+destruct /Htotal/ /Hstrict Htotal/.
+unhide.
+introOfRaw /x/ >> auto.
+  {
+  subsume /partial a -> (a -> partial b) -> partial b/ >> typecheck.
+  }
+introOfRaw /m/ >> auto.
+  {
+  subsume /(a -> partial b) -> partial b/ >> typecheck.
+  }
+assert /sequal m (fn y . m y)/ /Heq/.
+  {
+  RuleTactic.forallEtaSequal (parseCurr /a/) (Term.Sub (parseCurr /b/, Term.shift1)).
+  unfold /arrow in m/.
+  hypof.
+  }
+rewrite /-> Heq/.
+assert /sequal (seq y = x in m y) (m x)/ /Heq'/.
+  {
+  RuleTactic.seqHaltsSequal.
+  apply /Htotal/.
+  }
+rewrite /-> Heq'/.
+typecheck.
+qed ();
+recordTyping "seqt_type";
 
 
 endModule ();

@@ -555,6 +555,11 @@ signature RULE_TACTIC =
       val sequalSymm : tactic
       val sequalTrans : tactic1                   (* N *)
       val sequalCompat : tactic3                  (* M N P *)
+      val forallEtaSequal : tactic2               (* A B *)
+      val arrowEtaSequal : tactic2                (* A B *)
+      val existsEtaSequal : tactic2               (* A B *)
+      val prodEtaSequal : tactic2                 (* A B *)
+      val futureEtaSequal : tactic1               (* A *)
       val partialForm : tactic
       val partialEq : tactic
       val partialFormUniv : tactic
@@ -595,29 +600,43 @@ signature RULE_TACTIC =
       val seqHaltsSequal : tactic
       val seqHaltsInv : tactic1                   (* N *)
       val totalStrict : tactic
+      val voidTotal' : tactic
       val voidStrict : tactic
       val unitTotal : tactic
+      val unitTotal' : tactic
       val unitStrict : tactic
       val boolTotal : tactic
+      val boolTotal' : tactic
       val boolStrict : tactic
       val forallTotal : tactic2                   (* A B *)
+      val forallTotal' : tactic
       val forallStrict : tactic
       val arrowTotal : tactic2                    (* A B *)
+      val arrowTotal' : tactic
       val arrowStrict : tactic
       val intersectStrict : tactic
       val existsTotal : tactic2                   (* A B *)
+      val existsTotal' : tactic
       val existsStrict : tactic
       val prodTotal : tactic2                     (* A B *)
+      val prodTotal' : tactic
       val prodStrict : tactic
       val sumTotal : tactic2                      (* A B *)
+      val sumTotal' : tactic
       val sumStrict : tactic
       val futureTotal : tactic1                   (* A *)
+      val futureTotal' : tactic
       val futureStrict : tactic
+      val setTotal' : tactic
       val setStrict : tactic
+      val isetTotal' : tactic
       val isetStrict : tactic
+      val quotientTotal' : tactic
       val natTotal : tactic
+      val natTotal' : tactic
       val natStrict : tactic
       val typeHalts : tactic
+      val reduceSeqTotal : tactic1                (* A *)
       val uptypeForm : tactic
       val uptypeEq : tactic
       val uptypeFormUniv : tactic
@@ -5749,6 +5768,36 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.sequalCompat xM xN xP)
          end
 
+      fun forallEtaSequal xA xB =
+         let
+         in
+            refine (Rule.forallEtaSequal xA xB (T.evar ()))
+         end
+
+      fun arrowEtaSequal xA xB =
+         let
+         in
+            refine (Rule.arrowEtaSequal xA xB (T.evar ()))
+         end
+
+      fun existsEtaSequal xA xB =
+         let
+         in
+            refine (Rule.existsEtaSequal xA xB (T.evar ()))
+         end
+
+      fun prodEtaSequal xA xB =
+         let
+         in
+            refine (Rule.prodEtaSequal xA xB (T.evar ()))
+         end
+
+      fun futureEtaSequal xA =
+         let
+         in
+            refine (Rule.futureEtaSequal xA (T.evar ()))
+         end
+
       val partialForm =
          let
             do () = lift
@@ -6084,6 +6133,12 @@ structure RuleTactic :> RULE_TACTIC =
                 ]
          end
 
+      val voidTotal' =
+         let
+         in
+            refine (Rule.voidTotal')
+         end
+
       val voidStrict =
          let
          in
@@ -6095,6 +6150,12 @@ structure RuleTactic :> RULE_TACTIC =
             do () = lift
          in
             refine (Rule.unitTotal (T.evar ()))
+         end
+
+      val unitTotal' =
+         let
+         in
+            refine (Rule.unitTotal')
          end
 
       val unitStrict =
@@ -6110,6 +6171,12 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.boolTotal (T.evar ()))
          end
 
+      val boolTotal' =
+         let
+         in
+            refine (Rule.boolTotal')
+         end
+
       val boolStrict =
          let
          in
@@ -6120,6 +6187,18 @@ structure RuleTactic :> RULE_TACTIC =
          let
          in
             refine (Rule.forallTotal xA xB (T.evar ()))
+         end
+
+      val forallTotal' =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.forallTotal' (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
          end
 
       val forallStrict =
@@ -6138,6 +6217,18 @@ structure RuleTactic :> RULE_TACTIC =
          let
          in
             refine (Rule.arrowTotal xA xB (T.evar ()))
+         end
+
+      val arrowTotal' =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.arrowTotal' (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                ]
          end
 
       val arrowStrict =
@@ -6165,6 +6256,18 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.existsTotal xA xB (T.evar ()))
          end
 
+      val existsTotal' =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.existsTotal' (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
       val existsStrict =
          let
             do () = lift
@@ -6183,6 +6286,13 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.prodTotal xA xB (T.evar ()))
          end
 
+      val prodTotal' =
+         let
+            do () = lift
+         in
+            refine (Rule.prodTotal' (T.evar ()) (T.evar ()))
+         end
+
       val prodStrict =
          let
             do () = lift
@@ -6194,6 +6304,13 @@ structure RuleTactic :> RULE_TACTIC =
          let
          in
             refine (Rule.sumTotal xA xB (T.evar ()))
+         end
+
+      val sumTotal' =
+         let
+            do () = lift
+         in
+            refine (Rule.sumTotal' (T.evar ()) (T.evar ()))
          end
 
       val sumStrict =
@@ -6209,11 +6326,30 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.futureTotal xA (T.evar ()))
          end
 
+      val futureTotal' =
+         let
+            do () = lift
+         in
+            refine (Rule.futureTotal' (T.evar ()))
+         end
+
       val futureStrict =
          let
             do () = lift
          in
             refine (Rule.futureStrict (T.evar ()))
+         end
+
+      val setTotal' =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.setTotal' (T.evar ()) (T.evar ()))
+            >>> [
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                idtac,
+                ]
          end
 
       val setStrict =
@@ -6224,6 +6360,18 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.setStrict (T.evar ()) (T.evar ()))
             >>> [
                 chdir (D.bindsVary dir [binder [2, 1, 2, ] (J.concl jud), ]),
+                idtac,
+                ]
+         end
+
+      val isetTotal' =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.isetTotal' (T.evar ()) (T.evar ()))
+            >>> [
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
                 idtac,
                 ]
          end
@@ -6240,11 +6388,30 @@ structure RuleTactic :> RULE_TACTIC =
                 ]
          end
 
+      val quotientTotal' =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.quotientTotal' (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), binder [1, 2, ] (J.concl jud), ]),
+                idtac,
+                ]
+         end
+
       val natTotal =
          let
             do () = lift
          in
             refine (Rule.natTotal (T.evar ()))
+         end
+
+      val natTotal' =
+         let
+         in
+            refine (Rule.natTotal')
          end
 
       val natStrict =
@@ -6258,6 +6425,12 @@ structure RuleTactic :> RULE_TACTIC =
             do () = lift
          in
             refine (Rule.typeHalts (T.evar ()))
+         end
+
+      fun reduceSeqTotal xA =
+         let
+         in
+            refine (Rule.reduceSeqTotal xA (T.evar ()) (T.evar ()))
          end
 
       val uptypeForm =

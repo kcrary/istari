@@ -34,6 +34,9 @@ signature REDUCTION =
       (* does nothing on native terms, fails otherwise *)
       val reflNative : reduction
 
+      (* reduces seq V M --> M V *)
+      val seq : reduction
+
       val user1 : reduction1 -> reduction
       val user2 : reduction2 -> reduction
 
@@ -133,6 +136,7 @@ signature REDUCTION_INTERNAL =
              | Compat of reduction list
              | Nativered
              | ReflNative
+             | Seq
              | User1 of constant * int * term
              | User2 of constant * int * int * constant * int * term
          end
@@ -159,6 +163,8 @@ functor ReductionFun (structure Term : TERM
                       structure Constant : CONSTANT_INTERNAL
                                            where type constant = Term.constant
                                            where type term = Term.term
+                      structure Valuability : VALUABILITY
+                                              where type term = Term.term
                       structure Simplify : SIMPLIFY
                                            where type term = Term.term
                                            where type sub = Term.sub
@@ -171,6 +177,8 @@ functor ReductionFun (structure Term : TERM
                       structure Pickling : PICKLING
                                            where type constant = Term.constant
                                            where type term = Term.term
+                      structure Prim : PRIM
+                                       where type constant = Term.constant
                       structure Unsafe : UNSAFE)
    :> 
    REDUCTION_PRIV
@@ -199,6 +207,7 @@ functor ReductionFun (structure Term : TERM
              | Compat of reduction list
              | Nativered
              | ReflNative
+             | Seq
              | User1 of reduction1
              | User2 of reduction2
 
@@ -217,6 +226,7 @@ functor ReductionFun (structure Term : TERM
       fun compat l = Compat l
       val native = Nativered
       val reflNative = ReflNative
+      val seq = Seq
       val user1 = User1
       val user2 = User2
 
@@ -331,6 +341,20 @@ functor ReductionFun (structure Term : TERM
 
                          | SOME _ =>
                               raise Reduce))
+
+           | Seq =>
+                (case (h, spine) of
+                    (Const const, App m1 :: App m2 :: rest) =>
+                       if Constant.eq (const, Prim.seq) then
+                          if Valuability.valuability m1 > 0 then
+                             Elim (m2, App m1 :: rest)
+                          else
+                             raise Reduce
+                       else
+                          raise Reduce
+
+                  | _ =>
+                       raise Reduce)
 
            | Within (path, red) =>
                 (try
@@ -547,7 +571,8 @@ functor ReductionFun (structure Term : TERM
                      | Nativered => 5
                      | User1 _ => 6
                      | User2 _ => 7
-                     | ReflNative => 8)
+                     | ReflNative => 8
+                     | Seq => 9)
                    [
                    P.wrap
                       (fn Trans l => l
@@ -589,7 +614,9 @@ functor ReductionFun (structure Term : TERM
                       User2
                       pu2,
 
-                   P.const ReflNative
+                   P.const ReflNative,
+
+                   P.const Seq
                    ])
 
       val puReduction1 =

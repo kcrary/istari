@@ -926,6 +926,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       val accSym = Symbol.fromValue "Acc"
       val datatypeSym = Symbol.fromValue "Datatype"
       val natSym = Symbol.fromValue "Nat"
+      val partialSym = Symbol.fromValue "Partial"
 
       val constAcc = loadSymbol accSym "Acc"
       val constLeq = loadSymbol natSym "leq"
@@ -1086,6 +1087,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          iterator : constant,               (* the iterator constant *)
          strip : constant,                  (* the strip constant *)
          strict : constant,                 (* the strictness constant *)
+         total : constant,                  (* the totality constant *)
          }
 
       datatype con_environment =
@@ -1160,16 +1162,17 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
       val puTenv : type_environment P.pu =
          P.wrap
-            (fn TENV {const, red, args, numargs, adisj, iterator, strip, strict} =>
-                (const, red, args, numargs, adisj, iterator, strip, strict))
-            (fn (const, red, args, numargs, adisj, iterator, strip, strict) =>
-                TENV {const=const, red=red, args=args, numargs=numargs, adisj=adisj, iterator=iterator, strip=strip, strict=strict})
-            (P.tuple8
+            (fn TENV {const, red, args, numargs, adisj, iterator, strip, strict, total} =>
+                (const, red, args, numargs, adisj, iterator, strip, strict, total))
+            (fn (const, red, args, numargs, adisj, iterator, strip, strict, total) =>
+                TENV {const=const, red=red, args=args, numargs=numargs, adisj=adisj, iterator=iterator, strip=strip, strict=strict, total=total})
+            (P.tuple9
                 PP.puConstant
                 R.puReduction
                 (P.list (P.pair (P.option PP.puSymbol) pumx))
                 P.int
                 pumx
+                PP.puConstant
                 PP.puConstant
                 PP.puConstant
                 PP.puConstant)
@@ -2176,7 +2179,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             val () =
                List.app
-                  (fn (TENV {const, iterator, numargs=numberOfIndexArgs, strip, strict}) =>
+                  (fn (TENV {const, iterator, numargs=numberOfIndexArgs, strip, strict, total}) =>
                       (
                       insert DE.destructTactics const destructor';
    
@@ -2186,7 +2189,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
    
                       insert EqualityTacticInternal.injectionTactics const injector';
 
-                      insert TypecheckInternal.strictnessTactics const (Backchain.applyRaw (ETerm.literal (T.Const strict)))
+                      insert TypecheckInternal.strictnessTactics const (Backchain.applyRaw (ETerm.literal (T.Const strict)));
+
+                      insert TypecheckInternal.totalityTactics const (Backchain.applyRaw (ETerm.literal (T.Const total)))
                       ))
                   tplist
 
@@ -4266,9 +4271,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                    T.apply2 Prim.forall
                                       (X.mterm c)
                                       (T.Lam (symopt, u)))
-                               (T.apply2 Prim.forall
-                                   tp
-                                   (T.Lam (NONE, T.apply1 Prim.halts T.zero)))
+                               (T.apply1 Prim.total tp)
                                args
 
                          val strictdef =
@@ -4315,7 +4318,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                          close total;
                          close strict;
 
-                         strict
+                         (total, strict)
                       end)
                   typeInfoList
 
@@ -4401,8 +4404,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             val tplist =
                map4
-                  (fns (const, red, stripConst, _, args, numberOfIndexArgs) afield (iterator, _) strict => 
-                      TENV {const=const, red=red, args=args, numargs=numberOfIndexArgs, adisj=afield, iterator=iterator, strip=stripConst, strict=strict})
+                  (fns (const, red, stripConst, _, args, numberOfIndexArgs) afield (iterator, _) (total, strict) => 
+                      TENV {const=const, red=red, args=args, numargs=numberOfIndexArgs, adisj=afield, iterator=iterator, strip=stripConst, strict=strict, total=total})
                   typeInfoList indextpsList iterInfoList strictnessLemmas
 
             val conlist =

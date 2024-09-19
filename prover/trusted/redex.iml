@@ -41,6 +41,8 @@ functor RedexFun (structure Term : TERM
                   structure Constant : CONSTANT
                                        where type constant = Term.constant
                                        where type term = Term.term
+                  structure Valuability : VALUABILITY
+                                          where type term = Term.term
                   structure Native : NATIVE
                                      where type constant = Term.constant
                                      where type term = Term.term
@@ -333,7 +335,7 @@ functor RedexFun (structure Term : TERM
 
       val () = H.insert userTable Prim.letnext OTHER
       val () = H.insert redexTable Prim.letnext reduceLetnext
-                       
+
 
 
       fun reduceFnann whnf spine =
@@ -349,5 +351,26 @@ functor RedexFun (structure Term : TERM
 
       val () = H.insert userTable Prim.fnann OTHER
       val () = H.insert redexTable Prim.fnann reduceFnann
+
+
+      fun reduceSeq whnf spine =
+         (case spine of
+             T.App m1 :: T.App m2 :: spine' =>
+                let
+                   val m1' = whnf m1
+                in
+                   if Valuability.valuability m1' > 0 then
+                      SOME (T.Elim (m2, T.App m1' :: spine'))
+                   else
+                      NONE
+                end
+
+           | _ => NONE)
+
+      val () = H.insert userTable Prim.seq OTHER
+      val () = H.insert redexTable Prim.seq reduceSeq
+
+      val () = H.insert userTable Prim.seqt OTHER
+      val () = H.insert redexTable Prim.seqt reduceSeq
 
    end

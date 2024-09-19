@@ -3820,6 +3820,41 @@ sequal P[M / x] P[N / x]
 
 
 
+(* Strong eta *)
+
+rule forallEtaSequal
+sequal M (fn x . M $x)
+>>
+|-
+M : forall {x : A} B ;
+
+
+rule arrowEtaSequal
+sequal M (fn x . M $x)
+>>
+|-
+M : arrow A B ;
+
+
+rule existsEtaSequal
+sequal M (M #1, M #2)
+>>
+|- M : exists {x : A} B ;
+
+
+rule prodEtaSequal
+sequal M (M #1, M #2)
+>>
+|- M : prod A B ;
+
+
+rule futureEtaSequal
+sequal M (next (M #prev))
+>>
+|- M : future A ;
+
+
+
 (* Partial types *)
 
 rule partialForm
@@ -4096,6 +4131,11 @@ A <: partial A
 x : A |- halts $x ;
 
 
+rule voidTotal'
+total void ext ((), (fn x . ()))
+>>
+
+
 rule voidStrict
 void <: partial void
 >>
@@ -4105,6 +4145,11 @@ rule unitTotal
 halts M
 >>
 |- M : unit ;
+
+
+rule unitTotal'
+total unit ext ((), (fn x . ()))
+>>
 
 
 rule unitStrict
@@ -4118,6 +4163,11 @@ halts M
 |- M : bool ;
 
 
+rule boolTotal'
+total bool ext ((), (fn x . ()))
+>>
+
+
 rule boolStrict
 bool <: partial bool
 >>
@@ -4127,6 +4177,13 @@ rule forallTotal
 halts M
 >>
 |- M : forall {x : A} B ;
+
+
+rule forallTotal'
+total (forall {x : A} B) ext ((), (fn x . ()))
+>>
+|- A : type ;
+x : A |- B : type ;
 
 
 rule forallStrict
@@ -4140,6 +4197,13 @@ rule arrowTotal
 halts M
 >>
 |- M : arrow A B ;
+
+
+rule arrowTotal'
+total (arrow A B) ext ((), (fn x . ()))
+>>
+|- A : type ;
+x : A |- B : type ;
 
 
 rule arrowStrict
@@ -4162,6 +4226,13 @@ halts M
 |- M : exists {x : A} B ;
 
 
+rule existsTotal'
+total (exists {x : A} B) ext ((), (fn x . ()))
+>>
+|- A : type ;
+x : A |- B : type ;
+
+
 rule existsStrict
 exists {x : A} B <: partial (exists {x : A} B)
 >>
@@ -4173,6 +4244,13 @@ rule prodTotal
 halts M
 >>
 |- M : prod A B ;
+
+
+rule prodTotal'
+total (prod A B) ext ((), (fn x . ()))
+>>
+|- A : type ;
+|- B : type ;
 
 
 rule prodStrict
@@ -4188,6 +4266,13 @@ halts M
 |- M : sum A B ;
 
 
+rule sumTotal'
+total (sum A B) ext ((), (fn x . ()))
+>>
+|- A : type ;
+|- B : type ;
+
+
 rule sumStrict
 sum A B <: partial (sum A B)
 >>
@@ -4201,10 +4286,23 @@ halts M
 |- M : future A ;
 
 
+rule futureTotal'
+total (future A) ext ((), (fn x . ()))
+>>
+promote |- A : type ;
+
+
 rule futureStrict
 future A <: partial (future A)
 >>
 promote |- A : type ;
+
+
+rule setTotal'
+total (set {x : A} B) ext ((), (fn x . ()))
+>>
+x : A |- B : type ;
+|- total A ;
 
 
 rule setStrict
@@ -4214,6 +4312,13 @@ x : A |- B : type ;
 |- A <: partial A ;
 
 
+rule isetTotal'
+total (iset {x : A} B) ext ((), (fn x . ()))
+>>
+x : A |- B : type ;
+|- total A ;
+
+
 rule isetStrict
 iset {x : A} B <: partial (iset {x : A} B)
 >>
@@ -4221,10 +4326,23 @@ x : A |- B : type ;
 |- A <: partial A ;
 
 
+rule quotientTotal'
+total (quotient A (fn x y . B)) ext ((), (fn x . ()))
+>>
+|- quotient A (fn x y . B) : type ;
+x : A, y : A |- B : type ;
+|- total A ;
+
+
 rule natTotal
 halts M
 >>
 |- M : nat ;
+
+
+rule natTotal'
+total nat ext ((), (fn x . ()))
+>>
 
 
 rule natStrict
@@ -4236,6 +4354,13 @@ rule typeHalts
 halts A
 >>
 |- A : type ;
+
+
+rule reduceSeqTotal
+sequal (seq M (fn x . N)) (N [M / x])
+>>
+|- M : A ;
+|- total A ;
 
 
 

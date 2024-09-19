@@ -23,51 +23,6 @@ Require Import ValidationUtil.
 Require Import Equivalences.
 
 
-Lemma def_quotient :
-  forall a b,
-    equiv (app (app Defs.quotient a) (lam (lam b))) (quotient a b).
-Proof.
-intros a m.
-unfold Defs.quotient.
-eapply equiv_trans.
-  {
-  apply steps_equiv.
-  eapply star_step.
-    {
-    apply step_app1.
-    apply step_app2.
-    }
-  simpsub.
-  eapply star_step.
-    {
-    apply step_app2.
-    }
-  simpsub.
-  cbn [Nat.add].
-  simpsub.
-  apply star_refl.
-  }
-apply equiv_quotient; auto using equiv_refl.
-apply steps_equiv.
-eapply star_step.
-  {
-  apply step_app1.
-  apply step_app2.
-  }
-simpsub.
-cbn [Nat.add].
-eapply star_step.
-  {
-  apply step_app2.
-  }
-simpsub.
-cbn [Nat.add].
-rewrite -> subst_var01_sh2.
-apply star_refl.
-Qed.
-
-
-
 Hint Rewrite def_quotient : prepare.
 
 

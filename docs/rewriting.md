@@ -233,6 +233,15 @@ rewriter's weakening and compatibility tables.
   firm, and soft-strict constants.
 
 
+- `reduceSeq /[short-targets]/`
+
+  Contracts occurrences of `seq x = M in N` or `seqt x = M in N` into
+  `N [M / x]`.  If `M` is not valuable, the rewrite generates subgoals
+  `M : E` and `total E` (where `E` is a fresh evar) for the
+  typechecker to solve.
+  
+
+
 
 ### Rewriting tools
 

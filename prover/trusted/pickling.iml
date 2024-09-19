@@ -29,7 +29,7 @@ functor PicklingFun (structure Term : TERM
                      structure Trail : TRAIL_PRIV
                                        where type term = Term.term
                                        where type ebind = Term.ebind
-                     structure Constant : CONSTANT_INTERNAL
+                     structure Constant : CONSTANT_PRIV
                                           where type constant = Term.constant
                                           where type term = Term.term)
    :>
@@ -113,11 +113,32 @@ functor PicklingFun (structure Term : TERM
 
       val puLuid = P.pair puNonce P.int
 
-      val puInfo = 
-         P.tuple3
-            (P.option puTermFwd)
-            (P.list puSymbol)
-            Constant.puOpacity
+      val puOpacity =
+         Pickle.alt
+            (fn C.SOFT => 0
+              | C.FIRM => 1
+              | C.SOFT_STRICT => 2
+              | C.HARD => 3
+              | C.OPAQUE => 4)
+            [
+            Pickle.const C.SOFT,
+            Pickle.const C.FIRM,
+            Pickle.const C.SOFT_STRICT,
+            Pickle.const C.HARD,
+            Pickle.const C.OPAQUE
+            ]
+
+      val puConstInfo = 
+         P.wrap
+            (fn C.CI { def, path, opacity, valu } => 
+                (def, path, opacity, valu))
+            (fn (def, path, opacity, valu) =>
+                C.CI { def=def, path=path, opacity=opacity, valu=valu })
+            (P.tuple4
+                (P.option puTermFwd)
+                (P.list puSymbol)
+                puOpacity
+                P.int)
 
 
       fun pathToName path =
@@ -152,8 +173,7 @@ functor PicklingFun (structure Term : TERM
                          (luid, Sum.INL (pathToName (Constant.path const)))
                          )
                    else
-                      (luid,
-                       Sum.INR (C.definitionTrue const, C.path const, C.opacity const))
+                      (luid, Sum.INR (C.export const))
                 end)
 
             (fn (luid, info) =>
@@ -170,7 +190,7 @@ functor PicklingFun (structure Term : TERM
        
                          | SOME const => const)
 
-                  | Sum.INR (def, path, opac) =>
+                  | Sum.INR info =>
                        (* It's the first time we've seen this constant while loading this file,
                           and by uniqueness of nonces, we haven't seen it in any other files.
                           So this is the first time we've seen this constant, unless we're reloading
@@ -185,14 +205,14 @@ functor PicklingFun (structure Term : TERM
                           (fn () =>
                               (* This really is the first time we've seen this constant; create it. *)
                               let
-                                 val const = C.declare true def path opac
+                                 val const = C.import info
                               in
                                  CT.insert constantToLuidTable const (luid, ref false);
 
                                  const
                               end)))
 
-            (P.pair puLuid (P.sum P.string puInfo))
+            (P.pair puLuid (P.sum P.string puConstInfo))
 
 
       val zero = Word32.fromInt 0
