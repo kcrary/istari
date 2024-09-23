@@ -110,10 +110,13 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
          *)
          working : group,
 
-         (* lookup table to give names to constants, returns address in reverse,
-            the resulting address cannot be empty
+         (* lookup table to give names to constants
+
+            It maps a constant to a path, and a lists of paths.  All the paths are nonempty
+            and given in reverse.  The first path is a good path to the constant.  The list
+            is a history of old paths that might map to the constant, but must be checked.
          *)
-         reverse : symbol list CD.dict
+         reverse : (symbol list * symbol list list) CD.dict
          }
            
       val initialEnv =
@@ -123,9 +126,9 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
                PrimInternal.primitives,
             D.empty)
 
-      val initialReverse =
+      val initialReverse : (symbol list * symbol list list) CD.dict =
          List.foldl
-            (fns (sym, const) d => CD.insert d const [sym])
+            (fns (sym, const) d => CD.insert d const ([sym], []))
             CD.empty
             PrimInternal.primitives
 
@@ -145,79 +148,6 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
 
       (* the handler is in Prover *)
       exception Unclean of Term.problem * Term.term
-
-      fun declare sym def =
-         let
-            val ST { current, path, env = G (envConsts, envMods), working = G (workingConsts, workingMods), reverse } = R.deref theState
-
-            val opac =
-               (case def of
-                   NONE => C.OPAQUE
-
-                 | SOME _ => C.HARD)
-         in
-            if D.member workingConsts sym then
-               signalError (String.concat
-                               [
-                               "the name ",
-                               Symbol.toValue sym,
-                               " is already used in the current module"
-                               ])
-            else
-               let
-                  val const = 
-                     try
-                        C.declare false def (sym :: path) opac
-                     with
-                        ConstantInternal.DeclareUnclean prob =>
-                           (case def of
-                               NONE => raise (Fail "impossible")
-
-                             | SOME m => raise (Unclean (prob, m)))
-               in
-                  R.assign theState
-                     (ST {
-                         current = current,
-                         path = path,
-                         env = G (D.insert envConsts sym const, envMods),
-                         working = G (D.insert workingConsts sym const, workingMods),
-                         reverse = CD.insert reverse const [sym]
-                         });
-
-                  const
-               end
-         end
-
-
-
-      fun reify sym jud v =
-         let
-            val ST { current, path, env = G (envConsts, envMods), working = G (workingConsts, workingMods), reverse } = R.deref theState
-         in
-            if D.member workingConsts sym then
-               signalError (String.concat
-                               [
-                               "the name ",
-                               Symbol.toValue sym,
-                               " is already used in the current module"
-                               ])
-            else
-               let
-                  val result as (const, _, _) = Refine.reify jud v (sym :: path)
-               in
-                  R.assign theState
-                     (ST {
-                         current = current,
-                         path = path,
-                         env = G (D.insert envConsts sym const, envMods),
-                         working = G (D.insert workingConsts sym const, workingMods),
-                         reverse = CD.insert reverse const [sym]
-                         });
-
-                  result
-               end
-         end
-
 
 
 
@@ -277,7 +207,7 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
             (case CD.find reverse const of
                 NONE => question :: List.rev (C.path const)
                 
-              | SOME name => List.rev name)
+              | SOME (name, _) => List.rev name)
          end
 
       fun lastname const =
@@ -293,12 +223,173 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
 
                      | name :: _ => name)
                 
-              | SOME [] => raise (Fail "invariant")
+              | SOME ([], _) => raise (Fail "invariant")
 
-              | SOME (name :: _) => name)
+              | SOME ((name :: _), _) => name)
          end
 
       fun toString const = String.concatWith "." (map Symbol.toValue (name const))
+
+
+
+      (* the mapping for const in reverse is probably broken, fix it *)
+      fun correctReverse env const reverse =
+         (case CD.find reverse const of
+             NONE =>
+                reverse
+
+           | SOME (path, history) =>
+                let
+                   fun loop l =
+                      (case l of
+                          [] => NONE
+       
+                        | path :: rest =>
+                             (case resolveConst env (List.rev path) of
+                                 NONE =>
+                                    loop rest
+       
+                               | SOME const' =>
+                                    if Constant.eq (const, const') then
+                                       SOME (path, rest)
+                                    else
+                                       loop rest))
+                in
+                   (case loop (path :: history) of
+                       NONE =>
+                          CD.remove reverse const
+       
+                     | SOME (path, rest) =>
+                          CD.insert reverse const (path, rest))
+                end)
+
+
+      (* the mappings in the group are probably broken, fix them *)
+      fun correctReverseGroup env (G (consts, mods)) oldReverse =
+         D.foldl
+            (fn (_, group, reverse) => correctReverseGroup env group reverse)
+            (D.foldl
+                (fn (_, const, reverse) => correctReverse env const reverse)
+                oldReverse
+                consts)
+            mods
+
+
+
+      fun insertEnvConst (G (envConsts, envMods)) reverse sym const =
+         let
+            val (old, _, envConsts') =
+               D.operate envConsts sym (fn () => const) (fn _ => const)
+               
+            val env' = G (envConsts', envMods)
+
+            val reverse' =
+               (case old of
+                   NONE =>
+                      reverse
+
+                 | SOME oldconst =>
+                      correctReverse env' oldconst reverse)
+         in
+            (env', reverse')
+         end
+
+
+      fun insertEnvMod (G (envConsts, envMods)) reverse sym group =
+         let
+            val (old, _, envMods') =
+               D.operate envMods sym (fn () => group) (fn _ => group)
+
+            val env' = G (envConsts, envMods')
+
+            val reverse' =
+               (case old of
+                   NONE =>
+                      reverse
+
+                 | SOME oldgroup =>
+                      correctReverseGroup env' oldgroup reverse)
+         in
+            (env', reverse')
+         end
+
+
+
+      fun declare sym def =
+         let
+            val ST { current, path, env, working = G (workingConsts, workingMods), reverse } = R.deref theState
+
+            val opac =
+               (case def of
+                   NONE => C.OPAQUE
+
+                 | SOME _ => C.HARD)
+         in
+            if D.member workingConsts sym then
+               signalError (String.concat
+                               [
+                               "the name ",
+                               Symbol.toValue sym,
+                               " is already used in the current module"
+                               ])
+            else
+               let
+                  val const = 
+                     try
+                        C.declare false def (sym :: path) opac
+                     with
+                        ConstantInternal.DeclareUnclean prob =>
+                           (case def of
+                               NONE => raise (Fail "impossible")
+
+                             | SOME m => raise (Unclean (prob, m)))
+
+                  val (env', reverse') = insertEnvConst env reverse sym const
+               in
+                  R.assign theState
+                     (ST {
+                         current = current,
+                         path = path,
+                         env = env',
+                         working = G (D.insert workingConsts sym const, workingMods),
+                         reverse = CD.insert reverse' const ([sym], [])
+                         });
+
+                  const
+               end
+         end
+
+
+
+      fun reify sym jud v =
+         let
+            val ST { current, path, env, working = G (workingConsts, workingMods), reverse } = R.deref theState
+         in
+            if D.member workingConsts sym then
+               signalError (String.concat
+                               [
+                               "the name ",
+                               Symbol.toValue sym,
+                               " is already used in the current module"
+                               ])
+            else
+               let
+                  val result as (const, _, _) = Refine.reify jud v (sym :: path)
+
+                  val (env', reverse') = insertEnvConst env reverse sym const
+               in
+                  R.assign theState
+                     (ST {
+                         current = current,
+                         path = path,
+                         env = env',
+                         working = G (D.insert workingConsts sym const, workingMods),
+                         reverse = CD.insert reverse' const ([sym], [])
+                         });
+
+                  result
+               end
+         end
 
 
 
@@ -411,12 +502,12 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
                       let
                          val newpath = name :: path
                       in
-                         CD.insertMerge reverse const newpath
-                            (fn oldpath =>
+                         CD.insertMerge reverse const (newpath, [])
+                            (fn (oldpath, history) =>
                                 if prefer then
-                                   newpath
+                                   (newpath, oldpath :: history)
                                 else
-                                   oldpath)
+                                   (oldpath, newpath :: history))
                       end)
                   reverse
                   consts
@@ -426,18 +517,21 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
 
 
 
+      (* precondition: no collision adding closingName to state *)
       fun endModuleMain closingName closingGroup state =
          let
-            val ST { current, path, env = G (envConst, envMod), working = G (workingConst, workingMod), reverse } = state
+            val ST { current, path, env, working = G (workingConst, workingMod), reverse } = state
 
-            val envMod' = D.insert envMod closingName closingGroup
+            val (env', reverse') = insertEnvMod env reverse closingName closingGroup
+
             val workingMod' = D.insert workingMod closingName closingGroup
-            val reverse' = populate false reverse [closingName] closingGroup
+
+            val reverse' = populate false reverse' [closingName] closingGroup
          in
             ST { 
                current = current,
                path = path,
-               env = G (envConst, envMod'),
+               env = env',
                working = G (workingConst, workingMod'),
                reverse = reverse'
                }
@@ -450,20 +544,17 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
 
            | state :: rest =>
                 let
+                   (* state is the state that prevailed before the module was opened *)
+
                    val ST { current=closingName, working=closingGroup } = R.deref theState
+
+                   (* no collision adding current to state, otherwise wouldn't have opened in the first place *)
 
                    val state' = endModuleMain closingName closingGroup state
                 in
                    R.assign theStack rest;
                    R.assign theState state'
                 end)
-
-
-
-      (* always prefers the latter *)
-      fun union (G (consts1, mods1)) (G (consts2, mods2)) =
-         G (D.union consts1 consts2 (fn (_, _, x) => x),
-            D.union mods1 mods2 (fn (_, _, x) => x))
 
 
 
@@ -482,16 +573,49 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
 
               | SOME group =>
                    let
-                      val env' = union env group
-                      val reverse' = populate true reverse [] group
+                      val G (oldConsts, oldMods) = env
+                      val G (useConsts, useMods) = group
+
+                      val constCollisions : constant list ref = ref nil
+                      val modCollisions : group list ref = ref nil
+
+                      val newEnv =
+                         G (D.union oldConsts useConsts
+                               (fn (_, old, new) =>
+                                   (
+                                   constCollisions := old :: !constCollisions;
+                                   new
+                                   )),
+                            D.union oldMods useMods
+                               (fn (_, old, new) =>
+                                   (
+                                   modCollisions := old :: !modCollisions;
+                                   new
+                                   )))
+
+                      val newReverse = populate true reverse [] group
+
+                      val newReverse =
+                         List.foldl
+                            (fns const reverse =>
+                                correctReverse newEnv const reverse)
+                            newReverse
+                            (!constCollisions)
+
+                      val newReverse =
+                         List.foldl
+                            (fns group reverse =>
+                                correctReverseGroup newEnv group reverse)
+                            newReverse
+                            (!modCollisions)
                    in
                       R.assign theState
                          (ST {
                              current = current,
                              path = path,
-                             env = env',
+                             env = newEnv,
                              working = working,
-                             reverse = reverse'
+                             reverse = newReverse
                              })
                    end)
          end
@@ -500,7 +624,7 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
 
       fun alias sym const =
          let
-            val ST { current, path, env = G (envConsts, envMods), working = working as G (workingConsts, _), reverse } = R.deref theState
+            val ST { current, path, env, working = working as G (workingConsts, _), reverse } = R.deref theState
          in
             if D.member workingConsts sym then
                signalError (String.concat
@@ -510,21 +634,28 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
                                " is already used in the current module"
                                ])
             else
-               R.assign theState
-                  (ST {
-                      current = current,
-                      path = path,
-                      env = G (D.insert envConsts sym const, envMods),
-                      working = working,
-                      reverse = CD.insert reverse const [sym],
-                      })
+               let
+                  val (env', reverse') = insertEnvConst env reverse sym const
+               in
+                  R.assign theState
+                     (ST {
+                         current = current,
+                         path = path,
+                         env = env',
+                         working = working,
+                         reverse = 
+                            CD.insertMerge reverse' const 
+                               ([sym], [])
+                               (fn (path, history) => ([sym], path :: history))
+                         })
+               end
          end
 
 
 
       fun aliasExport sym const =
          let
-            val ST { current, path, env = G (envConsts, envMods), working = working as G (workingConsts, workingMods), reverse } = R.deref theState
+            val ST { current, path, env, working = working as G (workingConsts, workingMods), reverse } = R.deref theState
          in
             if D.member workingConsts sym then
                signalError (String.concat
@@ -534,21 +665,28 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
                                " is already used in the current module"
                                ])
             else
-               R.assign theState
-                  (ST {
-                      current = current,
-                      path = path,
-                      env = G (D.insert envConsts sym const, envMods),
-                      working = G (D.insert workingConsts sym const, workingMods),
-                      reverse = CD.insert reverse const [sym]
-                      })
+               let
+                  val (env', reverse') = insertEnvConst env reverse sym const
+               in
+                  R.assign theState
+                     (ST {
+                         current = current,
+                         path = path,
+                         env = env',
+                         working = G (D.insert workingConsts sym const, workingMods),
+                         reverse = 
+                            CD.insertMerge reverse' const 
+                               ([sym], [])
+                               (fn (path, history) => ([sym], path :: history))
+                         })
+               end
          end
 
 
 
       fun aliasModule sym addr =
          let
-            val ST { current, path, env = env as G (envConsts, envMods), working = working as G (_, workingMods), reverse } = R.deref theState
+            val ST { current, path, env = env, working = working as G (_, workingMods), reverse } = R.deref theState
          in
             (case resolveMod env addr of
                 NONE =>
@@ -568,14 +706,18 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
                                       " is already used in the current module"
                                       ])
                    else
-                      R.assign theState
-                         (ST {
-                             current = current,
-                             path = path,
-                             env = G (envConsts, D.insert envMods sym group),
-                             working = working,
-                             reverse = populate true reverse [sym] group
-                             }))
+                      let
+                         val (env', reverse') = insertEnvMod env reverse sym group
+                      in
+                         R.assign theState
+                            (ST {
+                                current = current,
+                                path = path,
+                                env = env',
+                                working = working,
+                                reverse = populate true reverse' [sym] group
+                                })
+                      end)
          end
 
 

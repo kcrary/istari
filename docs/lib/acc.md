@@ -4,15 +4,13 @@ Accessibility is used for expressing strong induction.  A relation is
 *well-founded* if every element of the underlying type is accessible
 using that relation.
 
-The `Acc` predicate is defined among the primitives, but aliased in
-the `Acc` module:
-
     Acc : intersect (i : level) . forall (A : U i) (R : A -> A -> U i) . A -> U i
 
 So if `A` is a type, and `R` is a relation on `A`, then `Acc A R x`
 means that properties of `x` can be proven by induction.  (Ignoring
 constructive niceties, it means that there are no infinite chains
-descending from `x`.)
+descending from `x`.)  The definition is complicated, and is given at
+the bottom of the page.
 
 For example, well-foundedness of `<` on natural numbers is expressed
 by the lemma:

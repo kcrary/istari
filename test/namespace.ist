@@ -1,0 +1,131 @@
+
+fun shouldbe const str =
+  if Namespace.toString const =$ str then
+    ()
+  else
+    raise (Fail "unexpected reverse resolution");
+
+
+grammardef Namespace
+
+   start shouldbe Constant
+
+end;
+
+grammaron Namespace;
+
+
+
+beginModule "Foo";
+defineRaw /baz/ /()/;
+endModule ();
+
+shouldbe /Foo.baz/ "Foo.baz";
+
+
+
+aliasModule /Bar/ /Foo/;
+
+shouldbe /Foo.baz/ "Bar.baz";
+
+
+
+beginModule "Bar";
+defineRaw /baz/ /()/;
+endModule ();
+
+shouldbe /Foo.baz/ "Foo.baz";
+shouldbe /Bar.baz/ "Bar.baz";
+
+
+
+openModule /Foo/;
+
+shouldbe /Foo.baz/ "baz";
+
+
+
+openModule /Bar/;
+
+shouldbe /Foo.baz/ "Foo.baz";
+shouldbe /Bar.baz/ "baz";
+
+
+
+defineRaw /baz/ /()/;
+
+shouldbe /Foo.baz/ "Foo.baz";
+shouldbe /Bar.baz/ "Bar.baz";
+shouldbe /baz/ "baz";
+
+
+
+alias /baz'/ /baz/;
+
+shouldbe /baz/ "baz'";
+
+
+
+defineRaw /baz'/ /()/;
+
+shouldbe /baz/ "baz";
+
+
+
+val const1 = parseConstant /Foo.baz/;
+
+shouldbe const1 "Foo.baz";
+
+
+beginModule "Foo2";
+beginModule "Foo";
+defineRaw /baz/ /()/;
+val const2 = parseConstant /baz/;
+
+shouldbe const2 "baz";
+
+endModule ();
+
+shouldbe const2 "Foo.baz";
+
+endModule ();
+
+shouldbe const2 "Foo2.Foo.baz";
+
+
+
+openModule /Foo2/;
+
+shouldbe const1 "?.Foo.baz";
+shouldbe const2 "Foo.baz";
+
+
+
+beginModule "Foo3";
+beginModule "Foo";
+defineRaw /baz/ /()/;
+val const3 = parseConstant /baz/;
+
+shouldbe const3 "baz";
+
+endModule ();
+
+shouldbe const3 "Foo.baz";
+
+endModule ();
+
+shouldbe const3 "Foo3.Foo.baz";
+
+
+
+openModule /Foo3/;
+
+shouldbe const1 "?.Foo.baz";
+shouldbe const2 "Foo2.Foo.baz";
+shouldbe const3 "Foo.baz";
+
+
+
+
+
+

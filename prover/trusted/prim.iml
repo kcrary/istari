@@ -68,14 +68,12 @@ signature PRIM =
 
       (* defined *)
       val abort : constant
-      val acc : constant      (* Acc *)
       val ann : constant
       val ap : constant
       val arrow : constant
       val eeqtp : constant
       val fix : constant
       val fnann : constant    (* annotated fn *)
-      val iff : constant
       val implies : constant
       val istp : constant
       val lett : constant     (* let *)
@@ -93,9 +91,11 @@ signature PRIM =
       val zero : constant
 
       (* defined, invisible until placed into library *)
+      val acc : constant                   (* Acc *)
       val bottom : constant
       val eqb : constant
       val cEqzb : constant                 (* Eqzb *)
+      val iff : constant
       val cInteger : constant
       val integer_from_Integer : constant
       val integer_to_Integer : constant
@@ -175,6 +175,8 @@ functor PrimFun (structure Term : TERM
       fun defconstInvis str path m = declare false str path (Constant.Valuability.valuability m) (SOME m)
 
       (* Anticipate where the invisible constants will eventually be made visible. *)
+      val accPath = List.map Symbol.fromValue ["Acc"]
+      val logicPath = List.map Symbol.fromValue ["Logic"]
       val intPath = List.map Symbol.fromValue ["Integer"]
       val natPath = List.map Symbol.fromValue ["Nat"]
       val symPath = List.map Symbol.fromValue ["Symbol"]
@@ -263,10 +265,6 @@ functor PrimFun (structure Term : TERM
       val eeqtp =
          defconst "eeqtp"
          (T.Lam (NONE, T.Lam (NONE, T.apply2 prod (T.apply2 subtype (T.Var 1) (T.Var 0)) (T.apply2 subtype (T.Var 0) (T.Var 1)))))
-
-      val iff =
-         defconst "iff"
-         (T.Lam (NONE, T.Lam (NONE, T.apply2 prod (T.apply2 arrow (T.Var 1) (T.Var 0)) (T.apply2 arrow (T.Var 0) (T.Var 1)))))
 
       val fnann =
          defconst "fnann"
@@ -363,7 +361,7 @@ functor PrimFun (structure Term : TERM
       fun lamsb l m = List.foldr lamb m l
 
       val acc =
-         defconst "Acc"
+         defconstInvis "Acc" accPath
          (* fn A R x .
                exists (a : mu t . exists (y : A) . forall (z : A) . R z y -> t) .
                   fix
@@ -406,6 +404,10 @@ functor PrimFun (structure Term : TERM
                          (T.Var 1)))))
                                      
 
+
+      val iff =
+         defconstInvis "iff" logicPath
+         (T.Lam (NONE, T.Lam (NONE, T.apply2 prod (T.apply2 arrow (T.Var 1) (T.Var 0)) (T.apply2 arrow (T.Var 0) (T.Var 1)))))
 
       val integer_to_nat =
          defconstInvis "integer_to_nat" intPath
