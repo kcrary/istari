@@ -890,8 +890,6 @@ structure FnindInternal :> FNIND_INTERNAL =
 
       open Tactic
 
-      (* We ought to make sure that the rhs(es) do not mention the iterator. If they do, antireduce will get confused. *)
-
       fun defineInd (impargs, expargs) funcs tps =
          let
             val () = ProverInternal.checkpoint ()
@@ -937,7 +935,7 @@ structure FnindInternal :> FNIND_INTERNAL =
 
                             val jud = Judgement.make Seq.empty (T.apply2 Prim.ov a m)
                          in
-                            (fname, iterator, m, a, jud)
+                            (fname, iterator, iterspine, m, a, jud)
                          end)
                      funcs
                      tps
@@ -947,19 +945,19 @@ structure FnindInternal :> FNIND_INTERNAL =
 
             val (goals, f) =
                TypecheckInternal.multigoalTypecheck 
-                  (List.map (fn (fname, _, _, _, jud) => (Symbol.toValue fname, (jud, D.empty))) defs)
+                  (List.map (fn (fname, _, _, _, _, jud) => (Symbol.toValue fname, (jud, D.empty))) defs)
 
             fun finish vs =
                let
                   val () = 
                      List.app
-                        (fn (_, _, _, a, _) => ProverInternal.checkClean a)
+                        (fn (_, _, _, _, a, _) => ProverInternal.checkClean a)
                         defs
 
-                  (* mapping maps iterators to the fnind constants built using them *)
+                  (* mapping maps iterators to the fnind constants built using them and the spine used to build it *)
                   val mapping =
                      ListPair.foldl
-                        (fns (fname, iterator, m, a, jud) v mapping =>
+                        (fns (fname, iterator, iterspine, m, a, jud) v mapping =>
                             let
                                val const = Namespace.declare fname (SOME m)
       
@@ -986,7 +984,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                                       print (Symbol.toValue fname);
                                       print " defined.\n";
 
-                                      CD.insert mapping iterator const
+                                      CD.insert mapping iterator (const, iterspine)
                                       )
       
                                  | Sum.INR _ =>
@@ -997,21 +995,31 @@ structure FnindInternal :> FNIND_INTERNAL =
                         defs
                         vs
 
-                  fun antireduce nIndex nConstrArgs depth m =
+                  (* depth = # of index arguments + # of visible arguments + # of constructor arguments + additional depth *)
+                  fun antireduce depth m =
                      (case Normalize.simplify m of
                          T.Elim (h as T.Const const, spine) =>
-                            (case CD.find mapping const of
+                            (case
+                                (case CD.find mapping const of
+                                    NONE => NONE
+
+                                  | SOME (const', iterspine) =>
+                                       (* Basically shifting the pervasive arguments, since everything else is closed. *)
+                                       (case Prefix.identicalPrefixSpine (T.ssubst iterspine (T.Shift depth)) spine of
+                                           NONE => NONE
+
+                                         | SOME residual => SOME (const', residual)))
+                             of
                                 NONE =>
                                    let
-                                      val (spine', reds) = antireduceSpine nIndex nConstrArgs depth spine
+                                      val (spine', reds) = antireduceSpine depth spine
                                    in
                                       (T.Elim (h, spine'), R.compat reds)
                                    end
             
-                              | SOME const' =>
+                              | SOME (const', residual) =>
                                    let
-                                      val (spine', reds) =
-                                         antireduceSpine nIndex nConstrArgs depth (List.drop spine (nPerv + nDts + nArms))
+                                      val (spine', reds) = antireduceSpine depth residual
             
                                       val reds' =
                                          Int.natrecUp
@@ -1021,7 +1029,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                                    in
                                       (T.Elim (T.Const const', 
                                                Int.natrecUp
-                                                  (fns i l => T.App (T.Var (i + nVis + nConstrArgs + nIndex + depth)) :: l)
+                                                  (fns i l => T.App (T.Var (i + depth)) :: l)
                                                   spine'
                                                   nFnindArgs),
                                        R.trans [R.unfold, R.beta nFnindArgs, R.compat reds'])
@@ -1029,7 +1037,7 @@ structure FnindInternal :> FNIND_INTERNAL =
 
                        | T.Elim (h as T.Var _, spine) =>
                             let
-                               val (spine', reds) = antireduceSpine nIndex nConstrArgs depth spine
+                               val (spine', reds) = antireduceSpine depth spine
                             in
                                (T.Elim (h, spine'), R.compat reds)
                             end
@@ -1039,15 +1047,15 @@ structure FnindInternal :> FNIND_INTERNAL =
                                neglect such a weird scenario.  If it happens, the user can do the definition manually.
                             *)
                             let
-                               val (spine', reds) = antireduceSpine nIndex nConstrArgs depth spine
+                               val (spine', reds) = antireduceSpine depth spine
                             in
                                (T.Elim (h, spine'), R.compat reds)
                             end
 
                        | T.Elim (m1, spine) =>
                             let
-                               val (m1', red1) = antireduce nIndex nConstrArgs depth m1
-                               val (spine', reds) = antireduceSpine nIndex nConstrArgs depth spine
+                               val (m1', red1) = antireduce depth m1
+                               val (spine', reds) = antireduceSpine depth spine
                             in
                                (T.Elim (m1', spine'),
                                 R.trans [R.compat reds, R.within [0] red1])
@@ -1055,7 +1063,7 @@ structure FnindInternal :> FNIND_INTERNAL =
 
                        | T.Lam (binder, m1) =>
                             let
-                               val (m1', red) = antireduce nIndex nConstrArgs (depth+1) m1
+                               val (m1', red) = antireduce (depth+1) m1
                             in
                                (T.Lam (binder, m1'),
                                 R.within [0] red)
@@ -1063,8 +1071,8 @@ structure FnindInternal :> FNIND_INTERNAL =
 
                        | T.Pair (m1, m2) =>
                             let
-                               val (m1', red1) = antireduce nIndex nConstrArgs depth m1
-                               val (m2', red2) = antireduce nIndex nConstrArgs depth m2
+                               val (m1', red1) = antireduce depth m1
+                               val (m2', red2) = antireduce depth m2
                             in
                                (T.Pair (m1', m2'),
                                 R.trans [R.within [0] red1, R.within [1] red2])
@@ -1072,7 +1080,7 @@ structure FnindInternal :> FNIND_INTERNAL =
 
                        | T.Next m1 =>
                             let
-                               val (m1', red) = antireduce nIndex nConstrArgs depth m1
+                               val (m1', red) = antireduce depth m1
                             in
                                (T.Next m1',
                                 R.within [0] red)
@@ -1081,13 +1089,13 @@ structure FnindInternal :> FNIND_INTERNAL =
                        | m' =>
                             (m', R.refl))
 
-                  and antireduceSpine nIndex nConstrArgs depth spine =
+                  and antireduceSpine depth spine =
                      List.foldr
                         (fns elim (newspine, reds) =>
                             (case elim of
                                 T.App m =>
                                    let
-                                      val (m', red) = antireduce nIndex nConstrArgs depth m
+                                      val (m', red) = antireduce depth m
                                    in
                                       (T.App m' :: newspine, red :: reds)
                                    end
@@ -1107,7 +1115,7 @@ structure FnindInternal :> FNIND_INTERNAL =
                                 (* no function for this datatype, skip it *)
                                 ()
 
-                           | SOME fconst =>
+                           | SOME (fconst, _) =>
                                 Vector.app
                                    (fn (constr, nConstrArgs, args, ured) =>
                                        let
@@ -1138,7 +1146,7 @@ structure FnindInternal :> FNIND_INTERNAL =
           
                                           val (rhs, red2) =
                                              (* in middle, replace calls to the iterators with calls to the induction functions *)
-                                             antireduce nIndex nConstrArgs 0 middle
+                                             antireduce (nVis + nIndex + nConstrArgs) middle
           
                                           val ured' = R.new2 fconst (nFnindArgs + nIndex) 0 constr (nVis + nConstrArgs) rhs red1 red2
 
