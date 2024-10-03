@@ -725,6 +725,60 @@ reflexivity.
 Qed.
 
 
+Lemma sound_halts_value :
+  forall G m,
+    value m
+    -> pseq G (deq triv triv (halts m)).
+Proof.
+intros G m Hvalue.
+revert G.
+refine (seq_pseq 1 [] m 0 _ _); cbn.
+intros G Hclm.
+rewrite -> seq_deq.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+exists (iubase (halts_urel stop i (subst s m))).
+simpsub.
+assert (converges (subst s m)) as Hconv.
+  {
+  exists (subst s m).
+  split; auto using star_refl.
+  invert Hvalue.
+  intros a th r Hcanon <-.
+  simpsub.
+  apply value_i; auto. 
+  }
+do2 2 split.
+  {
+  apply interp_eval_refl.
+  apply interp_halts.
+  eapply subst_closub; eauto.
+  }
+
+  {
+  replace (halts_urel stop i (subst s m)) with (halts_urel stop i (subst s' m)).
+    {
+    apply interp_eval_refl.
+    apply interp_halts.
+    eapply subst_closub; eauto.
+    }
+  apply halts_urel_iff.
+  split; auto.
+  intros _.
+  exists (subst s' m).
+  split; auto using star_refl.
+  invert Hvalue.
+  intros a th r Hcanon <-.
+  simpsub.
+  apply value_i; auto. 
+  }
+cut (rel (den (iubase (halts_urel stop i (subst s m)))) i triv triv).
+  {
+  intro; auto.
+  }
+do2 5 split; auto using star_refl; prove_hygiene.
+Qed.
+
 
 Lemma sound_admiss_formation :
   forall G a a',

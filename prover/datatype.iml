@@ -1058,6 +1058,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       val list_rec_cons = Susp.delay (fn () => RR.read (List.map Symbol.fromValue ["Datatype", "list_rec_cons"]) RR.reduction2)
       val con_unroll = Susp.delay (fn () => Option.valOf $ Database.findUnroll $ Namespace.resolve $ List.map Symbol.fromValue ["Datatype", "con"])
       val dt_iter_unroll = Susp.delay (fn () => Option.valOf $ Database.findUnroll $ Namespace.resolve $ List.map Symbol.fromValue ["Datatype", "dt_iter"])
+      val con_zero = Susp.delay (fn () => RR.read (List.map Symbol.fromValue ["Datatype", "con_zero"]) RR.reduction2)
+      val con_succ = Susp.delay (fn () => RR.read (List.map Symbol.fromValue ["Datatype", "con_succ"]) RR.reduction2)
 
       val reductions =
          Susp.delay
@@ -3017,6 +3019,16 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                          val const = define consym (dwrap pre_def) (dwraptp pre_t)
 
                          val numberOfTotalDynArgs = numberOfDynVisibleArgs + List.length conargs
+
+                         (* recognize that const has valuability numberOfTotalDynArgs+1, instead of merely numberOfTotalDynArgs *)
+                         val () =
+                            R.recomputeValuability const
+                               (R.trans [
+                                        R.unfold,
+                                        R.within 
+                                           (Int.natrecUp (fns _ l => 0 :: l) [] numberOfTotalDynArgs)
+                                           (R.user2 (if j = 0 then Susp.force con_zero else Susp.force con_succ))
+                                        ])
 
                          val red =
                             R.trans [R.unfold, R.beta numberOfTotalDynArgs]

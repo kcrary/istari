@@ -309,6 +309,7 @@ structure Tacticgen :> TACTICGEN =
 
             write "\n\
 \      val sumLeft : int -> tactic\n\
+\      val haltsValue : tactic\n\
 \      val checkPositive : tactic\n\
 \      val checkNegative : tactic\n\
 \      val integerIntroOf : tactic\n\
@@ -617,6 +618,7 @@ structure Tacticgen :> TACTICGEN =
 
             write "\n\
 \      fun sumLeft i = refine (Rule.sumLeft i (T.evar ()) (T.evar ()) (T.evar ()))\n\
+\      val haltsValue = refine Rule.haltsValue\n\
 \      val checkPositive = refine Rule.checkPositive\n\
 \      val checkNegative = refine Rule.checkNegative\n\
 \      val integerIntroOf = refine Rule.integerIntroOf\n\

@@ -287,6 +287,7 @@ intros; eapply sound_partial_ext; eauto; done.
 intros; eapply sound_partial_elim; eauto; done.
 intros; eapply sound_halts_eta; eauto; done.
 intros; eapply sound_halts_eta_hyp; eauto; done.
+intros; eapply sound_halts_value; eauto; done.
 intros; eapply sound_fixpoint_induction; eauto; done.
 intros; eapply sound_partial_formation_invert; eauto; done.
 intros; eapply sound_seq_bind; eauto; done.

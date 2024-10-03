@@ -143,6 +143,14 @@ signature REDUCTION_INTERNAL =
 
       val detail : reduction -> Detail.reduction
 
+
+      (* recomputeValuability const red
+
+         if    red : const --> M
+         then  sets const's valuability to M's valuability
+      *)
+      val recomputeValuability : constant -> reduction -> unit
+
    end
 
 
@@ -160,7 +168,7 @@ signature REDUCTION_PRIV =
 
 
 functor ReductionFun (structure Term : TERM
-                      structure Constant : CONSTANT_INTERNAL
+                      structure Constant : CONSTANT_PRIV
                                            where type constant = Term.constant
                                            where type term = Term.term
                       structure Valuability : VALUABILITY
@@ -650,5 +658,10 @@ functor ReductionFun (structure Term : TERM
             puRed
 
       fun detail red = red
+
+
+      fun recomputeValuability const red =
+         Constant.setValuability const
+            (Constant.Valuability.valuability (reduce red (Elim (Const const, []))))
 
    end

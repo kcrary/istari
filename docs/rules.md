@@ -4101,6 +4101,12 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G1, [() / x]G2 |- [() / x]C ext N
 
+- `haltsValue`
+
+      G |- halts M
+      >>
+      (where M is valuable)
+
 - `fixpointInductionEq A M N`
 
       G |- fix M = fix N : partial A
@@ -4462,6 +4468,13 @@ variables.  The official rules, using de Bruijn indices, are given
 - `reduceSeqTotal A M N`
 
       G |- sequal (seq M (fn x . N)) [M / x]N
+      >>
+      G |- M : A
+      G |- total A
+
+- `haltsTotal A M`
+
+      G |- halts M
       >>
       G |- M : A
       G |- total A

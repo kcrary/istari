@@ -136,6 +136,10 @@ signature CONSTANT_PRIV =
       (* Not actually privileged, but it's neater to exclude it from the public signature. *)
       structure Valuability : VALUABILITY where type term = term
 
+
+      (* for the use of Reduction.recomputeValuability *)
+      val setValuability : constant -> int -> unit
+
       (* So we can backpatch the fixpoint constant for valuability computation. *)
       val fix_constant : constant ref
 
@@ -268,15 +272,13 @@ functor ConstantFun (structure Term : TERM
          end
 
 
-      fun reduceValuability const n =
+      fun setValuability const n =
          let
             val info = ArrayInf.sub (theConstants, const)
             val CI { def, path, opacity, valu } = info
          in
             if n < 0 then
                raise (Fail "new valuability is negative")
-            else if n > valu then
-               raise (Fail "new valuability is not lower")
             else
                (
                ArrayInf.update (theConstants, const,
@@ -285,6 +287,17 @@ functor ConstantFun (structure Term : TERM
                   (fn () =>
                       ArrayInf.update (theConstants, const, info))
                )
+         end
+         
+
+      fun reduceValuability const new =
+         let
+            val old = valuability const
+         in
+            if new > old then
+               raise (Fail "new valuability is not lower")
+            else
+               setValuability const new
          end
 
 

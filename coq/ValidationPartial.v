@@ -2186,6 +2186,7 @@ simpsub.
 apply star_refl.
 Qed.
 
+
 Hint Rewrite def_total : prepare.
 
 
@@ -2945,6 +2946,29 @@ apply (tr_pi_elim' _ a (halts (var 0))); auto.
   apply (tr_sigma_elim2' _ (subtype a (partial a)) (pi (subst sh1 a) (halts (var 0)))); auto.
   simpsub.
   reflexivity.
+  }
+
+  {
+  simpsub.
+  reflexivity.
+  }
+Qed.
+
+
+Lemma haltsTotal_valid : haltsTotal_obligation.
+Proof.
+prepare.
+intros G a m ext1 n Hm Ha.
+apply (tr_halts_eta2 _ (app (ppi2 n) m) (app (ppi2 n) m)).
+eapply tr_pi_elim'.
+  {
+  eapply tr_sigma_elim2'; eauto.
+  simpsub.
+  reflexivity.
+  }
+
+  {
+  auto.
   }
 
   {

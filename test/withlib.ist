@@ -7,6 +7,106 @@ openModule /Partial/;
 openModule /SyntacticEquality/;
 openModule /Miscellaneous/;
 
+fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
+
+
+
+lemma "halts_nat"
+/
+  halts 4
+/;
+
+RuleTactic.haltsValue.
+qed ();
+
+
+
+lemma "not_halts_garbage"
+/
+  forall (x : nonsense) . halts x
+/;
+
+intro /x/.
+shouldfail RuleTactic.haltsValue.
+Prover.abandon ();
+
+
+
+lemma "halts_almost_garbage"
+/
+  forall (x : nonsense) . halts (succ x)
+/;
+
+intro /x/.
+RuleTactic.haltsValue.
+qed ();
+
+
+
+lemma "halts_integer"
+/
+  halts z`12345
+/;
+
+RuleTactic.haltsValue.
+qed ();
+
+
+
+lemma "halts_integer_variable"
+/
+  forall (x : integer) . halts x
+/;
+
+intro /x/.
+shouldfail RuleTactic.haltsValue.
+RuleTactic.haltsTotal (Term.evar ()) >> auto.
+qed ();
+
+
+
+lemma "seq_nil"
+/
+  seq x = nil in unit
+/;
+
+reduce //.
+split.
+qed ();
+
+
+
+lemma "seq_cons"
+/
+  (* cons 1 1 is ill-typed but it's still valuable *)
+  seq x = cons 1 1 in unit
+/;
+
+reduce //.
+split.
+qed ();
+
+
+
+lemma "halts_nil"
+/
+  halts nil
+/;
+
+RuleTactic.haltsValue.
+qed ();
+
+
+
+lemma "halts_cons"
+/
+  forall (x : nonsense) . halts (x :: nil)
+/;
+
+intro /x/.
+RuleTactic.haltsValue.
+qed ();
+
 
 
 defineInd /x/

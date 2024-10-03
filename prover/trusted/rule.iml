@@ -91,8 +91,24 @@ signature RULE =
 
       (* sumLeft i a b c
          case analyzes i:(sum a b) with right-hand-side c
+
+         G1, (A % B), G2 |- C ext sum_case i 
+                                    (fn y . M[1 .. i . 0 . ^i+1])
+                                    (fn y . N[1 .. i . 0 . ^i+1])
+         >>
+         G1, A, G2[inl 0 . ^] |- C[under_i(inl 0 . ^)] ext M
+         G1, B, G2[inr 0 . ^] |- C[under_i(inr 0 . ^)] ext N
       *)
       val sumLeft : int -> term -> term -> term -> rule
+
+
+      (* haltsValue
+         
+         G |- halts M
+         >>
+         M is valuable
+      *)
+      val haltsValue : rule
 
 
 
@@ -1180,6 +1196,26 @@ structure Rule :> RULE =
                    (Lam (NONE, Sub (n, substAt zero 0 1 gsize)))
 
            | _ => raise ExtractFailure)
+
+
+      (* The rule generator doesn't know about valuability. *)
+
+      val haltsValue =
+         ("haltsValue",
+          fn jud =>
+             (case N.whnf (J.concl jud) of
+                 Elim (Const const, [App m]) =>
+                    if 
+                       Constant.eq (const, Prim.halts)
+                       andalso
+                       Valuability.valuability m > 0 
+                    then
+                       ([], fn0 T.Triv)
+                    else
+                       raise Failure
+
+               | _ => 
+                    raise Failure))
 
 
       (* The rule generator doesn't know about native terms, so it can't generate the 

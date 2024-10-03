@@ -667,6 +667,7 @@ exact natTotal'_valid.
 exact natStrict_valid.
 exact typeHalts_valid.
 exact reduceSeqTotal_valid.
+exact haltsTotal_valid.
 exact uptypeForm_valid.
 exact uptypeEq_valid.
 exact uptypeFormUniv_valid.
@@ -1164,48 +1165,74 @@ apply tr_booltp_eta_hyp.
 Qed.
 
 
+(* The haltsValue rule is hardcoded because the rule generator does
+   not know about values.  There seems to be no robustness advantage
+   to extending the rule generator with functionality that will only
+   be used once.
+
+   The rule as hardcoded relies on the correctness of the valuability
+   implementation to accept only when M is equivalent to some value.
+*)
+Lemma haltsValue_valid :
+  forall G M N,
+    equiv M N
+    -> value N
+    -> tr G (Defs.dof triv (app Defs.halts M)).
+Proof.
+intros G m n Hequiv Hvalue.
+unfold Defs.dof.
+rewrite -> def_halts.
+rewrite -> Hequiv.
+apply tr_halts_value; auto.
+Qed.
+
+
+
 (* The remaining rules without validations above are:
 
    1. the reduction rules
 
-      The reduction rules follow immediately from tr_compute and tr_compute_hyp.
+      The reduction rules follow immediately from tr_compute and
+      tr_compute_hyp.
 
    2. checkPositive and checkNegative
 
-      The correctness of checkPositive and checkNegative follow immediately from
-      tr_positive_algorithm, and tr_negative_algorithm, assuming the checker is
-      implemented correctly with respect to the formal algorithm.
+      The correctness of checkPositive and checkNegative follow
+      immediately from tr_positive_algorithm, and
+      tr_negative_algorithm, assuming the checker is implemented
+      correctly with respect to the formal algorithm.
 
    3. the rules pertaining to let hypotheses
 
-      The let-hypothesis rules pertain to a definition mechanism in the proof
-      assistant that does not exist in the type theory.  But the rules are simple
-      and it is easy to see they are correct.
+      The let-hypothesis rules pertain to a definition mechanism in
+      the proof assistant that does not exist in the type theory.  But
+      the rules are simple and it is easy to see they are correct.
 
    4. the rules pertaining to native data types (integers and symbols)
 
-      The native data type rules cannot be proven correct because the native data
-      types do not exist in the type theory.  These rules fall into several
-      categories:
+      The native data type rules cannot be proven correct because the
+      native data types do not exist in the type theory.  These rules
+      fall into several categories:
 
-      (a) the formation of the type
-      (b) the membership of literals in the type
-      (c) the flatness of the type
-      (d) in the case of integers, an isomorphism
+      (a) the formation of the type (b) the membership of literals in
+      the type (c) the flatness of the type (d) in the case of
+      integers, an isomorphism
 
-      The correctness of each of these rules is apparent by inspection.
+      The correctness of each of these rules is apparent by
+      inspection.
 
-      A flat type is one in which the elements are precisely a set of values without
-      any internal structure (in addition to expressions that are beta-equivalent to
-      such a value).  There are several consequences of flatness:
+      A flat type is one in which the elements are precisely a set of
+      values without any internal structure (in addition to
+      expressions that are beta-equivalent to such a value).  There
+      are several consequences of flatness:
 
-      (i)   totality (by sound_total_flat)
-      (ii)  strictness (follows from totality by tr_total_strict)
-      (iii) upward closure (by sound_flat_upward)
-      (iv)  admissibility (follows from upward closure by tr_uptype_admiss)
-      (v)   equality implies syntactic equality (by sound_flat_sequal)
+      (i) totality (by sound_total_flat) (ii) strictness (follows from
+      totality by tr_total_strict) (iii) upward closure (by
+      sound_flat_upward) (iv) admissibility (follows from upward
+      closure by tr_uptype_admiss) (v) equality implies syntactic
+      equality (by sound_flat_sequal)
 
-      For integers, several rules establish an isomorphism between native integers
-      and defined integers (as quotiented pairs of natural numbers).  The
-      correctness of the isomorphism code is apparent by inspection.
-*)
+      For integers, several rules establish an isomorphism between
+      native integers and defined integers (as quotiented pairs of
+      natural numbers).  The correctness of the isomorphism code is
+      apparent by inspection.  *)

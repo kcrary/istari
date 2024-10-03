@@ -6,6 +6,7 @@ Require Import Sequence.
 Require Import Syntax.
 Require Import Subst.
 Require Import SimpSub.
+Require Import Dynamic.
 Require Import Promote.
 Require Import Equivalence.
 Require Import Defined.
@@ -1615,6 +1616,11 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr (substctx (dot triv id) G2 ++ G1) (deq m n (subst (under (length G2) (dot triv id)) b))
       -> tr (G2 ++ hyp_tm (halts p) :: G1) (deq (subst (under (length G2) sh1) m) (subst (under (length G2) sh1) n) b)
   
+| tr_halts_value :
+    forall G m,
+      value m
+      -> tr G (deq triv triv (halts m))
+
 | tr_fixpoint_induction :
     forall G a m m',
       tr G (deq triv triv (admiss a))
