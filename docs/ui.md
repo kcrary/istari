@@ -122,9 +122,9 @@ must be done before starting the server.
 | `C-c [return]` or `C-return`     | goto line                                  |
 | `C-c .`                          | move cursor to current line                |
 |                                  |                                            |
-| `C-c l`                          | set initial indentation                    |
+| `C-c C-l`                        | set initial indentation                    |
 | `M-i`                            | reindent next line                         |
-| <code>M-&#124</code>             | insert and indent vertical bar             | 
+| <code>M-&#124;</code>            | insert and indent vertical bar             | 
 |                                  |                                            |
 | `C-c C-c`                        | interrupt                                  |
 | `C-c x`                          | interject with IML code                    |
