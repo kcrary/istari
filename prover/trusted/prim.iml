@@ -71,11 +71,15 @@ signature PRIM =
       val ann : constant
       val ap : constant
       val arrow : constant
+      val dprod : constant
       val eeqtp : constant
       val fix : constant
       val fnann : constant    (* annotated fn *)
       val implies : constant
+      val isquash : constant
       val istp : constant
+      val leth : constant     (* let, but hard instead of firm *)
+      val lete : constant     (* let with eager evaluation *)
       val lett : constant     (* let *)
       val letnext : constant
       val manual : constant
@@ -100,6 +104,7 @@ signature PRIM =
       val integer_from_Integer : constant
       val integer_to_Integer : constant
       val integer_to_nat : constant
+      val letpair : constant
       val leqb : constant
       val cLeqzb : constant                (* Leqzb *)
       val nat_to_integer : constant
@@ -185,6 +190,7 @@ functor PrimFun (structure Term : TERM
       val miscPath = List.map Symbol.fromValue ["Miscellaneous"]
       val partialPath = List.map Symbol.fromValue ["Partial"]
       val sequalPath = List.map Symbol.fromValue ["SyntacticEquality"]
+      val tuplePath = List.map Symbol.fromValue ["Tuple"]
 
       val bool = newconst "bool" 1
       val coguard = newconst "coguard" 3
@@ -262,6 +268,10 @@ functor PrimFun (structure Term : TERM
          defconst "arrow"
          (T.Lam (NONE, T.Lam (NONE, T.apply2 forall (T.Var 1) (T.Lam (NONE, T.Var 1)))))
 
+      val dprod = 
+         defconst "dprod"
+         (T.Lam (NONE, T.Lam (NONE, T.apply2 exists (T.Var 1) (T.Lam (NONE, T.Var 1)))))
+
       val eeqtp =
          defconst "eeqtp"
          (T.Lam (NONE, T.Lam (NONE, T.apply2 prod (T.apply2 subtype (T.Var 1) (T.Var 0)) (T.apply2 subtype (T.Var 0) (T.Var 1)))))
@@ -274,6 +284,10 @@ functor PrimFun (structure Term : TERM
          defconst "implies"
          (T.Const arrow)
 
+      val isquash = 
+         defconst "isquash"
+         (T.Lam (NONE, T.apply2 iset (T.Const unit) (T.Lam (NONE, T.Var 1))))
+
       val istp =
          defconst "istp"
          (T.Lam (NONE, T.apply2 eqtp T.zero T.zero))
@@ -282,6 +296,14 @@ functor PrimFun (structure Term : TERM
       val letnext =
          defconst "letnext"
          (T.Lam (NONE, T.Lam (NONE, T.app T.zero (T.prev (T.Var 1)))))
+
+      val leth =
+         defconst "leth"
+         (T.Lam (NONE, T.Lam (NONE, T.app T.zero (T.Var 1))))
+
+      val lete =
+         defconst "lete"
+         (T.Lam (NONE, T.Lam (NONE, T.app T.zero (T.Var 1))))
 
       val lett =
          defconst "let"
@@ -517,6 +539,11 @@ functor PrimFun (structure Term : TERM
                      (T.apply2 leqzb (T.Native (T.Integer 0I)) (T.Var 0))
                      (T.Pair (T.apply1 integer_to_nat (T.Var 0), T.Const zero))
                      (T.Pair (T.Const zero, T.apply1 integer_to_nat (T.apply1 negz (T.Var 0))))))
+
+      (* hardcoded reduction in Redex depends on this definition *)
+      val letpair =
+         defconstInvis "letpair" tuplePath
+         (T.Lam (NONE, T.Lam (NONE, T.app2 T.zero (T.Elim (T.Var 1, [T.Pi1])) (T.Elim (T.Var 1, [T.Pi2])))))
 
       val leqb =
          defconstInvis "leqb" natPath

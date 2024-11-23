@@ -26,7 +26,7 @@ Require Import ValidationSum.
 Require Import ValidationFuture.
 
 (* The order of some of these matters, for some reason. *)
-Hint Rewrite def_iff def_eeqtp def_guard def_arrow def_pi def_sigma def_prod def_sum def_set def_iset def_inl def_inr def_sum_case def_fut def_letnext def_intersect def_union : prepare.
+Hint Rewrite def_iff def_eeqtp def_guard def_arrow def_pi def_sigma def_prod def_dprod def_sum def_set def_iset def_inl def_inr def_sum_case def_fut def_letnext def_intersect def_union : prepare.
 
 
 Lemma eeqtpRefl_valid : eeqtpRefl_obligation.
@@ -642,6 +642,81 @@ apply tr_prod_intro.
     {
     eapply tr_subtype_eta2.
     eapply tr_prod_elim2; eauto.
+    }
+  }
+Qed.
+
+
+Lemma dprodEeq_valid : dprodEeq_obligation.
+Proof.
+prepare.
+intros G a a' b b' m n Ha Hb.
+apply tr_prod_intro.
+  {
+  apply tr_sigma_sub.
+    {
+    unfold dsubtype.
+    eapply tr_subtype_eta2.
+    eapply tr_prod_elim1; eauto.
+    }
+
+    {
+    unfold dsubtype.
+    eapply tr_subtype_eta2.
+    eapply tr_prod_elim1; eauto.
+    }
+
+    {
+    apply (tr_subtype_convert_hyp' _ [] _ a).
+      {
+      unfold subtype.
+      eapply tr_subtype_eta2.
+      eapply tr_prod_elim2; eauto.
+      }
+
+      {
+      unfold subtype.
+      eapply tr_subtype_eta2.
+      eapply tr_prod_elim1; eauto.
+      }
+    cbn [List.app].
+    apply (tr_subtype_formation_invert1 _ _ _ (subst sh1 b) (subst sh1 b)).
+    eapply tr_inhabitation_formation.
+    eapply tr_prod_elim2; eauto.
+    }
+  }
+
+  {
+  apply tr_sigma_sub.
+    {
+    unfold dsubtype.
+    eapply tr_subtype_eta2.
+    eapply tr_prod_elim2; eauto.
+    }
+
+    {
+    unfold dsubtype.
+    apply (tr_subtype_convert_hyp' _ [] _ a).
+      {
+      unfold subtype.
+      eapply tr_subtype_eta2.
+      eapply tr_prod_elim2; eauto.
+      }
+
+      {
+      unfold subtype.
+      eapply tr_subtype_eta2.
+      eapply tr_prod_elim1; eauto.
+      }
+    cbn [List.app].
+    eapply tr_subtype_eta2.
+    eapply tr_prod_elim2; eauto.
+    }
+
+    {
+    apply (tr_subtype_formation_invert1 _ _ _ (subst sh1 b') (subst sh1 b')).
+    eapply tr_inhabitation_formation.
+    eapply tr_prod_elim1; eauto.
     }
   }
 Qed.
@@ -3741,6 +3816,459 @@ apply tr_prod_intro.
 Qed.
 
 
+Lemma compatDprodIff0_valid : compatDprodIff0_obligation.
+Proof.
+prepare.
+intros G a a' b ext0 m Hb Hm.
+simpsub.
+apply tr_prod_intro.
+  {
+  apply tr_pi_intro.
+    {
+    apply tr_sigma_formation; auto.
+    apply (tr_pi_formation_invert1 _ _ _ (subst sh1 a') (subst sh1 a')).
+    eapply tr_inhabitation_formation.
+    eapply tr_prod_elim1; eauto.
+    }
+  apply tr_sigma_intro.
+    {
+    apply (tr_pi_elim' _ (subst sh1 a) (subst (sh 2) a')).
+      {
+      apply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+    
+        {
+        cbn [length].
+        simpsub.
+        rewrite <- !compose_assoc.
+        unfold sh1.
+        rewrite -> !compose_sh_unlift.
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      rewrite <- compose_assoc.
+      unfold sh1.
+      rewrite -> compose_sh_unlift.
+      simpsub.
+      eapply tr_prod_elim1; eauto.
+      }
+  
+      {
+      eapply tr_sigma_elim1.
+      eapply hypothesis; eauto using index_0.
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      simpsub.
+      reflexivity.
+      }
+    }
+  
+    {
+    eapply tr_sigma_elim2'.
+      {
+      eapply hypothesis; eauto using index_0.
+      simpsub.
+      reflexivity.
+      }
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    apply (tr_assert _ (subst (sh 2) a) (ppi1 (var 1))).
+      {
+      eapply tr_sigma_elim1.
+      eapply hypothesis; eauto using index_S, index_0.
+      simpsub.
+      reflexivity.
+      }
+    simpsub.
+    cbn [Nat.add].
+    eapply (weakening _ [_; _] [_]).
+      {
+      cbn [length].
+      simpsub.
+      rewrite <- compose_assoc.
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      cbn [length].
+      simpsub.
+      rewrite <- compose_assoc.
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    exact Hb.
+    }
+  }
+
+  {
+  apply tr_pi_intro.
+    {
+    apply tr_sigma_formation; auto.
+      {
+      apply (tr_pi_formation_invert1 _ _ _ (subst sh1 a) (subst sh1 a)).
+      eapply tr_inhabitation_formation.
+      eapply tr_prod_elim2; eauto.
+      }
+    apply (tr_assert _ (subst sh1 a) (app (ppi2 (subst sh1 m)) (var 0))).
+      {
+      eapply (tr_pi_elim' _ (subst sh1 a') (subst (sh 2) a)).
+        {
+        eapply (weakening _ [_] []).
+          {
+          simpsub; auto.
+          }
+
+          {
+          cbn [length]; simpsub.
+          rewrite <- !compose_assoc.
+          simpsub.
+          auto.
+          }
+        cbn [length].
+        simpsub.
+        rewrite <- compose_assoc.
+        simpsub.
+        eapply tr_prod_elim2; eauto.
+        }
+
+        {
+        eapply hypothesis; eauto using index_0.
+        }
+      
+        {
+        simpsub.
+        auto.
+        }
+      }
+    simpsub.
+    eapply (weakening _ [_] [_]).
+      {
+      simpsub; auto.
+      }
+
+      {
+      cbn [length]; simpsub.
+      rewrite <- !compose_assoc.
+      simpsub.
+      auto.
+      }
+    cbn [length].
+    simpsub.
+    rewrite <- compose_assoc.
+    simpsub.
+    exact Hb.
+    }
+  apply tr_sigma_intro.
+    {
+    apply (tr_pi_elim' _ (subst sh1 a') (subst (sh 2) a)).
+      {
+      apply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+    
+        {
+        cbn [length].
+        simpsub.
+        rewrite <- !compose_assoc.
+        unfold sh1.
+        rewrite -> !compose_sh_unlift.
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      rewrite <- compose_assoc.
+      unfold sh1.
+      rewrite -> compose_sh_unlift.
+      simpsub.
+      eapply tr_prod_elim2; eauto.
+      }
+  
+      {
+      eapply tr_sigma_elim1.
+      eapply hypothesis; eauto using index_0.
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      simpsub.
+      reflexivity.
+      }
+    }
+  
+    {
+    eapply tr_sigma_elim2'.
+      {
+      eapply hypothesis; eauto using index_0.
+      simpsub.
+      reflexivity.
+      }
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [Nat.add].
+    eapply (weakening _ [_] [_]).
+      {
+      simpsub; auto.
+      }
+
+      {
+      cbn [length]; simpsub.
+      rewrite <- !compose_assoc.
+      simpsub.
+      auto.
+      }
+    cbn [length].
+    simpsub.
+    rewrite <- compose_assoc.
+    simpsub.
+    exact Hb.
+    }
+  }
+Qed.
+
+
+Lemma compatDprodIff1_valid : compatDprodIff1_obligation.
+Proof.
+prepare.
+intros G a b b' ext0 m Ha Hm.
+apply tr_prod_intro.
+  {
+  apply tr_pi_intro.
+    {
+    apply tr_sigma_formation; auto.
+    apply (tr_pi_formation_invert1 _ _ _ (subst (sh 2) b') (subst (sh 2) b')).
+    eapply (tr_inhabitation_formation _ (ppi1 (subst sh1 m)) (ppi1 (subst sh1 m))).
+    eapply (tr_prod_elim1 _ _ (pi (subst sh1 b') (subst (sh 2) b))).
+    apply (weakening _ [_] []).
+      {
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length].
+    simpsub.
+    cbn [List.app].
+    rewrite <- compose_assoc.
+    unfold sh1.
+    rewrite -> compose_sh_unlift.
+    simpsub.
+    auto.
+    }
+  simpsub.
+  apply tr_sigma_intro.
+    {
+    eapply tr_sigma_elim1.
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    cbn [Nat.add].
+    reflexivity.
+    }
+  
+    {
+    simpsub.
+    eapply (tr_pi_elim' _ (subst sh1 b) (subst (sh 2) b')).
+      {
+      apply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+    
+        {
+        cbn [length unlift].
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      rewrite <- compose_assoc.
+      unfold sh1.
+      rewrite -> compose_sh_unlift.
+      simpsub.
+      eapply tr_prod_elim1; eauto.
+      }
+
+      {
+      eapply tr_sigma_elim2'.
+        {
+        eapply hypothesis; eauto using index_0.
+        simpsub.
+        cbn [Nat.add].
+        reflexivity.
+        }
+  
+        {
+        simpsub.
+        reflexivity.
+        }
+      }
+  
+      {
+      simpsub.
+      reflexivity.
+      }
+    }
+  
+    {
+    apply (weakening _ [_; _] []).
+      {
+      cbn [length].
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      cbn [length].
+      simpsub.
+      cbn [Nat.add].
+      rewrite <- !compose_assoc.
+      simpsub.
+      reflexivity.
+      }
+    cbn [length].
+    simpsub.
+    eapply tr_pi_formation_invert1.
+    eapply tr_inhabitation_formation.
+    eapply tr_prod_elim2; eauto.
+    }
+  }
+
+  {
+  apply tr_pi_intro.
+    {
+    apply tr_sigma_formation; auto.
+    apply (tr_pi_formation_invert1 _ _ _ (subst (sh 2) b) (subst (sh 2) b)).
+    eapply (tr_inhabitation_formation _ (ppi2 (subst sh1 m)) (ppi2 (subst sh1 m))).
+    apply (weakening _ [_] []).
+      {
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length].
+    simpsub.
+    cbn [List.app].
+    rewrite <- compose_assoc.
+    unfold sh1.
+    rewrite -> compose_sh_unlift.
+    eapply tr_prod_elim2; eauto.
+    }
+  simpsub.
+  apply tr_sigma_intro.
+    {
+    eapply tr_sigma_elim1.
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    cbn [Nat.add].
+    reflexivity.
+    }
+  
+    {
+    simpsub.
+    eapply (tr_pi_elim' _ (subst sh1 b') (subst (sh 2) b)).
+      {
+      apply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+    
+        {
+        cbn [length unlift].
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      rewrite <- compose_assoc.
+      unfold sh1.
+      rewrite -> compose_sh_unlift.
+      simpsub.
+      eapply tr_prod_elim2; eauto.
+      }
+
+      {
+      eapply tr_sigma_elim2'.
+        {
+        eapply hypothesis; eauto using index_0.
+        simpsub.
+        cbn [Nat.add].
+        reflexivity.
+        }
+  
+        {
+        simpsub.
+        reflexivity.
+        }
+      }
+  
+      {
+      simpsub.
+      reflexivity.
+      }
+    }
+  
+    {
+    apply (weakening _ [_; _] []).
+      {
+      cbn [length].
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      cbn [length].
+      simpsub.
+      cbn [Nat.add].
+      rewrite <- !compose_assoc.
+      simpsub.
+      reflexivity.
+      }
+    cbn [length].
+    simpsub.
+    eapply tr_pi_formation_invert1.
+    eapply tr_inhabitation_formation.
+    eapply tr_prod_elim1; eauto.
+    }
+  }
+Qed.
+
+
 Lemma compatSumIff0_valid : compatSumIff0_obligation.
 Proof.
 prepare.
@@ -4890,6 +5418,116 @@ apply tr_prod_intro.
 Qed.
 
 
+Lemma compatDprodArrow0_valid : compatDprodArrow0_obligation.
+Proof.
+prepare.
+intros G a a' b ext0 m Hb Hm.
+simpsub.
+apply tr_pi_intro.
+  {
+  apply tr_sigma_formation; auto.
+    {
+    apply (tr_pi_formation_invert1 _ _ _ (subst sh1 a') (subst sh1 a')).
+    eapply tr_inhabitation_formation; eauto.
+    }
+
+    {
+    apply (weakening _ [_] []).
+      {
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      cbn [length].
+      simpsub.
+      rewrite <- !compose_assoc.
+      simpsub.
+      reflexivity.
+      }
+    cbn [length].
+    simpsub.
+    cbn [List.app].
+    auto.
+    }
+  }
+apply tr_sigma_intro.
+  {
+  apply (tr_pi_elim' _ (subst sh1 a) (subst (sh 2) a')).
+    {
+    apply (weakening _ [_] []).
+      {
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      cbn [length].
+      simpsub.
+      rewrite <- !compose_assoc.
+      unfold sh1.
+      rewrite -> !compose_sh_unlift.
+      simpsub.
+      reflexivity.
+      }
+    cbn [length].
+    simpsub.
+    cbn [List.app].
+    rewrite <- compose_assoc.
+    simpsub.
+    exact Hm.
+    }
+
+    {
+    eapply tr_sigma_elim1.
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
+
+  {
+  simpsub.
+  eapply tr_sigma_elim2'.
+    {
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    reflexivity.
+    }
+  simpsub.
+  reflexivity.
+  }
+
+  {
+  cbn [Nat.add].
+  apply (weakening _ [_; _] []).
+    {
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length].
+    simpsub.
+    rewrite <- !compose_assoc.
+    unfold sh1.
+    rewrite -> !compose_sh_unlift.
+    simpsub.
+    reflexivity.
+    }
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  auto.
+  }
+Qed.
+
+
 Lemma compatProdArrow1_valid : compatProdArrow1_obligation.
 Proof.
 prepare.
@@ -4949,6 +5587,136 @@ apply tr_prod_intro.
     simpsub.
     reflexivity.
     }
+  }
+Qed.
+
+
+Lemma compatDprodArrow1_valid : compatDprodArrow1_obligation.
+Proof.
+prepare.
+intros G a b b' ext0 m Ha Hm.
+apply tr_pi_intro.
+  {
+  apply tr_sigma_formation; auto.
+  apply (tr_pi_formation_invert1 _ _ _ (subst (sh 2) b') (subst (sh 2) b')).
+  eapply (tr_inhabitation_formation _ (subst sh1 m) (subst sh1 m)).
+  apply (weakening _ [_] []).
+    {
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  rewrite <- compose_assoc.
+  unfold sh1.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  auto.
+  }
+simpsub.
+apply tr_sigma_intro.
+  {
+  eapply tr_sigma_elim1.
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  cbn [Nat.add].
+  reflexivity.
+  }
+
+  {
+  simpsub.
+  eapply (tr_pi_elim' _ (subst sh1 b) (subst (sh 2) b')).
+    {
+    apply (weakening _ [_] []).
+      {
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length].
+    simpsub.
+    cbn [List.app].
+    rewrite <- compose_assoc.
+    unfold sh1.
+    rewrite -> compose_sh_unlift.
+    simpsub.
+    auto.
+    }
+
+    {
+    eapply tr_sigma_elim2'.
+      {
+      eapply hypothesis; eauto using index_0.
+      simpsub.
+      cbn [Nat.add].
+      reflexivity.
+      }
+
+      {
+      simpsub.
+      reflexivity.
+      }
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
+
+  {
+  apply (tr_assert _ (subst (sh 2) b) (ppi2 (var 1))).
+    {
+    eapply tr_sigma_elim2'.
+      {
+      eapply hypothesis; eauto using index_S, index_0.
+      simpsub.
+      reflexivity.
+      }
+    simpsub.
+    reflexivity.
+    }
+  apply (weakening _ [_; _] [_]).
+    {
+    cbn [length].
+    simpsub.
+    rewrite <- compose_assoc.
+    unfold sh1.
+    rewrite -> compose_sh_unlift.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length].
+    simpsub.
+    cbn [Nat.add].
+    rewrite <- !compose_assoc.
+    unfold sh1.
+    rewrite -> !compose_sh_unlift.
+    simpsub.
+    reflexivity.
+    }
+  cbn [length].
+  simpsub.
+  cbn [List.app Nat.add].
+  rewrite <- !compose_assoc.
+  simpsub.
+  eapply tr_pi_formation_invert2; eauto.
+  apply (tr_inhabitation_formation _ m m).
+  auto.
   }
 Qed.
 
@@ -5445,5 +6213,99 @@ apply tr_prod_intro.
   simpsubin H.
   simpsub.
   exact H.
+  }
+Qed.
+
+
+Lemma compatDprodEntails0_valid : compatDprodEntails0_obligation.
+Proof.
+prepare.
+intros G a a' b m p Ha Hprod.
+apply tr_sigma_intro.
+  {
+  exploit (tr_generalize G a (ppi1 p) (deq m m (subst (sh 1) a'))) as H; auto.
+    {
+    eapply tr_sigma_elim1; eauto.
+    }
+  simpsubin H.
+  simpsub.
+  exact H.
+  }
+
+  {
+  eapply tr_sigma_elim2'; eauto.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply (weakening _ [_] []).
+    {
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  apply (tr_inhabitation_formation _ (ppi2 p) (ppi2 p)).
+  eapply tr_sigma_elim2'; eauto.
+  simpsub.
+  auto.
+  }
+Qed.
+
+
+Lemma compatDprodEntails1_valid : compatDprodEntails1_obligation.
+Proof.
+prepare.
+intros G a b b' m p Hb Hprod.
+apply tr_sigma_intro.
+  {
+  eapply tr_sigma_elim1; eauto.
+  }
+
+  {
+  simpsub.
+  exploit (tr_generalize G b (ppi2 p) (deq m m (subst sh1 b'))) as H; auto.
+    {
+    eapply tr_sigma_elim2'; eauto.
+    simpsub.
+    auto.
+    }
+  simpsubin H.
+  simpsub.
+  exact H.
+  }
+
+  {
+  apply (weakening _ [_] []).
+    {
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  apply (tr_assert _ b (ppi2 p)).
+    {
+    eapply tr_sigma_elim2'; eauto.
+    simpsub.
+    auto.
+    }
+  simpsub.
+  apply (tr_inhabitation_formation _ m m).
+  auto.
   }
 Qed.

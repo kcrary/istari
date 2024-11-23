@@ -24,6 +24,7 @@ Conventions:
 [Guarded types](#guarded-types)<br>
 [Strong sums](#strong-sums)<br>
 [Products](#products)<br>
+[Semi-dependent products](#semi-dependent-products)<br>
 [Union types](#union-types)<br>
 [Coguarded types](#coguarded-types)<br>
 [Disjoint sums](#disjoint-sums)<br>
@@ -45,6 +46,7 @@ Conventions:
 [Subset types](#subset-types)<br>
 [Intensional subset types](#intensional-subset-types)<br>
 [Squash](#squash)<br>
+[Intensional squash](#intensional-squash)<br>
 [Quotient types](#quotient-types)<br>
 [Impredicative universals](#impredicative-universals)<br>
 [Impredicative polymorphism](#impredicative-polymorphism)<br>
@@ -1122,14 +1124,14 @@ Conventions:
 
 - `prodExistsEq A A' B B'`
 
-      G |- eqtp (prod A B) (exists A (fn . B[^1]))
+      G |- eqtp (prod A B) (exists A' (fn . B'[^1]))
       >>
       G |- eqtp A A'
       G |- eqtp B B'
 
 - `prodExistsEqUniv A A' B B' I`
 
-      G |- eq (univ I) (prod A B) (exists A (fn . B[^1]))
+      G |- eq (univ I) (prod A B) (exists A' (fn . B'[^1]))
       >>
       G |- eq (univ I) A A'
       G |- eq (univ I) B B'
@@ -1248,6 +1250,197 @@ Conventions:
       >>
       G |- istp (prod A B)
       G |- A
+
+
+### Semi-dependent products
+
+- `dprodForm A B`
+
+      G |- istp (dprod A B)
+      >>
+      G |- istp A
+      G, A |- istp B[^1]
+
+- `dprodEq A A' B B'`
+
+      G |- eqtp (dprod A B) (dprod A' B')
+      >>
+      G |- eqtp A A'
+      G, A |- eqtp B[^1] B'[^1]
+
+- `dprodFormUniv A B I`
+
+      G |- of (univ I) (dprod A B)
+      >>
+      G |- of (univ I) A
+      G, A |- of (univ I[^1]) B[^1]
+
+- `dprodEqUniv A A' B B' I`
+
+      G |- eq (univ I) (dprod A B) (dprod A' B')
+      >>
+      G |- eq (univ I) A A'
+      G, A |- eq (univ I[^1]) B[^1] B'[^1]
+
+- `dprodExistsEq A A' B B'`
+
+      G |- eqtp (dprod A B) (exists A' (fn . B'))
+      >>
+      G |- eqtp A A'
+      G, A |- eqtp B[^1] B'
+
+- `dprodExistsEqUniv A A' B B' I`
+
+      G |- eq (univ I) (dprod A B) (exists A' (fn . B'))
+      >>
+      G |- eq (univ I) A A'
+      G, A |- eq (univ I[^1]) B[^1] B'
+
+- `prodDprodEq A A' B B'`
+
+      G |- eqtp (prod A B) (dprod A' B')
+      >>
+      G |- eqtp A A'
+      G |- eqtp B B'
+
+- `prodDprodEqUniv A A' B B' I`
+
+      G |- eq (univ I) (prod A B) (dprod A' B')
+      >>
+      G |- eq (univ I) A A'
+      G |- eq (univ I) B B'
+
+- `dprodSub A A' B B'`
+
+      G |- subtype (dprod A B) (dprod A' B')
+      >>
+      G |- subtype A A'
+      G, A |- subtype B[^1] B'[^1]
+      G, A' |- istp B'[^1]
+
+- `dprodExistsSub A A' B B'`
+
+      G |- subtype (dprod A B) (exists A' (fn . B'))
+      >>
+      G |- subtype A A'
+      G, A |- subtype B[^1] B'
+      G, A' |- istp B'
+
+- `existsDprodSub A A' B B'`
+
+      G |- subtype (exists A (fn . B)) (dprod A' B')
+      >>
+      G |- subtype A A'
+      G, A |- subtype B B'[^1]
+      G, A' |- istp B'[^1]
+
+- `dprodProdSub A A' B B'`
+
+      G |- subtype (dprod A B) (prod A' B')
+      >>
+      G |- subtype A A'
+      G, A |- subtype B[^1] B'[^1]
+      G |- istp B'
+
+- `prodDprodSub A A' B B'`
+
+      G |- subtype (prod A B) (dprod A' B')
+      >>
+      G |- subtype A A'
+      G, A |- subtype B[^1] B'[^1]
+      G |- istp B
+      G, A' |- istp B'[^1]
+
+- `dprodIntroOf A B M N`
+
+      G |- of (dprod A B) (M , N)
+      >>
+      G |- of A M
+      G |- of B N
+
+- `dprodIntroEq A B M M' N N'`
+
+      G |- eq (dprod A B) (M , N) (M' , N')
+      >>
+      G |- eq A M M'
+      G |- eq B N N'
+
+- `dprodIntro A B`
+
+      G |- dprod A B ext (M , N)
+      >>
+      G |- A ext M
+      G |- B ext N
+
+- `dprodElim1Of A B M`
+
+      G |- of A (M #1)
+      >>
+      G |- of (dprod A B) M
+
+- `dprodElim1Eq A B M N`
+
+      G |- eq A (M #1) (N #1)
+      >>
+      G |- eq (dprod A B) M N
+
+- `dprodElim1 A B`
+
+      G |- A ext M #1
+      >>
+      G |- dprod A B ext M
+
+- `dprodElim2Of A B M`
+
+      G |- of B (M #2)
+      >>
+      G |- of (dprod A B) M
+
+- `dprodElim2Eq A B M N`
+
+      G |- eq B (M #2) (N #2)
+      >>
+      G |- eq (dprod A B) M N
+
+- `dprodElim2 A B`
+
+      G |- B ext M #2
+      >>
+      G |- dprod A B ext M
+
+- `dprodEta A B M`
+
+      G |- eq (dprod A B) M (M #1 , M #2)
+      >>
+      G |- of (dprod A B) M
+
+- `dprodExt A B M N`
+
+      G |- eq (dprod A B) M N
+      >>
+      G |- of (dprod A B) M
+      G |- of (dprod A B) N
+      G |- eq A (M #1) (N #1)
+      G |- eq B (M #2) (N #2)
+
+- `dprodLeft n A B C`
+
+      G1, (dprod A B), G2 |- C ext M[under_n (0 #2 . 0 #1 . ^1)]
+      >>
+      G1, A, B[^1], G2[(1 , 0) . ^2] |- C[under_n ((1 , 0) . ^2)] ext M
+
+- `dprodFormInv1 A B`
+
+      G |- istp A
+      >>
+      G |- istp (dprod A B)
+
+- `dprodFormInv2 A B M`
+
+      G |- istp B
+      >>
+      G |- istp (dprod A B)
+      G |- of A M
 
 
 ### Union Types
@@ -3368,6 +3561,86 @@ Conventions:
       G |- arrow A B
 
 
+### Intensional squash
+
+- `isquashForm A`
+
+      G |- istp (isquash A)
+      >>
+      G |- istp A
+
+- `isquashEq A B`
+
+      G |- eqtp (isquash A) (isquash B)
+      >>
+      G |- eqtp A B
+
+- `isquashFormUniv A I`
+
+      G |- of (univ I) (isquash A)
+      >>
+      G |- of (univ I) A
+
+- `isquashEqUniv A B I`
+
+      G |- eq (univ I) (isquash A) (isquash B)
+      >>
+      G |- of (univ I) A
+      G |- of (univ I) B
+      G |- eq (univ I) A B
+
+- `isquashIntroOf A`
+
+      G |- of (isquash A) ()
+      >>
+      G |- A
+
+- `isquashIntro A`
+
+      G |- isquash A
+      >>
+      G |- A
+
+- `isquashIntroOfIsquash A`
+
+      G |- of (isquash A) ()
+      >>
+      G |- isquash A
+
+- `isquashElim A C M`
+
+      G |- C ext N[() . id]
+      >>
+      G |- of (isquash A) M
+      G, (hidden) A |- C[^1] ext N
+
+- `isquashExt A M N`
+
+      G |- eq (isquash A) M N
+      >>
+      G |- of (isquash A) M
+      G |- of (isquash A) N
+
+- `isquashLeft n A C`
+
+      G1, (isquash A), G2 |- C ext M[under_n (() . ^1)]
+      >>
+      G1, (hidden) A, G2[() . ^1] |- C[under_n (() . ^1)] ext M
+
+- `isquashSub A B`
+
+      G |- subtype (isquash A) (isquash B)
+      >>
+      G |- istp B
+      G |- arrow A B
+
+- `isquashFormInv A`
+
+      G |- istp A
+      >>
+      G |- istp (isquash A)
+
+
 ### Quotient types
 
 - `quotientForm A B`
@@ -3858,6 +4131,20 @@ Conventions:
       G |- of A M
       G, A |- of B[^1] N
 
+- `lethForm A B M N`
+
+      G |- of B (leth M (fn . N))
+      >>
+      G |- of A M
+      G, A |- of B[^1] N
+
+- `leteForm A B M N`
+
+      G |- of B (lete M (fn . N))
+      >>
+      G |- of A M
+      G, A |- of B[^1] N
+
 - `eeqtpSymm A B`
 
       G |- eeqtp A B ext (() , ())
@@ -3879,6 +4166,26 @@ Conventions:
       G, A, (forall A[^1] (fn . arrow (R[^2] 0 1) B[0 . ^2])) |- B[^1] ext P
       G |- of A M
       G |- of (acc A R M) N
+
+- `insert n`
+
+      G1, G2 |- C ext M[under_n (() . id)]
+      >>
+      G1, unit, G2[^] |- C[under_n (^1)] ext M
+
+- `forallLeft M`
+
+      G, (forall A (fn . B)) |- C[^] ext N[0 M[^] . ^]
+      >>
+      G |- of A M
+      G, B[M . id] |- C[^] ext N
+
+- `arrowLeft`
+
+      G, arrow A B |- C[^] ext N[0 M[^] . ^]
+      >>
+      G |- A ext M
+      G, B |- C[^] ext N
 
 
 ### Syntactic equality
@@ -4268,6 +4575,12 @@ Conventions:
       >>
       G |- halts (seq M N)
 
+- `sequalUnderSeq M M' N`
+
+      G |- sequal (seq M (fn . N)) N[M' . id]
+      >>
+      G |- seq M (fn . sequal 0 M'[^1])
+
 - `totalStrict A`
 
       G |- subtype A (partial A)
@@ -4394,6 +4707,26 @@ Conventions:
 - `prodStrict A B`
 
       G |- subtype (prod A B) (partial (prod A B))
+      >>
+      G |- istp A
+      G |- istp B
+
+- `dprodTotal A B M`
+
+      G |- halts M
+      >>
+      G |- of (dprod A B) M
+
+- `dprodTotal' A B`
+
+      G |- total (dprod A B) ext (() , fn . ())
+      >>
+      G |- istp A
+      G |- istp B
+
+- `dprodStrict A B`
+
+      G |- subtype (dprod A B) (partial (dprod A B))
       >>
       G |- istp A
       G |- istp B
@@ -4609,6 +4942,13 @@ Conventions:
       G |- uptype A
       G |- uptype B
 
+- `dprodUptype A B`
+
+      G |- uptype (dprod A B)
+      >>
+      G |- uptype A
+      G, A |- uptype B[^1]
+
 - `sumUptype A B`
 
       G |- uptype (sum A B)
@@ -4819,6 +5159,13 @@ Conventions:
       >>
       G |- admiss A
       G |- admiss B
+
+- `dprodAdmissUptype A B`
+
+      G |- admiss (dprod A B)
+      >>
+      G |- uptype A
+      G, A |- admiss B[^1]
 
 - `sumAdmiss A B`
 
@@ -5219,6 +5566,13 @@ justifying derivations are quite large.)
       G |- eeqtp A A'
       G |- eeqtp B B'
 
+- `dprodEeq A A' B B'`
+
+      G |- eeqtp (dprod A B) (dprod A' B') ext (() , ())
+      >>
+      G |- eeqtp A A'
+      G, A |- eeqtp B[^1] B'[^1]
+
 - `sumEeq A A' B B'`
 
       G |- eeqtp (sum A B) (sum A' B') ext (() , ())
@@ -5417,6 +5771,20 @@ justifying derivations are quite large.)
       G |- istp A
       G |- iff B B' ext M
 
+- `compatDprodIff0 A A' B`
+
+      G |- iff (dprod A B) (dprod A' B) ext (fn . (M[^1] #1 (0 #1) , 0 #2) , fn . (M[^1] #2 (0 #1) , 0 #2))
+      >>
+      G, A |- istp B[^1]
+      G |- iff A A' ext M
+
+- `compatDprodIff1 A B B'`
+
+      G |- iff (dprod A B) (dprod A B') ext (fn . (0 #1 , M[^1] #1 (0 #2)) , fn . (0 #1 , M[^1] #2 (0 #2)))
+      >>
+      G |- istp A
+      G |- iff B B' ext M
+
 - `compatSumIff0 A A' B`
 
       G |- iff (sum A B) (sum A' B) ext (fn . sum_case 0 (fn . inl (M[^2] #1 0)) (fn . inr 0) , fn . sum_case 0 (fn . inl (M[^2] #2 0)) (fn . inr 0))
@@ -5481,6 +5849,20 @@ justifying derivations are quite large.)
       G |- istp A
       G |- arrow B B' ext M
 
+- `compatDprodArrow0 A A' B`
+
+      G |- arrow (dprod A B) (dprod A' B) ext fn . (M[^1] (0 #1) , 0 #2)
+      >>
+      G |- istp B
+      G |- arrow A A' ext M
+
+- `compatDprodArrow1 A B B'`
+
+      G |- arrow (dprod A B) (dprod A B') ext fn . (0 #1 , M[^1] (0 #2))
+      >>
+      G |- istp A
+      G |- arrow B B' ext M
+
 - `compatSumArrow0 A A' B`
 
       G |- arrow (sum A B) (sum A' B) ext fn . sum_case 0 (fn . inl (M[^2] 0)) (fn . inr 0)
@@ -5530,3 +5912,17 @@ justifying derivations are quite large.)
       >>
       G, B |- B'[^1] ext M
       G |- prod A B ext P
+
+- `compatDprodEntails0 A A' B`
+
+      G |- dprod A' B ext (M[P #1 . id] , P #2)
+      >>
+      G, A |- A'[^1] ext M
+      G |- dprod A B ext P
+
+- `compatDprodEntails1 A B B'`
+
+      G |- dprod A B' ext (P #1 , M[P #2 . id])
+      >>
+      G, B |- B'[^1] ext M
+      G |- dprod A B ext P

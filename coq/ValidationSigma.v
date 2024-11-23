@@ -422,7 +422,7 @@ eapply (tr_union_intro _ _ _ (var 1)).
 Qed.
 
 
-Hint Rewrite def_sigma def_prod : prepare.
+Hint Rewrite def_sigma def_prod def_dprod : prepare.
 
 
 Lemma existsForm_valid : existsForm_obligation.
@@ -682,18 +682,34 @@ Lemma prodEqUniv_valid : prodEqUniv_obligation.
   eapply tr_prod_formation_univ; eauto using deq_intro.
   Qed.
 
-Lemma prodExistsEq_valid: prodExistsEq_obligation.
-  unfoldtop. autounfold with valid_hint.
-  intros G a a' b b' triv1 triv0 H0 H1.
-  valid_rewrite. 
-  constructor; eauto using deqtype_intro, tr_eqtype_formation_left.
-  Qed.
+
+Lemma prodExistsEq_valid : prodExistsEq_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext1 ext0 H0 H1.
+apply (tr_eqtype_transitivity _ _ (prod a' b')).
+  {
+  apply tr_prod_formation; auto.
+  }
+
+  {
+  apply tr_prod_sigma_equal; eapply tr_eqtype_formation_right; eauto.
+  }
+Qed.
+
 
 Lemma prodExistsEqUniv_valid : prodExistsEqUniv_obligation.
-  unfoldtop. autounfold with valid_hint.
-  intros G a a' b b' i triv0 triv1 H1 H2.
-  valid_rewrite. 
-  do 2 constructor; eauto using deq_intro, tr_eq_reflexivity.
+Proof.
+prepare.
+intros G a a' b b' i ext1 ext0 Ha Hb.
+apply (tr_transitivity _ _ (prod a' b')).
+  {
+  apply tr_prod_formation_univ; auto.
+  }
+
+  {
+  apply tr_prod_sigma_equal_univ; eapply tr_eq_reflexivity; apply tr_symmetry; eauto.
+  }
 Qed.
 
 
@@ -1157,4 +1173,323 @@ Proof.
 prepare.
 intros G a b c d m n ext1 ext0 Hcd Hmn.
 eapply tr_union_elim_eqtype; eauto.
+Qed.
+
+
+Lemma dprodForm_valid : dprodForm_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+apply tr_sigma_formation; auto.
+Qed.
+
+
+Lemma dprodEq_valid : dprodEq_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext1 ext0 Ha Hb.
+apply tr_sigma_formation; auto.
+Qed.
+
+
+Lemma dprodFormUniv_valid : dprodFormUniv_obligation.
+Proof.
+prepare.
+intros G a b i ext1 ext0 Ha Hb.
+apply tr_sigma_formation_univ; auto.
+Qed.
+
+
+Lemma dprodEqUniv_valid : dprodEqUniv_obligation.
+Proof.
+prepare.
+intros G a a' b b' i ext1 ext0 Ha Hb.
+apply tr_sigma_formation_univ; auto.
+Qed.
+
+
+Lemma dprodExistsEq_valid : dprodExistsEq_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext1 ext0 Ha Hb.
+apply tr_sigma_formation; auto.
+Qed.
+
+
+Lemma dprodExistsEqUniv_valid : dprodExistsEqUniv_obligation.
+Proof.
+prepare.
+intros G a a' b b' i ext1 ext0 Ha Hb.
+apply tr_sigma_formation_univ; auto.
+Qed.
+
+
+Lemma prodDprodEq_valid : prodDprodEq_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext1 ext0 Ha Hb.
+apply (tr_eqtype_transitivity _ _ (prod a' b')).
+  {
+  apply tr_prod_formation; auto.
+  }
+
+  {
+  apply tr_prod_sigma_equal; eapply tr_eqtype_formation_right; eauto.
+  }
+Qed.
+
+
+Lemma prodDprodEqUniv_valid : prodDprodEqUniv_obligation.
+Proof.
+prepare.
+intros G a a' b b' i ext1 ext0 Ha Hb.
+apply (tr_transitivity _ _ (prod a' b')).
+  {
+  apply tr_prod_formation_univ; auto.
+  }
+
+  {
+  apply tr_prod_sigma_equal_univ; eapply tr_eq_reflexivity; apply tr_symmetry; eauto.
+  }
+Qed.
+
+
+Lemma dprodSub_valid : dprodSub_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext2 ext1 ext0 Ha Hb Hb'.
+apply tr_sigma_sub; auto.
+Qed.
+
+
+Lemma dprodExistsSub_valid : dprodExistsSub_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext2 ext1 ext0 Ha Hb Hb'.
+apply tr_sigma_sub; auto.
+Qed.
+
+
+Lemma existsDprodSub_valid : existsDprodSub_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext2 ext1 ext0 Ha Hb Hb'.
+apply tr_sigma_sub; auto.
+Qed.
+
+
+Lemma dprodProdSub_valid : dprodProdSub_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext2 ext1 ext0 Ha Hb Hb'.
+apply tr_sigma_prod_sub; auto.
+Qed.
+
+
+Lemma prodDprodSub_valid : prodDprodSub_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext3 ext2 ext1 ext0 Ha Hb Hbl Hbr.
+apply tr_prod_sigma_sub; auto.
+Qed.
+
+
+Lemma dprodIntroOf_valid : dprodIntroOf_obligation.
+Proof.
+prepare.
+intros G a b m n ext1 ext0 Hm Hn.
+apply tr_sigma_intro; auto.
+  {
+  simpsub.
+  auto.
+  }
+
+  {
+  eapply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+    
+    {
+    cbn [length].
+    simpsub.
+    rewrite <- compose_assoc.
+    simpsub.
+    auto.
+    }
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  apply (tr_inhabitation_formation _ n n); auto.
+  }
+Qed.
+
+
+Lemma dprodIntroEq_valid : dprodIntroEq_obligation.
+Proof.
+prepare.
+intros G a b m m' n n' ext1 ext0 Hm Hn.
+apply tr_sigma_intro; auto.
+  {
+  simpsub.
+  auto.
+  }
+
+  {
+  eapply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+    
+    {
+    cbn [length].
+    simpsub.
+    rewrite <- compose_assoc.
+    simpsub.
+    auto.
+    }
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  apply (tr_inhabitation_formation _ n n'); auto.
+  }
+Qed.
+
+
+Lemma dprodIntro_valid : dprodIntro_obligation.
+Proof.
+prepare.
+intros G a b m n Hm Hn.
+apply tr_sigma_intro; auto.
+  {
+  simpsub.
+  auto.
+  }
+
+  {
+  eapply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+    
+    {
+    cbn [length].
+    simpsub.
+    rewrite <- compose_assoc.
+    simpsub.
+    auto.
+    }
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  apply (tr_inhabitation_formation _ n n); auto.
+  }
+Qed.
+
+
+Lemma dprodElim1Of_valid : dprodElim1Of_obligation.
+Proof.
+prepare.
+intros G a b m ext0 Hm.
+eapply tr_sigma_elim1; eauto.
+Qed.
+
+
+Lemma dprodElim1Eq_valid : dprodElim1Eq_obligation.
+Proof.
+prepare.
+intros G a b m m' ext0 Hm.
+eapply tr_sigma_elim1; eauto.
+Qed.
+
+
+Lemma dprodElim1_valid : dprodElim1_obligation.
+Proof.
+prepare.
+intros G a b m Hm.
+eapply tr_sigma_elim1; eauto.
+Qed.
+
+
+Lemma dprodElim2Of_valid : dprodElim2Of_obligation.
+Proof.
+prepare.
+intros G a b m ext0 Hm.
+replace b with (subst1 (ppi1 m) (subst sh1 b)) by (simpsub; auto).
+eapply tr_sigma_elim2; eauto.
+Qed.
+
+
+Lemma dprodElim2Eq_valid : dprodElim2Eq_obligation.
+Proof.
+prepare.
+intros G a b m m' ext0 Hm.
+replace b with (subst1 (ppi1 m) (subst sh1 b)) by (simpsub; auto).
+eapply tr_sigma_elim2; eauto.
+Qed.
+
+
+Lemma dprodElim2_valid : dprodElim2_obligation.
+Proof.
+prepare.
+intros G a b m Hm.
+replace b with (subst1 (ppi1 m) (subst sh1 b)) by (simpsub; auto).
+eapply tr_sigma_elim2; eauto.
+Qed.
+
+
+Lemma dprodEta_valid : dprodEta_obligation.
+Proof.
+prepare.
+intros G a b m ext0 Hm.
+apply tr_sigma_eta; auto.
+Qed.
+
+
+Lemma dprodExt_valid : dprodExt_obligation.
+Proof.
+prepare.
+intros G a b m n ext3 ext2 ext1 ext0 Hm Hn H1 H2.
+eapply tr_sigma_ext; eauto.
+  {
+  simpsub.
+  auto.
+  }
+eapply tr_sigma_formation_invert2; eauto.
+eapply tr_inhabitation_formation; eauto.
+Qed.
+
+
+Lemma dprodLeft_valid : dprodLeft_obligation.
+Proof.
+prepare.
+intros G1 G2 a b c m Hc.
+apply tr_sigma_eta_hyp; auto.
+Qed.
+
+
+Lemma dprodFormInv1_valid : dprodFormInv1_obligation.
+Proof.
+prepare.
+intros G a b ext0 H.
+eapply tr_sigma_formation_invert1; eauto.
+Qed.
+
+
+Lemma dprodFormInv2_valid : dprodFormInv2_obligation.
+Proof.
+prepare.
+intros G a b m ext1 ext0 Hsig Hm.
+simpsub.
+cut (tr (hyp_tm a :: G) (deqtype (subst sh1 b) (subst sh1 b))).
+  {
+  intro Hb.
+  so (tr_generalize _#4 Hm Hb) as H.
+  simpsubin H.
+  exact H.
+  }
+eapply tr_sigma_formation_invert2; eauto.
 Qed.

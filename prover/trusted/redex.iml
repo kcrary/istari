@@ -337,6 +337,31 @@ functor RedexFun (structure Term : TERM
       val () = H.insert redexTable Prim.letnext reduceLetnext
 
 
+      fun reduceLetpair whnf spine =
+         (case spine of
+             T.App arg :: T.App body :: spine' =>
+                (case whnf arg of
+                    T.Pair (m1, m2) =>
+                       SOME (T.Elim (body, T.App m1 :: T.App m2 :: spine'))
+
+                  | _ => NONE)
+
+           | _ => NONE)
+
+      val () = H.insert userTable Prim.letpair OTHER
+      val () = H.insert redexTable Prim.letpair reduceLetpair
+
+
+      fun reduceLeteager whnf spine =
+         (case spine of
+             T.App arg :: T.App body :: spine' =>
+                SOME (T.Elim (body, T.App (whnf arg) :: spine'))
+
+           | _ => NONE)
+
+      val () = H.insert userTable Prim.lete OTHER
+      val () = H.insert redexTable Prim.lete reduceLeteager
+
 
       fun reduceFnann whnf spine =
          (case spine of

@@ -221,6 +221,8 @@ structure ParseTerm =
       val guard = T.apply2 Prim.guard
 
       fun lett x m n = T.apply2 Prim.lett m (T.lam (SOME x) n)
+      fun leth x m n = T.apply2 Prim.leth m (T.lam (SOME x) n)
+      fun lete x m n = T.apply2 Prim.lete m (T.lam (SOME x) n)
 
       fun letnext x m n = T.apply2 Prim.letnext m (T.lam (SOME x) n)
 
@@ -250,6 +252,7 @@ structure ParseTerm =
       (* Term 20 *)
 
       val prod = T.apply2 Prim.prod
+      val dprod = T.apply2 Prim.dprod
       val coguard = T.apply2 Prim.coguard
 
 
@@ -759,6 +762,8 @@ structure UnparseTerm =
       val () = registerBinary Prim.guard "-g>" 0
 
       val () = registerLet Prim.lett "let "
+      val () = registerLet Prim.leth "leth "
+      val () = registerLet Prim.lete "lete "
 
       val () = registerLet Prim.letnext "let next "
 
@@ -856,6 +861,7 @@ structure UnparseTerm =
       (* Term 20 *)
 
       val () = registerBinary Prim.prod "&" 20
+      val () = registerBinary Prim.dprod "&d" 20
       val () = registerBinary Prim.coguard "&g" 20
 
 
@@ -1172,6 +1178,8 @@ grammardef Term
    rule Term(0)    ::= Term(1) "-g>" Term(0) => guard
 
    rule Term(0)    ::= "let" Ident "=" Term(1) "in" Term(0) => lett
+   rule Term(0)    ::= "leth" Ident "=" Term(1) "in" Term(0) => leth
+   rule Term(0)    ::= "lete" Ident "=" Term(1) "in" Term(0) => lete
    rule Term(0)    ::= "let" "next" Ident "=" Term(1) "in" Term(0) => letnext
    rule Term(0)    ::= "seq" Ident "=" Term(1) "in" Term(0) => seq
    rule Term(0)    ::= "seqt" Ident "=" Term(1) "in" Term(0) => seqt
@@ -1187,6 +1195,7 @@ grammardef Term
    rule Term(15)   ::= Term(16) "%" Term(15) => sum
 
    rule Term(20)   ::= Term(21) "&" Term(20) => prod
+   rule Term(20)   ::= Term(21) "&d" Term(20) => dprod
    rule Term(20)   ::= Term(21) "&g" Term(20) => coguard
 
    rule Term(30)   ::= Term(31) "=" Term(31) ":" Term(31) => eq
@@ -1224,7 +1233,7 @@ grammardef Term
 
    rule Term(100)  ::= EMBED => literal
    rule Term(100)  ::= "e`" EMBED => id
-   rule Term(100)  ::= "l`" LTerm => literal
+   rule Term(100)  ::= "l`" LTerm(100) => literal
    rule Term(100)  ::= "lv`" NUMBER => literalVariable
    rule Term(100)  ::= "lv`" EMBED => literalVariable
    rule Term(100)  ::= LOCATION Ident => short

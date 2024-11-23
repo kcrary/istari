@@ -122,8 +122,8 @@ signature TACTIC_INTERNAL =
 
       include TACTIC
 
-
       val interrupt : (Rule.rule -> goal -> unit) ref
+      val debugExecute : bool ref
 
    end
 
@@ -766,28 +766,34 @@ structure TacticInternal :> TACTIC_INTERNAL =
             val n =  Seq.length (J.context jud')
          in
             if n >= m then
-               (case Refine.refine (Rule.weaken m (n - m)) jud' of
-                   ([jud''], g) =>
-                      (case Refine.cast jud jud'' of
-                          NONE =>
-                             (* This shouldn't ordinarily happen. *)
-                             fk "validation cast failed"
-
-                        | SOME f =>
-                             let
-                                val v' = f v
-                             in
-                                sk ([], (fn vs => g (v' :: vs)), fk)
-                             end)
-                 | _ =>
-                      raise (Fail "impossible"))
+               (try
+                   (case Refine.refine (Rule.weaken m (n - m)) jud' of
+                       ([jud''], g) =>
+                          (case Refine.cast jud jud'' of
+                              NONE =>
+                                 (* This shouldn't ordinarily happen. *)
+                                 fk "cast validation failed"
+    
+                            | SOME f =>
+                                 let
+                                    val v' = f v
+                                 in
+                                    sk ([], (fn vs => g (v' :: vs)), fk)
+                                 end)
+                     | _ =>
+                          raise (Fail "impossible"))
+                with
+                   Rule.Failure =>
+                      fk "cast validation failed")
             else
-               fk "validation cast failed"
+               fk "cast validation failed"
          end
          )
 
 
       extension Answer of (Refine.validation, string) Sum.sum
+
+      val debugExecute = ref false
 
       fun execute goal tac =
          (case
@@ -801,7 +807,28 @@ structure TacticInternal :> TACTIC_INTERNAL =
        
                              | _ => raise Refine.ValidationFailure)
 
-                      | _ => Answer (Sum.INR "outstanding goals")))
+                      | _ =>
+                           (
+                           if !debugExecute then
+                              (
+                              print "==========\n";
+                              print "Executing incomplete proof of:\n";
+                              Show.showGoal goal;
+                              print "\nwith outstanding goals:\n";
+                              List.app
+                                 (fn (_, goal') =>
+                                     (
+                                     Show.showGoal goal';
+                                     print "\n"
+                                     )) subgoals;
+                              print "----------\n"
+                              )
+                           else
+                              ();
+
+                           Answer (Sum.INR "outstanding goals")
+                           )))
+                                   
           of
              Answer x => x
 

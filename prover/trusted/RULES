@@ -1057,14 +1057,14 @@ prod A B = prod A' B' : Ui
 
 
 rule prodExistsEq
-prod A B = exists {x : A} B : type
+prod A B = exists {x : A'} B' : type
 >>
 |- A = A' : type ;
 |- B = B' : type ;
 
 
 rule prodExistsEqUniv
-prod A B = exists {x : A} B : Ui
+prod A B = exists {x : A'} B' : Ui
 >>
 |- A = A' : Ui ;
 |- B = B' : Ui ;
@@ -1183,6 +1183,198 @@ B : type
 >>
 |- prod A B : type ;
 |- A ;
+
+
+
+(* Dependent prod *)
+
+rule dprodForm
+dprod A B : type
+>>
+|- A : type ;
+x : A |- B : type ;
+
+
+rule dprodEq
+dprod A B = dprod A' B' : type
+>>
+|- A = A' : type ;
+x : A |- B = B' : type ;
+
+
+rule dprodFormUniv
+dprod A B : Ui
+>>
+|- A : Ui ;
+x : A |- B : Ui ;
+
+
+rule dprodEqUniv
+dprod A B = dprod A' B' : Ui
+>>
+|- A = A' : Ui ;
+x : A |- B = B' : Ui ;
+
+
+rule dprodExistsEq
+dprod A B = exists {x : A'} B' : type
+>>
+|- A = A' : type ;
+x : A |- B = B' : type ;
+
+
+rule dprodExistsEqUniv
+dprod A B = exists {x : A'} B' : Ui
+>>
+|- A = A' : Ui ;
+x : A |- B = B' : Ui ;
+
+
+
+rule prodDprodEq
+prod A B = dprod A' B' : type
+>>
+|- A = A' : type ;
+|- B = B' : type ;
+
+
+rule prodDprodEqUniv
+prod A B = dprod A' B' : Ui
+>>
+|- A = A' : Ui ;
+|- B = B' : Ui ;
+
+
+rule dprodSub
+dprod A B <: dprod A' B'
+>>
+|- A <: A' ;
+x : A |- B <: B' ;
+x : A' |- B' : type ;
+
+
+rule dprodExistsSub
+dprod A B <: exists {x : A'} B'
+>>
+|- A <: A' ;
+x : A |- B <: B' ;
+x : A' |- B' : type ;
+
+
+rule existsDprodSub
+exists {x : A} B <: dprod A' B'
+>>
+|- A <: A' ;
+x : A |- B <: B' ;
+x : A' |- B' : type ;
+
+
+rule dprodProdSub
+dprod A B <: prod A' B'
+>>
+|- A <: A' ;
+x : A |- B <: B' ;
+|- B' : type ;
+
+
+rule prodDprodSub
+prod A B <: dprod A' B'
+>>
+|- A <: A' ;
+x : A |- B <: B' ;
+|- B : type ;
+x : A' |- B' : type ;
+
+
+rule dprodIntroOf
+(M, N) : dprod A B
+>>
+|- M : A ;
+|- N : B ;
+
+
+rule dprodIntroEq
+(M, N) = (M', N') : dprod A B
+>>
+|- M = M' : A ;
+|- N = N' : B ;
+
+
+rule dprodIntro
+dprod A B ext (M, N)
+>>
+|- A ext M ;
+|- B ext N ;
+
+
+rule dprodElim1Of
+M #1 : A
+>>
+|- M : dprod A B ;
+
+
+rule dprodElim1Eq
+M #1 = N #1 : A
+>>
+|- M = N : dprod A B ;
+
+
+rule dprodElim1
+A ext M #1
+>>
+|- dprod A B ext M ;
+
+
+rule dprodElim2Of
+M #2 : B
+>>
+|- M : dprod A B ;
+
+
+rule dprodElim2Eq
+M #2 = N #2 : B
+>>
+|- M = N : dprod A B ;
+
+
+rule dprodElim2
+B ext M #2
+>>
+|- dprod A B ext M ;
+
+
+rule dprodEta 
+M = (M #1, M #2) : dprod A B
+>>
+|- M : dprod A B ;
+
+
+rule dprodExt
+M = N : dprod A B
+>>
+|- M : dprod A B ;
+|- N : dprod A B ;
+|- M #1 = N #1 : A ;
+|- M #2 = N #2 : B ;
+
+
+lrule dprodLeft
+x : (dprod A B) ... |- C ext M[$x #1 / y, $x #2 / z]
+>>
+y : A, z : B ...[($y, $z) / x] |- C[($y, $z) / x] ext M ;
+
+
+rule dprodFormInv1
+A : type
+>>
+|- dprod A B : type ;
+
+
+rule dprodFormInv2
+B : type
+>>
+|- dprod A B : type ;
+|- M : A ;
 
 
 
@@ -3217,12 +3409,91 @@ x : (squash A) ... |- C ext M [() / y]
 y : hide A ...[() / x] |- C [() / x] ext M ;
 
 
-
 rule squashSub
 squash A <: squash B
 >>
 |- B : type ;
 |- arrow A B ;
+
+
+
+(* Isquash *)
+
+rule isquashForm
+isquash A : type
+>>
+|- A : type ;
+
+
+rule isquashEq
+isquash A = isquash B : type
+>>
+|- A = B : type ;
+
+
+rule isquashFormUniv
+isquash A : Ui
+>>
+|- A : Ui ;
+
+
+rule isquashEqUniv
+isquash A = isquash B : Ui
+>>
+|- A : Ui ;
+|- B : Ui ;
+|- A = B : Ui ;
+
+
+rule isquashIntroOf
+() : isquash A
+>>
+|- A ;
+
+
+rule isquashIntro
+isquash A
+>>
+|- A ;
+
+
+rule isquashIntroOfIsquash
+() : isquash A
+>>
+|- isquash A ;
+
+
+rule isquashElim
+C ext N [() / x]
+>>
+|- M : isquash A ;
+x : hide A |- C ext N ;
+
+
+rule isquashExt
+M = N : isquash A
+>>
+|- M : isquash A ;
+|- N : isquash A ;
+
+
+lrule isquashLeft
+x : (isquash A) ... |- C ext M [() / y]
+>>
+y : hide A ...[() / x] |- C [() / x] ext M ;
+
+
+rule isquashSub
+isquash A <: isquash B
+>>
+|- B : type ;
+|- arrow A B ;
+
+
+rule isquashFormInv
+A : type
+>>
+|- isquash A : type ;
 
 
 
@@ -3718,6 +3989,20 @@ let M (fn x . N) : B
 x : A |- N : B ;
 
 
+rule lethForm
+leth M (fn x . N) : B
+>>
+|- M : A ;
+x : A |- N : B ;
+
+
+rule leteForm
+lete M (fn x . N) : B
+>>
+|- M : A ;
+x : A |- N : B ;
+
+
 rule accInd
 B [M / w] ext fix (fn g x . P [(fn y r . $g $y) / z]) M
 >>
@@ -4121,6 +4406,12 @@ halts M
 |- halts (seq M N) ;
 
 
+rule sequalUnderSeq
+sequal (seq M (fn x . N)) (N[M' / x])
+>>
+|- seq M (fn x . sequal $x M') ;
+
+
 
 (* Totality / Strictness *)
 
@@ -4260,6 +4551,26 @@ prod A B <: partial (prod A B)
 |- B : type ;
 
 
+rule dprodTotal
+halts M
+>>
+|- M : dprod A B ;
+
+
+rule dprodTotal'
+total (dprod A B) ext ((), (fn x . ()))
+>>
+|- A : type ;
+|- B : type ;
+
+
+rule dprodStrict
+dprod A B <: partial (dprod A B)
+>>
+|- A : type ;
+|- B : type ;
+
+
 rule sumTotal
 halts M
 >>
@@ -4354,6 +4665,18 @@ rule typeHalts
 halts A
 >>
 |- A : type ;
+
+
+rule univTotal'
+total Ui ext ((), (fn x . ()))
+>>
+|- I : level ;
+
+
+rule univStrict
+Ui <: partial Ui
+>>
+|- I : level ;
 
 
 rule reduceSeqTotal
@@ -4477,6 +4800,13 @@ uptype (prod A B)
 >>
 |- uptype A ;
 |- uptype B ;
+
+
+rule dprodUptype
+uptype (dprod A B)
+>>
+|- uptype A ;
+x : A |- uptype B ;
 
 
 rule sumUptype
@@ -4697,6 +5027,13 @@ admiss (prod A B)
 |- admiss B ;
 
 
+rule dprodAdmissUptype
+admiss (dprod A B)
+>>
+|- uptype A ;
+x : A |- admiss B ;
+
+
 rule sumAdmiss
 admiss (sum A B)
 >>
@@ -4874,6 +5211,13 @@ eeqtp (prod A B) (prod A' B') ext ((), ())
 >>
 |- eeqtp A A' ;
 |- eeqtp B B' ;
+
+
+rule dprodEeq
+eeqtp (dprod A B) (dprod A' B') ext ((), ())
+>>
+|- eeqtp A A' ;
+x : A |- eeqtp B B' ;
 
 
 rule sumEeq
@@ -5074,6 +5418,20 @@ iff (prod A B) (prod A B') ext ((fn x . ($x #1, M #1 ($x #2))), (fn x . ($x #1, 
 |- iff B B' ext M ;
 
 
+rule compatDprodIff0
+iff (dprod A B) (dprod A' B) ext ((fn x . (M #1 ($x #1), $x #2)), (fn x . (M #2 ($x #1), $x #2)))
+>>
+x : A |- B : type ;
+|- iff A A' ext M ;
+
+
+rule compatDprodIff1
+iff (dprod A B) (dprod A B') ext ((fn x . ($x #1, M #1 ($x #2))), (fn x . ($x #1, M #2 ($x #2))))
+>>
+|- A : type ;
+|- iff B B' ext M ;
+
+
 rule compatSumIff0
 iff (sum A B) (sum A' B) ext ((fn x . sum_case $x (fn y . inl (M #1 $y)) (fn y . inr $y)), (fn x . sum_case $x (fn y . inl (M #2 $y)) (fn y . inr $y)))
 >>
@@ -5138,6 +5496,20 @@ arrow (prod A B) (prod A B') ext (fn x . ($x #1, M ($x #2)))
 |- arrow B B' ext M ;
 
 
+rule compatDprodArrow0
+arrow (dprod A B) (dprod A' B) ext (fn x . (M ($x #1), $x #2))
+>>
+|- B : type ;
+|- arrow A A' ext M ;
+
+
+rule compatDprodArrow1
+arrow (dprod A B) (dprod A B') ext (fn x . ($x #1, M ($x #2)))
+>>
+|- A : type ;
+|- arrow B B' ext M ;
+
+
 rule compatSumArrow0
 arrow (sum A B) (sum A' B) ext (fn x . sum_case $x (fn y . inl (M $y)) (fn y . inr $y))
 >>
@@ -5186,6 +5558,20 @@ prod A B' ext (P #1, M [P #2 / x])
 >>
 x : B |- B' ext M ;
 |- prod A B ext P ;
+
+
+rule compatDprodEntails0
+dprod A' B ext (M [P #1 / x], P #2)
+>>
+x : A |- A' ext M ;
+|- dprod A B ext P ;
+
+
+rule compatDprodEntails1
+dprod A B' ext (P #1, M [P #2 / y])
+>>
+y : B |- B' ext M ;
+|- dprod A B ext P ;
 
 
 

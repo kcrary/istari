@@ -702,6 +702,17 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                 fail "squash pattern expected")
 
 
+      fun destIsquash i pat set =
+         (case pat of
+             And [p] =>
+                (refine $ Rule.isquashLeft i (evar ()) (evar ()))
+                >>+
+                dest i p set
+
+           | _ =>
+                fail "isquash pattern expected")
+
+
       (* comment in signature *)
       fun refold jud i j m r =
          let
@@ -823,7 +834,8 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
             insert Prim.istp (destUnit RT.istpLeft);
             insert Prim.subtype (destUnit RT.subtypeLeft);
             insert Prim.sum destSum;
-            insert Prim.squash destSquash
+            insert Prim.squash destSquash;
+            insert Prim.isquash destIsquash
          end
 
 
@@ -931,8 +943,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
             (case J.hyp jud i of
                 J.Tm c =>
                    termCaseT (N.whnf (T.Sub (c, T.Shift (i+1))))
-                   /
-                    | \Prim.ov\ ($whnfHard \Prim.set\ ? (fn . ?)) ? =>
+                   /| \Prim.ov\ ($whnfHard \Prim.set\ ? (fn . ?)) ? =>
                       \(fnc a b m =>
                            refine (Rule.setElim a b (T.evar ()) m)
                            >>> [
@@ -946,6 +957,31 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                                >>> [
                                    (* M[^] : A[^] *)
                                    refine (Rule.setWeakenOf (T.Sub (a, T.shift1)) (T.Sub (b, T.underShift 1 1)) (T.Sub (m, T.shift1)))
+                                   >>+
+                                   (* M[^] : {A[^] | B[0 . ^2]} *)
+                                   refine (Rule.hypothesis (i+1)) >> done,
+ 
+                                   (* M[^] : A[^] |- ... *)
+                                   refine (Rule.exchange 0 1 (i+1))
+                                   >>+
+                                   refine (Rule.weaken (i+2) 1)
+                                   >>+
+                                   idtacM Primary
+                                   ]
+                               ])\
+
+                    | \Prim.ov\ ($whnfHard \Prim.iset\ ? (fn . ?)) ? =>
+                      \(fnc a b m =>
+                           refine (Rule.isetElim a b (T.evar ()) m)
+                           >>> [
+                               refine (Rule.hypothesis i) >> done,
+        
+                               chdir (D.bindh dir name) 
+                               >>+
+                               refine (Rule.assert (T.apply2 Prim.ov (T.Sub (a, T.shift1)) (T.Sub (m, T.shift1))) (T.evar ()))
+                               >>> [
+                                   (* M[^] : A[^] *)
+                                   refine (Rule.isetWeakenOf (T.Sub (a, T.shift1)) (T.Sub (b, T.underShift 1 1)) (T.Sub (m, T.shift1)))
                                    >>+
                                    (* M[^] : {A[^] | B[0 . ^2]} *)
                                    refine (Rule.hypothesis (i+1)) >> done,

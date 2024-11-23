@@ -37,6 +37,7 @@ variables.  The official rules, using de Bruijn indices, are given
 [Guarded types](#guarded-types)<br>
 [Strong sums](#strong-sums)<br>
 [Products](#products)<br>
+[Semi-dependent products](#semi-dependent-products)<br>
 [Union types](#union-types)<br>
 [Couarded types](#coguarded-types)<br>
 [Disjoint sums](#disjoint-sums)<br>
@@ -58,6 +59,7 @@ variables.  The official rules, using de Bruijn indices, are given
 [Subset types](#subset-types)<br>
 [Intensional subset types](#intensional-subset-types)<br>
 [Squash](#squash)<br>
+[Intensional squash](#intensional-squash)<br>
 [Quotient types](#quotient-types)<br>
 [Impredicative universals](#impredicative-universals)<br>
 [Impredicative polymorphism](#impredicative-polymorphism)<br>
@@ -1134,14 +1136,14 @@ variables.  The official rules, using de Bruijn indices, are given
 
 - `prodExistsEq A A' B B'`
 
-      G |- (A & B) = (exists (x : A) . B) : type
+      G |- (A & B) = (exists (x : A') . B') : type
       >>
       G |- A = A' : type
       G |- B = B' : type
 
 - `prodExistsEqUniv A A' B B' I`
 
-      G |- (A & B) = (exists (x : A) . B) : univ I
+      G |- (A & B) = (exists (x : A') . B') : univ I
       >>
       G |- A = A' : univ I
       G |- B = B' : univ I
@@ -1260,6 +1262,197 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- A & B : type
       G |- A
+
+
+### Semi-dependent products
+
+- `dprodForm A B`
+
+      G |- dprod A B : type
+      >>
+      G |- A : type
+      G, x : A |- B : type
+
+- `dprodEq A A' B B'`
+
+      G |- dprod A B = dprod A' B' : type
+      >>
+      G |- A = A' : type
+      G, x : A |- B = B' : type
+
+- `dprodFormUniv A B I`
+
+      G |- dprod A B : univ I
+      >>
+      G |- A : univ I
+      G, x : A |- B : univ I
+
+- `dprodEqUniv A A' B B' I`
+
+      G |- dprod A B = dprod A' B' : univ I
+      >>
+      G |- A = A' : univ I
+      G, x : A |- B = B' : univ I
+
+- `dprodExistsEq A A' B B'`
+
+      G |- dprod A B = (exists (x : A') . B') : type
+      >>
+      G |- A = A' : type
+      G, x : A |- B = B' : type
+
+- `dprodExistsEqUniv A A' B B' I`
+
+      G |- dprod A B = (exists (x : A') . B') : univ I
+      >>
+      G |- A = A' : univ I
+      G, x : A |- B = B' : univ I
+
+- `prodDprodEq A A' B B'`
+
+      G |- (A & B) = dprod A' B' : type
+      >>
+      G |- A = A' : type
+      G |- B = B' : type
+
+- `prodDprodEqUniv A A' B B' I`
+
+      G |- (A & B) = dprod A' B' : univ I
+      >>
+      G |- A = A' : univ I
+      G |- B = B' : univ I
+
+- `dprodSub A A' B B'`
+
+      G |- dprod A B <: dprod A' B'
+      >>
+      G |- A <: A'
+      G, x : A |- B <: B'
+      G, x : A' |- B' : type
+
+- `dprodExistsSub A A' B B'`
+
+      G |- dprod A B <: (exists (x : A') . B')
+      >>
+      G |- A <: A'
+      G, x : A |- B <: B'
+      G, x : A' |- B' : type
+
+- `existsDprodSub A A' B B'`
+
+      G |- (exists (x : A) . B) <: dprod A' B'
+      >>
+      G |- A <: A'
+      G, x : A |- B <: B'
+      G, x : A' |- B' : type
+
+- `dprodProdSub A A' B B'`
+
+      G |- dprod A B <: (A' & B')
+      >>
+      G |- A <: A'
+      G, x : A |- B <: B'
+      G |- B' : type
+
+- `prodDprodSub A A' B B'`
+
+      G |- (A & B) <: dprod A' B'
+      >>
+      G |- A <: A'
+      G, x : A |- B <: B'
+      G |- B : type
+      G, x : A' |- B' : type
+
+- `dprodIntroOf A B M N`
+
+      G |- (M , N) : dprod A B
+      >>
+      G |- M : A
+      G |- N : B
+
+- `dprodIntroEq A B M M' N N'`
+
+      G |- (M , N) = (M' , N') : dprod A B
+      >>
+      G |- M = M' : A
+      G |- N = N' : B
+
+- `dprodIntro A B`
+
+      G |- dprod A B ext (M , N)
+      >>
+      G |- A ext M
+      G |- B ext N
+
+- `dprodElim1Of A B M`
+
+      G |- M #1 : A
+      >>
+      G |- M : dprod A B
+
+- `dprodElim1Eq A B M N`
+
+      G |- M #1 = N #1 : A
+      >>
+      G |- M = N : dprod A B
+
+- `dprodElim1 A B`
+
+      G |- A ext M #1
+      >>
+      G |- dprod A B ext M
+
+- `dprodElim2Of A B M`
+
+      G |- M #2 : B
+      >>
+      G |- M : dprod A B
+
+- `dprodElim2Eq A B M N`
+
+      G |- M #2 = N #2 : B
+      >>
+      G |- M = N : dprod A B
+
+- `dprodElim2 A B`
+
+      G |- B ext M #2
+      >>
+      G |- dprod A B ext M
+
+- `dprodEta A B M`
+
+      G |- M = (M #1 , M #2) : dprod A B
+      >>
+      G |- M : dprod A B
+
+- `dprodExt A B M N`
+
+      G |- M = N : dprod A B
+      >>
+      G |- M : dprod A B
+      G |- N : dprod A B
+      G |- M #1 = N #1 : A
+      G |- M #2 = N #2 : B
+
+- `dprodLeft n A B C`
+
+      G1, x : (dprod A B), G2 |- C ext [x #1, x #2 / y, z]M
+      >>
+      G1, y : A, z : B, [(y , z) / x]G2 |- [(y , z) / x]C ext M
+
+- `dprodFormInv1 A B`
+
+      G |- A : type
+      >>
+      G |- dprod A B : type
+
+- `dprodFormInv2 A B M`
+
+      G |- B : type
+      >>
+      G |- dprod A B : type
+      G |- M : A
 
 
 ### Union Types
@@ -3380,6 +3573,86 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- A -> B
 
 
+### Intensional squash
+
+- `isquashForm A`
+
+      G |- isquash A : type
+      >>
+      G |- A : type
+
+- `isquashEq A B`
+
+      G |- isquash A = isquash B : type
+      >>
+      G |- A = B : type
+
+- `isquashFormUniv A I`
+
+      G |- isquash A : univ I
+      >>
+      G |- A : univ I
+
+- `isquashEqUniv A B I`
+
+      G |- isquash A = isquash B : univ I
+      >>
+      G |- A : univ I
+      G |- B : univ I
+      G |- A = B : univ I
+
+- `isquashIntroOf A`
+
+      G |- () : isquash A
+      >>
+      G |- A
+
+- `isquashIntro A`
+
+      G |- isquash A
+      >>
+      G |- A
+
+- `isquashIntroOfIsquash A`
+
+      G |- () : isquash A
+      >>
+      G |- isquash A
+
+- `isquashElim A C M`
+
+      G |- C ext [() / x]N
+      >>
+      G |- M : isquash A
+      G, x (hidden) : A |- C ext N
+
+- `isquashExt A M N`
+
+      G |- M = N : isquash A
+      >>
+      G |- M : isquash A
+      G |- N : isquash A
+
+- `isquashLeft n A C`
+
+      G1, x : (isquash A), G2 |- C ext [() / y]M
+      >>
+      G1, y (hidden) : A, [() / x]G2 |- [() / x]C ext M
+
+- `isquashSub A B`
+
+      G |- isquash A <: isquash B
+      >>
+      G |- B : type
+      G |- A -> B
+
+- `isquashFormInv A`
+
+      G |- A : type
+      >>
+      G |- isquash A : type
+
+
 ### Quotient types
 
 - `quotientForm A B`
@@ -3843,6 +4116,20 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- M : A
       G, x : A |- N : B
 
+- `lethForm A B M N`
+
+      G |- leth M (fn x . N) : B
+      >>
+      G |- M : A
+      G, x : A |- N : B
+
+- `leteForm A B M N`
+
+      G |- lete M (fn x . N) : B
+      >>
+      G |- M : A
+      G, x : A |- N : B
+
 - `accInd A B I M N R`
 
       G |- [M / w]B ext fix (fn g . fn x . [fn y . fn r . g y / z]P) M
@@ -3852,6 +4139,28 @@ variables.  The official rules, using de Bruijn indices, are given
       G, x : A, z : (forall (y : A) . R y x -> [y / w]B) |- [x / w]B ext P
       G |- M : A
       G |- N : acc A R M
+
+- `insert n`
+
+      G1, G2 |- C ext [() / x]M
+      >>
+      G1, x : unit, G2 |- C ext M
+
+- `forallLeft M`
+
+      G, x : (forall (y : A) . B) |- C ext [x M / y]N
+      >>
+      G |- M : A
+      G, y : [M / x]B |- C ext N
+      (where x is not free in C)
+
+- `arrowLeft`
+
+      G, x : (A -> B) |- C ext [x M / y/N
+      >>
+      G |- A ext M
+      G, y : B |- C ext N
+      (where x is not free in C)
 
 
 ### Syntactic equality
@@ -4241,6 +4550,12 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- halts (seq M N)
 
+- `sequalUnderSeq M M' N`
+
+      G |- sequal (seq M (fn x . N)) [M' / x]N
+      >>
+      G |- seq M (fn x . sequal x M')
+
 - `totalStrict A`
 
       G |- A <: partial A
@@ -4367,6 +4682,26 @@ variables.  The official rules, using de Bruijn indices, are given
 - `prodStrict A B`
 
       G |- (A & B) <: partial (A & B)
+      >>
+      G |- A : type
+      G |- B : type
+
+- `dprodTotal A B M`
+
+      G |- halts M
+      >>
+      G |- M : dprod A B
+
+- `dprodTotal' A B`
+
+      G |- total (dprod A B) ext (() , fn x . ())
+      >>
+      G |- A : type
+      G |- B : type
+
+- `dprodStrict A B`
+
+      G |- dprod A B <: partial (dprod A B)
       >>
       G |- A : type
       G |- B : type
@@ -4582,6 +4917,13 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- uptype A
       G |- uptype B
 
+- `dprodUptype A B`
+
+      G |- uptype (dprod A B)
+      >>
+      G |- uptype A
+      G, x : A |- uptype B
+
 - `sumUptype A B`
 
       G |- uptype (A % B)
@@ -4792,6 +5134,13 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- admiss A
       G |- admiss B
+
+- `dprodAdmissUptype A B`
+
+      G |- admiss (dprod A B)
+      >>
+      G |- uptype A
+      G, x : A |- admiss B
 
 - `sumAdmiss A B`
 
@@ -5195,6 +5544,13 @@ justifying derivations are quite large.)
       G |- eeqtp A A'
       G |- eeqtp B B'
 
+- `dprodEeq A A' B B'`
+
+      G |- eeqtp (dprod A B) (dprod A' B') ext (() , ())
+      >>
+      G |- eeqtp A A'
+      G, x : A |- eeqtp B B'
+
 - `sumEeq A A' B B'`
 
       G |- eeqtp (A % B) (A' % B') ext (() , ())
@@ -5393,6 +5749,20 @@ justifying derivations are quite large.)
       G |- A : type
       G |- iff B B' ext M
 
+- `compatDprodIff0 A A' B`
+
+      G |- iff (dprod A B) (dprod A' B) ext (fn x . (M #1 (x #1) , x #2) , fn x . (M #2 (x #1) , x #2))
+      >>
+      G, x : A |- B : type
+      G |- iff A A' ext M
+
+- `compatDprodIff1 A B B'`
+
+      G |- iff (dprod A B) (dprod A B') ext (fn x . (x #1 , M #1 (x #2)) , fn x . (x #1 , M #2 (x #2)))
+      >>
+      G |- A : type
+      G |- iff B B' ext M
+
 - `compatSumIff0 A A' B`
 
       G |- iff (A % B) (A' % B) ext (fn x . sum_case x (fn y . inl (M #1 y)) (fn y . inr y) , fn x . sum_case x (fn y . inl (M #2 y)) (fn y . inr y))
@@ -5457,6 +5827,20 @@ justifying derivations are quite large.)
       G |- A : type
       G |- B -> B' ext M
 
+- `compatDprodArrow0 A A' B`
+
+      G |- dprod A B -> dprod A' B ext fn x . (M (x #1) , x #2)
+      >>
+      G |- B : type
+      G |- A -> A' ext M
+
+- `compatDprodArrow1 A B B'`
+
+      G |- dprod A B -> dprod A B' ext fn x . (x #1 , M (x #2))
+      >>
+      G |- A : type
+      G |- B -> B' ext M
+
 - `compatSumArrow0 A A' B`
 
       G |- A % B -> A' % B ext fn x . sum_case x (fn y . inl (M y)) (fn y . inr y)
@@ -5506,3 +5890,17 @@ justifying derivations are quite large.)
       >>
       G, x : B |- B' ext M
       G |- A & B ext P
+
+- `compatDprodEntails0 A A' B`
+
+      G |- dprod A' B ext ([P #1 / x]M , P #2)
+      >>
+      G, x : A |- A' ext M
+      G |- dprod A B ext P
+
+- `compatDprodEntails1 A B B'`
+
+      G |- dprod A B' ext (P #1 , [P #2 / y]M)
+      >>
+      G, y : B |- B' ext M
+      G |- dprod A B ext P

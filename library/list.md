@@ -81,6 +81,8 @@ Lists are covariant:
 
     length_nonzero_form : type:length_nonzero_form
 
+    length_leq_form : type:length_leq_form
+
 
 ### Fold
 
@@ -164,6 +166,9 @@ Lists are covariant:
       | Exists_hit : forall h t . P h -> Exists (h :: t)
       | Exists_miss : forall h t . Exists t -> Exists (h :: t)
 
+(The first argument, `a`, is implicit in `Forall`, `Exists`, and their
+constructors.)
+
     Forall_as_foldr : type:Forall_as_foldr
 
     Exists_as_foldr : type:Exists_as_foldr
@@ -246,6 +251,8 @@ Lists are covariant:
 
     nth_In : type:nth_In
 
+    list_eq_by_nth : type:list_eq_by_nth
+
 
 ### Zip and Unzip
 
@@ -285,6 +292,46 @@ Lists are covariant:
     nth_unzip : type:nth_unzip
 
 
+### Keep
+
+    keep : type:keep
+         imp:keep
+
+Keeping too many elements is permitted, and results in the full list.
+
+    keep _ zero _ --> nil
+    keep _ (succ _) nil --> nil
+    keep a (succ n) (cons h t) --> cons h (keep a n t)
+
+    keep_nil : type:keep_nil
+
+    length_keep_min : type:length_keep_min
+
+    length_keep_leq : type:length_keep_leq
+
+    length_keep : type:length_keep
+
+    keep_idem : type:keep_idem
+
+    keep_append_leq : type:keep_append_leq
+
+    keep_append_geq : type:keep_append_geq
+
+    keep_append_eq : type:keep_append_eq
+
+    keep_all : type:keep_all
+
+    keep_map : type:keep_map
+
+    Forall_keep_weaken : type:Forall_keep_weaken
+
+    Exists_keep_weaken : type:Exists_keep_weaken
+
+    In_keep_weaken : type:In_keep_weaken
+
+    nth_keep : type:nth_keep
+
+
 ### Drop
 
     drop : type:drop
@@ -293,17 +340,22 @@ Lists are covariant:
 Dropping too many elements is permitted, and results in the empty list.
 
     drop _ zero l --> l
-    drop a (succ n) l --> list_case a (list a) l nil (fn _ l' . drop n l')
+    drop _ (succ _) nil --> nil
+    drop _ (succ n) (cons h t) --> drop n t
 
     drop_nil : type:drop_nil
 
     length_drop : type:length_drop
+
+    drop_plus : type:drop_plus
 
     drop_append_leq : type:drop_append_leq
 
     drop_append_geq : type:drop_append_geq
 
     drop_append_eq : type:drop_append_eq
+
+    drop_all : type:drop_all
 
     drop_map : type:drop_map
 
@@ -317,6 +369,8 @@ Dropping too many elements is permitted, and results in the empty list.
 
     nth_as_drop : type:nth_as_drop
 
+    split_list : type:split_list
+
 
 ### Map_flat
 
@@ -329,3 +383,51 @@ Dropping too many elements is permitted, and results in the empty list.
     In_map_flat : type:In_map_flat
 
     map_flat_as_foldr : type:map_flat_as_foldr
+
+
+### For all pairs of distinct elements
+
+    datatype
+      intersect (i : level) .
+      forall (a : U i) (P : a -> a -> U i) .
+      U i
+    of
+      Forall_dist : list a -> type =
+  
+      | Forall_dist_nil :
+          Forall_dist nil
+  
+      | Forall_dist_cons :
+          forall h t .
+            Forall (P h) t
+            -> Forall_dist t
+            -> Forall_dist (cons h t)
+
+(The first argument, `a`, is implicit in `Forall_dist` and its
+constructors)
+
+    Forall_dist_nil_iff : type:Forall_dist_nil_iff
+
+    Forall_dist_cons_iff : type:Forall_dist_cons_iff
+
+    Forall_dist_append : type:Forall_dist_append
+
+    Forall_dist_append_iff : type:Forall_dist_append_iff
+
+    Forall_dist_implies : type:Forall_dist_implies
+
+    Forall_dist_map : type:Forall_dist_map
+
+    Forall_dist_reverse : type:Forall_dist_reverse
+
+    decidable_Forall_dist_dep : type:decidable_Forall_dist_dep
+
+    decidable_Forall_dist : type:decidable_Forall_dist
+
+
+### Lists are covariant
+
+    list_subtype : type:list_subtype
+
+Note that this fact relies on `nil` and `cons`'s type argument being
+invisible (*i.e.,* taken using `intersect`).

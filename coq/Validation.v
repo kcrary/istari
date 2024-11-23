@@ -218,6 +218,33 @@ exact prodExt_valid.
 exact prodLeft_valid.
 exact prodFormInv1_valid.
 exact prodFormInv2_valid.
+exact dprodForm_valid.
+exact dprodEq_valid.
+exact dprodFormUniv_valid.
+exact dprodEqUniv_valid.
+exact dprodExistsEq_valid.
+exact dprodExistsEqUniv_valid.
+exact prodDprodEq_valid.
+exact prodDprodEqUniv_valid.
+exact dprodSub_valid.
+exact dprodExistsSub_valid.
+exact existsDprodSub_valid.
+exact dprodProdSub_valid.
+exact prodDprodSub_valid.
+exact dprodIntroOf_valid.
+exact dprodIntroEq_valid.
+exact dprodIntro_valid.
+exact dprodElim1Of_valid.
+exact dprodElim1Eq_valid.
+exact dprodElim1_valid.
+exact dprodElim2Of_valid.
+exact dprodElim2Eq_valid.
+exact dprodElim2_valid.
+exact dprodEta_valid.
+exact dprodExt_valid.
+exact dprodLeft_valid.
+exact dprodFormInv1_valid.
+exact dprodFormInv2_valid.
 exact unionForm_valid.
 exact unionEq_valid.
 exact unionFormUniv_valid.
@@ -510,6 +537,18 @@ exact squashElim_valid.
 exact squashExt_valid.
 exact squashLeft_valid.
 exact squashSub_valid.
+exact isquashForm_valid.
+exact isquashEq_valid.
+exact isquashFormUniv_valid.
+exact isquashEqUniv_valid.
+exact isquashIntroOf_valid.
+exact isquashIntro_valid.
+exact isquashIntroOfIsquash_valid.
+exact isquashElim_valid.
+exact isquashExt_valid.
+exact isquashLeft_valid.
+exact isquashSub_valid.
+exact isquashFormInv_valid.
 exact quotientForm_valid.
 exact quotientEq_valid.
 exact quotientFormUniv_valid.
@@ -570,6 +609,8 @@ exact assert_valid.
 exact assert'_valid.
 exact inhabitant_valid.
 exact letForm_valid.
+exact lethForm_valid.
+exact leteForm_valid.
 exact accInd_valid.
 exact sequalForm_valid.
 exact sequalIntroOf_valid.
@@ -629,6 +670,7 @@ exact activeCaseSeq_valid.
 exact caseHaltsInv_valid.
 exact seqHaltsSequal_valid.
 exact seqHaltsInv_valid.
+exact sequalUnderSeq_valid.
 exact totalStrict_valid.
 exact voidTotal'_valid.
 exact voidStrict_valid.
@@ -651,6 +693,9 @@ exact existsStrict_valid.
 exact prodTotal_valid.
 exact prodTotal'_valid.
 exact prodStrict_valid.
+exact dprodTotal_valid.
+exact dprodTotal'_valid.
+exact dprodStrict_valid.
 exact sumTotal_valid.
 exact sumTotal'_valid.
 exact sumStrict_valid.
@@ -666,6 +711,8 @@ exact natTotal_valid.
 exact natTotal'_valid.
 exact natStrict_valid.
 exact typeHalts_valid.
+exact univTotal'_valid.
+exact univStrict_valid.
 exact reduceSeqTotal_valid.
 exact haltsTotal_valid.
 exact uptypeForm_valid.
@@ -685,6 +732,7 @@ exact arrowUptype_valid.
 exact intersectUptype_valid.
 exact existsUptype_valid.
 exact prodUptype_valid.
+exact dprodUptype_valid.
 exact sumUptype_valid.
 exact futureUptype_valid.
 exact eqUptype_valid.
@@ -718,6 +766,7 @@ exact arrowAdmiss_valid.
 exact intersectAdmiss_valid.
 exact existsAdmissUptype_valid.
 exact prodAdmiss_valid.
+exact dprodAdmissUptype_valid.
 exact sumAdmiss_valid.
 exact futureAdmiss_valid.
 exact eqAdmiss_valid.
@@ -746,6 +795,7 @@ exact forallEeq_valid.
 exact existsEeq_valid.
 exact arrowEeq_valid.
 exact prodEeq_valid.
+exact dprodEeq_valid.
 exact sumEeq_valid.
 exact futureEeq_valid.
 exact intersectEeq_valid.
@@ -774,6 +824,8 @@ exact compatArrowIff0_valid.
 exact compatArrowIff1_valid.
 exact compatProdIff0_valid.
 exact compatProdIff1_valid.
+exact compatDprodIff0_valid.
+exact compatDprodIff1_valid.
 exact compatSumIff0_valid.
 exact compatSumIff1_valid.
 exact compatFutureIff_valid.
@@ -783,6 +835,8 @@ exact compatArrowArrow0_valid.
 exact compatArrowArrow1_valid.
 exact compatProdArrow0_valid.
 exact compatProdArrow1_valid.
+exact compatDprodArrow0_valid.
+exact compatDprodArrow1_valid.
 exact compatSumArrow0_valid.
 exact compatSumArrow1_valid.
 exact compatFutureArrow_valid.
@@ -790,6 +844,8 @@ exact compatForallEntails1_valid.
 exact compatArrowEntails1_valid.
 exact compatProdEntails0_valid.
 exact compatProdEntails1_valid.
+exact compatDprodEntails0_valid.
+exact compatDprodEntails1_valid.
 Qed.
   
 
@@ -1165,6 +1221,185 @@ apply tr_booltp_eta_hyp.
 Qed.
 
 
+(* The insert rule is hardcoded because it involves a pattern used only in the structural
+   rules: it operates on the context, but does not operate on anything *in* the context.
+*)
+Lemma insert_valid :
+  forall G1 G2 c m,
+    tr (substctx sh1 G2 ++ hyp_tm Defs.unit :: G1) (Defs.dof m (subst (under (length G2) sh1) c))
+    -> tr (G2 ++ G1) (Defs.dof (subst (under (length G2) (dot triv id)) m) c).
+Proof.
+unfold Defs.unit.
+unfold Defs.dof.
+intros G1 G2 c m H0.
+so (exchange_valid G1 G2 (hyp_tm unittp :: nil) nil _ _ H0) as H.
+cbn [length] in H.
+simpsubin H.
+cbn [List.app] in H.
+eassert _ as H'; [refine (tr_generalize _ _ triv _ _ H) |].
+  {
+  apply tr_unittp_intro.
+  }
+renameover H' into H.
+unfold Defs.dof in H.
+simpsubin H.
+cbn [dots] in H.
+cbn [Nat.add] in H.
+rewrite -> subst1_dots in H.
+simpsubin H.
+replace (@dot obj triv (sh (length G2))) with (@Subst.compose obj (dot triv id) (sh (length G2))) in H.
+2:{
+  simpsub.
+  reflexivity.
+  }
+rewrite <- under_dots in H.
+rewrite <- compose_under in H.
+simpsubin H.
+exact H.
+Qed.
+
+
+(* The forallLeft rule is hardcoded because it involves a pattern not used in any other rule
+   (except arrowLeft): the conclusion has a hypothesis.
+*)
+Lemma forallLeft_valid :
+  forall G a b m c n ext,
+    tr G (Defs.dof ext (app (app Defs.of a) m))
+    -> tr (hyp_tm (subst1 m b) :: G) (Defs.dof n (subst sh1 c))
+    -> tr (hyp_tm (app (app Defs.pi a) (lam b)) :: G) (Defs.dof (subst (dot (app (var 0) (subst sh1 m)) sh1) n) (subst sh1 c)).
+Proof.
+prepare.
+intros G a b m c n ext Hm Hc.
+cut (tr (hyp_tm (pi a b) :: G) (substj (dot (app (var 0) (subst sh1 m)) id) (deq (subst (dot (var 0) (sh 2)) n) (subst (dot (var 0) (sh 2)) n) (subst (sh 2) c)))).
+  {
+  intro H.
+  simpsubin H.
+  exact H.
+  }
+apply (tr_generalize _ (subst (dot (subst sh1 m) sh1) b)).
+  {
+  eapply tr_pi_elim'.
+    {
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    eapply (weakening _ [_] nil).
+      {
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    exact Hm.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
+apply (weakening _ [_] [_]).
+  {
+  cbn [length unlift].
+  simpsub.
+  reflexivity.
+  }
+
+  {
+  cbn [length unlift].
+  simpsub.
+  cbn [Nat.add].
+  reflexivity.
+  }
+cbn [length unlift].
+simpsub.
+cbn [List.app].
+rewrite -> subst_var0_sh1.
+exact Hc.
+Qed.
+
+
+(* The arrowLeft rule is hardcoded because it involves a pattern not used in any other rule
+   (except forallLeft): the conclusion has a hypothesis.
+*)
+Lemma arrowLeft_valid :
+  forall G a b m c n,
+    tr G (Defs.dof m a)
+    -> tr (hyp_tm b :: G) (Defs.dof n (subst sh1 c))
+    -> tr (hyp_tm (app (app Defs.arrow a) b) :: G) (Defs.dof (subst (dot (app (var 0) (subst sh1 m)) sh1) n) (subst sh1 c)).
+Proof.
+unfold Defs.dof.
+intros G a b m c n Hm Hc.
+rewrite -> def_arrow.
+cut (tr (hyp_tm (pi a (subst sh1 b)) :: G) (substj (dot (app (var 0) (subst sh1 m)) id) (deq (subst (dot (var 0) (sh 2)) n) (subst (dot (var 0) (sh 2)) n) (subst (sh 2) c)))).
+  {
+  intro H.
+  simpsubin H.
+  exact H.
+  }
+apply (tr_generalize _ (subst sh1 b)).
+  {
+  eapply tr_pi_elim'.
+    {
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    eapply (weakening _ [_] nil).
+      {
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    exact Hm.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
+apply (weakening _ [_] [_]).
+  {
+  cbn [length unlift].
+  simpsub.
+  reflexivity.
+  }
+
+  {
+  cbn [length unlift].
+  simpsub.
+  cbn [Nat.add].
+  reflexivity.
+  }
+cbn [length unlift].
+simpsub.
+cbn [List.app].
+rewrite -> subst_var0_sh1.
+exact Hc.
+Qed.
+
+
 (* The haltsValue rule is hardcoded because the rule generator does
    not know about values.  There seems to be no robustness advantage
    to extending the rule generator with functionality that will only
@@ -1235,4 +1470,5 @@ Qed.
       For integers, several rules establish an isomorphism between
       native integers and defined integers (as quotiented pairs of
       natural numbers).  The correctness of the isomorphism code is
-      apparent by inspection.  *)
+      apparent by inspection.
+*)

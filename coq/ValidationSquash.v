@@ -25,7 +25,7 @@ Require Import Defined.
 Require Import ValidationSet.
 
 
-Hint Rewrite def_iff def_set def_squash : prepare.
+Hint Rewrite def_iff def_set def_squash def_isquash : prepare.
 
 
 
@@ -761,4 +761,508 @@ eapply (tr_set_intro _#5 (app (subst (sh 2) m) (var 0))).
   cbn [List.app].
   auto.
   }
+Qed.
+
+
+Lemma isquashForm_valid : isquashForm_obligation.
+Proof.
+prepare.
+intros G a ext0 H.
+apply tr_iset_formation.
+  {
+  apply tr_unittp_istype.
+  }
+
+  {
+  eapply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  exact H.
+  }
+Qed.
+
+
+Lemma isquashEq_valid : isquashEq_obligation.
+Proof.
+prepare.
+intros G a b m Hab.
+apply tr_iset_formation.
+  {
+  apply tr_unittp_istype.
+  }
+
+  {
+  eapply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  exact Hab.
+  }
+Qed.
+
+
+Lemma isquashFormUniv_valid : isquashFormUniv_obligation.
+Proof.
+prepare.
+intros G a i ext0 H.
+apply tr_iset_formation_univ.
+  {
+  apply tr_unittp_formation_univ_gen.
+  apply tr_univ_formation_invert.
+  eapply tr_inhabitation_formation; eauto.
+  }
+
+  {
+  apply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  auto.
+  }
+Qed.
+
+
+Lemma isquashEqUniv_valid : isquashEqUniv_obligation.
+Proof.
+prepare.
+intros G a b i ext2 ext1 m Ha Hb Hab.
+apply tr_iset_formation_univ.
+  {
+  apply tr_unittp_formation_univ_gen.
+  apply tr_univ_formation_invert.
+  eapply tr_inhabitation_formation; eauto.
+  }
+
+  {
+  apply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  auto.
+  }
+Qed.
+
+
+Lemma isquashIntroOf_valid : isquashIntroOf_obligation.
+Proof.
+prepare.
+intros G a m H.
+apply (tr_iset_intro _#5 m).
+  {
+  apply tr_unittp_intro.
+  }
+
+  {
+  simpsub.
+  auto.
+  }
+
+  {
+  apply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_inhabitation_formation; eauto.
+  }
+Qed.
+
+
+Lemma isquashIntro_valid : isquashIntro_obligation.
+Proof.
+prepare.
+intros G a m H.
+apply (tr_iset_intro _#5 m).
+  {
+  apply tr_unittp_intro.
+  }
+
+  {
+  simpsub.
+  auto.
+  }
+
+  {
+  apply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_inhabitation_formation; eauto.
+  }
+Qed.
+
+
+Lemma isquashIntroOfIsquash_valid : isquashIntroOfIsquash_obligation.
+Proof.
+prepare.
+intros G a ext0 Hsq.
+eapply tr_iset_elim2.
+  {
+  exact Hsq.
+  }
+simpsub.
+cbn [Nat.add].
+eapply (tr_iset_intro _#5 (var 0)).
+  {
+  apply tr_unittp_intro.
+  }
+
+  {
+  simpsub.
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  apply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  apply (tr_inhabitation_formation _ (var 0) (var 0)).
+  eapply hypothesis; eauto using index_0.
+  }
+Qed.
+
+
+Lemma isquashElim_valid : isquashElim_obligation.
+Proof.
+prepare.
+intros G a c m ext0 n Hhyg Hm Hn.
+refine (tr_iset_elim2 _#5 Hm _).
+simpsub.
+so (subst_into_absent_single _ _ _ triv Hhyg) as H.
+simpsubin H.
+rewrite -> H; auto.
+Qed.
+
+
+Lemma isquashExt_valid : isquashExt_obligation.
+Proof.
+prepare.
+intros G a m n ext1 ext0 Hm Hn.
+refine (tr_iset_elim2 _#5 Hm _).
+simpsub.
+apply (tr_iset_intro _#5 (var 0)).
+  {
+  apply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  apply (tr_transitivity _ _ triv).
+    {
+    apply tr_unittp_eta.
+    eapply tr_iset_elim1; eauto.
+    }
+
+    {
+    apply tr_symmetry.
+    apply tr_unittp_eta.
+    eapply tr_iset_elim1; eauto.
+    }
+  }
+
+  {
+  simpsub.
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  cbn [Nat.add].
+  apply (tr_inhabitation_formation _ (var 1) (var 1)).
+  eapply hypothesis; eauto using index_S, index_0.
+  }
+Qed.
+
+
+Lemma isquashLeft_valid : isquashLeft_obligation.
+Proof.
+prepare.
+intros G1 G2 a c m Hhyp Hm.
+replace (subst (under (length G2) (dot triv (sh 1))) m) with (subst (under (length G2) (dot triv id)) (subst (under (length G2) (dot (var 0) (sh 2))) m)).
+2:{
+  rewrite <- subst_compose.
+  rewrite <- compose_under.
+  simpsub.
+  auto.
+  }
+apply tr_iset_left; auto.
+  {
+  eapply hygiene_subst; eauto.
+  intros i Hi.
+  cbn in Hi.
+  set (k := length G2) in Hi |- *.
+  so (Nat.lt_trichotomy i k) as [Hlt | [Heq | Hlt]].
+    {
+    rewrite -> project_under_lt; auto.
+    apply hygiene_var.
+    omega.
+    }
+
+    {
+    contradiction.
+    }
+
+    {
+    rewrite -> project_under_geq; try omega.
+    replace (i - k) with (S (i - k - 1)) by omega.
+    simpsub.
+    apply hygiene_var.
+    omega.
+    }
+  }
+match goal with
+| |- tr _ ?X =>
+   change (tr (substctx sh1 G2 ++ ([hyp_tm (subst sh1 a)] ++ hyp_tm unittp :: G1)) X)
+end.
+rewrite -> app_assoc.
+replace (under (length G2) (dot (var 0) (sh 2))) with (@under obj (length (substctx sh1 G2 ++ [hyp_tm (subst sh1 a)])) sh1).
+2:{
+  rewrite -> app_length.
+  cbn [length].
+  rewrite -> length_substctx.
+  rewrite <- under_sum.
+  auto.
+  }
+apply tr_unittp_eta_hyp.
+rewrite -> app_length.
+cbn [length].
+rewrite -> length_substctx.
+rewrite -> substctx_append.
+cbn [length].
+simpsub.
+rewrite <- app_assoc.
+cbn [List.app].
+rewrite <- under_sum.
+rewrite <- compose_under.
+rewrite -> under_succ.
+unfold sh1.
+rewrite -> compose_sh_dot.
+rewrite -> under_zero.
+simpsub.
+unfold Defs.triv in Hm.
+exact Hm.
+Qed.
+
+
+Lemma isquashSub_valid : isquashSub_obligation.
+Proof.
+prepare.
+intros G a b ext1 m Hb Himp.
+rewrite -> def_arrow in Himp.
+apply tr_subtype_intro.
+  {
+  apply tr_iset_formation.
+    {
+    apply tr_unittp_istype.
+    }
+  
+    {
+    eapply (weakening _ [_] []).
+      {
+      simpsub.
+      auto.
+      }
+  
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    eapply tr_pi_formation_invert1; eauto.
+    eapply tr_inhabitation_formation; eauto.
+    }
+  }
+
+  {
+  apply tr_iset_formation.
+    {
+    apply tr_unittp_istype.
+    }
+  
+    {
+    eapply (weakening _ [_] []).
+      {
+      simpsub.
+      auto.
+      }
+  
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  }
+simpsub.
+cbn [Nat.add].
+apply (tr_iset_elim2 _ unittp (subst (sh 2) a) (var 0)).
+  {
+  eapply hypothesis; auto using index_0.
+  simpsub.
+  auto.
+  }
+simpsub.
+cbn [Nat.add].
+eapply (tr_iset_intro _#5 (app (subst (sh 2) m) (var 0))).
+  {
+  apply (tr_iset_elim1 _ _ (subst (sh 3) a)).
+  eapply hypothesis; eauto using index_0, index_S.
+  simpsub.
+  reflexivity.
+  }
+
+  {
+  simpsub.
+  eapply (tr_pi_elim' _ (subst (sh 2) a) (subst (sh 3) b)).
+    {
+    eapply (weakening _ [_; _] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      cbn [length unlift].
+      simpsub.
+      eauto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app Nat.add].
+    simpsub.
+    auto.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    reflexivity.
+    }
+  
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
+
+  {
+  eapply (weakening _ [_; _; _] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  auto.
+  }
+Qed.
+
+
+Lemma isquashFormInv_valid : isquashFormInv_obligation.
+Proof.
+prepare.
+intros G a ext0 Hsq.
+apply (tr_assert _ unittp triv).
+  {
+  apply tr_unittp_intro.
+  }
+simpsub.
+eapply tr_iset_formation_invert2; eauto.
 Qed.

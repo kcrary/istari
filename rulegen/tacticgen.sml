@@ -309,6 +309,9 @@ structure Tacticgen :> TACTICGEN =
 
             write "\n\
 \      val sumLeft : int -> tactic\n\
+\      val insert : int -> tactic\n\
+\      val forallLeft : tactic1\n\
+\      val arrowLeft : tactic\n\
 \      val haltsValue : tactic\n\
 \      val checkPositive : tactic\n\
 \      val checkNegative : tactic\n\
@@ -618,6 +621,44 @@ structure Tacticgen :> TACTICGEN =
 
             write "\n\
 \      fun sumLeft i = refine (Rule.sumLeft i (T.evar ()) (T.evar ()) (T.evar ()))\n\
+\\n\
+\      fun insert i =\n\
+\         let\n\
+\            do (jud, dir) = withgoal\n\
+\            val sym = D.fresh dir\n\
+\            val (dir2, dir1) = D.split dir i\n\
+\            val dir' = D.binds (D.bind dir1 sym) dir2\n\
+\         in\n\
+\            refine (Rule.insert i)\n\
+\            >>> [\n\
+\                chdir dir'\n\
+\                ]\n\
+\         end\n\
+\\n\
+\      fun forallLeft m =\n\
+\         let\n\
+\            do (jud, dir) = withgoal\n\
+\            val dir' = D.tl dir\n\
+\         in\n\
+\            refine (Rule.forallLeft m)\n\
+\            >>> [\n\
+\                chdir dir',\n\
+\                idtac\n\
+\                ]\n\
+\         end\n\
+\\n\
+\      val arrowLeft =\n\
+\         let\n\
+\            do (jud, dir) = withgoal\n\
+\            val dir' = D.tl dir\n\
+\         in\n\
+\            refine Rule.arrowLeft\n\
+\            >>> [\n\
+\                chdir dir',\n\
+\                idtac\n\
+\                ]\n\
+\         end\n\
+\\n\
 \      val haltsValue = refine Rule.haltsValue\n\
 \      val checkPositive = refine Rule.checkPositive\n\
 \      val checkNegative = refine Rule.checkNegative\n\

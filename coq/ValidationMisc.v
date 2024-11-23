@@ -147,3 +147,53 @@ eapply tr_pi_elim'; eauto.
   auto.
   }
 Qed.
+
+
+Lemma lethForm_valid : lethForm_obligation.
+Proof.
+prepare.
+intros G a b m n ext1 ext0 Hm Hn.
+unfold Defs.leth.
+rewrite -> equiv_beta.
+simpsub.
+rewrite -> equiv_beta.
+simpsub.
+eapply tr_pi_elim'; eauto.
+  {
+  apply tr_pi_intro.
+    {
+    eapply tr_inhabitation_formation; eauto.
+    }
+  exact Hn.
+  }
+
+  {
+  simpsub.
+  auto.
+  }
+Qed.
+
+
+Lemma leteForm_valid : leteForm_obligation.
+Proof.
+prepare.
+intros G a b m n ext1 ext0 Hm Hn.
+unfold Defs.lete.
+rewrite -> equiv_beta.
+simpsub.
+rewrite -> equiv_beta.
+simpsub.
+eapply tr_pi_elim'; eauto.
+  {
+  apply tr_pi_intro.
+    {
+    eapply tr_inhabitation_formation; eauto.
+    }
+  exact Hn.
+  }
+
+  {
+  simpsub.
+  auto.
+  }
+Qed.

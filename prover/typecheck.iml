@@ -53,10 +53,14 @@ signature TYPECHECK_INTERNAL =
          -> (Message.label * Tactic.goal) list * (Refine.validation list -> Refine.validation list)
 
 
+      exception Stop of Message.label
+
+
       (* Tactics may add hypotheses to the end, but must not alter existing hypotheses.
 
-         The typechecker is not currently reentrant, so do not use any tactics that might
-         call the typechecker.
+         The typechecker is re-entrant, so the world won't end if these tactics call the type checker.
+         But the two calls won't collaborate at all, so it probably won't behave very well except on
+         small instances.
       *)
 
       val introTactics : tactic ConstantTable.table
@@ -68,6 +72,7 @@ signature TYPECHECK_INTERNAL =
       val eqkindTactics : tactic Constant2Table.table
       val subtypeTactics : tactic Constant2Table.table
       val subtypeLeftTactics : tactic ConstantTable.table
+      val subtypeRightTactics : tactic ConstantTable.table
       val strictnessTactics : tactic ConstantTable.table
       val totalityTactics : tactic ConstantTable.table
 
@@ -285,6 +290,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
       val eqkindTactics : tactic H2.table = H2.table ()
       val subtypeTactics : tactic H2.table = H2.table ()
       val subtypeLeftTactics : tactic H.table = H.table ()
+      val subtypeRightTactics : tactic H.table = H.table ()
       val strictnessTactics : tactic H.table = H.table ()
       val totalityTactics : tactic H.table = H.table ()
 
@@ -321,16 +327,16 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                 raise (Fail "precondition1"))
 
 
-      extension ExecuteSuccess of (Message.label * goal) list
+      extension ExecuteSuccess of (Message.label * goal) list * validator
       extension ExecuteFailure
 
       fun execute tac goal fk sk =
          (case
              tac goal
                 (fn _ => ExecuteFailure)
-                (fn (subgoals, _, _) => ExecuteSuccess subgoals)
+                (fn (subgoals, validate, _) => ExecuteSuccess (subgoals, validate))
           of
-             ExecuteSuccess subgoals => sk subgoals
+             ExecuteSuccess (subgoals, validate) => sk (subgoals, validate)
            | ExecuteFailure => fk ()
            | _ => raise (Fail "impossible"))
 
@@ -968,7 +974,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
          so the typechecker will be re-entrant.
 
          We don't really want the user's callbacks to be calling the typechecker, but if they
-         do, we should be able to cope with it.  If we don't, the error they user will get are
+         do, we should be able to cope with it.  If we don't, the errors the user will get are
          very confusing.
 
          The alternative of locking out calls to the typechecker while the typechecker is running
@@ -1024,29 +1030,57 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
          deferred := (prob, table, goal, dest, (origin, List.tl hist)) :: !deferred
          )
 
+
+
       (* NB!  When we put a tactic into the destination that accompanies a goal,
          we know that that the tactic will be applied to an equivalent goal.
          However, we do NOT know that it will be applied to the same instance of
          that goal.  Consequently, we cannot reuse validations without a cast.
       *)
 
+      fun reusethen (originaljud, _) subgoals validate tacs (goal as (jud, _)) fk sk =
+         (case Refine.cast originaljud jud of
+             SOME caster =>
+                let
+                   fun tac _ fk' sk' =
+                      (* tac simulates the tactic that produced these goals,
+                         but it offers no opportunity for backtracking
+                      *)
+                      sk' (subgoals, validate, fk')
+       
+                   do (subgoals', validate', fk') = andthenl tac tacs goal fk
+       
+                   fun validate'' vs =
+                      let
+                         val (v, vs') = validate' vs
+                      in
+                         (caster v, vs')
+                      end
+                in
+                   sk (subgoals', validate'', fk')
+                end
+
+           | NONE =>
+                raise (Fail "reuse applied to inequivalent goal"))
+
+
+
+      exception Stop of Message.label
 
       fun tryRule (st as ST { progress }) table history tac (goal as (jud, _)) dest fk =
-         let
-            val sz = Seq.length (J.context jud)
-            do subgoals = execute tac goal fk
-
-            val (obs, tacs) = processSubgoals sz table history subgoals
-         in
-            progress := true;
-            enqueue st obs;
-
-            (* We can't reuse tac's results without a cast, and it's
-               probably cheaper (and definitely easier) just to run
-               it again.
-            *)
-            dest := (tac >>> tacs)
-         end
+         try
+            let
+               val sz = Seq.length (J.context jud)
+               do (subgoals, validate) = execute tac goal fk
+   
+               val (obs, tacs) = processSubgoals sz table history subgoals
+            in
+               progress := true;
+               enqueue st obs;
+               dest := reusethen goal subgoals validate tacs
+            end
+         with
+            Stop label => dest := idtacM label
 
 
       (* immediate st table history tab key ctx concl dir pretac
@@ -1244,8 +1278,10 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                           raise Backtrack)\
 
                (* 7a. Let *)
-             | _ ; \Prim.lett\ ? (fn ? . ?) =>
-               \(fnc m1 binder m2 =>
+             | _ ; (| \Prim.lett\ => \(fnc => ((), Rule.letForm))\
+                    | \Prim.leth\ => \(fnc => ((), Rule.lethForm))\
+                    | \Prim.lete\ => \(fnc => ((), Rule.leteForm))\) @ $ap ? $ap (fn ? . ?) $nil =>
+               \(fnc rule m1 binder m2 =>
                     let
                        val e = T.evar ()
 
@@ -1270,7 +1306,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                        dest :=
                           (
                           (* G |- let M1 (fn . M2) : A *)
-                          refine (Rule.letForm e a m1 m2)
+                          refine (rule e a m1 m2)
                           >>> [
                               (* G |- M1 : E *)
                               play dest1,
@@ -1866,6 +1902,24 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
  
                       | NONE => raise Backtrack))\
 
+               (* 6b. Use a right-indexed subtyping rule. *)
+             | _ ; const? @ _ =!>
+               \(fnc const =>
+                    (case H.find subtypeRightTactics const of
+                        SOME tac =>
+                           tryRule st table history tac goal dest
+                           (fn () =>
+                               dest :=
+                                  error history "unexpected subtyping failure"
+                                  (fn () =>
+                                      (
+                                      showPrefixed " first: " dir a;
+                                      showPrefixed "second: " dir b;
+                                      print "\n"
+                                      )))
+ 
+                      | NONE => raise Backtrack))\
+
                (* 7. Try A = B : type *)
              | _ =>
                \fnc =>
@@ -2325,7 +2379,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                                           )))
                       in
                          progress := true;
-                         dest := (refine Rule.checkPositive)
+                         dest := (refine Rule.checkPositive)  (* probably just as fast to check again as to cast a validation *)
                       end\
             /
          end
@@ -2909,6 +2963,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.foralltp RT.foralltpIntroOf;
             insert Prim.exists (pairOnly >> RT.existsIntroOf);
             insert Prim.prod (pairOnly >> RT.prodIntroOf);
+            insert Prim.dprod (pairOnly >> RT.dprodIntroOf);
             insert Prim.future (nextOnly >> RT.futureIntroOf);
             insert Prim.iforall RT.iforallIntroOf;
             insert Prim.iexists (lift (fn () => RT.iexistsIntroOf (T.evar ())));
@@ -2930,6 +2985,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.unit (RT.unitIntroOf >> done);
             insert Prim.void (RT.voidElim >> idtacM Primary);
             insert Prim.squash (RT.squashIntroOfSquash >>> [idtacM Secondary, idtacM Primary]);
+            insert Prim.isquash (RT.isquashIntroOfIsquash >> idtacM Primary);
             insert Prim.ov (RT.ofIntro >> idtacM Primary);
             insert Prim.eq (RT.eqIntro >> idtacM Primary);
             insert Prim.istp (RT.istpIntro >> idtacM Primary);
@@ -2988,6 +3044,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.coguard RT.coguardForm;
             insert Prim.exists RT.existsForm;
             insert Prim.prod RT.prodForm;
+            insert Prim.dprod RT.dprodForm;
             insert Prim.future RT.futureForm;
             insert Prim.void RT.voidForm;
             insert Prim.unit RT.unitForm;
@@ -3010,6 +3067,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.level RT.levelForm;
             insert Prim.lleq RT.lleqForm;
             insert Prim.squash RT.squashForm;
+            insert Prim.isquash RT.isquashForm;
             insert Prim.eeqtp eeqtpForm;
             insert Prim.integer RT.integerForm;
             insert Prim.symbol RT.symbolForm;
@@ -3033,6 +3091,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.coguard RT.coguardEq;
             insert Prim.exists RT.existsEq;
             insert Prim.prod RT.prodEq;
+            insert Prim.dprod RT.dprodEq;
             insert Prim.future RT.futureEq;
             insert Prim.void RT.voidEq;
             insert Prim.unit RT.unitEq;
@@ -3054,6 +3113,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.level RT.levelEq;
             insert Prim.lleq RT.lleqEq;
             insert Prim.squash RT.squashEq;
+            insert Prim.isquash RT.isquashEq;
             insert Prim.integer RT.integerEq;
             insert Prim.symbol RT.symbolEq;
             insert Prim.partial RT.partialEq;
@@ -3100,6 +3160,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.coguard RT.coguardFormUniv;
             insert Prim.exists RT.existsFormUniv;
             insert Prim.prod RT.prodFormUniv;
+            insert Prim.dprod RT.dprodFormUniv;
             insert Prim.future RT.futureFormUniv;
             insert Prim.rec RT.recFormUniv;
             insert Prim.void RT.voidFormUniv;
@@ -3124,6 +3185,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.level RT.levelFormUniv;
             insert Prim.lleq RT.lleqFormUniv;
             insert Prim.squash RT.squashFormUniv;
+            insert Prim.isquash RT.isquashFormUniv;
             insert Prim.integer RT.integerFormUniv;
             insert Prim.symbol RT.symbolFormUniv;
             insert Prim.partial RT.partialFormUniv;
@@ -3146,6 +3208,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.coguard RT.coguardEqUniv;
             insert Prim.exists RT.existsEqUniv;
             insert Prim.prod RT.prodEqUniv;
+            insert Prim.dprod RT.dprodEqUniv;
             insert Prim.future RT.futureEqUniv;
             insert Prim.rec RT.recEqUniv;
             insert Prim.void RT.voidEqUniv;
@@ -3170,6 +3233,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.level RT.levelEqUniv;
             insert Prim.lleq RT.lleqEqUniv;
             insert Prim.squash RT.squashEqUniv;
+            insert Prim.isquash RT.isquashEqUniv;
             insert Prim.integer RT.integerEqUniv;
             insert Prim.symbol RT.symbolEqUniv;
             insert Prim.partial RT.partialEqUniv;
@@ -3240,9 +3304,15 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.prod Prim.prod RT.prodSub;
             insert Prim.prod Prim.exists RT.prodExistsSub;
             insert Prim.exists Prim.prod RT.existsProdSub;
+            insert Prim.dprod Prim.dprod RT.dprodSub;
+            insert Prim.dprod Prim.exists RT.dprodExistsSub;
+            insert Prim.exists Prim.dprod RT.existsDprodSub;
+            insert Prim.prod Prim.dprod RT.prodDprodSub;
+            insert Prim.dprod Prim.prod RT.dprodProdSub;
             insert Prim.future Prim.future RT.futureSub;
             insert Prim.sum Prim.sum RT.sumSub;
             insert Prim.squash Prim.squash RT.squashSub;
+            insert Prim.isquash Prim.isquash RT.isquashSub;
             insert Prim.partial Prim.partial RT.partialSub
          end
 
@@ -3258,6 +3328,13 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       val () =
          let
+            fun insert const tac = H.insert subtypeRightTactics const tac
+         in
+            insert Prim.guard RT.guardSubIntro
+         end
+
+      val () =
+         let
             fun insert const tac = H.insert strictnessTactics const tac
          in
             insert Prim.partial RT.partialStrict;
@@ -3269,10 +3346,12 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.intersect RT.intersectStrict;
             insert Prim.exists RT.existsStrict;
             insert Prim.prod RT.prodStrict;
+            insert Prim.dprod RT.dprodStrict;
             insert Prim.sum RT.sumStrict;
             insert Prim.future RT.futureStrict;
             insert Prim.set RT.setStrict;
             insert Prim.iset RT.isetStrict;
+            insert Prim.univ RT.univStrict;
             insert Prim.nat RT.natStrict;
             insert Prim.integer RT.integerStrict;
             insert Prim.symbol RT.symbolStrict
@@ -3289,8 +3368,10 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             insert Prim.arrow RT.arrowTotal';
             insert Prim.exists RT.existsTotal';
             insert Prim.prod RT.prodTotal';
+            insert Prim.dprod RT.dprodTotal';
             insert Prim.sum RT.sumTotal';
             insert Prim.future RT.futureTotal';
+            insert Prim.univ RT.univTotal';
             insert Prim.nat RT.natTotal'
          end
 

@@ -1,0 +1,168 @@
+
+structure ParseTuple =
+   struct
+
+      structure R = CheckpointedRef
+      structure T = ETerm
+      type constant = Constant.constant
+
+      val lettrip : constant R.dest = R.dest ()
+      val letquad : constant R.dest = R.dest ()
+      val letquint : constant R.dest = R.dest ()
+
+      fun parseLetpair x y m n = T.apply2 Prim.letpair m (T.lam (SOME x) (T.lam (SOME y) n))
+
+      fun parseLettrip x y z m n = T.apply2 (R.read lettrip) m (T.lam (SOME x) (T.lam (SOME y) (T.lam (SOME z) n)))
+
+      fun parseLetquad w x y z m n = T.apply2 (R.read letquad) m (T.lam (SOME w) (T.lam (SOME x) (T.lam (SOME y) (T.lam (SOME z) n))))
+
+      fun parseLetquint v w x y z m n = T.apply2 (R.read letquint) m (T.lam (SOME v) (T.lam (SOME w) (T.lam (SOME x) (T.lam (SOME y) (T.lam (SOME z) n)))))
+
+   end
+
+
+grammardef Tuple
+
+   open ParseTuple
+
+   rule Term(0)    ::= "let" "(" Ident "," Ident ")" "=" Term(1) "in" Term(0) => parseLetpair
+   rule Term(0)    ::= "let" "trip" Ident Ident Ident "=" Term(1) "in" Term(0) => parseLettrip
+   rule Term(0)    ::= "let" "quad" Ident Ident Ident Ident "=" Term(1) "in" Term(0) => parseLetquad
+   rule Term(0)    ::= "let" "quint" Ident Ident Ident Ident Ident "=" Term(1) "in" Term(0) => parseLetquint
+
+end
+
+grammaron Tuple
+
+
+
+functor AfterTupleAll () :> sig end =
+   struct
+
+      structure CR = CheckpointedRef
+      structure U = Show.Unparsing
+
+      val Collapse (lettrip, letquad, letquint) =
+         readRegistry /Tuple.AfterTupleAllEnv/
+            /[constant constant constant]/
+
+      val () = Registry.delete (parseLongident /Tuple.AfterTupleAllEnv/)
+         
+
+      val () = CR.write ParseTuple.lettrip lettrip
+      val () = CR.write ParseTuple.letquad letquad
+      val () = CR.write ParseTuple.letquint letquint
+
+
+      fun register k arity prec unp =
+         ConstantTable.insert U.unparsingTable k (arity, prec, ref true, unp)
+
+      val () =
+         register Prim.letpair 2 0
+         (U.wrap
+             (U.apply2 Prim.letpair U.show (U.lam (U.lam U.show)))
+             (fn (m, (x, (y, n))) => 
+                 U.boxi 0 $
+                 U.append
+                    [
+                    U.box $ U.append
+                       [
+                       U.string "let (",
+                       U.string x,
+                       U.string ", ",
+                       U.string y,
+                       U.string ") =",
+                       U.break 1,
+                       U.box (m 1)
+                       ],
+                    U.break 1,
+                    U.string "in",
+                    U.break 1,
+                    U.box (n 0)
+                    ]))
+
+      val () =
+         register lettrip 2 0
+         (U.wrap
+             (U.apply2 lettrip U.show (U.lam (U.lam (U.lam U.show))))
+             (fn (m, (x, (y, (z, n)))) =>
+                 U.boxi 0 $
+                 U.append
+                    [
+                    U.box $ U.append
+                       [
+                       U.string "let trip ",
+                       U.string x,
+                       U.string " ",
+                       U.string y,
+                       U.string " ",
+                       U.string z,
+                       U.string " =",
+                       U.break 1,
+                       U.box (m 1)
+                       ],
+                    U.break 1,
+                    U.string "in",
+                    U.break 1,
+                    U.box (n 0)
+                    ]))
+
+      val () =
+         register letquad 2 0
+         (U.wrap
+             (U.apply2 letquad U.show (U.lam (U.lam (U.lam (U.lam U.show)))))
+             (fn (m, (w, (x, (y, (z, n))))) =>
+                 U.boxi 0 $
+                 U.append
+                    [
+                    U.box $ U.append
+                       [
+                       U.string "let quad ",
+                       U.string w,
+                       U.string " ",
+                       U.string x,
+                       U.string " ",
+                       U.string y,
+                       U.string " ",
+                       U.string z,
+                       U.string " =",
+                       U.break 1,
+                       U.box (m 1)
+                       ],
+                    U.break 1,
+                    U.string "in",
+                    U.break 1,
+                    U.box (n 0)
+                    ]))
+
+      val () =
+         register letquint 2 0
+         (U.wrap
+             (U.apply2 letquint U.show (U.lam (U.lam (U.lam (U.lam (U.lam U.show))))))
+             (fn (m, (v, (w, (x, (y, (z, n)))))) =>
+                 U.boxi 0 $
+                 U.append
+                    [
+                    U.box $ U.append
+                       [
+                       U.string "let quint ",
+                       U.string v,
+                       U.string " ",
+                       U.string w,
+                       U.string " ",
+                       U.string x,
+                       U.string " ",
+                       U.string y,
+                       U.string " ",
+                       U.string z,
+                       U.string " =",
+                       U.break 1,
+                       U.box (m 1)
+                       ],
+                    U.break 1,
+                    U.string "in",
+                    U.break 1,
+                    U.box (n 0)
+                    ]))
+
+   end

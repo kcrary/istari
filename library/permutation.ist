@@ -1,0 +1,2058 @@
+(* Inspired by the Coq library of the same name. *)
+
+File.import "list-load.iml";
+File.import "logic-load.iml";
+File.import "nat-load.iml";
+
+openModule /List/;
+openModule /Logic/;
+
+beginModule "Permutation";
+
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    forall (a : U i) .
+    U i
+  of
+    Perm : list a -> list a -> type =
+    
+    | Perm_nil :
+        Perm nil nil
+
+    | Perm_cons :
+        forall h t t' .
+          Perm t t'
+          -> Perm (h :: t) (h :: t')
+
+    | Perm_swap :
+        forall x y t .
+          Perm (x :: y :: t) (y :: x :: t)
+
+    | Perm_trans :
+        forall l1 l2 l3 .
+          Perm l1 l2
+          -> Perm l2 l3
+          -> Perm l1 l3
+/;
+
+Database.setImplicits (parseConstant /Perm/) 1;
+
+
+
+lemma "Perm_refl"
+/
+  intersect i . forall (a : U i) (l : list a) . Perm l l
+/;
+
+inference.
+intro /i a l/.
+induction /l/ >> autoWith /Perm/.
+qed ();
+
+
+
+lemma "Perm_symm"
+/
+  intersect i . forall (a : U i) (l1 l2 : list a) .
+    Perm l1 l2
+    -> Perm l2 l1
+/;
+
+inference.
+intro /i a l1 l2 H/.
+induction /H/ >> autoWith /Perm/.
+(* trans *)
+intro /l1 l2 l3 _ IH1 _ IH2/.
+apply /Perm_trans/ >> auto.
+qed ();
+
+
+
+lemma "Perm_append_right"
+/
+  forall i (a : U i) (l1 l1' l2 : list a) .
+    Perm l1 l1'
+    -> Perm (append l1 l2) (append l1' l2)
+/;
+
+inference.
+intro /i a l1 l1' l2 Hperm/.
+induction /Hperm/ >> autoWith /Perm Perm_refl/.
+intro /l1a l1b l1c _ IH1 _ IH2/.
+apply /Perm_trans _ _ (append l1b l2)/ >> auto.
+qed ();
+
+
+
+lemma "Perm_append_left"
+/
+  forall i (a : U i) (l1 l2 l2' : list a) .
+    Perm l2 l2'
+    -> Perm (append l1 l2) (append l1 l2')
+/;
+
+inference.
+intro /i a l1 l2 l2' Hperm/.
+induction /l1/ >> autoWith /Perm/.
+qed ();
+
+
+
+lemma "Perm_append"
+/
+  forall i (a : U i) (l1 l1' l2 l2' : list a) .
+    Perm l1 l1'
+    -> Perm l2 l2'
+    -> Perm (append l1 l2) (append l1' l2')
+/;
+
+inference.
+intro /i a l1 l1' l2 l2' Hperm1 Hperm2/.
+apply /Perm_trans _ _ (append l1 l2')/.
+  {
+  apply /Perm_append_left/ >> auto.
+  }
+
+  {
+  apply /Perm_append_right/ >> auto.
+  }
+qed ();
+
+
+
+lemma "Perm_cons_snoc"
+/
+  forall i (a : U i) (h : a) (t : list a) .
+    Perm (h :: t) (append t (h :: nil))
+/;
+
+intro /i a h t/.
+induction /t/ >> autoWith /Perm_refl/.
+intro /h' t IH/.
+apply /Perm_trans/.
+  {
+  apply /Perm_swap/.
+  }
+
+  {
+  apply /Perm_cons/ >> auto.
+  }
+
+  typechecker ();
+qed ();
+
+
+
+lemma "Perm_snoc_cons"
+/
+  forall i (a : U i) (h : a) (t : list a) .
+    Perm (append t (h :: nil)) (h :: t)
+/;
+
+intro /i a h t/.
+apply /Perm_symm/.
+apply /Perm_cons_snoc/.
+qed ();
+
+
+
+lemma "Perm_cons_middle"
+/
+  forall i (a : U i) (x : a) (l1 l2 : list a) .
+    Perm (x :: append l1 l2) (append l1 (x :: l2))
+/;
+
+inference.
+intro /i a x l1 l2/.
+rewrite /<- append_cons_assoc/.
+rewrite /<- append_assoc _ _ _ (x :: nil) l2/.
+apply /Perm_append_right _ _ (x :: l1) (append l1 (x :: nil))/.
+apply /Perm_cons_snoc/.
+qed ();
+
+
+
+lemma "Perm_middle_cons"
+/
+  forall i (a : U i) (x : a) (l1 l2 : list a) .
+    Perm (append l1 (x :: l2)) (x :: append l1 l2)
+/;
+
+inference.
+intro /i a x l1 l2/.
+apply /Perm_symm/.
+apply /Perm_cons_middle/.
+qed ();
+
+
+
+lemma "Perm_append_swap"
+/
+  forall i (a : U i) (l1 l2 : list a) .
+    Perm (append l1 l2) (append l2 l1)
+/;
+
+inference.
+intro /i a l1 l2/.
+induction /l1/.
+
+(* nil *)
+{
+rewrite /-> append_id_r/.
+apply /Perm_refl/.
+}
+
+(* cons *)
+{
+intro /x l1 IH/.
+apply /Perm_trans _ _ (x :: append l2 l1)/.
+  {
+  apply /Perm_cons/ >> auto.
+  }
+apply /Perm_cons_middle/.
+}
+qed ();
+
+
+
+lemma "Perm_middle_form"
+/
+  forall i (a : U i) (x : a) (l1 l2 m : list a) .
+    Perm (append l1 (x :: l2)) m
+    -> exists m1 m2 .
+         m = append m1 (x :: m2) : list a
+         & Perm (append l1 l2) (append m1 m2)
+/;
+
+inference.
+intro /i a x l1 l2 m/.
+remember /append l1 (x :: l2)/ /_/ /l/ /Heq/.
+intro /Hperm/.
+revert /l1 l2 Heq/.
+induction /Hperm/.
+
+(* nil *)
+{
+intro /l1 l2 Heq/.
+destruct /l1/ /| h l1/ >> reduce /Heq/ >> injection /Heq/.
+}
+
+(* cons *)
+{
+intro /h t t' Hperm IH l1 l2 Heq/.
+destruct /l1/ /| k l1/ >> reduce /Heq/ >> injection /Heq/.
+  {
+  subst /h l2/.
+  existses [/nil/, /t'/].
+  reduce //.
+  split >> auto.
+  }
+
+  {
+  subst /k t/.
+  so /IH l1 l2 ()/ /m1 m2 Heq' Hperm'/.
+  subst /t'/.
+  existses [/h :: m1/, /m2/].
+  reduce //.
+  split >> auto.
+  apply /Perm_cons/ >> auto.
+  }
+}
+
+(* swap *)
+{
+intro /h k t l1 l2 Heq/.
+destruct /l1/ /| y1 (| y2 l1')/ >> reduce /Heq concl/ >> injection /Heq/.
+  {
+  subst /h l2/.
+  existses [/k :: nil/, /t/].
+  reduce //.
+  split >> auto.
+  apply /Perm_refl/.
+  }
+  
+  {
+  subst /y1/.
+  injection /0/.
+  subst /k l2/.
+  existses [/nil/, /h :: t/].
+  reduce //.
+  split >> auto.
+  apply /Perm_refl/.
+  }
+
+  {
+  subst /y1/.
+  injection /0/.
+  subst /y2 t/.
+  existses [/k :: h :: l1'/, /l2/].
+  reduce //.
+  split >> auto.
+  apply /Perm_swap/.
+  }
+}
+
+(* trans *)
+{
+intro /l n m _ IH1 _ IH2 l1 l2 Heql/.
+so /IH1 _ _ Heql/ /n1 n2 Heqn Hperm1/.
+so /IH2 _ _ Heqn/ /m1 m2 Heqm Hperm2/.
+existses [/m1/, /m2/].
+split >> auto.
+apply /Perm_trans/ >> auto.
+}
+qed ();
+
+
+
+lemma "Perm_middle_invert"
+/
+  forall i (a : U i) (x : a) (l1 l1' l2 l2' : list a) .
+    Perm (append l1 (x :: l2)) (append l1' (x :: l2'))
+    -> Perm (append l1 l2) (append l1' l2')
+/;
+
+inference.
+intro /i a x l1 m1 l2 m2 Hperm/.
+so /Perm_middle_form _# 6 Hperm/ /n1 n2 Heq Hperm'/.
+apply /Perm_trans/ >> auto.
+clear /Hperm Hperm'/.
+revert /n1 Heq/.
+induction /m1/.
+
+(* nil *)
+{
+intro /n1 Heq/.
+destruct /n1/ /| k n1/.
+  {
+  reduce /Heq concl/.
+  injection /Heq/.
+  subst /n2/.
+  apply /Perm_refl/.
+  }
+
+  {
+  reduce /Heq concl/.
+  injection /Heq/.
+  subst /k m2/.
+  apply /Perm_cons_middle/.
+  }
+}
+
+(* cons *)
+{
+intro /h m1 IH n1 Heq/.
+destruct /n1/ /| k n1/.
+  {
+  reduce /Heq concl/.
+  injection /Heq/.
+  subst /h n2/.
+  apply /Perm_middle_cons/.
+  }
+
+  {
+  reduce /Heq concl/.
+  injection /Heq/.
+  reintro /? Heq'/.
+  subst /k/.
+  apply /Perm_cons/.
+  apply /IH/ >> auto.
+  }
+}
+qed ();
+
+
+
+lemma "Perm_cons_invert"
+/
+  forall i (a : U i) (x : a) (l l' : list a) .
+    Perm (x :: l) (x :: l')
+    -> Perm l l'
+/;
+
+intro /i a x l l' Hperm/.
+apply /Perm_middle_invert _ _ x nil nil/ >> auto.
+qed ();
+
+
+
+lemma "Perm_implies_In"
+/
+  forall i (a : U i) (l l' : list a) .
+    Perm l l'
+    -> (forall x . In a x l -> In a x l')
+/;
+
+inference.
+intro /i a l1 l2 Hperm x/.
+induction /Hperm/ >> auto.
+
+(* cons *)
+{
+intro /h t t' _ IH (Heq | Hin)/ >> auto.
+}
+
+(* swap *)
+{
+intro /y z l (Heqy | Heqz | Hin)/ >> auto.
+}
+
+(* trans *)
+{
+intro /l1 l2 l3 _ IH1 _ IH2 Hin/.
+auto.
+}
+qed ();
+
+
+
+lemma "Perm_implies_In_iff"
+/
+  forall i (a : U i) (l l' : list a) .
+    Perm l l'
+    -> (forall x . In a x l <-> In a x l')
+/;
+
+inference.
+intro /i a l1 l2 Hperm x/.
+split.
+  {
+  apply /Perm_implies_In/ >> auto.
+  }
+
+  {
+  apply /Perm_implies_In/.
+  apply /Perm_symm/ >> auto.
+  }
+qed ();
+
+
+
+lemma "length_Perm"
+/
+  forall i (a : U i) (l l' : list a) .
+    Perm l l'
+    -> length l = length l' : nat
+/;
+
+inference.
+intro /i a l l' H/.
+induction /H/ >> attempt (intros >> reduce // >> compat >> auto >> done).
+intro /l1 l2 l3 _ IH1 _ IH2/.
+transitivity /_/ >> auto.
+qed ();
+
+
+
+lemma "Forall_Perm"
+/
+  forall i (a : U i) (P : a -> U i) (l l' : list a) .
+    Perm l l'
+    -> Forall P l
+    -> Forall P l'
+/;
+
+inference.
+intro /i a P l1 l2 Hperm/.
+induction /Hperm/ >> auto.
+
+(* cons *)
+{
+intro /h t t' _ IH Hall/.
+inversion /Hall/.
+apply /Forall_cons/ >> auto.
+}
+
+(* swap *)
+{
+intro /x y t Hall/.
+inversion /Hall/.
+reintro /Hx Hall'/.
+inversion /Hall'/.
+reintro /Hy Ht/.
+autoWith /Forall_cons/.
+}
+
+(* trans *)
+{
+intro /l1 l2 l3 _ IH1 _ IH2 Hall/.
+auto.
+}
+qed ();
+
+
+
+lemma "Forall_Perm_iff"
+/
+  forall i (a : U i) (P : a -> U i) (l l' : list a) .
+    Perm l l'
+    -> (Forall P l <-> Forall P l')
+/;
+
+inference.
+intro /i a P l1 l2 Hperm/.
+split.
+  {
+  apply /Forall_Perm/ >> auto.
+  }
+
+  {
+  apply /Forall_Perm/.
+  apply /Perm_symm/ >> auto.
+  }
+qed ();
+
+
+
+lemma "Exists_Perm"
+/
+  forall i (a : U i) (P : a -> U i) (l l' : list a) .
+    Perm l l'
+    -> Exists P l
+    -> Exists P l'
+/;
+
+inference.
+intro /i a P l1 l2 Hperm/.
+induction /Hperm/ >> auto.
+
+(* cons *)
+{
+intro /h t t' _ IH Hex/.
+inversion /Hex/ >> autoWith /Exists/.
+}
+
+(* swap *)
+{
+intro /x y t Hex/.
+inversion /Hex/ >> autoWith /Exists/.
+reintro /Hex'/.
+inversion /Hex'/ >> autoWith /Exists/.
+}
+
+(* trans *)
+{
+intro /l1 l2 l3 _ IH1 _ IH2 Hex/.
+auto.
+}
+qed ();
+
+
+
+lemma "Exists_Perm_iff"
+/
+  forall i (a : U i) (P : a -> U i) (l l' : list a) .
+    Perm l l'
+    -> (Exists P l <-> Exists P l')
+/;
+
+inference.
+intro /i a P l1 l2 Hperm/.
+split.
+  {
+  apply /Exists_Perm/ >> auto.
+  }
+
+  {
+  apply /Exists_Perm/.
+  apply /Perm_symm/ >> auto.
+  }
+qed ();
+
+
+
+lemma "Perm_reverse"
+/
+  forall i (a : U i) (l : list a) .
+    Perm l (reverse l)
+/;
+
+inference.
+intro /i a l/.
+induction /l/.
+  {
+  apply /Perm_nil/.
+  }
+intro /h t IH/.
+apply /Perm_trans _ _ (h :: reverse t)/.
+  {
+  apply /Perm_cons/ >> auto.
+  }
+
+  {
+  apply /Perm_cons_snoc/.
+  }
+qed ();
+
+
+
+lemma "reverse_Perm"
+/
+  forall i (a : U i) (l l' : list a) .
+    Perm l l'
+    -> Perm (reverse l) (reverse l')
+/;
+
+inference.
+intro /i a l l' Hperm/.
+apply /Perm_trans _ _ l/.
+  {
+  apply /Perm_symm/.
+  apply /Perm_reverse/.
+  }
+apply /Perm_trans _ _ l'/ >> auto.
+apply /Perm_reverse/.
+qed ();
+
+
+
+lemma "Perm_map"
+/
+  forall i (a b : U i) (f : a -> b) (l l' : list a) .
+    Perm l l'
+    -> Perm (map f l) (map f l')
+/;
+
+inference.
+intro /i a b f l l' Hperm/.
+induction /Hperm/.
+
+(* nil *)
+{
+apply /Perm_nil/.
+}
+
+(* cons *)
+{
+intro /h t t' _ IH/.
+apply /Perm_cons/ >> auto.
+}
+
+(* swap *)
+{
+intro /x y t/.
+apply /Perm_swap/.
+}
+
+(* trans *)
+{
+intro /l1 l2 l3 _ IH1 _ IH2/.
+apply /Perm_trans/ >> auto.
+}
+qed ();
+
+
+
+lemma "foldr_Perm"
+/
+  forall i (a b : U i) (z : b) (f : a -> b -> b) .
+    (forall x x' y . f x (f x' y) = f x' (f x y) : b)
+    -> forall l l' . 
+         Perm l l'
+         -> foldr z f l = foldr z f l' : b
+/;
+
+inference.
+intro /i a b z f Hcommute l l' Hperm/.
+induction /Hperm/ >> auto.
+
+(* cons *)
+{
+intro /h t t' _ IH/.
+compat >> auto.
+}
+
+(* trans *)
+{
+intro /l1 l2 l3 _ IH1 _ IH2/.
+transitivity /_/ >> auto.
+}
+qed ();
+
+
+
+lemma "foldl_Perm"
+/
+  forall i (a b : U i) (z : b) (f : a -> b -> b) .
+    (forall x x' y . f x (f x' y) = f x' (f x y) : b)
+    -> forall l l' . 
+         Perm l l'
+         -> foldl z f l = foldl z f l' : b
+/;
+
+inference.
+intro /i a b z f Hcommute l l' Hperm/.
+rewrite /-> foldl_as_foldr at 0 0/.
+apply /foldr_Perm/ >> auto.
+apply /reverse_Perm/ >> auto.
+qed ();
+
+
+
+lemma "Forall_dist_Perm"
+/
+  forall i (a : U i) (P : a -> a -> U i) (l l' : list a) .
+    (forall x y . P x y -> P y x)
+    -> Perm l l'
+    -> Forall_dist P l
+    -> Forall_dist P l'
+/;
+
+inference.
+intro /i a P l l' Hsymm Hperm/.
+induction /Hperm/.
+
+(* nil *)
+{
+intro /_/.
+apply /Forall_dist_nil/.
+}
+
+(* cons *)
+{
+intro /h t t' Hperm IH Hall/.
+inversion /Hall/.
+reintro /Hh Ht/.
+apply /Forall_dist_cons/ >> auto.
+apply /Forall_Perm/ >> auto.
+}
+
+(* swap *)
+{
+intro /x y t Hall/.
+inversion /Hall/.
+reintro /Hx_yt Hyt/.
+inversion /Hyt/.
+reintro /Hy_t Ht/.
+inversion /Hx_yt/.
+reintro /Hxy Hx_t/.
+apply /Forall_dist_cons/.
+  {
+  apply /Forall_cons/ >> auto.
+  }
+apply /Forall_dist_cons/ >> auto.
+}
+
+(* trans *)
+{
+intro /l1 l2 l3 _ IH1 _ IH2 H1/.
+auto.
+}
+qed ();
+
+
+
+lemma "Forall_dist_Perm_iff"
+/
+  forall i (a : U i) (P : a -> a -> U i) (l l' : list a) .
+    (forall x y . P x y -> P y x)
+    -> Perm l l'
+    -> (Forall_dist P l <-> Forall_dist P l')
+/;
+
+inference.
+intro /i a P l1 l2 Hsymm Hperm/.
+split.
+  {
+  apply /Forall_dist_Perm/ >> auto.
+  }
+
+  {
+  apply /Forall_dist_Perm/ >> auto.
+  apply /Perm_symm/ >> auto.
+  }
+qed ();
+
+
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    U i
+  of
+    perm : type =
+    | perm_refl : perm
+    | perm_cons : perm -> perm
+    | perm_swap : perm
+    | perm_trans : perm -> perm -> perm
+/;
+
+
+
+alias /bogus/ /Miscellaneous.bogus/;
+
+define /permute p l/
+/
+  (fnind permute : perm -> list bogus -> list bogus of
+   | perm_refl . fn l . l
+
+   | perm_cons p .
+       (fnind _ : list [bogus] -> list bogus of
+        | nil . nil
+
+        | cons h t . cons h (permute p t))
+
+   | perm_swap .
+       (fnind _ : list [bogus] -> list bogus of
+        | nil . nil
+
+        | cons h1 t1 .
+            (fnind _ : list [bogus] -> list bogus of
+             | nil . cons h1 nil
+
+             | cons h2 t . cons h2 (cons h1 t)) t1)
+
+   | perm_trans p1 p2 . fn l .
+       permute p2 (permute p1 l)) p l
+//
+  intersect i (a : U i) . perm -> list a -> list a
+/;
+
+inference.
+introOf /i a p l/.
+revert /l/.
+sinduction /p/.
+reintro /IH/.
+destruct /p/ /{| p | | p1 p2}/.
+
+(* refl *)
+{
+intro /l/.
+unfold /permute/ >> auto.
+}
+
+(* cons *)
+{
+intro /l/.
+destruct /l/ /| h t/.
+  {
+  unfold /permute/.
+  typecheck.
+  }
+
+  {
+  unfold /permute/.
+  fold /permute _ _/.
+  typecheck.
+  apply /IH/.
+  apply /perm_cons_subterm/.
+  }
+}
+
+(* swap *)
+{
+intro /l/.
+destruct /l/ /| h1 (| h2 t)/ >> unfold /permute/ >> reduce // >> typecheck.
+}
+
+(* trans *)
+{
+intro /l1/.
+unfold /permute/ >> fold /permute _ _ at all/.
+apply /IH/.
+  {
+  apply /perm_trans_subterm/.
+  }
+apply /IH/.
+apply /perm_trans_subterm/.
+}
+qed ();
+
+
+
+reductions
+/
+  permute (perm_refl) l --> l ;
+
+  permute (perm_cons p) l -->
+    (fnind _ : list [bogus] -> list bogus of
+     | nil . nil
+
+     | cons h t . cons h (permute p t)) l ;
+
+  permute (perm_swap) l -->
+    (fnind _ : list [bogus] -> list bogus of
+     | nil . nil
+
+     | cons h1 t1 .
+         (fnind _ : list [bogus] -> list bogus of
+          | nil . cons h1 nil
+
+          | cons h2 t . cons h2 (cons h1 t)) t1) l ;
+
+  permute (perm_trans p1 p2) l --> permute p2 (permute p1 l) ;
+
+  unfolding permute
+/;
+
+
+
+lemma "Perm_permute"
+/
+  forall i (a : U i) (p : perm) (l : list a) .
+    Perm l (permute p l)
+/;
+
+inference.
+intro /i a p/.
+induction /p/.
+
+(* refl *)
+{
+intro /l/.
+apply /Perm_refl/.
+}
+
+(* cons *)
+{
+intro /p IH l/.
+destruct /l/ /| h t/ >> reduce // >> autoWith /Perm_nil Perm_cons/.
+}
+
+(* swap *)
+{
+intro /(| h1 (| h2 t))/ >> reduce // >> autoWith /Perm_nil Perm_cons/.
+apply /Perm_swap/.
+}
+
+(* trans *)
+{
+intro /p1 IH1 p2 IH2 l1/.
+apply /Perm_trans _ _ (permute p1 l1)/ >> auto.
+}
+qed ();
+
+
+
+lemma "Perm_impl_permute"
+/
+  forall i (a : U i) (l l' : list a) .
+    Perm l l'
+    -> exists p . permute p l = l' : list a
+/;
+
+inference.
+intro /i a l l' H/.
+induction /H/.
+
+(* nil *)
+{
+exists /perm_refl/.
+reduce //.
+reflexivity.
+}
+
+(* cons *)
+{
+intro /h t t' _ (p Heq)/.
+exists /perm_cons p/.
+reduce //.
+auto.
+}
+
+(* swap *)
+{
+intro /x y t/.
+exists /perm_swap/.
+reduce //.
+reflexivity.
+}
+
+(* trans *)
+{
+intro /l1 l2 l3 _ (p1 Heq1) _ (p2 Heq2)/.
+exists /perm_trans p1 p2/.
+reduce //.
+rewrite /-> Heq1/.
+hyp /Heq2/.
+}
+qed ();
+
+
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    forall (a : U i) .
+    U i
+  of
+    PPerm : list a -> list a -> type =
+    
+    | PPerm_nil :
+        PPerm nil nil
+
+    | PPerm_cons :
+        forall h t t' .
+          PPerm t t'
+          -> PPerm (h :: t) (h :: t')
+
+    | PPerm_swap :
+        forall x y t .
+          PPerm (x :: y :: t) (y :: x :: t)
+
+    | PPerm_trans :
+        forall l1 l2 l3 .
+          PPerm l1 l2
+          -> PPerm l2 l3
+          -> PPerm l1 l3
+
+    | PPerm_drop :
+        forall h t .
+          PPerm (h :: t) t
+/;
+
+Database.setImplicits (parseConstant /PPerm/) 1;
+
+
+
+lemma "PPerm_refl"
+/
+  intersect i . forall (a : U i) (l : list a) . PPerm l l
+/;
+
+inference.
+intro /i a l/.
+induction /l/ >> autoWith /PPerm/.
+qed ();
+
+
+
+lemma "Perm_impl_PPerm"
+/
+  forall i (a : U i) (l l' : list a) .
+    Perm l l'
+    -> PPerm l l'
+/;
+
+inference.
+intro /i a l l' Hperm/.
+induction /Hperm/ >> nautoWith 7 /PPerm/.
+qed ();
+
+
+
+lemma "PPerm_drop_all"
+/
+  forall i (a : U i) (l : list a) .
+    PPerm l nil
+/;
+
+inference.
+intro /i a l/.
+induction /l/ >> autoWith /PPerm_drop PPerm_nil PPerm_trans/.
+qed ();
+
+
+
+lemma "PPerm_append_right"
+/
+  forall i (a : U i) (l1 l1' l2 : list a) .
+    PPerm l1 l1'
+    -> PPerm (append l1 l2) (append l1' l2)
+/;
+
+inference.
+intro /i a l1 l1' l2 Hpperm/.
+induction /Hpperm/ >> autoWith /PPerm PPerm_refl/.
+intro /l1a l1b l1c _ IH1 _ IH2/.
+apply /PPerm_trans _ _ (append l1b l2)/ >> auto.
+qed ();
+
+
+
+lemma "PPerm_append_left"
+/
+  forall i (a : U i) (l1 l2 l2' : list a) .
+    PPerm l2 l2'
+    -> PPerm (append l1 l2) (append l1 l2')
+/;
+
+inference.
+intro /i a l1 l2 l2' Hpperm/.
+induction /l1/ >> autoWith /PPerm/.
+qed ();
+
+
+
+lemma "PPerm_append"
+/
+  forall i (a : U i) (l1 l1' l2 l2' : list a) .
+    PPerm l1 l1'
+    -> PPerm l2 l2'
+    -> PPerm (append l1 l2) (append l1' l2')
+/;
+
+inference.
+intro /i a l1 l1' l2 l2' Hpperm1 Hpperm2/.
+apply /PPerm_trans _ _ (append l1 l2')/.
+  {
+  apply /PPerm_append_left/ >> auto.
+  }
+
+  {
+  apply /PPerm_append_right/ >> auto.
+  }
+qed ();
+
+
+
+lemma "PPerm_cons_snoc"
+/
+  forall i (a : U i) (h : a) (t : list a) .
+    PPerm (h :: t) (append t (h :: nil))
+/;
+
+intro /i a h t/.
+induction /t/ >> autoWith /PPerm_refl/.
+intro /h' t IH/.
+apply /PPerm_trans/.
+  {
+  apply /PPerm_swap/.
+  }
+
+  {
+  apply /PPerm_cons/ >> auto.
+  }
+
+  typechecker ();
+qed ();
+
+
+
+lemma "PPerm_snoc_cons"
+/
+  forall i (a : U i) (h : a) (t : list a) .
+    PPerm (append t (h :: nil)) (h :: t)
+/;
+
+intro /i a h t/.
+induction /t/ >> autoWith /PPerm_refl/.
+intro /h' t IH/.
+apply /PPerm_trans/.
+  {
+  apply /PPerm_cons/ >> auto.
+  }
+
+  {
+  apply /PPerm_swap/.
+  }
+
+  typechecker ();
+qed ();
+
+
+
+lemma "PPerm_cons_middle"
+/
+  forall i (a : U i) (x : a) (l1 l2 : list a) .
+    PPerm (x :: append l1 l2) (append l1 (x :: l2))
+/;
+
+inference.
+intro /i a x l1 l2/.
+rewrite /<- append_cons_assoc/.
+rewrite /<- append_assoc _ _ _ (x :: nil) l2/.
+apply /PPerm_append_right _ _ (x :: l1) (append l1 (x :: nil))/.
+apply /PPerm_cons_snoc/.
+qed ();
+
+
+
+lemma "PPerm_middle_cons"
+/
+  forall i (a : U i) (x : a) (l1 l2 : list a) .
+    PPerm (append l1 (x :: l2)) (x :: append l1 l2)
+/;
+
+inference.
+intro /i a x l1 l2/.
+rewrite /<- append_cons_assoc/.
+rewrite /<- append_assoc _ _ _ (x :: nil) l2/.
+apply /PPerm_append_right _ _ (append l1 (x :: nil)) (x :: l1)/.
+apply /PPerm_snoc_cons/.
+qed ();
+
+
+
+lemma "PPerm_drop_middle"
+/
+  forall i (a : U i) (x : a) (l1 l2 : list a) .
+    PPerm (append l1 (x :: l2)) (append l1 l2)
+/;
+
+inference.
+intro /i a x l1 l2/.
+induction /l1/.
+
+(* nil *)
+{
+apply /PPerm_drop/.
+}
+
+(* cons *)
+{
+intro /h l1 IH/.
+apply /PPerm_cons/ >> auto.
+}
+qed ();
+
+
+
+lemma "PPerm_append_swap"
+/
+  forall i (a : U i) (l1 l2 : list a) .
+    PPerm (append l1 l2) (append l2 l1)
+/;
+
+inference.
+intro /i a l1 l2/.
+induction /l1/.
+
+(* nil *)
+{
+rewrite /-> append_id_r/.
+apply /PPerm_refl/.
+}
+
+(* cons *)
+{
+intro /x l1 IH/.
+apply /PPerm_trans _ _ (x :: append l2 l1)/.
+  {
+  apply /PPerm_cons/ >> auto.
+  }
+rewrite /<- append_cons_assoc/.
+rewrite /<- append_assoc _ _ l2 (x :: nil) l1/.
+apply /PPerm_append_right _ _ (x :: l2)/.
+apply /PPerm_cons_snoc/.
+}
+qed ();
+
+
+
+lemma "PPerm_keep"
+/
+  forall i (a : U i) (l : list a) n .
+    PPerm l (keep n l)
+/;
+
+inference.
+intro /i a l n/.
+revert /l/.
+induction /n/.
+
+(* 0 *)
+{
+intro /l/.
+apply /PPerm_drop_all/.
+}
+
+(* succ *)
+{
+intro /n IH l/.
+destruct /l/ /| h t/ >> reduce //.
+  {
+  apply /PPerm_nil/.
+  }
+
+  {
+  apply /PPerm_cons/ >> auto.
+  }
+}
+qed ();
+
+
+
+lemma "PPerm_drops"
+/
+  forall i (a : U i) (l : list a) n .
+    PPerm l (drop n l)
+/;
+
+inference.
+intro /i a l n/.
+revert /l/.
+induction /n/.
+
+(* 0 *)
+{
+intro /l/.
+apply /PPerm_refl/.
+}
+
+(* succ *)
+{
+intro /n IH l/.
+destruct /l/ /| h t/ >> reduce //.
+  {
+  apply /PPerm_nil/.
+  }
+
+  {
+  apply /PPerm_trans _ _ t/.
+    {
+    apply /PPerm_drop/.
+    }
+
+    {
+    apply /IH/.
+    }
+  }
+}
+qed ();
+
+
+
+lemma "PPerm_middle_form"
+/
+  forall i (a : U i) (x : a) (l1 l2 m : list a) .
+    PPerm (append l1 (x :: l2)) m
+    -> (exists m1 m2 .
+          m = append m1 (x :: m2) : list a
+          & PPerm (append l1 l2) (append m1 m2))
+       %
+       PPerm (append l1 l2) m
+/;
+
+inference.
+intro /i a x l1 l2 m/.
+remember /append l1 (x :: l2)/ /_/ /l/ /Heq/.
+intro /Hperm/.
+revert /l1 l2 Heq/.
+induction /Hperm/.
+
+(* nil *)
+{
+intro /l1 l2 Heq/.
+destruct /l1/ /| h l1/ >> reduce /Heq/ >> injection /Heq/.
+}
+
+(* cons *)
+{
+intro /h t t' Hperm IH l1 l2 Heq/.
+destruct /l1/ /| k l1/ >> reduce /Heq/ >> injection /Heq/.
+  {
+  subst /h l2/.
+  left.
+  existses [/nil/, /t'/].
+  reduce //.
+  split >> auto.
+  }
+
+  {
+  subst /k t/.
+  so /IH l1 l2 ()/ /m1 m2 Heq' Hperm' | Hperm'/.
+    {
+    subst /t'/.
+    left.
+    existses [/h :: m1/, /m2/].
+    reduce //.
+    split >> auto.
+    apply /PPerm_cons/ >> auto.
+    }
+   
+    {
+    right.
+    reduce //.
+    apply /PPerm_cons/ >> auto.
+    }
+  }
+}
+
+(* swap *)
+{
+intro /h k t l1 l2 Heq/.
+left.
+destruct /l1/ /| y1 (| y2 l1')/ >> reduce /Heq concl/ >> injection /Heq/.
+  {
+  subst /h l2/.
+  existses [/k :: nil/, /t/].
+  reduce //.
+  split >> auto.
+  apply /PPerm_refl/.
+  }
+  
+  {
+  subst /y1/.
+  injection /0/.
+  subst /k l2/.
+  existses [/nil/, /h :: t/].
+  reduce //.
+  split >> auto.
+  apply /PPerm_refl/.
+  }
+
+  {
+  subst /y1/.
+  injection /0/.
+  subst /y2 t/.
+  existses [/k :: h :: l1'/, /l2/].
+  reduce //.
+  split >> auto.
+  apply /PPerm_swap/.
+  }
+}
+
+(* trans *)
+{
+intro /l n m _ IH1 Hperm2 IH2 l1 l2 Heql/.
+so /IH1 _ _ Heql/ /n1 n2 Heqn Hperm1' | Hperm1'/.
+1:{
+  right.
+  apply /PPerm_trans/ >> auto.
+  }
+so /IH2 _ _ Heqn/ /m1 m2 Heqm Hperm2' | Hperm2'/.
+1:{
+  right.
+  apply /PPerm_trans/ >> auto.
+  }
+left.
+existses [/m1/, /m2/].
+split >> auto.
+apply /PPerm_trans/ >> auto.
+}
+
+(* drop *)
+{
+intro /h t l1 l2 Heq/.
+destruct /l1/ /| k l1/ >> reduce /Heq/ >> injection /Heq/.
+  {
+  subst /h l2/.
+  right.
+  reduce //.
+  apply /PPerm_refl/.
+  }
+subst /k t/.
+left.
+existses [/l1/, /l2/].
+reduce //.
+split >> auto.
+apply /PPerm_drop/.
+}
+qed ();
+
+
+
+lemma "PPerm_middle_invert"
+/
+  forall i (a : U i) (x : a) (l1 l1' l2 l2' : list a) .
+    PPerm (append l1 (x :: l2)) (append l1' (x :: l2'))
+    -> PPerm (append l1 l2) (append l1' l2')
+/;
+
+inference.
+intro /i a x l1 m1 l2 m2 Hperm/.
+so /PPerm_middle_form _# 6 Hperm/ /n1 n2 Heq Hperm' | Hperm'/.
+1:{
+  apply /PPerm_trans/ >> auto.
+  apply /PPerm_drop_middle/.
+  }
+apply /PPerm_trans/ >> auto.
+clear /Hperm Hperm'/.
+revert /n1 Heq/.
+induction /m1/.
+
+(* nil *)
+{
+intro /n1 Heq/.
+destruct /n1/ /| k n1/.
+  {
+  reduce /Heq concl/.
+  injection /Heq/.
+  subst /n2/.
+  apply /PPerm_refl/.
+  }
+
+  {
+  reduce /Heq concl/.
+  injection /Heq/.
+  subst /k m2/.
+  apply /PPerm_cons_middle/.
+  }
+}
+
+(* cons *)
+{
+intro /h m1 IH n1 Heq/.
+destruct /n1/ /| k n1/.
+  {
+  reduce /Heq concl/.
+  injection /Heq/.
+  subst /h n2/.
+  apply /PPerm_middle_cons/.
+  }
+
+  {
+  reduce /Heq concl/.
+  injection /Heq/.
+  reintro /? Heq'/.
+  subst /k/.
+  apply /PPerm_cons/.
+  apply /IH/ >> auto.
+  }
+}
+qed ();
+
+
+
+lemma "PPerm_cons_invert"
+/
+  forall i (a : U i) (x : a) (l l' : list a) .
+    PPerm (x :: l) (x :: l')
+    -> PPerm l l'
+/;
+
+intro /i a x l l' Hperm/.
+apply /PPerm_middle_invert _ _ x nil nil/ >> auto.
+qed ();
+
+
+
+lemma "PPerm_implies_In"
+/
+  forall i (a : U i) (l l' : list a) .
+    PPerm l l'
+    -> (forall x . In a x l' -> In a x l)
+/;
+
+inference.
+intro /i a l1 l2 Hpperm x/.
+induction /Hpperm/ >> auto.
+
+(* cons *)
+{
+intro /h t t' _ IH (Heq | Hin)/ >> auto.
+}
+
+(* swap *)
+{
+intro /y z l (Heqy | Heqz | Hin)/ >> auto.
+}
+
+(* trans *)
+{
+intro /l1 l2 l3 _ IH1 _ IH2 Hin/.
+auto.
+}
+qed ();
+
+
+
+lemma "length_PPerm"
+/
+  forall i (a : U i) (l l' : list a) .
+    PPerm l l'
+    -> length l' <= length l
+/;
+
+inference.
+intro /i a l l' H/.
+induction /H/.
+  {
+  apply /Nat.leq_refl/.
+  }
+
+  {
+  intro /h t t' _ IH/.
+  apply /Nat.leq_succ_succ/ >> auto.
+  }
+
+  {
+  intro /x y t/.
+  apply /Nat.leq_refl/.
+  }
+
+  {
+  intro /l1 l2 l3 _ IH1 _ IH2/.
+  transitivity /_/ >> auto.
+  }
+
+  {
+  intro /h t/.
+  apply /Nat.leq_succ/.
+  }
+qed ();
+
+
+
+lemma "Forall_PPerm"
+/
+  forall i (a : U i) (P : a -> U i) (l l' : list a) .
+    PPerm l l'
+    -> Forall P l
+    -> Forall P l'
+/;
+
+inference.
+intro /i a P l1 l2 Hpperm/.
+induction /Hpperm/ >> auto.
+
+(* cons *)
+{
+intro /h t t' _ IH Hall/.
+inversion /Hall/.
+apply /Forall_cons/ >> auto.
+}
+
+(* swap *)
+{
+intro /x y t Hall/.
+inversion /Hall/.
+reintro /Hx Hall'/.
+inversion /Hall'/.
+reintro /Hy Ht/.
+autoWith /Forall_cons/.
+}
+
+(* trans *)
+{
+intro /l1 l2 l3 _ IH1 _ IH2 Hall/.
+auto.
+}
+
+(* drop *)
+{
+intro /h t Hall/.
+inversion /Hall/.
+auto.
+}
+qed ();
+
+
+
+lemma "Exists_PPerm"
+/
+  forall i (a : U i) (P : a -> U i) (l l' : list a) .
+    PPerm l l'
+    -> Exists P l'
+    -> Exists P l
+/;
+
+inference.
+intro /i a P l1 l2 Hpperm/.
+induction /Hpperm/ >> auto.
+
+(* cons *)
+{
+intro /h t t' _ IH Hex/.
+inversion /Hex/ >> autoWith /Exists/.
+}
+
+(* swap *)
+{
+intro /x y t Hex/.
+inversion /Hex/ >> autoWith /Exists/.
+reintro /Hex'/.
+inversion /Hex'/ >> autoWith /Exists/.
+}
+
+(* trans *)
+{
+intro /l1 l2 l3 _ IH1 _ IH2 Hex/.
+auto.
+}
+
+(* drop *)
+{
+intro /h t H/.
+apply /Exists_miss/ >> auto.
+}
+qed ();
+
+
+
+lemma "PPerm_reverse_r"
+/
+  forall i (a : U i) (l : list a) .
+    PPerm l (reverse l)
+/;
+
+inference.
+intro /i a l/.
+apply /Perm_impl_PPerm/.
+apply /Perm_reverse/.
+qed ();
+
+
+
+lemma "PPerm_reverse_l"
+/
+  forall i (a : U i) (l : list a) .
+    PPerm (reverse l) l
+/;
+
+inference.
+intro /i a l/.
+apply /Perm_impl_PPerm/.
+apply /Perm_symm/.
+apply /Perm_reverse/.
+qed ();
+
+
+
+lemma "reverse_PPerm"
+/
+  forall i (a : U i) (l l' : list a) .
+    PPerm l l'
+    -> PPerm (reverse l) (reverse l')
+/;
+
+inference.
+intro /i a l l' Hpperm/.
+apply /PPerm_trans _ _ l/.
+  {
+  apply /PPerm_reverse_l/.
+  }
+apply /PPerm_trans _ _ l'/ >> auto.
+apply /PPerm_reverse_r/.
+qed ();
+
+
+
+lemma "PPerm_map"
+/
+  forall i (a b : U i) (f : a -> b) (l l' : list a) .
+    PPerm l l'
+    -> PPerm (map f l) (map f l')
+/;
+
+inference.
+intro /i a b f l l' Hpperm/.
+induction /Hpperm/.
+
+(* nil *)
+{
+apply /PPerm_nil/.
+}
+
+(* cons *)
+{
+intro /h t t' _ IH/.
+apply /PPerm_cons/ >> auto.
+}
+
+(* swap *)
+{
+intro /x y t/.
+apply /PPerm_swap/.
+}
+
+(* trans *)
+{
+intro /l1 l2 l3 _ IH1 _ IH2/.
+apply /PPerm_trans/ >> auto.
+}
+
+(* drop *)
+{
+intro /h t/.
+apply /PPerm_drop/.
+}
+qed ();
+
+
+
+lemma "Forall_dist_PPerm"
+/
+  forall i (a : U i) (P : a -> a -> U i) (l l' : list a) .
+    (forall x y . P x y -> P y x)
+    -> PPerm l l'
+    -> Forall_dist P l
+    -> Forall_dist P l'
+/;
+
+inference.
+intro /i a P l l' Hsymm Hperm/.
+induction /Hperm/.
+
+(* nil *)
+{
+intro /_/.
+apply /Forall_dist_nil/.
+}
+
+(* cons *)
+{
+intro /h t t' Hperm IH Hall/.
+inversion /Hall/.
+reintro /Hh Ht/.
+apply /Forall_dist_cons/ >> auto.
+apply /Forall_PPerm/ >> auto.
+}
+
+(* swap *)
+{
+intro /x y t Hall/.
+inversion /Hall/.
+reintro /Hx_yt Hyt/.
+inversion /Hyt/.
+reintro /Hy_t Ht/.
+inversion /Hx_yt/.
+reintro /Hxy Hx_t/.
+apply /Forall_dist_cons/.
+  {
+  apply /Forall_cons/ >> auto.
+  }
+apply /Forall_dist_cons/ >> auto.
+}
+
+(* trans *)
+{
+intro /l1 l2 l3 _ IH1 _ IH2 H1/.
+auto.
+}
+
+(* drop *)
+{
+intro /h t Hall/.
+inversion /Hall/ >> auto.
+}
+qed ();
+
+
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    U i
+  of
+    pperm : type =
+    | pperm_refl : pperm
+    | pperm_cons : pperm -> pperm
+    | pperm_swap : pperm
+    | pperm_trans : pperm -> pperm -> pperm
+    | pperm_drop : pperm
+/;
+
+
+
+define /ppermute p l/
+/
+  (fnind ppermute : pperm -> list bogus -> list bogus of
+   | pperm_refl . fn l . l
+
+   | pperm_cons p .
+       (fnind _ : list [bogus] -> list bogus of
+        | nil . nil
+
+        | cons h t . cons h (ppermute p t))
+
+   | pperm_swap .
+       (fnind _ : list [bogus] -> list bogus of
+        | nil . nil
+
+        | cons h1 t1 .
+            (fnind _ : list [bogus] -> list bogus of
+             | nil . cons h1 nil
+
+             | cons h2 t . cons h2 (cons h1 t)) t1)
+
+   | pperm_trans p1 p2 . fn l .
+       ppermute p2 (ppermute p1 l)
+
+   | pperm_drop .
+       (fnind _ : list [bogus] -> list bogus of
+        | nil . nil
+
+        | cons _ t . t)) p l
+//
+  intersect i (a : U i) . pperm -> list a -> list a
+/;
+
+inference.
+introOf /i a p l/.
+revert /l/.
+sinduction /p/.
+reintro /IH/.
+destruct /p/ /{| p | | p1 p2}/.
+
+(* refl *)
+{
+intro /l/.
+unfold /ppermute/ >> auto.
+}
+
+(* cons *)
+{
+intro /l/.
+destruct /l/ /| h t/.
+  {
+  unfold /ppermute/.
+  typecheck.
+  }
+
+  {
+  unfold /ppermute/.
+  fold /ppermute _ _/.
+  typecheck.
+  apply /IH/.
+  apply /pperm_cons_subterm/.
+  }
+}
+
+(* swap *)
+{
+intro /l/.
+destruct /l/ /| h1 (| h2 t)/ >> unfold /ppermute/ >> reduce // >> typecheck.
+}
+
+(* trans *)
+{
+intro /l1/.
+unfold /ppermute/ >> fold /ppermute _ _ at all/.
+apply /IH/.
+  {
+  apply /pperm_trans_subterm/.
+  }
+apply /IH/.
+apply /pperm_trans_subterm/.
+}
+
+(* drop *)
+{
+intro /l/.
+destruct /l/ /| h t/ >> unfold /ppermute/ >> reduce // >> typecheck.
+}
+qed ();
+
+
+
+reductions
+/
+  ppermute (pperm_refl) l --> l ;
+
+  ppermute (pperm_cons p) l -->
+    (fnind _ : list [bogus] -> list bogus of
+     | nil . nil
+
+     | cons h t . cons h (ppermute p t)) l ;
+
+  ppermute (pperm_swap) l -->
+    (fnind _ : list [bogus] -> list bogus of
+     | nil . nil
+
+     | cons h1 t1 .
+         (fnind _ : list [bogus] -> list bogus of
+          | nil . cons h1 nil
+
+          | cons h2 t . cons h2 (cons h1 t)) t1) l ;
+
+  ppermute (pperm_trans p1 p2) l --> ppermute p2 (ppermute p1 l) ;
+
+  ppermute (pperm_drop) l -->
+    (fnind _ : list [bogus] -> list bogus of
+     | nil . nil
+
+     | cons _ t . t) l ;
+
+  unfolding ppermute
+/;
+
+
+
+lemma "PPerm_ppermute"
+/
+  forall i (a : U i) (p : pperm) (l : list a) .
+    PPerm l (ppermute p l)
+/;
+
+inference.
+intro /i a p/.
+induction /p/.
+
+(* refl *)
+{
+intro /l/.
+apply /PPerm_refl/.
+}
+
+(* cons *)
+{
+intro /p IH l/.
+destruct /l/ /| h t/ >> reduce // >> autoWith /PPerm_nil PPerm_cons/.
+}
+
+(* swap *)
+{
+intro /(| h1 (| h2 t))/ >> reduce // >> autoWith /PPerm_nil PPerm_cons/.
+apply /PPerm_swap/.
+}
+
+(* trans *)
+{
+intro /p1 IH1 p2 IH2 l1/.
+apply /PPerm_trans _ _ (ppermute p1 l1)/ >> auto.
+}
+
+(* drop *)
+{
+intro /(| h t)/ >> reduce // >> autoWith /PPerm_nil PPerm_drop/.
+}
+qed ();
+
+
+
+lemma "PPerm_impl_ppermute"
+/
+  forall i (a : U i) (l l' : list a) .
+    PPerm l l'
+    -> exists p . ppermute p l = l' : list a
+/;
+
+inference.
+intro /i a l l' H/.
+induction /H/.
+
+(* nil *)
+{
+exists /pperm_refl/.
+reduce //.
+reflexivity.
+}
+
+(* cons *)
+{
+intro /h t t' _ (p Heq)/.
+exists /pperm_cons p/.
+reduce //.
+auto.
+}
+
+(* swap *)
+{
+intro /x y t/.
+exists /pperm_swap/.
+reduce //.
+reflexivity.
+}
+
+(* trans *)
+{
+intro /l1 l2 l3 _ (p1 Heq1) _ (p2 Heq2)/.
+exists /pperm_trans p1 p2/.
+reduce //.
+rewrite /-> Heq1/.
+hyp /Heq2/.
+}
+
+(* drop *)
+{
+intro /h t/.
+exists /pperm_drop/.
+reduce //.
+reflexivity.
+}
+qed ();
+
+
+
+endModule ();
+
+
+

@@ -60,6 +60,8 @@ cons is right associative.
       Term % [Term]                                                  (sum type)
 
       Term & [Term]                                                  (product type)
+      Term &d [Term]                                                 (semi-dependent product type)
+      Term &g [Term]                                                 (coguard type)
 
       Term = Term : Term                                             (equality)
       Term = Term : type                                             (type equality)

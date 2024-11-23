@@ -976,6 +976,50 @@ apply tr_total_strict.
 Qed.
 
 
+Lemma dprodTotal_valid : dprodTotal_obligation.
+Proof.
+prepare.
+intros G a b M ext0 H.
+rewrite -> def_dprod in H.
+eapply tr_sigma_total; eauto.
+Qed.
+
+
+Lemma dprodStrict_valid : dprodStrict_obligation.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+rewrite -> def_dprod.
+apply tr_total_strict.
+  {
+  apply tr_sigma_formation; auto.
+  eapply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+    
+    {
+    cbn [length].
+    simpsub.
+    rewrite <- compose_assoc.
+    simpsub.
+    auto.
+    }
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  exact Hb.
+  }
+
+  {
+  eapply tr_sigma_total.
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  eauto.
+  }
+Qed.
+
+
 Lemma sumTotal_valid : sumTotal_obligation.
 Proof.
 prepare.
@@ -1047,6 +1091,23 @@ prepare.
 intros G a b ext1 ext0 Hb Ha.
 rewrite -> def_iset.
 apply tr_iset_strict; auto.
+Qed.
+
+
+Lemma univStrict_valid : univStrict_obligation.
+Proof.
+prepare.
+intros G i ext Hi.
+apply tr_total_strict.
+  {
+  apply tr_univ_formation; auto.
+  }
+
+  {
+  apply tr_type_halt.
+  apply (tr_formation_weaken _ (subst sh1 i)).
+  eapply hypothesis; eauto using index_0.
+  }
 Qed.
 
 
@@ -1280,6 +1341,15 @@ apply (tr_eqtype_convert _#3 (uptype (sigma a (subst sh1 b)))).
   cbn [List.app].
   eapply tr_uptype_eta2; eauto.
   }
+Qed.
+
+
+Lemma dprodUptype_valid : dprodUptype_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+rewrite -> def_dprod.
+apply tr_sigma_uptype; eauto using tr_uptype_eta2.
 Qed.
 
 
@@ -1722,6 +1792,15 @@ prepare.
 intros G a b ext1 ext0 Ha Hb.
 rewrite -> def_prod.
 apply tr_prod_admiss; eauto using tr_admiss_eta2.
+Qed.
+
+
+Lemma dprodAdmissUptype_valid : dprodAdmissUptype_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+rewrite -> def_dprod.
+apply tr_sigma_uptype_admiss; eauto using tr_uptype_eta2, tr_admiss_eta2.
 Qed.
 
 
@@ -2452,6 +2531,58 @@ apply tr_sigma_intro.
 Qed.
 
 
+Hint Rewrite def_dprod : prepare.
+
+Lemma dprodTotal'_valid : dprodTotal'_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+assert (tr (hyp_tm (sigma a (subst sh1 b)) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  eapply tr_sigma_total; eauto.
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  eauto.
+  }
+assert (tr (hyp_tm a :: G) (deqtype (subst sh1 b) (subst sh1 b))) as Hb'.
+  {
+  eapply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+    
+    {
+    cbn [length].
+    simpsub.
+    rewrite <- compose_assoc.
+    simpsub.
+    auto.
+    }
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  exact Hb.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_sigma_formation; auto.
+  }
+
+  {
+  simpsub.
+  apply tr_pi_intro; auto.
+  apply tr_sigma_formation; auto.
+  }
+
+  {
+  apply total_rhs_formation.
+  apply tr_sigma_formation; auto.
+  }
+Qed.
+
+
 Hint Rewrite def_sum : prepare.
 
 Lemma sumTotal'_valid : sumTotal'_obligation.
@@ -2932,6 +3063,37 @@ apply tr_sigma_intro.
 Qed.
 
 
+Hint Rewrite def_univ : prepare.
+
+Lemma univTotal'_valid : univTotal'_obligation.
+Proof.
+prepare.
+intros G i ext Hi.
+assert (tr (hyp_tm (univ i) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply tr_type_halt.
+  apply (tr_formation_weaken _ (subst sh1 i)).
+  eapply hypothesis; eauto using index_0.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_univ_formation; auto.
+  }
+
+  {
+  simpsub.
+  apply tr_pi_intro; auto.
+  apply tr_univ_formation; auto.
+  }
+
+  {
+  apply total_rhs_formation.
+  apply tr_univ_formation; auto.
+  }
+Qed.
+
+
 Hint Rewrite def_sequal : prepare.
 
 Lemma reduceSeqTotal_valid : reduceSeqTotal_obligation.
@@ -2974,5 +3136,51 @@ eapply tr_pi_elim'.
   {
   simpsub.
   reflexivity.
+  }
+Qed.
+
+
+Hint Rewrite def_sequal : prepare.
+
+Lemma sequalUnderSeq_valid : sequalUnderSeq_obligation.
+Proof.
+prepare.
+intros G m m' n ext0 Hm.
+assert (tr G (deq triv triv (halts m))) as Hhalts.
+  {
+  apply (tr_active_halts_invert _ _ (seq (var 0) (sequal (var 0) (subst (sh 2) m')))).
+    {
+    simpsub.
+    apply tr_type_halt.
+    eapply tr_inhabitation_formation; eauto.
+    }
+
+    {
+    apply active_seq.
+    apply active_var.
+    }
+  }
+assert (tr G (deq triv triv (sequal m m'))) as Hsequal.
+  {
+  apply (tr_sequal_eta2 _ ext0 ext0).
+  apply (tr_eqtype_convert _ _ _ (seq m (sequal (var 0) (subst sh1 m')))); auto.
+  apply tr_sequal_eqtype.
+  2:{
+    eapply tr_inhabitation_formation; eauto.
+    }
+  replace (sequal m m') with (subst1 m (sequal (var 0) (subst sh1 m'))).
+  2:{
+    simpsub.
+    reflexivity.
+    }
+  apply tr_seq_halts_sequal; auto.
+  }
+apply (tr_sequal_trans _ _ (subst1 m n)).
+  {
+  apply tr_seq_halts_sequal; auto.
+  }
+
+  {
+  apply tr_sequal_compat; auto.
   }
 Qed.

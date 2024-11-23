@@ -134,6 +134,27 @@ apply star_refl.
 Qed.
 
 
+Lemma def_dprod : forall a b,
+    equiv (app (app Defs.dprod a) b) (sigma a (subst sh1 b)).
+Proof.
+intros a m.
+unfold Defs.dprod.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app1.
+  apply step_app2.
+  }
+simpsub.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl.
+Qed.
+
+
 Lemma def_eeqtp :
   forall a b,
     equiv (app (app Defs.eeqtp a) b) (prod (subtype a b) (subtype b a)).
@@ -1187,6 +1208,25 @@ Lemma def_squash :
 Proof.
 intros a.
 unfold Defs.squash.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+
+  {
+  simpsub.
+  apply star_refl.
+  }
+Qed.
+
+
+Lemma def_isquash : 
+  forall a,
+    equiv (app Defs.isquash a) (iset unittp (subst sh1 a)).
+Proof.
+intros a.
+unfold Defs.isquash.
 apply steps_equiv.
 eapply star_step.
   {

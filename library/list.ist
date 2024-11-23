@@ -372,6 +372,54 @@ qed ();
 
 
 
+lemma "length_leq_form"
+/
+  forall i (a : U i) (l : list a) n .
+    n <= length l
+    -> exists (l1 l2 : list a) .
+         l = append l1 l2 : list a
+         & n = length l1 : nat
+/;
+
+inference.
+intro /i a l n/.
+revert /l/.
+induction /n/.
+
+(* 0 *)
+{
+intro /l _/.
+existses [/nil/, /l/].
+auto.
+}
+
+(* succ *)
+{
+intro /n IH l Hleq/.
+destruct /l/ /| h t/.
+  {
+  so /Nat.leq_succ_0_not _ Hleq/ /0/.
+  }
+so /IH t __/ /l1 l2 Heq Hlen/.
+  {
+  apply /Nat.leq_succ_invert/ >> auto.
+  }
+existses [/h :: l1/, /l2/].
+split.
+  {
+  reduce //.
+  auto.
+  }
+
+  {
+  reduce //.
+  compat >> auto.
+  }
+}
+qed ();
+
+
+
 (* Fold *)
 
 define /foldr {a b} z f l/
@@ -1916,6 +1964,61 @@ qed ();
 
 
 
+lemma "list_eq_by_nth"
+/
+  forall i (a : U i) (l l' : list a) .
+    length l = length l' : nat
+    -> (forall j . j < length l -> nth l j = nth l' j : Option.option a)
+    -> l = l' : list a
+/;
+
+inference.
+intro /i a l/.
+induction /l/.
+
+(* nil *)
+{
+intro /ll Hlen _/.
+destruct /ll/ /| ? ?/ >> auto.
+reduce /Hlen/.
+injection /Hlen/.
+}
+
+(* cons *)
+{
+intro /h t IH ll Hlen Hnth/.
+destruct /ll/ /| h' t'/.
+  {
+  reduce /Hlen/.
+  injection /Hlen/.
+  }
+compat.
+  {
+  so /Hnth 0 __ / /Heq/.
+    {
+    apply /Nat.lt_0_succ/.
+    }
+  reduce /Heq/.
+  injection /Heq/.
+  auto.
+  }
+apply /IH/.
+  {
+  reduce /Hlen/.
+  apply /Nat.succ_inj/ >> auto.
+  }
+intro /j Hj/.
+so /Hnth (succ j) __/ /H/.
+  {
+  apply /Nat.lt_succ_succ/ >> auto.
+  }
+reduce /H/.
+hyp /H/.
+}
+qed ();
+
+
+
 (* Zip *)
 
 define /zip {a b} l1/
@@ -2274,6 +2377,367 @@ qed ();
 
 
 
+(* Keep *)
+
+defineInd /{a}/
+/
+  keep : nat -> list a -> list a of
+  | zero . fn _ . nil
+
+  | succ n .
+      (fnind _ : list [a] -> list a of
+       | nil . nil
+
+       | cons h t . h :: keep n t)
+//
+  intersect i . forall (a : U i) . nat -> list a -> list a
+/;
+
+
+
+lemma "keep_nil"
+/
+  forall i (a : U i) n .
+    keep n nil = nil : list a
+/;
+
+inference.
+intro /i a n/.
+destruct /n/ /| n/ >> auto.
+qed ();
+
+
+
+lemma "length_keep_min"
+/
+  forall i (a : U i) n (l : list a) .
+    length (keep n l) = Nat.min n (length l) : nat
+/;
+
+inference.
+intro /i a n/.
+induction /n/.
+
+(* 0 *)
+{
+intro /l/.
+rewrite /-> Nat.min_ann_l/.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /n IH l/.
+destruct /l/ /| h t/ >> reduce //.
+  {
+  rewrite /-> Nat.min_ann_r/.
+  reflexivity.
+  }
+
+  {
+  rewrite /-> Nat.min_succ/.
+  compat.
+  apply /IH/.
+  }
+}
+qed ();
+
+
+
+lemma "length_keep_leq"
+/
+  forall i (a : U i) n (l : list a) .
+    length (keep n l) <= n
+/;
+
+inference.
+intro /i a n l/.
+rewrite /-> length_keep_min/.
+apply /Nat.min_leq_l/.
+qed ();
+
+
+
+lemma "length_keep"
+/
+  forall i (a : U i) n (l : list a) .
+    n <= length l
+    -> length (keep n l) = n : nat
+/;
+
+intro /i a n l Hlen/.
+rewrite /-> length_keep_min/.
+rewrite /-> Nat.min_eq_l/ >> auto.
+qed ();
+
+
+
+lemma "keep_idem"
+/
+  forall i (a : U i) n (l : list a) .
+    keep n (keep n l) = keep n l : list a
+/;
+
+inference.
+intro /i a n/.
+induction /n/.
+
+(* 0 *)
+{
+auto.
+}
+
+(* succ *)
+{
+intro /n IH (| h t)/ >> reduce // >> auto.
+}
+qed ();
+
+
+
+lemma "keep_append_leq"
+/
+  forall i (a : U i) n (l1 l2 : list a) .
+    n <= length l1
+    -> keep n (append l1 l2) = keep n l1 : list a
+/;
+
+inference.
+intro /i a n/.
+induction /n/.
+
+(* 0 *)
+{
+auto.
+}
+
+(* succ *)
+{
+intro /n IH (| h l1) l2 Hleq/.
+  {
+  reduce /Hleq/.
+  so /Nat.leq_succ_0_not _ Hleq/ /0/.
+  }
+
+  {
+  reduce //.
+  compat.
+  apply /IH/.
+  apply /Nat.leq_succ_invert/.
+  auto.
+  }
+}
+qed ();
+
+
+
+lemma "keep_append_geq"
+/
+  forall i (a : U i) n (l1 l2 : list a) .
+    length l1 <= n
+    -> keep n (append l1 l2) = append l1 (keep (n - length l1) l2) : list a
+/;
+
+inference.
+intro /i a n/.
+induction /n/.
+
+(* 0 *)
+{
+intro /l1 l2 Hlen/.
+destruct /l1/ /| h t/.
+1:{
+  reduce /Hlen/.
+  so /Nat.leq_succ_0_not _ Hlen/ /0/.
+  }
+reduce //.
+auto.
+}
+
+(* succ *)
+{
+intro /n IH (| h l1) l2 Hleq/.
+  {
+  reduce //.
+  reflexivity.
+  }
+reduce //.
+compat.
+apply /IH/.
+apply /Nat.leq_succ_invert/.
+auto.
+}
+qed ();
+
+
+
+lemma "keep_append_eq"
+/
+  forall i (a : U i) n (l1 l2 : list a) .
+    n = length l1 : nat
+    -> keep n (append l1 l2) = l1 : list a
+/;
+
+inference.
+intro /i a n l1 l2 Heq/.
+subst /n/.
+rewrite /-> keep_append_geq/.
+rewrite /-> Nat.minus_self/.
+reduce //.
+rewrite /-> append_id_r/.
+reflexivity.
+qed ();
+
+
+
+lemma "keep_all"
+/
+  forall i (a : U i) (l : list a) .
+    keep (length l) l = l : list a
+/;
+
+inference.
+intro /i a l/.
+rewrite /<- append_id_r _ _ l at 1/.
+apply /keep_append_eq/.
+reflexivity.
+qed ();
+
+
+
+lemma "keep_map"
+/
+  forall i (a b : U i) n (f : a -> b) (l : list a) .
+    keep n (map f l) = map f (keep n l) : list b
+/;
+
+inference.
+intro /i a b n f/.
+induction /n/ >> auto.
+(* succ *)
+intro /n IH l/.
+destruct /l/ /| x l/ >> reduce // >> auto.
+qed ();
+
+
+
+lemma "Forall_keep_weaken"
+/
+  forall i (a : U i) (P : a -> U i) n (l : list a) .
+    Forall P l
+    -> Forall P (keep n l)
+/;
+
+inference.
+intro /i a P n/.
+induction /n/ >> reduce //.
+
+(* 0 *)
+{
+intro /l _/.
+apply /Forall_nil/.
+}
+
+(* succ *)
+{
+intro /n IH l Hall/.
+destruct /l/ /| x l/ >> reduce // >> auto.
+inversion /Hall/.
+reintro /Hx Hl/.
+apply /Forall_cons/ >> auto.
+}
+qed ();
+
+
+
+lemma "Exists_keep_weaken"
+/
+  forall i (a : U i) (P : a -> U i) n (l : list a) .
+    Exists P (keep n l)
+    -> Exists P l
+/;
+
+inference.
+intro /i a P n/.
+induction /n/ >> reduce //.
+
+(* 0 *)
+{
+intro /l Hex/.
+inversion /Hex/.
+}
+
+(* succ *)
+{
+intro /n IH l Hex/.
+destruct /l/ /| x l/ >> reduce // >> auto.
+reduce /Hex/.
+inversion /Hex/ >> autoWith /Exists/.
+}
+qed ();
+
+
+
+lemma "In_keep_weaken"
+/
+  forall i (a : U i) x n (l : list a) .
+    In a x (keep n l)
+    -> In a x l
+/;
+
+inference.
+intro /i a x n/.
+induction /n/.
+
+(* 0 *)
+{
+intro /l 0/.
+}
+
+(* succ *)
+{
+intro /n IH (| h t) Hin/ >> reduce /Hin/.
+  {
+  so /Hin/ /0/.
+  }
+
+  {
+  reduce //.
+  destruct /Hin/ /? | ?/ >> auto.
+  }
+}
+qed ();
+
+
+
+lemma "nth_keep"
+/
+  forall i (a : U i) m n (l : list a) .
+    n < m
+    -> nth (keep m l) n = nth l n : option a
+/;
+
+inference.
+intro /i a m/.
+induction /m/.
+
+(* 0 *)
+{
+intro /n l Hlt/.
+so /Nat.lt_0_not _ Hlt/ /0/.
+}
+
+(* succ *)
+{
+intro /m IH n l Hlt/.
+destruct /n/ /| n/ >> destruct /l/ /| h t/ >> reduce // >> auto.
+apply /IH/.
+apply /Nat.lt_succ_invert/ >> auto.
+}
+qed ();
+
+
+
 (* Drop *)
 
 defineInd
@@ -2299,7 +2763,7 @@ lemma "drop_nil"
 
 inference.
 intro /i a n/.
-induction /n/ >> auto.
+destruct /n/ /| n/ >> auto.
 qed ();
 
 
@@ -2316,6 +2780,29 @@ induction /n/ >> auto.
 (* succ *)
 intro /n IH l/.
 destruct /l/ /| x l/ >> reduce // >> autoWith /Nat.minus_0_l/.
+qed ();
+
+
+
+lemma "drop_plus"
+/
+  forall i (a : U i) (l : list a) m n .
+    drop n (drop m l) = drop (m + n) l : list a
+/;
+
+inference.
+intro /i a l m n/.
+revert /l/.
+induction /m/ >> auto.
+(* succ *)
+intro /m IH l/.
+destruct /l/ /| h t/.
+  {
+  reduce //.
+  apply /drop_nil/.
+  }
+reduce //.
+apply /IH/.
 qed ();
 
 
@@ -2382,6 +2869,21 @@ intro /i a n l1 l2 Heq/.
 subst /n/.
 rewrite /-> drop_append_geq/.
 rewrite /-> Nat.minus_self/.
+reflexivity.
+qed ();
+
+
+
+lemma "drop_all"
+/
+  forall i (a : U i) (l : list a) .
+    drop (length l) l = nil : list a
+/;
+
+inference.
+intro /i a l/.
+rewrite /<- append_id_r _ _ l at 1/.
+apply /drop_append_eq/.
 reflexivity.
 qed ();
 
@@ -2507,6 +3009,25 @@ qed ();
 
 
 
+lemma "split_list"
+/
+  forall i (a : U i) n (l : list a) .
+    l = append (keep n l) (drop n l) : list a
+/;
+
+inference.
+intro /i a n/.
+induction /n/ >> auto.
+(* succ *)
+intro /n IH l/.
+destruct /l/ /| h t/ >> auto.
+reduce //.
+compat.
+apply /IH/.
+qed ();
+
+  
+
 (* Map_flat *)
 
 defineInd /{a b} f/
@@ -2594,6 +3115,317 @@ induction /l/ >> auto.
 qed ();
 
 
+
+(* For all pairs of distinct elements *)
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    forall (a : U i) (P : a -> a -> U i) .
+    U i
+  of
+    Forall_dist : list a -> type =
+
+    | Forall_dist_nil :
+        Forall_dist nil
+
+    | Forall_dist_cons :
+        forall h t .
+          Forall (P h) t
+          -> Forall_dist t
+          -> Forall_dist (cons h t)
+/;
+
+Database.setImplicits (parseConstant /Forall_dist/) 1;
+Database.setImplicits (parseConstant /Forall_dist_nil/) 1;
+Database.setImplicits (parseConstant /Forall_dist_cons/) 1;
+
+
+
+lemma "Forall_dist_nil_iff"
+/
+  forall i (a : U i) (P : a -> a -> U i) .
+    Forall_dist P nil
+    <->
+    unit
+/;
+
+inference.
+intro /i a P/.
+split >> auto.
+intro /_/.
+apply /Forall_dist_nil/.
+qed ();
+
+
+
+lemma "Forall_dist_cons_iff"
+/
+  forall i (a : U i) (P : a -> a -> U i) x l .
+    Forall_dist P (x :: l)
+    <->
+    Forall (P x) l & Forall_dist P l
+/;
+
+inference.
+intro /i a P x l/.
+split.
+  {
+  intro /H/.
+  inversion /H/.
+  auto.
+  }
+
+  {
+  intro /(Hx Hl)/.
+  apply /Forall_dist_cons/ >> auto.
+  }
+qed ();
+
+
+
+lemma "Forall_dist_append_iff"
+/
+  forall i (a : U i) (P : a -> a -> U i) l1 l2 .
+    Forall_dist P (append l1 l2)
+    <->
+    Forall (fn x . Forall (P x) l2) l1 & Forall_dist P l1 & Forall_dist P l2
+/;
+
+inference.
+intro /i a P l1 l2/.
+split.
+  {
+  revert /l2/.
+  induction /l1/.
+    (* nil *)
+    {
+    intro /l2 H/.
+    splitn 2 >> autoWith /Forall_nil Forall_dist_nil/.
+    }
+
+    (* cons *)
+    {
+    intro /h t IH l2 Hall/.
+    inversion /Hall/.
+    reintro /Hh_t_l2 Hall'/.
+    so /IH _ Hall'/ /Ht_l2 Ht Hl2/.
+    rewrite /-> Forall_append_iff in Hh_t_l2/.
+    destruct /Hh_t_l2/ /Hh_t Hh_l2/.
+    splitn 2 >> autoWith /Forall_cons Forall_dist_cons/.
+    }
+  }
+
+  {
+  revert /l2/.
+  induction /l1/.
+    (* nil *)
+    {
+    intro /l2 (_ _ H)/.
+    auto.
+    }
+
+    (* cons *)
+    {
+    intro /h t IH l2 (Hht_l2 Hht Hl2)/.
+    inversion /Hht_l2/.
+    reintro /Hh_l2 Ht_l2/.
+    inversion /Hht/.
+    reintro /Hh_t Ht/.
+    apply /Forall_dist_cons/ >> auto.
+    apply /Forall_append/ >> auto.
+    }
+  }
+qed ();
+
+
+
+lemma "Forall_dist_append"
+/
+  forall i (a : U i) (P : a -> a -> U i) l1 l2 .
+    Forall (fn x . Forall (P x) l2) l1
+    -> Forall_dist P l1
+    -> Forall_dist P l2
+    -> Forall_dist P (append l1 l2)
+/;
+
+inference.
+intro /i a P l1 l2 Hl1_l2 Hl1 Hl2/.
+apply /Forall_dist_append_iff/ >> auto >> done.
+qed ();
+
+
+
+lemma "Forall_dist_implies"
+/
+  forall i (a : U i) (P Q : a -> a -> U i) (l : list a) .
+    (forall x y . P x y -> Q x y)
+    -> Forall_dist P l
+    -> Forall_dist Q l
+/;
+
+inference.
+intro /i a P Q l Himpl Hall/.
+induction /Hall/ >> autoWith /Forall_dist_nil/.
+(* cons *)
+intro /h t Hh _ IH/.
+apply /Forall_dist_cons/ >> auto.
+apply /Forall_implies/ >> auto.
+qed ();
+
+
+
+lemma "Forall_dist_map"
+/
+  forall i (a b : U i) (P : b -> b -> U i) (f : a -> b) (l : list a) .
+    Forall_dist P (map f l)
+    <->
+    Forall_dist (fn x y . P (f x) (f y)) l
+/;
+
+inference.
+intro /i a b P f l/.
+split.
+  {
+  induction /l/.
+    {
+    intro /_/.
+    apply /Forall_dist_nil/.
+    }
+
+    {
+    intro /h t IH Hall/.
+    inversion /Hall/.
+    reintro /Hh Ht/.
+    apply /Forall_dist_cons/ >> auto.
+    reduce //.
+    rewrite /-> Forall_map in Hh/ >> auto.
+    }
+  }
+
+  {
+  induction /l/.
+    {
+    intro /_/.
+    apply /Forall_dist_nil/.
+    }
+
+    {
+    intro /h t IH Hall/.
+    inversion /Hall/.
+    reintro /Hh Ht/.
+    apply /Forall_dist_cons/ >> autoWith /Forall_map/.
+    }
+  }
+qed ();
+
+
+
+lemma "Forall_dist_reverse"
+/
+  forall i (a : U i) (P : a -> a -> U i) (l : list a) .
+    (forall x y . P x y -> P y x)
+    -> Forall_dist P (reverse l)
+       <->
+       Forall_dist P l
+/;
+
+inference.
+intro /i a P l Hsymm/.
+induction /l/ >> auto.
+intro /h t IH/.
+rewrite /-> Forall_dist_cons_iff/.
+rewrite /-> Forall_dist_append_iff/.
+rewrite /-> Forall_dist_cons_iff/.
+rewrite /-> Forall_nil_iff/.
+rewrite /-> Forall_dist_nil_iff/.
+rewrite /-> Logic.prod_id_r at 0 0/.
+rewrite /-> IH/.
+rewrite /-> Forall_reverse/.
+rewrite /-> Forall_forall at 0 0/.
+reduce //.
+rewrite /-> Forall_cons_iff within x/.
+rewrite /-> Forall_nil_iff within x/.
+rewrite /-> Logic.prod_id_r within x/.
+assert /forall x . P x h <-> P h x/ /H/.
+  {
+  inference.
+  intro /x/.
+  split >> auto.
+  }
+rewrite /-> H within x/.
+reflexivity.
+qed ();
+
+
+
+lemma "decidable_Forall_dist_dep"
+/
+  forall i (a : U i) (P : a -> a -> U i) (l : list a) .
+    (forall x y . In a x l -> In a y l -> Decidable.decidable (P x y))
+    -> Decidable.decidable (Forall_dist P l)
+/;
+
+inference.
+intro /i a P l/.
+induction /l/.
+
+(* nil *)
+{
+intro /_/.
+left.
+apply /Forall_dist_nil/.
+}
+
+(* cons *)
+{
+intro /h t IH Hdec/.
+rewrite /-> Forall_dist_cons_iff/.
+so /IH __/ /Ht | Hno/.
+  {
+  intro /x y Hx Hy/.
+  apply /Hdec/ >> right >> auto.
+  }
+
+1:{
+  right.
+  contrapositive /Hno/.
+  apply /Hno/.
+  }
+so /decidable_Forall_dep _ _ (P h) t __/ /Hh | Hno/.
+  {
+  intro /x Hx/.
+  apply /Hdec/ >>> [left, right] >> auto.
+  }
+
+1:{
+  right.
+  contrapositive /Hno/.
+  apply /Hno/.
+  }
+left.
+auto.
+}
+qed ();
+
+
+
+lemma "decidable_Forall_dist"
+/
+  forall i (a : U i) (P : a -> a -> U i) (l : list a) .
+    (forall x y . Decidable.decidable (P x y))
+    -> Decidable.decidable (Forall_dist P l)
+/;
+
+inference.
+intro /i a P l Hdec/.
+apply /decidable_Forall_dist_dep/ >> auto.
+qed ();  
+
+
+
+(* Covariance *)
 
 lemma "list_subtype"
 /

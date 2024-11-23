@@ -278,7 +278,10 @@ existential quantification.)
 
 The non-dependent form of the strong sum is the product type, written
 `A & B`.  (We reserve the operator `*` for multiplication.)  It plays
-the role of the "and" connective.
+the role of the "and" connective.  A variant of the product is the
+semi-dependent product, written `A &d B`: when showing `A &d B` is
+well-formed, one can assume `A` is inhabited while showing `B` is
+well-formed.
 
 
 #### Disjoint sums

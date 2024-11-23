@@ -3423,7 +3423,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
       fun compatProdEqtp0 a a' tac =
          (* tac :: A = A' : type
-            A -> B = A' -> B : type
+            A & B = A' & B : type
          *)
          refine (Rule.prodEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
          >>> [
@@ -3440,7 +3440,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
       fun compatProdEqtp1 b b' tac =
          (* tac :: B = B' : type
-            A -> B = A -> B' : type
+            A & B = A & B' : type
          *)
          refine (Rule.prodEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
          >>> [
@@ -3452,6 +3452,43 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
              (* B = B' : type *)
              tac,
+             ]
+
+
+      fun compatDprodEqtp0 a a' tac =
+         (* tac :: A = A' : type
+            A &d B = A' &d B : type
+         *)
+         refine (Rule.dprodEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A = A' : type *)
+             tac,
+
+             (* B = B : type *)
+             refine (Rule.eqtpRefl (T.evar ()))
+             >>+
+             (* B : type *)
+             idtacM Secondary
+             ]
+
+
+      fun compatDprodEqtp1 b b' tac =
+         (* tac :: B[^] = B'[^] : type
+            A &d B = A &d B' : type
+         *)
+         refine (Rule.dprodEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A = A : type *)
+             refine (Rule.eqtpRefl (T.evar ()))
+             >>+
+             (* A : type *)
+             idtacM Secondary,
+
+             (* A |- B[^] = B'[^] : type *)
+             refine (Rule.weaken 0 1)
+             >>+
+             (* B = B' : type *)
+             tac
              ]
 
 
@@ -4002,7 +4039,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
       fun compatProdEeqtp0 a a' tac =
          (* tac :: A <:> A'
-            A -> B <:> A' -> B
+            A & B <:> A' & B
          *)
          refine (Rule.prodEeq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
          >>> [
@@ -4019,7 +4056,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
       fun compatProdEeqtp1 b b' tac =
          (* tac :: B <:> B'
-            A -> B <:> A -> B'
+            A & B <:> A & B'
          *)
          refine (Rule.prodEeq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
          >>> [
@@ -4031,6 +4068,47 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
              (* B <:> B' *)
              tac,
+             ]
+
+
+      fun compatDprodEeqtp0 a a' tac =
+         (* tac :: A <:> A'
+            A &d B <:> A' &d B
+         *)
+         refine (Rule.dprodEeq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A <:> A' *)
+             tac,
+
+             (* A |- B[^] <:> B[^] *)
+             refine (Rule.eeqtpRefl (T.evar ()))
+             >>+
+             (* A |- B[^] : type *)
+             let
+                do (_, dir) = withgoal
+             in
+                chdir (D.bind0 dir) >>+ idtacM Secondary
+             end
+             ]
+
+
+      fun compatDprodEeqtp1 b b' tac =
+         (* tac :: B[^] <:> B'[^]
+            A &d B <:> A &d B'
+         *)
+         refine (Rule.dprodEeq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A <:> A *)
+             refine (Rule.eeqtpRefl (T.evar ()))
+             >>+
+             (* A : type *)
+             idtacM Secondary,
+
+             (* A |- B[^] <:> B'[^] *)
+             refine (Rule.weaken 0 1)
+             >>+
+             (* B <:> B' *)
+             tac
              ]
 
 
@@ -4467,6 +4545,61 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
              (* B <: B' *)
              tac
+             ]
+
+
+      fun compatDprodSubtype0 a a' tac =
+         (* tac :: A <: A'
+            A &d B <: A' &d B
+         *)
+         refine (Rule.dprodSub (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A <: A' *)
+             tac,
+
+             (* A |- B[^] <: B[^] *)
+             refine (Rule.subtypeRefl (T.evar ()))
+             >>+
+             (* A |- B : type *)
+             let
+                do (_, dir) = withgoal
+             in
+                chdir (D.bind0 dir) >>+ idtacM Secondary
+             end,
+
+             (* A' |- B'[^] : type *)
+             let
+                do (_, dir) = withgoal
+             in
+                chdir (D.bind0 dir) >>+ idtacM Secondary
+             end
+             ]
+
+
+      fun compatDprodSubtype1 b b' tac =
+         (* tac :: B <: B'
+            A &d B <: A &d B'
+         *)
+         refine (Rule.dprodSub (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A <: A *)
+             refine (Rule.subtypeRefl (T.evar ()))
+             >>+
+             (* A : type *)
+             idtacM Secondary,
+
+             (* A |- B[^] <: B'[^] *)
+             refine (Rule.weaken 0 1)
+             >>+
+             (* B <: B' *)
+             tac,
+
+             (* A |- B'[^] : type *)
+             let
+                do (_, dir) = withgoal
+             in
+                chdir (D.bind0 dir) >>+ idtacM Secondary
+             end
              ]
 
 
@@ -4914,6 +5047,34 @@ structure RewriteInternal :> REWRITE_INTERNAL =
              ]
 
 
+      fun compatDprodIff0 a a' tac =
+         (* tac :: A <-> A'
+            (A &d B) <-> (A' &d B)
+         *)
+         refine (Rule.compatDprodIff0 (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A |- B[^] : type *)
+             idtacM Secondary,
+             
+             (* A <-> A' *)
+             tac
+             ]
+
+
+      fun compatDprodIff1 b b' tac =
+         (* tac :: B <-> B'
+            (A &d B) <-> (A &d B')
+         *)
+         refine (Rule.compatDprodIff1 (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A : type *)
+             idtacM Secondary,
+             
+             (* B <-> B' *)
+             tac
+             ]
+
+
       fun compatSumIff0 a a' tac =
          (* tac :: A <-> A'
             (A % B) <-> (A' % B)
@@ -5065,6 +5226,34 @@ structure RewriteInternal :> REWRITE_INTERNAL =
              ]
 
 
+      fun compatDprodArrow0 a a' tac =
+         (* tac :: A -> A'
+            (A &d B) -> (A' &d B)
+         *)
+         refine (Rule.compatDprodArrow0 (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* B : type *)
+             idtacM Secondary,
+             
+             (* A -> A' *)
+             tac
+             ]
+
+
+      fun compatDprodArrow1 b b' tac =
+         (* tac :: B -> B'
+            (A & B) -> (A & B')
+         *)
+         refine (Rule.compatDprodArrow1 (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A : type *)
+             idtacM Secondary,
+
+             (* B -> B' *)
+             tac
+             ]
+
+
       fun compatSumArrow0 a a' tac =
          (* tac :: A -> A'
             (A % B) -> (A' % B)
@@ -5190,6 +5379,40 @@ structure RewriteInternal :> REWRITE_INTERNAL =
              ]
 
 
+      fun compatDprodEntails0 a a' tac =
+         (* tac :: A |- A'[^]
+            A &d B |- A'[^] &d B[^]
+         *)
+         refine (Rule.compatDprodEntails0 (T.Sub (a, T.shift1)) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A &d B, A[^] |- A'[^2] *)
+             refine (Rule.weaken 1 1)
+             >>+
+             (* A |- A'[^] *)
+             tac,
+
+             (* A &d B |- A[^] &d B[^] *)
+             refine (Rule.hypothesis 0) >> done
+             ]
+
+
+      fun compatDprodEntails1 b b' tac =
+         (* tac :: B |- B'[^]
+            A &d B |- A[^] &d B'[^]
+         *)
+         refine (Rule.compatDprodEntails1 (T.evar ()) (T.Sub (b, T.shift1)) (T.evar ()))
+         >>> [
+             (* A &d B, B[^] |- B'[^2] *)
+             refine (Rule.weaken 1 1)
+             >>+
+             (* B |- B'[^] *)
+             tac,
+
+             (* A &d B |- A[^] &d B[^] *)
+             refine (Rule.hypothesis 0) >> done
+             ]
+
+
       val () = 
          List.app
             (fn (const, i, binds, rconst, rconst', cov, tac) =>
@@ -5204,6 +5427,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             (Prim.arrow, 1, 0, Prim.eqtp, Prim.eqtp, true, compatArrowEqtp1),
             (Prim.prod, 0, 0, Prim.eqtp, Prim.eqtp, true, compatProdEqtp0),
             (Prim.prod, 1, 0, Prim.eqtp, Prim.eqtp, true, compatProdEqtp1),
+            (Prim.dprod, 0, 0, Prim.eqtp, Prim.eqtp, true, compatDprodEqtp0),
+            (Prim.dprod, 1, 0, Prim.eqtp, Prim.eqtp, true, compatDprodEqtp1),
             (Prim.sum, 0, 0, Prim.eqtp, Prim.eqtp, true, compatSumEqtp0),
             (Prim.sum, 1, 0, Prim.eqtp, Prim.eqtp, true, compatSumEqtp1),
             (Prim.future, 0, 0, Prim.eqtp, Prim.eqtp, true, compatFutureEqtp),
@@ -5232,6 +5457,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             (Prim.arrow, 1, 0, Prim.eeqtp, Prim.eeqtp, true, compatArrowEeqtp1),
             (Prim.prod, 0, 0, Prim.eeqtp, Prim.eeqtp, true, compatProdEeqtp0),
             (Prim.prod, 1, 0, Prim.eeqtp, Prim.eeqtp, true, compatProdEeqtp1),
+            (Prim.dprod, 0, 0, Prim.eeqtp, Prim.eeqtp, true, compatDprodEeqtp0),
+            (Prim.dprod, 1, 0, Prim.eeqtp, Prim.eeqtp, true, compatDprodEeqtp1),
             (Prim.sum, 0, 0, Prim.eeqtp, Prim.eeqtp, true, compatSumEeqtp0),
             (Prim.sum, 1, 0, Prim.eeqtp, Prim.eeqtp, true, compatSumEeqtp1),
             (Prim.future, 0, 0, Prim.eeqtp, Prim.eeqtp, true, compatFutureEeqtp),
@@ -5253,6 +5480,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             (Prim.arrow, 1, 0, Prim.subtype, Prim.subtype, true, compatArrowSubtype1),
             (Prim.prod, 0, 0, Prim.subtype, Prim.subtype, true, compatProdSubtype0),
             (Prim.prod, 1, 0, Prim.subtype, Prim.subtype, true, compatProdSubtype1),
+            (Prim.dprod, 0, 0, Prim.subtype, Prim.subtype, true, compatDprodSubtype0),
+            (Prim.dprod, 1, 0, Prim.subtype, Prim.subtype, true, compatDprodSubtype1),
             (Prim.sum, 0, 0, Prim.subtype, Prim.subtype, true, compatSumSubtype0),
             (Prim.sum, 1, 0, Prim.subtype, Prim.subtype, true, compatSumSubtype1),
             (Prim.future, 0, 0, Prim.subtype, Prim.subtype, true, compatFutureSubtype),
@@ -5275,6 +5504,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             (Prim.arrow, 1, 0, Prim.iff, Prim.iff, true, compatArrowIff1),
             (Prim.prod, 0, 0, Prim.iff, Prim.iff, true, compatProdIff0),
             (Prim.prod, 1, 0, Prim.iff, Prim.iff, true, compatProdIff1),
+            (Prim.dprod, 0, 0, Prim.iff, Prim.iff, true, compatDprodIff0),
+            (Prim.dprod, 1, 0, Prim.iff, Prim.iff, true, compatDprodIff1),
             (Prim.sum, 0, 0, Prim.iff, Prim.iff, true, compatSumIff0),
             (Prim.sum, 1, 0, Prim.iff, Prim.iff, true, compatSumIff1),
             (Prim.future, 0, 0, Prim.iff, Prim.iff, true, compatFutureIff),
@@ -5286,6 +5517,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             (Prim.arrow, 1, 0, Prim.arrow, Prim.arrow, true, compatArrowArrow1),
             (Prim.prod, 0, 0, Prim.arrow, Prim.arrow, true, compatProdArrow0),
             (Prim.prod, 1, 0, Prim.arrow, Prim.arrow, true, compatProdArrow1),
+            (Prim.dprod, 1, 0, Prim.arrow, Prim.arrow, true, compatDprodArrow1),
             (Prim.sum, 0, 0, Prim.arrow, Prim.arrow, true, compatSumArrow0),
             (Prim.sum, 1, 0, Prim.arrow, Prim.arrow, true, compatSumArrow1),
             (Prim.future, 0, 0, Prim.arrow, Prim.arrow, true, compatFutureArrow),
@@ -5297,6 +5529,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             (Prim.arrow, 1, 0, Prim.entailment, Prim.entailment, true, compatArrowEntails1),
             (Prim.prod, 0, 0, Prim.entailment, Prim.entailment, true, compatProdEntails0),
             (Prim.prod, 1, 0, Prim.entailment, Prim.entailment, true, compatProdEntails1),
+            (Prim.dprod, 0, 0, Prim.entailment, Prim.entailment, true, compatDprodEntails0),
+            (Prim.dprod, 1, 0, Prim.entailment, Prim.entailment, true, compatDprodEntails1),
             (Prim.ov, 0, 0, Prim.subtype, Prim.entailment, true, compatOfSubtype0),
             (Prim.eq, 0, 0, Prim.subtype, Prim.entailment, true, compatEqSubtype0),
             ]

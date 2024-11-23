@@ -1034,6 +1034,22 @@ apply tr_symmetry; auto.
 Qed.
 
 
+Lemma tr_sequal_eta2 :
+  forall G p q m n,
+    tr G (deq p q (sequal m n))
+    -> tr G (deq triv triv (sequal m n)).
+Proof.
+intros G p q m n Htr.
+assert (tr G (deq p triv (sequal m n))) as Htr'.
+  {
+  apply tr_sequal_eta.
+  apply (tr_transitivity _ _ q); auto.
+  apply tr_symmetry; auto.
+  }
+apply (tr_transitivity _ _ p); auto.
+apply tr_symmetry; auto.
+Qed.
+
 
 (* base types *)
 

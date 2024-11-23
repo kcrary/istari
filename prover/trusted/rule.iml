@@ -89,8 +89,8 @@ signature RULE =
       val letUnfoldHyp : int -> int -> Judgement.hyp -> rule
 
 
-      (* sumLeft i a b c
-         case analyzes i:(sum a b) with right-hand-side c
+      (* sumLeft i A B C
+         case analyzes i:(sum A B) with right-hand-side C
 
          G1, (A % B), G2 |- C ext sum_case i 
                                     (fn y . M[1 .. i . 0 . ^i+1])
@@ -100,6 +100,36 @@ signature RULE =
          G1, B, G2[inr 0 . ^] |- C[under_i(inr 0 . ^)] ext N
       *)
       val sumLeft : int -> term -> term -> term -> rule
+
+
+      (* insert i
+
+         G1, G2 |- C ext M[under_i(() . id)]  
+         >>
+         G1, unit, G2[^] |- C[under_i(^)] ext M
+         (where |G2| = i)
+      *)
+      val insert : int -> rule
+
+
+      (* forallLeft M
+
+         G, (forall A . B) |- C[^] ext N[0 M[^] . ^]
+         >>
+         G |- M : A
+         G, B[M . id] |- C[^] ext N
+      *)
+      val forallLeft : term -> rule
+
+
+      (* arrowLeft
+
+         G, (A -> B) |- C[^] ext N[0 M[^] . ^]
+         >>
+         G |- A ext M
+         G, B |- C[^] ext N
+      *)
+      val arrowLeft : rule
 
 
       (* haltsValue
@@ -1164,11 +1194,6 @@ structure Rule :> RULE =
                 raise Unsafe.UnsafeNotAllowed)
 
 
-      (* The rule generator can't handle the form the extract takes in this rule
-         (it combines variables from both the near and far zones), and it's not worth
-         implementing it for only one rule.
-      *)
-
       open Term
 
       fun substAt m i j k =
@@ -1176,6 +1201,12 @@ structure Rule :> RULE =
             Dot (m, Shift (j+1))
          else
             Idot (j, substAt m (i+1) (j+1) k)
+
+
+      (* The rule generator can't handle the form the extract takes in this rule
+         (it combines variables from both the near and far zones), and it's not worth
+         implementing it for only one rule.
+      *)
 
       fun sumLeft gsize a b c =
          Arg.lmake "sumLeft" [] gsize
@@ -1198,8 +1229,104 @@ structure Rule :> RULE =
            | _ => raise ExtractFailure)
 
 
-      (* The rule generator doesn't know about valuability. *)
+      (* The rule generator would require us to give the hypothesis currently at position i. *)
+      fun insert i =
+         ("insert",
+          (fn jud =>
+              (case S.splitOpt (J.context jud) i of
+                  NONE =>
+                     raise Failure
 
+                | SOME (ctx2, ctx1) =>
+                     let
+                        val ctx' =
+                           S.append
+                              (J.subContext ctx2 T.shift1)
+                              (S.cons (J.Tm (T.Const Prim.unit)) ctx1)
+                     in
+                        ([J.make ctx' (T.Sub (J.concl jud, T.underShift i 1))],
+                         (fn [m] => 
+                                T.Sub (m, T.under i (T.Dot (T.Triv, T.id)))
+
+                           | _ => raise ExtractFailure))
+                     end)))
+
+
+      (* The rule generator won't create rules with a hypothesis in the conclusion. *)
+      fun forallLeft m =
+         ("forallLeft",
+          (fn jud =>
+              (case S.expose (J.context jud) of
+                  S.Cons (J.Tm t, ctx) =>
+                     (case N.whnf t of
+                         T.Elim (T.Const const, [T.App a, T.App lamb]) =>
+                            if Constant.eq (const, Prim.forall) then
+                               (case N.whnf lamb of
+                                   T.Lam (_, b) =>
+                                      let
+                                         val csh = J.concl jud
+                                         val c = T.evar ()
+                                      in
+                                         if U.unify1 csh (T.Sub (c, T.shift1)) then
+                                            ([
+                                             J.make ctx (T.apply2 Prim.ov a m),
+                                             J.make (S.cons (J.Tm (T.Sub (b, T.Dot (m, T.id)))) ctx) csh
+                                             ],
+                                             (fn [_, n] =>
+                                                 T.Sub (n, T.Dot (T.Elim (T.zero, [T.App (T.Sub (m, T.shift1))]), T.shift1))
+   
+                                               | _ => raise ExtractFailure))
+                                         else
+                                            raise Failure
+                                      end
+   
+                                 | _ => 
+                                      raise Failure)
+                            else
+                               raise Failure
+
+                       | _ =>
+                            raise Failure)
+
+                | _ =>
+                     raise Failure)))
+
+
+      (* The rule generator won't create rules with a hypothesis in the conclusion. *)
+      val arrowLeft =
+         ("arrowLeft",
+          (fn jud =>
+              (case S.expose (J.context jud) of
+                  S.Cons (J.Tm t, ctx) =>
+                     (case N.whnf t of
+                         T.Elim (T.Const const, [T.App a, T.App b]) =>
+                            if Constant.eq (const, Prim.arrow) then
+                               let
+                                  val csh = J.concl jud
+                                  val c = T.evar ()
+                               in
+                                  if U.unify1 csh (T.Sub (c, T.shift1)) then
+                                     ([
+                                      J.make ctx a,
+                                      J.make (S.cons (J.Tm b) ctx) csh
+                                      ],
+                                      (fn [m, n] =>
+                                          T.Sub (n, T.Dot (T.Elim (T.zero, [T.App (T.Sub (m, T.shift1))]), T.shift1))
+   
+                                        | _ => raise ExtractFailure))
+                                  else
+                                     raise Failure
+                               end
+                            else
+                               raise Failure
+
+                       | _ =>
+                            raise Failure)
+
+                | _ =>
+                     raise Failure)))
+
+      (* The rule generator doesn't know about valuability. *)
       val haltsValue =
          ("haltsValue",
           fn jud =>

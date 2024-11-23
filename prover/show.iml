@@ -232,12 +232,14 @@ structure ShowInternal
 
       val showLiteralBinders = ref false
       val showVeryLiteral = ref false
+      val showSubstitutions = ref false
 
       (* if !showVeryLiteral then s = id
 
          'evars' is for cycle detection because it's barely possible for there to be
-         a cycle in the raw, unsimplified syntax via the substitutions.
-         If !showVeryLiteral=false, raw substitutions aren't shown so evars is
+         a cycle in the raw, unsimplified syntax via the substitutions.  (The occurs check
+         is run on simplified code wherein substitutions are already carried out.)
+         If !showVeryLiteral=false, raw substitutions aren't shown so 'evars' is
          ignored.
       *)
       fun showLiteralMain pp evars prec m s spine =
@@ -361,7 +363,8 @@ structure ShowInternal
                           (fn _ =>
                               (
                               PP.print pp "E";
-                              PP.print pp (Int.toString (T.ebindToInt eb))
+                              PP.print pp (Int.toString (T.ebindToInt eb));
+                              showSub pp s
                               ))
                           spine)
 
@@ -460,6 +463,24 @@ structure ShowInternal
                 PP.break pp 1;
                 showLiteralSubMain pp evars s
                 ))
+
+
+      and showSub pp s =
+         if !showSubstitutions then
+            (case s of
+                T.Shift 0 => ()
+
+              | _ =>
+                   (
+                   PP.print pp "[";
+                   PP.openBox pp PP.Consistent 0;
+                   showLiteralSubMain pp IS.empty s;
+                   PP.closeBox pp;
+                   PP.print pp "]"
+                   ))
+         else
+            ()
+
 
       fun showLiteral m =
          showTop 0 (fn pp => showLiteralMain pp IS.empty precMin m T.id [])
@@ -580,7 +601,6 @@ structure ShowInternal
       fun hideContent x = x
 
 
-      val showSubstitutions = ref false
       val showImplicits = ref false
 
       fun collectLams m s acc =
@@ -752,7 +772,7 @@ structure ShowInternal
                 (
                 PP.print pp "E";
                 PP.print pp (Int.toString (T.ebindToInt e));
-                showSub pp margin dir s
+                showSub pp s
                 )
 
            | T.Lam _ =>
@@ -876,20 +896,6 @@ structure ShowInternal
 
                 showSpine pp margin dir rest
                 ))
-
-      and showSub pp margin dir s =
-         if !showSubstitutions then
-            (case s of
-                T.Shift 0 => ()
-
-              | _ =>
-                   (
-                   PP.print pp "[";
-                   showLiteralSubMain pp IS.empty s;
-                   PP.print pp "]"
-                   ))
-         else
-            ()
 
       fun showPP pp dir m =
          showMain pp 0 dir precMin m T.id []

@@ -101,6 +101,11 @@ Lists are covariant:
     length_nonzero_form : forall (i : level) (a : U i) (l : list a) .
                              0 < length l -> exists (h : a) (t : list a) . l = h :: t : list a
 
+    length_leq_form : forall (i : level) (a : U i) (l : list a) (n : nat) .
+                         n <= length l
+                         -> exists (l1 l2 : list a) .
+                              l = append l1 l2 : list a & n = length l1 : nat
+
 
 ### Fold
 
@@ -209,6 +214,9 @@ Lists are covariant:
       Exists : list a -> type =
       | Exists_hit : forall h t . P h -> Exists (h :: t)
       | Exists_miss : forall h t . Exists t -> Exists (h :: t)
+
+(The first argument, `a`, is implicit in `Forall`, `Exists`, and their
+constructors.)
 
     Forall_as_foldr : forall (i : level) (a : U i) (P : a -> U i) (l : list a) .
                          Forall P l <-> foldr unit (fn h Q . P h & Q) l
@@ -331,6 +339,11 @@ Lists are covariant:
     nth_In : forall (lv : level) (a : U lv) (l : list a) (i : nat) .
                 Option.option_case (nth l i) unit (fn x . In a x l)
 
+    list_eq_by_nth : forall (i : level) (a : U i) (l l' : list a) .
+                        length l = length l' : nat
+                        -> (forall (j : nat) . j < length l -> nth l j = nth l' j : Option.option a)
+                        -> l = l' : list a
+
 
 ### Zip and Unzip
 
@@ -391,6 +404,58 @@ Lists are covariant:
                    & nth (unzip l #2) i = Option.map (fn x . x #2) (nth l i) : Option.option b
 
 
+### Keep
+
+    keep : intersect (i : level) . forall (a : U i) . nat -> list a -> list a
+         (1 implicit argument)
+
+Keeping too many elements is permitted, and results in the full list.
+
+    keep _ zero _ --> nil
+    keep _ (succ _) nil --> nil
+    keep a (succ n) (cons h t) --> cons h (keep a n t)
+
+    keep_nil : forall (i : level) (a : U i) (n : nat) . keep n nil = nil : list a
+
+    length_keep_min : forall (i : level) (a : U i) (n : nat) (l : list a) .
+                         length (keep n l) = Nat.min n (length l) : nat
+
+    length_keep_leq : forall (i : level) (a : U i) (n : nat) (l : list a) . length (keep n l) <= n
+
+    length_keep : forall (i : level) (a : U i) (n : nat) (l : list a) .
+                     n <= length l -> length (keep n l) = n : nat
+
+    keep_idem : forall (i : level) (a : U i) (n : nat) (l : list a) .
+                   keep n (keep n l) = keep n l : list a
+
+    keep_append_leq : forall (i : level) (a : U i) (n : nat) (l1 l2 : list a) .
+                         n <= length l1 -> keep n (append l1 l2) = keep n l1 : list a
+
+    keep_append_geq : forall (i : level) (a : U i) (n : nat) (l1 l2 : list a) .
+                         length l1 <= n
+                         -> keep n (append l1 l2) = append l1 (keep (n - length l1) l2) : list a
+
+    keep_append_eq : forall (i : level) (a : U i) (n : nat) (l1 l2 : list a) .
+                        n = length l1 : nat -> keep n (append l1 l2) = l1 : list a
+
+    keep_all : forall (i : level) (a : U i) (l : list a) . keep (length l) l = l : list a
+
+    keep_map : forall (i : level) (a b : U i) (n : nat) (f : a -> b) (l : list a) .
+                  keep n (map f l) = map f (keep n l) : list b
+
+    Forall_keep_weaken : forall (i : level) (a : U i) (P : a -> U i) (n : nat) (l : list a) .
+                            Forall P l -> Forall P (keep n l)
+
+    Exists_keep_weaken : forall (i : level) (a : U i) (P : a -> U i) (n : nat) (l : list a) .
+                            Exists P (keep n l) -> Exists P l
+
+    In_keep_weaken : forall (i : level) (a : U i) (x : a) (n : nat) (l : list a) .
+                        In a x (keep n l) -> In a x l
+
+    nth_keep : forall (i : level) (a : U i) (m n : nat) (l : list a) .
+                  n < m -> nth (keep m l) n = nth l n : Option.option a
+
+
 ### Drop
 
     drop : intersect (i : level) . forall (a : U i) . nat -> list a -> list a
@@ -399,12 +464,16 @@ Lists are covariant:
 Dropping too many elements is permitted, and results in the empty list.
 
     drop _ zero l --> l
-    drop a (succ n) l --> list_case a (list a) l nil (fn _ l' . drop n l')
+    drop _ (succ _) nil --> nil
+    drop _ (succ n) (cons h t) --> drop n t
 
     drop_nil : forall (i : level) (a : U i) (n : nat) . drop n nil = nil : list a
 
     length_drop : forall (i : level) (a : U i) (n : nat) (l : list a) .
                      length (drop n l) = length l - n : nat
+
+    drop_plus : forall (i : level) (a : U i) (l : list a) (m n : nat) .
+                   drop n (drop m l) = drop (m + n) l : list a
 
     drop_append_leq : forall (i : level) (a : U i) (n : nat) (l1 l2 : list a) .
                          n <= length l1 -> drop n (append l1 l2) = append (drop n l1) l2 : list a
@@ -414,6 +483,8 @@ Dropping too many elements is permitted, and results in the empty list.
 
     drop_append_eq : forall (i : level) (a : U i) (n : nat) (l1 l2 : list a) .
                         n = length l1 : nat -> drop n (append l1 l2) = l2 : list a
+
+    drop_all : forall (i : level) (a : U i) (l : list a) . drop (length l) l = nil : list a
 
     drop_map : forall (i : level) (a b : U i) (n : nat) (f : a -> b) (l : list a) .
                   drop n (map f l) = map f (drop n l) : list b
@@ -435,6 +506,9 @@ Dropping too many elements is permitted, and results in the empty list.
                        = list_case (drop n l) Option.None (fn h v0 . Option.Some h)
                        : Option.option a
 
+    split_list : forall (i : level) (a : U i) (n : nat) (l : list a) .
+                    l = append (keep n l) (drop n l) : list a
+
 
 ### Map_flat
 
@@ -449,3 +523,77 @@ Dropping too many elements is permitted, and results in the empty list.
 
     map_flat_as_foldr : forall (i : level) (a b : U i) (f : a -> list b) (l : list a) .
                            map_flat f l = foldr nil (fn h t . append (f h) t) l : list b
+
+
+### For all pairs of distinct elements
+
+    datatype
+      intersect (i : level) .
+      forall (a : U i) (P : a -> a -> U i) .
+      U i
+    of
+      Forall_dist : list a -> type =
+  
+      | Forall_dist_nil :
+          Forall_dist nil
+  
+      | Forall_dist_cons :
+          forall h t .
+            Forall (P h) t
+            -> Forall_dist t
+            -> Forall_dist (cons h t)
+
+(The first argument, `a`, is implicit in `Forall_dist` and its
+constructors)
+
+    Forall_dist_nil_iff : forall (i : level) (a : U i) (P : a -> a -> U i) .
+                             Forall_dist P nil <-> unit
+
+    Forall_dist_cons_iff : forall (i : level) (a : U i) (P : a -> a -> U i) (x : a) (l : list a) .
+                              Forall_dist P (x :: l) <-> Forall (P x) l & Forall_dist P l
+
+    Forall_dist_append : forall (i : level) (a : U i) (P : a -> a -> U i) (l1 l2 : list a) .
+                            Forall (fn x . Forall (P x) l2) l1
+                            -> Forall_dist P l1
+                            -> Forall_dist P l2
+                            -> Forall_dist P (append l1 l2)
+
+    Forall_dist_append_iff : forall (i : level) (a : U i) (P : a -> a -> U i) (l1 l2 : list a) .
+                                Forall_dist P (append l1 l2)
+                                  <-> Forall (fn x . Forall (P x) l2) l1
+                                      & Forall_dist P l1
+                                      & Forall_dist P l2
+
+    Forall_dist_implies : forall (i : level) (a : U i) (P Q : a -> a -> U i) (l : list a) .
+                             (forall (x y : a) . P x y -> Q x y)
+                             -> Forall_dist P l
+                             -> Forall_dist Q l
+
+    Forall_dist_map : forall
+                         (i : level)
+                         (a b : U i)
+                         (P : b -> b -> U i)
+                         (f : a -> b)
+                         (l : list a) .
+                         Forall_dist P (map f l) <-> Forall_dist (fn x y . P (f x) (f y)) l
+
+    Forall_dist_reverse : forall (i : level) (a : U i) (P : a -> a -> U i) (l : list a) .
+                             (forall (x y : a) . P x y -> P y x)
+                             -> Forall_dist P (reverse l) <-> Forall_dist P l
+
+    decidable_Forall_dist_dep : forall (i : level) (a : U i) (P : a -> a -> U i) (l : list a) .
+                                   (forall (x y : a) .
+                                      In a x l -> In a y l -> Decidable.decidable (P x y))
+                                   -> Decidable.decidable (Forall_dist P l)
+
+    decidable_Forall_dist : forall (i : level) (a : U i) (P : a -> a -> U i) (l : list a) .
+                               (forall (x y : a) . Decidable.decidable (P x y))
+                               -> Decidable.decidable (Forall_dist P l)
+
+
+### Lists are covariant
+
+    list_subtype : forall (i : level) (a b : U i) . a <: b -> list a <: list b
+
+Note that this fact relies on `nil` and `cons`'s type argument being
+invisible (*i.e.,* taken using `intersect`).

@@ -12,6 +12,158 @@ fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
 structure P = ReductionProver;
 
 
+
+lemma "isquash_intro_elim"
+/
+  forall i (a : U i) . a -> isquash a
+/;
+
+inference.
+intro /i a H/.
+assert /isquash a/ /Hsq/.
+  {
+  split.
+  hyp /H/.
+  }
+clear /H/.
+destructRaw /Hsq/ /[H]/.
+unhide.
+split.
+hyp /H/.
+qed ();
+
+
+
+lemma "introOf_iforall"
+/
+  (fn x . x) : iforall (a : U 0) . a -> a
+/;
+
+introOf /a x/.
+typecheck.
+qed ();
+
+
+
+lemma "let_type"
+/
+  (let x = 1 in x) : nat
+/;
+
+typecheck.
+qed ();
+
+
+
+lemma "leth_type"
+/
+  (leth x = 1 in x) : nat
+/;
+
+typecheck.
+qed ();
+
+
+
+lemma "lete_type"
+/
+  (lete x = 1 in x) : nat
+/;
+
+typecheck.
+qed ();
+
+
+
+lemma "let_reduce"
+/
+  let n = (fn x . x) 0
+  in
+    { n : nat }
+/;
+
+whreduceHard //.
+reduce //.
+split.
+typecheck.
+qed ();
+
+
+
+lemma "leth_reduce"
+/
+  leth n = (fn x . x) 0
+  in
+    { n : nat }
+/;
+
+whreduceHard //.
+unfold /leth/.
+reduce //.
+split.
+typecheck.
+qed ();
+
+
+
+lemma "lete_reduce"
+/
+  lete n = (fn x . x) 0
+  in
+    { n : nat }
+/;
+
+whreduceHard //.
+split.
+typecheck.
+qed ();
+
+
+
+lemma "insert"
+/
+  forall (a : U 0) . a -> (a & unit)
+/;
+
+intro /a x/.
+RuleTactic.insert 1.
+renameBefore /h/ /x/.
+split.
+  {
+  hyp /x/.
+  }
+
+  {
+  hyp /h/.
+  }
+qed ();
+
+
+
+lemma "forallArrowLeft"
+/
+  forall i (a : U i) (b c : a -> U i) (x : a) .
+    (forall (x : a) . b x -> c x)
+    -> b x
+    -> c x
+/;
+
+inference.
+intro /i a b c x H Hb/.
+moveBefore /H/ /concl/.
+RuleTactic.forallLeft (Term.Var 1).
+  {
+  hypof.
+  }
+RuleTactic.arrowLeft.
+  {
+  hyp /Hb/.
+  }
+hyp /H/.
+qed ();
+
+
+
 lemma "seq_nat_value"
 /
   seq x = 1 + 1 in x = 2 : nat
