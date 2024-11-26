@@ -125,6 +125,19 @@ functor AfterNat () :>
             /[constant]/
 
 
+      val () = Constant.setOpacity Prim.nat Constant.HARD
+
+      val unrollNat =
+         R.user $
+         R.new Prim.nat [] 0
+            (T.apply1 Prim.mu (T.Lam (NONE, T.apply2 Prim.sum (T.Const Prim.unit) (T.Var 0))))
+            R.unfold
+            R.refl
+
+      val () = Constant.setOpacity Prim.nat Constant.OPAQUE
+
+
+
       val natPrimInductionPriority =
          let
             do (jud, dir) = withgoal
@@ -136,7 +149,7 @@ functor AfterNat () :>
             /| $tm \Prim.nat\ =>
                \fnc =>
                    (* nat |- C *)
-                   refine (Rule.reduceHyp 0 R.unfold)
+                   refine (Rule.reduceHyp 0 unrollNat)
                    >>
                    (* mu . unit % 0 |- C = C[0 . ^2][0 . id] *)
                    refine (Rule.muInd
@@ -200,7 +213,7 @@ functor AfterNat () :>
                                       (T.apply2 Prim.subtype
                                           (T.Var 1)
                                           (T.Const Prim.nat))
-                                      (R.within [2] R.unfold))
+                                      (R.within [2] unrollNat))
                            >>
                            chdir (Directory.bindhs dir' [NONE, NONE, NONE, NONE])
                            >>
