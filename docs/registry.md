@@ -80,8 +80,7 @@ The full interface for the registry is:
           val constant    : Constant.constant key
           val term        : Term.term key
           val reduction   : Reduction.reduction key
-          val reduction1  : Reduction.reduction1 key
-          val reduction2  : Reduction.reduction2 key
+          val ureduction  : Reduction.ureduction key
     
           val list    : 'a key -> 'a list key
           val option  : 'a key -> 'a option key

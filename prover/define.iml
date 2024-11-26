@@ -19,40 +19,37 @@ signature DEFINE =
       val recordTyping : string -> unit
 
 
+      datatype element = Ordinary of symbol option | Active of constant * symbol option list
+
+      val makeReduction :
+         ((constant * element list * eterm) 
+          * constant list * constant list)
+         -> Reduction.ureduction
+
       val reductions : 
-         ((constant * symbol option list * constant * symbol option list * symbol option list * eterm) list
+         ((constant * element list * eterm) list
           * constant list * constant list)
          -> unit
 
-      val makeReduction1 : 
-         ((constant * symbol option list * eterm)
-          * constant list * constant list)
-         -> Reduction.reduction1
+      val register : Reduction.ureduction -> unit
 
-      val makeReduction2 : 
-         ((constant * symbol option list * constant * symbol option list * symbol option list * eterm)
-          * constant list * constant list)
-         -> Reduction.reduction2
+      (* registerNative i n red : arguments i .. i+n-1 must be native for the reduction to activate *)
+      val registerNative : int -> int -> Reduction.ureduction -> unit
 
-      val register : Reduction.reduction2 -> unit
-
-      (* given i n r, the active argument(s) are i ... i+n-1 *)
-      val registerNative : int -> int -> Reduction.reduction1 -> unit
-
-      (* reduction_to_redction1 const i red
+      (* reduction_to_ureduction const i red
 
          if    red : const i-1 ... 0 --> M
          then  red' does the same
                and
                returns red'
       *)
-      val reduction_to_reduction1 : constant -> int -> Reduction.reduction -> Reduction.reduction1
+      val reduction_to_ureduction : constant -> int -> Reduction.reduction -> Reduction.ureduction
 
-      (* unfold1 const n = reduction_to_reduction1 const n (Reduction.trans [Reduction.unfold, Reduction.beta n]) *)
-      val unfold1 : constant -> int -> Reduction.reduction1
+      (* unfold1 const n = reduction_to_ureduction const n (Reduction.trans [Reduction.unfold, Reduction.beta n]) *)
+      val unfold1 : constant -> int -> Reduction.ureduction
 
-      (* unfold1 const n = reduction_to_reduction1 const n (valOf (Database.findUnroll const)) *)
-      val unroll1 : constant -> int -> Reduction.reduction1
+      (* unfold1 const n = reduction_to_ureduction const n (valOf (Database.findUnroll const)) *)
+      val unroll1 : constant -> int -> Reduction.ureduction
 
    end
 
@@ -66,8 +63,8 @@ signature DEFINE_INTERNAL =
       val recUnroller : Constant.constant -> Reduction.reduction
 
       datatype general_reduction =
-         Standard of Reduction.reduction2
-       | Native of int * int * Reduction.reduction1
+         Standard of Reduction.ureduction
+       | Native of int * int * Reduction.ureduction
 
       (* Returns all reductions registered for normalization (except primitive or imported ones). *)
       val registered : unit -> general_reduction list
@@ -241,7 +238,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
               
                                 (* fix (fn . M) *)
               
-                                R.user1 PrimReduction.unroll_fix,
+                                R.user PrimReduction.unroll_fix,
               
                                 (* (fn . M) (fix (fn . M)) *)
                                 ]
@@ -255,8 +252,8 @@ structure DefineInternal :> DEFINE_INTERNAL =
                              [
                              (* const *)
               
-                             R.user1 
-                                (R.new1 const 0 (T.app (T.Lam (NONE, m)) (T.Const const)) r1 r2),
+                             R.user
+                                (R.new const [] 0 (T.app (T.Lam (NONE, m)) (T.Const const)) r1 r2),
               
                              (* (fn . M) const *)
               
@@ -477,7 +474,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
                         R.beta nPervs,
       
                         (* fix (fn . <func1[s], ..., funcn[s]>) *)
-                        R.user1 PrimReduction.unroll_fix,
+                        R.user PrimReduction.unroll_fix,
       
                         (* (fn . <func1[s], ..., funcn[s]>) (fix (fn . <func1[s], ..., funcn[s]>)) *)
                         ]
@@ -502,8 +499,8 @@ structure DefineInternal :> DEFINE_INTERNAL =
                      [
                      (* groupconst k-1 ... 0 elims *)
    
-                     R.user1
-                        (R.new1 groupconst nPervs
+                     R.user
+                        (R.new groupconst [] nPervs
                             (T.app groupbody groupconstInst)
                             r1 r2),
    
@@ -597,8 +594,8 @@ structure DefineInternal :> DEFINE_INTERNAL =
                             [
                             (* const k-1 ... 0 *)
 
-                            R.user1
-                               (R.new1 const nPervs
+                            R.user
+                               (R.new const [] nPervs
                                    (T.Elim (Int.natrecUp (fns _ f => T.Lam (NONE, f)) func nFuncs,
                                             List.map
                                                (fn (_, constj, _) => T.App (T.Elim (T.Const constj, spine)))
@@ -616,8 +613,8 @@ structure DefineInternal :> DEFINE_INTERNAL =
                          R.trans
                             [
                             (* compact red *)
-                            R.user1
-                               (R.new1 const nPervs 
+                            R.user
+                               (R.new const [] nPervs 
                                    (R.reduce red (T.Elim (T.Const const, spine)))
                                    red R.refl),
 
@@ -687,24 +684,15 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
 
          
-      (* natrec f x i = f (i-1) (f (i-2) (... (f 0 x) ...)) *)
-      fun natrec f x i =
-         if i = 0 then
-            x
-         else
-            f (i-1) (natrec f x (i-1))
-
-
-
       datatype general_reduction =
-         Standard of R.reduction2
-       | Native of int * int * R.reduction1
+         Standard of R.ureduction
+       | Native of int * int * R.ureduction
 
 
       (* All the registered reductions except primitive or imported ones. *)
       val theRegistered : general_reduction list C.cref = C.new []
                           
-      (* All the registered reductions, in a format for autoreduce. *)
+      (* All the registered reductions in a format for autoreduce. *)
       val theStrat : R.reduction list Dict.dict C.cref =
          C.new
             (List.foldl
@@ -715,11 +703,11 @@ structure DefineInternal :> DEFINE_INTERNAL =
                 (List.foldl
                     (fns r d =>
                         let
-                           val (const, _, _) = R.triggers r
+                           val const = R.trigger r
                         in
                            Dict.insertMerge d const
-                              [R.user2 r]
-                              (fn l => R.user2 r :: l)
+                              [R.user r]
+                              (fn l => R.user r :: l)
                         end)
                     (List.foldl
                         (fns (const, r) d => Dict.insert d const [r])
@@ -729,27 +717,28 @@ structure DefineInternal :> DEFINE_INTERNAL =
                 Native.operators)
 
 
-      fun registerMain exportable r =
+      fun registerMain exportable red =
          let
-            val (const, _, _) = R.triggers r
+            val const = R.trigger red
          in
-            RedexInternal.register r;
+            RedexInternal.register red;
 
             if exportable then
-               C.assign theRegistered (Standard r :: C.deref theRegistered)
+               C.assign theRegistered (Standard red :: C.deref theRegistered)
             else
                ();
 
             C.assign theStrat
                (Dict.insertMerge (C.deref theStrat) const
-                   [R.user2 r]
-                   (fn l => R.user2 r :: l))
+                   [R.user red]
+                   (fn l => R.user red :: l))
          end
 
-      fun registerNativeMain exportable i n r =
+      fun registerNativeMain exportable i n red =
          let
-            val const = R.trigger r
-            val r' = 
+            val const = R.trigger red
+
+            val red' = 
                R.trans
                   [R.compat (Int.natrecUp 
                                 (fns _ l => R.refl :: l) 
@@ -758,19 +747,19 @@ structure DefineInternal :> DEFINE_INTERNAL =
                                     []
                                     n)
                                 i),
-                   R.user1 r]
+                   R.user red]
          in
-            RedexInternal.registerNative i n r;
+            RedexInternal.registerNative i n red;
 
             if exportable then
-               C.assign theRegistered (Native (i, n, r) :: C.deref theRegistered)
+               C.assign theRegistered (Native (i, n, red) :: C.deref theRegistered)
             else
                ();
 
             C.assign theStrat
                (Dict.insertMerge (C.deref theStrat) const
-                   [r']
-                   (fn l => r' :: l))
+                   [red']
+                   (fn l => red' :: l))
          end
          
       val register = registerMain true
@@ -778,15 +767,15 @@ structure DefineInternal :> DEFINE_INTERNAL =
          
       fun importReduction gr =
          (case gr of
-             Standard r => registerMain false r
+             Standard red => registerMain false red
 
-           | Native (i, n, r) => registerNativeMain false i n r)
+           | Native (i, n, red) => registerNativeMain false i n red)
 
       fun registered () = C.deref theRegistered
 
 
 
-      fun reduction_to_reduction1 const n red =
+      fun reduction_to_ureduction const n red =
          let
             val m =
                T.Elim (T.Const const,
@@ -797,28 +786,58 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
             val m' = R.reduce red m
          in
-            R.new1 const n m' red R.refl
+            R.new const [] n m' red R.refl
          end
 
       fun unfold1 const n =
-         reduction_to_reduction1 const n (R.trans [R.unfold, R.beta n])
+         reduction_to_ureduction const n (R.trans [R.unfold, R.beta n])
 
       fun unroll1 const n =
-         reduction_to_reduction1 const n (Option.valOf (Database.findUnroll const))
+         reduction_to_ureduction const n (Option.valOf (Database.findUnroll const))
 
 
 
-      fun makeReduction1 ((const, args, erhs), unf, unr) =
+      datatype element = Ordinary of symbol option | Active of constant * symbol option list
+
+      fun makeReduction ((const, args, erhs), unf, unr) =
          let
-            val (n, dir) =
+            val dir =
                List.foldl
-                  (fns osym (n, dir) => (n+1, D.bindh dir osym))
-                  (0, D.empty)
+                  (fns elem dir =>
+                      (case elem of
+                          Ordinary osym =>
+                             D.bindh dir osym
+
+                        | Active (_, innerargs) =>
+                             List.foldl
+                                (fns osym dir => D.bindh dir osym)
+                                dir
+                                innerargs))
+                  D.empty
                   args
 
-            val lhs =
-               T.Elim (T.Const const,
-                       natrec (fns i sp => T.App (T.Var i) :: sp) [] n)
+            val (_, lhsSpine) =
+               List.foldr
+                  (fns elem (i, spine) =>
+                      (case elem of
+                          Ordinary _ =>
+                             (i+1, Term.App (Term.Var i) :: spine)
+
+                        | Active (const', innerArgs) =>
+                             let
+                                val (i, innerSpine) =
+                                   List.foldr
+                                      (fns _ (i, spine) =>
+                                          (i+1, Term.App (Term.Var i) :: spine))
+                                      (i, [])
+                                      innerArgs
+                             in
+                                (i, T.App (T.Elim (T.Const const', innerSpine)) :: spine)
+                             end))
+                  (0, [])
+                  args
+
+            val lhs = T.Elim (T.Const const, lhsSpine)
 
             val rhs = ETerm.withdir dir (ETerm.explicit erhs)
 
@@ -852,104 +871,23 @@ structure DefineInternal :> DEFINE_INTERNAL =
                   Dict.empty
                   unr
 
-            val (m1, r1) = AR.autoreduce' true dp dl lhs
-            val (m2, r2) = AR.autoreduce' true dp Dict.empty rhs
+            val (m1, red1) = AR.autoreduce' true dp dl lhs
+            val (m2, red2) = AR.autoreduce' true dp Dict.empty rhs
+
+            val (zonesRev, residual) =
+               List.foldl
+                  (fns elem (zonesRev, residual) =>
+                      (case elem of
+                          Ordinary _ =>
+                             (zonesRev, residual+1)
+
+                        | Active (const', innerArgs) =>
+                             ((residual, const', List.length innerArgs) :: zonesRev, 0)))
+                  ([], 0)
+                  args
          in
             try
-               Reduction.new1 const n rhs r1 r2
-            with
-            Reduction.Reduce =>
-               (
-               Message.message 20 0
-                  (fn () =>
-                      let
-                         val b = !Show.showImplicits
-                      in
-                         Show.showImplicits := true;
-
-                         print "Terms have no common reduct:\n";
-                         Show.show dir lhs;
-                         print "-->\n";
-                         Show.show dir m1;
-                         print "\n";
-                         Show.show dir rhs;
-                         print "-->\n";
-                         Show.show dir m2;
-
-                         Show.showImplicits := b
-                      end);
-
-               signalError "terms have no common reduct"
-               )
-         end
-
-      
-      fun makeReduction2 ((const1, args1, const2, args2, args3, erhs), unf, unr) =
-         let
-            val (n1, dir1) =
-               List.foldl
-                  (fns osym (n, dir) => (n+1, D.bindh dir osym))
-                  (0, D.empty)
-                  args1
-
-            val (n2, dir2) =
-               List.foldl
-                  (fns osym (n, dir) => (n+1, D.bindh dir osym))
-                  (0, dir1)
-                  args2
-
-            val (n3, dir) =
-               List.foldl
-                  (fns osym (n, dir) => (n+1, D.bindh dir osym))
-                  (0, dir2)
-                  args3
-                  
-            val lhs =
-               T.Elim (T.Const const1,
-                       natrec 
-                          (fns i sp => T.App (T.Var (n2+n3+i)) :: sp)
-                          (T.App (T.Elim (T.Const const2,
-                                          natrec (fns i sp => T.App (T.Var (n3+i)) :: sp) [] n2))
-                           :: natrec (fns i sp => T.App (T.Var i) :: sp) [] n3)
-                          n1)
-
-            val rhs = ETerm.withdir dir (ETerm.explicit erhs)
-
-            val dp =
-               List.foldl
-                  (fns const dp =>
-                      Dict.insertMerge dp const
-                         [R.unfold]
-                         (fn l => R.unfold :: l))
-                  (C.deref theStrat)
-                  unf
-
-            val dl =
-               List.foldl
-                  (fns const dl =>
-                      (case Database.findUnroll const of
-                          SOME red =>
-                             Dict.insert dl const red
-
-                        | NONE =>
-                             (
-                             Message.message 20 0
-                                (fn () =>
-                                    (
-                                    print (Namespace.toString const);
-                                    print " is not unrollable"
-                                    ));
-
-                             signalError "constant is not unrollable"
-                             )))
-                  Dict.empty
-                  unr
-
-            val (m1, r1) = AR.autoreduce' true dp dl lhs
-            val (m2, r2) = AR.autoreduce' true dp Dict.empty rhs
-         in
-            try
-               Reduction.new2 const1 n1 n3 const2 n2 rhs r1 r2
+               Reduction.new const (List.rev zonesRev) residual rhs red1 red2
             with
             Reduction.Reduce =>
                (
@@ -982,24 +920,35 @@ structure DefineInternal :> DEFINE_INTERNAL =
             val () = P.checkpoint ()
          in
             List.app
-               (fn (pat as (const1, _, const2, _, _, _)) =>
+               (fn (pat as (const, args, rhs)) =>
                    let
-                      val red = makeReduction2 (pat, unf, unr)
+                      val red = makeReduction (pat, unf, unr)
    
-                      val name1 = Symbol.toValue (Namespace.lastname const1)
-                      val name2 = Symbol.toValue (Namespace.lastname const2)
+                      val names =
+                         "reduce_"
+                         :: Symbol.toValue (Namespace.lastname const)
+                         :: List.foldr
+                               (fns elem l =>
+                                   (case elem of
+                                       Ordinary _ => l
+   
+                                     | Active (const', _) =>
+                                          "_" :: Symbol.toValue (Namespace.lastname const') :: l))
+                               []
+                               args
                    in
                       register red;
                       
                       Registry.write 
-                         (Symbol.fromValue (String.concat [name1, "_", name2]))
-                         Registry.reduction2
+                         (Symbol.fromValue (String.concat names))
+                         Registry.ureduction
                          red
                    end)
                pats;
    
             Message.message 0 0 (fn () => print "Reductions registered.\n")
          end
+
 
    end
 
@@ -1019,8 +968,10 @@ structure ParseDefine =
 
       fun definePattern name (impargs, expargs) = (name, impargs, expargs)
 
-      fun reduce1Pattern head args rhs = (head, args, rhs)
-      fun reduce2Pattern head1 args1 head2 args2 args3 rhs = (head1, args1, head2, args2, args3, rhs)
+      val ordinary = Define.Ordinary
+      fun active const args = Define.Active (const, args)
+
+      fun reducePattern const args rhs = (const, args, rhs)
 
       fun actionsSimple x = (x, [], [])
       fun actionsUnfold unf x = (x, unf, [])
@@ -1044,11 +995,16 @@ grammardef Define
 
    rule DefinePattern    ::= Ident GroupedOIdents => definePattern
 
-   rule Reduce1Pattern   ::= Constant OIdents "-->" Term => reduce1Pattern
-   rule Reduce2Pattern   ::= Constant OIdents "(" Constant OIdents ")" OIdents "-->" Term => reduce2Pattern
-   
-   rule ReducePatterns   ::= Reduce2Pattern => sing
-   rule ReducePatterns   ::= Reduce2Pattern ";" ReducePatterns => cons
+   rule ReduceElement    ::= OIdent => ordinary
+   rule ReduceElement    ::= "(" Constant OIdents ")" => active
+
+   rule ReduceElements   ::= => null
+   rule ReduceElements   ::= ReduceElement ReduceElements => cons
+
+   rule ReducePattern    ::= Constant ReduceElements "-->" Term => reducePattern
+
+   rule ReducePatterns   ::= ReducePattern => sing
+   rule ReducePatterns   ::= ReducePattern ";" ReducePatterns => cons
 
    rule ReduceActions    ::= => actionsSimple
    rule ReduceActions    ::= ";" => actionsSimple
@@ -1057,8 +1013,7 @@ grammardef Define
    rule ReduceActions    ::= ";" "unfolding" Constants "unrolling" Constants => actionsUnfoldUnroll
    rule ReduceActions    ::= ";" "unrolling" Constants "unfolding" Constants => actionsUnrollUnfold
    
-   rule Reduce1Directive ::= Reduce1Pattern ReduceActions => app
-   rule Reduce2Directive ::= Reduce2Pattern ReduceActions => app
+   rule Reduce1Directive ::= ReducePattern ReduceActions => app
    rule ReduceDirective  ::= ReducePatterns ReduceActions => app
 
    rule MutFunc          ::= Ident OIdents "=" Term => mutFunc

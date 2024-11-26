@@ -133,10 +133,11 @@ reduces to:
     nodecase n x f (forest_iter a P Q empcase nodecase nilcase conscase n f)
 
 These reductions are registered with the normalization engine and
-applied automatically.  In addition, they are placed in the registry so
-that users can obtain them for writing tactics.  The name is the
-iterator's name prepended to the constructor's name.  For example, the
-preceding reduction would be written under the name `tree_iter_Node`.
+applied automatically.  In addition, they are placed in the registry
+so that users can obtain them for writing tactics.  The name is
+`reduce` followed by the iterator's name, followed by the contructor's
+name.  For example, the preceding reduction would be written under the
+name `reduce_tree_iter_Node`.
 
 
 

@@ -78,7 +78,7 @@ structure RR = Registry;
 structure NR = RedexInternal;  (* Can use NR.register when a reduction need not be exported. *)
 structure PR = PrimReduction;
 
-val list_case_nil = makeReduction2
+val list_case_nil = makeReduction
 /
   list_case (nil) n c --> n ;
   unfolding list_case nil
@@ -86,7 +86,7 @@ val list_case_nil = makeReduction2
 
 NR.register list_case_nil;
 
-val list_case_cons = makeReduction2
+val list_case_cons = makeReduction
 /
   list_case (cons h t) n c --> c h t ;
   unfolding list_case cons
@@ -94,7 +94,7 @@ val list_case_cons = makeReduction2
 
 NR.register list_case_cons;
 
-val list_rec_nil = makeReduction2
+val list_rec_nil = makeReduction
 /
   list_rec n c (nil) --> n ;
   unrolling list_rec unfolding nil
@@ -102,22 +102,22 @@ val list_rec_nil = makeReduction2
 
 NR.register list_rec_nil;
 
-val list_rec_cons = makeReduction2
+val list_rec_cons = makeReduction
 /
   list_rec n c (cons h t) --> c h t (list_rec n c t) ;
   unrolling list_rec unfolding cons
 /;
 
-writeRegistry /list_rec_cons/ /reduction2/ list_rec_cons;
+writeRegistry /list_rec_cons/ /ureduction/ list_rec_cons;
 NR.register list_rec_cons;
 
-val list_rec_x = R.user1 $ makeReduction1
+val list_rec_x = R.user $ makeReduction
 /
   list_iter a P n c l --> list_rec n c l ;
   unfolding list_iter
 /;
 
-val list_iter_nil = makeReduction2
+val list_iter_nil = makeReduction
 /
   list_iter a P n c (nil) --> n ;
   unfolding list_iter nil
@@ -126,7 +126,7 @@ val list_iter_nil = makeReduction2
 
 Define.register list_iter_nil;
 
-val list_iter_cons = makeReduction2
+val list_iter_cons = makeReduction
 /
   list_iter a P n c (cons h t) --> c h t (list_iter a P n c t) ;
   unfolding list_iter cons
@@ -305,7 +305,7 @@ defineRaw /mapx a b f l/
 
 val map_unroll = Option.valOf $ Database.findUnroll $ parseConstant /map/;
 
-val map_nil = makeReduction2
+val map_nil = makeReduction
 /
   map f (nil) --> nil ;
   unrolling map
@@ -314,7 +314,7 @@ val map_nil = makeReduction2
 
 NR.register map_nil;
 
-val map_cons = makeReduction2
+val map_cons = makeReduction
 /
   map f (cons h t) --> cons (f h) (map f t) ;
   unrolling map
@@ -335,9 +335,9 @@ P.start m;
 P.apply map_unroll;
 val (_, r2) = P.done ();
 
-val map_x = R.user1 $ R.new1 (parseConstant /mapx/) 4 m r1 r2;
+val map_x = R.user $ R.new (parseConstant /mapx/) [] 4 m r1 r2;
 
-val mapx_nil = makeReduction2
+val mapx_nil = makeReduction
 /
   mapx a b f (nil) --> nil ;
   unfolding mapx list_case nil
@@ -349,7 +349,7 @@ Define.register mapx_nil;
 
 P.start (parseLTerm /mapx 4 3 2 (cons 1 0)/);
 P.apply map_x;
-P.user2 map_cons;
+P.user map_cons;
 val (_, r1) = P.done ();
 
 val m = parseLTerm /cons (2 1) (mapx 4 3 2 0)/;
@@ -359,7 +359,7 @@ P.apply map_x;
 P.leave ();
 val (_, r2) = P.done ();
 
-val mapx_cons = R.new2 (parseConstant /mapx/) 3 0 cons 2 m r1 r2;
+val mapx_cons = R.new (parseConstant /mapx/) [(3, cons, 2)] 0 m r1 r2;
 Define.register mapx_cons;
 
 
@@ -445,7 +445,7 @@ definerecRaw /length l/
 
 val length_unroll = Option.valOf $ Database.findUnroll $ parseConstant /length/;
 
-val length_nil = makeReduction2
+val length_nil = makeReduction
 /
   length (nil) --> 0 ;
   unrolling length
@@ -454,7 +454,7 @@ val length_nil = makeReduction2
 
 Define.register length_nil;
 
-val length_cons = makeReduction2
+val length_cons = makeReduction
 /
   length (cons h t) --> succ (length t) ;
   unrolling length
@@ -601,7 +601,7 @@ defineRaw /nthx a i l/
 
 
 
-val hd_cons = makeReduction2
+val hd_cons = makeReduction
 /
   hd (cons h t) --> h ;
   unfolding hd list_case cons
@@ -609,7 +609,7 @@ val hd_cons = makeReduction2
 
 NR.register hd_cons;
 
-val tl_cons = makeReduction2
+val tl_cons = makeReduction
 /
   tl (cons h t) --> t ;
   unfolding tl list_case cons
@@ -617,7 +617,7 @@ val tl_cons = makeReduction2
 
 NR.register tl_cons;
 
-val drop_zero = makeReduction2
+val drop_zero = makeReduction
 /
   drop (zero) l --> l ;
   unrolling drop
@@ -625,7 +625,7 @@ val drop_zero = makeReduction2
 
 NR.register drop_zero;
 
-val drop_succ = makeReduction2
+val drop_succ = makeReduction
 /
   drop (succ n) l --> drop n (tl l) ;
   unrolling drop
@@ -639,11 +639,11 @@ P.start (parseLTerm /nth zero 0/);
 P.unfold ();
 P.beta 2;
 P.enter [1];
-P.user2 drop_zero;
+P.user drop_zero;
 P.leave ();
 val (m, r1) = P.done ();
 
-val nth_zero = R.new2 (parseConstant /nth/) 0 1 Prim.zero 0 m r1 R.refl;
+val nth_zero = R.new (parseConstant /nth/) [(0, Prim.zero, 0)] 1 m r1 R.refl;
 NR.register nth_zero;
 
 (* nth_succ : nth (succ n) l --> hd (drop n) (tl l) *)
@@ -652,7 +652,7 @@ P.start (parseLTerm /nth (succ 1) 0/);
 P.unfold ();
 P.beta 2;
 P.enter [1];
-P.user2 drop_succ;
+P.user drop_succ;
 P.leave ();
 val (_, r1) = P.done ();
 
@@ -662,16 +662,16 @@ P.unfold ();
 P.beta 2;
 val (_, r2) = P.done ();
 
-val nth_succ = R.new2 (parseConstant /nth/) 0 1 Prim.succ 1 m r1 r2;
+val nth_succ = R.new (parseConstant /nth/) [(0, Prim.succ, 1)] 1 m r1 r2;
 NR.register nth_succ;
 
-val hd_x = R.user1 $ makeReduction1
+val hd_x = R.user $ makeReduction
 /
   hdx a l --> hd l ;
   unfolding hdx
 /;
 
-val tl_x = R.user1 $ makeReduction1
+val tl_x = R.user $ makeReduction
 /
   tlx a l --> tl l ;
   unfolding tlx
@@ -682,46 +682,46 @@ P.unfold ();
 P.beta 3;
 val (m, r1) = P.done ();
 
-val drop_x = R.user1 $ R.new1 (parseConstant /dropx/) 3 m r1 R.refl;
+val drop_x = R.user $ R.new (parseConstant /dropx/) [] 3 m r1 R.refl;
 
 P.start (parseLTerm /nthx 2 1 0/);
 P.unfold ();
 P.beta 3;
 val (m, r1) = P.done ();
 
-val nth_x = R.user1 $ R.new1 (parseConstant /nthx/) 3 m r1 R.refl;
+val nth_x = R.user $ R.new (parseConstant /nthx/) [] 3 m r1 R.refl;
 
 P.start (parseLTerm /hdx 2 (cons 1 0)/);
 P.unfold ();
 P.beta 2;
-P.user2 hd_cons;
+P.user hd_cons;
 val (m, r1) = P.done ();
 
-val hdx_cons = R.new2 (parseConstant /hdx/) 1 0 (parseConstant /cons/) 2 m r1 R.refl;
+val hdx_cons = R.new (parseConstant /hdx/) [(1, parseConstant /cons/, 2)] 0 m r1 R.refl;
 Define.register hdx_cons;
 
 P.start (parseLTerm /tlx 2 (cons 1 0)/);
 P.unfold ();
 P.beta 2;
-P.user2 tl_cons;
+P.user tl_cons;
 val (m, r1) = P.done ();
 
-val tlx_cons = R.new2 (parseConstant /tlx/) 1 0 (parseConstant /cons/) 2 m r1 R.refl;
+val tlx_cons = R.new (parseConstant /tlx/) [(1, parseConstant /cons/, 2)] 0 m r1 R.refl;
 Define.register tlx_cons;
 
 P.start (parseLTerm /dropx 1 zero 0/);
 P.unfold ();
 P.beta 3;
-P.user2 drop_zero;
+P.user drop_zero;
 val (m, r1) = P.done ();
 
-val dropx_zero = R.new2 (parseConstant /dropx/) 1 1 Prim.zero 0 m r1 R.refl;
+val dropx_zero = R.new (parseConstant /dropx/) [(1, Prim.zero, 0)] 1 m r1 R.refl;
 Define.register dropx_zero;
 
 P.start (parseLTerm /dropx 2 (succ 1) 0/);
 P.unfold ();
 P.beta 3;
-P.user2 drop_succ;
+P.user drop_succ;
 val (_, r1) = P.done ();
 
 val m = parseLTerm /dropx 2 1 (tlx 2 0)/;
@@ -734,13 +734,13 @@ P.beta 2;
 P.leave ();
 val (_, r2) = P.done ();
 
-val dropx_succ = R.new2 (parseConstant /dropx/) 1 1 Prim.succ 1 m r1 r2;
+val dropx_succ = R.new (parseConstant /dropx/) [(1, Prim.succ, 1)] 1 m r1 r2;
 Define.register dropx_succ;
 
 P.start (parseLTerm /nthx 1 zero 0/);
 P.unfold ();
 P.beta 3;
-P.user2 nth_zero;
+P.user nth_zero;
 val (_, r1) = P.done ();
 
 val m = parseLTerm /hdx 1 0/;
@@ -749,13 +749,13 @@ P.unfold ();
 P.beta 2;
 val (_, r2) = P.done ();
 
-val nthx_zero = R.new2 (parseConstant /nthx/) 1 1 Prim.zero 0 m r1 r2;
+val nthx_zero = R.new (parseConstant /nthx/) [(1, Prim.zero, 0)] 1 m r1 r2;
 Define.register nthx_zero;
 
 P.start (parseLTerm /nthx 2 (succ 1) 0/);
 P.unfold ();
 P.beta 3;
-P.user2 nth_succ;
+P.user nth_succ;
 val (_, r1) = P.done ();
 
 val m = parseLTerm /nthx 2 1 (tlx 2 0)/;
@@ -768,7 +768,7 @@ P.beta 2;
 P.leave ();
 val (_, r2) = P.done ();
 
-val nthx_succ = R.new2 (parseConstant /nthx/) 1 1 Prim.succ 1 m r1 r2;
+val nthx_succ = R.new (parseConstant /nthx/) [(1, Prim.succ, 1)] 1 m r1 r2;
 Define.register nthx_succ;
 
 
@@ -1181,62 +1181,62 @@ val multicase_unroll = Option.valOf (Database.findUnroll multicase);
 
 P.start $ parseLTerm /multiprod nil/;
 P.apply multiprod_unroll;
-P.user2 list_case_nil;
+P.user list_case_nil;
 val (_, r1) = P.done ();
 
-val multiprod_nil = R.new2 multiprod 0 0 nl 0 (Term.Const Prim.unit) r1 R.refl;
+val multiprod_nil = R.new multiprod [(0, nl, 0)] 0 (Term.Const Prim.unit) r1 R.refl;
 Define.register multiprod_nil;
 
 P.start $ parseLTerm /multiprod (cons 1 0)/;
 P.apply multiprod_unroll;
-P.user2 list_case_cons;
+P.user list_case_cons;
 P.beta 2;
 val (t2, r2) = P.done ();
 
-val multiprod_cons = R.new2 multiprod 0 0 cons 2 t2 r2 R.refl;
+val multiprod_cons = R.new multiprod [(0, cons, 2)] 0 t2 r2 R.refl;
 Define.register multiprod_cons;
 
 P.start $ parseLTerm /multisum nil/;
 P.apply multisum_unroll;
-P.user2 list_case_nil;
+P.user list_case_nil;
 val (_, r3) = P.done ();
 
-val multisum_nil = R.new2 multisum 0 0 nl 0 (Term.Const Prim.void) r3 R.refl;
+val multisum_nil = R.new multisum [(0, nl, 0)] 0 (Term.Const Prim.void) r3 R.refl;
 Define.register multisum_nil;
 
 P.start $ parseLTerm /multisum (cons 1 0)/;
 P.apply multisum_unroll;
-P.user2 list_case_cons;
+P.user list_case_cons;
 P.beta 2;
 val (t4, r4) = P.done ();
 
-val multisum_cons = R.new2 multisum 0 0 cons 2 t4 r4 R.refl;
+val multisum_cons = R.new multisum [(0, cons, 2)] 0 t4 r4 R.refl;
 Define.register multisum_cons;
 
 val multiproj_unroll = Option.valOf $ Database.findUnroll $ parseConstant /multiproj/;
 
 P.start (parseLTerm /multiproj 1 zero 0/);
 P.apply multiproj_unroll;
-P.user2 PR.nat_case_zero;
+P.user PR.nat_case_zero;
 val (m, r1) = P.done ();
 
-val multiproj_zero = R.new2 (parseConstant /multiproj/) 1 1 Prim.zero 0 m r1 R.refl;
+val multiproj_zero = R.new (parseConstant /multiproj/) [(1, Prim.zero, 0)] 1 m r1 R.refl;
 NR.register multiproj_zero;
 
 P.start (parseLTerm /multiproj 2 (succ 1) 0/);
 P.apply multiproj_unroll;
-P.user2 PR.nat_case_succ;
+P.user PR.nat_case_succ;
 P.beta 1;
 val (m, r1) = P.done ();
 
-val multiproj_succ = R.new2 (parseConstant /multiproj/) 1 1 Prim.succ 1 m r1 R.refl;
+val multiproj_succ = R.new (parseConstant /multiproj/) [(1, Prim.succ, 1)] 1 m r1 R.refl;
 NR.register multiproj_succ;
 
 P.start (parseLTerm /multicase (cons 3 2) 1 0/);
 P.unfold ();
-P.user1 PR.unroll_fix;
+P.user PR.unroll_fix;
 P.beta 4;
-P.user2 list_case_cons;
+P.user list_case_cons;
 P.beta 2;
 val (_, r1a) = P.done ();
 
@@ -1247,7 +1247,7 @@ P.unfold ();
 P.leave ();
 val (_, r1b) = P.done ();
 
-val multicase_cons = R.new2 (parseConstant /multicase/) 0 2 cons 2 m r1a r1b;
+val multicase_cons = R.new (parseConstant /multicase/) [(0, cons, 2)] 2 m r1a r1b;
 NR.register multicase_cons;
 
 P.start (parseLTerm /multicasex 3 2 1 0/);
@@ -1260,11 +1260,11 @@ P.start m;
 P.apply multicase_unroll;
 val (_, r2) = P.done ();
 
-val multicase_x = R.user1 $ R.new1 (parseConstant /multicasex/) 4 m r1 r2;
+val multicase_x = R.user $ R.new (parseConstant /multicasex/) [] 4 m r1 r2;
 
 P.start (parseLTerm /multicasex 4 (cons 3 2) 1 0/);
 P.apply multicase_x;
-P.user2 multicase_cons;
+P.user multicase_cons;
 val (_, r1) = P.done ();
 
 val m = ETerm.closed /additional` b h t arms x . sum_case x (fn y . arms #1 y) (fn y . multicasex b t (arms #2) y)/;
@@ -1274,7 +1274,7 @@ P.apply multicase_x;
 P.leave ();
 val (_, r2) = P.done ();
 
-val multicasex_cons = R.new2 (parseConstant /multicasex/) 1 2 cons 2 m r1 r2;
+val multicasex_cons = R.new (parseConstant /multicasex/) [(1, cons, 2)] 2 m r1 r2;
 NR.register multicasex_cons;
 
 
@@ -1548,7 +1548,7 @@ P.unfold ();
 P.beta 2;
 val (_, r2) = P.done ();
 
-val repbody_x = R.user1 $ R.new1 (parseConstant /repbodyx/) 4 m r1 r2;
+val repbody_x = R.user $ R.new (parseConstant /repbodyx/) [] 4 m r1 r2;
 
 
 
@@ -1867,7 +1867,7 @@ P.start m;
 P.apply prd_unroll;
 val (_, r2) = P.done ();
 
-val prd_x = R.user1 $ R.new1 (parseConstant /prdx/) 5 m r1 r2;
+val prd_x = R.user $ R.new (parseConstant /prdx/) [] 5 m r1 r2;
 
 
 
@@ -2236,20 +2236,20 @@ qed ();
 
 
 
-val con_zero = makeReduction2
+val con_zero = makeReduction
 /
   con (zero) x y --> inl (x , y) ;
   unrolling con
 /;
 
-val con_succ = makeReduction2
+val con_succ = makeReduction
 /
   con (succ n) x y --> inr (con n x y) ;
   unrolling con
 /;
 
-writeRegistry /con_zero/ /reduction2/ con_zero;
-writeRegistry /con_succ/ /reduction2/ con_succ;
+writeRegistry /con_zero/ /ureduction/ con_zero;
+writeRegistry /con_succ/ /ureduction/ con_succ;
 
 
 (***  Subterms  ***
@@ -2677,7 +2677,7 @@ definerecRaw /mapi a b n l f/
 val mapi = parseConstant /mapi/;
 val mapi_unroll = Option.valOf $ Database.findUnroll mapi;
 
-val mapi_nil = makeReduction2
+val mapi_nil = makeReduction
 /
   mapi a b n (nil) f --> nil ;
   unrolling mapi
@@ -2686,7 +2686,7 @@ val mapi_nil = makeReduction2
 
 Define.register mapi_nil;
 
-val mapi_cons = makeReduction2
+val mapi_cons = makeReduction
 /
   mapi a b n (cons h t) f --> cons (f n h) (mapi a b (succ n) t f) ;
   unrolling mapi

@@ -72,7 +72,7 @@ signature DATATYPE =
                *
                int option list        (* which of the constructor's arguments are internal, and if so, for what datatype # *)
                *
-               Reduction.reduction2   (* the reduction for the iterator applied to the constructor *)
+               Reduction.ureduction   (* the reduction for the iterator applied to the constructor *)
                ) Vector.vector
             ) Vector.vector
 
@@ -1055,21 +1055,21 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       datatype entry = Item of (int * term) | Subst of T.sub
 
 
-      val list_rec_cons = Susp.delay (fn () => RR.read (List.map Symbol.fromValue ["Datatype", "list_rec_cons"]) RR.reduction2)
+      val list_rec_cons = Susp.delay (fn () => RR.read (List.map Symbol.fromValue ["Datatype", "list_rec_cons"]) RR.ureduction)
       val con_unroll = Susp.delay (fn () => Option.valOf $ Database.findUnroll $ Namespace.resolve $ List.map Symbol.fromValue ["Datatype", "con"])
       val dt_iter_unroll = Susp.delay (fn () => Option.valOf $ Database.findUnroll $ Namespace.resolve $ List.map Symbol.fromValue ["Datatype", "dt_iter"])
-      val con_zero = Susp.delay (fn () => RR.read (List.map Symbol.fromValue ["Datatype", "con_zero"]) RR.reduction2)
-      val con_succ = Susp.delay (fn () => RR.read (List.map Symbol.fromValue ["Datatype", "con_succ"]) RR.reduction2)
+      val con_zero = Susp.delay (fn () => RR.read (List.map Symbol.fromValue ["Datatype", "con_zero"]) RR.ureduction)
+      val con_succ = Susp.delay (fn () => RR.read (List.map Symbol.fromValue ["Datatype", "con_succ"]) RR.ureduction)
 
       val reductions =
          Susp.delay
             (fn () =>
                 [
-                (Prim.nat_case, [R.user2 PR.nat_case_succ, R.user2 PR.nat_case_zero]),
-                (Prim.sum_case, [R.user2 PR.sum_case_inr, R.user2 PR.sum_case_inl]),
-                (Susp.force constListRec, [R.user2 (Susp.force list_rec_cons)]),
-                (Susp.force constCon, [R.trans [Susp.force con_unroll, R.user2 PR.nat_case_succ], 
-                                       R.trans [Susp.force con_unroll, R.user2 PR.nat_case_zero]])
+                (Prim.nat_case, [R.user PR.nat_case_succ, R.user PR.nat_case_zero]),
+                (Prim.sum_case, [R.user PR.sum_case_inr, R.user PR.sum_case_inl]),
+                (Susp.force constListRec, [R.user (Susp.force list_rec_cons)]),
+                (Susp.force constCon, [R.trans [Susp.force con_unroll, R.user PR.nat_case_succ], 
+                                       R.trans [Susp.force con_unroll, R.user PR.nat_case_zero]])
                 ])
 
 
@@ -1102,7 +1102,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          args : mxterm conarg list,         (* the constructor's arguments *)
          numargs : int,                     (* the constructor's number of arguments *)
          indices : mxterm list,             (* the constructor's indices *)
-         iteratorReduction : R.reduction2   (* the iterator reduction for this constructor *)
+         iteratorReduction : R.ureduction   (* the iterator reduction for this constructor *)
          }
 
       datatype environment =
@@ -1125,9 +1125,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          discriminators : constant Vector.vector,                (* the discriminators *)
          extractorTypes : constant Vector.vector,                (* the extractor types *)
          extractors : constant Vector.vector,                    (* the extractors *)
-         discriminatorReductions : R.reduction2 Vector.vector,   (* the discriminator's reductions *)
-         extractorTypeReductions : R.reduction2 Vector.vector,   (* the extractor type's reductions *)
-         extractorReductions : R.reduction2 Vector.vector,       (* the extractor type's reductions *)
+         discriminatorReductions : R.ureduction Vector.vector,   (* the discriminator's reductions *)
+         extractorTypeReductions : R.ureduction Vector.vector,   (* the extractor type's reductions *)
+         extractorReductions : R.ureduction Vector.vector,       (* the extractor type's reductions *)
          totalConstructors : int,                                (* the total number of constructors *)
          }
 
@@ -1193,7 +1193,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                 (P.list puConarg)
                 P.int
                 (P.list pumx)
-                R.puReduction2)
+                R.puUreduction)
                
       val puEnv : environment P.pu =
          P.wrap
@@ -1220,10 +1220,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                     (P.vector PP.puConstant)
                     (P.vector PP.puConstant)
                     (P.vector PP.puConstant)
-                    (P.vector R.puReduction2)
+                    (P.vector R.puUreduction)
                     (P.tuple3
-                        (P.vector R.puReduction2)
-                        (P.vector R.puReduction2)
+                        (P.vector R.puUreduction)
+                        (P.vector R.puUreduction)
                         P.int)))
 
 
@@ -1979,8 +1979,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                              (R.compat
                                  [
                                  R.refl,
-                                 R.trans [R.within [2] (R.user2 (Vector.sub discriminatorReductions mpos)), R.native],
-                                 R.trans [R.within [2] (R.user2 (Vector.sub discriminatorReductions npos)), R.native]
+                                 R.trans [R.within [2] (R.user (Vector.sub discriminatorReductions mpos)), R.native],
+                                 R.trans [R.within [2] (R.user (Vector.sub discriminatorReductions npos)), R.native]
                                  ]))
                   >>+
                   (* (eqzb mpos (D M)) = (eqzb mpos (D N)) : bool *)
@@ -2087,9 +2087,9 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                       refine (Rule.reduceHyp 0
                                  (R.compat
                                      [
-                                     R.user2 (Vector.sub extractorTypeReductions mpos),
-                                     R.user2 (Vector.sub extractorReductions mpos),
-                                     R.user2 (Vector.sub extractorReductions mpos)
+                                     R.user (Vector.sub extractorTypeReductions mpos),
+                                     R.user (Vector.sub extractorReductions mpos),
+                                     R.user (Vector.sub extractorReductions mpos)
                                      ]))
                       >>+
                       (* package = package' : package-type |- C[^] *)
@@ -2162,7 +2162,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                *
                int option list        (* which of the constructor's arguments are internal, and if so, for what datatype # *)
                *
-               Reduction.reduction2   (* the reduction for the iterator applied to the constructor *)
+               Reduction.ureduction   (* the reduction for the iterator applied to the constructor *)
                ) Vector.vector
             ) Vector.vector
 
@@ -2787,8 +2787,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                          val red' =
                             (* This one will still work after const is made opaque. *)
-                            R.user1 $
-                            R.new1 const numberOfStaticArgs
+                            R.user $
+                            R.new const [] numberOfStaticArgs
                                (R.reduce red (T.Elim (T.Const const,
                                                       natrecr numberOfStaticArgs (fns i l => T.App (T.Var i) :: l) [])))
                                red
@@ -3027,7 +3027,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                         R.unfold,
                                         R.within 
                                            (Int.natrecUp (fns _ l => 0 :: l) [] numberOfTotalDynArgs)
-                                           (R.user2 (if j = 0 then Susp.force con_zero else Susp.force con_succ))
+                                           (R.user (if j = 0 then Susp.force con_zero else Susp.force con_succ))
                                         ])
 
                          val red =
@@ -3035,8 +3035,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
                          val red' =
                             (* This one will still work after const is made opaque. *)
-                            R.user1 $
-                            R.new1 const numberOfTotalDynArgs
+                            R.user $
+                            R.new const [] numberOfTotalDynArgs
                                (R.reduce red (T.Elim (T.Const const,
                                                       natrecr numberOfTotalDynArgs (fns i l => T.App (T.Var i) :: l) [])))
                                red
@@ -3699,13 +3699,13 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                             T.Elim (T.Var (numberOfConstructors - 1 - j + numberOfIndexArgs + conParams),
                                     List.rev caseargs)
 
-                         val r = AR.new2 false dp dl iterConst iterParams 0 conConst conParams after
+                         val r = AR.new false dp dl iterConst [(iterParams, conConst, conParams)] 0 after
                       in
                          Define.register r;
                          
                          RR.write
-                            (Symbol.fromValue (String.concat [constName, "_", Symbol.toValue name]))
-                            RR.reduction2
+                            (Symbol.fromValue (String.concat ["reduce_", constName, "_", Symbol.toValue name]))
+                            RR.ureduction
                             r;
 
                          r
@@ -3835,18 +3835,19 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                          val iterRed = Vector.sub iterReductions j
 
                          val r =
-                            R.new2
+                            R.new
                                discrimConst
-                               (numberOfStatVisibleArgs + numberOfIndexArgs) 0
-                               conConst
-                               (numberOfDynVisibleArgs + numberOfArgs)
+                               [(numberOfStatVisibleArgs + numberOfIndexArgs,
+                                 conConst,
+                                 numberOfDynVisibleArgs + numberOfArgs)]
+                               0
                                (T.Native (T.Integer (IntInf.fromInt j)))
-                               (R.trans [R.unfold, R.betas, R.user2 iterRed, R.betas])
+                               (R.trans [R.unfold, R.betas, R.user iterRed, R.betas])
                                R.refl
                       in
                          RR.write
                             (Symbol.fromValue (String.concat [constName, "_discrim_", Symbol.toValue name]))
-                            RR.reduction2
+                            RR.ureduction
                             r;
 
                          r
@@ -4065,10 +4066,10 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                             in
                                                if x < k then
                                                   decisionTreeReduction x i k
-                                                     (R.user2 PrimReduction.ite_tru :: R.compat [R.native] :: acc)
+                                                     (R.user PrimReduction.ite_tru :: R.compat [R.native] :: acc)
                                                else
                                                   decisionTreeReduction x k j
-                                                     (R.user2 PrimReduction.ite_fals :: R.compat [R.native] :: acc)
+                                                     (R.user PrimReduction.ite_fals :: R.compat [R.native] :: acc)
                                             end
 
                                       val discrimPerv = compact ctx (X.apps (X.constant discrimconst) pervargs)
@@ -4110,8 +4111,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                          ([
                                                           R.unfold,
                                                           R.betas,
-                                                          R.compat [R.user2 (Vector.sub discriminatorReductions pos)],
-                                                          R.user1 PrimReduction.reduce_lett,
+                                                          R.compat [R.user (Vector.sub discriminatorReductions pos)],
+                                                          R.user PrimReduction.reduce_lett,
                                                           R.beta 1
                                                           ]
                                                           @
@@ -4123,11 +4124,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                       T.Sub (X.term t, T.Shift (numberOfIndexArgs + numberOfDynVisibleArgs + numberOfArgs))
 
                                                    val r =
-                                                      R.new2
+                                                      R.new
                                                          exttpConst
-                                                         (numberOfStatVisibleArgs + numberOfIndexArgs) 0
-                                                         conConst
-                                                         (numberOfDynVisibleArgs + numberOfArgs)
+                                                         [(numberOfStatVisibleArgs + numberOfIndexArgs,
+                                                           conConst,
+                                                           numberOfDynVisibleArgs + numberOfArgs)]
+                                                         0
                                                          res
                                                          pre
                                                          R.refl
@@ -4174,7 +4176,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                    (fn a =>
                                                        List.hd $
                                                        mimicType 0 ~1 ctx a []
-                                                       (fns _ _ b _ => [X.unreduce b (R.user2 r) arm])))
+                                                       (fns _ _ b _ => [X.unreduce b (R.user r) arm])))
                                             ext4
                                             arms exttpReds
 
@@ -4202,7 +4204,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                    val iterRed = Vector.sub iterReductions pos
 
                                                    val pre =
-                                                      R.trans [R.unfold, R.betas, R.user2 iterRed, R.betas]
+                                                      R.trans [R.unfold, R.betas, R.user iterRed, R.betas]
 
                                                    val arm =
                                                       natrecr numberOfArgs
@@ -4210,11 +4212,12 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                                                          T.Triv
 
                                                    val r =
-                                                      R.new2
+                                                      R.new
                                                          extConst
-                                                         (numberOfStatVisibleArgs + numberOfIndexArgs) 0
-                                                         conConst
-                                                         (numberOfDynVisibleArgs + numberOfArgs)
+                                                         [(numberOfStatVisibleArgs + numberOfIndexArgs,
+                                                           conConst,
+                                                           numberOfDynVisibleArgs + numberOfArgs)]
+                                                         0
                                                          arm
                                                          pre
                                                          R.refl

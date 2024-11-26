@@ -33,32 +33,18 @@ signature AUTO_REDUCE =
          -> term * reduction
       
 
-      (* new1 underlam dp dl const n P
+      (* new underlam dp dl const zones n P
 
          underlam, dp, dl as in autoreduce
-         const, n, P as in Reduction.new1
+         const, zones, n, P as in Reduction.new
 
          dl is available only to the left-hand-reduction
       *)
-      val new1 : 
+      val new :
          bool
          -> (constant * reduction list) list
          -> (constant * reduction) list
-         -> constant -> int -> term -> Reduction.reduction1
-
-
-      (* new2 underlam dp dl const l m const' n Q
-
-         underlam, dp, dl as in autoreduce
-         const, l, m, const', n, Q as in Reduction.new2
-
-         dl is available only to the left-hand-reduction
-      *)
-      val new2 : 
-         bool
-         -> (constant * reduction list) list
-         -> (constant * reduction) list
-         -> constant -> int -> int -> constant -> int -> term -> Reduction.reduction2
+         -> constant -> (int * constant * int) list -> int -> term -> Reduction.ureduction
 
    end
 
@@ -197,20 +183,29 @@ structure AutoReduce :> AUTO_REDUCE =
 
       
 
-      (* natrec f x i = f (i-1) (f (i-2) (... (f 0 x) ...)) *)
-      fun natrec f x i =
-         if i = 0 then
-            x
-         else
-            f (i-1) (natrec f x (i-1))
-
-
-      fun new1 underlam dp dl const n p =
-         if n >= 0 then
+      fun new underlam dp dl const zones n p =
+         if
+            n >= 0 andalso List.all (fn (l, _, m) => l >= 0 andalso n >= 0) zones
+         then
             let
-               val before =
-                  T.Elim (T.Const const,
-                          natrec (fns i sp => T.App (T.Var i) :: sp) [] n)
+               val (_, spine) =
+                  List.foldr
+                     (fns (l, const2, m) (i, spine) =>
+                         let
+                            val innerspine =
+                               Int.natrecUp (fns j sp => T.App (T.Var (i+j)) :: sp) [] m
+
+                            val spine' = T.App (T.Elim (T.Const const2, innerspine)) :: spine
+                            
+                            val spine'' =
+                               Int.natrecUp (fns j sp => T.App (T.Var (i+m+j)) :: sp) spine' l
+                         in
+                            (i + l + m, spine'')
+                         end)
+                     (n, Int.natrecUp (fns j sp => T.App (T.Var j) :: sp) [] n)
+                     zones
+
+               val before = T.Elim (T.Const const, spine)
 
                val dp' =
                   List.foldl
@@ -224,43 +219,10 @@ structure AutoReduce :> AUTO_REDUCE =
                      D.empty
                      dl
 
-               val (_, r1) = reduction underlam dp' dl' before []
-               val (_, r2) = reduction underlam dp' D.empty p []
+               val (_, red1) = reduction underlam dp' dl' before []
+               val (_, red2) = reduction underlam dp' D.empty p []
             in
-               R.new1 const n p r1 r2
-            end
-         else
-            raise R.Reduce
-
-      
-      fun new2 underlam dp dl const l m const' n q =
-         if l >= 0 andalso m >= 0 andalso n >= 0 then
-            let
-               val before =
-                  T.Elim (T.Const const,
-                          natrec 
-                             (fns i sp => T.App (T.Var (m+n+i)) :: sp)
-                             (T.App (T.Elim (T.Const const',
-                                             natrec (fns i sp => T.App (T.Var (m+i)) :: sp) [] n))
-                              :: natrec (fns i sp => T.App (T.Var i) :: sp) [] m)
-                             l)
-
-               val dp' =
-                  List.foldl
-                     (fns (const, l) dp' => D.insert dp' const l)
-                     D.empty
-                     dp
-   
-               val dl' =
-                  List.foldl
-                     (fns (const, r) dl' => D.insert dl' const r)
-                     D.empty
-                     dl
-
-               val (_, r1) = reduction underlam dp' dl' before []
-               val (_, r2) = reduction underlam dp' D.empty q []
-            in
-               R.new2 const l m const' n q r1 r2
+               R.new const zones n p red1 red2
             end
          else
             raise R.Reduce

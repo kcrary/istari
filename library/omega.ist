@@ -7345,80 +7345,26 @@ qed ();
 
 
 
-(* Reductions.  Put them last so they don't interfere with proofs.
-
-   Need to define add' to avoid a looping reduction for add.
-*)
-
-define /add' a1 x1 t1 l2/
-/
-  add (cons a1 x1 t1) l2
-//
-  integer -> integer -> expr -> expr -> expr
-/;
-
-unfold /add'/.
-typecheck.
-qed ();
-
-
-
-reductions 
+reductions
 /
   add (nil) l --> l ;
 
-  unrolling add
-  unfolding add'
-/;
+  add (cons a1 x1 t1) (nil) --> cons a1 x1 t1 ;
 
-
-val r = makeReduction2
-/
-
-  add (cons a1 x1 t1) l2 -->
-     expr_iter (fn _ . expr)
-        (cons a1 x1 t1)
-        (fn a2 x2 t2 _ .
-            if leqzb x1 x2 then
-               if eqzb x1 x2 then
-                  if eqzb (a1 +z a2) z`0 then
-                     add t1 t2
-                  else
-                     cons (a1 +z a2) x1 (add t1 t2)
-               else
-                  cons a1 x1 (add t1 l2)
-            else
-               cons a2 x2 (add' a1 x1 t1 t2))
-        l2 ;
+  add (cons a1 x1 t1) (cons a2 x2 t2) -->
+    if leqzb x1 x2 then
+       if eqzb x1 x2 then
+          if eqzb (a1 +z a2) z`0 then
+             add t1 t2
+          else
+             cons (a1 +z a2) x1 (add t1 t2)
+       else
+          cons a1 x1 (add t1 (cons a2 x2 t2))
+    else
+       cons a2 x2 (add (cons a1 x1 t1) t2) ;
 
   unrolling add
-  unfolding add'
 /;
-
-
-
-reductions
-/
-  add' a1 x1 t1 (nil) --> cons a1 x1 t1 ;
-
-  add' a1 x1 t1 (cons a2 x2 t2) -->
-     if leqzb x1 x2 then
-        if eqzb x1 x2 then
-           if eqzb (a1 +z a2) z`0 then
-              add t1 t2
-           else
-              cons (a1 +z a2) x1 (add t1 t2)
-        else
-           cons a1 x1 (add t1 (cons a2 x2 t2))
-     else
-        cons a2 x2 (add' a1 x1 t1 t2) ;
-
-  unfolding add' 
-  unrolling add
-/;
-
-
-val () = Define.register r;
 
 
 

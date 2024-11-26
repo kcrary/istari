@@ -6,10 +6,100 @@ Ctrl.use "../library/acc-load.iml";
 Ctrl.use "../library/nat-load.iml";
 Ctrl.use "../library/integer-load.iml";
 
-fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
+fun shouldfail tac goal fk sk = tac goal (fn _ => idtac goal fk sk) (fn _ => fk "unexpected success");
 
 
 structure P = ReductionProver;
+
+
+
+define /plus2 x y/
+/
+  x + y
+//
+  nat -> nat -> nat
+/;
+
+unfold /plus2/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  plus2 (zero) (zero) --> 0 ;
+
+  plus2 (zero) (succ n) --> succ n ;
+
+  plus2 (succ m) (succ n) --> succ (plus2 m (succ n)) ;
+
+  unfolding plus2
+/;
+
+
+
+lemma "binary_reduction"
+/
+  forall (x y : nat) .
+    x = 0 : nat
+    -> y = 3 : nat
+    -> plus2 x y = y : nat
+/;
+
+intro /x y Hx Hy/.
+reduce //.
+subst /x/.
+reduce //.
+shouldfail reflexivity.
+subst /y/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+define /ignore1 z x/
+/
+  x
+//
+  integer -> nat -> nat
+/;
+
+unfold /ignore1/.
+typecheck.
+qed ();
+
+
+
+val red = makeReduction
+/
+  ignore1 z (succ n) --> succ n ;
+
+  unfolding ignore1
+/;
+
+Define.registerNative 0 1 red;
+
+
+
+lemma "native_reduction"
+/
+  forall (z : integer) (x : nat) .
+    z = z`0 : integer
+    -> x = 3 : nat
+    -> ignore1 z x = x : nat
+/;
+
+intro /z x Hz Hx/.
+reduce //.
+subst /x/.
+reduce //.
+shouldfail reflexivity.
+subst /z/.
+reduce //.
+reflexivity.
+qed ();
 
 
 
@@ -3346,7 +3436,7 @@ val r1 =
     [
     R.unfold,
     R.beta 1,
-    R.user1 PrimReduction.unroll_pause,
+    R.user PrimReduction.unroll_pause,
     R.beta 1
     ];
 
@@ -3361,18 +3451,18 @@ val r2 =
 Show.showLiteral (Normalize.simplifyAll (R.reduce r1 t1));
 Show.showLiteral (Normalize.simplifyAll (R.reduce r2 t2));
 
-val r = R.new1 myfix 1 t2 r1 r2;
+val r = R.new myfix [] 1 t2 r1 r2;
 
 
 
 lemma "paused"
   / pause (fn x . void -> pause x x) (fn x . void -> pause x x) /;
 
-reduceUsing /\Reduction.user1 PrimReduction.unroll_pause\/.
+reduceUsing /\Reduction.user PrimReduction.unroll_pause\/.
 whreduce /concl/.
-unreduceUsing /\Reduction.user1 PrimReduction.unroll_pause\ with pause (fn x . void -> pause x x) (fn x . void -> pause x x)/.
-reduceUsing /\Reduction.user1 PrimReduction.unroll_pause\/.
-convertUnreduceUsing /\Reduction.user1 PrimReduction.unroll_pause\ with pause (fn x . void -> pause x x) (fn x . void -> pause x x)/.
+unreduceUsing /\Reduction.user PrimReduction.unroll_pause\ with pause (fn x . void -> pause x x) (fn x . void -> pause x x)/.
+reduceUsing /\Reduction.user PrimReduction.unroll_pause\/.
+convertUnreduceUsing /\Reduction.user PrimReduction.unroll_pause\ with pause (fn x . void -> pause x x) (fn x . void -> pause x x)/.
 unroll /pause/.
 whreduce /concl/.
 roll /pause (fn x . void -> pause x x) (fn x . void -> pause x x)/.
@@ -3405,12 +3495,12 @@ val r1 =
   R.trans
     [
     R.unfold,
-    R.user1 PrimReduction.unroll_fix,
+    R.user PrimReduction.unroll_fix,
     R.beta 4,
-    R.user2 PrimReduction.nat_case_zero
+    R.user PrimReduction.nat_case_zero
     ];
 
-val natind_zero = R.new2 (parseConstant /natind/) 0 2 (parseConstant /zero/) 0 (Term.Var 1) r1 R.refl;
+val natind_zero = R.new (parseConstant /natind/) [(0, parseConstant /zero/, 0)] 2 (Term.Var 1) r1 R.refl;
 
 val t2a =
   parseLTerm
@@ -3420,9 +3510,9 @@ val r2a =
   R.trans
     [
     R.unfold,
-    R.user1 PrimReduction.unroll_fix,
+    R.user PrimReduction.unroll_fix,
     R.beta 4,
-    R.user2 PrimReduction.nat_case_succ,
+    R.user PrimReduction.nat_case_succ,
     R.beta 1
     ];
 
@@ -3433,7 +3523,7 @@ val t2b =
 val r2b =
   R.within [2] R.unfold;
 
-val natind_succ = R.new2 (parseConstant /natind/) 0 2 (parseConstant /succ/) 1 t2b r2a r2b;
+val natind_succ = R.new (parseConstant /natind/) [(0, parseConstant /succ/, 1)] 2 t2b r2a r2b;
 
 Define.register natind_zero;
 Define.register natind_succ;
@@ -3464,7 +3554,7 @@ val r1 =
   R.trans 
     [
     R.unfold,
-    R.user2 natind_succ
+    R.user natind_succ
     ];
 
 val r2 = R.within [2] R.unfold;
@@ -3472,9 +3562,9 @@ val r2 = R.within [2] R.unfold;
 Show.showLiteral (Normalize.simplifyAll (R.reduce r1 t1));
 Show.showLiteral (Normalize.simplifyAll (R.reduce r2 t2));
 
-val r = R.new2 mynatind 0 2 Prim.succ 1 t2 r1 r2;
+val r = R.new mynatind [(0, Prim.succ, 1)] 2 t2 r1 r2;
 
-Show.showLiteral (Normalize.simplifyAll (R.reduce (R.user2 r) t1));
+Show.showLiteral (Normalize.simplifyAll (R.reduce (R.user r) t1));
 
 val t1' = parseLTerm /mynatind zero 1 0/;
 val t2' = parseLTerm /1/;
@@ -3483,14 +3573,14 @@ val r1' =
   R.trans
     [
     R.unfold,
-    R.user2 natind_zero
+    R.user natind_zero
     ];
 
 Show.showLiteral (Normalize.simplifyAll (R.reduce r1' t1'));
 
-val r' = R.new2 mynatind 0 2 Prim.zero 0 (Term.Var 1) r1' R.refl;
+val r' = R.new mynatind [(0, Prim.zero, 0)] 2 (Term.Var 1) r1' R.refl;
 
-Show.showLiteral (Normalize.simplifyAll (R.reduce (R.user2 r') t1'));
+Show.showLiteral (Normalize.simplifyAll (R.reduce (R.user r') t1'));
 
 
 
@@ -3501,15 +3591,15 @@ assert /mynatind 4 unit (fn _ a . nat & a) : type / /H/.
   {
   reduce /concl/.
   showPosition /at 1/;
-  reduceUsing /\R.trans [R.user2 r, R.beta 2]\ at pos 1/.
+  reduceUsing /\R.trans [R.user r, R.beta 2]\ at pos 1/.
   showPosition /at 3/;
-  reduceUsing /\R.trans [R.user2 r, R.beta 2]\ at pos 3/.
+  reduceUsing /\R.trans [R.user r, R.beta 2]\ at pos 3/.
   showPosition /at 5/;
-  reduceUsing /\R.trans [R.user2 r, R.beta 2]\ at pos 5/.
+  reduceUsing /\R.trans [R.user r, R.beta 2]\ at pos 5/.
   showPosition /at 7/;
-  reduceUsing /\R.trans [R.user2 r, R.beta 2]\ at pos 7/.
+  reduceUsing /\R.trans [R.user r, R.beta 2]\ at pos 7/.
   showPosition /at 9/;
-  reduceUsing /\Reduction.user2 r'\ at pos 9/.
+  reduceUsing /\Reduction.user r'\ at pos 9/.
   typecheck.
   }
 split.
@@ -3543,9 +3633,9 @@ val r1 =
 
 Show.showLiteral (Normalize.simplifyAll (R.reduce r1 t1));
 
-val r = R.new1 mypause 1 (Term.Var 0) r1 R.refl;
+val r = R.new mypause [] 1 (Term.Var 0) r1 R.refl;
 
-Show.showLiteral (Normalize.simplifyAll (R.reduce (R.user1 r) (ETerm.closed /mypause (nat -> nat)/)));
+Show.showLiteral (Normalize.simplifyAll (R.reduce (R.user r) (ETerm.closed /mypause (nat -> nat)/)));
 
 
 

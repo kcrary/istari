@@ -24,12 +24,15 @@ signature REDEX_INTERNAL =
 
       include REDEX
 
-      type reduction1
-      type reduction2
+      type ureduction
 
-      (* You probably don't want these.  You probably want Define.register, ... instead. *)
-      val register : reduction2 -> unit
-      val registerNative : int -> int -> reduction1 -> unit
+      (* You probably don't want this.  You probably want Define.register instead. *)
+      val register : ureduction -> unit
+
+      (* registerNative i n red: arguments i ... i+n-1 must be native for the reduction to activate
+         You probably don't want this.  You probably want Define.register instead.
+      *)
+      val registerNative : int -> int -> ureduction -> unit  
 
       (* Returns true iff the constant has a reduction registered (including primitively). *)
       val registered : constant -> bool
@@ -55,14 +58,13 @@ functor RedexFun (structure Term : TERM
                                    where type constant = Term.constant
                   structure PrimReduction : PRIM_REDUCTION_INTERNAL
                                             where type reduction = Reduction.reduction
-                                            where type reduction2 = Reduction.reduction2)
+                                            where type ureduction = Reduction.ureduction)
    :>
    REDEX_INTERNAL
    where type term = Term.term
    where type constant = Term.constant
    where type elim = Term.elim
-   where type reduction1 = Reduction.reduction1
-   where type reduction2 = Reduction.reduction2
+   where type ureduction = Reduction.ureduction
    =
    struct
 
@@ -73,8 +75,7 @@ functor RedexFun (structure Term : TERM
       type constant = T.constant
       type elim = T.elim
 
-      type reduction1 = Reduction.reduction1
-      type reduction2 = Reduction.reduction2
+      type ureduction = Reduction.ureduction
 
       structure D = RedBlackDict (structure Key = Constant.Ordered)
       structure H = CheckpointedHashTable (structure Key = Constant.Hashable)
@@ -90,19 +91,23 @@ functor RedexFun (structure Term : TERM
          If a reduction has been registered for const, then the userTable will map
          const to a reduction sort.
 
-         - If the reduction is one or more standard reductions (i.e., reduction2s)
-           then the reduction sort will be STANDARD (i, d).
+         - If the reduction is one or more standard reductions (i.e., ureductions)
+           then the reduction sort will be STANDARD t, where t is a reduction
+           tree indicating how to process arguments.
 
-           + i is the index of the constant's principal argument, which must agree
-             for all of const's redices
+           A reduction tree one of the following:
 
-           + d maps each reduction's second constant to the reduction
+           + NODE (i, d) indicates that the next active argument is the ith argument
+             remaining.  The constant of that ith argument is used as a key in the 
+             dictionary to find out what to do next.  If the dictionary returns
+             (m, t), it means that the last active argument (i.e., the ith argument)
+             must have exactly m arguments, and with continue with t.
 
-           + Thus if red is a registered reduction2, and
+           + LEAF red indicates there are no more active arguments, and red is the
+             reduction to use.
 
-             triggers red = (const, i, const')
-
-             then the table will map const to NATIVE (i, d) where d maps const' to red.
+           + NATIVE (i, n, t) indicates that, of the arguments remaining, i ... i+n-1
+             must be native.  After those arguments, continue with t.
 
          - If the reduction is some other sort of reduction (unary native, binary native,
            or hardcoded), the reduction sort will be OTHER.
@@ -110,8 +115,13 @@ functor RedexFun (structure Term : TERM
 
       val redexTable : ((term -> term) -> elim list -> term option) H.table = H.table ()
 
+      datatype reduction_tree =
+         LEAF of int * term
+       | NODE of int * (int * reduction_tree) D.dict
+       | NATIVE of int * int * reduction_tree
+         
       datatype reduction_sort =
-         STANDARD of int * Reduction.reduction2 D.dict
+         STANDARD of reduction_tree
        | OTHER
 
       val userTable : reduction_sort H.table = H.table ()
@@ -128,120 +138,172 @@ functor RedexFun (structure Term : TERM
 
 
 
-      (* standardRedex i d whnf spine
 
-         if    const's active argument has index i
-               forall all red in const's reductions, d maps red's second constant to red
-               whnf computes hard weak-head normal forms
-         then  if    const spine reduces to M
-               then  returns SOME M
-               else  returns NONE
+      exception Grab
+
+      fun grab i spine s =
+         if i = 0 then
+            (s, spine)
+         else
+            (case spine of
+                T.App m :: rest =>
+                   grab (i-1) rest (T.Dot (m, s))
+
+              | _ => raise Grab)
+
+      fun grabNative whnf i spine s =
+         if i = 0 then
+            (s, spine)
+         else
+            (case spine of
+                T.App m :: rest =>
+                   (case whnf m of
+                       m' as T.Native _ => 
+                          grabNative whnf (i-1) rest (T.Dot (m', s))
+
+                     | _ => raise Grab)
+
+              | _ => raise Grab)
+
+
+
+
+      (* standardRedexLoop whnf t spine s
+
+         s and t incorporate the spine seen so far
+         spine is the remaining spine
+         whnf computes hard weak-head-normal forms
       *)
-      fun standardRedex i d whnf spine =
-         (case List.splitOpt spine i of
-             SOME (spine1, T.App arg :: spine3) =>
-                (case whnf arg of
-                    T.Elim (T.Const const', spine2) =>
-                       (case D.find d const' of
-                           SOME red =>
-                              (try
-                                  SOME (Reduction.ureduce2 red spine1 spine2 spine3)
-                               with
-                                  Reduction.Reduce => NONE)
+      fun standardRedexLoop whnf t spine s =
+         (case t of
+             NODE (i, d) =>
+                let
+                   val (s', spine') = grab i spine s
+                in
+                   (case spine' of
+                       T.App m :: spine'' =>
+                          (case whnf m of
+                              T.Elim (T.Const const, argspine) =>
+                                 (case D.find d const of
+                                     SOME (j, t') =>
+                                        (case grab j argspine s' of
+                                            (s'', []) =>
+                                               standardRedexLoop whnf t' spine'' s''
 
-                         | NONE => NONE)
+                                          | _ => NONE)
 
-                  | _ => NONE)
+                                   | NONE => NONE)
 
-           | _ => NONE)
+                            | _ => NONE)
+
+                     | _ => NONE)
+                end
+
+           | LEAF (i, p) =>
+                let
+                   val (s', spine') = grab i spine s
+                in
+                   SOME (T.Elim (T.Sub (p, s'), spine'))
+                end
+
+           | NATIVE (i, n, t') =>
+                let
+                   val (s', spine') = grab i spine s
+                   val (s'', spine'') = grabNative whnf n spine' s'
+                in
+                   standardRedexLoop whnf t' spine'' s''
+                end)
+
+
+      fun standardRedex t whnf spine =
+         try
+            standardRedexLoop whnf t spine T.id
+         with
+            Grab => NONE
 
 
 
-      (* nativeRedex i n red whnf spine
+      (* makeTree i k zones n p
 
-         if    const's active arguments have index i ... i+n-1
-               red is const's reduction
-               whnf computes hard weak-head normal forms
-         then  if    const spine reduces to M
-               then  returns SOME M
-               else  returns NONE
+         arguments i .. i+k-1 must be native  (if k = 0 then no native arguments)
+         zones are the remaining active arguments
+         n residual arguments at the end
+         p is the right-hand-side
       *)
-      fun nativeRedex i n red whnf spine =
-         (case List.splitOpt spine i of
-             SOME (spine1, spine23) =>
-                (case List.splitOpt spine23 n of
-                    SOME (spine2, spine3) =>
-                       (try
-                           let
-                              val spine2' =
-                                 List.map
-                                    (fn T.App arg =>
-                                           (case whnf arg of
-                                               arg' as T.Native _ => T.App arg'
-                                             | _ => raise Reduction.Reduce)
-   
-                                      | _ => raise Reduction.Reduce)
-                                    spine2
-                           in
-                              SOME (Reduction.ureduce1 red (spine1 @ spine2' @ spine3))
-                           end
-                        with
-                           Reduction.Reduce => NONE)
+      fun makeTree i k zones n p =
+         (case zones of
+             nil =>
+                if k = 0 then
+                   LEAF (n, p)
+                else if i + k <= n then
+                   NATIVE (i, k, LEAF (n - i - k, p))
+                else (* i + k > n *)
+                   raise (Fail "native arguments are out of bounds")
 
-                  | _ => NONE)
-
-           | _ => NONE)
+           | (l, const, m) :: rest =>
+                if k = 0 then
+                   NODE (l, D.singleton const (m, makeTree 0 0 rest n p))
+                else if i + k <= l then
+                   NATIVE (i, k, NODE (l - i - k, D.singleton const (m, makeTree 0 0 rest n p)))
+                else if l < i then
+                   NODE (l, D.singleton const (m, makeTree (i-l-1) k rest n p))
+                else (* i <= l < i + k *)
+                   raise (Fail "native arguments overlap with active arguments"))
 
 
+      fun mergeTree (t1 : reduction_tree) t2 =
+         (case (t1, t2) of
+             (LEAF _, LEAF _) => raise (Fail "overlapping registered reductions")
 
-      fun register red =
+           | (NODE (l1, d1), NODE (l2, d2)) =>
+                if l1 = l2 then
+                   NODE (l1, D.union d1 d2 
+                                (fn (_, (p1, t1'), (p2, t2')) => 
+                                    if p1 = p2 then
+                                       (p1, mergeTree t1' t2')
+                                    else
+                                       raise (Fail "conflicting arity of active arguments in registered reductions")))
+                else
+                   raise (Fail "conflicting active arguments in registered reductions")
+
+           | (NATIVE (i1, k1, t1'), NATIVE (i2, k2, t2')) =>
+                if i1 = i2 andalso k1 = k2 then
+                   NATIVE (i1, k1, mergeTree t1' t2')
+                else
+                   raise (Fail "conflicting native arguments in registered reductions")
+
+           | _ => raise (Fail "overlapping registered reductions"))
+       
+
+      (* precondition: i >= 0, k >= 0 *)
+      fun registerMain i k red =
          let
-            val (const, i, const') = Reduction.triggers red
+            val (const, zones, n, p) = Reduction.expose red
+
+            val t = makeTree i k zones n p
 
             val (_, x) =
                H.operate userTable const
-                  (fn () => STANDARD (i, D.singleton const' red))
-                  (fn STANDARD (i', d) =>
-                         if i <> i' then
-                            raise (Fail "inconsistent active argument in registered reductions")
-                         else
-                            let
-                               val (d', overlap) = D.insert' d const' red
-                            in
-                               if overlap then
-                                  raise (Fail "overlapping registered reductions")
-                               else
-                                  STANDARD (i, D.insert d const' red)
-                            end
+                  (fn () => STANDARD t)
+                  (fn (STANDARD t') => STANDARD (mergeTree t t')
 
-                    | OTHER =>
-                         raise (Fail "overlapping registered reductions"))
+                    | OTHER =>  raise (Fail "overlapping registered reductions"))
          in
             (case x of
-                STANDARD (_, d) =>
-                   H.insert redexTable const (standardRedex i d)
+                STANDARD t =>
+                   H.insert redexTable const (standardRedex t)
 
               | OTHER =>
                    raise (Fail "impossible"))
          end
+                      
+      fun register red = registerMain 0 0 red
 
-
-
-      fun registerNative i n red =
-         let
-            val const = Reduction.trigger red
-         in
-            H.operate userTable const
-               (fn () =>
-                   (
-                   H.insert redexTable const (nativeRedex i n red);
-                   OTHER
-                   ))
-               (fn _ =>
-                   raise (Fail "overlapping registered reductions"));
-
-            ()
-         end
+      fun registerNative i k red =
+         if 0 <= i andalso 0 <= k then
+            registerMain i k red
+         else
+            raise (Fail "native arguments are out of bounds")
 
 
 
