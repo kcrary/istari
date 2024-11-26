@@ -278,6 +278,19 @@ which appears in the `Hyp` structure.
 
     As `splitOf` but does not invoke the typechecker.
 
+- `introForm /[ipattern] ... [ipattern]/`
+
+  Proves a goal of the form `A : type` or `A : U i`, where `A`
+  consists of a nested dependent type with depth at least as long as
+  the given number of arguments.  (For example, 
+  `forall (x : B) . exists (y : C x) . D x y` has depth 2.)
+  Typically a pattern will be a simple name, but more expressive
+  patterns are possible.  (See [Destruction](#destruction).)
+
+  + `introFormRaw /[ipattern] ... [ipattern]/`
+
+    As `introForm` but does not invoke the typechecker.
+
 
 
 ### Hypothesis tactics

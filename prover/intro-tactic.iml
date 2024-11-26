@@ -54,6 +54,10 @@ signature INTRO_TACTIC =
       val contrapositiveRaw : Hyp.hypothesis -> tactic
       val contrapositive : Hyp.hypothesis -> tactic
 
+      val introFormPriority : IntroPattern.ipattern list -> priority tacticm
+      val introFormRaw : IntroPattern.ipattern list -> tactic
+      val introForm : IntroPattern.ipattern list -> tactic
+
       val proveLambda : tactic
 
    end
@@ -845,6 +849,172 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
       fun contrapositiveRaw hyp = contrapositivePriority hyp >> idtac
 
       fun contrapositive hyp = Typecheck.withTypecheckSnd $ contrapositivePriority hyp
+
+
+
+      val introFormRules : (T.term -> T.term -> Rule.rule) H.table = H.table ()
+      val introFormUnivRules : (T.term -> T.term -> T.term -> Rule.rule) H.table = H.table ()
+      val introFormImpredRules : (T.term -> T.term -> T.term -> Rule.rule) H.table = H.table ()
+      val introFormImpredUnivRules : (T.term -> T.term -> T.term -> T.term -> Rule.rule) H.table = H.table ()
+
+      val () =
+         List.app
+            (fn (const, rule) => H.insert introFormRules const rule)
+            [
+            (Prim.forall, Rule.forallForm),
+            (Prim.exists, Rule.existsForm),
+            (Prim.intersect, Rule.intersectForm),
+            (Prim.union, Rule.unionForm),
+            (Prim.set, Rule.setForm),
+            (Prim.iset, Rule.isetForm),
+            ]
+
+      val () =
+         List.app
+            (fn (const, rule) => H.insert introFormUnivRules const rule)
+            [
+            (Prim.forall, Rule.forallFormUniv),
+            (Prim.exists, Rule.existsFormUniv),
+            (Prim.intersect, Rule.intersectFormUniv),
+            (Prim.union, Rule.unionFormUniv),
+            (Prim.set, Rule.setFormUniv),
+            (Prim.iset, Rule.isetFormUniv),
+            ]
+
+      val () =
+         List.app
+            (fn (const, rule) => H.insert introFormImpredRules const rule)
+            [
+            (Prim.iforall, Rule.iforallForm),
+            (Prim.iexists, Rule.iexistsForm),
+            ]
+
+      val () =
+         List.app
+            (fn (const, rule) => H.insert introFormImpredUnivRules const rule)
+            [
+            (Prim.iforall, Rule.iforallFormUniv),
+            (Prim.iexists, Rule.iexistsFormUniv),
+            ]
+
+      fun introFormPriority pats =
+         (case pats of
+             nil => idtacM Primary
+
+           | pat :: rest =>
+                goalCaseT
+                /| \Prim.ov\ (\Prim.univ\ _) (const? @ $ap _ $ap (fn ? . _) $nil) =>
+                   \(fnc const binder =>
+                        (case H.find introFormUnivRules const of
+                            SOME rule =>
+                               let
+                                  val pat' =
+                                     (case pat of
+                                         IntroPattern.Ident NONE =>
+                                            IntroPattern.Ident binder
+                      
+                                       | _ => pat)
+                               in
+                                  refine (rule (T.evar ()) (T.evar ()) (T.evar ()))
+                                  >>> [
+                                      idtacM Secondary,
+                         
+                                      D.destruct0 pat' (introFormPriority rest)
+                                      ]
+                               end
+
+                          | NONE => fail "not a conclusion for introForm"))\
+
+                 | \Prim.istp\ (const? @ $ap _ $ap (fn ? . _) $nil) =>
+                   \(fnc const binder =>
+                        (case H.find introFormRules const of
+                            SOME rule =>
+                               let
+                                  val pat' =
+                                     (case pat of
+                                         IntroPattern.Ident NONE =>
+                                            IntroPattern.Ident binder
+                      
+                                       | _ => pat)
+                               in
+                                  refine (rule (T.evar ()) (T.evar ()))
+                                  >>> [
+                                      idtacM Secondary,
+                         
+                                      D.destruct0 pat' (introFormPriority rest)
+                                      ]
+                               end
+
+                          | NONE => fail "not a conclusion for introForm"))\
+
+                 | \Prim.ov\ (\Prim.univ\ _) (const? @ $ap _ $ap _ $ap (fn ? . _) $nil) =>
+                   \(fnc const binder =>
+                        (case H.find introFormImpredUnivRules const of
+                            SOME rule =>
+                               let
+                                  val pat' =
+                                     (case pat of
+                                         IntroPattern.Ident NONE =>
+                                            IntroPattern.Ident binder
+                      
+                                       | _ => pat)
+                               in
+                                  refine (rule (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                                  >>> [
+                                      idtacM Secondary,
+                                      idtacM Secondary,
+                         
+                                      D.destruct0 pat' (introFormPriority rest)
+                                      ]
+                               end
+
+                          | NONE => fail "not a conclusion for introForm"))\
+
+                 | \Prim.istp\ (const? @ $ap _ $ap _ $ap (fn ? . _) $nil) =>
+                   \(fnc const binder =>
+                        (case H.find introFormImpredRules const of
+                            SOME rule =>
+                               let
+                                  val pat' =
+                                     (case pat of
+                                         IntroPattern.Ident NONE =>
+                                            IntroPattern.Ident binder
+                      
+                                       | _ => pat)
+                               in
+                                  refine (rule (T.evar ()) (T.evar ()) (T.evar ()))
+                                  >>> [
+                                      idtacM Secondary,
+                         
+                                      D.destruct0 pat' (introFormPriority rest)
+                                      ]
+                               end
+
+                          | NONE => fail "not a conclusion for introForm"))\
+
+                 | \Prim.istp\ (\Prim.foralltp\ (fn ? . _)) =>
+                   \(fnc binder =>
+                        let
+                           val pat' =
+                              (case pat of
+                                  IntroPattern.Ident NONE =>
+                                     IntroPattern.Ident binder
+               
+                                | _ => pat)
+                        in
+                           refine (Rule.foralltpForm (T.evar ()))
+                           >>+
+                           D.destruct0 pat' (introFormPriority rest)
+                        end)\
+
+                 | _ =>
+                   \(fnc =>
+                        fail "not a conclusion for introForm")\
+                /)
+
+      fun introFormRaw pats = introFormPriority pats >> idtac
+
+      fun introForm pats = Typecheck.withTypecheckSnd $ introFormPriority pats
 
    end
 
