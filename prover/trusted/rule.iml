@@ -141,6 +141,29 @@ signature RULE =
       val haltsValue : rule
 
 
+      (* sequivalencePath path M N
+
+         G |- C[M]
+         >>
+         G |- sequal M N
+         G |- C[N]
+
+         C is determined by path.  Paths are interpreted as in Simplify.applySubterm.
+      *)
+      val sequivalencePath : int list -> term -> term -> rule
+
+
+      (* sequivalenceLeftPath path M N
+
+         G1, C[M], G2 |- D
+         >>
+         G1 |- sequal M N
+         G1, C[N], G2 |- D
+
+         C is determined by path.  Paths are interpreted as in Simplify.applySubterm.
+      *)
+      val sequivalenceLeftPath : int -> int list -> term -> term -> rule
+
 
       (* <x> : integer *)
       val integerIntroOf : rule
@@ -613,8 +636,8 @@ structure Rule :> RULE =
                 end)
 
 
-      fun onhyp jud i =
-         (case S.splitOpt (J.context jud) i of
+      fun splitContext ctx i =
+         (case S.splitOpt ctx i of
              NONE => raise Failure
 
            | SOME (bottom, h_top) =>
@@ -622,30 +645,41 @@ structure Rule :> RULE =
                     S.Nil => raise Failure
 
                   | S.Cons (h, top) =>
-                       (h,
-                        (fn h' =>
-                            J.make
-                               (S.append bottom (S.cons h' top))
-                               (J.concl jud)))))
+                       (bottom, h, top)))
+
+      fun hypTm h =
+         (case h of
+             J.Tm a =>
+                (a, J.Tm)
+
+           | J.Tml a =>
+                (a, J.Tml)
+
+           | J.Tmh a =>
+                (a, J.Tmh)
+
+           | J.Let m =>
+                (m, J.Let)
+
+           | _ => raise Failure)
+
+      fun onhyp jud i =
+         let
+            val (bottom, h, top) = splitContext (J.context jud) i
+         in
+            (h,
+             (fn h' =>
+                 J.make
+                    (S.append bottom (S.cons h' top))
+                    (J.concl jud)))
+         end
 
       fun onhypTm jud i =
          let
             val (h, f) = onhyp jud i
+            val (a, g) = hypTm h
          in
-            (case h of
-                J.Tm a =>
-                   (a, (fn a' => f (J.Tm a')))
-
-              | J.Tml a =>
-                   (a, (fn a' => f (J.Tml a')))
-
-              | J.Tmh a =>
-                   (a, (fn a' => f (J.Tmh a')))
-
-              | J.Let m =>
-                   (m, (fn m' => f (J.Let m')))
-
-              | _ => raise Failure)
+            (a, (fn a' => f (g a')))
          end
 
 
@@ -1343,6 +1377,109 @@ structure Rule :> RULE =
 
                | _ => 
                     raise Failure))
+
+
+
+      (* We can almost do this with applySubterm, but we have to shift m and n when we go under binders. *)
+      fun replacePath path m n p =
+         (case path of
+             [] => 
+                if U.unify1 p m then
+                   n
+                else
+                   raise Failure
+
+           | i :: rest =>
+                let
+                   val (h, spine) = Simplify.simp p id []
+                in
+                   (case spine of
+                       [] =>
+                          (case h of
+                              Lam (binder, p') =>
+                                 if i = 0 then
+                                    Lam (binder, replacePath rest (Sub (m, shift1)) (Sub (n, shift1)) p')
+                                 else
+                                    raise Failure
+
+                            | Pair (p1, p2) =>
+                                 if i = 0 then
+                                    Pair (replacePath rest m n p1, p2)
+                                 else if i = 1 then
+                                    Pair (p1, replacePath rest m n p2)
+                                 else
+                                    raise Failure
+
+                            | Next p' =>
+                                 if i = 0 then
+                                    Next (replacePath rest m n p')
+                                 else
+                                    raise Failure
+
+                            | _ =>
+                                 raise Failure)
+
+                     | _ :: _ =>
+                          (case Int.compare i 0 of
+                              LESS =>
+                                 raise Failure
+
+                            | EQUAL =>
+                                 Elim (replacePath rest m n h, spine)
+
+                            | GREATER =>
+                                 Elim (h, replacePathSpine rest (i-1) m n spine [])))
+                end)
+
+      and replacePathSpine path i m n spine acc =
+         (case spine of
+             [] =>
+                raise Failure
+
+           | (elim as App p) :: rest =>
+                if i = 0 then
+                   List.revAppend
+                      acc
+                      (App (replacePath path m n p) :: rest)
+                else
+                   replacePathSpine path (i-1) m n rest (elim :: acc)
+          
+           | elim :: rest =>
+                if i = 0 then
+                   raise Failure
+                else
+                   replacePathSpine path (i-1) m n rest (elim :: acc))
+
+
+      fun sequivalencePath path m n =
+         ("sequivalencePath",
+          fn jud =>
+             let
+                val ctx = J.context jud
+                val c = J.concl jud
+                val c' = replacePath path m n c
+             in
+                ([J.make ctx (apply2 Prim.sequal m n),
+                  J.make ctx c'],
+                 (fn [_, p] => p
+                   | _ => raise ExtractFailure))
+             end)
+
+      fun sequivalenceLeftPath i path m n =
+         ("sequivalenceLeftPath",
+          fn jud =>
+             let
+                val ctx = J.context jud
+                val (bottom, h, top) = splitContext ctx i
+                val (c, g) = hypTm h
+                val c' = replacePath path m n c
+             in
+                ([J.make top (apply2 Prim.sequal m n),
+                  J.make (S.append bottom (S.cons (g c') top)) (J.concl jud)],
+                 (fn [_, p] => p
+                   | _ => raise ExtractFailure))
+             end)
+
 
 
       (* The rule generator doesn't know about native terms, so it can't generate the 

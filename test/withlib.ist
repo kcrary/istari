@@ -12,6 +12,33 @@ fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
 
 
 
+lemma "sequivalence_path"
+/
+  forall (P : nat -> nat -> U 0) m n .
+    m = n : nat
+    -> unit % (forall x . P x m)
+    -> unit % (forall x . P x m)
+/;
+
+inference.
+intro /P m n Heq H/.
+so /nat_elemental _ _ Heq/ /Hsequal/.
+moveBefore /Hsequal/ /H/.
+assert /unit/ /Hunit/ >>> [split, idtac].
+Tactic.refine (Rule.sequivalencePath [2, 2, 0, 2] (parseCurr /m/) (parseCurr /n/)).
+  {
+  hyp /Hsequal/.
+  }
+Tactic.refine (Rule.sequivalenceLeftPath 1 [2, 2, 0, 2] (Term.Var 3) (Term.Var 2)).
+  {
+  let do (_, dir) = Tactic.withgoal in Tactic.chdir (Directory.shift dir 2) end.
+  hyp /Hsequal/.
+  }
+hyp /H/.
+qed ();
+
+
+
 (* case with annotation; won't define it without the annotation *)
 defineRaw /compose n/
 /

@@ -1430,20 +1430,24 @@ Qed.
       The reduction rules follow immediately from tr_compute and
       tr_compute_hyp.
 
-   2. checkPositive and checkNegative
+   2. sequivalencePath and sequivalenceLeftPath
+
+      These rules follow from tr_sequal_compat and the proofs of sequivalence and sequivalenceLeft.
+
+   3. checkPositive and checkNegative
 
       The correctness of checkPositive and checkNegative follow
       immediately from tr_positive_algorithm, and
       tr_negative_algorithm, assuming the checker is implemented
       correctly with respect to the formal algorithm.
 
-   3. the rules pertaining to let hypotheses
+   4. the rules pertaining to let hypotheses
 
       The let-hypothesis rules pertain to a definition mechanism in
       the proof assistant that does not exist in the type theory.  But
       the rules are simple and it is easy to see they are correct.
 
-   4. the rules pertaining to native data types (integers and symbols)
+   5. the rules pertaining to native data types (integers and symbols)
 
       The native data type rules cannot be proven correct because the
       native data types do not exist in the type theory.  These rules

@@ -498,6 +498,15 @@ structure RewriteContext =
                 contextToPath rest (0 :: path))
 
 
+      fun contextBindings c acc =
+         (case c of
+             [] => acc
+
+           | Flam _ :: rest => contextBindings rest (acc+1)
+
+           | _ :: rest => contextBindings rest acc)
+         
+
       fun instantiate c m =
          (case c of
              [] => m
@@ -1034,6 +1043,15 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                returns SOME (sk tac')
                OR
                returns NONE
+
+         There's no fundamental reason why we can't rewrite with syntactic equality under binders
+         (as long as the equands don't mention the bound variable), but the rewriter's plumbing is
+         wrong for it.  If we are rewriting C{M} to C{N} we need M = M'[^k] and N = N'[^k] (where k
+         is the number of bindings in C), and we need to have sequal M' N'.  Instead, the coercion
+         carries a tactic proving sequal M N.  We ought to be able to get sequal M' N', but only with
+         different plumbing.  The plumbing is engineered for equalities (and relations) that are
+         allowed to refer to bindings, and I don't want to bother implementing different plumbing for
+         sequal when sequal is semi-deprecated anyway.
       *)
       fun propagateSyntacticEquality dir c m n tac =
          if 

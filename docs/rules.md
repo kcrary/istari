@@ -167,6 +167,20 @@ variables.  The official rules, using de Bruijn indices, are given
       G1, y : [M / x]H, G2 |- C ext P
       (where red reduces M to N, x is the ith variable in H's scope)
 
+- `whnfConcl`
+
+      G |- C ext M
+      >>
+      G |- D ext M
+      (where the weak-head normal form of C is D)
+
+- `whnfHyp n`
+
+      G1, x : H, G2 |- C ext M
+      >>
+      G1, x : H', G2 |- C ext M
+      (where the weak-head normal form of H is H')
+
 - `whnfHardConcl`
 
       G |- C ext M
@@ -194,6 +208,20 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G1, x : H', G2 |- C ext M
       (where the normal form of H is H')
+
+- `whnfConclAt path`
+
+      G |- C ext M
+      >>
+      G |- C' ext M
+      (where C' is obtained from C by weak-head normalizing a subterm determined by path)
+
+- `whnfHypAt n path`
+
+      G1, x : H, G2 |- C ext M
+      >>
+      G1, x : H', G2 |- C' ext M
+      (where H' is obtained from H by weak-head normalizing a subterm determined by path)
 
 
 ### Dependent functions
@@ -4223,6 +4251,24 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G1, x : A, G2 |- sequal A B
       G1, x : B, G2 |- C ext M
+
+- `sequivalencePath path M N`
+
+      G |- C ext P
+      >>
+      G |- sequal M N
+      G |- C' ext P
+
+      (where C' is obtained from C by changing a subterm determined by path from M to N)
+
+- `sequivalenceLeftPath n path M N`
+
+      G1, x : H, G2 |- C ext P
+      >>
+      G1 |- sequal M N
+      G1, x : H', G2 |- C ext P
+
+      (where H' is obtained from H by changing a subterm determined by path from M to N)
 
 - `substitutionSyntactic n A B M`
 
