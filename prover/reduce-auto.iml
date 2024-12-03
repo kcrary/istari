@@ -110,13 +110,18 @@ structure AutoReduce :> AUTO_REDUCE =
             (case m' of
                 T.Elim (h, spine) =>
                    let
+                      val dl' =
+                         (case h of
+                             T.Const const => D.remove dl const
+                           | _ => dl)
+
                       val (spine', rs) =
                          List.foldr
                             (fns elim (spine', rs) =>
                                 (case elim of
                                     T.App n =>
                                        let
-                                          val (n', r) = reduction underlam dp D.empty n []
+                                          val (n', r) = reduction underlam dp dl' n []
                                        in
                                           (T.App n' :: spine', r :: rs)
                                        end
@@ -132,7 +137,7 @@ structure AutoReduce :> AUTO_REDUCE =
               | T.Lam (binder, m1) =>
                    if underlam then
                       let
-                         val (m1', r1) = reduction underlam dp D.empty m1 []
+                         val (m1', r1) = reduction underlam dp dl m1 []
                       in
                          (T.Lam (binder, m1'),
                           R.trans (List.rev (R.within [0] r1 :: R.betas :: acc)))
@@ -142,8 +147,8 @@ structure AutoReduce :> AUTO_REDUCE =
 
               | T.Pair (m1, m2) =>
                    let
-                      val (m1', r1) = reduction underlam dp D.empty m1 []
-                      val (m2', r2) = reduction underlam dp D.empty m2 []
+                      val (m1', r1) = reduction underlam dp dl m1 []
+                      val (m2', r2) = reduction underlam dp dl m2 []
                    in
                       (T.Pair (m1', m2'),
                        R.trans (List.rev (R.within [1] r2 :: R.within [0] r1 :: R.betas :: acc)))
@@ -151,7 +156,7 @@ structure AutoReduce :> AUTO_REDUCE =
 
               | T.Next m1 =>
                    let
-                      val (m1', r1) = reduction underlam dp D.empty m1 []
+                      val (m1', r1) = reduction underlam dp dl m1 []
                    in
                       (T.Next m1',
                        R.trans (List.rev (R.within [0] r1 :: R.betas :: acc)))

@@ -202,9 +202,20 @@ places the left- and right-hand-side into normal form and compares
 them.  The `unrolling` clause indicates that, while normalizing, the
 prover should unroll `length`.  One can also employ an `unfolding`
 clause to indicate that the prover should unfold certain identifiers.
-An `unrolling` clause will be applied only once (to avoid looping),
-and only on the left-hand-side.  In contrast, an `unfolding` clause
-will be applied at every opportunity.
+An unfolding clause will be applied at every opportunity.  In
+contrast, to avoid looping, an unrolling clause will be applied only
+once on any path through the syntax, and then only on the
+left-hand-side.  For example, if `f` unrolls to `g`, then:
+
+    f (f x) (f y) --> g (f x) (f y)
+
+But:
+
+    h (f x) (f y) --> h (g x) (g y)
+
+(A failed use of an unrolling still counts as a use, so if `f x y`
+unrolls to `g x y`, then `f (f x y)` reduces to itself, not to 
+`f (g x y)`, because of the outer appearance of `f`.)
 
 The left-hand-sides of reductions take a special syntax: they must
 consist of a constant followed by a list of arguments.  Amidst the
