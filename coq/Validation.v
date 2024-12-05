@@ -1430,9 +1430,10 @@ Qed.
       The reduction rules follow immediately from tr_compute and
       tr_compute_hyp.
 
-   2. sequivalencePath and sequivalenceLeftPath
+   2. sequalCompatPath
 
-      These rules follow from tr_sequal_compat and the proofs of sequivalence and sequivalenceLeft.
+      The rule follows immediately from tr_sequal_compat
+      (assuming the code to rebuild the term is correct).
 
    3. checkPositive and checkNegative
 

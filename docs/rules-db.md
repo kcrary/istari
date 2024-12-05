@@ -4321,6 +4321,14 @@ Conventions:
       >>
       G |- sequal M N
 
+- `sequalCompatPath path M N P`
+
+      G |- sequal C{N[^k]} C{P[^k]}
+      >>
+      G |- sequal N P
+
+      (where M = C{M'}, C is determined by path, and C binds k variables)
+
 - `forallEtaSequal A B M`
 
       G |- sequal M (fn . M[^1] 0)

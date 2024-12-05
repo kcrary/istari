@@ -4252,24 +4252,6 @@ variables.  The official rules, using de Bruijn indices, are given
       G1, x : A, G2 |- sequal A B
       G1, x : B, G2 |- C ext M
 
-- `sequivalencePath path M N`
-
-      G |- C ext P
-      >>
-      G |- sequal M N
-      G |- C' ext P
-
-      (where C' is obtained from C by changing a subterm determined by path from M to N)
-
-- `sequivalenceLeftPath n path M N`
-
-      G1, x : H, G2 |- C ext P
-      >>
-      G1 |- sequal M N
-      G1, x : H', G2 |- C ext P
-
-      (where H' is obtained from H by changing a subterm determined by path from M to N)
-
 - `substitutionSyntactic n A B M`
 
       G1, x : A, G2 |- B ext N
@@ -4295,6 +4277,14 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- sequal [M / x]P [N / x]P
       >>
       G |- sequal M N
+
+- `sequalCompatPath path M N P`
+
+      G |- sequal C{N} C{P}
+      >>
+      G |- sequal N P
+
+      (where M = C{M'}, and C is determined by path)
 
 - `forallEtaSequal A B M`
 

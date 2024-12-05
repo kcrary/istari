@@ -141,28 +141,16 @@ signature RULE =
       val haltsValue : rule
 
 
-      (* sequivalencePath path M N
+      (* sequalCompatPath path M N P
 
-         G |- C[M]
+         G |- sequal C{N} C{P}
          >>
-         G |- sequal M N
-         G |- C[N]
+         G |- sequal N P
 
-         C is determined by path.  Paths are interpreted as in Simplify.applySubterm.
+         where M = C{M'} and C is determined by path.
+         Paths are interpreted as in Simplify.applySubterm.
       *)
-      val sequivalencePath : int list -> term -> term -> rule
-
-
-      (* sequivalenceLeftPath path M N
-
-         G1, C[M], G2 |- D
-         >>
-         G1 |- sequal M N
-         G1, C[N], G2 |- D
-
-         C is determined by path.  Paths are interpreted as in Simplify.applySubterm.
-      *)
-      val sequivalenceLeftPath : int -> int list -> term -> term -> rule
+      val sequalCompatPath : int list -> term -> term -> term -> rule
 
 
       (* <x> : integer *)
@@ -1380,39 +1368,52 @@ structure Rule :> RULE =
 
 
 
-      (* We can almost do this with applySubterm, but we have to shift m and n when we go under binders. *)
+      (* We can almost do this with applySubterm, but we have to shift n and p when we go under binders. *)
       fun replacePath path m n p =
          (case path of
              [] => 
-                if U.unify1 p m then
-                   n
-                else
-                   raise Failure
+                (n, p)
 
            | i :: rest =>
                 let
-                   val (h, spine) = Simplify.simp p id []
+                   val (h, spine) = Simplify.simp m id []
                 in
                    (case spine of
                        [] =>
                           (case h of
-                              Lam (binder, p') =>
+                              Lam (binder, m') =>
                                  if i = 0 then
-                                    Lam (binder, replacePath rest (Sub (m, shift1)) (Sub (n, shift1)) p')
+                                    let
+                                       val (n', p') = replacePath rest m' (Sub (n, shift1)) (Sub (p, shift1))
+                                    in
+                                       (Lam (binder, n'), Lam (binder, p'))
+                                    end
                                  else
                                     raise Failure
 
-                            | Pair (p1, p2) =>
+                            | Pair (m1, m2) =>
                                  if i = 0 then
-                                    Pair (replacePath rest m n p1, p2)
+                                    let
+                                       val (n1, p1) = replacePath rest m1 n p
+                                    in
+                                       (Pair (n1, m2), Pair (p1, m2))
+                                    end
                                  else if i = 1 then
-                                    Pair (p1, replacePath rest m n p2)
+                                    let
+                                       val (n2, p2) = replacePath rest m2 n p
+                                    in
+                                       (Pair (m1, n2), Pair (m1, p2))
+                                    end
                                  else
                                     raise Failure
 
-                            | Next p' =>
+                            | Next m' =>
                                  if i = 0 then
-                                    Next (replacePath rest m n p')
+                                    let
+                                       val (n', p') = replacePath rest m' n p
+                                    in
+                                       (Next n', Next p')
+                                    end
                                  else
                                     raise Failure
 
@@ -1425,61 +1426,55 @@ structure Rule :> RULE =
                                  raise Failure
 
                             | EQUAL =>
-                                 Elim (replacePath rest m n h, spine)
+                                 let
+                                    val (n', p') = replacePath rest h n p
+                                 in
+                                    (Elim (n', spine), Elim (p', spine))
+                                 end
 
                             | GREATER =>
-                                 Elim (h, replacePathSpine rest (i-1) m n spine [])))
+                                 let
+                                    val (nspine, pspine) = replacePathSpine rest (i-1) n p spine []
+                                 in
+                                    (Elim (h, nspine), Elim (h, pspine))
+                                 end))
                 end)
 
-      and replacePathSpine path i m n spine acc =
+      and replacePathSpine path i n p spine acc =
          (case spine of
              [] =>
                 raise Failure
 
-           | (elim as App p) :: rest =>
+           | (elim as App m) :: rest =>
                 if i = 0 then
-                   List.revAppend
-                      acc
-                      (App (replacePath path m n p) :: rest)
+                   let
+                      val (n', p') = replacePath path m n p
+                   in
+                      (List.revAppend acc (App n' :: rest),
+                       List.revAppend acc (App p' :: rest))
+                   end
                 else
-                   replacePathSpine path (i-1) m n rest (elim :: acc)
+                   replacePathSpine path (i-1) n p rest (elim :: acc)
           
            | elim :: rest =>
                 if i = 0 then
                    raise Failure
                 else
-                   replacePathSpine path (i-1) m n rest (elim :: acc))
+                   replacePathSpine path (i-1) n p rest (elim :: acc))
 
-
-      fun sequivalencePath path m n =
-         ("sequivalencePath",
+      fun sequalCompatPath path m n p =
+         ("sequalCompatPath",
           fn jud =>
              let
-                val ctx = J.context jud
-                val c = J.concl jud
-                val c' = replacePath path m n c
+                val (n', p') = replacePath path m n p
              in
-                ([J.make ctx (apply2 Prim.sequal m n),
-                  J.make ctx c'],
-                 (fn [_, p] => p
-                   | _ => raise ExtractFailure))
+                if Unify.unify1 (J.concl jud) (apply2 Prim.sequal n' p') then
+                   ([J.make (J.context jud) (apply2 Prim.sequal n p)],
+                    (fn [_] => Triv
+                      | _ => raise ExtractFailure))
+                else
+                   raise Failure
              end)
-
-      fun sequivalenceLeftPath i path m n =
-         ("sequivalenceLeftPath",
-          fn jud =>
-             let
-                val ctx = J.context jud
-                val (bottom, h, top) = splitContext ctx i
-                val (c, g) = hypTm h
-                val c' = replacePath path m n c
-             in
-                ([J.make top (apply2 Prim.sequal m n),
-                  J.make (S.append bottom (S.cons (g c') top)) (J.concl jud)],
-                 (fn [_, p] => p
-                   | _ => raise ExtractFailure))
-             end)
-
 
 
       (* The rule generator doesn't know about native terms, so it can't generate the 
