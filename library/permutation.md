@@ -292,3 +292,27 @@ Note the addition of `PPerm_drop`.
     PPerm_ppermute : type:PPerm_ppermute
 
     PPerm_impl_ppermute : type:PPerm_impl_ppermute
+
+
+### Rearrangements
+
+Rearrangement by successive insertion is less general than
+permutations, and consequently they can be represented less verbosely,
+by a list of numbers.
+
+    insert : type:insert
+
+    insert (zero) x l --> x :: l
+    insert (succ _) x (nil) --> x :: nil
+    insert (succ n) x (cons h t) --> h :: insert n x t
+
+    rearrange : type:rearrange
+
+    rearrange (nil) l --> l
+    rearrange (cons _ _) (nil) --> nil
+    rearrange (cons n p) (cons h t) --> insert n h (rearrange p t)
+
+    Perm_insert : type:Perm_insert
+
+    Perm_rearrange : type:Perm_rearrange
+

@@ -364,3 +364,29 @@ Note the addition of `PPerm_drop`.
 
     PPerm_impl_ppermute : forall (i : level) (a : U i) (l l' : list a) .
                              PPerm l l' -> exists (p : pperm) . ppermute p l = l' : list a
+
+
+### Rearrangements
+
+Rearrangement by successive insertion is less general than
+permutations, and consequently they can be represented less verbosely,
+by a list of numbers.
+
+    insert : intersect (i : level) (a : U i) . nat -> a -> list a -> list a
+
+    insert (zero) x l --> x :: l
+    insert (succ _) x (nil) --> x :: nil
+    insert (succ n) x (cons h t) --> h :: insert n x t
+
+    rearrange : intersect (i : level) (a : U i) . list nat -> list a -> list a
+
+    rearrange (nil) l --> l
+    rearrange (cons _ _) (nil) --> nil
+    rearrange (cons n p) (cons h t) --> insert n h (rearrange p t)
+
+    Perm_insert : forall (i : level) (a : U i) (n : nat) (h : a) (t : list a) .
+                     Perm (h :: t) (insert n h t)
+
+    Perm_rearrange : forall (i : level) (a : U i) (p : list nat) (l : list a) .
+                        Perm l (rearrange p l)
+

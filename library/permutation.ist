@@ -2052,7 +2052,190 @@ qed ();
 
 
 
+(* Less general than perm, and therefore less verbose. *)
+
+define /insert n x l/
+/
+  (fnind ins : nat -> list bogus -> list bogus of
+   | zero . fn l . x :: l
+
+   | succ n .
+       (fnind _ : list [bogus] -> list bogus of
+        | nil . x :: nil
+
+        | cons h t . cons h (ins n t))) n l
+//
+  intersect i (a : U i) . nat -> a -> list a -> list a
+/;
+
+inference.
+introOf /i a n x l/.
+revert /l/.
+sinduction /n/.
+reintro /IH/.
+destruct /n/ /| n/.
+  {
+  intro /l/.
+  unfold /insert/.
+  typecheck.
+  }
+
+  {
+  intro /(| h t)/.
+    {
+    unfold /insert/.
+    typecheck.
+    }
+
+    {
+    unfold /insert/.
+    reduce //.
+    fold /insert _ _ _/.
+    typecheck.
+    apply /IH/.
+    apply /Nat.lt_succ/.
+    }
+  }
+qed ();
+
+
+
+reductions
+/
+  insert (zero) x l --> x :: l ;
+  insert (succ n) x (nil) --> x :: nil ;
+  insert (succ n) x (cons h t) --> h :: insert n x t ;
+
+  unfolding insert
+/;
+
+
+
+define /rearrange p l/
+/
+  (fnind rearr : list [nat] -> list bogus -> list bogus of
+   | nil . fn l . l
+
+   | cons n p' .
+       (fnind _ : list [bogus] -> list bogus of
+        | nil . nil
+
+        | cons h t .
+            insert n h (rearr p' t))) p l
+//
+  intersect i (a : U i) . list nat -> list a -> list a
+/;
+
+inference.
+introOf /i a p l/.
+revert /l/.
+sinduction /p/.
+reintro /IH/.
+intro /l/.
+destruct /p/ /| n p/.
+  {
+  unfold /rearrange/.
+  typecheck.
+  }
+unfold /rearrange/.
+fold /rearrange _ _ within _ _/.
+destruct /l/ /| h t/.
+  {
+  reduce //.
+  typecheck.
+  }
+reduce //.
+typecheck.
+apply /IH/.
+apply /cons_subterm/.
+qed ();
+
+
+
+reductions
+/
+  rearrange (nil) l --> l ;
+  rearrange (cons _ _) (nil) --> nil ;
+  rearrange (cons n p) (cons h t) --> insert n h (rearrange p t) ;
+
+  unfolding rearrange
+/;
+
+
+
+lemma "Perm_insert"
+/
+  forall i (a : U i) n (h : a) (t : list a) .
+    Perm (h :: t) (insert n h t)
+/;
+
+inference.
+intro /i a n x/.
+induction /n/.
+
+(* 0 *)
+{
+intro /t/.
+apply /Perm_refl/.
+}
+
+(* succ *)
+{
+intro /n IH l/.
+destruct /l/ /| h t/.
+  {
+  unfold /insert/.
+  apply /Perm_refl/.
+  }
+reduce //.
+apply /Perm_trans _ _ (h :: x :: t)/.
+  {
+  apply /Perm_swap/.
+  }
+
+  {
+  apply /Perm_cons/ >> auto.
+  }
+}
+qed ();
+
+
+
+lemma "Perm_rearrange"
+/
+  forall i (a : U i) (p : list nat) (l : list a) .
+    Perm l (rearrange p l)
+/;
+
+inference.
+intro /i a p/.
+induction /p/.
+
+(* nil *)
+{
+intro /l/.
+apply /Perm_refl/.
+}
+
+(* cons *)
+{
+intro /n p IH l/.
+destruct /l/ /| h t/.
+  {
+  unfold /rearrange/.
+  apply /Perm_nil/.
+  }
+reduce //.
+apply /Perm_trans _ _ (h :: rearrange p t)/.
+  {
+  apply /Perm_cons/ >> auto.
+  }
+
+  {
+  apply /Perm_insert/.
+  }
+}
+qed ();
+
+
 endModule ();
-
-
-
