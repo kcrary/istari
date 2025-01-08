@@ -41,6 +41,18 @@ It has concrete syntax:
 
     let trip x y z = M in N   =def=   lettrip M (fn x y z . N)
 
+Open-scope elims for triples are:
+
+    trip1 : type:trip1
+
+    trip2 : type:trip2
+
+    trip3 : type:trip3
+
+    trip1 (triple x y z) --> x
+    trip2 (triple x y z) --> y
+    trip3 (triple x y z) --> z
+
 
 ### Quadruples
 
@@ -65,6 +77,21 @@ It has concrete syntax:
 
     let quad w x y z = M in N   =def=   letquad M (fn w x y z . N)
 
+Open-scope elims for quadruples are:
+
+    quad1 : type:quad1
+
+    quad2 : type:quad2
+
+    quad3 : type:quad3
+
+    quad4 : type:quad4
+
+    quad1 (quad w x y z) --> w
+    quad2 (quad w x y z) --> x
+    quad3 (quad w x y z) --> y
+    quad4 (quad w x y z) --> z
+
 
 ### Quintuples
 
@@ -88,3 +115,21 @@ The pattern-matching elim for quintuples is:
 It has concrete syntax:
 
     let quint v w x y z = M in N   =def=   letquint M (fn v w x y z . N)
+
+Open-scope elims for quintuples are:
+
+    quint1 : type:quint1
+
+    quint2 : type:quint2
+
+    quint3 : type:quint3
+
+    quint4 : type:quint4
+
+    quint5 : type:quint5
+
+    quint1 (quint v w x y z) --> v
+    quint2 (quint v w x y z) --> w
+    quint3 (quint v w x y z) --> x
+    quint4 (quint v w x y z) --> y
+    quint5 (quint v w x y z) --> z

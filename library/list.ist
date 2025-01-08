@@ -5,6 +5,7 @@ File.import "miscellaneous-load.iml";
 File.import "nat-load.iml";
 File.import "option-load.iml";
 File.import "partial-load.iml";
+File.import "bool-load.iml";
 File.import "decidable-load.iml";
 File.import "list-aux.iml";
 
@@ -39,50 +40,39 @@ structure Nothing = AfterList ();
 
 
 
-defineRaw /list_case {a b} l mnil mcons/
+define /list_case l mnil mcons/
 /
-  list_iter a (fn _ . b) mnil (fn h t _ . mcons h t) l
+  list_iter Miscellaneous.bogus (fn _ . Miscellaneous.bogus) mnil (fn h t _ . mcons h t) l
+//
+  intersect i (a b : U i) . list a -> b -> (a -> list a -> b) -> b
 /;
 
-
-
-reductions
-/
-  list_case _ _ (nil) z _ --> z ;
-  list_case _ _ (cons h t) _ s --> s h t ;
-  unfolding list_case
-/;
-
-
-
-lemma "list_case_type"
-/
-  ` list_case :
-  intersect (i : level) .
-  forall (a b : U i) .
-     list a 
-     -> b 
-     -> (a -> list a -> b)
-     -> b
-/;
-
+inference.
 introOf /i a b l mnil mcons/.
 destruct /l/ /| h t/.
 
 (* nil *)
 {
-reduce //.
+unfold /list_case/.
 hypof.
 }
 
 (* cons *)
 {
-reduce //.
+unfold /list_case/.
 typecheck.
 }
 qed ();
-recordTyping "list_case_type";
 
+
+
+reductions
+/
+  list_case (nil) z _ --> z ;
+  list_case (cons h t) _ s --> s h t ;
+
+  unfolding list_case
+/;
 
 
 
@@ -243,7 +233,7 @@ qed ();
 
 definerec /length {a} l/
 /
-  `list_case a nat l 0 (fn _ t . succ (length a t))
+  list_case l 0 (fn _ t . succ (length a t))
 //
   intersect (i : level) .
   forall (a : U i) . list a -> nat
@@ -452,7 +442,7 @@ reductions
 
 definerec /foldl {a b} z f l/
 /
-  `list_case a b l z (fn h t . foldl a b (f h z) f t)
+  list_case l z (fn h t . foldl a b (f h z) f t)
 //
   intersect i .
   forall (a b : U i) .
@@ -946,7 +936,7 @@ qed ();
 
 definerec /In a x l/
 /
-  `list_case a Miscellaneous.bogus l void (fn h t . x = h : a % In a x t)
+  list_case l void (fn h t . x = h : a % In a x t)
 //
   intersect i . forall (a : U i) . a -> list a -> U i
 /;
@@ -2061,7 +2051,7 @@ qed ();
 reductions
 /
   zip a b (nil) _ --> nil ;
-  zip a b (cons h1 t1) l2 --> list_case b (list (a & b)) l2 nil (fn h2 t2 . cons (h1 , h2) (zip a b t1 t2)) ;
+  zip a b (cons h1 t1) l2 --> list_case l2 nil (fn h2 t2 . cons (h1 , h2) (zip a b t1 t2)) ;
 
   unzip a b (nil) --> (nil , nil) ;
   unzip a b (cons h t) --> (cons (h #1) (unzip a b t #1) , cons (h #2) (unzip a b t #2)) ;
@@ -3425,6 +3415,248 @@ qed ();
 
 
 
+(* Boolean predicates *)
+
+define /Forallb f l/
+/
+  (fnind all : list [Miscellaneous.bogus] -> bool of
+   | nil . true
+   | cons h t . Bool.andb (f h) (all t)) l
+//
+  intersect i (a : U i) . (a -> bool) -> list a -> bool
+/;
+
+inference.
+introOf /i a f l/.
+sinduction /l/.
+reintro /IH/.
+unfold /Forallb/.
+destruct /l/ /| h t/ >> reduce // >> auto.
+fold /Forallb f t/.
+fold /manual (Forallb _ _)/.
+typecheck.
+apply /IH/.
+apply /cons_subterm/.
+qed ();
+
+val cForallb = parseConstant /Forallb/;
+
+
+
+define /Existsb f l/
+/
+  (fnind some : list [Miscellaneous.bogus] -> bool of
+   | nil . false
+   | cons h t . Bool.orb (f h) (some t)) l
+//
+  intersect i (a : U i) . (a -> bool) -> list a -> bool
+/;
+
+inference.
+introOf /i a f l/.
+sinduction /l/.
+reintro /IH/.
+unfold /Existsb/.
+destruct /l/ /| h t/ >> reduce // >> auto.
+fold /Existsb f t/.
+fold /manual (Existsb _ _)/.
+typecheck.
+apply /IH/.
+apply /cons_subterm/.
+qed ();
+
+val cExistsb = parseConstant /Existsb/;
+
+
+
+reductions
+/
+  Forallb f (nil) --> true ;
+  Forallb f (cons h t) --> Bool.andb (f h) (Forallb f t) ;
+
+  Existsb f (nil) --> false ;
+  Existsb f (cons h t) --> Bool.orb (f h) (Existsb f t) ;
+
+  unfolding Forallb Existsb
+/;
+
+
+
+lemma "istrue_Forallb"
+/
+  forall i (a : U i) (f : a -> bool) (l : list a) .
+    Bool.istrue (Forallb f l) <-> Forall (fn x . Bool.istrue (f x)) l
+/;
+
+inference.
+intro /i a f l/.
+split.
+  {
+  induction /l/.
+    {
+    intro /_/.
+    apply /Forall_nil/.
+    }
+
+    {
+    intro /h t IH H/.
+    rewrite /-> Bool.istrue_andb in H/.
+    destruct /H/ /Hh Ht/.
+    apply /Forall_cons/ >> auto.
+    }
+  }
+
+  {
+  intro /H/.
+  induction /H/.
+    {
+    apply /Bool.istrue_true/.
+    }
+
+    {
+    intro /h t Hh _ IH/.
+    rewrite /-> Bool.istrue_andb/.
+    split >> auto.
+    }
+  }
+qed ();
+
+val istrue_Forallb = parseConstant /istrue_Forallb/;
+
+
+
+lemma "istrue_Existsb"
+/
+  forall i (a : U i) (f : a -> bool) (l : list a) .
+    Bool.istrue (Existsb f l) <-> Exists (fn x . Bool.istrue (f x)) l
+/;
+
+inference.
+intro /i a f l/.
+split.
+  {
+  induction /l/.
+    {
+    intro /H/.
+    so /Bool.not_istrue_false H/ /0/.
+    }
+
+    {
+    intro /h t IH H/.
+    rewrite /-> Bool.istrue_orb in H/.
+    destruct /H/ /Hh | Ht/.
+      {
+      apply /Exists_hit/ >> auto.
+      }
+
+      {
+      apply /Exists_miss/ >> auto.
+      }
+    }
+  }
+
+  {
+  intro /H/.
+  induction /H/.
+    {
+    intro /h t H/.
+    rewrite /-> Bool.istrue_orb/.
+    left >> auto.
+    }
+
+    {
+    intro /h t _ IH/.
+    rewrite /-> Bool.istrue_orb/.
+    right >> auto.
+    }
+  }
+qed ();
+
+val istrue_Existsb = parseConstant /istrue_Existsb/;
+
+
+
+define /Forall_distb f l/
+/
+  (fnind all : list [Miscellaneous.bogus] -> bool of
+   | nil . true
+   | cons h t . Bool.andb (Forallb (f h) t) (all t)) l
+//
+  intersect i (a : U i) . (a -> a -> bool) -> list a -> bool
+/;
+
+inference.
+introOf /i a f l/.
+sinduction /l/.
+reintro /IH/.
+unfold /Forall_distb/.
+destruct /l/ /| h t/ >> reduce // >> auto.
+fold /Forall_distb f t/.
+fold /manual (Forall_distb _ _)/.
+typecheck.
+apply /IH/.
+apply /cons_subterm/.
+qed ();
+
+val cForall_distb = parseConstant /Forall_distb/;
+
+
+
+reductions
+/
+  Forall_distb f (nil) --> true ;
+  Forall_distb f (cons h t) --> Bool.andb (Forallb (f h) t) (Forall_distb f t) ;
+
+  unfolding Forall_distb
+/;
+
+
+
+lemma "istrue_Forall_distb"
+/
+  forall i (a : U i) (f : a -> a -> bool) (l : list a) .
+    Bool.istrue (Forall_distb f l) <-> Forall_dist (fn x y . Bool.istrue (f x y)) l
+/;
+
+inference.
+intro /i a f l/.
+split.
+  {
+  induction /l/.
+    {
+    intro /_/.
+    apply /Forall_dist_nil/.
+    }
+
+    {
+    intro /h t IH H/.
+    rewrite /-> Bool.istrue_andb in H/.
+    destruct /H/ /Hall Hdist/.
+    rewrite /-> istrue_Forallb in Hall/.
+    apply /Forall_dist_cons/ >> auto.
+    }
+  }
+
+  {
+  intro /H/.
+  induction /H/.
+    {
+    apply /Bool.istrue_true/.
+    }
+
+    {
+    intro /h t Hall _ IH/.
+    rewrite /-> Bool.istrue_andb/.
+    split >> auto.
+    rewrite /-> istrue_Forallb/ >> auto.
+    }
+  }
+qed ();
+
+val istrue_Forall_distb = parseConstant /istrue_Forall_distb/;
+
+
+
 (* Covariance *)
 
 lemma "list_subtype"
@@ -3448,8 +3680,8 @@ val list_subtype = parseConstant /list_subtype/;
 
 
 writeRegistry /AfterListAllEnv/
-  /[constant constant constant constant constant constant constant]/
-  (Collapse (list, list_uptype, cForall, cForall_uptype, cExists, cExists_uptype, list_subtype));
+  /[constant constant constant constant constant constant constant constant constant constant constant constant constant]/
+  (Collapse (list, list_uptype, cForall, cForall_uptype, cExists, cExists_uptype, cForallb, istrue_Forallb, cExistsb, istrue_Existsb, cForall_distb, istrue_Forall_distb, list_subtype));
 
 
 endModule ();

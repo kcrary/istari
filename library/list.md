@@ -25,17 +25,15 @@ The iterator for lists:
 
     list_iter : type:list_iter
 
-    list_iter a P z s (nil) --> z
-    list_iter a P z s (cons h t) --> s h t (list_iter a P z s t)
+    list_iter a P n c (nil) --> n
+    list_iter a P n c (cons h t) --> c h t (list_iter a P n c t)
 
 A simpler case-analysis operation:
 
     list_case : type:list_case
-              = def:list_case
-              imp:list_case
 
-    list_case _ _ (nil) z _ --> z
-    list_case _ _ (cons h t) _ s --> s h t
+    list_case (nil) n c --> n
+    list_case (cons h t) n c --> c h t
 
 Lists are covariant:
 
@@ -423,6 +421,30 @@ constructors)
     decidable_Forall_dist_dep : type:decidable_Forall_dist_dep
 
     decidable_Forall_dist : type:decidable_Forall_dist
+
+
+### Boolean predicates
+
+    Forallb : type:Forallb
+
+    Forallb f (nil) --> true
+    Forallb f (cons h t) --> Bool.andb (f h) (Forallb f t)
+
+    Existsb : type:Existsb
+
+    Existsb f (nil) --> false
+    Existsb f (cons h t) --> Bool.orb (f h) (Existsb f t)
+
+    Forall_distb : type:Forall_distb
+
+    Forall_distb f (nil) --> true
+    Forall_distb f (cons h t) --> Bool.andb (Forallb (f h) t) (Forall_distb f t)
+
+    istrue_Forallb : type:istrue_Forallb
+
+    istrue_Existsb : type:istrue_Existsb
+
+    istrue_Forall_distb : type:istrue_Forall_distb
 
 
 ### Lists are covariant

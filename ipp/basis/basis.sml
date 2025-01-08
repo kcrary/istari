@@ -780,7 +780,7 @@ structure Basis :> IML__BASIS =
               
             fun drop l n =
                List.drop (l, n)
-               handle Subscripot => raise (Invalid "subscript")
+               handle Subscript => raise (Invalid "subscript")
 
             fun dropOpt l n =
                SOME (List.drop (l, n))

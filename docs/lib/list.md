@@ -28,20 +28,15 @@ The iterator for lists:
                      -> (forall (v0 : a) (v1 : list a) . P v1 -> P (v0 :: v1))
                      -> forall (v0 : list a) . P v0
 
-    list_iter a P z s (nil) --> z
-    list_iter a P z s (cons h t) --> s h t (list_iter a P z s t)
+    list_iter a P n c (nil) --> n
+    list_iter a P n c (cons h t) --> c h t (list_iter a P n c t)
 
 A simpler case-analysis operation:
 
-    list_case : intersect (i : level) .
-                   forall (a b : U i) . list a -> b -> (a -> list a -> b) -> b
-              = fn a b l mnil mcons . (fnind list_fn : forall (v0 : list [a]) . b of
-                                        | nil . mnil
-                                        | cons h t . mcons h t) l
-              (2 implicit arguments)
+    list_case : intersect (i : level) (a b : U i) . list a -> b -> (a -> list a -> b) -> b
 
-    list_case _ _ (nil) z _ --> z
-    list_case _ _ (cons h t) _ s --> s h t
+    list_case (nil) n c --> n
+    list_case (cons h t) n c --> c h t
 
 Lists are covariant:
 
@@ -589,6 +584,34 @@ constructors)
     decidable_Forall_dist : forall (i : level) (a : U i) (P : a -> a -> U i) (l : list a) .
                                (forall (x y : a) . Decidable.decidable (P x y))
                                -> Decidable.decidable (Forall_dist P l)
+
+
+### Boolean predicates
+
+    Forallb : intersect (i : level) (a : U i) . (a -> bool) -> list a -> bool
+
+    Forallb f (nil) --> true
+    Forallb f (cons h t) --> Bool.andb (f h) (Forallb f t)
+
+    Existsb : intersect (i : level) (a : U i) . (a -> bool) -> list a -> bool
+
+    Existsb f (nil) --> false
+    Existsb f (cons h t) --> Bool.orb (f h) (Existsb f t)
+
+    Forall_distb : intersect (i : level) (a : U i) . (a -> a -> bool) -> list a -> bool
+
+    Forall_distb f (nil) --> true
+    Forall_distb f (cons h t) --> Bool.andb (Forallb (f h) t) (Forall_distb f t)
+
+    istrue_Forallb : forall (i : level) (a : U i) (f : a -> bool) (l : list a) .
+                        Bool.istrue (Forallb f l) <-> Forall (fn x . Bool.istrue (f x)) l
+
+    istrue_Existsb : forall (i : level) (a : U i) (f : a -> bool) (l : list a) .
+                        Bool.istrue (Existsb f l) <-> Exists (fn x . Bool.istrue (f x)) l
+
+    istrue_Forall_distb : forall (i : level) (a : U i) (f : a -> a -> bool) (l : list a) .
+                             Bool.istrue (Forall_distb f l)
+                               <-> Forall_dist (fn x y . Bool.istrue (f x y)) l
 
 
 ### Lists are covariant

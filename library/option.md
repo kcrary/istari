@@ -24,17 +24,15 @@ The iterator for options:
 
     option_iter : type:option_iter
 
-    option_iter a P z s (None _) --> z
-    option_iter a P z s (Some _ x) --> s x
+    option_iter a P n s (None) --> n
+    option_iter a P n s (Some x) --> s x
 
 A simpler case-analysis operation:
 
     option_case : type:option_case
-                = def:option_case
-                imp:option_case
 
-    option_case _ _ (None _) n _ --> n
-    option_case _ _ (Some _ x) _ s --> s x
+    option_case (None) n s --> n
+    option_case (Some x) n s --> s x
 
 Options are covariant:
 

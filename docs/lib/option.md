@@ -25,17 +25,15 @@ The iterator for options:
                      forall (a : U i) (P : option a -> U i) .
                        P None -> (forall (v0 : a) . P (Some v0)) -> forall (v0 : option a) . P v0
 
-    option_iter a P z s (None _) --> z
-    option_iter a P z s (Some _ x) --> s x
+    option_iter a P n s (None) --> n
+    option_iter a P n s (Some x) --> s x
 
 A simpler case-analysis operation:
 
-    option_case : intersect (i : level) . forall (a b : U i) . option a -> b -> (a -> b) -> b
-                = fn a b l mnone msome . option_iter a (fn v0 . b) mnone msome l
-                (2 implicit arguments)
+    option_case : intersect (i : level) (a b : U i) . option a -> b -> (a -> b) -> b
 
-    option_case _ _ (None _) n _ --> n
-    option_case _ _ (Some _ x) _ s --> s x
+    option_case (None) n s --> n
+    option_case (Some x) n s --> s x
 
 Options are covariant:
 

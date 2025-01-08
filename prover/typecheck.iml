@@ -381,14 +381,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                    printHistLoop (i+1) rest fullsize dir
                 end)
 
-
-      fun errorDetail hist msg details () =
-         (
-         print msg;
-         print "\n";
-
-         details ();
-
+      fun printHist hist =
          (case hist of
              [] => ()
 
@@ -396,8 +389,14 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                 (
                 print "\nwith history:\n";
                 printHistLoop 0 hist (S.length (J.context jud)) dir
-                ));
+                ))
 
+      fun errorDetail hist msg details () =
+         (
+         print msg;
+         print "\n";
+         details ();
+         printHist hist;
          print "\n"
          )
 
@@ -1067,7 +1066,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
 
       exception Stop of Message.label
 
-      fun tryRule (st as ST { progress }) table history tac (goal as (jud, _)) dest fk =
+      fun tryRule (st as ST { progress }) table (history as (_, hist)) tac (goal as (jud, _)) dest fk =
          try
             let
                val sz = Seq.length (J.context jud)
@@ -1080,7 +1079,8 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                dest := reusethen goal subgoals validate tacs
             end
          with
-            Stop label => dest := idtacM label
+            Stop label => 
+               dest := idtacM (Message.addDetail label (fn () => printHist hist))
 
 
       (* immediate st table history tab key ctx concl dir pretac

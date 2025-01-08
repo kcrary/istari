@@ -32,7 +32,7 @@ finite.isto : logic.isto decidable.isto list.isto
 finite-map.isto : bool.isto decidable.isto list.isto logic.isto option.isto
 girard-paradox.isto : datatype.isto logic.isto nat.isto
 integer.isto : acc.isto bool.isto decidable.isto nat.isto partial.isto stable.isto
-list.isto : datatype.isto decidable.isto logic.isto miscellaneous.isto nat.isto option.isto partial.isto
+list.isto : bool.isto datatype.isto decidable.isto logic.isto miscellaneous.isto nat.isto option.isto partial.isto
 nat.isto : acc.isto bool.isto decidable.isto stable.isto
 natural.isto : bool.isto integer.isto nat.isto logic.isto
 omega.isto : datatype.isto logic.isto bool.isto nat.isto integer.isto list.isto natural.isto

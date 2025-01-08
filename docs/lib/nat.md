@@ -44,6 +44,8 @@ A simpler case-analysis operation:
 
     leq_0_min : forall (n : nat) . 0 <= n
 
+    leq_0_minimal : forall (n : nat) . n <= 0 -> n = 0 : nat
+
     leq_succ_0_not : forall (n : nat) . succ n <= 0 -> void
 
     leq_succ_succ : forall (m n : nat) . m <= n -> succ m <= succ n
@@ -94,7 +96,7 @@ This one gives transitivity in the form needed for rewriting:
 
 Strong induction for natural numbers:
 
-    lt_well_founded : forall (n : nat) . Acc nat lt n
+    lt_well_founded : forall (n : nat) . Acc.Acc nat lt n
 
 
 ### Addition

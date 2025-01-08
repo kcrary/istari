@@ -43,6 +43,8 @@ A simpler case-analysis operation:
 
     leq_0_min : type:leq_0_min
 
+    leq_0_minimal : type:leq_0_minimal
+
     leq_succ_0_not : type:leq_succ_0_not
 
     leq_succ_succ : type:leq_succ_succ
