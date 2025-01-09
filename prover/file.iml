@@ -7,6 +7,9 @@ signature FILE =
       (* load Istari library *)
       val load : string -> unit
 
+      (* load Istari library without loading dependencies or recording a dependency *)
+      val loadWithoutDependencies : string -> unit
+
       
       (* use IML file (but only once) *)
       val import : string -> unit
@@ -24,6 +27,9 @@ signature FILE_INTERNAL =
       val save : string -> unit
 
 
+      val forgetDependencies : unit -> unit
+
+
       (* the IML "use" function *)
       val useHook : (string -> unit) ref
 
@@ -33,7 +39,7 @@ signature FILE_INTERNAL =
 structure FileInternal :> FILE_INTERNAL =
    struct
 
-      val magicNumber = Bytestring.fromString "Ist0000S"
+      val magicNumber = Bytestring.fromString "Ist0000T"
 
       structure CR = CheckpointedRef
       structure D = DatabaseInternal
@@ -260,6 +266,8 @@ structure FileInternal :> FILE_INTERNAL =
 
       (* All together *)
 
+      val dependencies : string list CR.cref = CR.new []
+
       fun save filename =
          let
             val outs = BinIO.openOut filename
@@ -269,6 +277,7 @@ structure FileInternal :> FILE_INTERNAL =
                    (
                    Bytestring.output outs magicNumber;
                    P.pickle (BinIO.output1 outs) P.word32 (Nonce.nonce ());
+                   P.pickle (BinIO.output1 outs) (P.list P.string) (List.rev (CR.deref dependencies));
                    P.pickle (BinIO.output1 outs) P.bool (Unsafe.allowed ());
                    writeNamespace outs;
                    DatabaseInternal.writeDatabase outs;
@@ -299,7 +308,7 @@ structure FileInternal :> FILE_INTERNAL =
 
       val magicNumberErrorMessage = "imported database is not an Istari file or was written by an incompatible version of Istari"
 
-      fun load filename =
+      fun loadMain loaddeps top filename =
          if Unsafe.getParanoid () then
             signalError "paranoid is set"
          else if not (List.null (N.currentModule ())) then
@@ -336,31 +345,42 @@ structure FileInternal :> FILE_INTERNAL =
                          in
                             if NS.member (CR.deref loaded) nonce then
                                (* already loaded; ignore *)
-                               (
-                               print "[";
-                               print filename;
-                               print " already loaded]\n"
-                               )
-                            else
-                               (
-                               CR.assign loaded (NS.insert (CR.deref loaded) nonce);
-
-                               if
-                                  P.unpickle (fn () => input1 ins) P.bool
-                               then
-                                  Unsafe.allow ()
+                               if top then
+                                  (
+                                  print "[";
+                                  print filename;
+                                  print " already loaded]\n"
+                                  )
                                else
-                                  () ;
+                                  (* ignore silently *)
+                                  ()
+                            else
+                               let
+                                  val () = CR.assign loaded (NS.insert (CR.deref loaded) nonce)
 
-                               readNamespace ins;
-                               DatabaseInternal.readDatabase ins;
-                               readRegistry ins;
-                               readReductions ins;
-                               DatatypeInternal.read (fn () => input1 ins);
-                               print "[";
-                               print filename;
-                               print " loaded]\n"
-                               )
+                                  val deps = P.unpickle (fn () => input1 ins) (P.list P.string)
+                               in
+                                  if loaddeps then
+                                     List.app (loadMain true false) deps
+                                  else
+                                     () ;
+
+                                  if
+                                     P.unpickle (fn () => input1 ins) P.bool
+                                  then
+                                     Unsafe.allow ()
+                                  else
+                                     () ;
+   
+                                  readNamespace ins;
+                                  DatabaseInternal.readDatabase ins;
+                                  readRegistry ins;
+                                  readReductions ins;
+                                  DatatypeInternal.read (fn () => input1 ins);
+                                  print "[";
+                                  print filename;
+                                  print " loaded]\n"
+                               end
                          end)
                   (fn () => BinIO.closeIn ins)
                with
@@ -402,6 +422,23 @@ structure FileInternal :> FILE_INTERNAL =
                             " does not support extracts"
                             ])
             end
+
+      fun load filename =
+         let
+            val filename =
+               try
+                  Path.canonize filename
+               with Path.Path =>
+                  signalError ("bad path name " ^ filename)
+         in
+            loadMain true true filename;
+            CR.assign dependencies (filename :: CR.deref dependencies)
+         end
+
+      fun loadWithoutDependencies filename = loadMain false true filename
+
+      fun forgetDependencies () = CR.assign dependencies nil
+
 
 
 

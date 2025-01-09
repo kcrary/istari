@@ -37,6 +37,10 @@ signature NAMESPACE =
       (* Remove module from exportable entities. *)
       val hideModule : symbol -> unit
 
+      (* Resolve address as if all modules were closed. *)
+      val resolveGlobal : address -> constant
+      val resolveGlobalOpt : address -> constant option
+
    end
 
 
@@ -793,6 +797,61 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
             else
                raise (Fail "module absent in hideModule")
          end
+
+
+      (* addr nonempty, |path| = |states| *)
+      fun resolveGlobalLoop addr path group states =
+         (case (addr, path) of
+             (nil, _) =>
+                raise (Fail "precondition")
+
+           | ([sym], _) =>
+                resolveConst group addr
+
+           | (_, nil) =>
+                resolveConst group addr
+
+           | (asym :: addr', psym :: path') =>
+                if Symbol.eq (asym, psym) then
+                   (case states of
+                       ST { working } :: rest =>
+                          resolveGlobalLoop addr' path' working rest
+
+                     | _ =>
+                          raise (Fail "precondition"))
+                else
+                   resolveConst group addr)
+
+      fun resolveGlobalOpt addr =
+         if List.null addr then
+            signalError "empty address"
+         else
+            let
+               (* the stack and the current path have the same length *)
+
+               val state as (ST { path=revpath }) = R.deref theState
+               val states = List.rev (state :: R.deref theStack)
+               val path = List.rev revpath
+            in
+               (case states of
+                   ST { env } :: rest =>
+                      resolveGlobalLoop addr path env rest
+   
+                 | _ =>
+                      raise (Fail "impossible"))
+            end
+
+      fun resolveGlobal addr =
+         (case resolveGlobalOpt addr of
+             SOME const => const
+
+           | NONE =>
+                signalError (String.concat
+                                [
+                                "no constant with global address ",
+                                String.concatWith "." (map Symbol.toValue addr),
+                                " exists"
+                                ]))
 
    end
 
