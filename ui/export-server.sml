@@ -105,7 +105,9 @@ fun export prelude =
    in
       if SMLofNJ.exportML exportPath then
          (
-         print "Istari proof assistant [";
+         print "Istari proof assistant ";
+         print Version.version;
+         print " [";
          print replDate;
          print "]\nRunning on ";
          print system;

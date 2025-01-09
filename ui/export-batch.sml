@@ -47,7 +47,9 @@ val replDate = Date.toString (Date.fromTimeUniv (Time.now ()))
 fun go prelude (_, args) =
    (
    C.process args;
-   print "Istari proof assistant [";
+   print "Istari proof assistant ";
+   print Version.version;
+   print " [";
    print replDate;
    print "]\nRunning on ";
    print system;

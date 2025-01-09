@@ -8,6 +8,7 @@ signature MISC_TACTIC =
 
       val exfalso : tactic
 
+      val trustmeRaw : tactic
       val trustme : tactic
 
    end
@@ -70,6 +71,17 @@ structure MiscTactic :> MISC_TACTIC =
              refine (Rule.voidElim (T.evar ())))
 
 
-      val trustme = refine Rule.trustme
+      val trustmeRaw = refine Rule.trustme
+
+      val trustme =
+         let
+            do (jud, _) = withgoal
+         in
+            refine (Rule.assert (T.apply1 Prim.istp (J.concl jud)) (T.evar ()))
+            >>> [
+                Typecheck.typecheck,
+                trustmeRaw
+                ]
+         end
 
    end
