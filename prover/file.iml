@@ -106,8 +106,17 @@ structure FileInternal :> FILE_INTERNAL =
          (case (old, new) of
              ([], []) => ()
 
-           | ([], _) =>
-                List.app N.beginModuleSym new
+           | ([], sym' :: _) =>
+                if toplevel andalso N.moduleExists [sym'] then
+                   signalError
+                      (String.concat
+                          [
+                          "module name ",
+                          Symbol.toValue sym',
+                          " to be loaded is already used in the namespace"
+                          ])
+                else
+                   List.app N.beginModuleSym new
 
            | (sym :: _, []) =>
                 (
@@ -122,6 +131,14 @@ structure FileInternal :> FILE_INTERNAL =
            | (sym :: restold, sym' :: restnew) =>
                 if Symbol.eq (sym, sym') then
                    gotoModule false restold restnew
+                else if toplevel andalso N.moduleExists [sym'] then
+                   signalError
+                      (String.concat
+                          [
+                          "module name ",
+                          Symbol.toValue sym',
+                          " to be loaded is already used in the namespace"
+                          ])
                 else
                    (
                    List.app (fn _ => N.endModule ()) old;
@@ -280,6 +297,8 @@ structure FileInternal :> FILE_INTERNAL =
 
       val loaded = CR.new NS.empty
 
+      val magicNumberErrorMessage = "imported database is not an Istari file or was written by an incompatible version of Istari"
+
       fun load filename =
          if Unsafe.getParanoid () then
             signalError "paranoid is set"
@@ -301,7 +320,7 @@ structure FileInternal :> FILE_INTERNAL =
                                           (fns _ l =>
                                               (case BinIO.input1 ins of
                                                   NONE =>
-                                                     signalError "imported database was written by an incompatible version of Istari"
+                                                     signalError magicNumberErrorMessage
                            
                                                 | SOME b => b :: l))
                                           []
@@ -311,7 +330,7 @@ structure FileInternal :> FILE_INTERNAL =
                                if Bytestring.eq (magicNumber, magicNumber') then
                                   ()
                                else
-                                  signalError "imported database was written by an incompatible version of Istari"
+                                  signalError magicNumberErrorMessage
 
                             val nonce = P.unpickle (fn () => input1 ins) P.word32
                          in

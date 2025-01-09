@@ -81,6 +81,14 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
 
       fun signalError str = raise (Namespace (String.concat ["Error: ", str, ".\n"]))
 
+      fun signalErrorOverlap sym =
+         signalError (String.concat
+                         [
+                         "the name ",
+                         Symbol.toValue sym,
+                         " is already used in the current module"
+                         ])
+
       val () = 
          Handler.customHandler
          (fn Namespace str => (print str; true)
@@ -326,12 +334,7 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
                  | SOME _ => C.HARD)
          in
             if D.member workingConsts sym then
-               signalError (String.concat
-                               [
-                               "the name ",
-                               Symbol.toValue sym,
-                               " is already used in the current module"
-                               ])
+               signalErrorOverlap sym
             else
                let
                   val const = 
@@ -366,12 +369,7 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
             val ST { current, path, env, working = G (workingConsts, workingMods), reverse } = R.deref theState
          in
             if D.member workingConsts sym then
-               signalError (String.concat
-                               [
-                               "the name ",
-                               Symbol.toValue sym,
-                               " is already used in the current module"
-                               ])
+               signalErrorOverlap sym
             else
                let
                   val result as (const, _, _) = Refine.reify jud v (sym :: path)
@@ -457,13 +455,7 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
                signalError "bad module name"
 
             else if D.member workingMods sym then
-               signalError (String.concat
-                               [
-                               "the module name ",
-                               Symbol.toValue sym,
-                               " is already used in the current module"
-                               ])
-
+               signalErrorOverlap sym
             else
                (
                R.assign theStack (st :: R.deref theStack);
@@ -627,12 +619,7 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
             val ST { current, path, env, working = working as G (workingConsts, _), reverse } = R.deref theState
          in
             if D.member workingConsts sym then
-               signalError (String.concat
-                               [
-                               "the name ",
-                               Symbol.toValue sym,
-                               " is already used in the current module"
-                               ])
+               signalErrorOverlap sym
             else
                let
                   val (env', reverse') = insertEnvConst env reverse sym const
@@ -658,12 +645,7 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
             val ST { current, path, env, working = working as G (workingConsts, workingMods), reverse } = R.deref theState
          in
             if D.member workingConsts sym then
-               signalError (String.concat
-                               [
-                               "the name ",
-                               Symbol.toValue sym,
-                               " is already used in the current module"
-                               ])
+               signalErrorOverlap sym
             else
                let
                   val (env', reverse') = insertEnvConst env reverse sym const

@@ -409,7 +409,10 @@ functor ReplFun (structure Platform : PLATFORM
                print "]\n"
                )
 
-            val ins = TextIO.openIn filename
+            val ins =
+               TextIO.openIn filename
+               handle exn => handleExn exn
+
             val strm = Stream.fromTextInstream ins
             val source = ShowContext.streamToSource firstRow strm
             val s = Incremental.lex strm Span.origin
