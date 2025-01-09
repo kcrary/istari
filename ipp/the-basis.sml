@@ -16,7 +16,11 @@ functor TheBasis (datatype data =
    =
    struct
 
-      val sig1_BOOL = [("bool", T), ("not", E 0)]
+      val sig1_BOOL =
+         [("bool", T),
+          ("not", E 0),
+          ("=", E 0),
+          ("xor", E 0)]
       
       val sig1_INTEGER =
          [("int", T),

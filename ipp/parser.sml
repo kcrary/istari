@@ -189,6 +189,8 @@ structure Parser :> PARSER =
                end
 
             fun list_pat (l, pats, r) = (Plist pats, join l r)
+            val identity_pat = identity
+            fun constr_pat (longid, span) = (Pconstr (longid, span), span)
             fun atom_pjuxta (pat as (_, r)) = (Jatom pat, r)
 
             fun constr_pjuxta (longid, span) =

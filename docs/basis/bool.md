@@ -6,6 +6,8 @@
           type bool
     
           val not : bool -> bool
+          val = : bool -> bool -> bool
+          val xor : bool -> bool -> bool
 
        end
 

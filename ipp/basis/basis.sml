@@ -5,6 +5,9 @@ signature Basis__BOOL =
       type bool
 
       val not : bool -> bool
+
+      val s__e : bool -> bool -> bool
+      val xor : bool -> bool -> bool
       
    end
 
@@ -475,6 +478,9 @@ structure Basis :> IML__BASIS =
 
             datatype bool = datatype bool
             val not = Bool.not
+            
+            fun s__e x y = if x then y else not y
+            fun xor x y = if x then not y else y
 
          end
 

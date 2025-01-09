@@ -5,6 +5,8 @@ module type BOOL =
       type bool
 
       val not : bool -> bool
+      val s__e : bool -> bool -> bool
+      val xor : bool -> bool -> bool
       
    end
 

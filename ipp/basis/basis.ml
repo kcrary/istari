@@ -7,6 +7,8 @@ module Bool : BOOL with type bool = bool =
 
       type bool = Bool.t = false | true 
       let not = not 
+      let s__e = Bool.equal
+      let xor x y = Bool.equal x (Bool.not y)
       
    end
 
