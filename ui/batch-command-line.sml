@@ -2,15 +2,13 @@
 signature BATCH_COMMAND_LINE =
    sig
 
+      (* Call to process command-line arguments *)
       val process : string list -> unit
 
-      (* The following return appropriate results after process has been run on the
-         command-line arguments.
-      *)
 
+      (* After arguments have been processed, call these to obtain the results. *)
       val inputFile : unit -> string
       val outputFile : unit -> string option
-
       val rapidFlag : unit -> bool
 
    end

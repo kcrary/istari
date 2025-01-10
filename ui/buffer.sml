@@ -2,29 +2,42 @@
 signature BUFFER =
    sig
 
+      (* Given information about the current location in the input buffer (used for
+         error reporting and cursor motion), create a new stream.
+
+         new a b
+
+         a: the beginning of the preceding gap (possibly empty)
+         b: the line number we're starting on
+
+         Forcing the stream can cause the buffer to call Memory.setLocation with an
+         appropriate location as processing advances through the input.
+      *)
+      val new : int -> int -> char Stream.stream
+
+
+      (* Forcing the stream might raise one of these exceptions, when the UI sends
+         certain input.
+      *)
       exception Interjection of char Stream.stream
       exception Rewind of int
       exception Exit
 
-      (* new a b
 
-         a: the beginning of the preceding gap (possibly empty)
-         b: the line number we're starting on
-      *)
-      val new : int -> int -> char Stream.stream
-
-      (* Notify buffer that we've completed a directive.  For signal to work properly,
+      (* Notify the buffer that we've completed a directive.  For signal to work properly,
          the users of the stream should not consume any more of the stream than necessary.
+         Used to identify gaps, and to set the cursor glyph in the UI.
       *)
       val signal : unit -> unit
 
+
+      (* Buffer calls this when the UI send a ready input. *)
       val onReadyHook : (unit -> unit) ref
 
    end
 
 
-functor UIBuffer (structure UI : UI
-                  structure Memory : MEMORY) :> BUFFER =
+structure Buffer :> BUFFER =
    struct
 
       exception Interjection of char Stream.stream

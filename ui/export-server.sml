@@ -2,26 +2,11 @@ CM.make "sources.cm";
 use "platform-nj.sml";
 CM.make "../ipp/basis/basis.cm";
 
-local
-
-   structure Buffer = UIBuffer (structure UI = UI
-                                structure Memory = Memory)
-
-   structure ReplStuff =
-      ReplFun (structure Platform = PlatformNJ
-               structure UI = UI
-               structure PostProcess = PostProcessNJ
-               structure Memory = Memory
-               structure Buffer = Buffer)
-               
-in
-
-   structure Repl = ReplStuff.Repl
-   structure Ctrl = ReplStuff.Ctrl
-   structure RecoverRepl = ReplStuff.RecoverRepl
-   structure RecoverReplInside = ReplStuff.RecoverReplInside
-
-end;
+structure ReplStuff = ReplFun (structure Platform = Platform);
+structure Repl = ReplStuff.Repl;
+structure Ctrl = ReplStuff.Ctrl;
+structure RecoverRepl = ReplStuff.RecoverRepl;
+structure RecoverReplInside = ReplStuff.RecoverReplInside;
 
 
 Incremental.load "../prover/prover.proj";

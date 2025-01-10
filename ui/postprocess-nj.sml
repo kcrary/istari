@@ -1,5 +1,5 @@
 
-structure PostProcessNJ :> POSTPROCESS =
+structure PostProcess :> POSTPROCESS =
    struct
 
       type errinfo = string * ((int * int) * (int * int)) * string

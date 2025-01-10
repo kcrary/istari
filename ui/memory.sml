@@ -10,33 +10,39 @@ signature MEMORY =
 
       (* Create a tentative checkpoint at the current location.
          A tentative checkpoint carries no rewind data and is overwritten by the
-         next setLocation.
+         next call to setLocation.
       *)
       val setLocation : location -> unit
+
 
       (* Obtains a checkpoint.  Saves it at the current tentative checkpoint, making it
          non-tentative.  Ignored if the last checkpoint is not tentative.
       *)
       val checkpoint : unit -> unit
 
+
       (* Make the last checkpoint persistent. *)
       val saveLast : unit -> unit
+
       
-      (* Restores the last checkpoint at (a, b) such that a <= n.  Returns its location.
-         If the last such non-persistent checkpoint fails, then restores
-         the last such persistent checkpoint instead.
+      (* Restores the most recent checkpoint such that its location is (a, b) and
+         a <= n.  Returns its location.  If the last such non-persistent checkpoint
+         fails, then restores the most recent such persistent checkpoint instead.
       *)
       val rewind : int -> location
+
 
       (* Restores the last checkpoint.  Returns its location. *)
       val rewindLast : unit -> location
 
 
-
-      (* First () argument captures the state; second restores it. *)
+      (* Callback for Memory to capture the state.  The first () argument captures
+         the state; the second restores it.
+      *)
       val rewindHook : (unit -> unit -> bool) ref
 
-      (* Resets to the initial state. *)
+
+      (* Callback for Memory to reset to the initial state. *)
       val resetHook : (unit -> unit) ref
 
    end

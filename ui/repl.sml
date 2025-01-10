@@ -2,28 +2,29 @@
 signature REPL_HOOKS =
    sig
 
-      (* Call on uncaught exceptions. *)
+      (* Callback to be called on uncaught exceptions. *)
       val exceptionHandler : (exn -> bool) ref
 
-      (* First () argument captures the state; second restores it. *)
+      (* Callback to capture the prover's state.  The first () argument captures the
+         state; the second restores it.
+      *)
       val checkpoint : (unit -> unit -> bool) ref
 
-      (* Reset to initial state. *)
+      (* Callback to reset the prover to its initial state. *)
       val reset : (unit -> unit) ref
 
-      (* Display appropriate information *)
+      (* Callbacks to display certain information. *)
       val onReady : (unit -> unit) ref
       val onRewind : (unit -> unit) ref
 
    end
 
 
+(* This operations are made available to the user. *)
 signature CTRL =
    sig
 
-      val load : string -> unit     (* load a compiled project *)
       val use : string -> unit      (* use an IML file *)
-      val escape : unit -> unit
       val exit : unit -> 'a
 
       val pwd : unit -> string
@@ -61,36 +62,7 @@ signature RECOVER_REPL =
    end
 
 
-signature PLATFORM =
-   sig
-
-      (* load the code from the given file name *)
-      val use : string -> unit
-
-      (* load the compiled project with the given base name *)
-      val load : string -> bool
-
-      (* install a function to process output *)
-      val captureOutput : (string -> unit) -> unit
-
-      (* set the output function back to the default *)
-      val resetOutput : unit -> unit
-
-      val printDepth : int ref
-      val printLength : int ref
-      val stringLength : int ref
-
-      val gcMessages : bool -> unit
-      val exnHistory : exn -> string list
-
-   end
-
-
-functor ReplFun (structure Platform : PLATFORM
-                 structure UI : UI
-                 structure Buffer : BUFFER
-                 structure Memory : MEMORY
-                 structure PostProcess : POSTPROCESS)
+functor ReplFun (structure Platform : PLATFORM)
    :>
    sig
       structure Repl : REPL
@@ -101,12 +73,11 @@ functor ReplFun (structure Platform : PLATFORM
    =
    struct
 
-      val interjectionRow = 0
-      val firstRow = 1  
+      (* constants to conform to Emacs's conventions *)
+      val firstRow = 1
       val firstCol = 0
+      val interjectionRow = 0  (* basically arbitrary *)
 
-
-      structure SubRepl = SubReplFun (structure PostProcess = PostProcess)
 
       exception Exit = Buffer.Exit
       exception Exception
@@ -115,6 +86,7 @@ functor ReplFun (structure Platform : PLATFORM
       val theTempFilename = ref "/dev/null"
 
 
+      (* ReplFun's caller fills these in. *)
       structure Hooks =
          struct
 
@@ -126,6 +98,9 @@ functor ReplFun (structure Platform : PLATFORM
 
          end
 
+
+
+      (* Miscellany *)
 
       val backtrace = ref false
 
@@ -223,7 +198,6 @@ functor ReplFun (structure Platform : PLATFORM
             end
             
 
-
       (* This will also handle lexing errors that arise in s. *)
       fun parse sourcename source s =
          Incremental.parse s
@@ -247,17 +221,12 @@ functor ReplFun (structure Platform : PLATFORM
                 print "\n";
 
                 if !Hooks.exceptionHandler exn then
-                   (
-                   Incremental.undo ();
-                   raise Exception
-                   )
+                   ()
                 else
-                   (
                    displayUncaughtException exn;
 
-                   Incremental.undo ();
-                   raise Exception
-                   )
+                Incremental.undo ();
+                raise Exception
                 ))
 
       
@@ -295,80 +264,6 @@ functor ReplFun (structure Platform : PLATFORM
                )
             else
                ()
-         end
-
-
-
-      (* Loading IML projects *)
-
-      exception LoadError
-
-      structure Regexp =
-         RegexpFun (structure Streamable =
-                       MonomorphizeStreamable (structure Streamable = StreamStreamable
-                                               type elem = char))
-
-      local
-
-         open Regexp
-         fun filesep ch = ch = #"/" orelse ch = #"\\"
-         fun notfilesep ch = not (filesep ch)
-
-      in
-
-         val reFilename = seq [plus' any, set filesep,
-                               capture (plus' (set notfilesep)),
-                               string ".iml.sml"]
-      end
-
-
-      fun ippload projfilename runCommands =
-         let
-            val () = 
-               Incremental.load projfilename
-               handle
-                  Error.Error (msg, place) =>
-                     (
-                     print "IPP error: ";
-                     print msg;
-                     print " at ";
-                     print (Error.placeToString "" place);
-                     print "\n\n";
-                     raise LoadError
-                     )
-
-            val proj = Make.getProjectBase projfilename
-         in
-            print "[loading ";
-            print proj;
-            print "]\n";
-
-            SubRepl.errorHandler :=
-               (fn (errfile, span, msg) =>
-                   (case Regexp.match reFilename (Stream.fromString errfile) of
-                       NONE =>
-                          (
-                          print "<file not identified>";
-                          print msg
-                          )
-          
-                     | SOME [Regexp.One goodname] =>
-                          (
-                          Main.invert projfilename goodname span msg;
-                          ()
-                          )
-          
-                     | SOME _ =>
-                          raise (Fail "impossible")));
-
-            (if Platform.load proj then () else raise LoadError)
-            handle exn =>
-               (
-               Incremental.undo ();
-               handleExn exn
-               );
-
-            runCommands ()
          end
 
 
@@ -436,7 +331,7 @@ functor ReplFun (structure Platform : PLATFORM
 
          1. the declaration containing the use is typechecked and compiled
          2. the compiled code is executed
-         3. during that execution, the "use" happens immediately, which results in
+         3. during that execution, any "use" happens immediately, which results in
             more execution and more bindings are introduced
          4. the binding resulting from the original declaration is introduced
 
@@ -460,7 +355,7 @@ functor ReplFun (structure Platform : PLATFORM
 
          1. the declaration containing the use is typechecked and compiled
          2. the compiled code is executed
-         3. during that execute, the "use" enqueues a "use" command, and then returns
+         3. during that execution, any "use" enqueues a USE command, and then returns
          4. the binding resulting from the original declaration is introduced
          5. enqueued commands take place
 
@@ -478,9 +373,13 @@ functor ReplFun (structure Platform : PLATFORM
       *)
 
       datatype command =
-         LOAD of string
-       | USE of string
+         USE of string
 
+      (* Any commands enqueued during a command go into a fresh queue that
+         is processed before returning to the original queue.  Notionally
+         we have a stack of queues, but each queue other than the top one
+         are stored in the control flow.
+      *)
       val commands : command IQueue.iqueue ref = ref (IQueue.iqueue ())
 
       fun runCommands () =
@@ -500,8 +399,7 @@ functor ReplFun (structure Platform : PLATFORM
                   Finally.finally
                      (fn () => 
                          (case command of
-                             LOAD filename => ippload filename runCommands
-                           | USE filename => ippuse filename runCommands))
+                             USE filename => ippuse filename runCommands))
                      (fn () => commands := q);
 
                   runCommands ()
@@ -530,6 +428,9 @@ functor ReplFun (structure Platform : PLATFORM
          end
             
 
+      (* Process an interjection input.  Unlike mainLoop, it can finish.  Also, it
+         doesn't save checkpoints and doesn't involve the buffer.
+      *)
       fun interjectLoop source s =
          (case Stream.front s of
              Stream.Nil => ()
@@ -605,7 +506,7 @@ functor ReplFun (structure Platform : PLATFORM
   
 
 
-      (* Set up initial environment *)
+      (* Create the initial environment *)
 
       fun makeStruct l =
          foldl
@@ -620,7 +521,7 @@ functor ReplFun (structure Platform : PLATFORM
 
       val ctrlSig =
          makeStruct
-            ["load", "use", "escape", "exit", 
+            ["use", "exit", 
              "pwd", "cd",
              "printDepth", "printLength", "stringLength", "gcMessages", "allowBeep", "backtrace"]
 
@@ -645,21 +546,28 @@ functor ReplFun (structure Platform : PLATFORM
 
       (* Start the REPL *)
 
-      fun startRepl a b =
+      fun activate main =
          let
             val tempFilename = OS.FileSys.tmpName ()
+
+            val () =
+               (
+               theTempFilename := tempFilename;
+               Incremental.outputStream := (fn () => TextIO.openOut tempFilename);
+               Platform.captureOutput SubRepl.process;
+               commands := IQueue.iqueue ()
+               )
+
+            val x = main ()
          in
-            theTempFilename := tempFilename;
-            Incremental.outputStream := (fn () => TextIO.openOut tempFilename);
-            Platform.captureOutput SubRepl.process;
-            commands := IQueue.iqueue ();
-
-            replLoop a b handle Exit => ();
-
             Platform.resetOutput ();
-            OS.FileSys.remove tempFilename handle OS.SysErr _ => ()
+            OS.FileSys.remove tempFilename handle OS.SysErr _ => ();
+            x
          end
 
+      fun startRepl gapStart row =
+         activate
+         (fn () => replLoop gapStart row handle Exit => ())
 
       fun run () =
          (
@@ -667,30 +575,20 @@ functor ReplFun (structure Platform : PLATFORM
          startRepl firstRow firstRow
          )
 
-
       fun batch filename =
          let
-            val tempFilename = OS.FileSys.tmpName ()
-
-            val () =
-               (
-               theTempFilename := tempFilename;
-               Incremental.outputStream := (fn () => TextIO.openOut (!theTempFilename));
-               Platform.captureOutput SubRepl.process;
-               commands := IQueue.iqueue ();
-
-               IQueue.insert (!commands) (USE filename)
-               )
-
             val result =
-               (runCommands (); true)
-               handle
-                  Exit => false
-                | Exception => false
+               activate
+               (fn () =>
+                   (
+                   IQueue.insert (!commands) (USE filename);
+   
+                   (runCommands (); true)
+                   handle
+                      Exit => false
+                    | Exception => false
+                   ))
          in
-            Platform.resetOutput ();
-            OS.FileSys.remove tempFilename handle OS.SysErr _ => ();
-
             if result then
                ()
             else
@@ -703,6 +601,9 @@ functor ReplFun (structure Platform : PLATFORM
             result
          end
 
+
+
+      (* Exports *)
 
       structure Repl =
          struct
@@ -718,17 +619,12 @@ functor ReplFun (structure Platform : PLATFORM
       structure Ctrl =
          struct
 
-            fun load filename = IQueue.insert (!commands) (LOAD filename)
-
             fun use filename = IQueue.insert (!commands) (USE filename)
-
-            fun escape () = raise Exit
 
             fun exit () = 
                (
                Platform.resetOutput ();
                
-               TextIO.print "[running the proper exit code]\n";
                OS.Process.exit OS.Process.success
                )
 

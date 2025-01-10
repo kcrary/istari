@@ -2,19 +2,27 @@
 signature SUBREPL =
    sig
 
+      (* set this to true to make the subrepl not echo the next line *)
+      val skipLine : bool ref  
+
+      (* call this to process a line of output from the ML repl *)
+      val process : string -> unit
+
+      (* the subrepl sets this to true when an error occurs *)
+      val errorDetected : bool ref
+
+
+
       (* filename, span, message *)
       type errinfo = string * ((int * int) * (int * int)) * string
 
-      val skipLine : bool ref  (* don't echo the next line *)
-      val errorDetected : bool ref
+      (* callback for error handling *)
       val errorHandler : (errinfo -> unit) ref
-
-      val process : string -> unit
 
    end
 
 
-functor SubReplFun (structure PostProcess : POSTPROCESS) :> SUBREPL =
+structure SubRepl :> SUBREPL =
    struct
 
       type errinfo = string * ((int * int) * (int * int)) * string

@@ -30,14 +30,19 @@ signature UI =
       
       val allowBeep : bool ref
 
-      val output : string -> unit
-      val message : string -> unit
-      val beep : unit -> unit
+      (* actions to make the UI do something *)
+
+      val output : string -> unit       (* ordinary output *)
+      val message : string -> unit      (* show message in the echo area *)
+      val beep : unit -> unit           (* sound the bell if allowBeep is set *)
       val moveCursor : int -> unit      (* move the cursor to the indicated line *)
       val ready : unit -> unit          (* set the cursor glyph *)
       val readyPartial : unit -> unit   (* set the cursor glyph *)
       val working : unit -> unit        (* set the cursor glyph *)
       val flush : unit -> unit          (* induce the UI to send FlushAck *)
+
+
+      (* input message received from the UI *)
 
       datatype input =
          Line of string          (* nonempty, ends in newline *)

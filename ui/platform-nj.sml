@@ -1,5 +1,9 @@
 
-structure PlatformNJ :> PLATFORM =
+(* This can't go in the CM project, since it refers to some stuff (e.g., CM) that 
+   CM projects don't have access to.
+*)
+
+structure Platform :> PLATFORM =
    struct
 
       val use = use
