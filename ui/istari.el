@@ -15,6 +15,10 @@
 (defvar istari-binary-index 0)
 (defvar istari-binary (cdar (last istari-binaries)))
 
+(defcustom istari-retract-maximum 5
+  "How many lines Istari should automatically retract when modified.")
+  
+
 (defvar ist-output-frame-top 0)
 (defvar ist-output-frame-left 638)
 (defvar ist-output-frame-height 75)
@@ -107,9 +111,17 @@
 
 ;; borrowed this code from ProofGeneral
 ;; it still allows modification by undo; I don't know how to prevent that
+;; (defun ist-read-only-hook (overlay after start end &optional len)
+;;   (unless (or inhibit-read-only (= (overlay-start overlay) (overlay-end overlay)))
+;;     (error "Read-only region")))
 (defun ist-read-only-hook (overlay after start end &optional len)
-  (unless (or inhibit-read-only (= (overlay-start overlay) (overlay-end overlay)))
-    (error "Read-only region")))
+  (cond
+   ((and
+     (>= (line-number-at-pos start) (- (line-number-at-pos (overlay-end overlay)) istari-retract-maximum))
+     (< start (overlay-end ist-cursor)))
+    (ist-rewind start))
+   ((not (or inhibit-read-only (= (overlay-start overlay) (overlay-end overlay))))
+    (error "Read-only region"))))
 (add-to-list 'debug-ignored-errors "Read-only region")
 
 (defun ist-overlay-read-only ()

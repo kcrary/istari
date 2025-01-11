@@ -95,13 +95,28 @@ then enter `M-i` to repeat that adjustment on subsequent lines.
 
 ### Protection of executed code
 
-By default, code above Istari's current line is set to read only.  The
-user can toggle this using `C-c C-r`.  Use caution when editing code
-already-executed code.  If you insert or delete newlines above the
-current line, Istari's UI will become confused.
+By default, code above Istari's current line is protected.  When you
+edit one of the last several lines of the protected region (the
+default is 5), Istari automatically rewinds to that line, or the
+latest line before it that has a checkpoint.  Attempted edits earlier
+than that are rejected.  This prevents Istari from rewinding a large
+amount of progress due to a stray keystroke.
 
-Undo can alter the read-only region, because I don't know how to
-prevent it from doing so.
+Note that undo can alter the read-only region and it does not trigger
+an automatic rewind.  (That is because undo bypasses Emacs's overlay
+mechanism and I don't know how to prevent it from doing so.)
+
+The maximum number of lines to rewind automatically is controlled by
+an emacs variable.  You can set that variable using 
+`C-x v istari-retract-maximum`.  Setting it to zero makes the entire
+protected region read-only.  Setting it to a large value allows one to
+edit (and automatically rewind) anywhere above the current line.
+
+The user can toggle the protected region using `C-c C-r`.  When it is
+off, anything can be edited and automatic rewinds are not triggered.
+Use caution when editing already-executed code.  If you insert or
+delete newlines above the current line, Istari's UI may become
+confused.
 
 
 
