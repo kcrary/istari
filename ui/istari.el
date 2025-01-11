@@ -6,16 +6,14 @@
 
 
 
-(defcustom istari-binary 
-  (concat istari-root "/ui/bin/istarisrv-heapimg")
-  "Location of the Istari binary.")
+(defcustom istari-binaries
+  (list
+   (cons "Libraries disabled." (concat istari-root "/ui/bin/istarisrv-nolib-heapimg"))
+   (cons "Libraries enabled." (concat istari-root "/ui/bin/istarisrv-heapimg")))
+  "Locations of the Istari binaries.")
 
-(defcustom istari-nolib-binary 
-  (concat istari-root "/ui/bin/istarisrv-nolib-heapimg")
-  "Location of the Istari binary (without preloaded libraries).")
-
-(defcustom istari-load-libraries t
-  "Whether to preload the Istari libraries.")
+(defvar istari-binary-index 0)
+(defvar istari-binary (cdar (last istari-binaries)))
 
 (defvar ist-output-frame-top 0)
 (defvar ist-output-frame-left 638)
@@ -35,6 +33,7 @@
 (define-key istari-mode-map [f5] 'istari-next)
 (define-key istari-mode-map "\C-c\C-m" 'istari-goto)
 (define-key istari-mode-map [3 C-return] 'istari-goto)
+(define-key istari-mode-map [C-return] 'istari-goto)
 (define-key istari-mode-map "\C-cx" 'istari-interject)
 (define-key istari-mode-map (kbd "C-c C-.") 'istari-goto-marker)
 (define-key istari-mode-map "\C-c\C-c" 'istari-interrupt)
@@ -43,7 +42,7 @@
 (define-key istari-mode-map [f10] 'istari-run)
 
 (define-key istari-mode-map "\C-cpt" 'istari-terminate)
-(define-key istari-mode-map "\C-cpl" 'istari-toggle-load-libraries)
+(define-key istari-mode-map "\C-cpl" 'istari-cycle-binaries)
 
 (define-key istari-mode-map "\C-c\C-d" 'istari-detail)
 (define-key istari-mode-map "\C-cs" 'istari-show)
@@ -290,8 +289,7 @@
               ; connect using a pipe (Emacs has a bug with large sends using ptys)
               ((process-connection-type nil)) 
             (start-process "ist-ml" "*subordinate istari process*" "sml" 
-                           (concat "@SMLload=" 
-                                   (if istari-load-libraries istari-binary istari-nolib-binary)))))
+                           (concat "@SMLload=" istari-binary))))
     (set-process-filter (get-process "ist-ml") 'ist-ml-output)
     ;; make sure the input is flushed
     (accept-process-output ist-ml-proc)))
@@ -437,13 +435,21 @@
   (interactive)
   (istari-interject "Debugger.run ();"))
 
-(defun istari-toggle-load-libraries ()
-  "Toggle loading the Istari library."
+(defun istari-cycle-binaries ()
+  "Cycle through Istari binaries."
   (interactive)
-  (setq istari-load-libraries (not istari-load-libraries))
-  (if istari-load-libraries
-      (message "Loading libraries enabled")
-    (message "Loading libraries disabled")))
+  (progn
+    (setq istari-binary-index (1+ istari-binary-index))
+    (let*
+        ((l (reverse istari-binaries))
+         (x (nth istari-binary-index l))
+         (y (if x
+                x
+              (progn
+                (setq istari-binary-index 0)
+                (car l)))))
+      (setq istari-binary (cdr y))
+      (message (car y)))))
 
 
 ;; This is to make (thing-at-point 'longid) work

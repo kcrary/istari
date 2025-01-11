@@ -13,21 +13,19 @@ generated : lexrepl-nj.cmlex.sml
 
 server : generated
 	cd ../prover; make smlnj
-	echo "export true;" | $(SMLNJ) export-server.sml
+	echo "exportServer \"../library/prelude.iml\" \"Libraries loaded.\\n\" \"bin/istarisrv-heapimg\";" | $(SMLNJ) export.sml
 
 server-nolib : generated
 	cd ../prover; make smlnj
-	echo "export false;" | $(SMLNJ) export-server.sml
+	echo "exportServer \"empty.iml\" \"\" \"bin/istarisrv-nolib-heapimg\";" | $(SMLNJ) export.sml
 
 batch : generated
 	cd ../prover; make smlnj
-	echo "export true;" | $(SMLNJ) export-batch.sml
-	../ipp/bin/$(MKNJEXEC) $(SMLNJ) `pwd`/bin istari-heapimg istari
+	echo "exportBatch \"../library/prelude.iml\" \"Libraries loaded.\\n\" \"bin/istari-heapimg\";" | $(SMLNJ) export.sml
 
 batch-nolib : generated
 	cd ../prover; make smlnj
-	echo "export false;" | $(SMLNJ) export-batch.sml
-	../ipp/bin/$(MKNJEXEC) $(SMLNJ) `pwd`/bin istari-nolib-heapimg istari-nolib
+	echo "exportBatch \"empty.iml\" \"\" \"bin/istari-nolib-heapimg\";" | $(SMLNJ) export.sml
 
 procdoc :
 	cd ../prover; make smlnj

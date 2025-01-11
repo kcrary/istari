@@ -22,7 +22,7 @@ signature SUBREPL =
    end
 
 
-structure SubRepl :> SUBREPL =
+functor SubReplFun (structure PostProcess : POSTPROCESS) :> SUBREPL =
    struct
 
       type errinfo = string * ((int * int) * (int * int)) * string

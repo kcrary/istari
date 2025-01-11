@@ -5,9 +5,9 @@ CM.make "../ipp/basis/basis.cm";
 local
 
    structure ReplStuff =
-      ReplFun (structure Platform = PlatformNJ
+      ReplFun (structure Platform = Platform
                structure UI = NullUI
-               structure PostProcess = PostProcessNJ
+               structure PostProcess = PostProcess
                structure Memory = NullMemory
                structure Buffer = SimpleBuffer)
 

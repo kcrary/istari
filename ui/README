@@ -1,0 +1,70 @@
+
+The architecture is contorted here to deal with user interrupts, and
+some other SML/NJ issues.
+
+1.
+
+The obvious way to handle interrupts is using continuations and signal
+handlers, but that doesn't seem to work because of how SML/NJ handles
+_use_.  (See ui/README in the improved-ui branch for a discussion of
+the problem.)  Instead, we employ a ramshackle workaround.
+
+We build the server binary with exportML, which puts the full SML/NJ
+repl into the binary.  The user never sees it, but we utilize it to
+deal with user interrupts.  A user interrupt can either come within a
+call to use, or outside of it.
+
+- If the user interrupts during use, use aborts and raises an
+  exception.  That's fine; we can handle that.
+
+- If the user interrupts outside of use (i.e., in the repl code
+  itself), it aborts the IML repl and drops us back into the SML/NJ
+  repl.  We always follow a ^C with a call to RecoverRepl.recover,
+  which restarts the IML repl.
+
+Of course, we _always_ call recover after a ^C (since we have no way
+of knowing which state prevails).  Thus, if the interrupt arrived
+during use, the repl resumes and _it_ processes the call to recover.
+To deal with this we make sure that RecoverRepl.recover is in the IML
+namespace, and IML's version does nothing.
+
+All this is to prevent an SML/NJ behavior in which uncaught exceptions
+raised by used code get turned into ExnDuringExecution.  But despite
+all this trouble, occasionally SML/NJ gets itself into a state in
+which that happens anyway.  This seems to be some sort of race
+condition.
+
+
+2.
+
+Batch mode shares most of the code with the server.  We implement
+batch mode by immediately starting an IML use, and afterward we write
+the Istari state.  All of the fancy code the server uses to deal with
+console input and checkpoints exist in batch mode but it never gets
+called.  (It doesn't add appreciably to the size of the binary.)
+
+However, server and batch mode have to be separate binaries, because
+the server has to be an SML/NJ repl (as discussed above), and batch
+mode cannot be an SML/NJ repl.  The latter is for a more pedestrian
+reason: we cannot pass command-line arguments to the SML/NJ repl.
+
+Consequently, the server is built with exportML, while batch mode is
+build with exportFn.
+
+Because of all this, we need four Istari binaries: server and batch
+mode, each with and without the libraries.  Plus we have binaries for
+the istaritags and procdoc tools.
+
+
+3.
+
+There is an additional wrinkle in the export code, because of a
+peculiarity in the way SML/NJ propagates exceptions from _use_.  When
+use is initiated by startup code, uncaught exceptions raised by the
+used code turn into ExnDuringExecution; but when it is initiated by
+user code, uncaught exceptions are treated properly.  Thus, we need to
+convince SML/NJ that everything is initiated by user code.  To do
+this, export.sml does not actually do the export.  Instead, it creates
+an export function, and the makefile pipes in a call to the export
+function.  Thus it looks as though export was called by an expression
+typed into the SML/NJ repl.

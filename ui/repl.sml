@@ -45,7 +45,7 @@ signature REPL =
 
       val run : unit -> unit
 
-      (* load the indicated file, as it it were being used, true result indicates success *)
+      (* load the indicated file, as it it were being used; true result indicates success *)
       val batch : string -> bool
 
       structure Hooks : REPL_HOOKS
@@ -53,6 +53,7 @@ signature REPL =
    end
 
 
+(* see below *)
 signature RECOVER_REPL =
    sig
 
@@ -62,7 +63,11 @@ signature RECOVER_REPL =
    end
 
 
-functor ReplFun (structure Platform : PLATFORM)
+functor ReplFun (structure Platform : PLATFORM
+                 structure UI : UI
+                 structure Memory : MEMORY
+                 structure Buffer : BUFFER
+                 structure PostProcess : POSTPROCESS)
    :>
    sig
       structure Repl : REPL
@@ -72,6 +77,8 @@ functor ReplFun (structure Platform : PLATFORM)
    end
    =
    struct
+
+      structure SubRepl = SubReplFun (structure PostProcess = PostProcess)
 
       (* constants to conform to Emacs's conventions *)
       val firstRow = 1
@@ -648,6 +655,8 @@ functor ReplFun (structure Platform : PLATFORM)
          the IML repl will be interrupted.  So we arrange the environment so that in the
          IML repl RecoverRepl points to RecoverReplInside, but outside the IML repl it
          points to RecoverRepl.
+
+         (See README for more.)
       *)
 
       structure RecoverRepl =
