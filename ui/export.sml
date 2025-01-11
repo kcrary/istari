@@ -56,16 +56,22 @@ Incremental.consult "open Pervasive;\n";
 open Pervasive;
 
 
+val version =
+   String.concat
+      [
+      Version.version,
+      " [",
+      Date.toString (Date.fromTimeUniv (Time.now ())),
+      "]"
+      ]
+
 fun splash () =
    let
       val {system, version_id, date} = Compiler.version
-      val replDate = Date.toString (Date.fromTimeUniv (Time.now ()))
    in
       print "Istari proof assistant ";
-      print Version.version;
-      print " [";
-      print replDate;
-      print "]\nRunning on ";
+      print version;
+      print "\nRunning on ";
       print system;
       print " v";
       print (Int.toString (hd version_id));
@@ -91,7 +97,7 @@ fun server message =
    )
 
 
-structure C = BatchCommandLine
+structure C = BatchCommandLine (val version = version)
 
 fun batch message (_, args) =
    (
@@ -103,7 +109,8 @@ fun batch message (_, args) =
    if C.rapidFlag () then
       (
       Unsafe.allow ();
-      Datatype.rapid := true
+      Datatype.rapid := true;
+      print "Rapid datatype elaboration activated.\n"
       )
    else
       ();

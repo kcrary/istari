@@ -15,7 +15,7 @@ signature BATCH_COMMAND_LINE =
 
 
 
-structure BatchCommandLine :> BATCH_COMMAND_LINE =
+functor BatchCommandLine (val version : string) :> BATCH_COMMAND_LINE =
    struct
 
       structure C = ParseCommandLine
@@ -31,10 +31,18 @@ structure BatchCommandLine :> BATCH_COMMAND_LINE =
          print "  istari [options] <istari-file>\n\
                \  -no             do not write output\n\
                \  -o <filename>   set output file name\n\
-               \  -rapid          activate unsafe mode and rapid datatype elaboration\n";
+               \  -rapid          activate unsafe mode and rapid datatype elaboration\n\
+               \  -version        display version information\n";
          exit ()
          )
 
+      fun showVersion () =
+         (
+         print "Istari proof assistant ";
+         print version;
+         print "\n";
+         exit ()
+         )
    
       val infileKey : string C.id_key =
          C.key (C.default'
@@ -68,6 +76,7 @@ structure BatchCommandLine :> BATCH_COMMAND_LINE =
             (C.or
                 [
                 C.map usage (C.exactly "--help"),
+                C.map showVersion (C.exactly "-version"),
                 
                 C.unitOpt "-no" outfileKey NONE,
                 C.stringOpt "-o" (C.mapKeyIn SOME outfileKey),
