@@ -1,6 +1,5 @@
-open:FiniteMap
-open:List
 open:Option
+open:FiniteMap
 # `FiniteMap`
 
 ### Simple finite maps
@@ -40,6 +39,8 @@ equality.  The equality test is supplied to the `empty` operation.
 
     eqtest : type:eqtest
            = def:eqtest
+
+    finite_map_impl_eqtest : type:finite_map_impl_eqtest
 
 A recommended way to use `empty` is to define `eqt : eqtest A`, then
 define `myempty` to be `empty eqt`.  If `myempty` is then made a [soft
@@ -103,6 +104,70 @@ The derived notion of membership is useful:
 
     lookup_merge_right' : type:lookup_merge_right'
 
+    decidable_member : type:decidable_member
+
+
+
+##### Mapping over finite maps
+
+
+    map : type:map
+
+    map_identity : type:map_identity
+
+    map_compose : type:map_compose
+
+    lookup_map : type:lookup_map
+
+    map_empty : type:map_empty
+
+    map_update : type:map_update
+
+    map_remove : type:map_remove
+
+    map_merge : type:map_merge
+
+    member_map : type:member_map
+
+
+
+##### Combination (a.k.a. symmetric merge)
+
+    combine : type:combine
+            = def:combine
+            imp:combine
+
+    combine_transpose : type:combine_transpose
+
+    lookup_combine_left : type:lookup_combine_left
+
+    lookup_combine_right : type:lookup_combine_right
+
+    lookup_combine_both : type:lookup_combine_both
+
+    combine_empty_left : type:combine_empty_left
+
+    combine_empty_right : type:combine_empty_right
+
+    combine_update_left_absent : type:combine_update_left_absent
+
+    combine_update_right_absent : type:combine_update_right_absent
+
+    combine_update_left_present : type:combine_update_left_present
+
+    combine_update_right_present : type:combine_update_right_present
+
+    combine_remove_left_absent : type:combine_remove_left_absent
+
+    combine_remove_right_absent : type:combine_remove_right_absent
+
+    combine_remove_left_present : type:combine_remove_left_present
+
+    combine_remove_right_present : type:combine_remove_right_present
+
+    map_combine : type:map_combine
+
+
 
 #### Finite map domains
 
@@ -117,103 +182,6 @@ Another version returns the domain squashed:
     finite_map_domain_squash : type:finite_map_domain_squash
 
 
-### Generic finite maps
-
-We can define a generic class determining what it means to be a finite map:
-
-    FiniteMap : type:FiniteMap
-              = def:FiniteMap
-
-We can then prove properties about such maps similar to what we showed
-above for simple finite maps:
-
-    FiniteMap_look_emp : type:FiniteMap_look_emp
-
-    FiniteMap_look_upd : type:FiniteMap_look_upd
-
-    FiniteMap_look_upd_neq : type:FiniteMap_look_upd_neq
-
-    FiniteMap_look_rem : type:FiniteMap_look_rem
-
-    FiniteMap_look_rem_neq : type:FiniteMap_look_rem_neq
-
-    FiniteMap_upd_upd : type:FiniteMap_upd_upd
-
-    FiniteMap_upd_upd_neq : type:FiniteMap_upd_upd_neq
-
-    FiniteMap_rem_emp : type:FiniteMap_rem_emp
-
-    FiniteMap_rem_upd : type:FiniteMap_rem_upd
-
-    FiniteMap_rem_upd_neq : type:FiniteMap_rem_upd_neq
-
-    FiniteMap_rem_absent : type:FiniteMap_rem_absent
-
-Note that generic finite maps require that the domain's equality is
-decidable, and thus an equality test is not supplied to the `emp`
-operation.
-
-
-### Generic finite maps with merge
-
-The `FiniteMap` class does not include a merge operation.  The
-`FiniteMapMerge` class adds one:
-
-    FiniteMapMerge : type:FiniteMapMerge
-                   = def:FiniteMapMerge
-
-    FiniteMapMerge_look_mer_left : type:FiniteMapMerge_look_mer_left
-
-    FiniteMapMerge_look_mer_right : type:FiniteMapMerge_look_mer_right
-
-    FiniteMapMerge_mer_emp_left : type:FiniteMapMerge_mer_emp_left
-
-    FiniteMapMerge_mer_emp_right : type:FiniteMapMerge_mer_emp_right
-
-    FiniteMapMerge_upd_mer_left : type:FiniteMapMerge_upd_mer_left
-
-    FiniteMapMerge_upd_mer_right : type:FiniteMapMerge_upd_mer_right
-
-    FiniteMapMerge_rem_mer : type:FiniteMapMerge_rem_mer
-
-
-### Generic finite maps minus extensionality
-
-To assist in building finite maps, there is a class that leaves out
-extensionality equality:
-
-    PreFiniteMap : type:PreFiniteMap
-                 = def:PreFiniteMap
-
-Given a pre-finite-map, one can build a finite map by quotienting it:
-
-    (* "quotient pre-finite-map" *)
-    qpfm : type:qpfm
-         = def:qpfm
-
-    quotient_emp : type:quotient_emp
-
-    quotient_look : type:quotient_look
-
-    quotient_upd : type:quotient_upd
-
-    quotient_rem : type:quotient_rem
-
-    FiniteMap_qpfm : type:FiniteMap_qpfm
-
-Another class gives finite maps with merge but without extensionality:
-
-    PreFiniteMapMerge : type:PreFiniteMapMerge
-                      = def:PreFiniteMapMerge
-
-    quotient_mer : type:quotient_mer
-
-    FiniteMapMerge_qpfm : type:FiniteMapMerge_qpfm
-
-The simple finite maps are defined using these tools.  The discrepancy
-between the types of `empty` versus `emp` is mediated using a lemma
-that extracts an equality test from a finite map:
-
-    finite_map_impl_eqtest : type:finite_map_impl_eqtest
-
-(By definition, all equality tests at the same type are equal.)
+The submodule [`Class`](finite-map-class.html) defines a generic class
+determining what it means to be a finite map.  It is used in the
+implementation of the simple finite maps above.

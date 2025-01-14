@@ -1,6 +1,7 @@
 
 File.import "bool-load.iml";
 File.import "decidable-load.iml";
+File.import "function-load.iml";
 File.import "list-load.iml";
 File.import "logic-load.iml";
 File.import "option-load.iml";
@@ -10,6 +11,9 @@ openModule /Option/;
 openModule /List/;
 
 beginModule "FiniteMap";
+
+
+beginModule "Class";
 
 
 (* Generic finite maps *)
@@ -905,6 +909,12 @@ qed ();
 
 
 
+endModule ();  (* Class *)
+
+openModule /Class/;
+
+
+
 (* Simple finite maps *)
 
 define /eqtest A/
@@ -919,6 +929,9 @@ unfold /eqtest/.
 typecheck.
 qed ();
 
+
+
+beginModule "Impl";
 
 
 define /pre_finite_map A B/
@@ -1186,6 +1199,10 @@ splitn 3 >> auto.
   }
 qed ();
 
+
+
+endModule ();  (* Impl *)
+openModule /Impl/;
 
 
 
@@ -1808,6 +1825,830 @@ qed ();
 
 
 
+lemma "decidable_member"
+/
+  forall i (A B : U i) (f : finite_map A B) a .
+    Decidable.decidable (member f a)
+/;
+
+inference.
+intro /i A B f a/.
+unfold /member/.
+generalize /lookup f a/ /_/ /X/.
+destruct /X/ /{| b}/.
+  {
+  right.
+  intro /(b' Heq)/.
+  injection /Heq/.
+  }
+
+  {
+  left.
+  exists /b/.
+  reflexivity.
+  }
+qed ();
+
+
+
+(* Map *)
+
+beginModule "MapImpl";
+
+
+define /pre_map A B C g f/
+/
+  (f #1,
+   (fnind comp : list [(A & B)] -> list (A & C) of
+    | nil . nil
+    | cons h t . (h #1, g (h #1) (h #2)) :: comp t) (f #2))
+//
+  intersect i . forall (A B C : U i) . (A -> B -> C) -> pre_finite_map A B -> pre_finite_map A C
+/;
+
+inference.
+unfold /pre_map, pre_finite_map at all/.
+typecheck.
+qed ();
+
+
+
+lemma "pre_lookup_pre_map"
+/
+  forall i (A B C : U i) (g : A -> B -> C) (f : pre_finite_map A B) (a : A) .
+    pre_lookup A C (pre_map A B C g f) a
+    = Option.map (g a) (pre_lookup A B f a)
+    : option C
+/;
+
+inference.
+intro /i A B C g f a/.
+destruct /f/ /e f/.
+unfold /pre_map, pre_lookup at all/.
+induction /f/ >> auto.
+intro /(a' b) f IH/.
+reduce //.
+boolCase /e a a'/ /Heq/ >> auto.
+destruct /e/ /e He/.
+compat.
+compat.
+symmetry.
+apply /He/ >> auto.
+qed ();
+
+
+endModule ();
+openModule /MapImpl/;
+
+
+
+defineVary /map {A B C} h f/ /map'/
+/
+  pre_map A B C h f
+//
+  intersect i . forall (A B C : U i) . (A -> B -> C) -> finite_map A B -> finite_map A C
+/;
+
+inference.
+introOf /i A B C h f/.
+unfold /map'/.
+destruct /f/ /[f g Hfg]/.
+unfold /finite_map/.
+infer /qpfm A C (pre_finite_map A C) (pre_lookup A C)/ /Hof/.
+unfold /qpfm in Hof in concl/.
+extensionality.
+intro /a/.
+rewrite /-> pre_lookup_pre_map at 0 0/.
+compat >> auto.
+qed ();
+
+
+
+lemma "lookup_map"
+/
+  forall i (A B C : U i) (g : A -> B -> C) (f : finite_map A B) a .
+    lookup (map g f) a
+    = Option.map (g a) (lookup f a)
+    : option C
+/;
+
+inference.
+intro /i A B C g f a/.
+assert /\Prover.currentConcl ()\ : type/ /Hof/.
+  {
+  typecheck.
+  }
+destruct /f/ /[f]/.
+unhide.
+unfold /lookup at all, map at all/.
+apply /pre_lookup_pre_map/.
+qed ();
+
+
+
+lemma "map_identity"
+/
+  forall i (A B : U i) f .
+    map (fn _ x . x) f = f : finite_map A B
+/;
+
+inference.
+intro /i A B f/.
+apply /finite_map_ext/.
+intro /a/.
+rewrite /-> lookup_map/.
+rewrite /-> Option.map_identity/.
+reflexivity.
+qed ();
+
+
+
+lemma "map_compose"
+/
+  forall i (A B C D : U i) (g : A -> C -> D) (h : A -> B -> C) f .
+    map g (map h f) = map (fn x y . g x (h x y)) f : finite_map A D
+/;
+
+inference.
+intro /i A B C D g h f/.
+apply /finite_map_ext/.
+intro /a/.
+rewrite /-> lookup_map at all/.
+rewrite /-> Option.map_compose/.
+reflexivity.
+qed ();
+
+
+
+lemma "map_empty"
+/
+  forall i (A B C : U i) (g : A -> B -> C) e .
+    map g (empty e) = empty e : finite_map A C
+/;
+
+inference.
+intro /i A B C g e/.
+apply /finite_map_ext/.
+intro /a/.
+rewrite /-> lookup_map/.
+rewrite /-> lookup_empty at 0 0/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "map_update"
+/
+  forall i (A B C : U i) (g : A -> B -> C) f a b .
+    map g (update f a b) = update (map g f) a (g a b) : finite_map A C
+/;
+
+inference.
+intro /i A B C g f a b/.
+apply /finite_map_ext/.
+intro /a'/.
+rewrite /-> lookup_map/.
+so /finite_map_impl_eq_decidable _# 2 f a a'/ /Heq | Hneq/.
+  {
+  subst /a'/.
+  rewrite /-> lookup_update at 0 0/.
+  reduce //.
+  reflexivity.
+  }
+
+  {
+  rewrite /-> lookup_update_neq at 0 0/ >> auto.
+  rewrite /-> lookup_map/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "map_remove"
+/
+  forall i (A B C : U i) (g : A -> B -> C) f a .
+    map g (remove f a) = remove (map g f) a : finite_map A C
+/;
+
+inference.
+intro /i A B C g f a/.
+apply /finite_map_ext/.
+intro /a'/.
+rewrite /-> lookup_map/.
+so /finite_map_impl_eq_decidable _# 2 f a a'/ /Heq | Hneq/.
+  {
+  subst /a'/.
+  rewrite /-> lookup_remove at 0 0/.
+  reflexivity.
+  }
+
+  {
+  rewrite /-> lookup_remove_neq at 0 0/ >> auto.
+  rewrite /-> lookup_map/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "map_merge"
+/
+  forall i (A B C : U i) (g : A -> B -> C) f f' .
+    map g (merge f f') = merge (map g f) (map g f') : finite_map A C
+/;
+
+inference.
+intro /i A B C g f f'/.
+apply /finite_map_ext/.
+intro /a/.
+setEq /X/ /lookup f a/ /_/ /Hlook/.
+symmetryIn /Hlook/.
+rewrite /-> lookup_map/.
+destruct /X/ /{| b}/.
+  {
+  rewrite /-> lookup_merge_right/ >> auto.
+  rewrite /-> lookup_merge_right/.
+    {
+    rewrite /-> lookup_map/.
+    rewrite /-> Hlook/.
+    reflexivity.
+    }
+  rewrite /-> lookup_map/.
+  reflexivity.
+  }
+
+  {
+  rewrite /-> lookup_merge_left _# 6 b/ >> auto.
+  rewrite /-> lookup_merge_left _# 6 (g a b)/.
+    {
+    rewrite /-> lookup_map/.
+    rewrite /-> Hlook/.
+    reflexivity.
+    }
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "member_map"
+/
+  forall i (A B C : U i) a (g : A -> B -> C) f .
+    member (map g f) a <-> member f a
+/;
+
+inference.
+intro /i A B C a g f/.
+unfold /member at 0 0/.
+split.
+  {
+  intro /(c Hlook)/.
+  rewrite /-> lookup_map in Hlook/.
+  revert /Hlook/.
+  remember /lookup f a/ /_/ /X/ /Hlook/.
+  symmetryIn /Hlook/.
+  destruct /X/ /{| b}/.
+    {
+    intro /H/.
+    reduce /H/.
+    injection /H/.
+    }
+  intro /Heq/.
+  reduce /Heq/.
+  injection /Heq/.
+  subst /c/.
+  exists /b/.
+  auto.
+  }
+
+  {
+  intro /(b Hlook)/.
+  exists /g a b/.
+  rewrite /-> lookup_map/.
+  rewrite /-> Hlook/.
+  reflexivity.
+  }
+qed ();
+
+
+
+(* Combination (symmetric merge) *)
+
+define /combine {A B} f g h/
+/
+  merge
+    (map
+       (fn a b .
+          (case lookup g a : option of
+           | None . b
+           | Some b' . h a b b'))
+       f)
+    g
+//
+  intersect i . forall (A B : U i) .
+    finite_map A B -> finite_map A B -> (A -> B -> B -> B) -> finite_map A B
+/;
+
+inference.
+unfold /combine/.
+typecheck.
+qed ();
+
+
+
+lemma "combine_transpose"
+/
+  forall i (A B : U i) f g h .
+    combine f g h = combine g f (fn a b b' . h a b' b) : finite_map A B
+/;
+
+inference.
+intro /i A B f g h/.
+apply /finite_map_ext/.
+intro /a/.
+unfold /combine at 0 0/.
+setEq /X/ /lookup f a/ /_/ /Hlook/.
+setEq /Y/ /lookup g a/ /_/ /Hlook'/.
+symmetryIn /Hlook/.
+symmetryIn /Hlook'/.
+destruct /X/ /{| b}/ >> destruct /Y/ /{| b'}/.
+  {
+  rewrite /-> lookup_merge_right/.
+    {
+    rewrite /-> lookup_map/.
+    rewrite /-> Hlook/.
+    auto.
+    }
+  rewrite /-> lookup_merge_right/.
+    {
+    rewrite /-> lookup_map/.
+    rewrite /-> Hlook'/.
+    auto.
+    }
+  rewrite /-> Hlook, -> Hlook'/.
+  auto.
+  }
+
+  {
+  rewrite /-> lookup_merge_right/.
+    {
+    rewrite /-> lookup_map/.
+    rewrite /-> Hlook/.
+    auto.
+    }
+  rewrite /-> lookup_merge_left _# 6 b'/ >> auto.
+  rewrite /-> lookup_map/.
+  reduce //.
+  rewrite /-> Hlook, -> Hlook'/.
+  reduce //.
+  auto.
+  }
+
+  {
+  rewrite /-> lookup_merge_left _# 6 b/.
+    {
+    rewrite /-> lookup_map/.
+    rewrite /-> Hlook/.
+    reduce //.
+    rewrite /-> Hlook'/.
+    reduce //.
+    auto.
+    }
+  rewrite /-> lookup_merge_right/.
+    {
+    rewrite /-> lookup_map/.
+    reduce //.
+    rewrite /-> Hlook, -> Hlook'/.
+    reduce //.
+    auto.
+    }
+  auto.
+  }
+
+  {
+  rewrite /-> lookup_merge_left _# 6 (h a b b')/.
+    {
+    rewrite /-> lookup_map/.
+    rewrite /-> Hlook/.
+    reduce //.
+    rewrite /-> Hlook'/.
+    reduce //.
+    auto.
+    }
+  rewrite /-> lookup_merge_left _# 6 (h a b b')/.
+    {
+    rewrite /-> lookup_map/.
+    rewrite /-> Hlook'/.
+    reduce //.
+    rewrite /-> Hlook/.
+    reduce //.
+    auto.
+    }
+  auto.
+  }
+qed ();
+
+
+
+lemma "lookup_combine_right"
+/
+  forall i (A B : U i) f g h (a : A) .
+    lookup f a = None : option B
+    -> lookup (combine f g h) a = lookup g a : option B
+/;
+
+inference.
+intro /i A B f g h a Hlook/.
+unfold /combine/.
+rewrite /-> lookup_merge_right/ >> auto.
+rewrite /-> lookup_map/.
+rewrite /-> Hlook/ >> auto.
+qed ();
+
+
+
+lemma "lookup_combine_left"
+/
+  forall i (A B : U i) f g h (a : A) .
+    lookup g a = None : option B
+    -> lookup (combine f g h) a = lookup f a : option B
+/;
+
+inference.
+intro /i A B f g h a Hlook/.
+rewrite /-> combine_transpose/.
+apply /lookup_combine_right/ >> auto.
+qed ();
+
+
+
+lemma "lookup_combine_both"
+/
+  forall i (A B : U i) f g h (a : A) b b' .
+    lookup f a = Some b : option B
+    -> lookup g a = Some b' : option B
+    -> lookup (combine f g h) a = Some (h a b b') : option B
+/;
+
+inference.
+intro /i A B f g h a b b' Hlookf Hlookg/.
+unfold /combine/.
+rewrite /-> lookup_merge_left _# 6 (h a b b')/ >> auto.
+rewrite /-> lookup_map/.
+rewrite /-> Hlookf/.
+reduce //.
+rewrite /-> Hlookg/.
+auto.
+qed ();
+
+
+
+lemma "combine_empty_left"
+/
+  forall i (A B : U i) e f h .
+    combine (empty e) f h = f : finite_map A B
+/;
+
+inference.
+intro /i A B e f h/.
+apply /finite_map_ext/.
+intro /a/.
+rewrite /-> lookup_combine_right/ >> auto.
+apply /lookup_empty/.
+qed ();
+
+
+
+lemma "combine_empty_right"
+/
+  forall i (A B : U i) e f h .
+    combine f (empty e) h = f : finite_map A B
+/;
+
+inference.
+intro /i A B e f h/.
+rewrite /-> combine_transpose/.
+rewrite /-> combine_empty_left/.
+reflexivity.
+qed ();
+
+
+
+lemma "combine_update_left_absent"
+/
+  forall i (A B : U i) f g h a b .
+    lookup g a = None : option B
+    -> combine (update f a b) g h = update (combine f g h) a b : finite_map A B
+/;
+
+inference.
+intro /i A B f g h a b Hlookg/.
+apply /finite_map_ext/.
+intro /a'/.
+so /finite_map_impl_eq_decidable _# 2 f a a'/ /Heq | Hneq/.
+  {
+  subst /a'/.
+  rewrite /-> lookup_combine_left/ >>> [auto, idtac].
+  rewrite /-> lookup_update at 0 0/.
+  auto.
+  }
+rewrite /-> lookup_update_neq/ >>> [auto, idtac].
+setEq /X/ /lookup g a'/ /_/ /Hlookg'/.
+symmetryIn /Hlookg'/.
+destruct /X/ /{| c'}/.
+  {
+  rewrite /-> lookup_combine_left/ >>> [auto, idtac].
+  rewrite /-> lookup_combine_left/ >>> [auto, idtac].
+  rewrite /-> lookup_update_neq/ >> auto.
+  }
+setEq /X/ /lookup f a'/ /_/ /Hlookf'/.
+symmetryIn /Hlookf'/.
+destruct /X/ /{| c}/.
+  {
+  rewrite /-> lookup_combine_right/.
+    {
+    rewrite /-> lookup_update_neq/ >> auto.
+    }
+  rewrite /-> lookup_combine_right/ >> auto.
+  }
+rewrite /-> lookup_combine_both _# 7 c c'/ >> auto.
+  {
+  rewrite /-> lookup_update_neq/ >> auto.
+  }
+
+  {
+  rewrite /-> lookup_combine_both _# 7 c c'/ >> auto.
+  }
+qed ();
+
+
+
+lemma "combine_update_right_absent"
+/
+  forall i (A B : U i) f g h a b .
+    lookup f a = None : option B
+    -> combine f (update g a b) h = update (combine f g h) a b : finite_map A B
+/;
+
+inference.
+intro /i A B f g h a b Hlook/.
+rewrite /-> combine_transpose at 0 1/.
+apply /combine_update_left_absent/ >> auto.
+qed ();
+
+
+
+lemma "combine_update_left_present"
+/
+  forall i (A B : U i) f g h a b b' .
+    lookup g a = Some b' : option B
+    -> combine (update f a b) g h = update (combine f g h) a (h a b b') : finite_map A B
+/;
+
+inference.
+intro /i A B f g h a b b' Hlookg/.
+apply /finite_map_ext/.
+intro /a'/.
+so /finite_map_impl_eq_decidable _# 2 f a a'/ /Heq | Hneq/.
+  {
+  subst /a'/.
+  rewrite /-> lookup_combine_both _# 7 b b'/ >> auto.
+    {
+    rewrite /-> lookup_update/ >> auto.
+    }
+  rewrite /-> lookup_update/.
+  auto.
+  }
+rewrite /-> lookup_update_neq/ >>> [auto, idtac].
+setEq /X/ /lookup g a'/ /_/ /Hlookg'/.
+symmetryIn /Hlookg'/.
+destruct /X/ /{| c'}/.
+  {
+  rewrite /-> lookup_combine_left/ >>> [auto, idtac].
+  rewrite /-> lookup_combine_left/ >>> [auto, idtac].
+  rewrite /-> lookup_update_neq/ >> auto.
+  }
+setEq /X/ /lookup f a'/ /_/ /Hlookf'/.
+symmetryIn /Hlookf'/.
+destruct /X/ /{| c}/.
+  {
+  rewrite /-> lookup_combine_right/.
+    {
+    rewrite /-> lookup_update_neq/ >> auto.
+    }
+  rewrite /-> lookup_combine_right/ >> auto.
+  }
+rewrite /-> lookup_combine_both _# 7 c c'/ >> auto.
+  {
+  rewrite /-> lookup_update_neq/ >> auto.
+  }
+
+  {
+  rewrite /-> lookup_combine_both _# 7 c c'/ >> auto.
+  }
+qed ();
+
+
+
+lemma "combine_update_right_present"
+/
+  forall i (A B : U i) f g h a b b' .
+    lookup f a = Some b' : option B
+    -> combine f (update g a b) h = update (combine f g h) a (h a b' b) : finite_map A B
+/;
+
+inference.
+intro /i A B f g h a b b' Hlook/.
+rewrite /-> combine_transpose at 0 1/.
+apply /combine_update_left_present/ >> auto.
+qed ();
+
+
+
+lemma "combine_remove_left_absent"
+/
+  forall i (A B : U i) f g h a .
+    lookup g a = None : option B
+    -> combine (remove f a) g h = remove (combine f g h) a : finite_map A B
+/;
+
+inference.
+intro /i A B f g h a Hlookg/.
+apply /finite_map_ext/.
+intro /a'/.
+so /finite_map_impl_eq_decidable _# 2 f a a'/ /Heq | Hneq/.
+  {
+  subst /a'/.
+  rewrite /-> lookup_remove/.
+  rewrite /-> lookup_combine_right/ >> auto.
+  apply /lookup_remove/.
+  }
+rewrite /-> lookup_remove_neq/ >>> [auto, idtac].
+setEq /X/ /lookup g a'/ /_/ /Hlookg'/.
+symmetryIn /Hlookg'/.
+destruct /X/ /{| c'}/.
+  {
+  rewrite /-> lookup_combine_left/ >>> [auto, idtac].
+  rewrite /-> lookup_combine_left/ >>> [auto, idtac].
+  rewrite /-> lookup_remove_neq/ >> auto.
+  }
+setEq /X/ /lookup f a'/ /_/ /Hlookf'/.
+symmetryIn /Hlookf'/.
+destruct /X/ /{| c}/.
+  {
+  rewrite /-> lookup_combine_right/.
+    {
+    rewrite /-> lookup_remove_neq/ >> auto.
+    }
+  rewrite /-> lookup_combine_right/ >> auto.
+  }
+rewrite /-> lookup_combine_both _# 7 c c'/ >> auto.
+  {
+  rewrite /-> lookup_remove_neq/ >> auto.
+  }
+rewrite /-> lookup_combine_both _# 7 c c'/ >> auto.
+qed ();
+
+
+
+lemma "combine_remove_right_absent"
+/
+  forall i (A B : U i) f g h a .
+    lookup f a = None : option B
+    -> combine f (remove g a) h = remove (combine f g h) a : finite_map A B
+/;
+
+inference.
+intro /i A B f g h a Hlookg/.
+rewrite /-> combine_transpose at 0 1/.
+apply /combine_remove_left_absent/ >> auto.
+qed ();
+
+
+
+lemma "combine_remove_left_present"
+/
+  forall i (A B : U i) f g h a b .
+    lookup g a = Some b : option B
+    -> combine (remove f a) g h = update (combine f g h) a b : finite_map A B
+/;
+
+inference.
+intro /i A B f g h a b' Hlookg/.
+apply /finite_map_ext/.
+intro /a'/.
+so /finite_map_impl_eq_decidable _# 2 f a a'/ /Heq | Hneq/.
+  {
+  subst /a'/.
+  rewrite /-> lookup_combine_right/.
+    {
+    rewrite /-> lookup_remove/ >> auto.
+    }
+  rewrite /-> lookup_update/.
+  auto.
+  }
+rewrite /-> lookup_update_neq/ >>> [auto, idtac].
+setEq /X/ /lookup g a'/ /_/ /Hlookg'/.
+symmetryIn /Hlookg'/.
+destruct /X/ /{| c'}/.
+  {
+  rewrite /-> lookup_combine_left/ >>> [auto, idtac].
+  rewrite /-> lookup_combine_left/ >>> [auto, idtac].
+  rewrite /-> lookup_remove_neq/ >> auto.
+  }
+setEq /X/ /lookup f a'/ /_/ /Hlookf'/.
+symmetryIn /Hlookf'/.
+destruct /X/ /{| c}/.
+  {
+  rewrite /-> lookup_combine_right/.
+    {
+    rewrite /-> lookup_remove_neq/ >> auto.
+    }
+  rewrite /-> lookup_combine_right/ >> auto.
+  }
+rewrite /-> lookup_combine_both _# 7 c c'/ >> auto.
+  {
+  rewrite /-> lookup_remove_neq/ >> auto.
+  }
+
+  {
+  rewrite /-> lookup_combine_both _# 7 c c'/ >> auto.
+  }
+qed ();
+
+
+
+lemma "combine_remove_right_present"
+/
+  forall i (A B : U i) f g h a b .
+    lookup f a = Some b : option B
+    -> combine f (remove g a) h = update (combine f g h) a b : finite_map A B
+/;
+
+inference.
+intro /i A B f g h a b Hlookg/.
+rewrite /-> combine_transpose at 0 1/.
+apply /combine_remove_left_present/ >> auto.
+qed ();
+
+
+
+lemma "map_combine"
+/
+  forall i (A B C : U i) (k : A -> B -> C) f g h h' .
+    (forall a b b' . k a (h a b b') = h' a (k a b) (k a b') : C)
+    -> map k (combine f g h) = combine (map k f) (map k g) h' : finite_map A C
+/;
+
+inference.
+intro /i A B C k f g h h' Hcommute/.
+apply /finite_map_ext/.
+intro /a/.
+rewrite /-> lookup_map/.
+setEq /X/ /lookup g a/ /_/ /Hlookg/.
+symmetryIn /Hlookg/.
+destruct /X/ /{| c'}/.
+  {
+  rewrite /-> lookup_combine_left/ >>> [auto, idtac].
+  rewrite /-> lookup_combine_left/.
+    {
+    rewrite /-> lookup_map/.
+    rewrite /-> Hlookg/ >> auto.
+    }
+  rewrite /-> lookup_map/ >> auto.
+  }
+setEq /X/ /lookup f a/ /_/ /Hlookf/.
+symmetryIn /Hlookf/.
+destruct /X/ /{| c}/.
+  {
+  rewrite /-> lookup_combine_right/ >>> [auto, idtac].
+  rewrite /-> lookup_combine_right/.
+    {
+    rewrite /-> lookup_map/.
+    rewrite /-> Hlookf/ >> auto.
+    }
+  rewrite /-> lookup_map/ >> auto.
+  }
+rewrite /-> lookup_combine_both _# 7 c c'/ >> auto.
+rewrite /-> lookup_combine_both _# 7 (k a c) (k a c')/.
+  {
+  rewrite /-> lookup_map/.
+  rewrite /-> Hlookf/ >> auto.
+  }
+
+  {
+  rewrite /-> lookup_map/.
+  rewrite /-> Hlookg/ >> auto.
+  }
+reduce //.
+compat.
+apply /Hcommute/.
+qed ();
+
+
+
 (* Finite domain *)
 
 lemma "finite_map_domain_quotient"
@@ -1820,7 +2661,7 @@ lemma "finite_map_domain_quotient"
 
 inference.
 intro /i A B f/.
-exactRaw /map (fn x . x #1) (f #2)/.
+exactRaw /List.map (fn x . x #1) (f #2)/.
 unfold /member, lookup/.
 destruct /f/ /[f g Hfg]/.
   {
@@ -1841,7 +2682,7 @@ destruct /f/ /[f g Hfg]/.
     reflexivity.
     }
   }
-assert /forall (f : pre_finite_map A B) a . (exists (b : B) . pre_lookup A B f a = Some b : option B) <-> In A a (map (fn x . x #1) (f #2))/ /Hprop/.
+assert /forall (f : pre_finite_map A B) a . (exists (b : B) . pre_lookup A B f a = Some b : option B) <-> In A a (List.map (fn x . x #1) (f #2))/ /Hprop/.
   {
   clear /f g Hfg/.
   inference.
@@ -1963,7 +2804,6 @@ destruct /L/ /[L HL]/.
 split.
 existsAuto.
 qed ();
-
 
 
 endModule ();

@@ -130,6 +130,8 @@ Lists are covariant:
     map _ b _ (nil) --> nil
     map a b f (cons h t) --> cons (f h) (map a b f t)
 
+    map_identity : forall (i : level) (a : U i) (l : list a) . map (fn x . x) l = l : list a
+
     map_compose : forall (i : level) (a b c : U i) (f : b -> c) (g : a -> b) (l : list a) .
                      map f (map g l) = map (fn x . f (g x)) l : list c
 

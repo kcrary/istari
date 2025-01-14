@@ -64,6 +64,9 @@ Options are covariant:
     map _ b (None _) _ --> None b
     map _ b (Some _ x) f --> Some b (f x)
 
+    map_identity : type:map_identity
+
+    map_compose : type:map_compose
 
     valof : type:valof
          = def:valof

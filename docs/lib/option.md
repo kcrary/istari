@@ -65,6 +65,10 @@ Options are covariant:
     map _ b (None _) _ --> None b
     map _ b (Some _ x) f --> Some b (f x)
 
+    map_identity : forall (i : level) (a : U i) (l : option a) . map (fn x . x) l = l : option a
+
+    map_compose : forall (i : level) (a b c : U i) (f : b -> c) (g : a -> b) (l : option a) .
+                     map f (map g l) = map (fn x . f (g x)) l : option c
 
     valof : intersect (i : level) . forall (a : U i) . option a -> a -> a
          = fn a l x . option_case l x (fn y . y)

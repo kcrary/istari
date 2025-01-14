@@ -1,0 +1,452 @@
+
+beginModule "Function";
+
+
+define /identity/
+/
+  fn x . x
+//
+  intersect i (a : U i) . a -> a
+/;
+
+inference.
+unfold /identity/.
+typecheck.
+qed ();
+
+
+
+define /compose f g/
+/
+  fn x . f (g x)
+//
+  intersect i (a b c : U i) .
+    (b -> c)
+    -> (a -> b)
+    -> (a -> c)
+/;
+
+inference.
+unfold /compose/.
+typecheck.
+qed ();
+
+
+
+lemma "compose_id_l"
+/
+  forall i (a b : U i) (f : a -> b) .
+    compose identity f = f : (a -> b)
+/;
+
+intro /i a b f/.
+unfold /compose, identity/.
+introEq /x/.
+reflexivity.
+qed ();
+
+
+
+lemma "compose_id_r"
+/
+  forall i (a b : U i) (f : a -> b) .
+    compose f identity = f : (a -> b)
+/;
+
+intro /i a b f/.
+unfold /compose, identity/.
+introEq /x/.
+reflexivity.
+qed ();
+
+
+
+lemma "compose_assoc"
+/
+  forall i (a b c d : U i) (f : c -> d) (g : b -> c) (h : a -> b) .
+    compose (compose f g) h = compose f (compose g h) : (a -> d)
+/;
+
+inference.
+intro /i a b c d f g h/.
+unfold /compose at all/.
+introEq /x/.
+reflexivity.
+qed ();
+
+
+
+define /one_to_one {a b} f/
+/
+  forall (x y : a) . f x = f y : b -> x = y : a
+//
+  intersect i . forall (a b : U i) . (a -> b) -> U i
+/;
+
+unfold /one_to_one/.
+typecheck.
+qed ();
+
+
+
+(* equivalent to one_to_one classically, but not constructively *)
+define /injective {a b} f/
+/
+  exists (g : b -> a) . forall (x : a) . g (f x) = x : a
+//
+  intersect i . forall (a b : U i) . (a -> b) -> U i
+/;
+
+unfold /injective/.
+typecheck.
+qed ();
+
+
+
+define /surjective {a b} f/
+/
+  exists (g : b -> a) . forall (x : b) . f (g x) = x : b
+//
+  intersect i . forall (a b : U i) . (a -> b) -> U i
+/;
+
+unfold /surjective/.
+typecheck.
+qed ();
+
+
+
+define /bijective {a b} f/
+/
+  exists (g : b -> a) . 
+    (forall (x : a) . g (f x) = x : a)
+    & (forall (x : b) . f (g x) = x : b)
+//
+  intersect i . forall (a b : U i) . (a -> b) -> U i
+/;
+
+unfold /bijective/.
+typecheck.
+qed ();
+
+
+
+lemma "injective_impl_one_to_one"
+/
+  forall i (a b : U i) (f : a -> b) .
+    injective f
+    -> one_to_one f
+/;
+
+inference.
+intro /i a b f Hinj/.
+destruct /Hinj/ /g Hinv/.
+unfold /one_to_one/.
+intro /x y Heq/.
+rewrite /<- Hinv x, <- Hinv y/.
+compat >> auto.
+qed ();
+
+
+
+lemma "bijective_impl_injective"
+/
+  forall i (a b : U i) (f : a -> b) .
+    bijective f
+    -> injective f
+/;
+
+inference.
+intro /i a b f (g Hpost Hpre)/.
+unfold /injective/.
+exists /g/.
+auto.
+qed ();
+
+
+
+lemma "bijective_impl_surjective"
+/
+  forall i (a b : U i) (f : a -> b) .
+    bijective f
+    -> surjective f
+/;
+
+inference.
+intro /i a b f (g Hpost Hpre)/.
+unfold /surjective/.
+exists /g/.
+auto.
+qed ();
+
+
+
+lemma "bijective_impl_one_to_one"
+/
+  forall i (a b : U i) (f : a -> b) .
+    bijective f
+    -> one_to_one f
+/;
+
+inference.
+intro /i a b f Hbij/.
+apply /injective_impl_one_to_one/.
+apply /bijective_impl_injective/.
+auto.
+qed ();
+
+
+
+lemma "injective_and_surjective_impl_bijective"
+/
+  forall i (a b : U i) (f : a -> b) .
+    injective f
+    -> surjective f
+    -> bijective f
+/;
+
+inference.
+intro /i a b f (g Hpost) (h Hpre)/.
+unfold /bijective/.
+exists /g/.
+split >> auto.
+intro /x/.
+rewrite /<- Hpre x at 0/.
+rewrite /-> Hpost/.
+rewrite /-> Hpre/.
+reflexivity.
+qed ();
+
+
+
+lemma "injective_inverse"
+/
+  forall i (a b : U i) (f : a -> b) .
+    injective f
+    -> exists (g : b -> a) .
+         surjective g
+         & compose g f = identity : (a -> a)
+/;
+
+inference.
+intro /i a b f (g Hinv)/.
+exists /g/.
+split.
+  {
+  unfold /surjective/.
+  exists /f/.
+  auto.
+  }
+
+  {
+  unfold /compose, identity/.
+  introEq /x/.
+  apply /Hinv/.
+  }
+qed ();
+
+
+
+lemma "surjective_inverse"
+/
+  forall i (a b : U i) (f : a -> b) .
+    surjective f
+    -> exists (g : b -> a) .
+         injective g
+         & compose f g = identity : (b -> b)
+/;
+
+inference.
+intro /i a b f (g Hinv)/.
+exists /g/.
+split.
+  {
+  unfold /injective/.
+  exists /f/.
+  auto.
+  }
+
+  {
+  unfold /compose, identity/.
+  introEq /x/.
+  apply /Hinv/.
+  }
+qed ();
+
+
+
+lemma "bijective_inverse"
+/
+  forall i (a b : U i) (f : a -> b) .
+    bijective f
+    -> exists (g : b -> a) .
+         bijective g
+         & compose g f = identity : (a -> a)
+         & compose f g = identity : (b -> b)
+/;
+
+inference.
+intro /i a b f (g Hpost Hpre)/.
+exists /g/.
+splitn 2.
+  {
+  unfold /bijective/.
+  exists /f/.
+  auto.
+  }
+
+  {
+  unfold /compose, identity/.
+  introEq /x/.
+  apply /Hpost/.
+  }
+
+  {
+  unfold /compose, identity/.
+  introEq /x/.
+  apply /Hpre/.
+  }
+qed ();
+
+
+
+lemma "one_to_one_identity"
+/
+  forall i (a : U i) . `one_to_one a a identity
+/;
+
+inference.
+intro /i a/.
+unfold /one_to_one/.
+unfold /identity at all/.
+auto.
+qed ();
+
+
+
+lemma "injective_identity"
+/
+  forall i (a : U i) . `injective a a identity
+/;
+
+inference.
+intro /i a/.
+unfold /injective/.
+exists /identity/.
+unfold /identity at all/.
+auto.
+qed ();
+
+
+
+lemma "surjective_identity"
+/
+  forall i (a : U i) . `surjective a a identity
+/;
+
+inference.
+intro /i a/.
+unfold /surjective/.
+exists /identity/.
+unfold /identity at all/.
+auto.
+qed ();
+
+
+
+lemma "bijective_identity"
+/
+  forall i (a : U i) . `bijective a a identity
+/;
+
+inference.
+intro /i a/.
+unfold /bijective/.
+exists /identity/.
+unfold /identity at all/.
+auto.
+qed ();
+
+
+
+lemma "one_to_one_compose"
+/
+  forall i (a b c : U i) (f : b -> c) (g : a -> b) .
+    one_to_one f
+    -> one_to_one g
+    -> one_to_one (compose f g)
+/;
+
+inference.
+unfold /compose/.
+unfold /one_to_one at all/.
+intro /i a b c f g Hf Hg/.
+intro /x y Hxy/.
+reduce /Hxy/.
+auto.
+qed ();
+
+
+
+lemma "injective_compose"
+/
+  forall i (a b c : U i) (f : b -> c) (g : a -> b) .
+    injective f
+    -> injective g
+    -> injective (compose f g)
+/;
+
+inference.
+intro /i a b c f g (f' Hf) (g' Hg)/.
+unfold /injective/.
+exists /compose g' f'/.
+intro /x/.
+unfold /compose at all/.
+rewrite /-> Hf, -> Hg/.
+reflexivity.
+qed ();
+
+
+
+lemma "surjective_compose"
+/
+  forall i (a b c : U i) (f : b -> c) (g : a -> b) .
+    surjective f
+    -> surjective g
+    -> surjective (compose f g)
+/;
+
+inference.
+intro /i a b c f g (f' Hf) (g' Hg)/.
+unfold /surjective/.
+exists /compose g' f'/.
+intro /x/.
+unfold /compose at all/.
+rewrite /-> Hg, -> Hf/.
+reflexivity.
+qed ();
+
+
+
+lemma "bijective_compose"
+/
+  forall i (a b c : U i) (f : b -> c) (g : a -> b) .
+    bijective f
+    -> bijective g
+    -> bijective (compose f g)
+/;
+
+inference.
+intro /i a b c f g Hf Hg/.
+apply /injective_and_surjective_impl_bijective/.
+  {
+  apply /injective_compose/ >> autoWith /bijective_impl_injective/.
+  }
+
+  {
+  apply /surjective_compose/ >> autoWith /bijective_impl_surjective/.
+  }
+qed ();
+
+
+endModule ();

@@ -6,6 +6,7 @@
 - [`Decidable`](lib/decidable.html)
 - [`Finite`](lib/finite.html)
 - [`FiniteMap`](lib/finite-map.html)
+- [`Function`](lib/function.html)
 - [`GirardParadox`](lib/girard-paradox.html) (type is not a type)
 - [`Integer`](lib/integer.html)
 - [`Logic`](lib/logic.html)

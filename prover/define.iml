@@ -10,6 +10,7 @@ signature DEFINE =
 
       val defineRaw : (symbol * symbol option list * symbol option list) -> eterm -> unit
       val define : (symbol * symbol option list * symbol option list) -> eterm -> eterm -> unit
+      val defineVary : (symbol * symbol option list * symbol option list) -> symbol -> eterm -> eterm -> unit
 
       val definerecRaw : (symbol * symbol option list * symbol option list) -> eterm -> unit
       val definerec : (symbol * symbol option list * symbol option list) -> eterm -> eterm -> unit
@@ -138,7 +139,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
 
 
-      fun define (name, impargs, expargs) em ea =
+      fun defineVary (name, impargs, expargs) altname em ea =
          let
             val () = P.checkpoint ()
 
@@ -165,7 +166,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
                   (* The shift should be unnecessary, since a should be closed, but do it anyway. *)
                   (T.apply2 Prim.ov (T.Sub (a, T.shift1)) (T.Var 0))
 
-            val goal = (jud, D.literal [name])
+            val goal = (jud, D.literal [altname])
 
             fun cont vs =
                (case vs of
@@ -213,6 +214,11 @@ structure DefineInternal :> DEFINE_INTERNAL =
             P.setGoals [(Message.blank, goal)] cont
          end
          
+
+
+      fun define (pattern as (name, impargs, expargs)) em ea = 
+         defineVary pattern name em ea
+
 
 
       (* if    const unfolds to fix (fn . M)

@@ -1,13 +1,14 @@
 
 ISTARIBIN=../ui/bin
 
-DOCUNITS = acc bar bool decidable finite finite-map girard-paradox integer logic list miscellaneous nat natural option partial permutation relations smith-paradox stable symbol tuple union wtype
+DOCUNITS = acc bar bool decidable finite finite-map function girard-paradox integer logic list miscellaneous nat natural option partial permutation relations smith-paradox stable symbol tuple union wtype
 UNITS = $(DOCUNITS) datatype syntactic-equality omega
+DOCS = finite-map-class
 
 
 all : $(foreach i, $(UNITS), $(i).isto)
 
-docs : $(foreach i, $(DOCUNITS), ../docs/lib/$(i).md)
+docs : $(foreach i, $(DOCUNITS), ../docs/lib/$(i).md) $(foreach i, $(DOCS), ../docs/lib/$(i).md)
 
 %.isto : %.ist %-aux.iml
 	$(ISTARIBIN)/istari-nolib $<
@@ -29,7 +30,7 @@ datatype.isto : acc.isto miscellaneous.isto nat.isto partial.isto     integer.is
 bool.isto : logic.isto
 decidable.isto : logic.isto bool.isto
 finite.isto : logic.isto decidable.isto list.isto
-finite-map.isto : bool.isto decidable.isto list.isto logic.isto option.isto
+finite-map.isto : bool.isto decidable.isto function.isto list.isto logic.isto option.isto
 girard-paradox.isto : datatype.isto logic.isto nat.isto
 integer.isto : acc.isto bool.isto decidable.isto nat.isto partial.isto stable.isto
 list.isto : bool.isto datatype.isto decidable.isto logic.isto miscellaneous.isto nat.isto option.isto partial.isto

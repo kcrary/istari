@@ -40,6 +40,9 @@ equality.  The equality test is supplied to the `empty` operation.
     eqtest : intersect (i : level) . U i -> U i
            = fn A . { e : A -> A -> bool | forall (x y : A) . x = y : A <-> Bool.istrue (e x y) }
 
+    finite_map_impl_eqtest : intersect (i : level) .
+                                forall (A B : U i) . finite_map A B -> eqtest A
+
 A recommended way to use `empty` is to define `eqt : eqtest A`, then
 define `myempty` to be `empty eqt`.  If `myempty` is then made a [soft
 constant](../terms.html#opacity), the lemmas that follow will work
@@ -151,6 +154,222 @@ The derived notion of membership is useful:
     lookup_merge_right' : forall (i : level) (A B : U i) (f g : finite_map A B) (a : A) .
                              not (member f a) -> lookup (merge f g) a = lookup g a : option B
 
+    decidable_member : forall (i : level) (A B : U i) (f : finite_map A B) (a : A) .
+                          Decidable.decidable (member f a)
+
+
+
+##### Mapping over finite maps
+
+
+    map : intersect (i : level) .
+             forall (A B C : U i) . (A -> B -> C) -> finite_map A B -> finite_map A C
+
+    map_identity : forall (i : level) (A B : U i) (f : finite_map A B) .
+                      map (fn v0 x . x) f = f : finite_map A B
+
+    map_compose : forall
+                     (i : level)
+                     (A B C D : U i)
+                     (g : A -> C -> D)
+                     (h : A -> B -> C)
+                     (f : finite_map A B) .
+                     map g (map h f) = map (fn x y . g x (h x y)) f : finite_map A D
+
+    lookup_map : forall (i : level) (A B C : U i) (g : A -> B -> C) (f : finite_map A B) (a : A) .
+                    lookup (map g f) a = Option.map (g a) (lookup f a) : option C
+
+    map_empty : forall (i : level) (A B C : U i) (g : A -> B -> C) (e : eqtest A) .
+                   map g (empty e) = empty e : finite_map A C
+
+    map_update : forall
+                    (i : level)
+                    (A B C : U i)
+                    (g : A -> B -> C)
+                    (f : finite_map A B)
+                    (a : A)
+                    (b : B) .
+                    map g (update f a b) = update (map g f) a (g a b) : finite_map A C
+
+    map_remove : forall (i : level) (A B C : U i) (g : A -> B -> C) (f : finite_map A B) (a : A) .
+                    map g (remove f a) = remove (map g f) a : finite_map A C
+
+    map_merge : forall (i : level) (A B C : U i) (g : A -> B -> C) (f f' : finite_map A B) .
+                   map g (merge f f') = merge (map g f) (map g f') : finite_map A C
+
+    member_map : forall (i : level) (A B C : U i) (a : A) (g : A -> B -> C) (f : finite_map A B) .
+                    member (map g f) a <-> member f a
+
+
+
+##### Combination (a.k.a. symmetric merge)
+
+    combine : intersect (i : level) .
+                 forall (A B : U i) .
+                   finite_map A B -> finite_map A B -> (A -> B -> B -> B) -> finite_map A B
+            = fn A B f g h .
+                 merge (map (fn a b . (fnind option_fn : forall (v0 : option [B]) . B of
+                                       | None . b
+                                       | Some b' . h a b b') (lookup g a)) f) g
+            (2 implicit arguments)
+
+    combine_transpose : forall
+                           (i : level)
+                           (A B : U i)
+                           (f g : finite_map A B)
+                           (h : A -> B -> B -> B) .
+                           combine f g h = combine g f (fn a b b' . h a b' b) : finite_map A B
+
+    lookup_combine_left : forall
+                             (i : level)
+                             (A B : U i)
+                             (f g : finite_map A B)
+                             (h : A -> B -> B -> B)
+                             (a : A) .
+                             lookup g a = None : option B
+                             -> lookup (combine f g h) a = lookup f a : option B
+
+    lookup_combine_right : forall
+                              (i : level)
+                              (A B : U i)
+                              (f g : finite_map A B)
+                              (h : A -> B -> B -> B)
+                              (a : A) .
+                              lookup f a = None : option B
+                              -> lookup (combine f g h) a = lookup g a : option B
+
+    lookup_combine_both : forall
+                             (i : level)
+                             (A B : U i)
+                             (f g : finite_map A B)
+                             (h : A -> B -> B -> B)
+                             (a : A)
+                             (b b' : B) .
+                             lookup f a = Some b : option B
+                             -> lookup g a = Some b' : option B
+                             -> lookup (combine f g h) a = Some (h a b b') : option B
+
+    combine_empty_left : forall
+                            (i : level)
+                            (A B : U i)
+                            (e : eqtest A)
+                            (f : finite_map A B)
+                            (h : A -> B -> B -> B) .
+                            combine (empty e) f h = f : finite_map A B
+
+    combine_empty_right : forall
+                             (i : level)
+                             (A B : U i)
+                             (e : eqtest A)
+                             (f : finite_map A B)
+                             (h : A -> B -> B -> B) .
+                             combine f (empty e) h = f : finite_map A B
+
+    combine_update_left_absent : forall
+                                    (i : level)
+                                    (A B : U i)
+                                    (f g : finite_map A B)
+                                    (h : A -> B -> B -> B)
+                                    (a : A)
+                                    (b : B) .
+                                    lookup g a = None : option B
+                                    -> combine (update f a b) g h
+                                         = update (combine f g h) a b
+                                         : finite_map A B
+
+    combine_update_right_absent : forall
+                                     (i : level)
+                                     (A B : U i)
+                                     (f g : finite_map A B)
+                                     (h : A -> B -> B -> B)
+                                     (a : A)
+                                     (b : B) .
+                                     lookup f a = None : option B
+                                     -> combine f (update g a b) h
+                                          = update (combine f g h) a b
+                                          : finite_map A B
+
+    combine_update_left_present : forall
+                                     (i : level)
+                                     (A B : U i)
+                                     (f g : finite_map A B)
+                                     (h : A -> B -> B -> B)
+                                     (a : A)
+                                     (b b' : B) .
+                                     lookup g a = Some b' : option B
+                                     -> combine (update f a b) g h
+                                          = update (combine f g h) a (h a b b')
+                                          : finite_map A B
+
+    combine_update_right_present : forall
+                                      (i : level)
+                                      (A B : U i)
+                                      (f g : finite_map A B)
+                                      (h : A -> B -> B -> B)
+                                      (a : A)
+                                      (b b' : B) .
+                                      lookup f a = Some b' : option B
+                                      -> combine f (update g a b) h
+                                           = update (combine f g h) a (h a b' b)
+                                           : finite_map A B
+
+    combine_remove_left_absent : forall
+                                    (i : level)
+                                    (A B : U i)
+                                    (f g : finite_map A B)
+                                    (h : A -> B -> B -> B)
+                                    (a : A) .
+                                    lookup g a = None : option B
+                                    -> combine (remove f a) g h
+                                         = remove (combine f g h) a
+                                         : finite_map A B
+
+    combine_remove_right_absent : forall
+                                     (i : level)
+                                     (A B : U i)
+                                     (f g : finite_map A B)
+                                     (h : A -> B -> B -> B)
+                                     (a : A) .
+                                     lookup f a = None : option B
+                                     -> combine f (remove g a) h
+                                          = remove (combine f g h) a
+                                          : finite_map A B
+
+    combine_remove_left_present : forall
+                                     (i : level)
+                                     (A B : U i)
+                                     (f g : finite_map A B)
+                                     (h : A -> B -> B -> B)
+                                     (a : A)
+                                     (b : B) .
+                                     lookup g a = Some b : option B
+                                     -> combine (remove f a) g h
+                                          = update (combine f g h) a b
+                                          : finite_map A B
+
+    combine_remove_right_present : forall
+                                      (i : level)
+                                      (A B : U i)
+                                      (f g : finite_map A B)
+                                      (h : A -> B -> B -> B)
+                                      (a : A)
+                                      (b : B) .
+                                      lookup f a = Some b : option B
+                                      -> combine f (remove g a) h
+                                           = update (combine f g h) a b
+                                           : finite_map A B
+
+    map_combine : forall
+                     (i : level)
+                     (A B C : U i)
+                     (k : A -> B -> C)
+                     (f g : finite_map A B)
+                     (h : A -> B -> B -> B)
+                     (h' : A -> C -> C -> C) .
+                     (forall (a : A) (b b' : B) . k a (h a b b') = h' a (k a b) (k a b') : C)
+                     -> map k (combine f g h) = combine (map k f) (map k g) h' : finite_map A C
+
+
 
 #### Finite map domains
 
@@ -160,386 +379,17 @@ the list quotiented by rearrangement:
 
     finite_map_domain_quotient : forall (i : level) (A B : U i) (f : finite_map A B) .
                                     quotient (L L'
-                                                : { L : list A
-                                                  | forall (a : A) . member f a <-> In A a L }) .
-                                      (forall (a : A) . In A a L <-> In A a L')
+                                                : { L : List.list A
+                                                  | forall (a : A) . member f a <-> List.In A a L }) .
+                                      (forall (a : A) . List.In A a L <-> List.In A a L')
 
 Another version returns the domain squashed:
 
     finite_map_domain_squash : forall (i : level) (A B : U i) (f : finite_map A B) .
-                                  { exists (L : list A) . forall (a : A) . member f a <-> In A a L }
+                                  { exists (L : List.list A) .
+                                      forall (a : A) . member f a <-> List.In A a L }
 
 
-### Generic finite maps
-
-We can define a generic class determining what it means to be a finite map:
-
-    FiniteMap : forall (i : level) (A B T : U i) .
-                   T -> (T -> A -> option B) -> (T -> A -> B -> T) -> (T -> A -> T) -> U i
-              = fn i A B T emp look upd rem .
-                   (forall (f g : T) .
-                      (forall (a : A) . look f a = look g a : option B) -> f = g : T)
-                   & (forall (a a' : A) . Decidable.decidable (a = a' : A))
-                   & (forall (a : A) . look emp a = None : option B)
-                   & (forall (f : T) (a : A) (b : B) . look (upd f a b) a = Some b : option B)
-                   & (forall (f : T) (a : A) (b : B) (a' : A) .
-                        a != a' : A -> look (upd f a b) a' = look f a' : option B)
-                   & (forall (f : T) (a : A) . look (rem f a) a = None : option B)
-                   & (forall (f : T) (a a' : A) .
-                        a != a' : A -> look (rem f a) a' = look f a' : option B)
-                   & unit
-
-We can then prove properties about such maps similar to what we showed
-above for simple finite maps:
-
-    FiniteMap_look_emp : forall
-                            (i : level)
-                            (A B T : U i)
-                            (emp : T)
-                            (look : T -> A -> option B)
-                            (upd : T -> A -> B -> T)
-                            (rem : T -> A -> T) .
-                            FiniteMap i A B T emp look upd rem
-                            -> forall (a : A) . look emp a = None : option B
-
-    FiniteMap_look_upd : forall
-                            (i : level)
-                            (A B T : U i)
-                            (emp : T)
-                            (look : T -> A -> option B)
-                            (upd : T -> A -> B -> T)
-                            (rem : T -> A -> T) .
-                            FiniteMap i A B T emp look upd rem
-                            -> forall (f : T) (a : A) (b : B) .
-                                 look (upd f a b) a = Some b : option B
-
-    FiniteMap_look_upd_neq : forall
-                                (i : level)
-                                (A B T : U i)
-                                (emp : T)
-                                (look : T -> A -> option B)
-                                (upd : T -> A -> B -> T)
-                                (rem : T -> A -> T) .
-                                FiniteMap i A B T emp look upd rem
-                                -> forall (f : T) (a : A) (b : B) (a' : A) .
-                                     a != a' : A -> look (upd f a b) a' = look f a' : option B
-
-    FiniteMap_look_rem : forall
-                            (i : level)
-                            (A B T : U i)
-                            (emp : T)
-                            (look : T -> A -> option B)
-                            (upd : T -> A -> B -> T)
-                            (rem : T -> A -> T) .
-                            FiniteMap i A B T emp look upd rem
-                            -> forall (f : T) (a : A) . look (rem f a) a = None : option B
-
-    FiniteMap_look_rem_neq : forall
-                                (i : level)
-                                (A B T : U i)
-                                (emp : T)
-                                (look : T -> A -> option B)
-                                (upd : T -> A -> B -> T)
-                                (rem : T -> A -> T) .
-                                FiniteMap i A B T emp look upd rem
-                                -> forall (f : T) (a a' : A) .
-                                     a != a' : A -> look (rem f a) a' = look f a' : option B
-
-    FiniteMap_upd_upd : forall
-                           (i : level)
-                           (A B T : U i)
-                           (emp : T)
-                           (look : T -> A -> option B)
-                           (upd : T -> A -> B -> T)
-                           (rem : T -> A -> T) .
-                           FiniteMap i A B T emp look upd rem
-                           -> forall (f : T) (a : A) (b b' : B) .
-                                upd (upd f a b) a b' = upd f a b' : T
-
-    FiniteMap_upd_upd_neq : forall
-                               (i : level)
-                               (A B T : U i)
-                               (emp : T)
-                               (look : T -> A -> option B)
-                               (upd : T -> A -> B -> T)
-                               (rem : T -> A -> T) .
-                               FiniteMap i A B T emp look upd rem
-                               -> forall (f : T) (a : A) (b : B) (a' : A) (b' : B) .
-                                    a != a' : A
-                                    -> upd (upd f a b) a' b' = upd (upd f a' b') a b : T
-
-    FiniteMap_rem_emp : forall
-                           (i : level)
-                           (A B T : U i)
-                           (emp : T)
-                           (look : T -> A -> option B)
-                           (upd : T -> A -> B -> T)
-                           (rem : T -> A -> T) .
-                           FiniteMap i A B T emp look upd rem
-                           -> forall (a : A) . rem emp a = emp : T
-
-    FiniteMap_rem_upd : forall
-                           (i : level)
-                           (A B T : U i)
-                           (emp : T)
-                           (look : T -> A -> option B)
-                           (upd : T -> A -> B -> T)
-                           (rem : T -> A -> T) .
-                           FiniteMap i A B T emp look upd rem
-                           -> forall (f : T) (a : A) (b : B) . rem (upd f a b) a = rem f a : T
-
-    FiniteMap_rem_upd_neq : forall
-                               (i : level)
-                               (A B T : U i)
-                               (emp : T)
-                               (look : T -> A -> option B)
-                               (upd : T -> A -> B -> T)
-                               (rem : T -> A -> T) .
-                               FiniteMap i A B T emp look upd rem
-                               -> forall (f : T) (a : A) (b : B) (a' : A) .
-                                    a != a' : A -> rem (upd f a b) a' = upd (rem f a') a b : T
-
-    FiniteMap_rem_absent : forall
-                              (i : level)
-                              (A B T : U i)
-                              (emp : T)
-                              (look : T -> A -> option B)
-                              (upd : T -> A -> B -> T)
-                              (rem : T -> A -> T) .
-                              FiniteMap i A B T emp look upd rem
-                              -> forall (f : T) (a : A) .
-                                   look f a = None : option B -> rem f a = f : T
-
-Note that generic finite maps require that the domain's equality is
-decidable, and thus an equality test is not supplied to the `emp`
-operation.
-
-
-### Generic finite maps with merge
-
-The `FiniteMap` class does not include a merge operation.  The
-`FiniteMapMerge` class adds one:
-
-    FiniteMapMerge : forall (i : level) (A B T : U i) .
-                        T
-                        -> (T -> A -> option B)
-                        -> (T -> A -> B -> T)
-                        -> (T -> A -> T)
-                        -> (T -> T -> T)
-                        -> U i
-                   = fn i A B T emp look upd rem mer .
-                        FiniteMap i A B T emp look upd rem
-                        & (forall (f g : T) (a : A) (b : B) .
-                             look f a = Some b : option B -> look (mer f g) a = Some b : option B)
-                        & (forall (f g : T) (a : A) .
-                             look f a = None : option B -> look (mer f g) a = look g a : option B)
-                        & unit
-
-    FiniteMapMerge_look_mer_left : forall
-                                      (i : level)
-                                      (A B T : U i)
-                                      (emp : T)
-                                      (look : T -> A -> option B)
-                                      (upd : T -> A -> B -> T)
-                                      (rem : T -> A -> T)
-                                      (mer : T -> T -> T) .
-                                      FiniteMapMerge i A B T emp look upd rem mer
-                                      -> forall (f g : T) (a : A) (b : B) .
-                                           look f a = Some b : option B
-                                           -> look (mer f g) a = Some b : option B
-
-    FiniteMapMerge_look_mer_right : forall
-                                       (i : level)
-                                       (A B T : U i)
-                                       (emp : T)
-                                       (look : T -> A -> option B)
-                                       (upd : T -> A -> B -> T)
-                                       (rem : T -> A -> T)
-                                       (mer : T -> T -> T) .
-                                       FiniteMapMerge i A B T emp look upd rem mer
-                                       -> forall (f g : T) (a : A) .
-                                            look f a = None : option B
-                                            -> look (mer f g) a = look g a : option B
-
-    FiniteMapMerge_mer_emp_left : forall
-                                     (i : level)
-                                     (A B T : U i)
-                                     (emp : T)
-                                     (look : T -> A -> option B)
-                                     (upd : T -> A -> B -> T)
-                                     (rem : T -> A -> T)
-                                     (mer : T -> T -> T) .
-                                     FiniteMapMerge i A B T emp look upd rem mer
-                                     -> forall (f : T) . mer emp f = f : T
-
-    FiniteMapMerge_mer_emp_right : forall
-                                      (i : level)
-                                      (A B T : U i)
-                                      (emp : T)
-                                      (look : T -> A -> option B)
-                                      (upd : T -> A -> B -> T)
-                                      (rem : T -> A -> T)
-                                      (mer : T -> T -> T) .
-                                      FiniteMapMerge i A B T emp look upd rem mer
-                                      -> forall (f : T) . mer f emp = f : T
-
-    FiniteMapMerge_upd_mer_left : forall
-                                     (i : level)
-                                     (A B T : U i)
-                                     (emp : T)
-                                     (look : T -> A -> option B)
-                                     (upd : T -> A -> B -> T)
-                                     (rem : T -> A -> T)
-                                     (mer : T -> T -> T) .
-                                     FiniteMapMerge i A B T emp look upd rem mer
-                                     -> forall (f g : T) (a : A) (b : B) .
-                                          upd (mer f g) a b = mer (upd f a b) g : T
-
-    FiniteMapMerge_upd_mer_right : forall
-                                      (i : level)
-                                      (A B T : U i)
-                                      (emp : T)
-                                      (look : T -> A -> option B)
-                                      (upd : T -> A -> B -> T)
-                                      (rem : T -> A -> T)
-                                      (mer : T -> T -> T) .
-                                      FiniteMapMerge i A B T emp look upd rem mer
-                                      -> forall (f g : T) (a : A) (b : B) .
-                                           look f a = None : option B
-                                           -> upd (mer f g) a b = mer f (upd g a b) : T
-
-    FiniteMapMerge_rem_mer : forall
-                                (i : level)
-                                (A B T : U i)
-                                (emp : T)
-                                (look : T -> A -> option B)
-                                (upd : T -> A -> B -> T)
-                                (rem : T -> A -> T)
-                                (mer : T -> T -> T) .
-                                FiniteMapMerge i A B T emp look upd rem mer
-                                -> forall (f g : T) (a : A) .
-                                     rem (mer f g) a = mer (rem f a) (rem g a) : T
-
-
-### Generic finite maps minus extensionality
-
-To assist in building finite maps, there is a class that leaves out
-extensionality equality:
-
-    PreFiniteMap : forall (i : level) (A B T : U i) .
-                      T -> (T -> A -> option B) -> (T -> A -> B -> T) -> (T -> A -> T) -> U i
-                 = fn i A B T emp look upd rem .
-                      (forall (a a' : A) . Decidable.decidable (a = a' : A))
-                      & (forall (a : A) . look emp a = None : option B)
-                      & (forall (f : T) (a : A) (b : B) . look (upd f a b) a = Some b : option B)
-                      & (forall (f : T) (a : A) (b : B) (a' : A) .
-                           a != a' : A -> look (upd f a b) a' = look f a' : option B)
-                      & (forall (f : T) (a : A) . look (rem f a) a = None : option B)
-                      & (forall (f : T) (a a' : A) .
-                           a != a' : A -> look (rem f a) a' = look f a' : option B)
-                      & unit
-
-Given a pre-finite-map, one can build a finite map by quotienting it:
-
-    (* "quotient pre-finite-map" *)
-    qpfm : intersect (i : level) . forall (A B T : U i) . (T -> A -> option B) -> U i
-         = fn A B T look . quotient (f g : T) . (forall (a : A) . look f a = look g a : option B)
-
-    quotient_emp : forall
-                      (i : level)
-                      (A B T : U i)
-                      (emp : T)
-                      (look : T -> A -> option B)
-                      (upd : T -> A -> B -> T)
-                      (rem : T -> A -> T) .
-                      PreFiniteMap i A B T emp look upd rem -> emp : qpfm A B T look
-
-    quotient_look : forall
-                       (i : level)
-                       (A B T : U i)
-                       (emp : T)
-                       (look : T -> A -> option B)
-                       (upd : T -> A -> B -> T)
-                       (rem : T -> A -> T) .
-                       PreFiniteMap i A B T emp look upd rem
-                       -> look : qpfm A B T look -> A -> option B
-
-    quotient_upd : forall
-                      (i : level)
-                      (A B T : U i)
-                      (emp : T)
-                      (look : T -> A -> option B)
-                      (upd : T -> A -> B -> T)
-                      (rem : T -> A -> T) .
-                      PreFiniteMap i A B T emp look upd rem
-                      -> upd : qpfm A B T look -> A -> B -> qpfm A B T look
-
-    quotient_rem : forall
-                      (i : level)
-                      (A B T : U i)
-                      (emp : T)
-                      (look : T -> A -> option B)
-                      (upd : T -> A -> B -> T)
-                      (rem : T -> A -> T) .
-                      PreFiniteMap i A B T emp look upd rem
-                      -> rem : qpfm A B T look -> A -> qpfm A B T look
-
-    FiniteMap_qpfm : forall
-                        (i : level)
-                        (A B T : U i)
-                        (emp : T)
-                        (look : T -> A -> option B)
-                        (upd : T -> A -> B -> T)
-                        (rem : T -> A -> T) .
-                        PreFiniteMap i A B T emp look upd rem
-                        -> FiniteMap i A B (qpfm A B T look) emp look upd rem
-
-Another class gives finite maps with merge but without extensionality:
-
-    PreFiniteMapMerge : forall (i : level) (A B T : U i) .
-                           T
-                           -> (T -> A -> option B)
-                           -> (T -> A -> B -> T)
-                           -> (T -> A -> T)
-                           -> (T -> T -> T)
-                           -> U i
-                      = fn i A B T emp look upd rem mer .
-                           PreFiniteMap i A B T emp look upd rem
-                           & (forall (f g : T) (a : A) (b : B) .
-                                look f a = Some b : option B
-                                -> look (mer f g) a = Some b : option B)
-                           & (forall (f g : T) (a : A) .
-                                look f a = None : option B
-                                -> look (mer f g) a = look g a : option B)
-                           & unit
-
-    quotient_mer : forall
-                      (i : level)
-                      (A B T : U i)
-                      (emp : T)
-                      (look : T -> A -> option B)
-                      (upd : T -> A -> B -> T)
-                      (rem : T -> A -> T)
-                      (mer : T -> T -> T) .
-                      PreFiniteMapMerge i A B T emp look upd rem mer
-                      -> mer : qpfm A B T look -> qpfm A B T look -> qpfm A B T look
-
-    FiniteMapMerge_qpfm : forall
-                             (i : level)
-                             (A B T : U i)
-                             (emp : T)
-                             (look : T -> A -> option B)
-                             (upd : T -> A -> B -> T)
-                             (rem : T -> A -> T)
-                             (mer : T -> T -> T) .
-                             PreFiniteMapMerge i A B T emp look upd rem mer
-                             -> FiniteMapMerge i A B (qpfm A B T look) emp look upd rem mer
-
-The simple finite maps are defined using these tools.  The discrepancy
-between the types of `empty` versus `emp` is mediated using a lemma
-that extracts an equality test from a finite map:
-
-    finite_map_impl_eqtest : intersect (i : level) .
-                                forall (A B : U i) . finite_map A B -> eqtest A
-
-(By definition, all equality tests at the same type are equal.)
+The submodule [`Class`](finite-map-class.html) defines a generic class
+determining what it means to be a finite map.  It is used in the
+implementation of the simple finite maps above.

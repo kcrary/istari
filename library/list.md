@@ -108,6 +108,8 @@ Lists are covariant:
     map _ b _ (nil) --> nil
     map a b f (cons h t) --> cons (f h) (map a b f t)
 
+    map_identity : type:map_identity
+
     map_compose : type:map_compose
 
     map_append : type:map_append

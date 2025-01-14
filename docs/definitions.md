@@ -62,6 +62,34 @@ establishing the constant's type.  But in a raw definition one must be
 sure to avoid creating evars.
 
 
+##### Varying the name
+
+When defining a constant using `define`, the typing proof has access
+to the definition using the same name.  For example:
+
+    double = fn x . x + x
+    |-
+    double : nat -> nat
+
+If `double` happens to be in scope, but it is not defined in the
+current module, it is legal to shadow it.  However, it is not legal to
+create a hypothesis with that name.  The form `defineVary` allows one
+to use a different name within the typing proof than the one that will
+be defined.  Thus:
+
+    defineVary /double x/ /double'/
+    / x + x /
+    / nat -> nat /;
+
+produces:
+
+    double' = fn x . x + x
+    |-
+    double' : nat -> nat
+
+but still defines the constant `double`.
+
+
 
 ### Recursive definitions
 
