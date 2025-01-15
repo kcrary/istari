@@ -92,6 +92,7 @@ fun server message =
 
    splash ();
    print message;
+   if message = "" then () else print "\n";
    
    Repl.run ()
    )
@@ -105,6 +106,7 @@ fun batch message (_, args) =
 
    splash ();
    print message;
+   if message = "" then () else print "\n";
 
    if C.rapidFlag () then
       (
