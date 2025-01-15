@@ -3,12 +3,13 @@
 0. Ensure the prerequisites are installed:
 
    - Git
-   - Standard ML of New Jersey (version 110.89 or later)
+   - Standard ML of New Jersey (version 110.89 or later, but see below)
    - GNU Emacs
    - (if running on Windows) Cygwin
 
-   If you are building on Windows, do not use Standard ML of New
-   Jersey version 110.99.3 or 110.99.4.
+   Some versions of Standard ML of New Jersey contain bugs that keep
+   Istari from compiling.  On Linux, version 110.99.4 is confirmed to
+   work.  On Mac and Windows, version 110.99.2 is confirmed to work.
 
 1. Obtain the distribution from Github:
 
