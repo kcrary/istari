@@ -67,7 +67,7 @@ val version =
 
 fun splash () =
    let
-      val {system, version_id, date} = Compiler.version
+      val {system, version_id, ...} = Compiler.version
    in
       print "Istari proof assistant ";
       print version;
@@ -76,9 +76,7 @@ fun splash () =
       print " v";
       print (Int.toString (hd version_id));
       app (fn i => (print "."; print (Int.toString i))) (tl version_id);
-      print " [";
-      print date;
-      print "]\n";
+      print "\n";
 
       (* Make the startup splash cleaner. *)
       Control.Print.out := {say = (fn _ => ()), flush = (fn () => ())}

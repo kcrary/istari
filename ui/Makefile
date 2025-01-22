@@ -46,6 +46,7 @@ install :
 
 clean :
 	rm -rf .cm
+	rm -rf bin/*
 
 veryclean : clean
 	rm *.cmlex.sml

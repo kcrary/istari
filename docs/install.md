@@ -8,8 +8,9 @@
    - (if running on Windows) Cygwin
 
    Some versions of Standard ML of New Jersey contain bugs that keep
-   Istari from compiling.  On Linux, version 110.99.4 is confirmed to
-   work.  On Mac and Windows, version 110.99.2 is confirmed to work.
+   Istari from compiling.  On Linux, version 110.99.7.1 is confirmed
+   to work.  On Mac and Windows, version 110.99.2 is confirmed to
+   work.
 
 1. Obtain the distribution from Github:
 
