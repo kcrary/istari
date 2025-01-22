@@ -3374,6 +3374,14 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- M : A
       G |- {[M / x]B}
 
+- `setIntroEqSquash A B M N`
+
+      G |- M = N : {x : A | B}
+      >>
+      G, x : A |- B : type
+      G |- M = N : A
+      G |- {[M / x]B}
+
 - `squashIntroOfSquash A`
 
       G |- () : {A}
@@ -3494,6 +3502,14 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G, x : A |- B : type
       G |- M : A
+      G |- {[M / x]B}
+
+- `isetIntroEqSquash A B M N`
+
+      G |- M = N : iset A (fn x . B)
+      >>
+      G, x : A |- B : type
+      G |- M = N : A
       G |- {[M / x]B}
 
 - `isetElim A B C M`

@@ -95,4 +95,6 @@ validated using that formalization.
 
 - [IML basis](basis.html)
 
+- [Change log](changelog.html)
+
 - [Copyright](copyright.html)

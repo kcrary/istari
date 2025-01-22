@@ -3362,6 +3362,14 @@ Conventions:
       G |- of A M
       G |- squash B[M . id]
 
+- `setIntroEqSquash A B M N`
+
+      G |- eq (set A (fn . B)) M N
+      >>
+      G, A |- istp B
+      G |- eq A M N
+      G |- squash B[M . id]
+
 - `squashIntroOfSquash A`
 
       G |- of (squash A) ()
@@ -3482,6 +3490,14 @@ Conventions:
       >>
       G, A |- istp B
       G |- of A M
+      G |- squash B[M . id]
+
+- `isetIntroEqSquash A B M N`
+
+      G |- eq (iset A (fn . B)) M N
+      >>
+      G, A |- istp B
+      G |- eq A M N
       G |- squash B[M . id]
 
 - `isetElim A B C M`
