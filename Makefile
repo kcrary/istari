@@ -4,7 +4,7 @@ smlnj :
 	cd ipp; make smlnj
 	cd cmlibi; make smlnj
 	cd ui; mkdir -p bin; make batch-nolib
-	cd library; make
+	cd core; make
 	cd ui; make server batch server-nolib istaritags
 
 .PHONY : install
