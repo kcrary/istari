@@ -2,6 +2,7 @@
 File.import "bool-load.iml";
 File.import "decidable-load.iml";
 File.import "function-load.iml";
+File.import "kindlike-load.iml";
 File.import "list-load.iml";
 File.import "logic-load.iml";
 File.import "option-load.iml";
@@ -10,13 +11,15 @@ openModule /Bool/;
 openModule /Option/;
 openModule /List/;
 
+aliasModule /F/ /Function/;
+aliasModule /K/ /Kindlike/;
+
 beginModule "FiniteMap";
 
 
+(* Generic finite maps *)
 beginModule "Class";
 
-
-(* Generic finite maps *)
 
 define /FiniteMap i A B T emp look upd rem/
 /
@@ -544,6 +547,13 @@ qed ();
 
            
 
+endModule ();  (* Class *)
+openModule /Class/;
+
+
+beginModule "Factory";
+
+
 (* Generic finite maps minus extensionality *)
 
 define /PreFiniteMap i A B T emp look upd rem/
@@ -909,9 +919,8 @@ qed ();
 
 
 
-endModule ();  (* Class *)
-
-openModule /Class/;
+endModule ();  (* Factory *)
+openModule /Factory/;
 
 
 
@@ -934,9 +943,43 @@ qed ();
 beginModule "Impl";
 
 
+define /list_iter_inv mnil mcons l/
+/
+  list_iter Miscellaneous.bogus Miscellaneous.bogus mnil mcons l
+//
+  intersect i (a b : U i) .
+    b
+    -> (a -> list a -> b -> b)
+    -> list a -> b
+/;
+
+inference.
+introOf /i a b mnil mcons l/.
+unfold /list_iter_inv/.
+sinduction /l/.
+reintro /IH/.
+destruct /l/ /| h t/ >> reduce // >> auto.
+fold /manual (list_iter _ _ _ _ _)/.
+typecheck.
+apply /IH/.
+apply /cons_subterm/.
+qed ();
+
+
+
+reductions
+/
+  list_iter_inv mnil mcons (nil) --> mnil ;
+  list_iter_inv mnil mcons (cons h t) --> mcons h t (list_iter_inv mnil mcons t) ;
+
+  unfolding list_iter_inv
+/;
+
+
+
 define /pre_finite_map A B/
 /
-  eqtest A & list (A & B)
+  eqtest A & { l : list (A & B) | Forall_dist (fn x y . x #1 != y #1 : A) l }
 //
   intersect i . U i -> U i -> U i
 /;
@@ -959,21 +1002,26 @@ define /pre_empty A B e/
 inference.
 unfold /pre_empty, pre_finite_map/.
 typecheck.
+split.
+apply /Forall_dist_nil/.
 qed ();
 
 
 
 define /pre_lookup A B f a/
 /
-  (fnind look : list [(A & B)] -> option B of
-   | nil . None
-   | cons h t . if f #1 a (h #1) then Some (h #2) else look t) (f #2)
+  list_iter_inv
+    None
+    (fn h t r . if f #1 a (h #1) then Some (h #2) else r)
+    (f #2)
 //
   intersect i . forall (A B : U i) . pre_finite_map A B -> A -> option B
 /;
 
 inference.
+introOf /i A B f a/.
 unfold /pre_lookup/.
+unfold /pre_finite_map in f/.
 typecheck.
 qed ();
 
@@ -981,15 +1029,89 @@ qed ();
 
 define /pre_update A B f a b/
 /
-  (f #1, (a, b) :: f #2)
+  (f #1,
+   list_iter_inv
+     ((a, b) :: nil)
+     (fn h t r . if f #1 a (h #1) then (a, b) :: t else h :: r)
+     (f #2))
 //
   intersect i . forall (A B : U i) . pre_finite_map A B -> A -> B -> pre_finite_map A B
 /;
 
 inference.
+introOf /i A B f a b/.
 unfold /pre_update/.
-unfold /pre_finite_map at all/.
-typecheck.
+unfold /pre_finite_map in f in concl/.
+destruct /f/ /e (l Hl)/.
+reduce //.
+typecheck >> auto.
+destruct /e/ /e He/.
+split.
+revert /Hl/.
+induction /l/ >> auto.
+  {
+  intro /_/.
+  apply /Forall_dist_cons/.
+    {
+    apply /Forall_nil/.
+    }
+
+    {
+    apply /Forall_dist_nil/.
+    }
+  }
+
+  {
+  intro /(a' b') l IH Hdist/ >> auto.
+  reduce //.
+  rewrite /-> Forall_dist_cons_iff in Hdist/.
+  reduce /Hdist/.
+  destruct /Hdist/ /Hallneq Hdist/.
+  boolCase /e a a'/ /Heq/.
+    {
+    rewrite /<- He in Heq/.
+    subst /a'/.
+    apply /Forall_dist_cons/ >> auto.
+    }
+
+    {
+    apply /Forall_dist_cons/ >> auto.
+    reduce //.
+    clear /IH Hdist/.
+    revert /Hallneq/.
+    induction /l/.
+      {
+      intro /_/.
+      apply /Forall_cons/.
+      1:{
+        apply /Forall_nil/.
+        }
+      reduce //.
+      rewrite /<- He in Heq/.
+      contrapositive /Heq/ >> auto.
+      }
+
+      {
+      intro /(a'' b'') l IH Hallneq/.
+      reduce //.
+      rewrite /-> Forall_cons_iff in Hallneq/.
+      reduce /Hallneq/.
+      destruct /Hallneq/ /Hneq Hallneq/.
+      boolCase /e a a''/ /Heq'/.
+        {
+        apply /Forall_cons/ >> auto.
+        reduce //.
+        rewrite /<- He in Heq'/.
+        subst /a''/.
+        auto.
+        }
+
+        {
+        apply /Forall_cons/ >> auto.
+        }
+      }
+    }
+  }
 qed ();
 
 
@@ -997,29 +1119,61 @@ qed ();
 define /pre_remove A B f a/
 /
   (f #1,
-   (fnind rem : list [(A & B)] -> list (A & B) of
-    | nil . nil
-    | cons h t . if f #1 a (h #1) then rem t else h :: rem t) (f #2))
+   list_iter_inv
+     nil
+     (fn h t r . if f #1 a (h #1) then t else h :: r)
+     (f #2))
 //
   intersect i . forall (A B : U i) . pre_finite_map A B -> A -> pre_finite_map A B
 /;
 
 inference.
-unfold /pre_remove, pre_finite_map at all/.
+introOf /i A B f a/.
+unfold /pre_remove, pre_finite_map in f in concl/.
 typecheck.
+destruct /f/ /(e He) (l Hl)/.
+reduce //.
+split.
+revert /Hl/.
+induction /l/ >> auto.
+intro /(a' b') l IH Hdist/ >> auto.
+reduce //.
+rewrite /-> Forall_dist_cons_iff in Hdist/.
+reduce /Hdist/.
+destruct /Hdist/ /Hallneq Hdist/.
+boolCase /e a a'/ /Heq/ >> auto.
+apply /Forall_dist_cons/ >> auto.
+reduce //.
+clear /IH Hdist Heq/.
+revert /Hallneq/.
+induction /l/ >> auto.
+intro /(a'' b'') t IH Hallneq/ >> auto.
+reduce //.
+rewrite /-> Forall_cons_iff in Hallneq/.
+reduce /Hallneq/.
+destruct /Hallneq/ /Hneq Hallneq/.
+boolCase /e a a''/ /Heq/ >> auto.
+apply /Forall_cons/ >> auto.
 qed ();
 
 
 
 define /pre_merge A B f g/
 /
-  (f #1, append (f #2) (g #2))
+  list_iter_inv
+    g
+    (fn h _ r . pre_update A B r (h #1) (h #2))
+    (f #2)
 //
   intersect i . forall (A B : U i) . pre_finite_map A B -> pre_finite_map A B -> pre_finite_map A B
 /;
 
 inference.
-unfold /pre_merge, pre_finite_map at all/.
+introOf /i A B f g/.
+unfold /pre_merge/.
+destruct /f/ /_ f/.
+reduce //.
+destruct /f/ /f _/.
 typecheck.
 qed ();
 
@@ -1036,12 +1190,12 @@ lemma "PreFiniteMap_pre_finite_map"
 /;
 
 inference.
-intro /i A B e/.
+intro /i A B e0/.
 unfold /PreFiniteMap/.
 splitn 6 >> auto.
   {
   intro /a a'/.
-  destruct /e/ /[e He]/.
+  destruct /e0/ /[e He]/.
   exactRaw /if e a a' then inl () else inr (fn _ . ())/.
   boolCase /e a a'/ /Heq/ >> unfold /Decidable.decidable/.
     {
@@ -1066,61 +1220,97 @@ splitn 6 >> auto.
   {
   intro /f a b/.
   unfold /pre_update, pre_lookup/.
-  destruct /f/ /[e' He'] f/.
+  destruct /f/ /[e He] [f _]/.
   reduce //.
-  boolEq true /e' a a/ >> auto.
+  induction /f/ >> auto.
+    {
+    boolEq true /e a a/ >> auto.
+    }
+  intro /(a' b') f IH/ >> auto.
+  reduce //.
+  boolCase /e a a'/ /Heq/ >> auto.
+    {
+    boolEq true /e a a/ >> auto.
+    }
+  boolEq false /e a a'/ >> auto.
   }
 
   {
   intro /f a b a' Hneq/.
-  unfold /pre_update, pre_lookup/.
-  infer /f/ /Hoff/.
-  destruct /f/ /[e' He'] f/.
+  unfold /pre_update, pre_lookup at 0 0/.
+  destruct /f/ /[e He] [f _]/.
   reduce //.
-  fold /pre_lookup A B (e', f) a'/.
-  boolEq false /e' a' a/ >> auto.
-  contrapositive /Hneq/.
-  auto.
+  unhide.
+  induction /f/ >> auto.
+    {
+    boolEq false /e a' a/ >> auto.
+    contrapositive /Hneq/.
+    auto.
+    }
+  intro /(a'' b'') f IH/ >> auto.
+  reduce //.
+  boolCase /e a a''/ /Heq/.
+    {
+    rewrite /<- He in Heq/.
+    subst /a''/.
+    boolEq false /e a' a/ >> auto.
+    contrapositive /Hneq/ >> auto.
+    }
+  boolCase /e a' a''/ /Heq'/ >> auto.
   }
 
   {
   intro /f a/.
   unfold /pre_remove, pre_lookup/.
-  destruct /f/ /[e' He'] f/.
+  destruct /f/ /[e He] [f Hf]/.
   reduce //.
+  unhide.
+  revert /Hf/.
   induction /f/ >> auto.
-  intro /(a' b) f IH/.
+  intro /(a' b') f IH Hdist/.
   reduce //.
-  boolCase /e' a a'/ /Heq/.
+  rewrite /-> Forall_dist_cons_iff in Hdist/.
+  reduce /Hdist/.
+  destruct /Hdist/ /Hallneq Hdist/.
+  boolCase /e a a'/ /Heq/.
     {
-    exact /IH/.
+    rewrite /<- He in Heq/.
+    subst /a'/.
+    clear /IH Hdist/.
+    revert /Hallneq/.
+    induction /f/ >> auto.
+    intro /(a'' b'') f IH Hallneq/.
+    reduce //.
+    rewrite /-> Forall_cons_iff in Hallneq/.
+    reduce /Hallneq/.
+    destruct /Hallneq/ /Hneq Hallneq/.
+    boolEq false /e a a''/.
+      {
+      rewrite /<- He/.
+      auto.
+      }
+    apply /IH/ >> auto.
     }
   
     {
-    boolEq false /e' a a'/ >> auto.
+    boolEq false /e a a'/ >> auto.
     }
   }
 
   {
   intro /f a a' Hneq/.
   unfold /pre_remove, pre_lookup at all/.
-  destruct /f/ /[e' He'] f/.
+  destruct /f/ /[e He] [f _]/.
   reduce //.
   unhide.
   induction /f/ >> auto.
-  intro /(a'' b) f IH/.
+  intro /(a'' b'') f IH/.
   reduce //.
-  boolCase /e' a a''/ /Heq/.
-    {
-    rewrite /<- He' in Heq/.
-    subst /a''/.
-    boolEq false /e' a' a/.
-      {
-      contrapositive /Hneq/ >> auto.
-      }
-    exact /IH/.
-    }
-  boolCase /e' a' a''/ /Heq'/ >> auto.
+  boolCase /e a a''/ /Heq/ >> auto.
+  rewrite /<- He in Heq/.
+  subst /a''/.
+  boolEq false /e a' a/ >> auto.
+  contrapositive /Hneq/ >> auto.
   }
 qed ();
 
@@ -1138,64 +1328,69 @@ lemma "PreFiniteMapMerge_pre_finite_map"
 /;
 
 inference.
-intro /i A B e/.
+intro /i A B e0/.
 unfold /PreFiniteMapMerge/.
+so /PreFiniteMap_pre_finite_map i A B e0/ /Hpfm/.
 splitn 3 >> auto.
   {
-  apply /PreFiniteMap_pre_finite_map/.
-  }
-
-  {
   intro /f g a b Hlook/.
-  destruct /f/ /[e' He'] f/.
-  destruct /g/ /[e'' He''] g/.
-  unfold /pre_merge/.
-  unfold /pre_lookup in Hlook in concl/.
-  reduce /Hlook concl/.
+  destruct /f/ /[e He] [f _]/.
   unhide.
+  unfold /pre_lookup in Hlook, pre_merge/.
+  reduce /Hlook concl/.
   revert /Hlook/.
   induction /f/.
     {
     intro /H/.
     injection /H/.
     }
- 
+  intro /(a' b') f IH/.
+  reduce //.
+  boolCase /e a a'/ /Heq/.
     {
-    intro /(a' b') f IH/.
-    reduce //.
-    boolCase /e' a a'/ /Heq/ >> auto.
+    intro /H/.
+    injection /H/.
+    rewrite /<- He in Heq/.
+    subst /a' b'/.
+    destruct /Hpfm/ /_ _ Hlook_upd _/.
+    apply /Hlook_upd/.
+    }
+
+    {
+    intro /Hlook/.
+    rewrite /<- He in Heq/.
+    destruct /Hpfm/ /_ _ _ Hlook_upd_neq _/.
+    rewrite /-> Hlook_upd_neq/.
+      {
+      contrapositive /Heq/ >> auto.
+      }
+    apply /IH/ >> auto.
     }
   }
 
   {
   intro /f g a Hlook/.
-  destruct /f/ /[e' He'] f/.
-  destruct /g/ /[e'' He''] g/.
-  assert /e' = e'' : (A -> A -> bool)/ /Heqe/.
-    {
-    introEq /x y/.
-    apply /iff_eq_bool/.
-    auto.
-    }
-  unfold /pre_merge/.
-  unfold /pre_lookup in Hlook in concl at all/.
-  reduce /Hlook concl/.
+  destruct /f/ /[e He] [f _]/.
   unhide.
+  unfold /pre_lookup in Hlook, pre_merge/.
+  reduce /Hlook concl/.
   revert /Hlook/.
-  induction /f/.
+  induction /f/ >> auto.
+  intro /(a' b') f IH/.
+  reduce //.
+  boolCase /e a a'/ /Heq/.
     {
-    intro /_/.
-    rewrite /<- Heqe/.
-    reflexivity.
-    }
-  
-    {
-    intro /(a' b') f IH/.
-    reduce //.
-    boolCase /e' a a'/ /Heq/ >> auto.
     intro /H/.
     injection /H/.
     }
+  intro /Hlook/.
+  rewrite /<- He in Heq/.
+  destruct /Hpfm/ /_ _ _ Hlook_upd_neq _/.
+  rewrite /-> Hlook_upd_neq/.
+    {
+    contrapositive /Heq/ >> auto.
+    }
+  apply /IH/ >> auto.
   }
 qed ();
 
@@ -1867,8 +2062,28 @@ define /pre_map A B C g f/
 /;
 
 inference.
+introOf /i A B C g f/.
+destruct /f/ /e (f Hdist)/.
+unhide.
 unfold /pre_map, pre_finite_map at all/.
+reduce //.
 typecheck.
+split.
+induction /Hdist/.
+  {
+  apply /Forall_dist_nil/.
+  }
+intro /(a b) f Hallneq _ IH/.
+reduce //.
+apply /Forall_dist_cons/ >> auto.
+clear /IH/.
+induction /Hallneq/.
+  {
+  apply /Forall_nil/.
+  }
+intro /(a' b') f Hneq _ IH/.
+reduce //.
+apply /Forall_cons/ >> auto.
 qed ();
 
 
@@ -1883,7 +2098,7 @@ lemma "pre_lookup_pre_map"
 
 inference.
 intro /i A B C g f a/.
-destruct /f/ /e f/.
+destruct /f/ /e (f _)/.
 unfold /pre_map, pre_lookup at all/.
 induction /f/ >> auto.
 intro /(a' b) f IH/.
@@ -2690,7 +2905,7 @@ assert /forall (f : pre_finite_map A B) a . (exists (b : B) . pre_lookup A B f a
   split.
     {
     intro /(b Heq)/.
-    destruct /f/ /[e He] f/.
+    destruct /f/ /[e He] [f _]/.
     reduce //.
     revert /Heq/.
     unfold /pre_lookup/.
@@ -2720,7 +2935,7 @@ assert /forall (f : pre_finite_map A B) a . (exists (b : B) . pre_lookup A B f a
     }
 
     {
-    destruct /f/ /[e He] f/.
+    destruct /f/ /[e He] [f _]/.
     unfold /pre_lookup/.
     reduce //.
     induction /f/.
@@ -2803,6 +3018,182 @@ destruct /L/ /[L]/.
 destruct /L/ /[L HL]/.
 split.
 existsAuto.
+qed ();
+
+
+
+(* Miscellaneous *)
+
+lemma "equipollent_finite_map"
+/
+  forall i (A B C : U i) .
+    F.equipollent B C
+    -> F.equipollent (finite_map A B) (finite_map A C)
+/;
+
+intro /i A B C Hequi/.
+unfold /F.equipollent in Hequi in concl/.
+destruct /Hequi/ /f g Hgf Hfg/.
+exists /fn m . map (fn _ b . f b) m/.
+unfold /F.bijective/.
+exists /fn m . map (fn _ c . g c) m/.
+split.
+  {
+  intro /m/.
+  apply /finite_map_ext/.
+  reduce //.
+  intro /a/.
+  rewrite /-> lookup_map at 0 0/.
+  rewrite /-> Option.map_compose/.
+  reduce //.
+  rewrite /-> Hgf within _/.
+  apply /Option.map_identity/.
+  }
+
+  {
+  intro /m/.
+  apply /finite_map_ext/.
+  reduce //.
+  intro /a/.
+  rewrite /-> lookup_map at 0 0/.
+  rewrite /-> Option.map_compose/.
+  reduce //.
+  rewrite /-> Hfg within _/.
+  apply /Option.map_identity/.
+  }
+qed ();
+
+
+
+lemma "subpollent_finite_map"
+/
+  forall i (A B C : U i) .
+    F.subpollent B C
+    -> F.subpollent (finite_map A B) (finite_map A C)
+/;
+
+intro /i A B C Hsub/.
+unfold /F.subpollent in Hsub in concl/.
+destruct /Hsub/ /f g Hgf/.
+exists /fn m . map (fn _ b . f b) m/.
+unfold /F.split_injective/.
+exists /fn m . map (fn _ c . g c) m/.
+intro /m/.
+apply /finite_map_ext/.
+reduce //.
+intro /a/.
+rewrite /-> lookup_map at 0 0/.
+rewrite /-> Option.map_compose/.
+reduce //.
+rewrite /-> Hgf within _/.
+apply /Option.map_identity/.
+qed ();
+
+
+
+lemma "finite_map_subtype"
+/
+  forall i (A B C : U i) . B <: C -> finite_map A B <: finite_map A C
+/;
+
+inference.
+intro /i A B C HsubBC/.
+assert /pre_finite_map A B <: pre_finite_map A C/ /HsubABC/.
+  {
+  unfold /pre_finite_map at 0 0/.
+  intro /(e (l Hdist))/.
+  typecheck.
+  split.
+  induction /Hdist/.
+    {
+    apply /Forall_dist_nil/.
+    }
+  intro /(a b) l Hall _ IH/.
+  apply /Forall_dist_cons/ >> auto.
+  reduce //.
+  clear /IH/.
+  induction /Hall/.
+    {
+    apply /Forall_nil/.
+    }
+  intro /(a' b') l Hneq _ IH/.
+  apply /Forall_cons/ >> auto.
+  }
+intro /m/.
+infer /finite_map A C/ /Hof/.
+unfold /finite_map in m in concl in Hof/.
+unfold /qpfm in m in concl in Hof/.
+destruct /m/ /[m1 m2 Hm]/.
+RuleTactic.quotientIntroEq >> auto.
+intro /a/.
+subsume /option B/ >> auto.
+assert /forall (m : pre_finite_map A B) . pre_lookup A B m a = pre_lookup A C m a : option B/ /H/.
+  {
+  clear /m1 m2 Hm Hof/.
+  intro /m/.
+  unfold /pre_finite_map in m/.
+  destruct /m/ /e m/.
+  unfold /pre_lookup at 0 0/.
+  reduce //.
+  destruct /m/ /m _/.
+  sinduction /m/.
+  reintro /IH/.
+  destruct /m/ /| (a' b) m/.
+    {
+    reduce //.
+    reflexivity.
+    }
+  reduce //.
+  boolCase /e a a'/ /Heq/ >>> [auto, idtac].
+  apply /IH/.
+  apply /List.cons_subterm/.
+  }
+transitivity /pre_lookup A B m1 a/.
+  {
+  symmetry.
+  apply /H/.
+  }
+transitivity /pre_lookup A B m2 a/ >> auto.
+qed ();
+
+
+
+(* Impredicative quantification *)
+
+lemma "kindlike_finite_map"
+/
+  forall i (A : U i) (B : U (1 + i)) .
+    B
+    -> K.kindlike i B
+    -> K.kindlike i (finite_map A B)
+/;
+
+inference.
+intro /i A B b0 Hkind/.
+apply /K.kindlike_subpollent _ _ (finite_map A unit & (A -> B))/.
+1:{
+  apply /K.kindlike_prod/.
+    {
+    apply /K.kindlike_degenerate/.
+    }
+
+    {
+    apply /K.kindlike_arrow_right/ >> auto.
+    }
+  }
+unfold /F.subpollent/.
+exists /fn f . (map (fn _ _ . ()) f, (fn a . option_case (lookup f a) b0 (fn b . b)))/.
+unfold /F.split_injective/.
+exists /fn p . map (fn a _ . p #2 a) (p #1)/.
+intro /f/.
+reduce //.
+apply /finite_map_ext/.
+intro /a/.
+rewrite /-> lookup_map at 0 0/.
+rewrite /-> Option.map_compose/.
+reduce //.
+remember /lookup f a/ /_/ /X/ /Hlook/.
+destruct /X/ /{| b}/ >> auto.
 qed ();
 
 

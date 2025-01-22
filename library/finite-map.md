@@ -182,6 +182,31 @@ Another version returns the domain squashed:
     finite_map_domain_squash : type:finite_map_domain_squash
 
 
+
+#### Generic finite maps
+
 The submodule [`Class`](finite-map-class.html) defines a generic class
 determining what it means to be a finite map.  It is used in the
 implementation of the simple finite maps above.
+
+The simple finite maps are defined using tools from the `Class`
+submodule.  The discrepancy between the types of `empty` versus `emp`
+(*q.v.*) is mediated using the `finite_map_impl_eqtest` lemma (above)
+that extracts an equality test from a finite map.  (By definition, all
+equality tests at the same type are equal.)
+
+    FiniteMap_finite_map : type:FiniteMap_finite_map
+
+    FiniteMap_finite_map' : type:FiniteMap_finite_map'
+
+
+
+#### Miscellaneous
+
+    finite_map_subtype : type:finite_map_subtype
+
+    equipollent_finite_map : type:equipollent_finite_map
+
+    subpollent_finite_map : type:subpollent_finite_map
+
+    kindlike_finite_map : type:kindlike_finite_map

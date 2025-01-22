@@ -34,10 +34,6 @@ A simpler case-analysis operation:
     option_case (None) n s --> n
     option_case (Some x) n s --> s x
 
-Options are covariant:
-
-    option_subtype : type:option_subtype
-
 
 ### Operations
 
@@ -74,3 +70,14 @@ Options are covariant:
 
     valof _ (None _) x --> x
     valof _ (Some _ x) --> x
+
+
+
+### Miscellaneous
+
+    option_subtype : type:option_subtype
+
+Note that the subtyping principle relies on `None` and `Some`'s type
+argument being invisible (*i.e.,* taken using `intersect`).
+
+    kindlike_option : type:kindlike_option

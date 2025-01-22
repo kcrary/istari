@@ -46,6 +46,9 @@ signature GENERALIZE =
       val rememberRaw : eterm -> eterm -> symbol option -> symbol option -> tactic
       val remember : eterm -> eterm -> symbol option -> symbol option -> tactic
 
+      val rememberPriority' : eterm -> eterm -> symbol option -> symbol option -> priority tacticm
+      val rememberRaw' : eterm -> eterm -> symbol option -> symbol option -> tactic
+      val remember' : eterm -> eterm -> symbol option -> symbol option -> tactic
 
       val setEqPriority : symbol -> ETerm.eterm -> ETerm.eterm -> symbol option -> priority tacticm
       val setEqRaw : symbol -> ETerm.eterm -> ETerm.eterm -> symbol option -> tactic
@@ -426,6 +429,16 @@ structure Generalize :> GENERALIZE =
       fun remember em ea name eqname =
          rememberGen em ea NONE name eqname
 
+      fun rememberPriority' em ea name eqname =
+         rememberGenPriority em ea NONE name eqname
+         >>!
+         EqualityTactic.symmetryInPriority (Hyp.NUMBER 0)
+
+      fun rememberRaw' em ea name eqname =
+         rememberPriority' em ea name eqname >> idtac
+
+      fun remember' em ea name eqname =
+         Typecheck.withTypecheckSnd $ rememberPriority' em ea name eqname
 
       fun setEqPriority sym em ea symEq =
          let

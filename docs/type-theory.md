@@ -371,6 +371,8 @@ type](#intersection-types), but not quite the same.  If `A` is
 inhabited, then `intersect (_ : A) . B` is extensionally equivalent to
 `B` (*i.e.,* they contain the same elements) but they are not equal
 types.  However, if `A` is inhabited then `A -g> B` is *equal* to `B`.
+(This fact is necessary to support the [kindlike
+construction](lib/kindlike.html).)
 
 
 #### Coguarded types

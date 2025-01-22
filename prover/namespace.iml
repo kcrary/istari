@@ -36,7 +36,8 @@ signature NAMESPACE =
       val aliasModule : symbol -> address -> unit
       val aliasExport : symbol -> constant -> unit  (* an alias to be exported *)
 
-      (* Remove module from exportable entities. *)
+      (* Remove from exportable entities. *)
+      val hide : symbol -> unit
       val hideModule : symbol -> unit
 
       (* Resolve address as if all modules were closed. *)
@@ -789,6 +790,24 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
             appGroup f group []
          end
 
+
+
+      fun hide sym =
+         let
+            val ST { current, path, env, working = G (workingConst, workingMod), reverse } = R.deref theState
+         in
+            if D.member workingConst sym then
+               R.assign theState
+                  (ST {
+                      current = current,
+                      path = path,
+                      env = env,
+                      reverse = reverse,
+                      working = G (D.remove workingConst sym, workingMod)
+                      })
+            else
+               raise (Fail "constant absent in hideModule")
+         end
 
 
       fun hideModule sym =

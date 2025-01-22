@@ -390,6 +390,47 @@ Another version returns the domain squashed:
                                       forall (a : A) . member f a <-> List.In A a L }
 
 
+
+#### Generic finite maps
+
 The submodule [`Class`](finite-map-class.html) defines a generic class
 determining what it means to be a finite map.  It is used in the
 implementation of the simple finite maps above.
+
+The simple finite maps are defined using tools from the `Class`
+submodule.  The discrepancy between the types of `empty` versus `emp`
+(*q.v.*) is mediated using the `finite_map_impl_eqtest` lemma (above)
+that extracts an equality test from a finite map.  (By definition, all
+equality tests at the same type are equal.)
+
+    FiniteMap_finite_map : forall (i : level) (A B : U i) (e : eqtest A) .
+                              Class.FiniteMap i A B (finite_map A B) (empty e) lookup update remove
+
+    FiniteMap_finite_map' : forall (i : level) (A B : U i) (f : finite_map A B) .
+                               Class.FiniteMap
+                                 i
+                                 A
+                                 B
+                                 (finite_map A B)
+                                 (empty (finite_map_impl_eqtest A B f))
+                                 lookup
+                                 update
+                                 remove
+
+
+
+#### Miscellaneous
+
+    finite_map_subtype : forall (i : level) (A B C : U i) .
+                            B <: C -> finite_map A B <: finite_map A C
+
+    equipollent_finite_map : forall (i : level) (A B C : U i) .
+                                Function.equipollent B C
+                                -> Function.equipollent (finite_map A B) (finite_map A C)
+
+    subpollent_finite_map : forall (i : level) (A B C : U i) .
+                               Function.subpollent B C
+                               -> Function.subpollent (finite_map A B) (finite_map A C)
+
+    kindlike_finite_map : forall (i : level) (A : U i) (B : U (1 + i)) .
+                             B -> Kindlike.kindlike i B -> Kindlike.kindlike i (finite_map A B)

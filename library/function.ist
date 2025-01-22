@@ -1,3 +1,5 @@
+File.import "logic-load.iml";
+File.import "function-aux.iml";
 
 beginModule "Function";
 
@@ -76,28 +78,27 @@ qed ();
 
 
 
-define /one_to_one {a b} f/
+define /injective {a b} f/
 /
   forall (x y : a) . f x = f y : b -> x = y : a
 //
   intersect i . forall (a b : U i) . (a -> b) -> U i
 /;
 
-unfold /one_to_one/.
+unfold /injective/.
 typecheck.
 qed ();
 
 
 
-(* equivalent to one_to_one classically, but not constructively *)
-define /injective {a b} f/
+define /split_injective {a b} f/
 /
   exists (g : b -> a) . forall (x : a) . g (f x) = x : a
 //
   intersect i . forall (a b : U i) . (a -> b) -> U i
 /;
 
-unfold /injective/.
+unfold /split_injective/.
 typecheck.
 qed ();
 
@@ -131,17 +132,17 @@ qed ();
 
 
 
-lemma "injective_impl_one_to_one"
+lemma "split_injective_impl_injective"
 /
   forall i (a b : U i) (f : a -> b) .
-    injective f
-    -> one_to_one f
+    split_injective f
+    -> injective f
 /;
 
 inference.
 intro /i a b f Hinj/.
 destruct /Hinj/ /g Hinv/.
-unfold /one_to_one/.
+unfold /injective/.
 intro /x y Heq/.
 rewrite /<- Hinv x, <- Hinv y/.
 compat >> auto.
@@ -149,16 +150,16 @@ qed ();
 
 
 
-lemma "bijective_impl_injective"
+lemma "bijective_impl_split_injective"
 /
   forall i (a b : U i) (f : a -> b) .
     bijective f
-    -> injective f
+    -> split_injective f
 /;
 
 inference.
 intro /i a b f (g Hpost Hpre)/.
-unfold /injective/.
+unfold /split_injective/.
 exists /g/.
 auto.
 qed ();
@@ -181,26 +182,26 @@ qed ();
 
 
 
-lemma "bijective_impl_one_to_one"
+lemma "bijective_impl_injective"
 /
   forall i (a b : U i) (f : a -> b) .
     bijective f
-    -> one_to_one f
+    -> injective f
 /;
 
 inference.
 intro /i a b f Hbij/.
-apply /injective_impl_one_to_one/.
-apply /bijective_impl_injective/.
+apply /split_injective_impl_injective/.
+apply /bijective_impl_split_injective/.
 auto.
 qed ();
 
 
 
-lemma "injective_and_surjective_impl_bijective"
+lemma "split_injective_and_surjective_impl_bijective"
 /
   forall i (a b : U i) (f : a -> b) .
-    injective f
+    split_injective f
     -> surjective f
     -> bijective f
 /;
@@ -219,10 +220,10 @@ qed ();
 
 
 
-lemma "injective_inverse"
+lemma "split_injective_inverse"
 /
   forall i (a b : U i) (f : a -> b) .
-    injective f
+    split_injective f
     -> exists (g : b -> a) .
          surjective g
          & compose g f = identity : (a -> a)
@@ -252,7 +253,7 @@ lemma "surjective_inverse"
   forall i (a b : U i) (f : a -> b) .
     surjective f
     -> exists (g : b -> a) .
-         injective g
+         split_injective g
          & compose f g = identity : (b -> b)
 /;
 
@@ -261,7 +262,7 @@ intro /i a b f (g Hinv)/.
 exists /g/.
 split.
   {
-  unfold /injective/.
+  unfold /split_injective/.
   exists /f/.
   auto.
   }
@@ -310,20 +311,6 @@ qed ();
 
 
 
-lemma "one_to_one_identity"
-/
-  forall i (a : U i) . `one_to_one a a identity
-/;
-
-inference.
-intro /i a/.
-unfold /one_to_one/.
-unfold /identity at all/.
-auto.
-qed ();
-
-
-
 lemma "injective_identity"
 /
   forall i (a : U i) . `injective a a identity
@@ -332,6 +319,20 @@ lemma "injective_identity"
 inference.
 intro /i a/.
 unfold /injective/.
+unfold /identity at all/.
+auto.
+qed ();
+
+
+
+lemma "split_injective_identity"
+/
+  forall i (a : U i) . `split_injective a a identity
+/;
+
+inference.
+intro /i a/.
+unfold /split_injective/.
 exists /identity/.
 unfold /identity at all/.
 auto.
@@ -369,25 +370,6 @@ qed ();
 
 
 
-lemma "one_to_one_compose"
-/
-  forall i (a b c : U i) (f : b -> c) (g : a -> b) .
-    one_to_one f
-    -> one_to_one g
-    -> one_to_one (compose f g)
-/;
-
-inference.
-unfold /compose/.
-unfold /one_to_one at all/.
-intro /i a b c f g Hf Hg/.
-intro /x y Hxy/.
-reduce /Hxy/.
-auto.
-qed ();
-
-
-
 lemma "injective_compose"
 /
   forall i (a b c : U i) (f : b -> c) (g : a -> b) .
@@ -397,8 +379,27 @@ lemma "injective_compose"
 /;
 
 inference.
+unfold /compose/.
+unfold /injective at all/.
+intro /i a b c f g Hf Hg/.
+intro /x y Hxy/.
+reduce /Hxy/.
+auto.
+qed ();
+
+
+
+lemma "split_injective_compose"
+/
+  forall i (a b c : U i) (f : b -> c) (g : a -> b) .
+    split_injective f
+    -> split_injective g
+    -> split_injective (compose f g)
+/;
+
+inference.
 intro /i a b c f g (f' Hf) (g' Hg)/.
-unfold /injective/.
+unfold /split_injective/.
 exists /compose g' f'/.
 intro /x/.
 unfold /compose at all/.
@@ -438,14 +439,879 @@ lemma "bijective_compose"
 
 inference.
 intro /i a b c f g Hf Hg/.
-apply /injective_and_surjective_impl_bijective/.
+apply /split_injective_and_surjective_impl_bijective/.
   {
-  apply /injective_compose/ >> autoWith /bijective_impl_injective/.
+  apply /split_injective_compose/ >> autoWith /bijective_impl_split_injective/.
   }
 
   {
   apply /surjective_compose/ >> autoWith /bijective_impl_surjective/.
   }
+qed ();
+
+
+
+define /equipollent a b/
+/
+  exists (f : a -> b) . bijective f
+//
+  intersect i . U i -> U i -> U i
+/;
+
+inference.
+unfold /equipollent/.
+typecheck.
+qed ();
+
+
+
+lemma "equipollent_refl"
+/
+  forall i (a : U i) . equipollent a a
+/;
+
+intro /i a/.
+unfold /equipollent/.
+exists /identity/.
+apply /bijective_identity/.
+qed ();
+
+
+
+lemma "equipollent_symm"
+/
+  forall i (a b : U i) .
+    equipollent a b
+    -> equipollent b a
+/;
+
+inference.
+intro /i a b (f g Hgf Hfg)/.
+unfold /equipollent/.
+exists /g/.
+unfold /bijective/.
+exists /f/.
+auto.
+qed ();
+
+
+
+lemma "equipollent_trans"
+/
+  forall i (a b c : U i) .
+    equipollent a b
+    -> equipollent b c
+    -> equipollent a c
+/;
+
+intro /i a b c (f Hf) (g Hg)/.
+unfold /equipollent/.
+exists /compose g f/.
+apply /bijective_compose/ >> auto.
+qed ();
+
+
+
+define /subpollent a b/
+/
+  exists (f : a -> b) . split_injective f
+//
+  intersect i . U i -> U i -> U i
+/;
+
+inference.
+unfold /subpollent/.
+typecheck.
+qed ();
+
+
+
+lemma "equipollent_impl_subpollent"
+/
+  forall i (a b : U i) . equipollent a b -> subpollent a b
+/;
+
+inference.
+intro /i a b (f g Hgf _)/.
+unfold /subpollent, split_injective/.
+existses [/f/, /g/].
+auto.
+qed ();
+
+
+
+lemma "subpollent_refl"
+/
+  forall i (a : U i) . subpollent a a
+/;
+
+inference.
+intro /i a/.
+unfold /subpollent/.
+exists /identity/.
+apply /split_injective_identity/.
+qed ();
+
+
+
+(* Antisymmetry for subpollence requires the Schroeder-Bernstein theorem,
+   which doesn't hold constructively.
+*)
+
+
+
+lemma "subpollent_trans"
+/
+  forall i (a b c : U i) .
+    subpollent a b
+    -> subpollent b c
+    -> subpollent a c
+/;
+
+intro /i a b c (f Hf) (g Hg)/.
+unfold /subpollent/.
+exists /compose g f/.
+apply /split_injective_compose/ >> auto.
+qed ();
+ 
+
+
+structure Nothing = AfterEquipollent ();
+
+
+
+lemma "eeqtp_impl_equipollent"
+/
+  forall i (a b : U i) .
+    a <:> b
+    -> equipollent a b
+/;
+
+inference.
+intro /i a b Heq/.
+unfold /equipollent, bijective/.
+destruct /Heq/ /Hab Hba/.
+exists /fn x . x/.
+exists /fn x . x/.
+reduce //.
+auto.
+qed ();
+
+
+
+lemma "equipollent_arrow"
+/
+  forall i (a a' b b' : U i) .
+    equipollent a a'
+    -> equipollent b b'
+    -> equipollent (a -> b) (a' -> b')
+/;
+
+inference.
+intro /i a a' b b' (f fi Hfif Hffi) (g gi Hgig Hggi)/.
+unfold /equipollent/.
+exists /fn h x . g (h (fi x))/.
+unfold /bijective/.
+exists /fn h x . gi (h (f x))/.
+split.
+  {
+  intro /h/.
+  introEq /x/.
+  reduce //.
+  rewrite /-> Hfif/.
+  rewrite /-> Hgig/.
+  reflexivity.
+  }
+
+  {
+  intro /h/.
+  introEq /x/.
+  reduce //.
+  rewrite /-> Hggi/.
+  rewrite /-> Hffi/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "equipollent_prod"
+/
+  forall i (a a' b b' : U i) .
+    equipollent a a'
+    -> equipollent b b'
+    -> equipollent (a & b) (a' & b')
+/;
+
+inference.
+intro /i a a' b b' (f fi Hfif Hffi) (g gi Hgig Hggi)/.
+unfold /equipollent/.
+exists /fn x . (f (x #1), g (x #2))/.
+unfold /bijective/.
+exists /fn x . (fi (x #1), gi (x #2))/.
+split.
+  {
+  intro /(x y)/.
+  reduce //.
+  rewrite /-> Hfif/.
+  rewrite /-> Hgig/.
+  reflexivity.
+  }
+
+  {
+  intro /(x y)/.
+  reduce //.
+  rewrite /-> Hffi/.
+  rewrite /-> Hggi/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "equipollent_sum"
+/
+  forall i (a a' b b' : U i) .
+    equipollent a a'
+    -> equipollent b b'
+    -> equipollent (a % b) (a' % b')
+/;
+
+inference.
+intro /i a a' b b' (f fi Hfif Hffi) (g gi Hgig Hggi)/.
+unfold /equipollent, bijective/.
+exists /fn x . case x of | inl y . inl (f y) | inr y . inr (g y)/.
+exists /fn x . case x of | inl y . inl (fi y) | inr y . inr (gi y)/.
+split.
+  {
+  intro /(x | x)/ >> reduce //.
+    {
+    rewrite /-> Hfif/ >> auto.
+    }
+
+    {
+    rewrite /-> Hgig/ >> auto.
+    }
+  }
+
+  {
+  intro /(x | x)/ >> reduce //.
+    {
+    rewrite /-> Hffi/ >> auto.
+    }
+
+    {
+    rewrite /-> Hggi/ >> auto.
+    }
+  }
+qed ();
+
+
+
+lemma "equipollent_forall"
+/
+  forall i (a : U i) (b b' : a -> U i) .
+    (forall x . equipollent (b x) (b' x))
+    -> equipollent (forall (x : a) . b x) (forall (x : a) . b' x)
+/;
+
+inference.
+intro /i a b b' H/.
+unfold /equipollent in H in concl, bijective in H in concl/.
+exists /fn k x . H x #1 (k x)/.
+exists /fn k x . H x #2 #1 (k x)/.
+split.
+  {
+  intro /k/.
+  introEq /x/.
+  reduce //.
+  rewrite /-> H x #2 #2 #1/.
+  reflexivity.
+  }
+
+  {
+  intro /k/.
+  introEq /x/.
+  reduce //.
+  rewrite /-> H x #2 #2 #2/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "equipollent_exists"
+/
+  forall i (a : U i) (b b' : a -> U i) .
+    (forall x . equipollent (b x) (b' x))
+    -> equipollent (exists (x : a) . b x) (exists (x : a) . b' x)
+/;
+
+inference.
+intro /i a b b' H/.
+unfold /equipollent in H in concl, bijective in H in concl/.
+exists /fn x . (x #1, H (x #1) #1 (x #2))/.
+exists /fn x . (x #1, H (x #1) #2 #1 (x #2))/.
+split.
+  {
+  intro /x/.
+  reduce //.
+  extensionality >> auto.
+  reduce //.
+  rewrite /-> H (x #1) #2 #2 #1/.
+  reflexivity.
+  }
+
+  {
+  intro /x/.
+  reduce //.
+  extensionality >> auto.
+  reduce //.
+  rewrite /-> H (x #1) #2 #2 #2/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "equipollent_future"
+/
+  forall i (a b : future (U i)) .
+    future (equipollent (a #prev) (b #prev))
+    -> equipollent (future (a #prev)) (future (b #prev))
+/;
+
+inference.
+intro /i a b/.
+destruct /a/ /[a]/.
+destruct /b/ /[b]/.
+intro /[H]/.
+unfold /equipollent in H in concl/.
+unfold /bijective in H in concl/.
+reduce /H/.
+assert
+  /exists (f : future (a -> b)) .
+    let next f = f
+    in
+      exists (g : future (b -> a)) .
+        let next g = g
+        in
+          future (forall (x : a) . g (f x) = x : a)
+          & future (forall (x : b) . f (g x) = x : b)
+  / /Hfut/.
+  {
+  exists /next (H #1)/.
+  reduce //.
+  exists /next (H #2 #1)/.
+  reduce //.
+  split.
+    {
+    split.
+    exact /H #2 #2 #1/.
+    }
+
+    {
+    split.
+    exact /H #2 #2 #2/.
+    }
+  }
+clear /H/.
+destruct /Hfut/ /[f] H/ >> reduce /H/.
+destruct /H/ /[g] H/ >> reduce /H/.
+destruct /H/ /[Hgf] [Hfg]/.
+reduce //.
+exists /fn x . let next x' = x in next (f x')/.
+exists /fn x . let next x' = x in next (g x')/.
+split.
+  {
+  intro /[x]/.
+  reduce //.
+  compat >> auto.
+  }
+
+  {
+  intro /[x]/.
+  reduce //.
+  compat >> auto.
+  }
+qed ();
+
+
+
+lemma "equipollent_set"
+/
+  forall i (a : U i) (b b' : a -> U i) .
+    (forall a . b a <-> b' a)
+    -> equipollent { x : a | b x } { x : a | b' x }
+/;
+
+intro /i a b b' Hiff/.
+apply /eeqtp_impl_equipollent/.
+unfold /eeqtp/.
+split.
+  {
+  intro /(x Hx)/.
+  typecheck.
+  split >> auto.
+  }
+
+  {
+  intro /(x Hx)/.
+  typecheck.
+  split >> auto.
+  }
+qed ();
+
+
+
+lemma "equipollent_set_iset"
+/
+  forall i (a : U i) (P : a -> U i) .
+    equipollent { x : a | P x } (iset (x : a) . P x)
+/;
+
+inference.
+intro /i a P/.
+apply /eeqtp_impl_equipollent/.
+unfold /eeqtp/.
+split.
+  {
+  intro /(x Hx)/.
+  typecheck.
+  split >> auto.
+  }
+
+  {
+  intro /(x Hx)/.
+  typecheck.
+  split >> auto.
+  }
+qed ();
+
+
+
+lemma "equipollent_iset"
+/
+  forall i (a : U i) (b b' : a -> U i) .
+    (forall a . b a <-> b' a)
+    -> equipollent (iset (x : a) . b x) (iset (x : a) . b' x)
+/;
+
+intro /i a b b' Hiff/.
+transitivity /{ x : a | b x }/.
+  {
+  symmetry.
+  apply /equipollent_set_iset/.
+  }
+transitivity /{ x : a | b' x }/.
+  {
+  apply /equipollent_set/ >> auto.
+  }
+apply /equipollent_set_iset/.
+qed ();
+
+
+
+lemma "equipollent_squash"
+/
+  forall i (a b : U i) .
+    (a <-> b)
+    -> equipollent { a } { b }
+/;
+
+inference.
+intro /i a b Hiff/.
+unfold /squash at 0 0/.
+apply /equipollent_set/ >> auto.
+qed ();
+
+
+
+lemma "equipollent_isquash"
+/
+  forall i (a b : U i) .
+    (a <-> b)
+    -> equipollent (isquash a) (isquash b)
+/;
+
+inference.
+intro /i a b Hiff/.
+unfold /isquash at 0 0/.
+apply /equipollent_iset/ >> auto.
+qed ();
+
+
+
+lemma "equipollent_squash_isquash"
+/
+  forall i (a : U i) .
+    equipollent { a } (isquash a)
+/;
+
+inference.
+intro /i a/.
+unfold /squash, isquash/.
+apply /equipollent_set_iset/.
+qed ();
+
+
+
+lemma "equipollent_set_constraint"
+/
+  forall i (a : U i) (P : a -> U i) .
+    equipollent { x : a | P x } (exists (x : a) . { P x })
+/;
+
+inference.
+intro /i a P/.
+unfold /equipollent/.
+exists /fn x . (x, ())/.
+  {
+  destruct /0/ /x Hx/.
+  auto.
+  }
+unfold /bijective/.
+exists /fn x . x #1/.
+  {
+  reintro /_ x/.
+  destruct /x/ /x Hx/ >> auto.
+  }
+
+  {
+  reintro /f x/.
+  reduce //.
+  destruct /x/ /x Hx/.
+  generalize /f (x, ())/ /_/ /Y/ >> auto.
+  destruct /Y/ /y Hy/.
+  auto.
+  }
+
+  {
+  reintro /f x/.
+  reduce //.
+  destruct /x/ /x [Hx]/.
+  generalize /f (x, ())/ /_/ /Y/ >> auto.
+  destruct /Y/ /y Hy/.
+  auto.
+  }
+
+  {
+  reintro /x/.
+  destruct /x/ /x [Hx]/ >> auto.
+  }
+split.
+  {
+  intro /x/.
+  reduce //.
+  reflexivity.
+  }
+
+  {
+  intro /(x [Hx])/.
+  reduce //.
+  reflexivity >> auto.
+  }
+qed ();
+
+
+
+lemma "equipollent_iset_constraint"
+/
+  forall i (a : U i) (P : a -> U i) .
+    equipollent (iset (x : a) . P x) (exists (x : a) . isquash (P x))
+/;
+
+inference.
+intro /i a P/.
+transitivity /{ x : a | P x }/.
+  {
+  symmetry.
+  apply /equipollent_set_iset/.
+  }
+transitivity /exists (x : a) . { P x }/.
+  {
+  apply /equipollent_set_constraint/.
+  }
+apply /equipollent_exists/.
+intro /x/.
+reduce //.
+apply /equipollent_squash_isquash/.
+qed ();
+
+
+
+lemma "equipollent_set_elim"
+/
+  forall i (a : U i) (b : a -> U i) .
+    (forall x . { b x })
+    -> equipollent { x : a | b x } a
+/;
+
+inference.
+intro /i a b Hall/.
+apply /eeqtp_impl_equipollent/.
+unfold /eeqtp/.
+split >> auto.
+intro /x/.
+typecheck.
+apply /Hall/.
+qed ();
+
+
+
+lemma "equipollent_iset_elim"
+/
+  forall i (a : U i) (b : a -> U i) .
+    (forall x . isquash (b x))
+    -> equipollent (iset (x : a) . b x) a
+/;
+
+inference.
+intro /i a b Hall/.
+transitivity /{ x : a | b x }/.
+  {
+  symmetry.
+  apply /equipollent_set_iset/.
+  }
+apply /equipollent_set_elim/.
+intro /x/.
+so /Hall x/ /[H]/.
+auto.
+qed ();
+
+
+
+lemma "equipollent_squash_unit"
+/
+  forall i (a : U i) .
+    { a }
+    -> equipollent { a } unit
+/;
+
+inference.
+intro /i a H/.
+unfold /squash/.
+apply /equipollent_set_elim/.
+auto.
+qed ();
+
+
+
+lemma "equipollent_isquash_unit"
+/
+  forall i (a : U i) .
+    isquash a
+    -> equipollent (isquash a) unit
+/;
+
+inference.
+intro /i a H/.
+unfold /isquash/.
+apply /equipollent_iset_elim/.
+auto.
+qed ();
+
+
+
+lemma "eeqtp_impl_subpollent"
+/
+  forall i (a b : U i) .
+    a <:> b
+    -> subpollent a b
+/;
+
+inference.
+intro /i a b Hab/.
+apply /equipollent_impl_subpollent/.
+apply /eeqtp_impl_equipollent/ >> auto.
+qed ();
+
+
+
+lemma "subpollent_arrow"
+/
+  forall i (a a' b b' : U i) .
+    subpollent a a'
+    -> subpollent b b'
+    -> subpollent (a -> b) (a' -> b')
+/;
+
+inference.
+intro /i a a' b b' (f fi Hf) (g gi Hg)/.
+unfold /subpollent/.
+exists /fn h x . g (h (fi x))/.
+unfold /split_injective/.
+exists /fn h x . gi (h (f x))/.
+intro /h/.
+introEq /x/.
+reduce //.
+rewrite /-> Hf/.
+rewrite /-> Hg/.
+reflexivity.
+qed ();
+
+
+
+lemma "subpollent_prod"
+/
+  forall i (a a' b b' : U i) .
+    subpollent a a'
+    -> subpollent b b'
+    -> subpollent (a & b) (a' & b')
+/;
+
+inference.
+intro /i a a' b b' (f fi Hf) (g gi Hg)/.
+unfold /subpollent/.
+exists /fn x . (f (x #1), g (x #2))/.
+unfold /split_injective/.
+exists /fn x . (fi (x #1), gi (x #2))/.
+intro /(x y)/.
+reduce //.
+rewrite /-> Hf/.
+rewrite /-> Hg/.
+reflexivity.
+qed ();
+
+
+
+lemma "subpollent_sum"
+/
+  forall i (a a' b b' : U i) .
+    subpollent a a'
+    -> subpollent b b'
+    -> subpollent (a % b) (a' % b')
+/;
+
+inference.
+intro /i a a' b b' (f fi Hf) (g gi Hg)/.
+unfold /subpollent, split_injective/.
+exists /fn x . case x of | inl y . inl (f y) | inr y . inr (g y)/.
+exists /fn x . case x of | inl y . inl (fi y) | inr y . inr (gi y)/.
+intro /(x | x)/ >> reduce //.
+  {
+  rewrite /-> Hf/ >> auto.
+  }
+
+  {
+  rewrite /-> Hg/ >> auto.
+  }
+qed ();
+
+
+
+lemma "subpollent_forall"
+/
+  forall i (a : U i) (b b' : a -> U i) .
+    (forall x . subpollent (b x) (b' x))
+    -> subpollent (forall (x : a) . b x) (forall (x : a) . b' x)
+/;
+
+inference.
+intro /i a b b' H/.
+unfold /subpollent in H in concl, split_injective in H in concl/.
+exists /fn k x . H x #1 (k x)/.
+exists /fn k x . H x #2 #1 (k x)/.
+intro /k/.
+introEq /x/.
+reduce //.
+rewrite /-> H x #2 #2/.
+reflexivity.
+qed ();
+
+
+
+lemma "subpollent_exists"
+/
+  forall i (a : U i) (b b' : a -> U i) .
+    (forall x . subpollent (b x) (b' x))
+    -> subpollent (exists (x : a) . b x) (exists (x : a) . b' x)
+/;
+
+inference.
+intro /i a b b' H/.
+unfold /subpollent in H in concl, split_injective in H in concl/.
+exists /fn x . (x #1, H (x #1) #1 (x #2))/.
+exists /fn x . (x #1, H (x #1) #2 #1 (x #2))/.
+intro /x/.
+reduce //.
+extensionality >> auto.
+reduce //.
+rewrite /-> H (x #1) #2 #2/.
+reflexivity.
+qed ();
+
+
+
+lemma "subpollent_future"
+/
+  forall i (a b : future (U i)) .
+    future (subpollent (a #prev) (b #prev))
+    -> subpollent (future (a #prev)) (future (b #prev))
+/;
+
+inference.
+intro /i a b/.
+destruct /a/ /[a]/.
+destruct /b/ /[b]/.
+intro /[H]/.
+unfold /subpollent in H in concl/.
+unfold /split_injective in H in concl/.
+reduce /H/.
+assert
+  /exists (f : future (a -> b)) .
+    let next f = f
+    in
+      exists (g : future (b -> a)) .
+        let next g = g
+        in
+          future (forall (x : a) . g (f x) = x : a)
+  / /Hfut/.
+  {
+  exists /next (H #1)/.
+  reduce //.
+  exists /next (H #2 #1)/.
+  reduce //.
+  exact /next (H #2 #2)/.
+  }
+clear /H/.
+destruct /Hfut/ /[f] H/ >> reduce /H/.
+destruct /H/ /[g] H/ >> reduce /H/.
+destruct /H/ /[Hgf]/.
+reduce //.
+exists /fn x . let next x' = x in next (f x')/.
+exists /fn x . let next x' = x in next (g x')/.
+intro /[x]/.
+reduce //.
+compat >> auto.
+qed ();
+
+
+
+lemma "subpollent_set"
+/
+  forall i (a : U i) (b b' : a -> U i) .
+    (forall a . b a <-> b' a)
+    -> subpollent { x : a | b x } { x : a | b' x }
+/;
+
+intro /i a b b' Hiff/.
+apply /equipollent_impl_subpollent/.
+apply /equipollent_set/ >> auto.
+qed ();
+
+
+
+lemma "subpollent_iset"
+/
+  forall i (a : U i) (b b' : a -> U i) .
+    (forall a . b a <-> b' a)
+    -> subpollent (iset (x : a) . b x) (iset (x : a) . b' x)
+/;
+
+intro /i a b b' Hiff/.
+apply /equipollent_impl_subpollent/.
+apply /equipollent_iset/ >> auto.
 qed ();
 
 

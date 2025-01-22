@@ -1,5 +1,7 @@
 
 File.import "datatype-load.iml";
+File.import "function-load.iml";
+File.import "kindlike-load.iml";
 
 beginModule "Option";
 
@@ -172,14 +174,42 @@ reductions
 
 
 
+(* Miscellaneous *)
+
 lemma "option_subtype"
 /
   intersect i (a b : U i) . a <: b -> option a <: option b
 /;
 
 intro /i A B sub {| x}/ >> auto.
-qed();
+qed ();
 
+
+
+aliasModule /K/ /Kindlike/;
+aliasModule /F/ /Function/;
+
+lemma "kindlike_option"
+/
+  forall i (a : U (1 + i)) .
+    a
+    -> K.kindlike i a
+    -> K.kindlike i (option a)
+/;
+
+inference.
+intro /i a a0 Hkind/.
+apply /K.kindlike_subpollent _ _ (unit % a)/.
+1:{
+  apply /K.kindlike_sum/ >> auto.
+  apply /K.kindlike_degenerate/.
+  }
+unfold /F.subpollent/.
+exists /fn x . option_case x (inl ()) (fn y . inr y)/.
+unfold /F.split_injective/.
+exists /fn x . (case x of | inl _ . None | inr y . Some y)/.
+intro /{| x}/ >> reduce // >> auto.
+qed ();
 
 
 endModule ();

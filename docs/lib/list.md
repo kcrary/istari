@@ -616,9 +616,12 @@ constructors)
                                <-> Forall_dist (fn x y . Bool.istrue (f x y)) l
 
 
-### Lists are covariant
+### Miscellaneous
 
     list_subtype : forall (i : level) (a b : U i) . a <: b -> list a <: list b
 
-Note that this fact relies on `nil` and `cons`'s type argument being
-invisible (*i.e.,* taken using `intersect`).
+Note that the subtyping principle relies on `nil` and `cons`'s type
+argument being invisible (*i.e.,* taken using `intersect`).
+
+    kindlike_list : forall (i : level) (a : U (1 + i)) .
+                       a -> Kindlike.kindlike i a -> Kindlike.kindlike i (list a)

@@ -1022,6 +1022,14 @@ The destruction tactics are:
 
     As `rememberAt` but does not invoke the typechecker.
 
+  + `remember' /[term M]/ /[term A]/ /[name option x]/ /[name option H]/`
+
+    As `remember` but reverses the direction of the equality.
+
+  + `rememberRaw' /[term M]/ /[term A]/ /[name option x]/ /[name option H]/`
+
+    As `rememberRaw` but reverses the direction of the equality.
+
 
 - `setEq /[name x]/ /[term M]/ /[term A]/ /[name option H]/`
 

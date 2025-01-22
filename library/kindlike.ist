@@ -1,0 +1,908 @@
+
+File.import "bar-load.iml";
+File.import "function-load.iml";
+
+openModule /Function/;
+
+beginModule "Kindlike";
+
+
+define /guardable i A/
+/
+  exists (f : forall (P : U i) . (P -g> A) -> A) .
+    forall (P : U i) . P -> forall (x : A) . f P x = x : A
+//
+  forall i . U (1 + i) -> U (1 + i)
+/;
+
+inference.
+unfold /guardable/.
+typecheck.
+qed ();
+
+
+
+lemma "guardable_univ"
+/
+  forall i . guardable i (U i)
+/;
+
+inference.
+intro /i/.
+unfold /guardable/.
+exists /fn P A . P -g> A/.
+reduce //.
+intro /P HP A/.
+symmetry.
+univIntroEqtype >> auto.
+RuleTactic.guardSatEq >> auto.
+qed ();
+
+
+
+lemma "guardable_unit"
+/
+  forall i . guardable i unit
+/;
+
+inference.
+intro /i/.
+unfold /guardable/.
+exists /fn _ _ . ()/.
+reduce //.
+intro /P _ x/.
+extensionality.
+qed ();
+
+
+
+lemma "guardable_arrow"
+/
+  forall i A B .
+    guardable i B
+    -> guardable i (A -> B)
+/;
+
+inference. 
+unfold /guardable at all/.
+intro /i A B (g Hsat)/.
+exists /fn P f x . g P (f x)/.
+reduce //.
+intro /P HP f/.
+introEq /x/.
+reduce //.
+apply /Hsat/ >> auto.
+qed ();
+
+
+
+lemma "guardable_karrow"
+/
+  forall i (K1 K2 : Kind i) .
+    guardable i K2
+    -> guardable i (K1 -k> K2)
+/;
+
+inference. 
+intro /i K1 K2 Hguard/.
+rewrite /(K1 -k> K2) = (K1 -> K2) : U (1 + i)/.
+  {
+  typecheck.
+  }
+apply /guardable_arrow/ >> auto.
+qed ();
+
+
+
+lemma "guardable_tarrow"
+/
+  forall i (A : U i) (K : Kind i) .
+    guardable i K
+    -> guardable i (A -t> K)
+/;
+
+inference.
+intro /i A K Hguard/.
+rewrite /(A -t> K) = (A -> K) : U (1 + i)/.
+  {
+  typecheck.
+  }
+apply /guardable_arrow/ >> auto.
+qed ();
+
+
+
+lemma "guardable_prod"
+/
+  forall i A B .
+    guardable i A
+    -> guardable i B
+    -> guardable i (A & B)
+/;
+
+inference.
+unfold /guardable at all/.
+intro /i A B (f1 Hsat1) (f2 Hsat2)/.
+exists /fn P x . (f1 P (x #1), f2 P (x #2))/.
+reduce //.
+intro /P HP (x y)/.
+RuleTactic.prodIntroEq >> auto.
+qed ();
+
+
+
+(* It does not appear that future is guardable.  The guard is needed
+   now, but you only get it in the future.
+*)
+
+
+
+(* The antecedent could be given that X is guardable later,
+   but since future isn't guardable, that doesn't seem useful.
+*)
+lemma "guardable_rec"
+/
+  forall i (F : future (U (1 + i)) -> U (1 + i)) .
+    (forall X . guardable i (F X))
+    -> guardable i (rec X . F (next X))
+/;
+
+intro /i F Hguard/.
+unrollTypeUniv /rec with (lsucc i)/.
+apply /Hguard/.
+qed ();
+
+
+
+define /kindlike i A/
+/
+  exists (B : U i) (C : Kind i) (P : B -> C -> U i) .
+    subpollent A { x : B & C | P (x #1) (x #2) }
+//
+  forall i . U (1 + i) -> U (2 + i)
+/;
+
+inference.
+introOf /i A/.
+unfold /kindlike/.
+typecheck.
+qed ();
+
+
+
+lemma "forall_kindlike"
+/
+  forall i (A : U (1 + i)) .
+    kindlike i A
+    -> exists (Q : (A -> U i) -> U i) .
+         forall (B : A -> U i) . Q B <:> (intersect (x : A) . B x)
+/;
+
+intro /i A Hkind/.
+destruct /Hkind/ /C D P (f g Hgf)/.
+exists /fn B . intersect (c : C) . iforall (d : D) . { P c d } -g> B (g (c, d))/.
+intro /B/.
+reduce //.
+unfold /eeqtp/.
+split.
+  {
+  intro /m/ >> auto.
+  introOf /x/.
+  infer /m ap (f x #1) ap (f x #2)/ /H/ >> auto.
+    {
+    generalize /f x/ /_/ /Y/.
+    destruct /Y/ /y Hy/ >> auto.
+    }
+  unfold /ap in H at 0 0/.
+  reduce /H/.
+  eqtp /B (g (f x #1, f x #2))/ >> auto.
+  compat.
+  rewrite /(f x #1, f x #2) = f x : { x : C & D | P (x #1) (x #2) }/.
+  1:{
+    apply /Hgf/.
+    }
+  extensionality.
+    {
+    extensionality >> auto.
+    }
+  reduce //.
+  generalize /f x/ /_/ /Y/.
+  destruct /Y/ /y Hy/ >> auto.
+  }
+
+  {
+  intro /m/.
+  introOf /c d [Hcd]/.
+  infer /m ap (g (c, d))/ /H/ >> auto.
+  }
+qed ();
+
+
+
+lemma "exists_kindlike"
+/
+  forall i (A : U (1 + i)) .
+    kindlike i A
+    -> exists (Q : (A -> U i) -> U i) .
+         forall (B : A -> U i) . Q B <:> (union (x : A) . B x)
+/;
+
+intro /i A Hkind/.
+destruct /Hkind/ /C D P (f g Hgf)/.
+exists /fn B . union (c : C) . iexists (d : D) . { P c d } &g B (g (c, d))/.
+intro /B/.
+reduce //.
+unfold /eeqtp/.
+split.
+  {
+  intro /m/.
+  destruct /m/ /c d [Hcd] m/.
+  unhide.
+  typecheck.
+  auto.
+  }
+
+  {
+  intro /m/.
+  destruct /m/ /a b/.
+  unhide.
+  typecheck1 >>> [typecheck, idtac, idtac].
+    {
+    change /concl/ /f a #1 : _/.
+    typecheck.
+    }
+  typecheck1 >>> [typecheck, typecheck, idtac, idtac].
+    {
+    change /concl/ /f a #2 : _/.
+    typecheck.
+    }
+  typecheck1 >>> [typecheck, idtac, idtac].
+    {
+    split.
+    generalize /f a/ /_/ /X/.
+    destruct /X/ /x Hx/.
+    auto.
+    }
+  eqtp /B a/ >> auto.
+  compat.
+  rewrite /(f a #1, f a #2) = f a : { x : C & D | P (x #1) (x #2) }/.
+    {
+    symmetry.
+    extensionality.
+      {
+      extensionality >> auto.
+      }
+    generalize /f a/ /_/ /X/.
+    destruct /X/ /x Hx/.
+    auto.
+    }
+  rewrite /-> Hgf/ >> auto.
+  }
+qed ();
+
+
+
+lemma "kindlike_subpollent"
+/
+  forall i (A B : U (1 + i)) .
+    subpollent A B
+    -> kindlike i B
+    -> kindlike i A
+/;
+
+inference.
+intro /i A B HAB (C D P Hsub)/.
+unfold /kindlike/.
+existses [/C/, /D/, /P/].
+transitivity /_/ >> auto.
+qed ();
+
+
+
+lemma "kindlike_kind"
+/
+  forall i (K : Kind i) . kindlike i K
+/;
+
+inference.
+intro /i K/.
+unfold /kindlike/.
+exists /unit/.
+exists /K/.
+exists /fn _ _ . unit/.
+reduce //.
+unfold /subpollent/.
+exists /fn x . ((), x)/ >> auto.
+unfold /split_injective/.
+exists /fn x . x #2/ >> auto.
+qed ();
+
+
+
+lemma "kindlike_univ"
+/
+  forall i . kindlike i (U i)
+/;
+
+inference.
+intro /i/.
+apply /kindlike_kind/.
+qed ();
+
+
+
+lemma "kindlike_degenerate"
+/
+  forall i (A : U i) . kindlike i A
+/;
+
+inference.
+intro /i A/.
+unfold /kindlike, subpollent/.
+existses [/A/, /unit/].
+exists /fn _ _ . unit/.
+reduce //.
+exists /fn x . (x, ())/ >> auto.
+unfold /Function.split_injective/.
+exists /fn x . x #1/ >> auto.
+qed ();
+
+
+
+lemma "kindlike_arrow_right"
+/
+  forall i (A : U i) (B : U (1 + i)) .
+    kindlike i B
+    -> kindlike i (A -> B)
+/;
+
+inference.
+intro /i A B (C D P f g Hgf)/.
+unfold /kindlike/.
+exists /A -> C/.
+exists /A -t> D/.
+exists /fn h k . forall (a : A) . isquash (P (h a) (k a))/.
+unfold /subpollent/.
+exists /fn h . ((fn a . f (h a) #1), (fn a . f (h a) #2))/.
+  {
+  reintro /h/.
+  reduce //.
+  split.
+  intro /a/.
+  generalize /f (h a)/ /_/ /X/.
+  destruct /X/ /x Hx/.
+  auto.
+  }
+unfold /split_injective/.
+exists /fn h a . g (h #1 a, h #2 a)/.
+  {
+  reintro /_ h/.
+  reduce //.
+  split.
+  intro /a/.
+  generalize /f (h a)/ /_/ /X/.
+  destruct /X/ /x Hx/.
+  auto.
+  }
+
+  {
+  reintro /h a/.
+  destruct /h/ /(h1 h2) Hh/.
+  reduce /Hh concl/.
+  unhide.
+  so /Hh a/ /[H]/.
+  auto.
+  }
+intro /h/.
+reduce //.
+introEq /a/.
+  {
+  reintro /a/.
+  reduce //.
+  generalize /f (h a)/ /_/ /X/.
+  destruct /X/ /x Hx/.
+  auto.
+  }
+reduce //.
+rewrite /<- Hgf (h a) at 2/.
+  {
+  reintro /_/.
+  reduce //.
+  generalize /f (h a)/ /_/ /X/.
+  destruct /X/ /x Hx/.
+  auto.
+  }
+compat.
+symmetry.
+extensionality.
+  {
+  extensionality >> auto.
+  }
+
+  {
+  generalize /f (h a)/ /_/ /X/.
+  destruct /X/ /x Hx/.
+  auto.
+  }
+qed ();
+
+
+
+lemma "kindlike_arrow_left"
+/
+  forall i A (B : Kind i) .
+    kindlike i A
+    -> guardable i B
+    -> kindlike i (A -> B)
+/;
+
+inference.
+intro /i A D HA (h Hsat)/.
+destruct /HA/ /B C P f g Hgf/.
+unfold /kindlike, subpollent/.
+exists /unit/.
+exists /B -t> C -k> D/.
+exists /fn _ _ . unit/.
+exists /fn k . ((), (fn b c . h (P b c) (k (g (b, c)))))/ >> auto.
+unfold /Function.split_injective/.
+exists /fn l a . l #2 (f a #1) (f a #2)/ >> auto.
+intro /k/.
+reduce //.
+introEq /a/ >> auto.
+reduce //.
+rewrite /k (g (f a #1, f a #2)) = k a : (P (f a #1) (f a #2) -g> D)/.
+  {
+  introEq /Hbc/ >> auto.
+  rewrite /(f a #1, f a #2) = f a : { x : B & C | P (x #1) (x #2) }/.
+    {
+    symmetry.
+    extensionality >> auto.
+    extensionality >> auto.
+    }
+  rewrite /-> Hgf/.
+  reflexivity.
+  }
+generalize /f a/ /_/ /X/.
+destruct /X/ /bc H/.
+unhide.
+apply /Hsat/ >> auto.
+qed ();
+
+
+
+lemma "kindlike_prod"
+/
+  forall i A B .
+    kindlike i A
+    -> kindlike i B
+    -> kindlike i (A & B)
+/;
+
+inference.
+intro /i A B (A1 A2 P f fi Hf) (B1 B2 Q g gi Hg)/.
+unfold /kindlike/.
+exists /A1 & B1/.
+exists /A2 & B2/.
+exists /fn x y . P (x #1) (y #1) & Q (x #2) (y #2)/.
+unfold /subpollent/.
+exists /fn x . ((f (x #1) #1, g (x #2) #1), (f (x #1) #2, g (x #2) #2))/.
+  {
+  reintro /x/.
+  destruct /x/ /a b/.
+  reduce //.
+  generalize /f a/ /_/ /X/.
+  destruct /X/ /x Hx/.
+  generalize /g b/ /_/ /Y/.
+  destruct /Y/ /y Hy/.
+  auto.
+  }
+unfold /split_injective/.
+existsRaw /fn x . (fi (x #1 #1, x #2 #1), gi (x #1 #2, x #2 #2))/.
+  {
+  typecheck.
+  reintro /_ x/.
+  destruct /x/ /a b/.
+  reduce //.
+  generalize /f a/ /_/ /X/.
+  destruct /X/ /x Hx/.
+  generalize /g b/ /_/ /Y/.
+  destruct /Y/ /y Hy/.
+  auto.
+  }
+
+  {
+  introOf /(((a1 b1) (a2 b2)) (Ha Hb))/.
+  reduce /Ha Hb concl/.
+  typecheck >> auto.
+  }
+intro /(a b)/.
+reduce //.
+RuleTactic.prodIntroEq.
+  {
+  rewrite /<- Hf a at 2/.
+    {
+    reduce //.
+    generalize /f a/ /_/ /X/.
+    destruct /X/ /x Hx/.
+    auto.
+    }
+  compat.
+  symmetry.
+  extensionality.
+    {
+    extensionality >> auto.
+    }
+
+    {
+    generalize /f a/ /_/ /X/.
+    destruct /X/ /x Hx/.
+    auto.
+    }
+  }
+
+  {
+  rewrite /<- Hg b at 2/.
+    {
+    reduce //.
+    generalize /g b/ /_/ /X/.
+    destruct /X/ /x Hx/.
+    auto.
+    }
+  compat.
+  symmetry.
+  extensionality.
+    {
+    extensionality >> auto.
+    }
+
+    {
+    generalize /g b/ /_/ /X/.
+    destruct /X/ /x Hx/.
+    auto.
+    }
+  }
+qed ();
+
+
+
+lemma "kindlike_sum"
+/
+  forall i (A B : U (1 + i)) .
+    A -> B -> kindlike i A -> kindlike i B -> kindlike i (A % B)
+/;
+
+inference.
+intro /i A B a0 b0 HkindA HkindB/.
+apply /kindlike_subpollent _ _ (bool & A & B)/.
+1:{
+  apply /kindlike_prod/.
+    {
+    apply /kindlike_degenerate/.
+    }
+  apply /kindlike_prod/ >> auto.
+  }
+unfold /subpollent/.
+exists /fn x . (case x of
+                | inl a . (true, a, b0)
+                | inr b . (false, a0, b))/.
+unfold /split_injective/.
+exists /fn x . if x #1 then inl (x #2 #1) else inr (x #2 #2)/.
+reduce //.
+intro /(a | b)/ >> reduce // >> auto.
+qed ();
+
+
+
+define /inverses A B f g/
+/
+  (forall (x : A) . g (f x) = x : A)
+//
+  intersect i . forall (A B : U i) . (A -> B) -> (B -> A) -> U (1 + i)
+/;
+
+inference.
+unfold /inverses/.
+typecheck.
+qed ();
+
+
+
+lemma "kindlike_future_gen"
+/
+  forall i (A : future (U (1 + i))) .
+    future (kindlike i (A #prev))
+    -> kindlike i (future (A #prev))
+/;
+
+inference.
+intro /i [A]/.
+reduce //.
+intro /HA/.
+unfold /kindlike in HA, subpollent in HA/.
+destruct /HA/ /[HA]/.
+unfold /Function.split_injective in HA/.
+fold /inverses A { x : B & C | P (x #1) (x #2) } f g within B C P f g in HA/.
+assert
+  /exists (B : future (U i)) .
+     let next B = B
+     in
+       exists (C : future (Kind i)) .
+         let next C = C
+         in
+           (exists (P : future (B -> C -> U i)) .
+              let next P = P
+              in
+                exists (f : future (A -> { x : B & C | P (x #1) (x #2) })).
+                  let next f = f
+                  in
+                    exists (g : future ({ x : B & C | P (x #1) (x #2) } -> A)).
+                      let next g = g
+                      in
+                        future (inverses A { x : B & C | P (x #1) (x #2) } f g))
+  / /H/.
+  {
+  exists /next (HA ## 0)/.
+  reduce //.
+  exists /next (HA ## 1)/.
+  reduce //.
+  exists /next (HA ## 2)/.
+  reduce //.
+  exists /next (HA ## 3)/.
+  reduce //.
+  exists /next (HA ## 4)/.
+  reduce //.
+  exact /next (HA #2 #2 #2 #2 #2)/.
+  }
+clear /HA/.
+destruct /H/ /[B] H/.
+reduce /H/.
+destruct /H/ /[C] H/.
+reduce /H/.
+destruct /H/ /[P] H/.
+reduce /H/.
+destruct /H/ /[f] H/.
+reduce /H/.
+destruct /H/ /[g] H/.
+reduce /H/.
+destruct /H/ /[Hinv]/.
+unfold /kindlike, subpollent/.
+unfold /Function.split_injective/.
+fold /inverses (future A) { x : B' & C' | P' (x #1) (x #2) } f' g' within B' C' P' f' g'/.
+exists /future B/.
+exists /future C/.
+exists /fn b c . let next b' = b in let next c' = c in future {P b' c'}/.
+reduce //.
+exists /fn a . let next a' = a in (next (f a' #1), next (f a' #2))/.
+  {
+  reintro /a/.
+  destruct /a/ /[a]/.
+  reduce //.
+  split.
+  split.
+  generalize /f a/ /_/ /X/.
+  destruct /X/ /x Hbc/.
+  split >> auto.
+  }
+existsRaw /fn a . let next b = a #1 in let next c = a #2 in next (g (b, c))/ >> auto.
+  {
+  typecheck.
+  reintro /_ a/.
+  reduce //.
+  destruct /a/ /[a]/.
+  reduce //.
+  split.
+  split.
+  generalize /f a/ /_/ /X/.
+  destruct /X/ /x Hbc/.
+  auto.
+  }
+
+  {
+  introOf /x/.
+  reduce //.
+  destruct /x/ /([b] [c]) [Hbc]/.
+  reduce /Hbc concl/.
+  typecheck.
+  }
+unfold /inverses/.
+intro /[a]/.
+reduce //.
+compat.
+rewrite /(f a #1, f a #2) = f a : { x : B & C | P (x #1) (x #2) }/.
+  {
+  symmetry.
+  extensionality.
+  1:{
+    generalize /f a/ /_/ /X/.
+    destruct /X/ /(b c) Hbc/.
+    auto.
+    }
+  extensionality >> auto.
+  }
+unfold /inverses in Hinv/.
+apply /Hinv/.
+qed ();
+
+
+
+lemma "kindlike_future"
+/
+  forall i A .
+    future (kindlike i A)
+    -> kindlike i (future A)
+/;
+
+inference.
+intro /i A HA/.
+apply /kindlike_future_gen _ (next A)/.
+reduce //.
+hyp /HA/.
+qed ();
+
+
+
+lemma "kindlike_set"
+/
+  forall i (A : U (1 + i)) (P : A -> U i) .
+    kindlike i A
+    -> kindlike i { x : A | P x }
+/;
+
+inference.
+intro /i A Q (B C P f g Hgf)/.
+unfold /kindlike/.
+exists /B/.
+exists /C/.
+exists /fn b c . P b c &d Q (g (b, c))/ >> auto.
+unfold /subpollent/.
+existsRaw /f/.
+  {
+  typecheck >> auto.
+  }
+
+  {
+  introOf /(x Hx)/.
+  unhide.
+  reduce //.
+  typecheck >> auto.
+  remember /f x/ /_/ /Y/ /Heq/.
+  destruct /Y/ /(b c) Hbc/.
+  reduce /Hbc concl/.
+  rewrite /-> Heq/.
+  rewrite /-> Hgf/.
+  auto.
+  }
+unfold /split_injective/.
+reduce //.
+existsRaw /g/.
+  {
+  reintro /h/.
+  typecheck >> auto.
+    {
+    destruct /0/ /x Hx/.
+    remember /f x/ /_/ /Y/ /Heq/.
+    destruct /Y/ /(b c) Hbc/.
+    reduce /Hbc concl/.
+    rewrite /-> Heq/.
+    rewrite /-> Hgf/.
+    auto.
+    }
+    
+    {
+    generalize /h (f x)/ /_/ /Y/ >> auto.
+      {
+      destruct /0/ /x Hx/.
+      remember /f x/ /_/ /Y/ /Heq/.
+      destruct /Y/ /(b c) Hbc/.
+      reduce /Hbc concl/.
+      rewrite /-> Heq/.
+      rewrite /-> Hgf/.
+      auto.
+      }
+    destruct /Y/ /y Hu/ >> auto.
+    }
+  }
+
+  {
+  introOf /((b c) (HPx HQx))/ >> auto.
+  typecheck >> auto.
+  }
+intro /(x Hx)/.
+symmetry.
+extensionality >> auto.
+qed ();
+  
+
+
+lemma "kindlike_iset"
+/
+  forall i (A : U (1 + i)) (P : A -> U i) .
+    kindlike i A
+    -> kindlike i (iset (x : A) . P x)
+/;
+
+inference.
+intro /i A Q (B C P f g Hgf)/.
+unfold /kindlike/.
+exists /B/.
+exists /C/.
+exists /fn b c . P b c &d Q (g (b, c))/ >> auto.
+unfold /subpollent/.
+existsRaw /f/.
+  {
+  typecheck >> auto.
+  }
+
+  {
+  introOf /(x Hx)/.
+  unhide.
+  reduce //.
+  typecheck >> auto.
+  remember /f x/ /_/ /Y/ /Heq/.
+  destruct /Y/ /(b c) Hbc/.
+  reduce /Hbc concl/.
+  rewrite /-> Heq/.
+  rewrite /-> Hgf/.
+  auto.
+  }
+unfold /split_injective/.
+reduce //.
+existsRaw /g/.
+  {
+  reintro /h/.
+  typecheck >> auto.
+    {
+    destruct /0/ /x Hx/.
+    remember /f x/ /_/ /Y/ /Heq/.
+    destruct /Y/ /(b c) Hbc/.
+    reduce /Hbc concl/.
+    rewrite /-> Heq/.
+    rewrite /-> Hgf/.
+    auto.
+    }
+    
+    {
+    generalize /h (f x)/ /_/ /Y/ >> auto.
+      {
+      destruct /0/ /x Hx/.
+      remember /f x/ /_/ /Y/ /Heq/.
+      destruct /Y/ /(b c) Hbc/.
+      reduce /Hbc concl/.
+      rewrite /-> Heq/.
+      rewrite /-> Hgf/.
+      auto.
+      }
+    destruct /Y/ /y Hu/ >> auto.
+    }
+  }
+
+  {
+  introOf /((b c) (HPx HQx))/ >> auto.
+  typecheck >> auto.
+  }
+intro /(x Hx)/.
+symmetry.
+extensionality >> auto.
+qed ();
+  
+
+
+lemma "kindlike_rec"
+/
+  forall i (F : future (U (1 + i)) -> U (1 + i)) .
+    (forall X . let next X' = X in future (kindlike i X') -> kindlike i (F X))
+    -> kindlike i (rec X . F (next X))
+/;
+
+inference.
+intro /i F HF/.
+apply /Bar.ffix ap (lsucc (lsucc i))/.
+intro /IH/.
+unrollTypeUniv /rec with (lsucc i)/.
+apply /HF (next (rec X . F (next X)))/.
+hyp /IH/.
+qed ();
+
+
+
+endModule ();

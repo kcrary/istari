@@ -428,6 +428,43 @@ apply (tr_eqtype_convert _#3 (set a (squash b))).
 Qed.
 
 
+Lemma setIntroEqSquash_valid : setIntroEqSquash_obligation.
+Proof.
+prepare.
+intros G a b m n ext2 ext1 ext0 Hb Hm Hmb.
+apply (tr_eqtype_convert _#3 (set a (squash b))).
+  {
+  apply tr_eqtype_symmetry.
+  apply tr_squash_idem.
+  eapply (tr_set_formation _#5 (var 0) (var 0)); eauto.
+    {
+    eapply tr_inhabitation_formation; eauto.
+    }
+    
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+  }
+
+  {
+  eapply tr_set_intro; eauto.
+    {
+    unfold subst1.
+    rewrite -> subst_squash.
+    exact Hmb.
+    }
+
+    {
+    apply tr_squash_formation1; auto.
+    }
+  }
+Qed.
+
+
 Lemma squashIntroOfSquash_valid : squashIntroOfSquash_obligation.
 Proof.
 prepare.
@@ -499,18 +536,19 @@ auto.
 Qed.
 
 
-Lemma tr_set_left :
-  forall G1 G2 a b c m,
+Lemma tr_set_left_gen :
+  forall G1 G2 a b c m n,
     hygiene (fun i => i <> length G2) m
+    -> hygiene (fun i => i <> length G2) n
     -> tr (hyp_tm a :: G1) (deqtype b b)
-    -> tr (substctx sh1 G2 ++ hyp_tm b :: hyp_tm a :: G1) (deq m m (subst (under (length G2) sh1) c))
+    -> tr (substctx sh1 G2 ++ hyp_tm b :: hyp_tm a :: G1) (deq m n (subst (under (length G2) sh1) c))
     -> tr (G2 ++ hyp_tm (set a b) :: G1)
          (deq
             (subst (under (length G2) (dot triv id)) m)
-            (subst (under (length G2) (dot triv id)) m)
+            (subst (under (length G2) (dot triv id)) n)
             c).
 Proof.
-intros G1 G2 a b c m Hhyg Hb Hm.
+intros G1 G2 a b c m n Hhygm Hhygn Hb Hm.
 set (k := length G2) in * |- *.
 apply (tr_set_elim2 _ (subst (sh (S k)) a) (subst (under 1 (sh (S k))) b) (var k)).
   {
@@ -610,25 +648,44 @@ apply (tr_set_elim2 _ (subst (sh (S k)) a) (subst (under 1 (sh (S k))) b) (var k
     }
   rewrite <- compose_under.
   simpsub.
-  so (subst_into_absent_single _ k m triv Hhyg) as H.
+  so (subst_into_absent_single _ k m triv Hhygm) as H.
   rewrite -> H.
+  so (subst_into_absent_single _ k n triv Hhygn) as H'.
+  rewrite -> H'.
   apply tr_set_hyp_weaken.
   exact Hm.
   }
 Qed.
 
 
-Lemma tr_iset_left :
+Lemma tr_set_left :
   forall G1 G2 a b c m,
     hygiene (fun i => i <> length G2) m
+    -> tr (hyp_tm a :: G1) (deqtype b b)
     -> tr (substctx sh1 G2 ++ hyp_tm b :: hyp_tm a :: G1) (deq m m (subst (under (length G2) sh1) c))
-    -> tr (G2 ++ hyp_tm (iset a b) :: G1)
+    -> tr (G2 ++ hyp_tm (set a b) :: G1)
          (deq
             (subst (under (length G2) (dot triv id)) m)
             (subst (under (length G2) (dot triv id)) m)
             c).
 Proof.
-intros G1 G2 a b c m Hhyg Hm.
+intros G1 G2 a b c m Hhyg Hb Hm.
+apply tr_set_left_gen; auto.
+Qed.
+
+
+Lemma tr_iset_left_gen :
+  forall G1 G2 a b c m n,
+    hygiene (fun i => i <> length G2) m
+    -> hygiene (fun i => i <> length G2) n
+    -> tr (substctx sh1 G2 ++ hyp_tm b :: hyp_tm a :: G1) (deq m n (subst (under (length G2) sh1) c))
+    -> tr (G2 ++ hyp_tm (iset a b) :: G1)
+         (deq
+            (subst (under (length G2) (dot triv id)) m)
+            (subst (under (length G2) (dot triv id)) n)
+            c).
+Proof.
+intros G1 G2 a b c m n Hhygm Hhygn Hm.
 set (k := length G2) in * |- *.
 apply (tr_iset_elim2 _ (subst (sh (S k)) a) (subst (under 1 (sh (S k))) b) (var k)).
   {
@@ -676,11 +733,28 @@ apply (tr_iset_elim2 _ (subst (sh (S k)) a) (subst (under 1 (sh (S k))) b) (var 
     }
   rewrite <- compose_under.
   simpsub.
-  so (subst_into_absent_single _ k m triv Hhyg) as H.
+  so (subst_into_absent_single _ k m triv Hhygm) as H.
   rewrite -> H.
+  so (subst_into_absent_single _ k n triv Hhygn) as H'.
+  rewrite -> H'.
   apply tr_iset_hyp_weaken.
   exact Hm.
   }
+Qed.
+
+
+Lemma tr_iset_left :
+  forall G1 G2 a b c m,
+    hygiene (fun i => i <> length G2) m
+    -> tr (substctx sh1 G2 ++ hyp_tm b :: hyp_tm a :: G1) (deq m m (subst (under (length G2) sh1) c))
+    -> tr (G2 ++ hyp_tm (iset a b) :: G1)
+         (deq
+            (subst (under (length G2) (dot triv id)) m)
+            (subst (under (length G2) (dot triv id)) m)
+            c).
+Proof.
+intros G1 G2 a b c m Hhyg Hm.
+apply tr_iset_left_gen; auto.
 Qed.
 
 
@@ -725,6 +799,126 @@ apply (tr_set_left _ []).
   simpsub.
   cbn [List.app].
   apply (tr_generalize _ a m (deqtype b b)); auto.
+  }
+
+  {
+  simpsub.
+  cbn [List.app].
+  eapply (weakening _ [_] [_]).
+    {
+    cbn [unlift length].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [unlift length].
+    simpsub.
+    auto.
+    }
+  cbn [unlift length].
+  simpsub.
+  cbn [List.app].
+  eapply (tr_iset_intro _#5 (var 0)).
+    {
+    eapply (weakening _ [_] []).
+      {
+      cbn [unlift length].
+      simpsub.
+      auto.
+      }
+  
+      {
+      cbn [unlift length].
+      simpsub.
+      auto.
+      }
+    cbn [unlift length].
+    simpsub.
+    cbn [List.app].
+    exact Hm.
+    }
+
+    {
+    simpsub.
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    auto.
+    }
+
+    {
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [unlift length].
+      simpsub.
+      auto.
+      }
+  
+      {
+      cbn [unlift length].
+      simpsub.
+      auto.
+      }
+    cbn [unlift length].
+    simpsub.
+    cbn [List.app].
+    rewrite -> subst_var0_sh1.
+    exact Hb.
+    }
+  }
+Qed.
+
+
+Lemma isetIntroEqSquash_valid : isetIntroEqSquash_obligation.
+Proof.
+prepare.
+intros G a b m n ext2 ext1 ext0 Hb Hm Hmb.
+apply (tr_assert _ (squash (subst1 m b)) ext0).
+  {
+  simpsubin Hmb.
+  exact Hmb.
+  }
+replace (substj sh1 (deq m n (iset a b))) with (deq (subst (under 0 (dot triv id)) (subst (sh 2) m)) (subst (under 0 (dot triv id)) (subst (sh 2) n)) (subst sh1 (iset a b))).
+2:{
+  simpsub.
+  auto.
+  }
+apply (tr_set_left_gen _ []).
+  {
+  cbn.
+  eapply hygiene_shift'.
+  apply (hygiene_weaken _ okay); auto using hygiene_okay.
+  intros j Hj.
+  omega.
+  }
+
+  {
+  cbn.
+  eapply hygiene_shift'.
+  apply (hygiene_weaken _ okay); auto using hygiene_okay.
+  intros j Hj.
+  omega.
+  }
+
+  {
+  simpsub.
+  eapply (weakening _ [_] []).
+    {
+    cbn [unlift length].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [unlift length].
+    simpsub.
+    auto.
+    }
+  cbn [unlift length].
+  simpsub.
+  cbn [List.app].
+  apply (tr_generalize _ a m (deqtype b b)); auto.
+  eapply tr_eq_reflexivity; eauto.
   }
 
   {

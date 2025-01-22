@@ -1,7 +1,7 @@
 
 ISTARIBIN=../ui/bin
 
-DOCUNITS = acc bar bool decidable finite finite-map function girard-paradox integer logic list miscellaneous nat natural option partial permutation relations smith-paradox stable symbol tuple union wtype
+DOCUNITS = acc bar bool decidable finite finite-map function girard-paradox integer kindlike logic list miscellaneous nat natural option partial permutation relations smith-paradox stable symbol tuple union wtype
 UNITS = $(DOCUNITS) datatype syntactic-equality omega
 DOCS = finite-map-class
 
@@ -30,14 +30,15 @@ datatype.isto : acc.isto miscellaneous.isto nat.isto partial.isto     integer.is
 bool.isto : logic.isto
 decidable.isto : logic.isto bool.isto
 finite.isto : logic.isto decidable.isto list.isto
-finite-map.isto : bool.isto decidable.isto function.isto list.isto logic.isto option.isto
+finite-map.isto : bool.isto decidable.isto function.isto kindlike.isto list.isto logic.isto option.isto
 girard-paradox.isto : datatype.isto logic.isto nat.isto
 integer.isto : acc.isto bool.isto decidable.isto nat.isto partial.isto stable.isto
-list.isto : bool.isto datatype.isto decidable.isto logic.isto miscellaneous.isto nat.isto option.isto partial.isto
+kindlike.isto : bar.isto function.isto
+list.isto : bool.isto datatype.isto decidable.isto function.ist kindlike.ist logic.isto miscellaneous.isto nat.isto option.isto partial.isto
 nat.isto : acc.isto bool.isto decidable.isto stable.isto
 natural.isto : bool.isto integer.isto nat.isto logic.isto
 omega.isto : datatype.isto logic.isto bool.isto nat.isto integer.isto list.isto natural.isto
-option.isto : datatype.isto integer.isto
+option.isto : datatype.isto function.isto kindlike.isto integer.isto
 permutation.isto : list.isto logic.isto nat.isto
 relations.isto : datatype.isto acc.isto decidable.isto finite.isto
 smith-paradox.isto : logic.isto nat.isto omega.isto partial.isto syntactic-equality.isto

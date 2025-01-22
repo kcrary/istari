@@ -253,10 +253,11 @@ The `FiniteMap` class does not include a merge operation.  The
                                      rem (mer f g) a = mer (rem f a) (rem g a) : T
 
 
-### Generic finite maps minus extensionality
+### The factory
 
-To assist in building finite maps, there is a class that leaves out
-extensionality equality:
+The `FiniteMap.Class.Factory` submodule provides tools to assist in
+constructing finite maps.  First, there is a class of generic finite
+maps *minus extensional equality.*
 
     PreFiniteMap : forall (i : level) (A B T : U i) .
                       T -> (T -> A -> option B) -> (T -> A -> B -> T) -> (T -> A -> T) -> U i
@@ -326,7 +327,7 @@ Given a pre-finite-map, one can build a finite map by quotienting it:
                         PreFiniteMap i A B T emp look upd rem
                         -> FiniteMap i A B (qpfm A B T look) emp look upd rem
 
-Another class gives finite maps with merge but without extensionality:
+Another class gives finite maps with merge but minus extensionality:
 
     PreFiniteMapMerge : forall (i : level) (A B T : U i) .
                            T
@@ -366,24 +367,3 @@ Another class gives finite maps with merge but without extensionality:
                              (mer : T -> T -> T) .
                              PreFiniteMapMerge i A B T emp look upd rem mer
                              -> FiniteMapMerge i A B (qpfm A B T look) emp look upd rem mer
-
-The simple finite maps are defined using these tools.  The discrepancy
-between the types of `empty` versus `emp` is mediated using the
-`finite_map_impl_eqtest` lemma (above) that extracts an equality test
-from a finite map.  (By definition, all equality tests at the same
-type are equal.)
-
-    FiniteMap_finite_map : forall (i : level) (A B : U i) (e : eqtest A) .
-                              FiniteMap i A B (finite_map A B) (empty e) lookup update remove
-
-    FiniteMap_finite_map' : forall (i : level) (A B : U i) (f : finite_map A B) .
-                               FiniteMap
-                                 i
-                                 A
-                                 B
-                                 (finite_map A B)
-                                 (empty (finite_map_impl_eqtest A B f))
-                                 lookup
-                                 update
-                                 remove
-

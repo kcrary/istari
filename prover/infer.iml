@@ -17,7 +17,7 @@ signature INFER =
       exception Clash
 
       (* Repored by infer when a prefix of the path has an evar type. *)
-      exception Ambiguous
+      exception Ambiguous of term * term
 
       (* inferVar G i
 
@@ -127,7 +127,7 @@ structure Infer :> INFER =
       exception InferError of term * term option * string
       exception NotPath of string
       exception Clash
-      exception Ambiguous
+      exception Ambiguous of term * term
 
       open Tactic
       open CasePervasive
@@ -147,8 +147,8 @@ structure Infer :> INFER =
 
            | elim :: _ =>
                 (case Normalize.simplify a of
-                    T.Elim (T.Sub _, _) =>
-                       raise Ambiguous
+                    a as (T.Elim (T.Sub _, _)) =>
+                       raise (Ambiguous (m, a))
 
                   | _ =>
                        raise (InferError

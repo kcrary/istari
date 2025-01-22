@@ -1483,7 +1483,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                             (* Could not infer a type for M because of a problem with the head variable. *)
                             dest := inferError history dir m' aopt msg
 
-                       | Infer.Ambiguous =>
+                       | Infer.Ambiguous _ =>
                             (* 8b. a strict prefix of M's type is an evar, defer *)
                             defer st (Of, table, goal, dest, history)
 
@@ -2301,6 +2301,19 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                             soldieron ()
                             )
 
+                       | Infer.Ambiguous (m, a) =>
+                            (
+                            dest :=
+                               error history "a prefix of a type path has an evar head"
+                               (fn () =>
+                                   (
+                                   showPrefixed "path: " dir m;
+                                   showPrefixed "has type: " dir a;
+                                   print "\n"
+                                   ));
+                            soldieron ()
+                            )
+
                        | Infer.NotPath msg =>
                             (
                             dest :=
@@ -2813,7 +2826,10 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                        Sum.INR (m', aopt, msg)
 
                   | Infer.NotPath msg =>
-                       Sum.INR (m, NONE, "not a path: " ^ msg))
+                       Sum.INR (m, NONE, "not a path: " ^ msg)
+
+                  | Infer.Ambiguous (m', a) =>
+                       Sum.INR (m', SOME a, "a prefix of the path has an evar head"))
              of
                 Sum.INL (a, tac) =>
                    refine (Rule.assert (T.apply2 Prim.ov a m) (T.evar ()))

@@ -1,6 +1,7 @@
 open:Option
 open:FiniteMap
 open:Class
+open:Factory
 # `FiniteMap.Class`
 
 
@@ -65,10 +66,11 @@ The `FiniteMap` class does not include a merge operation.  The
     FiniteMapMerge_rem_mer : type:FiniteMapMerge_rem_mer
 
 
-### Generic finite maps minus extensionality
+### The factory
 
-To assist in building finite maps, there is a class that leaves out
-extensionality equality:
+The `FiniteMap.Class.Factory` submodule provides tools to assist in
+constructing finite maps.  First, there is a class of generic finite
+maps *minus extensional equality.*
 
     PreFiniteMap : type:PreFiniteMap
                  = def:PreFiniteMap
@@ -89,7 +91,7 @@ Given a pre-finite-map, one can build a finite map by quotienting it:
 
     FiniteMap_qpfm : type:FiniteMap_qpfm
 
-Another class gives finite maps with merge but without extensionality:
+Another class gives finite maps with merge but minus extensionality:
 
     PreFiniteMapMerge : type:PreFiniteMapMerge
                       = def:PreFiniteMapMerge
@@ -97,14 +99,3 @@ Another class gives finite maps with merge but without extensionality:
     quotient_mer : type:quotient_mer
 
     FiniteMapMerge_qpfm : type:FiniteMapMerge_qpfm
-
-The simple finite maps are defined using these tools.  The discrepancy
-between the types of `empty` versus `emp` is mediated using the
-`finite_map_impl_eqtest` lemma (above) that extracts an equality test
-from a finite map.  (By definition, all equality tests at the same
-type are equal.)
-
-    FiniteMap_finite_map : type:FiniteMap_finite_map
-
-    FiniteMap_finite_map' : type:FiniteMap_finite_map'
-

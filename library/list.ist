@@ -1,12 +1,15 @@
 
+File.import "bool-load.iml";
 File.import "datatype-load.iml";
+File.import "decidable-load.iml";
+File.import "function-load.iml";
+File.import "kindlike-load.iml";
 File.import "logic-load.iml";
 File.import "miscellaneous-load.iml";
 File.import "nat-load.iml";
 File.import "option-load.iml";
 File.import "partial-load.iml";
-File.import "bool-load.iml";
-File.import "decidable-load.iml";
+
 File.import "list-aux.iml";
 
 
@@ -3655,7 +3658,7 @@ val istrue_Forall_distb = parseConstant /istrue_Forall_distb/;
 
 
 
-(* Covariance *)
+(* Miscellaneous *)
 
 lemma "list_subtype"
 /
@@ -3673,8 +3676,70 @@ apply /IH/.
 apply /cons_subterm/.
 qed ();
 
-val list_subtype = parseConstant /list_subtype/;
 
+
+
+aliasModule /K/ /Kindlike/;
+aliasModule /F/ /Function/;
+
+lemma "kindlike_list"
+/
+  forall i (a : U (1 + i)) .
+    a
+    -> K.kindlike i a
+    -> K.kindlike i (list a)
+/;
+
+inference.
+intro /i a a0 Hkind/.
+apply /K.kindlike_subpollent _ _ (nat & (nat -> a))/.
+1:{
+  apply /K.kindlike_prod/.
+    {
+    apply /K.kindlike_degenerate/.
+    }
+  apply /K.kindlike_arrow_right/ >> auto.
+  }
+unfold /F.subpollent/.
+set /f/
+  /(fnind f : list [a] -> nat & (nat -> a) of
+    | nil . (0, (fn _ . a0))
+    | cons h t .
+        (succ (f t #1),
+         (fn i . nat_case i h (fn i' . f t #2 i'))))/.
+typecheckLet /f/ /_/ /Hoff/.
+reduce /Hoff/.
+exists /f/.
+unfold /F.split_injective/.
+set /g/
+  /(fnind g : nat -> (nat -> a) -> list a of
+    | zero . fn h . nil
+    | succ i . fn h .
+        cons (h 0) (g i (fn j . h (succ j))))/.
+typecheckLet /g/ /_/ /Hofg/.
+reduce /Hofg/.
+exists /fn p . g (p #1) (p #2)/.
+reduce //.
+intro /l/.
+induction /l/.
+  {
+  unfold /f at all, g/.
+  reflexivity.
+  }
+intro /h t IH/.
+unfold /f/.
+fold /f _/.
+unfold /f at 1/.
+fold /f _/.
+unfold /g/.
+fold /g _ _/.
+reduce //.
+compat.
+rewrite /(fn j . f t #2 j) = f t #2 : (nat -> a)/ >> auto.
+introEq /j/.
+reduce //.
+reflexivity.
+qed ();
 
 
 endModule ();

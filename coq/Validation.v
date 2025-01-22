@@ -505,6 +505,7 @@ exact setIntroOf_valid.
 exact setIntroEq_valid.
 exact setIntro_valid.
 exact setIntroOfSquash_valid.
+exact setIntroEqSquash_valid.
 exact squashIntroOfSquash_valid.
 exact setElim_valid.
 exact setLeft_valid.
@@ -522,6 +523,7 @@ exact isetIntroOf_valid.
 exact isetIntroEq_valid.
 exact isetIntro_valid.
 exact isetIntroOfSquash_valid.
+exact isetIntroEqSquash_valid.
 exact isetElim_valid.
 exact isetLeft_valid.
 exact isetFormInv1_valid.
