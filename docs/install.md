@@ -7,14 +7,14 @@
    - GNU Emacs
    - (if running on Windows) Cygwin
 
-   Some versions of Standard ML of New Jersey contain bugs that keep
-   Istari from compiling.  On Linux, version 110.99.7.1 is confirmed
-   to work.  On Mac and Windows, version 110.99.2 is confirmed to
-   work.
+   [Some versions](compiler-versions.html) of Standard ML of New
+   Jersey contain bugs or incompatibilities that keep Istari from
+   compiling.  Version 110.99.7.1 is confirmed to work on Linux, Mac,
+   and Windows.
 
 1. Obtain the distribution from Github:
 
-       git clone --recursive https://github.com/kcrary/istari.git istari
+       git clone --recursive --branch v1.0.1 https://github.com/kcrary/istari.git istari
 
 2. If you forgot to use the `--recursive` option in the previous step,
    populate the `cmlib` directory:
