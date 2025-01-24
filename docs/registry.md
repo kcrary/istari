@@ -44,13 +44,13 @@ or just:
     readRegistry /Foo.bar/ /int * term/
 
 As a practical example, the `notb_tru` reduction (with type
-`Reduction.reduction2`) is obtained by:
+`Reduction.ureduction`) is obtained by:
 
-    val notb_tru = readRegistry /Bool.notb_tru/ /reduction2/
+    val notb_tru = readRegistry /Bool.notb_tru/ /ureduction/
 
-Here, `Registry.reduction2` (the result of parsing `/reduction2/`)
-has the type `Reduction.reduction2 Registry.key`, so `notb_tru` will
-have the type `Reduction.reduction2`.
+Here, `Registry.ureduction` (the result of parsing `/ureduction/`)
+has the type `Reduction.ureduction Registry.key`, so `notb_tru` will
+have the type `Reduction.ureduction`.
 
 The key parser has a special syntax for keys for [collapsed
 tuples](iml.html#collapsed-tuples).  To construct the key for 

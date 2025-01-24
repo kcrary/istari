@@ -16,4 +16,4 @@
   The `ioerr` type is abstract, because we cannot reconcile the
   different data carried by I/O errors in the SML and OCaml bases.
   Consequently, the programmer must match `Io`'s argument using a
-  wildcard.
+  variable or wildcard.

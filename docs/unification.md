@@ -168,6 +168,6 @@ The Case of Higher-Order Patterns. In *Joint International Conference
 and Symposium on Logic Programming,* 1996.
 
 [3] To see how such equations arise, see: Derek Dreyer, Robert Harper,
-Manuel M.T. Chakravarty, and Gabriele Keller. Modular Type Classes. In
-*Thirty-Fourth ACM Symposium on Principles of Programming Languages*,
+Manuel M.T. Chakravarty, and Gabriele Keller. Modular Type Classes.
+In *Thirty-Fourth ACM Symposium on Principles of Programming Languages*,
 2007. Section 4.6.
