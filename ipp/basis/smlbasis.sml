@@ -480,6 +480,6 @@ structure Smlbasis :> IML__SMLBASIS =
 
       (* really calling polyEqual (of course) *)
       fun s__e (x, y) = x = y
-      fun op <> (x, y) = x <> y
+      val op <> = fn (x, y) => x <> y
 
    end
