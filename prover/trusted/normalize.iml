@@ -253,8 +253,17 @@ functor NormalizeFun (structure Term : TERM
                              whnfMain BASIC n id spine
                           end
 
+                       else if Redex.blessed const then
+                          (* treat this as a primitive reduction, not a user reduction *)
+                          (case Redex.redex whnfBasic const spine of
+                              NONE =>
+                                 Elim (m, spine)
+
+                            | SOME n =>
+                                 whnfMain BASIC n id [])
+
                        else
-                          Elim (Const const, spine)
+                          Elim (m, spine)
 
                   | STANDARD =>
                        (case Redex.redex whnfHard const spine of
@@ -318,9 +327,9 @@ functor NormalizeFun (structure Term : TERM
 
       and whnfHard m = whnfMain HARD m id []
 
+      and whnfBasic m = whnfMain BASIC m id []
 
       fun whnf m = whnfMain STANDARD m id []
-      fun whnfBasic m = whnfMain BASIC m id []
       
 
 

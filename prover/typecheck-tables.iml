@@ -1,0 +1,596 @@
+
+signature TYPECHECK_TABLES =
+   sig
+
+      type tactic = Tactic.tactic
+      type 'a tacticm = 'a Tactic.tacticm
+      type priority = Tactic.priority
+      
+
+      exception Stop of Message.label
+
+
+      (* Tactics may add hypotheses to the end, but must not alter existing hypotheses.
+
+         The typechecker is re-entrant, so the world won't end if these tactics call the type checker.
+         But the two calls won't collaborate at all, so it probably won't behave very well except on
+         small instances.
+
+         If the tactic fails, the typechecker will typically try something else.  But if
+         the tactic raises Stop, the typechecker will abandon the goal and return an error.
+      *)
+
+      val introTactics : tactic ConstantTable.table
+      val istpTactics : tactic ConstantTable.table
+      val eqtpTactics : tactic Constant2Table.table
+      val ofunivTactics : tactic ConstantTable.table
+      val equnivTactics : tactic Constant2Table.table
+      val ofkindTactics : tactic ConstantTable.table
+      val eqkindTactics : tactic Constant2Table.table
+      val subtypeTactics : tactic Constant2Table.table
+      val subtypeLeftTactics : tactic ConstantTable.table
+      val subtypeRightTactics : tactic ConstantTable.table
+      val strictnessTactics : tactic ConstantTable.table
+      val totalityTactics : tactic ConstantTable.table
+
+      (* Should not alter the context.
+
+         If trivialIntroTactics maps const to tac,
+         then tac proves () : (const @ ...)
+
+         If semitrivialIntroTactics maps const to (m, tac)
+         then tac proves m : (const @ ...)
+         and m is closed.
+      *)
+
+      val trivialIntroTactics : priority tacticm ConstantTable.table
+      val semitrivialIntroTactics : (Term.term * priority tacticm) ConstantTable.table
+
+   end
+
+
+structure TypecheckTables :> TYPECHECK_TABLES =
+   struct
+
+      structure D = Directory
+      structure J = Judgement
+      structure T = Term
+      structure RT = RuleTactic
+      structure H = ConstantTable
+      structure H2 = Constant2Table
+
+      open Tactic
+      open Case
+      
+      exception Stop of Message.label
+
+      val introTactics : tactic H.table = H.table ()
+      val trivialIntroTactics : priority tacticm H.table = H.table ()
+      val semitrivialIntroTactics : (T.term * priority tacticm) H.table = H.table ()
+      val istpTactics : tactic H.table = H.table ()
+      val eqtpTactics : tactic H2.table = H2.table ()
+      val ofunivTactics : tactic H.table = H.table ()
+      val equnivTactics : tactic H2.table = H2.table ()
+      val ofkindTactics : tactic H.table = H.table ()
+      val eqkindTactics : tactic H2.table = H2.table ()
+      val subtypeTactics : tactic H2.table = H2.table ()
+      val subtypeLeftTactics : tactic H.table = H.table ()
+      val subtypeRightTactics : tactic H.table = H.table ()
+      val strictnessTactics : tactic H.table = H.table ()
+      val totalityTactics : tactic H.table = H.table ()
+
+
+      val lambdaOnly =
+         goalCaseT
+         / \Prim.ov\ _ ($whnfBasic (fn . _)) => \fnc => idtac\ /
+
+      val pairOnly =
+         goalCaseT
+         / \Prim.ov\ _ ($whnfBasic (_ , _)) => \fnc => idtac\ /
+
+      val nextOnly =
+         goalCaseT
+         / \Prim.ov\ _ ($whnfBasic (next _)) => \fnc => idtac\ /
+
+      val trivOnly =
+         goalCaseT
+         / \Prim.ov\ _ ($whnfBasic ()) => \fnc => idtac\ /
+
+      fun only const =
+         goalCaseT
+         / \Prim.ov\ _ ($whnfBasic (\const\ @ _)) => \fnc => idtac\ /
+
+      fun onEvar tac =
+         lift (fn () => tac (T.evar ()))
+
+
+      (* As an intro "rule" for partial A, use bottom as the intro if appropriate,
+         or else use an intro rule for A and leave as an obligation that A is strict.
+      *)
+      val partialIntro =
+         goalCaseT
+         /| \Prim.ov\ (\Prim.partial\ _) ($whnfBasic \Prim.bottom\) =>
+            \(fnc =>
+                 RT.partialIntroBottomOf)\
+
+          | \Prim.ov\ (\Prim.partial\ ($as (const? @ _))) _ =>
+            \(fnc a const =>
+                 (case H.find introTactics const of
+                     SOME tac =>
+                        refine (Rule.subsumptionOf a (T.evar ()) (T.evar ()))
+                        >>> [idtac, tac]
+
+                   | NONE =>
+                        (case H.find trivialIntroTactics const of
+                            SOME tac =>
+                               refine (Rule.subsumptionOf a (T.evar ()) (T.evar ()))
+                               >>> [idtac, tac >> idtac]
+
+                          | NONE =>
+                               fail "no intro rule for underlying type")))\
+         /
+
+
+      val () =
+         let
+            val insert = H.insert introTactics
+         in
+            insert Prim.forall (lambdaOnly >> RT.forallIntroOf);
+            insert Prim.arrow (lambdaOnly >> RT.arrowIntroOf);
+            insert Prim.tarrow (lambdaOnly >> RT.tarrowIntroOf);
+            insert Prim.karrow (lambdaOnly >> RT.karrowIntroOf);
+            insert Prim.intersect RT.intersectIntroOf;
+            insert Prim.union (lift (fn () => RT.unionIntroOf (T.evar ())));
+            insert Prim.guard RT.guardIntroOf;
+            insert Prim.coguard RT.coguardIntroOfSquash;
+            insert Prim.foralltp RT.foralltpIntroOf;
+            insert Prim.exists (pairOnly >> RT.existsIntroOf);
+            insert Prim.prod (pairOnly >> RT.prodIntroOf);
+            insert Prim.dprod (pairOnly >> RT.dprodIntroOf);
+            insert Prim.future (nextOnly >> RT.futureIntroOf);
+            insert Prim.iforall RT.iforallIntroOf;
+            insert Prim.iexists (lift (fn () => RT.iexistsIntroOf (T.evar ())));
+            insert Prim.set RT.setIntroOfSquash;
+            insert Prim.iset RT.isetIntroOfSquash;
+            insert Prim.quotient RT.quotientIntroOf;
+            insert Prim.bool (first [only Prim.tru >> RT.boolIntro1Of, only Prim.fals >> RT.boolIntro2Of]);
+            insert Prim.sum (first [only Prim.inl >> RT.sumIntro1Of, only Prim.inr >> RT.sumIntro2Of]);
+            insert Prim.integer RT.integerIntroOf;
+            insert Prim.symbol RT.symbolIntroOf;
+            insert Prim.partial partialIntro
+         end
+
+
+      val () =
+         let
+            val insert = H.insert trivialIntroTactics
+         in
+            insert Prim.unit (RT.unitIntroOf >> done);
+            insert Prim.void (RT.voidElim >> idtacM Primary);
+            insert Prim.squash (RT.squashIntroOfSquash >>> [idtacM Secondary, idtacM Primary]);
+            insert Prim.isquash (RT.isquashIntroOfIsquash >> idtacM Primary);
+            insert Prim.ov (RT.ofIntro >> idtacM Primary);
+            insert Prim.eq (RT.eqIntro >> idtacM Primary);
+            insert Prim.istp (RT.istpIntro >> idtacM Primary);
+            insert Prim.eqtp (RT.eqtpIntro >> idtacM Primary);
+            insert Prim.subtype (RT.subtypeIntro >> idtacM Primary)
+         end
+
+
+      val eeqtpForm =
+         goalCaseT
+         /
+            \Prim.istp\ (\Prim.eeqtp\ ? ?) =>
+            \fnc a b =>
+                refine (Rule.assert (T.apply1 Prim.istp a) (T.evar ()))
+                >>> [
+                    idtac,
+
+                    (* A : type |- A[^1] <:> B[^1] : type *)
+                    refine (Rule.assert (T.apply1 Prim.istp (T.Sub (b, T.shift1))) (T.evar ()))
+                    >>> [
+                        (* A : type |- B[^] : type *)
+                        refine (Rule.weaken 0 1),
+
+                        (* A : type, B[^] : type |- A[^2] <:> B[^2] : type *)
+                        refine (Rule.reduce (Reduction.within [1] Reduction.unfold))
+                        >>
+                        refine (Rule.prodForm (T.evar ()) (T.evar ()))
+                        >>> [
+                            refine (Rule.subtypeForm (T.evar ()) (T.evar ()))
+                            >>> [
+                                refine (Rule.hypothesis 1),
+                                refine (Rule.hypothesis 0)
+                                ],
+
+                            refine (Rule.subtypeForm (T.evar ()) (T.evar ()))
+                            >>> [
+                                refine (Rule.hypothesis 0),
+                                refine (Rule.hypothesis 1)
+                                ]
+                            ]
+                        ]
+                    ]\
+         /
+
+      val () =
+         let
+            val insert = H.insert istpTactics
+         in
+            insert Prim.forall RT.forallForm;
+            insert Prim.arrow RT.arrowForm;
+            insert Prim.tarrow RT.tarrowForm;
+            insert Prim.karrow RT.karrowForm;
+            insert Prim.intersect RT.intersectForm;
+            insert Prim.union RT.unionForm;
+            insert Prim.guard RT.guardForm;
+            insert Prim.coguard RT.coguardForm;
+            insert Prim.exists RT.existsForm;
+            insert Prim.prod RT.prodForm;
+            insert Prim.dprod RT.dprodForm;
+            insert Prim.future RT.futureForm;
+            insert Prim.void RT.voidForm;
+            insert Prim.unit RT.unitForm;
+            insert Prim.bool RT.boolForm;
+            insert Prim.iforall RT.iforallForm;
+            insert Prim.iexists RT.iexistsForm;
+            insert Prim.eq RT.eqForm;
+            insert Prim.ov RT.ofForm;
+            insert Prim.set RT.setForm;
+            insert Prim.iset RT.isetForm;
+            insert Prim.quotient RT.quotientForm;
+            insert Prim.univ RT.univForm;
+            insert Prim.kind RT.kindForm;
+            insert Prim.eqtp RT.eqtpForm;
+            insert Prim.istp RT.istpForm;
+            insert Prim.subtype RT.subtypeForm;
+            insert Prim.eeqtp RT.eeqtpForm;
+            insert Prim.sum RT.sumForm;
+            insert Prim.nat RT.natForm;
+            insert Prim.level RT.levelForm;
+            insert Prim.lleq RT.lleqForm;
+            insert Prim.squash RT.squashForm;
+            insert Prim.isquash RT.isquashForm;
+            insert Prim.eeqtp eeqtpForm;
+            insert Prim.integer RT.integerForm;
+            insert Prim.symbol RT.symbolForm;
+            insert Prim.partial RT.partialForm;
+            insert Prim.halts (onEvar RT.haltsForm);
+            insert Prim.admiss RT.admissForm;
+            insert Prim.uptype RT.uptypeForm
+         end
+
+      val () =
+         let
+            fun insert const tac = H2.insert eqtpTactics (const, const) tac
+         in
+            insert Prim.forall RT.forallEq;
+            insert Prim.arrow RT.arrowEq;
+            insert Prim.tarrow RT.tarrowEq;
+            insert Prim.karrow RT.karrowEq;
+            insert Prim.intersect RT.intersectEq;
+            insert Prim.union RT.unionEq;
+            insert Prim.guard RT.guardEq;
+            insert Prim.coguard RT.coguardEq;
+            insert Prim.exists RT.existsEq;
+            insert Prim.prod RT.prodEq;
+            insert Prim.dprod RT.dprodEq;
+            insert Prim.future RT.futureEq;
+            insert Prim.void RT.voidEq;
+            insert Prim.unit RT.unitEq;
+            insert Prim.bool RT.boolEq;
+            insert Prim.iforall RT.iforallEq;
+            insert Prim.iexists RT.iexistsEq;
+            insert Prim.eq RT.eqEq;
+            insert Prim.ov RT.ofEq;
+            insert Prim.set RT.setEq;
+            insert Prim.iset RT.isetEq;
+            insert Prim.quotient RT.quotientEq;
+            insert Prim.kind RT.kindEq;
+            insert Prim.eqtp RT.eqtpEq;
+            insert Prim.istp RT.istpEq;
+            insert Prim.subtype RT.subtypeEq;
+            insert Prim.eeqtp RT.eeqtpEq;
+            insert Prim.sum RT.sumEq;
+            insert Prim.nat RT.natEq;
+            insert Prim.level RT.levelEq;
+            insert Prim.lleq RT.lleqEq;
+            insert Prim.squash RT.squashEq;
+            insert Prim.isquash RT.isquashEq;
+            insert Prim.integer RT.integerEq;
+            insert Prim.symbol RT.symbolEq;
+            insert Prim.partial RT.partialEq;
+            insert Prim.halts (onEvar RT.haltsEq);
+            insert Prim.admiss RT.admissEq;
+            insert Prim.uptype RT.uptypeEq
+         end
+
+      val () =
+         let
+            fun symmetricize2 tac = RT.eqtpSymm >> tac >> RT.eqtpSymm
+            fun symmetricize3 tac = RT.eqtpSymm >> tac >>> [RT.eqtpSymm, RT.eqtpSymm, idtac]
+
+            fun insert2 const const' tac = 
+               (
+               H2.insert eqtpTactics (const, const') tac;
+               H2.insert eqtpTactics (const', const) (symmetricize2 tac)
+               )
+
+            fun insert3 const const' tac = 
+               (
+               H2.insert eqtpTactics (const, const') tac;
+               H2.insert eqtpTactics (const', const) (symmetricize3 tac)
+               )
+         in
+            insert2 Prim.arrow Prim.forall RT.arrowForallEq;
+            insert2 Prim.tarrow Prim.arrow RT.tarrowArrowEq;
+            insert3 Prim.tarrow Prim.forall RT.tarrowForallEq;
+            insert2 Prim.karrow Prim.arrow RT.karrowArrowEq;
+            insert3 Prim.karrow Prim.forall RT.karrowForallEq
+         end
+
+      val () =
+         let
+            fun insert const tac = H.insert ofunivTactics const tac
+         in
+            insert Prim.forall RT.forallFormUniv;
+            insert Prim.arrow RT.arrowFormUniv;
+            insert Prim.tarrow RT.tarrowFormUniv;
+            insert Prim.karrow RT.karrowFormUniv;
+            insert Prim.intersect RT.intersectFormUniv;
+            insert Prim.union RT.unionFormUniv;
+            insert Prim.guard RT.guardFormUniv;
+            insert Prim.coguard RT.coguardFormUniv;
+            insert Prim.exists RT.existsFormUniv;
+            insert Prim.prod RT.prodFormUniv;
+            insert Prim.dprod RT.dprodFormUniv;
+            insert Prim.future RT.futureFormUniv;
+            insert Prim.rec RT.recFormUniv;
+            insert Prim.void RT.voidFormUniv;
+            insert Prim.unit RT.unitFormUniv;
+            insert Prim.bool RT.boolFormUniv;
+            insert Prim.mu RT.muFormUniv;
+            insert Prim.iforall RT.iforallFormUniv;
+            insert Prim.iexists RT.iexistsFormUniv;
+            insert Prim.eq RT.eqFormUniv;
+            insert Prim.ov RT.ofFormUniv;
+            insert Prim.set RT.setFormUniv;
+            insert Prim.iset RT.isetFormUniv;
+            insert Prim.quotient RT.quotientFormUniv;
+            insert Prim.univ RT.univFormUniv;
+            insert Prim.kind RT.kindFormUniv;
+            insert Prim.eqtp RT.eqtpFormUniv;
+            insert Prim.istp RT.istpFormUniv;
+            insert Prim.subtype RT.subtypeFormUniv;
+            insert Prim.eeqtp RT.eeqtpFormUniv;
+            insert Prim.sum RT.sumFormUniv;
+            insert Prim.nat RT.natFormUniv;
+            insert Prim.level RT.levelFormUniv;
+            insert Prim.lleq RT.lleqFormUniv;
+            insert Prim.squash RT.squashFormUniv;
+            insert Prim.isquash RT.isquashFormUniv;
+            insert Prim.integer RT.integerFormUniv;
+            insert Prim.symbol RT.symbolFormUniv;
+            insert Prim.partial RT.partialFormUniv;
+            insert Prim.halts (onEvar RT.haltsFormUniv);
+            insert Prim.admiss RT.admissFormUniv;
+            insert Prim.uptype RT.uptypeFormUniv
+         end
+
+      val () =
+         let
+            fun insert const tac = H2.insert equnivTactics (const, const) tac
+         in
+            insert Prim.forall RT.forallEqUniv;
+            insert Prim.arrow RT.arrowEqUniv;
+            insert Prim.tarrow RT.tarrowEqUniv;
+            insert Prim.karrow RT.karrowEqUniv;
+            insert Prim.intersect RT.intersectEqUniv;
+            insert Prim.union RT.unionEqUniv;
+            insert Prim.guard RT.guardEqUniv;
+            insert Prim.coguard RT.coguardEqUniv;
+            insert Prim.exists RT.existsEqUniv;
+            insert Prim.prod RT.prodEqUniv;
+            insert Prim.dprod RT.dprodEqUniv;
+            insert Prim.future RT.futureEqUniv;
+            insert Prim.rec RT.recEqUniv;
+            insert Prim.void RT.voidEqUniv;
+            insert Prim.unit RT.unitEqUniv;
+            insert Prim.bool RT.boolEqUniv;
+            insert Prim.mu RT.muEqUniv;
+            insert Prim.iforall RT.iforallEqUniv;
+            insert Prim.iexists RT.iexistsEqUniv;
+            insert Prim.eq RT.eqEqUniv;
+            insert Prim.ov RT.ofEqUniv;
+            insert Prim.set RT.setEqUniv;
+            insert Prim.iset RT.isetEqUniv;
+            insert Prim.quotient RT.quotientEqUniv;
+            insert Prim.univ RT.univEqUniv;
+            insert Prim.kind RT.kindEqUniv;
+            insert Prim.eqtp RT.eqtpEqUniv;
+            insert Prim.istp RT.istpEqUniv;
+            insert Prim.subtype RT.subtypeEqUniv;
+            insert Prim.eeqtp RT.eeqtpEqUniv;
+            insert Prim.sum RT.sumEqUniv;
+            insert Prim.nat RT.natEqUniv;
+            insert Prim.level RT.levelEqUniv;
+            insert Prim.lleq RT.lleqEqUniv;
+            insert Prim.squash RT.squashEqUniv;
+            insert Prim.isquash RT.isquashEqUniv;
+            insert Prim.integer RT.integerEqUniv;
+            insert Prim.symbol RT.symbolEqUniv;
+            insert Prim.partial RT.partialEqUniv;
+            insert Prim.halts (onEvar RT.haltsEqUniv);
+            insert Prim.admiss RT.admissEqUniv;
+            insert Prim.uptype RT.uptypeEqUniv
+         end
+
+      val () =
+         let
+            fun symmetricize2 tac = RT.eqSymm >> tac >> RT.eqSymm
+            fun symmetricize3 tac = RT.eqSymm >> tac >>> [RT.eqSymm, RT.eqSymm, idtac]
+
+            fun insert2 const const' tac = 
+               (
+               H2.insert equnivTactics (const, const') tac;
+               H2.insert equnivTactics (const', const) (symmetricize2 tac)
+               )
+
+            fun insert3 const const' tac = 
+               (
+               H2.insert equnivTactics (const, const') tac;
+               H2.insert equnivTactics (const', const) (symmetricize3 tac)
+               )
+         in
+            insert2 Prim.arrow Prim.forall RT.arrowForallEqUniv;
+            insert2 Prim.tarrow Prim.arrow RT.tarrowArrowEqUniv;
+            insert3 Prim.tarrow Prim.forall RT.tarrowForallEqUniv;
+            insert2 Prim.karrow Prim.arrow RT.karrowArrowEqUniv;
+            insert3 Prim.karrow Prim.forall RT.karrowForallEqUniv
+         end
+
+      val () =
+         let
+            val insert = H.insert ofkindTactics
+         in
+            insert Prim.tarrow RT.tarrowKind;
+            insert Prim.karrow RT.karrowKind;
+            insert Prim.prod RT.prodKind;
+            insert Prim.future RT.futureKind;
+            insert Prim.rec RT.recKind;
+            insert Prim.unit RT.unitKind;
+            insert Prim.univ RT.univKind
+         end
+
+      val () =
+         let
+            fun insert const tac = H2.insert eqkindTactics (const, const) tac
+         in
+            insert Prim.tarrow RT.tarrowKindEq;
+            insert Prim.karrow RT.karrowKindEq;
+            insert Prim.prod RT.prodKindEq;
+            insert Prim.future RT.futureKindEq;
+            insert Prim.rec RT.recKindEq;
+            insert Prim.unit RT.unitKindEq;
+            insert Prim.univ RT.univKindEq
+         end
+
+      val () =
+         let
+            fun insert const const' tac = H2.insert subtypeTactics (const, const') tac
+         in
+            insert Prim.forall Prim.forall RT.forallSub;
+            insert Prim.arrow Prim.arrow RT.arrowSub;
+            insert Prim.arrow Prim.forall RT.arrowForallSub;
+            insert Prim.forall Prim.arrow RT.forallArrowSub;
+            insert Prim.exists Prim.exists RT.existsSub;
+            insert Prim.prod Prim.prod RT.prodSub;
+            insert Prim.prod Prim.exists RT.prodExistsSub;
+            insert Prim.exists Prim.prod RT.existsProdSub;
+            insert Prim.dprod Prim.dprod RT.dprodSub;
+            insert Prim.dprod Prim.exists RT.dprodExistsSub;
+            insert Prim.exists Prim.dprod RT.existsDprodSub;
+            insert Prim.prod Prim.dprod RT.prodDprodSub;
+            insert Prim.dprod Prim.prod RT.dprodProdSub;
+            insert Prim.future Prim.future RT.futureSub;
+            insert Prim.sum Prim.sum RT.sumSub;
+            insert Prim.squash Prim.squash RT.squashSub;
+            insert Prim.isquash Prim.isquash RT.isquashSub;
+            insert Prim.partial Prim.partial RT.partialSub
+         end
+
+      val () =
+         let
+            fun insert const tac = H.insert subtypeLeftTactics const tac
+         in
+            insert Prim.void RT.voidSub;
+            insert Prim.set RT.setSubElim;
+            insert Prim.iset RT.isetSubElim;
+            insert Prim.coguard RT.coguardSubElim
+         end
+
+      val () =
+         let
+            fun insert const tac = H.insert subtypeRightTactics const tac
+         in
+            insert Prim.guard RT.guardSubIntro
+         end
+
+      val () =
+         let
+            fun insert const tac = H.insert strictnessTactics const tac
+         in
+            insert Prim.partial RT.partialStrict;
+            insert Prim.void RT.voidStrict;
+            insert Prim.unit RT.unitStrict;
+            insert Prim.bool RT.boolStrict;
+            insert Prim.forall RT.forallStrict;
+            insert Prim.arrow RT.arrowStrict;
+            insert Prim.intersect RT.intersectStrict;
+            insert Prim.exists RT.existsStrict;
+            insert Prim.prod RT.prodStrict;
+            insert Prim.dprod RT.dprodStrict;
+            insert Prim.sum RT.sumStrict;
+            insert Prim.future RT.futureStrict;
+            insert Prim.set RT.setStrict;
+            insert Prim.iset RT.isetStrict;
+            insert Prim.univ RT.univStrict;
+            insert Prim.nat RT.natStrict;
+            insert Prim.integer RT.integerStrict;
+            insert Prim.symbol RT.symbolStrict
+         end
+
+      val () =
+         let
+            fun insert const tac = H.insert totalityTactics const tac
+         in
+            insert Prim.void RT.voidTotal';
+            insert Prim.unit RT.unitTotal';
+            insert Prim.bool RT.boolTotal';
+            insert Prim.forall RT.forallTotal';
+            insert Prim.arrow RT.arrowTotal';
+            insert Prim.exists RT.existsTotal';
+            insert Prim.prod RT.prodTotal';
+            insert Prim.dprod RT.dprodTotal';
+            insert Prim.sum RT.sumTotal';
+            insert Prim.future RT.futureTotal';
+            insert Prim.univ RT.univTotal';
+            insert Prim.nat RT.natTotal'
+         end
+
+
+      fun enterTypingAxiom const a tac =
+         let
+            val jud =
+               J.make Seq.empty (T.apply2 Prim.ov a (T.Const const))
+
+            val v =
+               Sum.outL $
+               Tactic.execute (jud, D.empty) tac
+         in
+            DatabaseInternal.importType const jud v
+         end
+
+      val () =
+         List.app
+            (fn (const, ea, rule) => enterTypingAxiom const (ETerm.closed ea) (refine rule))
+            [
+            (Prim.abort, /intersect (i : level) (a : U i) . void -> a/, Rule.abortType),
+
+            (Prim.zero, /nat/, Rule.zeroType),
+            (Prim.succ, /nat -> nat/, Rule.succType),
+
+            (Prim.lzero, /level/, Rule.lzeroType),
+            (Prim.lsucc, /level -> level/, Rule.lsuccType),
+            (Prim.lmax, /level -> level -> level/, Rule.lmaxType),
+
+            (Prim.tru, /bool/, Rule.boolIntro1Of),
+            (Prim.fals, /bool/, Rule.boolIntro2Of),
+            (Prim.ite, /intersect (i : level) (a : U i) . bool -> a -> a -> a/, Rule.iteType),
+
+            (Prim.sum_case,
+             /intersect (i : level) (a b c : U i) . sum a b -> (a -> c) -> (b -> c) -> c/,
+             Rule.sum_caseType)
+            ]
+
+   end

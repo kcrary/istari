@@ -299,34 +299,37 @@ functor ReplFun (structure Platform : PLATFORM
                   raise (Error.GeneralError ("bad path name " ^ filename))
 
             val olddir = OS.FileSys.getDir ()
-
-            val (newdir, _) = Path.split filename
-
-            val () = OS.FileSys.chDir newdir
-
-            val () =
-               (
-               print "[opening ";
-               print filename;
-               print "]\n"
-               )
-
-            val ins =
-               TextIO.openIn filename
-               handle exn => handleExn exn
-
-            val strm = Stream.fromTextInstream ins
-            val source = ShowContext.streamToSource firstRow strm
-            val s = Incremental.lex strm Span.origin
          in
             Finally.finally
-               (fn () => useLoop (SOME filename) source s runCommands)
-               (fn () => 
-                   (
-                   TextIO.closeIn ins;
-                   OS.FileSys.chDir olddir
-                   ))
-         end
+               (fn () =>
+                   let
+                      val (newdir, filenameLocal) = Path.split filename
+          
+                      val () =
+                         OS.FileSys.chDir newdir
+                         handle exn => handleExn exn
+                            
+                      val () =
+                         (
+                         print "[opening ";
+                         print filename;
+                         print "]\n"
+                         )
+          
+                      val ins =
+                         TextIO.openIn filenameLocal
+                         handle exn => handleExn exn
+          
+                      val strm = Stream.fromTextInstream ins
+                      val source = ShowContext.streamToSource firstRow strm
+                      val s = Incremental.lex strm Span.origin
+                   in
+                      Finally.finally
+                         (fn () => useLoop (SOME filename) source s runCommands)
+                         (fn () => TextIO.closeIn ins)
+                   end)
+               (fn () => OS.FileSys.chDir olddir)
+            end
 
 
 

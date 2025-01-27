@@ -13,6 +13,83 @@ structure P = ReductionProver;
 
 
 
+
+lemma "typechecker_destructs_futures"
+/
+  forall i (a : U i) (b : a -> U i) (f : forall (z : a) . b z -> nat) .
+    (fn x y . let next x' = x in let next y' = y in next (f x' y'))
+    :
+    forall (x : future a) .
+      (let next x' = x in future (b x'))
+      -> future nat
+/;
+
+inference.
+intro /i a b f/.
+typecheck.
+qed ();
+
+
+
+lemma "typechecker_reduces_letnext"
+/
+  forall i (a : U i) (b : a -> U i) (x : future a) 
+    (y : let next x' = x in future (b x'))
+    (f : forall (z : a) . b z -> nat) .
+      (let next x' = x in let next y' = y in next (f x' y')) : future nat
+/;
+
+inference.
+intro /i a b x y f/.
+destruct /x/ /[x]/.
+reduce /y/.
+destruct /y/ /[y]/.
+typecheck.
+qed ();
+
+
+
+
+define /myforall_elim f/
+/
+  f
+//
+  intersect i (a : U i) (P : a -> U i) . (forall (x : a) . P x) -> forall (x : a) . P x
+/;
+
+unfold /myforall_elim/.
+typecheck.
+qed ();
+
+
+
+lemma "deferred_inference"
+/
+  forall i (a : U i) (P Q : a -> U i) (f : forall (x : a) . P x -> Q x) (x : a) (h : P x) .
+    myforall_elim f x h : Q x
+/;
+
+inference.
+intro /i a P Q f x h/.
+typecheck.
+qed ();
+
+
+
+lemma "squashed_typechecking_goal"
+/
+  forall i (a : U i) (P : a -> U i) (x : a) .
+    P x
+    -> x : { y : a | P y }
+/;
+
+inference.
+intro /i a P x H/.
+typecheck.
+qed ();
+
+
+
 lemma "introForm"
 /
   (intersect (i : level) . forall (a : U i) . exists (b : U i) . iforall (c : U i) . iexists (d : U i) . foralltp e . e)
@@ -403,8 +480,6 @@ lemma "set_intro"
 inference.
 intro /i a b x H/.
 typecheck.
-split.
-hyp /H/.
 qed ();
 
 
@@ -429,7 +504,6 @@ lemma "coguard_intro_of"
 inference.
 intro /i a b x H/.
 typecheck.
-split >> auto.
 qed ();
 
 
@@ -470,8 +544,6 @@ inference.
 intro /i a b x/.
 destruct /x/ /[H x]/.
 typecheck.
-split.
-hyp /H/.
 qed ();
 
 
@@ -1455,8 +1527,6 @@ inference.
 intro /i a b x/.
 destructRaw /x/ /[x H]/.
 typecheck.
-split.
-hyp /H/.
 qed ();
 
 

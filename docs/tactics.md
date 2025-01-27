@@ -1201,7 +1201,7 @@ The destruction tactics are:
     As `trivialize` but does not invoke the typechecker.
 
 
-- `Typecheck.trace : bool ref`
+- `Typecheck.trace : bool -> unit`
 
   When set to true, the typechecker traces its process.
 

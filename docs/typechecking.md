@@ -132,10 +132,11 @@ A typecheckable proposition has one of the following forms:
 
 - `C = C' : K i`
 
-The typechecker seeks to prove typecheckable propositions.  In addition,
-the typechecker will attempt to discharge level constraints (`i <l=
-j`), and positivity requirements for inductive types (`positive (fn t
-. A)`).
+The typechecker seeks to prove typecheckable propositions.  In
+addition, the typechecker will attempt to discharge level constraints
+(`i <l= j`), positivity requirements for inductive types 
+(`positive (fn t . A)`), and totality requirements for partial types
+(`total A`).
 
 The algorithm proceeds as follows:
 
@@ -152,13 +153,14 @@ and put `A` in [hard whnf](#reduction-strategies).  Then:
    (We say a term is marked manual when it has the form `manual _` or
    `manualf _`.)
 
-4. If the goal matches a hypothesis, use it.
+4. If the goal is an instance of a hypothesis, use it.
 
 5. If `M` is a variable, attempt to unify its type with `A`, unless
    its type is a universe.  (This is not quite a special case of 8,
    since `A` might be `intersect`, etc.)
 
 6. If `A` is known, use any applicable intro or formation rule.
+   Destruct any future hypotheses that come into scope.
 
    If `A` = `partial A'`, use any applicable intro rule for `A'` and check that
    `A' <: partial A'`.
@@ -175,8 +177,9 @@ and put `A` in [hard whnf](#reduction-strategies).  Then:
 
    a. Infer the natural type for `M`, say `B`.
 
-   b. If `M`'s natural type cannot be inferred because a prefix of
-      its type is an evar, defer.
+   b. If `M`'s natural type cannot be inferred because a prefix of `M`
+      has an evar type, suspend this goal, but process any subgoals
+      that came from inferring that prefix's type.
 
    c. If `B` is not of the form `U i`, attempt to unify `A` and `B`.
       (Special case of d, but avoids extra subgoals.)
@@ -198,11 +201,12 @@ For goals of the form `A : type`, put `A` in
 
 2. If `A` is marked manual, generate a subgoal and stop.
 
-3. If the goal matches a hypothesis, use it.
+3. If the goal is an instance of a hypothesis, use it.
 
 4. If `A` is a variable and its sort is type or `U i` then accept.
 
-5. If `A` is known, use any applicable formation rule.
+5. If `A` is known, use any applicable formation rule.  Destruct any
+   future hypotheses that come into scope.
 
 6. Prove `A : U i` for fresh `i`.
 
@@ -233,9 +237,10 @@ For goals of the form `A <: B`, put `A` and `B` in
 4. Attempt to unify B with partial A.  If successful, prove
    `A <: partial A` using a strictness rule.
 
-5. If the goal matches a hypothesis, use it.
+5. If the goal is an instance of a hypothesis, use it.
 
-6. Use any applicable subtyping rule.
+6. Use any applicable subtyping rule.  Destruct any future
+   hypotheses that come into scope.
 
 7. Prove `A = B : type`.
 
@@ -249,9 +254,10 @@ For goals of the form `A = B : type`, put `A` and `B` in
 
 2. Attempt to unify `A` and `B`.  If successful, prove `A : type`.
 
-3. If the goal matches a hypothesis, use it.
+3. If the goal is an instance of a hypothesis, use it.
 
-4. Use any applicable type equality rule.
+4. Use any applicable type equality rule.  Destruct any future
+   hypotheses that come into scope.
 
 5. Prove `A = B : U i` for unknown `i`.
 
@@ -266,13 +272,15 @@ in [hard whnf](#reduction-strategies).  Then:
 2. Attempt to unify `A` and `B`.  If successful, prove `A : U i` or 
    `A : K i`.
 
-3. If the goal matches a hypothesis, use it.
+3. If the goal is an instance of a hypothesis, use it.
 
-4. Use any applicable type equality rule.
+4. Use any applicable type equality rule.  Destruct any future
+   hypotheses that come into scope.
 
 5. Try compatibility.
 
 6. Reject.
+
 
 
 ##### Reduction strategies
@@ -301,9 +309,9 @@ Three strategies are used for normalization, depending on the context:
    expressed using firm constants.
 
 
-### Typechecker interface
+### The typechecker interface
 
-There are five main entry points to the typechecker:
+There are six main entry points to the typechecker:
 
 - `typecheck : tactic`
 
@@ -311,7 +319,12 @@ There are five main entry points to the typechecker:
 
 - `withTypecheck : tactic -> tactic`
 
-  Runs the given tactic, then runs the typechecker its subgoals.
+  Runs the given tactic, then runs the typechecker on its subgoals.
+
+- `withTypecheckSnd : priority tacticm -> tactic`
+
+  Runs the given tactic, then runs the typechecker on its subgoals
+  marked secondary.
 
 - `typecheck1 : tactic`
 
@@ -362,4 +375,23 @@ led to that point.  At the end of the trace (goal 4 in this case) is
 the initial goal.
 
 One can get a detailed trace of everything the typechecker does by
-setting `Typecheck.trace : bool ref` to true.
+calling `Typecheck.trace true`.
+
+
+### Old typecheckers
+
+Improvements to the typechecker can break code.  In order to more
+easily migrate to new versions of Istari, one can instruct Istari to
+revert to an old version of the typechecker.  This will affect not
+only the `typecheck` tactic, but every tactic that invokes the
+typechecker.
+
+The code for old typecheckers resides in `library/typecheck`.  To
+select the typechecker for, say, version 1.0.1, execute:
+
+    File.import "library/typecheck/1.0.1-load.iml";
+    Typecheck_1_0_1.select ();
+
+To reselect the current typechecker, execute:
+
+    TypecheckDefault.select ();

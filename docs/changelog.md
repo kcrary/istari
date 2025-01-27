@@ -1,5 +1,16 @@
 # Change log
 
+#### Development version
+
+- The typechecker deals better with the future modality, and with type
+  inference for higher-order functions.
+
+- Old versions of the typechecker can be loaded from
+  `library/typecheck`.
+
+- Bug fixes.
+
+
 #### 1.0.1
 
 - New tactics:

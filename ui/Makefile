@@ -14,12 +14,10 @@ generated : lexrepl-nj.cmlex.sml
 server : generated
 	cd ../prover; make smlnj
 	echo "exportServer \"../core/prelude.iml\" \"Core libraries loaded.\" \"bin/istarisrv-heapimg\";" | $(SMLNJ) export.sml
-	../ipp/bin/$(MKNJEXEC) $(SMLNJ) `pwd`/bin istarisrv-heapimg istarisrv
 
 server-nolib : generated
 	cd ../prover; make smlnj
 	echo "exportServer \"empty.iml\" \"\" \"bin/istarisrv-nolib-heapimg\";" | $(SMLNJ) export.sml
-	../ipp/bin/$(MKNJEXEC) $(SMLNJ) `pwd`/bin istarisrv-nolib-heapimg istarisrv-nolib
 
 batch : generated
 	cd ../prover; make smlnj

@@ -14,6 +14,7 @@ confirmed to work, or not.
 
 ### Mac (Intel)
 
+- 110.99.4 works.
 - 110.99.7 does not work.
 - 110.99.7.1 works.
 
