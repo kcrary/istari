@@ -67,6 +67,10 @@ signature NAMESPACE_INTERNAL =
       (* Apply to all exportable namespace entries. *)
       val appExport : (address * constant -> unit) -> unit
 
+
+      (* callback to determine if a proof is underway *)
+      val underway : (unit -> bool) ref
+
    end
 
 
@@ -462,15 +466,22 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
 
 
 
+      val underway : (unit -> bool) ref = ref (fn () => false)
+
+
       fun beginModuleSym sym =
          let
             val st as ST { current, path, env, working = working as G (_, workingMods), reverse } = R.deref theState
          in
-            if Symbol.eq (sym, zilch) then
+            if !underway () then
+               signalError "proof underway"
+
+            else if Symbol.eq (sym, zilch) then
                signalError "bad module name"
 
             else if D.member workingMods sym then
                signalErrorOverlap sym
+
             else
                (
                R.assign theStack (st :: R.deref theStack);
@@ -550,18 +561,21 @@ structure NamespaceInternal :> NAMESPACE_INTERNAL =
                signalError "not in module"
 
            | state :: rest =>
-                let
-                   (* state is the state that prevailed before the module was opened *)
-
-                   val ST { current=closingName, working=closingGroup } = R.deref theState
-
-                   (* no collision adding current to state, otherwise wouldn't have opened in the first place *)
-
-                   val state' = endModuleMain closingName closingGroup state
-                in
-                   R.assign theStack rest;
-                   R.assign theState state'
-                end)
+                if !underway () then
+                   signalError "proof underway"
+                else
+                   let
+                      (* state is the state that prevailed before the module was opened *)
+   
+                      val ST { current=closingName, working=closingGroup } = R.deref theState
+   
+                      (* no collision adding current to state, otherwise wouldn't have opened in the first place *)
+   
+                      val state' = endModuleMain closingName closingGroup state
+                   in
+                      R.assign theStack rest;
+                      R.assign theState state'
+                   end)
 
 
 
