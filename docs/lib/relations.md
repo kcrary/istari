@@ -113,7 +113,8 @@ Lemmas:
                       -> forall (x y : a) . plus R x y -> plus R' y x
 
     plus_well_founded : forall (i : level) (a : U i) (R : a -> a -> U i) .
-                           (forall (x : a) . Acc a R x) -> forall (x : a) . Acc a (plus R) x
+                           (forall (x : a) . Acc.Acc a R x)
+                           -> forall (x : a) . Acc.Acc a (plus R) x
 
 Lexicographic order on pairs.
 
@@ -126,9 +127,9 @@ Lexicographic order on pairs.
                               (a b : U i)
                               (Q : a -> a -> U i)
                               (R : b -> b -> U i) .
-                              (forall (x : a) . Acc a Q x)
-                              -> (forall (x : b) . Acc b R x)
-                              -> forall (x : a & b) . Acc (a & b) (lexpair Q R) x
+                              (forall (x : a) . Acc.Acc a Q x)
+                              -> (forall (x : b) . Acc.Acc b R x)
+                              -> forall (x : a & b) . Acc.Acc (a & b) (lexpair Q R) x
 
     transpose : intersect (i : level) (a : U i) . (a -> a -> U i) -> a -> a -> U i
               = fn R x y . R y x
@@ -147,7 +148,7 @@ relation is decidable, well-founded, and finitely branching.
 
     decidable_plus : forall (i : level) (a : U i) (R : a -> a -> U i) .
                         (forall (x y : a) . Decidable.decidable (R x y))
-                        -> (forall (x : a) . Acc a R x)
+                        -> (forall (x : a) . Acc.Acc a R x)
                         -> (forall (y : a) . Finite.finite (fn x . R x y))
                         -> forall (x y : a) . Decidable.decidable (plus R x y)
 
@@ -157,7 +158,7 @@ equality on the underlying type is decidable.
     decidable_star : forall (i : level) (a : U i) (R : a -> a -> U i) .
                         (forall (x y : a) . Decidable.decidable (x = y : a))
                         -> (forall (x y : a) . Decidable.decidable (R x y))
-                        -> (forall (x : a) . Acc a R x)
+                        -> (forall (x : a) . Acc.Acc a R x)
                         -> (forall (y : a) . Finite.finite (fn x . R x y))
                         -> forall (x y : a) . Decidable.decidable (star R x y)
 

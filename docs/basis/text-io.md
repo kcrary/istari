@@ -29,3 +29,7 @@
        end
 
     structure TextIO : TEXT_IO
+
+File names are always represented as [Unix
+paths](path.html#windows-paths-as-unix-paths), regardless of the
+platform.

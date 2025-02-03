@@ -14,6 +14,9 @@ signature FILE =
       (* use IML file (but only once) *)
       val import : string -> unit
 
+      (* the library search path *)
+      val libraryPath : string list ref
+
    end
 
 
@@ -27,6 +30,7 @@ signature FILE_INTERNAL =
       val save : string -> unit
 
 
+      (* forget any dependencies of files previously loaded *)
       val forgetDependencies : unit -> unit
 
 
@@ -449,27 +453,68 @@ structure FileInternal :> FILE_INTERNAL =
 
       val imported : StringSet.set CR.cref = CR.new StringSet.empty
 
+      val libraryPath : string list ref = ref []
 
-      fun import filename =
+
+      fun tryimport filename =
          let
-            val filename =
+            val filename' =
                try
                   Path.canonize filename
                with Path.Path =>
                   signalError ("bad path name " ^ filename)
          in
-            if StringSet.member (CR.deref imported) filename then
-               ()
-            else
+            if StringSet.member (CR.deref imported) filename' then
+               true
+            else if FileSystem.exists filename' then
                (
-               CR.assign imported (StringSet.insert (CR.deref imported) filename);
+               CR.assign imported (StringSet.insert (CR.deref imported) filename');
 
                (* This will end up canonizing filename again, but it doesn't seem like
                   a big enough deal to do anything about it.
                *)
-               !useHook filename
+               !useHook filename';
+
+               true
                )
+            else
+               false
          end
+
+      (* precondition: filename is a relative path *)
+      fun importLoop filename searchpath =
+         (case searchpath of
+             nil =>
+                signalError
+                   (String.concat
+                       [
+                       "cannot find ",
+                       filename,
+                       " in the search path"
+                       ])
+
+           | dir :: rest =>
+                if tryimport (Path.join dir filename) then
+                   ()
+                else
+                   importLoop filename rest)
+                
+      fun import filename =
+         if Path.isRelative filename then
+            importLoop filename ("." :: !libraryPath)
+         else
+            if
+               tryimport filename
+            then
+               ()
+            else
+               signalError
+                  (String.concat
+                      [
+                      "file ",
+                      filename,
+                      " is not found"
+                      ])
 
    end
 

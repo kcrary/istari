@@ -7,9 +7,6 @@ signature PLATFORM =
       (* load the code from the given file name *)
       val use : string -> unit
 
-      (* load the compiled project with the given base name *)
-      val load : string -> bool
-
       (* install a function to process the ML platform's output *)
       val captureOutput : (string -> unit) -> unit
 

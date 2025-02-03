@@ -148,6 +148,8 @@ structure Procdoc
 
       val longid = R.seq [ident, R.star' (R.seq [R.string ".", ident])]
 
+      val path = R.plus' (R.set (fn ch => Char.<> ch #"\n"))
+
       val regexp =
          R.seq
             [
@@ -157,7 +159,8 @@ structure Procdoc
                R.seq [R.string "def:", R.capture longid],
                R.seq [R.string "defrec:", R.capture longid],
                R.seq [R.string "imp:", R.capture longid],
-               R.seq [R.string "open:", R.capture longid]
+               R.seq [R.string "open:", R.capture longid],
+               R.seq [R.string "load:", R.capture path]
                ],
             R.star' (R.set space),
             R.string "\n"
@@ -250,6 +253,10 @@ structure Procdoc
                         | SOME [R.Alt (4, [R.One longid])] =>
                              (* open *)
                              Namespace.openModule (toAddr longid)
+
+                        | SOME [R.Alt (5, [R.One path])] =>
+                             (* load *)
+                             File.load path
 
                         | _ => 
                              raise (Fail "impossible"));

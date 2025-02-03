@@ -1,6 +1,6 @@
 
 smlnj :
-	cd ipp/basis; make smlnj
+	cd basis; make smlnj
 	cd ipp; make smlnj
 	cd cmlibi; make smlnj
 	cd ui; mkdir -p bin; make batch-nolib
@@ -19,6 +19,7 @@ ocaml :
 	cd prover; make ocaml
 
 clean :
+	cd basis; make clean
 	cd ipp; make clean
 	cd cmlibi; make clean
 	cd prover; make clean

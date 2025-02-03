@@ -1,4 +1,6 @@
 
+include Path_sig
+include Path
 include Basis_sig
 
 
@@ -238,6 +240,37 @@ module Word : WORD with type word = Word62.word =
    end
 
 
+module Char : CHAR with type char = char =
+   struct
+
+      type nonrec char = char
+
+      let ord = Char.code
+      let chr = Char.chr
+
+      let s__e = Char.equal
+      let s__LG x y = not (Char.equal x y)
+      let s__L x y = Char.compare x y < 0
+      let s__G x y = Char.compare x y > 0
+      let s__Le x y = Char.compare x y <= 0
+      let (>=) x y = Char.compare x y >= 0
+      let compare = Order.charCompare
+      
+      let contains = String.contains
+
+      let isAlpha ch =
+         let n = Char.code ch
+         in
+            (65 <= n && n <= 90)
+            ||
+            (97 <= n && n <= 122)
+
+      let toLower = Char.lowercase_ascii
+      let toUpper = Char.uppercase_ascii
+      
+   end
+
+
 module String : STRING with type string = string =
    struct
 
@@ -281,25 +314,6 @@ module String : STRING with type string = string =
       let (>=) x y = String.compare x y >= 0
       let compare = Order.stringCompare
 
-   end
-
-
-module Char : CHAR with type char = char =
-   struct
-
-      type nonrec char = char
-
-      let ord = Char.code
-      let chr = Char.chr
-
-      let s__e = Char.equal
-      let s__LG x y = not (Char.equal x y)
-      let s__L x y = Char.compare x y < 0
-      let s__G x y = Char.compare x y > 0
-      let s__Le x y = Char.compare x y <= 0
-      let (>=) x y = Char.compare x y >= 0
-      let compare = Order.charCompare
-      
    end
 
 
@@ -442,7 +456,7 @@ module ListPair : LIST_PAIR =
       exception UnequalLengths
 
       let rec foldl f z l1 l2 =
-         (match (l1, l2) with
+            (match (l1, l2) with
              ([], _) -> z
 
            | (_, []) -> z
@@ -702,6 +716,44 @@ module Array : ARRAY with type 'a array = 'a array =
    end
 
 
+module FileSystem : FILE_SYSTEM =
+   struct
+
+      exception FileSystem of string
+
+      let chDir dir = 
+         try
+            Sys.chdir (Path.toNativePath dir)
+         with
+            Sys_error msg -> raise (FileSystem msg)
+
+      let getDir () =
+         try
+            Path.fromNativePath (Sys.getcwd ())
+         with
+            Sys_error msg -> raise (FileSystem msg)
+
+      let exists filename =
+         try
+            Sys.file_exists (Path.toNativePath filename)
+         with
+            Sys_error _ -> false
+
+      let isDir filename =
+         try
+            Sys.is_directory (Path.toNativePath filename)
+         with
+            Sys_error msg -> raise (FileSystem msg)
+
+      let remove filename =
+         try
+            Sys.remove (Path.toNativePath filename)
+         with
+            Sys_error msg -> raise (FileSystem msg)
+
+   end
+
+
 module IO : IO =
    struct
 
@@ -770,7 +822,7 @@ module TextIO : TEXT_IO =
          else
             Stdlib.flush outc
 
-      let openIn filename = (Stdlib.open_in filename, ref false)
+      let openIn filename = (Stdlib.open_in (Path.toNativePath filename), ref false)
 
       let closeIn (outc, closed) = 
          (
@@ -778,10 +830,10 @@ module TextIO : TEXT_IO =
          Stdlib.close_in outc
          )
 
-      let openOut filename = (Stdlib.open_out filename, ref false)
+      let openOut filename = (Stdlib.open_out (Path.toNativePath filename), ref false)
 
       let openAppend filename =
-         (Stdlib.open_out_gen [Stdlib.Open_append; Stdlib.Open_creat] 0o644 filename, ref false)
+         (Stdlib.open_out_gen [Stdlib.Open_append; Stdlib.Open_creat] 0o644 (Path.toNativePath filename), ref false)
 
       let closeOut (outc, closed) = 
          (
@@ -830,7 +882,7 @@ module BinIO :
          else
             Stdlib.flush outc
 
-      let openIn filename = (Stdlib.open_in_bin filename, ref false)
+      let openIn filename = (Stdlib.open_in_bin (Path.toNativePath filename), ref false)
 
       let closeIn (outc, closed) = 
          (
@@ -838,10 +890,10 @@ module BinIO :
          Stdlib.close_in outc
          )
 
-      let openOut filename = (Stdlib.open_out_bin filename, ref false)
+      let openOut filename = (Stdlib.open_out_bin (Path.toNativePath filename), ref false)
 
       let openAppend filename =
-         (Stdlib.open_out_gen [Stdlib.Open_append; Stdlib.Open_creat; Stdlib.Open_binary] 0o644 filename, ref false)
+         (Stdlib.open_out_gen [Stdlib.Open_append; Stdlib.Open_creat; Stdlib.Open_binary] 0o644 (Path.toNativePath filename), ref false)
 
       let closeOut (outc, closed) = 
          (

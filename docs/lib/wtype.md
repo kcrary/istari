@@ -23,14 +23,14 @@ better canonicity properties.)
 
     wind : intersect (i : level) (a : U i) (b : a -> U i) (P : (wtype (x : a) . b x) -> U i) .
               (forall (x : a) (y : b x -> wtype (x1 : a) . b x1) .
-                 (forall (z : b x) . P (y z)) -> P (x , y))
+                 (forall (z : b x) . P (y z)) -> P (x, y))
               -> forall (m : wtype (x : a) . b x) . P m
          =rec= fn f m . f (m #1) (m #2) (fn z . wind f (m #2 z))
 
     wtype_iter : intersect (i : level) .
                     forall (a : U i) (b : a -> U i) (P : (wtype (x : a) . b x) -> U i) .
                       (forall (x : a) (y : b x -> wtype (x1 : a) . b x1) .
-                         (forall (z : b x) . P (y z)) -> P (x , y))
+                         (forall (z : b x) . P (y z)) -> P (x, y))
                       -> forall (m : wtype (x : a) . b x) . P m
                = fn a b P f m . wind f m
 
@@ -54,4 +54,4 @@ Induction over W-types employs the `precedes` predicate, wherein
                                (a : U i)
                                (b : a -> U i)
                                (m : wtype (x : a) . b x) .
-                               Acc (wtype (x : a) . b x) (precedes a b) m
+                               Acc.Acc (wtype (x : a) . b x) (precedes a b) m

@@ -3,10 +3,24 @@
 #### Development version
 
 - The typechecker deals better with the future modality, and with type
-  inference for higher-order functions.
+  inference for polymorphic, higher-order functions.
 
 - Old versions of the typechecker can be loaded from
   `library/typecheck`.
+
+- `File.import` uses the search path to find files that are not in the
+  current directory.
+
+- Library changes:
+
+  + `GirardParadox` and `SmithParadox` libraries are no longer
+     pre-loaded.
+
+- Basis changes:
+
+  + Added `Path` and `FileSystem` modules.
+
+  + Use Unix paths consistently.
 
 - Bug fixes.
 

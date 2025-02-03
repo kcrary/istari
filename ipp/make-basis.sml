@@ -256,7 +256,7 @@ structure MakeBasis =
 
       fun go () =
          let
-            val ins = TextIO.openIn "basis/BASIS"
+            val ins = TextIO.openIn "../basis/BASIS"
          in
             Finally.finally
             (fn () =>

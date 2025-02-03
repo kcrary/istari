@@ -389,7 +389,7 @@ typechecker.
 The code for old typecheckers resides in `library/typecheck`.  To
 select the typechecker for, say, version 1.0.1, execute:
 
-    File.import "library/typecheck/1.0.1-load.iml";
+    File.import "typecheck/1.0.1-load.iml";
     Typecheck_1_0_1.select ();
 
 To reselect the current typechecker, execute:

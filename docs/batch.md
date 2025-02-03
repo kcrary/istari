@@ -10,4 +10,6 @@ Batch mode is invoked as follows:
     istari [options] <istari-file>
     -no             do not write output
     -o <filename>   set output file name
+    -L <directory>  add directory to library path
     -rapid          activate unsafe mode and rapid datatype elaboration
+    -version        display version information

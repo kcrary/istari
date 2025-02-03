@@ -125,7 +125,7 @@ A simpler case-analysis operation:
 
 Strong induction for natural numbers:
 
-    ltn_well_founded : forall (n : natural) . Acc natural ltn n
+    ltn_well_founded : forall (n : natural) . Acc.Acc natural ltn n
 
 
 ### Addition

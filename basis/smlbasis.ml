@@ -1,4 +1,6 @@
 
+include Path_sig
+include Path
 include Smlbasis_sig
 
 
@@ -240,6 +242,36 @@ module Word32 : WORD with type word = Word32.word =
    end
 
 
+module Char : CHAR with type char = char =
+   struct
+
+      type nonrec char = char
+
+      let ord = Char.code
+      let chr = Char.chr
+
+      let s__e (x, y) = Char.equal x y
+      let s__LG (x, y) = not (Char.equal x y)
+      let s__L (x, y) = Char.compare x y < 0
+      let s__G (x, y) = Char.compare x y > 0
+      let s__Le (x, y) = Char.compare x y <= 0
+      let (>=) (x, y) = Char.compare x y >= 0
+      let compare (x, y) = Order.charCompare x y
+
+      let contains = String.contains
+
+      let isAlpha ch =
+         let n = Char.code ch
+         in
+            (65 <= n && n <= 90)
+            ||
+            (97 <= n && n <= 122)
+
+      let toLower = Char.lowercase_ascii
+      let toUpper = Char.uppercase_ascii
+      
+   end
+
 
 module String : STRING with type string = string =
    struct
@@ -275,25 +307,6 @@ module String : STRING with type string = string =
 
       let fields = Basis.String.fields
 
-   end
-
-
-module Char : CHAR with type char = char =
-   struct
-
-      type nonrec char = char
-
-      let ord = Char.code
-      let chr = Char.chr
-
-      let s__e (x, y) = Char.equal x y
-      let s__LG (x, y) = not (Char.equal x y)
-      let s__L (x, y) = Char.compare x y < 0
-      let s__G (x, y) = Char.compare x y > 0
-      let s__Le (x, y) = Char.compare x y <= 0
-      let (>=) (x, y) = Char.compare x y >= 0
-      let compare (x, y) = Order.charCompare x y
-      
    end
 
 

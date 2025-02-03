@@ -17,7 +17,7 @@ smlnj : generated
 	$(SMLNJ) export-smlnj.sml
 	bin/$(MKNJEXEC) $(SMLNJ) `pwd`/bin ipp-heapimg ipp
 
-the-basis.sml : basis/BASIS
+the-basis.sml : ../basis/BASIS
 	$(SMLNJ) make-basis.sml
 
 .PHONY : install
@@ -26,7 +26,6 @@ install :
 
 clean :
 	rm -rf .cm
-	cd basis; make clean
 
 veryclean : clean
 	rm -f *.cmyacc.sml

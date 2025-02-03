@@ -151,7 +151,11 @@ functor TheBasis (datatype data =
           (">", E 0),
           ("<=", E 0),
           (">=", E 0),
-          ("compare", E 0)]
+          ("compare", E 0),
+          ("contains", E 0),
+          ("isAlpha", E 0),
+          ("toLower", E 0),
+          ("toUpper", E 0)]
       
       val sig1_LIST =
          [("list", T),
@@ -288,6 +292,33 @@ functor TheBasis (datatype data =
           ("openAppend", E 0),
           ("closeOut", E 0)]
       
+      val sig1_FILE_SYSTEM =
+         [("FileSystem", E 1),
+          ("chDir", E 0),
+          ("getDir", E 0),
+          ("exists", E 0),
+          ("isDir", E 0),
+          ("remove", E 0)]
+      
+      val sig1_PATH =
+         [("Path", E 0),
+          ("explode", E 0),
+          ("implode", E 0),
+          ("canonize", E 0),
+          ("isAbsolute", E 0),
+          ("isRelative", E 0),
+          ("hasPath", E 0),
+          ("makeAbsolute", E 0),
+          ("join", E 0),
+          ("split", E 0),
+          ("joinExt", E 0),
+          ("splitExt", E 0),
+          ("toWindowsPath", E 0),
+          ("fromWindowsPath", E 0),
+          ("toNativePath", E 0),
+          ("fromNativePath", E 0),
+          ("fromHybridPath", E 0)]
+      
       val sig1_GENERAL =
          [("order", T),
           ("exn", T),
@@ -326,6 +357,8 @@ functor TheBasis (datatype data =
           ("IO", S sig1_IO),
           ("TEXT_IO", S sig1_TEXT_IO),
           ("BIN_IO", S sig1_BIN_IO),
+          ("FILE_SYSTEM", S sig1_FILE_SYSTEM),
+          ("PATH", S sig1_PATH),
           ("GENERAL", S sig1_GENERAL),
           ("CONT", S sig1_CONT),
           ("Bool", M sig1_BOOL),
@@ -343,9 +376,11 @@ functor TheBasis (datatype data =
           ("Option", M sig1_OPTION),
           ("Array", M sig1_ARRAY),
           ("Vector", M sig1_VECTOR),
+          ("FileSystem", M sig1_FILE_SYSTEM),
           ("IO", M sig1_IO),
           ("TextIO", M sig1_TEXT_IO),
           ("BinIO", M sig1_BIN_IO),
+          ("Path", M sig1_PATH),
           ("General", M sig1_GENERAL),
           ("Cont", M sig1_CONT)]
       
@@ -468,7 +503,11 @@ functor TheBasis (datatype data =
           (">", E 0),
           ("<=", E 0),
           (">=", E 0),
-          ("compare", E 0)]
+          ("compare", E 0),
+          ("contains", E 0),
+          ("isAlpha", E 0),
+          ("toLower", E 0),
+          ("toUpper", E 0)]
       
       val sig2_LIST =
          [("list", T),

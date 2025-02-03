@@ -210,7 +210,7 @@ We say that `a` is smaller than `b` when `b` < `a` &le; 0 or 0 &le; `a` < `b`:
 
 Smaller is well-founded, giving us strong induction for integers:
 
-    smaller_well_founded : forall (a : integer) . Acc integer smaller a
+    smaller_well_founded : forall (a : integer) . Acc.Acc integer smaller a
 
 
 As a corollary, we can build an iterator for integers.  It has three

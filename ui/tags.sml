@@ -256,6 +256,18 @@ structure TagsCommandLine :>
       structure C = ParseCommandLine
 
       fun exit () = OS.Process.exit OS.Process.success
+      fun exitfail () = OS.Process.exit OS.Process.failure
+
+      fun fromHybridPath filename =
+         Basis.Path.fromHybridPath filename
+         handle Basis.Path.Path =>
+            (
+            print "Error: bad path ";
+            print filename;
+            print "\n";
+            exitfail ()
+            )
+
 
       fun usage () =
          (
@@ -267,9 +279,11 @@ structure TagsCommandLine :>
          exit ()
          )
 
-      val infileKey : string C.list_key = C.key C.list
+      val infileKey : string C.list_key = 
+         C.mapKeyIn fromHybridPath (C.key C.list)
 
-      val outfileKey : string C.id_key = C.key (C.default "TAGS")
+      val outfileKey : string C.id_key = 
+         C.mapKeyIn fromHybridPath (C.key (C.default "TAGS"))
 
       val appendKey : bool C.id_key = C.key (C.default false)
 

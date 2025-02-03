@@ -7,10 +7,10 @@ trusted/the-rules.iml : trusted/RULES
 	cd ../rulegen; make rules
 
 smlnj : trusted/the-rules.iml
-	$(IPP) -t sml -build -B ../ipp/basis prover.proj
+	$(IPP) -t sml -build -B ../basis prover.proj
 
 ocaml-generated prover.make :
-	$(IPP) -t ocaml -build -B ../ipp/basis prover.proj
+	$(IPP) -t ocaml -build -B ../basis prover.proj
 
 ocaml : ocaml-generated prover.make
 	make -f Makefile.ocaml ocaml

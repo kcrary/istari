@@ -161,6 +161,12 @@ module type CHAR =
       val (>=) : char -> char -> bool
       val compare : char -> char -> Order.order
 
+      val contains : string -> char -> bool
+
+      val isAlpha : char -> bool
+      val toLower : char -> char
+      val toUpper : char -> char
+
    end
 
 
@@ -358,6 +364,23 @@ module type BIN_IO =
       val openOut : string -> outstream
       val openAppend : string -> outstream
       val closeOut : outstream -> unit
+
+   end
+
+
+module type FILE_SYSTEM =
+   sig
+
+      exception FileSystem of string
+
+      val chDir : string -> unit
+      val getDir : unit -> string
+
+      val exists : string -> bool
+      
+      val isDir : string -> bool
+
+      val remove : string -> unit
 
    end
 

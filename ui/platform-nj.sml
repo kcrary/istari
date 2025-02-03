@@ -8,8 +8,6 @@ structure Platform :> PLATFORM =
 
       val use = use
 
-      fun load basename = CM.make (basename ^ ".cm")
-
       val oldout = { say = print, flush = (fn () => ()) }
 
       fun captureOutput f =

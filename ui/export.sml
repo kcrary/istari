@@ -1,12 +1,11 @@
 CM.make "sources.cm";
 use "platform-nj.sml";
-CM.make "../ipp/basis/basis.cm";
 
 structure ReplStuff = ReplFun (structure Platform = Platform
                                structure UI = UI
                                structure PostProcess = PostProcess
                                structure Memory = Memory
-                               structure Buffer = Buffer)
+                               structure Buffer = Buffer);
 structure Repl = ReplStuff.Repl;
 structure Ctrl = ReplStuff.Ctrl;
 structure RecoverRepl = ReplStuff.RecoverRepl;
@@ -15,6 +14,12 @@ structure RecoverReplInside = ReplStuff.RecoverReplInside;
 
 Incremental.load "../prover/prover.proj";
 CM.make "../prover/prover.cm";
+
+(* We have access to both Path, and Basis.Path.  They are mostly
+   the same code, but different instances.  Make sure we're using
+   the latter.
+*)
+structure Path = Basis.Path;
 
 
 (* Set hooks *)
@@ -83,12 +88,55 @@ fun splash () =
    end
 
 
-fun server message =
+(* precondition: buildDir is a valid, absolute path *)
+fun setLibraryPath buildDir l =
+   let
+      val execDir = Basis.FileSystem.getDir ()
+
+      val envlib =
+         (case OS.Process.getEnv "ISTARILIB" of
+             NONE => NONE
+
+           | SOME path =>
+                (let
+                    val path' = Path.fromHybridPath path
+                 in
+                    if Path.isAbsolute path' then
+                       SOME path'
+                    else
+                       (
+                       print "Error: ISTARILIB must be an absolute path.\n";
+                       NONE
+                       )
+                 end
+                 handle Path.Path =>
+                    (
+                    print "Error: ISTARILIB must be a valid path.\n";
+                    NONE
+                    )))
+
+      val lib =
+         (case envlib of
+             SOME path => path
+
+           | NONE =>
+                Path.canonize (Path.join buildDir "../library"))
+   in
+      FileInternal.libraryPath :=
+         map (Path.makeAbsolute execDir) l 
+         @ [lib]
+   end
+
+
+fun server buildDir message =
    (
    (* only in server mode *)
    ProverInternal.beforeLemmaHook := Memory.saveLast;
 
    splash ();
+
+   setLibraryPath buildDir [];
+
    print message;
    if message = "" then () else print "\n";
    
@@ -98,11 +146,14 @@ fun server message =
 
 structure C = BatchCommandLine (val version = version)
 
-fun batch message (_, args) =
+fun batch buildDir message (_, args) =
    (
    C.process args;
 
    splash ();
+
+   setLibraryPath buildDir (C.libPath ());
+
    print message;
    if message = "" then () else print "\n";
 
@@ -147,19 +198,23 @@ fun import prelude =
 
 
 fun exportServer prelude message exportPath =
-   (
-   import prelude;
-
-   if SMLofNJ.exportML exportPath then
-      server message 
-   else
-      ()
-   )
+   let
+      val buildDir = Basis.FileSystem.getDir ()
+   in
+      import prelude;
+   
+      if SMLofNJ.exportML exportPath then
+         server buildDir message 
+      else
+         ()
+   end
 
 
 fun exportBatch prelude message exportPath =
-   (
-   import prelude;
+   let
+      val buildDir = Basis.FileSystem.getDir ()
+   in
+      import prelude;
 
-   SMLofNJ.exportFn (exportPath, batch message)
-   )
+      SMLofNJ.exportFn (exportPath, batch buildDir message)
+   end

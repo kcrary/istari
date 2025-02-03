@@ -159,6 +159,12 @@ signature Basis__CHAR =
       val >= : char -> char -> bool
       val compare : char -> char -> order
 
+      val contains : string -> char -> bool
+
+      val isAlpha : char -> bool
+      val toLower : char -> char
+      val toUpper : char -> char
+
    end
 
 
@@ -360,6 +366,26 @@ signature Basis__BIN_IO =
    end
 
 
+signature Basis__FILE_SYSTEM =
+   sig
+
+      exception FileSystem of string
+
+      val chDir : string -> unit
+      val getDir : unit -> string
+
+      val exists : string -> bool
+      
+      val isDir : string -> bool
+
+      val remove : string -> unit
+
+   end
+
+
+signature Basis__PATH = PATH
+
+
 signature Basis__GENERAL =
    sig
 
@@ -422,6 +448,8 @@ signature IML__BASIS =
       structure IO : Basis__IO
       structure TextIO : Basis__TEXT_IO where type instream = TextIO.instream where type outstream = TextIO.outstream
       structure BinIO : Basis__BIN_IO where type instream = BinIO.instream where type outstream = BinIO.outstream
+      structure FileSystem : Basis__FILE_SYSTEM
+      structure Path : Basis__PATH = Path
       structure General : Basis__GENERAL
       structure Cont : Basis__CONT
 
@@ -1079,6 +1107,34 @@ structure Basis :> IML__BASIS =
          end
 
 
+      structure FileSystem :> Basis__FILE_SYSTEM =
+         struct
+
+            exception FileSystem of string
+
+            fun chDir dir = 
+               OS.FileSys.chDir (Path.toNativePath dir)
+               handle OS.SysErr (msg, _) => raise (FileSystem msg)
+
+            fun getDir () =
+               Path.fromNativePath (OS.FileSys.getDir ())
+               handle OS.SysErr (msg, _) => raise (FileSystem msg)
+
+            fun exists filename =
+               (OS.FileSys.modTime (Path.toNativePath filename); true)
+               handle OS.SysErr _ => false
+
+            fun isDir filename =
+               OS.FileSys.isDir (Path.toNativePath filename)
+               handle OS.SysErr (msg, _) => raise (FileSystem msg)
+
+            fun remove filename =
+               OS.FileSys.remove (Path.toNativePath filename)
+               handle OS.SysErr (msg, _) => raise (FileSystem msg)
+
+         end
+
+
       structure IO :> Basis__IO =
          struct
       
@@ -1094,6 +1150,10 @@ structure Basis :> IML__BASIS =
 
             open TextIO
 
+            fun openIn filename = TextIO.openIn (Path.toNativePath filename)
+            fun openOut filename = TextIO.openOut (Path.toNativePath filename)
+            fun openAppend filename = TextIO.openAppend (Path.toNativePath filename)
+
             fun inputN s i = TextIO.inputN (s, i)
             fun output1 s ch = TextIO.output1 (s, ch)
             fun output s str = TextIO.output (s, str)
@@ -1106,11 +1166,18 @@ structure Basis :> IML__BASIS =
 
             open BinIO
 
+            fun openIn filename = BinIO.openIn (Path.toNativePath filename)
+            fun openOut filename = BinIO.openOut (Path.toNativePath filename)
+            fun openAppend filename = BinIO.openAppend (Path.toNativePath filename)
+
             fun inputN s i = BinIO.inputN (s, i)
             fun output1 s ch = BinIO.output1 (s, ch)
             fun output s str = BinIO.output (s, str)
 
          end
+
+
+      structure Path :> Basis__PATH = Path
 
 
       structure General :> Basis__GENERAL =

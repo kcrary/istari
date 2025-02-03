@@ -1,5 +1,7 @@
 # The Istari Library
 
+### The Core library
+
 - [`Acc`](lib/acc.html) (accessibility)
 - [`Bar`](lib/bar.html) (simulated partial computable objects)
 - [`Bool`](lib/bool.html)
@@ -7,8 +9,8 @@
 - [`Finite`](lib/finite.html)
 - [`FiniteMap`](lib/finite-map.html)
 - [`Function`](lib/function.html)
-- [`GirardParadox`](lib/girard-paradox.html) (type is not a type)
 - [`Integer`](lib/integer.html)
+- [`Kindlike`](lib/kindlike.html) (types eligible for impredicative quantification)
 - [`Logic`](lib/logic.html)
 - [`List`](lib/list.html)
 - [`Miscellaneous`](lib/miscellaneous.html)
@@ -18,9 +20,14 @@
 - [`Partial`](lib/partial.html) (partial computable objects)
 - [`Permutation`](lib/permutation.html) (permutations on lists)
 - [`Relations`](lib/relations.html)
-- [`SmithParadox`](lib/smith-paradox) (there exist inadmissible types)
 - [`Stable`](lib/stable.html)
 - [`Symbol`](lib/symbol.html)
 - [`Tuple`](lib/tuple.html)
 - [`Union`](lib/union.html) (elimination forms for `union` and `iexists`)
 - [`Wtype`](lib/wtype.html) (well-founded types)
+
+
+### Other libraries
+
+- [`GirardParadox`](lib/girard-paradox.html) (type is not a type)
+- [`SmithParadox`](lib/smith-paradox) (there exist inadmissible types)

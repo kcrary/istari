@@ -28,12 +28,17 @@ Thus Istari content and IML code must be loaded separately:
       File.import "[filename]";
 
   Like load, a file can only be imported once.  Subsequent imports
-  of the same file have no effect.
+  of the same file have no effect.  If the file cannot be found in the
+  current directory, it will then try each directory in the search
+  path.
 
-  Alternatively, one can load an IML file unconditionally using the
-  primitive operation:
+  Alternatively, one can load an IML file unconditionally and without
+  using the search path using the primitive operation:
 
       Ctrl.use "[filename]";
+
+  In either version, the current directory is temporarily set to the
+  directory containing the file being imported or used.
 
 
 
@@ -70,7 +75,7 @@ each functor if it wants, but it is usually more useful just to have
 the `nat-load.iml` file call all the functors.
 
 
-#### Constant names in moving code
+### Constant names in moving code
 
 When writing `nat-aux.iml`, one should be aware of a subtle issue.
 The dynamic environment in which its functors are called often differ
@@ -83,3 +88,22 @@ if the code needs to resolve a constant that resides in a module that
 might or might not still be open, it should use
 `Namespace.resolveGlobal`, which looks up a constant by the name that
 it will have once all modules have been closed.
+
+
+### The search path
+
+By default, the search path contains only Istari's library, whose
+location is given by the `ISTARILIB` environment variable.  If the
+variable is not defined, the `library` subdirectory of the Istari
+distribution is used.
+
+Additional directories can be added in batch mode using the `-L
+<directory>` flag.  Additional directories are searched before the
+Istari library.
+
+In either mode, the search path can be viewed or altered by reading or
+writing:
+
+    File.libraryPath : string list ref
+
+The search path generally should contain only absolute path names.
