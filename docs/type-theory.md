@@ -940,7 +940,8 @@ for two substitutions to be equivalent at a context.
 for the purpose of understanding pointwise functionality.)
 
 Suppose that `G` binds each variable at most once.  We say that `s`
-and `s'` are equivalent at `G` if for all `x` in the domain of `G`:
+and `s'` are equivalent at `G` if, for all `x` in the domain of `G`, if
+`G(x)` is `A` then:
 
 1. `x` is in the domain of `s` and `s'`
 2. `s(A) = s'(A) : type`
@@ -949,10 +950,9 @@ and `s'` are equivalent at `G` if for all `x` in the domain of `G`:
 
 One notion of functionality, called *full functionality*, would
 require that `t(A) = t'(A) : type` for any closed substitutions `t`
-and `t'` that are equivalent at the context obtained by truncating `G`
-immediately before `x`'s binding.  (It is easy to prove that one can
-drop the functionality requirement from this latter equivalence
-without changing anything.)
+and `t'` that are *similar* at the context obtained by truncating `G`
+immediately before `x`'s binding.  Similarity is the same as
+equivalence except the functionality requirement is dropped.
 
 Full functionality is a common requirement in mathematics, but it
 turns out not to work well in this sort of type theory.  Instead, we
@@ -964,13 +964,11 @@ as well.  However, pointwise functionality provides a stronger
 invariant that is useful in induction arguments.
 
 Under pointwise functionality, we require that `s(A) = s''(A) : type`
-for any `s''` that is equivalent to `s` (again, at the context
+for any `s''` that is similar to `s` (again, at the context
 obtained by truncating `G` immediately before `x`'s binding).  Thus,
 we require that `A` be functional not over *all pairs* of equivalent
-substitutions, but merely over substitutions that are equivalent to
-the one under consideration.  (Again, one can prove that one can drop
-the functionality requirement from this latter equivalence without
-changing anything.)
+substitutions, but merely over substitutions that are similar to
+the one under consideration.
 
 There are various ramifications to pointwise functionality, but the
 most important pertains to induction.  Consider a proposed rule for
