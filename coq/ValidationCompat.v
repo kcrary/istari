@@ -741,6 +741,37 @@ apply tr_prod_intro.
 Qed.
 
 
+Lemma letnextEeq_valid : letnextEeq_obligation.
+Proof.
+prepare.
+intros G a b b' m ext2 ext1 n Ha Hm Hb.
+apply tr_prod_intro.
+  {
+  cut (tr G (deq (subst1 (prev m) triv) (subst1 (prev m) triv) (subst1 (prev m) (subtype b b')))).
+    {
+    intro H.
+    simpsubin H.
+    exact H.
+    }
+  apply (tr_fut_elim _ _ _ a); auto.
+  apply (tr_subtype_eta2 _ _ _ (ppi1 n) (ppi1 n)).
+  eapply tr_prod_elim1; eauto.
+  }
+
+  {
+  cut (tr G (deq (subst1 (prev m) triv) (subst1 (prev m) triv) (subst1 (prev m) (subtype b' b)))).
+    {
+    intro H.
+    simpsubin H.
+    exact H.
+    }
+  apply (tr_fut_elim _ _ _ a); auto.
+  apply (tr_subtype_eta2 _ _ _ (ppi2 n) (ppi2 n)).
+  eapply tr_prod_elim2; eauto.
+  }
+Qed.
+
+
 Lemma intersectEeq_valid : intersectEeq_obligation.
 Proof.
 prepare.
@@ -886,6 +917,337 @@ apply tr_prod_intro.
     apply (tr_subtype_formation_invert1 _ _ _ b' b').
     eapply tr_inhabitation_formation.
     eapply tr_prod_elim1; eauto.
+    }
+  }
+Qed.
+
+
+Lemma eeqEeq_valid : eeqEeq_obligation.
+Proof.
+prepare.
+intros G a a' b b' m n Ha Hb.
+assert (tr G (deqtype a a)) as Hofa.
+  {
+  apply (tr_subtype_istype1 _ _ a').
+  apply (tr_subtype_eta2 _ _ _ (ppi1 m) (ppi1 m)).
+  eapply tr_prod_elim1; eauto.
+  }
+assert (tr G (deqtype b b)) as Hofb.
+  {
+  apply (tr_subtype_istype1 _ _ b').
+  apply (tr_subtype_eta2 _ _ _ (ppi1 n) (ppi1 n)).
+  eapply tr_prod_elim1; eauto.
+  }
+assert (tr G (deqtype a' a')) as Hofa'.
+  {
+  apply (tr_subtype_istype2 _ a).
+  apply (tr_subtype_eta2 _ _ _ (ppi1 m) (ppi1 m)).
+  eapply tr_prod_elim1; eauto.
+  }
+assert (tr G (deqtype b' b')) as Hofb'.
+  {
+  apply (tr_subtype_istype2 _ b).
+  apply (tr_subtype_eta2 _ _ _ (ppi1 n) (ppi1 n)).
+  eapply tr_prod_elim1; eauto.
+  }
+apply tr_prod_intro.
+  {
+  rewrite -> !def_eeqtp.
+  apply tr_prod_sub.
+    {
+    apply tr_subtype_intro.
+      {
+      apply tr_subtype_formation; auto.
+      }
+
+      {
+      apply tr_subtype_formation; auto.
+      }
+    simpsub.
+    apply (tr_assert _ (subst sh1 (subtype a b)) (var 0)).
+      {
+      eapply hypothesis; eauto using index_0.
+      }
+    simpsub.
+    cbn [Nat.add].
+    apply tr_equal_elim.
+    replace triv with (@subst obj (under 1 sh1) triv) by (simpsub; auto).
+    apply (tr_subtype_eta_hyp _ [_]).
+    cbn [length].
+    simpsub.
+    cbn [List.app].
+    apply tr_equal_intro.
+    apply (tr_subtype_trans _ _ (subst sh1 a)).
+      {
+      apply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+    
+        {
+        cbn [length].
+        simpsub.
+        rewrite <- !compose_assoc.
+        unfold sh1.
+        rewrite -> !compose_sh_unlift.
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      apply (tr_subtype_eta2 _ _ _ (ppi2 m) (ppi2 m)).
+      eapply tr_prod_elim2; eauto.
+      }
+    apply (tr_subtype_trans _ _ (subst sh1 b)).
+    2:{
+      apply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+    
+        {
+        cbn [length].
+        simpsub.
+        rewrite <- !compose_assoc.
+        unfold sh1.
+        rewrite -> !compose_sh_unlift.
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      apply (tr_subtype_eta2 _ _ _ (ppi1 n) (ppi1 n)).
+      eapply tr_prod_elim1; eauto.
+      }
+    apply (tr_subtype_eta2 _ _ _ (var 0) (var 0)).
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    apply tr_subtype_intro.
+      {
+      apply tr_subtype_formation; auto.
+      }
+
+      {
+      apply tr_subtype_formation; auto.
+      }
+    simpsub.
+    apply (tr_assert _ (subst sh1 (subtype b a)) (var 0)).
+      {
+      eapply hypothesis; eauto using index_0.
+      }
+    simpsub.
+    cbn [Nat.add].
+    apply tr_equal_elim.
+    replace triv with (@subst obj (under 1 sh1) triv) by (simpsub; auto).
+    apply (tr_subtype_eta_hyp _ [_]).
+    cbn [length].
+    simpsub.
+    cbn [List.app].
+    apply tr_equal_intro.
+    apply (tr_subtype_trans _ _ (subst sh1 a)).
+    2:{
+      apply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+    
+        {
+        cbn [length].
+        simpsub.
+        rewrite <- !compose_assoc.
+        unfold sh1.
+        rewrite -> !compose_sh_unlift.
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      apply (tr_subtype_eta2 _ _ _ (ppi1 m) (ppi1 m)).
+      eapply tr_prod_elim1; eauto.
+      }
+    apply (tr_subtype_trans _ _ (subst sh1 b)).
+    1:{
+      apply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+    
+        {
+        cbn [length].
+        simpsub.
+        rewrite <- !compose_assoc.
+        unfold sh1.
+        rewrite -> !compose_sh_unlift.
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      apply (tr_subtype_eta2 _ _ _ (ppi2 n) (ppi2 n)).
+      eapply tr_prod_elim2; eauto.
+      }
+    apply (tr_subtype_eta2 _ _ _ (var 0) (var 0)).
+    eapply hypothesis; eauto using index_0.
+    }
+  }
+
+  {
+  rewrite -> !def_eeqtp.
+  apply tr_prod_sub.
+    {
+    apply tr_subtype_intro.
+      {
+      apply tr_subtype_formation; auto.
+      }
+
+      {
+      apply tr_subtype_formation; auto.
+      }
+    simpsub.
+    apply (tr_assert _ (subst sh1 (subtype a' b')) (var 0)).
+      {
+      eapply hypothesis; eauto using index_0.
+      }
+    simpsub.
+    cbn [Nat.add].
+    apply tr_equal_elim.
+    replace triv with (@subst obj (under 1 sh1) triv) by (simpsub; auto).
+    apply (tr_subtype_eta_hyp _ [_]).
+    cbn [length].
+    simpsub.
+    cbn [List.app].
+    apply tr_equal_intro.
+    apply (tr_subtype_trans _ _ (subst sh1 a')).
+      {
+      apply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+    
+        {
+        cbn [length].
+        simpsub.
+        rewrite <- !compose_assoc.
+        unfold sh1.
+        rewrite -> !compose_sh_unlift.
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      apply (tr_subtype_eta2 _ _ _ (ppi1 m) (ppi1 m)).
+      eapply tr_prod_elim1; eauto.
+      }
+    apply (tr_subtype_trans _ _ (subst sh1 b')).
+    2:{
+      apply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+    
+        {
+        cbn [length].
+        simpsub.
+        rewrite <- !compose_assoc.
+        unfold sh1.
+        rewrite -> !compose_sh_unlift.
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      apply (tr_subtype_eta2 _ _ _ (ppi2 n) (ppi2 n)).
+      eapply tr_prod_elim2; eauto.
+      }
+    apply (tr_subtype_eta2 _ _ _ (var 0) (var 0)).
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    apply tr_subtype_intro.
+      {
+      apply tr_subtype_formation; auto.
+      }
+
+      {
+      apply tr_subtype_formation; auto.
+      }
+    simpsub.
+    apply (tr_assert _ (subst sh1 (subtype b' a')) (var 0)).
+      {
+      eapply hypothesis; eauto using index_0.
+      }
+    simpsub.
+    cbn [Nat.add].
+    apply tr_equal_elim.
+    replace triv with (@subst obj (under 1 sh1) triv) by (simpsub; auto).
+    apply (tr_subtype_eta_hyp _ [_]).
+    cbn [length].
+    simpsub.
+    cbn [List.app].
+    apply tr_equal_intro.
+    apply (tr_subtype_trans _ _ (subst sh1 a')).
+    2:{
+      apply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+    
+        {
+        cbn [length].
+        simpsub.
+        rewrite <- !compose_assoc.
+        unfold sh1.
+        rewrite -> !compose_sh_unlift.
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      apply (tr_subtype_eta2 _ _ _ (ppi2 m) (ppi2 m)).
+      eapply tr_prod_elim2; eauto.
+      }
+    apply (tr_subtype_trans _ _ (subst sh1 b')).
+    1:{
+      apply (weakening _ [_] []).
+        {
+        simpsub.
+        reflexivity.
+        }
+    
+        {
+        cbn [length].
+        simpsub.
+        rewrite <- !compose_assoc.
+        unfold sh1.
+        rewrite -> !compose_sh_unlift.
+        simpsub.
+        reflexivity.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      apply (tr_subtype_eta2 _ _ _ (ppi1 n) (ppi1 n)).
+      eapply tr_prod_elim1; eauto.
+      }
+    apply (tr_subtype_eta2 _ _ _ (var 0) (var 0)).
+    eapply hypothesis; eauto using index_0.
     }
   }
 Qed.

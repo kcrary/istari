@@ -1750,65 +1750,80 @@ structure TypecheckMain :> TYPECHECK_MAIN =
 
                (* 5. Look in the table. *)
              | _ =!>
-               \fnc =>
-                   if 
-                      immediate st table history tabSubtype a ctx concl dir dest idtac
-                      orelse
-                      immediate st table history tabEqtp a ctx (T.apply2 Prim.eqtp a b) dir dest 
-                         (lift (fn () => refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))))
-                      orelse
-                      immediate st table history tabEqtp b ctx (T.apply2 Prim.eqtp b a) dir dest
-                         (lift (fn () =>
-                                   refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))
-                                   >>
-                                   refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))))
-                      orelse
-                      immediate st table history tabEquniv a ctx
-                         (T.apply3 Prim.eq (T.apply1 Prim.univ (T.evar ())) a b)
-                         dir dest
-                         (lift (fn () => 
-                                   refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))
-                                   >>
-                                   refine (Rule.univForgetEq (T.evar ()) (T.evar ()) (T.evar ()))))
-                      orelse
-                      immediate st table history tabEquniv b ctx
-                         (T.apply3 Prim.eq (T.apply1 Prim.univ (T.evar ())) b a)
-                         dir dest
-                         (lift (fn () => 
-                                   refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))
-                                   >>
-                                   refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))
-                                   >>
-                                   refine (Rule.univForgetEq (T.evar ()) (T.evar ()) (T.evar ()))))
-                   then
-                      ()
-                   else
-                      raise Backtrack\
+               \(fnc =>
+                    if 
+                       immediate st table history tabSubtype a ctx concl dir dest idtac
+                       orelse
+                       immediate st table history tabEqtp a ctx (T.apply2 Prim.eqtp a b) dir dest 
+                          (lift (fn () => refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))))
+                       orelse
+                       immediate st table history tabEqtp b ctx (T.apply2 Prim.eqtp b a) dir dest
+                          (lift (fn () =>
+                                    refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))
+                                    >>
+                                    refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))))
+                       orelse
+                       immediate st table history tabEquniv a ctx
+                          (T.apply3 Prim.eq (T.apply1 Prim.univ (T.evar ())) a b)
+                          dir dest
+                          (lift (fn () => 
+                                    refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))
+                                    >>
+                                    refine (Rule.univForgetEq (T.evar ()) (T.evar ()) (T.evar ()))))
+                       orelse
+                       immediate st table history tabEquniv b ctx
+                          (T.apply3 Prim.eq (T.apply1 Prim.univ (T.evar ())) b a)
+                          dir dest
+                          (lift (fn () => 
+                                    refine (Rule.subtypeReflEqtype (T.evar ()) (T.evar ()))
+                                    >>
+                                    refine (Rule.eqtpSymm (T.evar ()) (T.evar ()))
+                                    >>
+                                    refine (Rule.univForgetEq (T.evar ()) (T.evar ()) (T.evar ()))))
+                    then
+                       ()
+                    else
+                       raise Backtrack)\
 
                (* 6a. Use a subtyping rule. *)
              | const? @ _ ; const? @ _ =!>
-               \fnc const1 const2 =>
-                   (case H2.find subtypeTactics (const1, const2) of
-                       SOME tac =>
-                          tryRule st table history tac goal dest
-                          (fn () =>
-                              dest :=
-                                 error history "unexpected subtyping failure"
-                                    (fn () =>
-                                        (
-                                        showPrefixed " first: " dir a;
-                                        showPrefixed "second: " dir b;
-                                        print "\n"
-                                        )))
-                             (fn () => progress := true)
+               \(fnc const1 const2 =>
+                    let
+                       val tac =
+                          (case H2.find subtypeTactics (const1, const2) of
+                              SOME tac => tac
+ 
+                            | NONE =>
+                                 (case (H.find subtypeLeftTactics const1, H.find subtypeRightTactics const2) of
+                                     (NONE, NONE) => raise Backtrack
 
-                     | NONE => raise Backtrack)\
+                                   | (SOME (_, tac), NONE) => tac
+                                   | (NONE, SOME (_, tac)) => tac
+
+                                   | (SOME (lpri, ltac), SOME (rpri, rtac)) =>
+                                        if lpri <= rpri then
+                                           ltac
+                                        else
+                                           rtac))
+                    in
+                       tryRule st table history tac goal dest
+                       (fn () =>
+                           dest :=
+                              error history "unexpected subtyping failure"
+                                 (fn () =>
+                                     (
+                                     showPrefixed " first: " dir a;
+                                     showPrefixed "second: " dir b;
+                                     print "\n"
+                                     )))
+                          (fn () => progress := true)
+                    end)\
 
                (* 6b. Use a left-indexed subtyping rule. *)
-             | const? @ _ ; _ =!>
+            | const? @ _ ; _ =!>
                \(fnc const =>
                     (case H.find subtypeLeftTactics const of
-                        SOME tac =>
+                        SOME (_, tac) =>
                            tryRule st table history tac goal dest
                               (fn () =>
                                   dest :=
@@ -1820,14 +1835,14 @@ structure TypecheckMain :> TYPECHECK_MAIN =
                                          print "\n"
                                          )))
                              (fn () => progress := true)
- 
+
                       | NONE => raise Backtrack))\
 
                (* 6b. Use a right-indexed subtyping rule. *)
              | _ ; const? @ _ =!>
                \(fnc const =>
                     (case H.find subtypeRightTactics const of
-                        SOME tac =>
+                        SOME (_, tac) =>
                            tryRule st table history tac goal dest
                               (fn () =>
                                   dest :=
@@ -1844,24 +1859,24 @@ structure TypecheckMain :> TYPECHECK_MAIN =
 
                (* 7. Try A = B : type *)
              | _ =>
-               \fnc =>
-                   let
-                      val dest' = newdest ()
-                      val goal' = (J.make ctx (T.apply2 Prim.eqtp a b), dir)
-                   in
-                      progress := true;
-
-                      dest :=
-                         (
-                         (* G |- A <: B *)
-                         refine (Rule.subtypeReflEqtype a b)
-                         >>
-                         (* G |- A = B : type *)
-                         play dest'
-                         );
-
-                      enqueue st [(Eqtp, table, goal', dest', history)]
-                   end\
+               \(fnc =>
+                    let
+                       val dest' = newdest ()
+                       val goal' = (J.make ctx (T.apply2 Prim.eqtp a b), dir)
+                    in
+                       progress := true;
+ 
+                       dest :=
+                          (
+                          (* G |- A <: B *)
+                          refine (Rule.subtypeReflEqtype a b)
+                          >>
+                          (* G |- A = B : type *)
+                          play dest'
+                          );
+ 
+                       enqueue st [(Eqtp, table, goal', dest', history)]
+                    end)\
             /
          end
                           

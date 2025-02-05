@@ -63,7 +63,7 @@ signature REWRITE =
       val convertHead       : ((captures * constant * eterm) * targets) list -> tactic
       val fold              : ((captures * eterm) * targets) list -> tactic
       val convertFold       : ((captures * eterm) * targets) list -> tactic
-      val folds              : int -> ((captures * eterm) * targets) list -> tactic
+      val folds             : int -> ((captures * eterm) * targets) list -> tactic
       val unfold            : (ehead * targets) list -> tactic
       val unfoldHead        : (ehead * targets) list -> tactic
       val roll              : ((captures * eterm) * targets) list -> tactic
@@ -4174,6 +4174,32 @@ structure RewriteInternal :> REWRITE_INTERNAL =
          tac
 
 
+      fun compatLetnextEeqtp b b' tac =
+         goalCaseT
+         /| \Prim.eeqtp\ (\Prim.letnext\ _ (fn ? . _)) _ =>
+            \(fnc binder =>
+                 let
+                    do (_, dir) = withgoal
+                    val dir' = D.bindVary dir binder
+                 in
+                    (* tac :: B <:> B'
+                       letnext M (fn . B) <:> letnext M (fn . B')
+                    *)
+                    refine (Rule.letnextEeq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                    >>> [
+                        (* promote |- A : type *)
+                        idtacM Secondary,
+
+                        (* M : future A *)
+                        idtacM Secondary,
+                        
+                        (* later A |- B <:> B' *)
+                        chdir dir' >>+ tac
+                        ]
+                 end)\
+         /
+
+
       fun compatIntersectEeqtp0 a a' tac =
          goalCaseT
          /
@@ -4343,6 +4369,38 @@ structure RewriteInternal :> REWRITE_INTERNAL =
               end)\
          /
 
+
+      fun compatEeqtpEeqtp0 a a' tac =
+         (* tac : A <:> A' *)
+         (* (A <:> B) <:> (A' <:> B) *)
+         refine (Rule.eeqEeq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A <:> A' *)
+             tac,
+
+             (* B <:> B *)
+             refine (Rule.eeqtpRefl (T.evar ()))
+             >>+
+             (* B : type *)
+             idtacM Secondary
+             ]
+             
+
+      fun compatEeqtpEeqtp1 b b' tac =
+         (* tac : B <:> B' *)
+         (* (A <:> B) <:> (A <:> B') *)
+         refine (Rule.eeqEeq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         >>> [
+             (* A <:> A *)
+             refine (Rule.eeqtpRefl (T.evar ()))
+             >>+
+             (* A : type *)
+             idtacM Secondary,
+
+             (* B <:> B' *)
+             tac
+             ]
+             
 
       fun compatIsetIff1 b b' tac =
          goalCaseT
@@ -5480,6 +5538,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             (Prim.sum, 0, 0, Prim.eeqtp, Prim.eeqtp, true, compatSumEeqtp0),
             (Prim.sum, 1, 0, Prim.eeqtp, Prim.eeqtp, true, compatSumEeqtp1),
             (Prim.future, 0, 0, Prim.eeqtp, Prim.eeqtp, true, compatFutureEeqtp),
+            (Prim.letnext, 1, 1, Prim.eeqtp, Prim.eeqtp, true, compatLetnextEeqtp),
             (Prim.intersect, 0, 0, Prim.eeqtp, Prim.eeqtp, true, compatIntersectEeqtp0),
             (Prim.intersect, 1, 1, Prim.eeqtp, Prim.eeqtp, true, compatIntersectEeqtp1),
             (Prim.union, 0, 0, Prim.eeqtp, Prim.eeqtp, true, compatUnionEeqtp0),
@@ -5488,6 +5547,8 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             (Prim.set, 0, 0, Prim.eeqtp, Prim.eeqtp, true, compatSetEeqtp0),
             (Prim.iset, 0, 0, Prim.eeqtp, Prim.eeqtp, true, compatIsetEeqtp0),
             (Prim.iset, 1, 1, Prim.iff, Prim.eeqtp, true, compatIsetIff1),
+            (Prim.eeqtp, 0, 0, Prim.eeqtp, Prim.eeqtp, true, compatEeqtpEeqtp0),
+            (Prim.eeqtp, 1, 0, Prim.eeqtp, Prim.eeqtp, true, compatEeqtpEeqtp1),
 
             (* subtype *)
             (Prim.forall, 0, 0, Prim.subtype, Prim.subtype, false, compatForallSubtype0),

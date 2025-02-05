@@ -158,6 +158,7 @@ exact guardElim_valid.
 exact guardSatEq_valid.
 exact guardSub_valid.
 exact guardSubIntro_valid.
+exact guardSubElim_valid.
 exact coguardForm_valid.
 exact coguardEq_valid.
 exact coguardFormUniv_valid.
@@ -173,6 +174,7 @@ exact coguardElim2_valid.
 exact coguardLeft_valid.
 exact coguardSatEq_valid.
 exact coguardSub_valid.
+exact coguardSubIntro_valid.
 exact coguardSubElim_valid.
 exact existsForm_valid.
 exact existsEq_valid.
@@ -800,8 +802,10 @@ exact prodEeq_valid.
 exact dprodEeq_valid.
 exact sumEeq_valid.
 exact futureEeq_valid.
+exact letnextEeq_valid.
 exact intersectEeq_valid.
 exact unionEeq_valid.
+exact eeqEeq_valid.
 exact compatGuardEeq1_valid.
 exact compatSetEeq0_valid.
 exact compatIsetEeq0_valid.

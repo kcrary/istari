@@ -11,6 +11,10 @@
 - `File.import` uses the search path to find files that are not in the
   current directory.
 
+- Rewriting changes:
+
+  + `eeq` can be rewritten through `letnext` and `eeq`.
+
 - Library changes:
 
   + `GirardParadox` and `SmithParadox` libraries are no longer

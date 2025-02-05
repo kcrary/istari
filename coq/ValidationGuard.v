@@ -432,7 +432,7 @@ apply tr_subtype_intro; auto.
   apply tr_guard_formation; auto.
   eapply tr_subtype_istype1; eauto.
   }
-simpsub.
+  simpsub.
 apply (tr_guard_intro _ (subst sh1 a)).
   {
   eapply (weakening _ [_] []).
@@ -458,6 +458,69 @@ apply (tr_guard_intro _ (subst sh1 a)).
   simpsub.
   cbn [Nat.add].
   eapply hypothesis; eauto using index_S, index_0.
+  }
+Qed.
+
+
+Lemma guardSubElim_valid : guardSubElim_obligation.
+Proof.
+prepare.
+intros G a b c m ext0 Ha Hbc.
+apply (tr_subtype_trans _ _ b); auto.
+apply tr_subtype_intro.
+  {
+  apply tr_guard_formation.
+    {
+    eapply tr_inhabitation_formation; eauto.
+    }
+
+    {
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    
+      {
+      cbn [length unlift].
+      simpsub.
+      cbn [Nat.add].
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_subtype_istype1; eauto.
+    }
+  }
+
+  {
+  eapply tr_subtype_istype1; eauto.
+  }
+apply (tr_guard_elim _ (subst sh1 a) _ _ _ (subst sh1 m) (subst sh1 m)).
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  eapply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  
+    {
+    cbn [length unlift].
+    simpsub.
+    cbn [Nat.add].
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  exact Ha.
   }
 Qed.
 
@@ -1072,6 +1135,71 @@ prepare.
 intros G a b c d m ext2 ext1 ext0 Hab Hb Hcd Hd.
 eapply tr_coguard_sub; eauto.
 Qed.
+
+
+Lemma coguardSubIntro_valid : coguardSubIntro_obligation.
+Proof.
+prepare.
+intros G a b c m ext0 Ha Hbc.
+apply (tr_subtype_trans _ _ b); auto.
+apply tr_subtype_intro.
+2:{
+  apply tr_coguard_formation.
+    {
+    eapply tr_inhabitation_formation; eauto.
+    }
+
+    {
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    
+      {
+      cbn [length unlift].
+      simpsub.
+      cbn [Nat.add].
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_subtype_istype2; eauto.
+    }
+  }
+
+  {
+  eapply tr_subtype_istype2; eauto.
+  }
+simpsub.
+apply (tr_coguard_intro _ (subst sh1 a) _ (subst sh1 m) (subst sh1 m)).
+2:{
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  eapply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  
+    {
+    cbn [length unlift].
+    simpsub.
+    cbn [Nat.add].
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  exact Ha.
+  }
+Qed.
+
 
 
 Lemma coguardSubElim_valid : coguardSubElim_obligation.

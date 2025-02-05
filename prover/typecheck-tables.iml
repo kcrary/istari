@@ -18,6 +18,9 @@ signature TYPECHECK_TABLES =
 
          If the tactic fails, the typechecker will typically try something else.  But if
          the tactic raises Stop, the typechecker will abandon the goal and return an error.
+
+         In subtypeLeft and subtypeRight, the int is a priority.  If both a left and right
+         subtyping rule is available, the one with the lower number is chosen first.
       *)
 
       val introTactics : tactic ConstantTable.table
@@ -28,8 +31,8 @@ signature TYPECHECK_TABLES =
       val ofkindTactics : tactic ConstantTable.table
       val eqkindTactics : tactic Constant2Table.table
       val subtypeTactics : tactic Constant2Table.table
-      val subtypeLeftTactics : tactic ConstantTable.table
-      val subtypeRightTactics : tactic ConstantTable.table
+      val subtypeLeftTactics : (int * tactic) ConstantTable.table
+      val subtypeRightTactics : (int * tactic) ConstantTable.table
       val strictnessTactics : tactic ConstantTable.table
       val totalityTactics : tactic ConstantTable.table
 
@@ -74,8 +77,8 @@ structure TypecheckTables :> TYPECHECK_TABLES =
       val ofkindTactics : tactic H.table = H.table ()
       val eqkindTactics : tactic H2.table = H2.table ()
       val subtypeTactics : tactic H2.table = H2.table ()
-      val subtypeLeftTactics : tactic H.table = H.table ()
-      val subtypeRightTactics : tactic H.table = H.table ()
+      val subtypeLeftTactics : (int * tactic) H.table = H.table ()
+      val subtypeRightTactics : (int * tactic) H.table = H.table ()
       val strictnessTactics : tactic H.table = H.table ()
       val totalityTactics : tactic H.table = H.table ()
 
@@ -503,17 +506,19 @@ structure TypecheckTables :> TYPECHECK_TABLES =
          let
             fun insert const tac = H.insert subtypeLeftTactics const tac
          in
-            insert Prim.void RT.voidSub;
-            insert Prim.set RT.setSubElim;
-            insert Prim.iset RT.isetSubElim;
-            insert Prim.coguard RT.coguardSubElim
+            insert Prim.void (0, RT.voidSub);
+            insert Prim.set (0, RT.setSubElim);
+            insert Prim.iset (0, RT.isetSubElim);
+            insert Prim.guard (1, RT.guardSubElim);
+            insert Prim.coguard (0, RT.coguardSubElim)
          end
 
       val () =
          let
             fun insert const tac = H.insert subtypeRightTactics const tac
          in
-            insert Prim.guard RT.guardSubIntro
+            insert Prim.guard (0, RT.guardSubIntro);
+            insert Prim.coguard (1, RT.coguardSubIntro)
          end
 
       val () =
