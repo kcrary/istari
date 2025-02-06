@@ -116,6 +116,57 @@ eapply tr_generalize; eauto.
 Qed.
 
 
+Lemma assertLater_valid : assertLater_obligation.
+Proof.
+prepare.
+intros G a b m n Ha Hb.
+rewrite -> def_lett.
+assert (equiv m (prev (next m))) as Hequivm.
+  {
+  apply equiv_symm.
+  apply steps_equiv.
+  apply star_one.
+  apply step_prev2.
+  }
+rewrite -> Hequivm.
+rewrite -> equiv_beta.
+replace b with (subst1 (prev (next m)) (subst sh1 b)) by (simpsub; auto).
+apply (tr_fut_elim _ (next m) (next m) a); auto.
+  {
+  apply tr_fut_intro; auto.
+  }
+
+  {
+  eapply tr_inhabitation_formation; eauto.
+  }
+Qed.
+
+
+Lemma assertLater'_valid : assertLater'_obligation.
+Proof.
+prepare.
+intros G a b m n Ha Hb.
+assert (equiv m (prev (next m))) as Hequivm.
+  {
+  apply equiv_symm.
+  apply steps_equiv.
+  apply star_one.
+  apply step_prev2.
+  }
+rewrite -> Hequivm.
+simpsub.
+replace b with (subst1 (prev (next m)) (subst sh1 b)) by (simpsub; auto).
+apply (tr_fut_elim _ (next m) (next m) a); auto.
+  {
+  apply tr_fut_intro; auto.
+  }
+
+  {
+  eapply tr_inhabitation_formation; eauto.
+  }
+Qed.
+
+
 Lemma inhabitant_valid : inhabitant_obligation.
 Proof.
 prepare.

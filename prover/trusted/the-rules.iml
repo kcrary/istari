@@ -596,6 +596,8 @@ signature THE_RULES =
       val generalize : term -> term -> term -> rule
       val assert : term -> term -> rule
       val assert' : term -> term -> rule
+      val assertLater : term -> term -> rule
+      val assertLater' : term -> term -> rule
       val inhabitant : term -> term -> rule
       val letForm : term -> term -> term -> term -> rule
       val lethForm : term -> term -> term -> term -> rule
@@ -1518,6 +1520,8 @@ fun substitutionSimple gsize a b m = Arg.lmake "substitutionSimple" [] gsize [J.
 fun generalize a b m = Arg.make "generalize" [m, ] (Sub (b, Dot (m, Shift 0))) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Nothing, [J.Tm (a), ], b), ] (fn [_, n, ] => Sub (n, Dot (m, Shift 0)) | _ => raise Arg.ExtractFailure)
 fun assert a b = Arg.make "assert" [] (b) [(Arg.Nothing, [], a), (Arg.Nothing, [J.Tm (a), ], Sub (b, Shift 1)), ] (fn [m, n, ] => Elim (const_let, [App (m), App (Lam (NONE, n)), ]) | _ => raise Arg.ExtractFailure)
 fun assert' a b = Arg.make "assert'" [] (b) [(Arg.Nothing, [], a), (Arg.Nothing, [J.Tm (a), ], Sub (b, Shift 1)), ] (fn [m, n, ] => Sub (n, Dot (m, Shift 0)) | _ => raise Arg.ExtractFailure)
+fun assertLater a b = Arg.make "assertLater" [] (b) [(Arg.Promote, [], a), (Arg.Nothing, [J.Tml (a), ], Sub (b, Shift 1)), ] (fn [m, n, ] => Elim (const_let, [App (m), App (Lam (NONE, n)), ]) | _ => raise Arg.ExtractFailure)
+fun assertLater' a b = Arg.make "assertLater'" [] (b) [(Arg.Promote, [], a), (Arg.Nothing, [J.Tml (a), ], Sub (b, Shift 1)), ] (fn [m, n, ] => Sub (n, Dot (m, Shift 0)) | _ => raise Arg.ExtractFailure)
 fun inhabitant a m = Arg.make "inhabitant" [m, ] (a) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), ] (fn [_, ] => m | _ => raise Arg.ExtractFailure)
 fun letForm a b m n = Arg.make "letForm" [] (Elim (const_of, [App (b), App (Elim (const_let, [App (m), App (Lam (NONE, n)), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Sub (b, Shift 1)), App (n), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun lethForm a b m n = Arg.make "lethForm" [] (Elim (const_of, [App (b), App (Elim (const_leth, [App (m), App (Lam (NONE, n)), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Sub (b, Shift 1)), App (n), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)

@@ -835,6 +835,8 @@ The destruction tactics are:
 
     As `assert` but then run `tac` on the first subgoal.
 
+  + See also [`assertLater`](#miscellaneous-tactics).
+
 
 - `destructSet /[hyp x]/ /[name]/`
 
@@ -1353,6 +1355,18 @@ pages.
   + `change /concl/ /[term A]/`
 
     As above but replaces the conclusion.
+
+
+- `assertLater /[term A]/ /[name option]/`
+
+  Generates a subgoal to prove `A` with all later hypotheses promoted
+  to the present.  Create a new **later** hypothesis of type `A` using
+  the given name.  (Since the new hypothesis is later, one cannot
+  match an intro pattern against it yet.)
+
+  This is similar to asserting `future A` and immediately decomposing
+  the new hypothesis, but doing it that way generates an additional
+  typing goal that `assertLater` does not generate.
 
 
 - `exfalso`

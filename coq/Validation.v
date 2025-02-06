@@ -611,6 +611,8 @@ exact substitutionSimple_valid.
 exact generalize_valid.
 exact assert_valid.
 exact assert'_valid.
+exact assertLater_valid.
+exact assertLater'_valid.
 exact inhabitant_valid.
 exact letForm_valid.
 exact lethForm_valid.

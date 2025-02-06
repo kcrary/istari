@@ -8,6 +8,8 @@ signature MISC_TACTIC =
 
       val exfalso : tactic
 
+      val assertLater : ETerm.eterm -> Symbol.symbol option -> tactic
+
       val trustmeRaw : tactic
       val trustme : tactic
 
@@ -69,6 +71,19 @@ structure MiscTactic :> MISC_TACTIC =
              refine (Rule.inhabitant (T.evar ()) T.Triv)
              >>
              refine (Rule.voidElim (T.evar ())))
+
+
+      fun assertLater ea symopt =
+         let
+            do (jud, dir) = withgoal
+            val a = ETerm.withdir dir ea
+         in
+            refine (Rule.assertLater a (J.concl jud))
+            >>> [
+                idtac,
+                chdir (D.bindh dir symopt)
+                ]
+         end
 
 
       val trustmeRaw = refine Rule.trustme
