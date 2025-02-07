@@ -54,6 +54,10 @@ signature GENERALIZE =
       val setEqRaw : symbol -> ETerm.eterm -> ETerm.eterm -> symbol option -> tactic
       val setEq : symbol -> ETerm.eterm -> ETerm.eterm -> symbol option -> tactic
 
+      val setEqPriority' : symbol -> ETerm.eterm -> ETerm.eterm -> symbol option -> priority tacticm
+      val setEqRaw' : symbol -> ETerm.eterm -> ETerm.eterm -> symbol option -> tactic
+      val setEq' : symbol -> ETerm.eterm -> ETerm.eterm -> symbol option -> tactic
+
    end
 
 
@@ -516,5 +520,16 @@ structure Generalize :> GENERALIZE =
 
       fun setEq sym em ea symEq =
          TC.withTypecheckSnd $ setEqPriority sym em ea symEq
+
+      fun setEqPriority' sym em ea symEq =
+         setEqPriority sym em ea symEq
+         >>!
+         EqualityTactic.symmetryInPriority (Hyp.NUMBER 0)
+
+      fun setEqRaw' sym em ea symEq =
+         setEqPriority' sym em ea symEq >> idtac
+ 
+      fun setEq' sym em ea symEq =
+         Typecheck.withTypecheckSnd $ setEqPriority' sym em ea symEq
  
    end

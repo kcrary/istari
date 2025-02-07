@@ -13,7 +13,10 @@
 
 - New tactics:
 
-  + `assertLater`
+  + `assertLater` is like `assert`, but asserts a "later" fact.
+
+  + `setEq'` is like `setEq` but reverses the direction of the
+    equality.
 
 - Rewriting changes:
 

@@ -1042,6 +1042,14 @@ The destruction tactics are:
 
     As `setEq` but does not invoke the typechecker.
 
+  + `setEq' /[name x]/ /[term M]/ /[term A]/ /[name option H]/`
+
+    As `setEq` but reverses the direction of the equality.
+
+  + `setEqRaw' /[name x]/ /[term M]/ /[term A]/ /[name option H]/`
+
+    As `setEqRaw` but reverses the direction of the equality.
+
 
 - `boolCase /[term M]/ /[name option H]/`
 

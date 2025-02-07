@@ -80,7 +80,7 @@ prepended to `_iter`.  For example, `tree_iter` has the type:
               -> Q (m + n) (Cons a m n t f))
         -> forall (n : nat) (t : tree a n) . P n t
 
-Iterators such as this are used by the [`iterate`
+Iterators such as this are used by the [`induction`
 tactic](tactics.html#induction), which provides a simple treatment of
 structural induction suitable for most (but not all) purposes.
 
