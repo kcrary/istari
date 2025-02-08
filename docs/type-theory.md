@@ -30,6 +30,8 @@ about `M` and its interaction with other terms.  An important
 consequence of this design is it streamlines the use of dependent
 types.
 
+All of Istari's primitive rules are given [here](rules.html).
+
 
 #### What is a type?
 

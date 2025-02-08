@@ -1762,7 +1762,7 @@ rewrite <- under_dots.
 rewrite <- compose_under.
 rewrite <- (compose_sh_sh _ 1 1).
 rewrite -> subst_compose.
-apply tr_sound_tighten.
+apply tr_tighten.
   {
   apply (tr_subtype_eta2 _#3 (var 0) (var 0)).
   eapply hypothesis; eauto using index_0.

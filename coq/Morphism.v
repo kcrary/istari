@@ -471,6 +471,15 @@ reflexivity.
 Qed.
 
 
+Add Parametric Morphism object : (@fut object)
+  with signature equiv ==> equiv
+  as equiv_fut.
+Proof.
+intros m1 m1' H1.
+apply equiv_fut; auto.
+Qed.
+
+
 Add Parametric Morphism object : (@sequal object)
   with signature equiv ==> equiv ==> equiv
   as equiv_sequal.

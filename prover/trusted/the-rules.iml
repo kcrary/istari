@@ -294,6 +294,10 @@ signature THE_RULES =
       val futureExt : term -> term -> term -> rule
       val futureLeft : int -> term -> term -> rule
       val futureInjection : term -> term -> term -> rule
+      val squashFutureSwap : term -> rule
+      val isquashFutureSwap : term -> rule
+      val futureSquashSwap : term -> rule
+      val futureIsquashSwap : term -> rule
       val recKind : term -> term -> rule
       val recKindEq : term -> term -> term -> rule
       val recForm : term -> rule
@@ -1218,6 +1222,10 @@ fun futureEta a m = Arg.make "futureEta" [] (Elim (const_eq, [App (Elim (const_f
 fun futureExt a m n = Arg.make "futureExt" [] (Elim (const_eq, [App (Elim (const_future, [App (a), ])), App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_future, [App (a), ])), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_future, [App (a), ])), App (n), ])), (Arg.PromoteUnhide, [], Elim (const_eq, [App (a), App (Elim (m, [Prev, ])), App (Elim (n, [Prev, ])), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun futureLeft gsize a b = Arg.lmake "futureLeft" [] gsize [J.Tm (Elim (const_future, [App (a), ])), ] (b) [(Arg.PromoteUnhide, [], NONE, Elim (const_istp, [App (a), ])), (Arg.Nothing, [J.Tml (a), ], SOME (Dot (Next (Var 0), Shift 1)), Sub (b, under gsize (Dot (Next (Var 0), Shift 1)))), ] (fn [_, m, ] => Sub (m, under gsize (Dot (Elim (Var 0, [Prev, ]), Shift 1))) | _ => raise Arg.ExtractFailure)
 fun futureInjection a m n = Arg.make "futureInjection" [] (Elim (const_future, [App (Elim (const_eq, [App (a), App (m), App (n), ])), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_eq, [App (Elim (const_future, [App (a), ])), App (Next (m)), App (Next (n)), ])), ] (fn [_, _, ] => Next (Triv) | _ => raise Arg.ExtractFailure)
+fun squashFutureSwap a = Arg.make "squashFutureSwap" [] (Elim (const_squash, [App (Elim (const_future, [App (a), ])), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_future, [App (Elim (const_squash, [App (a), ])), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun isquashFutureSwap a = Arg.make "isquashFutureSwap" [] (Elim (const_isquash, [App (Elim (const_future, [App (a), ])), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_future, [App (Elim (const_isquash, [App (a), ])), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun futureSquashSwap a = Arg.make "futureSquashSwap" [] (Elim (const_future, [App (Elim (const_squash, [App (a), ])), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_squash, [App (Elim (const_future, [App (a), ])), ])), ] (fn [_, _, ] => Next (Triv) | _ => raise Arg.ExtractFailure)
+fun futureIsquashSwap a = Arg.make "futureIsquashSwap" [] (Elim (const_future, [App (Elim (const_isquash, [App (a), ])), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_isquash, [App (Elim (const_future, [App (a), ])), ])), ] (fn [_, _, ] => Next (Triv) | _ => raise Arg.ExtractFailure)
 fun recKind i k = Arg.make "recKind" [] (Elim (const_of, [App (Elim (const_kind, [App (i), ])), App (Elim (const_rec, [App (Lam (NONE, k)), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_level), App (i), ])), (Arg.Unhide, [J.Tml (Elim (const_kind, [App (i), ])), ], Elim (const_of, [App (Elim (const_kind, [App (Sub (i, Shift 1)), ])), App (k), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun recKindEq i k l = Arg.make "recKindEq" [] (Elim (const_eq, [App (Elim (const_kind, [App (i), ])), App (Elim (const_rec, [App (Lam (NONE, k)), ])), App (Elim (const_rec, [App (Lam (NONE, l)), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_level), App (i), ])), (Arg.Unhide, [J.Tml (Elim (const_kind, [App (i), ])), ], Elim (const_eq, [App (Elim (const_kind, [App (Sub (i, Shift 1)), ])), App (k), App (l), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun recForm a = Arg.make "recForm" [] (Elim (const_istp, [App (Elim (const_rec, [App (Lam (NONE, a)), ])), ])) [(Arg.Unhide, [J.Tpl, ], Elim (const_istp, [App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)

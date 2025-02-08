@@ -945,6 +945,32 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deqtype (set a b) (set a b))
       -> tr G (deqtype (set a b) (set a (squash b)))
 
+(* Future/squash swaps *)
+
+| tr_future_squash_swap :
+    forall G m a,
+      tr (promote G) (deqtype a a)
+      -> tr G (deq m m (set unittp (fut (subst sh1 a))))
+      -> tr G (deq (next triv) (next triv) (fut (set unittp (subst sh1 a))))
+  
+| tr_future_isquash_swap :
+    forall G m a,
+      tr (promote G) (deqtype a a)
+      -> tr G (deq m m (iset unittp (fut (subst sh1 a))))
+      -> tr G (deq (next triv) (next triv) (fut (iset unittp (subst sh1 a))))
+
+| tr_squash_future_swap :
+    forall G m a,
+      tr (promote G) (deqtype a a)
+      -> tr G (deq m m (fut (set unittp (subst sh1 a))))
+      -> tr G (deq triv triv (set unittp (fut (subst sh1 a))))
+
+| tr_isquash_future_swap :
+    forall G m a,
+      tr (promote G) (deqtype a a)
+      -> tr G (deq m m (fut (iset unittp (subst sh1 a))))
+      -> tr G (deq triv triv (iset unittp (fut (subst sh1 a))))
+
 (* Quotient types *)
 
 | tr_quotient_formation :
@@ -1354,7 +1380,7 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr (G2 ++ hyp_tm b :: G1) J
       -> tr (G2 ++ hyp_tm a :: G1) J
 
-| tr_sound_tighten :
+| tr_tighten :
     forall G1 G2 a b J,
       tr G1 (dsubtype b a)
       -> tr (G2 ++ hyp_tm (equal (subst sh1 b) (var 0) (var 0)) :: hyp_tm b :: G1) J

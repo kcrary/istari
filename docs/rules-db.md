@@ -11,6 +11,16 @@ Conventions:
 - Omitted extracts in the conclusion are taken to be `()`.  Omitted
   extracts in premises are unused.
 
+Note that no effort was made to keep the set of rules minimal.  Many
+rules that would follow from other rules are nonetheless included for
+the sake of convenience or performance.  Since (nearly) all the rules
+are verified, there is no robustness advantage to minimizing the set
+of rules.
+
+Rules are given here in the official form, using de Bruijn indices.
+Human-readable rules, using explicit variables, are given
+[here](rules-db.html).
+
 
 ### Contents
 
@@ -2042,6 +2052,34 @@ Conventions:
       >>
       promote(G) |- istp A
       G |- eq (future A) (next M) (next N)
+
+- `squashFutureSwap A`
+
+      G |- squash (future A)
+      >>
+      promote(G) |- istp A
+      G |- future (squash A)
+
+- `isquashFutureSwap A`
+
+      G |- isquash (future A)
+      >>
+      promote(G) |- istp A
+      G |- future (isquash A)
+
+- `futureSquashSwap A`
+
+      G |- future (squash A) ext next ()
+      >>
+      promote(G) |- istp A
+      G |- squash (future A)
+
+- `futureIsquashSwap A`
+
+      G |- future (isquash A) ext next ()
+      >>
+      promote(G) |- istp A
+      G |- isquash (future A)
 
 
 ### Recursive types

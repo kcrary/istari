@@ -465,3 +465,41 @@ apply (tr_eqtype_convert _ _ _ (fut (equal a m m))).
     }
   }
 Qed.
+
+
+Lemma futureSquashSwap_valid : futureSquashSwap_obligation.
+Proof.
+prepare.
+intros G a ext1 m Ha Hm.
+rewrite -> def_squash in Hm |- *.
+eapply tr_future_squash_swap; eauto.
+Qed.
+
+
+Lemma futureIsquashSwap_valid : futureIsquashSwap_obligation.
+Proof.
+prepare.
+intros G a ext1 m Ha Hm.
+rewrite -> def_isquash in Hm |- *.
+eapply tr_future_isquash_swap; eauto.
+Qed.
+
+
+Lemma squashFutureSwap_valid : squashFutureSwap_obligation.
+Proof.
+prepare.
+intros G a m ext0 Ha Hm.
+rewrite -> def_squash in Hm |- *.
+simpsub.
+eapply tr_squash_future_swap; eauto.
+Qed.
+
+
+Lemma isquashFutureSwap_valid : isquashFutureSwap_obligation.
+Proof.
+prepare.
+intros G a m ext0 Ha Hm.
+rewrite -> def_isquash in Hm |- *.
+simpsub.
+eapply tr_isquash_future_swap; eauto.
+Qed.

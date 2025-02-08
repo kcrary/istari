@@ -102,6 +102,7 @@ UNITS = \
 	SoundSubstitution \
 	SoundSubtype \
 	SoundStructural \
+	SoundSwap \
 	SoundUtil \
 	SoundUniv \
 	SoundWtype \

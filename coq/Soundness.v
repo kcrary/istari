@@ -32,6 +32,7 @@ Require Import SoundSimple.
 Require Import SoundSubstitution.
 Require Import SoundSubtype.
 Require Import SoundStructural.
+Require Import SoundSwap.
 Require Import SoundUniv.
 Require Import SoundWtype.
 Require Import Shut.
@@ -185,6 +186,10 @@ intros; eapply sound_iset_hyp_weaken; eauto; done.
 intros; eapply sound_iset_formation_invert1; eauto; done.
 intros; eapply sound_iset_formation_invert2; eauto; done.
 intros; eapply sound_squash_idem; eauto; done.
+intros; eapply sound_future_squash_swap; eauto; done.
+intros; eapply sound_future_isquash_swap; eauto; done.
+intros; eapply sound_squash_future_swap; eauto; done.
+intros; eapply sound_isquash_future_swap; eauto; done.
 intros; eapply sound_quotient_formation; eauto; done.
 intros; eapply sound_quotient_formation_univ; eauto; done.
 intros; eapply sound_quotient_intro; eauto; done.

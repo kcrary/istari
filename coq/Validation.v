@@ -309,6 +309,10 @@ exact futureEta_valid.
 exact futureExt_valid.
 exact futureLeft_valid.
 exact futureInjection_valid.
+exact squashFutureSwap_valid.
+exact isquashFutureSwap_valid.
+exact futureSquashSwap_valid.
+exact futureIsquashSwap_valid.
 exact recKind_valid.
 exact recKindEq_valid.
 exact recForm_valid.

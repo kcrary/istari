@@ -16,8 +16,8 @@ Conventions:
 
 Note that no effort was made to keep the set of rules minimal.  Many
 rules that would follow from other rules are nonetheless included for
-the sake of convenience or performance.  Since the rules are (nearly)
-all verified, there is no robustness advantage to minimizing the set
+the sake of convenience or performance.  Since (nearly) all the rules
+are verified, there is no robustness advantage to minimizing the set
 of rules.
 
 Rules are given here in human-readable format, using explicit
@@ -2054,6 +2054,34 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       promote(G) |- A : type
       G |- next M = next N : future A
+
+- `squashFutureSwap A`
+
+      G |- {future A}
+      >>
+      promote(G) |- A : type
+      G |- future {A}
+
+- `isquashFutureSwap A`
+
+      G |- isquash (future A)
+      >>
+      promote(G) |- A : type
+      G |- future (isquash A)
+
+- `futureSquashSwap A`
+
+      G |- future {A} ext next ()
+      >>
+      promote(G) |- A : type
+      G |- {future A}
+
+- `futureIsquashSwap A`
+
+      G |- future (isquash A) ext next ()
+      >>
+      promote(G) |- A : type
+      G |- isquash (future A)
 
 
 ### Recursive types
