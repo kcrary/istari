@@ -811,6 +811,7 @@ exact futureEeq_valid.
 exact letnextEeq_valid.
 exact intersectEeq_valid.
 exact unionEeq_valid.
+exact eqEeq_valid.
 exact eeqEeq_valid.
 exact compatGuardEeq1_valid.
 exact compatSetEeq0_valid.

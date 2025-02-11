@@ -20,7 +20,9 @@
 
 - Rewriting changes:
 
-  + `eeq` can be rewritten through `letnext` and `eeq`.
+  + `eqtp` can be rewritten through `eq`.
+
+  + `eeq` can be rewritten through `letnext`, `eq`, and `eeq`.
 
 - Library changes:
 

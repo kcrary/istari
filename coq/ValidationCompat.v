@@ -26,7 +26,7 @@ Require Import ValidationSum.
 Require Import ValidationFuture.
 
 (* The order of some of these matters, for some reason. *)
-Hint Rewrite def_iff def_eeqtp def_guard def_arrow def_pi def_sigma def_prod def_dprod def_sum def_set def_iset def_inl def_inr def_sum_case def_fut def_letnext def_intersect def_union : prepare.
+Hint Rewrite def_iff def_eeqtp def_guard def_arrow def_pi def_sigma def_prod def_dprod def_sum def_set def_iset def_inl def_inr def_sum_case def_fut def_letnext def_intersect def_union def_eq : prepare.
 
 
 Lemma eeqtpRefl_valid : eeqtpRefl_obligation.
@@ -917,6 +917,142 @@ apply tr_prod_intro.
     apply (tr_subtype_formation_invert1 _ _ _ b' b').
     eapply tr_inhabitation_formation.
     eapply tr_prod_elim1; eauto.
+    }
+  }
+Qed.
+
+
+
+Lemma eqEeq_valid : eqEeq_obligation.
+Proof.
+prepare.
+intros G a b m n p ext1 ext0 Heeq Hma Hna.
+assert (tr G (deq m m b)) as Hmb.
+  {
+  eapply tr_subtype_elim; eauto.
+  apply (tr_subtype_eta2 _#3 (ppi1 p) (ppi1 p)).
+  eapply tr_prod_elim1; eauto.
+  }
+assert (tr G (deq n n b)) as Hnb.
+  {
+  eapply tr_subtype_elim; eauto.
+  apply (tr_subtype_eta2 _#3 (ppi1 p) (ppi1 p)).
+  eapply tr_prod_elim1; eauto.
+  }
+assert (tr G (deqtype a a)) as Ha.
+  {
+  eapply tr_inhabitation_formation; eauto.
+  }
+assert (tr G (deqtype b b)) as Hb.
+  {
+  eapply tr_inhabitation_formation; eauto.
+  }
+apply tr_prod_intro.
+  {
+  apply tr_subtype_intro.
+    {
+    apply tr_equal_formation; auto.
+    }
+
+    {
+    apply tr_equal_formation; auto.
+    }
+  simpsub.
+  apply (tr_assert _ (equal (subst sh1 a) (subst sh1 m) (subst sh1 n)) (var 0)).
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+  simpsub.
+  cbn [Nat.add].
+  apply tr_equal_elim.
+  apply (tr_equal_eta_hyp _ [_] _ _ _ triv triv).
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  apply tr_equal_intro.
+  apply tr_equal_intro.
+  apply (tr_subtype_elim _ (subst sh1 a)).
+    {
+    apply (weakening _ [_] []).
+      {
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      cbn [length].
+      simpsub.
+      rewrite <- !compose_assoc.
+      unfold sh1.
+      rewrite -> !compose_sh_unlift.
+      simpsub.
+      reflexivity.
+      }
+    cbn [length].
+    simpsub.
+    cbn [List.app].
+    apply (tr_subtype_eta2 _ _ _ (ppi1 p) (ppi1 p)).
+    eapply tr_prod_elim1; eauto.
+    }
+    
+    {
+    apply tr_equal_elim.
+    apply (tr_equal_eta2 _#4 (var 0) (var 0)).
+    eapply hypothesis; eauto using index_0.
+    }
+  }
+
+  {
+  apply tr_subtype_intro.
+    {
+    apply tr_equal_formation; auto.
+    }
+
+    {
+    apply tr_equal_formation; auto.
+    }
+  simpsub.
+  apply (tr_assert _ (equal (subst sh1 b) (subst sh1 m) (subst sh1 n)) (var 0)).
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+  simpsub.
+  cbn [Nat.add].
+  apply tr_equal_elim.
+  apply (tr_equal_eta_hyp _ [_] _ _ _ triv triv).
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  apply tr_equal_intro.
+  apply tr_equal_intro.
+  apply (tr_subtype_elim _ (subst sh1 b)).
+    {
+    apply (weakening _ [_] []).
+      {
+      simpsub.
+      reflexivity.
+      }
+  
+      {
+      cbn [length].
+      simpsub.
+      rewrite <- !compose_assoc.
+      unfold sh1.
+      rewrite -> !compose_sh_unlift.
+      simpsub.
+      reflexivity.
+      }
+    cbn [length].
+    simpsub.
+    cbn [List.app].
+    apply (tr_subtype_eta2 _ _ _ (ppi2 p) (ppi2 p)).
+    eapply tr_prod_elim2; eauto.
+    }
+    
+    {
+    apply tr_equal_elim.
+    apply (tr_equal_eta2 _#4 (var 0) (var 0)).
+    eapply hypothesis; eauto using index_0.
     }
   }
 Qed.
