@@ -1,5 +1,5 @@
-open:Miscellaneous
-# `Miscellaneous`
+open:Misc
+# `Misc`
 
 This module contains various constants that need to be primitive, but aren't used
 widely enough to make them pervasive.
@@ -14,7 +14,7 @@ widely enough to make them pervasive.
 | `negative`     | arises in determining whether `mu` types are well-formed |
 
 
-It also contains some defined notions that defy categorization:
+It also contains some definitions and lemmas that defy categorization:
 
     nonsense : type:nonsense
              = def:nonsense
@@ -24,3 +24,12 @@ nonsense, even terms that would normally be ill-formed.  As a
 corollary, every type is a subtype of nonsense:
 
     nonsense_subtype : type:nonsense_subtype
+
+
+Extensional type equivalence can be mapped through any covariant or
+contravariant type operator:
+
+    eeqtp_compat_covariant : type:eeqtp_compat_covariant
+
+    eeqtp_compat_contravariant : type:eeqtp_compat_contravariant
+

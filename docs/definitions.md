@@ -57,7 +57,8 @@ after the fact using by proving a typing lemma and attaching it using
 There is a hazard to using raw definitions: Constant definitions are
 not permitted to contain evars.  With an ordinary definition, any
 evars (such as those arising from calling functions with implicit
-arguments) would typically be instantiated in the course of
+arguments) would typically (although [not
+necessarily](theorem-infirmity.html)) be instantiated in the course of
 establishing the constant's type.  But in a raw definition one must be
 sure to avoid creating evars.
 

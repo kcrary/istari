@@ -13,7 +13,7 @@
 - [`Kindlike`](lib/kindlike.html) (types eligible for impredicative quantification)
 - [`Logic`](lib/logic.html)
 - [`List`](lib/list.html)
-- [`Miscellaneous`](lib/miscellaneous.html)
+- [`Misc`](lib/misc.html)
 - [`Nat`](lib/nat.html)
 - [`Natural`](lib/natural.html) (natural numbers using "native" arithmetic)
 - [`Option`](lib/option.html)

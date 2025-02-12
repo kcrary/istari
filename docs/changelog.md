@@ -22,12 +22,14 @@
 
   + `eqtp` can be rewritten through `eq`.
 
-  + `eeq` can be rewritten through `letnext`, `eq`, and `eeq`.
+  + `eeqtp` can be rewritten through `letnext`, `eq`, and `eeqtp`.
 
 - Library changes:
 
   + `GirardParadox` and `SmithParadox` libraries are no longer
      pre-loaded.
+
+  + `Miscellaneous` has been renamed to `Misc`.
 
 - Basis changes:
 
