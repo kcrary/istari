@@ -1,0 +1,230 @@
+
+File.import "kindlike-load.iml";
+
+File.import "weaksum-aux.iml";
+grammaron Weaksum;
+
+beginModule "Weaksum";
+
+
+define /weaksum a b/
+/
+  union (x : a) . b x
+//
+  intersect i . forall (a : U i) . (a -> U i) -> U i
+/;
+
+unfold /weaksum/.
+typecheck.
+qed ();
+
+
+
+structure Nothing = AfterWeaksum ();
+
+
+
+define /packinv {a} b y/
+/
+  y
+//
+  intersect i . forall (a : U i) (b : a -> U i) . 
+    intersect (x : a) . b x -> weaksum (x : a) . b x
+/;
+
+unfold /packinv/.
+unfold /weaksum/.
+typecheck.
+qed ();
+
+
+
+define /pack {a} b x y/
+/
+  `packinv a b y
+//
+  intersect i . forall (a : U i) (b : a -> U i) .
+    forall (x : a) . b x -> weaksum (x : a) . b x
+/;
+
+unfold /pack/.
+typecheck.
+qed ();
+
+
+
+define /unpack {a b c} y f/
+/
+  f y
+//
+  intersect i . 
+  forall (a : U i) (b : a -> U i) (c : U i) .
+    (weaksum (x : a) . b x) -> (intersect (x : a) . b x -> c) -> c
+/;
+
+unfold /unpack/.
+unfold /weaksum/.
+inference.
+introOf /i a b c y/.
+destruct /y/ /x y/.
+unhide.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  unpack _ _ _ (pack _ _ _ y) f --> f y ;
+  unpack _ _ _ (packinv _ _ y) f --> f y ;
+
+  unfolding unpack pack packinv
+/;
+
+
+
+define /unpackt {a b} t u/
+/
+  weaksum (x : a) . exists (y : b x) .
+    `pack a b x y = u : (weaksum (x : a) . b x)
+    & t x y
+//
+  intersect i .
+  forall (a : U i) (b : a -> U i) .
+    (forall (x : a) . b x -> U i)
+    -> (weaksum (x : a) . b x)
+    -> U i
+/;
+
+unfold /unpackt/.
+typecheck.
+qed ();
+
+
+
+define /unpackt_intro_inv {a b c} y z/
+/
+  packinv
+    (fn x' . exists (y' : b x') . `pack a b x' y' = `packinv a b y : (weaksum (x : a) . b x) & c x' y')
+    (y, (), z)
+//
+  intersect i .
+  forall (a : U i) (b : a -> U i) (c : forall (x : a) . b x -> U i) .
+  intersect (x : a) .
+  forall (y : b x) .
+    c x y -> `unpackt a b c (`packinv a b y)
+/;
+
+unfold /unpackt_intro_inv/.
+unfold /unpackt/.
+typecheck.
+unfold /pack/.
+reflexivity.
+qed ();
+
+    
+    
+define /unpackt_intro {a b c} x y z/
+/
+  `unpackt_intro_inv a b c y z
+//
+  intersect i .
+  forall 
+    (a : U i) (b : a -> U i) (c : forall (x : a) . b x -> U i)
+    (x : a)
+    (y : b x) .
+      c x y -> `unpackt a b c (`pack a b x y)
+/;
+
+unfold /unpackt_intro/.
+typecheck.
+unfold /pack/.
+reflexivity.
+qed ();
+
+
+
+define /unpackt_elim {a b c d} z w f/
+/
+  `unpack a 
+    (fn x . exists (y : b x) . `pack a b x y = z : (weaksum (x : a) . b x) & c x y)
+    (d z)
+    w
+    (fn w' . f (w' #1) (w' #2 #2))
+//
+  intersect i .
+  forall 
+    (a : U i) (b : a -> U i) (c : forall (x : a) . b x -> U i)
+    (d : (weaksum (x : a) . b x) -> U i)
+    (z : weaksum (x : a) . b x) .
+      `unpackt a b c z
+      -> (intersect (x : a) . forall (y : b x) . c x y -> d (`pack a b x y))
+      -> d z
+/;
+
+unfold /unpackt_elim/.
+unfold /unpackt/.
+inference.
+introOf /i a b c d z w f/.
+reduce //.
+typecheck.
+reintro /x y/.
+reduce /y/.
+exact /y #2 #1/.
+qed ();
+
+
+
+reductions
+/
+  unpackt_elim _ _ _ _ _ (unpackt_intro_inv _ _ _ y z) f --> f y z ;
+  unpackt_elim _ _ _ _ _ (unpackt_intro _ _ _ _ y z) f --> f y z ;
+
+  unfolding unpackt_elim unpackt_intro unpackt_intro_inv
+/;
+
+
+
+lemma "iexists_weaksum"
+/
+  forall i (a : Kind i) (b : a -> U i) .
+    (iexists (x : a) . b x) <:> (weaksum (x : a) . b x)
+/;
+
+inference.
+intro /i a b/.
+unfold /weaksum/.
+reduce //.
+unfold /eeqtp/.
+split.
+  {
+  intro /(x y)/.
+  typecheck.
+  }
+
+  {
+  intro /(x y)/.
+  typecheck.
+  }
+qed ();
+
+
+
+lemma "weaksum_kindlike"
+/
+  forall i (A : U (1 + i)) .
+    Kindlike.kindlike i A
+    -> exists (Q : (A -> U i) -> U i) .
+         forall (B : A -> U i) . Q B <:> (weaksum (x : A) . B x)
+/;
+
+inference.
+intro /i A Hkindlike/.
+so /Kindlike.exists_kindlike _ _ Hkindlike/ /Q HQ/.
+exists /Q/.
+unfold /weaksum/.
+hyp /HQ/.
+qed ();
+
+
+endModule ();

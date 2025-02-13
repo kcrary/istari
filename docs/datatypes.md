@@ -23,11 +23,18 @@ One defines datatypes with the `typedef` command.  For example:
 A datatype definition begins with "invisible" pervasive arguments
 preceded by the `intersect` keyword.  They are `intersect`-bound in
 the types of the datatypes and constructors.  (This is typically used
-for level variables.)  Next are the visible pervasive arguments,
+for level variables.)  Next are intermediate pervasive arguments,
+preceded by the `intermediate` keyword.  (There are none in the
+example.)  Next are the visible pervasive arguments,
 preceded by the `forall` keyword.  They are arguments to all the
 datatypes and constructors.  Next is the universe to which the
 datatypes belong.  In the example, the datatypes belong to the same
 universe (`U i`) to which the type argument `a` belongs.
+
+Invisible arguments are bound in both types and constructors by
+`intersect`, and visible arguments are bound in both by `forall`.
+Intermediate arguments are bound in types by `forall` but in
+constructors by `intersect`.
 
 Next are the datatype and their constructors.  Each datatype can take
 additional "index" arguments.  In the example, both datatypes take
@@ -135,7 +142,7 @@ reduces to:
 These reductions are registered with the normalization engine and
 applied automatically.  In addition, they are placed in the registry
 so that users can obtain them for writing tactics.  The name is
-`reduce` followed by the iterator's name, followed by the contructor's
+`reduce` followed by the iterator's name, followed by the constructor's
 name.  For example, the preceding reduction would be written under the
 name `reduce_tree_iter_Node`.
 

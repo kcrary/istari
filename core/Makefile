@@ -1,7 +1,7 @@
 
 ISTARIBIN=../ui/bin
 
-DOCUNITS = acc bar bool decidable finite finite-map function integer kindlike logic list misc nat natural option partial permutation relations stable symbol tuple union wtype
+DOCUNITS = acc bar bool decidable finite finite-map function integer kindlike logic list misc nat natural option partial permutation relations stable symbol tuple weaksum wtype
 UNITS = $(DOCUNITS) datatype syntactic-equality omega
 DOCS = finite-map-class
 
@@ -45,7 +45,7 @@ stable.isto : decidable.isto logic.isto
 symbol.isto : bool.isto logic.isto partial.isto
 syntactic-equality.isto : nat.isto integer.isto natural.isto symbol.isto
 tuple.isto : datatype.isto misc.isto
-union.isto : logic.isto
+weaksum.isto : kindlike.isto
 wtype.isto : acc.isto
 
 clean :

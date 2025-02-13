@@ -1,5 +1,9 @@
 # `SmithParadox`
 
+Can be loaded using `File.import "smith-paradox-load.iml";`
+
+---
+
 Smith's paradox [1] is a proof that there exist non-admissible types,
 that is, types that cannot be used with 
 [fixpoint induction](../type-theory.html#partial-types).

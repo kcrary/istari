@@ -1,5 +1,17 @@
+load:union.isto
 open:Union
 # `Union`: elimination forms for `union` and `iexists`
+
+Can be loaded using `File.import "girard-paradox-load.iml";`  To
+enable `Union`'s syntactic sugar:
+
+    grammaroff Weaksum;
+    grammaron Union;
+
+This is necessary because `Union`'s syntactic sugar conflicts with
+`Weaksum`'s.
+
+---
 
 To assist in typechecking code that operates on a union, we have
 `unpack` and its dependently typed analogue `unpack_dep`:
@@ -10,8 +22,8 @@ To assist in typechecking code that operates on a union, we have
     unpack_dep : type:unpack_dep
                = def:unpack_dep
 
-The syntactic sugar `unpack x = u in m` is accepted for
-`` `unpack u (fn x . m)``.
+If enabled, the syntactic sugar `unpack x = u in m` is accepted for ``
+`unpack u (fn x . m)``.
 
 Since unions are, at least in part, for managing situations in which
 some variables are hidden, everything in this module takes every
@@ -29,8 +41,8 @@ union, so we have a variation on `unpack` for defining types:
     unpackt : type:unpackt
             = def:unpackt
 
-The syntactic sugar `unpackt (x , y) = u in b` is accepted for
-`` `unpackt _ _ (fn x y . b) u``.
+If enabled, the syntactic sugar `unpackt (x , y) = u in b` is accepted
+for `` `unpackt _ _ (fn x y . b) u``.
 
 The `unpackt` type has an introduction and elimination form:
 
@@ -80,14 +92,14 @@ A similar set of definitions is available for `iexists`:
     iunpack_dep : type:iunpack_dep
                 = def:iunpack_dep
 
-The syntactic sugar `iunpack x = u in m` is accepted for
+If enabled, the syntactic sugar `iunpack x = u in m` is accepted for
 `` `iunpack u (fn x . m)``.
 
     iunpackt : type:iunpackt
              = def:iunpackt
 
-The syntactic sugar `iunpackt (x , y) = u in b` is accepted for
-`` `iunpackt _ _ _ (fn x y . b) u``.
+If enabled, the syntactic sugar `iunpackt (x , y) = u in b` is
+accepted for `` `iunpackt _ _ _ (fn x y . b) u``.
 
     iunpackt_intro : type:iunpackt_intro
                    = def:iunpackt_intro

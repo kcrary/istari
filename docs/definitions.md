@@ -143,7 +143,7 @@ mutually defined functions.  Thus `snork1` and `snork2` have the type
 `nat -> nat -> nat` (although this has to be proven, of course).
 
 The definition also creates an appropriate unrolling rewrite.  If one
-uses `unfold /snork2/` on the goal:
+uses `unroll /snork2/` on the goal:
 
     snork2 4 2 = 16 : nat
 
@@ -221,8 +221,8 @@ engine, one may use the `reductions` command:
 
     reductions
     /
-      length _ (nil _) --> 0 ;
-      length a (cons _ h t) --> succ (length a t) ;
+      length _ (nil) --> 0 ;
+      length a (cons h t) --> succ (length a t) ;
       unrolling length
     /;
 
@@ -248,19 +248,13 @@ unrolls to `g x y`, then `f (f x y)` reduces to itself, not to
 
 The left-hand-sides of reductions take a special syntax: they must
 consist of a constant followed by a list of arguments.  Amidst the
-arguments is exactly one *principal* argument (`nil _` and `cons _ h
-t` in the example).  The principal argument must be parenthesized,
-even if it takes no arguments.
+arguments are *principal* arguments (`nil` and 
+`cons h t` in the example).  The principal argument(s) must be
+parenthesized, even if they take no arguments (*e.g.,* `nil`).
 
 The right-hand-side uses the ordinary term syntax, except that
 implicit arguments are not inserted.  (An evar on the right-hand-side
 would never be correct.)
-
-Note that the process of verifying reductions is purely syntactic, so
-it can be sensitive to subtle changes.  For example, this variation on
-the second reduction, though deceptively similar, is incorrect:
-
-      length _ (cons a h t) --> succ (length a t) ;  (* incorrect *)
 
 The right-hand-side of a reduction should not contain an instance of
 the left-hand-side (even beneath a lambda).  Such a reduction (if
@@ -269,6 +263,21 @@ looping.  Since unification tries to avoid normalizing, the
 non-terminating behavior might not arise for some time, making its
 cause not obvious when it finally does.
 
+Note that the process of verifying reductions is purely syntactic, so
+it can be sensitive to subtle changes.  For example, consider the
+correct reduction for `tree_iter` on `Node`:
+
+    tree_iter a P Q hemp hnode hnil hcons _ (Node a' n x f) --> 
+      hnode n x f (forest_iter a P Q hemp hnode hnil hcons n f)
+
+The variation, though deceptively similar, is incorrect:
+
+    (* incorrect *)
+    tree_iter a P Q hemp hnode hnil hcons _ (Node a' n x f) --> 
+      hnode n x f (forest_iter a' P Q hemp hnode hnil hcons n f)
+
+We know that `a` and `a'` must be the same type, but syntactically it
+is `a` not `a'` that finds its way to the call to `forest_iter`.
 
 
 ### Inductive function definitions
@@ -282,7 +291,6 @@ Istari provides a command to streamline the process:
       treesize : tree [a] __ -> nat of
       | Empty . 0
       | Node _ x f . succ (forestsize f)
-      | One _ t . treesize t
       
       and
       forestsize : forest __ -> nat of

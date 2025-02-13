@@ -2,6 +2,8 @@
 
 ### The Core library
 
+The following libraries are pre-loaded:
+
 - [`Acc`](lib/acc.html) (accessibility)
 - [`Bar`](lib/bar.html) (simulated partial computable objects)
 - [`Bool`](lib/bool.html)
@@ -23,11 +25,14 @@
 - [`Stable`](lib/stable.html)
 - [`Symbol`](lib/symbol.html)
 - [`Tuple`](lib/tuple.html)
-- [`Union`](lib/union.html) (elimination forms for `union` and `iexists`)
+- [`Weaksum`](lib/weaksum.html) (an alternative interface for union types)
 - [`Wtype`](lib/wtype.html) (well-founded types)
 
 
 ### Other libraries
 
+The following libraries can be loaded from the `library` directory:
+
 - [`GirardParadox`](lib/girard-paradox.html) (type is not a type)
 - [`SmithParadox`](lib/smith-paradox) (there exist inadmissible types)
+- [`Union`](lib/union.html) (elimination forms for `union` and `iexists`)

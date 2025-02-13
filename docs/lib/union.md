@@ -1,5 +1,16 @@
 # `Union`: elimination forms for `union` and `iexists`
 
+Can be loaded using `File.import "girard-paradox-load.iml";`  To
+enable `Union`'s syntactic sugar:
+
+    grammaroff Weaksum;
+    grammaron Union;
+
+This is necessary because `Union`'s syntactic sugar conflicts with
+`Weaksum`'s.
+
+---
+
 To assist in typechecking code that operates on a union, we have
 `unpack` and its dependently typed analogue `unpack_dep`:
 
@@ -12,8 +23,8 @@ To assist in typechecking code that operates on a union, we have
                       (intersect (x : a) . forall (y : b x) . c y) -> c u
                = fn c u f . f u
 
-The syntactic sugar `unpack x = u in m` is accepted for
-`` `unpack u (fn x . m)``.
+If enabled, the syntactic sugar `unpack x = u in m` is accepted for ``
+`unpack u (fn x . m)``.
 
 Since unions are, at least in part, for managing situations in which
 some variables are hidden, everything in this module takes every
@@ -34,8 +45,8 @@ union, so we have a variation on `unpack` for defining types:
             = fn a b c u .
                  union (x : a) . exists (y : b x) . y = u : (union (x1 : a) . b x1) & c x y
 
-The syntactic sugar `unpackt (x , y) = u in b` is accepted for
-`` `unpackt _ _ (fn x y . b) u``.
+If enabled, the syntactic sugar `unpackt (x , y) = u in b` is accepted
+for `` `unpackt _ _ (fn x y . b) u``.
 
 The `unpackt` type has an introduction and elimination form:
 
@@ -45,7 +56,7 @@ The `unpackt` type has an introduction and elimination form:
                        (b : a -> U i)
                        (c : forall (x : a) . b x -> U i)
                        (x : a) .
-                       forall (y : b x) . c x y -> `unpackt a b c y
+                       forall (y : b x) . c x y -> unpackt a b c y
                   = fn y z . (y, (), z)
 
     unpackt_elim  : intersect
@@ -55,7 +66,7 @@ The `unpackt` type has an introduction and elimination form:
                        (c : forall (x : a) . b x -> U i)
                        (d : (union (x : a) . b x) -> U i)
                        (u : union (x : a) . b x) .
-                       `unpackt a b c u
+                       unpackt a b c u
                        -> (intersect (x : a) . forall (y : b x) . c x y -> d y)
                        -> d u
                   = fn w f . f (w #1) (w #2 #2)
@@ -103,7 +114,7 @@ A similar set of definitions is available for `iexists`:
                        (intersect (x : a) . forall (y : b x) . c y) -> c u
                 = fn c u f . f u
 
-The syntactic sugar `iunpack x = u in m` is accepted for
+If enabled, the syntactic sugar `iunpack x = u in m` is accepted for
 `` `iunpack u (fn x . m)``.
 
     iunpackt : forall (i : level) (a : Kind i) (b : a -> U i) .
@@ -111,8 +122,8 @@ The syntactic sugar `iunpack x = u in m` is accepted for
              = fn i a b c u .
                   iexists (x : a) . exists (y : b x) . y = u : (iexists (x1 : a) . b x1) & c x y
 
-The syntactic sugar `iunpackt (x , y) = u in b` is accepted for
-`` `iunpackt _ _ _ (fn x y . b) u``.
+If enabled, the syntactic sugar `iunpackt (x , y) = u in b` is
+accepted for `` `iunpackt _ _ _ (fn x y . b) u``.
 
     iunpackt_intro : intersect
                         (i : level)
@@ -120,7 +131,7 @@ The syntactic sugar `iunpackt (x , y) = u in b` is accepted for
                         (b : a -> U i)
                         (c : forall (x : a) . b x -> U i)
                         (x : a) .
-                        forall (y : b x) . c x y -> `iunpackt i a b c y
+                        forall (y : b x) . c x y -> iunpackt a b c y
                    = fn y z . (y, (), z)
 
     iunpackt_elim  : intersect
@@ -130,7 +141,7 @@ The syntactic sugar `iunpackt (x , y) = u in b` is accepted for
                         (c : forall (x : a) . b x -> U i)
                         (d : (iexists (x : a) . b x) -> U i)
                         (u : iexists (x : a) . b x) .
-                        `iunpackt i a b c u
+                        iunpackt a b c u
                         -> (intersect (x : a) . forall (y : b x) . c x y -> d y)
                         -> d u
                    = fn w f . f (w #1) (w #2 #2)

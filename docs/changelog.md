@@ -26,8 +26,10 @@
 
 - Library changes:
 
-  + `GirardParadox` and `SmithParadox` libraries are no longer
-     pre-loaded.
+  + The `GirardParadox`, `SmithParadox`, and `Union` libraries are no
+    longer pre-loaded.
+
+  + `Weaksum` added.
 
   + `Miscellaneous` has been renamed to `Misc`.
 
