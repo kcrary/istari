@@ -49,6 +49,11 @@ signature TYPECHECK_TABLES =
       val trivialIntroTactics : priority tacticm ConstantTable.table
       val semitrivialIntroTactics : (Term.term * priority tacticm) ConstantTable.table
 
+
+      (* Tools *)
+
+      val unhideForSubtype : tactic
+
    end
 
 
@@ -597,5 +602,18 @@ structure TypecheckTables :> TYPECHECK_TABLES =
              /intersect (i : level) (a b c : U i) . sum a b -> (a -> c) -> (b -> c) -> c/,
              Rule.sum_caseType)
             ]
+
+
+
+      open Tactic
+
+      val unhideForSubtype =
+         let
+            do () = lift
+         in
+            refine (Rule.inhabitant (T.evar ()) T.Triv)
+            >>+
+            refine (Rule.subtypeIntro (T.evar ()) (T.evar ()))
+         end
 
    end

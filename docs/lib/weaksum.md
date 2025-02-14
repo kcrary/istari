@@ -34,6 +34,18 @@ access to the witness term:
 The syntactic sugar `unpack x = u in m` is accepted for 
 `unpack u (fn x . m)`.
 
+Weaksum is covariant and preserves extensional equality:
+
+    weaksum_subtype : forall (i : level) (a a' : U i) (b : a -> U i) (b' : a' -> U i) .
+                         a <: a'
+                         -> (forall (x : a) . b x <: b' x)
+                         -> (weaksum (x : a) . b x) <: (weaksum (x : a') . b' x)
+
+    weaksum_eeqtp : forall (i : level) (a a' : U i) (b : a -> U i) (b' : a' -> U i) .
+                       a <:> a'
+                       -> (forall (x : a) . b x <:> b' x)
+                       -> (weaksum (x : a) . b x) <:> (weaksum (x : a') . b' x)
+
 Since the body of the `unpack` does not have access to the witness
 term, it is unsuitable for composing predicates that talk about the
 a weak sum's witness term.  For that, we can define `unpackt`:

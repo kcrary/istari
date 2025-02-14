@@ -82,5 +82,7 @@ A simpler case-analysis operation:
 Note that the subtyping principle relies on `None` and `Some`'s type
 argument being invisible (*i.e.,* taken using `intersect`).
 
+    option_eeqtp : forall (i : level) (a b : U i) . a <:> b -> option a <:> option b
+
     kindlike_option : forall (i : level) (a : U (1 + i)) .
                          a -> Kindlike.kindlike i a -> Kindlike.kindlike i (option a)

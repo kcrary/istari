@@ -80,4 +80,6 @@ A simpler case-analysis operation:
 Note that the subtyping principle relies on `None` and `Some`'s type
 argument being invisible (*i.e.,* taken using `intersect`).
 
+    option_eeqtp : type:option_eeqtp
+
     kindlike_option : type:kindlike_option

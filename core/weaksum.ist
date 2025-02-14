@@ -1,5 +1,6 @@
 
 File.import "kindlike-load.iml";
+File.import "misc-load.iml";
 
 File.import "weaksum-aux.iml";
 grammaron Weaksum;
@@ -80,6 +81,55 @@ reductions
 
   unfolding unpack pack packinv
 /;
+
+
+
+lemma "weaksum_subtype"
+/
+  forall i (a a' : U i) (b : a -> U i) (b' : a' -> U i) .
+    a <: a'
+    -> (forall (x : a) . b x <: b' x)
+    -> (weaksum (x : a) . b x) <: (weaksum (x : a') . b' x)
+/;
+
+inference.
+intro /i a a' b b' Ha Hb/.
+intro /y/.
+destruct /y/ /x y/.  (* weaksum's destructor is not installed yet *)
+unhide.
+fold /`packinv a' (fn x' . b' x') y/.
+fold /pack _ x _/.
+typecheck.
+qed ();
+
+
+
+lemma "weaksum_eeqtp"
+/
+  forall i (a a' : U i) (b : a -> U i) (b' : a' -> U i) .
+    a <:> a'
+    -> (forall (x : a) . b x <:> b' x)
+    -> (weaksum (x : a) . b x) <:> (weaksum (x : a') . b' x)
+/;
+
+inference.
+intro /i a a' b b' Ha/.
+so /Ha/ /Hsuba Hsuba'/.
+intro /Hb/.
+unfold /eeqtp/.
+split.
+  {
+  apply /weaksum_subtype/ >> auto.
+  intro /x/.
+  exact /Hb x #1/.
+  }
+
+  {
+  apply /weaksum_subtype/ >> auto.
+  intro /x/.
+  exact /Hb x #2/.
+  }
+qed ();
 
 
 

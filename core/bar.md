@@ -116,9 +116,11 @@ The monad laws for `bindbart`:
     bindbart_assoc : type:bindbart_assoc
 
 
-Bar is covariant:
+Bar is covariant and preserves extensional equality:
 
     bar_subtype : type:bar_subtype
+
+    bar_eeqtp : type:bar_eeqtp
 
 
 Finally we can define a fixpoint operator on simulated partial objects:

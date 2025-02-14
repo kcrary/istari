@@ -2,11 +2,27 @@
 functor AfterOptionAll () :> sig end =
    struct
 
+      structure T = Term
+
       val option = resolveGlobal /Option.option/
       val option_subtype = resolveGlobal /Option.option_subtype/
+      val option_eeqtp = resolveGlobal /Option.option_eeqtp/
   
       val () =
          Constant2Table.insert TypecheckTables.subtypeTactics (option, option)
-         (Backchain.applyRaw /\Term.Const option_subtype\/)
+         (TypecheckTables.unhideForSubtype >>+ Backchain.applyRaw /\Term.Const option_subtype\/)
+
+      fun compatOptionEeqtp _ _ tac =
+         (* tac :: A <:> A' *)
+         (* option A <:> option A' *)
+         Backchain.witnessPriority /\T.Const option_eeqtp\ _ _ _ __/
+         >>!
+         (* A <:> A' *)
+         tac
+
+      val () =
+         RewriteInternal.CICTable.insert RewriteInternal.compatibilityTable
+            (option, 0, Prim.eeqtp)
+            (RewriteTypes.General Prim.eeqtp, true, 0, compatOptionEeqtp)
 
    end

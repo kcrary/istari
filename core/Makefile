@@ -27,6 +27,7 @@ tags :
 ## everything Istari's datatype implementation needs, including stuff datatype.ist doesn't
 datatype.isto : acc.isto misc.isto nat.isto partial.isto     integer.isto
 
+bar.isto : misc.isto
 bool.isto : logic.isto
 decidable.isto : logic.isto bool.isto
 finite.isto : logic.isto decidable.isto list.isto
@@ -37,7 +38,7 @@ kindlike.isto : bar.isto function.isto
 list.isto : bool.isto datatype.isto decidable.isto function.ist kindlike.ist logic.isto misc.isto nat.isto option.isto partial.isto
 nat.isto : acc.isto bool.isto decidable.isto stable.isto
 natural.isto : bool.isto integer.isto nat.isto logic.isto
-omega.isto : datatype.isto logic.isto bool.isto nat.isto integer.isto list.isto natural.isto
+omega.isto : datatype.isto logic.isto bool.isto nat.isto integer.isto list.isto misc.isto natural.isto
 option.isto : datatype.isto function.isto kindlike.isto integer.isto
 permutation.isto : list.isto logic.isto misc.isto nat.isto
 relations.isto : datatype.isto acc.isto decidable.isto finite.isto
@@ -45,7 +46,7 @@ stable.isto : decidable.isto logic.isto
 symbol.isto : bool.isto logic.isto partial.isto
 syntactic-equality.isto : nat.isto integer.isto natural.isto symbol.isto
 tuple.isto : datatype.isto misc.isto
-weaksum.isto : kindlike.isto
+weaksum.isto : kindlike.isto misc.isto
 wtype.isto : acc.isto
 
 clean :

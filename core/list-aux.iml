@@ -52,6 +52,8 @@ functor AfterList () :> sig end =
 functor AfterListAll () :> sig end =
    struct
 
+      structure T = Term
+
       val list = resolveGlobal /List.list/
       val list_uptype = resolveGlobal /List.list_uptype/
       val cForall = resolveGlobal /List.Forall/
@@ -65,6 +67,7 @@ functor AfterListAll () :> sig end =
       val cForall_distb = resolveGlobal /List.Forall_distb/
       val istrue_Forall_distb = resolveGlobal /List.istrue_Forall_distb/
       val list_subtype = resolveGlobal /List.list_subtype/
+      val list_eeqtp = resolveGlobal /List.list_eeqtp/
 
       val () =
          List.app
@@ -85,6 +88,19 @@ functor AfterListAll () :> sig end =
 
       val () =
          Constant2Table.insert TypecheckTables.subtypeTactics (list, list)
-         (Backchain.applyRaw /\Term.Const list_subtype\/)
+         (TypecheckTables.unhideForSubtype >>+ Backchain.applyRaw /\T.Const list_subtype\/)
+
+      fun compatListEeqtp _ _ tac =
+         (* tac :: A <:> A' *)
+         (* list A <:> list A' *)
+         Backchain.witnessPriority /\T.Const list_eeqtp\ _ _ _ __/
+         >>!
+         (* A <:> A' *)
+         tac
+
+      val () =
+         RewriteInternal.CICTable.insert RewriteInternal.compatibilityTable
+            (list, 0, Prim.eeqtp)
+            (RewriteTypes.General Prim.eeqtp, true, 0, compatListEeqtp)
 
    end

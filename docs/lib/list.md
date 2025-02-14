@@ -623,5 +623,7 @@ constructors)
 Note that the subtyping principle relies on `nil` and `cons`'s type
 argument being invisible (*i.e.,* taken using `intersect`).
 
+    list_eeqtp : forall (i : level) (a b : U i) . a <:> b -> list a <:> list b
+
     kindlike_list : forall (i : level) (a : U (1 + i)) .
                        a -> Kindlike.kindlike i a -> Kindlike.kindlike i (list a)

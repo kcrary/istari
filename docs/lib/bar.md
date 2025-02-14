@@ -132,9 +132,11 @@ The monad laws for `bindbart`:
                           : U i
 
 
-Bar is covariant:
+Bar is covariant and preserves extensional equality:
 
     bar_subtype : forall (i : level) (a b : U i) . a <: b -> bar a <: bar b
+
+    bar_eeqtp : forall (i : level) (a b : U i) . a <:> b -> bar a <:> bar b
 
 
 Finally we can define a fixpoint operator on simulated partial objects:

@@ -22,7 +22,8 @@
 
   + `eqtp` can be rewritten through `eq`.
 
-  + `eeqtp` can be rewritten through `letnext`, `eq`, and `eeqtp`.
+  + `eeqtp` can be rewritten through `bar`, `eq`, `eeqtp`, `option`, 
+    `letnext`, `list`, and `weaksum`.
 
 - Library changes:
 
@@ -35,6 +36,8 @@
     reduce automatically.
 
   + `Miscellaneous` has been renamed to `Misc`.
+
+  + Other minor additions.
 
 - Basis changes:
 

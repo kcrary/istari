@@ -456,4 +456,6 @@ constructors)
 Note that the subtyping principle relies on `nil` and `cons`'s type
 argument being invisible (*i.e.,* taken using `intersect`).
 
+    list_eeqtp : type:list_eeqtp
+
     kindlike_list : type:kindlike_list

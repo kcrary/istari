@@ -54,6 +54,7 @@ functor AfterBarAll () :> sig end =
       structure D = DestructInternal
       structure R = Reduction
       structure T = Term
+      structure H = ConstantTable
 
       open Tactic
       open Case
@@ -63,14 +64,29 @@ functor AfterBarAll () :> sig end =
       val now = resolveGlobal /Bar.now/
       val laterf = resolveGlobal /Bar.laterf/
       val bar_subtype = resolveGlobal /Bar.bar_subtype/
+      val bar_eeqtp = resolveGlobal /Bar.bar_eeqtp/
       val bar_iter = resolveGlobal /Bar.bar_iter/
 
       val () =
          Constant2Table.insert TypecheckTables.subtypeTactics (bar, bar)
-            (Backchain.applyRaw /\Term.Const bar_subtype\/)
+            (TypecheckTables.unhideForSubtype >>+ Backchain.applyRaw /\Term.Const bar_subtype\/)
 
       val () =
-         ConstantTable.insert InductionInternal.iterators bar (bar_iter, 1, 0)
+         H.insert InductionInternal.iterators bar (bar_iter, 1, 0)
+
+      fun compatBarEeqtp _ _ tac =
+         (* tac :: A <:> A' *)
+         (* bar A <:> bar A' *)
+         Backchain.witnessPriority /\T.Const bar_eeqtp\ _ _ _ __/
+         >>!
+         (* A <:> A' *)
+         tac
+
+      val () =
+         RewriteInternal.CICTable.insert RewriteInternal.compatibilityTable
+            (bar, 0, Prim.eeqtp)
+            (RewriteTypes.General Prim.eeqtp, true, 0, compatBarEeqtp)
+
 
       fun destBar i pat set =
          (case pat of
@@ -119,6 +135,6 @@ functor AfterBarAll () :> sig end =
                 fail "bar pattern expected")
 
       val () =
-         ConstantTable.insert D.destructTactics bar destBar
+         H.insert D.destructTactics bar destBar
 
    end

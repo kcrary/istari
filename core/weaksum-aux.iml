@@ -49,6 +49,13 @@ functor AfterWeaksumAll () :> sig end =
       val pack = resolveGlobal /Weaksum.pack/
       val unpack = resolveGlobal /Weaksum.unpack/
       val unpackt = resolveGlobal /Weaksum.unpackt/
+      val weaksum_subtype = resolveGlobal /Weaksum.weaksum_subtype/
+      val weaksum_eeqtp = resolveGlobal /Weaksum.weaksum_eeqtp/
+
+      val () =
+         Constant2Table.insert TypecheckTables.subtypeTactics (weaksum, weaksum)
+            (TypecheckTables.unhideForSubtype >>+ Backchain.applyRaw /\Term.Const weaksum_subtype\/)
+
 
       val () = CheckpointedRef.write ParseWeaksum.unpack unpack
       val () = CheckpointedRef.write ParseWeaksum.unpackt unpackt
@@ -83,6 +90,83 @@ functor AfterWeaksumAll () :> sig end =
       structure S = Seq
 
       open Tactic
+
+
+
+      val unfoldWeaksum =
+         R.compat [R.trans [R.unfold, R.beta 2, R.within [2, 0] (R.beta 1)],
+                   R.trans [R.unfold, R.beta 2, R.within [2, 0] (R.beta 1)]]
+
+      fun compatWeaksumEeqtp0 a a' tac =
+         goalCaseT
+         /
+         \Prim.eeqtp\ _ (\weaksum\ _ (fn ? . _)) =>
+         \(fnc binder =>
+              let
+                 do (_, dir) = withgoal
+                 val dir' = Directory.bindVary dir binder
+              in
+                 (* tac :: A <:> A'
+                    weaksum A . B <:> weaksum A' . B
+                 *)
+                 refine (Rule.reduce unfoldWeaksum)
+                 >>+
+                 (* union A . B <:> union A' B *)
+                 refine (Rule.unionEeq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                 >>> [
+                     (* A <:> A' *)
+                     tac,
+        
+                     (* A |- B <:> B *)
+                     refine (Rule.eeqtpRefl (T.evar ()))
+                     >>+
+                     (* A |- B : type *)
+                     chdir dir' >>+ idtacM Secondary
+                     ]
+              end)\
+         /
+
+
+      val () =
+         RewriteInternal.CICTable.insert RewriteInternal.compatibilityTable
+            (weaksum, 0, Prim.eeqtp)
+            (RewriteTypes.General Prim.eeqtp, true, 0, compatWeaksumEeqtp0)
+
+
+      fun compatWeaksumEeqtp1 b b' tac =
+         goalCaseT
+         /
+         \Prim.eeqtp\ _ (\weaksum\ _ (fn ? . _)) =>
+         \(fnc binder =>
+              let
+                 do (_, dir) = withgoal
+                 val dir' = Directory.bindVary dir binder
+              in
+                 (* tac :: B <:> B'
+                    weaksum A . B <:> weaksum A . B'
+                 *)
+                 refine (Rule.reduce unfoldWeaksum)
+                 >>+
+                 (* union A . B <:> union A B' *)
+                 refine (Rule.unionEeq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                 >>> [
+                     (* A <:> A *)
+                     refine (Rule.eeqtpRefl (T.evar ()))
+                     >>+
+                     (* A : type *)
+                     idtacM Secondary,
+        
+                     (* A |- B <:> B' *)
+                     chdir dir' >>+ tac
+                     ]
+              end)\
+         /
+
+
+      val () =
+         RewriteInternal.CICTable.insert RewriteInternal.compatibilityTable
+            (weaksum, 1, Prim.eeqtp)
+            (RewriteTypes.General Prim.eeqtp, true, 1, compatWeaksumEeqtp1)
 
 
       fun destWeaksum i pat set =
