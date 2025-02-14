@@ -331,16 +331,33 @@ Strong induction for natural numbers:
     (* =? *)
     eqb : nat -> nat -> bool
 
+    eqb (zero) (zero) --> true
+    eqb (zero) (succ _) --> false
+    eqb (succ _) (zero) --> false
+    eqb (succ m) (succ n) --> eqb m n
+
     (* <=? *)
     leqb : nat -> nat -> bool
+
+    leqb (zero) _ --> true
+    leqb (succ _) (zero) --> false
+    leqb (succ m) (succ n) --> leqb m n
 
     (* <? *)
     ltb : nat -> nat -> bool
         = fn m n . succ m <=? n
 
+    ltb _ (zero) --> false
+    ltb m (succ n) --> leqb m n
+
     (* !=? *)
     neqb : nat -> nat -> bool
          = fn m n . Bool.notb (m =? n)
+
+    neqb (zero) (zero) --> false
+    neqb (zero) (succ _) --> true
+    neqb (succ _) (zero) --> true
+    neqb (succ m) (succ n) --> neqb m n
 
     istrue_eqb : forall (m n : nat) . Bool.istrue (m =? n) <-> m = n : nat
 

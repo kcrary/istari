@@ -31,6 +31,9 @@
 
   + `Weaksum` added.
 
+  + In `Nat`, the boolean tests `eqb`, `leqb`, `ltb`, and `neqb` now
+    reduce automatically.
+
   + `Miscellaneous` has been renamed to `Misc`.
 
 - Basis changes:
@@ -38,6 +41,9 @@
   + Added `Path` and `FileSystem` modules.
 
   + Use Unix paths consistently.
+
+- Added rules `assertLater`, `assertLater'`, `coguardSubIntro`,
+  `eeqEeq`, `eqEeq`, `guardSubElim`, and `letnextEeq`.
 
 - Bug fixes.
 

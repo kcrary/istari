@@ -328,16 +328,33 @@ Strong induction for natural numbers:
     (* =? *)
     eqb : type:eqb
 
+    eqb (zero) (zero) --> true
+    eqb (zero) (succ _) --> false
+    eqb (succ _) (zero) --> false
+    eqb (succ m) (succ n) --> eqb m n
+
     (* <=? *)
     leqb : type:leqb
+
+    leqb (zero) _ --> true
+    leqb (succ _) (zero) --> false
+    leqb (succ m) (succ n) --> leqb m n
 
     (* <? *)
     ltb : type:ltb
         = def:ltb
 
+    ltb _ (zero) --> false
+    ltb m (succ n) --> leqb m n
+
     (* !=? *)
     neqb : type:neqb
          = def:neqb
+
+    neqb (zero) (zero) --> false
+    neqb (zero) (succ _) --> true
+    neqb (succ _) (zero) --> true
+    neqb (succ m) (succ n) --> neqb m n
 
     istrue_eqb : type:istrue_eqb
 

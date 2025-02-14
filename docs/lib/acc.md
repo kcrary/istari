@@ -22,9 +22,9 @@ The main use of accessibility is to invoke
 often obtained from a [well-foundness
 lemma](../definitions.html#strong-induction).
 
-Accessibility can also be used directly.  The definition is
-complicated (given below); it is easier to think about in terms of its
-intro and elim operations:
+Accessibility can also be used directly.  Since the definition is
+complicated, it is easier to think about in terms of its intro and
+elim operations:
 
     Acc_intro : forall (i : level) (A : U i) (R : A -> A -> U i) (x : A) .
                    (forall (y : A) . R y x -> Acc A R y) -> Acc A R x

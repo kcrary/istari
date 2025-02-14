@@ -263,6 +263,8 @@ looping.  Since unification tries to avoid normalizing, the
 non-terminating behavior might not arise for some time, making its
 cause not obvious when it finally does.
 
+##### A subtlety
+
 Note that the process of verifying reductions is purely syntactic, so
 it can be sensitive to subtle changes.  For example, consider the
 correct reduction for `tree_iter` on `Node`:
@@ -270,14 +272,40 @@ correct reduction for `tree_iter` on `Node`:
     tree_iter a P Q hemp hnode hnil hcons _ (Node a' n x f) --> 
       hnode n x f (forest_iter a P Q hemp hnode hnil hcons n f)
 
-The variation, though deceptively similar, is incorrect:
+This variation, though deceptively similar, is incorrect:
 
     (* incorrect *)
     tree_iter a P Q hemp hnode hnil hcons _ (Node a' n x f) --> 
       hnode n x f (forest_iter a' P Q hemp hnode hnil hcons n f)
 
-We know that `a` and `a'` must be the same type, but syntactically it
-is `a` not `a'` that finds its way to the call to `forest_iter`.
+Assuming the term is well-typed, we know that `a` and `a'` must be the
+same type, but syntactically it is `a`, not `a'`, that finds its way to
+the call to `forest_iter`.
+
+##### Multiple active arguments
+
+A reduction can more than one active argument.  For example, consider
+the reductions for `leqb`, the boolean-valued less-or-equal test on
+natural numbers:
+
+    leqb (zero) _ --> true
+    leqb (succ _) (zero) --> false
+    leqb (succ m) (succ n) --> leqb m n
+
+If the first argument is `zero`, the test always reduces to true.
+However, if the first argument is `succ`, a second argument must be
+considered.  The first active argument must be in the same position
+across all `leqb`'s reductions.  The second active argument must be in
+the same position across all reductions that agree on the first one,
+and so on.
+
+In this example, since the first reduction differs from the other two
+in the first active argument (`zero` versus `succ`), they are not
+required to agree on the location or existence of the second.
+However, since the second and third reductions agree on the first
+active argument, they must agree on the position (and existence) of
+the second active argument.  (Internally, Istari builds a decision
+tree.)
 
 
 ### Inductive function definitions
