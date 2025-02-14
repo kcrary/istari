@@ -25,3 +25,4 @@ clean :
 	cd prover; make clean
 	cd ui; make clean
 	cd core; make clean
+	cd library; make clean
