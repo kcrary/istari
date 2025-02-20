@@ -17,51 +17,20 @@ typedef
 
 
 
-define /treesize a n x/
+defineInd /a/
 /
-  tree_iter a
-    (fn _ _ . nat)
-    (fn _ _ . nat)
-    0
-    (fn _ _ _ m . (succ m))
-    0
-    (fn _ _ _ m1 _ m2 . Nat.plus m1 m2)
-    n
-    x
+  treesize : tree [a] _ -> nat of
+  | Empty . 0
+  | Node _ _ f . succ (forestsize f)
+
+  and forestsize : forest _ -> nat of
+  | Nil . 0
+  | Cons _ _ t f . treesize t + forestsize f
 //
-  intersect (i : level) .
-  forall (a : U i) (n : nat) .
-    tree a n -> nat
+  intersect (i : level) . forall (a : U i) (n : nat) . tree a n -> nat
+  and
+  intersect (i : level) . forall (a : U i) (n : nat) . forest a n -> nat
 /;
-
-introOf /i a n x/.
-unfold /treesize/.
-typecheck.
-qed ();
-
-
-
-define /forestsize a n x/
-/
-  forest_iter a
-    (fn _ _ . nat)
-    (fn _ _ . nat)
-    0
-    (fn _ _ _ m . (succ m))
-    0
-    (fn _ _ _ m1 _ m2 . Nat.plus m1 m2)
-    n
-    x
-//
-  intersect (i : level) .
-  forall (a : U i) (n : nat) .
-    forest a n -> nat
-/;
-
-introOf /i a n x/.
-unfold /forestsize/.
-typecheck.
-qed ();
 
 
 
@@ -95,20 +64,17 @@ reintro /IH/.
 split.
   {
   intro /n t Heq/.
-  moveBefore /n t/ /s/.
   subst /s/.
   destruct /t/ /{ Heq | n' x f Heq }/.
     {
+    reduce //.
     subst /n/.
-    unfold /treesize/.
     auto.
     }
 
     {
-    moveBefore /n'/ /n/.
+    reduce //.
     subst /n/.
-    unfold /treesize/.
-    fold /forestsize _ _ f/.
     compat.
     apply /IH (forest_strip f)/ >> auto.
     apply /Node_subterm/.
@@ -117,20 +83,17 @@ split.
 
   {
   intro /n f Heq/.
-  moveBefore /n f/ /s/.
   subst /s/.
   destruct /f/ /{ Heq | m' n' t f Heq }/.
     {
+    reduce //.
     subst /n/.
-    unfold /forestsize/.
     auto.
     }
 
     {
-    moveBefore /m' n'/ /n/.
+    reduce //.
     subst /n/.
-    unfold /forestsize/.
-    fold /treesize _ _ t , forestsize _ _ f/.
     compat.
       {
       apply /IH (tree_strip t)/ >> auto.
