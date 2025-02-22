@@ -52,6 +52,7 @@ Definition acc : fterm :=
 Definition admiss : fterm := lam (admiss (var 0)).
 Definition bool : fterm := booltp.
 Definition bottom : fterm := app theta (lam (var 0)).
+Definition coguard : fterm := lam (lam (coguard (var 1) (var 0))).
 Definition dprod : fterm := lam (lam (sigma (var 1) (var 1))).
 Definition eeqtp : fterm := lam (lam (prod (subtype (var 1) (var 0)) (subtype (var 0) (var 1)))).
 Definition eq : fterm := lam (lam (lam (equal (var 2) (var 1) (var 0)))).
@@ -59,15 +60,14 @@ Definition eqtp : fterm := lam (lam (eqtype (var 1) (var 0))).
 Definition false : fterm := bfalse.
 Definition foralltp : fterm := lam (alltp (app (var 1) (var 0))).
 Definition future : fterm := lam (fut (var 0)).
-Definition guard : fterm := lam (lam (guard (var 1) (var 0))).
 Definition iexists : fterm := lam (lam (lam (exist (var 2) (var 1) (app (var 1) (var 0))))).
 Definition iff : fterm := lam (lam (prod (pi (var 1) (var 1)) (pi (var 0) (var 2)))).
 Definition iforall : fterm := lam (lam (lam (all (var 2) (var 1) (app (var 1) (var 0))))).
-Definition intersect : fterm := lam (lam (intersect (var 1) (app (var 1) (var 0)))).
 Definition iset : fterm := lam (lam (iset (var 1) (app (var 1) (var 0)))).
 Definition isquash : fterm := lam (Syntax.iset unittp (var 1)).
 Definition istp : fterm := lam (eqtype (var 0) (var 0)).
 Definition ite : fterm := lam (lam (lam (bite (var 2) (var 1) (var 0)))).
+Definition halts : fterm := lam (halts (var 0)).
 Definition karrow : fterm := lam (lam (karrow (var 1) (var 0))).
 Definition kind : fterm := lam (kind (var 0)).
 Definition letnext : fterm := lam (lam (app (var 0) (prev (var 1)))).
@@ -91,7 +91,10 @@ Definition monotone : fterm := lam (alltp (alltp (pi (subtype (var 1) (var 0)) (
 Definition mu : fterm := lam (mu (app (var 1) (var 0))).
 Definition nat : fterm := nattp.
 Definition negative : fterm := lam (isnegative (app (var 1) (var 0))).
+Definition nonsense : fterm := guard voidtp voidtp.
 Definition of : fterm := lam (lam (equal (var 1) (var 0) (var 0))).
+Definition orphan : fterm := triv.
+Definition partial : fterm := lam (partial (var 0)).
 Definition prod : fterm := lam (lam (prod (var 1) (var 0))).
 Definition quotient : fterm := lam (lam (quotient (var 1) (app (app (var 2) (var 1)) (var 0)))).
 Definition rec : fterm := lam (rec (app (var 1) (var 0))).
@@ -140,16 +143,14 @@ Definition max : fterm :=
 
 Definition total : fterm :=
   lam (sigma
-         (subtype (var 0) (partial (var 0)))
-         (pi (var 1) (halts (var 0)))).
+         (subtype (var 0) (Syntax.partial (var 0)))
+         (pi (var 1) (Syntax.halts (var 0)))).
 
 Definition arrow : fterm := lam (lam (pi (var 1) (var 1))).
-Definition coguard : fterm := lam (lam (coguard (var 1) (var 0))).
-Definition halts : fterm := lam (halts (var 0)).
-Definition partial : fterm := lam (partial (var 0)).
+Definition pi : fterm := lam (lam (pi (var 1) (app (var 1) (var 0)))).
 Definition set : fterm := lam (lam (set (var 1) (app (var 1) (var 0)))).
+Definition sigma : fterm := lam (lam (sigma (var 1) (app (var 1) (var 0)))).
+Definition intersect : fterm := lam (lam (intersect (var 1) (app (var 1) (var 0)))).
+Definition guard : fterm := lam (lam (guard (var 1) (var 0))).
 Definition subtype : fterm := lam (lam (subtype (var 1) (var 0))).
 Definition theta : fterm := theta.
-
-Definition pi : fterm := lam (lam (pi (var 1) (app (var 1) (var 0)))).
-Definition sigma : fterm := lam (lam (sigma (var 1) (app (var 1) (var 0)))).

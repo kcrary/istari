@@ -611,6 +611,15 @@ eapply reduce_seq_beta; eauto using reduce_id.
 Qed.
 
 
+Lemma row_0_invert :
+  forall (r : @row object nil),
+    r = rw_nil.
+Proof.
+intros r.
+exact (row_nil_invert _ r).
+Qed.
+
+
 Lemma row_1_invert :
   forall i (r : @row object (cons i nil)),
     exists m,
@@ -632,6 +641,20 @@ intros i j r.
 so (row_cons_invert _#3 r) as (m & r1 & ->).
 so (row_cons_invert _#3 r1) as (n & r2 & ->).
 so (row_nil_invert _ r2); subst r2.
+eauto.
+Qed.
+
+
+Lemma row_3_invert :
+  forall i j k (r : @row object (cons i (cons j (cons k nil)))),
+    exists m n p,
+      r = rw_cons m (rw_cons n (rw_cons p rw_nil)).
+Proof.
+intros i j k r.
+so (row_cons_invert _#3 r) as (m & r1 & ->).
+so (row_cons_invert _#3 r1) as (n & r2 & ->).
+so (row_cons_invert _#3 r2) as (p & r3 & ->).
+so (row_nil_invert _ r3); subst r3.
 eauto.
 Qed.
 
@@ -1951,3 +1974,4 @@ Ltac invertc_mc H :=
   let H' := fresh
   in
     invertc H; []; intros ? H'; invertc_mcr H'.
+

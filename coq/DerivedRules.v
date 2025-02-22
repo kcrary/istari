@@ -1847,3 +1847,23 @@ rewrite -> (substctx_eqsub _ _ id).
 simpsub.
 exact Hc.
 Qed.
+
+
+(* Nonsense *)
+
+Lemma tr_nonsense_formation :
+  forall G,
+    tr G (deqtype nonsense nonsense).
+Proof.
+intro G.
+unfold nonsense.
+apply tr_guard_formation.
+  {
+  apply tr_voidtp_istype.
+  }
+
+  {
+  apply (tr_voidtp_elim _ (var 0) (var 0)).
+  eapply hypothesis; eauto using index_0.
+  }
+Qed.

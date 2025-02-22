@@ -621,6 +621,7 @@ signature THE_RULES =
       val sequalSymm : term -> term -> rule
       val sequalTrans : term -> term -> term -> rule
       val sequalCompat : term -> term -> term -> rule
+      val sequalCompatLam : term -> term -> rule
       val forallEtaSequal : term -> term -> term -> rule
       val arrowEtaSequal : term -> term -> term -> rule
       val existsEtaSequal : term -> term -> term -> rule
@@ -944,6 +945,7 @@ val const_mu = Const Prim.mu
 val const_nat = Const Prim.nat
 val const_nat_case = Const Prim.nat_case
 val const_negz = Const Prim.negz
+val const_nonsense = Const Prim.nonsense
 val const_partial = Const Prim.partial
 val const_plusz = Const Prim.plusz
 val const_positive = Const Prim.positive
@@ -1550,6 +1552,7 @@ fun substitutionSyntactic gsize a b m = Arg.lmake "substitutionSyntactic" [] gsi
 fun sequalSymm m n = Arg.make "sequalSymm" [] (Elim (const_sequal, [App (n), App (m), ])) [(Arg.Unhide, [], Elim (const_sequal, [App (m), App (n), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun sequalTrans m n p = Arg.make "sequalTrans" [] (Elim (const_sequal, [App (m), App (p), ])) [(Arg.Unhide, [], Elim (const_sequal, [App (m), App (n), ])), (Arg.Unhide, [], Elim (const_sequal, [App (n), App (p), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun sequalCompat m n p = Arg.make "sequalCompat" [] (Elim (const_sequal, [App (Sub (p, Dot (m, Shift 0))), App (Sub (p, Dot (n, Shift 0))), ])) [(Arg.Unhide, [], Elim (const_sequal, [App (m), App (n), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun sequalCompatLam m n = Arg.make "sequalCompatLam" [] (Elim (const_sequal, [App (Lam (NONE, m)), App (Lam (NONE, n)), ])) [(Arg.Unhide, [J.Tm (const_nonsense), ], Elim (const_sequal, [App (m), App (n), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun forallEtaSequal a b m = Arg.make "forallEtaSequal" [] (Elim (const_sequal, [App (m), App (Lam (NONE, Elim (Sub (m, Shift 1), [App (Var 0), ]))), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_forall, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun arrowEtaSequal a b m = Arg.make "arrowEtaSequal" [] (Elim (const_sequal, [App (m), App (Lam (NONE, Elim (Sub (m, Shift 1), [App (Var 0), ]))), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_arrow, [App (a), App (b), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun existsEtaSequal a b m = Arg.make "existsEtaSequal" [] (Elim (const_sequal, [App (m), App (Pair (Elim (m, [Pi1, ]), Elim (m, [Pi2, ]))), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_exists, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)

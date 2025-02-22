@@ -43,6 +43,7 @@ Definition map_operator {A B : Type} (f : A -> B) (a : list nat) (th : operator 
   | oper_app _ => oper_app _
   | oper_intersect _ => oper_intersect _
   | oper_union _ => oper_union _
+  | oper_constfn _ => oper_constfn _
   | oper_fut _ => oper_fut _
   | oper_cnext _ => oper_cnext _
   | oper_cprev _ => oper_cprev _
@@ -87,6 +88,7 @@ Definition map_operator {A B : Type} (f : A -> B) (a : list nat) (th : operator 
   | oper_admiss _ => oper_admiss _
   | oper_uptype _ => oper_uptype _
   | oper_seq _ => oper_seq _
+  | oper_marker _ x => oper_marker _ x
   end.
 
 
@@ -230,6 +232,13 @@ Qed.
 
 Lemma map_union :
   forall A B (f : A -> B) m1 m2, map_term f (union m1 m2) = union (map_term f m1) (map_term f m2).
+Proof.
+auto.
+Qed.
+
+
+Lemma map_constfn :
+  forall A B (f : A -> B), map_term f constfn = constfn.
 Proof.
 auto.
 Qed.
@@ -543,7 +552,15 @@ auto.
 Qed.
 
 
-Hint Rewrite map_ext map_extt map_var map_univ map_cty map_con map_karrow map_tarrow map_pi map_clam map_capp map_ctlam map_ctapp map_lam map_app map_intersect map_union map_fut map_cnext map_cprev map_next map_prev map_rec map_equal map_triv map_eqtype map_sequal map_subtype map_kind map_all map_alltp map_exist map_mu map_ispositive map_isnegative map_voidtp map_unittp map_cunit map_booltp map_btrue map_bfalse map_bite map_prod map_sigma map_cpair map_cpi1 map_cpi2 map_ppair map_ppi1 map_ppi2 map_wt map_set map_iset map_quotient map_guard map_coguard map_partial map_halts map_admiss map_uptype map_seq : map.
+Lemma map_marker :
+  forall A B (f : A -> B) x, map_term f (marker x) = marker x.
+Proof.
+auto.
+Qed.
+
+
+
+Hint Rewrite map_ext map_extt map_var map_univ map_cty map_con map_karrow map_tarrow map_pi map_clam map_capp map_ctlam map_ctapp map_lam map_app map_intersect map_union map_constfn map_fut map_cnext map_cprev map_next map_prev map_rec map_equal map_triv map_eqtype map_sequal map_subtype map_kind map_all map_alltp map_exist map_mu map_ispositive map_isnegative map_voidtp map_unittp map_cunit map_booltp map_btrue map_bfalse map_bite map_prod map_sigma map_cpair map_cpi1 map_cpi2 map_ppair map_ppi1 map_ppi2 map_wt map_set map_iset map_quotient map_guard map_coguard map_partial map_halts map_admiss map_uptype map_seq map_marker : map.
 
 
 Lemma map_sumbool :

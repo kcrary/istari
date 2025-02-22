@@ -26,6 +26,7 @@ Require Import MapTerm.
 Require Import Hygiene.
 Require Import Extend.
 Require Import ExtendTruncate.
+Require Import SemanticsConstfn.
 Require Import SemanticsPi.
 Require Import SemanticsEqual.
 Require Import SemanticsAll.
@@ -513,6 +514,15 @@ intros pg s i a b A B Ha IH1 Hb IH2 j Hj.
 rewrite -> iutruncate_iuunion.
 apply interp_union; auto.
 apply IH2; auto.
+}
+
+(* constfn *)
+{
+intros pg s i j Hj.
+rewrite -> iutruncate_iubase.
+rewrite -> ceiling_constfn.
+rewrite -> Nat.min_r; auto.
+apply interp_constfn.
 }
 
 (* prod *)

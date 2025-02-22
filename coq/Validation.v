@@ -636,6 +636,7 @@ exact substitutionSyntactic_valid.
 exact sequalSymm_valid.
 exact sequalTrans_valid.
 exact sequalCompat_valid.
+exact sequalCompatLam_valid.
 exact forallEtaSequal_valid.
 exact arrowEtaSequal_valid.
 exact existsEtaSequal_valid.
@@ -1433,7 +1434,6 @@ rewrite -> def_halts.
 rewrite -> Hequiv.
 apply tr_halts_value; auto.
 Qed.
-
 
 
 (* The remaining rules without validations above are:

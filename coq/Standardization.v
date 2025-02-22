@@ -113,6 +113,9 @@ Inductive ireduce : term object -> term object -> Prop :=
     ireduce m1 n1
     -> reduce m2 n2
     -> ireduce (seq m1 m2) (seq n1 n2)
+
+| ireduce_marker {x} :
+    ireduce (marker x) (marker x)
 .
 
 
@@ -120,7 +123,7 @@ Lemma ireduce_impl_mc_reduce :
   forall m n, ireduce m n -> mc reduce m n.
 Proof.
 intros m n H.
-induct H; eauto using mc_var, mc_oper, reducer_mcr, reduce_compat, mc_app, mc_prev, mc_bite, mc_ppi1, mc_ppi2, mc_seq.
+induct H; eauto using mc_var, mc_oper, reducer_mcr, reduce_compat, mc_app, mc_prev, mc_bite, mc_ppi1, mc_ppi2, mc_seq, mcr_nil.
 Qed.
 
 
@@ -219,6 +222,15 @@ cases th; try (intros; apply ireduce_canon; auto using reducer_id with dynamic; 
   invertc Hr.
   intros Hm2 _.
   apply ireduce_seq; auto using ireduce_impl_reduce.
+  }
+
+  (* marker *)
+  {
+  intros x r Hall.
+  so (row_invert_auto _ _ r) as H; cbn in H.
+  subst r.
+  fold (@marker object x).
+  apply ireduce_marker.
   }
 }
 Qed.
@@ -599,6 +611,18 @@ cases th; try (intros; destruct Hncanon; auto with dynamic; done).
   apply sreduce_seq; auto.
   apply (reduce_funct1_under _ 1); auto using sreduce_impl_reduce.
   }
+
+  (* marker *)
+  {
+  intros x r r' Hr IH Hncanon.
+  so (row_invert_auto _ _ r) as H; cbn in H.
+  subst r.
+  so (row_invert_auto _ _ r') as H; cbn in H.
+  subst r'.
+  fold (@marker object x).
+  simpsub.
+  apply sreduce_id.
+  }
 }
 Qed.
 
@@ -734,7 +758,7 @@ cases th; try (intros; destruct Hncanon; auto with dynamic; done).
 
   (* seq *)
   {
-  intros r s Hrs IH Hncanon.
+  intros r s Hrs IH _.
   so (row_invert_auto _ _ r) as (m1 & m2 & ->).
   so (row_invert_auto _ _ s) as (n1 & n2 & ->).
   fold (seq m1 m2) in *.
@@ -745,6 +769,17 @@ cases th; try (intros; destruct Hncanon; auto with dynamic; done).
   intros IH2 _.
   apply sreduce_seq; auto.
   apply sreduce_impl_reduce; auto.
+  }
+
+  (* marker *)
+  {
+  intros x r r' _ _ _.
+  so (row_invert_auto _ _ r) as H; cbn in H.
+  subst r.
+  so (row_invert_auto _ _ r') as H; cbn in H.
+  subst r'.
+  fold (@marker object x).
+  apply sreduce_id.
   }
 }
 
@@ -1191,6 +1226,19 @@ invert Hmn.
       apply ireduce_impl_reduce; auto.
       }
     }
+  }
+
+  (* marker *)
+  {
+  intros x <- Heq1 Heq2 <-.
+  injectionT Heq1.
+  intros <-.
+  injectionT Heq2.
+  intros <-.
+  fold (@marker object x).
+  exists p.
+  split; auto.
+  apply reduce_id.
   }
 } 
 Qed.

@@ -363,6 +363,29 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr (cons (hyp_tm b) (cons (hyp_tm a) G)) (deqtype (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) q))
       -> tr G (deqtype (subst1 m p) (subst1 n q))
   
+(* Constant functions (unused) *)
+
+| tr_constfn_formation :
+    forall G,
+      tr G (deq constfn constfn (univ nzero))
+
+| tr_constfn_intro :
+    forall G m n,
+      tr (cons (hyp_tm nonsense) G) (deq triv triv (sequal (subst (dot triv sh1) m) m))
+      -> tr (cons (hyp_tm nonsense) G) (deq triv triv (sequal (subst (dot triv sh1) n) n))
+      -> tr G (deq (lam m) (lam n) constfn)
+
+| tr_constfn_elim :
+    forall G m p q,
+      tr G (deq m m constfn)
+      -> tr G (deq triv triv (sequal (app m p) (app m q)))
+
+| tr_constfn_ext :
+    forall G m n,
+      tr G (deq m m constfn)
+      -> tr G (deq n n constfn)
+      -> tr G (deq m n constfn)
+
 (* Fut *)
 
 | tr_fut_kind_formation :
@@ -1515,6 +1538,11 @@ Inductive tr : @context obj -> judgement -> Prop :=
     forall G m n p,
       tr G (deq triv triv (sequal m n))
       -> tr G (deq triv triv (sequal (subst1 m p) (subst1 n p)))
+
+| tr_sequal_compat_lam :
+    forall G m n,
+      tr (hyp_tm nonsense :: G) (deq triv triv (sequal m n))
+      -> tr G (deq triv triv (sequal (lam m) (lam n)))
 
 | tr_pi_eta_sequal :
     forall G a b m,

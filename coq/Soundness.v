@@ -11,6 +11,7 @@ Require Import Judgement.
 Require Import Hygiene.
 Require Import SoundAdmiss.
 Require Import SoundAll.
+Require Import SoundConstfn.
 Require Import SoundEqtype.
 Require Import SoundEqual.
 Require Import SoundExist.
@@ -101,6 +102,10 @@ intros; eapply sound_union_formation_univ; eauto; done.
 intros; eapply sound_union_intro; eauto; done.
 intros; eapply sound_union_elim; eauto; done.
 intros; eapply sound_union_elim_eqtype; eauto; done.
+intros; eapply sound_constfn_formation; eauto; done.
+intros; eapply sound_constfn_intro; eauto; done.
+intros; eapply sound_constfn_elim; eauto; done.
+intros; eapply sound_constfn_ext; eauto; done.
 intros; eapply sound_fut_kind_formation; eauto; done.
 intros; eapply sound_fut_formation; eauto; done.
 intros; eapply sound_fut_formation_univ; eauto; done.
@@ -270,6 +275,7 @@ intros; eapply sound_syntactic_substitution; eauto; done.
 intros; eapply sound_sequal_symm; eauto; done.
 intros; eapply sound_sequal_trans; eauto; done.
 intros; eapply sound_sequal_compat; eauto; done.
+intros; eapply sound_sequal_compat_lam; eauto; done.
 intros; eapply sound_pi_eta_sequal; eauto; done.
 intros; eapply sound_sigma_eta_sequal; eauto; done.
 intros; eapply sound_fut_eta_sequal; eauto; done.

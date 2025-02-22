@@ -33,6 +33,12 @@ Require Import ProperEquiv.
 Require Import Truncate.
 Require Import ProperDownward.
 Require Import Equivalences.
+Require Import SemanticsGuard.
+Require Import Defined.
+Require Absentia.
+Require Import PageCode.
+Require Import PageType.
+
 
 
 
@@ -40,7 +46,6 @@ Local Ltac prove_hygiene :=
   repeat (apply hygiene_auto; cbn; repeat2 split; auto);
   eauto using hygiene_weaken, clo_min, hygiene_shift', hygiene_subst1, subst_closub;
   try (apply hygiene_var; cbn; auto; done).
-
 
 
 Lemma sound_sequal_formation :
@@ -689,6 +694,116 @@ do2 4 split.
 
   {
   do2 5 split; auto using star_refl; prove_hygiene.
+  }
+Qed.
+
+
+Lemma sound_sequal_compat_lam :
+  forall G m n,
+    pseq (hyp_tm nonsense :: G) (deq triv triv (sequal m n))
+    -> pseq G (deq triv triv (sequal (lam m) (lam n))).
+Proof.
+intros G m n.
+revert G.
+refine (seq_pseq 2 [hyp_emp] m [hyp_emp] n 1 [_] _ _ _); cbn.
+intros G Hclm Hcln Hseq.
+rewrite -> seq_deq in Hseq |- *.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (subst_closub_under_permit _#4 Hclm Hcls) as Hclsm.
+so (subst_closub_under_permit _#4 Hcln Hcls) as Hclsn.
+so (subst_closub_under_permit _#4 Hclm Hcls') as Hclsm'.
+so (subst_closub_under_permit _#4 Hcln Hcls') as Hclsn'.
+assert (forall p,
+          hygiene clo p
+          -> pwctx i (dot p s) (dot p s') (hyp_tm nonsense :: G)) as Hssif.
+  {
+  intros p Hclp.
+  apply pwctx_cons_tm_seq; auto.
+    {
+    simpsub.
+    eapply seqhyp_tm.
+      {
+      apply interp_eval_refl.
+      apply interp_nonsense.
+      }
+
+      {
+      apply interp_eval_refl.
+      apply interp_nonsense.
+      }
+
+      {
+      cbn.
+      exists (le_refl _).
+      do2 2 split; auto.
+      }
+    }
+
+    {
+    intros j t t' Ht.
+    exists toppg.
+    eexists.
+    simpsub.
+    split; apply interp_eval_refl; apply interp_nonsense.
+    }
+  }
+exists (iubase (unit_urel stop i)).
+simpsub.
+assert (rel (unit_urel stop i) i triv triv) as Htriv.
+  {
+  do2 5 split; auto using star_refl.
+    {
+    apply hygiene_auto; cbn; auto.
+    }
+
+    {
+    apply hygiene_auto; cbn; auto.
+    }
+  }
+do2 4 split; auto.
+  {
+  apply interp_eval_refl.
+  apply interp_sequal.
+    {
+    prove_hygiene.
+    }
+
+    {
+    prove_hygiene.
+    }
+  apply equiv_lam.
+  apply Absentia.subst_closed_equiv.
+  intros p Hclp.
+  simpsub.
+  so (Hssif p Hclp) as Hss.
+  so (Hseq _ _ _ Hss) as (R & Hl & _).
+  simpsubin Hl.
+  invert (basic_value_inv _#6 value_sequal Hl).
+  intros _ _ H _.
+  exact H.
+  }
+
+  {
+  apply interp_eval_refl.
+  apply interp_sequal.
+    {
+    prove_hygiene.
+    }
+
+    {
+    prove_hygiene.
+    }
+  apply equiv_lam.
+  apply Absentia.subst_closed_equiv.
+  intros p Hclp.
+  simpsub.
+  so (Hssif p Hclp) as Hss.
+  so (Hseq _ _ _ Hss) as (R & _ & Hr & _).
+  simpsubin Hr.
+  invert (basic_value_inv _#6 value_sequal Hr).
+  intros _ _ H _.
+  exact H.
   }
 Qed.
 
