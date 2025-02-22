@@ -883,3 +883,15 @@ intros object m.
 apply plus_star.
 apply theta_fix'.
 Qed.
+
+
+(* Nonsense *)
+
+Lemma subst_nonsense :
+  forall object (s : @sub object), subst s nonsense = nonsense.
+Proof.
+prove_subst.
+Qed.
+
+
+Hint Rewrite subst_nonsense : subst.

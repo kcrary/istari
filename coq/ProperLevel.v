@@ -29,6 +29,7 @@ Require Import ProperDownward.
 Require Import SemanticsPi.
 Require Import SemanticsEqual.
 Require Import SemanticsAll.
+Require Import SemanticsConstfn.
 Require Import SemanticsExist.
 Require Import SemanticsMu.
 Require Import SemanticsUniv.
@@ -1124,6 +1125,14 @@ cbn.
 reflexivity.
 }
 
+(* constfn *)
+{
+intros pg s i H h.
+exists (iubase (constfn_urel (cin pg) i)).
+rewrite -> extend_iubase.
+rewrite -> extend_constfn; auto.
+}
+
 (* prod *)
 {
 intros pg s i a b A B _ IH1 _ IH2 IHo h.
@@ -2089,6 +2098,7 @@ try (intros;
            |eapply interp_pi
            |eapply interp_intersect
            |eapply interp_union
+           |eapply interp_constfn
            |eapply interp_prod
            |eapply interp_sigma
            |eapply interp_set

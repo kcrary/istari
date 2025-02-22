@@ -127,6 +127,7 @@ try (intros;
            |apply interp_pi
            |apply interp_intersect
            |apply interp_union
+           |apply interp_constfn
            |apply interp_sigma
            |apply interp_set
            |apply interp_iset

@@ -29,6 +29,7 @@ Require Import ExtSpace.
 
 
 Require Import SemanticsAll.
+Require Import SemanticsConstfn.
 Require Import SemanticsEqtype.
 Require Import SemanticsEqual.
 Require Import SemanticsExist.
@@ -254,6 +255,10 @@ with basicv : page -> bool -> nat -> sterm -> wiurel stop -> Prop :=
         basic pg s i a A
         -> functional pg s i (den A) b B
         -> basicv pg s i (union a b) (iuunion stop A B)
+
+| interp_constfn :
+    forall pg s i,
+      basicv pg s i constfn (iubase (constfn_urel stop i))
 
 | interp_prod :
     forall pg s i a b (A B : wiurel stop),

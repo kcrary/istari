@@ -3,6 +3,7 @@ COQC = coqc
 COQDEP = coqdep
 
 UNITS = \
+	Absentia \
 	Approximation \
 	Axioms \
 	Candidate \
@@ -54,6 +55,7 @@ UNITS = \
 	Rules \
 	Semantics \
 	SemanticsAll \
+	SemanticsConstfn \
 	SemanticsExist \
 	SemanticsEqual \
 	SemanticsFut \
@@ -79,6 +81,7 @@ UNITS = \
 	SimpSub \
 	SoundAdmiss \
 	SoundAll \
+	SoundConstfn \
 	SoundEqtype \
 	SoundEqual \
 	SoundExist \

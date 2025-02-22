@@ -316,6 +316,15 @@ eapply tr_sequal_eta2; eauto.
 Qed.
 
 
+Lemma sequalCompatLam_valid : sequalCompatLam_obligation.
+Proof.
+prepare.
+intros G M N ext0 H.
+apply tr_sequal_compat_lam.
+eapply tr_sequal_eta2; eauto.
+Qed.
+
+
 Hint Rewrite def_pi : prepare.
 
 Lemma forallEtaSequal_valid : forallEtaSequal_obligation.

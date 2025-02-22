@@ -35,6 +35,7 @@ Inductive operator : list nat -> Type :=
 
 | oper_intersect   : operator [0; 1]
 | oper_union       : operator [0; 1]
+| oper_constfn     : operator nil
 
 | oper_fut         : operator [0]
 | oper_cnext       : operator [0]
@@ -105,6 +106,9 @@ Inductive operator : list nat -> Type :=
 
 (* Degenerate candidates used for inductive types. *)
 | oper_extt        : object -> operator nil
+
+(* Infinite set of constants for the absentia proof. *)
+| oper_marker      : nat -> operator nil
 .
 
 
@@ -520,6 +524,7 @@ Definition lam {obj} m             : @term obj := oper _ (oper_lam _) (rw_cons _
 Definition app {obj} m1 m2         : @term obj := oper _ (oper_app _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition intersect {obj} m1 m2   : @term obj := oper _ (oper_intersect _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition union {obj} m1 m2       : @term obj := oper _ (oper_union _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
+Definition constfn {obj}           : @term obj := oper _ (oper_constfn _) rw_nil.
 Definition fut {obj} m             : @term obj := oper _ (oper_fut _) (rw_cons _ _ m rw_nil).
 Definition cnext {obj} m           : @term obj := oper _ (oper_cnext _) (rw_cons _ _ m rw_nil).
 Definition cprev {obj} m           : @term obj := oper _ (oper_cprev _) (rw_cons _ _ m rw_nil).
@@ -566,6 +571,8 @@ Definition uptype {obj} m          : @term obj := oper _ (oper_uptype _) (rw_con
 Definition seq {obj} m1 m2         : @term obj := oper _ (oper_seq _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition ext {obj} x             : @term obj := oper _ (oper_ext _ x) rw_nil.
 Definition extt {obj} x            : @term obj := oper _ (oper_extt _ x) rw_nil.
+Definition marker {obj} i          : @term obj := oper _ (oper_marker _ i) rw_nil.
+
 
 
 Definition deqtype {object} a b := @deq object triv triv (eqtype a b).
@@ -626,6 +633,9 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 
 | same_union :
     same_operator [0; 1] [0; 1] (oper_union A) (oper_union B)
+
+| same_constfn :
+    same_operator nil nil (oper_constfn A) (oper_constfn B)
 
 | same_fut :
     same_operator [0] [0] (oper_fut A) (oper_fut B)
@@ -764,6 +774,9 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 
 | same_extt {x y} :
     same_operator nil nil (oper_extt A x) (oper_extt B y)
+
+| same_marker {x y} :
+    same_operator nil nil (oper_marker A x) (oper_marker B y)
 .
 
 

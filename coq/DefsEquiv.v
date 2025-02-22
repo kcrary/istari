@@ -679,6 +679,15 @@ eapply equiv_trans.
 Qed.
 
 
+Lemma def_nonsense :
+  @equiv Rules.obj Defs.nonsense nonsense.
+Proof.
+unfold Defs.nonsense.
+unfold nonsense.
+apply equiv_refl.
+Qed.
+
+
 Lemma def_of :
   forall a m,
     equiv (app (app Defs.of a) m) (equal a m m).

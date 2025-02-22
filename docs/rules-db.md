@@ -4272,6 +4272,8 @@ Human-readable rules, using explicit variables, are given
 
 ### Syntactic equality
 
+Syntactic equality is intended for internal use only.
+
 - `sequalForm M`
 
       G |- istp (sequal M M)
@@ -4374,6 +4376,12 @@ Human-readable rules, using explicit variables, are given
       G |- sequal P[M . id] P[N . id]
       >>
       G |- sequal M N
+
+- `sequalCompatLam M N`
+
+      G |- sequal (fn . M) (fn . N)
+      >>
+      G, nonsense |- sequal M N
 
 - `sequalCompatPath path M N P`
 

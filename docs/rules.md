@@ -4235,7 +4235,9 @@ variables.  The official rules, using de Bruijn indices, are given
       (where x is not free in C)
 
 
-### Syntactic equality
+### Syntactic equality 
+
+Syntactic equality is intended for internal use only.
 
 - `sequalForm M`
 
@@ -4321,6 +4323,12 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- sequal [M / x]P [N / x]P
       >>
       G |- sequal M N
+
+- `sequalCompatLam M N`
+
+      G |- sequal (fn x . M) (fn x . N)
+      >>
+      G, x : nonsense |- sequal M N
 
 - `sequalCompatPath path M N P`
 

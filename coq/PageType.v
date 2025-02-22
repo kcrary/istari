@@ -41,6 +41,7 @@ Require Import SemanticsSigma.
 Require Import ExtendTruncate.
 Require Import Equality.
 Require Import SemanticsPositive.
+Require Import SemanticsGuard.
 
 
 
@@ -1751,4 +1752,40 @@ Proof.
 intros G lv lv' m Hseq i s s' pg pg' Hs Hlv Hlv'.
 so (Hseq _#3 Hs) as (pg'' & R & HR & Hm).
 exact (interp_ltpagetp_invert _#11 HR Hm Hlv Hlv').
+Qed.
+
+
+Lemma interp_nonsense :
+  forall system pg s i,
+    basicv system pg s i nonsense
+      (iuguard stop i 
+         (iubase (void_urel stop))
+         (nearrow_const _ (iurel_ofe _) (iubase (void_urel stop)))).
+Proof.
+intros system pg s i.
+apply interp_guard.
+  {
+  apply interp_eval_refl.
+  apply interp_void.
+  }
+
+  {
+  apply functional_i.
+    {
+    prove_hygiene.
+    }
+
+    {
+    rewrite -> ceiling_squash.
+    rewrite -> Nat.min_l; auto.
+    }
+
+    {
+    intros j m p Hj Hmp.
+    simpsub.
+    cbn.
+    apply interp_eval_refl.
+    apply interp_void.
+    }
+  }
 Qed.
