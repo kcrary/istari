@@ -284,6 +284,10 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                (refine2 Rule.subtypeEstablish >>> [idtacM Secondary, idtacM Secondary, idtacM Primary],
                 nobinder);
 
+            insert Prim.parametric
+               (refine2 Rule.parametricIntro >>> [idtacM Secondary, idtacM Primary],
+                RT.binder [2]);
+
             insert Prim.lett
                (introLet, RT.binder [1])
          end
@@ -696,6 +700,29 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
           
                                       D.destruct0 pat (introOfPriority rest)
                                       ])\
+
+                           | \Prim.parametric\ _ (fn ? . _) =>
+                             \(fnc binder =>
+                                  let
+                                     val pat' =
+                                        (case pat of
+                                            IntroPattern.Ident NONE =>
+                                               IntroPattern.Ident binder
+          
+                                          | _ => pat)
+                                  in
+                                     refine (Rule.parametricOfExt (T.evar ()) (T.Const Prim.void) (T.evar ()) (T.evar ()) (T.evar ()))
+                                     >>> [
+                                         idtacM Secondary,
+
+                                         attempt
+                                            (refine (Rule.parametricIntroOfForall (T.evar ()) (T.evar ()) (T.evar ()))
+                                             >>> [proveLambda, Irrelevance.proveIrrelevantUnfolds])
+                                            >> idtacM Secondary,
+             
+                                         D.destruct0 pat' (introOfPriority rest)
+                                         ]
+                                  end)\
 
                            | \Prim.foralltp\ (fn ? . _) =>
                              \(fnc binder =>

@@ -139,7 +139,7 @@ introduction](rules.html#future-modality)), any future assumptions are
 automatically promoted to become ordinary (term or type) assumptions.
 
 Hidden assumptions have no special status in the type theory.  A
-hidden assumption, say `x (later) : A`, expresses the syntactic
+hidden assumption, say `x (hidden) : A`, expresses the syntactic
 restriction that `x` cannot appear in the extract.  This expresses a
 sort of proof irrelevance; the extract cannot make decisions based on
 `x` if it cannot refer to `x` at all.  Hidden assumptions arise in
@@ -330,6 +330,36 @@ instantiating `i` with `1`.  Nevertheless, both paths to `U 1` are the
 *same type.* In contrast, if instead `list` were a dependent function,
 then the two paths would result in two different types, `list 0 nat`
 and `list 1 nat`.
+
+
+#### Parametric functions
+
+[[rules]](rules.html#parametric-functions)
+
+The parametric function type, written `parametric (x : A) . B` is the
+type of dependent functions belonging from `A` and `B`, but the
+argument cannot be used [relevantly](proof-irrelevance.html) in the
+body.  It is useful for writing impredicative functions, or
+manipulating impredicative packages (a.k.a. [weak
+sums](lib/weaksum.html)).
+
+Parametric functions are applied using parametric application, written
+`f Ap x`.  The argument of a parametric application is an irrelevant
+position, so `fn x . f Ap x` is a parametric function.
+
+The intersection type `intersect (x : A) . B[x]` (and the impredicative
+function type `iforall (x : K) . B[x]`, which works in much the same way)
+can be hard to use, because the "body" must have the type `B[x]` but
+isn't allowed to mention `x`.  This can make things challenging for
+the typechecker.  In contrast, the body of a parametric function *can*
+mention `x`, provided it uses it only irrelevantly.
+
+This makes for a similar situation as in the polymorphic lambda
+calculus.  In the polymorphic lambda calculus, a polymorphic
+function's type argument can only be used in a lambda abstraction's
+type annotation, or in a polymorphic application.  In Istari, both of
+those (written `fn (x : A) . M` and `f Ap t`) are irrelevant
+positions, and are thus permissible uses of a parametric argument.
 
 
 #### Union types
@@ -779,7 +809,7 @@ produces a `C` for every argument in `A`, but that it produces the
 
 Universal and existential quantification enjoy impredicative versions,
 which might be written `iforall i (t : A) . B` and 
-`iexistsi (t : A) . B`.  (In the implementation, the `i` is kept
+`iexists i (t : A) . B`.  (In the implementation, the `i` is kept
 implicit; it is not displayed and it is inferred automaticaly.)  In
 each, `A` must be a kind belonging to `K(i)` and `B` must be a type
 belonging to `U(i)`.  Then each belongs to `U(i)`.  In contrast, if
@@ -793,7 +823,9 @@ because impredicative quantification relies on the function being
 discriminate on it.  (In the polymorphic lambda calculus, the
 dependency is typically written as a function, but there is a
 syntactic separation that prevents the terms from discriminating on
-types.  In Istari there is no such syntactic separation.)
+types.  Istari does not have syntactic separation between types and
+terms, but something similar can be accomplished using 
+[proof irrelevance](proof-irrelevance.html).)
 
 Similarly, the impredicative existential does not pair the witness `t`
 with the inhabitant of `B`.  Thus, the impredicative existential is a

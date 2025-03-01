@@ -14,7 +14,7 @@ widely enough to make them pervasive.
 | `negative`     | arises in determining whether `mu` types are well-formed |
 
 
-It also contains some definitions and lemmas that defy categorization:
+It also contains other material that defies categorization:
 
     nonsense : type:nonsense
              = def:nonsense
@@ -25,11 +25,9 @@ corollary, every type is a subtype of nonsense:
 
     nonsense_subtype : type:nonsense_subtype
 
-
 Extensional type equivalence can be mapped through any covariant or
 contravariant type operator:
 
     eeqtp_compat_covariant : type:eeqtp_compat_covariant
 
     eeqtp_compat_contravariant : type:eeqtp_compat_contravariant
-

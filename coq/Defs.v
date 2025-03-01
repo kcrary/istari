@@ -17,7 +17,7 @@ Definition dof (m a : fterm) : judgement := deq m m a.
 Definition inl : fterm := lam (ppair btrue (var 0)).
 Definition inr : fterm := lam (ppair bfalse (var 0)).
 
-Definition abort : fterm := lam (var 0).
+Definition abort : fterm := lam triv.
 
 Definition acc : fterm :=
   lam 
@@ -94,6 +94,7 @@ Definition negative : fterm := lam (isnegative (app (var 1) (var 0))).
 Definition nonsense : fterm := guard voidtp voidtp.
 Definition of : fterm := lam (lam (equal (var 1) (var 0) (var 0))).
 Definition orphan : fterm := triv.
+Definition parametric : fterm := lam (lam (intersect booltp (bite (var 0) (pi (var 2) (app (var 2) (var 0))) constfn))).
 Definition partial : fterm := lam (partial (var 0)).
 Definition prod : fterm := lam (lam (prod (var 1) (var 0))).
 Definition quotient : fterm := lam (lam (quotient (var 1) (app (app (var 2) (var 1)) (var 0)))).
@@ -107,6 +108,7 @@ Definition sum : fterm := lam (lam (sigma booltp (bite (var 0) (var 2) (var 1)))
 Definition tarrow : fterm := lam (lam (tarrow (var 1) (var 0))).
 Definition true : fterm := btrue.
 Definition union : fterm := lam (lam (union (var 1) (app (var 1) (var 0)))).
+Definition unavailable : fterm := triv.
 Definition unit : fterm := unittp.
 Definition univ : fterm := lam (univ (var 0)).
 Definition uptype : fterm := lam (uptype (var 0)).
@@ -140,6 +142,14 @@ Definition max : fterm :=
                                     (lam
                                        (app succ
                                           (app (app (var 4) (var 1)) (var 0)))))))))).
+
+
+Definition irrelevant : fterm :=
+  lam (intersect nonsense
+         (Syntax.sequal (app (var 1) (var 0)) (app (var 1) Syntax.triv))).
+
+Definition paramapp : fterm :=
+  lam (lam (app (var 1) Syntax.triv)).
 
 Definition total : fterm :=
   lam (sigma

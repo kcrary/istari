@@ -40,6 +40,8 @@ signature REWRITE =
       val reduceHardRew     : rewrite
       val whreduceHardRew   : rewrite
       val reduceSeqRew      : rewrite
+      val reduceParamRew    : rewrite
+      val convertIrrRew     : captures -> eterm -> rewrite
 
 
       (* target: hypothesis and occurrences, where
@@ -81,6 +83,8 @@ signature REWRITE =
       val reduceSeqPriority : targets -> Tactic.priority Tactic.tacticm
       val reduceSeqRaw      : targets -> tactic
       val reduceSeq         : targets -> tactic
+      val reduceParam       : Hyp.hypothesis list -> tactic
+      val convertIrr        : ((captures * eterm) * targets) list -> tactic
 
       val trace : bool ref
 
@@ -1557,7 +1561,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
       (* Main entry point *)
 
-      (* rewriteOnce rew h i nohits
+      (* rewriteOnce rew h i nohits sequel
 
          Rewrite hypothesis/concl h using rew on the ith hit.  If there are fewer than i hits,
          call (nohits msg), where msg is an error message that could be used.
@@ -2847,6 +2851,277 @@ structure RewriteInternal :> REWRITE_INTERNAL =
       fun reduceHard targets = rewriteRaw [(reduceHardRew, targets)]
 
       fun whreduceHard targets = rewriteRaw [(whreduceHardRew, targets)]
+
+
+
+      fun reduceParamRew _ _ =
+         let
+            fun test _ n =
+               (case n of
+                   T.Elim (T.Const const, T.App func :: T.App _ :: _) =>
+                      Constant.eq (const, Prim.paramapp)
+                      andalso
+                      (case N.simplify func of
+                          T.Lam _ => true
+
+                        | _ => false)
+
+                 | _ =>
+                      false)
+
+            fun act _ n =
+               (case n of
+                   T.Elim (T.Const const, T.App func :: T.App arg :: spine) =>
+                      if Constant.eq (const, Prim.paramapp) then
+                         (case N.simplify func of
+                             T.Lam (_, body) =>
+                                (case Irrelevance.irrelevance (Irrelevance.IntSet.singleton 0) body of
+                                    SOME red =>
+                                       let
+                                          val body' = R.reduce red body
+
+                                          (* red : body --> body' and body' does not contain 0 *)
+
+                                          val red1 =
+                                             R.trans
+                                                [
+                                                (* paramapp (fn . body) arg spine *)
+                                                R.unfold,
+                                                (* (fn . fn . 1 unavailable) (fn . body) arg spine *)
+                                                R.beta 2,
+                                                (* (fn . body) unavailable spine *)
+                                                R.within [0, 0] red,
+                                                (* (fn . body') unavailable spine *)
+                                                R.beta 1
+                                                (* body' [unavailable . id] spine *)
+                                                ]
+
+                                          val red2 =
+                                             R.trans
+                                                [
+                                                (* (fn . body) arg spine *)
+                                                R.within [0, 0] red,
+                                                (* (fn . body') arg spine *)
+                                                R.beta 1
+                                                (* body' [arg . id] spine = body' [unavailable . id] spine *)
+                                                ]
+
+                                          val red3 =
+                                             (* (fn . body) arg spine *)
+                                             R.beta 1
+                                             (* body [arg . id] spine *)
+
+                                          val n12 = T.Elim (T.Sub (body', T.Dot (T.Const Prim.unavailable, T.id)), spine)
+                                          val n23 = T.Elim (T.Lam (NONE, body), T.App arg :: spine)
+                                             
+                                          (* red1 : paramapp (fn . body) arg spine --> N12
+                                             red2 : N23 --> N12
+                                             red3 : N23 --> body [arg . id] spine
+                                          *)
+                                          
+                                          val rew =
+                                             Seq (Reduce red1, n12, Seq (Unreduce red2, n23, Reduce red3))
+                                       in
+                                          SOME (n, T.Elim (T.Sub (body, T.Dot (arg, T.id)), spine), [], rew)
+                                       end
+
+                                  | NONE => NONE)
+
+                           | _ => NONE)
+                      else
+                         NONE
+
+                 | _ => NONE)
+         in
+            Computation (test, act)
+         end
+
+      fun reduceParamLoop hyps =
+         (case hyps of
+             [] => idtacM Primary
+
+           | hyp :: resthyps =>
+                let
+                   do ho = Hyp.findhypOrConcl hyp
+
+                   fun loop () =
+                      (case ho of
+                          SOME h => refine (Rule.normalizeHyp h)
+   
+                        | NONE => refine Rule.normalizeConcl)
+                      >>+
+                      rewriteOnce reduceParamRew hyp 0
+                         (fn _ => reduceParamLoop resthyps)
+                         (lift loop)
+                in
+                   loop ()
+                end)
+
+      fun reduceParam hyps =
+         (case hyps of
+             [] => reduceParamLoop [Hyp.NAME conclSym]
+           | _ => reduceParamLoop hyps)
+         >>+ idtac
+
+
+
+      val maxInt =
+         (case Int.maxInt of
+             NONE => raise (Fail "impossible")
+
+           | SOME x => x)
+
+      fun matchIrrLoop i irrl mspine nspine lastred =
+         (case (mspine, nspine) of
+             ([], _) =>
+                SOME (nspine, lastred)
+
+           | (T.App m :: mrest, T.App n :: nrest) =>
+                let
+                   val (j, red_j, irrl') =
+                      (case irrl of
+                          [] => (maxInt, R.refl, [])
+
+                        | (i, red) :: rest => (i, red, rest))
+                in
+                   if i = j then
+                      (
+                      (* if an argument is an evar, unify it in even if it's irrelevant *)
+                      (case N.simplify m of
+                          T.Elim (T.Sub (T.Evar eb, s), []) =>
+                             (* Normally s is id, so this can't fail.  Failure means something weird is going on.
+                                We'll ignore it.
+                             *)
+                             (Prune.setEbindSub eb s n; ())
+
+                        | _ => 
+                             ());
+
+                      matchIrrLoop (i+1) irrl' mrest nrest red_j
+                      )
+                   else if Unify.unify1 m n then
+                      matchIrrLoop (i+1) irrl mrest nrest lastred
+                   else
+                      NONE
+                end
+
+           | (T.Pi1 :: mrest, T.Pi1 :: nrest) =>
+                matchIrrLoop i irrl mrest nrest lastred
+
+           | (T.Pi2 :: mrest, T.Pi2 :: nrest) =>
+                matchIrrLoop i irrl mrest nrest lastred
+
+           | (T.Prev :: mrest, T.Prev :: nrest) =>
+                matchIrrLoop i irrl mrest nrest lastred
+
+           | _ => NONE)
+                
+
+      fun convertIrrRew capture em hyp (jud, dir) =
+         let
+            val sh =
+               (case hyp of
+                   NONE => 0
+
+                 | SOME i => i+1)
+
+            val dir' = D.shift dir sh
+
+            val m = N.simplify (ET.withdir dir' (ET.additional capture em))
+            val added = List.length capture
+         in
+            (case m of
+                T.Elim (T.Const const, mspine) =>
+                   (case Database.findIrrelevance const of
+                       NONE =>
+                          raise (RewriteFailure "no irrelevance information for head")
+
+                     | SOME irrl =>
+                          let
+                             fun test bvs n =
+                                let
+                                   val bvs' = bvs - added
+                                in
+                                   bvs' >= 0
+                                   andalso
+                                   (case n of
+                                       T.Elim (T.Const const', nspine) =>
+                                          Constant.eq (const, const')
+                                          andalso
+                                          let
+                                             val mspine' =
+                                                if bvs' = 0 then
+                                                   mspine
+                                                else
+                                                   T.ssubst mspine (T.underShift added bvs')
+
+                                             val mark = Trail.mark ()
+
+                                             val b = Option.isSome $ matchIrrLoop 0 irrl mspine' nspine R.refl
+                                          in
+                                             Trail.rewind mark;
+                                             b
+                                          end
+
+                                     | _ => false)
+                                end
+
+                             fun act bvs n =
+                                let
+                                   val bvs' = bvs - added
+                                in
+                                   if bvs' >= 0 then
+                                      (case n of
+                                          T.Elim (T.Const const', nspine) =>
+                                             if Constant.eq (const, const') then
+                                                let
+                                                   val mspine' =
+                                                      if bvs' = 0 then
+                                                         mspine
+                                                      else
+                                                         T.ssubst mspine (T.underShift added bvs')
+
+                                                   val mark = Trail.mark ()
+                                                in
+                                                   (case matchIrrLoop 0 irrl mspine' nspine R.refl of
+                                                       SOME (leftover, red) =>
+                                                          let
+                                                             val m' = T.Elim (T.Const const, mspine' @ leftover)
+                                                             val p = R.reduce red n
+                                                          in
+                                                             SOME (n, m', [], Seq (Reduce red, p, Unreduce red))
+                                                          end
+
+                                                     | NONE =>
+                                                          (
+                                                          Trail.rewind mark;
+                                                          NONE
+                                                          ))
+                                                end
+                                             else
+                                                NONE
+   
+                                        | _ => NONE)
+                                   else
+                                      NONE
+                                end
+                          in
+                             Computation (test, act)
+                          end)
+
+              | T.Elim (T.Var _, _) =>
+                   raise (RewriteFailure "term head is a variable")
+
+              | _ =>
+                   raise (RewriteFailure "term is not rigid"))
+         end
+                   
+      fun convertIrr aims =
+         rewriteRaw
+            (List.map
+                (fn ((capture, em), targets) => (convertIrrRew capture em, targets))
+                aims)
+
 
 
       fun replaceRew capture em en ea hyp (_, dir) =

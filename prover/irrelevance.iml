@@ -1,0 +1,329 @@
+
+signature IRRELEVANCE =
+   sig
+
+      structure IntSet : SET where type elem = int
+
+      (* irrelevance set M
+
+         red : M --> N
+         N does not contain any i in set
+         and
+         returns SOME red
+
+         or returns NONE
+
+         Works best if M is in normal form.  Consider:  (fn f . f x) abort
+         The x is irrelevant, but you have to normalize to discover that.
+      *)
+      val irrelevance : IntSet.set -> Term.term -> Reduction.reduction option
+
+      val proveIrrelevant : Tactic.tactic
+
+      (* same as proveIrrelevant but tries unfolding head constants/variables *)
+      val proveIrrelevantUnfolds : Tactic.tactic
+
+
+      (* the term can mention hidden variables in irrelevant positions *)
+      val inhabitant : Term.term -> Tactic.tactic
+
+   end
+
+
+structure Irrelevance :> IRRELEVANCE =
+   struct
+
+      structure T = Term
+      structure J = Judgement
+      structure R = Reduction
+      structure N = Normalize
+
+      open Tactic
+
+
+      structure IntSet = RedBlackSet (structure Elem = IntOrdered)
+
+
+      exception Relevant
+
+      (* set must be nonempty *)
+      fun irrelevanceLoop set depth m =
+         (case m of
+             T.Elim (T.Var i, spine) =>
+                if i >= depth andalso IntSet.member set (i - depth) then
+                   (* Not irrelevant, so fail. *)
+                   raise Relevant
+                else
+                   R.compat (irrelevanceSpineNomask set depth spine [])
+
+           | T.Elim (T.Const const, spine) =>
+                (case Database.findIrrelevance const of
+                    SOME ((i, red_i) :: restmask) =>
+                       let
+                          val (red, spinereds) = irrelevanceSpineMask set depth 0 i red_i restmask spine R.refl []
+                       in
+                          R.trans [red, R.compat spinereds]
+                       end
+
+                  | _ =>
+                       R.compat (irrelevanceSpineNomask set depth spine []))
+
+
+           | T.Elim (n as T.Sub (T.Evar _, _), spine) =>
+                let
+                   val k = IntSet.greatest set + depth + 1
+
+                   val p =
+                      Int.natrecDown
+                         (fns i p =>
+                             if i >= depth andalso IntSet.member set (i - depth) then
+                                Prune.Pundef p
+                             else
+                                Prune.Pidot (i, p))
+                         (Prune.Pshift k)
+                         k
+                in
+                   if Prune.pruneable n p then
+                      R.compat (irrelevanceSpineNomask set depth spine [])
+                   else
+                      raise Relevant
+                end
+
+           | T.Elim (n, spine) =>
+                (* If M is normal, this must be a type error, but just handle it. *)
+                R.trans [R.within [0] (irrelevanceLoop set depth n),
+                         R.compat (irrelevanceSpineNomask set depth spine [])]
+
+           | T.Lam (_, n) =>
+                R.within [0] (irrelevanceLoop set (depth+1) n)
+
+           | T.Pair (m1, m2) =>
+                R.trans [R.within [0] (irrelevanceLoop set depth m1),
+                         R.within [1] (irrelevanceLoop set depth m2)]
+
+           | T.Next n =>
+                R.within [0] (irrelevanceLoop set depth n)
+
+           | T.Triv => R.refl
+           | T.Native _ => R.refl
+           | T.Marker _ => R.refl
+
+           | _ =>
+                (* This can't happen if M is in normal form. *)
+                irrelevanceLoop set depth (Normalize.simplify m))
+
+
+      and irrelevanceSpineNomask set depth spine acc =
+         (case spine of
+             nil =>
+                List.rev acc
+
+           | T.App m :: rest =>
+                irrelevanceSpineNomask set depth rest (irrelevanceLoop set depth m :: acc)
+
+           | _ :: rest =>
+                irrelevanceSpineNomask set depth rest acc)
+
+
+      (* irrelevanceSpineMask set depth i j red_j restmask spine lastred acc
+
+         we are at position i
+         the next irrelevant position is j
+         the irrelevance reduction for position j is red_j
+         the remaining mask after (j, nextred) is restmask
+         we are processing spine
+         lastred is the irrelevance reduction for the last irrelevant position preceding i
+         acc is the accumulated reductions for the processed spine
+      *)
+      and irrelevanceSpineMask set depth i j red_j restmask spine lastred acc =
+         (case spine of
+             [] =>
+                (* partial application *)
+                (lastred, List.rev acc)
+
+           | T.App m :: restspine =>
+                if i = j then
+                   (case restmask of
+                       [] =>
+                          let
+                             val spinereds = irrelevanceSpineNomask set depth restspine (R.refl :: acc)
+                          in
+                             (red_j, spinereds)
+                          end
+
+                     | (j', red_j') :: restmask' =>
+                          irrelevanceSpineMask set depth (i+1) j' red_j' restmask' restspine red_j (R.refl :: acc))
+                else
+                   irrelevanceSpineMask set depth (i+1) j red_j restmask restspine lastred (irrelevanceLoop set depth m :: acc)
+
+           | _ =>
+                (* We should not encounter anything but App while we have irrelevant arguments yet to come.
+                   This is surely an error, but we'll try to recover by pretending that we didn't have a mask.
+                *)
+                let
+                   val spinereds = irrelevanceSpineNomask set depth spine acc
+                in
+                   (lastred, spinereds)
+                end)
+
+
+      fun irrelevanceMain set m =
+         try
+            SOME (irrelevanceLoop set 0 m)
+         with
+            Relevant => NONE
+
+
+      fun irrelevance set m =
+         if IntSet.isEmpty set then
+            SOME R.refl
+         else
+            irrelevanceMain set (N.simplifyAll m)
+
+
+      (* proveIrrelevantFinish M red
+
+         if    red : M --> N and N does not contain 0
+         then  proves irrelevant (fn . M)
+      *)
+      fun proveIrrelevantFinish m red =
+         (* irrelevant (fn . M) *)
+         refine (Rule.reduce (R.within [1, 0] red))
+         >>+
+         (* irrelevant (fn . N) *)
+         refine (Rule.irrelevance (T.evar ()))
+         >>+
+         (* nonsense |- sequal N N[unavailable . ^]
+                      = sequal N N
+         *)
+         refine (Rule.sequalIntro (T.evar ()))
+         >>
+         done
+
+
+      val proveIrrelevant : tactic =
+         (* We normalize the conclusion to ensure we have maximum opportunity to find
+            irrelevant arguments.
+         *)
+         refine Rule.normalizeConcl
+         >>+
+         let
+            do (jud, _) = withgoal
+         in
+            (case J.concl jud of
+                T.Elim (T.Const const, [T.App (T.Lam (_, m))]) =>
+                   if Constant.eq (const, Prim.irrelevant) then
+                      (case irrelevanceMain (IntSet.singleton 0) m of
+                          SOME red =>
+                             (* red : M --> N and N does not contain 0 *)
+                             proveIrrelevantFinish m red
+
+                        | NONE => 
+                             fail "argument is relevant")
+                   else
+                      fail "not an irrelevance goal"
+
+              | _ =>
+                   fail "not an irrelevance goal")
+         end
+
+
+      fun proveIrrelevantUnfoldsLoop () : tactic =
+         refine Rule.normalizeConcl
+         >>+
+         let
+            do (jud, _) = withgoal
+         in
+            (case J.concl jud of
+                T.Elim (T.Const const, [T.App (T.Lam (_, m))]) =>
+                   if Constant.eq (const, Prim.irrelevant) then
+                      (case irrelevanceMain (IntSet.singleton 0) m of
+                          SOME red =>
+                             (* red : M --> N and N does not contain 0 *)
+                             proveIrrelevantFinish m red
+
+                        | NONE =>
+                             (* 0 seems to be relevant, try again *)
+                             (case m of
+                                 T.Elim (T.Const _, _) =>
+                                    (* irrelevant (fn . const spine) *)
+                                    refine (Rule.reduce (R.within [1, 0] R.unfold))
+                                    >>+
+                                    (* irrelevant (fn . M') *)
+                                    lift proveIrrelevantUnfoldsLoop
+                                    
+                               | T.Elim (T.Var i, spine) =>
+                                    if i > 0 then
+                                       (case J.hypOpt jud (i-1) of
+                                           SOME (J.Let _) =>
+                                              (* irrelevant (fn . i spine) *)
+                                              refine (Rule.letUnfold (i-1)
+                                                         (T.apply1 Prim.irrelevant
+                                                             (T.Lam (NONE,
+                                                                     T.Elim (T.Var 1, 
+                                                                             T.ssubst spine (T.underShift 1 1))))))
+                                              >>+
+                                              lift proveIrrelevantUnfoldsLoop
+   
+                                         | _ =>
+                                              fail "argument is relevant")
+                                    else
+                                       fail "argument is relevant"
+
+                               | _ => fail "argument is relevant"))
+                      
+                   else
+                      fail "not an irrelevance goal"
+
+              | _ =>
+                   fail "not an irrelevance goal")
+         end
+
+      val proveIrrelevantUnfolds = lift proveIrrelevantUnfoldsLoop
+
+
+      fun hiddenSet i ctx set =
+         (case Seq.expose ctx of
+             Seq.Nil => set
+
+           | Seq.Cons (h, ctx') =>
+                if
+                   (case h of
+                       J.Tmh _ => true
+                     | J.Tph => true
+                     | _ => false)
+                then
+                   hiddenSet (i+1) ctx' (IntSet.insert set i)
+                else
+                   hiddenSet (i+1) ctx' set)
+                       
+
+      fun inhabitantIrr m =
+         let
+            do (jud, _) = withgoal
+
+            val set = hiddenSet 0 (J.context jud) IntSet.empty
+         in
+            (case irrelevance set m of
+                NONE =>
+                   fail "hidden variables are relevant"
+
+              | SOME red =>
+                   let
+                      val a = J.concl jud
+                      val m' = R.reduce red m
+
+                      (* M' mentions no hidden variables *)
+                   in
+                      (* A *)
+                      refine (Rule.inhabitant (T.evar ()) m')
+                      >>+
+                      (* M' : A *)
+                      refine (Rule.unreduce (T.apply2 Prim.ov a m) (R.within [2] red))
+                      (* M : A *)
+                   end)
+         end
+
+      fun inhabitant m = cut (first [refine (Rule.inhabitant (T.evar ()) m), inhabitantIrr m])
+
+   end

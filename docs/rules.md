@@ -34,6 +34,7 @@ variables.  The official rules, using de Bruijn indices, are given
 [T-Functions](#t-functions)<br>
 [K-Functions](#k-functions)<br>
 [Intersection types](#intersection-types)<br>
+[Parametric functions](#parametric-functions)<br>
 [Guarded types](#guarded-types)<br>
 [Strong sums](#strong-sums)<br>
 [Products](#products)<br>
@@ -883,6 +884,165 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- (intersect (x : A) . B) : type
       G |- M : A
+
+
+### Parametric functions
+
+- `parametricForm A B`
+
+      G |- parametric A (fn x . B) : type
+      >>
+      G |- A : type
+      G, x : A |- B : type
+
+- `parametricEq A A' B B'`
+
+      G |- parametric A (fn x . B) = parametric A' (fn x . B') : type
+      >>
+      G |- A = A' : type
+      G, x : A |- B = B' : type
+
+- `parametricFormUniv A B I`
+
+      G |- parametric A (fn x . B) : univ I
+      >>
+      G |- A : univ I
+      G, x : A |- B : univ I
+
+- `parametricEqUniv A A' B B' I`
+
+      G |- parametric A (fn x . B) = parametric A' (fn x . B') : univ I
+      >>
+      G |- A = A' : univ I
+      G, x : A |- B = B' : univ I
+
+- `parametricSub A A' B B'`
+
+      G |- parametric A (fn x . B) <: parametric A' (fn x . B')
+      >>
+      G |- A' <: A
+      G, x : A' |- B <: B'
+      G, x : A |- B : type
+
+- `parametricForallSub A A' B B'`
+
+      G |- parametric A (fn x . B) <: (forall (x : A') . B')
+      >>
+      G |- A' <: A
+      G, x : A' |- B <: B'
+      G, x : A |- B : type
+
+- `parametricIntroOf A B M`
+
+      G |- (fn x . M) : parametric A (fn x . B)
+      >>
+      G |- A : type
+      G |- irrelevant (fn x . M)
+      G, x : A |- M : B
+
+- `parametricIntroEq A B M N`
+
+      G |- (fn x . M) = (fn x . N) : parametric A (fn x . B)
+      >>
+      G |- A : type
+      G |- irrelevant (fn x . M)
+      G |- irrelevant (fn x . N)
+      G, x : A |- M = N : B
+
+- `parametricIntro A B`
+
+      G |- parametric A (fn x . B) ext fn x . M
+      >>
+      G |- A : type
+      G, x (hidden) : A |- B ext M
+
+- `parametricIntroOfForall A B M`
+
+      G |- M : parametric A (fn x . B)
+      >>
+      G |- M : forall (x : A) . B
+      G |- irrelevant (fn x . M x)
+
+- `parametricElimOf A B M P`
+
+      G |- paramapp M P : [P / x]B
+      >>
+      G |- M : parametric A (fn x . B)
+      G |- P : A
+
+- `parametricElimEq A B M N P Q`
+
+      G |- paramapp M P = paramapp N Q : [P / x]B
+      >>
+      G |- M = N : parametric A (fn x . B)
+      G |- P = Q : A
+
+- `parametricElim A B P`
+
+      G |- [P / x]B ext paramapp M P
+      >>
+      G |- parametric A (fn x . B) ext M
+      G |- P : A
+
+- `parametricBeta M N`
+
+      G |- sequal (paramapp (fn x . M) N) [N / x]M
+      >>
+      G |- irrelevant (fn x . M)
+
+- `parametricEta A B M`
+
+      G |- M = (fn x . paramapp M x) : parametric A (fn x . B)
+      >>
+      G |- M : parametric A (fn x . B)
+
+- `parametricExt A B M N`
+
+      G |- M = N : parametric A (fn x . B)
+      >>
+      G |- M : parametric A (fn x . B)
+      G |- N : parametric A (fn x . B)
+      G, x : A |- paramapp M x = paramapp N x : B
+
+- `parametricExt' A A' A'' B B' B'' M N`
+
+      G |- M = N : parametric A (fn x . B)
+      >>
+      G |- A : type
+      G |- M : parametric A' (fn x . B')
+      G |- N : parametric A'' (fn x . B'')
+      G, x : A |- paramapp M x = paramapp N x : B
+
+- `parametricOfExt A A' B B' M`
+
+      G |- M : parametric A (fn x . B)
+      >>
+      G |- A : type
+      G |- M : parametric A' (fn x . B')
+      G, x : A |- paramapp M x : B
+
+- `parametricFormInv1 A B`
+
+      G |- A : type
+      >>
+      G |- parametric A (fn x . B) : type
+
+- `parametricFormInv2 A B M`
+
+      G |- [M / x]B : type
+      >>
+      G |- parametric A (fn x . B) : type
+      G |- M : A
+
+- `parametricElimIrrelevant M P Q`
+
+      G |- sequal (paramapp M P) (paramapp M Q)
+
+- `irrelevance M`
+
+      G |- irrelevant (fn x . M)
+      >>
+      G, y : nonsense |- sequal [y / x]M [unavailable / x]M
 
 
 ### Guarded types

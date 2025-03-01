@@ -130,6 +130,28 @@ signature THE_RULES =
       val intersectElim : term -> term -> term -> rule
       val intersectFormInv1 : term -> term -> rule
       val intersectFormInv2 : term -> term -> term -> rule
+      val parametricForm : term -> term -> rule
+      val parametricEq : term -> term -> term -> term -> rule
+      val parametricFormUniv : term -> term -> term -> rule
+      val parametricEqUniv : term -> term -> term -> term -> term -> rule
+      val parametricSub : term -> term -> term -> term -> rule
+      val parametricForallSub : term -> term -> term -> term -> rule
+      val parametricIntroOf : term -> term -> term -> rule
+      val parametricIntroEq : term -> term -> term -> term -> rule
+      val parametricIntro : term -> term -> rule
+      val parametricIntroOfForall : term -> term -> term -> rule
+      val parametricElimOf : term -> term -> term -> term -> rule
+      val parametricElimEq : term -> term -> term -> term -> term -> term -> rule
+      val parametricElim : term -> term -> term -> rule
+      val parametricBeta : term -> term -> rule
+      val parametricEta : term -> term -> term -> rule
+      val parametricExt : term -> term -> term -> term -> rule
+      val parametricExt' : term -> term -> term -> term -> term -> term -> term -> term -> rule
+      val parametricOfExt : term -> term -> term -> term -> term -> rule
+      val parametricFormInv1 : term -> term -> rule
+      val parametricFormInv2 : term -> term -> term -> rule
+      val parametricElimIrrelevant : term -> term -> term -> rule
+      val irrelevance : term -> rule
       val guardForm : term -> term -> rule
       val guardEq : term -> term -> term -> term -> rule
       val guardFormUniv : term -> term -> term -> rule
@@ -926,6 +948,7 @@ val const_integer = Const Prim.integer
 val const_integer_from_Integer = Const Prim.integer_from_Integer
 val const_integer_to_Integer = Const Prim.integer_to_Integer
 val const_intersect = Const Prim.intersect
+val const_irrelevant = Const Prim.irrelevant
 val const_iset = Const Prim.iset
 val const_isquash = Const Prim.isquash
 val const_istp = Const Prim.istp
@@ -946,6 +969,8 @@ val const_nat = Const Prim.nat
 val const_nat_case = Const Prim.nat_case
 val const_negz = Const Prim.negz
 val const_nonsense = Const Prim.nonsense
+val const_paramapp = Const Prim.paramapp
+val const_parametric = Const Prim.parametric
 val const_partial = Const Prim.partial
 val const_plusz = Const Prim.plusz
 val const_positive = Const Prim.positive
@@ -965,6 +990,7 @@ val const_symbol_eqb = Const Prim.symbol_eqb
 val const_tarrow = Const Prim.tarrow
 val const_timesz = Const Prim.timesz
 val const_total = Const Prim.total
+val const_unavailable = Const Prim.unavailable
 val const_union = Const Prim.union
 val const_unit = Const Prim.unit
 val const_univ = Const Prim.univ
@@ -1061,6 +1087,28 @@ fun intersectElimEq a b m n p = Arg.make "intersectElimEq" [] (Elim (const_eq, [
 fun intersectElim a b p = Arg.make "intersectElim" [] (Sub (b, Dot (p, Shift 0))) [(Arg.Nothing, [], Elim (const_intersect, [App (a), App (Lam (NONE, b)), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (p), ])), ] (fn [m, _, ] => m | _ => raise Arg.ExtractFailure)
 fun intersectFormInv1 a b = Arg.make "intersectFormInv1" [] (Elim (const_istp, [App (a), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_intersect, [App (a), App (Lam (NONE, b)), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun intersectFormInv2 a b m = Arg.make "intersectFormInv2" [] (Elim (const_istp, [App (Sub (b, Dot (m, Shift 0))), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_intersect, [App (a), App (Lam (NONE, b)), ])), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricForm a b = Arg.make "parametricForm" [] (Elim (const_istp, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricEq a a' b b' = Arg.make "parametricEq" [] (Elim (const_eqtp, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_parametric, [App (a'), App (Lam (NONE, b')), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eqtp, [App (b), App (b'), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricFormUniv a b i = Arg.make "parametricFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Elim (const_univ, [App (Sub (i, Shift 1)), ])), App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricEqUniv a a' b b' i = Arg.make "parametricEqUniv" [] (Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_parametric, [App (a'), App (Lam (NONE, b')), ])), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eq, [App (Elim (const_univ, [App (Sub (i, Shift 1)), ])), App (b), App (b'), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricSub a a' b b' = Arg.make "parametricSub" [] (Elim (const_subtype, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_parametric, [App (a'), App (Lam (NONE, b')), ])), ])) [(Arg.Unhide, [], Elim (const_subtype, [App (a'), App (a), ])), (Arg.Unhide, [J.Tm (a'), ], Elim (const_subtype, [App (b), App (b'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricForallSub a a' b b' = Arg.make "parametricForallSub" [] (Elim (const_subtype, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_forall, [App (a'), App (Lam (NONE, b')), ])), ])) [(Arg.Unhide, [], Elim (const_subtype, [App (a'), App (a), ])), (Arg.Unhide, [J.Tm (a'), ], Elim (const_subtype, [App (b), App (b'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricIntroOf a b m = Arg.make "parametricIntroOf" [] (Elim (const_of, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (Lam (NONE, m)), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_irrelevant, [App (Lam (NONE, m)), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (b), App (m), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricIntroEq a b m n = Arg.make "parametricIntroEq" [] (Elim (const_eq, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (Lam (NONE, m)), App (Lam (NONE, n)), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_irrelevant, [App (Lam (NONE, m)), ])), (Arg.Unhide, [], Elim (const_irrelevant, [App (Lam (NONE, n)), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eq, [App (b), App (m), App (n), ])), ] (fn [_, _, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricIntro a b = Arg.make "parametricIntro" [] (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Nothing, [J.Tmh (a), ], b), ] (fn [_, m, ] => Lam (NONE, m) | _ => raise Arg.ExtractFailure)
+fun parametricIntroOfForall a b m = Arg.make "parametricIntroOfForall" [] (Elim (const_of, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_forall, [App (a), App (Lam (NONE, b)), ])), App (m), ])), (Arg.Unhide, [], Elim (const_irrelevant, [App (Lam (NONE, Elim (Sub (m, Shift 1), [App (Var 0), ]))), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricElimOf a b m p = Arg.make "parametricElimOf" [] (Elim (const_of, [App (Sub (b, Dot (p, Shift 0))), App (Elim (const_paramapp, [App (m), App (p), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (p), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricElimEq a b m n p q = Arg.make "parametricElimEq" [] (Elim (const_eq, [App (Sub (b, Dot (p, Shift 0))), App (Elim (const_paramapp, [App (m), App (p), ])), App (Elim (const_paramapp, [App (n), App (q), ])), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (m), App (n), ])), (Arg.Unhide, [], Elim (const_eq, [App (a), App (p), App (q), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricElim a b p = Arg.make "parametricElim" [p, ] (Sub (b, Dot (p, Shift 0))) [(Arg.Nothing, [], Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (p), ])), ] (fn [m, _, ] => Elim (const_paramapp, [App (m), App (p), ]) | _ => raise Arg.ExtractFailure)
+fun parametricBeta m n = Arg.make "parametricBeta" [] (Elim (const_sequal, [App (Elim (const_paramapp, [App (Lam (NONE, m)), App (n), ])), App (Sub (m, Dot (n, Shift 0))), ])) [(Arg.Unhide, [], Elim (const_irrelevant, [App (Lam (NONE, m)), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricEta a b m = Arg.make "parametricEta" [] (Elim (const_eq, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (m), App (Lam (NONE, Elim (const_paramapp, [App (Sub (m, Shift 1)), App (Var 0), ]))), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricExt a b m n = Arg.make "parametricExt" [] (Elim (const_eq, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (n), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eq, [App (b), App (Elim (const_paramapp, [App (Sub (m, Shift 1)), App (Var 0), ])), App (Elim (const_paramapp, [App (Sub (n, Shift 1)), App (Var 0), ])), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricExt' a a' a'' b b' b'' m n = Arg.make "parametricExt'" [] (Elim (const_eq, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_parametric, [App (a'), App (Lam (NONE, b')), ])), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_parametric, [App (a''), App (Lam (NONE, b'')), ])), App (n), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eq, [App (b), App (Elim (const_paramapp, [App (Sub (m, Shift 1)), App (Var 0), ])), App (Elim (const_paramapp, [App (Sub (n, Shift 1)), App (Var 0), ])), ])), ] (fn [_, _, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricOfExt a a' b b' m = Arg.make "parametricOfExt" [] (Elim (const_of, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), App (m), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_parametric, [App (a'), App (Lam (NONE, b')), ])), App (m), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (b), App (Elim (const_paramapp, [App (Sub (m, Shift 1)), App (Var 0), ])), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricFormInv1 a b = Arg.make "parametricFormInv1" [] (Elim (const_istp, [App (a), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricFormInv2 a b m = Arg.make "parametricFormInv2" [] (Elim (const_istp, [App (Sub (b, Dot (m, Shift 0))), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_parametric, [App (a), App (Lam (NONE, b)), ])), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun parametricElimIrrelevant m p q = Arg.make "parametricElimIrrelevant" [] (Elim (const_sequal, [App (Elim (const_paramapp, [App (m), App (p), ])), App (Elim (const_paramapp, [App (m), App (q), ])), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+fun irrelevance m = Arg.make "irrelevance" [] (Elim (const_irrelevant, [App (Lam (NONE, m)), ])) [(Arg.Unhide, [J.Tm (const_nonsense), ], Elim (const_sequal, [App (m), App (Sub (m, Dot (const_unavailable, Shift 1))), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun guardForm a b = Arg.make "guardForm" [] (Elim (const_istp, [App (Elim (const_guard, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (Sub (b, Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun guardEq a a' b b' = Arg.make "guardEq" [] (Elim (const_eqtp, [App (Elim (const_guard, [App (a), App (b), ])), App (Elim (const_guard, [App (a'), App (b'), ])), ])) [(Arg.Unhide, [], Elim (const_iff, [App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eqtp, [App (Sub (b, Shift 1)), App (Sub (b', Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun guardFormUniv a b i = Arg.make "guardFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_guard, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Elim (const_univ, [App (Sub (i, Shift 1)), ])), App (Sub (b, Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)

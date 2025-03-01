@@ -119,6 +119,13 @@ rewriter's weakening and compatibility tables.
     Replaces the target term (having head constant `c`) with `M`, if
     they are beta-equivalent.  (Cheaper than convert.)
 
+  + `convertIrr /[term M] within [captures] [targets]/`
+
+    The term `M` and the target term must begin with the same
+    constant.  Replaces the target term with `M` if they are
+    beta-equivalent, except that the two terms can differ in the
+    constant's irrelevant arguments.
+
 
 - `fold /[term M] within [captures] [targets]/`
 
@@ -214,6 +221,10 @@ rewriter's weakening and compatibility tables.
 - `reduce /[short-targets]/`
 
   Puts the target term into normal form.
+
+  + `reduceParam /[hyps]/`
+
+    Like `reduce`, but also reduces parametric application.
 
 
 - `whreduce /[short-targets]/`

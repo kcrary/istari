@@ -195,6 +195,9 @@ structure ParseTerm =
       fun iexists x a b = T.apply3 Prim.iexists T.evar (instance a) (T.lam x b)
       fun iexistss al b = foldr (fns (x, a) b => iexists x a b) b al
 
+      fun parametric x a b = T.apply2 Prim.parametric (instance a) (T.lam x b)
+      fun parametrics al b = foldr (fns (x, a) b => parametric x a b) b al
+
       fun intersect x a b = T.apply2 Prim.intersect (instance a) (T.lam x b)
       fun intersects al b = foldr (fns (x, a) b => intersect x a b) b al
 
@@ -300,6 +303,8 @@ structure ParseTerm =
       fun ann m a = T.apply2 Prim.ann a m
 
       fun ap m n = T.apply2 Prim.ap m n
+
+      fun paramapp m n = T.apply2 Prim.paramapp m n
 
       fun appEvars m n =
          (case Int.compare n 0 of
@@ -656,6 +661,8 @@ structure UnparseTerm =
 
       val () = registerIBinder Prim.iexists "iexists"
 
+      val () = registerBinder Prim.parametric "parametric"
+
       val () = registerBinder Prim.intersect "intersect"
 
       val () = registerBinder Prim.union "union"
@@ -965,6 +972,19 @@ structure UnparseTerm =
                      U.box (a 91)
                      ])))
 
+      val () =
+         register Prim.paramapp 2 90
+         (U.wrap
+             (U.apply2 Prim.paramapp U.show U.show)
+             (fn (f, a) =>
+                 (U.append
+                     [
+                     f 90,
+                     U.break 1,
+                     U.string "Ap ",
+                     U.box (a 91)
+                     ])))
+
 
 
       (* Term 100 *)
@@ -1163,6 +1183,7 @@ grammardef Term
    rule Term(0)    ::= "exists" Bindings "." Term(0) => existss
    rule Term(0)    ::= "iforall" Bindings "." Term(0) => iforalls
    rule Term(0)    ::= "iexists" Bindings "." Term(0) => iexistss
+   rule Term(0)    ::= "parametric" Bindings "." Term(0) => parametrics
    rule Term(0)    ::= "intersect" Bindings "." Term(0) => intersects
    rule Term(0)    ::= "union" Bindings "." Term(0) => unions
    rule Term(0)    ::= "foralltp" OIdents "." Term(0) => foralltps
@@ -1220,6 +1241,7 @@ grammardef Term
 
    rule Term(90)   ::= Term(90) ":>" Term(91) => ann
    rule Term(90)   ::= Term(90) "ap" Term(91) => ap
+   rule Term(90)   ::= Term(90) "Ap" Term(91) => paramapp
    rule Term(90)   ::= Term(90) "_#" NUMBER => appEvars
    rule Term(90)   ::= Term(90) "__#" NUMBER => appHoles
 

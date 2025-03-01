@@ -1,0 +1,175 @@
+
+File.import "misc-load.iml";
+File.import "function-load.iml";
+
+beginModule "Irrelevance";
+
+
+aliasExport /unavailable/ Prim.unavailable;
+aliasExport /irrelevant/ Prim.irrelevant;
+
+
+recordIrrelevance Prim.ap [1];
+recordIrrelevance Prim.paramapp [1];
+recordIrrelevance Prim.ann [0];
+recordIrrelevance Prim.fnann [0];
+recordIrrelevance Prim.abort [0];
+
+
+(* Proof irrelevance *)
+
+define /pirr a/
+/
+  { a }
+//
+  intersect i . U i -> U i
+/;
+
+unfold /pirr/.
+typecheck.
+qed ();
+
+
+
+define /inpi m/
+/
+  ()
+//
+  intersect i (a : U i) . a -> pirr a
+/;
+
+unfold /inpi, pirr/.
+typecheck.
+qed ();
+
+recordIrrelevance /inpi/ [0];
+
+
+
+define /outpi m f/
+/
+  f unavailable
+//
+  intersect i (a b : U i) .
+    pirr a
+    -> (parametric (_ : a) . b)
+    -> b
+/;
+
+unfold /outpi/.
+introOf /i a b m f/.
+reduce //.
+destruct /m/ /[m]/.
+fold /f Ap m/.
+typecheck.
+qed ();
+
+recordIrrelevance /outpi/ [0];
+
+
+
+reductions
+/
+  outpi (inpi m) f --> f Ap m ;
+
+  unfolding inpi outpi paramapp
+/;
+
+
+
+(* Isomorphism between impredicative and parametric functions *)
+
+define /iforall_to_parametric f/
+/
+  fn x . f
+//
+  intersect i (a : Kind i) (b : a -> U i) .
+    (iforall (x : a) . b x)
+    -> parametric (x : a) . b x
+/;
+
+unfold /iforall_to_parametric/.
+typecheck.
+qed ();
+
+
+
+define /parametric_to_iforall f/
+/
+  f unavailable
+//
+  intersect i (a : Kind i) (b : a -> U i) .
+    (parametric (x : a) . b x)
+    -> iforall (x : a) . b x
+/;
+
+unfold /parametric_to_iforall/.
+inference.
+introOf /i a b f x/.
+reduce //.
+fold /f Ap x/.
+typecheck.
+qed ();
+
+
+
+lemma "iforall_to_parametric_inverse"
+/
+  forall i (a : Kind i) (b : a -> U i) (f : iforall (x : a) . b x) .
+    parametric_to_iforall (iforall_to_parametric f) = f : (iforall (x : a) . b x)
+/;
+
+inference.
+intro /i a b f/.
+extensionality.
+reintro /x/.
+unfold /iforall_to_parametric, parametric_to_iforall/.
+reflexivity.
+qed ();
+
+
+
+lemma "parametric_to_iforall_inverse"
+/
+  forall i (a : Kind i) (b : a -> U i) (f : parametric (x : a) . b x) .
+    iforall_to_parametric (parametric_to_iforall f) = f : (parametric (x : a) . b x)
+/;
+
+inference.
+intro /i a b f/.
+unfold /parametric_to_iforall, iforall_to_parametric/.
+fold /f Ap x within x/.
+introEq /x/.
+reduceParam //.
+reflexivity.
+qed ();
+
+
+
+lemma "iforall_parametric_equipollent"
+/
+  forall i (a : Kind i) (b : a -> U i) .
+    Function.equipollent (iforall (x : a) . b x) (parametric (x : a) . b x)
+/;
+
+inference.
+intro /i a b/.
+unfold /Function.equipollent/.
+exists /iforall_to_parametric/.
+unfold /Function.bijective/.
+exists /parametric_to_iforall/.
+split.
+  {
+  intro /f/.
+  apply /iforall_to_parametric_inverse/.
+  }
+
+  {
+  intro /f/.
+  apply /parametric_to_iforall_inverse/.
+  }
+qed ();
+
+
+endModule ();
+

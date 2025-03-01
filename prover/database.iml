@@ -25,6 +25,21 @@ signature DATABASE =
       val setUnroll : constant -> Reduction.reduction -> unit
       val setUnrollLocal : constant -> Reduction.reduction -> unit  (* not to be exported *)
 
+
+      (* if const |-> [... (ni, redi) ...]
+         then ni are the irrelevant positions
+         that is:
+            n0 < n1 < ...
+            for all i,
+               redi : const M0 ... Mni --> const M0' ... Mni'
+               where  Mj' = unavailable (if j in { ... ni ... })
+                      Mj' = Mj          (otherwise)
+      *)
+      type irrelevance = (int * Reduction.reduction) list
+      val findIrrelevance : constant -> irrelevance option
+      val setIrrelevance : constant -> irrelevance -> unit
+      val setIrrelevanceLocal : constant -> irrelevance -> unit  (* not to be exported *)
+
    end
 
 
@@ -75,9 +90,17 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
        | Written of 'a
          (* Has been written to by this file.  Cannot be written to.  Generates an export entry. *)
 
-      type 'a entry = 'a * 'a status
-
+      type 'a field = 'a * 'a status
       (* Local writes will change the entry without changing the status.  Thus, they will not be exported. *)
+
+      type irrelevance = (int * Reduction.reduction) list
+
+      datatype entry =
+         Entry of { tp : (Judgement.judgement * Refine.validation) option field,
+                    implicits : int field,
+                    unroll : Reduction.reduction option field,
+                    irrelevance : irrelevance option field }
+                    
 
 
       fun modify const status x =
@@ -108,19 +131,18 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
                                     ])))
 
 
-      val empty = ((NONE, Empty), (0, Empty), (NONE, Empty))
+      val empty = Entry { tp = (NONE, Empty), 
+                          implicits = (0, Empty), 
+                          unroll = (NONE, Empty),
+                          irrelevance = (NONE, Empty) }
 
-      fun alterType f (t, implicits, unroll) = (f t, implicits, unroll)
-      fun alterImplicits f (t, implicits, unroll) = (t, f implicits, unroll)
-      fun alterUnroll f (t, implicits, unroll) = (t, implicits, f unroll)
+      fun alterType f (Entry { tp, implicits, unroll, irrelevance }) = Entry { tp=f tp, implicits=implicits, unroll=unroll, irrelevance=irrelevance }
+      fun alterImplicits f (Entry { tp, implicits, unroll, irrelevance }) = Entry { tp=tp, implicits=f implicits, unroll=unroll, irrelevance=irrelevance }
+      fun alterUnroll f (Entry { tp, implicits, unroll, irrelevance }) = Entry { tp=tp, implicits=implicits, unroll=f unroll, irrelevance=irrelevance }
+      fun alterIrrelevance f (Entry { tp, implicits, unroll, irrelevance }) = Entry { tp=tp, implicits=implicits, unroll=unroll, irrelevance=f irrelevance }
 
 
-
-      val theDatabase : 
-         ((Judgement.judgement * Refine.validation) option entry 
-          * int entry 
-          * Reduction.reduction option entry) H.table 
-         = H.table ()
+      val theDatabase : entry H.table = H.table ()
 
       fun alterEntry const f =
          (
@@ -135,7 +157,7 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
 
       fun findType const =
          Option.mapPartial
-            (fn ((t, _), _, _) => t)
+            (fn Entry {tp=(t, _)} => t)
             (H.find theDatabase const)
 
       fun setType const jud v =
@@ -159,7 +181,7 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
          (case H.find theDatabase const of
              NONE => 0
 
-           | SOME (_, (i, _), _) => i)
+           | SOME (Entry { implicits=(x, _) }) => x)
 
       fun setImplicits const i =
          alterEntry const
@@ -180,7 +202,7 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
 
       fun findUnroll const =
          Option.mapPartial
-            (fn (_, _, (unroll, _)) => unroll)
+            (fn Entry { unroll=(x, _) } => x)
             (H.find theDatabase const)
 
       fun setUnroll const r =
@@ -200,11 +222,36 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
 
 
 
+      fun findIrrelevance const =
+         Option.mapPartial
+            (fn Entry { irrelevance=(x, _) } => x)
+            (H.find theDatabase const)
+
+      fun setIrrelevance const r =
+         alterEntry const
+            (alterIrrelevance
+                (fn (_, status) => modify const status (SOME r)))
+
+      fun importIrrelevance const r =
+         alterEntry const
+            (alterIrrelevance
+                (fn (_, status) => import const status (SOME r)))
+
+      fun setIrrelevanceLocal const r =
+         alterEntry const
+            (alterIrrelevance
+                (fn (_, status) => (SOME r, status)))
+
+
+
+
+
       datatype database_entry =
          NoMore
        | Type of constant * (Judgement.judgement * Refine.validation)
        | Implicits of constant * int
        | Unroll of constant * Reduction.reduction
+       | Irrelevance of constant * irrelevance
 
 
       val impossible = Fail "impossible"
@@ -214,7 +261,8 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
             (fn NoMore => 0
               | Type _ => 1
               | Implicits _ => 2
-              | Unroll _ => 3)
+              | Unroll _ => 3
+              | Irrelevance _ => 4)
             
             [
             P.const NoMore,
@@ -235,7 +283,13 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
                (fn Unroll (const, r) => (const, r)
                  | _ => raise impossible)
                Unroll
-               (P.pair PP.puConstant ReductionInternal.puReduction)
+               (P.pair PP.puConstant ReductionInternal.puReduction),
+
+            P.wrap
+               (fn Irrelevance (const, lr) => (const, lr)
+                 | _ => raise impossible)
+               Irrelevance
+               (P.pair PP.puConstant (P.list (P.pair P.int ReductionInternal.puReduction)))
             ]
 
       fun writeEntry outs x =
@@ -248,7 +302,7 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
       fun writeDatabase outs =
          (
          H.app
-            (fn (const, ((_, tStat), (_, implicitsStat), (_, unrollStat))) =>
+            (fn (const, Entry { tp=(_, tStat), implicits=(_, implicitsStat), unroll=(_, unrollStat), irrelevance=(_, irrelevanceStat) }) =>
                 (
                 (case tStat of
                     Written (SOME (jud, v)) =>
@@ -268,6 +322,15 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
                 (case unrollStat of
                     Written (SOME r) =>
                        writeEntry outs (Unroll (const, r))
+
+                  | Written NONE =>
+                       raise (Fail "invariant")
+
+                  | _ => ());
+
+                (case irrelevanceStat of
+                    Written (SOME lr) =>
+                       writeEntry outs (Irrelevance (const, lr))
 
                   | Written NONE =>
                        raise (Fail "invariant")
@@ -307,6 +370,12 @@ structure DatabaseInternal :> DATABASE_INTERNAL =
               | Unroll (const, r) =>
                    (
                    importUnroll const r;
+                   true
+                   )
+
+              | Irrelevance (const, lr) =>
+                   (
+                   importIrrelevance const lr;
                    true
                    ))
          then

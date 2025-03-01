@@ -32,6 +32,8 @@ signature DEFINE =
           * constant list * constant list)
          -> unit
 
+      val recordIrrelevance : constant -> int list -> unit
+
       val register : Reduction.ureduction -> unit
 
       (* registerNative i n red : arguments i .. i+n-1 must be native for the reduction to activate *)
@@ -87,6 +89,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
       structure R = ReductionInternal
       structure S = Seq
       structure J = Judgement
+      structure I = Irrelevance
 
       structure Dict = AR.Dict
 
@@ -955,6 +958,151 @@ structure DefineInternal :> DEFINE_INTERNAL =
             Message.message 0 0 (fn () => print "Reductions registered.\n")
          end
 
+
+      fun peelLambdas const i m =
+         if i = 0 then
+            m
+         else
+            termCase m
+            /| fn . ? =>
+               \(fnc m' =>
+                    peelLambdas const (i-1) m')\
+
+             | _ =>
+               \(fnc =>
+                    signalError (String.concat ["constant ", Namespace.toString const, " takes insufficient arguments"]))\
+            /
+            
+
+      (* computeIrrelevance const m i mask j l lastred acc
+
+         define  P{i} = P (if i is relevant); unavailable (if i is irrelevant)
+
+         if    const unfolds to m
+               for all j, Pj = j (if relevant) and Pj = unavailable (if irrelevant)
+               mask = [ irrelevant_k | k = i-1 .. 0 ]
+               j is the first prospective irrelevant argument >= i
+               l is the list of prospective irrelevant arguments after j
+               (j :: l) is sorted increasing
+               lastred : const P0 .. Pi-1 --> const P0{0} .. Pk-1{i-1}
+         then  for all k in (j :: l), redk : const P0 ... Pk --> const P0{0} .. Pk{k}
+               and
+               return (rev ([... (k, redk) ...] @ acc))
+      *)
+      fun computeIrrelevance const m i mask j l lastred acc =
+         if i = j then
+            let
+               val n = peelLambdas const (i+1) m
+            in
+               (case I.irrelevance (I.IntSet.singleton 0) n of
+                   NONE =>
+                      signalError
+                         (String.concat [
+                                        "argument ",
+                                        Int.toString i,
+                                        " to constant ",
+                                        Namespace.toString const,
+                                        " is relevant"
+                                        ])
+
+                 | SOME red =>
+                      let
+                         (* lastred : const P0 .. Pi-1 --> const P0{0} .. Pi-1{i-1}
+                            so lastred will serve as  const P0 .. Pi --> const P0{0} .. Pi-1{i-1} Pi
+
+                            red : N --> N' where 0 not in N'
+                         *)
+
+                         val path = Int.natrecUp (fns _ path => 0 :: path) [] (i+2)
+
+                         val redl =
+                            R.trans
+                               [
+                               (* const i .. 0 *)
+                               lastred,
+                               (* const i{0} .. 1{i-1} 0 *)
+                               R.unfold,
+                               (* (fn .. i+1 times . N) i{0} .. 1{i-1} 0 *)
+
+                               (* note that the spine is always nonempty *)
+                               R.within path red,
+
+                               (* (fn .. i+1 times . N') i{0} .. 1{i-1} 0 *)
+                               R.beta (i+1),
+                               (* N'[0 . 1{i-1} .. i{0} . id] 
+                                  = N'[unavailable . 1{i-1} .. i{0} . id]
+                                  = N'[0{i} . 1{i-1} .. i{0} . id]
+                                  = N'[0{i} .. i{0} . id]
+                               *)
+                               ]
+
+                         val mask' = true :: mask
+
+                         val right =
+                            T.Elim (T.Const const,
+                                    List.revMapi
+                                       (fns k irr =>
+                                           if irr then
+                                              T.App (T.Const Prim.unavailable)
+                                           else
+                                              T.App (T.Var k))
+                                       mask')
+
+                         (* Right = const i{0} .. 0{i} *)
+
+                         val redr =
+                            R.trans
+                               [
+                               (* const i{0} .. 0{i} *)
+                               R.unfold,
+                               (* (fn .. i+1 times . N) i{0} .. 0{i} *)
+                               R.within path red,
+                               (* (fn .. i+1 times . N') i{0} .. 0{i} *)
+                               R.beta (i+1)
+                               (* N'[0{i} .. i{0} . id] *)
+                               ]
+
+                         val newred = R.user $ R.new const [] (i+1) right redl redr
+
+                         (* newred : const P0 .. Pi --> const P0{0} .. Pi{i} *)
+
+                         val acc' = (i, newred) :: acc
+                      in
+                         (case l of
+                             [] => 
+                                List.rev acc'
+
+                           | j' :: rest =>
+                                if i < j' then
+                                   computeIrrelevance const m (i+1) mask' j' rest newred acc'
+                                else
+                                   signalError "list of argument numbers is not strictly ordered")
+                      end)
+            end
+         else
+            computeIrrelevance const m (i+1) (false :: mask) j l lastred acc
+
+
+      fun recordIrrelevance const l =
+         (case l of
+             [] =>
+                (
+                Database.setIrrelevance const [];
+                Message.message 0 0 (fn () => print "Irrelevance recorded.\n")
+                )
+
+           | j :: rest =>
+                (case Constant.definition const of
+                    SOME m =>
+                       let
+                          val irr = computeIrrelevance const m 0 [] j rest R.refl []
+                       in
+                          Database.setIrrelevance const irr;
+                          Message.message 0 0 (fn () => print "Irrelevance recorded.\n")
+                       end
+       
+                  | NONE =>
+                       signalError (String.concat ["constant ", Namespace.toString const, " is opaque"])))
 
    end
 

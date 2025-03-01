@@ -12,7 +12,7 @@ structure ParseWeaksum =
       fun parseWeaksum x a b = T.apply2 (R.read weaksum) (ParseTerm.instance a) (T.lam x b)
       fun parseWeaksums al b = foldr (fns (x, a) b => parseWeaksum x a b) b al
 
-      fun parseUnpack y m n = T.apply5 (R.read unpack) T.evar T.evar T.evar m (T.lam (SOME y) n)
+      fun parseUnpack x y m n = T.apply5 (R.read unpack) T.evar T.evar T.evar m (T.lam (SOME x) (T.lam (SOME y) n))
       fun parseUnpackt x y m b = T.apply4 (R.read unpackt) T.evar T.evar (T.lam (SOME x) (T.lam (SOME y) b)) m
 
    end
@@ -21,7 +21,7 @@ structure ParseWeaksum =
 grammardef Weaksum
 
    rule Term(0) ::= "weaksum" Bindings "." Term(0) => ParseWeaksum.parseWeaksums
-   rule Term(0) ::= "unpack" Ident "=" Term(1) "in" Term(0) => ParseWeaksum.parseUnpack
+   rule Term(0) ::= "unpack" "(" Ident "," Ident ")" "=" Term(1) "in" Term(0) => ParseWeaksum.parseUnpack
    rule Term(0) ::= "unpackt" "(" Ident "," Ident ")" "=" Term(1) "in" Term(0) => ParseWeaksum.parseUnpackt
 
    reserved "weaksum" "unpack" "unpackt" : Indent
@@ -60,22 +60,20 @@ functor AfterWeaksumAll () :> sig end =
       val () = CheckpointedRef.write ParseWeaksum.unpack unpack
       val () = CheckpointedRef.write ParseWeaksum.unpackt unpackt
       
-      val () = UnparseTerm.registerLet unpack "unpack "
-
       val () =
          UnparseTerm.register unpack 5 0
          (U.wrap
-             (U.apply5 unpack U.wild U.wild U.wild U.show (U.lam $ U.show))
-             (fn ((), (), (), m, (y, b)) => 
+             (U.ifNoImplicits (U.apply5 unpack U.wild U.wild U.wild U.show (U.lam $ U.lam $ U.show)))
+             (fn ((), (), (), m, (x, (y, b))) => 
                  UnparseTerm.letContent 
                     "unpack " 
-                    (U.string y)
+                    (U.append [U.string "(", U.string x, U.string ", ", U.string y, U.string ")"])
                     m b))
 
       val () =
          UnparseTerm.register unpackt 4 0
          (U.wrap
-             (U.apply4 unpackt U.wild U.wild (U.lam $ U.lam $ U.show) U.show)
+             (U.ifNoImplicits (U.apply4 unpackt U.wild U.wild (U.lam $ U.lam $ U.show) U.show))
              (fn ((), (), (x, (y, b)), m) => 
                  UnparseTerm.letContent 
                     "unpackt " 
@@ -202,7 +200,7 @@ functor AfterWeaksumAll () :> sig end =
                                      (T.Sub (a, T.Shift 2))
                                      (T.Lam (NONE, T.Sub (b, T.Idot (0, T.Shift 3))))
                                      (T.Var 1) T.zero)
-                                 (R.trans [R.unfold, R.beta 4, R.unfold, R.beta 3])
+                                 (R.trans [R.unfold, R.beta 4])
                               >>+
                               (* ..., A, B |- C[pack A[^2] (fn . B[0 . ^3]) 1 0 . ^2] *)
                               refine (Rule.exchange 0 2 i)

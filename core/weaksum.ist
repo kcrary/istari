@@ -1,5 +1,6 @@
 
 File.import "kindlike-load.iml";
+File.import "irrelevance-load.iml";
 File.import "misc-load.iml";
 
 File.import "weaksum-aux.iml";
@@ -25,61 +26,54 @@ structure Nothing = AfterWeaksum ();
 
 
 
-define /packinv {a} b y/
-/
-  y
-//
-  intersect i . forall (a : U i) (b : a -> U i) . 
-    intersect (x : a) . b x -> weaksum (x : a) . b x
-/;
-
-unfold /packinv/.
-unfold /weaksum/.
-typecheck.
-qed ();
-
-
-
 define /pack {a} b x y/
 /
-  `packinv a b y
+  y
 //
   intersect i . forall (a : U i) (b : a -> U i) .
     forall (x : a) . b x -> weaksum (x : a) . b x
 /;
 
 unfold /pack/.
+unfold /weaksum/.
 typecheck.
 qed ();
+
+recordIrrelevance /pack/ [0, 1, 2];
 
 
 
 define /unpack {a b c} y f/
 /
-  f y
+  f Irrelevance.unavailable y
 //
   intersect i . 
   forall (a : U i) (b : a -> U i) (c : U i) .
-    (weaksum (x : a) . b x) -> (intersect (x : a) . b x -> c) -> c
+    (weaksum (x : a) . b x) 
+    -> (parametric (x : a) . b x -> c)
+    -> c
 /;
 
 unfold /unpack/.
 unfold /weaksum/.
 inference.
-introOf /i a b c y/.
+introOf /i a b c y f/.
 destruct /y/ /x y/.
 unhide.
+reduce //.
+fold /f Ap x/.
 typecheck.
 qed ();
+
+recordIrrelevance /unpack/ [0, 1, 2];
 
 
 
 reductions
 /
-  unpack _ _ _ (pack _ _ _ y) f --> f y ;
-  unpack _ _ _ (packinv _ _ y) f --> f y ;
+  unpack _ _ _ (pack _ _ x y) f --> f Ap x y ;
 
-  unfolding unpack pack packinv
+  unfolding unpack pack paramapp
 /;
 
 
@@ -97,8 +91,7 @@ intro /i a a' b b' Ha Hb/.
 intro /y/.
 destruct /y/ /x y/.  (* weaksum's destructor is not installed yet *)
 unhide.
-fold /`packinv a' (fn x' . b' x') y/.
-fold /pack _ x _/.
+fold /`pack a' (fn x' . b' x') x y/.
 typecheck.
 qed ();
 
@@ -152,45 +145,26 @@ qed ();
 
 
 
-define /unpackt_intro_inv {a b c} y z/
-/
-  packinv
-    (fn x' . exists (y' : b x') . `pack a b x' y' = `packinv a b y : (weaksum (x : a) . b x) & c x' y')
-    (y, (), z)
-//
-  intersect i .
-  forall (a : U i) (b : a -> U i) (c : forall (x : a) . b x -> U i) .
-  intersect (x : a) .
-  forall (y : b x) .
-    c x y -> `unpackt a b c (`packinv a b y)
-/;
-
-unfold /unpackt_intro_inv/.
-unfold /unpackt/.
-typecheck.
-unfold /pack/.
-reflexivity.
-qed ();
-
-    
-    
 define /unpackt_intro {a b c} x y z/
 /
-  `unpackt_intro_inv a b c y z
+  pack
+    (fn x' . exists (y' : b x') . `pack a b x' y' = `pack a b x y : (weaksum (x : a) . b x) & c x' y')
+    x
+    (y, (), z)
 //
   intersect i .
   forall 
     (a : U i) (b : a -> U i) (c : forall (x : a) . b x -> U i)
-    (x : a)
-    (y : b x) .
+    (x : a) (y : b x) .
       c x y -> `unpackt a b c (`pack a b x y)
 /;
 
 unfold /unpackt_intro/.
+unfold /unpackt/.
 typecheck.
-unfold /pack/.
-reflexivity.
 qed ();
+
+recordIrrelevance /unpackt_intro/ [0, 1, 2, 3];
 
 
 
@@ -200,7 +174,7 @@ define /unpackt_elim {a b c d} z w f/
     (fn x . exists (y : b x) . `pack a b x y = z : (weaksum (x : a) . b x) & c x y)
     (d z)
     w
-    (fn w' . f (w' #1) (w' #2 #2))
+    (fn x w' . f Ap x (w' #1) (w' #2 #2))
 //
   intersect i .
   forall 
@@ -208,7 +182,7 @@ define /unpackt_elim {a b c d} z w f/
     (d : (weaksum (x : a) . b x) -> U i)
     (z : weaksum (x : a) . b x) .
       `unpackt a b c z
-      -> (intersect (x : a) . forall (y : b x) . c x y -> d (`pack a b x y))
+      -> (parametric (x : a) . forall (y : b x) . c x y -> d (`pack a b x y))
       -> d z
 /;
 
@@ -227,10 +201,9 @@ qed ();
 
 reductions
 /
-  unpackt_elim _ _ _ _ _ (unpackt_intro_inv _ _ _ y z) f --> f y z ;
-  unpackt_elim _ _ _ _ _ (unpackt_intro _ _ _ _ y z) f --> f y z ;
+  unpackt_elim _ _ _ _ _ (unpackt_intro _ _ _ x y z) f --> f Ap x y z ;
 
-  unfolding unpackt_elim unpackt_intro unpackt_intro_inv
+  unfolding unpackt_elim unpackt_intro paramapp
 /;
 
 

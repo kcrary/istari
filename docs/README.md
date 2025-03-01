@@ -91,6 +91,8 @@ validated using that formalization.
 
 - [Unification](unification.html)
 
+- [Proof irrelevance](proof-irrelevance.html)
+
 - [Library](library.html)
 
 - [IML basis](basis.html)

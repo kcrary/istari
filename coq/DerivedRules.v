@@ -1867,3 +1867,21 @@ apply tr_guard_formation.
   eapply hypothesis; eauto using index_0.
   }
 Qed.
+
+
+Lemma tr_nonsense_intro :
+  forall G m n,
+    tr G (deq m n nonsense).
+Proof.
+intros G m n.
+unfold nonsense.
+apply tr_guard_intro.
+  {
+  apply tr_voidtp_istype.
+  }
+
+  {
+  apply (tr_voidtp_elim _ (var 0) (var 0)).
+  eapply hypothesis; eauto using index_0.
+  }
+Qed.

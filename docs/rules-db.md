@@ -31,6 +31,7 @@ Human-readable rules, using explicit variables, are given
 [T-Functions](#t-functions)<br>
 [K-Functions](#k-functions)<br>
 [Intersection types](#intersection-types)<br>
+[Parametric functions](#parametric-functions)<br>
 [Guarded types](#guarded-types)<br>
 [Strong sums](#strong-sums)<br>
 [Products](#products)<br>
@@ -881,6 +882,165 @@ Human-readable rules, using explicit variables, are given
       >>
       G |- istp (intersect A (fn . B))
       G |- of A M
+
+
+### Parametric functions
+
+- `parametricForm A B`
+
+      G |- istp (parametric A (fn . B))
+      >>
+      G |- istp A
+      G, A |- istp B
+
+- `parametricEq A A' B B'`
+
+      G |- eqtp (parametric A (fn . B)) (parametric A' (fn . B'))
+      >>
+      G |- eqtp A A'
+      G, A |- eqtp B B'
+
+- `parametricFormUniv A B I`
+
+      G |- of (univ I) (parametric A (fn . B))
+      >>
+      G |- of (univ I) A
+      G, A |- of (univ I[^1]) B
+
+- `parametricEqUniv A A' B B' I`
+
+      G |- eq (univ I) (parametric A (fn . B)) (parametric A' (fn . B'))
+      >>
+      G |- eq (univ I) A A'
+      G, A |- eq (univ I[^1]) B B'
+
+- `parametricSub A A' B B'`
+
+      G |- subtype (parametric A (fn . B)) (parametric A' (fn . B'))
+      >>
+      G |- subtype A' A
+      G, A' |- subtype B B'
+      G, A |- istp B
+
+- `parametricForallSub A A' B B'`
+
+      G |- subtype (parametric A (fn . B)) (forall A' (fn . B'))
+      >>
+      G |- subtype A' A
+      G, A' |- subtype B B'
+      G, A |- istp B
+
+- `parametricIntroOf A B M`
+
+      G |- of (parametric A (fn . B)) (fn . M)
+      >>
+      G |- istp A
+      G |- irrelevant (fn . M)
+      G, A |- of B M
+
+- `parametricIntroEq A B M N`
+
+      G |- eq (parametric A (fn . B)) (fn . M) (fn . N)
+      >>
+      G |- istp A
+      G |- irrelevant (fn . M)
+      G |- irrelevant (fn . N)
+      G, A |- eq B M N
+
+- `parametricIntro A B`
+
+      G |- parametric A (fn . B) ext fn . M
+      >>
+      G |- istp A
+      G, (hidden) A |- B ext M
+
+- `parametricIntroOfForall A B M`
+
+      G |- of (parametric A (fn . B)) M
+      >>
+      G |- of (forall A (fn . B)) M
+      G |- irrelevant (fn . M[^1] 0)
+
+- `parametricElimOf A B M P`
+
+      G |- of B[P . id] (paramapp M P)
+      >>
+      G |- of (parametric A (fn . B)) M
+      G |- of A P
+
+- `parametricElimEq A B M N P Q`
+
+      G |- eq B[P . id] (paramapp M P) (paramapp N Q)
+      >>
+      G |- eq (parametric A (fn . B)) M N
+      G |- eq A P Q
+
+- `parametricElim A B P`
+
+      G |- B[P . id] ext paramapp M P
+      >>
+      G |- parametric A (fn . B) ext M
+      G |- of A P
+
+- `parametricBeta M N`
+
+      G |- sequal (paramapp (fn . M) N) M[N . id]
+      >>
+      G |- irrelevant (fn . M)
+
+- `parametricEta A B M`
+
+      G |- eq (parametric A (fn . B)) M (fn . paramapp M[^1] 0)
+      >>
+      G |- of (parametric A (fn . B)) M
+
+- `parametricExt A B M N`
+
+      G |- eq (parametric A (fn . B)) M N
+      >>
+      G |- of (parametric A (fn . B)) M
+      G |- of (parametric A (fn . B)) N
+      G, A |- eq B (paramapp M[^1] 0) (paramapp N[^1] 0)
+
+- `parametricExt' A A' A'' B B' B'' M N`
+
+      G |- eq (parametric A (fn . B)) M N
+      >>
+      G |- istp A
+      G |- of (parametric A' (fn . B')) M
+      G |- of (parametric A'' (fn . B'')) N
+      G, A |- eq B (paramapp M[^1] 0) (paramapp N[^1] 0)
+
+- `parametricOfExt A A' B B' M`
+
+      G |- of (parametric A (fn . B)) M
+      >>
+      G |- istp A
+      G |- of (parametric A' (fn . B')) M
+      G, A |- of B (paramapp M[^1] 0)
+
+- `parametricFormInv1 A B`
+
+      G |- istp A
+      >>
+      G |- istp (parametric A (fn . B))
+
+- `parametricFormInv2 A B M`
+
+      G |- istp B[M . id]
+      >>
+      G |- istp (parametric A (fn . B))
+      G |- of A M
+
+- `parametricElimIrrelevant M P Q`
+
+      G |- sequal (paramapp M P) (paramapp M Q)
+
+- `irrelevance M`
+
+      G |- irrelevant (fn . M)
+      >>
+      G, nonsense |- sequal M M[unavailable . ^1]
 
 
 ### Guarded types

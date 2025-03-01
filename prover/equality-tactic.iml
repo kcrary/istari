@@ -797,6 +797,30 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                   ])\
          /
 
+      val parametricExt =
+         goalCaseT
+         /
+         \Prim.eq\ ($as (\Prim.parametric\ ? (fn ? . ?))) ? ? =>
+         \(fnc ab a binder b m n =>
+              refine (Rule.parametricExt' a (T.Const Prim.void) (T.Const Prim.void) b (T.evar ()) (T.evar ()) m n)
+              >>> [
+                  idtacM Secondary,
+
+                  attempt
+                     (refine (Rule.parametricIntroOfForall (T.evar ()) (T.evar ()) (T.evar ()))
+                      >>> [IntroTactic.proveLambda, Irrelevance.proveIrrelevant])
+                     >> idtacM Secondary,
+
+                  attempt
+                     (refine (Rule.parametricIntroOfForall (T.evar ()) (T.evar ()) (T.evar ()))
+                      >>> [IntroTactic.proveLambda, Irrelevance.proveIrrelevant])
+                     >> idtacM Secondary,
+
+                  withgoal
+                  (fn (_, dir) => chdir (D.bindVary dir binder) >>+ idtacM Primary)
+                  ])\
+         /
+
       val arrowExt =
          goalCaseT
          /
@@ -957,6 +981,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             (Prim.arrow, arrowExt),
             (Prim.tarrow, tkarrowExt Rule.tarrowExt),
             (Prim.karrow, tkarrowExt Rule.karrowExt),
+            (Prim.parametric, parametricExt),
             (Prim.intersect, intersectExt),
             (Prim.iforall, iforallExt),
             (Prim.exists, existsExt),
@@ -1004,6 +1029,45 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                      ],
 
                  refine (Rule.forallElimOf 
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.under 1 T.shift1))
+                            (T.Sub (n, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 1) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+                 
+                 withgoal
+                 (fn (_, dir) =>
+                     chdir (D.bindh dir binder)
+                     >>+ refine (Rule.weaken 3 2) 
+                     >>+ tac)
+                 ]
+             ]
+
+
+      fun parametricExtAuto binder a b m n tac =
+         refine (Rule.parametricExt a b m n)
+         >>> [
+             refine (Rule.hypothesis 1) >> done,
+             refine (Rule.hypothesis 0) >> done,
+             
+             assert2 
+                (T.apply2 Prim.ov b (T.apply2 Prim.paramapp (T.Sub (m, T.shift1)) T.zero))
+                (T.apply2 Prim.ov b (T.apply2 Prim.paramapp (T.Sub (n, T.shift1)) T.zero))
+             >>> [
+                 refine (Rule.parametricElimOf 
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.under 1 T.shift1))
+                            (T.Sub (m, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 2) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+
+                 refine (Rule.parametricElimOf 
                             (T.Sub (a, T.shift1))
                             (T.Sub (b, T.under 1 T.shift1))
                             (T.Sub (n, T.shift1))
@@ -1554,6 +1618,10 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                            \(fnc a b =>
                                 forallExtAuto ident a b m n (introEqLoop rest))\
 
+                         | \Prim.parametric\ ? (fn . ?) =>
+                           \(fnc a b =>
+                                parametricExtAuto ident a b m n (introEqLoop rest))\
+
                          | \Prim.arrow\ ? ? =>
                            \(fnc a b =>
                                 arrowExtAuto ident a b m n (introEqLoop rest))\
@@ -1619,6 +1687,10 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                     /| \Prim.forall\ ? (fn . ?) =>
                        \(fnc a b =>
                             forallExtAuto NONE a b m n loop)\
+   
+                     | \Prim.parametric\ ? (fn . ?) =>
+                       \(fnc a b =>
+                            parametricExtAuto NONE a b m n loop)\
    
                      | \Prim.arrow\ ? ? =>
                        \(fnc a b =>

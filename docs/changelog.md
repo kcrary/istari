@@ -11,6 +11,24 @@
 - `File.import` uses the search path to find files that are not in the
   current directory.
 
+- Proof irrelevance is implemented.
+
+  + Type `parametric` added.
+
+  + `Weaksum` provides an improved interface for union-like types.
+
+  + The new `reduceParam` rewrite is like `reduce`, but also reduces
+    parametric application.
+
+  + The new `convertIrr` rewrite replaces a constant's irrelevant
+    arguments.
+
+  + The chaining tactics `so`, `apply`, `exploit`, and `witness`
+    (often) permit using hidden variables in irrelevant arguments.
+
+  + The definition of `abort` has been changed to make it proof
+    irrelevant.
+
 - New tactics:
 
   + `assertLater` is like `assert`, but asserts a "later" fact.
@@ -27,10 +45,13 @@
 
 - Library changes:
 
-  + The `GirardParadox`, `SmithParadox`, and `Union` libraries are no
-    longer pre-loaded.
+  + The `GirardParadox` and `SmithParadox` libraries are no longer
+    pre-loaded.
 
-  + `Weaksum` added.
+  + `Weaksum`  and `Irrelevant` added.
+
+  + The `Union` library has been deleted, as `Weaksum` accomplishes
+    its purposes better.  (Union types still exist.)
 
   + In `Nat`, the boolean tests `eqb`, `leqb`, `ltb`, and `neqb` now
     reduce automatically.
@@ -46,7 +67,9 @@
   + Use Unix paths consistently.
 
 - Added rules `assertLater`, `assertLater'`, `coguardSubIntro`,
-  `eeqEeq`, `eqEeq`, `guardSubElim`, and `letnextEeq`.
+  `eeqEeq`, `eqEeq`, `guardSubElim`, `letnextEeq`, and
+  `sequalCompatLam`.  Also added rules governing parametric functions
+  and irrelevance.
 
 - Bug fixes.
 

@@ -67,16 +67,18 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
       structure D = Directory
       structure DE = DestructInternal
       structure TC = Typecheck
+      structure I = Irrelevance
 
       open Tactic
       open CasePervasive
 
 
+
       (* soSpine A spine tac fk sk
 
-         if    tac partially proves G |- A (marking typing subgoals true)
+         if    tac partially proves G |- A (marking typing subgoals Secondary)
          then  calls sk (B, tac')
-               where tac' partially proves G |- B (marking typing subgoals true)a
+               where tac' partially proves G |- B (marking typing subgoals Secondary)
                and B arises from using spine on A
          or    calls fk <message>
       *)
@@ -112,6 +114,10 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                    \(fnc =>
                         fk "marker used for dependent argument")\
 
+                 | \Prim.parametric\ _ _ =>
+                   \(fnc =>
+                        fk "marker used for dependent argument")\
+
                  | const? @ ? =>
                    \(fnc const aspine =>
                         soSpineRetry "type error in marker application" const aspine spine tac fk sk)\
@@ -138,8 +144,17 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                            (refine (Rule.arrowElim dom cod) >>>
                                [
                                tac,
-                               refine (Rule.inhabitant dom n) >> idtacM Secondary
+                               I.inhabitant n >> idtacM Secondary
                                ])
+                           fk sk)\
+
+                 | \Prim.parametric\ ? (fn . ?) =>
+                   \(fnc dom cod =>
+                        soSpine
+                           (T.Sub (cod, T.Dot (n, T.id)))
+                           rest
+                           (refine (Rule.parametricElim dom cod n) >>>
+                            [tac, idtacM Secondary])
                            fk sk)\
 
                  | \Prim.tarrow\ ? ? =>
@@ -148,7 +163,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                            (refine (Rule.tarrowElim dom cod) >>>
                                [
                                tac,
-                               refine (Rule.inhabitant dom n) >> idtacM Secondary
+                               I.inhabitant n >> idtacM Secondary
                                ])
                            fk sk)\
                         
@@ -158,7 +173,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                            (refine (Rule.karrowElim dom cod) >>>
                                [
                                tac,
-                               refine (Rule.inhabitant dom n) >> idtacM Secondary
+                               I.inhabitant n >> idtacM Secondary
                                ])
                            fk sk)\
 
@@ -260,11 +275,11 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                 (case remainder of
                     [] =>
                        sk (a,
-                           refine (Rule.inhabitant a m) >> tac >> idtacM Secondary)
+                           I.inhabitant m >> tac >> idtacM Secondary)
 
                   | spine =>
                        soSpine a spine
-                          (refine (Rule.inhabitant a m') >> tac >> idtacM Secondary)
+                          (I.inhabitant m' >> tac >> idtacM Secondary)
                           fk sk)
 
            | Sum.INR msg => fk msg)
@@ -345,6 +360,17 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                     in
                        applyMain (T.Sub (cod, T.Dot (e, T.id))) c
                           (refine (Rule.intersectElim dom cod e) 
+                           >>> [tac, idtacM Secondary])
+                          fk sk
+                    end)\
+ 
+             | \Prim.parametric\ ? (fn . ?) =>
+               \(fnc dom cod =>
+                    let
+                       val e = T.evar ()
+                    in
+                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
+                          (refine (Rule.parametricElim dom cod e) 
                            >>> [tac, idtacM Secondary])
                           fk sk
                     end)\

@@ -36,6 +36,7 @@ Require Import ValidationMisc.
 Require Import ValidationMu.
 Require Import ValidationNat.
 Require Import ValidationOf.
+Require Import ValidationParam.
 Require Import ValidationPartial.
 Require Import ValidationPi.
 Require Import ValidationQuotient.
@@ -145,6 +146,28 @@ exact intersectElimEq_valid.
 exact intersectElim_valid.
 exact intersectFormInv1_valid.
 exact intersectFormInv2_valid.
+exact parametricForm_valid.
+exact parametricEq_valid.
+exact parametricFormUniv_valid.
+exact parametricEqUniv_valid.
+exact parametricSub_valid.
+exact parametricForallSub_valid.
+exact parametricIntroOf_valid.
+exact parametricIntroEq_valid.
+exact parametricIntro_valid.
+exact parametricIntroOfForall_valid.
+exact parametricElimOf_valid.
+exact parametricElimEq_valid.
+exact parametricElim_valid.
+exact parametricBeta_valid.
+exact parametricEta_valid.
+exact parametricExt_valid.
+exact parametricExt'_valid.
+exact parametricOfExt_valid.
+exact parametricFormInv1_valid.
+exact parametricFormInv2_valid.
+exact parametricElimIrrelevant_valid.
+exact irrelevance_valid.
 exact guardForm_valid.
 exact guardEq_valid.
 exact guardFormUniv_valid.

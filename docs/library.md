@@ -12,6 +12,7 @@ The following libraries are pre-loaded:
 - [`FiniteMap`](lib/finite-map.html)
 - [`Function`](lib/function.html)
 - [`Integer`](lib/integer.html)
+- [`Irrelevance`](lib/irrelevance) (proof irrelevance)
 - [`Kindlike`](lib/kindlike.html) (types eligible for impredicative quantification)
 - [`Logic`](lib/logic.html)
 - [`List`](lib/list.html)
@@ -25,7 +26,7 @@ The following libraries are pre-loaded:
 - [`Stable`](lib/stable.html)
 - [`Symbol`](lib/symbol.html)
 - [`Tuple`](lib/tuple.html)
-- [`Weaksum`](lib/weaksum.html) (an alternative interface for union types)
+- [`Weaksum`](lib/weaksum.html) (an improved interface for union types)
 - [`Wtype`](lib/wtype.html) (well-founded types)
 
 
@@ -35,4 +36,3 @@ The following libraries can be loaded from the `library` directory:
 
 - [`GirardParadox`](lib/girard-paradox.html) (type is not a type)
 - [`SmithParadox`](lib/smith-paradox) (there exist inadmissible types)
-- [`Union`](lib/union.html) (elimination forms for `union` and `iexists`)

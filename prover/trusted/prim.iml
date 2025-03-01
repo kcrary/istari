@@ -31,6 +31,7 @@ signature PRIM =
       val lsucc : constant
       val lzero : constant
       val mu : constant
+      val parametric : constant
       val partial : constant
       val prod : constant
       val quotient : constant
@@ -49,21 +50,22 @@ signature PRIM =
 
       (* primitive, invisible until placed into library *)
       val admiss : constant
-      val bogus : constant       (* for placeholder terms *)
-      val entailment : constant  (* dummy constant for the rewriter *)
+      val bogus : constant        (* for placeholder terms *)
+      val entailment : constant   (* dummy constant for the rewriter *)
       val eqzb : constant
       val halts : constant
       val leqzb : constant
-      val magic : constant       (* extract for trustme *)
+      val magic : constant        (* extract for trustme *)
       val negative : constant
       val negz : constant
-      val orphan : constant      (* substituted for variables going out of scope *)
+      val orphan : constant       (* substituted for variables going out of scope *)
       val plusz : constant
       val positive : constant
       val sequal : constant
       val symbol : constant
       val symbol_eqb : constant
       val timesz : constant
+      val unavailable : constant  (* substituted for proof irrelevant arguments *)
       val uptype : constant
 
       (* defined *)
@@ -104,12 +106,14 @@ signature PRIM =
       val integer_from_Integer : constant
       val integer_to_Integer : constant
       val integer_to_nat : constant
+      val irrelevant : constant
       val letpair : constant
       val leqb : constant
       val cLeqzb : constant                (* Leqzb *)
       val nat_to_integer : constant
       val cNegz : constant                 (* Negz *)
       val nonsense : constant
+      val paramapp : constant
       val plus : constant
       val cPlusz : constant                (* Plusz *)
       val times : constant
@@ -184,13 +188,14 @@ functor PrimFun (structure Term : TERM
       val accPath = List.map Symbol.fromValue ["Acc"]
       val logicPath = List.map Symbol.fromValue ["Logic"]
       val intPath = List.map Symbol.fromValue ["Integer"]
-      val natPath = List.map Symbol.fromValue ["Nat"]
-      val symPath = List.map Symbol.fromValue ["Symbol"]
       val intdefPath = List.map Symbol.fromValue ["Def", "Symbol"]
       val intisoPath = List.map Symbol.fromValue ["Iso", "Symbol"]
+      val irrPath = List.map Symbol.fromValue ["Irrelevance"]
+      val natPath = List.map Symbol.fromValue ["Nat"]
       val miscPath = List.map Symbol.fromValue ["Miscellaneous"]
       val partialPath = List.map Symbol.fromValue ["Partial"]
       val sequalPath = List.map Symbol.fromValue ["SyntacticEquality"]
+      val symPath = List.map Symbol.fromValue ["Symbol"]
       val tuplePath = List.map Symbol.fromValue ["Tuple"]
 
       val bool = newconst "bool" 1
@@ -219,6 +224,7 @@ functor PrimFun (structure Term : TERM
       val lsucc = newconst "lsucc" 2
       val lzero = newconst "lzero" 1
       val mu = newconst "mu" 2
+      val parametric = newconst "parametric" 3
       val partial = newconst "partial" 2
       val prod = newconst "prod" 3
       val quotient = newconst "quotient" 3
@@ -251,11 +257,12 @@ functor PrimFun (structure Term : TERM
       val symbol = newconstInvis "symbol" 1 symPath
       val symbol_eqb = newconstInvis "symbol_eqb" 2 symPath
       val timesz = newconstInvis "timesz" 2 intPath
+      val unavailable = newconstInvis "unavailable" 0 irrPath
       val uptype = newconstInvis "uptype" 2 partialPath
 
       val abort =
          defconst "abort"
-         (T.Lam (NONE, T.zero))
+         (T.Lam (NONE, T.Triv))
 
       val ann =
          defconst "ann"
@@ -339,6 +346,12 @@ functor PrimFun (structure Term : TERM
       val ov =
          defconst "of"
          (T.Lam (NONE, T.Lam (NONE, T.apply3 eq (T.Var 1) T.zero T.zero)))
+
+      val paramapp =
+         defconst "paramapp"
+         (T.Lam (NONE,
+                 T.Lam (NONE,
+                        T.app (T.Var 1) (T.Const unavailable))))
 
       val pause =
          defconst "pause"
@@ -606,6 +619,15 @@ functor PrimFun (structure Term : TERM
                     (T.Lam (NONE,
                             T.apply2 forall (T.Var 1) (T.Lam (NONE, T.apply1 halts T.zero))))))
 
+      val irrelevant =
+         defconstInvis "irrelevant" irrPath
+         (T.Lam (SOME (Symbol.fromValue "f"),
+                 T.apply2 intersect
+                    (T.Const nonsense)
+                    (T.Lam (SOME (Symbol.fromValue "x"),
+                            T.apply2 sequal
+                               (T.app (T.Var 1) (T.Var 0))
+                               (T.app (T.Var 1) (T.Const unavailable))))))
 
 
 

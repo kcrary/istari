@@ -44,44 +44,6 @@ Qed.
 Hint Rewrite subst_conjoin : subst.
 
 
-Lemma def_parametric :
-  forall a b,
-    equiv (app (app Defs.parametric a) (lam b)) (conjoin (pi a b) constfn).
-Proof.
-intros a m.
-unfold Defs.parametric.
-eapply equiv_trans.
-  {
-  apply steps_equiv.
-  eapply star_step.
-    {
-    apply step_app1.
-    apply step_app2.
-    }
-  simpsub.
-  eapply star_step.
-    {
-    apply step_app2.
-    }
-  simpsub.
-  apply star_refl.
-  }
-unfold conjoin.
-apply equiv_intersect; auto using equiv_refl.
-apply equiv_bite; auto using equiv_refl.
-simpsub.
-apply equiv_pi; auto using equiv_refl.
-apply steps_equiv.
-eapply star_step.
-  {
-  apply step_app2.
-  }
-simpsub.
-apply star_refl'.
-reflexivity.
-Qed.
-
-
 Lemma tr_conjoin_formation :
   forall G a a' b b',
     tr G (deqtype a a')
@@ -312,7 +274,116 @@ eapply tr_intersect_formation_invert2; eauto.
 Qed.
 
 
-Hint Rewrite def_irrelevant def_nonsense def_parametric def_sequal : prepare.
+Lemma def_parametric :
+  forall a b,
+    equiv (app (app Defs.parametric a) (lam b)) (conjoin (pi a b) constfn).
+Proof.
+intros a m.
+unfold Defs.parametric.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app1.
+    apply step_app2.
+    }
+  simpsub.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+unfold conjoin.
+apply equiv_intersect; auto using equiv_refl.
+apply equiv_bite; auto using equiv_refl.
+simpsub.
+apply equiv_pi; auto using equiv_refl.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl'.
+reflexivity.
+Qed.
+
+
+Lemma def_paramapp :
+  forall m n,
+    equiv
+      (app (app Defs.paramapp m) n)
+      (app m triv).
+Proof.
+intros m n.
+unfold Defs.paramapp.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app1.
+  apply step_app2.
+  }
+simpsub.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl.
+Qed.
+
+
+Lemma def_irrelevant :
+  forall m,
+    equiv 
+      (app Defs.irrelevant (lam m))
+      (intersect nonsense (sequal m (subst (dot triv sh1) m))).
+Proof.
+intro m.
+unfold Defs.irrelevant.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  cbn [Nat.add].
+  apply star_refl.
+  }
+apply equiv_intersect.
+  {
+  apply equiv_refl.
+  }
+apply equiv_sequal.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  rewrite -> subst_var0_sh1.
+  apply star_refl.
+  }
+
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+Qed.
+
+
+Hint Rewrite def_parametric def_paramapp def_irrelevant def_nonsense def_sequal : prepare.
 
 
 Lemma tr_parametric_formation :
@@ -526,14 +597,26 @@ auto.
 Qed.
 
 
+Lemma tr_intersect_elim' :
+  forall G a b c m n p,
+    tr G (deq m n (intersect a b))
+    -> tr G (deq p p a)
+    -> c = subst1 p b
+    -> tr G (deq m n c).
+Proof.
+intros G a b c m n p H1 H2 ->.
+eapply tr_intersect_elim; eauto.
+Qed.
+
+
 Lemma irrelevant_elim :
   forall G m p,
-    tr G (deq p p (pi nonsense (sequal m (subst (dot triv sh1) m))))
+    tr G (deq p p (intersect nonsense (sequal m (subst (dot triv sh1) m))))
     -> tr (hyp_tm nonsense :: G) (deq triv triv (sequal m (subst (dot triv sh1) m))).
 Proof.
 intros G m p H.
-apply (tr_sequal_eta2 _ (app (subst sh1 p) (var 0)) (app (subst sh1 p) (var 0))).
-eapply (tr_pi_elim' _ _ (sequal (subst (dot (var 0) (sh 2)) m) (subst (dot triv (sh 2)) m))).
+apply (tr_sequal_eta2 _ (subst sh1 p) (subst sh1 p)).
+eapply (tr_intersect_elim' _ _ (sequal (subst (dot (var 0) (sh 2)) m) (subst (dot triv (sh 2)) m))).
 2:{
   eapply hypothesis; eauto using index_0.
   }
@@ -643,12 +726,101 @@ apply tr_conjoin_intro.
 Qed.
 
 
+Lemma tr_sequal_equal2 :
+  forall G a m m' n n',
+    tr G (deq triv triv (sequal m m'))
+    -> tr G (deq triv triv (sequal n n'))
+    -> tr G (deq m n a)
+    -> tr G (deq m' n' a).
+Proof.
+intros G a m m' n n' Hm Hn Hmn.
+apply (tr_transitivity _ _ m).
+  {
+  apply tr_symmetry.
+  apply tr_sequal_equal; auto.
+  eapply tr_eq_reflexivity; eauto.
+  }
+apply (tr_transitivity _ _ n); auto.
+apply tr_sequal_equal; auto.
+eapply tr_eq_reflexivity.
+apply tr_symmetry; eauto.
+Qed.
+
+
+Lemma parametricIntroOfForall_valid : parametricIntroOfForall_obligation.
+Proof.
+prepare.
+intros G a b m ext1 p Hm Hirr.
+apply tr_conjoin_intro; auto.
+apply (tr_sequal_equal2 _ _ (lam (app (subst sh1 m) (var 0))) _ (lam (app (subst sh1 m) (var 0)))).
+  {
+  apply tr_sequal_symm.
+  eapply tr_pi_eta_sequal; eauto.
+  }
+
+  {
+  apply tr_sequal_symm.
+  eapply tr_pi_eta_sequal; eauto.
+  }
+assert (tr (hyp_tm nonsense :: G) (deq triv triv (sequal (app (subst sh1 m) triv) (app (subst sh1 m) (var 0))))) as Htr.
+  {
+  simpsubin Hirr.
+  apply tr_sequal_symm.
+  apply (tr_sequal_eta2 _ (subst sh1 p) (subst sh1 p)).
+  replace (sequal (app (subst sh1 m) (var 0)) (app (subst sh1 m) triv)) with (subst1 (var 0) (sequal (app (subst (sh 2) m) (var 0)) (app (subst (sh 2) m) triv))) by (simpsub; auto).
+  apply (tr_intersect_elim _ nonsense _ _ _ _ (var 0)).
+    {
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    exact Hirr.
+    }
+  
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+  }
+apply tr_constfn_intro; simpsub; auto.
+Qed.
+
+
 Lemma parametricElimOf_valid : parametricElimOf_obligation.
 Proof.
 prepare.
 intros G a b m p ext1 ext0 Hm Hp.
-eapply tr_pi_elim; eauto.
-eapply tr_conjoin_elim1; eauto.
+apply (tr_transitivity _ _ (app m p)).
+  {
+  apply tr_symmetry.
+  apply tr_sequal_equal.
+    {
+    apply tr_constfn_elim.
+    eapply tr_conjoin_elim2; eauto.
+    }
+  eapply tr_pi_elim; eauto.
+  eapply tr_conjoin_elim1; eauto.
+  }
+
+  {
+  apply tr_sequal_equal.
+    {
+    apply tr_constfn_elim.
+    eapply tr_conjoin_elim2; eauto.
+    }
+  eapply tr_pi_elim; eauto.
+  eapply tr_conjoin_elim1; eauto.
+  }
 Qed.
 
 
@@ -656,8 +828,32 @@ Lemma parametricElimEq_valid : parametricElimEq_obligation.
 Proof.
 prepare.
 intros G a b m n p q ext1 ext0 Hm Hp.
-eapply tr_pi_elim; eauto.
-eapply tr_conjoin_elim1; eauto.
+assert (tr G (deq (app m p) (app n q) (subst1 p b))) as Heq.
+  {
+  eapply tr_pi_elim; eauto.
+  eapply tr_conjoin_elim1; eauto.
+  }
+apply (tr_transitivity _ _ (app m p)).
+  {
+  apply tr_symmetry.
+  apply tr_sequal_equal.
+    {
+    apply tr_constfn_elim.
+    eapply tr_conjoin_elim2.
+    eapply tr_eq_reflexivity; eauto.
+    }
+  eapply tr_eq_reflexivity; eauto.
+  }
+apply (tr_transitivity _ _ (app n q)); auto.
+apply tr_sequal_equal.
+  {
+  apply tr_constfn_elim.
+  eapply tr_conjoin_elim2.
+  eapply tr_eq_reflexivity.
+  apply tr_symmetry; eauto.
+  }
+eapply tr_eq_reflexivity.
+eapply tr_symmetry; eauto.
 Qed.
 
 
@@ -665,8 +861,69 @@ Lemma parametricElim_valid : parametricElim_obligation.
 Proof.
 prepare.
 intros G a b p m ext0 Hm Hp.
-eapply tr_pi_elim; eauto.
-eapply tr_conjoin_elim1; eauto.
+apply (tr_transitivity _ _ (app m p)).
+  {
+  apply tr_symmetry.
+  apply tr_sequal_equal.
+    {
+    apply tr_constfn_elim.
+    eapply tr_conjoin_elim2; eauto.
+    }
+  eapply tr_pi_elim; eauto.
+  eapply tr_conjoin_elim1; eauto.
+  }
+
+  {
+  apply tr_sequal_equal.
+    {
+    apply tr_constfn_elim.
+    eapply tr_conjoin_elim2; eauto.
+    }
+  eapply tr_pi_elim; eauto.
+  eapply tr_conjoin_elim1; eauto.
+  }
+Qed.
+
+
+Lemma tr_constfn_intro1 :
+  forall G (m : @term obj),
+    tr (cons (hyp_tm nonsense) G) (deq triv triv (sequal (subst (dot triv sh1) m) m))
+    -> tr G (deq (lam m) (lam m) constfn).
+Proof.
+intros G m H.
+apply tr_constfn_intro; auto.
+Qed.
+
+
+Lemma parametricBeta_valid : parametricBeta_obligation.
+Proof.
+prepare.
+intros G m n p H.
+apply (tr_compute _ _ (sequal (subst1 triv m) (subst1 n m)) _ triv _ triv); auto using equiv_refl.
+  {
+  apply equiv_sequal.
+    {
+    apply steps_equiv.
+    eapply star_step.
+      {
+      apply step_app2.
+      }
+    apply star_refl.
+    }
+
+    {
+    simpsub.
+    apply equiv_refl.
+    }
+  }
+apply tr_sequal_symm.
+apply (tr_sequal_eta2 _ p p).
+eapply tr_intersect_elim'; eauto.
+  {
+  apply tr_nonsense_intro.
+  }
+simpsub.
+reflexivity.
 Qed.
 
 
@@ -676,20 +933,77 @@ prepare.
 intros G a b m ext0 H.
 apply tr_conjoin_intro.
   {
-  apply tr_pi_eta.
-  eapply tr_conjoin_elim1; eauto.
+  apply (tr_transitivity _ _ (lam (app (subst sh1 m) (var 0)))).
+    {
+    apply tr_pi_eta.
+    eapply tr_conjoin_elim1; eauto.
+    }
+  apply tr_pi_intro.
+    {
+    apply (tr_pi_formation_invert1 _#3 b b).
+    eapply tr_conjoin_formation_invert1.
+    eapply tr_inhabitation_formation; eauto.
+    }
+  apply tr_sequal_equal.
+    {
+    apply tr_constfn_elim.
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_conjoin_elim2; eauto.
+    }
+  eapply (tr_pi_elim' _ _ (subst (under 1 sh1) b)).
+  2:{
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      reflexivity.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> subst_var0_sh1.
+    eapply tr_conjoin_elim1; eauto.
+    }
+    
+    {
+    simpsub.
+    rewrite -> subst_var0_sh1.
+    auto.
+    }
   }
 
   {
-  apply tr_sequal_equal.
-    {
-    apply (tr_pi_eta_sequal _ a b); auto.
-    eapply tr_conjoin_elim1; eauto.
-    }
-
+  apply tr_constfn_ext.
     {
     eapply tr_conjoin_elim2; eauto.
     }
+  apply tr_constfn_intro1.
+  simpsub.
+  apply tr_sequal_intro.
   }
 Qed.
 
@@ -716,13 +1030,52 @@ eapply tr_pi_ext; auto.
   eapply tr_inhabitation_formation; eauto.
   }
 
-
-  {
+2:{
   eapply tr_conjoin_elim1; eauto.
   }
 
-  {
+2:{
   eapply tr_conjoin_elim1; eauto.
+  }
+eapply tr_sequal_equal2; eauto.
+  {
+  apply tr_constfn_elim.
+  eapply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_conjoin_elim2; eauto.
+  }
+
+  {
+  apply tr_constfn_elim.
+  eapply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_conjoin_elim2; eauto.
   }
 Qed.
 
@@ -743,12 +1096,52 @@ apply tr_conjoin_intro.
     }
   }
 eapply tr_pi_ext; auto.
-  {
+2:{
   eapply tr_conjoin_elim1; eauto.
   }
 
-  {
+2:{
   eapply tr_conjoin_elim1; eauto.
+  }
+eapply tr_sequal_equal2; eauto.
+  {
+  apply tr_constfn_elim.
+  eapply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_conjoin_elim2; eauto.
+  }
+
+  {
+  apply tr_constfn_elim.
+  eapply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_conjoin_elim2; eauto.
   }
 Qed.
 
@@ -762,12 +1155,52 @@ apply tr_conjoin_intro.
   eapply tr_conjoin_elim2; eauto.
   }
 eapply tr_pi_ext; eauto.
-  {
+2:{
   eapply tr_conjoin_elim1; eauto.
   }
 
-  {
+2:{
   eapply tr_conjoin_elim1; eauto.
+  }
+eapply tr_sequal_equal2; eauto.
+  {
+  apply tr_constfn_elim.
+  eapply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_conjoin_elim2; eauto.
+  }
+
+  {
+  apply tr_constfn_elim.
+  eapply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    reflexivity.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_conjoin_elim2; eauto.
   }
 Qed.
 
@@ -792,561 +1225,24 @@ eapply tr_conjoin_formation_invert1; eauto.
 Qed.
 
 
-Lemma parametricIntroIntersectEq_valid : parametricIntroIntersectEq_obligation.
-Proof.
-prepare.
-intros G a b m n ext0 H.
-assert (tr G (deqtype a a)) as Ha.
-  {
-  apply (tr_intersect_formation_invert1 _ _ _ b b).
-  eapply tr_inhabitation_formation; eauto.
-  }
-apply tr_conjoin_intro.
-  {
-  apply tr_pi_intro; auto.
-  replace b with (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)).
-  2:{
-    simpsub.
-    rewrite -> subst_var0_sh1; auto.
-    }
-  apply (tr_intersect_elim _ (subst sh1 a) _#4 (var 0)).
-  2:{
-    eapply hypothesis; eauto using index_0.
-    }
-  eapply (weakening _ [_] []).
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  rewrite -> subst_var0_sh1; auto.
-  }
-
-  {
-  apply tr_constfn_intro.
-    {
-    simpsub.
-    apply tr_sequal_intro.
-    }
-
-    {
-    simpsub.
-    apply tr_sequal_intro.
-    }
-  }
-Qed.
-
-
-Lemma parametricIntroIntersectOf_valid : parametricIntroIntersectOf_obligation.
-Proof.
-prepare.
-intros G a b m ext0 H.
-assert (tr G (deqtype a a)) as Ha.
-  {
-  apply (tr_intersect_formation_invert1 _ _ _ b b).
-  eapply tr_inhabitation_formation; eauto.
-  }
-apply tr_conjoin_intro.
-  {
-  apply tr_pi_intro; auto.
-  replace b with (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)).
-  2:{
-    simpsub.
-    rewrite -> subst_var0_sh1; auto.
-    }
-  apply (tr_intersect_elim _ (subst sh1 a) _#4 (var 0)).
-  2:{
-    eapply hypothesis; eauto using index_0.
-    }
-  eapply (weakening _ [_] []).
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  rewrite -> subst_var0_sh1; auto.
-  }
-
-  {
-  apply tr_constfn_intro.
-    {
-    simpsub.
-    apply tr_sequal_intro.
-    }
-
-    {
-    simpsub.
-    apply tr_sequal_intro.
-    }
-  }
-Qed.
-
-
-Lemma parametricIntroIntersect_valid : parametricIntroIntersect_obligation.
-Proof.
-prepare.
-intros G a b m H.
-assert (tr G (deqtype a a)) as Ha.
-  {
-  apply (tr_intersect_formation_invert1 _ _ _ b b).
-  eapply tr_inhabitation_formation; eauto.
-  }
-apply tr_conjoin_intro.
-  {
-  apply tr_pi_intro; auto.
-  replace b with (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)).
-  2:{
-    simpsub.
-    rewrite -> subst_var0_sh1; auto.
-    }
-  apply (tr_intersect_elim _ (subst sh1 a) _#4 (var 0)).
-  2:{
-    eapply hypothesis; eauto using index_0.
-    }
-  eapply (weakening _ [_] []).
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  rewrite -> subst_var0_sh1; auto.
-  }
-
-  {
-  apply tr_constfn_intro.
-    {
-    simpsub.
-    apply tr_sequal_intro.
-    }
-
-    {
-    simpsub.
-    apply tr_sequal_intro.
-    }
-  }
-Qed.
-
-
-Lemma tr_parametric_elim_intersect :
-  forall G a b m n p q,
-    tr G (deq m n (conjoin (pi a b) constfn))
-    -> tr G (deq (app m p) (app n q) (intersect a b)).
-Proof.
-intros G a b m n p q Hmn.
-assert (tr G (deqtype a a)) as Ha.
-  {
-  apply (tr_pi_formation_invert1 _#3 b b).
-  apply (tr_conjoin_formation_invert1 _#3 constfn constfn).
-  eapply tr_inhabitation_formation; eauto.
-  }
-apply tr_intersect_intro; auto.
-simpsub.
-apply (tr_transitivity _ _ (app (subst sh1 m) (var 0))).
-  {
-  apply tr_symmetry.
-  apply tr_sequal_equal.
-    {
-    apply tr_constfn_elim.
-    eapply (weakening _ [_] []).
-      {
-      cbn [length unlift].
-      simpsub.
-      auto.
-      }
-  
-      {
-      cbn [length unlift].
-      simpsub.
-      auto.
-      }
-    cbn [length unlift].
-    simpsub.
-    cbn [List.app].
-    apply (tr_eq_reflexivity _ _ n).
-    eapply tr_conjoin_elim2; eauto.
-    }
-
-    {
-    replace b with (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)).
-    2:{
-      simpsub.
-      rewrite -> subst_var0_sh1; auto.
-      }
-    apply (tr_pi_elim _ (subst sh1 a)).
-      {
-      eapply (weakening _ [_] []).
-        {
-        cbn [length unlift].
-        simpsub.
-        auto.
-        }
-    
-        {
-        cbn [length unlift].
-        simpsub.
-        auto.
-        }
-      cbn [length unlift].
-      simpsub.
-      cbn [List.app].
-      rewrite -> subst_var0_sh1.
-      apply (tr_eq_reflexivity _ _ n).
-      eapply tr_conjoin_elim1; eauto.
-      }
-      
-      {
-      eapply hypothesis; eauto using index_0.
-      }
-    }
-  }
-apply (tr_transitivity _ _ (app (subst sh1 n) (var 0))).
-2:{
-  apply tr_sequal_equal.
-    {
-    apply tr_constfn_elim.
-    eapply (weakening _ [_] []).
-      {
-      cbn [length unlift].
-      simpsub.
-      auto.
-      }
-  
-      {
-      cbn [length unlift].
-      simpsub.
-      auto.
-      }
-    cbn [length unlift].
-    simpsub.
-    cbn [List.app].
-    apply (tr_eq_reflexivity _ _ m).
-    apply tr_symmetry.
-    eapply tr_conjoin_elim2; eauto.
-    }
-
-    {
-    replace b with (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)).
-    2:{
-      simpsub.
-      rewrite -> subst_var0_sh1; auto.
-      }
-    apply (tr_pi_elim _ (subst sh1 a)).
-      {
-      eapply (weakening _ [_] []).
-        {
-        cbn [length unlift].
-        simpsub.
-        auto.
-        }
-    
-        {
-        cbn [length unlift].
-        simpsub.
-        auto.
-        }
-      cbn [length unlift].
-      simpsub.
-      cbn [List.app].
-      rewrite -> subst_var0_sh1.
-      apply (tr_eq_reflexivity _ _ m).
-      apply tr_symmetry.
-      eapply tr_conjoin_elim1; eauto.
-      }
-      
-      {
-      eapply hypothesis; eauto using index_0.
-      }
-    }
-  }
-eapply (tr_pi_elim' _ _ (subst (under 1 sh1) b)).
-2:{
-  eapply hypothesis; eauto using index_0.
-  }
-
-  {
-  eapply (weakening _ [_] []).
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  rewrite -> subst_var0_sh1; auto.
-  eapply tr_conjoin_elim1; eauto.
-  }
-
-  {
-  simpsub.
-  rewrite -> subst_var0_sh1; auto.
-  }
-Qed.
-
-
-Lemma parametricElimIntersectEq_valid : parametricElimIntersectEq_obligation.
-Proof.
-prepare.
-intros G a b m n p q ext0 Hmn.
-apply tr_parametric_elim_intersect; auto.
-Qed.
-
-
-Lemma parametricElimIntersectOf_valid : parametricElimIntersectOf_obligation.
-Proof.
-prepare.
-intros G a b m p ext0 Hm.
-apply tr_parametric_elim_intersect; auto.
-Qed.
-
-
-Lemma parametricElimIntersect_valid : parametricElimIntersect_obligation.
-Proof.
-prepare.
-intros G a b m H.
-apply tr_parametric_elim_intersect; auto.
-Qed.
-
-
 Lemma parametricElimIrrelevant_valid : parametricElimIrrelevant_obligation.
 Proof.
 prepare.
-intros G a b m p q ext0 H.
-apply tr_constfn_elim.
-eapply tr_conjoin_elim2; eauto.
+intros G m p q.
+apply tr_sequal_intro.
 Qed.
 
 
-Lemma tr_sequal_subst :
-  forall G m n p,
-    tr (hyp_tm nonsense :: G) (deq triv triv (sequal m n))
-    -> tr G (deq triv triv (sequal (subst1 p m) (subst1 p n))).
-Proof.
-intros G m n p H.
-replace (deq triv triv (sequal (subst1 p m) (subst1 p n))) with (substj (dot p id) (deq triv triv (sequal m n))) by (simpsub; auto).
-apply (tr_generalize _ nonsense p); auto.
-unfold nonsense.
-apply tr_guard_intro.
-  {
-  apply tr_voidtp_istype.
-  }
-apply (tr_voidtp_elim _ (var 0) (var 0)).
-eapply hypothesis; eauto using index_0.
-Qed.
-
-
-Lemma irrelevantCompat_valid : irrelevantCompat_obligation.
+Lemma irrelevance_valid : irrelevance_obligation.
 Proof.
 prepare.
-intros G m n p q Hm Hn.
-apply tr_pi_intro.
-  {
-  apply tr_nonsense_formation.
-  }
-simpsub.
-so (irrelevant_elim _ _ _ Hm) as Hm'.
-so (irrelevant_elim _ _ _ Hn) as Hn'.
-apply (tr_sequal_trans _ _ (subst1 n (subst (dot (var 0) (dot triv (sh 2))) m))).
-2:{
-  replace
-    (subst (dot (subst (dot triv sh1) n) (dot triv sh1)) m)
-    with 
-    (subst1 (subst (dot triv sh1) n) (subst (dot (var 0) (dot triv (sh 2))) m)) 
-    by (simpsub; auto).
-  apply tr_sequal_compat; auto.
-  }
-
-  {
-  apply tr_sequal_subst.
-  simpsubin Hm'.
-  cbn [Nat.add] in Hm'.
-  apply (exchange_1_1 _ _ _ []).
-    {
-    simpsub.
-    auto.
-    }
-  cbn [length].
-  simpsub.
-  cbn [List.app].
-  exact Hm'.
-  }
-Qed.
-
-
-Lemma irrelevantLam_valid : irrelevantLam_obligation.
-Proof.
-prepare.
+unfold Defs.unavailable.
 intros G m p H.
-apply tr_pi_intro.
+apply tr_intersect_intro.
   {
   apply tr_nonsense_formation.
   }
 simpsub.
-cbn [Nat.add].
-apply tr_sequal_compat_lam.
-apply (exchange_1_1 _ _ _ []).
-  {
-  simpsub.
-  auto.
-  }
-cbn [length].
-simpsub.
-cbn [List.app].
-so (irrelevant_elim _#3 H) as H'.
-simpsubin H'.
-cbn [Nat.add] in H'.
-exact H'.
-Qed.
-
-
-Lemma irrelevantApp_valid : irrelevantApp_obligation.
-Proof.
-prepare.
-intros G m n ext1 ext0 Hm Hn.
-apply tr_pi_intro.
-  {
-  apply tr_nonsense_formation.
-  }
-simpsub.
-so (irrelevant_elim _ _ _ Hm) as Hm'.
-so (irrelevant_elim _ _ _ Hn) as Hn'.
-so (tr_sequal_compat _ _ _ (app (var 0) (subst sh1 n)) Hm') as H1.
-simpsubin H1.
-so (tr_sequal_compat _ _ _ (app (subst sh1 (subst (dot triv sh1) m)) (var 0)) Hn') as H2.
-simpsubin H2.
-eapply tr_sequal_trans; eauto.
-Qed.
-
-
-Lemma irrelevantAppParametric_valid : irrelevantAppParametric_obligation.
-Proof.
-prepare.
-intros G a b m n ext1 ext0 Hirr Hparam.
-apply tr_pi_intro.
-  {
-  apply tr_nonsense_formation.
-  }
-simpsub.
-so (irrelevant_elim _ _ _ Hirr) as Hirr'.
-so (tr_sequal_compat _ _ _ (app (var 0) (subst sh1 (subst (dot triv sh1) n))) Hirr') as H2.
-simpsubin H2.
-eapply tr_sequal_trans; eauto.
-apply tr_constfn_elim.
-eapply tr_conjoin_elim2; eauto.
-Qed.
-
-
-Lemma irrelevantPair_valid : irrelevantPair_obligation.
-Proof.
-prepare.
-intros G m n ext1 ext0 Hm Hn.
-apply tr_pi_intro.
-  {
-  apply tr_nonsense_formation.
-  }
-simpsub.
-so (irrelevant_elim _ _ _ Hm) as Hm'.
-so (irrelevant_elim _ _ _ Hn) as Hn'.
-so (tr_sequal_compat _ _ _ (ppair (var 0) (subst sh1 n)) Hm') as H1.
-simpsubin H1.
-so (tr_sequal_compat _ _ _ (ppair (subst sh1 (subst (dot triv sh1) m)) (var 0)) Hn') as H2.
-simpsubin H2.
-eapply tr_sequal_trans; eauto.
-Qed.
-
-
-Lemma irrelevantPi1_valid : irrelevantPi1_obligation.
-Proof.
-prepare.
-intros G m ext0 Hm.
-apply tr_pi_intro.
-  {
-  apply tr_nonsense_formation.
-  }
-simpsub.
-so (irrelevant_elim _ _ _ Hm) as Hm'.
-so (tr_sequal_compat _ _ _ (ppi1 (var 0)) Hm') as H.
-simpsubin H.
-exact H.
-Qed.
-
-
-Lemma irrelevantPi2_valid : irrelevantPi2_obligation.
-Proof.
-prepare.
-intros G m ext0 Hm.
-apply tr_pi_intro.
-  {
-  apply tr_nonsense_formation.
-  }
-simpsub.
-so (irrelevant_elim _ _ _ Hm) as Hm'.
-so (tr_sequal_compat _ _ _ (ppi2 (var 0)) Hm') as H.
-simpsubin H.
-exact H.
-Qed.
-
-
-Lemma irrelevantNext_valid : irrelevantNext_obligation.
-Proof.
-prepare.
-intros G m ext0 Hm.
-apply tr_pi_intro.
-  {
-  apply tr_nonsense_formation.
-  }
-simpsub.
-so (irrelevant_elim _ _ _ Hm) as Hm'.
-so (tr_sequal_compat _ _ _ (next (var 0)) Hm') as H.
-simpsubin H.
-exact H.
-Qed.
-
-
-Lemma irrelevantPrev_valid : irrelevantPrev_obligation.
-Proof.
-prepare.
-intros G m ext0 Hm.
-apply tr_pi_intro.
-  {
-  apply tr_nonsense_formation.
-  }
-simpsub.
-so (irrelevant_elim _ _ _ Hm) as Hm'.
-so (tr_sequal_compat _ _ _ (prev (var 0)) Hm') as H.
-simpsubin H.
+apply (tr_sequal_eta2 _ p p).
 exact H.
 Qed.

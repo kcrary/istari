@@ -138,6 +138,7 @@ UNITS = \
 	ValidationMu \
 	ValidationNat \
 	ValidationOf \
+	ValidationParam \
 	ValidationPartial \
 	ValidationPi \
 	ValidationQuotient \

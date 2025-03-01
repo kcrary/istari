@@ -1,19 +1,400 @@
 
-File.import "union-load.iml";
-
 openModule /List/;
 openModule /Bar/;
-openModule /Union/;
 openModule /Natural/;
 openModule /Partial/;
 openModule /SyntacticEquality/;
 openModule /Misc/;
+openModule /Irrelevance/;
 openModule /Tuple/;
-
-grammaroff Weaksum;
-grammaron Union;
+openModule /Weaksum/;
 
 fun shouldfail tac = ifthen tac (fail "unexpected success") idtac;
+
+
+
+lemma "convertIrr_under"
+/
+  forall i (a b : U i) (c : b -> U i) (f : a -> b) (g : forall (x : a) . c (f x)) .
+    (fn x . pack ((fn _ . c) bogus) (bogus x) (g x))
+    : a -> weaksum (y : b) . c y
+/;
+
+inference.
+intro /i a b c f g/.
+convertIrr /pack c (f x) within x/.
+typecheck.
+qed ();
+
+
+
+lemma "unpackt_equal"
+/
+  forall i (a : U i) (b : a -> U i) (u : weaksum (x : a) . b x) .
+    unpackt (x, y) = u in y = y : b x
+/;
+
+inference.
+intro /i a b u/.
+destruct /u/ /x y/.
+convertIrr /pack b _ _/.
+witness /unpackt_intro x y __/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "unpackt_implication"
+/
+  forall i (a : U i) (b : a -> U i) 
+    (c d : forall (x : a) . b x -> U i)
+    (u : weaksum (x : a) . b x) .
+      (parametric (x : a) . forall (y : b x) . c x y -> d x y)
+      -> (unpackt (x , y) = u in c x y)
+      -> (unpackt (x , y) = u in d x y)
+/;
+
+inference.
+intro /i a b c d u Himpl Hu/.
+destruct /Hu/ /x y Heq Hy/.
+reduce /Hy/.
+subst /u/.
+apply /unpackt_intro x/.
+reduce //.
+apply /Himpl Ap x/ >> auto.
+qed ();
+
+
+
+lemma "destruct_unpackt"
+/
+  forall i (a : U i) (b : a -> U i) 
+    (c : forall (x : a) . b x -> U i) 
+    (d : (weaksum (x : a) . b x) -> U i) 
+    (u : weaksum (x : a) . b x) .
+      (parametric (x : a) . forall (y : b x) . c x y -> d (pack b x y))
+      -> (unpackt (x , y) = u in c x y)
+      -> d u
+/;
+
+inference.
+intro /i a b c d u Himpl Hu/.
+destruct /Hu/ /x y Heq H/.
+reduce /H/.
+subst /u/.
+apply /Himpl Ap x/ >> auto.
+qed ();
+
+
+
+lemma "destruct_unpackt_squash"
+/
+  forall i (a : U i) (b : a -> U i) 
+    (c : forall (x : a) . b x -> U i) 
+    (d : (weaksum (x : a) . b x) -> U i) 
+    (u : weaksum (x : a) . b x) .
+      (forall (x : a) (y : b x) . c x y -> d (pack b x y))
+      -> (unpackt (x , y) = u in c x y)
+      -> { d u }
+/;
+
+inference.
+intro /i a b c d u Himpl Hu/.
+destruct /Hu/ /x y Heq H/.
+reduce /H/.
+subst /u/.
+split.
+apply /Himpl/ >> auto.
+qed ();
+
+
+
+lemma "partial_application_irrelevance"
+/
+  forall i (a : U i) .
+    (fn b . `Weaksum.pack a b)
+    : parametric (b : a -> U i) . forall (x : a) . b x -> weaksum (x : a) . b x
+/;
+
+inference.
+intro /i a/.
+typecheck.
+qed ();
+
+
+
+lemma "parametric_intro_extract"
+/
+  forall i (a : U i) (b : a -> U i) (f g : forall (x : a) . b x) .
+    (forall (x : a) . f x = g x : b x)
+    -> parametric (x : a) . f x = g x : b x
+/;
+
+inference.
+intro /i a b f g Heq x/.
+shouldfail (apply /Heq/).
+unhide.
+apply /Heq/.
+qed ();
+
+
+
+define /parabar {a b c} f x y/
+/
+  f Ap x Ap y
+//
+  intersect i . forall (a b c : U i) . (parametric (x : a) (y : b) . c) -> a -> b -> c
+/;
+
+unfold /parabar/.
+typecheck.
+qed ();
+
+recordIrrelevance /parabar/ [0, 1, 2, 4, 5];
+
+
+
+lemma "parabar_application"
+/
+  forall i (a b c : U i) (f : parametric (x : a) (y : b) . c) .
+    (fn x y . parabar f x y)
+    : parametric (x : a) (y : b) . c
+/;
+
+inference.
+intro /i a b c f/.
+typecheck.
+qed ();
+
+
+
+lemma "parametric_subtype"
+/
+  forall i (a a' : U i) (b : a -> U i) (b' : a' -> U i)
+    (f : parametric (x : a) . b x)
+    (g : (parametric (x : a') . b' x) -> nat) .
+      a' <: a
+      -> (forall (x : a') . b x <: b' x)
+      -> g f : nat
+/;
+
+inference.
+intro /i a a' b b' f g Ha Hb/.
+typecheck.
+qed ();
+
+
+
+lemma "parametric_forall_subtype"
+/
+  forall i (a a' : U i) (b : a -> U i) (b' : a' -> U i)
+    (f : parametric (x : a) . b x)
+    (g : (forall (x : a') . b' x) -> nat) .
+      a' <: a
+      -> (forall (x : a') . b x <: b' x)
+      -> g f : nat
+/;
+
+inference.
+intro /i a a' b b' f g Ha Hb/.
+typecheck.
+qed ();
+
+
+
+define /parametric_def f x/
+/
+  abort (f x)
+//
+  intersect i (a : U i) (b : a -> U i) .
+    (a -> void)
+    -> parametric (x : a) . b x
+/;
+
+inference.
+introOf /i a b f x/.
+unfold /parametric_def/.
+reduceParam //.
+typecheck.
+qed ();
+
+
+
+lemma "parametric_introEq"
+/
+  forall i (a : U i) (b : a -> U i) (f g : parametric (x : a) . b x) .
+    (forall x . f Ap x = g Ap x : b x)
+    -> f = g : (parametric (x : a) . b x)
+/;
+
+inference.
+intro /i a b f g Heq/.
+introEq /x/.
+apply /Heq/.
+qed ();
+
+
+
+lemma "parametric_extAuto"
+/
+  forall i (a : U i) (b : a -> U i) (f g : parametric (x : a) . b x) .
+    (forall x . f Ap x = g Ap x : b x)
+    -> f = g : (parametric (x : a) . b x)
+/;
+
+inference.
+intro /i a b f g Heq/.
+extensionalityAuto.
+apply /Heq/.
+qed ();
+
+
+
+define /parafoo/
+/
+  fn x . 12
+//
+  parametric (x : nat) . nat
+/;
+
+unfold /parafoo/.
+introOf /x/.
+reduceParam //.
+typecheck.
+qed ();
+
+
+
+lemma "parametric_ext"
+/
+  forall i (a : U i) (b : a -> U i) (f g : parametric (x : a) . b x) .
+    (forall x . f Ap x = g Ap x : b x)
+    -> (fn x . f Ap x) = (fn x . g Ap x) : (parametric (x : a) . b x)
+/;
+
+inference.
+intro /i a b f g Heq/.
+extensionality.
+reduceParam //.
+apply /Heq/.
+qed ();
+
+
+
+lemma "parametric_functions"
+/
+  forall i (a : U i) (b : a -> U i) (f : parametric (x : a) . b x) .
+    (fn x y . (f Ap x, f Ap y))
+    : parametric (x y : a) . b x & b y
+/;
+
+inference.
+intro /i a b f/.
+typecheck.
+qed ();
+
+
+
+lemma "parametric_ap"
+/
+  forall i (a : U i) (b : a -> U i) (f : intersect (x : a) . b x) .
+    (fn x . f ap x)
+    : parametric (x : a) . b x
+/;
+
+inference.
+intro /i a b f/.
+typecheck.
+qed ();
+
+
+
+lemma "unparametric_forall"
+/
+  forall i (a : U i) (b : a -> U i) (f : forall (x : a) . b x) .
+    (fn x . f x)
+    : parametric (x : a) . b x
+/;
+
+inference.
+intro /i a b f/.
+typecheck.
+RuleTactic.parametricIntroOf.
+1:{
+  shouldfail Irrelevance.proveIrrelevant.
+Prover.abandon ();
+
+
+
+lemma "parametric_abort"
+/
+  forall i (a : U i) (b : a -> U i) (f : a -> void) .
+    (fn x . abort (f x))
+    : parametric (x : a) . b x
+/;
+
+inference.
+intro /i a b f/.
+typecheck.
+qed ();
+
+
+
+lemma "parametric_prune_evar"
+/
+  forall (i : level) (a b : U i) (f : a -> b) (g : { a } -> b) .
+    (fn x . _) : parametric (x : a) . b
+/;
+
+intro /i a b f g/.
+typecheck.
+shouldfail (change /concl/ /(f x) : b/).
+change /concl/ /(g ()) : b/.
+typecheck.
+qed ();
+
+
+
+lemma "parametric_prune_evar_multi"
+/
+  forall (i : level) (a b : U i) (f : a -> b) .
+    (fn x y z . _) : parametric (x : a) . forall (y : a) . parametric (z : a) . b
+/;
+
+intro /i a b f/.
+typecheck.
+shouldfail (change /concl/ /(f x) : b/).
+shouldfail (change /concl/ /(f z) : b/).
+change /concl/ /(f y) : b/.
+typecheck.
+qed ();
+
+
+
+lemma "parametric_compat"
+/
+  forall i (a b : U i) (x y z : a) (f : parametric (x y : a) . forall (z : a) . b) .
+    x = y : a
+    -> y = z : a
+    -> f Ap x Ap y z = f Ap y Ap z x : b
+/;
+
+inference.
+intro /i a b x y z f Hxy Hyz/.
+compat.
+  {
+  auto.
+  }
+
+  {
+  auto.
+  }
+
+  {
+  transitivity /y/ >> auto.
+  }
+qed ();
 
 
 
@@ -759,93 +1140,6 @@ lemma "overloading'"
 /;
 
 omega.
-qed ();
-
-
-
-lemma "iunpackt_implication"
-/
-  forall i (a : Kind i) (b : a -> U i) 
-    (c d : forall (x : a) . b x -> U i)
-    (u : iexists (x : a) . b x) .
-      (intersect (x : a) . forall (y : b x) . c x y -> d x y)
-      -> (iunpackt (x , y) = u in c x y)
-      -> (iunpackt (x , y) = u in d x y)
-/;
-
-inference.
-intro /i a b c d u Himpl Hu/.
-destruct /Hu/ /x y Heq Hy/.
-reduce /Hy/.
-subst /u/.
-apply /iunpackt_intro/.
-reduce //.
-apply /Himpl/ >> auto.
-qed ();
-
-
-
-lemma "unpackt_implication"
-/
-  forall i (a : U i) (b : a -> U i) 
-    (c d : forall (x : a) . b x -> U i)
-    (u : union (x : a) . b x) .
-      (intersect (x : a) . forall (y : b x) . c x y -> d x y)
-      -> (unpackt (x , y) = u in c x y)
-      -> (unpackt (x , y) = u in d x y)
-/;
-
-inference.
-intro /i a b c d u Himpl Hu/.
-destruct /Hu/ /x y Heq Hy/.
-reduce /Hy/.
-subst /u/.
-apply /unpackt_intro/.
-reduce //.
-apply /Himpl/ >> auto.
-qed ();
-
-
-
-lemma "destruct_unpackt"
-/
-  forall i (a : U i) (b : a -> U i) 
-    (c : forall (x : a) . b x -> U i) 
-    (d : (union (x : a) . b x) -> U i) 
-    (u : union (x : a) . b x) .
-      (intersect (x : a) . forall (y : b x) . c x y -> d y)
-      -> (unpackt (x , y) = u in c x y)
-      -> d u
-/;
-
-inference.
-intro /i a b c d u Himpl Hu/.
-destruct /Hu/ /x y Heq H/.
-reduce /H/.
-subst /u/.
-apply /Himpl/ >> auto.
-qed ();
-
-
-
-lemma "destruct_unpackt_squash"
-/
-  forall i (a : U i) (b : a -> U i) 
-    (c : forall (x : a) . b x -> U i) 
-    (d : (union (x : a) . b x) -> U i) 
-    (u : union (x : a) . b x) .
-      (forall (x : a) (y : b x) . c x y -> d y)
-      -> (unpackt (x , y) = u in c x y)
-      -> { d u }
-/;
-
-inference.
-intro /i a b c d u Himpl Hu/.
-destruct /Hu/ /x y Heq H/.
-reduce /H/.
-subst /u/.
-split.
-apply /Himpl/ >> auto.
 qed ();
 
 

@@ -888,6 +888,59 @@ structure Infer :> INFER =
                       | _ =>
                            fk (Mismatch (m, NONE, "ill-formed visibilized application")))
  
+                 else if Constant.eq (const, Prim.paramapp) then
+                    (case spine of
+                        T.App m' :: T.App p :: rest =>
+                           let
+                              fun kloop (a, mtac, m'', remainder) =
+                                 let
+                                    fun resume () = 
+                                       kloop (inferSpine ctx m'' a remainder mtac false prove)
+                                    
+                                    do () =
+                                       detectInferError m'' a remainder fk
+                                          (fn () => ak (m'', a, resume))
+
+                                    (* remainder = [] so M' = M''
+                                       mtac proves G |- M' : A
+                                    *)
+                                 in
+                                    termCase (N.whnfHard a)
+                                    /| \Prim.parametric\ ? (fn . ?) =>
+                                       \(fnc dom cod =>
+                                            let
+                                               val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
+                     
+                                               val tac' =
+                                                  (* G |- paramapp M' P : Cod[P . id] *)
+                                                  refine (Rule.parametricElimOf dom cod m' p)
+                                                  >>> [
+                                                      (* G |- M' : parametric Dom . Cod *)
+                                                      mtac,
+                                                      
+                                                      (* G |- P : Dom *)
+                                                      ptac
+                                                      ]
+                                            in
+                                               sk $
+                                               inferSpine ctx 
+                                                  (T.apply2 Prim.paramapp m' p)
+                                                  (T.Sub (cod, T.Dot (p, T.id)))
+                                                  rest tac' invis prove
+                                            end)\
+
+                                     | _ =>
+                                       \(fnc =>
+                                            fk (Mismatch (m, SOME a, "ill-typed parametric application")))\
+                                    /
+                                 end
+                           in
+                              inferMain ctx m' false prove fk ak kloop
+                           end
+
+                      | _ =>
+                           fk (Mismatch (m, NONE, "ill-formed parametric application")))
+
                  (* the normal case *)
                  else
                     let
@@ -1541,6 +1594,82 @@ structure Infer :> INFER =
                       | _ =>
                            fk (Mismatch (m, NONE, "ill-formed visibilized application")))
  
+                 else if Constant.eq (const, Prim.paramapp) then
+                    (case spine1 of
+                        T.App m' :: T.App p :: rest1 =>
+                           termCase n
+                           /| \Prim.paramapp\ @ ? =>
+                              \(fnc spine2 =>
+                                   (case spine2 of
+                                       T.App n' :: T.App q :: rest2 =>
+                                          let
+                                             fun kloop (a, mntac, m'', n'', rest1', rest2') : 'a =
+                                                (case (rest1', rest2') of
+                                                    ([], _ :: _) => fk Clash
+
+                                                  | (_ :: _, []) => fk Clash
+
+                                                  | (_ :: _, _ :: _) =>
+                                                       let
+                                                          fun resume () =
+                                                             kloop (compatSpine ctx m'' n'' a rest1' rest2' mntac false prove)
+                                                       in
+                                                          detectCompatError m'' a rest1' rest2' fk
+                                                             (fn () => ak (m'', a, resume))
+                                                             (fn () => raise (Fail "unreachable"))
+                                                       end
+
+                                                  | ([], []) =>
+                                                       (* rest1' = rest2' = []  so  M'' = M' and N'' = N'
+                                                          mntac proves G |- M' = N' : A
+                                                       *)
+                                                       termCase (N.whnfHard a)
+                                                       /| \Prim.parametric\ ? (fn . ?) =>
+                                                          \(fnc dom cod =>
+                                                               let
+                                                                  (* Requiring that P = Q as if this were a regular application,
+                                                                     but we don't have to do that.
+                                                                  *)
+                                                                  val pqtac = prove (J.make ctx (T.apply3 Prim.eq dom p q)) []
+                                        
+                                                                  val tac' =
+                                                                     (* G |- paramapp M' P = paramapp N' Q : Cod[P . id] *)
+                                                                     refine (Rule.parametricElimEq dom cod m' n' p q)
+                                                                     >>> [
+                                                                         (* G |- M' = N' : parametric Dom . Cod *)
+                                                                         mntac,
+                                                                         
+                                                                         (* G |- P = Q : Dom *)
+                                                                         pqtac
+                                                                         ]
+                                                               in
+                                                                  sk $
+                                                                  compatSpine ctx 
+                                                                     (T.apply2 Prim.paramapp m' p)
+                                                                     (T.apply2 Prim.paramapp n' q)
+                                                                     (T.Sub (cod, T.Dot (p, T.id)))
+                                                                     rest1 rest2 tac' invis prove
+                                                               end)\
+                   
+                                                        | _ =>
+                                                          \(fnc =>
+                                                               fk (Mismatch (m, SOME a, "ill-typed parametric application")))\
+                                                       /)
+                                          in
+                                             compatMain ctx m' n' false prove fk ak kloop
+                                          end
+        
+                                     | _ =>
+                                          fk (Mismatch (n, NONE, "ill-formed parametric application"))))\
+
+                            | _ =>
+                              \(fnc =>
+                                   fk Clash)\
+                           /
+
+                      | _ =>
+                           fk (Mismatch (m, NONE, "ill-formed parametric application")))
+
                  (* the normal case *)
                  else
                     termCase n

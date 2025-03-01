@@ -363,7 +363,7 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr (cons (hyp_tm b) (cons (hyp_tm a) G)) (deqtype (subst (dot (var 0) (sh 2)) p) (subst (dot (var 0) (sh 2)) q))
       -> tr G (deqtype (subst1 m p) (subst1 n q))
   
-(* Constant functions (unused) *)
+(* Constant functions *)
 
 | tr_constfn_formation :
     forall G,
