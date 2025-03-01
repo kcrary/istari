@@ -14,8 +14,8 @@ The introduction form for the weak sum is `pack`:
          = fn a b x y . y
          (1 implicit argument)
 
-The elimination form is `unpack`.  Note that the body does not have
-access to the witness term:
+The elimination form is `unpack`.  Note that the body has only
+parametric access to the witness term:
 
     unpack : intersect (i : level) .
                 forall (a : U i) (b : a -> U i) (c : U i) .
@@ -42,7 +42,7 @@ Weaksum is covariant and preserves extensional equality:
 
 Since the body of the `unpack` has only parametric access to the
 witness term, it is unsuitable for composing predicates that talk
-about the a weak sum's witness term.  For that, we can define
+about a weak sum's witness term.  For that, we can define
 `unpackt`:
 
     unpackt : intersect (i : level) .
@@ -56,7 +56,7 @@ about the a weak sum's witness term.  For that, we can define
 The syntactic sugar `unpackt (x, y) = u in c` is accepted for
 `unpackt (fn x y . c) u`.
 
-The introduction forms for `unpackt` inhabits it when the weak sum
+The introduction form for `unpackt` inhabits it when the weak sum
 being unpacked is a known package:
 
     unpackt_intro : intersect (i : level) .
