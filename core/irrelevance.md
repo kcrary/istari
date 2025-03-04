@@ -49,6 +49,47 @@ inhabitant becomes known, we can reduce:
 
     outpi (inpi m) f --> f Ap m
 
+All proofs are equal at a proof irrelevant type:
+
+    pirr_ext : type:pirr_ext
+
+Implication induces subtyping on `pirr`:
+
+    pirr_subtype : type:pirr_subtype
+
+    pirr_eeqtp : type:pirr_eeqtp
+
+However, care must be taken when using these.  If a proof `x` is
+extracted from `pirr A`, and `A` is changed to `B`, any uses of `x`
+must be adjusted (*e.g.,* using the `convertIrr` rewrite) to account
+for the fact that `x` now proves `B` instead of `A`.  For this reason,
+`pirr_subtype` and `pirr_eeqtp` are not employed automatically.
+
+Proof irrelevance commutes with the future modality:
+
+    pirr_from_future : type:pirr_from_future
+                     = def:pirr_from_future
+
+    future_from_pirr : type:future_from_pirr
+                     = def:future_from_pirr
+
+    pirr_from_future_inv : type:pirr_from_future_inv
+
+The other direction is an instance of `pirr_ext`.
+
+The typechecker will generally not be able to guess the future type
+argument `af`, so a visibilized application will typically be
+necessary.  A simpler version is available when the type argument is
+available in the present:
+
+    pirr_from_future' : type:pirr_from_future'
+                      = def:pirr_from_future'
+
+    future_from_pirr' : type:future_from_pirr'
+                      = def:future_from_pirr'
+
+    pirr_from_future'_inv : type:pirr_from_future'_inv
+
 
 #### Impredicative functions
 

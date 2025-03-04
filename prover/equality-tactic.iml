@@ -119,6 +119,9 @@ signature EQUALITY_TACTIC_INTERNAL =
 
       val extensionalityTactics : priority tacticm ConstantTable.table
 
+      (* an extensionality tactic to be used by reflexivity *)
+      val trivialExtensionalityTactics : tactic ConstantTable.table
+
    end
 
 
@@ -159,11 +162,39 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
 
       val reflexivity = TC.withTypecheckSnd reflexivityPriority
 
+      
+      val trivialExtensionalityTactics : tactic H.table = H.table ()
+
+      val eqReflexive =
+         let
+            do () = lift
+         in
+            cut $ setFailure "terms do not unify" $
+            first
+               [
+               refine (Rule.eqRefl (T.evar ()) (T.evar ())),
+
+               goalCaseT
+               /| \Prim.eq\ (const? @ _) _ _ =>
+                  \(fnc const =>
+                       (case H.find trivialExtensionalityTactics const of
+                           SOME tac =>
+                              tac
+      
+                         | NONE =>
+                              fail "trivial extensionality"))\
+      
+                | _ =>
+                  \(fnc =>
+                       fail "trivial extensionality")\
+               /
+               ]
+         end
 
       val () =
          (
          H.insert reflexivityTactics Prim.eq 
-            (cut (setFailure "terms do not unify" RuleTactic.eqRefl) >> idtacM Secondary);
+            (eqReflexive >> idtacM Secondary);
 
          H.insert reflexivityTactics Prim.eqtp 
             (cut (setFailure "types do not unify" RuleTactic.eqtpRefl) >> idtacM Secondary);

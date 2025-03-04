@@ -1,1 +1,81 @@
-(* empty *)
+
+
+structure ParseIrrelevance =
+   struct
+
+      structure R = CheckpointedRef
+      structure T = ETerm
+
+      val outpi : Constant.constant R.dest = R.dest ()
+
+      fun parseLetinpi x m n = T.apply2 (R.read outpi) m (T.lam (SOME x) n)
+
+   end
+
+
+grammardef Irrelevance
+
+   rule Term(0) ::= "let" "inpi" Ident "=" Term(1) "in" Term(0) => ParseIrrelevance.parseLetinpi
+
+end
+
+grammaron Irrelevance
+
+
+functor AfterIrrelevance () :> sig end =
+   struct
+
+      structure R = Reduction
+      structure S = Seq
+      structure T = Term
+      structure De = DestructInternal
+
+      val pirr = resolveGlobal /Irrelevance.pirr/
+      val inpi = resolveGlobal /Irrelevance.inpi/
+      val outpi = resolveGlobal /Irrelevance.outpi/
+      val pirr_ext = resolveGlobal /Irrelevance.pirr_ext/
+
+      val () = CheckpointedRef.write ParseIrrelevance.outpi outpi
+
+      val () = UnparseTerm.registerLet outpi "let inpi "
+
+      open Tactic
+
+      val pirrExt =
+         let
+            do () = lift
+         in
+            Backchain.witnessRaw /\T.Const pirr_ext\ _ _ _ _/
+         end
+
+      val () = ConstantTable.insert EqualityTacticInternal.extensionalityTactics pirr (pirrExt >> idtacM Secondary)
+      val () = ConstantTable.insert EqualityTacticInternal.trivialExtensionalityTactics pirr pirrExt
+
+
+      fun destPirr i pat set =
+         (case pat of
+             IntroPattern.And [p] =>
+                let
+                   do (jud, _) = withgoal
+                in
+                   (* ... pirr A ... |- C *)
+                   refine (Rule.reduceHyp i (R.trans [R.unfold, R.beta 1]))
+                   >>+
+                   (* ... { A } ... |- C *)
+                   refine (Rule.isquashLeft i (T.evar ()) (T.evar ()))
+                   >>+
+                   (* ... A ...[() . ^] |- C[under_i (() . ^ )] *)
+                   De.refold jud i 1
+                      (T.apply1 inpi T.zero)
+                      (R.trans [R.unfold, R.beta 1])
+                   >>+
+                   (* ... A ...[inpi 0 . ^] |- C[under_i (inpi 0 . ^)] *)
+                   De.dest i p set
+                 end
+
+           | _ =>
+                fail "pirr pattern expected")
+
+      val () = ConstantTable.insert De.destructTactics pirr destPirr
+
+   end

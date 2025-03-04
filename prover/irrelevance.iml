@@ -68,7 +68,6 @@ structure Irrelevance :> IRRELEVANCE =
                   | _ =>
                        R.compat (irrelevanceSpineNomask set depth spine []))
 
-
            | T.Elim (n as T.Sub (T.Evar _, _), spine) =>
                 let
                    val k = IntSet.greatest set + depth + 1
@@ -201,7 +200,81 @@ structure Irrelevance :> IRRELEVANCE =
          done
 
 
+
+      fun unfoldThese m s =
+         (case m of
+             T.Var i => 
+                (case T.substVar i s of
+                    T.Idx _ => R.refl
+
+                  | T.Term n => unfoldThese n T.id)
+
+           | T.Const const =>
+                if 
+                   Constant.eq (const, Prim.letnext)
+                   orelse
+                   Constant.eq (const, Prim.lett)
+                then
+                   R.unfold
+                else
+                   R.refl
+
+           | T.Elim (n, spine) =>
+                (case spine of
+                    [] =>
+                       unfoldThese n s
+
+                  | _ =>
+                       R.trans [R.within [0] (unfoldThese n s),
+                                R.compat (unfoldTheseSpine spine s [])])
+
+           | T.Lam (_, n) =>
+                R.within [0] (unfoldThese n (T.under 1 s))
+
+           | T.Pair (n1, n2) =>
+                R.trans [R.within [0] (unfoldThese n1 s), R.within [1] (unfoldThese n2 s)]
+
+           | T.Next n => 
+                R.within [0] (unfoldThese n s)
+
+           | T.Triv => R.refl
+
+           | T.Sub (n, s') =>
+                unfoldThese n (T.compose s' s)
+
+           | T.Evar eb =>
+                (case T.readEbind eb of
+                    NONE => R.refl
+
+                  | SOME n => unfoldThese n s)
+
+           | T.Native _ => R.refl
+
+           | T.Marker _ => R.refl)
+
+      and unfoldTheseSpine spine s acc =
+         (case spine of
+             [] =>
+                List.rev acc
+
+           | T.App m :: rest =>
+                unfoldTheseSpine rest s (unfoldThese m s :: acc)
+
+           | _ :: rest =>
+                unfoldTheseSpine rest s acc)
+
+
+
       val proveIrrelevant : tactic =
+         (* This is a hack.  Should get irrelevanceMain to do this, but then it has
+            to incorporate normalization too, and that requires some re-engineering.
+         *)
+         let
+            do (jud, _) = withgoal
+         in
+            refine (Rule.reduce (unfoldThese (J.concl jud) T.id))
+         end
+         >>+
          (* We normalize the conclusion to ensure we have maximum opportunity to find
             irrelevant arguments.
          *)

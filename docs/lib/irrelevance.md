@@ -27,7 +27,7 @@ important tool for proof irrelevance, and [weak sums](#weaksum.html)
 provide another.  Still another is the proof irrelevance modality:
 
     pirr : intersect (i : level) . U i -> U i
-         = fn a . { a }
+         = fn a . isquash a
 
 The type `pirr A` expresses the fact that `A` is true but its
 computational content is unavailable.  It is defined using the squash
@@ -48,6 +48,54 @@ to be used in `N`, so long as `x` is irrelevant in `N`.  When that
 inhabitant becomes known, we can reduce:
 
     outpi (inpi m) f --> f Ap m
+
+All proofs are equal at a proof irrelevant type:
+
+    pirr_ext : forall (i : level) (a : U i) (m m' : pirr a) . m = m' : pirr a
+
+Implication induces subtyping on `pirr`:
+
+    pirr_subtype : forall (i : level) (a b : U i) . (a -> b) -> pirr a <: pirr b
+
+    pirr_eeqtp : forall (i : level) (a b : U i) . a <-> b -> pirr a <:> pirr b
+
+However, care must be taken when using these.  If a proof `x` is
+extracted from `pirr A`, and `A` is changed to `B`, any uses of `x`
+must be adjusted (*e.g.,* using the `convertIrr` rewrite) to account
+for the fact that `x` now proves `B` instead of `A`.  For this reason,
+`pirr_subtype` and `pirr_eeqtp` are not employed automatically.
+
+Proof irrelevance commutes with the future modality:
+
+    pirr_from_future : intersect (i : level) (af : future (U i)) .
+                          let next a = af in future (pirr a) -> pirr (future a)
+                     = fn m . ()
+
+    future_from_pirr : intersect (i : level) (af : future (U i)) .
+                          let next a = af in pirr (future a) -> future (pirr a)
+                     = fn m . next ()
+
+    pirr_from_future_inv : forall (i : level) (af : future (U i)) .
+                              let next a = af
+                              in
+                              forall (m : future (pirr a)) .
+                                future_from_pirr (pirr_from_future m) = m : future (pirr a)
+
+The other direction is an instance of `pirr_ext`.
+
+The typechecker will generally not be able to guess the future type
+argument `af`, so a visibilized application will typically be
+necessary.  A simpler version is available when the type argument is
+available in the present:
+
+    pirr_from_future' : intersect (i : level) (a : U i) . future (pirr a) -> pirr (future a)
+                      = fn m . ()
+
+    future_from_pirr' : intersect (i : level) (a : U i) . pirr (future a) -> future (pirr a)
+                      = fn m . next ()
+
+    pirr_from_future'_inv : forall (i : level) (a : U i) (m : future (pirr a)) .
+                               future_from_pirr' (pirr_from_future' m) = m : future (pirr a)
 
 
 #### Impredicative functions
