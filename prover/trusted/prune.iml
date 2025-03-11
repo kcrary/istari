@@ -812,6 +812,107 @@ functor PruneFun (structure Term : TERM
          with Prune => false
 
 
+
+      (* extractEvar m s
+
+         if    m[s] = E[s']
+         then  return (E, s')
+         else  raise Prune
+      *)
+      fun extractEvar m s =
+         (case m of
+             T.Evar eb =>
+                (case T.readEbind eb of
+                    SOME n =>
+                       extractEvar n s
+
+                  | NONE =>
+                       (eb, s))
+
+           | T.Sub (n, s') =>
+                extractEvar n (T.compose s' s)
+
+           | T.Elim (n, spine) =>
+                (case spine of
+                    [] =>
+                       extractEvar n s
+
+                  | _ => 
+                       raise Prune)
+
+           | _ =>
+                raise Prune)
+
+
+      (* identicalSub s s'
+
+         if    s is represented using Shift and Idot
+         then  if    s and s' are identical
+               then  return true
+               else  return false
+      *)
+      fun identicalSub s1 s2 =
+         (case (s1, s2) of
+             (T.Shift i1, T.Shift i2) =>
+                i1 = i2
+
+           | (T.Idot (i1, s1'), T.Idot (i2, s2')) =>
+                i1 = i2
+                andalso
+                identicalSub s1' s2'
+
+           | (T.Shift i1, T.Idot (i2, s2')) =>
+                i1 = i2
+                andalso
+                identicalSub (T.Shift (i1+1)) s2'
+
+           | (T.Idot (i1, s1'), T.Shift i2) =>
+                i1 = i2
+                andalso
+                identicalSub s1' (T.Shift (i2+1))
+
+           | (T.Idot (i1, s1'), T.Dot (m, s2')) =>
+                (case N.simplify m of
+                    T.Elim (T.Var i2, []) =>
+                       i1 = i2
+                       andalso
+                       identicalSub s1' s2'
+
+                  | _ =>
+                       false)
+
+           | (T.Shift i1, T.Dot (m, s2')) =>
+                (case N.simplify m of
+                    T.Elim (T.Var i2, []) =>
+                       i1 = i2
+                       andalso
+                       identicalSub (T.Shift (i1+1)) s2'
+
+                  | _ =>
+                       false)
+
+           | _ =>
+                false)
+
+
+      (* identicalEvarSub M N
+
+         if    M is E or E[s] where s is represented using Shift and Idot
+         then  if    M and N are identical
+               then  return true
+               else  return false
+      *)
+      fun identicalEvarSub m n =
+         let
+            val (eb1, s1) = extractEvar m T.id
+            val (eb2, s2) = extractEvar n T.id
+         in
+            T.eqEbind eb1 eb2
+            andalso
+            identicalSub s1 s2
+         end
+
+
       fun setEbindSub eb s m =
          let
             val mark = Trail.mark ()
@@ -823,17 +924,35 @@ functor PruneFun (structure Term : TERM
                           SOME p => p
 
                         | NONE => raise Prune)
+
+                   val () = pruneMain Dict.empty 0 m p
                 in
-                   pruneMain Dict.empty 0 m p;
+                   (case T.readEbind eb of
+                       NONE =>
+                          (* see performance note above *)
+                          if occurs (T.ebindToInt eb) m then
+                             (* Occurs-check violation unless eb = m[p]. *)
+                             if identicalEvarSub (T.Evar eb) (T.Sub (m, psubToSub p)) then
+                                true
+                             else
+                                raise Prune
+                          else
+                             (
+                             Trail.setEbind eb (T.Sub (m, psubToSub p));
+                             true
+                             )
 
-                   (* see performance note above *)
-                   if occurs (T.ebindToInt eb) m then
-                      raise Prune
-                   else
-                      ();
-
-                   Trail.setEbind eb (T.Sub (m, psubToSub p));
-                   true
+                     | SOME _ =>
+                          (* Pruning m resulted in eb becoming bound.  Thus eb must appear
+                             somewhere within m.  This is an occurs-check violation unless
+                             eb = m[p].  (If it is a violation, it wouldn't be caught by the
+                             occurs check in the NONE branch, since the evar has changed
+                             from eb to something else.)
+                          *)
+                          if identicalEvarSub (T.Evar eb) (T.Sub (m, psubToSub p)) then
+                             true
+                          else
+                             raise Prune)
                 end
              with Prune => (Trail.rewind mark; false))
          end
