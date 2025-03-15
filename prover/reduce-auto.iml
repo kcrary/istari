@@ -7,31 +7,36 @@ signature AUTO_REDUCE =
       type reduction = Reduction.reduction
 
 
+      (* autowhnf dp dl m
+
+         Reduces m to whnf form, where constants in dp can be reduced unlimited times,
+         and constants in dl can be reduced at most once and only at the root.
+         Positions in the int list are reduced before trying the reduction.  The int
+         list must be sorted.
+
+         Returns the whnf of n, and a reduction from m to n.
+      *)
+      val autowhnf :
+         (constant * (int list * reduction) list) list
+         -> (constant * int list * reduction) list
+         -> term
+         -> term * reduction
+
+
       (* autoreduce underlam dp dl m
 
-         Reduces m to normal form, where constants in dp can be reduced unlimited times,
-         and constants in dl can be reduced at most once and only at the root.  Reduces
-         under lambdas if underlam.
+         Reduces m to normal form, where dp and dl are as in autowhnf.  Reduces under
+         lambdas if underlam.
 
          Returns the normal form n, and a reduction from m to n.
       *)
       val autoreduce :
          bool
-         -> (constant * reduction list) list
-         -> (constant * reduction) list
+         -> (constant * (int list * reduction) list) list
+         -> (constant * int list * reduction) list
          -> term
          -> term * reduction
 
-
-      structure Dict : DICT where type key = constant
-
-      val autoreduce' : 
-         bool
-         -> reduction list Dict.dict
-         -> reduction Dict.dict
-         -> term
-         -> term * reduction
-      
 
       (* new underlam dp dl const zones n P
 
@@ -42,8 +47,8 @@ signature AUTO_REDUCE =
       *)
       val new :
          bool
-         -> (constant * reduction list) list
-         -> (constant * reduction) list
+         -> (constant * (int list * reduction) list) list
+         -> (constant * int list * reduction) list
          -> constant -> (int * constant * int) list -> int -> term -> Reduction.ureduction
 
    end
@@ -60,133 +65,376 @@ structure AutoReduce :> AUTO_REDUCE =
       structure R = Reduction
       structure T = Term
 
-      structure Dict = RedBlackDict (structure Key = Constant.Ordered)
-      structure D = Dict
+      structure D = RedexInternal.Dict
+      structure H = ConstantTable
+
+      
+      exception Grab
+
+      fun grab i spine s =
+         if i = 0 then
+            (s, spine)
+         else
+            (case spine of
+                T.App m :: rest =>
+                   grab (i-1) rest (T.Dot (m, s))
+
+              | _ => raise Grab)
 
 
-      (* This could be made more efficient, but it seems fine for now. *)
+      fun elim m spine =
+         (case spine of
+             [] => m
 
-      fun reductionNorm underlam dp dl m acc =
-         (case N.simplify m of
-             T.Elim (T.Const const, _) =>
+           | _ => T.Elim (m, spine))
+
+      val special : 
+         ((int list * reduction) list D.dict
+          -> (int list * reduction) D.dict
+          -> constant
+          -> T.elim list 
+          -> R.reduction list 
+          -> (T.term * R.reduction list) option) H.table = H.table ()
+
+
+      fun reduction dp dl m s spine acc =
+         (case m of
+             T.Var i =>
+                (case T.substVar i s of
+                    T.Idx j =>
+                       (T.Elim (T.Var j, spine), acc)
+
+                  | T.Term n =>
+                       reduction dp dl n T.id spine acc)
+
+           | T.Const const =>
+                (* try dp, then dl, then reductionTree, then special *)
                 (case 
-                    List.findmap 
-                       (fn r =>
+                    List.findmap
+                       (fn (il, red) =>
                            (try
-                               SOME (r, R.reduce r m)
+                               let
+                                  val (spine', acc') =
+                                     reductionSpine dp 0 il spine [] acc
+                               in
+                                  SOME (R.reduce red (T.Elim (m, spine')), red :: acc')
+                               end
                             with R.Reduce => NONE))
                        (case D.find dp const of
                            NONE => []
- 
+
                          | SOME l => l)
                  of
-                    NONE =>
+                    SOME (n, acc') =>
+                       reduction dp dl n T.id [] acc'
+
+                  | NONE =>
                        (case
                            (case D.find dl const of
                                NONE => NONE
 
-                             | SOME r =>
+                             | SOME (il, red) =>
                                   (try
-                                      SOME (r, R.reduce r m)
+                                      let
+                                         val (spine', acc') =
+                                            reductionSpine dp 0 il spine [] acc
+                                      in
+                                         SOME (R.reduce red (T.Elim (m, spine')), red :: acc')
+                                      end
                                    with R.Reduce => NONE))
                         of
-                           NONE =>
-                              (m, R.trans (List.rev acc))
+                           SOME (n, acc') =>
+                              reduction dp (D.remove dl const) n T.id [] acc'
 
-                         | SOME (r, m') =>
-                              reduction underlam dp (D.remove dl const) m' (r :: acc))
+                         | NONE =>
+                              (case RedexInternal.reductionTree const of
+                                  SOME t =>
+                                     (try
+                                         let
+                                            val (n, acc') = reductionUsingTree dp 0 t spine T.id acc
+                                         in
+                                            reduction dp dl n T.id [] acc'
+                                         end
+                                      with
+                                         Grab =>
+                                            (* no more opporunities to reduce this, since nothing is in both reductionTree and special *)
+                                            (T.Elim (T.Const const, spine), acc))
 
-                  | SOME (r, m') =>
-                       reduction underlam dp dl m' (r :: acc))
+                                | NONE =>
+                                     (case H.find special const of
+                                         SOME f =>
+                                            (case 
+                                                f dp dl const spine acc 
+                                             of
+                                                SOME (p, acc') =>
+                                                   reduction dp dl p T.id [] acc'
+                                                   
+                                              | NONE =>
+                                                   (T.Elim (T.Const const, spine), acc))
 
-           | _ =>
-                (m, R.trans (List.rev acc)))
+                                       | NONE =>
+                                            (* no more opportunities to reduce this *)
+                                            (T.Elim (T.Const const, spine), acc)))))
+
+           | T.Elim (n, spine') =>
+                reduction dp dl n s (T.ssubst spine' s @ spine) acc
+
+           | T.Lam (binder, n1) =>
+                (case spine of
+                    [] =>
+                       (T.Lam (binder, T.Sub (n1, T.under 1 s)), acc)
+
+                  | T.App n2 :: rest =>
+                       reduction dp dl n1 (T.Dot (n2, s)) rest (R.beta 1 :: acc)
+
+                  | _ =>
+                       (T.Elim (T.Lam (binder, T.Sub (n1, T.under 1 s)), spine), acc))
+
+           | T.Pair (n1, n2) =>
+                (case spine of
+                    [] => 
+                       (T.Pair (T.Sub (n1, s), T.Sub (n2, s)), acc)
+
+                  | T.Pi1 :: rest =>
+                       reduction dp dl n1 s rest (R.beta 1 :: acc)
+
+                  | T.Pi2 :: rest =>
+                       reduction dp dl n2 s rest (R.beta 1 :: acc)
+
+                  | _ =>
+                       (T.Elim (T.Pair (T.Sub (n1, s), T.Sub (n2, s)), spine), acc))
+
+           | T.Next n1 =>
+                (case spine of
+                    [] =>
+                       (T.Next (T.Sub (n1, s)), acc)
+
+                  | T.Prev :: rest =>
+                       reduction dp dl n1 s rest (R.beta 1 :: acc)
+
+                  | _ =>
+                       (T.Elim (T.Next (T.Sub (n1, s)), spine), acc))
+
+           | T.Triv =>
+                (elim m spine, acc)
+
+           | T.Sub (n, s') =>
+                reduction dp dl n (T.compose s' s) spine acc
+
+           | T.Evar eb =>
+                (case T.readEbind eb of
+                    SOME n =>
+                       reduction dp dl n s spine acc
+
+                  | NONE =>
+                       (T.Elim (T.Sub (m, s), spine), acc))
+
+           | T.Native _ =>
+                (elim m spine, acc)
+
+           | T.Marker _ =>
+                (elim m spine, acc))
 
 
-      and reduction underlam dp dl m acc =
-         let
-            val m' = N.simplify (R.reduce R.betas m)
-         in
-            (case m' of
-                T.Elim (h, spine) =>
+      (* reductionSpine dp i il spine spineacc acc
+
+         i is the current position in the original apine
+         reduce positions il in the original spine
+         spine is the remaining spine
+         spineacc is the spine seen so far
+         acc are reductions so far
+      *)
+      and reductionSpine dp i il spine spineacc acc =
+         (case il of
+             [] =>
+                (List.revAppend spineacc spine, acc)
+
+           | j :: restj =>
+                reductionSpineLoop dp i j restj spine spineacc acc)
+
+
+      and reductionSpineLoop dp i j restj spine spineacc acc =
+         (case spine of
+             [] =>
+                (* spine too short, skip the rest *)
+                (List.rev spineacc, acc)
+
+           | (elim as T.App m) :: restspine =>
+                if i = j then
                    let
-                      val dl' =
-                         (case h of
-                             T.Const const => D.remove dl const
-                           | _ => dl)
-
-                      val (spine', rs) =
-                         List.foldr
-                            (fns elim (spine', rs) =>
-                                (case elim of
-                                    T.App n =>
-                                       let
-                                          val (n', r) = reduction underlam dp dl' n []
-                                       in
-                                          (T.App n' :: spine', r :: rs)
-                                       end
-
-                                  | _ =>
-                                       (elim :: spine', rs)))
-                            ([], [])
-                            spine
+                      val (m', reds) = reduction dp D.empty m T.id [] []
                    in
-                      reductionNorm underlam dp dl (T.Elim (h, spine')) (R.compat rs :: R.betas :: acc)
+                      reductionSpine dp (i+1) restj restspine (T.App m' :: spineacc)
+                         (R.within [i+1] (R.trans (List.rev reds)) :: acc)
+                   end
+                else
+                   reductionSpineLoop dp (i+1) j restj restspine (elim :: spineacc) acc
+
+           | elim :: restspine =>
+                reductionSpineLoop dp i j restj restspine (elim :: spineacc) acc)
+       
+
+      (* reductionUsingTree dp i t spine s acc
+
+         i is the current position in the original spine
+         s and t incorporate the spine seen so far
+         spine is the remaining spine
+         acc are reductions used so far
+      *)
+      and reductionUsingTree dp i t spine s acc =
+         (case t of
+             RedexInternal.LEAF (j, p, red) =>
+                let
+                   val (s', spine') = grab j spine s
+                in
+                   (T.Elim (T.Sub (p, s'), spine'), R.user red :: acc)
+                end
+
+           | RedexInternal.NODE (j, d) =>
+                let
+                   val (s', spine') = grab j spine s
+                in
+                   (* now at position i+j *)
+                   (case spine' of
+                       T.App m :: spine'' =>
+                          let
+                             val (n, reds_m) = reduction dp D.empty m T.id [] []
+                          in
+                             (case n of
+                                 T.Elim (T.Const const, argspine) =>
+                                    (case D.find d const of
+                                        SOME (k, t') =>
+                                           (case grab k argspine s' of
+                                               (s'', []) =>
+                                                  reductionUsingTree dp (i+j+1) t' spine'' s''
+                                                     (R.within [i+j+1] (R.trans (List.rev reds_m)) :: acc)
+
+                                             | _ => raise Grab)
+
+                                      | _ => raise Grab)
+
+                               | _ => raise Grab)
+                          end
+
+                     | _ =>
+                          raise Grab)
+                end
+
+           | RedexInternal.NATIVE (j, k, t') =>
+                if j > 0 then
+                   let
+                      val (s', spine') = grab j spine s
+                   in
+                      reductionUsingTree dp (i+j) (RedexInternal.NATIVE (0, k, t')) spine' s' acc
+                   end
+                else if k > 0 then
+                   (case spine of
+                       T.App m :: spine' =>
+                          let
+                             val (n, reds_n) = reduction dp D.empty m T.id [] []
+                          in
+                             (case n of
+                                 T.Native _ =>
+                                    reductionUsingTree dp (i+1) (RedexInternal.NATIVE (0, k-1, t')) spine' (T.Dot (n, s))
+                                       (R.within [i+1] (R.trans (List.rev reds_n)) :: acc)
+
+                               | _ => raise Grab)
+                          end
+
+                     | _ => raise Grab)
+                else
+                   reductionUsingTree dp i t' spine s acc)
+
+
+
+      fun reductionNorm underlam dp dl m =
+         let
+            val (n, reds) = reduction dp dl m T.id [] []
+         in
+            (case n of
+                T.Elim (_, []) =>
+                   (n, R.trans (List.rev reds))
+
+              | T.Elim (h, spine) =>
+                   let
+                      val (spine', reds_spine) = reductionNormSpine underlam dp spine [] []
+                   in
+                      (T.Elim (h, spine'), R.trans (List.rev (R.compat reds_spine :: reds)))
                    end
 
               | T.Lam (binder, m1) =>
                    if underlam then
                       let
-                         val (m1', r1) = reduction underlam dp dl m1 []
+                         val (n, red) = reductionNorm underlam dp dl m1
                       in
-                         (T.Lam (binder, m1'),
-                          R.trans (List.rev (R.within [0] r1 :: R.betas :: acc)))
+                         (T.Lam (binder, n), R.trans (List.rev (R.within [0] red :: reds)))
                       end
                    else
-                      (m', R.trans (List.rev (R.betas :: acc)))
+                      (n, R.trans (List.rev reds))
 
               | T.Pair (m1, m2) =>
                    let
-                      val (m1', r1) = reduction underlam dp dl m1 []
-                      val (m2', r2) = reduction underlam dp dl m2 []
+                      val (n1, red1) = reductionNorm underlam dp dl m1
+                      val (n2, red2) = reductionNorm underlam dp dl m2
                    in
-                      (T.Pair (m1', m2'),
-                       R.trans (List.rev (R.within [1] r2 :: R.within [0] r1 :: R.betas :: acc)))
+                      (T.Pair (n1, n2), R.trans (List.rev (R.within [1] red2 :: R.within [0] red1 :: reds)))
                    end
 
               | T.Next m1 =>
                    let
-                      val (m1', r1) = reduction underlam dp dl m1 []
+                      val (n, red) = reductionNorm underlam dp dl m1
                    in
-                      (T.Next m1',
-                       R.trans (List.rev (R.within [0] r1 :: R.betas :: acc)))
+                      (T.Next n, R.trans (List.rev (R.within [0] red :: reds)))
                    end
 
-              | _ => 
-                   (m', R.trans (List.rev (R.betas :: acc))))
+              | _ =>
+                   (n, R.trans (List.rev reds)))
+         end
+
+      and reductionNormSpine underlam dp spine spineacc redacc =
+         (case spine of
+             [] =>
+                (List.rev spineacc, List.rev redacc)
+
+           | T.App m :: rest =>
+                let
+                   val (n, red) = reductionNorm underlam dp D.empty m
+                in
+                   reductionNormSpine underlam dp rest (T.App n :: spineacc) (red :: redacc)
+                end
+
+           | elim :: rest =>
+                reductionNormSpine underlam dp rest (elim :: spineacc) redacc)
+
+
+
+      fun makePers dp =
+         List.foldl
+            (fns (const, l) dict => 
+                D.insertMerge dict const l
+                   (fn l' => l @ l'))
+            D.empty
+            dp
+
+
+      fun makeLin dl =
+         List.foldl
+            (fns (const, il, red) dict => D.insert dict const (il, red))
+            D.empty
+            dl
+         
+
+      fun autowhnf dp dl m =
+         let
+            val (n, reds) = reduction (makePers dp) (makeLin dl) m T.id [] []
+         in
+            (n, R.trans (List.rev reds))
          end
 
 
       fun autoreduce underlam dp dl m =
-         let
-            val dp' =
-               List.foldl
-                  (fns (const, l) dp' => D.insert dp' const l)
-                  D.empty
-                  dp
+         reductionNorm underlam (makePers dp) (makeLin dl) m
 
-            val dl' =
-               List.foldl
-                  (fns (const, r) dl' => D.insert dl' const r)
-                  D.empty
-                  dl
-         in
-            reduction underlam dp' dl' m [] 
-         end
-
-      fun autoreduce' underlam dp dl m = reduction underlam dp dl m []
-
-      
 
       fun new underlam dp dl const zones n p =
          if
@@ -212,24 +460,214 @@ structure AutoReduce :> AUTO_REDUCE =
 
                val before = T.Elim (T.Const const, spine)
 
-               val dp' =
-                  List.foldl
-                     (fns (const, l) dp' => D.insert dp' const l)
-                     D.empty
-                     dp
-   
-               val dl' =
-                  List.foldl
-                     (fns (const, r) dl' => D.insert dl' const r)
-                     D.empty
-                     dl
+               val dp' = makePers dp
+               val dl' = makeLin dl
 
-               val (_, red1) = reduction underlam dp' dl' before []
-               val (_, red2) = reduction underlam dp' D.empty p []
+               val (_, red1) = reductionNorm underlam dp' dl' before
+               val (_, red2) = reductionNorm underlam dp' D.empty p
             in
                R.new const zones n p red1 red2
             end
          else
             raise R.Reduce
+
+
+
+      fun reductionNativeUnary f dp dl const spine acc =
+         (case spine of
+             T.App m :: rest =>
+                let
+                   val (n, reds_n) = reduction dp D.empty m T.id [] []
+                in
+                   (case n of
+                       T.Native x =>
+                          (case f x of
+                              NONE => NONE
+
+                            | SOME p =>
+                                 SOME (p, R.native :: R.compat [R.trans (List.rev reds_n)] :: acc))
+
+                     | _ => NONE)
+                end
+
+           | _ => NONE)
+
+      fun reductionNativeBinary f dp dl const spine acc =
+         (case spine of
+             T.App m1 :: T.App m2 :: rest =>
+                let
+                   val (n1, reds_n1) = reduction dp D.empty m1 T.id [] []
+                   val (n2, reds_n2) = reduction dp D.empty m2 T.id [] []
+                in
+                   (case (n1, n2) of
+                       (T.Native x, T.Native y) =>
+                          (case f x y of
+                              NONE => NONE
+
+                            | SOME p =>
+                                 SOME (p, R.native :: R.compat [R.trans (List.rev reds_n1), R.trans (List.rev reds_n2)] :: acc))
+
+                     | _ => NONE)
+                end
+
+           | _ => NONE)
+                
+      val () =
+         List.app
+            (fn (const, Native.Unary f) => H.insert special const (reductionNativeUnary f)
+              | (const, Native.Binary f) => H.insert special const (reductionNativeBinary f))
+            Native.operators
+
+
+      fun reductionLetnext dp dl _ spine acc =
+         (case spine of
+             T.App arg :: T.App body :: rest =>
+                let
+                   val (arg', reds_arg) = reduction dp D.empty arg T.id [] []
+
+                   val red =
+                      R.trans
+                         [
+                         (* letnext (next m) body rest *)
+                         R.unfold,
+                         (* (fn fn . 0 (prev 1)) (next m) body rest *)
+                         R.beta 2,
+                         (* body (prev (next m)) rest *)
+                         R.compat [R.beta 1],
+                         (* body m rest *)
+                         ]
+                in
+                   (case arg' of
+                       T.Next m =>
+                          SOME (T.Elim (body, T.App m :: rest), 
+                                red :: R.compat [R.trans (List.rev reds_arg)] :: acc)
+
+                     | _ => NONE)
+                end
+
+           | _ => NONE)
+
+
+      fun reductionLetpair dp dl _ spine acc =
+         (case spine of
+             T.App arg :: T.App body :: rest =>
+                let
+                   val (arg', reds_arg) = reduction dp D.empty arg T.id [] []
+
+                   val red =
+                      R.trans
+                         [
+                         (* letpair (m1, m2) body rest *)
+                         R.unfold,
+                         (* (fn fn . 0 (pi1 1) (pi2 1)) (m1, m2) body rest *)
+                         R.beta 2,
+                         (* body (pi1 (m1, m2)) (pi2 (m1, m2)) rest *)
+                         R.compat [R.beta 1, R.beta 1],
+                         (* body m1 m2 rest *)
+                         ]
+                in
+                   (case arg' of
+                       T.Pair (m1, m2) =>
+                          SOME (T.Elim (body, T.App m1 :: T.App m2 :: rest),
+                                red :: R.compat [R.trans (List.rev reds_arg)] :: acc)
+
+                     | _ => NONE)
+                end
+
+           | _ => NONE)
+
+
+      fun reductionLete dp dl _ spine acc =
+         (case spine of
+             T.App arg :: T.App body :: rest =>
+                let
+                   val (m, reds_arg) = reduction dp D.empty arg T.id [] []
+
+                   val red =
+                      R.trans
+                         [
+                         (* leteager m body rest *)
+                         R.unfold,
+                         (* (fn fn . 0 1) m body rest *)
+                         R.beta 2,
+                         (* body m rest *)
+                         ]
+                in
+                   SOME (T.Elim (body, T.App m :: rest),
+                         red :: R.compat [R.trans (List.rev reds_arg)] :: acc)
+                end
+
+           | _ => NONE)
+
+
+      fun reductionFnann dp dl _ spine acc =
+         (case spine of
+             T.App _ :: T.App func :: T.App arg :: rest =>
+                let
+                   val (func', reds_func) = reduction dp D.empty func T.id [] []
+
+                   val red =
+                      R.trans
+                         [
+                         (* fnann _ (fn . body) arg rest *)
+                         R.unfold,
+                         (* (fn fn . 0) _ (fn . body) arg rest *)
+                         R.beta 3,
+                         (* body [arg . id] rest *)
+                         ]
+                in
+                   (case func' of
+                       T.Lam (_, body) =>
+                          SOME (T.Elim (T.Sub (body, T.Dot (arg, T.id)), rest),
+                                red :: R.within [2] (R.trans (List.rev reds_func)) :: acc)
+
+                     | _ => NONE)
+                end
+
+           | _ => NONE)
+
+
+      fun reductionSeq dp dl const spine acc =
+         (case spine of
+             T.App arg :: T.App body :: rest =>
+                let
+                   val (m, reds_arg) = reduction dp D.empty arg T.id [] []
+
+                   val red =
+                      R.trans
+                         [
+                         (* seq/seqt m body rest *)
+
+                         if Constant.eq (const, Prim.seqt) then
+                            R.unfold
+                         else
+                            R.refl,
+
+                         (* seq m body rest *)
+                         R.seq
+                         (* body m rest *)
+                         ]
+                in
+                   if Valuability.valuability m > 0 then
+                      SOME (T.Elim (body, T.App m :: rest),
+                            red :: R.compat [R.trans (List.rev reds_arg)] :: acc)
+                   else
+                      NONE
+                end
+
+           | _ => NONE)
+         
+                
+      val () =
+         List.app
+            (fn (const, f) => H.insert special const f)
+            [
+            (Prim.letnext, reductionLetnext),
+            (Prim.letpair, reductionLetpair),
+            (Prim.lete, reductionLete),
+            (Prim.fnann, reductionFnann),
+            (Prim.seq, reductionSeq),
+            (Prim.seqt, reductionSeq)
+            ]
 
    end

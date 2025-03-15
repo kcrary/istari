@@ -1070,11 +1070,13 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
          Susp.delay
             (fn () =>
                 [
-                (Prim.nat_case, [R.user PR.nat_case_succ, R.user PR.nat_case_zero]),
-                (Prim.sum_case, [R.user PR.sum_case_inr, R.user PR.sum_case_inl]),
-                (Susp.force constListRec, [R.user (Susp.force list_rec_cons)]),
-                (Susp.force constCon, [R.trans [Susp.force con_unroll, R.user PR.nat_case_succ], 
-                                       R.trans [Susp.force con_unroll, R.user PR.nat_case_zero]])
+                (Prim.nat_case, [([0], R.user PR.nat_case_succ), 
+                                 ([0], R.user PR.nat_case_zero)]),
+                (Prim.sum_case, [([0], R.user PR.sum_case_inr),
+                                 ([0], R.user PR.sum_case_inl)]),
+                (Susp.force constListRec, [([2], R.user (Susp.force list_rec_cons))]),
+                (Susp.force constCon, [([0], R.trans [Susp.force con_unroll, R.user PR.nat_case_succ]), 
+                                       ([0], R.trans [Susp.force con_unroll, R.user PR.nat_case_zero])])
                 ])
 
 
@@ -3654,7 +3656,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
             val reductions' =
                List.foldl
-                  (fns (const, _) d => (const, [R.unfold]) :: d)
+                  (fns (const, _) d => (const, [([], R.unfold)]) :: d)
                   (Susp.force reductions)
                   iterInfoList
 
@@ -3669,8 +3671,8 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
                          val iterParams = numberOfStatVisibleArgs + numberOfTypes + numberOfConstructors + numberOfIndexArgs
                          val conParams = numberOfDynVisibleArgs + numberOfConargs
 
-                         val dp = (conConst, [R.unfold]) :: reductions'
-                         val dl = [(Susp.force constIter, Susp.force dt_iter_unroll)]
+                         val dp = (conConst, [([], R.unfold)]) :: reductions'
+                         val dl = [(Susp.force constIter, [], Susp.force dt_iter_unroll)]
                          
                          val (_, _, caseargs) =
                             List.foldl

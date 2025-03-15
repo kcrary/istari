@@ -41,6 +41,16 @@ signature REDEX_INTERNAL =
       (* Returns true iff the constant has a reduction registered (including primitively). *)
       val registered : constant -> bool
 
+
+      structure Dict : DICT where type key = constant
+
+      datatype reduction_tree =
+         LEAF of int * term * ureduction
+       | NODE of int * (int * reduction_tree) Dict.dict
+       | NATIVE of int * int * reduction_tree
+
+      val reductionTree : constant -> reduction_tree option
+
    end
 
 
@@ -81,7 +91,8 @@ functor RedexFun (structure Term : TERM
 
       type ureduction = Reduction.ureduction
 
-      structure D = RedBlackDict (structure Key = Constant.Ordered)
+      structure Dict = RedBlackDict (structure Key = Constant.Ordered)
+      structure D = Dict
       structure H = CheckpointedHashTable (structure Key = Constant.Hashable)
 
 
@@ -102,13 +113,15 @@ functor RedexFun (structure Term : TERM
            A reduction tree one of the following:
 
            + NODE (i, d) indicates that the next active argument is the ith argument
-             remaining.  The constant of that ith argument is used as a key in the 
-             dictionary to find out what to do next.  If the dictionary returns
-             (m, t), it means that the last active argument (i.e., the ith argument)
+             remaining.  The constant of that ith argument is used as a key in the
+             dictionary to find out what to do next.  If the dictionary returns (m,
+             t), it means that the last active argument (i.e., the ith argument)
              must have exactly m arguments, and with continue with t.
 
-           + LEAF red indicates there are no more active arguments, and red is the
-             reduction to use.
+           + LEAF (i, m, red) indicates there are no more active arguments.  There are
+             i more arguments, and the once they are grabbed, the result is m.  The
+             reduction used is red.  (Redex doesn't use the reduction, but callers
+             of reductionTree might.)
 
            + NATIVE (i, n, t) indicates that, of the arguments remaining, i ... i+n-1
              must be native.  After those arguments, continue with t.
@@ -120,7 +133,7 @@ functor RedexFun (structure Term : TERM
       val redexTable : ((term -> term) -> elim list -> term option) H.table = H.table ()
 
       datatype reduction_tree =
-         LEAF of int * term
+         LEAF of int * term * R.ureduction
        | NODE of int * (int * reduction_tree) D.dict
        | NATIVE of int * int * reduction_tree
          
@@ -131,7 +144,6 @@ functor RedexFun (structure Term : TERM
       val userTable : reduction_sort H.table = H.table ()
 
 
-
       fun redex whnf const spine =
          (case H.find redexTable const of
              NONE => NONE
@@ -140,6 +152,13 @@ functor RedexFun (structure Term : TERM
 
       fun registered const = H.member redexTable const
 
+
+
+      fun reductionTree const =
+         (case H.find userTable const of
+             SOME (STANDARD t) => SOME t
+
+           | _ => NONE)
 
 
 
@@ -203,7 +222,7 @@ functor RedexFun (structure Term : TERM
                      | _ => NONE)
                 end
 
-           | LEAF (i, p) =>
+           | LEAF (i, p, _) =>
                 let
                    val (s', spine') = grab i spine s
                 in
@@ -227,30 +246,31 @@ functor RedexFun (structure Term : TERM
 
 
 
-      (* makeTree i k zones n p
+      (* makeTree i k zones n p red
 
          arguments i .. i+k-1 must be native  (if k = 0 then no native arguments)
          zones are the remaining active arguments
          n residual arguments at the end
          p is the right-hand-side
+         red is the reduction
       *)
-      fun makeTree i k zones n p =
+      fun makeTree i k zones n p red =
          (case zones of
              nil =>
                 if k = 0 then
-                   LEAF (n, p)
+                   LEAF (n, p, red)
                 else if i + k <= n then
-                   NATIVE (i, k, LEAF (n - i - k, p))
+                   NATIVE (i, k, LEAF (n - i - k, p, red))
                 else (* i + k > n *)
                    raise (Fail "native arguments are out of bounds")
 
            | (l, const, m) :: rest =>
                 if k = 0 then
-                   NODE (l, D.singleton const (m, makeTree 0 0 rest n p))
+                   NODE (l, D.singleton const (m, makeTree 0 0 rest n p red))
                 else if i + k <= l then
-                   NATIVE (i, k, NODE (l - i - k, D.singleton const (m, makeTree 0 0 rest n p)))
+                   NATIVE (i, k, NODE (l - i - k, D.singleton const (m, makeTree 0 0 rest n p red)))
                 else if l < i then
-                   NODE (l, D.singleton const (m, makeTree (i-l-1) k rest n p))
+                   NODE (l, D.singleton const (m, makeTree (i-l-1) k rest n p red))
                 else (* i <= l < i + k *)
                    raise (Fail "native arguments overlap with active arguments"))
 
@@ -284,7 +304,7 @@ functor RedexFun (structure Term : TERM
          let
             val (const, zones, n, p) = Reduction.expose red
 
-            val t = makeTree i k zones n p
+            val t = makeTree i k zones n p red
 
             val (_, x) =
                H.operate userTable const
@@ -431,7 +451,7 @@ functor RedexFun (structure Term : TERM
 
       fun reduceFnann whnf spine =
          (case spine of
-             _ :: T.App func :: T.App arg :: spine' =>
+             T.App _ :: T.App func :: T.App arg :: spine' =>
                 (case whnf func of
                     T.Lam (_, body) =>
                        SOME (T.Elim (T.Sub (body, T.Dot (arg, T.id)), spine'))

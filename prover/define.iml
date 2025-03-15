@@ -91,8 +91,6 @@ structure DefineInternal :> DEFINE_INTERNAL =
       structure J = Judgement
       structure I = Irrelevance
 
-      structure Dict = AR.Dict
-
       type symbol = Symbol.symbol
       type eterm = ETerm.eterm
       type constant = Constant.constant
@@ -701,30 +699,6 @@ structure DefineInternal :> DEFINE_INTERNAL =
       (* All the registered reductions except primitive or imported ones. *)
       val theRegistered : general_reduction list C.cref = C.new []
                           
-      (* All the registered reductions in a format for autoreduce. *)
-      val theStrat : R.reduction list Dict.dict C.cref =
-         C.new
-            (List.foldl
-                (fns (const, _) d =>
-                    Dict.insertMerge d const
-                       [R.native]
-                       (fn l => R.native :: l))
-                (List.foldl
-                    (fns r d =>
-                        let
-                           val const = R.trigger r
-                        in
-                           Dict.insertMerge d const
-                              [R.user r]
-                              (fn l => R.user r :: l)
-                        end)
-                    (List.foldl
-                        (fns (const, r) d => Dict.insert d const [r])
-                        Dict.empty
-                        PrimReductionInternal.hardcodes)
-                    PrimReductionInternal.redices)
-                Native.operators)
-
 
       fun registerMain exportable red =
          let
@@ -735,12 +709,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
             if exportable then
                C.assign theRegistered (Standard red :: C.deref theRegistered)
             else
-               ();
-
-            C.assign theStrat
-               (Dict.insertMerge (C.deref theStrat) const
-                   [R.user red]
-                   (fn l => R.user red :: l))
+               ()
          end
 
       fun registerNativeMain exportable i n red =
@@ -763,12 +732,7 @@ structure DefineInternal :> DEFINE_INTERNAL =
             if exportable then
                C.assign theRegistered (Native (i, n, red) :: C.deref theRegistered)
             else
-               ();
-
-            C.assign theStrat
-               (Dict.insertMerge (C.deref theStrat) const
-                   [red']
-                   (fn l => red' :: l))
+               ()
          end
          
       val register = registerMain true
@@ -851,20 +815,16 @@ structure DefineInternal :> DEFINE_INTERNAL =
             val rhs = ETerm.withdir dir (ETerm.explicit erhs)
 
             val dp =
-               List.foldl
-                  (fns const dp =>
-                      Dict.insertMerge dp const
-                         [R.unfold]
-                         (fn l => R.unfold :: l))
-                  (C.deref theStrat)
+               List.map
+                  (fn const => (const, [([], R.unfold)]))
                   unf
 
             val dl =
-               List.foldl
-                  (fns const dl =>
+               List.map
+                  (fn const =>
                       (case Database.findUnroll const of
                           SOME red =>
-                             Dict.insert dl const red
+                             (const, [], red)
 
                         | NONE =>
                              (
@@ -877,11 +837,10 @@ structure DefineInternal :> DEFINE_INTERNAL =
 
                              signalError "constant is not unrollable"
                              )))
-                  Dict.empty
                   unr
 
-            val (m1, red1) = AR.autoreduce' true dp dl lhs
-            val (m2, red2) = AR.autoreduce' true dp Dict.empty rhs
+            val (m1, red1) = AR.autoreduce true dp dl lhs
+            val (m2, red2) = AR.autoreduce true dp [] rhs
 
             val (zonesRev, residual) =
                List.foldl
