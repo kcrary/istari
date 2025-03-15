@@ -28,6 +28,8 @@ Repl.Hooks.exceptionHandler := Handler.handler;
 
 FileInternal.useHook := Ctrl.use;
 
+(* Only set ProverInternal.beforeLemmaHook in server mode, because it would actually be called. *)
+
 (* The rest of these don't matter in batch mode because batch mode never calls them. *)
 
 Repl.Hooks.checkpoint :=
@@ -42,17 +44,7 @@ Repl.Hooks.onReady := Message.display;
 
 Repl.Hooks.onRewind := Prover.show;
 
-Repl.Hooks.reset :=
-   let
-      val st = Checkpoint.checkpoint ()
-   in
-      (fn () => (
-                Checkpoint.restore st;
-                (* Ignore failure here, as per checkpoint spec. *)
-   
-                ()
-                ))
-   end;
+(* Set Repl.Hooks.reset after the prelude is loaded. *)
 
 
 (* Begin *)
@@ -132,6 +124,19 @@ fun server buildDir message =
    (
    (* only in server mode *)
    ProverInternal.beforeLemmaHook := Memory.saveLast;
+
+   (* only in server mode, prelude is loaded now *)
+   Repl.Hooks.reset :=
+      let
+         val st = Checkpoint.checkpoint ()
+      in
+         (fn () => (
+                   Checkpoint.restore st;
+                   (* Ignore failure here, as per checkpoint spec. *)
+      
+                   ()
+                   ))
+      end;
 
    splash ();
 
