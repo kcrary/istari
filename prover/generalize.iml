@@ -21,6 +21,11 @@ signature GENERALIZE =
       *)
       val pattern : Term.term -> Term.term -> int list option -> (Term.term, int) Sum.sum
 
+      val abstractOverGen : eterm -> Hyp.hypothesis -> int list option -> tactic
+      val abstractOver : eterm -> Hyp.hypothesis -> tactic
+      val abstractOverAt : eterm -> Hyp.hypothesis -> int list -> tactic
+
+
       val generalizeGenPriority : eterm -> eterm -> int list option -> symbol option -> priority tacticm
       val generalizeGenRaw : eterm -> eterm -> int list option -> symbol option -> tactic
       val generalizeGen : eterm -> eterm -> int list option -> symbol option -> tactic
@@ -69,6 +74,7 @@ structure Generalize :> GENERALIZE =
       structure D = Directory
       structure J = Judgement
       structure TC = Typecheck
+      structure R = Reduction
 
       open Tactic
 
@@ -242,6 +248,63 @@ structure Generalize :> GENERALIZE =
 
               | _ => Sum.INL n')
          end
+
+
+
+      fun abstractOverGen em hyp occ =
+         let
+            do goal as (jud, dir) = withgoal
+         in
+            (case Hyp.hypothesisToHypOrConcl goal hyp of
+                NONE =>
+                   let
+                      val m = ETerm.withdir dir em
+                      val n = J.concl jud
+                   in
+                      (case pattern m n occ of
+                          Sum.INL n' =>
+                             (* N = N'[M . id] *)
+                             refine (Rule.unreduce
+                                        (T.Elim (T.Lam (NONE, n'), [T.App m]))
+                                        (R.beta 1))
+                             (* (fn . N') M *)
+                             
+                        | Sum.INR j =>
+                             fail (String.concat ["target appears only ", Int.toString j, " times in conclusion"]))
+                   end
+
+              | SOME i =>
+                   let
+                      val m = ETerm.withdir (D.shift dir (i+1)) em
+
+                      fun tac n =
+                         (case pattern m n occ of
+                             Sum.INL n' =>
+                                (* ... N = N'[M . id] ... *)
+                                refine (Rule.unreduceHyp i
+                                           (T.Elim (T.Lam (NONE, n'), [T.App m]))
+                                           (R.beta 1))
+                                (* ... (fn . N') M ... *)
+
+                           | Sum.INR j =>
+                                fail (String.concat ["target appears only ", Int.toString j, " times in hypothesis ", Symbol.toValue (D.name dir i)]))
+                   in
+                      (case J.hyp jud i of
+                          J.Tm n => tac n
+                        | J.Tml n => tac n
+                        | J.Tmh n => tac n
+                        | J.Let n => tac n
+
+                        | _ =>
+                             fail (String.concat ["hypothesis ", Symbol.toValue (D.name dir i), " has an inappropriate sort"]))
+                   end)
+         end
+
+      fun abstractOver em hyp = abstractOverGen em hyp NONE
+
+      fun abstractOverAt em hyp occ = abstractOverGen em hyp (SOME occ)
+
+
 
       fun generalizeGenPriority em ea occ name =
          let
