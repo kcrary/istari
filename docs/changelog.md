@@ -29,6 +29,8 @@
   + The definition of `abort` has been changed to make it proof
     irrelevant.
 
+- The `forallfut` type has been added.
+
 - New tactics:
 
   + `assertLater` is like `assert`, but asserts a "later" fact.
@@ -68,8 +70,9 @@
 
 - Added rules `assertLater`, `assertLater'`, `coguardSubIntro`,
   `eeqEeq`, `eqEeq`, `guardSubElim`, `letnextEeq`, and
-  `sequalCompatLam`.  Also added rules governing parametric functions
-  and irrelevance.
+  `sequalCompatLam`.  Also added rules governing parametric functions,
+  irrelevance, and future functions, and rules commuting squash and
+  intensional squash with future.
 
 - Bug fixes.
 

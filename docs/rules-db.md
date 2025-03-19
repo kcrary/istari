@@ -40,6 +40,7 @@ Human-readable rules, using explicit variables, are given
 [Coguarded types](#coguarded-types)<br>
 [Disjoint sums](#disjoint-sums)<br>
 [Future modality](#future-modality)<br>
+[Future functions](#future-functions)<br>
 [Recursive types](#recursive-types)<br>
 [Inductive types](#inductive-types)<br>
 [Void](#void)<br>
@@ -2240,6 +2241,122 @@ Human-readable rules, using explicit variables, are given
       >>
       promote(G) |- istp A
       G |- isquash (future A)
+
+
+### Future functions
+
+- `forallfutForm A B`
+
+      G |- istp (forallfut A (fn . B))
+      >>
+      promote(G) |- istp A
+      G, (later) A |- istp B
+
+- `forallfutEq A A' B B'`
+
+      G |- eqtp (forallfut A (fn . B)) (forallfut A' (fn . B'))
+      >>
+      promote(G) |- eqtp A A'
+      G, (later) A |- eqtp B B'
+
+- `forallfutFormUniv A B I`
+
+      G |- of (univ I) (forallfut A (fn . B))
+      >>
+      G |- of level I
+      promote(G) |- of (univ I) A
+      G, (later) A |- of (univ I[^1]) B
+
+- `forallfutEqUniv A A' B B' I`
+
+      G |- eq (univ I) (forallfut A (fn . B)) (forallfut A' (fn . B'))
+      >>
+      G |- of level I
+      promote(G) |- eq (univ I) A A'
+      G, (later) A |- eq (univ I[^1]) B B'
+
+- `forallfutSub A A' B B'`
+
+      G |- subtype (forallfut A (fn . B)) (forallfut A' (fn . B'))
+      >>
+      promote(G) |- subtype A' A
+      G, (later) A' |- subtype B B'
+      G, (later) A |- istp B
+
+- `forallfutForallVoidSub A B B'`
+
+      G |- subtype (forallfut A (fn . B)) (forall void (fn . B'))
+      >>
+      promote(G) |- istp A
+      G, (later) A |- istp B
+
+- `forallfutIntroOf A B M`
+
+      G |- of (forallfut A (fn . B)) (fn . M)
+      >>
+      promote(G) |- istp A
+      G, (later) A |- of B M
+
+- `forallfutIntroEq A B M N`
+
+      G |- eq (forallfut A (fn . B)) (fn . M) (fn . N)
+      >>
+      promote(G) |- istp A
+      G, (later) A |- eq B M N
+
+- `forallfutIntro A B`
+
+      G |- forallfut A (fn . B) ext fn . M
+      >>
+      promote(G) |- istp A
+      G, (later) A |- B ext M
+
+- `forallfutElimOf A B M P`
+
+      G |- of B[P . id] (M P)
+      >>
+      G |- of (forallfut A (fn . B)) M
+      promote(G) |- of A P
+
+- `forallfutElimEq A B M N P Q`
+
+      G |- eq B[P . id] (M P) (N Q)
+      >>
+      G |- eq (forallfut A (fn . B)) M N
+      promote(G) |- eq A P Q
+
+- `forallfutElim A B P`
+
+      G |- B[P . id] ext M P
+      >>
+      G |- forallfut A (fn . B) ext M
+      promote(G) |- of A P
+
+- `forallfutExt A B M N`
+
+      G |- eq (forallfut A (fn . B)) M N
+      >>
+      promote(G) |- istp A
+      G |- of (forallfut A (fn . B)) M
+      G |- of (forallfut A (fn . B)) N
+      G, (later) A |- eq B (M[^1] 0) (N[^1] 0)
+
+- `forallfutExt' A A' A'' B B' B'' M N`
+
+      G |- eq (forallfut A (fn . B)) M N
+      >>
+      promote(G) |- istp A
+      G |- of (forall A' (fn . B')) M
+      G |- of (forall A'' (fn . B'')) N
+      G, (later) A |- eq B (M[^1] 0) (N[^1] 0)
+
+- `forallfutOfExt A A' B B' M`
+
+      G |- of (forallfut A (fn . B)) M
+      >>
+      promote(G) |- istp A
+      G |- of (forall A' (fn . B')) M
+      G, (later) A |- of B (M[^1] 0)
 
 
 ### Recursive types

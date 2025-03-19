@@ -133,6 +133,8 @@ try (intros;
            |apply interp_iset
            |apply interp_fut_zero
            |apply interp_fut
+           |apply interp_semifut_zero
+           |apply interp_semifut
            |apply interp_karrow
            |apply interp_tarrow
            |apply interp_prod

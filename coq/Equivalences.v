@@ -231,6 +231,15 @@ prove_equiv_compat.
 Qed.
 
 
+Lemma equiv_semifut :
+  forall (k k' : term object),
+    equiv k k'
+    -> equiv (semifut k) (semifut k').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
 Lemma equiv_intersect :
   forall (a a' b b' : term object),
     equiv a a'
@@ -462,4 +471,4 @@ Qed.
 End object.
 
 
-Hint Resolve equiv_fut equiv_rec equiv_clam equiv_capp equiv_cty equiv_con equiv_pi equiv_app equiv_bite equiv_ppair equiv_ppi1 equiv_ppi2 : equiv_compat.
+Hint Resolve equiv_fut equiv_semifut equiv_rec equiv_clam equiv_capp equiv_cty equiv_con equiv_pi equiv_app equiv_bite equiv_ppair equiv_ppi1 equiv_ppi2 : equiv_compat.

@@ -252,6 +252,10 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                (refine2 Rule.forallIntro >>> [idtacM Secondary, idtacM Primary],
                 RT.binder [2]);
 
+            insert Prim.forallfut
+               (refine2 Rule.forallfutIntro >>> [idtacM Secondary, idtacM Primary],
+                RT.binder [2]);
+
             insert Prim.arrow 
                (refine2 Rule.arrowIntro >>> [idtacM Secondary, idtacM Primary],
                 nobinder);
@@ -690,6 +694,26 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                                          ]
                                   end)\
 
+                           | \Prim.forallfut\ _ (fn ? . _) =>
+                             \(fnc binder =>
+                                  let
+                                     val pat' =
+                                        (case pat of
+                                            IntroPattern.Ident NONE =>
+                                               IntroPattern.Ident binder
+          
+                                          | _ => pat)
+                                  in
+                                     refine (Rule.forallfutOfExt (T.evar ()) (T.Const Prim.void) (T.evar ()) (T.evar ()) (T.evar ()))
+                                     >>> [
+                                         idtacM Secondary,
+
+                                         attempt proveLambda >> idtacM Secondary,
+             
+                                         D.destruct0 pat' (introOfPriority rest)
+                                         ]
+                                  end)\
+
                            | \Prim.arrow\ _ _ =>
                              \(fnc =>
                                   refine (Rule.arrowOfExt (T.evar ()) (T.Const Prim.void) (T.evar ()) (T.evar ()) (T.evar ()))
@@ -890,6 +914,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
             (fn (const, rule) => H.insert introFormRules const rule)
             [
             (Prim.forall, Rule.forallForm),
+            (Prim.forallfut, Rule.forallfutForm),
             (Prim.exists, Rule.existsForm),
             (Prim.intersect, Rule.intersectForm),
             (Prim.union, Rule.unionForm),
@@ -902,6 +927,7 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
             (fn (const, rule) => H.insert introFormUnivRules const rule)
             [
             (Prim.forall, Rule.forallFormUniv),
+            (Prim.forallfut, Rule.forallfutFormUniv),
             (Prim.exists, Rule.existsFormUniv),
             (Prim.intersect, Rule.intersectFormUniv),
             (Prim.union, Rule.unionFormUniv),

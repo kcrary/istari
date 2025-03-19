@@ -324,6 +324,16 @@ with basicv : page -> bool -> nat -> sterm -> wiurel stop -> Prop :=
       basic pg s i a A
       -> basicv pg s (S i) (fut a) (iufut stop (S i) A)
 
+| interp_semifut_zero :
+    forall pg s a,
+      hygiene clo a
+      -> basicv pg s 0 (semifut a) (iusemifut0 stop)
+
+| interp_semifut :
+    forall pg s i a (A : wiurel stop),
+      basic pg s i a A
+      -> basicv pg s (S i) (semifut a) (iusemifut stop (S i) A)
+
 | interp_void :
     forall pg s i,
       basicv pg s i voidtp (iubase (void_urel stop))

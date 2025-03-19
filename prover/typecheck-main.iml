@@ -292,7 +292,7 @@ structure TypecheckMain :> TYPECHECK_MAIN =
       val tabLleq = 8
 
 
-      (* not checkpointed *)
+      (* not checkpointed, since the stuff in it doesn't change *)
       structure H' = HashTable (structure Key = Constant.Hashable)
 
       (* matcher returns the classifier (e.g., tabOv) and the key term *)
@@ -340,13 +340,14 @@ structure TypecheckMain :> TYPECHECK_MAIN =
             ]
                         
 
-      type entry = int * T.term * T.term list * T.term
+      type entry = int * T.term * (bool * T.term) list * T.term
       type table = entry list PD.dict
 
-      (* Each table entry has the form (sz, C, [A1 ... An], B), meaning:
+      (* Each table entry has the form (sz, C, [(b1, A1) ... (bn, An)], B), meaning:
 
          If    G = G1, G2 where |G1| = sz
-         then  G1(0) = C = forall A1 ... An . B
+         then  G1(0) = C = forall/forallfut A1 ... An . B
+         bi = false means that Ai's quantifier is forall, otherwise it's forallfut
       *)
 
 
@@ -372,10 +373,13 @@ structure TypecheckMain :> TYPECHECK_MAIN =
                    (* n = |al| *)
                    fun innerloop n al a =
                       termCase a
-                      /
-                       | \Prim.forall\ ? (fn . ?) =>
-                         \fnc ai a' =>
-                             innerloop (n+1) (ai :: al) a'\
+                      /| \Prim.forall\ ? (fn . ?) =>
+                         \(fnc ai a' =>
+                              innerloop (n+1) ((false, ai) :: al) a')\
+
+                       | \Prim.forallfut\ ? (fn . ?) =>
+                         \(fnc ai a' =>
+                              innerloop (n+1) ((true, ai) :: al) a')\
 
                        | $as const? @ ? =>
                          \(fnc b const spine =>
@@ -448,7 +452,7 @@ structure TypecheckMain :> TYPECHECK_MAIN =
       (* instantiateLoop a args tac
 
          if    tac partially proves G |- A
-               A = forall A1 ... An . B
+               A = forall/forallfut A1 ... An . B
                args = [N1 ... Nn]
          then  returns tac'
                where
@@ -464,16 +468,30 @@ structure TypecheckMain :> TYPECHECK_MAIN =
                     T.Elim (T.Const const, [T.App dom, T.App codlam]) =>
                        (case N.simplify codlam of
                            T.Lam (_, cod) =>
-                              instantiateLoop (T.Sub (cod, T.Dot (n, T.id))) rest
-                                 (* G |- Cod[N . id] *)
-                                 (refine (Rule.forallElim dom cod n)
-                                  >>> [
-                                      (* G |- forall Dom . Cod *)
-                                      tac,
+                              if Constant.eq (const, Prim.forall) then
+                                 instantiateLoop (T.Sub (cod, T.Dot (n, T.id))) rest
+                                    (* G |- Cod[N . id] *)
+                                    (refine (Rule.forallElim dom cod n)
+                                     >>> [
+                                         (* G |- forall Dom . Cod *)
+                                         tac,
+   
+                                         (* G |- N : Dom *)
+                                         idtac
+                                         ])
 
-                                      (* G |- N : Dom *)
-                                      idtac
-                                      ])
+                              else 
+                                 (* const = forallfut *)
+                                 instantiateLoop (T.Sub (cod, T.Dot (n, T.id))) rest
+                                    (* G |- Cod[N . id] *)
+                                    (refine (Rule.forallfutElim dom cod n)
+                                     >>> [
+                                         (* G |- forall Dom . Cod *)
+                                         tac,
+   
+                                         (* G |- N : Dom *)
+                                         idtac
+                                         ])
 
                          | _ =>
                               raise (Fail "precondition2"))
@@ -504,7 +522,7 @@ structure TypecheckMain :> TYPECHECK_MAIN =
 
          Using the table and (tab, key), attempts to prove G |- A.
 
-         Calls prove C M to generate tactics proving G |- M : C.
+         Calls prove G C M to generate tactics proving G |- M : C.
       *)
       fun lookup table tab key ctx aim prove =
          let
@@ -533,10 +551,12 @@ structure TypecheckMain :> TYPECHECK_MAIN =
                                       (case (argsr, s) of
                                           ([], T.Shift _) => (actuals, tacs)
    
-                                        | (a :: rest, T.Dot (e, s')) =>
+                                        | ((isfut, a) :: rest, T.Dot (e, s')) =>
                                              let
                                                 val subtac =
-                                                   prove (T.Sub (a, s')) e
+                                                   prove 
+                                                      (if isfut then S.map J.promote ctx else ctx)
+                                                      (T.Sub (a, s')) e
                                              in
                                                 loop rest s' (e :: actuals) (subtac :: tacs)
                                              end
@@ -988,13 +1008,13 @@ structure TypecheckMain :> TYPECHECK_MAIN =
          let
             val r = ref []
 
-            fun prove a m =
+            fun prove ctx' a m =
                let
                   val subdest = newdest ()
 
                   val subgoal =
                      (Of, table, 
-                      (J.make ctx (T.apply2 Prim.ov a m), dir),
+                      (J.make ctx' (T.apply2 Prim.ov a m), dir),
                       subdest, history)
                in
                   r := subgoal :: !r;

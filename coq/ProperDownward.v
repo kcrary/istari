@@ -623,6 +623,31 @@ apply IH.
 omega.
 }
 
+(* semifut zero *)
+{
+intros pg s a H j Hj.
+assert (j = 0) by omega; subst j.
+rewrite -> iutruncate_iusemifut0; [| omega].
+apply interp_semifut_zero; auto.
+}
+
+(* semifut *)
+{
+intros pg s i a A Ha IH j Hj.
+destruct j as [| j].
+  {
+  rewrite -> iutruncate_iusemifut_one.
+  apply interp_semifut_zero.
+  eapply basic_closed; eauto.
+  }
+rewrite -> iutruncate_iusemifut; [| omega].
+rewrite -> Nat.min_r; [| omega].
+cbn.
+apply interp_semifut.
+apply IH.
+omega.
+}
+
 (* void *)
 {
 intros pg s i j Hj.

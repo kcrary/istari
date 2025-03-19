@@ -1242,6 +1242,23 @@ rewrite -> extend_iufut.
 reflexivity.
 }
 
+(* semifut zero *)
+{
+intros pg s a Hcla IHo h.
+exists (iusemifut0 (cin pg)).
+rewrite -> extend_iusemifut0.
+reflexivity.
+}
+
+(* semifut *)
+{
+intros pg s i a A _ IH IHo h.
+so (IH IHo h) as (R & ->).
+exists (iusemifut (cin pg) (S i) R).
+rewrite -> extend_iusemifut.
+reflexivity.
+}
+
 (* void *)
 {
 intros pg s i H h.
@@ -2105,6 +2122,8 @@ try (intros;
            |eapply interp_iset
            |eapply interp_fut_zero
            |eapply interp_fut
+           |eapply interp_semifut_zero
+           |eapply interp_semifut
            |eapply interp_void
            |eapply interp_unit
            |eapply interp_bool

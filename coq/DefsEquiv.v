@@ -228,6 +228,59 @@ apply star_refl.
 Qed.
 
 
+Lemma def_forallfut :
+  forall a b,
+    equiv (app (app Defs.forallfut a) (lam b)) (pi (semifut a) b).
+Proof.
+intros a m.
+unfold Defs.pi.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app1.
+    apply step_app2.
+    }
+  simpsub.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+apply equiv_pi; auto using equiv_refl.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl'.
+rewrite <- eqsub_expand_id.
+simpsub.
+reflexivity.
+Qed.
+
+
+Lemma def_fut : forall a,
+    equiv (app Defs.future a) (fut a).
+Proof.
+intros a.
+unfold Defs.future.
+  apply steps_equiv.
+  eapply star_step.
+  {
+    apply step_app2.
+  }
+  {
+    simpsub.
+    apply star_refl.
+  }
+Qed.
+
+
 Lemma def_guard :
   forall a b,
     equiv (app (app Defs.guard a) b) (guard a b).
@@ -1161,23 +1214,6 @@ eapply star_step.
   }
 simpsub.
 apply star_refl.
-Qed.
-
-
-Lemma def_fut : forall a,
-    equiv (app Defs.future a) (fut a).
-Proof.
-intros a.
-unfold Defs.future.
-  apply steps_equiv.
-  eapply star_step.
-  {
-    apply step_app2.
-  }
-  {
-    simpsub.
-    apply star_refl.
-  }
 Qed.
 
 

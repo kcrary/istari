@@ -442,6 +442,38 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr G (deq (next (prev m)) (next (prev n)) (fut a))
       -> tr G (deq m n (fut a))
 
+(* Semifut *)
+
+| tr_semifut_formation :
+    forall G a b,
+      tr (promote G) (deqtype a b)
+      -> tr G (deqtype (semifut a) (semifut b))
+  
+| tr_semifut_formation_univ :
+    forall G lv a b,
+      tr (promote G) (deq a b (univ lv))
+      -> tr G (deq lv lv pagetp)
+      -> tr G (deq (semifut a) (semifut b) (univ lv))
+  
+| tr_semifut_intro :
+    forall G m n a,
+      tr (promote G) (deq m n a)
+      -> tr G (deq m n (semifut a))
+  
+| tr_semifut_elim :
+    forall G m n a p q b,
+      tr G (deq m n (semifut a))
+      -> tr (promote G) (deqtype a a)
+      -> tr (cons (hyp_tml a) G) (deq p q b)
+      -> tr G (deq (subst1 m p) (subst1 n q) (subst1 m b))
+  
+| tr_semifut_elim_eqtype :
+    forall G m n a b c,
+      tr G (deq m n (semifut a))
+      -> tr (promote G) (deqtype a a)
+      -> tr (cons (hyp_tml a) G) (deqtype b c)
+      -> tr G (deqtype (subst1 m b) (subst1 n c))
+
 (* Guarded recursive types *)
 
 | tr_rec_kind_formation :

@@ -473,3 +473,321 @@ eapply urel_equiv; eauto.
   apply step_prev2.
   }
 Qed.
+
+
+Definition semifut_action
+  (w : ordinal) i (A : wurel w) : nat -> relation (wterm w)
+  :=
+  fun i' m p =>
+    i' <= i
+    /\ hygiene clo m
+    /\ hygiene clo p
+    /\ (i' > 0 -> rel A (pred i') m p).
+
+
+Lemma semifut_uniform :
+  forall w i A, uniform _ (semifut_action w i A).
+Proof.
+intros w i A.
+do2 3 split.
+
+(* closed *)
+{
+intros i' m n H.
+decompose H; auto.
+}
+
+(* equiv *)
+{
+intros i' m m' p p' Hclm' Hclp' Hequivm Hequivp Hact.
+decompose Hact.
+intros Hi _ _ Hact.
+do2 3 split; auto.
+intro Hpos.
+so (Hact Hpos) as H.
+eapply urel_equiv; eauto.
+}
+
+(* zigzag *)
+{
+intros i' m n p q Hmn Hpn Hpq.
+decompose Hmn.
+intros Hi Hclm _ Hmn.
+decompose Hpn.
+intros _ _ _ Hpn.
+decompose Hpq.
+intros _ _ Hclq Hpq.
+do2 3 split; auto.
+intro Hpos.
+apply (urel_zigzag _#4 n p); auto.
+}
+
+(* downward *)
+{
+intros i' m p H.
+decompose H.
+intros Hi Hclm Hclp Hact.
+do2 3 split; auto.
+  {
+  omega.
+  }
+intro Hpos.
+apply (urel_downward_leq _#3 i').
+  {
+  omega.
+  }
+apply Hact.
+omega.
+}
+Qed.
+
+
+Definition semifut_urel w i A :=
+  mk_urel (semifut_action w i A) (semifut_uniform _#3).
+
+
+Definition iusemifut (w : ordinal) (i : nat) (A : wiurel w) : wiurel w
+  :=
+  (semifut_urel w i (den A),
+   meta_half (meta_iurel A)).
+
+
+Definition iusemifut0 (w : ordinal) : wiurel w
+  :=
+  (semifut_urel w 0 empty_urel,
+   meta_half meta_null).
+
+
+Lemma den_iusemifut :
+  forall w i A,
+    den (iusemifut w i A) = semifut_urel w i (den A).
+Proof.
+reflexivity.
+Qed.
+
+
+Lemma den_iusemifut0 :
+  forall w,
+    den (iusemifut0 w) = semifut_urel w 0 empty_urel.
+Proof.
+reflexivity.
+Qed.
+
+
+Lemma iusemifut_inj :
+  forall w I I' A A',
+    iusemifut w I A = iusemifut w I' A'
+    -> A = A'.
+Proof.
+intros w I I' A A' Heq.
+unfold iusemifut in Heq.
+so (f_equal (fun z => snd z) Heq) as Heq'.
+cbn in Heq'.
+exact (meta_iurel_inj _#3 (meta_half_inj _#3 Heq')).
+Qed.
+
+
+Lemma ceiling_semifut :
+  forall n w i A,
+    ceiling (S n) (semifut_urel w i A)
+    =
+    semifut_urel w
+      (min i n)
+      (ceiling n A).
+Proof.
+intros n w i A.
+apply urel_extensionality.
+fextensionality 3.
+intros j m p.
+cbn.
+pextensionality.
+  {
+  intros (Hj & Hact).
+  decompose Hact.
+  intros Hj' Hclm Hclp Hact.
+  do2 3 split; auto.
+    {
+    apply Nat.min_glb; omega.
+    }
+
+    {
+    intro Hpos.
+    cbn.
+    so (Hact Hpos) as H.
+    split; auto.
+    omega.
+    }
+  }
+
+  {
+  intro Hact.
+  decompose Hact.
+  intros Hj Hclm Hclp Hact.
+  so (Nat.min_glb_l _#3 Hj) as Hji.
+  so (Nat.min_glb_r _#3 Hj) as Hjn.
+  split; [omega |].
+  do2 3 split; auto.
+  intro Hpos.
+  so (Hact Hpos) as H.
+  destruct H as (_ & H).
+  auto.
+  }
+Qed.
+
+
+Lemma iutruncate_iusemifut :
+  forall n w i A,
+    n > 1
+    -> iutruncate n (iusemifut w i A)
+       =
+       iusemifut w
+         (min i (pred n))
+         (iutruncate (pred n) A).
+Proof.
+intros n w i A Hpos.
+unfold iusemifut.
+unfold iutruncate.
+cbn [fst snd].
+f_equal.
+  {
+  destruct n as [| n]; [omega |].
+  apply ceiling_semifut.
+  }
+
+  {
+  rewrite -> meta_truncate_half; [| omega].
+  f_equal.
+  rewrite -> meta_truncate_iurel; auto.
+  omega.
+  }
+Qed.
+
+
+Lemma iutruncate_iusemifut_one :
+  forall w i A,
+    iutruncate 1 (iusemifut w i A)
+    =
+    iusemifut0 w.
+Proof.
+intros w i A.
+unfold iusemifut, iusemifut0.
+unfold iutruncate.
+cbn [fst snd].
+f_equal.
+  {
+  rewrite -> ceiling_semifut.
+  f_equal.
+    {
+    rewrite -> Nat.min_r; omega.
+    }
+  cbn.
+  apply ceiling_zero.
+  }
+
+  {
+  rewrite -> meta_truncate_half; [| omega].
+  reflexivity.
+  }
+Qed.
+
+
+Lemma iutruncate_iusemifut0 :
+  forall n w,
+    n > 0
+    -> iutruncate n (iusemifut0 w)
+       =
+       iusemifut0 w.
+Proof.
+intros n w Hpos.
+unfold iusemifut0.
+unfold iutruncate.
+cbn [fst snd].
+f_equal.
+  {
+  destruct n as [| n]; [omega |].
+  rewrite -> ceiling_semifut.
+  f_equal.
+  apply ceiling_empty_urel.
+  }
+
+  {
+  rewrite -> meta_truncate_half; auto.
+  rewrite -> meta_truncate_null.
+  reflexivity.
+  }
+Qed.
+
+
+Lemma extend_semifut :
+  forall v w (h : v <<= w) I A,
+    extend_urel v w (semifut_urel v I A)
+    =
+    semifut_urel w I
+      (extend_urel v w A).
+Proof.
+intros v w h I A.
+apply urel_extensionality.
+fextensionality 3.
+intros i m p.
+cbn.
+pextensionality.
+  {
+  intro H.
+  decompose H.
+  intros Hi Hclm Hclp Hact.
+  do2 3 split; eauto using map_hygiene_conv.
+  }
+
+  {
+  intro H.
+  decompose H.
+  intros Hi Hclm Hclp Hact.
+  do2 3 split; auto using map_hygiene.
+  }
+Qed.
+
+
+Lemma extend_iusemifut :
+  forall v w (h : v <<= w) I A,
+    extend_iurel h (iusemifut v I A)
+    =
+    iusemifut w I (extend_iurel h A).
+Proof.
+intros v w h I A.
+unfold iusemifut, extend_iurel.
+cbn.
+f_equal.
+  {
+  apply extend_semifut; auto.
+  }
+
+  {
+  rewrite -> extend_meta_half.
+  f_equal.
+  rewrite -> extend_meta_iurel.
+  reflexivity.
+  }
+Qed.
+
+
+Lemma extend_iusemifut0 :
+  forall v w (h : v <<= w),
+    extend_iurel h (iusemifut0 v)
+    =
+    iusemifut0 w.
+Proof.
+intros v w h.
+unfold iusemifut0, extend_iurel.
+cbn.
+f_equal.
+  {
+  rewrite -> extend_semifut; auto.
+  rewrite -> extend_empty_urel; auto.
+  }
+
+  {
+  rewrite -> extend_meta_half.
+  rewrite -> extend_meta_null.
+  reflexivity.
+  }
+Qed.

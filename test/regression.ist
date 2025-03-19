@@ -14,6 +14,228 @@ structure P = ReductionProver;
 
 
 
+lemma "forallfut_so"
+/
+  forall i (a : U i) (b : forallfut (_ : a) . U i) (P : U i) (Q : forallfut (x : a) . b x -> U i) .
+    P
+    -> (forallfut (x : a) . P -> forall (y : b x) . Q x y)
+    -> forallfut (x : a) . forall (y : b x) . Q x y
+/;
+
+inference.
+intro /i a b P Q HP HQ/.
+intro /x y/.
+so /HQ x __ y/ /H/.
+  {
+  hyp /HP/.
+  }
+hyp /H/.
+qed ();
+
+
+
+lemma "forallfut_exploit"
+/
+  forall i (a : U i) (b : forallfut (_ : a) . U i) (P : U i) (Q : forallfut (x : a) . b x -> U i) .
+    P
+    -> (forallfut (x : a) . forall (y : b x) . P -> Q x y)
+    -> forallfut (x : a) . forall (y : b x) . Q x y
+/;
+
+inference.
+intro /i a b P Q HP HQ/.
+intro /x y/.
+exploit /HQ x y/ /H/.
+  {
+  hyp /HP/.
+  }
+hyp /H/.
+qed ();
+
+
+
+lemma "forallfut_introEq"
+/
+  forall i (a : U i) (b : a -> U i) (f g : forallfut (x : a) . future (b x)) .
+    (forall (xf : future a) . let next x = xf in f x = g x : future (b x))
+    -> f = g : (forallfut (x : a) . future (b x))
+/;
+
+inference.
+intro /i a b f g Heq/.
+introEq /x/.
+apply /Heq (next x)/.
+qed ();
+
+
+
+lemma "forallfut_extensionalityAuto"
+/
+  forall i (a : U i) (b : a -> U i) (f g : forallfut (x : a) . future (b x)) .
+    (forall (xf : future a) . let next x = xf in f x = g x : future (b x))
+    -> f = g : (forallfut (x : a) . future (b x))
+/;
+
+inference.
+intro /i a b f g Heq/.
+extensionalityAuto.
+reintro /x/.
+apply /Heq (next x)/.
+qed ();
+
+
+
+lemma "forallfut_ext"
+/
+  forall i (a : U i) (b : a -> U i) (f g : forallfut (x : a) . future (b x)) .
+    (forallfut (x : a) . f x = g x : future (b x))
+    -> f = g : (forallfut (x : a) . future (b x))
+/;
+
+inference.
+intro /i a b f g Heq/.
+extensionality.
+reintro /x/.
+apply /Heq/.
+qed ();
+
+
+
+lemma "forallfut_sub"
+/
+  forall i (a a' : U i) (b : forallfut (_ : a). U i) (b' : forallfut (_ : a'). U i) .
+    a' <: a
+    -> (forallfut (x : a') . b x <: b' x)
+    -> (forallfut (x : a) . b x) <: (forallfut (x : a') . b' x)
+/;
+
+inference.
+intro /i a a' b b' Ha Hb/.
+typecheck.
+qed ();
+
+
+
+lemma "forallfut_intro_of'"
+/
+  forall i (a : U i) (b : a -> U i)
+    (f : forall (x : future a) . let next x' = x in future (b x')) .
+      (fn x . f (next x)) : forallfut (x : a) . future (b x)
+/;
+
+inference.
+intro /i a b f/.
+introOf /x/.
+reduce //.
+typecheck.
+qed ();
+
+
+
+lemma "forallfut_in_table"
+/
+  forall i (a b c : U i) (P : U i) 
+    (f : a -> b)
+    (g : forall (x : future b) . P -g> c) (m : future a) .
+      P
+      -> let next m' = m
+         in
+           g (next (f m')) : c
+/;
+
+inference.
+intro /i a b c P f g m HP/.
+assert /forallfut (x : a) . g (next (f x)) : c/ /Hof/.
+  {
+  intro /x/.
+  typecheck.
+  }
+clear /HP/.
+destruct /m/ /[m]/.
+reduce //.
+typecheck.
+qed ();
+
+
+
+lemma "forallfut_elim_eq"
+/
+  forall i (a : U i) (b : a -> U i) (f : forallfut (x : a) . future (b x)) (m n : future a) .
+    let next m' = m in
+    let next n' = n
+    in
+      future (m' = n' : a)
+      -> f m' = f n' : future (b m')
+/;
+
+inference.
+intro /i a b f [m] [n] [Heq]/.
+compat.
+hyp /Heq/.
+qed ();
+
+
+
+lemma "forallfut_elim_of"
+/
+  forall i (a : U i) (b : a -> U i) (f : forallfut (x : a) . future (b x)) (m : future a) .
+    let next m' = m
+    in
+      f m' : future (b m')
+/;
+
+inference.
+intro /i a b f [m]/.
+reduce //.
+typecheck.
+qed ();
+
+
+
+lemma "forallfut_intro_eq"
+/
+  forall i (a : U i) (b : a -> U i)
+    (f : forall (x : future a) . let next x' = x in future (b x')) .
+      (fn x . f (next x)) 
+      = (fn x . f (next x)) 
+      : (forallfut (x : a) . future (b x))
+/;
+
+inference.
+intro /i a b f/.
+compat.
+qed ();
+    
+
+
+lemma "forallfut_intro_of"
+/
+  forall i (a : U i) (b : a -> U i)
+    (f : forall (x : future a) . let next x' = x in future (b x')) .
+      (fn x . f (next x)) : forallfut (x : a) . future (b x)
+/;
+
+inference.
+intro /i a b f/.
+typecheck.
+qed ();
+    
+
+
+lemma "forallfut_intro"
+/
+  forall i (a : U i) (b : a -> U i) .
+    (forall (x : future a) . let next x' = x in future (b x'))
+    -> forallfut (x : a) . future (b x)
+/;
+
+inference.
+intro /i a b H x/.
+apply /H (next x)/.
+qed ();
+
+
+
 lemma "assert_later"
 /
   forall i (a b : U i) (f : future (a -> b)) (x : future a) .

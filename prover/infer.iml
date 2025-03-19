@@ -492,6 +492,29 @@ structure Infer :> INFER =
                               rest tac' invis prove
                         end)\
 
+                 | \Prim.forallfut\ ? (fn . ?) =>
+                   \(fnc dom cod =>
+                        let
+                           val ptac = prove (J.make
+                                                (Seq.map J.promote ctx)
+                                                (T.apply2 Prim.ov dom p)) []
+ 
+                           val tac' =
+                              (* G |- M P : Cod[P . id] *)
+                              refine (Rule.forallfutElimOf dom cod m p)
+                              >>> [
+                                  (* G |- M : forallfut Dom . Cod *)
+                                  tac,
+                                  
+                                  (* promote G |- P : Dom *)
+                                  ptac
+                                  ]
+                        in
+                           inferSpine ctx (T.app m p)
+                              (T.Sub (cod, T.Dot (p, T.id)))
+                              rest tac' invis prove
+                        end)\
+
                  | \Prim.tarrow\ ? ? =>
                    \(fnc dom cod =>
                         let
@@ -1227,6 +1250,29 @@ structure Infer :> INFER =
                                   tac,
                                   
                                   (* G |- P = Q : Dom *)
+                                  pqtac
+                                  ]
+                        in
+                           compatSpine ctx (T.app m p) (T.app n q)
+                              (T.Sub (cod, T.Dot (p, T.id)))
+                              rest1 rest2 tac' invis prove
+                        end)\
+
+                 | \Prim.forallfut\ ? (fn . ?) =>
+                   \(fnc dom cod =>
+                        let
+                           val pqtac = prove (J.make
+                                                 (Seq.map J.promote ctx)
+                                                 (T.apply3 Prim.eq dom p q)) []
+ 
+                           val tac' =
+                              (* G |- M P = N Q : Cod[P . id] *)
+                              refine (Rule.forallfutElimEq dom cod m n p q)
+                              >>> [
+                                  (* G |- M = N : forall Dom . Cod *)
+                                  tac,
+                                  
+                                  (* promote G |- P = Q : Dom *)
                                   pqtac
                                   ]
                         in

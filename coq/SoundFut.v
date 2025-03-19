@@ -1176,3 +1176,257 @@ do2 2 split.
   eapply urel_equiv; eauto.
   }
 Qed.
+
+
+Lemma sound_semifut_formation :
+  forall G a b,
+    pseq (promote G) (deqtype a b)
+    -> pseq G (deqtype (semifut a) (semifut b)).
+Proof.
+intros G a b.
+revert G.
+refine (seq_pseq_promote 2 [] a [] b 1 true [] _ _ _); cbn.
+intros G Hcla Hclb Hseq.
+rewrite -> seq_eqtype in Hseq |- *.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+destruct i as [| i].
+  {
+  exists (iusemifut0 stop).
+  simpsub.
+  do2 3 split;
+  apply interp_eval_refl; apply interp_semifut_zero; eapply subst_closub; eauto.
+  }
+so (pwctx_promote _#4 Hs) as Hs'.
+so (Hseq _#3 Hs') as (R & Hal & Har & Hbl & Hbr).
+exists (iusemifut stop (S i) R).
+do2 3 split;
+apply interp_eval_refl; apply interp_semifut; auto.
+Qed.
+
+
+Lemma sound_semifut_formation_univ :
+  forall G lv a b,
+    pseq (promote G) (deq a b (univ lv))
+    -> pseq G (deq lv lv pagetp)
+    -> pseq G (deq (semifut a) (semifut b) (univ lv)).
+Proof.
+intros G lv a b.
+revert G.
+refine (seq_pseq_promote 2 [] a [] b 2 true [] _ false [] _ _ _); cbn.
+intros G Hcla Hclb Hseq Hseqlv.
+rewrite -> seq_univ in Hseq |- *.
+rewrite -> seq_deq in Hseqlv.
+eassert _ as Hlv; [refine (seq_pagetp_invert G lv _) |].
+  {
+  intros i t t' Ht.
+  so (Hseqlv _#3 Ht) as (R & Hl & _ & Hlv & _).
+  eauto.
+  }
+clear Hseqlv.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+destruct i as [| i].
+  {
+  so (Hlv _#3 Hs) as (pg & Hlvl & Hlvr).
+  exists pg, (iusemifut0 stop).
+  do2 5 split; auto;
+  apply interp_eval_refl; apply interp_semifut_zero; eapply subst_closub; eauto.
+  }
+so (pwctx_promote _#4 Hs) as Hs'.
+so (Hseq _#3 Hs') as (pg & R & Hlvl & Hlvr & Hal & Har & Hbl & Hbr).
+exists pg, (iusemifut stop (S i) R).
+simpsub.
+do2 5 split; auto;
+apply interp_eval_refl; apply interp_semifut; auto.
+Qed.
+
+
+(* no actual next, but we'll name consistently *)
+Lemma semifut_action_next_zero :
+  forall w i A m n,
+    hygiene clo m
+    -> hygiene clo n
+    -> semifut_action w i A 0 m n.
+Proof.
+intros w i A m n Hcl Hcl'.
+do2 3 split; auto; omega.
+Qed.
+
+
+Lemma semifut_action_next :
+  forall w i A i' m n,
+    S i' <= i
+    -> rel A i' m n
+    -> semifut_action w i A (S i') m n.
+Proof.
+intros w I A i m n Hi Hmn.
+so (urel_closed _#5 Hmn) as (Hm & Hn).
+do2 3 split; auto.
+Qed.
+
+
+Lemma semifut_action_prev :
+  forall w i A i' m n,
+    semifut_action w i A (S i') m n
+    -> rel A i' m n.
+Proof.
+intros w I A i m n Hmn.
+decompose Hmn.
+intros Hi Hclm Hcln Hact.
+lapply Hact; [| omega].
+auto.
+Qed.
+
+
+Lemma sound_semifut_intro :
+  forall G m n a,
+    pseq (promote G) (deq m n a)
+    -> pseq G (deq m n (semifut a)).
+Proof.
+intros G m n a.
+revert G.
+refine (seq_pseq_promote 3 [] m [] n [] a 1 true [] _ _ _); cbn.
+intros G Hclm Hcln Hcla Hseq.
+rewrite -> seq_deq in Hseq |- *.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+destruct i as [| i].
+  {
+  exists (iusemifut0 stop).
+  simpsub.
+  do2 4 split;
+  try (apply interp_eval_refl; apply interp_semifut_zero; eapply subst_closub; eauto);
+  rewrite -> den_iusemifut0;
+  apply semifut_action_next_zero; try prove_hygiene.
+  }
+so (pwctx_promote _#4 Hs) as Hs'.
+so (Hseq _#3 Hs') as (R & Hal & Har & Hm & Hn & Hmn).
+exists (iusemifut stop (S i) R).
+simpsub.
+do2 4 split;
+try (apply interp_eval_refl; apply interp_semifut; auto);
+apply semifut_action_next; auto; omega.
+Qed.
+
+
+Lemma sound_semifut_elim :
+  forall G m n a p q b,
+    pseq G (deq m n (semifut a))
+    -> pseq (promote G) (deqtype a a)
+    -> pseq (cons (hyp_tml a) G) (deq p q b)
+    -> pseq G (deq (subst1 m p) (subst1 n q) (subst1 m b)).
+Proof.
+intros G m n a p q b.
+revert G.
+refine (seq_pseq_promote 1 [] a 3 false [] _ true [] _ false [_] _ _ _); cbn.
+intros G Hcla Hseqmn Hseqa Hseqpq.
+rewrite -> seq_eqtype in Hseqa.
+rewrite -> seq_deq in Hseqmn, Hseqpq |- *.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (Hseqmn _#3 Hs) as (Af & Hal & Har & Hm & Hn & Hmn).
+assert (forall c d,
+          rel (den Af) i c d
+          -> pwctx i (dot c s) (dot d s') (cons (hyp_tml a) G)) as Hs'.
+  {
+  intros c d Hcd.
+  so (urel_closed _#5 Hcd) as (Hclc & Hcld).
+  apply pwctx_cons_tml_seq; auto; try prove_hygiene.
+    {
+    intro Hpos.
+    destruct i as [| i]; [omega |].
+    cbn [pred].
+    simpsubin Hal.
+    simpsubin Har.
+    invert (basic_value_inv _#6 value_semifut Hal).
+    intros A Hal' Heq1.
+    invert (basic_value_inv _#6 value_semifut Har).
+    intros A' Har' Heq2.
+    so (eqtrans Heq1 (eqsymm Heq2)) as Heq.
+    clear Heq2.
+    subst Af.
+    so (iusemifut_inj _#5 Heq); subst A'.
+    apply (seqhyp_tm _#5 A); auto.
+    apply (semifut_action_prev _ (S i)).
+    exact Hcd.
+    }
+
+    {
+    intros j t t' Ht.
+    so (Hseqa _#3 Ht) as (R & Hl & Hr & _).
+    exists toppg, R.
+    auto.
+    }
+  }
+clear Hseqmn.
+so (Hseqpq _#3 (Hs' _ _ Hm)) as (B & Hbml & Hbmr & Hmp & _).
+so (Hseqpq _#3 (Hs' _ _ Hn)) as (B' & _ & Hbnr & _ & Hnq & _).
+so (Hseqpq _#3 (Hs' _ _ Hmn)) as (B'' & Hbml' & Hbnr' & _ & _ & Hmnpq).
+so (basic_fun _#7 Hbml Hbml'); subst B''.
+so (basic_fun _#7 Hbnr Hbnr'); subst B'.
+exists B.
+simpsub.
+do2 4 split; auto.
+Qed.
+
+
+Lemma sound_semifut_elim_eqtype :
+  forall G m n a b c,
+    pseq G (deq m n (semifut a))
+    -> pseq (promote G) (deqtype a a)
+    -> pseq (cons (hyp_tml a) G) (deqtype b c)
+    -> pseq G (deqtype (subst1 m b) (subst1 n c)).
+Proof.
+intros G m n a b c.
+revert G.
+refine (seq_pseq_promote 1 [] a 3 false [] _ true [] _ false [_] _ _ _); cbn.
+intros G Hcla Hseqmn Hseqa Hseqbc.
+rewrite -> seq_eqtype in Hseqa, Hseqbc |- *.
+rewrite -> seq_deq in Hseqmn.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (Hseqmn _#3 Hs) as (Af & Hal & Har & Hm & Hn & Hmn).
+assert (forall p q,
+          rel (den Af) i p q
+          -> pwctx i (dot p s) (dot q s') (cons (hyp_tml a) G)) as Hs'.
+  {
+  intros p q Hpq.
+  so (urel_closed _#5 Hpq) as (Hclp & Hclq).
+  apply pwctx_cons_tml_seq; auto; try prove_hygiene.
+    {
+    intro Hpos.
+    destruct i as [| i]; [omega |].
+    cbn [pred].
+    simpsubin Hal.
+    simpsubin Har.
+    invert (basic_value_inv _#6 value_semifut Hal).
+    intros A Hal' Heq1.
+    invert (basic_value_inv _#6 value_semifut Har).
+    intros A' Har' Heq2.
+    so (eqtrans Heq1 (eqsymm Heq2)) as Heq.
+    clear Heq2.
+    subst Af.
+    so (iusemifut_inj _#5 Heq); subst A'.
+    apply (seqhyp_tm _#5 A); auto.
+    apply (semifut_action_prev _ (S i)).
+    exact Hpq.
+    }
+
+    {
+    intros j t t' Ht.
+    so (Hseqa _#3 Ht) as (R & Hl & Hr & _).
+    exists toppg, R.
+    auto.
+    }
+  }
+clear Hseqmn.
+so (Hseqbc _#3 (Hs' _ _ Hm)) as (R & Hmbl & Hmbr & _).
+so (Hseqbc _#3 (Hs' _ _ Hn)) as (R' & _ & _ & Hncl & Hncr).
+so (Hseqbc _#3 (Hs' _ _ Hmn)) as (R'' & Hmbl' & _ & _ & Hncr').
+so (basic_fun _#7 Hmbl Hmbl'); subst R''.
+so (basic_fun _#7 Hncr Hncr'); subst R'.
+exists R.
+simpsub.
+do2 3 split; auto.
+Qed.

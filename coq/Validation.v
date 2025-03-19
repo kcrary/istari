@@ -26,6 +26,7 @@ Require Import ValidationCompat.
 Require Import ValidationEqtp.
 Require Import ValidationEqual.
 Require Import ValidationExist.
+Require Import ValidationForallfut.
 Require Import ValidationSigma.
 Require Import ValidationFuture.
 Require Import ValidationGuard.
@@ -168,6 +169,21 @@ exact parametricFormInv1_valid.
 exact parametricFormInv2_valid.
 exact parametricElimIrrelevant_valid.
 exact irrelevance_valid.
+exact forallfutForm_valid.
+exact forallfutEq_valid.
+exact forallfutFormUniv_valid.
+exact forallfutEqUniv_valid.
+exact forallfutSub_valid.
+exact forallfutForallVoidSub_valid.
+exact forallfutIntroOf_valid.
+exact forallfutIntroEq_valid.
+exact forallfutIntro_valid.
+exact forallfutElimOf_valid.
+exact forallfutElimEq_valid.
+exact forallfutElim_valid.
+exact forallfutExt_valid.
+exact forallfutExt'_valid.
+exact forallfutOfExt_valid.
 exact guardForm_valid.
 exact guardEq_valid.
 exact guardFormUniv_valid.

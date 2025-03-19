@@ -38,6 +38,7 @@ Inductive operator : list nat -> Type :=
 | oper_constfn     : operator nil
 
 | oper_fut         : operator [0]
+| oper_semifut     : operator [0]
 | oper_cnext       : operator [0]
 | oper_cprev       : operator [0]
 | oper_next        : operator [0]
@@ -526,6 +527,7 @@ Definition intersect {obj} m1 m2   : @term obj := oper _ (oper_intersect _) (rw_
 Definition union {obj} m1 m2       : @term obj := oper _ (oper_union _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition constfn {obj}           : @term obj := oper _ (oper_constfn _) rw_nil.
 Definition fut {obj} m             : @term obj := oper _ (oper_fut _) (rw_cons _ _ m rw_nil).
+Definition semifut {obj} m         : @term obj := oper _ (oper_semifut _) (rw_cons _ _ m rw_nil).
 Definition cnext {obj} m           : @term obj := oper _ (oper_cnext _) (rw_cons _ _ m rw_nil).
 Definition cprev {obj} m           : @term obj := oper _ (oper_cprev _) (rw_cons _ _ m rw_nil).
 Definition next {obj} m            : @term obj := oper _ (oper_next _) (rw_cons _ _ m rw_nil).
@@ -639,6 +641,9 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 
 | same_fut :
     same_operator [0] [0] (oper_fut A) (oper_fut B)
+
+| same_semifut :
+    same_operator [0] [0] (oper_semifut A) (oper_semifut B)
 
 | same_cnext :
     same_operator [0] [0] (oper_cnext A) (oper_cnext B)

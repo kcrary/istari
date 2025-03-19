@@ -240,7 +240,7 @@ functionally, it follows that `(fn x . M)` equals
 Note that if `A` is uninhabited, `forall (x : A) . B` and `A -> B` are
 well-formed types even when `B` is junk.
 
-The remaining function spaces are T-functions (`A -t> K`) and
+The remaining basic function spaces are T-functions (`A -t> K`) and
 K-functions (`K -k> K'`).  Both of them are equal to the ordinary
 function type, so they are are interchangeable with ordinary functions
 to a significant degree.  A minor difference is the codomain of a T-
@@ -254,6 +254,9 @@ K-function the domain is a kind.
 
 For example, `nat -t> U(0)` and `U(0) -k> U(0)` both belong to `K(0)`,
 and `U(0) -t> U(1)` belongs to `K(1)`.
+
+Other function-like types (intersection types, parametric functions,
+and future functions) are discussed below.
 
 
 #### Strong sums and products
@@ -472,6 +475,27 @@ The two elimination forms are actually equivalent.  In fact,
 `let next x = M in N` is defined to mean `[M #prev / x]N`.  Thus, `let
 next` is `#prev` wrapped up to make it more convenient to use.
 
+
+#### Future functions
+
+[[rules]](rules.html#future-functions)
+
+The future dependent function space, written `forallfut (x : A) . B`
+is very similar to the type 
+`forall (x' : future A) . let next x = x' in B` except that a future
+function's argument is not `next M` but simply `M` (unless `A` is
+another future, of course).  Thus, if `f : forallfut (x : A) . B` and
+`f` is being applied to `M`, `M` must have type `A`, but while
+checking `M : A`, any future assumptions are promoted to the present.
+
+In `B` and in the function body, `x` is a later assumption.
+Consequently, `x` must appear guarded by `future` or `next`, or in the
+argument to another future function.
+
+As noted, a future function is very similar to an ordinary function
+that uses a future domain.  Nevertheless they can be useful in some
+situations because applying a future function does not involve a
+`next`, which may improve the effectiveness of unification.
 
 
 #### Recursive types

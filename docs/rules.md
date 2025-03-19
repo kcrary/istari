@@ -43,6 +43,7 @@ variables.  The official rules, using de Bruijn indices, are given
 [Couarded types](#coguarded-types)<br>
 [Disjoint sums](#disjoint-sums)<br>
 [Future modality](#future-modality)<br>
+[Future functions](#future-functions)<br>
 [Recursive types](#recursive-types)<br>
 [Inductive types](#inductive-types)<br>
 [Void](#void)<br>
@@ -2242,6 +2243,122 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       promote(G) |- A : type
       G |- isquash (future A)
+
+
+### Future functions
+
+- `forallfutForm A B`
+
+      G |- forallfut A (fn x . B) : type
+      >>
+      promote(G) |- A : type
+      G, x (later) : A |- B : type
+
+- `forallfutEq A A' B B'`
+
+      G |- forallfut A (fn x . B) = forallfut A' (fn x . B') : type
+      >>
+      promote(G) |- A = A' : type
+      G, x (later) : A |- B = B' : type
+
+- `forallfutFormUniv A B I`
+
+      G |- forallfut A (fn x . B) : univ I
+      >>
+      G |- I : level
+      promote(G) |- A : univ I
+      G, x (later) : A |- B : univ I
+
+- `forallfutEqUniv A A' B B' I`
+
+      G |- forallfut A (fn x . B) = forallfut A' (fn x . B') : univ I
+      >>
+      G |- I : level
+      promote(G) |- A = A' : univ I
+      G, x (later) : A |- B = B' : univ I
+
+- `forallfutSub A A' B B'`
+
+      G |- forallfut A (fn x . B) <: forallfut A' (fn x . B')
+      >>
+      promote(G) |- A' <: A
+      G, x (later) : A' |- B <: B'
+      G, x (later) : A |- B : type
+
+- `forallfutForallVoidSub A B B'`
+
+      G |- forallfut A (fn x . B) <: (forall (x : void) . B')
+      >>
+      promote(G) |- A : type
+      G, x (later) : A |- B : type
+
+- `forallfutIntroOf A B M`
+
+      G |- (fn x . M) : forallfut A (fn x . B)
+      >>
+      promote(G) |- A : type
+      G, x (later) : A |- M : B
+
+- `forallfutIntroEq A B M N`
+
+      G |- (fn x . M) = (fn x . N) : forallfut A (fn x . B)
+      >>
+      promote(G) |- A : type
+      G, x (later) : A |- M = N : B
+
+- `forallfutIntro A B`
+
+      G |- forallfut A (fn x . B) ext fn x . M
+      >>
+      promote(G) |- A : type
+      G, x (later) : A |- B ext M
+
+- `forallfutElimOf A B M P`
+
+      G |- M P : [P / x]B
+      >>
+      G |- M : forallfut A (fn x . B)
+      promote(G) |- P : A
+
+- `forallfutElimEq A B M N P Q`
+
+      G |- M P = N Q : [P / x]B
+      >>
+      G |- M = N : forallfut A (fn x . B)
+      promote(G) |- P = Q : A
+
+- `forallfutElim A B P`
+
+      G |- [P / x]B ext M P
+      >>
+      G |- forallfut A (fn x . B) ext M
+      promote(G) |- P : A
+
+- `forallfutExt A B M N`
+
+      G |- M = N : forallfut A (fn x . B)
+      >>
+      promote(G) |- A : type
+      G |- M : forallfut A (fn x . B)
+      G |- N : forallfut A (fn x . B)
+      G, x (later) : A |- M x = N x : B
+
+- `forallfutExt' A A' A'' B B' B'' M N`
+
+      G |- M = N : forallfut A (fn x . B)
+      >>
+      promote(G) |- A : type
+      G |- M : forall (x : A') . B'
+      G |- N : forall (x : A'') . B''
+      G, x (later) : A |- M x = N x : B
+
+- `forallfutOfExt A A' B B' M`
+
+      G |- M : forallfut A (fn x . B)
+      >>
+      promote(G) |- A : type
+      G |- M : forall (x : A') . B'
+      G, x (later) : A |- M x : B
 
 
 ### Recursive types

@@ -525,6 +525,16 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                                 >> idtacM Primary
                                 ])\
 
+                     | \Prim.forallfut\ ? (fn ? . ?) =>
+                       \(fnc dom binder cod =>
+                            refine (Rule.forallfutIntroEq dom cod m n)
+                            >>> [
+                                idtacM Secondary,
+
+                                chdir (D.bindVary dir (seqOption [binder, binder1, binder2]))
+                                >> idtacM Primary
+                                ])\
+
                      | _ =>
                        \(fnc => fail "result type mismatch")\
                     /)\
@@ -646,6 +656,12 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                                  \(fnc a b =>
                                       (T.Sub (b, T.Dot (p, T.id)),
                                        refine (Rule.forallElimEq a b m n p q)
+                                       >>> [tac, idtac]))\
+       
+                               | \Prim.forallfut\ ? (fn . ?) =>
+                                 \(fnc a b =>
+                                      (T.Sub (b, T.Dot (p, T.id)),
+                                       refine (Rule.forallfutElimEq a b m n p q)
                                        >>> [tac, idtac]))\
        
                                | _ =>
@@ -818,6 +834,22 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          \Prim.eq\ ($as (\Prim.forall\ ? (fn ? . ?))) ? ? =>
          \(fnc ab a binder b m n =>
               refine (Rule.forallExt' a (T.Const Prim.void) (T.Const Prim.void) b (T.evar ()) (T.evar ()) m n)
+              >>> [
+                  idtacM Secondary,
+                  attempt IntroTactic.proveLambda >> idtacM Secondary,
+                  attempt IntroTactic.proveLambda >> idtacM Secondary,
+
+                  withgoal
+                  (fn (_, dir) => chdir (D.bindVary dir binder) >>+ idtacM Primary)
+                  ])\
+         /
+
+      val forallfutExt =
+         goalCaseT
+         /
+         \Prim.eq\ ($as (\Prim.forallfut\ ? (fn ? . ?))) ? ? =>
+         \(fnc ab a binder b m n =>
+              refine (Rule.forallfutExt' a (T.Const Prim.void) (T.Const Prim.void) b (T.evar ()) (T.evar ()) m n)
               >>> [
                   idtacM Secondary,
                   attempt IntroTactic.proveLambda >> idtacM Secondary,
@@ -1009,6 +1041,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             (fn (const, tac) => H.insert extensionalityTactics const tac)
             [
             (Prim.forall, forallExt),
+            (Prim.forallfut, forallfutExt),
             (Prim.arrow, arrowExt),
             (Prim.tarrow, tkarrowExt Rule.tarrowExt),
             (Prim.karrow, tkarrowExt Rule.karrowExt),
@@ -1060,6 +1093,50 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                      ],
 
                  refine (Rule.forallElimOf 
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.under 1 T.shift1))
+                            (T.Sub (n, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 1) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+                 
+                 withgoal
+                 (fn (_, dir) =>
+                     chdir (D.bindh dir binder)
+                     >>+ refine (Rule.weaken 3 2) 
+                     >>+ tac)
+                 ]
+             ]
+
+
+      fun forallfutExtAuto binder a b m n tac =
+         refine (Rule.forallfutExt a b m n)
+         >>> [
+             (* promote |- A : type *)
+             refine (Rule.weaken 0 2)
+             >>+
+             idtacM Secondary,
+
+             refine (Rule.hypothesis 1) >> done,
+             refine (Rule.hypothesis 0) >> done,
+             
+             assert2 
+                (T.apply2 Prim.ov b (T.app (T.Sub (m, T.shift1)) T.zero))
+                (T.apply2 Prim.ov b (T.app (T.Sub (n, T.shift1)) T.zero))
+             >>> [
+                 refine (Rule.forallfutElimOf 
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.under 1 T.shift1))
+                            (T.Sub (m, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 2) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+
+                 refine (Rule.forallfutElimOf 
                             (T.Sub (a, T.shift1))
                             (T.Sub (b, T.under 1 T.shift1))
                             (T.Sub (n, T.shift1))
@@ -1657,6 +1734,10 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                            \(fnc a b =>
                                 arrowExtAuto ident a b m n (introEqLoop rest))\
 
+                         | \Prim.forallfut\ ? (fn . ?) =>
+                           \(fnc a b =>
+                                forallfutExtAuto ident a b m n (introEqLoop rest))\
+
                          | \Prim.tarrow\ ? ? =>
                            \(fnc a b =>
                                 tkarrowExtAuto Rule.tarrowExt Rule.tarrowElimOf ident a b m n (introEqLoop rest))\
@@ -1726,6 +1807,10 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                      | \Prim.arrow\ ? ? =>
                        \(fnc a b =>
                             arrowExtAuto NONE a b m n loop)\
+   
+                     | \Prim.forallfut\ ? (fn . ?) =>
+                       \(fnc a b =>
+                            forallfutExtAuto NONE a b m n loop)\
    
                      | \Prim.tarrow\ ? ? =>
                        \(fnc a b =>

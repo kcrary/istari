@@ -22,7 +22,7 @@ Inductive canon : forall {a}, @operator object a -> Prop :=
 | canon_cty            : canon (oper_cty _)
 | canon_con            : canon (oper_con _)
 | canon_karrow         : canon (oper_karrow _)
-| canon_tarrow          : canon (oper_tarrow _)
+| canon_tarrow         : canon (oper_tarrow _)
 | canon_pi             : canon (oper_pi _)
 | canon_clam           : canon (oper_clam _)
 | canon_capp           : canon (oper_capp _)
@@ -33,6 +33,7 @@ Inductive canon : forall {a}, @operator object a -> Prop :=
 | canon_union          : canon (oper_union _)
 | canon_constfn        : canon (oper_constfn _)
 | canon_fut            : canon (oper_fut _)
+| canon_semifut        : canon (oper_semifut _)
 | canon_cnext          : canon (oper_cnext _)
 | canon_cprev          : canon (oper_cprev _)
 | canon_next           : canon (oper_next _)
@@ -630,6 +631,12 @@ intros; apply value_i; eauto with dynamic.
 Qed.
 
 
+Lemma value_semifut : forall {m1}, value (semifut m1).
+Proof.
+intros; apply value_i; eauto with dynamic.
+Qed.
+
+
 Lemma value_cnext : forall {m1}, value (cnext m1).
 Proof.
 intros; apply value_i; eauto with dynamic.
@@ -894,6 +901,7 @@ Arguments value_intersect {object m1 m2}.
 Arguments value_union {object m1 m2}.
 Arguments value_constfn {object}.
 Arguments value_fut {object m1}.
+Arguments value_semifut {object m1}.
 Arguments value_cnext {object m1}.
 Arguments value_cprev {object m1}.
 Arguments value_next {object m1}.
@@ -939,7 +947,7 @@ Arguments value_extt {object x}.
 Hint Constructors canon : dynamic.
 
 
-Hint Resolve value_univ value_cty value_con value_karrow value_tarrow value_pi value_clam value_capp value_ctlam value_ctapp value_lam value_intersect value_union value_constfn value_fut value_cnext value_cprev value_next value_rec value_equal value_triv value_eqtype value_sequal value_subtype value_kind value_all value_alltp value_exist value_mu value_ispositive value_isnegative value_voidtp value_unittp value_cunit value_booltp value_btrue value_bfalse value_prod value_sigma value_cpair value_cpi1 value_cpi2 value_ppair value_set value_iset value_quotient value_guard value_coguard value_wt value_partial value_halts value_admiss value_uptype value_ext value_extt : dynamic.
+Hint Resolve value_univ value_cty value_con value_karrow value_tarrow value_pi value_clam value_capp value_ctlam value_ctapp value_lam value_intersect value_union value_constfn value_fut value_semifut value_cnext value_cprev value_next value_rec value_equal value_triv value_eqtype value_sequal value_subtype value_kind value_all value_alltp value_exist value_mu value_ispositive value_isnegative value_voidtp value_unittp value_cunit value_booltp value_btrue value_bfalse value_prod value_sigma value_cpair value_cpi1 value_cpi2 value_ppair value_set value_iset value_quotient value_guard value_coguard value_wt value_partial value_halts value_admiss value_uptype value_ext value_extt : dynamic.
 
 
 Hint Resolve var_normal value_normal : dynamic.

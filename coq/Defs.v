@@ -58,6 +58,7 @@ Definition eeqtp : fterm := lam (lam (prod (subtype (var 1) (var 0)) (subtype (v
 Definition eq : fterm := lam (lam (lam (equal (var 2) (var 1) (var 0)))).
 Definition eqtp : fterm := lam (lam (eqtype (var 1) (var 0))).
 Definition false : fterm := bfalse.
+Definition forallfut : fterm := lam (lam (pi (semifut (var 1)) (app (var 1) (var 0)))).
 Definition foralltp : fterm := lam (alltp (app (var 1) (var 0))).
 Definition future : fterm := lam (fut (var 0)).
 Definition iexists : fterm := lam (lam (lam (exist (var 2) (var 1) (app (var 1) (var 0))))).

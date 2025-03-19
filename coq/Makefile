@@ -130,6 +130,7 @@ UNITS = \
 	ValidationEqtp \
 	ValidationEqual \
 	ValidationExist \
+	ValidationForallfut \
 	ValidationFuture \
 	ValidationGuard \
 	ValidationIstp \

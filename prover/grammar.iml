@@ -207,6 +207,9 @@ structure ParseTerm =
       fun foralltp x b = T.apply1 Prim.foralltp (T.lam x b)
       fun foralltps xl b = foldr foralltp b xl
 
+      fun forallfut x a b = T.apply2 Prim.forallfut (instance a) (T.lam x b)
+      fun forallfuts al b = foldr (fns (x, a) b => forallfut x a b) b al
+
       fun iset x a b = T.apply2 Prim.iset a (T.lam (SOME x) b)
 
       fun rec x a = T.apply1 Prim.rec (T.lam (SOME x) a)
@@ -667,6 +670,8 @@ structure UnparseTerm =
 
       val () = registerBinder Prim.union "union"
 
+      val () = registerBinder Prim.forallfut "forallfut"
+
       val () =
          register Prim.foralltp 1 0
          (U.wrap
@@ -1066,7 +1071,7 @@ structure UnparseTerm =
          List.foldl
             (fns str set => SymbolSet.insert set (Symbol.fromValue str))
             SymbolSet.empty
-            ["Kind", "U", "ap", "case", "exists", "fn", "forall", "iexists", "iforall", "if", "in", "inl", "inr", "let", "mu", "next", "pi1", "pi2", "prev", "quotient", "rec", "seq", "seqt", "then", "else"]
+            ["Kind", "U", "ap", "case", "exists", "fn", "forall", "forallfut", "iexists", "iforall", "if", "in", "inl", "inr", "let", "mu", "next", "pi1", "pi2", "prev", "quotient", "rec", "seq", "seqt", "then", "else"]
 
    end
 
@@ -1180,6 +1185,7 @@ grammardef Term
 
    rule Term(0)    ::= "fn" Bindingsn "." Term(0) => lams
    rule Term(0)    ::= "forall" Bindings "." Term(0) => foralls
+   rule Term(0)    ::= "forallfut" Bindings "." Term(0) => forallfuts
    rule Term(0)    ::= "exists" Bindings "." Term(0) => existss
    rule Term(0)    ::= "iforall" Bindings "." Term(0) => iforalls
    rule Term(0)    ::= "iexists" Bindings "." Term(0) => iexistss
