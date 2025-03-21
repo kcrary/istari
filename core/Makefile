@@ -1,7 +1,7 @@
 
 ISTARIBIN=../ui/bin
 
-DOCUNITS = acc bar bool decidable finite finite-map function integer irrelevance kindlike logic list misc nat natural option partial permutation relations stable symbol tuple weaksum wtype
+DOCUNITS = acc bar bool decidable finite finite-map function integer irrelevance kindlike logic list misc nat natural option partial permutation quotient relations stable symbol tuple weaksum wtype
 UNITS = $(DOCUNITS) datatype syntactic-equality omega
 DOCS = finite-map-class
 

@@ -1,0 +1,283 @@
+
+beginModule "Quotient";
+
+
+define /PER A R/
+/
+  (forall x y . R x y -> R y x)
+  & (forall x y z . R x y -> R y z -> R x z)
+//
+  intersect i . forall (A : U i) . (A -> A -> U i) -> U i
+/;
+
+unfold /PER/.
+typecheck.
+qed ();
+
+
+
+lemma "quotient_formation"
+/
+  forall i (A : U i) R .
+    PER A R
+    -> (quotient (x y : A) . R x y) : U i
+/;
+
+inference.
+intro /i A R Hper/.
+destruct /Hper/ /Hsymm Htrans/.
+typecheck >> auto.
+qed ();
+
+
+
+define /qintro A R Hper x Hx/
+/
+  x
+//
+  intersect i . 
+  forall (A : U i) (R : A -> A -> U i) .
+    PER A R
+    -> forall (x : A) .
+         R x x
+         -> quotient (x y : A) . R x y
+/;
+
+inference.
+introOf /i A R Hper x Hx/.
+unfold /qintro/.
+so /quotient_formation _# 3 Hper/ /Hof/.
+typecheck.
+qed ();
+
+recordIrrelevance /qintro/ [0, 1, 2, 4];
+
+
+
+lemma "quotient_representative"
+/
+  forall i 
+    (A : U i)
+    (R : A -> A -> U i)
+    (Hper : PER A R)
+    (x : quotient (x y : A) . R x y) .
+      isquash
+        (exists (y : A) (Hy : R y y) .
+           x = qintro A R Hper y Hy : (quotient (x y : A) . R x y))
+/;
+
+inference.
+intro /i A R Hper/.
+so /quotient_formation _# 3 Hper/ /Hofquot/.
+intro /x/.
+infer /x/ /Hofx/.
+assert /forall (y : A) (Hy : R y y) . _/ /Hof/.
+  {
+  intro /y Hy/.
+  infer /qintro A R Hper y Hy/ /H/.
+  hyp /H/.
+  }
+destruct /x/ /[x Hx]/.
+split.
+existses [/x/, /Hx/].
+unfold /qintro/.
+extensionality.
+hyp /Hx/.
+qed ();
+
+
+
+lemma "quotient_equality"
+/
+  forall i (A : U i) (R : A -> A -> U i) .
+    PER A R
+    -> forall (x y : quotient (x y : A) . R x y) .
+         { R x y }
+         -> x = y : (quotient (x y : A) . R x y)
+/;
+
+inference.
+intro /i A R Hper/.
+so /quotient_formation _# 3 Hper/ /Hofquot/.
+intro /x y/.
+introRaw /Hxy/.
+  {
+  destruct /x/ /[x x' Hx]/.
+  destruct /y/ /[y y' Hy]/.
+  typecheck.
+  destruct /Hper/ /Hsymm Htrans/.
+  split.
+    {
+    intro /Hxy/.
+    apply /Htrans _ x/.
+      {
+      apply /Hsymm/ >> auto.
+      }
+    apply /Htrans _ y/ >> auto.
+    }
+
+    {
+    intro /Hxy/.
+    apply /Htrans _ x/.
+      {
+      apply /Hsymm/ >> auto.
+      }
+    apply /Htrans _ y/ >> auto.
+    }
+  }
+destruct /x/ /[x Hx]/.
+destruct /y/ /[y]/.
+destruct /Hxy/ /[Hxy]/.
+unhide.
+extensionality.
+auto.
+qed ();
+
+
+
+define /PER2 A Q R/
+/
+  (forall x . Q x -> R x x)
+  & (forall x y . Q x -> Q y -> R x y -> R y x)
+  & (forall x y z . Q x -> Q y -> Q z -> R x y -> R y z -> R x z)
+//
+  intersect i . forall (A : U i) . (A -> U i) -> (A -> A -> U i) -> U i
+/;
+
+unfold /PER2/.
+typecheck.
+qed ();
+
+
+
+lemma "quotient2_formation"
+/
+  forall i (A : U i) Q R .
+    PER2 A Q R
+    -> (quotient (x y : A) . Q x & Q y & R x y) : U i
+/;
+
+inference.
+intro /i A Q R Hper/.
+destruct /Hper/ /_ Hsymm Htrans/.
+typecheck >> auto.
+  {
+  reintro /x y Hxy/.
+  destruct /Hxy/ /Hx Hy Hxy/.
+  auto.
+  }
+
+  {
+  reintro /x y z Hxy Hyz/.
+  destruct /Hxy/ /Hx Hy Hxy/.
+  destruct /Hyz/ /_ Hz Hyz/.
+  splitn 2 >> auto.
+  apply /Htrans _ y/ >> auto.
+  }
+qed ();
+
+
+
+define /qintro2 A Q R Hper x Hx/
+/
+  x
+//
+  intersect i . 
+  forall (A : U i) (Q : A -> U i) (R : A -> A -> U i) .
+    PER2 A Q R
+    -> forall (x : A) .
+         Q x
+         -> quotient (x y : A) . Q x & Q y & R x y
+/;
+
+inference.
+introOf /i A Q R Hper x Hx/.
+unfold /qintro2/.
+so /quotient2_formation _# 4 Hper/ /Hof/.
+typecheck.
+destruct /Hper/ /Hrefl _/.
+splitn 2 >> auto.
+qed ();
+
+
+
+lemma "quotient2_representative"
+/
+  forall i 
+    (A : U i)
+    (Q : A -> U i)
+    (R : A -> A -> U i)
+    (Hper : PER2 A Q R)
+    (x : quotient (x y : A) . Q x & Q y & R x y) .
+      isquash
+        (exists (y : A) (Hy : Q y) .
+           x = qintro2 A Q R Hper y Hy : (quotient (x y : A) . Q x & Q y & R x y))
+/;
+
+inference.
+intro /i A Q R Hper/.
+so /quotient2_formation _# 4 Hper/ /Hofquot/.
+intro /x/.
+infer /x/ /Hofx/.
+assert /forall (y : A) (Hy : Q y) . _/ /Hof/.
+  {
+  intro /y Hy/.
+  infer /qintro2 A Q R Hper y Hy/ /H/.
+  hyp /H/.
+  }
+destruct/x/ /[x Hx]/.
+split.
+destruct /Hx/ /Hx _ Hxx/.
+existses [/x/, /Hx/].
+unfold /qintro2/.
+extensionality.
+auto.
+qed ();
+
+
+
+lemma "quotient2_equality"
+/
+  forall i (A : U i) (Q : A -> U i) (R : A -> A -> U i) .
+    PER2 A Q R
+    -> forall (x y : quotient (x y : A) . Q x & Q y & R x y) .
+         { Q x -> Q y -> R x y }
+         -> x = y : (quotient (x y : A) . Q x & Q y & R x y)
+/;
+
+inference.
+intro /i A Q R Hper/.
+so /quotient2_formation _# 4 Hper/ /Hofquot/.
+intro /x y/.
+introRaw /Hxy/.
+  {
+  destruct /x/ /[x x' Hx]/.
+  destruct /y/ /[y y' Hy]/.
+  destruct /Hx/ /Hx Hx' HRx/.
+  destruct /Hy/ /Hy Hy' HRy/.
+  typecheck.
+  destruct /Hper/ /Hrefl Hsymm Htrans/.
+  split.
+    {
+    intro /Hxy _ _/.
+    apply /Htrans _ x/ >> nauto 3.
+    apply /Htrans _ y/ >> nauto 3.
+    }
+
+    {
+    intro /Hxy _ _/.
+    apply /Htrans _ x'/ >> nauto 3.
+    }
+  }
+destruct /x/ /[x Hx]/.
+destruct /y/ /[y Hy]/.
+destruct /Hxy/ /[Hxy]/.
+unhide.
+extensionality.
+destruct /Hx/ /Hx _/.
+destruct /Hy/ /Hy _/.
+auto.
+qed ();
+
+
+endModule ();
