@@ -50,7 +50,7 @@
   + The `GirardParadox` and `SmithParadox` libraries are no longer
     pre-loaded.
 
-  + `Weaksum`  and `Irrelevant` added.
+  + `Weaksum`, `Irrelevant`, and `Quotient` added.
 
   + The `Union` library has been deleted, as `Weaksum` accomplishes
     its purposes better.  (Union types still exist.)

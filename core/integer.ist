@@ -2279,6 +2279,22 @@ qed ();
 
 
 
+lemma "ltz_impl_neq"
+/
+  forall a b . 
+    a <z b
+    -> a != b : integer
+/;
+
+inference.
+intro /a b Hlt/.
+intro /?/.
+subst /b/.
+so /ltz_irrefl _ Hlt/ /0/.
+qed ();
+
+    
+
 lemma "ltz_trans"
 /
   forall a b c . a <z b -> b <z c -> a <z c
@@ -4500,6 +4516,76 @@ qed ();
 
 
 
+lemma "timesz_leqz_zero"
+/
+  forall a b .
+    z`0 <z= a
+    -> z`0 <z= b
+    -> z`0 <z= a *z b
+/;
+
+inference.
+intro /a b Ha Hb/.
+so /timesz_leqz _# 4 (leqz_refl _) (leqz_refl _) Ha Hb/ /H/.
+reduce /H/.
+hyp /H/.
+qed ();
+
+aliasExport /timesz_leqz_zero_pos_pos/ /timesz_leqz_zero/;
+
+
+
+lemma "timesz_leqz_zero_neg_neg"
+/
+  forall a b .
+    a <z= z`0
+    -> b <z= z`0
+    -> z`0 <z= a *z b
+/;
+
+inference.
+intro /a b Ha Hb/.
+so /timesz_leqz_neg_neg _# 4 (leqz_refl _) (leqz_refl _) Ha Hb/ /H/.
+reduce /H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "timesz_leqz_zero_pos_neg"
+/
+  forall a b .
+    z`0 <z= a
+    -> b <z= z`0
+    -> a *z b <z= z`0
+/;
+
+inference.
+intro /a b Ha Hb/.
+so /timesz_leqz_pos_neg _# 4 (leqz_refl _) (leqz_refl _) Ha Hb/ /H/.
+reduce /H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "timesz_leqz_zero_neg_pos"
+/
+  forall a b .
+    a <z= z`0
+    -> z`0 <z= b
+    -> a *z b <z= z`0
+/;
+
+inference.
+intro /a b Ha Hb/.
+so /timesz_leqz_neg_pos _# 4 (leqz_refl _) (leqz_refl _) Ha Hb/ /H/.
+reduce /H/.
+hyp /H/.
+qed ();
+
+
+
 lemma "timesz_ltz_zero"
 /
   forall a b .
@@ -4514,8 +4600,6 @@ unfold /ltz at all/.
 intro /a b Ha Hb/.
 so /timesz_leqz _# 4 __ __ Ha Hb/ /H/ >> autoWith /leqz_0_1/.
 qed ();
-
-
 
 aliasExport /timesz_ltz_zero_pos_pos/ /timesz_ltz_zero/;
 
@@ -4632,6 +4716,29 @@ qed ();
 
 
 
+lemma "timesz_neq_zero"
+/
+  forall a b .
+    a != z`0 : integer
+    -> b != z`0 : integer 
+    -> a *z b != z`0 : integer
+/;
+
+inference.
+intro /a b Ha Hb/.
+intro /Heq/.
+so /integer_integral_domain _# 2 Heq/ /Ha' | Hb'/.
+  {
+  apply /Ha/ >> auto.
+  }
+
+  {
+  apply /Hb/ >> auto.
+  }
+qed ();
+
+
+
 lemma "timesz_ltz_zero_invert"
 /
   forall a b .
@@ -4678,6 +4785,33 @@ so /integer_trichotomy a z`0/ /Ha | Ha | Ha/.
     rewrite /-> timesz_ann_r in Hab/.
     so /ltz_irrefl _ Hab/ /0/.
     }
+  }
+qed ();
+
+
+
+lemma "timesz_ltz_zero_invert_neg"
+/
+  forall a b .
+    a *z b <z z`0 -> a <z z`0 & z`0 <z b  %  z`0 <z a & b <z z`0
+/;
+
+inference.
+intro /a b Hneg/.
+so /negz_ltz _ _ Hneg/ /Hpos/.
+reduce /Hpos/.
+rewrite /-> negz_dist_timesz_r in Hpos/.
+so /timesz_ltz_zero_invert _ _ Hpos/ /Ha Hb | Ha Hb/.
+  {
+  left.
+  split >> auto.
+  apply /negz_ltz'/ >> auto.
+  }
+
+  {
+  right.
+  split >> auto.
+  apply /negz_ltz'/ >> auto.
   }
 qed ();
 
@@ -4755,6 +4889,47 @@ qed ();
 
 
 
+lemma "timesz_cancel_ltz_l"
+/
+  forall a b c .
+    z`0 <z c
+    -> c *z a <z c *z b
+    -> a <z b
+/;
+
+inference.
+intro /a b c Hc Hlt/.
+apply /ltz_from_leqz_neq/.
+  {
+  apply /timesz_cancel_leqz_l/ >> auto.
+  apply /ltz_impl_leqz/ >> auto.
+  }
+  
+  {
+  intro /?/.
+  subst /b/.
+  so /ltz_irrefl _ Hlt/ /0/.
+  }
+qed ();
+
+
+
+lemma "timesz_cancel_ltz_r"
+/
+  forall a b c .
+    z`0 <z c
+    -> a *z c <z b *z c
+    -> a <z b
+/;
+
+inference.
+intro /a b c Hc Hlt/.
+rewrite /-> timesz_commute in Hlt at 0 1/.
+apply /timesz_cancel_ltz_l/ >> auto.
+qed ();
+
+
+
 lemma "timesz_cancel_leqz_l_remainder"
 /
   forall a b c r .
@@ -4794,6 +4969,59 @@ inference.
 intro /a b c r Hpos Hr Hleq/.
 rewrite /-> timesz_commute in Hleq at 0 1/.
 apply /timesz_cancel_leqz_l_remainder/ >> auto.
+qed ();
+
+
+
+lemma "timesz_cancel_l"
+/
+  forall a b c .
+    c != z`0 : integer
+    -> c *z a = c *z b : integer
+    -> a = b : integer
+/;
+
+inference.
+assert /forall a b c .
+          c != z`0 : integer
+          -> c *z a = c *z b : integer
+          -> a <z= b/ /Hprop/ >> inference.
+1:{
+  intro /a b c Hnzero Heq/.
+  apply /leqz_antisymm/ >> auto.
+  }
+intro /a b c Hnzero Heq/.
+so /integer_dichotomy_neq _ _ Hnzero/ /Hltzero | Hleqzero/.
+  {
+  apply /timesz_cancel_leqz_l _ _ (~z c)/.
+    {
+    apply /negz_ltz _ z`0/ >> auto.
+    }
+  apply /leqz_refl_eq/.
+  rewrite /<- negz_dist_timesz_l at 1 0/.
+  compat >> auto.
+  }
+
+  {
+  apply /timesz_cancel_leqz_l _ _ c/ >> auto.
+  apply /leqz_refl_eq/ >> auto.
+  }
+qed ();
+
+
+
+lemma "timesz_cancel_r"
+/
+  forall a b c .
+    c != z`0 : integer
+    -> a *z c = b *z c : integer
+    -> a = b : integer
+/;
+
+inference.
+intro /a b c Hnzero Heq/.
+rewrite /-> timesz_commute in Heq at 0 1/.
+apply /timesz_cancel_l/ >> auto.
 qed ();
 
 

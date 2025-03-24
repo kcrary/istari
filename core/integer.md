@@ -93,6 +93,8 @@ This one gives transitivity in the form needed for rewriting:
 
     ltz_impl_leqz : type:ltz_impl_leqz
 
+    ltz_impl_neq : type:ltz_impl_neq
+
     ltz_irrefl : type:ltz_irrefl
 
     ltz_trans : type:ltz_trans
@@ -354,6 +356,17 @@ positive case that works upwards.
 
     timesz_leqz_r_neg : type:timesz_leqz_r_neg
 
+    timesz_leqz_zero : type:timesz_leqz_zero
+
+    (* an alias for timesz_leqz_zero *)
+    timesz_leqz_zero_pos_pos : type:timesz_leqz_zero_pos_pos
+
+    timesz_leqz_zero_pos_neg : type:timesz_leqz_zero_pos_neg
+
+    timesz_leqz_zero_neg_pos : type:timesz_leqz_zero_neg_pos
+
+    timesz_leqz_zero_neg_neg : type:timesz_leqz_zero_neg_neg
+
     timesz_ltz_zero : type:timesz_ltz_zero
 
     (* an alias for timesz_ltz_zero *)
@@ -367,7 +380,11 @@ positive case that works upwards.
 
     integer_integral_domain : type:integer_integral_domain
 
+    timesz_neq_zero : type:timesz_neq_zero
+
     timesz_ltz_zero_invert : type:timesz_ltz_zero_invert
+
+    timesz_ltz_zero_invert_neg : type:timesz_ltz_zero_invert_neg
 
     times_to_integer : type:times_to_integer
 
@@ -377,9 +394,17 @@ positive case that works upwards.
 
     timesz_ltz_r : type:timesz_ltz_r
 
+    timesz_cancel_l : type:timesz_cancel_l
+
+    timesz_cancel_r : type:timesz_cancel_r
+
     timesz_cancel_leqz_l : type:timesz_cancel_leqz_l
 
     timesz_cancel_leqz_r : type:timesz_cancel_leqz_r
+
+    timesz_cancel_ltz_l : type:timesz_cancel_ltz_l
+
+    timesz_cancel_ltz_r : type:timesz_cancel_ltz_r
 
     timesz_cancel_leqz_l_remainder : type:timesz_cancel_leqz_l_remainder
 

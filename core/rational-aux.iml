@@ -1,0 +1,305 @@
+
+structure ParseRational =
+   struct
+
+      structure R = CheckpointedRef
+      structure T = ETerm
+      type constant = Constant.constant
+
+      val integer_to_rational : constant R.dest = R.dest ()
+      val plusq : constant R.dest = R.dest ()
+      val timesq : constant R.dest = R.dest ()
+      val negq : constant R.dest = R.dest ()
+      val minusq : constant R.dest = R.dest ()
+      val divq : constant R.dest = R.dest ()
+      val leqq : constant R.dest = R.dest ()
+      val ltq : constant R.dest = R.dest ()
+      val eqqb : constant R.dest = R.dest ()
+      val leqqb : constant R.dest = R.dest ()
+      val ltqb : constant R.dest = R.dest ()
+      val neqqb : constant R.dest = R.dest ()
+
+      fun parsePlus x y = T.apply2 (R.read plusq) x y
+      fun parseTimes x y = T.apply2 (R.read timesq) x y
+      fun parseNeg x = T.apply1 (R.read negq) x
+      fun parseMinus x y = T.apply2 (R.read minusq) x y
+      fun parseDiv x y = T.apply2 (R.read divq) x y
+      fun parseLeq x y = T.apply2 (R.read leqq) x y
+      fun parseLt x y = T.apply2 (R.read ltq) x y
+      fun parseEqqb x y = T.apply2 (R.read eqqb) x y
+      fun parseLeqqb x y = T.apply2 (R.read leqqb) x y
+      fun parseLtqb x y = T.apply2 (R.read ltqb) x y
+      fun parseNeqqb x y = T.apply2 (R.read neqqb) x y
+
+      fun parseNumber n = T.apply1 (R.read integer_to_rational) (ParseTerm.integer n)
+      fun parseNumberEmbed n = T.apply1 (R.read integer_to_rational) (ParseTerm.integerEmbed n)
+
+   end
+
+
+grammardef Rational 
+
+   open ParseRational
+
+   rule Term(30)  ::= Term(31) "<q=" Term(31) => parseLeq
+   rule Term(30)  ::= Term(31) "<q" Term(31) => parseLt
+
+   rule Term(40)  ::= Term(40) "=q?" Term(41) => parseEqqb
+   rule Term(40)  ::= Term(40) "<q=?" Term(41) => parseLeqqb
+   rule Term(40)  ::= Term(40) "<q?" Term(41) => parseLtqb
+   rule Term(40)  ::= Term(40) "!q=?" Term(41) => parseNeqqb
+
+   rule Term(50)  ::= Term(50) "+q" Term(51) => parsePlus
+   rule Term(50)  ::= Term(50) "-q" Term(51) => parseMinus
+
+   rule Term(60)  ::= Term(60) "*q" Term(61) => parseTimes
+   rule Term(60)  ::= Term(60) "|q" Term(61) => parseDiv
+
+   rule Term(90)  ::= "~q" Term(91) => parseNeg
+
+   rule Term(100) ::= "q`" NUMBER => parseNumber
+   rule Term(100) ::= "q`" NNUMBER => parseNumber
+   rule Term(100) ::= "q`" EMBED => parseNumberEmbed
+
+end
+
+
+grammardef ArithmeticRational
+
+   open ParseRational
+
+   rule Term(30)  ::= Term(31) "<=" Term(31) => parseLeq
+   rule Term(30)  ::= Term(31) "<" Term(31) => parseLt
+
+   rule Term(40)  ::= Term(40) "=?" Term(41) => parseEqqb
+   rule Term(40)  ::= Term(40) "<=?" Term(41) => parseLeqqb
+   rule Term(40)  ::= Term(40) "<?" Term(41) => parseLtqb
+   rule Term(40)  ::= Term(40) "!=?" Term(41) => parseNeqqb
+
+   rule Term(50)  ::= Term(50) "+" Term(51) => parsePlus
+   rule Term(50)  ::= Term(50) "-" Term(51) => parseMinus
+
+   rule Term(60)  ::= Term(60) "*" Term(61) => parseTimes
+
+   rule Term(90)  ::= "~" Term(91) => parseNeg
+
+   rule Term(100) ::= NUMBER => parseNumber
+   rule Term(100) ::= NNUMBER => parseNumber
+
+end
+
+grammaron Rational
+
+
+functor AfterRationalDefs () =
+   struct
+
+      structure CR = CheckpointedRef
+      structure U = Show.Unparsing
+      structure H = ConstantTable
+
+      val integer_to_rational = resolveGlobal /Rational.integer_to_rational/
+      val plusq = resolveGlobal /Rational.plusq/
+      val timesq = resolveGlobal /Rational.timesq/
+      val negq = resolveGlobal /Rational.negq/
+      val minusq = resolveGlobal /Rational.minusq/
+      val divq = resolveGlobal /Rational.divq/
+      val leqq = resolveGlobal /Rational.leqq/
+      val ltq = resolveGlobal /Rational.ltq/
+      val eqqb = resolveGlobal /Rational.eqqb/
+      val leqqb = resolveGlobal /Rational.leqqb/
+      val ltqb = resolveGlobal /Rational.ltqb/
+      val neqqb = resolveGlobal /Rational.neqqb/
+
+      val () = CR.write ParseRational.integer_to_rational integer_to_rational
+      val () = CR.write ParseRational.plusq plusq
+      val () = CR.write ParseRational.timesq timesq
+      val () = CR.write ParseRational.negq negq
+      val () = CR.write ParseRational.minusq minusq
+      val () = CR.write ParseRational.divq divq
+      val () = CR.write ParseRational.leqq leqq
+      val () = CR.write ParseRational.ltq ltq
+      val () = CR.write ParseRational.eqqb eqqb
+      val () = CR.write ParseRational.leqqb leqqb
+      val () = CR.write ParseRational.ltqb ltqb
+      val () = CR.write ParseRational.neqqb neqqb
+
+      val rationalSym = Symbol.fromValue "rational"
+
+      fun register const prec lprec rprec strpref str =
+         let
+            val unp =
+               U.wrap
+                 (U.apply2 const U.show U.show)
+                 (fn (a, b) =>
+                     U.append [a lprec,
+                               U.break 1, 
+                               
+                               U.string
+                                  (if Symbol.eq (CR.deref Show.arithmetic, rationalSym) then
+                                      strpref
+                                   else
+                                      str),
+
+                               b rprec])
+         in
+            H.insert U.unparsingTable const (2, prec, ref true, unp)
+         end
+
+      val () = register leqq 30 31 31 "<= " "<q= "
+      val () = register ltq 30 31 31 "< " "<q "
+      val () = register plusq 50 50 51 "+ " "+q "
+      val () = register minusq 50 50 51 "- " "-q "
+      val () = register timesq 60 60 61 "* " "*q "
+      val () = register divq 60 60 61 "|q " "|q "
+      val () = register eqqb 40 40 41 "=? " "=q? "
+      val () = register leqqb 40 40 41 "<=? " "<q=? "
+      val () = register ltqb 40 40 41 "<? " "<q? "
+      val () = register neqqb 40 40 41 "!=? " "!q=? "
+
+      val () =
+         let
+            val unp =
+               U.wrap
+                  (U.apply1 negq U.show)
+                  (fn a => 
+                      U.append
+                         [
+                         U.string
+                            (if Symbol.eq (CR.deref Show.arithmetic, rationalSym) then
+                                "~ "
+                             else
+                                "~q "),
+
+                         a 91
+                         ])
+         in
+            H.insert U.unparsingTable negq (1, 90, ref true, unp)
+         end
+
+      val () =
+         let
+            val unp =
+               U.wrap
+                  (U.apply1 integer_to_rational U.integer)
+                  (fn x =>
+                      U.append
+                         [
+                         if Symbol.eq (CR.deref Show.arithmetic, rationalSym) then
+                            U.append []
+                         else
+                            U.string "q`",
+
+                         U.string (IntInf.toStringStd x)
+                         ])
+         in
+            H.insert U.unparsingTable integer_to_rational (1, 100, ref true, unp)
+         end
+
+   end
+
+
+functor AfterLtqInhabitant () :> sig end =
+   struct
+
+      structure T = Term
+
+      val leqq = resolveGlobal /Rational.leqq/
+      val ltq = resolveGlobal /Rational.ltq/
+      val leqq_inhabitant = resolveGlobal /Rational.leqq_inhabitant/
+      val ltq_inhabitant = resolveGlobal /Rational.ltq_inhabitant/
+
+      val () =
+         ConstantTable.insert TypecheckTables.trivialIntroTactics leqq
+            (Backchain.applyPriority /\T.Const leqq_inhabitant\/)
+
+      val () =
+         ConstantTable.insert TypecheckTables.trivialIntroTactics ltq
+            (Backchain.applyPriority /\T.Const ltq_inhabitant\/)
+   
+   end
+
+
+functor AfterRationalAll () :> sig end =
+   struct
+
+      structure T = Term
+      structure B = BackchainInternal
+      structure H = ConstantTable
+      structure CR = CheckpointedRef
+
+      val rational = resolveGlobal /Rational.rational/
+      val plusq = resolveGlobal /Rational.plusq/
+      val negq = resolveGlobal /Rational.negq/
+      val leqq = resolveGlobal /Rational.leqq/
+      val ltq = resolveGlobal /Rational.ltq/
+      val eqqb = resolveGlobal /Rational.eqqb/
+      val leqqb = resolveGlobal /Rational.leqqb/
+      val ltqb = resolveGlobal /Rational.ltqb/
+      val neqqb = resolveGlobal /Rational.neqqb/
+
+      val leqq_refl = resolveGlobal /Rational.leqq_refl/
+      val leqq_trans = resolveGlobal /Rational.leqq_trans/
+      val plusq_leqq = resolveGlobal /Rational.plusq_leqq/
+      val negq_leqq = resolveGlobal /Rational.negq_leqq/
+      val leqq_implication = resolveGlobal /Rational.leqq_implication/
+      val istrue_eqqb = resolveGlobal /Rational.istrue_eqqb/
+      val istrue_leqqb = resolveGlobal /Rational.istrue_leqqb/
+      val istrue_ltqb = resolveGlobal /Rational.istrue_ltqb/
+      val istrue_neqqb = resolveGlobal /Rational.istrue_neqqb/
+      val rational_total = resolveGlobal /Rational.rational_total/
+      val rational_strict = resolveGlobal /Rational.rational_strict/
+
+      val () =
+         ConstantTable.insert BoolTactic.booleanTests eqqb istrue_eqqb
+
+      val () =
+         ConstantTable.insert BoolTactic.booleanTests leqqb istrue_leqqb
+
+      val () =
+         ConstantTable.insert BoolTactic.booleanTests ltqb istrue_ltqb
+
+      val () =
+         ConstantTable.insert BoolTactic.booleanTests neqqb istrue_neqqb
+
+      val () =
+         H.insert EqualityTacticInternal.reflexivityTactics leqq
+         (B.witnessPriority /\T.Const leqq_refl\ _/)
+      
+      val () =
+         H.insert EqualityTacticInternal.transitivityTactics leqq
+         (fn n => B.witnessPriority /\T.Const leqq_trans\ _ \n\ _ __ __/)
+
+      val () =
+         List.app 
+            (fn (const, i, rconst, rconst', cov, tacfn) => 
+               RewriteInternal.CICTable.insert 
+                  RewriteInternal.compatibilityTable 
+                  (const, i, rconst)
+                  (RewriteTypes.General rconst', cov, 0, (fns _ _ tac => tacfn tac)))
+            [
+            (plusq, 0, leqq, leqq, true,
+             andthenOn 0 (B.witnessPriority /\T.Const plusq_leqq\ _ _ _ _ __ __/)),
+          
+            (plusq, 1, leqq, leqq, true,
+             andthenOn 1 (B.witnessPriority /\T.Const plusq_leqq\ _ _ _ _ __ __/)),
+          
+            (negq, 0, leqq, leqq, false,
+             andthenOn 0 (B.witnessPriority /\T.Const negq_leqq\ _ _ __/)),
+
+            (leqq, 0, leqq, Prim.arrow, false,
+             andthenOn 0 (B.witnessPriority /\T.Const leqq_implication\ _ _ _ _ __ __/)),
+          
+            (leqq, 1, leqq, Prim.arrow, true,
+             andthenOn 1 (B.witnessPriority /\T.Const leqq_implication\ _ _ _ _ __ __/)),
+            ]
+
+      val () =
+         H.insert TypecheckTables.totalityTactics rational
+         (exact /\T.Const rational_total\/)
+
+      val () =
+         H.insert TypecheckTables.strictnessTactics rational
+         (exact /\T.Const rational_strict\/)
+
+   end

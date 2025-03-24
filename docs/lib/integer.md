@@ -93,6 +93,8 @@ This one gives transitivity in the form needed for rewriting:
 
     ltz_impl_leqz : forall (a b : integer) . a <z b -> a <z= b
 
+    ltz_impl_neq : forall (a b : integer) . a <z b -> a != b : integer
+
     ltz_irrefl : forall (a : integer) . a <z a -> void
 
     ltz_trans : forall (a b c : integer) . a <z b -> b <z c -> a <z c
@@ -404,6 +406,17 @@ positive case that works upwards.
 
     timesz_leqz_r_neg : forall (a a' b : integer) . b <z= z`0 -> a <z= a' -> a' *z b <z= a *z b
 
+    timesz_leqz_zero : forall (a b : integer) . z`0 <z= a -> z`0 <z= b -> z`0 <z= a *z b
+
+    (* an alias for timesz_leqz_zero *)
+    timesz_leqz_zero_pos_pos : forall (a b : integer) . z`0 <z= a -> z`0 <z= b -> z`0 <z= a *z b
+
+    timesz_leqz_zero_pos_neg : forall (a b : integer) . z`0 <z= a -> b <z= z`0 -> a *z b <z= z`0
+
+    timesz_leqz_zero_neg_pos : forall (a b : integer) . a <z= z`0 -> z`0 <z= b -> a *z b <z= z`0
+
+    timesz_leqz_zero_neg_neg : forall (a b : integer) . a <z= z`0 -> b <z= z`0 -> z`0 <z= a *z b
+
     timesz_ltz_zero : forall (a b : integer) . z`0 <z a -> z`0 <z b -> z`0 <z a *z b
 
     (* an alias for timesz_ltz_zero *)
@@ -418,8 +431,14 @@ positive case that works upwards.
     integer_integral_domain : forall (a b : integer) .
                                  a *z b = z`0 : integer -> a = z`0 : integer % b = z`0 : integer
 
+    timesz_neq_zero : forall (a b : integer) .
+                         a != z`0 : integer -> b != z`0 : integer -> a *z b != z`0 : integer
+
     timesz_ltz_zero_invert : forall (a b : integer) .
                                 z`0 <z a *z b -> a <z z`0 & b <z z`0 % z`0 <z a & z`0 <z b
+
+    timesz_ltz_zero_invert_neg : forall (a b : integer) .
+                                    a *z b <z z`0 -> a <z z`0 & z`0 <z b % z`0 <z a & b <z z`0
 
     times_to_integer : forall (m n : nat) .
                           nat_to_integer (m * n) = nat_to_integer m *z nat_to_integer n : integer
@@ -433,9 +452,19 @@ positive case that works upwards.
 
     timesz_ltz_r : forall (a a' b : integer) . z`0 <z b -> a <z a' -> a *z b <z a' *z b
 
+    timesz_cancel_l : forall (a b c : integer) .
+                         c != z`0 : integer -> c *z a = c *z b : integer -> a = b : integer
+
+    timesz_cancel_r : forall (a b c : integer) .
+                         c != z`0 : integer -> a *z c = b *z c : integer -> a = b : integer
+
     timesz_cancel_leqz_l : forall (a b c : integer) . z`0 <z c -> c *z a <z= c *z b -> a <z= b
 
     timesz_cancel_leqz_r : forall (a b c : integer) . z`0 <z c -> a *z c <z= b *z c -> a <z= b
+
+    timesz_cancel_ltz_l : forall (a b c : integer) . z`0 <z c -> c *z a <z c *z b -> a <z b
+
+    timesz_cancel_ltz_r : forall (a b c : integer) . z`0 <z c -> a *z c <z b *z c -> a <z b
 
     timesz_cancel_leqz_l_remainder : forall (a b c r : integer) .
                                         z`0 <z c -> r <z c -> c *z a <z= c *z b +z r -> a <z= b

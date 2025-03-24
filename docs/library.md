@@ -22,6 +22,7 @@ The following libraries are pre-loaded:
 - [`Option`](lib/option.html)
 - [`Partial`](lib/partial.html) (partial computable objects)
 - [`Permutation`](lib/permutation.html) (permutations on lists)
+- [`Quotient`](lib/quotient.html) (tools for manipulating quotient types)
 - [`Relations`](lib/relations.html)
 - [`Stable`](lib/stable.html)
 - [`Symbol`](lib/symbol.html)

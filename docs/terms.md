@@ -77,6 +77,8 @@ cons is right associative.
       Term <l= Term                                                  (level inequality)
       Term <z= Term                                                  (integer inequality)
       Term <z Term                                                   (integer inequality)
+      Term <q= Term                                                  (rational inequality)
+      Term <q Term                                                   (rational inequality)
 
       Term :: [Term]                                                 (cons)
 
@@ -84,9 +86,13 @@ cons is right associative.
       [Term] - Term                                                  (natural number minus)
       [Term] +z Term                                                 (integer plus)
       [Term] -z Term                                                 (integer minus)
+      [Term] +q Term                                                 (rational plus)
+      [Term] -q Term                                                 (rational minus)
 
       [Term] * Term                                                  (natural number times)
       [Term] *z Term                                                 (integer times)
+      [Term] *q Term                                                 (rational times)
+      [Term] |q Term                                                 (rational divide)
 
       [Term] Term                                                    (application)
       [Term] #1                                                      (first projection)
@@ -122,6 +128,7 @@ cons is right associative.
       l` LTerm                                                       (literal term)
       level` Level                                                   (level expression)
       z` Number                                                      (integer literal)
+      q` Number                                                      (rational literal)
 
     OIdent ::=
       Ident
