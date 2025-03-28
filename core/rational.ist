@@ -257,9 +257,9 @@ define /rational/
   U 0
 /;
 
-so /Q.quotient2_formation _ _ ratpred ratequiv ratequiv_per/ /H/.
-fold /rational in H/.
-hyp /H/.
+unfold /rational/.
+fold /Q.quotient2 _ ratpred ratequiv ratequiv_per/.
+typecheck.
 qed ();
 
 
@@ -751,42 +751,8 @@ define /qintro x h/
 introOf /x h/.
 unfold /qintro/.
 fold /Q.qintro2 _ ratpred ratequiv ratequiv_per x h/.
-typecheck.
-fold /rational/.
-typecheck.
-qed ();
-
-
-
-define /qintrol x y h/
-/
-  x
-//
-  forall (x y : integer & integer) . ratpred x & ratpred y & ratequiv x y -> rational
-/;
-
-introOf /x y h/.
-unfold /qintrol/.
-fold /Q.qintro2l _ ratpred ratequiv ratequiv_per x y h/.
-typecheck.
-fold /rational/.
-typecheck.
-qed ();
-
-
-
-define /qintror x y h/
-/
-  y
-//
-  forall (x y : integer & integer) . ratpred x & ratpred y & ratequiv x y -> rational
-/;
-
-introOf /x y h/.
-unfold /qintror/.
-fold /Q.qintro2r _ ratpred ratequiv ratequiv_per x y h/.
-typecheck.
-fold /rational/.
+unfold /rational/.
+fold /Q.quotient2 _ ratpred ratequiv ratequiv_per/.
 typecheck.
 qed ();
 
@@ -801,11 +767,20 @@ lemma "rational_representative"
 /;
 
 inference.
-so /Q.quotient2_representative _ _ ratpred ratequiv ratequiv_per/ /H/.
-fold /rational in H at all/.
-unfold /Q.qintro2 in H/.
-fold /qintro x h within x h in H/.
-hyp /H/.
+intro /x/.
+infer /rational/ /Hof/.
+unfold /of in Hof, rational in Hof/.
+fold /Q.quotient2 _ ratpred ratequiv ratequiv_per in Hof/.
+unfold /rational in x/.
+fold /Q.quotient2 _ ratpred ratequiv ratequiv_per in x/.
+destruct /x/ /[x Hx]/.
+split.
+exists /x/.
+unfold /ratpred in Hx/.
+exists /Hx/.
+unfold /qintro/.
+fold /Q.qintro2 _ ratpred ratequiv ratequiv_per x Hx at 1/.
+reflexivity.
 qed ();
 
 
@@ -819,6 +794,7 @@ lemma "rational_equality"
 
 inference.
 unfold /rational at all/.
+fold /Q.quotient2 _ ratpred ratequiv ratequiv_per at all/.
 exact /Q.quotient2_equality _ _ ratpred ratequiv ratequiv_per/.
 qed ();
 
@@ -4147,6 +4123,21 @@ qed ();
 
 
 (* Relation to integers *)
+
+lemma "integer_to_rational_neq"
+/
+  forall a b .
+    a != b : integer
+    -> integer_to_rational a != integer_to_rational b : rational
+/;
+
+inference.
+intro /a b Hneq/.
+contrapositive /Hneq/.
+apply /integer_to_rational_injective/ >> auto.
+qed ();
+
+
 
 lemma "integer_to_rational_mono"
 /

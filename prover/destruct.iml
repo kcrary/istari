@@ -116,6 +116,9 @@ signature DESTRUCT_INTERNAL =
       *)
       val refold : Judgement.judgement -> int -> int -> Term.term -> Reduction.reduction -> Tactic.tactic
 
+      (* as refold, but only refolds hypotheses *)
+      val refoldHyps : Judgement.judgement -> int -> int -> Term.term -> Reduction.reduction -> Tactic.tactic
+
 
       val destUserQuotient : int -> ipattern -> Directory.set -> Directory.set destruct_tactic
       
@@ -715,7 +718,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
 
 
       (* comment in signature *)
-      fun refold jud i j m r =
+      fun refoldMain hypsOnly jud i j m r =
          let
             (* if    |G2a| = k
                      |G2b| = i-k
@@ -724,18 +727,20 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
             *)
             fun f k =
                if k = i then
-                  (* G1, G2a[m . ^j], G2b[...] |- C[under_i (n . ^j)]
-                     =
-                     G1, G2[m . ^j] |- C[under_i (n . ^j)]
-                                     = C[under_i+1 ^j][under_i (n . id)]
-                  *)
-                  
-                  refine (Rule.unreduceAt i
-                             (T.Sub (J.concl jud, T.under (i+1) (T.Shift j)))
-                             m r)
-                  (* G1, G2[m . ^j] |- C[under_i+1 ^j][under_i (m . id)]
-                                     = C[under_i (m . ^j)]
-                  *)
+                  if hypsOnly then
+                     idtac
+                  else
+                     (* G1, G2a[m . ^j], G2b[...] |- C[under_i (n . ^j)]
+                        =
+                        G1, G2[m . ^j] |- C[under_i (n . ^j)]
+                                        = C[under_i+1 ^j][under_i (n . id)]
+                     *)
+                     refine (Rule.unreduceAt i
+                                (T.Sub (J.concl jud, T.under (i+1) (T.Shift j)))
+                                m r)
+                     (* G1, G2[m . ^j] |- C[under_i+1 ^j][under_i (m . id)]
+                                        = C[under_i (m . ^j)]
+                     *)
                else
                   (* G1, G2a[m . ^j], H[under_k (n . ^j)], G2b'[under_k+1 (n . ^j)] |- ...
                                     = H[under_k+1 ^j][under_k (n . id)]
@@ -754,7 +759,11 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
          in
             f 0
          end
-             
+
+      val refold = refoldMain false
+      val refoldHyps = refoldMain true
+
+
 
       fun destNat i pat set =
          (case pat of

@@ -350,6 +350,10 @@ This one gives transitivity in the form needed for rewriting:
                                        integer_to_rational a = integer_to_rational b : rational
                                        -> a = b : integer
 
+    integer_to_rational_neq : forall (a b : integer) .
+                                 a != b : integer
+                                 -> integer_to_rational a != integer_to_rational b : rational
+
     integer_to_rational_mono : forall (a b : integer) .
                                   a <z= b -> integer_to_rational a <q= integer_to_rational b
 

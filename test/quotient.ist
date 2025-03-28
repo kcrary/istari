@@ -1,0 +1,299 @@
+
+openModule /Quotient/;
+
+
+define /intrel x y/
+/
+  x #1 + y #2 = y #1 + x #2 : nat
+//
+  (nat & nat) -> (nat & nat) -> U 0
+/;
+
+unfold /intrel/.
+typecheck.
+qed ();
+setOpacity /intrel/ Constant.SOFT;
+
+
+
+lemma "intrel_per"
+/
+  PER (nat & nat) intrel
+/;
+
+unfold /intrel, PER/.
+split.
+  {
+  intro /x y Hxy/.
+  reduce /Hxy concl/.
+  omega.
+  }
+
+  {
+  reduce //.
+  intro /x y z Hxy Hyz/.
+  omega.
+  }
+qed ();
+
+
+
+define /int/
+/
+  quotient1 (nat & nat) intrel intrel_per
+//
+  U 0
+/;
+
+unfold /int/.
+typecheck.
+qed ();
+
+
+
+define /add x y/
+/
+  (x #1 + y #1, x #2 + y #2)
+//
+  int -> int -> int
+/;
+
+introOf /x y/.
+destruct /x/ /[x Hx x' Hx' Hxx]/.
+destruct /y/ /[y Hy y' Hy' Hyy]/.
+unfold /add at 0 0/.
+unfold /qintro1 at all/.
+unfold /intrel in Hxx in Hyy/.
+unfold /int/.
+extensionality.
+unfold /intrel/.
+omega.
+qed ();
+
+
+
+lemma "add_commute"
+/
+  forall x y .
+    add x y = add y x : int
+/;
+
+inference.
+intro /x y/.
+infer /int/ /Heq/.
+unfold /of in Heq/.
+unfold /int in Heq/.
+destruct /x/ /[x Hx]/.
+destruct /y/ /[y Hy]/.
+unfold /int/.
+unfold /qintro1 at all, add at all/.
+extensionality.
+reduceHard //.
+omega.
+qed ();
+
+
+
+define /ratpred x/
+/
+  z`0 <z x #2 
+//
+  (integer & integer) -> U 0
+/;
+
+unfold /ratpred/.
+typecheck.
+qed ();
+
+
+
+define /ratrel x y/
+/
+  x #1 *z y #2 = y #1 *z x #2 : integer
+//
+  (integer & integer) -> (integer & integer) -> U 0
+/;
+
+unfold /ratrel/.
+typecheck.
+qed ();
+
+
+
+lemma "timesz_commute3"
+/
+  forall a b c .
+    a *z b *z c = a *z c *z b : integer
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> Integer.timesz_assoc at 0 0/.
+rewrite /-> Integer.timesz_commute at 1/.
+reflexivity.
+qed ();
+
+
+
+lemma "timesz_rotate4"
+/
+  forall a b c d .
+    a *z b *z c *z d = a *z d *z b *z c : integer
+/;
+
+inference.
+intro /a b c d/.
+rewrite /-> timesz_commute3 _ c d/.
+rewrite /-> timesz_commute3 _ b d/.
+reflexivity.
+qed ();
+
+
+
+lemma "ratrel_per"
+/
+  PER2 (integer & integer) ratpred ratrel
+/;
+
+unfold /PER2/.
+unfold /ratpred at all, ratrel at all/.
+splitn 2 >> auto.
+  {
+  intro /(xn xd) (yn yd) _ _ Heq/.
+  reduce /Heq concl/.
+  omega.
+  }
+
+  {
+  intro /(xn xd) (yn yd) (zn zd) Hposx Hposy Hposz Hxy Hyz/.
+  reduce /Hposx Hposy Hposz Hxy Hyz concl/.
+  so /Integer.eq_integer_decide yn z`0/ /Heqyn | Hnzeroyn/.
+    {
+    subst /yn/.
+    rewrite /-> Integer.timesz_ann_l in Hxy in Hyz/.
+    so /Integer.integer_integral_domain _# 2 Hxy/ /Hzeron1 | Hzero2/.
+    1:{
+      subst /yd/.
+      so /Integer.ltz_irrefl _ Hposy/ /0/.
+      }
+    symmetryIn /Hyz/.
+    so /Integer.integer_integral_domain _# 2 Hyz/ /Hzeron3 | Hzero2/.
+    1:{
+      subst /yd/.
+      so /Integer.ltz_irrefl _ Hposy/ /0/.
+      }
+    subst /xn zn/.
+    rewrite /-> Integer.timesz_ann_l at 0 0/.
+    reflexivity.
+    }
+
+    {
+    so /Integer.timesz_compat _# 4 Hxy Hyz/ /Heq/.
+    apply /Integer.timesz_cancel_r _ _ (yd *z yn)/.
+      {
+      apply /Integer.timesz_neq_zero/ >> auto.
+      symmetry.
+      apply /Integer.ltz_impl_neq/ >> auto.
+      }
+    rewrite /<- Integer.timesz_assoc in Heq at all in concl at all/.
+    rewrite /<- timesz_rotate4 _ yd yn zd/.
+    rewrite /-> timesz_rotate4 _ xd yd yn/.
+    rewrite /-> Integer.timesz_commute zn yn/.
+    rewrite /-> timesz_commute3 _ zn xd/.
+    hyp /Heq/.
+    }
+  }
+qed ();
+
+
+
+define /rat/
+/
+  quotient2 (integer & integer) ratpred ratrel ratrel_per
+//
+  U 0
+/;
+
+unfold /rat/.
+typecheck.
+qed ();
+
+
+
+define /mult x y/
+/
+  (x #1 *z y #1, x #2 *z y #2)
+//
+  rat -> rat -> rat
+/;
+
+introOf /x y/.
+destruct /x/ /[x Hx x' Hx' Hxx]/.
+destruct /y/ /[y Hy y' Hy' Hyy]/.
+unfold /mult at all, qintro2 at all/.
+unfold /rat/.
+destruct /x/ /xn xd/.
+destruct /x'/ /xn' xd'/.
+destruct /y/ /yn yd/.
+destruct /y'/ /yn' yd'/.
+unfold /ratpred in Hx in Hx' in Hy in Hy'/.
+unfold /ratrel in Hxx in Hyy/.
+reduce /Hx Hx' Hy Hy' Hxx Hyy concl/.
+extensionality.
+  {
+  unfold /ratpred/.
+  reduce //.
+  apply /Integer.timesz_ltz_zero/ >> auto.
+  }
+
+  {
+  unfold /ratpred/.
+  reduce //.
+  apply /Integer.timesz_ltz_zero/ >> auto.
+  }
+
+  {
+  unfold /ratrel/.
+  reduce //.
+  rewrite /<- Integer.timesz_assoc at all/.
+  rewrite /-> timesz_commute3 _ yn xd'/.
+  rewrite /-> Integer.timesz_assoc/.
+  rewrite /-> Hxx/.
+  rewrite /-> Hyy/.
+  rewrite /<- Integer.timesz_assoc/.
+  rewrite /-> timesz_commute3 _ xd yn'/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "mult_commute"
+/
+  forall x y .
+    mult x y = mult y x : rat
+/;
+
+inference.
+intro /x y/.
+infer /rat/ /Heq/.
+unfold /of in Heq/.
+unfold /rat in Heq/.
+destruct /x/ /[x Hx]/.
+destruct /y/ /[y Hy]/.
+unfold /rat/.
+infer /rat/ /Hof/.
+unfold /of in Hof/.
+unfold /rat in Hof/.
+unhide.
+apply /quotient2_equality/.
+split.
+unfold /qintro2 at all, mult at all/.
+unfold /ratrel/.
+destruct /x/ /xn xd/.
+destruct /y/ /yn yd/.
+reduce //.
+rewrite /-> Integer.timesz_commute xn yn/.
+rewrite /-> Integer.timesz_commute yd xd/.
+reflexivity.
+qed ();

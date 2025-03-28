@@ -316,6 +316,8 @@ This one gives transitivity in the form needed for rewriting:
 
     integer_to_rational_injective : type:integer_to_rational_injective
 
+    integer_to_rational_neq : type:integer_to_rational_neq
+
     integer_to_rational_mono : type:integer_to_rational_mono
 
     integer_to_rational_mono_lt : type:integer_to_rational_mono_lt
