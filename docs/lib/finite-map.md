@@ -388,8 +388,9 @@ Another version gives the list quotiented by permutation:
     finite_map_domain_quotient_perm : forall (i : level) (A B : U i) (f : finite_map A B) .
                                          quotient (L L'
                                                      : { L : List.list A
-                                                       | forall (a : A) .
-                                                           member f a <-> List.In A a L }) .
+                                                       | List.Forall_dist (fn x y . x != y : A) L
+                                                         & (forall (a : A) .
+                                                              member f a <-> List.In A a L) }) .
                                            Permutation.Perm L L'
 
 Still another version returns the domain unquotiented but squashed:
@@ -405,6 +406,7 @@ length is determined:
                                 exists (n : nat) .
                                   { exists (L : List.list A) .
                                       List.length L = n : nat
+                                      & List.Forall_dist (fn x y . x != y : A) L
                                       & (forall (a : A) . member f a <-> List.In A a L) }
 
 
