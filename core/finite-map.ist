@@ -6,6 +6,7 @@ File.import "kindlike-load.iml";
 File.import "list-load.iml";
 File.import "logic-load.iml";
 File.import "option-load.iml";
+File.import "permutation-load.iml";
 
 openModule /Bool/;
 openModule /Option/;
@@ -3018,6 +3019,495 @@ destruct /L/ /[L]/.
 destruct /L/ /[L HL]/.
 split.
 existsAuto.
+qed ();
+
+
+
+lemma "finite_map_domain_quotient_perm"
+/
+  forall i (A B : U i) (f : finite_map A B) .
+    quotient
+      (L L' : { L : list A | forall (a : A) . member f a <-> In A a L }) .
+      Permutation.Perm L L'
+/;
+
+inference.
+intro /i A B/.
+intro /f/.
+exactRaw /List.map (fn x . x #1) (f #2)/.
+unfold /member, lookup/.
+destruct /f/ /[f g Hfg]/.
+  {
+  typecheck1 >> autoWith /Permutation.Perm_symm/.
+    {
+    typecheck1 >> auto.
+    split.
+      {
+      intro /Hiff a/.
+      rewrite /<- Hiff/.
+      rewrite /-> Hfg/.
+      reflexivity.
+      }
+  
+      {
+      intro /Hiff a/.
+      rewrite /<- Hiff/.
+      rewrite /-> Hfg/.
+      reflexivity.
+      }
+    }
+
+    {
+    reintro /L1 L2 L3 H12 H23/.
+    apply /Permutation.Perm_trans _ _ L2/ >> auto.
+    }
+  }
+assert /forall (f : pre_finite_map A B) a . (exists (b : B) . pre_lookup A B f a = Some b : option B) <-> In A a (List.map (fn x . x #1) (f #2))/ /Hprop/.
+  {
+  clear /f g Hfg/.
+  inference.
+  intro /f a/.
+  split.
+    {
+    intro /(b Heq)/.
+    destruct /f/ /[e He] [f _]/.
+    reduce //.
+    revert /Heq/.
+    unfold /pre_lookup/.
+    induction /f/.
+      {
+      intro /H/.
+      injection /H/.
+      }
+
+      {
+      intro /(a' b') f IH/.
+      reduce //.
+      boolCase /e a a'/ /Heq/.
+        {
+        intro /_/.
+        left.
+        unhide.
+        apply /He/ >> auto.
+        }
+
+        {
+        intro /H/.
+        right.
+        apply /IH/ >> auto.
+        }
+      }
+    }
+
+    {
+    destruct /f/ /[e He] [f _]/.
+    unfold /pre_lookup/.
+    reduce //.
+    induction /f/.
+      {
+      intro /0/.
+      }
+
+      {
+      intro /(a' b') f IH/.
+      reduce //.
+      intro /(Heq | H)/.
+        {
+        subst /a'/.
+        boolEq true /e a a/ >> auto.
+        existsAuto.
+        }
+
+        {
+        boolCase /e a a'/ /Heq/.
+          {
+          existsAuto.
+          }
+          
+          {
+          apply /IH/ >> auto.
+          }
+        }
+      }
+    }
+  }
+extensionality >> autoWith /Permutation.Perm_symm/.
+  {
+  reintro /L1 L2 L3 H12 H23/.
+  apply /Permutation.Perm_trans _ _ L2/ >> auto.
+  }
+
+  {
+  split.
+  rewrite /-> Hfg h within h _/.
+  apply /Hprop/.
+  }
+unfold /pre_finite_map in f in g/.
+clear /Hprop/.
+destruct /f/ /e f/.
+destruct /g/ /e' g/.
+reduce //.
+destruct /f/ /f Hf/.
+destruct /g/ /g Hg/.
+squashHidden /Hf Hg/.
+assert /forall (e : eqtest A) (f : list (A & B)) a . (exists b . pre_lookup A B (e, f) a = Some b : option B) <-> In A a (List.map (fn x . x #1) f)/ /Hprop/.
+  {
+  clear /e e' f g Hf Hg Hfg/.
+  inference.
+  intro /e f a/.
+  unfold /pre_lookup/.
+  reduce //.
+  destruct /e/ /e He/.
+  split.
+    {
+    induction /f/.
+      {
+      intro /(? H)/.
+      injection /H/.
+      }
+    intro /(a' b') f IH/.
+    reduce //.
+    intro /(b H)/.
+    revert /H/.
+    boolCase /e a a'/ /Heq/.
+      {
+      intro /_/.
+      left.
+      unhide.
+      apply /He/ >> auto.
+      }
+    intro /Hlook/.
+    right.
+    apply /IH/.
+    exists /b/ >> auto.
+    }
+
+    {
+    induction /f/.
+      {
+      intro /0/.
+      }
+    intro /(a' b) f IH/.
+    reduce //.
+    intro /(Heq | Hin)/.
+      {
+      subst /a'/.
+      boolEq true /e a a/ >> auto.
+      existsAuto.
+      }
+
+      {
+      boolCase /e a a'/ /Heq/.
+        {
+        exists /b/.
+        auto.
+        }
+      so /IH Hin/ /b' Hlook/.
+      exists /b'/.
+      auto.
+      }
+    }
+  }
+assert /forall a . In A a (List.map (fn x . x #1) f) <-> In A a (List.map (fn x . x #1) g)/ /Hiff/.
+  {
+  inference.
+  intro /a/.
+  split.
+    {
+    intro /H/.
+    rewrite /<- Hprop e f a in H/.
+    rewrite /<- Hprop e' g a/.
+    rewrite /<- Hfg a/.
+    hyp /H/.
+    }
+
+    {
+    intro /H/.
+    rewrite /<- Hprop e f a/.
+    rewrite /<- Hprop e' g a in H/.
+    rewrite /<- Hfg a in H/.
+    hyp /H/.
+    }
+  }
+clear /Hfg Hprop/.
+clear /e'/.
+destruct /e/ /e He/.
+revert /g Hf Hg Hiff/.
+induction /f/.
+  {
+  intro /g _ _ Hiff/.
+  destruct /g/ /| (a b) g/.
+    {
+    reduce //.
+    apply /Permutation.Perm_nil/.
+    }
+  exfalso.
+  apply /Hiff a/.
+  reduce //.
+  left >> auto.
+  }
+intro /(a b) f IH gg [Hdistf] [Hdistg] Hiff/.
+destruct /gg/ /| (a' b') g/.
+  {
+  exfalso.
+  reduce /Hiff/.
+  apply /Hiff a/.
+  left >> auto.
+  }
+reduce /Hiff concl/.
+so /Decidable.decidable_istrue (e a a')/ /Htrue | Hntrue/.
+  {
+  assert /a = a' : A/ /Heq/.
+    {
+    unhide.
+    rewrite /<- He in Htrue/.
+    auto.
+    }
+  clear /Htrue/.
+  subst /a'/.
+  apply /Permutation.Perm_cons/.
+  apply /IH/.
+    {
+    split.
+    inversion /Hdistf/ >> auto.
+    }
+
+    {
+    split.
+    inversion /Hdistg/ >> auto.
+    }
+
+    {
+    intro /a'/.
+    split.
+      {
+      intro /Hin/.
+      so /Hiff a' #1 (inr Hin)/ /Heq | Hin'/ >> auto.
+      exfalso.
+      subst /a'/.
+      inversion /Hdistf/.
+      reintro /Hall _/.
+      rewrite /-> Forall_forall in Hall/.
+      rewrite /-> In_map in Hin/.
+      destruct /Hin/ /(a0 b0) Hin' Heqa0/.
+      reduce /Heqa0/.
+      subst /a0/.
+      so /Hall (a, b0) Hin'/ /Hneq/.
+      reduce /Hneq/.
+      so /Hneq ()/ /0/.
+      }
+
+      {
+      intro /Hin/.
+      so /Hiff a' #2 (inr Hin)/ /Heq | Hin'/ >> auto.
+      exfalso.
+      subst /a'/.
+      inversion /Hdistg/.
+      reintro /Hall _/.
+      rewrite /-> Forall_forall in Hall/.
+      rewrite /-> In_map in Hin/.
+      destruct /Hin/ /(a0 b0) Hin' Heqa0/.
+      reduce /Heqa0/.
+      subst /a0/.
+      so /Hall (a, b0) Hin'/ /Hneq/.
+      reduce /Hneq/.
+      so /Hneq ()/ /0/.
+      }
+    }
+  }
+assert /a != a' : A/ /Hneq/.
+  {
+  intro /?/.
+  subst /a'/.
+  unhide.
+  rewrite /<- He in Hntrue/.
+  so /Hntrue ()/ /0/.
+  }
+clear /Hntrue/.
+so /Hiff a #1 (inl ())/ /Heq | Hin'/.
+  {
+  so /Hneq Heq/ /0/.
+  }
+rewrite /-> In_map in Hin'/.
+destruct /Hin'/ /(a0 b0) Hin' Heqa0/.
+reduce /Heqa0/.
+subst /a0/.
+so /In_form _# 4 Hin'/ /g1 g2 Heqg/.
+subst /g/.
+rewrite /-> map_append/.
+reduce //.
+apply /Permutation.Perm_trans/.
+1:{
+  apply /Permutation.Perm_cons_middle _ _ _ (a' :: List.map (fn x . x #1) g1)/.
+  }
+
+  typechecker ();
+apply /Permutation.Perm_cons/.
+rewrite /<- map_append/.
+apply /IH ((a', b') :: append g1 g2)/.
+  {
+  split.
+  inversion /Hdistf/ >> auto.
+  }
+
+  {
+  split.
+  inversion /Hdistg/.
+  reintro /Hall Hdistg'/.
+  reduce /Hall/.
+  apply /Forall_dist_cons/ >> auto.
+    {
+    reduce //.
+    rewrite /-> Forall_append_iff in Hall in concl/.
+    rewrite /-> Forall_cons_iff in Hall/.
+    destruct /Hall/ /H1 _ H2/.
+    auto.
+    }
+
+    {
+    rewrite /-> Forall_dist_append_iff in Hdistg' in concl/.
+    rewrite /-> Forall_dist_cons_iff in Hdistg'/.
+    reduce /Hdistg' concl/.
+    destruct /Hdistg'/ /H1 H2 H3 H4/.
+    splitn 2 >> auto.
+    rewrite /-> Forall_forall in H1 in concl/.
+    intro /x Hx/.
+    reduce //.
+    so /H1 x Hx/ /H/.
+    reduce /H/.
+    inversion /H/ >> auto.
+    }
+  }
+
+  {
+  intro /a0/.
+  split.
+    {
+    intro /Hin0/.
+    so /Hiff a0 #1 (inr Hin0)/ /Heq | Hin0'/.
+      {
+      subst /a0/.
+      reduce //.
+      left >> auto.
+      }
+
+      {
+      rewrite /-> In_map in Hin0'/.
+      destruct /Hin0'/ /(a0' b0') Hin0' Heqa0/.
+      reduce /Heqa0/.
+      subst /a0'/.
+      right.
+      rewrite /-> In_map/.
+      exists /(a0, b0')/.
+      split >> auto.
+      rewrite /-> In_append in Hin0'/.
+      destruct /Hin0'/ /H | Hin0'/.
+        {
+        apply /In_append/ >> auto.
+        }
+      reduce /Hin0'/.
+      destruct /Hin0'/ /Heq | Hin0'/.
+      1:{
+        apply /In_append/ >> auto.
+        }
+      injection /Heq/.
+      subst /a0/.
+      exfalso.
+      inversion /Hdistf/.
+      reintro /_ H _/.
+      reduce /H/.
+      rewrite /-> In_map in Hin0/.
+      destruct /Hin0/ /(a'' b'') Hin0 Heqa''/.
+      reduce /Heqa''/.
+      subst /a''/.
+      rewrite /-> Forall_forall in H/.
+      so /H _ Hin0/ /Hneq'/.
+      reduce /Hneq'/.
+      so /Hneq' ()/ /0/.
+      }
+    }
+
+    {
+    intro /Hin0/.
+    reduce /Hin0/.
+    rewrite /-> map_append in Hin0/.
+    rewrite /-> In_append in Hin0/.
+    so /Hiff a0 #2 __/ /Heq | Hin0'/ >> auto.
+      {
+      rewrite /-> map_append/.
+      rewrite /-> In_append/.
+      reduce //.
+      destruct /Hin0/ /H | H | H/ >> auto.
+      }
+    subst /a0/.
+    exfalso.
+    destruct /Hin0/ /Heq | Hin0/.
+      {
+      so /Hneq Heq/ /0/.
+      }
+    rewrite /-> Forall_dist_cons_iff in Hdistg/.
+    destruct /Hdistg/ /_ Hdistg/.
+    rewrite /-> Forall_dist_append_iff in Hdistg/.
+    destruct /Hdistg/ /Hdist1 _ Hdist2/.
+    destruct /Hin0/ /Hin0 | Hin0/.
+      {
+      rewrite /-> In_map in Hin0/.
+      destruct /Hin0/ /(a'' b'') Hin0 Heqa''/.
+      reduce /Heqa''/.
+      subst /a''/.
+      rewrite /-> Forall_forall in Hdist1/.
+      so /Hdist1 _ Hin0/ /H/.
+      reduce /H/.
+      rewrite /-> Forall_cons_iff in H/.
+      reduce /H/.
+      destruct /H/ /H _/.
+      so /H ()/ /0/.
+      }
+
+      {
+      rewrite /-> Forall_dist_cons_iff in Hdist2/.
+      destruct /Hdist2/ /Hdist2 _/.
+      reduce /Hdist2/.
+      rewrite /-> In_map in Hin0/.
+      destruct /Hin0/ /(a'' b'') Hin0 Heqa''/.
+      reduce /Heqa''/.
+      subst /a''/.
+      rewrite /-> Forall_forall in Hdist2/.
+      so /Hdist2 _ Hin0/ /H/.
+      reduce /H/.
+      so /H ()/ /0/.
+      }
+    }
+  }
+qed ();
+
+      
+
+lemma "finite_map_domain_size"
+/
+  forall i (A B : U i) (f : finite_map A B) .
+    exists n .
+      { exists L .
+          length L = n : nat
+          & (forall (a : A) . member f a <-> In A a L) }
+/;
+
+inference.
+intro /i A B f/.
+so /finite_map_domain_quotient_perm i A B f/ /L/.
+assert /length L : nat/ /Hof/.
+  {
+  destruct /L/ /[L L' HL]/.
+  destruct /L/ /L _/.
+  destruct /L'/ /L' _/.
+  apply /Permutation.length_Perm/ >> auto.
+  }
+exists /length L/.
+destruct /L/ /[L]/.
+destruct /L/ /[L HL]/.
+split.
+exists /L/.
+auto.
 qed ();
 
 

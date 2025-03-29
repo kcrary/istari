@@ -220,6 +220,8 @@ constructors.)
 
     In_reverse : type:In_reverse
 
+    In_form : type:In_form
+
     decidable_Forall_dep : type:decidable_Forall_dep
 
     decidable_Forall : type:decidable_Forall

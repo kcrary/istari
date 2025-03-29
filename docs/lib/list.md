@@ -287,6 +287,9 @@ constructors.)
     In_reverse : forall (i : level) (a : U i) (x : a) (l : list a) .
                     In a x (reverse l) <-> In a x l
 
+    In_form : forall (i : level) (a : U i) (x : a) (l : list a) .
+                 In a x l -> exists (l1 l2 : list a) . l = append l1 (x :: l2) : list a
+
     decidable_Forall_dep : forall (i : level) (a : U i) (P : a -> U i) (l : list a) .
                               (forall (x : a) . In a x l -> Decidable.decidable (P x))
                               -> Decidable.decidable (Forall P l)

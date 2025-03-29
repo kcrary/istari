@@ -177,9 +177,18 @@ the list quotiented by rearrangement:
 
     finite_map_domain_quotient : type:finite_map_domain_quotient
 
-Another version returns the domain squashed:
+Another version gives the list quotiented by permutation:
+
+    finite_map_domain_quotient_perm : type:finite_map_domain_quotient_perm
+
+Still another version returns the domain unquotiented but squashed:
 
     finite_map_domain_squash : type:finite_map_domain_squash
+
+Finally, although the domain (as a list) is underdetermined, its
+length is determined:
+
+    finite_map_domain_size : type:finite_map_domain_size
 
 
 

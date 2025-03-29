@@ -383,11 +383,29 @@ the list quotiented by rearrangement:
                                                   | forall (a : A) . member f a <-> List.In A a L }) .
                                       (forall (a : A) . List.In A a L <-> List.In A a L')
 
-Another version returns the domain squashed:
+Another version gives the list quotiented by permutation:
+
+    finite_map_domain_quotient_perm : forall (i : level) (A B : U i) (f : finite_map A B) .
+                                         quotient (L L'
+                                                     : { L : List.list A
+                                                       | forall (a : A) .
+                                                           member f a <-> List.In A a L }) .
+                                           Permutation.Perm L L'
+
+Still another version returns the domain unquotiented but squashed:
 
     finite_map_domain_squash : forall (i : level) (A B : U i) (f : finite_map A B) .
                                   { exists (L : List.list A) .
                                       forall (a : A) . member f a <-> List.In A a L }
+
+Finally, although the domain (as a list) is underdetermined, its
+length is determined:
+
+    finite_map_domain_size : forall (i : level) (A B : U i) (f : finite_map A B) .
+                                exists (n : nat) .
+                                  { exists (L : List.list A) .
+                                      List.length L = n : nat
+                                      & (forall (a : A) . member f a <-> List.In A a L) }
 
 
 
