@@ -3027,7 +3027,8 @@ lemma "finite_map_domain_quotient_perm"
 /
   forall i (A B : U i) (f : finite_map A B) .
     quotient
-      (L L' : { L : list A | forall (a : A) . member f a <-> In A a L }) .
+      (L L' : { L : list A | Forall_dist (fn x y . x != y : A) L 
+                             & (forall (a : A) . member f a <-> In A a L) }) .
       Permutation.Perm L L'
 /;
 
@@ -3043,14 +3044,18 @@ destruct /f/ /[f g Hfg]/.
     typecheck1 >> auto.
     split.
       {
-      intro /Hiff a/.
+      intro /(Hdist Hiff)/.
+      split >> auto.
+      intro /a/.
       rewrite /<- Hiff/.
       rewrite /-> Hfg/.
       reflexivity.
       }
   
       {
-      intro /Hiff a/.
+      intro /(Hdist Hiff)/.
+      split >> auto.
+      intro /a/.
       rewrite /<- Hiff/.
       rewrite /-> Hfg/.
       reflexivity.
@@ -3138,7 +3143,32 @@ extensionality >> autoWith /Permutation.Perm_symm/.
   }
 
   {
+  infer /f #2/ /H/.
+  destructSet /H/ /Hf/.
+  clear /H/.
   split.
+  split.
+    {
+    reduce //.
+    apply /Forall_dist_map/.
+    reduce //.
+    auto.
+    }
+  apply /Hprop/.
+  }
+
+  {
+  infer /g #2/ /H/.
+  destructSet /H/ /Hg/.
+  clear /H/.
+  split.
+  split.
+    {
+    reduce //.
+    apply /Forall_dist_map/.
+    reduce //.
+    auto.
+    }
   rewrite /-> Hfg h within h _/.
   apply /Hprop/.
   }
@@ -3489,6 +3519,7 @@ lemma "finite_map_domain_size"
     exists n .
       { exists L .
           length L = n : nat
+          & Forall_dist (fn x y . x != y : A) L
           & (forall (a : A) . member f a <-> In A a L) }
 /;
 
