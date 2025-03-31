@@ -497,6 +497,42 @@ reflexivity.
 Qed.
 
 
+Lemma def_intersectfut :
+  forall a b,
+    equiv (app (app Defs.intersectfut a) (lam b)) (intersect (semifut a) b).
+Proof.
+intros a m.
+unfold Defs.intersect.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app1.
+    apply step_app2.
+    }
+  simpsub.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+apply equiv_intersect; auto using equiv_refl.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl'.
+rewrite <- eqsub_expand_id.
+simpsub.
+reflexivity.
+Qed.
+
+
 Lemma def_iset :
   forall a b,
     equiv (app (app Defs.iset a) (lam b)) (iset a b).

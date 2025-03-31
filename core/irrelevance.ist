@@ -125,113 +125,85 @@ qed ();
 
 define /pirr_from_future m/
 /
-  ()
+  inpi unavailable
 //
-  intersect i (af : future (U i)) . let next a = af in future (pirr a) -> pirr (future a)
+  intersect i . intersectfut (a : U i) . future (pirr a) -> pirr (future a)
 /;
 
 inference.
-introOf /i [a] m/.
+introOf /i a m/.
 unfold /pirr_from_future/.
 unfold /pirr in m in concl/.
+unfold /inpi/.
 typecheck.
 RuleTactic.isquashFutureSwap >> auto.
 qed ();
+
+recordIrrelevance /pirr_from_future/ [0];
 
 
 
 define /future_from_pirr m/
 /
-  next ()
+  next (inpi unavailable)
 //
-  intersect i (af : future (U i)) . let next a = af in pirr (future a) -> future (pirr a)
+  intersect i . intersectfut (a : U i) . pirr (future a) -> future (pirr a)
 /;
 
 inference.
-introOf /i [a] m/.
+introOf /i a m/.
 unfold /future_from_pirr/.
 unfold /pirr in m in concl/.
+unfold /inpi/.
 destruct /m/ /[m]/.
 unhide.
 destruct /m/ /[m]/.
 typecheck.
 qed ();
+
+recordIrrelevance /future_from_pirr/ [0];
+
+
+
+reductions
+/
+  pirr_from_future (future_from_pirr x) --> outpi x (fn y . inpi y) ;
+  future_from_pirr (pirr_from_future x) --> let next y = x in outpi y (fn z . next (inpi z)) ;
+
+  unfolding pirr_from_future future_from_pirr outpi inpi letnext
+/;
 
 
 
 lemma "pirr_from_future_inv"
 /
-  forall i (af : future (U i)) .
-    let next a = af
-    in
-      forall (m : future (pirr a)) .
-        future_from_pirr (pirr_from_future m) = m : future (pirr a)
+  forall i . forallfut (a : U i) . forall (m : future (pirr a)) .
+    future_from_pirr (pirr_from_future m) = m : future (pirr a)
 /;
 
 inference.
-intro /i [a] m/.
+intro /i a m/.
 unfold /future_from_pirr/.
 destruct /m/ /[m]/.
 compat.
 destruct /m/ /[m]/.
 fold /inpi m at all/.
+convertIrr /inpi m/.
 reflexivity.
 qed ();
 
 
 
-define /pirr_from_future' m/
+lemma "future_from_pirr_inv"
 /
-  ()
-//
-  intersect i (a : U i) . future (pirr a) -> pirr (future a)
-/;
-
-inference.
-introOf /i a m/.
-unfold /pirr_from_future'/.
-unfold /pirr in m in concl/.
-typecheck.
-RuleTactic.isquashFutureSwap >> auto.
-qed ();
-
-
-
-define /future_from_pirr' m/
-/
-  next ()
-//
-  intersect i (a : U i) . pirr (future a) -> future (pirr a)
-/;
-
-inference.
-introOf /i a m/.
-unfold /future_from_pirr'/.
-unfold /pirr in m in concl/.
-destruct /m/ /[m]/.
-unhide.
-destruct /m/ /[m]/.
-typecheck.
-qed ();
-
-
-
-lemma "pirr_from_future'_inv"
-/
-  forall i (a : U i) (m : future (pirr a)) .
-    future_from_pirr' (pirr_from_future' m) = m : future (pirr a)
+  forall i . forallfut (a : U i) . forall (m : pirr (future a)) .
+    pirr_from_future (future_from_pirr m) = m : pirr (future a)
 /;
 
 inference.
 intro /i a m/.
-unfold /future_from_pirr'/.
-destruct /m/ /[m]/.
-compat.
-destruct /m/ /[m]/.
-fold /inpi m at all/.
-reflexivity.
+apply /pirr_ext/ >> auto.
 qed ();
-
 
 
 

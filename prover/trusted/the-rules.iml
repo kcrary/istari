@@ -167,6 +167,16 @@ signature THE_RULES =
       val forallfutExt : term -> term -> term -> term -> rule
       val forallfutExt' : term -> term -> term -> term -> term -> term -> term -> term -> rule
       val forallfutOfExt : term -> term -> term -> term -> term -> rule
+      val intersectfutForm : term -> term -> rule
+      val intersectfutEq : term -> term -> term -> term -> rule
+      val intersectfutFormUniv : term -> term -> term -> rule
+      val intersectfutEqUniv : term -> term -> term -> term -> term -> rule
+      val intersectfutSub : term -> term -> term -> term -> rule
+      val intersectfutIntroOf : term -> term -> term -> rule
+      val intersectfutIntroEq : term -> term -> term -> term -> rule
+      val intersectfutElimOf : term -> term -> term -> term -> rule
+      val intersectfutElimEq : term -> term -> term -> term -> term -> rule
+      val intersectfutElim : term -> term -> term -> rule
       val guardForm : term -> term -> rule
       val guardEq : term -> term -> term -> term -> rule
       val guardFormUniv : term -> term -> term -> rule
@@ -716,10 +726,14 @@ signature THE_RULES =
       val forallTotal : term -> term -> term -> rule
       val forallTotal' : term -> term -> rule
       val forallStrict : term -> term -> rule
+      val forallfutTotal : term -> term -> term -> rule
+      val forallfutTotal' : term -> term -> rule
+      val forallfutStrict : term -> term -> rule
       val arrowTotal : term -> term -> term -> rule
       val arrowTotal' : term -> term -> rule
       val arrowStrict : term -> term -> rule
       val intersectStrict : term -> term -> rule
+      val intersectfutStrict : term -> term -> rule
       val existsTotal : term -> term -> term -> rule
       val existsTotal' : term -> term -> rule
       val existsStrict : term -> term -> rule
@@ -964,6 +978,7 @@ val const_integer = Const Prim.integer
 val const_integer_from_Integer = Const Prim.integer_from_Integer
 val const_integer_to_Integer = Const Prim.integer_to_Integer
 val const_intersect = Const Prim.intersect
+val const_intersectfut = Const Prim.intersectfut
 val const_irrelevant = Const Prim.irrelevant
 val const_iset = Const Prim.iset
 val const_isquash = Const Prim.isquash
@@ -1140,6 +1155,16 @@ fun forallfutElim a b p = Arg.make "forallfutElim" [p, ] (Sub (b, Dot (p, Shift 
 fun forallfutExt a b m n = Arg.make "forallfutExt" [] (Elim (const_eq, [App (Elim (const_forallfut, [App (a), App (Lam (NONE, b)), ])), App (m), App (n), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_forallfut, [App (a), App (Lam (NONE, b)), ])), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_forallfut, [App (a), App (Lam (NONE, b)), ])), App (n), ])), (Arg.Unhide, [J.Tml (a), ], Elim (const_eq, [App (b), App (Elim (Sub (m, Shift 1), [App (Var 0), ])), App (Elim (Sub (n, Shift 1), [App (Var 0), ])), ])), ] (fn [_, _, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun forallfutExt' a a' a'' b b' b'' m n = Arg.make "forallfutExt'" [] (Elim (const_eq, [App (Elim (const_forallfut, [App (a), App (Lam (NONE, b)), ])), App (m), App (n), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_forall, [App (a'), App (Lam (NONE, b')), ])), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_forall, [App (a''), App (Lam (NONE, b'')), ])), App (n), ])), (Arg.Unhide, [J.Tml (a), ], Elim (const_eq, [App (b), App (Elim (Sub (m, Shift 1), [App (Var 0), ])), App (Elim (Sub (n, Shift 1), [App (Var 0), ])), ])), ] (fn [_, _, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun forallfutOfExt a a' b b' m = Arg.make "forallfutOfExt" [] (Elim (const_of, [App (Elim (const_forallfut, [App (a), App (Lam (NONE, b)), ])), App (m), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_forall, [App (a'), App (Lam (NONE, b')), ])), App (m), ])), (Arg.Unhide, [J.Tml (a), ], Elim (const_of, [App (b), App (Elim (Sub (m, Shift 1), [App (Var 0), ])), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun intersectfutForm a b = Arg.make "intersectfutForm" [] (Elim (const_istp, [App (Elim (const_intersectfut, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tml (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun intersectfutEq a a' b b' = Arg.make "intersectfutEq" [] (Elim (const_eqtp, [App (Elim (const_intersectfut, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_intersectfut, [App (a'), App (Lam (NONE, b')), ])), ])) [(Arg.PromoteUnhide, [], Elim (const_eqtp, [App (a), App (a'), ])), (Arg.Unhide, [J.Tml (a), ], Elim (const_eqtp, [App (b), App (b'), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun intersectfutFormUniv a b i = Arg.make "intersectfutFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_intersectfut, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_level), App (i), ])), (Arg.PromoteUnhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [J.Tml (a), ], Elim (const_of, [App (Elim (const_univ, [App (Sub (i, Shift 1)), ])), App (b), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun intersectfutEqUniv a a' b b' i = Arg.make "intersectfutEqUniv" [] (Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (Elim (const_intersectfut, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_intersectfut, [App (a'), App (Lam (NONE, b')), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_level), App (i), ])), (Arg.PromoteUnhide, [], Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (a), App (a'), ])), (Arg.Unhide, [J.Tml (a), ], Elim (const_eq, [App (Elim (const_univ, [App (Sub (i, Shift 1)), ])), App (b), App (b'), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun intersectfutSub a a' b b' = Arg.make "intersectfutSub" [] (Elim (const_subtype, [App (Elim (const_intersectfut, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_intersectfut, [App (a'), App (Lam (NONE, b')), ])), ])) [(Arg.PromoteUnhide, [], Elim (const_subtype, [App (a'), App (a), ])), (Arg.Unhide, [J.Tml (a'), ], Elim (const_subtype, [App (b), App (b'), ])), (Arg.Unhide, [J.Tml (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun intersectfutIntroOf a b m = Arg.make "intersectfutIntroOf" [] (Elim (const_of, [App (Elim (const_intersectfut, [App (a), App (Lam (NONE, b)), ])), App (m), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tml (a), ], Elim (const_of, [App (b), App (Sub (m, Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun intersectfutIntroEq a b m n = Arg.make "intersectfutIntroEq" [] (Elim (const_eq, [App (Elim (const_intersectfut, [App (a), App (Lam (NONE, b)), ])), App (m), App (n), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tml (a), ], Elim (const_eq, [App (b), App (Sub (m, Shift 1)), App (Sub (n, Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun intersectfutElimOf a b m p = Arg.make "intersectfutElimOf" [] (Elim (const_of, [App (Sub (b, Dot (p, Shift 0))), App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_intersectfut, [App (a), App (Lam (NONE, b)), ])), App (m), ])), (Arg.PromoteUnhide, [], Elim (const_of, [App (a), App (p), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun intersectfutElimEq a b m n p = Arg.make "intersectfutElimEq" [] (Elim (const_eq, [App (Sub (b, Dot (p, Shift 0))), App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_intersectfut, [App (a), App (Lam (NONE, b)), ])), App (m), App (n), ])), (Arg.PromoteUnhide, [], Elim (const_of, [App (a), App (p), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun intersectfutElim a b p = Arg.make "intersectfutElim" [] (Sub (b, Dot (p, Shift 0))) [(Arg.Nothing, [], Elim (const_intersectfut, [App (a), App (Lam (NONE, b)), ])), (Arg.PromoteUnhide, [], Elim (const_of, [App (a), App (p), ])), ] (fn [m, _, ] => m | _ => raise Arg.ExtractFailure)
 fun guardForm a b = Arg.make "guardForm" [] (Elim (const_istp, [App (Elim (const_guard, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (Sub (b, Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun guardEq a a' b b' = Arg.make "guardEq" [] (Elim (const_eqtp, [App (Elim (const_guard, [App (a), App (b), ])), App (Elim (const_guard, [App (a'), App (b'), ])), ])) [(Arg.Unhide, [], Elim (const_iff, [App (a), App (a'), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_eqtp, [App (Sub (b, Shift 1)), App (Sub (b', Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun guardFormUniv a b i = Arg.make "guardFormUniv" [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_guard, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_of, [App (Elim (const_univ, [App (Sub (i, Shift 1)), ])), App (Sub (b, Shift 1)), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
@@ -1689,10 +1714,14 @@ val boolStrict = Arg.make "boolStrict" [] (Elim (const_subtype, [App (const_bool
 fun forallTotal a b m = Arg.make "forallTotal" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_forall, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun forallTotal' a b = Arg.make "forallTotal'" [] (Elim (const_total, [App (Elim (const_forall, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 fun forallStrict a b = Arg.make "forallStrict" [] (Elim (const_subtype, [App (Elim (const_forall, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_partial, [App (Elim (const_forall, [App (a), App (Lam (NONE, b)), ])), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun forallfutTotal a b m = Arg.make "forallfutTotal" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_forallfut, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun forallfutTotal' a b = Arg.make "forallfutTotal'" [] (Elim (const_total, [App (Elim (const_forallfut, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tml (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
+fun forallfutStrict a b = Arg.make "forallfutStrict" [] (Elim (const_subtype, [App (Elim (const_forallfut, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_partial, [App (Elim (const_forallfut, [App (a), App (Lam (NONE, b)), ])), ])), ])) [(Arg.PromoteUnhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tml (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun arrowTotal a b m = Arg.make "arrowTotal" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_arrow, [App (a), App (b), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun arrowTotal' a b = Arg.make "arrowTotal'" [] (Elim (const_total, [App (Elim (const_arrow, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (Sub (b, Shift 1)), ])), ] (fn [_, _, ] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 fun arrowStrict a b = Arg.make "arrowStrict" [] (Elim (const_subtype, [App (Elim (const_arrow, [App (a), App (b), ])), App (Elim (const_partial, [App (Elim (const_arrow, [App (a), App (b), ])), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun intersectStrict a b = Arg.make "intersectStrict" [] (Elim (const_subtype, [App (Elim (const_intersect, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_partial, [App (Elim (const_intersect, [App (a), App (Lam (NONE, b)), ])), ])), ])) [(Arg.Unhide, [], a), (Arg.Unhide, [J.Tm (a), ], Elim (const_subtype, [App (b), App (Elim (const_partial, [App (b), ])), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun intersectfutStrict a b = Arg.make "intersectfutStrict" [] (Elim (const_subtype, [App (Elim (const_intersectfut, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_partial, [App (Elim (const_intersectfut, [App (a), App (Lam (NONE, b)), ])), ])), ])) [(Arg.PromoteUnhide, [], a), (Arg.Unhide, [J.Tml (a), ], Elim (const_subtype, [App (b), App (Elim (const_partial, [App (b), ])), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun existsTotal a b m = Arg.make "existsTotal" [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_exists, [App (a), App (Lam (NONE, b)), ])), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun existsTotal' a b = Arg.make "existsTotal'" [] (Elim (const_total, [App (Elim (const_exists, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Pair (Triv, Lam (NONE, Triv)) | _ => raise Arg.ExtractFailure)
 fun existsStrict a b = Arg.make "existsStrict" [] (Elim (const_subtype, [App (Elim (const_exists, [App (a), App (Lam (NONE, b)), ])), App (Elim (const_partial, [App (Elim (const_exists, [App (a), App (Lam (NONE, b)), ])), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)

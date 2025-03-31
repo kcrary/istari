@@ -497,6 +497,9 @@ that uses a future domain.  Nevertheless they can be useful in some
 situations because applying a future function does not involve a
 `next`, which may improve the effectiveness of unification.
 
+The future intersection, written `intersectfut (x : A) . B` is the
+analogous intersection type with its invisible argument in the future.
+
 
 #### Recursive types
 

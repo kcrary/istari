@@ -14,6 +14,149 @@ structure P = ReductionProver;
 
 
 
+lemma "intersectfut_compat"
+/
+  forall i (a : U i) (b c : forallfut (_ : a) . U i) (xf : future a) 
+    (f : intersectfut (x : a) . b x -> c x) .
+      let next x = xf
+      in
+        forall (m n : b x) .
+          m = n : b x
+          -> f m = f n : c x
+/;
+
+inference.
+intro /i a b c [x] f m n Heq/.
+compat.
+hyp /Heq/.
+qed ();
+
+
+
+lemma "intersectfut_compat_ap"
+/
+  forall i (a : U i) (b c : forallfut (_ : a) . U i) (xf : future a) 
+    (f : intersectfut (x : a) . b x -> c x) .
+      let next x = xf
+      in
+        forall (m n : b x) .
+          m = n : b x
+          -> f ap x m = f n : c x
+/;
+
+inference.
+intro /i a b c [x] f m n Heq/.
+compat.
+hyp /Heq/.
+qed ();
+
+
+
+lemma "intersectfut_elim"
+/
+  forall i (a : U i) (b : forallfut (_ : a) . U i) (xf : future a) (f : intersectfut (x : a) . b x) .
+    let next x = xf
+    in
+      f : b x
+/;
+
+inference.
+intro /i a b [x] f/.
+reduce //.
+typecheck.
+qed ();
+
+
+
+lemma "intersectfut_elim_ap"
+/
+  forall i (a : U i) (b : forallfut (x : a) . U i) (xf : future a) (f : intersectfut (x : a) . b x) .
+    let next x = xf
+    in
+      f ap x : b x
+/;
+
+inference.
+intro /i a b [x] f/.
+reduce //.
+typecheck.
+qed ();
+
+
+
+lemma "intersectfut_intro_of"
+/
+  forall i (a : U i) (b : a -> U i)
+    (f : intersect (x : future a) . let next x' = x in future (b x')) .
+      f : intersectfut (x : a) . future (b x)
+/;
+
+inference.
+intro /i a b f/.
+introOf /x/.
+fold /f ap (next x)/.
+typecheck.
+qed ();
+    
+
+
+lemma "intersectfut_intro_eq"
+/
+  forall i (a : U i) (b : a -> U i)
+    (f g : intersect (x : future a) . let next x' = x in future (b x')) .
+      (forall (x : future a) . let next x' = x in f = g : future (b x'))
+      -> f = g : (intersectfut (x : a) . future (b x))
+/;
+
+inference.
+intro /i a b f g/.
+so /intersectfut_intro_of _ _ _ f/ /Hoff/.
+so /intersectfut_intro_of _ _ _ g/ /Hofg/.
+introRaw /Heq/.
+  {
+  introForm /[x]/.
+  reduce //.
+  infer /f ap (next x)/ /Hoffx/.
+  infer /g ap (next x)/ /Hofgx/.
+  reduce /Hoffx Hofgx/.
+  unfold /ap in Hoffx in Hofgx/.
+  typecheck.
+  }
+introEq /x/.
+apply /Heq (next x)/.
+qed ();
+    
+
+
+lemma "intersectfut_ext"
+/
+  forall i (a : U i) (b : a -> U i)
+    (f g : intersect (x : future a) . let next x' = x in future (b x')) .
+      (forall (x : future a) . let next x' = x in f = g : future (b x'))
+      -> f = g : (intersectfut (x : a) . future (b x))
+/;
+
+inference.
+intro /i a b f g/.
+so /intersectfut_intro_of _ _ _ f/ /Hoff/.
+so /intersectfut_intro_of _ _ _ g/ /Hofg/.
+introRaw /Heq/.
+  {
+  introForm /[x]/.
+  reduce //.
+  infer /f ap (next x)/ /Hoffx/.
+  infer /g ap (next x)/ /Hofgx/.
+  reduce /Hoffx Hofgx/.
+  unfold /ap in Hoffx in Hofgx/.
+  typecheck.
+  }
+extensionality.
+reintro /x/.
+apply /Heq (next x)/.
+qed ();
+    
+
+
 lemma "forallfut_so"
 /
   forall i (a : U i) (b : forallfut (_ : a) . U i) (P : U i) (Q : forallfut (x : a) . b x -> U i) .

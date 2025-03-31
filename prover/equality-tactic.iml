@@ -930,6 +930,20 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                   ])\
          /
 
+      val intersectfutExt =
+         goalCaseT
+         /
+         \Prim.eq\ (\Prim.intersectfut\ ? (fn ? . ?)) ? ? =>
+         \(fnc a binder b m n =>
+              refine (Rule.intersectfutIntroEq a b m n)
+              >>> [
+                  idtacM Secondary,
+
+                  withgoal
+                  (fn (_, dir) => chdir (D.bindVary dir binder) >>+ idtacM Primary)
+                  ])\
+         /
+
       val iforallExt =
          goalCaseT
          /
@@ -1047,6 +1061,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             (Prim.karrow, tkarrowExt Rule.karrowExt),
             (Prim.parametric, parametricExt),
             (Prim.intersect, intersectExt),
+            (Prim.intersectfut, intersectfutExt),
             (Prim.iforall, iforallExt),
             (Prim.exists, existsExt),
             (Prim.prod, prodExt),
@@ -1327,6 +1342,47 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                  (fn (_, dir) =>
                      chdir (D.bindh dir binder)
                      >>+ refine (Rule.weaken 3 2)
+                     >>+ tac)
+                 ]
+             ]
+
+
+      fun intersectfutExtAuto binder a b m n tac =
+         refine (Rule.intersectfutIntroEq a b m n)
+         >>> [
+             (* promote |- A : type *)
+             refine (Rule.weaken 0 2)
+             >>+
+             idtacM Secondary,
+
+             assert2 
+                (T.apply2 Prim.ov b (T.Sub (m, T.shift1)))
+                (T.apply2 Prim.ov b (T.Sub (n, T.shift1)))
+             >>> [
+                 refine (Rule.intersectfutElimOf 
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.under 1 T.shift1))
+                            (T.Sub (m, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 2) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+
+                 refine (Rule.intersectfutElimOf 
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.under 1 T.shift1))
+                            (T.Sub (n, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 1) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+                 
+                 withgoal
+                 (fn (_, dir) =>
+                     chdir (D.bindh dir binder)
+                     >>+ refine (Rule.weaken 3 2) 
                      >>+ tac)
                  ]
              ]
@@ -1750,6 +1806,10 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                            \(fnc a b =>
                                 intersectExtAuto ident a b m n (introEqLoop rest))\
 
+                         | \Prim.intersectfut\ ? (fn . ?) =>
+                           \(fnc a b =>
+                                intersectfutExtAuto ident a b m n (introEqLoop rest))\
+
                          | \Prim.guard\ ? ? =>
                            \(fnc a b =>
                                 guardExtAuto ident a b m n (introEqLoop rest))\
@@ -1823,6 +1883,10 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                      | \Prim.intersect\ ? (fn . ?) =>
                        \(fnc a b =>
                             intersectExtAuto NONE a b m n loop)\
+   
+                     | \Prim.intersectfut\ ? (fn . ?) =>
+                       \(fnc a b =>
+                            intersectfutExtAuto NONE a b m n loop)\
    
                      | \Prim.exists\ ? (fn . ?) =>
                        \(fnc a b =>

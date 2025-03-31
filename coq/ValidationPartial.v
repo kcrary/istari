@@ -830,6 +830,90 @@ apply tr_total_strict.
 Qed.
 
 
+Lemma forallfutTotal_valid : forallfutTotal_obligation.
+Proof.
+prepare.
+intros G a b m ext0 H.
+rewrite -> def_forallfut in H.
+eapply tr_pi_total; eauto.
+Qed.
+
+
+Lemma forallfutStrict_valid : forallfutStrict_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+rewrite -> def_forallfut.
+apply tr_total_strict.
+  {
+  apply tr_pi_formation; auto.
+    {
+    apply tr_semifut_formation; auto.
+    }
+
+    {
+    replace (deqtype b b) with (deqtype (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) b))).
+    2:{
+      simpsub.
+      rewrite -> subst_var0_sh1; auto.
+      }
+    apply (tr_semifut_elim_eqtype _ _ _ (subst sh1 a)).
+      {
+      eapply hypothesis; eauto using index_0.
+      }
+  
+      {
+      cbn.
+      eapply (weakening _ [_] []).
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+      cbn [length unlift].
+      simpsub.
+      cbn [List.app].
+      exact Ha.
+      }
+  
+      {
+      cbn.
+      eapply (weakening _ [_] [_]).
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+      cbn [length unlift].
+      simpsub.
+      cbn [List.app].
+      rewrite -> subst_var0_sh1.
+      exact Hb.
+      }
+    }
+  }
+
+  {
+  eapply tr_pi_total.
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  eauto.
+  }
+Qed.
+
+
 Lemma arrowTotal_valid : arrowTotal_obligation.
 Proof.
 prepare.
@@ -882,6 +966,72 @@ prepare.
 intros G a b m ext0 Hm Hb.
 rewrite -> def_intersect.
 eapply tr_intersect_strict; eauto.
+Qed.
+
+
+Lemma intersectfutStrict_valid : intersectfutStrict_obligation.
+Proof.
+prepare.
+intros G a b m ext0 Hm Hb.
+rewrite -> def_intersectfut.
+eapply (tr_intersect_strict _#3 m); eauto.
+  {
+  apply tr_semifut_intro; auto.
+  }
+
+  {
+  unfold dsubtype.
+  replace (deq triv triv (subtype b (partial b))) with (deq (subst1 (var 0) triv) (subst1 (var 0) triv) (subst1 (var 0) (subst (dot (var 0) (sh 2)) (subtype b (partial b))))).
+  2:{
+    simpsub.
+    rewrite -> !subst_var0_sh1.
+    auto.
+    }
+  apply (tr_semifut_elim _#3 (subst sh1 a)).
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_inhabitation_formation; eauto.
+    }
+
+    {
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> !subst_var0_sh1.
+    exact Hb.
+    }
+  }
 Qed.
 
 
@@ -2432,6 +2582,96 @@ apply tr_sigma_intro.
   {
   apply total_rhs_formation.
   apply tr_pi_formation; auto.
+  }
+Qed.
+
+
+Hint Rewrite def_forallfut : prepare.
+
+Lemma forallfutTotal'_valid : forallfutTotal'_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+assert (tr (hyp_tm (pi (semifut a) b) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply (tr_pi_total _ (subst sh1 (semifut a)) (subst (under 1 sh1) b)).
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  reflexivity.
+  }
+assert (tr G (deqtype (pi (semifut a) b) (pi (semifut a) b))) as Hform.
+  {
+  apply tr_pi_formation; auto.
+    {
+    apply tr_semifut_formation; auto.
+    }
+  
+    {
+    replace (deqtype b b) with (deqtype (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) b))).
+    2:{
+      simpsub.
+      rewrite -> subst_var0_sh1; auto.
+      }
+    apply (tr_semifut_elim_eqtype _ _ _ (subst sh1 a)).
+      {
+      eapply hypothesis; eauto using index_0.
+      }
+  
+      {
+      cbn.
+      eapply (weakening _ [_] []).
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+      cbn [length unlift].
+      simpsub.
+      cbn [List.app].
+      exact Ha.
+      }
+  
+      {
+      cbn.
+      eapply (weakening _ [_] [_]).
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+      cbn [length unlift].
+      simpsub.
+      cbn [List.app].
+      rewrite -> subst_var0_sh1.
+      exact Hb.
+      }
+    }
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  }
+
+  {
+  simpsub.
+  rewrite -> subst_var0_sh1.
+  apply tr_pi_intro; auto.
+  }
+
+  {
+  apply total_rhs_formation; auto.
   }
 Qed.
 

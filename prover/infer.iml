@@ -300,7 +300,7 @@ structure Infer :> INFER =
                M spine = M' spine', and M' is the largest such
                tac' proves G |- M' : B
 
-         Eliminates intersect/guard/foralltp at the end of the spine only if invis=true.
+         Eliminates intersect/intersectfut/guard/iforall/foralltp at the end of the spine only if invis=true.
       *)
       fun inferSpine ctx m a spine tac invis prove =
          if invis orelse not (List.null spine) then
@@ -320,6 +320,29 @@ structure Infer :> INFER =
                               tac,
     
                               (* G |- E : Dom *)
+                              etac
+                              ]
+                    in
+                       inferSpine ctx m
+                          (T.Sub (cod, T.Dot (e, T.id)))
+                          spine tac' invis prove
+                    end)\
+
+             | \Prim.intersectfut\ ? (fn . ?) =>
+               \(fnc dom cod =>
+                    let
+                       val e = T.evar ()
+                       
+                       val etac = prove (J.make (S.map J.promote ctx) (T.apply2 Prim.ov dom e)) []
+ 
+                       val tac' =
+                          (* G |- M : Cod[E . id] *)
+                          refine (Rule.intersectfutElimOf dom cod m e)
+                          >>> [
+                              (* G |- M : intersectfut Dom . Cod *)
+                              tac,
+    
+                              (* promote G |- E : Dom *)
                               etac
                               ]
                     in
@@ -438,7 +461,7 @@ structure Infer :> INFER =
 
       (* inferSpineElim G M A spine tac invis prove
 
-         As inferSpine except A is not an intersect/guard/foralltp.
+         As inferSpine except A is not an intersect/intersectfut/guard/iforall/foralltp.
       *)
       and inferSpineElim ctx m a spine tac invis prove =
          (case spine of
@@ -637,7 +660,7 @@ structure Infer :> INFER =
       (* inferSpineRetry G M A spine tac invis prove
 
          As inferSpine except:
-         - A is not an intersect/guard/foralltp
+         - A is not an intersect/intersectfut/guard/iforall/foralltp
          - A does not match the first elim in spine
          - A in whnf
 
@@ -708,7 +731,7 @@ structure Infer :> INFER =
 
          or continues with ak (M', A, resume) or fk error
 
-         Eliminates intersect/guard/foralltp at the end of the spine only if invis=true.
+         Eliminates intersect/intersectfut/guard/iforall/foralltp at the end of the spine only if invis=true.
 
          Answer type is polymorphic (not answer).
       *)
@@ -799,6 +822,32 @@ structure Infer :> INFER =
                                                       mtac,
                             
                                                       (* G |- P : Dom *)
+                                                      ptac,
+                                                      ]
+                                            in
+                                               sk $
+                                               inferSpine ctx
+                                                  (T.apply2 Prim.ap m' p)
+                                                  (T.Sub (cod, T.Dot (p, T.id)))
+                                                  rest tac' invis prove
+                                            end)\
+      
+                                     | \Prim.intersectfut\ ? (fn . ?) =>
+                                       \(fnc dom cod =>
+                                            let
+                                               val ptac = prove (J.make (S.map J.promote ctx) (T.apply2 Prim.ov dom p)) []
+        
+                                               val tac' =
+                                                  (* G |- ap M' P : Cod[P . id] *)
+                                                  refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 2])))
+                                                  >>
+                                                  (* G |- M' : Cod[P . id] *)
+                                                  refine (Rule.intersectfutElimOf dom cod m' p)
+                                                  >>> [
+                                                      (* G |- M' : intersectfut Dom . Cod *)
+                                                      mtac,
+                            
+                                                      (* promote G |- P : Dom *)
                                                       ptac,
                                                       ]
                                             in
@@ -1060,7 +1109,7 @@ structure Infer :> INFER =
                M spine1 = M' spine1', N spine2 = N' spine2', and M' and N' are the largest such
                tac' proves G |- M' = N' : B
 
-         Eliminates intersect/foralltp/guard at the end of spine1 only if invis=true.
+         Eliminates intersect/intersectfut/iforall/foralltp/guard at the end of spine1 only if invis=true.
 
          Similar code to inferSpine.
       *)
@@ -1082,6 +1131,29 @@ structure Infer :> INFER =
                               tac,
     
                               (* G |- E : Dom *)
+                              etac
+                              ]
+                       in
+                          compatSpine ctx m n
+                             (T.Sub (cod, T.Dot (e, T.id)))
+                             spine1 spine2 tac' invis prove
+                       end)\
+
+             | \Prim.intersectfut\ ? (fn . ?) =>
+               \(fnc dom cod =>
+                    let
+                       val e = T.evar ()
+                       
+                       val etac = prove (J.make (S.map J.promote ctx) (T.apply2 Prim.ov dom e)) []
+ 
+                       val tac' =
+                          (* G |- M = N : Cod[E . id] *)
+                          refine (Rule.intersectfutElimEq dom cod m n e)
+                          >>> [
+                              (* G |- M = N : intersectfut Dom . Cod *)
+                              tac,
+    
+                              (* promote G |- E : Dom *)
                               etac
                               ]
                        in
@@ -1197,7 +1269,7 @@ structure Infer :> INFER =
 
       (* compatSpineElim G M N A spine1 spine2 tac invis prove
 
-         As compatSpine except A is hard whnf and not an intersect/guard/foralltp.
+         As compatSpine except A is hard whnf and not an intersect/intersectfut/guard/iforall/foralltp.
 
          Similar code to inferSpineElim.
       *)
@@ -1442,7 +1514,7 @@ structure Infer :> INFER =
 
          or continues with ak (M', A, resume) or fk error
 
-         Eliminates intersect/guard/foralltp at the end of the spine only if invis=true.
+         Eliminates intersect/intersectfut/guard/iforall/foralltp at the end of the spine only if invis=true.
 
          Polymorphic answer type (not answer).
       *)
@@ -1525,6 +1597,32 @@ structure Infer :> INFER =
                                                   refine (Rule.intersectElimEq dom cod m' n' p)
                                                   >>> [
                                                       (* G |- M' = N' : intersect Dom . Cod *)
+                                                      mntac,
+                            
+                                                      (* G |- P : Dom *)
+                                                      ptac,
+                                                      ]
+                                            in
+                                               sk $
+                                               compatSpine ctx
+                                                  (T.apply2 Prim.ap m' p) n'
+                                                  (T.Sub (cod, T.Dot (p, T.id)))
+                                                  rest1 rest2 tac' invis prove
+                                            end)\
+      
+                                     | \Prim.intersectfut\ ? (fn . ?) =>
+                                       \(fnc dom cod =>
+                                            let
+                                               val ptac = prove (J.make (S.map J.promote ctx) (T.apply2 Prim.ov dom p)) []
+        
+                                               val tac' =
+                                                  (* G |- ap M' P = N' : Cod[P . id] *)
+                                                  refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.beta 2])))
+                                                  >>
+                                                  (* G |- M' = N' : Cod[P . id] *)
+                                                  refine (Rule.intersectfutElimEq dom cod m' n' p)
+                                                  >>> [
+                                                      (* G |- M' = N' : intersectfut Dom . Cod *)
                                                       mntac,
                             
                                                       (* G |- P : Dom *)

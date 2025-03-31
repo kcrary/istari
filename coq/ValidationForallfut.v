@@ -22,7 +22,7 @@ Require Import ValidationPi.
 Require Import Judgement.
 
 
-Hint Rewrite def_forallfut def_pi : prepare.
+Hint Rewrite def_forallfut def_intersectfut def_pi : prepare.
 
 
 Lemma forallfutForm_valid : forallfutForm_obligation.
@@ -954,4 +954,527 @@ apply (tr_semifut_elim _ _ _ (subst sh1 a)).
   rewrite -> !subst_var0_sh1.
   exact Hm.
   }
+Qed.
+
+
+Lemma intersectfutForm_valid : intersectfutForm_obligation.
+Proof.
+prepare.
+intros G a b m n Ha Hb.
+apply tr_intersect_formation; auto.
+  {
+  apply tr_semifut_formation; auto.
+  }
+
+  {
+  replace (deqtype b b) with (deqtype (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) b))).
+  2:{
+    simpsub.
+    rewrite -> subst_var0_sh1; auto.
+    }
+  apply (tr_semifut_elim_eqtype _ _ _ (subst sh1 a)).
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    exact Ha.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> subst_var0_sh1.
+    exact Hb.
+    }
+  }
+Qed.
+
+
+Lemma intersectfutEq_valid : intersectfutEq_obligation.
+Proof.
+prepare.
+intros G a a' b b' m n Ha Hb.
+apply tr_intersect_formation; auto.
+  {
+  apply tr_semifut_formation; auto.
+  }
+
+  {
+  replace (deqtype b b') with (deqtype (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) b'))).
+  2:{
+    simpsub.
+    rewrite -> !subst_var0_sh1; auto.
+    }
+  apply (tr_semifut_elim_eqtype _ _ _ (subst sh1 a)).
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_eqtype_formation_left; eauto.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> !subst_var0_sh1.
+    exact Hb.
+    }
+  }
+Qed.
+
+
+Lemma intersectfutFormUniv_valid : intersectfutFormUniv_obligation.
+Proof.
+prepare.
+intros G a b lv ext2 ext1 ext0 Hlv Ha Hb.
+apply tr_intersect_formation_univ; auto.
+  {
+  apply tr_semifut_formation_univ; auto.
+  }
+
+  {
+  replace (deq b b (univ (subst sh1 lv))) with (deq (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)) (subst1 (var 0) (univ (subst (sh 2) lv)))).
+  2:{
+    simpsub.
+    rewrite -> subst_var0_sh1; auto.
+    }
+  apply (tr_semifut_elim _ _ _ (subst sh1 a)).
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    apply (tr_formation_weaken _ lv).
+    exact Ha.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> subst_var0_sh1.
+    exact Hb.
+    }
+  }
+Qed.
+
+
+Lemma intersectfutEqUniv_valid : intersectfutEqUniv_obligation.
+Proof.
+prepare.
+intros G a a' b b' lv ext2 ext1 ext0 Hlv Ha Hb.
+apply tr_intersect_formation_univ; auto.
+  {
+  apply tr_semifut_formation_univ; auto.
+  }
+
+  {
+  replace (deq b b' (univ (subst sh1 lv))) with (deq (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) b')) (subst1 (var 0) (univ (subst (sh 2) lv)))).
+  2:{
+    simpsub.
+    rewrite -> !subst_var0_sh1; auto.
+    }
+  apply (tr_semifut_elim _ _ _ (subst sh1 a)).
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    apply (tr_formation_weaken _ lv).
+    eapply tr_eq_reflexivity; eauto.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> !subst_var0_sh1.
+    exact Hb.
+    }
+  }
+Qed.
+
+
+Lemma intersectfutSub_valid : intersectfutSub_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext2 ext1 ext0 Ha Hb Hb'.
+apply tr_intersect_sub.
+  {
+  apply tr_semifut_sub; auto.
+  }
+
+  {
+  unfold dsubtype.
+  replace (deq triv triv (subtype b b')) with (deq (subst1 (var 0) triv) (subst1 (var 0) triv) (subst1 (var 0) (subst (dot (var 0) (sh 2)) (subtype b b')))).
+  2:{
+    simpsub.
+    rewrite -> !subst_var0_sh1.
+    auto.
+    }
+  apply (tr_semifut_elim _#3 (subst sh1 a')).
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_subtype_istype1; eauto.
+    }
+
+    {
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> !subst_var0_sh1.
+    exact Hb.
+    }
+  }
+
+  {
+  replace (deqtype b b) with (deqtype (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) b))).
+  2:{
+    simpsub.
+    rewrite -> !subst_var0_sh1.
+    auto.
+    }
+  apply (tr_semifut_elim_eqtype _#3 (subst sh1 a)).
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    eapply tr_subtype_istype2; eauto.
+    }
+
+    {
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> !subst_var0_sh1.
+    exact Hb'.
+    }
+  }
+Qed.
+
+
+Lemma intersectfutIntroOf_valid : intersectfutIntroOf_obligation.
+Proof.
+prepare.
+intros G a b m ext1 ext0 Ha Hm.
+apply tr_intersect_intro.
+  {
+  apply tr_semifut_formation; auto.
+  }
+replace (deq (subst sh1 m) (subst sh1 m) b) with (deq (subst1 (var 0) (subst (sh 2) m)) (subst1 (var 0) (subst (sh 2) m)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) b))).
+2:{
+  simpsub.
+  rewrite -> !subst_var0_sh1; auto.
+  }
+apply (tr_semifut_elim _ _ _ (subst sh1 a)).
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  cbn.
+  eapply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  exact Ha.
+  }
+
+  {
+  eapply (weakening _ [_] [_]).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  rewrite -> !subst_var0_sh1.
+  exact Hm.
+  }
+Qed.
+
+
+Lemma intersectfutIntroEq_valid : intersectfutIntroEq_obligation.
+Proof.
+prepare.
+intros G a b m n ext1 ext0 Ha Hmn.
+apply tr_intersect_intro.
+  {
+  apply tr_semifut_formation; auto.
+  }
+replace (deq (subst sh1 m) (subst sh1 n) b) with (deq (subst1 (var 0) (subst (sh 2) m)) (subst1 (var 0) (subst (sh 2) n)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) b))).
+2:{
+  simpsub.
+  rewrite -> !subst_var0_sh1; auto.
+  }
+apply (tr_semifut_elim _ _ _ (subst sh1 a)).
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  cbn.
+  eapply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  exact Ha.
+  }
+
+  {
+  eapply (weakening _ [_] [_]).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  rewrite -> !subst_var0_sh1.
+  exact Hmn.
+  }
+Qed.
+
+
+Lemma intersectfutElimOf_valid : intersectfutElimOf_obligation.
+Proof.
+prepare.
+intros G a b m p ext1 ext0 Hm Hp.
+eapply tr_intersect_elim; eauto.
+apply tr_semifut_intro; eauto.
+Qed.
+
+
+Lemma intersectfutElimEq_valid : intersectfutElimEq_obligation.
+Proof.
+prepare.
+intros G a b m n p ext1 ext0 Hmn Hp.
+eapply tr_intersect_elim; eauto.
+apply tr_semifut_intro; eauto.
+Qed.
+
+
+Lemma intersectfutElim_valid : intersectfutElim_obligation.
+Proof.
+prepare.
+intros G a b p m ext0 Hm Hp.
+eapply tr_intersect_elim; eauto.
+apply tr_semifut_intro; eauto.
 Qed.

@@ -41,6 +41,7 @@ Human-readable rules, using explicit variables, are given
 [Disjoint sums](#disjoint-sums)<br>
 [Future modality](#future-modality)<br>
 [Future functions](#future-functions)<br>
+[Future intersect](#future-intersect)<br>
 [Recursive types](#recursive-types)<br>
 [Inductive types](#inductive-types)<br>
 [Void](#void)<br>
@@ -2357,6 +2358,82 @@ Human-readable rules, using explicit variables, are given
       promote(G) |- istp A
       G |- of (forall A' (fn . B')) M
       G, (later) A |- of B (M[^1] 0)
+
+
+### Future intersect
+
+- `intersectfutForm A B`
+
+      G |- istp (intersectfut A (fn . B))
+      >>
+      promote(G) |- istp A
+      G, (later) A |- istp B
+
+- `intersectfutEq A A' B B'`
+
+      G |- eqtp (intersectfut A (fn . B)) (intersectfut A' (fn . B'))
+      >>
+      promote(G) |- eqtp A A'
+      G, (later) A |- eqtp B B'
+
+- `intersectfutFormUniv A B I`
+
+      G |- of (univ I) (intersectfut A (fn . B))
+      >>
+      G |- of level I
+      promote(G) |- of (univ I) A
+      G, (later) A |- of (univ I[^1]) B
+
+- `intersectfutEqUniv A A' B B' I`
+
+      G |- eq (univ I) (intersectfut A (fn . B)) (intersectfut A' (fn . B'))
+      >>
+      G |- of level I
+      promote(G) |- eq (univ I) A A'
+      G, (later) A |- eq (univ I[^1]) B B'
+
+- `intersectfutSub A A' B B'`
+
+      G |- subtype (intersectfut A (fn . B)) (intersectfut A' (fn . B'))
+      >>
+      promote(G) |- subtype A' A
+      G, (later) A' |- subtype B B'
+      G, (later) A |- istp B
+
+- `intersectfutIntroOf A B M`
+
+      G |- of (intersectfut A (fn . B)) M
+      >>
+      promote(G) |- istp A
+      G, (later) A |- of B M[^1]
+
+- `intersectfutIntroEq A B M N`
+
+      G |- eq (intersectfut A (fn . B)) M N
+      >>
+      promote(G) |- istp A
+      G, (later) A |- eq B M[^1] N[^1]
+
+- `intersectfutElimOf A B M P`
+
+      G |- of B[P . id] M
+      >>
+      G |- of (intersectfut A (fn . B)) M
+      promote(G) |- of A P
+
+- `intersectfutElimEq A B M N P`
+
+      G |- eq B[P . id] M N
+      >>
+      G |- eq (intersectfut A (fn . B)) M N
+      promote(G) |- of A P
+
+- `intersectfutElim A B P`
+
+      G |- B[P . id] ext M
+      >>
+      G |- intersectfut A (fn . B) ext M
+      promote(G) |- of A P
 
 
 ### Recursive types
@@ -5037,6 +5114,26 @@ Syntactic equality is intended for internal use only.
       G |- istp A
       G, A |- istp B
 
+- `forallfutTotal A B M`
+
+      G |- halts M
+      >>
+      G |- of (forallfut A (fn . B)) M
+
+- `forallfutTotal' A B`
+
+      G |- total (forallfut A (fn . B)) ext (() , fn . ())
+      >>
+      promote(G) |- istp A
+      G, (later) A |- istp B
+
+- `forallfutStrict A B`
+
+      G |- subtype (forallfut A (fn . B)) (partial (forallfut A (fn . B)))
+      >>
+      promote(G) |- istp A
+      G, (later) A |- istp B
+
 - `arrowTotal A B M`
 
       G |- halts M
@@ -5063,6 +5160,13 @@ Syntactic equality is intended for internal use only.
       >>
       G |- A
       G, A |- subtype B (partial B)
+
+- `intersectfutStrict A B`
+
+      G |- subtype (intersectfut A (fn . B)) (partial (intersectfut A (fn . B)))
+      >>
+      promote(G) |- A
+      G, (later) A |- subtype B (partial B)
 
 - `existsTotal A B M`
 

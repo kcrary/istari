@@ -67,35 +67,31 @@ for the fact that `x` now proves `B` instead of `A`.  For this reason,
 
 Proof irrelevance commutes with the future modality:
 
-    pirr_from_future : intersect (i : level) (af : future (U i)) .
-                          let next a = af in future (pirr a) -> pirr (future a)
-                     = fn m . ()
+    pirr_from_future : intersect (i : level) .
+                          forallfut (a : U i) . future (pirr a) -> pirr (future a)
+                     = fn a m . ()
 
-    future_from_pirr : intersect (i : level) (af : future (U i)) .
-                          let next a = af in pirr (future a) -> future (pirr a)
-                     = fn m . next ()
+    future_from_pirr : intersect (i : level) .
+                          forallfut (a : U i) . pirr (future a) -> future (pirr a)
+                     = fn a m . next ()
 
-    pirr_from_future_inv : forall (i : level) (af : future (U i)) .
-                              let next a = af
-                              in
-                              forall (m : future (pirr a)) .
-                                future_from_pirr (pirr_from_future m) = m : future (pirr a)
+    pirr_from_future_inv : forall (i : level) .
+                              forallfut (a : U i) .
+                                forall (m : future (pirr a)) .
+                                  future_from_pirr (pirr_from_future m) = m : future (pirr a)
 
-The other direction is an instance of `pirr_ext`.
+    future_from_pirr_inv : forall (i : level) .
+                              forallfut (a : U i) .
+                                forall (m : pirr (future a)) .
+                                  pirr_from_future (future_from_pirr m) = m : pirr (future a)
 
-The typechecker will generally not be able to guess the future type
-argument `af`, so a visibilized application will typically be
-necessary.  A simpler version is available when the type argument is
-available in the present:
+(The latter direction is actually an instance of `pirr_ext`.)  The
+untyped reductions eliminate the commutations, but they leave eta
+redices:
 
-    pirr_from_future' : intersect (i : level) (a : U i) . future (pirr a) -> pirr (future a)
-                      = fn m . ()
+    pirr_from_future _ (future_from_pirr _ x) --> let inpi y = x in inpi y
 
-    future_from_pirr' : intersect (i : level) (a : U i) . pirr (future a) -> future (pirr a)
-                      = fn m . next ()
-
-    pirr_from_future'_inv : forall (i : level) (a : U i) (m : future (pirr a)) .
-                               future_from_pirr' (pirr_from_future' m) = m : future (pirr a)
+    future_from_pirr _ (pirr_from_future _ x) --> let next y = x in let inpi z = y in next (inpi z)
 
 
 #### Impredicative functions

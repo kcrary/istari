@@ -64,6 +64,7 @@ Definition future : fterm := lam (fut (var 0)).
 Definition iexists : fterm := lam (lam (lam (exist (var 2) (var 1) (app (var 1) (var 0))))).
 Definition iff : fterm := lam (lam (prod (pi (var 1) (var 1)) (pi (var 0) (var 2)))).
 Definition iforall : fterm := lam (lam (lam (all (var 2) (var 1) (app (var 1) (var 0))))).
+Definition intersectfut : fterm := lam (lam (intersect (semifut (var 1)) (app (var 1) (var 0)))).
 Definition iset : fterm := lam (lam (iset (var 1) (app (var 1) (var 0)))).
 Definition isquash : fterm := lam (Syntax.iset unittp (var 1)).
 Definition istp : fterm := lam (eqtype (var 0) (var 0)).

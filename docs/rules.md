@@ -44,6 +44,7 @@ variables.  The official rules, using de Bruijn indices, are given
 [Disjoint sums](#disjoint-sums)<br>
 [Future modality](#future-modality)<br>
 [Future functions](#future-functions)<br>
+[Future intersect](#future-intersect)<br>
 [Recursive types](#recursive-types)<br>
 [Inductive types](#inductive-types)<br>
 [Void](#void)<br>
@@ -2359,6 +2360,82 @@ variables.  The official rules, using de Bruijn indices, are given
       promote(G) |- A : type
       G |- M : forall (x : A') . B'
       G, x (later) : A |- M x : B
+
+
+### Future intersect
+
+- `intersectfutForm A B`
+
+      G |- intersectfut A (fn x . B) : type
+      >>
+      promote(G) |- A : type
+      G, x (later) : A |- B : type
+
+- `intersectfutEq A A' B B'`
+
+      G |- intersectfut A (fn x . B) = intersectfut A' (fn x . B') : type
+      >>
+      promote(G) |- A = A' : type
+      G, x (later) : A |- B = B' : type
+
+- `intersectfutFormUniv A B I`
+
+      G |- intersectfut A (fn x . B) : univ I
+      >>
+      G |- I : level
+      promote(G) |- A : univ I
+      G, x (later) : A |- B : univ I
+
+- `intersectfutEqUniv A A' B B' I`
+
+      G |- intersectfut A (fn x . B) = intersectfut A' (fn x . B') : univ I
+      >>
+      G |- I : level
+      promote(G) |- A = A' : univ I
+      G, x (later) : A |- B = B' : univ I
+
+- `intersectfutSub A A' B B'`
+
+      G |- intersectfut A (fn x . B) <: intersectfut A' (fn x . B')
+      >>
+      promote(G) |- A' <: A
+      G, x (later) : A' |- B <: B'
+      G, x (later) : A |- B : type
+
+- `intersectfutIntroOf A B M`
+
+      G |- M : intersectfut A (fn x . B)
+      >>
+      promote(G) |- A : type
+      G, x (later) : A |- M : B
+
+- `intersectfutIntroEq A B M N`
+
+      G |- M = N : intersectfut A (fn x . B)
+      >>
+      promote(G) |- A : type
+      G, x (later) : A |- M = N : B
+
+- `intersectfutElimOf A B M P`
+
+      G |- M : [P / x]B
+      >>
+      G |- M : intersectfut A (fn x . B)
+      promote(G) |- P : A
+
+- `intersectfutElimEq A B M N P`
+
+      G |- M = N : [P / x]B
+      >>
+      G |- M = N : intersectfut A (fn x . B)
+      promote(G) |- P : A
+
+- `intersectfutElim A B P`
+
+      G |- [P / x]B ext M
+      >>
+      G |- intersectfut A (fn x . B) ext M
+      promote(G) |- P : A
 
 
 ### Recursive types
@@ -4984,6 +5061,26 @@ Syntactic equality is intended for internal use only.
       G |- A : type
       G, x : A |- B : type
 
+- `forallfutTotal A B M`
+
+      G |- halts M
+      >>
+      G |- M : forallfut A (fn x . B)
+
+- `forallfutTotal' A B`
+
+      G |- total (forallfut A (fn x . B)) ext (() , fn x . ())
+      >>
+      promote(G) |- A : type
+      G, x (later) : A |- B : type
+
+- `forallfutStrict A B`
+
+      G |- forallfut A (fn x . B) <: partial (forallfut A (fn x . B))
+      >>
+      promote(G) |- A : type
+      G, x (later) : A |- B : type
+
 - `arrowTotal A B M`
 
       G |- halts M
@@ -5010,6 +5107,13 @@ Syntactic equality is intended for internal use only.
       >>
       G |- A
       G, x : A |- B <: partial B
+
+- `intersectfutStrict A B`
+
+      G |- intersectfut A (fn x . B) <: partial (intersectfut A (fn x . B))
+      >>
+      promote(G) |- A
+      G, x (later) : A |- B <: partial B
 
 - `existsTotal A B M`
 

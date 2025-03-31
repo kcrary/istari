@@ -75,20 +75,15 @@ Proof irrelevance commutes with the future modality:
 
     pirr_from_future_inv : type:pirr_from_future_inv
 
-The other direction is an instance of `pirr_ext`.
+    future_from_pirr_inv : type:future_from_pirr_inv
 
-The typechecker will generally not be able to guess the future type
-argument `af`, so a visibilized application will typically be
-necessary.  A simpler version is available when the type argument is
-available in the present:
+(The latter direction is actually an instance of `pirr_ext`.)  The
+untyped reductions eliminate the commutations, but they leave eta
+redices:
 
-    pirr_from_future' : type:pirr_from_future'
-                      = def:pirr_from_future'
+    pirr_from_future _ (future_from_pirr _ x) --> let inpi y = x in inpi y
 
-    future_from_pirr' : type:future_from_pirr'
-                      = def:future_from_pirr'
-
-    pirr_from_future'_inv : type:pirr_from_future'_inv
+    future_from_pirr _ (pirr_from_future _ x) --> let next y = x in let inpi z = y in next (inpi z)
 
 
 #### Impredicative functions

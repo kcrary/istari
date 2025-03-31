@@ -37,6 +37,8 @@ cons is right associative.
       parametric Bindings . [Term]                                   (parametric dependent function)
       weaksum Bindings . [Term]                                      (weak dependent sum)
       foralltp OIdents . [Term]                                      (impredicative polymorphism)
+      forallfut Bindings . [Term]                                    (future dependent product)  
+      intersectfut Bindings . [Term]                                 (future intersection type)  
       rec Ident . [Term]                                             (recursive type)
       mu Ident . [Term]                                              (inductive type)
       wtype ( Ident : [Term] ) . [Term]                              (W type)
