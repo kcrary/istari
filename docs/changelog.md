@@ -1,6 +1,6 @@
 # Change log
 
-#### Development version
+#### 1.1
 
 - The typechecker deals better with the future modality, and with type
   inference for polymorphic, higher-order functions.

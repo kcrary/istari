@@ -14,7 +14,7 @@
 
 2. Obtain the distribution from Github:
 
-       git clone --recursive --branch v1.0.1 https://github.com/kcrary/istari.git istari
+       git clone --recursive --branch v1.1 https://github.com/kcrary/istari.git istari
 
 3. If you forgot to use the `--recursive` option in the previous step,
    populate the `cmlib` directory:
