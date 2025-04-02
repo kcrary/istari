@@ -167,9 +167,45 @@ The cases are `now` and `later`:
 This is employed automatically by the `induction` tactic on hypotheses
 of `bar` type.
 
-A corollary of induction says we can map a function through `bindbart`:
+Several corollaries of induction pertaining to `bindbart`:
 
     bindbart_map : forall (i : level) (a : U i) (b c : a -> U i) (e : bar a) .
                       (forall (x : a) . b x -> c x)
                       -> (bindbart x = e in b x)
                       -> bindbart x = e in c x
+
+    bindbart_shift_future_out : forall (i : level) (a : U i) .
+                                   forallfut (b : a -> U i) .
+                                     forall (e : bar a) .
+                                       (bindbart x = e in future (b x))
+                                       -> future (bindbart x = e in b x)
+
+    bindbart_shift_future_in : forall (i : level) (a : U i) .
+                                  forallfut (b : a -> U i) .
+                                    forall (e : bar a) .
+                                      future (bindbart x = e in b x)
+                                      -> bindbart x = e in future (b x)
+
+    bindbart_shift_future_iff : forall (i : level) (a : U i) .
+                                   forallfut (b : a -> U i) .
+                                     forall (e : bar a) .
+                                       (bindbart x = e in future (b x))
+                                         <-> future (bindbart x = e in b x)
+
+    bindbart_commute : forall
+                          (i : level)
+                          (a b : U i)
+                          (c : a -> b -> U i)
+                          (e1 : bar a)
+                          (e2 : bar b) .
+                          (bindbart x = e1 in bindbart y = e2 in c x y)
+                          -> bindbart y = e2 in bindbart x = e1 in c x y
+
+    bindbart_commute_iff : forall
+                              (i : level)
+                              (a b : U i)
+                              (c : a -> b -> U i)
+                              (e1 : bar a)
+                              (e2 : bar b) .
+                              (bindbart x = e1 in bindbart y = e2 in c x y)
+                                <-> (bindbart y = e2 in bindbart x = e1 in c x y)

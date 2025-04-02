@@ -1,5 +1,21 @@
 # Change log
 
+#### Development version
+
+- Tactic changes:
+
+  + The behavior of `revert` on hidden hypotheses has changed; it now
+    generates a `parametric` conclusion, rather than a squash under an
+    arrow.  The old behavior can be obtained by using `squashHidden`
+    first.
+
+  + `revert` now works on later hypotheses.
+
+- Library changes:
+
+  + `Bar` has additional lemmas.
+
+
 #### 1.1
 
 - The typechecker deals better with the future modality, and with type

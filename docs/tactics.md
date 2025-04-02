@@ -425,7 +425,7 @@ which appears in the `Hyp` structure.
 - `squashHidden /[hyp] ... [hyp]/`
 
   Turns hidden hypotheses of `A` into an unhidden hypotheses of 
-  `{ A }`.  There must be no dependencies on the hypothesis.
+  `{ A }`.  There must be no dependencies on the hypotheses.
 
 
 

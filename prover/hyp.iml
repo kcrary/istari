@@ -564,6 +564,16 @@ structure Hyp :> HYP =
          end
 
 
+      
+      (* paramapp x y --> paramapp x unavailable *)
+      val repairParamapp =
+         R.user $
+         R.new Prim.paramapp [] 2
+            (T.apply2 Prim.paramapp (T.Var 1) (T.Const Prim.unavailable))
+            (R.trans [R.unfold, R.beta 2])
+            (R.trans [R.unfold, R.beta 2])
+
+
       fun revert0 dep =
          let
             do (jud, dir) = withgoal
@@ -593,14 +603,51 @@ structure Hyp :> HYP =
                        refine (Rule.hypothesisOf 0)
                        ]
 
-              | SOME (J.Tmh a) =>
-                   refine (Rule.arrowElim (T.apply1 Prim.squash (T.Sub (a, T.shift1))) c)
+              | SOME (J.Tml a) =>
+                   refine (Rule.forallfutElim (T.Sub (a, T.shift1)) (T.Sub (c, T.Idot (0, T.Shift 2))) T.zero)
                    >>> [
                        refine (Rule.weaken 0 1)
-                       >> chdir dir',
+                       >>+
+                       chdir dir'
+                       >>+
+                       replaceConcl (T.apply2 Prim.forallfut a (T.Lam (SOME name, c))),
 
-                       refine (Rule.squashIntro (T.evar ()))
-                       >> refine (Rule.hypothesis 0)                             
+                       refine (Rule.hypothesisOf 0)
+                       ]
+
+              | SOME (J.Tmh a) =>
+                   (* Can't use parametricElim; the rule won't allow me to put a hidden variable in the extract. *)
+                   (* A (hidden) |- C *)
+                   refine (Rule.assert' 
+                              (T.apply2 Prim.parametric (T.Sub (a, T.shift1)) (T.Lam (SOME name, T.Sub (c, T.underShift 1 1))))
+                              (T.evar ()))
+                   >>> [
+                       refine (Rule.weaken 0 1)
+                       >>+
+                       chdir dir',
+
+                       (* A (hidden), parametric A[^] . C[0 . ^2] |- C[^] *)
+                       refine (Rule.inhabitant (T.evar ()) 
+                                  (T.apply2 Prim.paramapp T.zero (T.Const Prim.unavailable)))
+                       >>+
+                       (* A (hidden), parametric A[^] . C[0 . ^2] |- paramapp 0 unavailable : C[^] *)
+                       refine (Rule.unreduce
+                                  (T.apply2 Prim.ov (T.Sub (c, T.shift1)) (T.apply2 Prim.paramapp T.zero (T.Var 1)))
+                                  (R.within [2] repairParamapp))
+                       >>+
+                       (* A (hidden), parametric A[^] . C[0 . ^2] |- paramapp 0 1 : C[^] *)
+                       refine (Rule.parametricElimOf 
+                                  (T.Sub (a, T.Shift 2))
+                                  (T.Sub (c, T.underShift 1 2))
+                                  T.zero 
+                                  (T.Var 1))
+                       >>> [
+                           (* A (hidden), parametric A[^] . C[0 . ^2] |- 0 : parametric A[^2] . C[0 . ^3] *)
+                           refine (Rule.hypothesisOf 0),
+
+                           (* A (hidden), parametric A[^] . C[0 . ^2] |- 1 : A[^2] *)
+                           refine (Rule.hypothesisOf 1)
+                           ]
                        ]
 
               | SOME (J.Let m) =>

@@ -148,6 +148,16 @@ The cases are `now` and `later`:
 This is employed automatically by the `induction` tactic on hypotheses
 of `bar` type.
 
-A corollary of induction says we can map a function through `bindbart`:
+Several corollaries of induction pertaining to `bindbart`:
 
     bindbart_map : type:bindbart_map
+
+    bindbart_shift_future_out : type:bindbart_shift_future_out
+
+    bindbart_shift_future_in : type:bindbart_shift_future_in
+
+    bindbart_shift_future_iff : type:bindbart_shift_future_iff
+
+    bindbart_commute : type:bindbart_commute
+
+    bindbart_commute_iff : type:bindbart_commute_iff

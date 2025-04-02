@@ -1,5 +1,6 @@
 
 File.import "misc-load.iml";
+File.import "logic-load.iml";
 
 File.import "bar-aux.iml";
 
@@ -490,6 +491,90 @@ intro /[x] [IH] [H]/.
 split.
 apply /IH/ >> auto.
 qed ();
+
+
+
+lemma "bindbart_shift_future_out"
+/
+  forall i (a : U i) . forallfut (b : a -> U i) . forall (e : bar a) .
+    (bindbart x = e in future (b x))
+    -> future (bindbart x = e in b x)
+/;
+
+inference.
+intro /i a b/.
+apply /bar_iter/ >> reduce // >> auto.
+intro /[xb] [IH] [H]/.
+split.
+apply /IH/ >> auto.
+qed ();
+
+
+
+lemma "bindbart_shift_future_in"
+/
+  forall i (a : U i) . forallfut (b : a -> U i) . forall (e : bar a) .
+    future (bindbart x = e in b x)
+    -> bindbart x = e in future (b x)
+/;
+
+inference.
+intro /i a b/.
+apply /bar_iter/ >> reduce // >> auto.
+intro /[xb] [IH] [H]/.
+split.
+apply /IH/ >> auto.
+qed ();
+
+
+
+lemma "bindbart_shift_future_iff"
+/
+  forall i (a : U i) . forallfut (b : a -> U i) . forall (e : bar a) .
+    (bindbart x = e in future (b x))
+    <->
+    future (bindbart x = e in b x)
+/;
+
+inference.
+intro /i a b e/.
+split >> autoWith /bindbart_shift_future_in bindbart_shift_future_out/.
+qed ();
+
+
+
+lemma "bindbart_commute"
+/
+  forall i (a b : U i) (c : a -> b -> U i) (e1 : bar a) (e2 : bar b) .
+    (bindbart x = e1 in bindbart y = e2 in c x y)
+    -> bindbart y = e2 in bindbart x = e1 in c x y
+/;
+
+inference.
+intro /i a b c e1/.
+apply /bar_iter/ >> reduce // >> auto.
+intro /[yb] [IH] Hc/.
+rewrite /-> bindbart_shift_future_iff in Hc/.
+destruct /Hc/ /[H]/.
+split.
+apply /IH/ >> auto.
+qed ();
+
+
+
+lemma "bindbart_commute_iff"
+/
+  forall i (a b : U i) (c : a -> b -> U i) (e1 : bar a) (e2 : bar b) .
+    (bindbart x = e1 in bindbart y = e2 in c x y)
+    <->
+    (bindbart y = e2 in bindbart x = e1 in c x y)
+/;
+
+inference.
+intro /i a b c e1 e2/.
+split >> autoWith /bindbart_commute/.
+qed ();
+
 
 
 endModule ();
