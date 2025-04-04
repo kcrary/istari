@@ -960,6 +960,135 @@ apply tr_total_strict.
 Qed.
 
 
+Lemma parametricTotal_valid : parametricTotal_obligation.
+Proof.
+prepare.
+intros G a b m ext0 H.
+rewrite -> def_parametric in H.
+eapply tr_pi_total; eauto.
+eapply tr_conjoin_elim1; eauto.
+Qed.
+
+
+Lemma parametricStrict_valid : parametricStrict_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+rewrite -> def_parametric.
+apply tr_total_strict.
+  {
+  apply tr_conjoin_formation.
+    {
+    apply tr_pi_formation; auto.
+    }
+    
+    {
+    apply (tr_formation_weaken _ nzero).
+    apply tr_constfn_formation.
+    }
+  }
+
+  {
+  eapply tr_pi_total.
+  eapply tr_conjoin_elim1.
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  eauto.
+  }
+Qed.
+
+
+Lemma parametricfutTotal_valid : parametricfutTotal_obligation.
+Proof.
+prepare.
+intros G a b m ext0 H.
+rewrite -> def_parametricfut in H.
+eapply tr_pi_total; eauto.
+eapply tr_conjoin_elim1; eauto.
+Qed.
+
+
+Lemma parametricfutStrict_valid : parametricfutStrict_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+rewrite -> def_parametricfut.
+apply tr_total_strict.
+  {
+  apply tr_conjoin_formation.
+  2:{
+    apply (tr_formation_weaken _ nzero).
+    apply tr_constfn_formation.
+    }
+  apply tr_pi_formation; auto.
+    {
+    apply tr_semifut_formation; auto.
+    }
+
+    {
+    replace (deqtype b b) with (deqtype (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) b))).
+    2:{
+      simpsub.
+      rewrite -> subst_var0_sh1; auto.
+      }
+    apply (tr_semifut_elim_eqtype _ _ _ (subst sh1 a)).
+      {
+      eapply hypothesis; eauto using index_0.
+      }
+  
+      {
+      cbn.
+      eapply (weakening _ [_] []).
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+      cbn [length unlift].
+      simpsub.
+      cbn [List.app].
+      exact Ha.
+      }
+  
+      {
+      cbn.
+      eapply (weakening _ [_] [_]).
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+      cbn [length unlift].
+      simpsub.
+      cbn [List.app].
+      rewrite -> subst_var0_sh1.
+      exact Hb.
+      }
+    }
+  }
+
+  {
+  eapply tr_pi_total.
+  eapply tr_conjoin_elim1.
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  eauto.
+  }
+Qed.
+
+
 Lemma intersectStrict_valid : intersectStrict_obligation.
 Proof.
 prepare.
@@ -1407,6 +1536,72 @@ eapply tr_uptype_eta2; eauto.
 Qed.
 
 
+Lemma forallfutUptype_valid : forallfutUptype_obligation.
+Proof.
+prepare.
+intros G a b ext1 p Ha Hb.
+rewrite -> def_forallfut.
+apply tr_pi_uptype; auto.
+  {
+  apply tr_semifut_formation; auto.
+  }
+  
+  {
+  eapply tr_uptype_eta2; eauto.
+  replace (deq p p (uptype b)) with (deq (subst1 (var 0) (subst (dot (var 0) (sh 2)) p)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) p)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) (uptype b)))).
+  2:{
+    simpsub.
+    rewrite -> !subst_var0_sh1; auto.
+    }
+  apply (tr_semifut_elim _ _ _ (subst sh1 a)).
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    auto.
+    }
+
+    {
+    simpsub.
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> !subst_var0_sh1.
+    exact Hb.
+    }
+  }
+Qed.
+
+
 Lemma arrowUptype_valid : arrowUptype_obligation.
 Proof.
 prepare.
@@ -1432,6 +1627,48 @@ eapply tr_uptype_eta2; eauto.
 Qed.
 
 
+Lemma tr_conjoin_uptype :
+  forall G a b,
+    tr G (deq triv triv (uptype a))
+    -> tr G (deq triv triv (uptype b))
+    -> tr G (deq triv triv (uptype (conjoin a b))).
+Proof.
+prepare.
+intros G a b Ha Hb.
+unfold conjoin.
+apply tr_intersect_uptype.
+  {
+  apply tr_booltp_istype.
+  }
+apply (tr_uptype_eta2 _
+         (bite (var 0) (subst (under 0 sh1) triv) (subst (under 0 sh1) triv))
+         (bite (var 0) (subst (under 0 sh1) triv) (subst (under 0 sh1) triv))).
+apply (tr_booltp_eta_hyp _ []).
+  {
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  apply (tr_compute _ _ (uptype a) _ triv _ triv); auto using equiv_refl.
+  apply equiv_uptype.
+  apply steps_equiv.
+  apply star_one.
+  apply step_bite2.
+  }
+
+  {
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  apply (tr_compute _ _ (uptype b) _ triv _ triv); auto using equiv_refl.
+  apply equiv_uptype.
+  apply steps_equiv.
+  apply star_one.
+  apply step_bite3.
+  }
+Qed.
+
+
+
 Lemma intersectUptype_valid : intersectUptype_obligation.
 Proof.
 prepare.
@@ -1439,6 +1676,72 @@ intros G a b ext1 ext0 Ha Hb.
 rewrite -> def_intersect.
 apply tr_intersect_uptype; auto.
 eapply tr_uptype_eta2; eauto.
+Qed.
+
+
+Lemma intersectfutUptype_valid : intersectfutUptype_obligation.
+Proof.
+prepare.
+intros G a b ext1 p Ha Hb.
+rewrite -> def_intersectfut.
+apply tr_intersect_uptype; auto.
+  {
+  apply tr_semifut_formation; auto.
+  }
+  
+  {
+  eapply tr_uptype_eta2; eauto.
+  replace (deq p p (uptype b)) with (deq (subst1 (var 0) (subst (dot (var 0) (sh 2)) p)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) p)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) (uptype b)))).
+  2:{
+    simpsub.
+    rewrite -> !subst_var0_sh1; auto.
+    }
+  apply (tr_semifut_elim _ _ _ (subst sh1 a)).
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    auto.
+    }
+
+    {
+    simpsub.
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> !subst_var0_sh1.
+    exact Hb.
+    }
+  }
 Qed.
 
 
@@ -1892,6 +2195,72 @@ eapply tr_admiss_eta2; eauto.
 Qed.
 
 
+Lemma forallfutAdmiss_valid : forallfutAdmiss_obligation.
+Proof.
+prepare.
+intros G a b ext1 p Ha Hb.
+rewrite -> def_forallfut.
+apply tr_pi_admiss; auto.
+  {
+  apply tr_semifut_formation; auto.
+  }
+  
+  {
+  eapply tr_admiss_eta2; eauto.
+  replace (deq p p (admiss b)) with (deq (subst1 (var 0) (subst (dot (var 0) (sh 2)) p)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) p)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) (admiss b)))).
+  2:{
+    simpsub.
+    rewrite -> !subst_var0_sh1; auto.
+    }
+  apply (tr_semifut_elim _ _ _ (subst sh1 a)).
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    auto.
+    }
+
+    {
+    simpsub.
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> !subst_var0_sh1.
+    exact Hb.
+    }
+  }
+Qed.
+
+
 Lemma arrowAdmiss_valid : arrowAdmiss_obligation.
 Proof.
 prepare.
@@ -1924,6 +2293,72 @@ intros G a b ext1 ext0 Ha Hb.
 rewrite -> def_intersect.
 apply tr_intersect_admiss; auto.
 eapply tr_admiss_eta2; eauto.
+Qed.
+
+
+Lemma intersectfutAdmiss_valid : intersectfutAdmiss_obligation.
+Proof.
+prepare.
+intros G a b ext1 p Ha Hb.
+rewrite -> def_intersectfut.
+apply tr_intersect_admiss; auto.
+  {
+  apply tr_semifut_formation; auto.
+  }
+  
+  {
+  eapply tr_admiss_eta2; eauto.
+  replace (deq p p (admiss b)) with (deq (subst1 (var 0) (subst (dot (var 0) (sh 2)) p)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) p)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) (admiss b)))).
+  2:{
+    simpsub.
+    rewrite -> !subst_var0_sh1; auto.
+    }
+  apply (tr_semifut_elim _ _ _ (subst sh1 a)).
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    cbn.
+    eapply (weakening _ [_] []).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    auto.
+    }
+
+    {
+    simpsub.
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> !subst_var0_sh1.
+    exact Hb.
+    }
+  }
 Qed.
 
 
@@ -2704,6 +3139,164 @@ apply tr_sigma_intro.
   {
   apply total_rhs_formation.
   apply tr_pi_formation; auto.
+  }
+Qed.
+
+
+Hint Rewrite def_parametric : prepare.
+
+Lemma parametricTotal'_valid : parametricTotal'_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+assert (tr (hyp_tm (conjoin (pi a b) constfn) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply (tr_pi_total _ (subst sh1 a) (subst (under 1 sh1) b)).
+  eapply tr_conjoin_elim1.
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  reflexivity.
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_conjoin_formation.
+    {
+    apply tr_pi_formation; auto.
+    }
+
+    {
+    apply (tr_formation_weaken _ nzero).
+    apply tr_constfn_formation.
+    }
+  }
+
+  {
+  simpsub.
+  rewrite -> subst_var0_sh1.
+  apply tr_pi_intro; auto.
+  apply tr_conjoin_formation.
+    {
+    apply tr_pi_formation; auto.
+    }
+
+    {
+    apply (tr_formation_weaken _ nzero).
+    apply tr_constfn_formation.
+    }
+  }
+
+  {
+  apply total_rhs_formation.
+  apply tr_conjoin_formation.
+    {
+    apply tr_pi_formation; auto.
+    }
+
+    {
+    apply (tr_formation_weaken _ nzero).
+    apply tr_constfn_formation.
+    }
+  }
+Qed.
+
+
+Hint Rewrite def_parametricfut : prepare.
+
+Lemma parametricfutTotal'_valid : parametricfutTotal'_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+assert (tr (hyp_tm (conjoin (pi (semifut a) b) constfn) :: G) (deq triv triv (halts (var 0)))) as Hhalts.
+  {
+  apply (tr_pi_total _ (subst sh1 (semifut a)) (subst (under 1 sh1) b)).
+  eapply tr_conjoin_elim1.
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  reflexivity.
+  }
+assert (tr G (deqtype (pi (semifut a) b) (pi (semifut a) b))) as Hform.
+  {
+  apply tr_pi_formation; auto.
+    {
+    apply tr_semifut_formation; auto.
+    }
+  
+    {
+    replace (deqtype b b) with (deqtype (subst1 (var 0) (subst (dot (var 0) (sh 2)) b)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) b))).
+    2:{
+      simpsub.
+      rewrite -> subst_var0_sh1; auto.
+      }
+    apply (tr_semifut_elim_eqtype _ _ _ (subst sh1 a)).
+      {
+      eapply hypothesis; eauto using index_0.
+      }
+  
+      {
+      cbn.
+      eapply (weakening _ [_] []).
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+      cbn [length unlift].
+      simpsub.
+      cbn [List.app].
+      exact Ha.
+      }
+  
+      {
+      cbn.
+      eapply (weakening _ [_] [_]).
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length unlift].
+        simpsub.
+        auto.
+        }
+      cbn [length unlift].
+      simpsub.
+      cbn [List.app].
+      rewrite -> subst_var0_sh1.
+      exact Hb.
+      }
+    }
+  }
+apply tr_sigma_intro.
+  {
+  apply tr_total_strict; auto.
+  apply tr_conjoin_formation; auto.
+  apply (tr_formation_weaken _ nzero).
+  apply tr_constfn_formation.
+  }
+
+  {
+  simpsub.
+  rewrite -> subst_var0_sh1.
+  apply tr_pi_intro; auto.
+  apply tr_conjoin_formation; auto.
+  apply (tr_formation_weaken _ nzero).
+  apply tr_constfn_formation.
+  }
+
+  {
+  apply total_rhs_formation; auto.
+  apply tr_conjoin_formation; auto.
+  apply (tr_formation_weaken _ nzero).
+  apply tr_constfn_formation.
   }
 Qed.
 

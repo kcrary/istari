@@ -1885,3 +1885,665 @@ apply tr_guard_intro.
   eapply hypothesis; eauto using index_0.
   }
 Qed.
+
+
+(* Conjoin *)
+
+Lemma tr_conjoin_formation :
+  forall G a a' b b',
+    tr G (deqtype a a')
+    -> tr G (deqtype b b')
+    -> tr G (deqtype (conjoin a b) (conjoin a' b')).
+Proof.
+intros G a a' b b' Ha Hb.
+apply tr_intersect_formation.
+  {
+  apply tr_booltp_istype.
+  }
+apply tr_booltp_elim_eqtype.
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  eapply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  auto.
+  }
+
+  {
+  eapply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  auto.
+  }
+Qed.
+
+
+Lemma tr_conjoin_formation_univ :
+  forall G a a' b b' lv,
+    tr G (deq a a' (univ lv))
+    -> tr G (deq b b' (univ lv))
+    -> tr G (deq (conjoin a b) (conjoin a' b') (univ lv)).
+Proof.
+intros G a a' b b' lv Ha Hb.
+assert (tr G (deq lv lv pagetp)) as Hlv.
+  {
+  apply tr_univ_formation_invert.
+  eapply tr_inhabitation_formation; eauto.
+  }
+apply tr_intersect_formation_univ.
+  {
+  apply (tr_univ_cumulative _ Defined.nzero); auto.
+    {
+    apply tr_booltp_formation_univ.
+    }
+
+    {
+    rewrite -> leqpagetp_nzero_equiv.
+    apply tr_unittp_intro.
+    }
+  }
+replace (univ (subst sh1 lv)) with (subst1 (var 0) (univ (subst (sh 2) lv))) by (simpsub; auto).
+apply tr_booltp_elim.
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  eapply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  auto.
+  }
+
+  {
+  eapply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  auto.
+  }
+Qed.
+
+
+Lemma tr_conjoin_intro :
+  forall G a b m n,
+    tr G (deq m n a)
+    -> tr G (deq m n b)
+    -> tr G (deq m n (conjoin a b)).
+Proof.
+intros G a b m n Ha Hb.
+unfold conjoin.
+apply tr_intersect_intro.
+  {
+  apply tr_booltp_istype.
+  }
+apply tr_equal_elim.
+apply (tr_equal_eta2 _#4 
+         (bite (var 0) (subst (under 0 sh1) triv) (subst (under 0 sh1) triv))
+         (bite (var 0) (subst (under 0 sh1) triv) (subst (under 0 sh1) triv))).
+apply (tr_booltp_eta_hyp _ []).
+  {
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  apply tr_equal_intro.
+  apply (tr_compute _ _ a _ m _ n); auto using equiv_refl.
+  apply steps_equiv.
+  apply star_one.
+  apply step_bite2.
+  }
+
+  {
+  cbn [length].
+  simpsub.
+  cbn [List.app].
+  apply tr_equal_intro.
+  apply (tr_compute _ _ b _ m _ n); auto using equiv_refl.
+  apply steps_equiv.
+  apply star_one.
+  apply step_bite3.
+  }
+Qed.
+
+
+Lemma tr_conjoin_elim1 :
+  forall G a b m n,
+    tr G (deq m n (conjoin a b))
+    -> tr G (deq m n a).
+Proof.
+intros G a b m n H.
+unfold conjoin in H.
+apply (tr_compute _ _ (bite btrue a b) _ m _ n); auto using equiv_refl.
+  {
+  apply equiv_symm.
+  apply steps_equiv.
+  apply star_one.
+  apply step_bite2.
+  }
+replace (bite btrue a b) with (subst1 btrue (bite (var 0) (subst sh1 a) (subst sh1 b))) by (simpsub; auto).
+apply (tr_intersect_elim _ booltp _ _ _ _ btrue); auto.
+apply tr_booltp_intro_btrue.
+Qed.
+
+
+Lemma tr_conjoin_elim2 :
+  forall G a b m n,
+    tr G (deq m n (conjoin a b))
+    -> tr G (deq m n b).
+Proof.
+intros G a b m n H.
+unfold conjoin in H.
+apply (tr_compute _ _ (bite bfalse a b) _ m _ n); auto using equiv_refl.
+  {
+  apply equiv_symm.
+  apply steps_equiv.
+  apply star_one.
+  apply step_bite3.
+  }
+replace (bite bfalse a b) with (subst1 bfalse (bite (var 0) (subst sh1 a) (subst sh1 b))) by (simpsub; auto).
+apply (tr_intersect_elim _ booltp _ _ _ _ bfalse); auto.
+apply tr_booltp_intro_bfalse.
+Qed.
+
+
+Lemma tr_conjoin_formation_invert1 :
+  forall G a a' b b',
+    tr G (deqtype (conjoin a b) (conjoin a' b'))
+    -> tr G (deqtype a a').
+Proof.
+intros G a a' b b' H.
+unfold conjoin in H.
+assert (forall (x y : @term obj), equiv x (bite btrue x y)) as Hequiv.
+  {
+  intros x y.
+  apply equiv_symm.
+  apply steps_equiv.
+  apply star_one.
+  apply step_bite2.
+  }
+rewrite -> (Hequiv a b).
+rewrite -> (Hequiv a' b').
+clear Hequiv.
+replace (deqtype (bite btrue a b) (bite btrue a' b')) with (substj (dot btrue id) (deqtype (bite (var 0) (subst sh1 a) (subst sh1 b)) (bite (var 0) (subst sh1 a') (subst sh1 b')))) by (simpsub; auto).
+apply (tr_generalize _ booltp).
+  {
+  apply tr_booltp_intro_btrue.
+  }
+eapply tr_intersect_formation_invert2; eauto.
+Qed.
+
+
+(* Subtyping lemmas *)
+
+Lemma tr_semifut_sub :
+  forall G a a',
+    tr (promote G) (dsubtype a a')
+    -> tr G (dsubtype (semifut a) (semifut a')).
+Proof.
+intros G a a' Ha.
+apply tr_subtype_intro.
+  {
+  apply tr_semifut_formation.
+  eapply tr_subtype_istype1; eauto.
+  }
+
+  {
+  apply tr_semifut_formation.
+  eapply tr_subtype_istype2; eauto.
+  }
+simpsub.
+replace (deq (var 0) (var 0) (semifut (subst sh1 a'))) with (deq (subst1 (var 0) (var 0)) (subst1 (var 0) (var 0)) (subst1 (var 0) (subst (sh 2) (semifut a')))) by (simpsub; auto).
+apply (tr_semifut_elim _ _ _ (subst sh1 a)).
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  cbn.
+  eapply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_subtype_istype1; eauto.
+  }
+simpsub.
+eapply (weakening _ [_] [_]).
+  {
+  cbn [length unlift].
+  simpsub.
+  auto.
+  }
+
+  {
+  cbn [length unlift].
+  simpsub.
+  auto.
+  }
+cbn [length unlift].
+simpsub.
+cbn [List.app].
+apply tr_semifut_intro.
+cbn.
+apply (tr_subtype_elim _ (subst sh1 a)).
+  {
+  eapply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  exact Ha.
+  }
+
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+Qed.
+
+
+Lemma tr_pi_sub :
+  forall G a a' b b',
+    tr G (dsubtype a' a)
+    -> tr (hyp_tm a' :: G) (dsubtype b b')
+    -> tr (hyp_tm a :: G) (deqtype b b)
+    -> tr G (dsubtype (pi a b) (pi a' b')).
+Proof.
+intros G a a' b b' Hsuba Hsubb Hb.
+apply tr_subtype_intro.
+  {
+  apply tr_pi_formation; auto.
+  eapply tr_subtype_istype2; eauto.
+  }
+
+  {
+  apply tr_pi_formation.
+    {
+    eapply tr_subtype_istype1; eauto.
+    }
+
+    {
+    eapply tr_subtype_istype2; eauto.
+    }
+  }
+simpsub.
+eapply tr_pi_ext; eauto.
+3:{
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  auto.
+  }
+
+3:{
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+  
+    {
+    simpsub.
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_subtype_istype1; eauto.
+  }
+
+  {
+  simpsub.
+  cbn [Nat.add].
+  apply (tr_subtype_elim _ (subst (dot (var 0) (sh 2)) b)).
+    {
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> !subst_var0_sh1; auto.
+    }
+
+    {
+    eapply tr_pi_elim'.
+      {
+      eapply hypothesis; eauto using index_S, index_0.
+      simpsub; auto.
+      }
+  
+      {
+      eapply (tr_subtype_elim _ (subst (sh 2) a')).
+        {
+        eapply (weakening _ [_; _] []).
+          {
+          simpsub; auto.
+          }
+  
+          {
+          cbn [length unlift].
+          simpsub.
+          reflexivity.
+          }
+        cbn [length unlift].
+        simpsub.
+        cbn [List.app].
+        auto.
+        }
+  
+        {
+        eapply hypothesis; eauto using index_0.
+        simpsub; auto.
+        }
+      }
+      
+      {
+      simpsub.
+      cbn [Nat.add].
+      simpsub.
+      auto.
+      }
+    }
+  }
+Qed.
+
+
+Lemma tr_intersect_sub :
+  forall G a a' b b',
+    tr G (dsubtype a' a)
+    -> tr (hyp_tm a' :: G) (dsubtype b b')
+    -> tr (hyp_tm a :: G) (deqtype b b)
+    -> tr G (dsubtype (intersect a b) (intersect a' b')).
+Proof.
+intros G a a' b b' Hsuba Hsubb Hb.
+apply tr_subtype_intro.
+  {
+  apply tr_intersect_formation; auto.
+  eapply tr_subtype_istype2; eauto.
+  }
+
+  {
+  apply tr_intersect_formation.
+    {
+    eapply tr_subtype_istype1; eauto.
+    }
+
+    {
+    eapply tr_subtype_istype2; eauto.
+    }
+  }
+simpsub.
+cbn [Nat.add].
+apply tr_intersect_intro.
+  {
+  apply (weakening _ [_] []).
+    {
+    simpsub.
+    auto.
+    }
+  
+    {
+    simpsub.
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  eapply tr_subtype_istype1; eauto.
+  }
+
+  {
+  simpsub.
+  cbn [Nat.add].
+  apply (tr_subtype_elim _ (subst (dot (var 0) (sh 2)) b)).
+    {
+    eapply (weakening _ [_] [_]).
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    rewrite -> !subst_var0_sh1; auto.
+    }
+
+    {
+    replace (subst (dot (var 0) (sh 2)) b) with (subst1 (var 0) (subst (dot (var 0) (sh 3)) b)) by (simpsub; reflexivity).
+    apply (tr_intersect_elim _ (subst (sh 2) a) _ _ _ (var 0) (var 0)).
+      {
+      eapply hypothesis; eauto using index_S, index_0.
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      eapply (tr_subtype_elim _ (subst (sh 2) a')).
+        {
+        eapply (weakening _ [_; _] []).
+          {
+          simpsub; auto.
+          }
+  
+          {
+          cbn [length unlift].
+          simpsub.
+          reflexivity.
+          }
+        cbn [length unlift].
+        simpsub.
+        cbn [List.app].
+        auto.
+        }
+  
+        {
+        eapply hypothesis; eauto using index_0.
+        simpsub; auto.
+        }
+      }
+    }
+  }
+Qed.
+
+
+Lemma tr_conjoin_sub_right :
+  forall G a b b',
+    tr G (dsubtype a b)
+    -> tr G (dsubtype a b')
+    -> tr G (dsubtype a (conjoin b b')).
+Proof.
+intros G a b b' Hsub Hsub'.
+apply tr_subtype_intro.
+  {
+  eapply tr_subtype_istype1; eauto.
+  }
+
+  {
+  apply tr_conjoin_formation.
+    {
+    eapply tr_subtype_istype2; eauto.
+    }
+
+    {
+    eapply tr_subtype_istype2; eauto.
+    }
+  }
+simpsub.
+apply tr_conjoin_intro.
+  {
+  apply (tr_subtype_elim _ (subst sh1 a)).
+    {
+    eapply (weakening _ [_] []).
+      {
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    auto.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+  }
+
+  {
+  apply (tr_subtype_elim _ (subst sh1 a)).
+    {
+    eapply (weakening _ [_] []).
+      {
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [length unlift].
+      simpsub.
+      auto.
+      }
+    cbn [length unlift].
+    simpsub.
+    cbn [List.app].
+    auto.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+  }
+Qed.
+
+
+Lemma tr_conjoin_sub_left1 :
+  forall G a b,
+    tr G (deqtype a a)
+    -> tr G (deqtype b b)
+    -> tr G (dsubtype (conjoin a b) a).
+Proof.
+intros G a b Ha Hb.
+apply tr_subtype_intro; auto.
+  {
+  apply tr_conjoin_formation; auto.
+  }
+apply (tr_conjoin_elim1 _ _ (subst sh1 b)).
+eapply hypothesis; eauto using index_0.
+simpsub.
+auto.
+Qed.
+
+
+Lemma tr_conjoin_sub_left2 :
+  forall G a b,
+    tr G (deqtype a a)
+    -> tr G (deqtype b b)
+    -> tr G (dsubtype (conjoin a b) b).
+Proof.
+intros G a b Ha Hb.
+apply tr_subtype_intro; auto.
+  {
+  apply tr_conjoin_formation; auto.
+  }
+apply (tr_conjoin_elim2 _ (subst sh1 a)).
+eapply hypothesis; eauto using index_0.
+simpsub.
+auto.
+Qed.

@@ -408,13 +408,13 @@ which appears in the `Hyp` structure.
 
   + `revertDep /[hyp] ... [hyp]/`
 
-    As `revert` except it always uses `forall`, even when an arrow
+    As `revert` except it uses `forall` in cases when an arrow
     would suffice.
 
   + `revert0 [bool]`
 
     Moves the last hypothesis into the conclusion.  If `bool` is true,
-    then it uses `forall` even if an arrow would suffice.
+    then it uses `forall` when an arrow would suffice.
 
 
 - `set /[name x]/ /[term M]/`

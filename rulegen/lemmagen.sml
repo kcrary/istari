@@ -179,6 +179,13 @@ structure Lemmagen :> LEMMAGEN =
                 write ")"
                 )
 
+           | Tmlh a =>
+                (
+                write "(hyp_tml ";
+                writeTerm write a;
+                write ")"
+                )
+
            | Tp => write "hyp_tp"
            | Tpl => write "hyp_tpl"
            | Tph => write "hyp_tp")
@@ -202,6 +209,7 @@ structure Lemmagen :> LEMMAGEN =
       fun isHidden h =
          (case h of
              Tmh _ => true
+           | Tmlh _ => true
            | Tph => true
            | _ => false)
 

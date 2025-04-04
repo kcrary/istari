@@ -28,6 +28,7 @@ structure Rule =
          Tm of term
        | Tml of term
        | Tmh of term
+       | Tmlh of term
        | Tp
        | Tpl
        | Tph

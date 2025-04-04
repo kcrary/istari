@@ -250,6 +250,13 @@ structure Docgen :> DOCGEN =
                 write "]"
                 )
 
+           | Tmlh a => 
+                (
+                write "\\underline{[";
+                writeTerm write precMax a;
+                write "]}"
+                )
+
            | Tp =>
                 write "{\\sf type}"
 

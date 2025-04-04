@@ -2,19 +2,26 @@
 
 #### Development version
 
+- One can now destruct a hidden future hypothesis.  The result will be
+  a hypothesis that is both later and hidden.
+
 - Tactic changes:
 
   + The behavior of `revert` on hidden hypotheses has changed; it now
-    generates a `parametric` conclusion, rather than a squash under an
+    generates an `intersect` conclusion, rather than a squash under an
     arrow.  The old behavior can be obtained by using `squashHidden`
     first.
 
-  + `revert` now works on later hypotheses.
+  + `revert` now works on later and later-hidden hypotheses.
 
 - Library changes:
 
   + `Bar` has additional lemmas.
 
+- Added rules `intersectfutIntro`, and `futureLeftHidden`. Also added
+  rules governing `parametricfut`; and totality, strictness, uptype,
+  and admissibility rules for `forallfut`, `intersectfut`,
+  `parametric`, and `parametricfut`.
 
 #### 1.1
 

@@ -14,6 +14,226 @@ structure P = ReductionProver;
 
 
 
+lemma "parametricfut_compat_ap"
+/
+  forall i (a : U i) (b c : forallfut (_ : a) . U i) (xf : future a) 
+    (f : parametricfut (x : a) . b x -> c x) .
+      let next x = xf
+      in
+        forall (m n : b x) .
+          m = n : b x
+          -> f Ap x m = f Ap x n : c x
+/;
+
+inference.
+intro /i a b c [x] f m n Heq/.
+compat.
+hyp /Heq/.
+qed ();
+
+
+
+lemma "parametricfut_elim"
+/
+  forall i (a : U i) (b : forallfut (_ : a) . U i) (xf : future a) (f : parametricfut (x : a) . b x) .
+    let next x = xf
+    in
+      f Ap x : b x
+/;
+
+inference.
+intro /i a b [x] f/.
+reduce //.
+typecheck.
+qed ();
+
+
+
+lemma "parametricfut_intro"
+/
+  forall i (a : U i) (b : a -> U i) .
+    (forall (x : future a) . let next x' = x in future (b x'))
+    -> parametricfut (x : a) . { future (b x) }
+/;
+
+inference.
+intro /i a b Hall/.
+intro /x/.
+split.
+apply /Hall (next x)/.
+qed ();
+
+
+
+lemma "parametricfut_intro'"
+/
+  forall i (a : U i) (b : a -> U i) .
+    (forall (x : future a) . let next x' = x in future (b x'))
+    -> parametricfut (x : a) . future unit
+/;
+
+inference.
+intro /i a b Hall/.
+intro /x/.
+split.
+split.
+qed ();
+
+
+
+lemma "parametricfut_intro_of"
+/
+  forall i (a : U i) (b : a -> U i)
+    (f : parametric (x : future a) . let next x' = x in future (b x')) .
+      f : parametricfut (x : a) . future (b x)
+/;
+
+inference.
+intro /i a b f/.
+introOf /x/.
+unfold /paramapp/.
+fold /f Ap (next x)/.
+typecheck.
+qed ();
+    
+
+
+lemma "parametricfut_intro_eq"
+/
+  forall i (a : U i) (b : a -> U i)
+    (f g : parametric (x : future a) . let next x' = x in future (b x')) .
+      (forall (x : future a) . let next x' = x in f Ap x' = g Ap x' : future (b x'))
+      -> f = g : (parametricfut (x : a) . future (b x))
+/;
+
+inference.
+intro /i a b f g/.
+so /parametricfut_intro_of _ _ _ f/ /Hoff/.
+so /parametricfut_intro_of _ _ _ g/ /Hofg/.
+introRaw /Heq/.
+  {
+  introForm /[x]/.
+  reduce //.
+  infer /f Ap (next x)/ /Hoffx/.
+  infer /g Ap (next x)/ /Hofgx/.
+  reduce /Hoffx Hofgx/.
+  unfold /paramapp in Hoffx in Hofgx/.
+  fold /f Ap x in Hoffx/.
+  fold /g Ap x in Hofgx/.
+  typecheck.
+  }
+introEq /x/.
+apply /Heq (next x)/.
+qed ();
+    
+
+
+lemma "parametricfut_ext"
+/
+  forall i (a : U i) (b : a -> U i)
+    (f g : parametric (x : future a) . let next x' = x in future (b x')) .
+      (forall (x : future a) . let next x' = x in f Ap x' = g Ap x' : future (b x'))
+      -> f = g : (parametricfut (x : a) . future (b x))
+/;
+
+inference.
+intro /i a b f g/.
+so /parametricfut_intro_of _ _ _ f/ /Hoff/.
+so /parametricfut_intro_of _ _ _ g/ /Hofg/.
+introRaw /Heq/.
+  {
+  introForm /[x]/.
+  reduce //.
+  infer /f Ap (next x)/ /Hoffx/.
+  infer /g Ap (next x)/ /Hofgx/.
+  reduce /Hoffx Hofgx/.
+  unfold /paramapp in Hoffx in Hofgx/.
+  fold /f Ap x in Hoffx/.
+  fold /g Ap x in Hofgx/.
+  typecheck.
+  }
+extensionality.
+reintro /x/.
+apply /Heq (next x)/.
+qed ();
+    
+
+
+lemma "destruct_hidden_future"
+/
+  forall i . forallfut (a : U i) . forall (b : forallfut (_ : a) . U i) .
+    (intersectfut (x : a) . future (b x))
+    -> intersect (x : future a) . let next x' = x in future (b x')
+/;
+
+inference.
+intro /i a b Hall x/.
+destruct /x/ /[x]/.
+reduce //.
+apply /Hall ap x/.
+qed ();
+
+
+
+lemma "squash_hidden_later"
+/
+  forall i (a : U i) (b : a -> U i) (c : U i) (x y : a) .
+    intersectfut (_ : b x) (_ : b y) .
+    c -> future ({ b x } & { b y })
+/;
+
+intro /i a b c x y Hx Hy Hc/.
+squashHidden /Hx Hy/.
+auto.
+qed ();
+
+
+
+lemma "squash_hidden_dep"
+/
+  forall i (a : U i) (b : a -> U i) .
+    intersect (x : a) . b x
+/;
+
+inference.
+intro /i a b x/.
+shouldfail $ squashHidden /x/.
+Prover.abandon ();
+
+
+
+lemma "intersectfut_intro"
+/
+  forall i (a : U i) (b : a -> U i) .
+    (forall (x : future a) . let next x' = x in future (b x'))
+    -> intersectfut (x : a) . { future (b x) }
+/;
+
+inference.
+intro /i a b Hall/.
+intro /x/.
+split.
+apply /Hall (next x)/.
+qed ();
+
+
+
+lemma "intersectfut_intro'"
+/
+  forall i (a : U i) (b : a -> U i) .
+    (forall (x : future a) . let next x' = x in future (b x'))
+    -> intersectfut (x : a) . future unit
+/;
+
+inference.
+intro /i a b Hall/.
+intro /x/.
+split.
+split.
+qed ();
+
+
+
 lemma "revert_hidden"
 /
   forall i (a : U i) (b : a -> U i) . 
@@ -26,8 +246,7 @@ intro /i a b Hall x/.
 revert /i a b Hall x/.
 intro /i a b Hall x/.
 revert /i a b Hall x/.
-intro /i a b Hall x/.
-exact /Hall ap x/.
+auto.
 qed ();
 
 
@@ -44,6 +263,22 @@ intro /i a b Hall [x]/.
 reduce //.
 revert /i a b Hall x/.
 auto.
+qed ();
+
+
+
+lemma "revert_later_hidden"
+/
+  forall i . forallfut (a : U i) . forall (b : forallfut (_ : a) . U i) .
+    (intersect (x : future a) . let next x' = x in future (b x'))
+    -> intersectfut (x : a) . future (b x)
+/;
+
+inference.
+intro /i a b Hall x/.
+revert /i a b Hall x/.
+intro /i a b Hall x/.
+apply /Hall ap (next x)/.
 qed ();
 
 

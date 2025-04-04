@@ -616,38 +616,27 @@ structure Hyp :> HYP =
                        ]
 
               | SOME (J.Tmh a) =>
-                   (* Can't use parametricElim; the rule won't allow me to put a hidden variable in the extract. *)
-                   (* A (hidden) |- C *)
-                   refine (Rule.assert' 
-                              (T.apply2 Prim.parametric (T.Sub (a, T.shift1)) (T.Lam (SOME name, T.Sub (c, T.underShift 1 1))))
-                              (T.evar ()))
+                   refine (Rule.intersectElim (T.Sub (a, T.shift1)) (T.Sub (c, T.Idot (0, T.Shift 2))) T.zero)
                    >>> [
                        refine (Rule.weaken 0 1)
                        >>+
-                       chdir dir',
-
-                       (* A (hidden), parametric A[^] . C[0 . ^2] |- C[^] *)
-                       refine (Rule.inhabitant (T.evar ()) 
-                                  (T.apply2 Prim.paramapp T.zero (T.Const Prim.unavailable)))
+                       chdir dir'
                        >>+
-                       (* A (hidden), parametric A[^] . C[0 . ^2] |- paramapp 0 unavailable : C[^] *)
-                       refine (Rule.unreduce
-                                  (T.apply2 Prim.ov (T.Sub (c, T.shift1)) (T.apply2 Prim.paramapp T.zero (T.Var 1)))
-                                  (R.within [2] repairParamapp))
-                       >>+
-                       (* A (hidden), parametric A[^] . C[0 . ^2] |- paramapp 0 1 : C[^] *)
-                       refine (Rule.parametricElimOf 
-                                  (T.Sub (a, T.Shift 2))
-                                  (T.Sub (c, T.underShift 1 2))
-                                  T.zero 
-                                  (T.Var 1))
-                       >>> [
-                           (* A (hidden), parametric A[^] . C[0 . ^2] |- 0 : parametric A[^2] . C[0 . ^3] *)
-                           refine (Rule.hypothesisOf 0),
+                       replaceConcl (T.apply2 Prim.intersect a (T.Lam (SOME name, c))),
 
-                           (* A (hidden), parametric A[^] . C[0 . ^2] |- 1 : A[^2] *)
-                           refine (Rule.hypothesisOf 1)
-                           ]
+                       refine (Rule.hypothesisOf 0)
+                       ]
+
+              | SOME (J.Tmlh a) =>
+                   refine (Rule.intersectfutElim (T.Sub (a, T.shift1)) (T.Sub (c, T.Idot (0, T.Shift 2))) T.zero)
+                   >>> [
+                       refine (Rule.weaken 0 1)
+                       >>+
+                       chdir dir'
+                       >>+
+                       replaceConcl (T.apply2 Prim.intersectfut a (T.Lam (SOME name, c))),
+
+                       refine (Rule.hypothesisOf 0)
                        ]
 
               | SOME (J.Let m) =>
@@ -852,7 +841,25 @@ structure Hyp :> HYP =
                               >>+
                               refine (Rule.hypothesis i),
               
-                              refine (Rule.weaken (i+1) 1)
+                              cut (setFailure ("dependency exists on hypothesis " ^ Symbol.toValue name)
+                                      (refine (Rule.weaken (i+1) 1)))
+                              >>+
+                              refine (Rule.exchange 0 1 i)
+                              >>+
+                              squashHiddenLoop rest
+                              ]
+
+                     | J.Tmlh a =>
+                          refine (Rule.assertLater
+                                     (T.apply1 Prim.squash (T.Sub (a, T.Shift (i+1))))
+                                     (T.evar ()))
+                          >>> [
+                              refine (Rule.squashIntro (T.evar ()))
+                              >>+
+                              refine (Rule.hypothesis i),
+              
+                              cut (setFailure ("dependency exists on hypothesis " ^ Symbol.toValue name)
+                                      (refine (Rule.weaken (i+1) 1)))
                               >>+
                               refine (Rule.exchange 0 1 i)
                               >>+
@@ -1003,6 +1010,7 @@ structure Hyp :> HYP =
                       J.Tm a => a
                     | J.Tml a => a
                     | J.Tmh a => a
+                    | J.Tmlh a => a
                     | J.Let a => a
                     | J.Tp => T.Triv
                     | J.Tpl => T.Triv

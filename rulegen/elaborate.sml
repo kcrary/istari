@@ -99,6 +99,8 @@ structure Elaborate :> ELABORATE =
 
            | S.Tmh a => traverseTerm d false scope a
 
+           | S.Tmlh a => traverseTerm d false scope a
+
            | S.Tp => d
 
            | S.Tpl => d
@@ -330,6 +332,8 @@ structure Elaborate :> ELABORATE =
            | S.Tml a => Tml (elabTerm d false scope a)
 
            | S.Tmh a => Tmh (elabTerm d false scope a)
+
+           | S.Tmlh a => Tmlh (elabTerm d false scope a)
 
            | S.Tp => Tp
 

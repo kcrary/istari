@@ -884,6 +884,30 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                   ])\
          /
 
+      val parametricfutExt =
+         goalCaseT
+         /
+         \Prim.eq\ ($as (\Prim.parametricfut\ ? (fn ? . ?))) ? ? =>
+         \(fnc ab a binder b m n =>
+              refine (Rule.parametricfutExt' a (T.Const Prim.void) (T.Const Prim.void) b (T.evar ()) (T.evar ()) m n)
+              >>> [
+                  idtacM Secondary,
+
+                  attempt
+                     (refine (Rule.parametricIntroOfForall (T.evar ()) (T.evar ()) (T.evar ()))
+                      >>> [IntroTactic.proveLambda, Irrelevance.proveIrrelevant])
+                     >> idtacM Secondary,
+
+                  attempt
+                     (refine (Rule.parametricIntroOfForall (T.evar ()) (T.evar ()) (T.evar ()))
+                      >>> [IntroTactic.proveLambda, Irrelevance.proveIrrelevant])
+                     >> idtacM Secondary,
+
+                  withgoal
+                  (fn (_, dir) => chdir (D.bindVary dir binder) >>+ idtacM Primary)
+                  ])\
+         /
+
       val arrowExt =
          goalCaseT
          /
@@ -1060,6 +1084,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             (Prim.tarrow, tkarrowExt Rule.tarrowExt),
             (Prim.karrow, tkarrowExt Rule.karrowExt),
             (Prim.parametric, parametricExt),
+            (Prim.parametricfut, parametricfutExt),
             (Prim.intersect, intersectExt),
             (Prim.intersectfut, intersectfutExt),
             (Prim.iforall, iforallExt),
@@ -1191,6 +1216,50 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                      ],
 
                  refine (Rule.parametricElimOf 
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.under 1 T.shift1))
+                            (T.Sub (n, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 1) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+                 
+                 withgoal
+                 (fn (_, dir) =>
+                     chdir (D.bindh dir binder)
+                     >>+ refine (Rule.weaken 3 2) 
+                     >>+ tac)
+                 ]
+             ]
+
+
+      fun parametricfutExtAuto binder a b m n tac =
+         refine (Rule.parametricfutExt a b m n)
+         >>> [
+             (* promote |- A : type *)
+             refine (Rule.weaken 0 2)
+             >>+
+             idtacM Secondary,
+
+             refine (Rule.hypothesis 1) >> done,
+             refine (Rule.hypothesis 0) >> done,
+             
+             assert2 
+                (T.apply2 Prim.ov b (T.apply2 Prim.paramapp (T.Sub (m, T.shift1)) T.zero))
+                (T.apply2 Prim.ov b (T.apply2 Prim.paramapp (T.Sub (n, T.shift1)) T.zero))
+             >>> [
+                 refine (Rule.parametricfutElimOf 
+                            (T.Sub (a, T.shift1))
+                            (T.Sub (b, T.under 1 T.shift1))
+                            (T.Sub (m, T.shift1))
+                            T.zero)
+                 >>> [
+                     refine (Rule.hypothesis 2) >> done,
+                     refine (Rule.hypothesisOf 0) >> done
+                     ],
+
+                 refine (Rule.parametricfutElimOf 
                             (T.Sub (a, T.shift1))
                             (T.Sub (b, T.under 1 T.shift1))
                             (T.Sub (n, T.shift1))
@@ -1806,6 +1875,10 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                            \(fnc a b =>
                                 intersectExtAuto ident a b m n (introEqLoop rest))\
 
+                         | \Prim.parametricfut\ ? (fn . ?) =>
+                           \(fnc a b =>
+                                parametricfutExtAuto ident a b m n (introEqLoop rest))\
+
                          | \Prim.intersectfut\ ? (fn . ?) =>
                            \(fnc a b =>
                                 intersectfutExtAuto ident a b m n (introEqLoop rest))\
@@ -1887,6 +1960,10 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                      | \Prim.intersectfut\ ? (fn . ?) =>
                        \(fnc a b =>
                             intersectfutExtAuto NONE a b m n loop)\
+   
+                     | \Prim.parametricfut\ ? (fn . ?) =>
+                       \(fnc a b =>
+                            parametricfutExtAuto NONE a b m n loop)\
    
                      | \Prim.exists\ ? (fn . ?) =>
                        \(fnc a b =>

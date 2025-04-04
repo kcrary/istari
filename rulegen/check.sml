@@ -84,6 +84,8 @@ structure Check :> CHECK =
 
            | Tmh a => checkTerm set a
 
+           | Tmlh a => checkTerm set a
+
            | Tp => set
 
            | Tpl => set

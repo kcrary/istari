@@ -86,3 +86,6 @@ Definition intersect2 {object} (a b : @term object) :=
 
 Definition nonsense {object} : term object :=
   guard voidtp voidtp.
+
+Definition conjoin {object} a b : @term object :=
+  intersect booltp (bite (var 0) (subst sh1 a) (subst sh1 b)).

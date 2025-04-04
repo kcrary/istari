@@ -895,3 +895,18 @@ Qed.
 
 
 Hint Rewrite subst_nonsense : subst.
+
+
+(* Conjoin *)
+
+Lemma subst_conjoin :
+  forall object (s : @sub object) m1 m2, subst s (conjoin m1 m2) = conjoin (subst s m1) (subst s m2).
+Proof.
+unfold conjoin.
+intros object s m1 m2.
+simpsub.
+reflexivity.
+Qed.
+
+
+Hint Rewrite subst_conjoin : subst.

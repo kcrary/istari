@@ -97,6 +97,7 @@ Definition nonsense : fterm := guard voidtp voidtp.
 Definition of : fterm := lam (lam (equal (var 1) (var 0) (var 0))).
 Definition orphan : fterm := triv.
 Definition parametric : fterm := lam (lam (intersect booltp (bite (var 0) (pi (var 2) (app (var 2) (var 0))) constfn))).
+Definition parametricfut : fterm := lam (lam (intersect booltp (bite (var 0) (pi (semifut (var 2)) (app (var 2) (var 0))) constfn))).
 Definition partial : fterm := lam (partial (var 0)).
 Definition prod : fterm := lam (lam (prod (var 1) (var 0))).
 Definition quotient : fterm := lam (lam (quotient (var 1) (app (app (var 2) (var 1)) (var 0)))).

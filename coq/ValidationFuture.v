@@ -157,6 +157,26 @@ Lemma futureLeft_valid : futureLeft_obligation.
   eauto using deqtype_intro.
 Qed.
 
+
+Lemma futureLeftHidden_valid : futureLeftHidden_obligation.
+Proof.
+prepare.
+intros G1 G2 a b ext0 m Hhyp Ha Hm.
+replace (subst (under (length G2) (dot triv (sh 1))) m) with (subst (under (length G2) (dot (prev (var 0)) sh1)) (subst (under (length G2) (dot triv sh1)) m)).
+2:{
+  simpsub.
+  rewrite <- compose_under.
+  simpsub.
+  reflexivity.
+  }
+apply tr_fut_eta_hyp; auto.
+replace (subst (under (length G2) (dot triv sh1)) m) with m; auto.
+symmetry.
+apply subst_into_absent_single.
+auto.
+Qed.
+
+
 Lemma tr_future_sub :
   forall G a b,
     tr (promote G) (dsubtype a b)

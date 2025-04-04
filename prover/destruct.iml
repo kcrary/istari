@@ -200,6 +200,7 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                             | _ => fail "undestructable type")
 
                      | SOME (J.Tmh a) =>
+                          (* only a few ways to destruct hidden hypotheses *)
                           termCaseT a
                           /| \Prim.void\ =>
                              \(fnc =>
@@ -209,6 +210,20 @@ structure DestructInternal :> DESTRUCT_INTERNAL =
                                   refine (Rule.voidElim (T.evar ()))
                                   >>
                                   refine (Rule.hypothesis i) >> done)\
+
+                           | \Prim.future\ ? =>
+                             \(fnc b =>
+                                  (case pat of
+                                      And [p] =>
+                                         refine (Rule.futureLeftHidden i (T.evar ()) (T.evar ()))
+                                         >>> [
+                                             idtacM (S.empty, Tertiary),
+
+                                             dest i p set
+                                             ]
+
+                                    | _ =>
+                                         fail "future pattern expected"))\
 
                            | _ =>
                              \(fnc =>

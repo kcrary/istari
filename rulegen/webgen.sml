@@ -71,6 +71,7 @@ structure Webgen :> WEBGEN =
              Tm m => metavars m
            | Tml m => metavars m
            | Tmh m => metavars m
+           | Tmlh m => metavars m
            | Tp => S.empty
            | Tpl => S.empty
            | Tph => S.empty)
@@ -466,6 +467,12 @@ structure Webgen :> WEBGEN =
            | Tmh a => 
                 (
                 write " (hidden) : ";
+                writeTerm write precMax a
+                )
+
+           | Tmlh a => 
+                (
+                write " (later hidden) : ";
                 writeTerm write precMax a
                 )
 

@@ -272,6 +272,10 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                (refine2 Rule.intersectIntro >>> [idtacM Secondary, idtacM Primary],
                 RT.binder [2]);
 
+            insert Prim.intersectfut
+               (refine2 Rule.intersectfutIntro >>> [idtacM Secondary, idtacM Primary],
+                RT.binder [2]);
+
             insert Prim.guard
                (refine2 Rule.guardIntro >>> [idtacM Secondary, idtacM Primary],
                 nobinder);
@@ -290,6 +294,10 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
 
             insert Prim.parametric
                (refine2 Rule.parametricIntro >>> [idtacM Secondary, idtacM Primary],
+                RT.binder [2]);
+
+            insert Prim.parametricfut
+               (refine2 Rule.parametricfutIntro >>> [idtacM Secondary, idtacM Primary],
                 RT.binder [2]);
 
             insert Prim.lett
@@ -762,6 +770,29 @@ structure IntroTacticInternal :> INTRO_TACTIC_INTERNAL =
                                    >>> [
                                        idtacM Secondary,
         
+                                       D.destruct0 pat' (introOfPriority rest)
+                                       ]
+                                end)\
+
+                         | \Prim.parametricfut\ _ (fn ? . _) =>
+                           \(fnc binder =>
+                                let
+                                   val pat' =
+                                      (case pat of
+                                          IntroPattern.Ident NONE =>
+                                             IntroPattern.Ident binder
+        
+                                        | _ => pat)
+                                in
+                                   refine (Rule.parametricfutOfExt (T.evar ()) (T.Const Prim.void) (T.evar ()) (T.evar ()) (T.evar ()))
+                                   >>> [
+                                       idtacM Secondary,
+
+                                       attempt
+                                          (refine (Rule.parametricIntroOfForall (T.evar ()) (T.evar ()) (T.evar ()))
+                                           >>> [proveLambda, Irrelevance.proveIrrelevantUnfolds])
+                                          >> idtacM Secondary,
+           
                                        D.destruct0 pat' (introOfPriority rest)
                                        ]
                                 end)\

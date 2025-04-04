@@ -159,9 +159,24 @@ signature RULE_TACTIC =
       val intersectfutSub : tactic
       val intersectfutIntroOf : tactic
       val intersectfutIntroEq : tactic
+      val intersectfutIntro : tactic
       val intersectfutElimOf : tactic3            (* A B P *)
       val intersectfutElimEq : tactic3            (* A B P *)
       val intersectfutElim : tactic3              (* A B P *)
+      val parametricfutForm : tactic
+      val parametricfutEq : tactic
+      val parametricfutFormUniv : tactic
+      val parametricfutEqUniv : tactic
+      val parametricfutSub : tactic
+      val parametricfutIntroOf : tactic
+      val parametricfutIntroEq : tactic
+      val parametricfutIntro : tactic
+      val parametricfutElimOf : tactic2           (* A B *)
+      val parametricfutElimEq : tactic2           (* A B *)
+      val parametricfutElim : tactic3             (* A B P *)
+      val parametricfutExt : tactic
+      val parametricfutExt' : tactic4             (* A' A'' B' B'' *)
+      val parametricfutOfExt : tactic2            (* A' B' *)
       val guardForm : tactic
       val guardEq : tactic
       val guardFormUniv : tactic
@@ -325,6 +340,7 @@ signature RULE_TACTIC =
       val futureEta : tactic
       val futureExt : tactic
       val futureLeft : int -> tactic
+      val futureLeftHidden : int -> tactic
       val futureInjection : tactic
       val squashFutureSwap : tactic
       val isquashFutureSwap : tactic
@@ -717,6 +733,12 @@ signature RULE_TACTIC =
       val arrowTotal : tactic2                    (* A B *)
       val arrowTotal' : tactic
       val arrowStrict : tactic
+      val parametricTotal : tactic2               (* A B *)
+      val parametricTotal' : tactic
+      val parametricStrict : tactic
+      val parametricfutTotal : tactic2            (* A B *)
+      val parametricfutTotal' : tactic
+      val parametricfutStrict : tactic
       val intersectStrict : tactic
       val intersectfutStrict : tactic
       val existsTotal : tactic2                   (* A B *)
@@ -760,8 +782,10 @@ signature RULE_TACTIC =
       val unitUptype : tactic
       val boolUptype : tactic
       val forallUptype : tactic
+      val forallfutUptype : tactic
       val arrowUptype : tactic
       val intersectUptype : tactic
+      val intersectfutUptype : tactic
       val existsUptype : tactic
       val prodUptype : tactic
       val dprodUptype : tactic
@@ -794,8 +818,10 @@ signature RULE_TACTIC =
       val unitAdmiss : tactic
       val boolAdmiss : tactic
       val forallAdmiss : tactic
+      val forallfutAdmiss : tactic
       val arrowAdmiss : tactic
       val intersectAdmiss : tactic
+      val intersectfutAdmiss : tactic
       val existsAdmissUptype : tactic
       val prodAdmiss : tactic
       val dprodAdmissUptype : tactic
@@ -2365,6 +2391,18 @@ structure RuleTactic :> RULE_TACTIC =
                 ]
          end
 
+      val intersectfutIntro =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.intersectfutIntro (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [2, ] (J.concl jud), ]),
+                ]
+         end
+
       fun intersectfutElimOf xA xB xP =
          let
          in
@@ -2381,6 +2419,165 @@ structure RuleTactic :> RULE_TACTIC =
          let
          in
             refine (Rule.intersectfutElim xA xB xP)
+         end
+
+      val parametricfutForm =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricfutForm (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val parametricfutEq =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricfutEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val parametricfutFormUniv =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricfutFormUniv (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [binder [2, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val parametricfutEqUniv =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricfutEqUniv (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [binder [2, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val parametricfutSub =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricfutSub (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [2, 2, ] (J.concl jud), ]),
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val parametricfutIntroOf =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricfutIntroOf (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val parametricfutIntroEq =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricfutIntroEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val parametricfutIntro =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricfutIntro (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [2, ] (J.concl jud), ]),
+                ]
+         end
+
+      fun parametricfutElimOf xA xB =
+         let
+         in
+            refine (Rule.parametricfutElimOf xA xB (T.evar ()) (T.evar ()))
+         end
+
+      fun parametricfutElimEq xA xB =
+         let
+         in
+            refine (Rule.parametricfutElimEq xA xB (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         end
+
+      fun parametricfutElim xA xB xP =
+         let
+         in
+            refine (Rule.parametricfutElim xA xB xP)
+         end
+
+      val parametricfutExt =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricfutExt (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      fun parametricfutExt' xA' xA'' xB' xB'' =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricfutExt' (T.evar ()) xA' xA'' (T.evar ()) xB' xB'' (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      fun parametricfutOfExt xA' xB' =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricfutOfExt (T.evar ()) xA' (T.evar ()) xB' (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
          end
 
       val guardForm =
@@ -3866,6 +4063,21 @@ structure RuleTactic :> RULE_TACTIC =
             val set = D.set dir
          in
             refine (Rule.futureLeft i (T.evar ()) (T.evar ()))
+            >>> [
+                chdir left,
+                chdir (rebind left 1 right set),
+                ]
+         end
+
+      fun futureLeftHidden i =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+            val (right, dir') = D.split dir i
+            val left = D.shift dir' 1
+            val set = D.set dir
+         in
+            refine (Rule.futureLeftHidden i (T.evar ()) (T.evar ()))
             >>> [
                 chdir left,
                 chdir (rebind left 1 right set),
@@ -7360,6 +7572,66 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.arrowStrict (T.evar ()) (T.evar ()))
          end
 
+      fun parametricTotal xA xB =
+         let
+         in
+            refine (Rule.parametricTotal xA xB (T.evar ()))
+         end
+
+      val parametricTotal' =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricTotal' (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val parametricStrict =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricStrict (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [2, 1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      fun parametricfutTotal xA xB =
+         let
+         in
+            refine (Rule.parametricfutTotal xA xB (T.evar ()))
+         end
+
+      val parametricfutTotal' =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricfutTotal' (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val parametricfutStrict =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.parametricfutStrict (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [2, 1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
       val intersectStrict =
          let
             do () = lift
@@ -7706,6 +7978,18 @@ structure RuleTactic :> RULE_TACTIC =
                 ]
          end
 
+      val forallfutUptype =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.forallfutUptype (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
       val arrowUptype =
          let
             do () = lift
@@ -7719,6 +8003,18 @@ structure RuleTactic :> RULE_TACTIC =
             do (jud, dir) = withgoal
          in
             refine (Rule.intersectUptype (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val intersectfutUptype =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.intersectfutUptype (T.evar ()) (T.evar ()))
             >>> [
                 idtac,
                 chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
@@ -7998,6 +8294,18 @@ structure RuleTactic :> RULE_TACTIC =
                 ]
          end
 
+      val forallfutAdmiss =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.forallfutAdmiss (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
       val arrowAdmiss =
          let
             do () = lift
@@ -8011,6 +8319,18 @@ structure RuleTactic :> RULE_TACTIC =
             do (jud, dir) = withgoal
          in
             refine (Rule.intersectAdmiss (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val intersectfutAdmiss =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.intersectfutAdmiss (T.evar ()) (T.evar ()))
             >>> [
                 idtac,
                 chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),

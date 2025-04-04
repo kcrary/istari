@@ -97,6 +97,7 @@ structure Parser :> PARSER =
             val tm_class = Tm
             val tml_class = Tml
             val tmh_class = Tmh
+            val tmlh_class = Tmlh
             fun tp_class () = Tp
             fun tpl_class () = Tpl
             fun tph_class () = Tph

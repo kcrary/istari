@@ -42,6 +42,7 @@ Human-readable rules, using explicit variables, are given
 [Future modality](#future-modality)<br>
 [Future functions](#future-functions)<br>
 [Future intersect](#future-intersect)<br>
+[Future parametric](#future-parametric)<br>
 [Recursive types](#recursive-types)<br>
 [Inductive types](#inductive-types)<br>
 [Void](#void)<br>
@@ -2208,6 +2209,13 @@ Human-readable rules, using explicit variables, are given
       promote(G1) |- istp A
       G1, (later) A, G2[next 0 . ^1] |- B[under_n (next 0 . ^1)] ext M
 
+- `futureLeftHidden n A B`
+
+      G1, (hidden) (future A), G2 |- B ext M[under_n (() . ^1)]
+      >>
+      promote(G1) |- istp A
+      G1, (later hidden) A, G2[next 0 . ^1] |- B[under_n (next 0 . ^1)] ext M
+
 - `futureInjection A M N`
 
       G |- future (eq A M N) ext next ()
@@ -2414,6 +2422,13 @@ Human-readable rules, using explicit variables, are given
       promote(G) |- istp A
       G, (later) A |- eq B M[^1] N[^1]
 
+- `intersectfutIntro A B`
+
+      G |- intersectfut A (fn . B) ext M[() . id]
+      >>
+      promote(G) |- istp A
+      G, (later hidden) A |- B ext M
+
 - `intersectfutElimOf A B M P`
 
       G |- of B[P . id] M
@@ -2434,6 +2449,118 @@ Human-readable rules, using explicit variables, are given
       >>
       G |- intersectfut A (fn . B) ext M
       promote(G) |- of A P
+
+
+### Future parametric
+
+- `parametricfutForm A B`
+
+      G |- istp (parametricfut A (fn . B))
+      >>
+      promote(G) |- istp A
+      G, (later) A |- istp B
+
+- `parametricfutEq A A' B B'`
+
+      G |- eqtp (parametricfut A (fn . B)) (parametricfut A' (fn . B'))
+      >>
+      promote(G) |- eqtp A A'
+      G, (later) A |- eqtp B B'
+
+- `parametricfutFormUniv A B I`
+
+      G |- of (univ I) (parametricfut A (fn . B))
+      >>
+      G |- of level I
+      promote(G) |- of (univ I) A
+      G, (later) A |- of (univ I[^1]) B
+
+- `parametricfutEqUniv A A' B B' I`
+
+      G |- eq (univ I) (parametricfut A (fn . B)) (parametricfut A' (fn . B'))
+      >>
+      G |- of level I
+      promote(G) |- eq (univ I) A A'
+      G, (later) A |- eq (univ I[^1]) B B'
+
+- `parametricfutSub A A' B B'`
+
+      G |- subtype (parametricfut A (fn . B)) (parametricfut A' (fn . B'))
+      >>
+      promote(G) |- subtype A' A
+      G, (later) A' |- subtype B B'
+      G, (later) A |- istp B
+
+- `parametricfutIntroOf A B M`
+
+      G |- of (parametricfut A (fn . B)) (fn . M)
+      >>
+      promote(G) |- istp A
+      G |- irrelevant (fn . M)
+      G, (later) A |- of B M
+
+- `parametricfutIntroEq A B M N`
+
+      G |- eq (parametricfut A (fn . B)) (fn . M) (fn . N)
+      >>
+      promote(G) |- istp A
+      G |- irrelevant (fn . M)
+      G |- irrelevant (fn . N)
+      G, (later) A |- eq B M N
+
+- `parametricfutIntro A B`
+
+      G |- parametricfut A (fn . B) ext fn . M
+      >>
+      promote(G) |- istp A
+      G, (later hidden) A |- B ext M
+
+- `parametricfutElimOf A B M P`
+
+      G |- of B[P . id] (paramapp M P)
+      >>
+      G |- of (parametricfut A (fn . B)) M
+      promote(G) |- of A P
+
+- `parametricfutElimEq A B M N P Q`
+
+      G |- eq B[P . id] (paramapp M P) (paramapp N Q)
+      >>
+      G |- eq (parametricfut A (fn . B)) M N
+      promote(G) |- eq A P Q
+
+- `parametricfutElim A B P`
+
+      G |- B[P . id] ext paramapp M P
+      >>
+      G |- parametricfut A (fn . B) ext M
+      promote(G) |- of A P
+
+- `parametricfutExt A B M N`
+
+      G |- eq (parametricfut A (fn . B)) M N
+      >>
+      promote(G) |- istp A
+      G |- of (parametricfut A (fn . B)) M
+      G |- of (parametricfut A (fn . B)) N
+      G, (later) A |- eq B (paramapp M[^1] 0) (paramapp N[^1] 0)
+
+- `parametricfutExt' A A' A'' B B' B'' M N`
+
+      G |- eq (parametricfut A (fn . B)) M N
+      >>
+      promote(G) |- istp A
+      G |- of (parametric A' (fn . B')) M
+      G |- of (parametric A'' (fn . B'')) N
+      G, (later) A |- eq B (paramapp M[^1] 0) (paramapp N[^1] 0)
+
+- `parametricfutOfExt A A' B B' M`
+
+      G |- of (parametricfut A (fn . B)) M
+      >>
+      promote(G) |- istp A
+      G |- of (parametric A' (fn . B')) M
+      G, (later) A |- of B (paramapp M[^1] 0)
 
 
 ### Recursive types
@@ -5168,6 +5295,60 @@ Syntactic equality is intended for internal use only.
       promote(G) |- A
       G, (later) A |- subtype B (partial B)
 
+- `parametricTotal A B M`
+
+      G |- halts M
+      >>
+      G |- of (parametric A (fn . B)) M
+
+- `parametricTotal' A B`
+
+      G |- total (parametric A (fn . B)) ext (() , fn . ())
+      >>
+      G |- istp A
+      G, A |- istp B
+
+- `parametricStrict A B`
+
+      G |- subtype (parametric A (fn . B)) (partial (parametric A (fn . B)))
+      >>
+      G |- istp A
+      G, A |- istp B
+
+- `parametricfutTotal A B M`
+
+      G |- halts M
+      >>
+      G |- of (parametricfut A (fn . B)) M
+
+- `parametricfutTotal' A B`
+
+      G |- total (parametricfut A (fn . B)) ext (() , fn . ())
+      >>
+      promote(G) |- istp A
+      G, (later) A |- istp B
+
+- `parametricfutStrict A B`
+
+      G |- subtype (parametricfut A (fn . B)) (partial (parametricfut A (fn . B)))
+      >>
+      promote(G) |- istp A
+      G, (later) A |- istp B
+
+- `intersectStrict A B`
+
+      G |- subtype (intersect A (fn . B)) (partial (intersect A (fn . B)))
+      >>
+      G |- A
+      G, A |- subtype B (partial B)
+
+- `intersectfutStrict A B`
+
+      G |- subtype (intersectfut A (fn . B)) (partial (intersectfut A (fn . B)))
+      >>
+      promote(G) |- A
+      G, (later) A |- subtype B (partial B)
+
 - `existsTotal A B M`
 
       G |- halts M
@@ -5411,6 +5592,13 @@ Syntactic equality is intended for internal use only.
       G |- istp A
       G, A |- uptype B
 
+- `forallfutUptype A B`
+
+      G |- uptype (forallfut A (fn . B))
+      >>
+      promote(G) |- istp A
+      G, (later) A |- uptype B
+
 - `arrowUptype A B`
 
       G |- uptype (arrow A B)
@@ -5424,6 +5612,13 @@ Syntactic equality is intended for internal use only.
       >>
       G |- istp A
       G, A |- uptype B
+
+- `intersectfutUptype A B`
+
+      G |- uptype (intersectfut A (fn . B))
+      >>
+      promote(G) |- istp A
+      G, (later) A |- uptype B
 
 - `existsUptype A B`
 
@@ -5629,6 +5824,13 @@ Syntactic equality is intended for internal use only.
       G |- istp A
       G, A |- admiss B
 
+- `forallfutAdmiss A B`
+
+      G |- admiss (forallfut A (fn . B))
+      >>
+      promote(G) |- istp A
+      G, (later) A |- admiss B
+
 - `arrowAdmiss A B`
 
       G |- admiss (arrow A B)
@@ -5642,6 +5844,13 @@ Syntactic equality is intended for internal use only.
       >>
       G |- istp A
       G, A |- admiss B
+
+- `intersectfutAdmiss A B`
+
+      G |- admiss (intersectfut A (fn . B))
+      >>
+      promote(G) |- istp A
+      G, (later) A |- admiss B
 
 - `existsAdmissUptype A B`
 

@@ -137,6 +137,7 @@ structure Tacticgen :> TACTICGEN =
                    Tm (Metavar (sym, _)) => SOME sym
                  | Tml (Metavar (sym, _)) => SOME sym
                  | Tmh (Metavar (sym, _)) => SOME sym
+                 | Tmlh (Metavar (sym, _)) => SOME sym
                  | _ => NONE)
          in
             (case symopt of
@@ -187,6 +188,9 @@ structure Tacticgen :> TACTICGEN =
                                                  defined n [] set
 
                                             | (Tmh n , set) =>
+                                                 defined n [] set
+
+                                            | (Tmlh n , set) =>
                                                  defined n [] set
 
                                             | (_, set) => set)

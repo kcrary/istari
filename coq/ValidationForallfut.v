@@ -283,92 +283,6 @@ apply tr_pi_formation_univ; auto.
 Qed.
 
 
-Lemma tr_semifut_sub :
-  forall G a a',
-    tr (promote G) (dsubtype a a')
-    -> tr G (dsubtype (semifut a) (semifut a')).
-Proof.
-intros G a a' Ha.
-apply tr_subtype_intro.
-  {
-  apply tr_semifut_formation.
-  eapply tr_subtype_istype1; eauto.
-  }
-
-  {
-  apply tr_semifut_formation.
-  eapply tr_subtype_istype2; eauto.
-  }
-simpsub.
-replace (deq (var 0) (var 0) (semifut (subst sh1 a'))) with (deq (subst1 (var 0) (var 0)) (subst1 (var 0) (var 0)) (subst1 (var 0) (subst (sh 2) (semifut a')))) by (simpsub; auto).
-apply (tr_semifut_elim _ _ _ (subst sh1 a)).
-  {
-  eapply hypothesis; eauto using index_0.
-  }
-
-  {
-  cbn.
-  eapply (weakening _ [_] []).
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  eapply tr_subtype_istype1; eauto.
-  }
-simpsub.
-eapply (weakening _ [_] [_]).
-  {
-  cbn [length unlift].
-  simpsub.
-  auto.
-  }
-
-  {
-  cbn [length unlift].
-  simpsub.
-  auto.
-  }
-cbn [length unlift].
-simpsub.
-cbn [List.app].
-apply tr_semifut_intro.
-cbn.
-apply (tr_subtype_elim _ (subst sh1 a)).
-  {
-  eapply (weakening _ [_] []).
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  
-    {
-    cbn [length unlift].
-    simpsub.
-    auto.
-    }
-  cbn [length unlift].
-  simpsub.
-  cbn [List.app].
-  exact Ha.
-  }
-
-  {
-  eapply hypothesis; eauto using index_0.
-  }
-Qed.
-
-
 Lemma forallfutSub_valid : forallfutSub_obligation.
 Proof.
 prepare.
@@ -1449,6 +1363,71 @@ apply (tr_semifut_elim _ _ _ (subst sh1 a)).
   cbn [List.app].
   rewrite -> !subst_var0_sh1.
   exact Hmn.
+  }
+Qed.
+
+
+Lemma intersectfutIntro_valid : intersectfutIntro_obligation.
+Proof.
+prepare.
+intros G a b ext0 m Hhyg Ha Hm.
+apply tr_intersect_intro.
+  {
+  apply tr_semifut_formation; auto.
+  }
+simpsub.
+replace (deq (subst (dot triv sh1) m) (subst (dot triv sh1) m) b) with (deq (subst1 (var 0) (subst (dot triv (sh 2)) m)) (subst1 (var 0) (subst (dot triv (sh 2)) m)) (subst1 (var 0) (subst (dot (var 0) (sh 2)) b))).
+2:{
+  simpsub.
+  rewrite -> !subst_var0_sh1; auto.
+  }
+apply (tr_semifut_elim _ _ _ (subst sh1 a)).
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  cbn.
+  eapply (weakening _ [_] []).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  exact Ha.
+  }
+
+  {
+  eapply (weakening _ [_] [_]).
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  cbn [List.app].
+  rewrite -> !subst_var0_sh1.
+  replace (subst (dot triv sh1) m) with m; auto.
+  so (subst_into_absent_single _ _ _ triv Hhyg) as H.
+  simpsubin H.
+  symmetry.
+  auto.
   }
 Qed.
 

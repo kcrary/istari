@@ -1026,7 +1026,7 @@ apply tr_pi_intro.
       }
 
       {
-      apply ValidationPi.tr_pi_sub.
+      apply tr_pi_sub.
         {
         eapply (weakening _ [_; _; _; _] []).
           {
@@ -1048,7 +1048,7 @@ apply tr_pi_intro.
         }
 
         {
-        apply ValidationPi.tr_pi_sub.
+        apply tr_pi_sub.
           {
           apply tr_subtype_refl.
           apply (tr_formation_weaken _ (subst (sh 5) lv)).

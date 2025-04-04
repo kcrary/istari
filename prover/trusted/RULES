@@ -990,6 +990,13 @@ promote |- A : type ;
 x : demote A |- M = N : B ;
 
 
+rule intersectfutIntro
+intersectfut {x : A} B ext M [() / x]
+>>
+promote |- A : type ;
+x : demote hide A |- B ext M ;
+
+
 rule intersectfutElimOf
 M : B [P / x]
 >>
@@ -1009,6 +1016,118 @@ B [P / x] ext M
 >>
 |- intersectfut {x : A} B ext M ;
 promote |- P : A ;
+
+
+
+(* Parametric-future *)
+
+rule parametricfutForm
+parametricfut {x : A} B : type
+>>
+promote |- A : type ;
+x : demote A |- B : type ;
+
+
+rule parametricfutEq
+parametricfut {x : A} B = parametricfut {x : A'} B' : type
+>>
+promote |- A = A' : type ;
+x : demote A |- B = B' : type ;
+
+
+rule parametricfutFormUniv
+parametricfut {x : A} B : Ui
+>>
+|- I : level ;
+promote |- A : Ui ;
+x : demote A |- B : Ui ;
+
+
+rule parametricfutEqUniv
+parametricfut {x : A} B = parametricfut {x : A'} B' : Ui
+>>
+|- I : level ;
+promote |- A = A' : Ui ;
+x : demote A |- B = B' : Ui ;
+
+
+rule parametricfutSub
+parametricfut {x : A} B <: parametricfut {x : A'} B'
+>>
+promote |- A' <: A ;
+x : demote A' |- B <: B' ;
+x : demote A |- B : type ;
+
+
+rule parametricfutIntroOf
+(fn x . M) : parametricfut {x : A} B
+>>
+promote |- A : type ;
+|- irrelevant (fn x . M) ;
+x : demote A |- M : B ;
+
+
+rule parametricfutIntroEq
+(fn x . M) = (fn x . N) : parametricfut {x : A} B
+>>
+promote |- A : type ;
+|- irrelevant (fn x . M) ;
+|- irrelevant (fn x . N) ;
+x : demote A |- M = N : B ;
+
+
+rule parametricfutIntro
+parametricfut {x : A} B ext (fn x . M)
+>>
+promote |- A : type ;
+x : demote hide A |- B ext M ;
+
+
+rule parametricfutElimOf
+paramapp M P : B [P / x]
+>>
+|- M : parametricfut {x : A} B ;
+promote |- P : A ; 
+
+
+rule parametricfutElimEq
+paramapp M P = paramapp N Q : B [P / x]
+>>
+|- M = N : parametricfut {x : A} B ;
+promote |- P = Q : A ;
+
+
+rule parametricfutElim
+B [P / x] ext paramapp M P
+>>
+|- parametricfut {x : A} B ext M ;
+promote |- P : A ;
+
+
+rule parametricfutExt
+M = N : parametricfut {x : A} B
+>>
+promote |- A : type ;
+|- M : parametricfut {x : A} B ;
+|- N : parametricfut {x : A} B ;
+x : demote A |- paramapp M $x = paramapp N $x : B ;
+
+
+rule parametricfutExt'
+M = N : parametricfut {x : A} B
+>>
+promote |- A : type ;
+|- M : parametric {x : A'} B' ;
+|- N : parametric {x : A''} B'' ;
+x : demote A |- paramapp M $x = paramapp N $x : B ;
+
+
+rule parametricfutOfExt
+M : parametricfut {x : A} B
+>>
+promote |- A : type ;
+|- M : parametric {x : A'} B' ;
+x : demote A |- paramapp M $x : B ;
 
 
 
@@ -2199,6 +2318,13 @@ x : (future A) ... |- B ext M [$x #prev / y]
 >>
 promote |- A : type ;
 y : demote A ...[next $y / x] |- B[next $y / x] ext M ;
+
+
+lrule futureLeftHidden
+x : hide (future A) ... |- B ext M [() / y]
+>>
+promote |- A : type ;
+y : hide demote A ...[next $y / x] |- B[next $y / x] ext M ;
 
 
 rule futureInjection
@@ -4954,6 +5080,46 @@ arrow A B <: partial (arrow A B)
 |- B : type ;
 
 
+rule parametricTotal
+halts M
+>>
+|- M : parametric {x : A} B ;
+
+
+rule parametricTotal'
+total (parametric {x : A} B) ext ((), (fn x . ()))
+>>
+|- A : type ;
+x : A |- B : type ;
+
+
+rule parametricStrict
+parametric {x : A} B <: partial (parametric {x : A} B)
+>>
+|- A : type ;
+x : A |- B : type ;
+
+
+rule parametricfutTotal
+halts M
+>>
+|- M : parametricfut {x : A} B ;
+
+
+rule parametricfutTotal'
+total (parametricfut {x : A} B) ext ((), (fn x . ()))
+>>
+promote |- A : type ;
+x : demote A |- B : type ;
+
+
+rule parametricfutStrict
+parametricfut {x : A} B <: partial (parametricfut {x : A} B)
+>>
+promote |- A : type ;
+x : demote A |- B : type ;
+
+
 rule intersectStrict
 intersect {x : A} B <: partial (intersect {x : A} B)
 >>
@@ -5231,6 +5397,13 @@ uptype (forall {x : A} B)
 x : A |- uptype B ;
 
 
+rule forallfutUptype
+uptype (forallfut {x : A} B)
+>>
+promote |- A : type ;
+x : demote A |- uptype B ;
+
+
 rule arrowUptype
 uptype (arrow A B)
 >>
@@ -5243,6 +5416,13 @@ uptype (intersect {x : A} B)
 >>
 |- A : type ;
 x : A |- uptype B ;
+
+
+rule intersectfutUptype
+uptype (intersectfut {x : A} B)
+>>
+promote |- A : type ;
+x : demote A |- uptype B ;
 
 
 rule existsUptype
@@ -5456,6 +5636,13 @@ admiss (forall {x : A} B)
 x : A |- admiss B ;
 
 
+rule forallfutAdmiss
+admiss (forallfut {x : A} B)
+>>
+promote |- A : type ;
+x : demote A |- admiss B ;
+
+
 rule arrowAdmiss
 admiss (arrow A B)
 >>
@@ -5468,6 +5655,13 @@ admiss (intersect {x : A} B)
 >>
 |- A : type ;
 x : A |- admiss B ;
+
+
+rule intersectfutAdmiss
+admiss (intersectfut {x : A} B)
+>>
+promote |- A : type ;
+x : demote A |- admiss B ;
 
 
 rule existsAdmissUptype

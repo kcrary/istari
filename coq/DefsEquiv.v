@@ -799,6 +799,153 @@ apply star_refl.
 Qed.
 
 
+Lemma def_parametric :
+  forall a b,
+    equiv (app (app Defs.parametric a) (lam b)) (conjoin (pi a b) constfn).
+Proof.
+intros a m.
+unfold Defs.parametric.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app1.
+    apply step_app2.
+    }
+  simpsub.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+unfold conjoin.
+apply equiv_intersect; auto using equiv_refl.
+apply equiv_bite; auto using equiv_refl.
+simpsub.
+apply equiv_pi; auto using equiv_refl.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl'.
+reflexivity.
+Qed.
+
+
+Lemma def_parametricfut :
+  forall a b,
+    equiv (app (app Defs.parametricfut a) (lam b)) (conjoin (pi (semifut a) b) constfn).
+Proof.
+intros a m.
+unfold Defs.parametric.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app1.
+    apply step_app2.
+    }
+  simpsub.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+unfold conjoin.
+apply equiv_intersect; auto using equiv_refl.
+apply equiv_bite; auto using equiv_refl.
+simpsub.
+apply equiv_pi; auto using equiv_refl.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl'.
+reflexivity.
+Qed.
+
+
+Lemma def_paramapp :
+  forall m n,
+    equiv
+      (app (app Defs.paramapp m) n)
+      (app m triv).
+Proof.
+intros m n.
+unfold Defs.paramapp.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app1.
+  apply step_app2.
+  }
+simpsub.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl.
+Qed.
+
+
+Lemma def_irrelevant :
+  forall m,
+    equiv 
+      (app Defs.irrelevant (lam m))
+      (intersect nonsense (sequal m (subst (dot triv sh1) m))).
+Proof.
+intro m.
+unfold Defs.irrelevant.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  cbn [Nat.add].
+  apply star_refl.
+  }
+apply equiv_intersect.
+  {
+  apply equiv_refl.
+  }
+apply equiv_sequal.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  rewrite -> subst_var0_sh1.
+  apply star_refl.
+  }
+
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+Qed.
+
+
 Lemma def_partial :
   forall a, equiv (app Defs.partial a) (partial a).
 Proof.

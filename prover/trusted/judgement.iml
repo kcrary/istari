@@ -9,6 +9,7 @@ signature JUDGEMENT =
          Tm of term
        | Tml of term
        | Tmh of term
+       | Tmlh of term
        | Tp
        | Tpl
        | Tph
@@ -60,6 +61,7 @@ structure Judgement :> JUDGEMENT =
          Tm of term
        | Tml of term
        | Tmh of term
+       | Tmlh of term
        | Tp
        | Tpl
        | Tph
@@ -75,6 +77,7 @@ structure Judgement :> JUDGEMENT =
              Tm a => Tm (Term.Sub (a, s))
            | Tml a => Tml (Term.Sub (a, s))
            | Tmh a => Tmh (Term.Sub (a, s))
+           | Tmlh a => Tmlh (Term.Sub (a, s))
            | Tp => Tp
            | Tpl => Tpl
            | Tph => Tph
@@ -102,12 +105,14 @@ structure Judgement :> JUDGEMENT =
       fun promote h =
          (case h of
              Tml a => Tm a
+           | Tmlh a => Tmh a
            | Tpl => Tp
            | _ => h)
 
       fun unhide h =
          (case h of
              Tmh a => Tm a
+           | Tmlh a => Tml a
            | Tph => Tp
            | _ => h)
 
@@ -115,6 +120,7 @@ structure Judgement :> JUDGEMENT =
          (case h of
              Tml a => Tm a
            | Tmh a => Tm a
+           | Tmlh a => Tm a
            | Tpl => Tp
            | Tph => Tp
            | _ => h)
@@ -152,6 +158,9 @@ structure Judgement :> JUDGEMENT =
            | (Tmh a, Tmh a') =>
                 Unify.unify a a'
 
+           | (Tmlh a, Tmlh a') =>
+                Unify.unify a a'
+
            | (Tp, Tp) => ()
 
            | (Tpl, Tpl) => ()
@@ -175,6 +184,12 @@ structure Judgement :> JUDGEMENT =
                 Unify.unify a a'
 
            | (Tmh a, Tm a') =>
+                Unify.unify a a'
+
+           | (Tmlh a, Tmlh a') =>
+                Unify.unify a a'
+
+           | (Tmlh a, Tml a') =>
                 Unify.unify a a'
 
            | (Tp, Tp) => ()
@@ -239,11 +254,11 @@ structure Judgement :> JUDGEMENT =
             (fn Tm _ => 0
               | Tml _ => 1
               | Tmh _ => 2
-              | Tp => 3
-              | Tpl => 4
-              | Tph => 5
-              | Let _ => 6)
-
+              | Tmlh _ => 3
+              | Tp => 4
+              | Tpl => 5
+              | Tph => 6
+              | Let _ => 7)
             [
             P.wrap
                (fn Tm m => m
@@ -261,6 +276,12 @@ structure Judgement :> JUDGEMENT =
                (fn Tmh m => m
                  | _ => raise impossible)
                Tmh
+               Pickling.puTerm,
+
+            P.wrap
+               (fn Tmlh m => m
+                 | _ => raise impossible)
+               Tmlh
                Pickling.puTerm,
 
             P.const Tp,

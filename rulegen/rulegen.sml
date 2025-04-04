@@ -67,6 +67,8 @@ structure Rulegen :> RULEGEN =
 
            | Tmh a => constantsTerm set a
 
+           | Tmlh a => constantsTerm set a
+
            | Tp => set
 
            | Tpl => set
@@ -271,6 +273,13 @@ structure Rulegen :> RULEGEN =
            | Tmh a =>
                 (
                 write "J.Tmh (";
+                writeTerm write a;
+                write ")"
+                )
+
+           | Tmlh a =>
+                (
+                write "J.Tmlh (";
                 writeTerm write a;
                 write ")"
                 )

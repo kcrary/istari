@@ -194,6 +194,12 @@ structure WebgenDB :> WEBGENDB =
                 writeTerm write precMax a
                 )
 
+           | Tmlh a => 
+                (
+                write "(later hidden) ";
+                writeTerm write precMax a
+                )
+
            | Tp =>
                 write "type"
 

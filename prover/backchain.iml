@@ -110,11 +110,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                             [tac, idtacM Primary])
                            fk sk)\
 
-                 | \Prim.forall\ _ _ =>
-                   \(fnc =>
-                        fk "marker used for dependent argument")\
-
-                 | \Prim.parametric\ _ _ =>
+                 | (\Prim.forall\ _ _ | \Prim.parametric\ _ _ | \Prim.forallfut\ _ _ | \Prim.parametricfut\ _ _) =>
                    \(fnc =>
                         fk "marker used for dependent argument")\
 
@@ -406,6 +402,17 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                           fk sk
                     end)\
  
+             | \Prim.parametricfut\ ? (fn . ?) =>
+               \(fnc dom cod =>
+                    let
+                       val e = T.evar ()
+                    in
+                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
+                          (refine (Rule.parametricfutElim dom cod e) 
+                           >>> [tac, idtacM Secondary])
+                          fk sk
+                    end)\
+ 
              | \Prim.iforall\ ? ? (fn ? . ?) =>
                \(fnc lev dom binder cod =>
                     let
@@ -582,6 +589,17 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                  in
                     exploitMain dep (T.Sub (cod, T.Dot (e, T.id)))
                     (refine (Rule.intersectfutElim dom cod e)
+                     >>> [tac, idtacM Secondary])
+                    sk
+                 end)\
+
+          | \Prim.parametricfut\ ? (fn . ?) =>
+            \(fnc dom cod =>
+                 let
+                    val e = T.evar ()
+                 in
+                    exploitMain dep (T.Sub (cod, T.Dot (e, T.id)))
+                    (refine (Rule.parametricfutElim dom cod e)
                      >>> [tac, idtacM Secondary])
                     sk
                  end)\

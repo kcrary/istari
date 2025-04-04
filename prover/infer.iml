@@ -982,7 +982,7 @@ structure Infer :> INFER =
                                        \(fnc dom cod =>
                                             let
                                                val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
-                     
+
                                                val tac' =
                                                   (* G |- paramapp M' P : Cod[P . id] *)
                                                   refine (Rule.parametricElimOf dom cod m' p)
@@ -991,6 +991,31 @@ structure Infer :> INFER =
                                                       mtac,
                                                       
                                                       (* G |- P : Dom *)
+                                                      ptac
+                                                      ]
+                                            in
+                                               sk $
+                                               inferSpine ctx 
+                                                  (T.apply2 Prim.paramapp m' p)
+                                                  (T.Sub (cod, T.Dot (p, T.id)))
+                                                  rest tac' invis prove
+                                            end)\
+
+                                     | \Prim.parametricfut\ ? (fn . ?) =>
+                                       \(fnc dom cod =>
+                                            let
+                                               val ptac = prove (J.make 
+                                                                    (Seq.map J.promote ctx)
+                                                                    (T.apply2 Prim.ov dom p)) []
+
+                                               val tac' =
+                                                  (* G |- paramapp M' P : Cod[P . id] *)
+                                                  refine (Rule.parametricfutElimOf dom cod m' p)
+                                                  >>> [
+                                                      (* G |- M' : parametric Dom . Cod *)
+                                                      mtac,
+                                                      
+                                                      (* promote G |- P : Dom *)
                                                       ptac
                                                       ]
                                             in
@@ -1781,6 +1806,35 @@ structure Infer :> INFER =
                                                                      refine (Rule.parametricElimEq dom cod m' n' p q)
                                                                      >>> [
                                                                          (* G |- M' = N' : parametric Dom . Cod *)
+                                                                         mntac,
+                                                                         
+                                                                         (* G |- P = Q : Dom *)
+                                                                         pqtac
+                                                                         ]
+                                                               in
+                                                                  sk $
+                                                                  compatSpine ctx 
+                                                                     (T.apply2 Prim.paramapp m' p)
+                                                                     (T.apply2 Prim.paramapp n' q)
+                                                                     (T.Sub (cod, T.Dot (p, T.id)))
+                                                                     rest1 rest2 tac' invis prove
+                                                               end)\
+                   
+                                                        | \Prim.parametricfut\ ? (fn . ?) =>
+                                                          \(fnc dom cod =>
+                                                               let
+                                                                  (* Requiring that P = Q as if this were a regular application,
+                                                                     but we don't have to do that.
+                                                                  *)
+                                                                  val pqtac = prove (J.make 
+                                                                                        (Seq.map J.promote ctx)
+                                                                                        (T.apply3 Prim.eq dom p q)) []
+                                        
+                                                                  val tac' =
+                                                                     (* G |- paramapp M' P = paramapp N' Q : Cod[P . id] *)
+                                                                     refine (Rule.parametricfutElimEq dom cod m' n' p q)
+                                                                     >>> [
+                                                                         (* G |- M' = N' : parametricfut Dom . Cod *)
                                                                          mntac,
                                                                          
                                                                          (* G |- P = Q : Dom *)
