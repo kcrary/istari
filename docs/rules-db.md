@@ -985,6 +985,13 @@ Human-readable rules, using explicit variables, are given
       G |- parametric A (fn . B) ext M
       G |- of A P
 
+- `parametricElim' A B P`
+
+      G |- B[P . id] ext paramapp M unavailable
+      >>
+      G |- parametric A (fn . B) ext M
+      G |- of A P
+
 - `parametricBeta M N`
 
       G |- sequal (paramapp (fn . M) N) M[N . id]
@@ -2532,6 +2539,13 @@ Human-readable rules, using explicit variables, are given
 - `parametricfutElim A B P`
 
       G |- B[P . id] ext paramapp M P
+      >>
+      G |- parametricfut A (fn . B) ext M
+      promote(G) |- of A P
+
+- `parametricfutElim' A B P`
+
+      G |- B[P . id] ext paramapp M unavailable
       >>
       G |- parametricfut A (fn . B) ext M
       promote(G) |- of A P

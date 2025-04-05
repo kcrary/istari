@@ -531,6 +531,34 @@ apply (tr_transitivity _ _ (app m p)).
 Qed.
 
 
+Lemma parametricElim'_valid : parametricElim'_obligation.
+Proof.
+prepare.
+intros G a b p m ext0 Hm Hp.
+apply (tr_transitivity _ _ (app m p)).
+  {
+  apply tr_symmetry.
+  apply tr_sequal_equal.
+    {
+    apply tr_constfn_elim.
+    eapply tr_conjoin_elim2; eauto.
+    }
+  eapply tr_pi_elim; eauto.
+  eapply tr_conjoin_elim1; eauto.
+  }
+
+  {
+  apply tr_sequal_equal.
+    {
+    apply tr_constfn_elim.
+    eapply tr_conjoin_elim2; eauto.
+    }
+  eapply tr_pi_elim; eauto.
+  eapply tr_conjoin_elim1; eauto.
+  }
+Qed.
+
+
 Lemma tr_constfn_intro1 :
   forall G (m : @term obj),
     tr (cons (hyp_tm nonsense) G) (deq triv triv (sequal (subst (dot triv sh1) m) m))
@@ -1678,6 +1706,36 @@ Qed.
 
 
 Lemma parametricfutElim_valid : parametricfutElim_obligation.
+Proof.
+prepare.
+intros G a b p m ext0 Hm Hp.
+apply (tr_transitivity _ _ (app m p)).
+  {
+  apply tr_symmetry.
+  apply tr_sequal_equal.
+    {
+    apply tr_constfn_elim.
+    eapply tr_conjoin_elim2; eauto.
+    }
+  eapply tr_pi_elim; eauto.
+  eapply tr_conjoin_elim1; eauto.
+  apply tr_semifut_intro; auto.
+  }
+
+  {
+  apply tr_sequal_equal.
+    {
+    apply tr_constfn_elim.
+    eapply tr_conjoin_elim2; eauto.
+    }
+  eapply tr_pi_elim; eauto.
+  eapply tr_conjoin_elim1; eauto.
+  apply tr_semifut_intro; auto.
+  }
+Qed.
+
+
+Lemma parametricfutElim'_valid : parametricfutElim'_obligation.
 Proof.
 prepare.
 intros G a b p m ext0 Hm Hp.

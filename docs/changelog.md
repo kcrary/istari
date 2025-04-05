@@ -18,10 +18,10 @@
 
   + `Bar` has additional lemmas.
 
-- Added rules `intersectfutIntro`, and `futureLeftHidden`. Also added
-  rules governing `parametricfut`; and totality, strictness, uptype,
-  and admissibility rules for `forallfut`, `intersectfut`,
-  `parametric`, and `parametricfut`.
+- Added rules `intersectfutIntro`, `futureLeftHidden`, and
+  `parametricElim'`. Also added rules governing `parametricfut`; and
+  totality, strictness, uptype, and admissibility rules for
+  `forallfut`, `intersectfut`, `parametric`, and `parametricfut`.
 
 #### 1.1
 

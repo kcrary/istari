@@ -160,6 +160,7 @@ exact parametricIntroOfForall_valid.
 exact parametricElimOf_valid.
 exact parametricElimEq_valid.
 exact parametricElim_valid.
+exact parametricElim'_valid.
 exact parametricBeta_valid.
 exact parametricEta_valid.
 exact parametricExt_valid.
@@ -206,6 +207,7 @@ exact parametricfutIntro_valid.
 exact parametricfutElimOf_valid.
 exact parametricfutElimEq_valid.
 exact parametricfutElim_valid.
+exact parametricfutElim'_valid.
 exact parametricfutExt_valid.
 exact parametricfutExt'_valid.
 exact parametricfutOfExt_valid.

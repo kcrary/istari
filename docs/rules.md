@@ -987,6 +987,13 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- parametric A (fn x . B) ext M
       G |- P : A
 
+- `parametricElim' A B P`
+
+      G |- [P / x]B ext paramapp M unavailable
+      >>
+      G |- parametric A (fn x . B) ext M
+      G |- P : A
+
 - `parametricBeta M N`
 
       G |- sequal (paramapp (fn x . M) N) [N / x]M
@@ -2534,6 +2541,13 @@ variables.  The official rules, using de Bruijn indices, are given
 - `parametricfutElim A B P`
 
       G |- [P / x]B ext paramapp M P
+      >>
+      G |- parametricfut A (fn x . B) ext M
+      promote(G) |- P : A
+
+- `parametricfutElim' A B P`
+
+      G |- [P / x]B ext paramapp M unavailable
       >>
       G |- parametricfut A (fn x . B) ext M
       promote(G) |- P : A
