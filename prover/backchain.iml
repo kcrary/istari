@@ -325,19 +325,22 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
 
 
 
-      (* applyMain A C tac fk sk
+      (* applyMain seen A C tac fk sk
 
          if    tac partially proves G |- A (marking typing subgoals secondary)
          then  if    C can backchain through A
-               then  calls sk tac'
-               where tac' partially proves G |- C (marking typing subgoals with true)
-               else  calls fk ()
+               then  calls sk (tac', seen, fk')
+               where tac' partially proves G |- C (marking typing subgoals secondary)
+                     tac' raises Rule.HiddenVariable if it fails due to hidden variables
+                     fk' is used to backtrack
+               else  calls fk seen
 
-         Note fk and sk have codomain answer.
+         Note fk and sk have codomain answer.  Seen is used to remember if a refinement
+         has failed due to hidden variables.
       *)
-      fun applyMain a c tac fk sk =
+      fun applyMain seen a c tac fk sk =
          if Unify.unify1 a c then
-            sk (tac, fk)
+            sk (tac, seen, fk)
          else
             termCase (N.whnfHard a)
             /| \Prim.forall\ ? (fn . ?) =>
@@ -345,16 +348,16 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                     let
                        val e = T.evar ()
                     in
-                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refine (Rule.forallElim dom cod e) 
+                       applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
+                          (refineHV (Rule.forallElim dom cod e) 
                            >>> [tac, idtacM Secondary])
                           fk sk
                     end)\
  
              | \Prim.arrow\ ? ? =>
                \(fnc dom cod =>
-                    applyMain cod c
-                       (refine (Rule.arrowElim dom cod) 
+                    applyMain seen cod c
+                       (refineHV (Rule.arrowElim dom cod) 
                         >>> [tac, idtacM Primary])
                        fk sk)\
  
@@ -363,8 +366,8 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                     let
                        val e = T.evar ()
                     in
-                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refine (Rule.intersectElim dom cod e) 
+                       applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
+                          (refineHV (Rule.intersectElim dom cod e) 
                            >>> [tac, idtacM Secondary])
                           fk sk
                     end)\
@@ -374,8 +377,8 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                     let
                        val e = T.evar ()
                     in
-                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refine (Rule.parametricElim dom cod e) 
+                       applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
+                          (refineHV (Rule.parametricElim dom cod e) 
                            >>> [tac, idtacM Secondary])
                           fk sk
                     end)\
@@ -385,8 +388,8 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                     let
                        val e = T.evar ()
                     in
-                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refine (Rule.forallfutElim dom cod e) 
+                       applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
+                          (refineHV (Rule.forallfutElim dom cod e) 
                            >>> [tac, idtacM Secondary])
                           fk sk
                     end)\
@@ -396,8 +399,8 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                     let
                        val e = T.evar ()
                     in
-                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refine (Rule.intersectfutElim dom cod e) 
+                       applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
+                          (refineHV (Rule.intersectfutElim dom cod e) 
                            >>> [tac, idtacM Secondary])
                           fk sk
                     end)\
@@ -407,8 +410,8 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                     let
                        val e = T.evar ()
                     in
-                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refine (Rule.parametricfutElim dom cod e) 
+                       applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
+                          (refineHV (Rule.parametricfutElim dom cod e) 
                            >>> [tac, idtacM Secondary])
                           fk sk
                     end)\
@@ -418,8 +421,8 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                     let
                        val e = T.evar ()
                     in
-                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refine (Rule.iforallElim cod lev dom e)
+                       applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
+                          (refineHV (Rule.iforallElim cod lev dom e)
                            >>> [
                                let
                                   do (_, dir) = withgoal
@@ -440,8 +443,8 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                     let
                        val e = T.evar ()
                     in
-                       applyMain (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refine (Rule.foralltpElim cod e)
+                       applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
+                          (refineHV (Rule.foralltpElim cod e)
                            >>> [
                                let
                                   do (_, dir) = withgoal
@@ -459,29 +462,29 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
 
              | \Prim.tarrow\ ? ? =>
                \(fnc dom cod =>
-                    applyMain cod c
-                       (refine (Rule.tarrowElim dom cod)
+                    applyMain seen cod c
+                       (refineHV (Rule.tarrowElim dom cod)
                         >>> [tac, idtacM Primary])
                        fk sk)\
  
              | \Prim.karrow\ ? ? =>
                \(fnc dom cod =>
-                    applyMain cod c
-                       (refine (Rule.karrowElim dom cod)
+                    applyMain seen cod c
+                       (refineHV (Rule.karrowElim dom cod)
                         >>> [tac, idtacM Primary])
                        fk sk)\
  
              | \Prim.prod\ ? ? =>
                \(fnc a1 a2 =>
-                    applyMain a1 c
-                       (refine (Rule.prodElim1 a1 a2) >> tac)
-                       (fn () =>
-                           applyMain a2 c
-                           (refine (Rule.prodElim2 a1 a2) >> tac)
+                    applyMain seen a1 c
+                       (refineHV (Rule.prodElim1 a1 a2) >> tac)
+                       (fn seen' =>
+                           applyMain seen' a2 c
+                           (refineHV (Rule.prodElim2 a1 a2) >> tac)
                            fk sk)
                        sk)\
  
-             | _ => \(fnc => fk ())\
+             | _ => \(fnc => fk seen)\
             /
 
       fun applyPriority em =
@@ -500,11 +503,18 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
             val mark = Trail.mark ()
 
             fun tac goal fk sk =
-               applyMain a c
+               applyMain false a c
                   atac
-                  (fn () => fk "lemma does not match goal")
-                  (fn (ctac, fk') =>
-                      ctac goal (fn _ => (Trail.rewind mark; fk' ())) sk)
+                  (fn seen => 
+                      if seen then
+                         fk "lemma does not match goal (matches rejected for hidden variables)"
+                      else
+                         fk "lemma does not match goal")
+                  (fn (ctac, seen, fk') =>
+                      try
+                         ctac goal (fn _ => (Trail.rewind mark; fk' seen)) sk
+                      with
+                         Rule.HiddenVariable => (Trail.rewind mark; fk' true))
          in
             Reorder.reorder
                (* applyMain has to return answer *)

@@ -102,6 +102,7 @@ signature TACTIC =
       (* primitive actions *)
 
       val refine : Rule.rule -> tactic
+      val refineHV : Rule.rule -> tactic  (* does not handle the Rule.HiddenVariable exception *)
       val chdir : Directory.directory -> tactic
       val cast : Judgement.judgement -> Refine.validation -> 'a tacticm
       val execute : goal -> tactic -> (Refine.validation, string) Sum.sum
@@ -772,6 +773,23 @@ structure TacticInternal :> TACTIC_INTERNAL =
 
            | Sum.INR msg => fk msg)
          )
+
+      fun refineHV rule (goal as (jud, dir)) fk sk =
+         (
+         !interrupt rule goal;
+         (case
+             try
+                Sum.INL (Refine.refine rule jud)
+             with
+                Rule.Failure =>
+                   Sum.INR (String.concat ["rule ", Rule.name rule, " does not apply"])
+          of
+             Sum.INL (subgoals, validate) =>
+                sk (map (fn s => (blank, (s, dir))) subgoals, validate, fk)
+
+           | Sum.INR msg => fk msg)
+         )
+
 
       fun chdir dir (ds, _) fk sk = sk ([(blank, (ds, dir))], valhd, fk)
 
