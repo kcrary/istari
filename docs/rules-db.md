@@ -5981,11 +5981,11 @@ Syntactic equality is intended for internal use only.
 
 ### Let hypotheses
 
-- `letIntro n M`
+- `letIntro M`
 
-      G1, G2 |- C ext N[under_n (M . id)]
+      G |- C ext let M (fn . N)
       >>
-      G1, = M, G2[^] |- C[under_n (^1)] ext N
+      G1, = M |- C[^] ext N
 
 - `letSubst n`
 

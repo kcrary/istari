@@ -5914,11 +5914,11 @@ Syntactic equality is intended for internal use only.
 
 ### Let hypotheses
 
-- `letIntro n M`
+- `letIntro M`
 
-      G1, G2 |- C ext [M / x]N
+      G |- C ext let x = M in N
       >>
-      G1, x = M, G2 |- C ext N
+      G, x = M |- C ext N
 
 - `letSubst n`
 

@@ -23,6 +23,11 @@
   totality, strictness, uptype, and admissibility rules for
   `forallfut`, `intersectfut`, `parametric`, and `parametricfut`.
 
+- Fixed an unsound bug in the letIntro rule that allowed the creation
+  of let hypotheses using hidden variables.  Also changed the extract
+  of the letIntro rule to use a let term.
+
+
 #### 1.1
 
 - The typechecker deals better with the future modality, and with type
