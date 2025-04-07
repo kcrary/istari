@@ -698,12 +698,48 @@ structure Hyp :> HYP =
          end
 
 
-      fun set sym em =
+      fun set sym em (goal as (jud, dir)) fk sk =
          let
-            do (_, dir) = withgoal
+            val m = ETerm.withdir dir em
+
+            fun hvk () =
+               let
+                  val (_, set) =
+                     Seq.foldl
+                        (fns hyp (i, set) =>
+                            if 
+                               (case hyp of
+                                   J.Tmh _ => true
+                                 | J.Tmlh _ => true
+                                 | J.Tph => true
+                                 | _ => false)
+                            then
+                               (i+1, Irrelevance.IntSet.insert set i)
+                            else
+                               (i+1, set))
+                        (0, Irrelevance.IntSet.empty)
+                        (J.context jud)
+              in
+                  (case Irrelevance.irrelevance set m of
+                      NONE =>
+                         fail "term contains relevant hidden variables"
+
+                    | SOME red =>
+                         let
+                            val n = R.reduce red m
+                         in
+                            refine (Rule.letIntro n)
+                            >>+
+                            refine (Rule.unreduceHyp 0 m red)
+                            >>+
+                            chdir (D.bind dir sym)
+                         end) 
+                  goal fk sk
+               end
          in
-            refine (Rule.letIntro (ETerm.withdir dir em))
-            >> chdir (D.bind dir sym)
+            (refineHV (Rule.letIntro m) hvk
+             >>+ chdir (D.bind dir sym))
+            goal fk sk
          end
 
 

@@ -336,7 +336,8 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                else  calls fk seen
 
          Note fk and sk have codomain answer.  Seen is used to remember if a refinement
-         has failed due to hidden variables.
+         has failed due to hidden variables.  Both tac and tac' take an extra continuation
+         that is invoked if a refinement fails due to hidden variables.
       *)
       fun applyMain seen a c tac fk sk =
          if Unify.unify1 a c then
@@ -349,16 +350,18 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                        val e = T.evar ()
                     in
                        applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refineHV (Rule.forallElim dom cod e) 
-                           >>> [tac, idtacM Secondary])
+                          (fn hvk =>
+                              refineHV (Rule.forallElim dom cod e) hvk
+                              >>> [tac hvk, idtacM Secondary])
                           fk sk
                     end)\
  
              | \Prim.arrow\ ? ? =>
                \(fnc dom cod =>
                     applyMain seen cod c
-                       (refineHV (Rule.arrowElim dom cod) 
-                        >>> [tac, idtacM Primary])
+                       (fn hvk =>
+                           refineHV (Rule.arrowElim dom cod) hvk
+                           >>> [tac hvk, idtacM Primary])
                        fk sk)\
  
              | \Prim.intersect\ ? (fn . ?) =>
@@ -367,8 +370,9 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                        val e = T.evar ()
                     in
                        applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refineHV (Rule.intersectElim dom cod e) 
-                           >>> [tac, idtacM Secondary])
+                          (fn hvk =>
+                              refineHV (Rule.intersectElim dom cod e) hvk
+                              >>> [tac hvk, idtacM Secondary])
                           fk sk
                     end)\
  
@@ -378,8 +382,9 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                        val e = T.evar ()
                     in
                        applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refineHV (Rule.parametricElim' dom cod e) 
-                           >>> [tac, idtacM Secondary])
+                          (fn hvk =>
+                              refineHV (Rule.parametricElim' dom cod e) hvk
+                              >>> [tac hvk, idtacM Secondary])
                           fk sk
                     end)\
  
@@ -389,8 +394,9 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                        val e = T.evar ()
                     in
                        applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refineHV (Rule.forallfutElim dom cod e) 
-                           >>> [tac, idtacM Secondary])
+                          (fn hvk =>
+                              refineHV (Rule.forallfutElim dom cod e) hvk
+                              >>> [tac hvk, idtacM Secondary])
                           fk sk
                     end)\
  
@@ -400,8 +406,9 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                        val e = T.evar ()
                     in
                        applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refineHV (Rule.intersectfutElim dom cod e) 
-                           >>> [tac, idtacM Secondary])
+                          (fn hvk =>
+                              refineHV (Rule.intersectfutElim dom cod e) hvk
+                              >>> [tac hvk, idtacM Secondary])
                           fk sk
                     end)\
  
@@ -411,8 +418,9 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                        val e = T.evar ()
                     in
                        applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refineHV (Rule.parametricfutElim' dom cod e) 
-                           >>> [tac, idtacM Secondary])
+                          (fn hvk =>
+                              refineHV (Rule.parametricfutElim' dom cod e) hvk
+                              >>> [tac hvk, idtacM Secondary])
                           fk sk
                     end)\
  
@@ -422,19 +430,20 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                        val e = T.evar ()
                     in
                        applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refineHV (Rule.iforallElim cod lev dom e)
-                           >>> [
-                               let
-                                  do (_, dir) = withgoal
-                               in
-                                  chdir (D.bindVary dir binder)
-                                  >> idtacM Secondary
-                               end,
-   
-                               tac,
-   
-                               idtacM Secondary
-                               ])
+                          (fn hvk =>
+                              refineHV (Rule.iforallElim cod lev dom e) hvk
+                              >>> [
+                                  let
+                                     do (_, dir) = withgoal
+                                  in
+                                     chdir (D.bindVary dir binder)
+                                     >> idtacM Secondary
+                                  end,
+      
+                                  tac hvk,
+      
+                                  idtacM Secondary
+                                  ])
                           fk sk
                     end)\
 
@@ -444,43 +453,47 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                        val e = T.evar ()
                     in
                        applyMain seen (T.Sub (cod, T.Dot (e, T.id))) c
-                          (refineHV (Rule.foralltpElim cod e)
-                           >>> [
-                               let
-                                  do (_, dir) = withgoal
-                               in
-                                  chdir (D.bindVary dir binder)
-                                  >> idtacM Secondary
-                               end,
-   
-                               tac,
-   
-                               idtacM Secondary
-                               ])
+                          (fn hvk =>
+                              refineHV (Rule.foralltpElim cod e) hvk
+                              >>> [
+                                  let
+                                     do (_, dir) = withgoal
+                                  in
+                                     chdir (D.bindVary dir binder)
+                                     >> idtacM Secondary
+                                  end,
+      
+                                  tac hvk,
+      
+                                  idtacM Secondary
+                                  ])
                           fk sk
                     end)\
 
              | \Prim.tarrow\ ? ? =>
                \(fnc dom cod =>
                     applyMain seen cod c
-                       (refineHV (Rule.tarrowElim dom cod)
-                        >>> [tac, idtacM Primary])
+                       (fn hvk =>
+                           refineHV (Rule.tarrowElim dom cod) hvk
+                           >>> [tac hvk, idtacM Primary])
                        fk sk)\
  
              | \Prim.karrow\ ? ? =>
                \(fnc dom cod =>
                     applyMain seen cod c
-                       (refineHV (Rule.karrowElim dom cod)
-                        >>> [tac, idtacM Primary])
+                       (fn hvk =>
+                           refineHV (Rule.karrowElim dom cod) hvk
+                           >>> [tac hvk, idtacM Primary])
                        fk sk)\
  
              | \Prim.prod\ ? ? =>
                \(fnc a1 a2 =>
                     applyMain seen a1 c
-                       (refineHV (Rule.prodElim1 a1 a2) >> tac)
+                       (fn hvk =>
+                           refineHV (Rule.prodElim1 a1 a2) hvk >>+ tac hvk)
                        (fn seen' =>
                            applyMain seen' a2 c
-                           (refineHV (Rule.prodElim2 a1 a2) >> tac)
+                           (fn hvk => refineHV (Rule.prodElim2 a1 a2) hvk >>+ tac hvk)
                            fk sk)
                        sk)\
  
@@ -504,17 +517,19 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
 
             fun tac goal fk sk =
                applyMain false a c
-                  atac
+                  (fn _ => atac)
                   (fn seen => 
                       if seen then
                          fk "lemma does not match goal (matches rejected for hidden variables)"
                       else
                          fk "lemma does not match goal")
                   (fn (ctac, seen, fk') =>
-                      try
-                         ctac goal (fn _ => (Trail.rewind mark; fk' seen)) sk
-                      with
-                         Rule.HiddenVariable => (Trail.rewind mark; fk' true))
+                      let
+                         fun fk'' _ = (Trail.rewind mark; fk' seen)
+                         fun hvk () = (Trail.rewind mark; fk' true)
+                      in
+                         ctac hvk goal fk'' sk
+                      end)
          in
             Reorder.reorder
                (* applyMain has to return answer *)
