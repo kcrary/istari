@@ -14,6 +14,10 @@
 
   + `revert` now works on later and later-hidden hypotheses.
 
+- In `Case`, `goalHypCaseT` and `goalHypCaseB` now take names.  The
+  old versions that take numbers are renamed to `goalHypnCaseT` and
+  `goalHypnCaseB`.
+
 - Library changes:
 
   + `Bar` has additional lemmas.

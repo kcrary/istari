@@ -1,7 +1,7 @@
 
 ISTARIBIN=../ui/bin
 
-DOCUNITS = acc bar bool decidable finite finite-map function integer irrelevance kindlike logic list misc nat natural option partial permutation quotient rational relations stable symbol tuple weaksum wtype
+DOCUNITS = acc bar bool decidable finite finite-map function integer irrelevance kindlike logic list misc nat natural option partial permutation quotient rational relations sqstable stable symbol tuple weaksum wtype
 UNITS = $(DOCUNITS) datatype syntactic-equality omega
 DOCS = finite-map-class
 
@@ -27,7 +27,7 @@ tags :
 ## everything Istari's datatype implementation needs, including stuff datatype.ist doesn't
 datatype.isto : acc.isto misc.isto nat.isto partial.isto     integer.isto
 
-bar.isto : logic.isto misc.isto
+bar.isto : logic.isto misc.isto sqstable.isto
 bool.isto : logic.isto
 decidable.isto : logic.isto bool.isto
 finite.isto : logic.isto decidable.isto list.isto
@@ -46,6 +46,7 @@ permutation.isto : list.isto logic.isto misc.isto nat.isto
 quotient.isto : logic.isto
 rational.isto : bool.isto decidable.isto integer.isto logic.isto partial.isto quotient.isto stable.ist
 relations.isto : datatype.isto acc.isto decidable.isto finite.isto
+sqstable.isto : decidable.isto logic.isto stable.isto syntactic-equality.isto
 stable.isto : decidable.isto logic.isto
 symbol.isto : bool.isto logic.isto partial.isto
 syntactic-equality.isto : nat.isto integer.isto natural.isto symbol.isto

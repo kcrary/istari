@@ -2878,47 +2878,24 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                       if Constant.eq (const, Prim.paramapp) then
                          (case N.simplify func of
                              T.Lam (_, body) =>
-                                (case Irrelevance.irrelevance (Irrelevance.IntSet.singleton 0) body of
-                                    SOME red =>
+                                (case Irrelevance.irrelevanceApp body of
+                                    SOME (red1, red2) =>
                                        let
-                                          val body' = R.reduce red body
+                                          (* red1 : N spine = paramapp (fn . body) arg spine --> N12
+                                             red2 : (fn . body) arg spine --> N12
+                                          *)
 
-                                          (* red : body --> body' and body' does not contain 0 *)
-
-                                          val red1 =
-                                             R.trans
-                                                [
-                                                (* paramapp (fn . body) arg spine *)
-                                                R.unfold,
-                                                (* (fn . fn . 1 unavailable) (fn . body) arg spine *)
-                                                R.beta 2,
-                                                (* (fn . body) unavailable spine *)
-                                                R.within [0, 0] red,
-                                                (* (fn . body') unavailable spine *)
-                                                R.beta 1
-                                                (* body' [unavailable . id] spine *)
-                                                ]
-
-                                          val red2 =
-                                             R.trans
-                                                [
-                                                (* (fn . body) arg spine *)
-                                                R.within [0, 0] red,
-                                                (* (fn . body') arg spine *)
-                                                R.beta 1
-                                                (* body' [arg . id] spine = body' [unavailable . id] spine *)
-                                                ]
+                                          val n12 = R.reduce red1 n
 
                                           val red3 =
                                              (* (fn . body) arg spine *)
                                              R.beta 1
                                              (* body [arg . id] spine *)
 
-                                          val n12 = T.Elim (T.Sub (body', T.Dot (T.Const Prim.unavailable, T.id)), spine)
                                           val n23 = T.Elim (T.Lam (NONE, body), T.App arg :: spine)
                                              
-                                          (* red1 : paramapp (fn . body) arg spine --> N12
-                                             red2 : N23 --> N12
+                                          (* red1 : N spine --> N12
+                                             red2 : N12 --> N23
                                              red3 : N23 --> body [arg . id] spine
                                           *)
                                           

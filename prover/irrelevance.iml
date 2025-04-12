@@ -21,6 +21,18 @@ signature IRRELEVANCE =
       val proveIrrelevantUnfolds : Tactic.tactic
 
 
+      (* irrelevanceApp M
+       
+         for all N, there exists P, such that for all spine,
+            red1 : paramapp (fn . M) N spine --> P spine
+            red2 : (fn . M) N spine --> P spine
+         and
+         returns (SOME (red1, red2))
+
+         or returns NONE
+      *)
+      val irrelevanceApp : Term.term -> (Reduction.reduction * Reduction.reduction) option
+
       (* the term can mention hidden variables in irrelevant positions *)
       val inhabitant : Term.term -> Tactic.tactic
 
@@ -296,6 +308,48 @@ structure Irrelevance :> IRRELEVANCE =
          end
 
       val proveIrrelevantUnfolds = lift proveIrrelevantUnfoldsLoop
+
+
+      fun irrelevanceApp m =
+         (case irrelevance (IntSet.singleton 0) m of
+             NONE => NONE
+
+           | SOME red =>
+                let
+                   (* red : M --> M' and M' does not contain 0 *)
+
+                   val red1 =
+                      R.trans
+                         [
+                         (* paramapp (fn . M) N spine *)
+                         R.unfold,
+
+                         (* (fn . fn . 1 unavailable) (fn . M) N spine *)
+                         R.beta 2,
+
+                         (* (fn . M) unavailable spine *)
+                         R.within [0, 0] red,
+
+                         (* (fn . M') unavailable spine *)
+                         R.beta 1,
+
+                         (* M' [unavailable . id] spine *)
+                         ]
+
+                   val red2 =
+                      R.trans
+                         [
+                         (* (fn . M) N spine *)
+                         R.within [0, 0] red,
+
+                         (* (fn . M') N spine *)
+                         R.beta 1,
+
+                         (* M' [N . id] = M' [unavailable . id] spine *)
+                         ]
+                in
+                   SOME (red1, red2)
+                end)
 
 
       fun hiddenSet i ctx set =

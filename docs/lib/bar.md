@@ -209,3 +209,8 @@ Several corollaries of induction pertaining to `bindbart`:
                               (e2 : bar b) .
                               (bindbart x = e1 in bindbart y = e2 in c x y)
                                 <-> (bindbart y = e2 in bindbart x = e1 in c x y)
+
+    sqstable_bindbart : intersect (i : level) (a : U i) (b : a -> U i) .
+                           forall (e : bar a) .
+                             (forall (x : a) . Sqstable.sqstable (b x))
+                             -> Sqstable.sqstable (`bindbart e b)

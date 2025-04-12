@@ -340,12 +340,12 @@ In the parser they are written `$tm`, `$tml`, `$tmh`, `$tp`, `$tpl`,
 
 In all the entry points that match a hypothesis extracted from a
 context (*i.e.,* `contextCase`, `contextnCase`, `contextCaseT`,
-`contextnCaseT`, `goalHypCaseT`, `goalContextCaseT`,
+`contextnCaseT`, `goalHypCaseT`, `goalHypnCaseT`, `goalContextCaseT`,
 `goalContextnCaseT`, `contextCaseB`, `contextnCaseB`, `goalHypCaseB`,
-`goalContextCaseB`, `goalContextnCaseB`, `allContextCase`, and
-`allGoalContextCase`), the hypothesis is shifted into the scope of the
-full context before matching.  That is, hypothesis `i` is shifted by
-`i+1`.
+`goalHypnCaseB`, `goalContextCaseB`, `goalContextnCaseB`,
+`allContextCase`, and `allGoalContextCase`), the hypothesis is shifted
+into the scope of the full context before matching.  That is,
+hypothesis `i` is shifted by `i+1`.
 
 In the entry points that mention `context`, the name of the
 hypothesis that was matched is passed as the first binding.  In the
@@ -448,7 +448,8 @@ The full collection of entry points is:
     val contextCaseT      : context -> Directory.directory -> (context, unit * Symbol.symbol, 'a tacticm) matcher -> 'a tacticm
     val contextnCaseT     : context -> (context, unit * int, 'a tacticm) matcher -> 'a tacticm
     val goalCaseT         : (term, unit, 'a tacticm) matcher -> 'a tacticm
-    val goalHypCaseT      : int -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+    val goalHypCaseT      : Symbol.symbol -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+    val goalHypnCaseT     : int -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
     val goalContextCaseT  : (context, unit * Symbol.symbol, 'a tacticm) matcher -> 'a tacticm
     val goalContextnCaseT : (context, unit * int, 'a tacticm) matcher -> 'a tacticm
 
@@ -463,7 +464,8 @@ The full collection of entry points is:
     val contextCaseB      : context -> Directory.directory -> (context, unit * Symbol.symbol, 'a tacticm) matcher -> 'a tacticm
     val contextnCaseB     : context -> (context, unit * int, 'a tacticm) matcher -> 'a tacticm
     val goalCaseB         : (term, unit, 'a tacticm) matcher -> 'a tacticm
-    val goalHypCaseB      : int -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+    val goalHypCaseB      : Symbol.symbol -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+    val goalHypnCaseB     : int -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
     val goalContextCaseB  : (context, unit * Symbol.symbol, 'a tacticm) matcher -> 'a tacticm
     val goalContextnCaseB : (context, unit * int, 'a tacticm) matcher -> 'a tacticm
 

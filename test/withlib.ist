@@ -14,6 +14,70 @@ fun shouldfail tac goal fk sk =
 
 
 
+lemma "squashConcl"
+/
+  forall i (a b c : U i) (d : c -> U i) (m n : nat) .
+    Sqstable.sqstable b
+    -> { a -> b & (forall x y y' . y = y' : d x) & unit & m < n }
+    -> a -> b & (forall x y y' . y = y' : d x) & unit & m < n
+/;
+
+inference.
+intro /i a b c d m n Hb Hsq/.
+squashConcl.
+hyp /Hsq/.
+qed ();
+
+
+
+lemma "infer_through_paramapp"
+/
+  forall i (a : U i) (b : a -> U i) (c : U i)
+    (d : forall (x : a) . b x -g> U i)
+    (f : forall (x : a) (h : pirr (b x)) .
+           let inpi h' = h
+           in
+             c -> d x ap h')
+    (y : a)
+    (z : c)
+    (hy : b y) . 
+      f y (inpi hy) z : d y ap hy
+/;
+
+inference.
+intro /i a b c d f y z hy/.
+infer /f y (inpi hy) z/ /H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "so_through_paramapp"
+/
+  forall i (a : U i) (b : a -> U i) (c : U i)
+    (d : forall (x : a) . b x -g> U i)
+    (f : unit
+         -> forall (x : a) (h : pirr (b x)) .
+            let inpi h' = h
+            in
+              c -> d x ap h')
+    (y : a)
+    (z : c)
+    (hy : b y) . 
+      d y ap hy
+/;
+
+inference.
+intro /i a b c d f y z hy/.
+so /f __ y (inpi hy) z/ /H/.
+  {
+  split.
+  }
+hyp /H/.
+qed ();
+
+
+
 lemma "let_using_irrelevant_hidden"
 /
   forall i (a : U i) (b : a -> U i) .

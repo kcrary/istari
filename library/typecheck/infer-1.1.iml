@@ -1,5 +1,5 @@
 
-signature INFER =
+signature INFER_1_1 =
    sig
 
       type term = Term.term
@@ -161,7 +161,7 @@ signature INFER =
    end
 
 
-structure Infer :> INFER =
+structure Infer_1_1 :> INFER_1_1 =
    struct
 
       structure T = Term
@@ -670,77 +670,23 @@ structure Infer :> INFER =
          termCase a
          /| const? @ ? =>
             \(fnc const aspine =>
-                 if Constant.eq (const, Prim.paramapp) then
-                    (* If we handle paramapp by unfolding it, we see unavailables. *)
-                    (case aspine of
-                        T.App func :: T.App n :: aspine' =>
-                           (case N.whnf func of
-                               T.Lam (_, f) =>
-                                  (case Irrelevance.irrelevanceApp f of
-                                      SOME (red1, red2) =>
-                                         let
-                                            val res = T.Elim (T.Lam (NONE, f), T.App n :: aspine')
+                 (case Constant.definition const of
+                     NONE =>
+                        (a, tac, m, spine)
 
-                                            val tac' =
-                                               (* (fn . M) N aspine' *)
-                                               refine (Rule.assert'
-                                                          (T.apply2 Prim.ov
-                                                              (T.Elim (T.Const Prim.paramapp, aspine))
-                                                              m)
-                                                          (T.apply2 Prim.ov
-                                                              res
-                                                              m))
-                                               >>> [
-                                                   (* M : paramapp func N aspine' *)
-                                                   tac,
-        
-                                                   (* M : paramapp func N aspine' |- (M : (fn . F) N aspine')[^] *)
-                                                   refine (Rule.whnfHypAt 0 [1, 1])
-                                                   >>+
-                                                   (* M : paramapp (fn . F) N aspine' |- (M : (fn . F) N aspine')[^] *)
-                                                   refine (Rule.reduceHypAt 0 0 
-                                                              (J.Tm (T.apply2 Prim.ov T.zero (T.Sub (m, T.shift1))))
-                                                              (T.Elim (T.Const Prim.paramapp, T.App (T.Lam (NONE, f)) :: T.App n :: aspine'))
-                                                              red1)
-                                                   >>+
-                                                   (* M : P aspine' |- (M : (fn . F) N aspine')[^] *)
-                                                   refine (Rule.reduceAt 0
-                                                              (T.apply2 Prim.ov T.zero (T.Sub (m, T.Shift 2)))
-                                                              (T.Sub (T.Elim (T.Lam (NONE, f), T.App n :: aspine'), T.shift1))
-                                                              red2)
-                                                   >>+
-                                                   (* M : P aspine' |- (M : P aspine')[^] *)
-                                                   refine (Rule.hypothesis 0)
-                                                   >> done
-                                                   ]
-                                         in
-                                            inferSpine ctx m res spine tac' invis prove
-                                         end
-        
-                                    | NONE => (a, tac, m, spine))
-
-                             | _ =>
-                                  (a, tac, m, spine))
-        
-                      | _ => (a, tac, m, spine))
-                 else
-                    (case Constant.definition const of
-                        NONE =>
-                           (a, tac, m, spine)
-   
-                      | SOME n =>
-                           let
-                              val tac' =
-                                 (* G |- M : N @ aspine *)
-                                 refine (Rule.unreduce
-                                            (T.apply2 Prim.ov a m)
-                                            (R.within [1] R.unfold))
-                                 >>+
-                                 (* G |- M : A *)
-                                 tac
-                           in
-                              inferSpine ctx m (T.Elim (n, aspine)) spine tac' invis prove
-                           end))\
+                   | SOME n =>
+                        let
+                           val tac' =
+                              (* G |- M : N @ aspine *)
+                              refine (Rule.unreduce
+                                         (T.apply2 Prim.ov a m)
+                                         (R.within [1] R.unfold))
+                              >>+
+                              (* G |- M : A *)
+                              tac
+                        in
+                           inferSpine ctx m (T.Elim (n, aspine)) spine tac' invis prove
+                        end))\
 
           | _ =>
             \(fnc =>

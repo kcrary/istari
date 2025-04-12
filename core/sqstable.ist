@@ -1,0 +1,400 @@
+
+File.import "logic-load.iml";
+File.import "decidable-load.iml";
+File.import "syntactic-equality-load.iml";
+File.import "stable-load.iml";
+
+File.import "sqstable-aux.iml";
+
+beginModule "Sqstable";
+
+
+define /sqstable P/
+/
+  { P } -> P
+//
+  intersect i . U i -> U i
+/;
+
+unfold /sqstable/.
+typecheck.
+qed ();
+Constant.setOpacity (parseConstant /sqstable/) Constant.FIRM;
+
+
+
+lemma "sqstable_and"
+/
+  intersect i (P Q : U i) . sqstable P -> sqstable Q -> sqstable (P & Q)
+/;
+
+inference.
+intro /i P Q HP HQ/.
+intro /[H]/.
+split.
+  {
+  apply /HP/.
+  split.
+  exact /H #1/.
+  }
+
+  {
+  apply /HQ/.
+  split.
+  exact /H #2/.
+  }
+qed ();
+
+
+
+lemma "sqstable_implies"
+/
+  intersect i (P Q : U i) . sqstable Q -> sqstable (P -> Q)
+/;
+
+inference.
+intro /i P Q HQ/.
+intro /[H] HP/.
+apply /HQ/.
+split >> auto.
+qed ();
+
+
+
+lemma "sqstable_forall"
+/
+  intersect i (A : U i) (P : A -> U i) .
+    (forall x . sqstable (P x))
+    -> sqstable (`forall A P)
+/;
+
+inference.
+intro /i A P HP/.
+assert /SyntacticEquality.sequal P (fn x . P x)/ /Heq/.
+  {
+  RuleTactic.arrowEtaSequal (Term.evar ()) (Term.evar ()) >> auto.
+  }
+rewrite /-> Heq/.
+intro /[H] x/.
+apply /HP/.
+split.
+auto.
+qed ();
+
+
+
+lemma "sqstable_forallfut"
+/
+  intersect i . intersectfut (A : U i) . intersect (P : forallfut (_ : A) . U i) .
+    (forallfut x . sqstable (P x))
+    -> sqstable (`forallfut A P)
+/;
+
+inference.
+intro /i A P HP/.
+assert /SyntacticEquality.sequal P (fn x . P x)/ /Heq/.
+  {
+  RuleTactic.forallEtaSequal (Term.Const Prim.void) (Term.Const Prim.void).
+  subsume /forallfut (_ : A) . U i/ >> auto.
+  }
+rewrite /-> Heq/.
+intro /[H] x/.
+apply /HP/.
+split.
+apply /H/.
+qed ();
+
+
+
+lemma "sqstable_intersect"
+/
+  intersect i (A : U i) (P : A -> U i) .
+    (intersect x . sqstable (P x))
+    -> sqstable (`intersect A P)
+/;
+
+inference.
+intro /i A P HP/.
+assert /SyntacticEquality.sequal P (fn x . P x)/ /Heq/.
+  {
+  RuleTactic.arrowEtaSequal (Term.evar ()) (Term.evar ()) >> auto.
+  }
+rewrite /-> Heq/.
+intro /[H] x/.
+apply /HP/.
+split.
+apply /H/.
+qed ();
+
+
+
+lemma "sqstable_intersectfut"
+/
+  intersect i . intersectfut (A : U i) . intersect (P : forallfut (_ : A) . U i) . 
+    (intersectfut x . sqstable (P x))
+    -> sqstable (`intersectfut A P)
+/;
+
+inference.
+intro /i A P HP/.
+assert /SyntacticEquality.sequal P (fn x . P x)/ /Heq/.
+  {
+  RuleTactic.forallEtaSequal (Term.Const Prim.void) (Term.Const Prim.void).
+  subsume /forallfut (_ : A) . U i/ >> auto.
+  }
+rewrite /-> Heq/.
+intro /[H] x/.
+apply /HP/.
+split.
+apply /H/.
+qed ();
+
+
+
+lemma "sqstable_parametric"
+/
+  intersect i (A : U i) (P : A -> U i) .
+    (parametric x . sqstable (P x))
+    -> sqstable (`parametric A P)
+/;
+
+inference.
+intro /i A P HP/.
+assert /SyntacticEquality.sequal P (fn x . P x)/ /Heq/.
+  {
+  RuleTactic.arrowEtaSequal (Term.evar ()) (Term.evar ()) >> auto.
+  }
+rewrite /-> Heq/.
+intro /[H] x/.
+apply /HP/.
+split.
+apply /H/.
+qed ();
+
+
+
+lemma "sqstable_parametricfut"
+/
+  intersect i . intersectfut (A : U i) . intersect (P : forallfut (_ : A) . U i) . 
+    (parametricfut x . sqstable (P x))
+    -> sqstable (`parametricfut A P)
+/;
+
+inference.
+intro /i A P HP/.
+assert /SyntacticEquality.sequal P (fn x . P x)/ /Heq/.
+  {
+  RuleTactic.forallEtaSequal (Term.Const Prim.void) (Term.Const Prim.void).
+  subsume /forallfut (_ : A) . U i/ >> auto.
+  }
+rewrite /-> Heq/.
+intro /[H] x/.
+apply /HP/.
+split.
+apply /H/.
+qed ();
+
+
+
+lemma "sqstable_future"
+/
+  intersect i . intersectfut (P : U i) .
+    future (sqstable P)
+    -> sqstable (future P)
+/;
+
+inference.
+intro /i P [HP]/.
+intro /[[H]]/.
+split.
+apply /HP/.
+split >> auto.
+qed ();
+
+
+
+lemma "sqstable_letnext"
+/
+  intersect i . 
+  intersectfut (A : U i) . 
+  forall (m : future A) .
+  intersect (B : forallfut (_ : A) . U i) .
+    (forallfut (x : A) . sqstable (B x))
+    -> sqstable (let next x = m in B x)
+/;
+
+inference.
+intro /i A [m] B HB/.
+reduce //.
+intro /[H]/.
+apply /HB/ >> auto.
+qed ();
+
+
+
+lemma "sqstable_true"
+/
+  sqstable unit
+/;
+
+intro /_/.
+split.
+qed ();
+
+
+
+lemma "sqstable_false"
+/
+  sqstable void
+/;
+
+intro /[0]/.
+qed ();
+
+
+
+lemma "sqstable_equal"
+/
+  intersect i (A : U i) (x y : A) .
+    sqstable (x = y : A)
+/;
+
+inference.
+intro /i A x y/.
+intro /[H]/.
+unhide.
+hyp /H/.
+qed ();
+
+
+
+lemma "sqstable_subtype"
+/
+  intersect i (A B : U i) .
+    sqstable (A <: B)
+/;
+
+inference.
+intro /i A B [H]/.
+unhide.
+hyp /H/.
+qed ();
+
+
+
+lemma "sqstable_squash"
+/
+  intersect i (A : U i) .
+    sqstable { A }
+/;
+
+inference.
+intro /i A/.
+intro /[[H]]/.
+split >> auto.
+qed ();
+
+
+
+lemma "sqstable_isquash"
+/
+  intersect i (A : U i) .
+    sqstable (isquash A)
+/;
+
+inference.
+intro /i A/.
+intro /[[H]]/.
+split >> auto.
+qed ();
+
+
+
+lemma "sqstable_not"
+/
+  intersect i (P : U i) . sqstable (not P)
+/;
+
+inference.
+intro /i P/.
+apply /sqstable_implies/ >> autoWith /sqstable_false/.
+qed ();
+
+
+
+lemma "sqstable_iff"
+/
+  intersect i (P Q : U i) . sqstable P -> sqstable Q -> sqstable (P <-> Q)
+/;
+
+inference.
+intro /i P Q Hp Hq/.
+apply /sqstable_and/ >> autoWith /sqstable_implies/.
+qed ();
+
+
+
+lemma "sqstable_equiv"
+/
+  intersect i (P Q : U i) .
+    P <-> Q
+    -> sqstable P
+    -> sqstable Q
+/;
+
+inference.
+intro /i P Q Hiff HstP [HQ]/.
+apply /Hiff/.
+apply /HstP/.
+split.
+apply /Hiff/ >> auto.
+qed ();
+
+
+
+lemma "decidable_impl_sqstable"
+/
+  intersect i (P : U i) . Decidable.decidable P -> sqstable P
+/;
+
+inference.
+intro /i P Hdec/.
+destruct /Hdec/ /Hp | Hnp/ >> auto.
+intro /[H]/.
+exfalso.
+so /Hnp H/ /0/.
+qed ();
+
+
+
+lemma "stable_impl_sqstable"
+/
+  forall i (P : U i) . Stable.stable P -> sqstable P
+/;
+
+inference.
+intro /i P Hstable [H]/.
+apply /Hstable/.
+intro /Hnotp/.
+exfalso.
+so /Hnotp H/ /0/.
+qed ();
+
+
+
+lemma "sqstable_elim"
+/
+  intersect i (P : U i) .
+    sqstable P
+    -> { P }
+    -> P
+/;
+
+inference.
+intro /i P H/.
+hyp /H/.
+qed ();
+
+
+
+endModule ();

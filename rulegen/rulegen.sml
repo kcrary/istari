@@ -347,7 +347,7 @@ structure Rulegen :> RULEGEN =
 \\n\
 \      val make :\n\
 \         string                                                      (* name *)\n\
-\         -> Term.term list                                           (* hidden variables *)\n\
+\         -> Term.term list                                           (* extract variables *)\n\
 \         -> Term.term                                                (* conclusion *)\n\
 \         -> (context_action * Judgement.hyp list * Term.term) list   (* premises *)\n\
 \         -> (Term.term list -> Term.term)                            (* extract *)\n\
@@ -355,7 +355,7 @@ structure Rulegen :> RULEGEN =
 \\n\
 \      val lmake :\n\
 \         string                             (* name *)\n\
-\         -> Term.term list                  (* hidden variables *)\n\
+\         -> Term.term list                  (* extract variables *)\n\
 \         -> int                             (* size of trailing context *)\n\
 \         -> Judgement.hyp list              (* conclusion floating context *)\n\
 \         -> Term.term                       (* conclusion rhs *)\n\

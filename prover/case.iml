@@ -128,7 +128,8 @@ signature CASE =
       val contextCaseT : context -> Directory.directory -> (hyp, unit * Symbol.symbol, 'a tacticm) matcher -> 'a tacticm
       val contextnCaseT : context -> (hyp, unit * int, 'a tacticm) matcher -> 'a tacticm
       val goalCaseT : (term, unit, 'a tacticm) matcher -> 'a tacticm
-      val goalHypCaseT : int -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+      val goalHypCaseT : Symbol.symbol -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+      val goalHypnCaseT : int -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
       val goalContextCaseT : (hyp, unit * Symbol.symbol, 'a tacticm) matcher -> 'a tacticm
       val goalContextnCaseT : (hyp, unit * int, 'a tacticm) matcher -> 'a tacticm
 
@@ -146,7 +147,8 @@ signature CASE =
       val contextCaseB : context -> Directory.directory -> (hyp, unit * Symbol.symbol, 'a tacticm) matcher -> 'a tacticm
       val contextnCaseB : context -> (hyp, unit * int, 'a tacticm) matcher -> 'a tacticm
       val goalCaseB : (term, unit, 'a tacticm) matcher -> 'a tacticm
-      val goalHypCaseB : int -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+      val goalHypCaseB : Symbol.symbol -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
+      val goalHypnCaseB : int -> (hyp, unit, 'a tacticm) matcher -> 'a tacticm
       val goalContextCaseB : (hyp, unit * Symbol.symbol, 'a tacticm) matcher -> 'a tacticm
       val goalContextnCaseB : (hyp, unit * int, 'a tacticm) matcher -> 'a tacticm
 
@@ -696,13 +698,21 @@ structure Case :> CASE =
       fun goalCaseT f (goal as (jud, _)) fk sk =
          caseT "no match in goalCaseT" (N.simplify (J.concl jud)) f goal fk sk
 
-      fun goalHypCaseT i f (goal as (jud, _)) fk sk =
+      fun goalHypnCaseT i f (goal as (jud, _)) fk sk =
          (case Seq.nthOpt (J.context jud) i of
              NONE =>
-                fk "no such hypothesis in goalHypCaseT"
+                fk "no such hypothesis in goalHypnCaseT"
 
            | SOME h =>
-                caseT "no match in goalHypCaseT" (J.subHyp h (T.Shift (i+1))) f goal fk sk)
+                caseT "no match in goalHypnCaseT" (J.subHyp h (T.Shift (i+1))) f goal fk sk)
+
+      fun goalHypCaseT sym f (goal as (_, dir)) fk sk =
+         (case Directory.lookupVarOpt (Directory.idir dir) sym of
+             SOME i =>
+                goalHypnCaseT i f goal fk sk
+
+           | NONE =>
+                fk "no such hypothesis in goalHypCaseT")
 
       fun goalContextCaseT f (goal as (jud, dir)) fk sk =
          anyhypLoop f 0 (J.context jud) dir
@@ -749,13 +759,21 @@ structure Case :> CASE =
       fun goalCaseB f (goal as (jud, _)) fk sk =
          caseB "no match in goalCaseB" (N.simplify (J.concl jud)) f goal fk sk
 
-      fun goalHypCaseB i f (goal as (jud, _)) fk sk =
+      fun goalHypnCaseB i f (goal as (jud, _)) fk sk =
          (case Seq.nthOpt (J.context jud) i of
              NONE =>
-                fk "no such hypothesis in goalHypCaseB"
+                fk "no such hypothesis in goalHypnCaseB"
 
            | SOME h =>
-                caseB "no match in goalHypCaseB" (J.subHyp h (T.Shift (i+1))) f goal fk sk)
+                caseB "no match in goalHypnCaseB" (J.subHyp h (T.Shift (i+1))) f goal fk sk)
+
+      fun goalHypCaseB sym f (goal as (_, dir)) fk sk =
+         (case Directory.lookupVarOpt (Directory.idir dir) sym of
+             SOME i =>
+                goalHypnCaseB i f goal fk sk
+
+           | NONE =>
+                fk "no such hypothesis in goalHypCaseB")
 
       fun goalContextCaseB f (goal as (jud, dir)) fk sk =
          anyhypLoop f 0 (J.context jud) dir
@@ -818,6 +836,7 @@ structure CasePervasive =
       val contextnCaseT = Case.contextnCaseT
       val goalCaseT = Case.goalCaseT
       val goalHypCaseT = Case.goalHypCaseT
+      val goalHypnCaseT = Case.goalHypnCaseT
       val goalContextCaseT = Case.goalContextCaseT
       val goalContextnCaseT = Case.goalContextnCaseT
       val termCaseB = Case.termCaseB
@@ -830,6 +849,7 @@ structure CasePervasive =
       val contextnCaseB = Case.contextnCaseB
       val goalCaseB = Case.goalCaseB
       val goalHypCaseB = Case.goalHypCaseB
+      val goalHypnCaseB = Case.goalHypnCaseB
       val goalContextCaseB = Case.goalContextCaseB
       val goalContextnCaseB = Case.goalContextnCaseB
       val allContextCase = Case.allContextCase
@@ -972,6 +992,7 @@ grammardef Case
    start contextnCaseT _ Match
    start goalCaseT Match
    start goalHypCaseT _ Match
+   start goalHypnCaseT _ Match
    start goalContextCaseT Match
    start goalContextnCaseT Match
    start termCaseB _ Match
@@ -984,6 +1005,7 @@ grammardef Case
    start contextnCaseB _ Match
    start goalCaseB Match
    start goalHypCaseB _ Match
+   start goalHypnCaseB _ Match
    start goalContextCaseB Match
    start goalContextnCaseB Match
    start allContextCase _ _ Match

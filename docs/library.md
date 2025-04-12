@@ -24,6 +24,7 @@ The following libraries are pre-loaded:
 - [`Permutation`](lib/permutation.html) (permutations on lists)
 - [`Quotient`](lib/quotient.html) (tools for manipulating quotient types)
 - [`Relations`](lib/relations.html)
+- [`Sqstable`](lib/sqstable.html)
 - [`Stable`](lib/stable.html)
 - [`Symbol`](lib/symbol.html)
 - [`Tuple`](lib/tuple.html)

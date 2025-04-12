@@ -1,0 +1,180 @@
+
+signature SQSTABLE_TACTIC =
+   sig
+
+      val proveSqstable : Tactic.tactic
+      val proveSqstableRaw : Tactic.tactic
+      val proveSqstablePriority : Tactic.priority Tactic.tacticm
+
+      val squashConcl : Tactic.tactic
+      val squashConclRaw : Tactic.tactic
+      val squashConclPriority : Tactic.priority Tactic.tacticm
+
+      val sqstableLemmas : Constant.constant ConstantTable.table
+
+   end
+
+
+functor AfterSqstableAll () :> SQSTABLE_TACTIC =
+   struct
+
+      structure T = Term
+      structure J = Judgement
+      structure N = Namespace
+      structure H = ConstantTable
+
+      open Tactic
+
+      val sqstable = resolveGlobal /Sqstable.sqstable/
+
+
+      val sqstableLemmas : Constant.constant H.table = H.table ()
+
+
+      fun sqstable_via_trivial c =
+         (* sqstable C *)
+         refine (Rule.assert (T.apply1 Prim.istp c) (T.evar ()))
+         >>> [
+             (* C : type *)
+             idtacM Secondary,
+
+             (* C : type |- sqstable C[^] *)
+             refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
+             >>> [
+                 (* C : type |- istp { C[^] } *)
+                 refine (Rule.squashForm (T.evar ()))
+                 >>+
+                 (* C : type |- C[^] : type *)
+                 refine (Rule.hypothesis 0) >> done,
+
+                 (* C : type, { C[^] } |- C[^2] *)
+                 refine (Rule.squashLeft 0 (T.evar ()) (T.evar ()))
+                 >>> [
+                     (* C : type |- C[^] : type *)
+                     refine (Rule.hypothesis 0) >> done,
+
+                     (* C : type, hide C[^] |- C[^2] *)
+                     refine (Rule.weaken 1 1)
+                     >>+
+                     (* hide C |- C[^] *)
+                     Typecheck.trivializePriority
+                     >>!
+                     (* C |- C[^] *)
+                     refine (Rule.hypothesis 0) >> done
+                     ]
+                 ]
+             ]
+
+      
+      fun proveSqstableLoop () =
+         reduceParam /concl/
+         >>+
+         first
+            [
+            assumption >> done,
+
+            goalCaseT
+               /| \sqstable\ ($as (const? @ _)) =>
+                  \(fnc c const =>
+                       (case H.find sqstableLemmas const of
+                           NONE =>
+                              first
+                                 [
+                                 sqstable_via_trivial c,
+   
+                                 idtacM Primary
+                                 ]
+    
+                         | SOME lemma =>
+                              ifthenM
+                                 (Backchain.applyPriority (ETerm.literal (T.Const lemma)))
+                                 (fn Primary => proveSqstableLoop ()
+                                   | Secondary => idtacM Secondary)
+                                 (first
+                                     [
+                                     sqstable_via_trivial c,
+                                     
+                                     idtacM Primary
+                                     ])))\
+   
+                | \Prim.future\ _ =>
+                  \(fnc =>
+                       split
+                       >>
+                       proveSqstableLoop ())\
+   
+                | (\Prim.arrow\ _ _ | \Prim.forall\ _ _ | \Prim.forallfut\ _ _ | \Prim.parametric\ _ _ | \Prim.parametricfut\ _ _ | \Prim.intersect\ _ _ | \Prim.intersectfut\ _ _) =>
+                  \(fnc =>
+                       IntroTactic.introPriority [IntroPattern.Ident NONE]
+                       >>!
+                       proveSqstableLoop ())\
+   
+                | _ =>
+                  \(fnc =>
+                       idtacM Primary)\
+               /
+               ]
+
+      val proveSqstablePriority = lift proveSqstableLoop
+
+      val proveSqstableRaw = proveSqstablePriority >> idtac
+
+      val proveSqstable = Typecheck.withTypecheckSnd proveSqstablePriority
+
+
+      val squashConclPriority =
+         let
+            do (jud, _) = withgoal
+         in
+            (* C *)
+            refine (Rule.assert (T.apply1 sqstable (J.concl jud)) (T.evar ()))
+            >>> [
+                (* sqstable C *)
+                proveSqstablePriority,
+
+                (* sqstable C |- C[^] *)
+                refine (Rule.arrowElim (T.evar ()) (T.evar ()))
+                >>> [
+                    (* sqstable C |- { C[^] } -> C[^] *)
+                    refine (Rule.hypothesis 0) >> done,
+
+                    (* sqstable C |- { C[^] } *)
+                    refine (Rule.weaken 0 1)
+                    >>+
+                    (* { C } *)
+                    idtacM Primary
+                    ]
+                ]
+         end
+
+      val squashConclRaw = squashConclPriority >> idtac
+
+      val squashConcl = Typecheck.withTypecheckSnd squashConclPriority
+
+
+
+      val () =
+         List.app
+            (fn (const, lemma) => 
+                H.insert sqstableLemmas const 
+                   (Namespace.resolveGlobal [parseIdent /Sqstable/, Symbol.fromValue lemma]))
+            [(Prim.prod, "sqstable_and"),
+             (Prim.arrow, "sqstable_implies"),
+             (Prim.forall, "sqstable_forall"),
+             (Prim.forallfut, "sqstable_forallfut"),
+             (Prim.intersect, "sqstable_intersect"),
+             (Prim.intersectfut, "sqstable_intersectfut"),
+             (Prim.parametric, "sqstable_parametric"),
+             (Prim.parametricfut, "sqstable_parametricfut"),
+             (Prim.future, "sqstable_future"),
+             (Prim.letnext, "sqstable_letnext"),
+             (Prim.unit, "sqstable_true"),
+             (Prim.void, "sqstable_false"),
+             (Prim.eq, "sqstable_equal"),
+             (Prim.subtype, "sqstable_subtype"),
+             (Prim.squash, "sqstable_squash"),
+             (Prim.isquash, "sqstable_isquash"),
+             (resolveGlobal /Logic.not/, "sqstable_not"),
+             (resolveGlobal /Logic.iff/, "sqstable_iff")]
+
+   end

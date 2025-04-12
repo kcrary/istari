@@ -241,23 +241,67 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
 
 
       and soSpineRetry msg const aspine spine tac fk sk =
-         (case Constant.definition const of
-             NONE =>
-                fk msg
+         if Constant.eq (const, Prim.paramapp) then
+            (* If we handle paramapp by unfolding it, we see unavailables. *)
+            (case aspine of
+                T.App func :: T.App n :: aspine' =>
+                   (case N.whnf func of
+                       T.Lam (_, m) =>
+                          (case I.irrelevanceApp m of
+                              SOME (red1, red2) =>
+                                 let
+                                    val res = T.Elim (T.Lam (NONE, m), T.App n :: aspine')
 
-           | SOME n =>
-                let
-                   val tac' =
-                      (* G |- N @ aspine *)
-                      refine (Rule.unreduce
-                                 (T.Elim (T.Const const, aspine))
-                                 Reduction.unfold)
-                      >>+
-                      (* G |- const @ aspine *)
-                      tac
-                in
-                   soSpine (T.Elim (n, aspine)) spine tac' fk sk
-                end)         
+                                    val tac' =
+                                       (* (fn . M) N aspine' *)
+                                       refine (Rule.assert'
+                                                  (T.Elim (T.Const Prim.paramapp, aspine))
+                                                  res)
+                                       >>> [
+                                           (* paramapp func N aspine' *)
+                                           tac,
+
+                                           (* paramapp func N aspine' |- ((fn . M) N aspine')[^] *)
+                                           refine (Rule.whnfHypAt 0 [1])
+                                           >>+
+                                           (* paramapp (fn . M) N aspine' |- ((fn . M) N aspine')[^] *)
+                                           refine (Rule.reduceHyp 0 red1)
+                                           >>+
+                                           (* P aspine' |- ((fn . M) N aspine')[^] *)
+                                           refine (Rule.reduce red2)
+                                           >>+
+                                           (* P aspine' |- (P aspine')[^] *)
+                                           refine (Rule.hypothesis 0)
+                                           >> done
+                                           ]
+                                 in
+                                    soSpine res spine tac' fk sk
+                                 end
+
+                            | NONE => fk msg)
+
+                     | _ =>
+                          fk msg)
+
+              | _ => fk msg)
+         else
+            (case Constant.definition const of
+                NONE =>
+                   fk msg
+   
+              | SOME n =>
+                   let
+                      val tac' =
+                         (* G |- N @ aspine *)
+                         refine (Rule.unreduce
+                                    (T.Elim (T.Const const, aspine))
+                                    Reduction.unfold)
+                         >>+
+                         (* G |- const @ aspine *)
+                         tac
+                   in
+                      soSpine (T.Elim (n, aspine)) spine tac' fk sk
+                   end)         
 
                           
 

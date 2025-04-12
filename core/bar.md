@@ -161,3 +161,5 @@ Several corollaries of induction pertaining to `bindbart`:
     bindbart_commute : type:bindbart_commute
 
     bindbart_commute_iff : type:bindbart_commute_iff
+
+    sqstable_bindbart : type:sqstable_bindbart

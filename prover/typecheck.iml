@@ -30,7 +30,7 @@ signature TYPECHECK =
       (* infer the type obtained by following the supplied typing with the indicated spine *)
       val inferSpinePriority : int -> ETerm.eterm -> Symbol.symbol option -> priority tacticm
 
-      (* prove the goal using () for its extract, subgoals will have the same context *)
+      (* prove the goal using a known extract, subgoals will have the same context *)
       val trivializePriority : priority tacticm
       val trivializeRaw : tactic
       val trivialize : tactic
@@ -288,7 +288,7 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
             do (goal as (jud, dir)) = withgoal
             val n = ETerm.withdir dir en
          in
-            goalHypCaseT i
+            goalHypnCaseT i
             /| $tm \Prim.ov\ ? ? =>
                \(fnc a m =>
                     termCaseT n
@@ -347,14 +347,15 @@ structure TypecheckInternal :> TYPECHECK_INTERNAL =
                  (case H.find TypecheckTables.trivialIntroTactics const of
                      SOME tac =>
                         refine (Rule.inhabitant (T.evar ()) T.Triv)
-                        >>
+                        >>+
                         tac
  
                    | NONE =>
                         (case H.find TypecheckTables.semitrivialIntroTactics const of
                             SOME (m, tac) =>
                                refine (Rule.inhabitant (T.evar ()) m)
-                               >> tac
+                               >>+
+                               tac
 
                           | NONE =>
                                fail "conclusion is not known to be computationally trivial")))\
