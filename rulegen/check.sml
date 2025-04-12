@@ -94,6 +94,82 @@ structure Check :> CHECK =
 
       val sort = Juliasort.sort String.compare
 
+
+      (* Checks that any occurrences of metavars in set are not under a binder
+         or a nontrivial substitution.  The set is intended to be the set of
+         metavariable used in the extract that are not bound by an extract.
+         There's nothing inherently wrong with such a metavariable being modified,
+         but we would need to make the checker for hidden variable occurrences
+         more sophisticated if any such metavariables were modified.
+      *)
+      exception ModifiedExtractMetavariable
+
+      fun unmodifiedTerm set under m =
+         (case m of
+             Var _ => ()
+
+           | Varfar _ => ()
+
+           | Const _ => ()
+
+           | Lam m' => 
+                unmodifiedTerm set true m'
+
+           | App (m1, m2) =>
+                (
+                unmodifiedTerm set under m1;
+                unmodifiedTerm set under m2
+                )
+
+           | Pair (m1, m2) =>
+                (
+                unmodifiedTerm set under m1;
+                unmodifiedTerm set under m2
+                )
+
+           | Pi1 m' =>
+                unmodifiedTerm set under m'
+
+           | Pi2 m' =>
+                unmodifiedTerm set under m'
+
+           | Next m' =>
+                unmodifiedTerm set under m'
+
+           | Prev m' =>
+                unmodifiedTerm set under m'
+
+           | Triv => ()
+
+           | Metavar (sym, s) =>
+                if S.member set sym then
+                   if under then
+                      raise ModifiedExtractMetavariable
+                   else
+                      (case s of
+                          Shift 0 => ()
+
+                        | _ => raise ModifiedExtractMetavariable)
+                else
+                   unmodifiedSub set under s)
+
+      and unmodifiedSub set under s =
+         (case s of
+             Shift _ => ()
+
+           | Dot (m, s') =>
+                (
+                unmodifiedTerm set under m;
+                unmodifiedSub set under s'
+                )
+
+           | ComposeShiftFar s' =>
+                unmodifiedSub set true s'
+
+           | Under s' =>
+                unmodifiedSub set true s')
+
+
       fun check rule =
          (case rule of
              Rule (_, (premises, concl, ext), _) =>
@@ -128,6 +204,8 @@ structure Check :> CHECK =
        
                    val eargset = S.difference eset bset
                    val argset = S.union oset eargset
+
+                   val () = unmodifiedTerm eargset false ext
                 in
                    (sort (List.map Symbol.toValue (S.toList argset)),
                     sort (List.map Symbol.toValue (S.toList eargset)))
@@ -175,6 +253,8 @@ structure Check :> CHECK =
        
                    val eargset = S.difference eset bset
                    val argset = S.union oset eargset
+
+                   val () = unmodifiedTerm eargset false ext
                 in
                    (sort (List.map Symbol.toValue (S.toList argset)),
                     sort (List.map Symbol.toValue (S.toList eargset)))
