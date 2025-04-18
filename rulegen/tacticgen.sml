@@ -338,6 +338,7 @@ structure Tacticgen :> TACTICGEN =
 \      type term = Term.term\n\
 \\n\
 \      open Tactic\n\
+\      open RefineTactic\n\
 \\n\
 \      type tactic1 = term -> tactic\n\
 \      type tactic2 = term -> tactic1\n\

@@ -1,0 +1,130 @@
+
+signature IRRELEVANCE_TACTIC =
+   sig
+
+      val proveIrrelevant : Tactic.tactic
+
+      (* same as proveIrrelevant but tries unfolding head constants/variables *)
+      val proveIrrelevantUnfolds : Tactic.tactic
+
+   end
+
+
+structure IrrelevanceTactic :> IRRELEVANCE_TACTIC =
+   struct
+
+      structure T = Term
+      structure J = Judgement
+      structure R = Reduction
+      structure N = Normalize
+
+      open Tactic
+      open RefineTactic
+      open Irrelevance
+
+
+      (* proveIrrelevantFinish M red
+
+         if    red : M --> N and N does not contain 0
+         then  proves irrelevant (fn . M)
+      *)
+      fun proveIrrelevantFinish m red =
+         (* irrelevant (fn . M) *)
+         refine (Rule.reduce (R.within [1, 0] red))
+         >>+
+         (* irrelevant (fn . N) *)
+         refine (Rule.irrelevance (T.evar ()))
+         >>+
+         (* nonsense |- sequal N N[unavailable . ^]
+                      = sequal N N
+         *)
+         refine (Rule.sequalIntro (T.evar ()))
+         >>
+         done
+
+
+
+      val proveIrrelevant : tactic =
+         (* Normalize for performance benefit.  (The reduction we get back from
+            irrelevance will do it, but it's cheaper this way.)
+         *)
+         refine Rule.normalizeConcl
+         >>+
+         let
+            do (jud, _) = withgoal
+         in
+            (case J.concl jud of
+                T.Elim (T.Const const, [T.App (T.Lam (_, m))]) =>
+                   if Constant.eq (const, Prim.irrelevant) then
+                      (case irrelevance (IntSet.singleton 0) m of
+                          SOME red =>
+                             (* red : M --> N and N does not contain 0 *)
+                             proveIrrelevantFinish m red
+
+                        | NONE => 
+                             fail "argument is relevant")
+                   else
+                      fail "not an irrelevance goal"
+
+              | _ =>
+                   fail "not an irrelevance goal")
+         end
+
+
+      fun proveIrrelevantUnfoldsLoop () : tactic =
+         (* Make sure the conclusion is normalized so it can easily be unfolded,
+            and also for performance benefit.
+         *)
+         refine Rule.normalizeConcl
+         >>+
+         let
+            do (jud, _) = withgoal
+         in
+            (case J.concl jud of
+                T.Elim (T.Const const, [T.App (T.Lam (_, m))]) =>
+                   if Constant.eq (const, Prim.irrelevant) then
+                      (case irrelevance (IntSet.singleton 0) m of
+                          SOME red =>
+                             (* red : M --> N and N does not contain 0 *)
+                             proveIrrelevantFinish m red
+
+                        | NONE =>
+                             (* 0 seems to be relevant, try again *)
+                             (case m of
+                                 T.Elim (T.Const _, _) =>
+                                    (* irrelevant (fn . const spine) *)
+                                    refine (Rule.reduce (R.within [1, 0] R.unfold))
+                                    >>+
+                                    (* irrelevant (fn . M') *)
+                                    lift proveIrrelevantUnfoldsLoop
+                                    
+                               | T.Elim (T.Var i, spine) =>
+                                    if i > 0 then
+                                       (case J.hypOpt jud (i-1) of
+                                           SOME (J.Let _) =>
+                                              (* irrelevant (fn . i spine) *)
+                                              refine (Rule.letUnfold (i-1)
+                                                         (T.apply1 Prim.irrelevant
+                                                             (T.Lam (NONE,
+                                                                     T.Elim (T.Var 1, 
+                                                                             T.ssubst spine (T.underShift 1 1))))))
+                                              >>+
+                                              lift proveIrrelevantUnfoldsLoop
+   
+                                         | _ =>
+                                              fail "argument is relevant")
+                                    else
+                                       fail "argument is relevant"
+
+                               | _ => fail "argument is relevant"))
+                      
+                   else
+                      fail "not an irrelevance goal"
+
+              | _ =>
+                   fail "not an irrelevance goal")
+         end
+
+      val proveIrrelevantUnfolds = lift proveIrrelevantUnfoldsLoop
+
+   end

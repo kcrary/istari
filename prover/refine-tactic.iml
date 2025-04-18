@@ -1,0 +1,560 @@
+
+signature REFINE_TACTIC =
+   sig
+
+      val refine : Rule.rule -> Tactic.tactic
+
+      (* invokes the extra continuation if the refinement fails due to hidden variables *)
+      val refineHV : Rule.rule -> (unit -> Tactic.answer) -> Tactic.tactic
+
+   end
+
+
+structure RefineTactic :> REFINE_TACTIC =
+   struct
+
+      structure T = Term
+      structure J = Judgement
+      structure R = Reduction
+      structure F = Refine
+      structure I = Irrelevance
+      structure N = Normalize
+
+      open TacticInternal
+
+
+      datatype result =
+         Success of J.judgement list * (F.validation list -> F.validation * F.validation list)
+       | Failure
+       | HiddenVariableFailure
+
+
+      fun refineprimHV rule hvk (goal as (jud, dir)) fk sk =
+         (
+         !interrupt rule goal;
+         (case
+             try
+                Success (Refine.refine rule jud)
+             with
+                Rule.Failure => Failure
+
+              | Rule.HiddenVariable => HiddenVariableFailure
+          of
+             Success (subgoals, validate) =>
+                sk (map (fn jud' => (Message.blank, (jud', dir))) subgoals, validate, fk)
+
+           | Failure =>
+                fk (String.concat ["rule ", Rule.name rule, " does not apply"])
+
+           | HiddenVariableFailure =>
+                hvk ())
+         )
+
+      fun refineprim rule goal fk sk =
+         refineprimHV rule (fn () => fk "primitive refinement fails due to hidden variables") goal fk sk
+
+
+
+      fun hiddenSetLoop i ctx set =
+         (case Seq.expose ctx of
+             Seq.Nil => set
+
+           | Seq.Cons (h, ctx') =>
+                if
+                   (case h of
+                       J.Tmh _ => true
+                     | J.Tmlh _ => true
+                     | J.Tph => true
+                     | _ => false)
+                then
+                   hiddenSetLoop (i+1) ctx' (I.IntSet.insert set i)
+                else
+                   hiddenSetLoop (i+1) ctx' set)
+
+
+      fun hiddenSet jud = hiddenSetLoop 0 (J.context jud) I.IntSet.empty
+
+                       
+
+      fun failure str = raise (Fail ("argument mismatch in irrelevant " ^ str))
+
+
+      fun ruleWithIrrelevance f args hvk (goal as (jud, _)) fk sk =
+         let
+            val (m, tac) = f args
+         in
+            (case I.irrelevance (hiddenSet jud) m of
+                NONE =>
+                   hvk ()
+
+              | SOME red =>
+                   cut (tac red (R.reduce red m)) goal fk sk)
+         end
+
+
+      val inhabitantIrr =
+         ruleWithIrrelevance
+            (fn [a, m] =>
+                (m, (fns red m' =>
+                        (* A *)
+                        refineprim (Rule.inhabitant a m')
+                        >>+
+                        (* M' : A *)
+                        refineprim (Rule.unreduce (T.apply2 Prim.ov a m) (R.within [2] red))
+                        (* M : A *)
+                        ))
+
+              | _ => failure "inhabitant")
+
+
+      fun forallishElimIrr rule =
+         ruleWithIrrelevance
+            (fn [a, b, p] =>
+                (p, (fns red p' =>
+                        (* B[P . id] *)
+                        refineprim (Rule.reduceAt 0 b p red)
+                        >>+
+                        (* B[P' . id] *)
+                        refineprim (rule a b p')
+                        >>> [
+                            (* forallish A . B *)
+                            idtac,
+
+                            (* P' : A  =  (0 : A[^])[P' . id] *)
+                            refineprim (Rule.unreduceAt 0 
+                                           (T.apply2 Prim.ov (T.Sub (a, T.shift1)) T.zero)
+                                           p red)
+                            (* (0 : A[^])[P . id]  =  P : A *)
+                            ]
+                        ))
+
+              | _ => failure "forallish")
+                        
+      val forallElimIrr = forallishElimIrr Rule.forallElim
+      val forallfutElimIrr = forallishElimIrr Rule.forallfutElim
+      val parametricElimIrr = forallishElimIrr Rule.parametricElim
+      val parametricfutElimIrr = forallishElimIrr Rule.parametricfutElim
+
+      
+      val existsIntroIrr =
+         ruleWithIrrelevance
+            (fn [a, b, m] =>
+                (m, (fns red m' =>
+                        (* exists A . B *)
+                        refineprim (Rule.existsIntro a b m')
+                        >>> [
+                            (* A |- B : type *)
+                            idtac,
+
+                            (* M' : A *)
+                            refineprim (Rule.unreduceAt 0
+                                           (T.apply2 Prim.ov (T.Sub (a, T.shift1)) T.zero)
+                                           m red)
+                            (* M : A *),
+
+                            (* B[M' . id] *)
+                            refineprim (Rule.unreduceAt 0 b m red)
+                            (* B[M . id] *)
+                            ]
+                        ))
+              | _ => failure "existsIntro")
+                        
+
+      val generalizeIrr =
+         ruleWithIrrelevance
+            (fn [a, b, m] =>
+                (m, (fns red m' =>
+                        (* B[M . id] *)
+                        refineprim (Rule.reduceAt 0 b m red)
+                        >>+
+                        (* B[M' . id] *)
+                        refineprim (Rule.generalize a b m')
+                        >>> [
+                            (* M' : A *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov a m) (R.within [2] red))
+                            (* M : A *),
+
+                            (* A |- B *)
+                            idtac
+                            ]
+                        ))
+
+              | _ => failure "generalize")
+
+
+      val sumElimIrr =
+         ruleWithIrrelevance
+            (fn [a, b, c, m] =>
+                (m, (fns red m' =>
+                        (* C[M . id] *)
+                        refineprim (Rule.reduceAt 0 c m red)
+                        >>+
+                        (* C[M' . id] *)
+                        refineprim (Rule.sumElim a b c m')
+                        >>> [
+                            (* M' : A % B *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov (T.apply2 Prim.sum a b) m) (R.within [2] red))
+                            (* M : A % B *),
+
+                            idtac,
+                            idtac
+                            ]
+                        ))
+
+              | _ => failure "sumElim")
+
+
+      val futureElimIrr =
+         ruleWithIrrelevance
+            (fn [a, b, m] =>
+                (m, (fns red m' =>
+                        (* B[M #prev . id] = B[0 #prev, ^][M . id] *)
+                        refineprim (Rule.reduceAt 0 (T.Sub (b, T.Dot (T.Elim (T.zero, [T.Prev]), T.shift1))) m red)
+                        >>+
+                        (* B[M' #prev . id] *)
+                        refineprim (Rule.futureElim a b m')
+                        >>> [
+                            idtac,
+
+                            (* M' : future A *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov (T.apply1 Prim.future a) m) (R.within [2] red))
+                            (* M' : future A *),
+
+                            idtac
+                            ]
+                        ))
+
+              | _ => failure "futureElim")
+
+
+      val setIntroIrr =
+         ruleWithIrrelevance
+            (fn [a, b, m] =>
+                (m, (fns red m' =>
+                        refineprim (Rule.setIntro a b m')
+                        >>> [
+                            idtac,
+
+                            (* M' : A *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov a m) (R.within [2] red))
+                            (* M : A *),
+
+                            (* B[M' . id] *)
+                            refineprim (Rule.unreduceAt 0 b m red)
+                            (* B[M . id] *)
+                            ]
+                        ))
+
+              | _ => failure "setIntro")
+                      
+                        
+      val isetIntroIrr =
+         ruleWithIrrelevance
+            (fn [a, b, m] =>
+                (m, (fns red m' =>
+                        refineprim (Rule.isetIntro a b m')
+                        >>> [
+                            idtac,
+
+                            (* M' : A *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov a m) (R.within [2] red))
+                            (* M : A *),
+
+                            (* B[M' . id] *)
+                            refineprim (Rule.unreduceAt 0 b m red)
+                            (* B[M . id] *)
+                            ]
+                        ))
+
+              | _ => failure "isetIntro")
+                      
+                        
+      val muIndIrr =
+         ruleWithIrrelevance
+            (fn [a, b, m] =>
+                (m, (fns red m' =>
+                        (* B[M . id] *)
+                        refineprim (Rule.reduceAt 0 b m red)
+                        >>+
+                        (* B[M' . id] *)
+                        refineprim (Rule.muInd a b m')
+                        >>> [
+                            idtac,
+                            idtac,
+                            idtac,
+
+                            (* M' : mu . A *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov (T.apply1 Prim.mu (T.Lam (NONE, a))) m) (R.within [2] red))
+                            (* M : mu . A *)
+                            ]
+                        ))
+
+              | _ => failure "muInd")
+
+
+      val muIndUnivIrr =
+         ruleWithIrrelevance
+            (fn [a, b, i, m] =>
+                (m, (fns red m' =>
+                        (* B[M . id] *)
+                        refineprim (Rule.reduceAt 0 b m red)
+                        >>+
+                        (* B[M' . id] *)
+                        refineprim (Rule.muIndUniv a b i m')
+                        >>> [
+                            idtac,
+                            idtac,
+                            idtac,
+                            idtac,
+
+                            (* M' : mu . A *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov (T.apply1 Prim.mu (T.Lam (NONE, a))) m) (R.within [2] red))
+                            (* M : mu . A *)
+                            ]
+                        ))
+
+              | _ => failure "muIndUniv")
+
+
+      val accIndIrr =
+         ruleWithIrrelevance
+            (fn [a, b, i, m, n, r] =>
+                (m, (fns red m' =>
+                        (* B[M . id] *)
+                        refineprim (Rule.reduceAt 0 b m red)
+                        >>+
+                        (* B[M' . id] *)
+                        refineprim (Rule.accInd a b i m' n r)
+                        >>> [
+                            idtac,
+                            idtac,
+                            idtac,
+                            
+                            (* M' : A *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov a m) (R.within [2] red))
+                            (* M : A *),
+
+                            (* N : acc A R M' *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov (T.apply3 Prim.acc a r m) n) (R.within [1, 3] red))
+                            (* N : acc A R M *)
+                            ]
+                        ))
+
+              | _ => failure "accInd")
+
+
+      val boolElimIrr =
+         ruleWithIrrelevance
+            (fn [a, m] =>
+                (m, (fns red m' =>
+                        (* A[M . id] *)
+                        refineprim (Rule.reduceAt 0 a m red)
+                        >>+
+                        (* A[M' . id] *)
+                        refineprim (Rule.boolElim a m')
+                        >>> [
+                            (* M' : bool *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov (T.Const Prim.bool) m) (R.within [2] red))
+                            (* M : bool *),
+
+                            idtac,
+                            idtac
+                            ]
+                        ))
+
+              | _ => failure "boolElim")
+
+
+      val unionElimIrr =
+         ruleWithIrrelevance
+            (fn [a, b, c, m] =>
+                (m, (fns red m' =>
+                        (* C *)
+                        refineprim (Rule.unionElim a b c m')
+                        >>> [
+                            idtac,
+
+                            (* M' : union A . B *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov (T.apply2 Prim.union a (T.Lam (NONE, b))) m) (R.within [2] red))
+                            (* M : union A . B *)
+                            ]
+                        ))
+
+              | _ => failure "unionElim")
+
+
+      val unionElimDepIrr =
+         ruleWithIrrelevance
+            (fn [a, b, c, m] =>
+                (m, (fns red m' =>
+                        (* C[M . id] *)
+                        refineprim (Rule.reduceAt 0 c m red)
+                        >>+
+                        (* C[M' . id] *)
+                        refineprim (Rule.unionElimDep a b c m')
+                        >>> [
+                            idtac,
+
+                            (* M' : union A . B *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov (T.apply2 Prim.union a (T.Lam (NONE, b))) m) (R.within [2] red))
+                            (* M : union A . B *)
+                            ]
+                        ))
+
+              | _ => failure "unionElimDep")
+
+
+      val iexistsElimIrr =
+         ruleWithIrrelevance
+            (fn [a, b, i, k, m] =>
+                (m, (fns red m' =>
+                        (* B *)
+                        refineprim (Rule.iexistsElim a b i k m')
+                        >>> [
+                            idtac,
+                            idtac,
+                            idtac,
+
+                            (* M' : iexists I K . A *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov (T.apply3 Prim.iexists i k (T.Lam (NONE, a))) m) (R.within [2] red))
+                            (* M : iexists I K . A *)
+                            ]
+                        ))
+
+              | _ => failure "iexistsElim")
+
+
+      val iexistsElimDepIrr =
+         ruleWithIrrelevance
+            (fn [a, b, i, k, m] =>
+                (m, (fns red m' =>
+                        (* B[M . id] *)
+                        refineprim (Rule.reduceAt 0 b m red)
+                        >>+
+                        (* B[M' . id] *)
+                        refineprim (Rule.iexistsElimDep a b i k m')
+                        >>> [
+                            idtac,
+                            idtac,
+                            idtac,
+
+                            (* M' : iexists I K . A *)
+                            refineprim (Rule.unreduce (T.apply2 Prim.ov (T.apply3 Prim.iexists i k (T.Lam (NONE, a))) m) (R.within [2] red))
+                            (* M : iexists I K . A *)
+                            ]
+                        ))
+
+              | _ => failure "iexistsElimDep")
+
+
+      val letIntroIrr =
+         ruleWithIrrelevance
+            (fn [m] =>
+                (m, (fns red m' =>
+                        (* C *)
+                        refineprim (Rule.letIntro m')
+                        >>+
+                        (* = M' |- C[^] *)
+                        refineprim (Rule.unreduceHyp 0 m red)
+                        (* = M |- C[^] *)
+                        ))
+
+              | _ => failure "letIntro")
+
+
+      val forallLeftIrr =
+         ruleWithIrrelevance
+            (fn [m] =>
+                (m, (fns red m' =>
+                        let
+                           do (jud, _) = withgoal
+                        in
+                           (case
+                               (case J.hyp jud 0 of
+                                   J.Tm t =>
+                                      (case N.whnf t of
+                                          T.Elim (T.Const const, [T.App a, T.App lamb]) =>
+                                             if Constant.eq (const, Prim.forall) then
+                                                (case N.whnf lamb of
+                                                    T.Lam (_, b) =>
+                                                       SOME (a, b)
+
+                                                  | _ => NONE)
+                                             else
+                                                NONE
+
+                                        | _ => NONE)
+
+                                 | _ => NONE)
+                            of
+                               NONE =>
+                                  fail "rule forallLeft does not apply"
+
+                             | SOME (a, b) =>
+                                  (* G, (forall A . B) |- C[^] *)
+                                  refineprim (Rule.forallLeft m')
+                                  >>> [
+                                      (* G |- M' : A *)
+                                      refineprim (Rule.unreduce (T.apply2 Prim.ov a m) (R.within [2] red))
+                                      (* G |- M : A *),
+          
+                                      (* G, B[M' . id] |- C[^] *)
+                                      refineprim (Rule.unreduceHypAt 0 0 (J.Tm b) m red)
+                                      (* G, B[M . id] |- C[^] *)
+                                      ])
+                        end))
+
+              | _ => failure "forallLeft")
+
+
+      structure Table = HashTable (structure Key = StringHashable)
+
+      val ruleIrrTactics : (T.term list -> (unit -> answer) -> tactic) Table.table = Table.table 41
+
+      val () =
+         List.app (fn (str, tac) => Table.insert ruleIrrTactics str tac)
+         [("inhabitant", inhabitantIrr),
+          ("forallElim", forallElimIrr),
+          ("forallfutElim", forallfutElimIrr),
+          ("parametricElim", parametricElimIrr),
+          ("parametricfutElim", parametricfutElimIrr),
+          ("existsIntro", existsIntroIrr),
+          ("generalize", generalizeIrr),
+          ("sumElim", sumElimIrr),
+          ("futureElim", futureElimIrr),
+          ("setIntro", setIntroIrr),
+          ("isetIntro", isetIntroIrr),
+          ("muInd", muIndIrr),
+          ("muIndUniv", muIndUnivIrr),
+          ("accInd", accIndIrr),
+          ("boolElim", boolElimIrr),
+          ("unionElim", unionElimIrr),
+          ("unionElimDep", unionElimDepIrr),
+          ("iexistsElim", iexistsElimIrr),
+          ("iexistsElimDep", iexistsElimDepIrr),
+          ("letIntro", letIntroIrr),
+          ("forallLeft", forallLeftIrr)]
+
+
+
+      fun refineHV rule hvk goal fk sk =
+         let
+            fun hvk' () =
+               let
+                  val (name, args) = Rule.info rule
+               in
+                  (case Table.find ruleIrrTactics name of
+                      NONE =>
+                         hvk ()
+
+                    | SOME tac =>
+                         tac args hvk goal fk sk)
+               end
+         in
+            refineprimHV rule hvk' goal fk sk
+         end
+
+      fun refine rule goal fk sk =
+         refineHV rule (fn () => fk "refinement fails due to hidden variables") goal fk sk
+
+   end

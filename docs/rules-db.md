@@ -3750,6 +3750,14 @@ Human-readable rules, using explicit variables, are given
       G1, A |- subtype A[^1] B[^1]
       G1, B |- C ext M
 
+- `tighten n A B C`
+
+      G1, A, G2 |- C ext M
+      >>
+      G1, A, G2 |- subtype B[(^1) o ^n] A[(^1) o ^n]
+      G1, A, G2 |- of B[(^1) o ^n] 0+n
+      G1, B, G2 |- C ext M
+
 - `subtypeRefl A`
 
       G |- subtype A A

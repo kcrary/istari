@@ -1539,7 +1539,8 @@ These tactics are primarily used to implement other tactics:
 - These primitive operations are discussed as part of [primitive
   tactics](primitive-tactics.html):
 
-      Tactic.refine : Rule.rule -> tactic
       Tactic.chdir : Directory.directory -> tactic
       Tactic.cast : Judgement.djudgement -> Refine.validation -> tactic
       Tactic.execute : judgement -> tactic -> (Refine.validation, string) Sum.sum
+
+      RefineTactic.refine : Rule.rule -> tactic

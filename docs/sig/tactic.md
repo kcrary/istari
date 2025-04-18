@@ -59,13 +59,15 @@
           val andthenlPadPri : priority tacticm -> priority tacticm list -> priority tacticm -> priority tacticm
     
           val andthenSeq : tactic list -> tactic
-
+    
           val attempt : tactic -> tactic
+          val attemptPri : priority tacticm -> priority tacticm
           val first : 'a tacticm list -> 'a tacticm
           val repeat : tactic -> tactic
           val repeatPri : priority tacticm -> priority tacticm
           val repeatCount : tactic -> int tacticm
           val repeatn : int -> tactic -> tactic
+          val repeatnPri : int -> priority tacticm -> priority tacticm
           val orthen : 'a tacticm -> (unit -> 'a tacticm) -> 'a tacticm
     
           val ifthen : 'a tacticm -> 'b tacticm -> 'b tacticm -> 'b tacticm
@@ -100,7 +102,6 @@
     
           (* primitive actions *)
     
-          val refine : Rule.rule -> tactic
           val chdir : Directory.directory -> tactic
           val cast : Judgement.judgement -> Refine.validation -> 'a tacticm
           val execute : goal -> tactic -> (Refine.validation, string) Sum.sum

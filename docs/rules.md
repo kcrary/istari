@@ -3752,6 +3752,14 @@ variables.  The official rules, using de Bruijn indices, are given
       G1, x : A |- A <: B
       G1, x : B |- C ext M
 
+- `tighten n A B C`
+
+      G1, x : A, G2 |- C ext M
+      >>
+      G1, x : A, G2 |- B <: A
+      G1, x : A, G2 |- x : B
+      G1, x : B, G2 |- C ext M
+
 - `subtypeRefl A`
 
       G |- A <: A

@@ -6,10 +6,386 @@ Ctrl.use "../core/acc-load.iml";
 Ctrl.use "../core/nat-load.iml";
 Ctrl.use "../core/integer-load.iml";
 
+recordIrrelevance Prim.ap [1];
+recordIrrelevance Prim.paramapp [1];
+
 fun shouldfail tac goal fk sk = tac goal (fn _ => idtac goal fk sk) (fn _ => fk "unexpected success");
 
-
 structure P = ReductionProver;
+
+
+
+lemma "unionElim_irrelevant_hidden"
+/
+  forall i (a b : U i) (c : b -> U i) (d : U i) . intersect (x : a) .
+  forall (f : parametric (_ : a) . union (y : b) . c y) (g : parametric (y : b) . forall (z : c y) . d) .
+    d
+/;
+
+inference.
+intro /i a b c d x f g/.
+RuleTactic.unionElim (parseCurr /b/) (parseCurr /additional` y . c y/) (parseCurr /f Ap x/).
+  {
+  reintro /y z/.
+  exact /g Ap y z/.
+  }
+
+  {
+  infer /f Ap x/ /H/.
+  hyp /H/.
+  }
+qed ();
+
+
+
+lemma "unionElimDep_irrelevant_hidden"
+/
+  forall i (a b : U i) (c : b -> U i) (d : (union (y : b) . c y) -> U i) . intersect (x : a) .
+  forall (f : parametric (_ : a) . union (y : b) . c y) (g : parametric (y : b) . forall (z : c y) . d z) .
+    d (f Ap x)
+/;
+
+inference.
+intro /i a b c d x f g/.
+RuleTactic.unionElimDep (parseCurr /b/) (parseCurr /additional` y . c y/) (parseCurr /additional` z . d z/) (parseCurr /f Ap x/).
+  {
+  reintro /y z/.
+  exact /g Ap y z/.
+  }
+
+  {
+  infer /f Ap x/ /H/.
+  hyp /H/.
+  }
+qed ();
+
+
+
+lemma "iexistsElim_irrelevant_hidden"
+/
+  forall i (a : U i) (b : Kind i) (c : b -> U i) (d : U i) . intersect (x : a) .
+  forall (f : parametric (_ : a) . iexists (y : b) . c y) (g : parametric (y : b) . forall (z : c y) . d) .
+    d
+/;
+
+inference.
+intro /i a b c d x f g/.
+RuleTactic.iexistsElim (parseCurr /additional` y . c y/) (parseCurr /i/) (parseCurr /b/) (parseCurr /f Ap x/).
+  { auto. }
+  { auto. }
+
+  {
+  reintro /y z/.
+  exact /g Ap y z/.
+  }
+
+  {
+  infer /f Ap x/ /H/.
+  hyp /H/.
+  }
+qed ();
+
+
+
+lemma "iexistsElimDep_irrelevant_hidden"
+/
+  forall i (a : U i) (b : Kind i) (c : b -> U i) (d : (iexists (y : b) . c y) -> U i) . intersect (x : a) .
+  forall (f : parametric (_ : a) . iexists (y : b) . c y) (g : parametric (y : b) . forall (z : c y) . d z) .
+    d (f Ap x)
+/;
+
+inference.
+intro /i a b c d x f g/.
+RuleTactic.iexistsElimDep (parseCurr /additional` y . c y/) (parseCurr /additional` z . d z/) (parseCurr /i/) (parseCurr /b/) (parseCurr /f Ap x/).
+  { auto. }
+  { auto. }
+
+  {
+  reintro /y z/.
+  exact /g Ap y z/.
+  }
+
+  {
+  infer /f Ap x/ /H/.
+  hyp /H/.
+  }
+qed ();
+
+
+
+lemma "boolElim_irrelevant_hidden"
+/
+  forall i (a : U i) (c : bool -> U i) . intersect (x : a) . 
+  forall (f : parametric (_ : a) . bool) (g : forall (y : bool) . c y) .
+    c (f Ap x)
+/;
+
+inference.
+intro /i a c x f g/.
+RuleTactic.boolElim (parseCurr /additional` y . c y/) (parseCurr /f Ap x/).
+  { auto. }
+  { auto. }
+  { auto. }
+qed ();
+
+
+
+lemma "muInd_irrelevant_hidden"
+/
+  forall i (a b : U i) (c : (mu t . b) -> U i) . intersect (x : a) . 
+  forall (f : parametric (_ : a) . b) (g : forall (y : mu t . b) . c y) .
+    c (f Ap x)
+/;
+ 
+inference.
+intro /i a b c x f g/.
+RuleTactic.muInd (parseCurr /additional` _ . b/) (parseCurr /additional` y . c y/) (parseCurr /f Ap x/).
+  { auto. }
+  { auto. }
+
+  {
+  reintro /t y _ _/.
+  assert /y : mu t . b/ /Hof/.
+    {
+    unrollType /mu/.
+    hypof.
+    }
+  apply /g/.
+  }
+
+  {
+  unrollType /mu/.
+  typecheck.
+  }
+qed ();
+
+
+
+lemma "muIndUniv_irrelevant_hidden"
+/
+  forall i (a b : U i) (c : (mu t . b) -> U i) . intersect (x : a) . 
+  forall (f : parametric (_ : a) . b) (g : forall (y : mu t . b) . c y) .
+    c (f Ap x)
+/;
+ 
+inference.
+intro /i a b c x f g/.
+RuleTactic.muIndUniv (parseCurr /additional` _ . b/) (parseCurr /additional` y . c y/) (parseCurr /i/) (parseCurr /f Ap x/).
+  { auto. }
+  { auto. }
+  { auto. }
+
+  {
+  reintro /t y _ _/.
+  assert /y : mu t . b/ /Hof/.
+    {
+    unrollType /mu/.
+    hypof.
+    }
+  split >> auto.
+  }
+
+  {
+  unrollType /mu/.
+  typecheck.
+  }
+qed ();
+
+
+
+lemma "accInd_irrelevant_hidden"
+/
+  forall i (a : U i) (c : nat -> U i) . intersect (x : a) . 
+  forall (f : parametric (_ : a) . nat) (g : forall (y : nat) . c y) .
+    c (f Ap x)
+/;
+
+inference.
+intro /i a c x f g/.
+so /Nat.lt_well_founded (f Ap x)/ /H/.
+RuleTactic.accInd (parseCurr /nat/) (parseCurr /additional` y . c y/) (parseCurr /i/) (parseCurr /f Ap x/) (parseCurr /H/) (parseCurr /Nat.lt/).
+  { auto. }
+  { auto. }
+  { auto. }
+  { auto. }
+  { auto. }
+qed ();
+
+
+
+lemma "setIntro_irrelevant_hidden"
+/
+  forall i (a b : U i) (c : b -> U i) . intersect (x : a) . 
+  forall (f : parametric (_ : a) . b) (g : forall (y : b) . c y) .
+    { y : b | c y }
+/;
+
+inference.
+intro /i a b c x f g/.
+exists /f Ap x/.
+apply /g/.
+qed ();
+
+
+
+lemma "isetIntro_irrelevant_hidden"
+/
+  forall i (a b : U i) (c : b -> U i) . intersect (x : a) . 
+  forall (f : parametric (_ : a) . b) (g : forall (y : b) . c y) .
+    iset (y : b) . c y
+/;
+
+inference.
+intro /i a b c x f g/.
+exists /f Ap x/.
+apply /g/.
+qed ();
+
+
+
+lemma "futureElim_irrelevant_hidden"
+/
+  forall i (a b : U i) (c : b -> U i) . intersect (x : a) . 
+  forall (f : parametric (_ : a) . b) (g : forall (y : b) . c y) .
+    let next y = next (f Ap x) in future (c y)
+/;
+
+inference.
+intro /i a b c x f g/.
+unfold /letnext/.
+RuleTactic.futureElim (parseCurr /b/) (parseCurr /additional` y . future (c y)/) (parseCurr /next (f Ap x)/).
+  { auto. }
+  { auto. }
+  { auto. }
+qed ();
+
+
+
+lemma "sumElim_irrelevant_hidden"
+/
+  forall i (a b c : U i) (d : b % c -> U i) . intersect (x : a) . 
+  forall (f : parametric (_ : a) . b % c) (g : forall (y : b) . d (inl y)) (h : forall (y : c) . d (inr y)) .
+    d (f Ap x)
+/;
+
+inference.
+intro /i a b c d x f g h/.
+RuleTactic.sumElim (parseCurr /b/) (parseCurr /c/) (parseCurr /additional` y . d y/) (parseCurr /f Ap x/).
+  { auto. }
+  { auto. }
+  { auto. }
+qed ();
+
+
+
+lemma "generalize_irrelevant_hidden"
+/
+  forall i (a b : U i) (c : b -> U i) . intersect (x : a) . 
+  forall (f : parametric (_ : a) . b) (g : forall (y : b) . c y) .
+    c (f Ap x)
+/;
+
+inference.
+intro /i a b c x f g/.
+generalize /f Ap x/ /_/ /y/.
+apply /g/.
+qed ();
+
+
+
+lemma "forallLeft_irrelevant_hidden"
+/
+  forall i (a b : U i) (c : b -> U i) . intersect (x : a) . 
+  forall (f : parametric (_ : a) . b) (g : forall (y : b) . c y) .
+    c (f Ap x)
+/;
+
+inference.
+intro /i a b c x f g/.
+RuleTactic.forallLeft (Term.Sub (parseCurr /f Ap x/, Term.Dot (Term.Const Prim.orphan, Term.id))).
+  {
+  typecheck.
+  }
+
+  {
+  hyp /g/.
+  }
+qed ();
+
+
+
+lemma "forallElim_irrelevant_hidden"
+/
+  forall i (a b : U i) (c : b -> U i) . intersect (x : a) . 
+  forall (f : parametric (_ : a) . b) (g : forall (y : b) . c y) .
+    c (f Ap x)
+/;
+
+inference.
+intro /i a b c x f g/.
+RuleTactic.forallElim (parseCurr /b/) (parseCurr /additional` y . c y/) (parseCurr /f Ap x/).
+  {
+  hyp /g/.
+  }
+
+  {
+  typecheck.
+  }
+qed ();
+
+
+
+lemma "parametricElim_irrelevant_hidden"
+/
+  forall i (a b : U i) (c : b -> U i) . intersect (x : a) . 
+  forall (f : parametric (_ : a) . b) (g : parametric (y : b) . c y) .
+    c (f Ap x)
+/;
+
+inference.
+intro /i a b c x f g/.
+RuleTactic.parametricElim (parseCurr /b/) (parseCurr /additional` y . c y/) (parseCurr /f Ap x/).
+  {
+  hyp /g/.
+  }
+
+  {
+  typecheck.
+  }
+qed ();
+
+
+
+lemma "existsIntro_irrelevant_hidden"
+/
+  forall i (a b : U i) (c : b -> U i) . intersect (x : a) . 
+  forall (f : parametric (_ : a) . b) (g : parametric (y : b) . c y) .
+    exists (y : b) . c y
+/;
+
+inference.
+intro /i a b c x f g/.
+exists /f Ap x/.
+apply /g/.
+qed ();
+
+
+
+lemma "let_using_irrelevant_hidden"
+/
+  forall i (a : U i) (b : a -> U i) .
+  intersect (x : a) .
+    (parametric (y : a) . b y)
+    -> b x
+/;
+
+inference.
+intro /i a b x Himpl/.
+set /z/ /Himpl Ap x/.
+exact /z/.
+unfold /z/.
+typecheck.
+qed ();
 
 
 
@@ -22,7 +398,7 @@ lemma "forallLeft_hidden"
 
 inference.
 intro /i a x Hid/.
-shouldfail $ Tactic.refine (Rule.forallLeft (Term.Var 1)).
+shouldfail $ RefineTactic.refine (Rule.forallLeft (Term.Var 1)).
 Prover.abandon ();
 
 
@@ -4089,7 +4465,7 @@ introRaw /n/.
   }
 let do dir = Tactic.withidir
 in
-  Tactic.refine (Rule.muInd
+  RefineTactic.refine (Rule.muInd
                    (ETerm.withidir dir /additional` t . unit % t/)
                    (ETerm.withidir dir /additional` x . x = x : nat/)
                    (ETerm.withidir dir /n/))
@@ -5169,7 +5545,7 @@ c
   }
 
   {
-  Tactic.refine (Rule.hypothesisOf 0).
+  RefineTactic.refine (Rule.hypothesisOf 0).
   }
 Prover.qed ();
 

@@ -70,6 +70,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
       structure I = Irrelevance
 
       open Tactic
+      open RefineTactic
       open CasePervasive
 
 
@@ -140,7 +141,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                            (refine (Rule.arrowElim dom cod) >>>
                                [
                                tac,
-                               I.inhabitant n >> idtacM Secondary
+                               refine (Rule.inhabitant (T.evar ()) n) >> idtacM Secondary
                                ])
                            fk sk)\
 
@@ -168,7 +169,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                            (refine (Rule.tarrowElim dom cod) >>>
                                [
                                tac,
-                               I.inhabitant n >> idtacM Secondary
+                               refine (Rule.inhabitant (T.evar ()) n) >> idtacM Secondary
                                ])
                            fk sk)\
                         
@@ -178,7 +179,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                            (refine (Rule.karrowElim dom cod) >>>
                                [
                                tac,
-                               I.inhabitant n >> idtacM Secondary
+                               refine (Rule.inhabitant (T.evar ()) n) >> idtacM Secondary
                                ])
                            fk sk)\
 
@@ -247,7 +248,7 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                 T.App func :: T.App n :: aspine' =>
                    (case N.whnf func of
                        T.Lam (_, m) =>
-                          (case I.irrelevanceApp m of
+                          (case I.paramappReductions m of
                               SOME (red1, red2) =>
                                  let
                                     val res = T.Elim (T.Lam (NONE, m), T.App n :: aspine')
@@ -324,11 +325,11 @@ structure BackchainInternal :> BACKCHAIN_INTERNAL =
                 (case remainder of
                     [] =>
                        sk (a,
-                           I.inhabitant m >> tac >> idtacM Secondary)
+                           refine (Rule.inhabitant (T.evar ()) m) >> tac >> idtacM Secondary)
 
                   | spine =>
                        soSpine a spine
-                          (I.inhabitant m' >> tac >> idtacM Secondary)
+                          (refine (Rule.inhabitant (T.evar ()) m') >> tac >> idtacM Secondary)
                           fk sk)
 
            | Sum.INR msg => fk msg)

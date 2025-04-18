@@ -5,6 +5,8 @@
 - One can now destruct a hidden future hypothesis.  The result will be
   a hypothesis that is both later and hidden.
 
+- All rules permit using hidden variables in irrelevant positions.
+
 - Tactic changes:
 
   + The behavior of `revert` on hidden hypotheses has changed; it now
@@ -13,6 +15,8 @@
     first.
 
   + `revert` now works on later and later-hidden hypotheses.
+
+  + `refine` has moved from `Tactic` to `RefineTactic`.
 
 - In `Case`, `goalHypCaseT` and `goalHypCaseB` now take names.  The
   old versions that take numbers are renamed to `goalHypnCaseT` and

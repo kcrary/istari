@@ -115,16 +115,9 @@ primary subgoals.
 
 The [`Tactic`](sig/tactic.html) module provides some primitive actions:
 
-    val refine : Rule.rule -> tactic
     val chdir : Directory.directory -> tactic
     val cast : Judgement.judgement -> Refine.validation -> tactic
     val execute : goal -> tactic -> (Refine.validation, string) Sum.sum
-
-- `refine r` applies the primitive rule `r` to the current goal.  One
-  usually does not want to use this in proof scripts directly, because
-  it does not alter the directory.  Thus, if the rule changes the
-  context (such as by adding a hypothesis), the resulting goal will
-  look strange.
 
 - `chdir d` replaces the current goal's directory with `d`.
 
@@ -134,6 +127,16 @@ The [`Tactic`](sig/tactic.html) module provides some primitive actions:
 
 - `execute g tac` runs `tac` on the goal `g`.  If it succeeds, it
   returns the validation, otherwise it returns the error message.
+
+The [`RefineTactic`](sig/refine-tactic.html) module provides:
+
+    val refine : Rule.rule -> tactic
+
+- `refine r` applies the primitive rule `r` to the current goal.  One
+  usually does not want to use this in proof scripts directly, because
+  it does not alter the directory.  Thus, if the rule changes the
+  context (such as by adding a hypothesis), the resulting goal will
+  look strange.
 
 Istari's primitive rules are in the `Rule` module, which can be found
 in `prover/trusted/rule.iml`.  Most of the rules appear in a somewhat
@@ -306,6 +309,8 @@ recursively and obtain a fully normal form.
 
 - [`Tactic`](sig/tactic.html) provides tactic definition and
   operations shown above, among others.
+
+- [`RefineTactic`](sig/refine-tactic.html) provides the refine tactic.
 
 - [`Trail`](sig/trail.html) establishes a trail of evar bindings that
   can be unwound when necessary.  Its most important operations are:

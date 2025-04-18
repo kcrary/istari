@@ -87,6 +87,7 @@ structure Hyp :> HYP =
       structure S = Seq
 
       open Tactic
+      open RefineTactic
       open CasePervasive
 
       type symbol = Symbol.symbol
@@ -191,7 +192,7 @@ structure Hyp :> HYP =
             do i = findhyp h
          in
             setFailure "hypothesis does not match goal" $
-            Tactic.refine (Rule.hypothesis i)
+            refine (Rule.hypothesis i)
          end
 
 
@@ -199,7 +200,7 @@ structure Hyp :> HYP =
          (case N.simplify m of
              T.Elim (T.Var i, [])  =>
                 setFailure "hypothesis does not match goal" $
-                Tactic.refine (Rule.hypothesisOf i)
+                refine (Rule.hypothesisOf i)
 
            | _ =>
                 fail "not a variable in hypof")
@@ -208,7 +209,7 @@ structure Hyp :> HYP =
          (case N.simplify m of
              T.Elim (T.Var i, []) =>
                 setFailure "hypothesis does not match goal" $
-                Tactic.refine (Rule.hypothesisEq i)
+                refine (Rule.hypothesisEq i)
 
            | _ =>
                 fail "not a variable in hypof")
@@ -228,11 +229,11 @@ structure Hyp :> HYP =
                           refine (Rule.univForgetOf (T.evar ()) (T.evar ()))
                           >>
                           setFailure "hypothesis does not match goal"
-                             (Tactic.refine (Rule.hypothesisOf i))
+                             (refine (Rule.hypothesisOf i))
    
                      | SOME J.Tp =>
                           setFailure "hypothesis does not match goal" $
-                          Tactic.refine (Rule.hypothesisOfTp i)
+                          refine (Rule.hypothesisOfTp i)
    
                      | SOME _ =>
                           fail "binding is not usable in hypof")
@@ -255,11 +256,11 @@ structure Hyp :> HYP =
                           refine (Rule.univForgetEq (T.evar ()) (T.evar ()) (T.evar ()))
                           >>
                           setFailure "hypothesis does not match goal"
-                             (Tactic.refine (Rule.hypothesisEq i))
+                             (refine (Rule.hypothesisEq i))
    
                      | SOME J.Tp =>
                           setFailure "hypothesis does not match goal" $
-                          Tactic.refine (Rule.hypothesisEqTp i)
+                          refine (Rule.hypothesisEqTp i)
    
                      | SOME _ =>
                           fail "binding is not usable in hypof")
@@ -404,7 +405,7 @@ structure Hyp :> HYP =
 
 
       fun weaken i j =
-         cut (setFailure "cannot clear hypotheses" $ Tactic.refine $ Rule.weaken i j)
+         cut (setFailure "cannot clear hypotheses" $ refine $ Rule.weaken i j)
          >>
          let
             do (_, dir) = Tactic.withgoal
@@ -459,13 +460,13 @@ structure Hyp :> HYP =
          let
             do (jud, _) = withgoal
          in
-            Tactic.refine (Rule.weaken 0 (Seq.length (Judgement.context jud)))
+            refine (Rule.weaken 0 (Seq.length (Judgement.context jud)))
             >> chdir Directory.empty
          end
 
 
       fun exchange i j k =
-         cut (setFailure "illegal exchange" $ Tactic.refine $ Rule.exchange i j k)
+         cut (setFailure "illegal exchange" $ refine $ Rule.exchange i j k)
          >>
          let
             do (_, dir) = Tactic.withgoal
@@ -701,43 +702,8 @@ structure Hyp :> HYP =
       fun set sym em (goal as (jud, dir)) fk sk =
          let
             val m = ETerm.withdir dir em
-
-            fun hvk () =
-               let
-                  val (_, set) =
-                     Seq.foldl
-                        (fns hyp (i, set) =>
-                            if 
-                               (case hyp of
-                                   J.Tmh _ => true
-                                 | J.Tmlh _ => true
-                                 | J.Tph => true
-                                 | _ => false)
-                            then
-                               (i+1, Irrelevance.IntSet.insert set i)
-                            else
-                               (i+1, set))
-                        (0, Irrelevance.IntSet.empty)
-                        (J.context jud)
-              in
-                  (case Irrelevance.irrelevance set m of
-                      NONE =>
-                         fail "term contains relevant hidden variables"
-
-                    | SOME red =>
-                         let
-                            val n = R.reduce red m
-                         in
-                            refine (Rule.letIntro n)
-                            >>+
-                            refine (Rule.unreduceHyp 0 m red)
-                            >>+
-                            chdir (D.bind dir sym)
-                         end) 
-                  goal fk sk
-               end
          in
-            (refineHV (Rule.letIntro m) hvk
+            (refine (Rule.letIntro m)
              >>+ chdir (D.bind dir sym))
             goal fk sk
          end

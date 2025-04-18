@@ -355,7 +355,6 @@ structure Rulegen :> RULEGEN =
 \signature RULE_ARG =\n\
 \   sig\n\
 \\n\
-\      type result\n\
 \      type rule\n\
 \\n\
 \      exception ExtractFailure\n\
@@ -368,6 +367,7 @@ structure Rulegen :> RULEGEN =
 \\n\
 \      val make :\n\
 \         string                                                      (* name *)\n\
+\         -> Term.term list                                           (* all variables *)\n\
 \         -> Term.term list                                           (* extract variables *)\n\
 \         -> Term.term                                                (* conclusion *)\n\
 \         -> (context_action * Judgement.hyp list * Term.term) list   (* premises *)\n\
@@ -457,6 +457,16 @@ structure Rulegen :> RULEGEN =
                       write "= Arg.make \"";
                       write (Symbol.toValue name);
                       write "\" [";
+
+                      List.app
+                         (fn str =>
+                             (
+                             write (lower str);
+                             write ", "
+                             ))
+                         oset;
+                                 
+                      write "] [";
 
                       List.app
                          (fn str =>

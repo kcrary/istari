@@ -173,6 +173,7 @@ signature RULE =
 
       val apply : rule -> Judgement.judgement -> Judgement.judgement list * (term list -> term)
       val name : rule -> string
+      val info : rule -> string * term list
 
       val trustme : rule
 
@@ -257,7 +258,7 @@ structure Rule :> RULE =
          struct
 
             type result = J.judgement list * (T.term list -> T.term)
-            type rule = string * (J.judgement -> result)
+            type rule = string * T.term list * (J.judgement -> result)
 
             exception ExtractFailure = ExtractFailure
 
@@ -274,8 +275,8 @@ structure Rule :> RULE =
                  | Unhide => S.map J.unhide g
                  | PromoteUnhide => S.map J.promoteAndUnhide g)
 
-            fun make str hidden a subgoals ext =
-               (str,
+            fun make str all hidden a subgoals ext =
+               (str, all,
                 fn jud =>
                    let
                       val () = checkHidden (J.context jud) hidden
@@ -297,7 +298,7 @@ structure Rule :> RULE =
                    end)
 
             fun lmake str hidden i hyps a subgoals ext =
-               (str,
+               (str, [],
                 fn jud =>
                    let
                       val () = checkHidden (J.context jud) hidden
@@ -366,7 +367,7 @@ structure Rule :> RULE =
 
       (* This one could be done using the rule generator, but this should be a tiny bit faster. *)
       fun hypothesis i =
-         ("hypothesis",
+         ("hypothesis", [],
           fn jud =>
              (case J.hypOpt jud i of
                  SOME (J.Tm a) =>
@@ -381,7 +382,7 @@ structure Rule :> RULE =
 
       (* Okay to unhide, since the variable isn't used in the extract. *)
       fun hypothesisOf i =
-         ("hypothesisOf",
+         ("hypothesisOf", [],
           fn jud =>
              let
                 val a =
@@ -402,7 +403,7 @@ structure Rule :> RULE =
 
       (* Okay to unhide, since the variable isn't used in the extract. *)
       fun hypothesisEq i =
-         ("hypothesisEq",
+         ("hypothesisEq", [],
           fn jud =>
              let
                 val a =
@@ -422,7 +423,7 @@ structure Rule :> RULE =
 
 
       fun hypothesisOfTp i =
-         ("hypothesisOfTp",
+         ("hypothesisOfTp", [],
           fn jud =>
              let
                 val () =
@@ -441,7 +442,7 @@ structure Rule :> RULE =
 
 
       fun hypothesisEqTp i =
-         ("hypothesisEqTp",
+         ("hypothesisEqTp", [],
           fn jud =>
              let
                 val () =
@@ -473,14 +474,14 @@ structure Rule :> RULE =
 
 
       fun identity str =
-         (str,
+         (str, [],
           (fn jud =>
               ([jud],
                fn1 (fn m => m))))
 
 
       fun weaken i j =
-         ("weaken",
+         ("weaken", [],
           fn jud =>
              if i < 0 orelse j < 0 orelse i + j > S.length (J.context jud) then
                 raise Failure
@@ -530,7 +531,7 @@ structure Rule :> RULE =
             T.Shift (j + k)
 
       fun exchange i j k =
-         ("exchange",
+         ("exchange", [],
           fn jud =>
              if i < 0 orelse j < 0 orelse k < 0 orelse i + j + k > S.length (J.context jud) then
                 raise Failure
@@ -679,7 +680,7 @@ structure Rule :> RULE =
 
 
       fun reduce red =
-         ("reduce",
+         ("reduce", [],
           fn jud =>
              (try
                  ([J.make (J.context jud) (Reduction.reduce red (J.concl jud))],
@@ -689,7 +690,7 @@ structure Rule :> RULE =
     
 
       fun unreduce c red =
-         ("unreduce",
+         ("unreduce", [],
           fn jud =>
              (try
                  if U.unify1 (J.concl jud) (Reduction.reduce red c) then
@@ -701,7 +702,7 @@ structure Rule :> RULE =
 
          
       fun reduceHyp i red =
-         ("reduceHyp",
+         ("reduceHyp", [],
           fn jud =>
              let
                 val (c, f) = onhypTm jud i
@@ -714,7 +715,7 @@ structure Rule :> RULE =
 
 
       fun unreduceHyp i c red =
-         ("unreduceHyp",
+         ("unreduceHyp", [],
           fn jud =>
              let
                 val (d, f) = onhypTm jud i
@@ -730,7 +731,7 @@ structure Rule :> RULE =
 
 
       fun reduceAt i a c red =
-         ("reduceAt",
+         ("reduceAt", [],
           fn jud =>
              let
                 val d =
@@ -750,7 +751,7 @@ structure Rule :> RULE =
 
 
       fun unreduceAt i a c red =
-         ("unreduceAt",
+         ("unreduceAt", [],
           fn jud =>
              let
                 val d =
@@ -777,7 +778,7 @@ structure Rule :> RULE =
 
 
       fun reduceHypAt j i h c red =
-         ("reduceHypAt",
+         ("reduceHypAt", [],
           fn jud =>
              let
                 val (hj, f) = onhyp jud j
@@ -797,7 +798,7 @@ structure Rule :> RULE =
 
 
       fun unreduceHypAt j i h c red =
-         ("unreduceHypAt",
+         ("unreduceHypAt", [],
           fn jud =>
              let
                 val (hj, f) = onhyp jud j
@@ -825,7 +826,7 @@ structure Rule :> RULE =
 
 
       fun whnfHypAt i path =
-         ("whnfHypAt",
+         ("whnfHypAt", [],
           fn jud =>
              let
                 val (c, f) = onhypTm jud i
@@ -836,14 +837,14 @@ structure Rule :> RULE =
 
 
       fun whnfConclAt path =
-         ("whnfConclAt",
+         ("whnfConclAt", [],
           fn jud =>
              ([J.make (J.context jud) (applySubterm N.whnf path (J.concl jud))],
               fn1 (fn m => m)))
 
 
       fun whnfHyp i =
-         ("whnfHyp",
+         ("whnfHyp", [],
           fn jud =>
              let
                 val (c, f) = onhypTm jud i
@@ -854,14 +855,14 @@ structure Rule :> RULE =
 
 
       val whnfConcl =
-         ("whnfConcl",
+         ("whnfConcl", [],
           fn jud =>
              ([J.make (J.context jud) (N.whnf (J.concl jud))],
               fn1 (fn m => m)))
 
 
       fun whnfHardHyp i =
-         ("whnfHardHyp",
+         ("whnfHardHyp", [],
           fn jud =>
              let
                 val (c, f) = onhypTm jud i
@@ -872,14 +873,14 @@ structure Rule :> RULE =
 
 
       val whnfHardConcl =
-         ("whnfHardConcl",
+         ("whnfHardConcl", [],
           fn jud =>
              ([J.make (J.context jud) (N.whnfHard (J.concl jud))],
               fn1 (fn m => m)))
 
 
       fun normalizeHyp i =
-         ("normalizeHyp",
+         ("normalizeHyp", [],
           fn jud =>
              let
                 val (c, f) = onhypTm jud i
@@ -890,7 +891,7 @@ structure Rule :> RULE =
 
 
       val normalizeConcl =
-         ("normalizeConcl",
+         ("normalizeConcl", [],
           fn jud =>
              ([J.make (J.context jud) (N.normalize (J.concl jud))],
               fn1 (fn m => m)))
@@ -1076,14 +1077,14 @@ structure Rule :> RULE =
                raise Failure
          end
 
-      val checkPositive = ("checkPositive", checkPosNeg true)
+      val checkPositive : rule = ("checkPositive", [], checkPosNeg true)
 
-      val checkNegative = ("checkNegative", checkPosNeg false)
+      val checkNegative : rule = ("checkNegative", [], checkPosNeg false)
 
 
       
       fun letIntro m =
-         ("letIntro",
+         ("letIntro", [m],
           fn jud =>
              let
                 val ctx = J.context jud
@@ -1097,7 +1098,7 @@ structure Rule :> RULE =
              end)
 
       fun letSubst i =
-         ("letSubst",
+         ("letSubst", [],
           fn jud =>
              (case S.splitOpt (J.context jud) i of
                  SOME (g3, g12) =>
@@ -1121,7 +1122,7 @@ structure Rule :> RULE =
                     raise Failure))
 
       fun letFold i c =
-         ("letFold",
+         ("letFold", [],
           fn jud =>
              (case J.hypOpt jud i of
                  SOME (J.Let m) =>
@@ -1138,7 +1139,7 @@ structure Rule :> RULE =
                | _ => raise Failure))
 
       fun letUnfold i c =
-         ("letUnfold",
+         ("letUnfold", [],
           fn jud =>
              (case J.hypOpt jud i of
                  SOME (J.Let m) =>
@@ -1155,7 +1156,7 @@ structure Rule :> RULE =
                | _ => raise Failure))
 
       fun letFoldHyp i j h =
-         ("letFoldHyp",
+         ("letFoldHyp", [],
           fn jud =>
              if j < i then
                 (case J.hypOpt jud i of
@@ -1179,7 +1180,7 @@ structure Rule :> RULE =
                 raise Failure)
 
       fun letUnfoldHyp i j h =
-         ("letUnfoldHyp",
+         ("letUnfoldHyp", [],
           fn jud =>
              if j < i then
                 (case J.hypOpt jud i of
@@ -1205,12 +1206,13 @@ structure Rule :> RULE =
 
 
 
-      fun apply (_, f) = f
-      fun name (str, _) = str
+      fun apply (_, _, f) = f
+      fun name (str, _, _) = str
+      fun info (str, args, _) = (str, args)
 
 
       val trustme =
-         ("trustme",
+         ("trustme", [],
           fn jud =>
              if Unsafe.allowed () then
                 ([], fn0 (T.Const Prim.magic))
@@ -1255,7 +1257,7 @@ structure Rule :> RULE =
 
       (* The rule generator would require us to give the hypothesis currently at position i. *)
       fun insert i =
-         ("insert",
+         ("insert", [],
           (fn jud =>
               (case S.splitOpt (J.context jud) i of
                   NONE =>
@@ -1278,7 +1280,7 @@ structure Rule :> RULE =
 
       (* The rule generator won't create rules with a hypothesis in the conclusion. *)
       fun forallLeft m =
-         ("forallLeft",
+         ("forallLeft", [m],
           (fn jud =>
               (case S.expose (J.context jud) of
                   S.Cons (J.Tm t, ctx) =>
@@ -1320,7 +1322,7 @@ structure Rule :> RULE =
 
       (* The rule generator won't create rules with a hypothesis in the conclusion. *)
       val arrowLeft =
-         ("arrowLeft",
+         ("arrowLeft", [],
           (fn jud =>
               (case S.expose (J.context jud) of
                   S.Cons (J.Tm t, ctx) =>
@@ -1354,7 +1356,7 @@ structure Rule :> RULE =
 
       (* The rule generator doesn't know about valuability. *)
       val haltsValue =
-         ("haltsValue",
+         ("haltsValue", [],
           fn jud =>
              (case N.whnf (J.concl jud) of
                  Elim (Const const, [App m]) =>
@@ -1467,7 +1469,7 @@ structure Rule :> RULE =
                    replacePathSpine path (i-1) n p rest (elim :: acc))
 
       fun sequalCompatPath path m n p =
-         ("sequalCompatPath",
+         ("sequalCompatPath", [],
           fn jud =>
              let
                 val (n', p') = replacePath path m n p
@@ -1486,7 +1488,7 @@ structure Rule :> RULE =
       *)
 
       val integerIntroOf =
-         ("integerIntroOf",
+         ("integerIntroOf", [],
           fn jud =>
              (case N.whnf (J.concl jud) of
                  Elim (Const const, [App a, App m]) =>
@@ -1512,7 +1514,7 @@ structure Rule :> RULE =
                     raise Failure))
 
       val integerIntroEq =
-         ("integerIntroEq",
+         ("integerIntroEq", [],
           fn jud =>
              (case N.whnf (J.concl jud) of
                  Elim (Const const, [App a, App m, App n]) =>
@@ -1541,7 +1543,7 @@ structure Rule :> RULE =
                     raise Failure))
 
       val symbolIntroOf =
-         ("symbolIntroOf",
+         ("symbolIntroOf", [],
           fn jud =>
              (case N.whnf (J.concl jud) of
                  Elim (Const const, [App a, App m]) =>
@@ -1567,7 +1569,7 @@ structure Rule :> RULE =
                     raise Failure))
 
       val symbolIntroEq =
-         ("symbolIntroEq",
+         ("symbolIntroEq", [],
           fn jud =>
              (case N.whnf (J.concl jud) of
                  Elim (Const const, [App a, App m, App n]) =>
