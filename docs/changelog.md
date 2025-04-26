@@ -16,6 +16,9 @@
 
   + `revert` now works on later and later-hidden hypotheses.
 
+  + `substitution` and `subst` now support substituting for later
+    hypotheses.
+
   + `refine` has moved from `Tactic` to `RefineTactic`.
 
 - In `Case`, `goalHypCaseT` and `goalHypCaseB` now take names.  The
@@ -26,11 +29,16 @@
 
   + `Bar` has additional lemmas.
 
-- Added rules `intersectfutIntro`, `futureLeftHidden`, and
-  `parametricElim'`. Also added rules governing `parametricfut`; and
-  totality, strictness, uptype, and admissibility rules for
-  `forallfut`, `intersectfut`, `parametric`, and `parametricfut`.
-  Changed the extract of `letIntro` to use a let term.
+- Added rules `intersectfutIntro`, `futureLeftHidden`,
+  `parametricElim'`, `substitutionLater`, and
+  `substitutionLaterSimple`. Also added rules governing
+  `parametricfut`; and totality, strictness, uptype, and admissibility
+  rules for `forallfut`, `intersectfut`, `parametric`, and
+  `parametricfut`.  Changed the extract of `letIntro` to use a let
+  term.
+
+- Rule premises from which the extract is not used unhide all their
+  hypotheses.  (Previously this was not true for some left rules.)
 
 - Fixed an unsound bug in the `letIntro` and `forallLeft` rules that
   allowed hidden variables to appear in extracts.

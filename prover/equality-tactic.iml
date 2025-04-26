@@ -2120,6 +2120,39 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
       val univIntroEqtype = RuleTactic.univIntroEqtype
 
 
+      fun refineSubstitution i m =
+         let
+            do (jud, _) = withgoal
+         in
+            (case J.hyp jud i of
+                J.Tm _ =>
+                   refine (Rule.substitution i (T.evar ()) (T.evar ()) m)
+
+              | J.Tml _ =>
+                   refine (Rule.substitutionLater i (T.evar ()) (T.evar ()) m)
+
+              | _ =>
+                   fail "cannot substitute for a hypothesis of this sort")
+         end
+                      
+
+      fun refineSubstitutionSimple i m =
+         let
+            do (jud, _) = withgoal
+         in
+            (case J.hyp jud i of
+                J.Tm _ =>
+                   refine (Rule.substitutionSimple i (T.evar ()) (T.evar ()) m)
+
+              | J.Tml _ =>
+                   refine (Rule.substitutionLaterSimple i (T.evar ()) (T.evar ()) m)
+
+              | _ =>
+                   fail "cannot substitute for a hypothesis of this sort")
+         end
+                      
+
+
       fun substitutionLiteralPriority i m =
          let
             val m' = T.evar ()
@@ -2142,13 +2175,13 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                   (* If the substitute variable doesn't appear in the conclusion,
                      use the better rule.
                   *)
-                  refine (Rule.substitutionSimple i (T.evar ()) (T.evar ()) m')
+                  refineSubstitutionSimple i m'
                   >>> [
                       idtacM Primary,
                       maingoal
                       ],
 
-                  refine (Rule.substitution i (T.evar ()) (T.evar ()) m')
+                  refineSubstitution i m'
                   >>> [
                       idtacM Secondary,
                       idtacM Primary,
@@ -2221,7 +2254,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                   (* If the substitution variable doesn't appear in the conclusion,
                      use the better rule.
                   *)
-                  refine (Rule.substitutionSimple i (T.evar ()) (T.evar ()) m')
+                  refineSubstitutionSimple i m'
                   >>> [
                       eqgoal,
                       maingoal
@@ -2230,7 +2263,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                   if cautious then
                      fail "in cautious substitution, variable appears in conclusion"
                   else
-                     refine (Rule.substitution i (T.evar ()) (T.evar ()) m')
+                     refineSubstitution i m'
                      >>> [
                          idtacM Secondary,
                          eqgoal,
@@ -2340,6 +2373,34 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
                                  (* j cannot have moved, but i and m are probably different now *)
                                  goalHypnCaseT j
                                  / $tm \Prim.eq\ _ ? var? =>
+                                   \(fnc m' i' =>
+                                        substMain true cautious i' j m')\
+                                 /)\
+
+                       | $tml \Prim.eq\ _ ($var \i\) ? =>
+                         \(fnc j m =>
+                              if strict then
+                                 substMain false cautious i j m
+                              else
+                                 Hyp.moveTermDeps m i
+                                 >>+
+                                 (* j cannot have moved, but i and m are probably different now *)
+                                 goalHypnCaseT j
+                                 / $tml \Prim.eq\ _ var? ? =>
+                                   \(fnc i' m' =>
+                                        substMain false cautious i' j m')\
+                                 /)\
+         
+                       | $tml \Prim.eq\ _ ? ($var \i\) =>
+                         \(fnc j m =>
+                              if strict then
+                                 substMain true cautious i j m
+                              else
+                                 Hyp.moveTermDeps m i
+                                 >>+
+                                 (* j cannot have moved, but i and m are probably different now *)
+                                 goalHypnCaseT j
+                                 / $tml \Prim.eq\ _ ? var? =>
                                    \(fnc m' i' =>
                                         substMain true cautious i' j m')\
                                  /)\

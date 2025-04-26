@@ -4682,6 +4682,21 @@ Human-readable rules, using explicit variables, are given
       G1, A, G2 |- eq A[(^1) o ^n] 0+n M[(^1) o ^n]
       G1, G2[M . id] |- B ext N
 
+- `substitutionLater n A B M`
+
+      G1, (later) A, G2 |- B ext N[under_n (^1)]
+      >>
+      G1, (later) A, G2 |- istp B
+      promote(G1), A, promote(G2) |- eq A[(^1) o ^n] 0+n M[(^1) o ^n]
+      G1, G2[M . id] |- B[under_n (M . id)] ext N
+
+- `substitutionLaterSimple n A B M`
+
+      G1, (later) A, G2 |- B[under_n (^1)] ext N[under_n (^1)]
+      >>
+      promote(G1), A, promote(G2) |- eq A[(^1) o ^n] 0+n M[(^1) o ^n]
+      G1, G2[M . id] |- B ext N
+
 - `generalize A B M`
 
       G |- B[M . id] ext N[M . id]

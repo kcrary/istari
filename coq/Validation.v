@@ -679,6 +679,8 @@ exact iexistsElimIstype_valid.
 exact iexistsElimEqtype_valid.
 exact substitution_valid.
 exact substitutionSimple_valid.
+exact substitutionLater_valid.
+exact substitutionLaterSimple_valid.
 exact generalize_valid.
 exact assert_valid.
 exact assert'_valid.

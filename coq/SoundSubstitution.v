@@ -1626,3 +1626,885 @@ autorewrite with canonlist.
 cbn.
 eapply (sound_compute_hyp_pre _ _ h h'); finish_pseq j.
 Qed.
+
+
+Lemma subst_later_pwctx :
+  forall G1 G2 a m i s s' A,
+    hygiene (ctxpred G1) a
+    -> hygiene (ctxpred G1) m
+    -> pwctx i s s' (G2 ++ cons (hyp_tml a) G1)
+    -> (forall j t t',
+          j < i
+          -> pwctx j t t' (promote G2 ++ cons (hyp_tm a) (promote G1))
+          -> exists R,
+               interp toppg true j (subst (compose (sh (S (length G2))) t) a) R
+               /\ interp toppg false j (subst (compose (sh (S (length G2))) t') a) R
+               /\ rel (den R) j (subst (compose (sh (S (length G2))) t) m) (subst (compose (sh (S (length G2))) t') m))
+    -> (i > 0 -> interp toppg true (pred i) (subst (compose (sh (S (length G2))) s) a) A)
+    -> (i > 0 -> interp toppg false (pred i) (subst (compose (sh (S (length G2))) s') a) A)
+    -> (i > 0 -> rel (den A) (pred i) (subst (compose (sh (S (length G2))) s) m) (subst (compose (sh (S (length G2))) s') m))
+    -> (i > 0 -> rel (den A) (pred i) (project s (length G2)) (subst (compose (sh (S (length G2))) s') m))
+    -> pwctx i (compose (under (length G2) sh1) s) (compose (under (length G2) sh1) s') (substctx (dot m id) G2 ++ G1).
+Proof.
+intros G1 G2 a m i s s' A Hcla Hclm Hs Hseqmm Hal Har Hm Hvm.
+assert (forall j s'',
+          j < i
+          -> seqctx j (compose (sh (S (length G2))) s) s'' (promote G1)
+          -> rel (den A) j (subst (compose (sh (S (length G2))) s) m) (subst s'' m)) as Hseqm.
+  {
+  intros j t Hj Ht.
+  exploit (extend_seqctx_left j s s' t (promote G1) (promote G2 ++ hyp_tm a :: nil)) as H.
+    {
+    rewrite <- app_assoc.
+    cbn.
+    replace (hyp_tm a :: promote G1) with (promote (hyp_tml a :: G1)) by reflexivity.
+    rewrite <- (promote_append _ G2 (hyp_tml a :: G1)).
+    apply pwctx_promote.
+    apply (pwctx_downward i); eauto.
+    }
+
+    {
+    rewrite -> app_length.
+    cbn [length].
+    rewrite -> length_promote.
+    replace (length G2 + 1) with (S (length G2)) by omega.
+    auto.
+    }
+  destruct H as (t' & Ht' & Heq).
+  rewrite <- app_assoc in Ht'.
+  cbn [List.app] in Ht'.
+  so (Hseqmm _#3 Hj Ht') as (A' & Hal' & _ & Hm').
+  assert (i > 0) as Hnzero by omega.
+  assert (j <= pred i) as Hj' by omega.
+  so (basic_fun _#7 (basic_downward _#7 Hj' (Hal Hnzero)) Hal'); subst A'.
+  simpsubin Hm'.
+  rewrite -> app_length in Heq.
+  rewrite -> length_promote in Heq.
+  cbn [length] in Heq.
+  replace (length G2 + 1) with (S (length G2)) in Heq by omega.
+  rewrite -> Heq in Hm'.
+  destruct Hm'; auto.
+  }
+assert (forall j s'',
+          j < i
+          -> seqctx j s'' (compose (sh (S (length G2))) s') (promote G1)
+          -> rel (den A) j (subst s'' m) (subst (compose (sh (S (length G2))) s') m)) as Hseqm'.
+  {
+  intros j t Hj Ht.
+  exploit (extend_seqctx_right j s s' t (promote G1) (promote G2 ++ hyp_tm a :: nil)) as H.
+    {
+    rewrite <- app_assoc.
+    cbn.
+    replace (hyp_tm a :: promote G1) with (promote (hyp_tml a :: G1)) by reflexivity.
+    rewrite <- (promote_append _ G2 (hyp_tml a :: G1)).
+    apply pwctx_promote.
+    apply (pwctx_downward i); eauto.
+    }
+
+    {
+    rewrite -> app_length.
+    cbn [length].
+    rewrite -> length_promote.
+    replace (length G2 + 1) with (S (length G2)) by omega.
+    auto.
+    }
+  destruct H as (t' & Ht' & Heq).
+  rewrite <- app_assoc in Ht'.
+  cbn [List.app] in Ht'.
+  so (Hseqmm _#3 Hj Ht') as (A' & _ & Har' & Hm').
+  assert (i > 0) as Hnzero by omega.
+  assert (j <= pred i) as Hj' by omega.
+  so (basic_fun _#7 (basic_downward _#7 Hj' (Har Hnzero)) Har'); subst A'.
+  simpsubin Hm'.
+  rewrite -> app_length in Heq.
+  rewrite -> length_promote in Heq.
+  cbn [length] in Heq.
+  replace (length G2 + 1) with (S (length G2)) in Heq by omega.
+  rewrite -> Heq in Hm'.
+  destruct Hm'; auto.
+  }
+clear Hseqmm.
+revert s s' Hs Hal Har Hm Hvm Hseqm Hseqm'.
+induct G2.
+  (* nil *)
+  {
+  intros ss ss' Hss Hal Har _ _ _ _.
+  simpsub.
+  cbn [List.app].
+  cbn in Hss.
+  invert Hss.
+  intros n q s s' H _ _ _ <- <-.
+  simpsub.
+  exact H.
+  }
+
+  (* cons *)
+  {
+  intros h G2 IH ss ss' Hss Hal Har Hm Hvm Hseqm Hseqm'.
+  cbn [length].
+  cbn in Hss.
+  invertc Hss.
+  intros n q s s' Hs Hnq Hleft Hright <- <-.
+  cbn [length] in Hvm.
+  simpsubin Hvm.
+  cbn [length] in Hm.
+  simpsubin Hm.
+  cbn [length] in Har.
+  simpsubin Har.
+  cbn [length] in Hal.
+  simpsubin Hal.
+  simpsub.
+  rewrite <- app_comm_cons.
+  (* The following proofs of Hmod and Hmod' are the essentially the same, but enough
+     differences that it's hard to factor them out.
+  *)
+  assert (seqctx i (compose (under (length G2) (dot (subst sh1 m) sh1)) s) s' (G2 ++ hyp_tml a :: G1)) as Hmod.
+    {
+    clear n q h Hnq Hleft Hright Hal IH Hseqm Hseqm'.
+    revert s s' Hs Har Hm Hvm.
+    induct G2.
+      (* nil *)
+      {
+      intros ss ss' Hss Har Hm Hvm.
+      cbn in Hss.
+      invertc Hss.
+      intros n q s s' Hs Hh _ _ <- <-.
+      cbn.
+      simpsub.
+      so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+      apply seqctx_cons; auto using pwctx_impl_seqctx.
+      simpsub.
+      cbn in Hm.
+      cbn in Hvm.
+      cbn in Har.
+      simpsubin Hh.
+      invertc Hh.
+      intros A' Hal Har' Hnq Hcln Hclq Hclsa Hclsa'.
+      destruct i as [| i].
+        {
+        apply (seqhyp_tml _#5 A); auto.
+          {
+          intro; omega.
+          }
+
+          {
+          intro; omega.
+          }
+
+          {
+          eapply subst_closub; eauto.
+          }
+        }
+      assert (S i > 0) as Hnzero by omega.
+      so (basic_fun _#7 (Har Hnzero) (Har' Hnzero)); subst A'.
+      apply (seqhyp_tml _#5 A); eauto using subst_closub.
+      intros _.
+      apply (urel_zigzag _#4 (subst s' m) n); auto.
+      }
+
+      (* cons *)
+      {
+      intros h G2 IH ss ss' Hss Har Hm Hvm.
+      cbn [List.app].
+      cbn in Hss.
+      invertc Hss.
+      intros n q s s' Hs Hh Hleft Hright <- <-.
+      cbn [length].
+      simpsub.
+      apply seqctx_cons; auto.
+      refine (seqhyp_relhyp _#7 _ (relhyp_refl _#5 Hh ander) Hh).
+      apply (Hright i false); auto using smaller_le.
+      }
+    }
+  assert (seqctx i s (compose (under (length G2) (dot (subst sh1 m) sh1)) s') (G2 ++ hyp_tml a :: G1)) as Hmod'.
+    {
+    clear n q h Hnq Hleft Hright Hal IH Hm Hmod Hseqm Hseqm'.
+    revert s s' Hs Har Hvm.
+    induct G2.
+      (* nil *)
+      {
+      intros ss ss' Hss Har Hvm.
+      cbn in Hss.
+      invertc Hss.
+      intros n q s s' Hs Hh _ _ <- <-.
+      cbn.
+      simpsub.
+      so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+      apply seqctx_cons; auto using pwctx_impl_seqctx.
+      simpsub.
+      cbn in Hvm.
+      cbn in Har.
+      simpsubin Hh.
+      invertc Hh.
+      intros A' Hal Har' Hnq Hcln Hclq Hclsa Hclsa'.
+      destruct i as [| i].
+        {
+        apply (seqhyp_tml _#5 A); auto.
+          {
+          intro; omega.
+          }
+
+          {
+          eapply subst_closub; eauto.
+          }
+        }
+      assert (S i > 0) as Hnzero by omega.
+      so (basic_fun _#7 (Har Hnzero) (Har' Hnzero)); subst A'.
+      apply (seqhyp_tml _#5 A); eauto using subst_closub.
+      }
+
+      (* cons *)
+      {
+      intros h G2 IH ss ss' Hss Har Hvm.
+      cbn [List.app].
+      cbn in Hss.
+      invertc Hss.
+      intros n q s s' Hs Hh Hleft Hright <- <-.
+      cbn [length].
+      simpsub.
+      apply seqctx_cons; auto.
+      refine (seqhyp_relhyp _#7 (relhyp_refl _#5 Hh andel) _ Hh).
+      apply (Hleft i false); auto using smaller_le.
+      }
+    }
+  apply pwctx_cons; auto; clear IH.
+    {
+    simpsub.
+    rewrite <- !compose_assoc.
+    rewrite <- compose_under.
+    simpsub.
+    refine (seqhyp_relhyp _#7 _ _ Hnq).
+      {
+      apply (Hright _ false); auto using smaller_le.  (* uses Hmod *)
+      }
+
+      {
+      apply (Hleft _ false); auto using smaller_le.  (* uses Hmod' *)
+      }
+    }
+
+    (* The following proofs of pwctx's left and right are almost the same, but
+       enough differences that it's hard to factor them out.
+    *)
+
+    {
+    intros j d s'' Hsmall Hs'.
+    rewrite <- !substh_qpromote_hyp.
+    simpsub.
+    rewrite <- compose_assoc.
+    rewrite <- compose_under.
+    simpsub.
+    eapply relhyp_trans.
+      {
+      apply relhyp_symm.
+      so (relhyp_smaller _#6 Hsmall (Hleft _#3 (smaller_le _ _ (le_refl _)) Hmod')) as H.
+      rewrite <- !substh_qpromote_hyp in H.
+      rewrite -> qpromote_hyp_combine in H.
+      rewrite -> Bool.orb_false_r in H.
+      exact H.
+      }
+    apply Hleft; auto.
+    cbn [length] in Hseqm.
+    simpsubin Hseqm.
+    clear h n q Hnq Hleft Hright Hmod' Hseqm'.
+    revert s s' s'' Hs Hs' Hal Har Hm Hvm Hseqm Hmod.
+    induct G2.
+      (* nil *)
+      {
+      intros ss ss' s'' Hss Hs' Hal Har Hm Hvm Hseqm _.
+      cbn [length] in Hal, Har, Hm, Hvm, Hseqm |- *.
+      cbn [List.app].
+      cbn in Hss.
+      invertc Hss.
+      intros n q s s' Hs Hnq Hleft _ <- <-.
+      so (seqhyp_impl_closed _#5 Hnq) as (Hcln & Hclq).
+      cbn in Hs'.
+      cbn.
+      rewrite -> qpromote_cons.
+      destruct d.
+        {
+        cbn.
+        invert Hsmall.
+        intro Hj.
+        assert (i > 0) as Hnzero by omega.
+        apply seqctx_cons; auto.
+        simpsub.
+        cbn in Hm.
+        cbn in Hvm.
+        cbn in Hseqm.
+        cbn in Hal.
+        cbn in Har.
+        cbn in Hs'.
+        so (Hseqm _ _ Hj Hs') as Hm'.
+        assert (j <= pred i) as Hj' by omega.
+        apply (seqhyp_relhyp_2 _#4 (hyp_tm (subst s' a))).
+          {
+          so (Hleft _#3 Hsmall Hs') as H.
+          cbn in H.
+          exact H.
+          }
+  
+          {
+          apply (seqhyp_tm _#5 (iutruncate (S j) A)); auto.
+            {
+            eapply (basic_downward _#3 (pred i)); auto.
+            apply Hal; auto.
+            }
+  
+            {
+            eapply (basic_downward _#3 (pred i)); auto.
+            apply Har; auto.
+            }
+          split; [omega |].
+          exact (urel_zigzag _#7 (urel_downward_leq _#6 Hj' (Hvm Hnzero)) (urel_downward_leq _#6 Hj' (Hm Hnzero)) Hm').
+          }
+        }
+        
+        {
+        cbn in Hs' |- *.
+        apply seqctx_cons; auto.
+        simpsub.
+        cbn in Hm.
+        cbn in Hvm.
+        cbn in Hseqm.
+        cbn in Hal.
+        cbn in Har.
+        so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+        so (seqctx_impl_closub _#4 Hs') as (_ & Hcls'').
+        destruct j as [| j].
+          {
+          apply (seqhyp_tml _#5 A); eauto using subst_closub; intro H; omega.
+          }
+        so (smaller_impl_le _#3 Hsmall) as Hlt.
+        assert (j <= pred i) as Hjpi by omega.
+        assert (i > 0) as Hnzero by omega.
+        so (seqctx_promote _#4 Hs') as Hs''.
+        so (Hseqm _ _ Hlt Hs'') as Hm'.
+        apply (seqhyp_relhyp_2 _#4 (hyp_tml (subst s' a))).
+          {
+          so (Hleft _#3 Hsmall Hs') as H.
+          cbn in H.
+          auto.
+          }
+  
+          {
+          apply (seqhyp_tml _#5 (iutruncate (S j) A)); eauto using subst_closub.
+            {
+            intros _.
+            cbn.
+            eapply (basic_downward _#3 (pred i)); auto.
+            apply Hal; auto.
+            }
+  
+            {
+            intros _.
+            cbn.
+            eapply (basic_downward _#3 (pred i)); auto.
+            apply Har; auto.
+            }
+
+            {
+            intros _.
+            split; [omega |].
+            cbn.
+            exact (urel_zigzag _#7 (urel_downward_leq _#6 Hjpi (Hvm Hnzero)) (urel_downward_leq _#6 Hjpi (Hm Hnzero)) Hm').
+            }
+          }
+        }
+      }
+
+      (* cons *)
+      {
+      intros h G2 IH ss ss' ss'' Hss Hs' Hal Har Hm Hvm Hseqm Hmod.
+      invertc Hss.
+      intros n q s s' Hs Hnq Hleft Hright <- <-.
+      cbn [length] in Hs'.
+      simpsubin Hs'.
+      rewrite <- app_comm_cons in Hs'.
+      rewrite -> qpromote_cons in Hs'.
+      invertc Hs'.
+      intros r s'' Hs' Hr <-.
+      cbn [List.app length].
+      rewrite -> qpromote_cons.
+      simpsub.
+      cbn [List.app length] in Hmod.
+      simpsubin Hmod.
+      invertc Hmod.
+      intros Hmod _.
+      apply seqctx_cons; eauto.
+      rewrite <- substh_qpromote_hyp in Hr.
+      simpsubin Hr.
+      rewrite <- compose_assoc in Hr.
+      rewrite <- compose_under in Hr.
+      simpsubin Hr.
+      eapply seqhyp_relhyp_1; eauto.
+      apply relhyp_symm.
+      apply Hright; auto.
+      eapply seqctx_smaller; eauto.
+      }
+    }
+
+    {
+    intros j d s'' Hsmall Hs'.
+    rewrite <- !substh_qpromote_hyp.
+    simpsub.
+    rewrite <- compose_assoc.
+    rewrite <- compose_under.
+    simpsub.
+    eapply relhyp_trans.
+      {
+      apply relhyp_symm.
+      so (relhyp_smaller _#6 Hsmall (Hright _#3 (smaller_le _ _ (le_refl _)) Hmod)) as H.
+      rewrite <- !substh_qpromote_hyp in H.
+      rewrite -> qpromote_hyp_combine in H.
+      rewrite -> Bool.orb_false_r in H.
+      exact H.
+      }
+    apply Hright; auto.
+    cbn [length] in Hseqm'.
+    simpsubin Hseqm'.
+    clear h n q Hnq Hleft Hright Hmod Hseqm.
+    revert s s' s'' Hs Hs' Hal Har Hm Hvm Hseqm' Hmod'.
+    induct G2.
+      (* nil *)
+      {
+      intros ss ss' s'' Hss Hs' Hal Har Hm Hvm Hseqm' _.
+      cbn [length] in Hal, Har, Hm, Hvm, Hseqm' |- *.
+      cbn [List.app].
+      cbn in Hss.
+      invertc Hss.
+      intros n q s s' Hs Hnq _ Hright <- <-.
+      so (seqhyp_impl_closed _#5 Hnq) as (Hcln & Hclq).
+      cbn in Hs'.
+      cbn.
+      rewrite -> qpromote_cons.
+      destruct d.
+        {
+        cbn.
+        invert Hsmall.
+        intro Hj.
+        assert (i > 0) as Hnzero by omega.
+        apply seqctx_cons; auto.
+        simpsub.
+        cbn in Hm.
+        cbn in Hvm.
+        cbn in Hseqm'.
+        cbn in Hal.
+        cbn in Har.
+        cbn in Hs'.
+        so (Hseqm' _ _ Hj Hs') as Hm'.
+        assert (j <= pred i) as Hj' by omega.
+        apply (seqhyp_relhyp_1 _#3 (hyp_tm (subst s a))).
+          {
+          so (Hright _#3 Hsmall Hs') as H.
+          cbn in H.
+          exact H.
+          }
+  
+          {
+          apply (seqhyp_tm _#5 (iutruncate (S j) A)); auto.
+            {
+            eapply (basic_downward _#3 (pred i)); eauto.
+            apply Hal; auto.
+            }
+  
+            {
+            eapply (basic_downward _#3 (pred i)); eauto.
+            apply Har; auto.
+            }
+          split; [omega |].
+          simpsubin Hnq.
+          invertc Hnq.
+          intros A' Hal' _ Hnq _ _ _ _.
+          so (basic_fun _#7 (Hal Hnzero) (Hal' Hnzero)); subst A'.
+          exact (urel_zigzag _#7 Hm' (urel_downward_leq _#6 Hj' (Hvm Hnzero)) (urel_downward_leq _#6 Hj' (Hnq Hnzero))).
+          }
+        }
+
+        {
+        cbn in Hs' |- *.
+        apply seqctx_cons; auto.
+        simpsub.
+        cbn in Hm.
+        cbn in Hvm.
+        cbn in Hseqm'.
+        cbn in Hal.
+        cbn in Har.
+        so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+        so (seqctx_impl_closub _#4 Hs') as (Hcls'' & _).
+        destruct j as [| j].
+          {
+          apply (seqhyp_tml _#5 A); eauto using subst_closub; intro H; omega.
+          }
+        so (smaller_impl_le _#3 Hsmall) as Hlt.
+        assert (j <= pred i) as Hjpi by omega.
+        assert (i > 0) as Hnzero by omega.
+        so (seqctx_promote _#4 Hs') as Hs''.
+        so (Hseqm' _ _ Hlt Hs'') as Hm'.
+        apply (seqhyp_relhyp_1 _#3 (hyp_tml (subst s a))).
+          {
+          so (Hright _#3 Hsmall Hs') as H.
+          cbn in H.
+          auto.
+          }
+  
+          {
+          apply (seqhyp_tml _#5 (iutruncate (S j) A)); eauto using subst_closub.
+            {
+            intros _.
+            cbn.
+            eapply (basic_downward _#3 (pred i)); auto.
+            apply Hal; auto.
+            }
+  
+            {
+            intros _.
+            cbn.
+            eapply (basic_downward _#3 (pred i)); auto.
+            apply Har; auto.
+            }
+
+            {
+            intros _.
+            split; [omega |].
+            simpsubin Hnq.
+            invertc Hnq.
+            intros A' Hal' _ Hnq _ _ _ _.
+            so (basic_fun _#7 (Hal Hnzero) (Hal' Hnzero)); subst A'.
+            exact (urel_zigzag _#7 Hm' (urel_downward_leq _#6 Hjpi (Hvm Hnzero)) (urel_downward_leq _#6 Hjpi (Hnq Hnzero))).
+            }
+          }
+        }
+      }
+
+      (* cons *)
+      {
+      intros h G IH ss ss' ss'' Hss Hs' Hal Har Hm Hvm Hseqm' Hmod'.
+      invertc Hss.
+      intros n q s s' Hs Hnq Hleft Hright <- <-.
+      cbn [length] in Hs'.
+      simpsubin Hs'.
+      rewrite <- app_comm_cons in Hs'.
+      rewrite -> qpromote_cons in Hs'.
+      invertc Hs'.
+      intros r s'' Hs' Hr <-.
+      cbn [List.app length].
+      rewrite -> qpromote_cons.
+      simpsub.
+      cbn [List.app length] in Hmod'.
+      simpsubin Hmod'.
+      invertc Hmod'.
+      intros Hmod' _.
+      apply seqctx_cons; eauto.
+      rewrite <- substh_qpromote_hyp in Hr.
+      simpsubin Hr.
+      rewrite <- compose_assoc in Hr.
+      rewrite <- compose_under in Hr.
+      simpsubin Hr.
+      eapply seqhyp_relhyp_2; eauto.
+      apply relhyp_symm.
+      apply Hleft; auto.
+      eapply seqctx_smaller; eauto.
+      }
+    }
+  }
+Qed.
+
+
+Lemma sound_substitution_later_pre :
+  forall G1 G2 a m n n' b,
+    hygiene (ctxpred G1) a
+    -> hygiene (ctxpred G1) m
+    -> seq (G2 ++ cons (hyp_tml a) G1) (deqtype b b)
+    -> seq (promote G2 ++ cons (hyp_tm a) (promote G1)) (deq (var (length G2)) (subst (sh (S (length G2))) m) (subst (sh (S (length G2))) a))
+    -> seq (substctx (dot m id) G2 ++ G1) (deq n n' (subst (under (length G2) (dot m id)) b))
+    -> seq (G2 ++ cons (hyp_tml a) G1) (deq (subst (under (length G2) sh1) n) (subst (under (length G2) sh1) n') b).
+Proof.
+intros G1 G2 a m r1 r2 b Hcla Hclm Hseqb Hseqvm Hseqr.
+rewrite -> seq_eqtype in Hseqb.
+apply seq_i.
+invertc Hseqvm; intro Hseqvm.
+invertc Hseqr; intro Hseqr.
+intros i s s' Hs.
+destruct i as [| i].
+  {
+  exploit (subst_later_pwctx G1 G2 a m 0 s s' (iubase empty_urel)) as Ht; auto.
+    {
+    intros j t t' H _.
+    omega.
+    }
+
+    {
+    intro H.
+    omega.
+    }
+
+    {
+    intro H.
+    omega.
+    }
+
+    {
+    intro H.
+    omega.
+    }
+
+    {
+    intro H.
+    omega.
+    }
+  set (t := compose (under (length G2) sh1) s) in Ht.
+  set (t' := compose (under (length G2) sh1) s') in Ht.
+  so (Hseqb _#3 Hs) as (B & Hbl & Hbr & _).
+  so (Hseqr _#3 Ht) as (B' & _ & Hbr' & Hr1 & Hr2 & Hr12).
+  assert (B = B').
+    {
+    unfold t' in Hbr'.
+    rewrite <- subst_compose in Hbr'.
+    rewrite <- compose_assoc in Hbr'.
+    rewrite <- compose_under in Hbr'.
+    simpsubin Hbr'.
+    set (u := compose (under (length G2) (dot (subst sh1 m) sh1)) s') in Hbr'.
+    assert (pwctx 0 s u (G2 ++ hyp_tml a :: G1)) as Hsu.
+      {
+      clear t t' Ht B B' Hbl Hbr Hbr' Hr1 Hr2 Hr12 Hseqb Hseqr Hseqvm.
+      subst u.
+      eapply seqctx_pwctx_left; eauto.
+      revert s s' Hs.
+      induct G2.
+        (* nil *)
+        {
+        intros ss ss' Hss.
+        cbn [List.app length].
+        cbn [List.app] in Hss.
+        invertc Hss.
+        intros n q s s' Hs Hh _ _ <- <-.
+        so (seqhyp_impl_closed _#5 Hh) as (Hcln & Hclq).
+        so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+        simpsub.
+        apply seqctx_cons; auto using pwctx_impl_seqctx.
+        simpsub.
+        apply (seqhyp_tml _#5 (iubase empty_urel)); eauto using subst_closub; intro H; omega.
+        }
+  
+        (* cons *)
+        {
+        intros h G2 IH ss ss' Hss.
+        cbn [List.app].
+        cbn in Hss.
+        invertc Hss.
+        intros n q s s' Hs Hnq Hleft Hright <- <-.
+        cbn [length].
+        simpsub.
+        apply seqctx_cons; auto.
+        refine (seqhyp_relhyp _#7 (relhyp_refl _#5 Hnq andel) _ Hnq).
+        refine (Hleft _#3 (smaller_refl _) _).
+        cbn.
+        apply IH; auto.
+        }
+      }
+    so (Hseqb _#3 Hsu) as (B'' & Hbl' & Hbr'' & _).
+    so (interp_fun _#7 Hbl Hbl'); subst B''.
+    so (interp_fun _#7 Hbr' Hbr''); subst B'.
+    reflexivity.
+    }
+  subst B'.
+  exists B.
+  simpsub.
+  do2 4 split; eauto using interp_increase, toppg_max.
+  }
+so (pwctx_promote _#4 Hs) as Hs'.
+rewrite -> promote_append in Hs'.
+cbn in Hs'.
+fold (promote G1) in Hs'.
+so (Hseqvm _#3 Hs') as (A & Hal & Har & Hvar & Hm & Hvm).
+simpsubin Hal.
+simpsubin Har.
+simpsubin Hvar.
+simpsubin Hm.
+simpsubin Hvm.
+exploit (subst_later_pwctx G1 G2 a m (S i) s s' A) as Ht; auto.
+  {
+  intros j t t' Hj Ht.
+  so (Hseqvm _#3 Ht) as (R & Hl & Hr & _ & H & _).
+  exists R.
+  simpsubin Hl.
+  simpsubin Hr.
+  simpsubin H.
+  do2 2 split; auto.
+  }
+set (t := compose (under (length G2) sh1) s) in Ht.
+set (t' := compose (under (length G2) sh1) s') in Ht.
+so (Hseqb _#3 Hs) as (B & Hbl & Hbr & _).
+so (Hseqr _#3 Ht) as (B' & _ & Hbr' & Hr1 & Hr2 & Hr12).
+assert (B = B').
+  {
+  unfold t' in Hbr'.
+  rewrite <- subst_compose in Hbr'.
+  rewrite <- compose_assoc in Hbr'.
+  rewrite <- compose_under in Hbr'.
+  simpsubin Hbr'.
+  set (u := compose (under (length G2) (dot (subst sh1 m) sh1)) s') in Hbr'.
+  assert (pwctx (S i) s u (G2 ++ hyp_tml a :: G1)) as Hsu.
+    {
+    clear t t' Ht B B' Hbl Hbr Hbr' Hr1 Hr2 Hr12 Hseqb Hseqr Hseqvm.
+    subst u.
+    eapply seqctx_pwctx_left; eauto.
+    simpsubin Hal.
+    simpsubin Har.
+    simpsubin Hvar.
+    simpsubin Hm.
+    simpsubin Hvm.
+    clear Hs'.
+    revert s s' Hs Hal Har Hvar Hm Hvm.
+    induct G2.
+      (* nil *)
+      {
+      intros ss ss' Hss Hal Har _ _ Hvm.
+      cbn [List.app length].
+      cbn [List.app] in Hss.
+      invertc Hss.
+      intros n q s s' Hs Hh _ _ <- <-.
+      so (seqhyp_impl_closed _#5 Hh) as (Hcln & Hclq).
+      so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+      simpsub.
+      apply seqctx_cons; auto using pwctx_impl_seqctx.
+      simpsub.
+      apply (seqhyp_tml _#5 A); eauto using subst_closub.
+      }
+
+      (* cons *)
+      {
+      intros h G2 IH ss ss' Hss Hal Har Hvar Hm Hvm.
+      cbn [List.app].
+      cbn in Hss.
+      invertc Hss.
+      intros n q s s' Hs Hnq Hleft Hright <- <-.
+      cbn [length].
+      simpsub.
+      apply seqctx_cons; auto.
+      refine (seqhyp_relhyp _#7 (relhyp_refl _#5 Hnq andel) _ Hnq).
+      refine (Hleft _#3 (smaller_refl _) _).
+      cbn.
+      apply IH; auto.
+      }
+    }
+  so (Hseqb _#3 Hsu) as (B'' & Hbl' & Hbr'' & _).
+  so (interp_fun _#7 Hbl Hbl'); subst B''.
+  so (interp_fun _#7 Hbr' Hbr''); subst B'.
+  reflexivity.
+  }
+subst B'.
+exists B.
+simpsub.
+do2 4 split; eauto using interp_increase, toppg_max.
+Qed.
+
+
+
+Lemma sound_substitution_later :
+  forall G1 G2 a m n n' b,
+    pseq (G2 ++ cons (hyp_tml a) G1) (deqtype b b)
+    -> pseq (promote G2 ++ cons (hyp_tm a) (promote G1)) (deq (var (length G2)) (subst (sh (S (length G2))) m) (subst (sh (S (length G2))) a))
+    -> pseq (substctx (dot m id) G2 ++ G1) (deq n n' (subst (under (length G2) (dot m id)) b))
+    -> pseq (G2 ++ cons (hyp_tml a) G1) (deq (subst (under (length G2) sh1) n) (subst (under (length G2) sh1) n') b).
+Proof.
+intros G1 G2 a m n n' b.
+revert G1.
+refine (seq_pseq_hyp_promote 2 [] a [] m 3 false _ [_] _ true _ [_] _ false _ [] _ _ [_] _ _).
+cbn.
+intros G Hcla Hclm H1 H2 H3 _.
+eapply sound_substitution_later_pre; eauto.
+Qed.
+
+
+Lemma sound_substitution_later_simple_pre :
+  forall G1 G2 a m n n' b,
+    hygiene (ctxpred G1) a
+    -> hygiene (ctxpred G1) m
+    -> seq (promote G2 ++ cons (hyp_tm a) (promote G1)) (deq (var (length G2)) (subst (sh (S (length G2))) m) (subst (sh (S (length G2))) a))
+    -> seq (substctx (dot m id) G2 ++ G1) (deq n n' b)
+    -> seq (G2 ++ cons (hyp_tml a) G1) (deq (subst (under (length G2) sh1) n) (subst (under (length G2) sh1) n') (subst (under (length G2) sh1) b)).
+Proof.
+intros G1 G2 a m r1 r2 b Hcla Hclm Hseqvm Hseqr.
+apply seq_i.
+invertc Hseqvm; intro Hseqvm.
+invertc Hseqr; intro Hseqr.
+intros i s s' Hs.
+destruct i as [| i].
+  {
+  exploit (subst_later_pwctx G1 G2 a m 0 s s' (iubase empty_urel)) as Ht; auto.
+    {
+    intros j t t' H _.
+    omega.
+    }
+
+    {
+    intro H.
+    omega.
+    }
+
+    {
+    intro H.
+    omega.
+    }
+
+    {
+    intro H.
+    omega.
+    }
+
+    {
+    intro H.
+    omega.
+    }
+  set (t := compose (under (length G2) sh1) s) in Ht.
+  set (t' := compose (under (length G2) sh1) s') in Ht.
+  so (Hseqr _#3 Ht) as (B & Hbl & Hbr & Hr1 & Hr2 & Hr12).
+  exists B.
+  simpsub.
+  do2 4 split; eauto using interp_increase, toppg_max.
+  }
+so (pwctx_promote _#4 Hs) as Hs'.
+rewrite -> promote_append in Hs'.
+cbn in Hs'.
+fold (promote G1) in Hs'.
+so (Hseqvm _#3 Hs') as (A & Hal & Har & Hvar & Hm & Hvm).
+simpsubin Hal.
+simpsubin Har.
+simpsubin Hvar.
+simpsubin Hm.
+simpsubin Hvm.
+exploit (subst_later_pwctx G1 G2 a m (S i) s s' A) as Ht; auto.
+  {
+  intros j t t' _ Ht.
+  so (Hseqvm _#3 Ht) as (R & Hl & Hr & _ & H & _).
+  exists R.
+  simpsubin Hl.
+  simpsubin Hr.
+  simpsubin H.
+  do2 2 split; auto.
+  }
+set (t := compose (under (length G2) sh1) s) in Ht.
+set (t' := compose (under (length G2) sh1) s') in Ht.
+so (Hseqr _#3 Ht) as (B & Hbl & Hbr & Hr1 & Hr2 & Hr12).
+exists B.
+simpsub.
+do2 4 split; eauto using interp_increase, toppg_max.
+Qed.
+
+
+
+Lemma sound_substitution_later_simple :
+  forall G1 G2 a m n n' b,
+    pseq (promote G2 ++ cons (hyp_tm a) (promote G1)) (deq (var (length G2)) (subst (sh (S (length G2))) m) (subst (sh (S (length G2))) a))
+    -> pseq (substctx (dot m id) G2 ++ G1) (deq n n' b)
+    -> pseq (G2 ++ cons (hyp_tml a) G1) (deq (subst (under (length G2) sh1) n) (subst (under (length G2) sh1) n') (subst (under (length G2) sh1) b)).
+Proof.
+intros G1 G2 a m n n' b.
+revert G1.
+refine (seq_pseq_hyp_promote 2 [] a [] m 2 true _ [_] _ false _ [] _ _ [_] _ _).
+cbn.
+intros G Hcla Hclm H1 H2 _.
+eapply sound_substitution_later_simple_pre; eauto.
+Qed.

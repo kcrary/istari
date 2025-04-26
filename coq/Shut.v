@@ -917,6 +917,219 @@ omega.
 Qed.
 
 
+(* Given a goal of the form:
+
+   forall G,
+     pseq (G1a ++ G1b ++ if b1 then promote G else G) J1
+     -> ...
+     -> pseq (Gna ++ Gnb ++ if bn then promote G else G) Jn
+     -> pseq (Ga ++ Gb ++ G) J
+
+   refine (seq_pseq_hyp_promote m H1 p1 ... Hm pm n b1 G1a G1b J1 ... bn Gna Gnb Jn Ga Gb J _)
+
+   will produce a subgoal of the form:
+
+   forall G,
+     hygiene (ctxpred (H1 ++ G) pi)
+     -> ...
+     -> hygiene (ctxpred (Hm ++ G) pm)
+     -> seq (G1a ++ G1b ++ if b1 then promote G else G) J1
+     -> ...
+     -> seq (Gna ++ Gnb ++ if bn then promote G else G) Jn
+     -> hygienej (ctxpred (Ga ++ Gb ++ G)) J
+     -> seq (Ga ++ Gb ++ G) J
+
+   Note that one can fill in all the Jis with _, and all the
+   Gias and Gibs with [_; ...; _].
+*)
+Lemma seq_pseq_hyp_promote :
+  forall m,
+    nat_rect (fun _ => list (scontext * term _) -> Prop)
+      (fun T =>
+         forall n,
+           nat_rect (fun _ => list (scontext * scontext * bool * judgement) -> Prop)
+             (fun L =>
+                forall G1 G2 J,
+                  (forall G,
+                     list_rect (fun _ => Prop)
+                       (list_rect (fun _ => Prop)
+                          (hygienej (ctxpred (G1 ++ G2 ++ G)) J -> seq (G1 ++ G2 ++ G) J)
+                          (fun X _ P => 
+                             match X with
+                             | pair (pair (pair G1' G2') b) J' => seq (G1' ++ G2' ++ match b with true => promote G | false => G end) J' -> P
+                             end)
+                          (rev L))
+                       (fun X _ P =>
+                          match X with
+                          | pair G' p => hygiene (ctxpred (G' ++ G)) p -> P
+                          end)
+                       (rev T))
+                  ->
+                  forall G,
+                    list_rect (fun _ => Prop)
+                      (pseq (G1 ++ G2 ++ G) J)
+                      (fun X _ P => 
+                         match X with
+                         | pair (pair (pair G1' G2') b) J' => pseq (G1' ++ G2' ++ match b with true => promote G | false => G end) J' -> P
+                         end)
+                      (rev L))
+             (fun _ P L =>
+                forall (b : bool) (G1 G2 : scontext) (J : judgement), P ((((G1, G2), b), J) :: L))
+             n
+             nil)
+      (fun _ P T =>
+         forall (G : scontext) (p : term obj), P ((G, p) :: T))
+      m
+      nil.
+Proof.
+intro m.
+set (T := @nil (scontext * term obj)).
+clearbody T.
+revert T.
+induct m.
+2:{
+  intros m IH T.
+  cbn.
+  intros G p.
+  apply IH.
+  }
+intros T.
+cbn.
+set (T' := rev T).
+clearbody T'.
+renameover T' into T.
+intro n.
+set (L := nil).
+clearbody L.
+revert L.
+induct n.
+2:{
+  intros n IH L.
+  cbn.
+  intros b G1 G2 J.
+  apply IH.
+  }
+intros L.
+cbn.
+set (L' := rev L).
+clearbody L'.
+renameover L' into L.
+intros G1 G2 J Hseqs G.
+set (i := 0).
+assert (forall j,
+          i <= j
+          -> list_rect (fun _ => Prop)
+               (list_rect (fun _ => Prop)
+                  (hygienej (ctxpred (G1 ++ G2 ++ G ++ shut j)) J -> seq (G1 ++ G2 ++ G ++ shut j) J)
+                  (fun X _ P => 
+                     match X with
+                     | pair (pair (pair G1' G2') b) J' => seq (G1' ++ G2' ++ match b with true => promote (G ++ shut j) | false => G ++ shut j end) J' -> P
+                     end)
+                  L)
+                (fun X _ P =>
+                   match X with
+                   | pair G' p => hygiene (ctxpred (G' ++ G ++ shut j)) p -> P
+                   end)
+                T) as H.
+  {
+  intros j Hj.
+  exact (Hseqs (G ++ shut j)).
+  }
+clear Hseqs.
+clearbody i.
+revert i H.
+induct T.
+
+(* nil *)
+{
+intros i1 Hseq.
+cbn in Hseq.
+revert i1 Hseq.
+induct L.
+  (* nil *)
+  {
+  cbn.
+  intros i1 Hseq.
+  so (shut_judgement _ (G1 ++ G2 ++ G) J) as (i2 & HclJ).
+  so (upper_bound_all 2 i1 i2) as (i & Hi1 & Hi2 & _).
+  exists i.
+  intros j Hj.
+  rewrite <- !app_assoc.
+  apply Hseq; eauto using le_trans.
+  lapply (HclJ j); [| omega].
+  intro H.
+  autorewrite with canonlist in H.
+  exact H.
+  }
+  
+  (* cons *)
+  {
+  intros (((G1', G2'), b), J') L IH i Hseqs.
+  cbn.
+  intros (j & Hseq).
+  apply (IH (max i j)).
+  intros k Hk.
+  destruct b.
+    {
+    rewrite -> promote_append.
+    rewrite -> promote_shut.
+    rewrite -> !app_assoc.
+    exploit (Hseqs k) as H.
+      {
+      so (Nat.le_max_l i j).
+      omega.
+      }
+    cbn in H.
+    rewrite -> promote_append in H.
+    rewrite -> promote_shut in H.
+    rewrite -> !app_assoc in H.
+    apply H.
+    setoid_rewrite <- app_assoc at 2.
+    apply Hseq.
+    so (Nat.le_max_r i j).
+    omega.
+    }
+
+    {
+    exploit (Hseqs k) as H.
+      {
+      so (Nat.le_max_l i j).
+      omega.
+      }
+    cbn in H.
+    apply H.
+    setoid_rewrite -> app_assoc.
+    setoid_rewrite -> app_assoc.
+    setoid_rewrite <- app_assoc at 2.
+    apply Hseq.
+    so (Nat.le_max_r i j).
+    omega.
+    }
+  }
+}
+
+(* cons *)
+{
+intros (G', p) T IH i Hseqs.
+so (shut_term _ (G' ++ G) p) as (j & Hclp).
+apply (IH (max i j)).
+intros k Hk.
+exploit (Hseqs k) as H.
+  {
+  so (Nat.le_max_l i j).
+  omega.
+  }
+cbn in H.
+apply H.
+rewrite -> app_assoc.
+apply Hclp.
+so (Nat.le_max_r i j).
+omega.
+}
+Qed.
+
+
+
 Ltac finish_pseq j :=
 eauto using le_trans;
 match goal with

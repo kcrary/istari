@@ -647,6 +647,8 @@ signature RULE_TACTIC =
       val iexistsElimEqtype : tactic7             (* A B C I K M N *)
       val substitution : int -> tactic1           (* M *)
       val substitutionSimple : int -> tactic2     (* B M *)
+      val substitutionLater : int -> tactic1      (* M *)
+      val substitutionLaterSimple : int -> tactic2(* B M *)
       val generalize : tactic3                    (* A B M *)
       val assert : tactic1                        (* A *)
       val assert' : tactic1                       (* A *)
@@ -6840,6 +6842,35 @@ structure RuleTactic :> RULE_TACTIC =
             val set = D.set dir
          in
             refine (Rule.substitutionSimple i (T.evar ()) xB xM)
+            >>> [
+                chdir (rebind left 1 right set),
+                chdir (rebind left 0 right set),
+                ]
+         end
+
+      fun substitutionLater i xM =
+         let
+            do (jud, dir) = withgoal
+            val (right, dir') = D.split dir i
+            val left = D.shift dir' 1
+            val set = D.set dir
+         in
+            refine (Rule.substitutionLater i (T.evar ()) (T.evar ()) xM)
+            >>> [
+                chdir (rebind left 1 right set),
+                chdir (rebind left 1 right set),
+                chdir (rebind left 0 right set),
+                ]
+         end
+
+      fun substitutionLaterSimple i xB xM =
+         let
+            do (jud, dir) = withgoal
+            val (right, dir') = D.split dir i
+            val left = D.shift dir' 1
+            val set = D.set dir
+         in
+            refine (Rule.substitutionLaterSimple i (T.evar ()) xB xM)
             >>> [
                 chdir (rebind left 1 right set),
                 chdir (rebind left 0 right set),

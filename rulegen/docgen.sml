@@ -377,13 +377,20 @@ structure Docgen :> DOCGEN =
                        NONE => ()
 
                      | SOME [] =>
-                          write ", \\Gamma_2"
+                          if promote then
+                             write ", \\overline{\\Gamma_2}"
+                          else
+                             write ", \\Gamma_2"
 
                      | SOME sub =>
                           (
                           write ", ";
                           writeSub write sub;
-                          write "\\Gamma_2"
+
+                          if promote then
+                             write "\\overline{\\Gamma_2}"
+                          else
+                             write "\\Gamma_2"
                           ));
    
                    write "\\vdash ";

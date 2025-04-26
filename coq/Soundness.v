@@ -263,6 +263,8 @@ intros; eapply sound_subtype_formation_invert1; eauto; done.
 intros; eapply sound_subtype_formation_invert2; eauto; done.
 intros; eapply sound_substitution; eauto; done.
 intros; eapply sound_substitution_simple; eauto; done.
+intros; eapply sound_substitution_later; eauto; done.
+intros; eapply sound_substitution_later_simple; eauto; done.
 intros; eapply sound_strengthen_context; eauto; done.
 intros; eapply sound_functionality_term_term; eauto; done.
 intros; eapply sound_functionality_term_type; eauto; done.

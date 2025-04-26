@@ -44,6 +44,25 @@ eapply tr_substitution_simple; eauto.
 Qed.
 
 
+Lemma substitutionLater_valid : substitutionLater_obligation.
+Proof.
+prepare.
+intros G1 G2 a b m ext1 ext0 n Hb Hm Hn.
+simpsubin Hb.
+simpsubin Hm.
+eapply tr_substitution_later; eauto.
+Qed.
+
+
+Lemma substitutionLaterSimple_valid : substitutionLaterSimple_obligation.
+Proof.
+prepare.
+intros G1 G2 a b m ext0 n Hm Hn.
+simpsubin Hm.
+eapply tr_substitution_later_simple; eauto.
+Qed.
+
+
 Lemma generalize_valid : generalize_obligation.
 Proof.
 prepare.

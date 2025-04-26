@@ -647,13 +647,20 @@ structure Webgen :> WEBGEN =
                        NONE => ()
 
                      | SOME [] =>
-                          write ", G2"
+                          if promote then
+                             write ", promote(G2)"
+                          else
+                             write ", G2"
 
                      | SOME sub =>
                           (
                           write ", ";
                           writeSub write sub;
-                          write "G2"
+
+                          if promote then
+                             write "promote(G2)"
+                          else
+                             write "G2"
                           ));
 
                    write " |- ";

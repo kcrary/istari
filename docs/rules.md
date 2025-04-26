@@ -4657,6 +4657,21 @@ variables.  The official rules, using de Bruijn indices, are given
       G1, x : A, G2 |- x = M : A
       G1, [M / x]G2 |- B ext N
 
+- `substitutionLater n A B M`
+
+      G1, x (later) : A, G2 |- B ext N
+      >>
+      G1, x (later) : A, G2 |- B : type
+      promote(G1), x : A, promote(G2) |- x = M : A
+      G1, [M / x]G2 |- [M / x]B ext N
+
+- `substitutionLaterSimple n A B M`
+
+      G1, x (later) : A, G2 |- B ext N
+      >>
+      promote(G1), x : A, promote(G2) |- x = M : A
+      G1, [M / x]G2 |- B ext N
+
 - `generalize A B M`
 
       G |- [M / x]B ext [M / x]N

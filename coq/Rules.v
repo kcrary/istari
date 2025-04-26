@@ -1466,6 +1466,19 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr (substctx (dot m id) G2 ++ G1) (deq n n' b)
       -> tr (G2 ++ cons (hyp_tm a) G1) (deq (subst (under (length G2) sh1) n) (subst (under (length G2) sh1) n') (subst (under (length G2) sh1) b))
   
+| tr_substitution_later :
+    forall G1 G2 a m n n' b,
+      tr (G2 ++ cons (hyp_tml a) G1) (deqtype b b)
+      -> tr (promote G2 ++ cons (hyp_tm a) (promote G1)) (deq (var (length G2)) (subst (sh (S (length G2))) m) (subst (sh (S (length G2))) a))
+      -> tr (substctx (dot m id) G2 ++ G1) (deq n n' (subst (under (length G2) (dot m id)) b))
+      -> tr (G2 ++ cons (hyp_tml a) G1) (deq (subst (under (length G2) sh1) n) (subst (under (length G2) sh1) n') b)
+
+| tr_substitution_later_simple :
+    forall G1 G2 a m n n' b,
+      tr (promote G2 ++ cons (hyp_tm a) (promote G1)) (deq (var (length G2)) (subst (sh (S (length G2))) m) (subst (sh (S (length G2))) a))
+      -> tr (substctx (dot m id) G2 ++ G1) (deq n n' b)
+      -> tr (G2 ++ cons (hyp_tml a) G1) (deq (subst (under (length G2) sh1) n) (subst (under (length G2) sh1) n') (subst (under (length G2) sh1) b))
+
 | tr_strengthen_context :
     forall G1 G2 a b J,
       tr G1 (deqtype a a)

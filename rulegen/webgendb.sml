@@ -325,11 +325,18 @@ structure WebgenDB :> WEBGENDB =
                        NONE => ()
 
                      | SOME (Shift 0) =>
-                          write ", G2"
+                          if promote then
+                             write ", promote(G2)"
+                          else
+                             write ", G2"
 
                      | SOME sub =>
                           (
-                          write ", G2";
+                          if promote then
+                             write ", promote(G2)"
+                          else
+                             write ", G2";
+
                           writeSub write sub
                           ));
    

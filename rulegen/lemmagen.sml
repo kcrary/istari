@@ -377,7 +377,9 @@ structure Lemmagen :> LEMMAGEN =
                                        (
                                        write "List.app (substctx ";
                                        writeSub write sub;
-                                       write " G2) "
+                                       write " ";
+                                       write (if promote then "(promote G2)" else "G2");
+                                       write ") "
                                        ));
                                 
                                 writeHyps write (if promote then "(promote G1)" else "G1") hyps;
