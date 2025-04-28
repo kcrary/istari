@@ -1,4 +1,5 @@
 
+.PHONY : test
 test :
 	istari-nolib -no regression.ist
 	istari -no typedef.ist
