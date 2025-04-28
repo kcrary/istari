@@ -42,9 +42,11 @@ istaritags :
 install :
 	cp bin/istari bin/istari-nolib bin/istaritags $(INSTALLDIR)
 
+.PHONY : clean
 clean :
 	rm -rf .cm
 	rm -rf bin/*
 
+.PHONY : veryclean
 veryclean : clean
 	rm *.cmlex.sml

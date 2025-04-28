@@ -24,9 +24,11 @@ the-basis.sml : ../basis/BASIS
 install :
 	cp bin/ipp $(INSTALLDIR)
 
+.PHONY : clean
 clean :
 	rm -rf .cm
 
+.PHONY : veryclean
 veryclean : clean
 	rm -f *.cmyacc.sml
 	rm -f *.cmlex.sml
