@@ -2,8 +2,10 @@
 .PHONY : all
 all : dvi
 
+.PHONY : dvi
 dvi : refiner.dvi refiner-db.dvi
 
+.PHONY : pdf
 pdf : refiner.pdf refiner-db.pdf
 
 refiner.dvi : refiner.tex the-rules.tex

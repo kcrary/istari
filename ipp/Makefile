@@ -1,6 +1,7 @@
 
 include ../Makefile.inc
 
+.PHONY : all
 all : smlnj
 
 .PHONY : generated
