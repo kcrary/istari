@@ -150,6 +150,8 @@ of `bar` type.
 
 Several corollaries of induction pertaining to `bindbart`:
 
+    bindbart_simple : type:bindbart_simple
+
     bindbart_map : type:bindbart_map
 
     bindbart_shift_future_out : type:bindbart_shift_future_out

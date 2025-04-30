@@ -96,6 +96,69 @@ witness term.
 
     `unpackt_elim _ _ _ _ _ (`unpackt_intro _ _ _ x y z) f --> f Ap x y z
 
+Some lemmas for manipulating `unpackt`:
+
+    unpackt_simple : parametric (i : level) (a : U i) (b : a -> U i) .
+                        forall (e : weaksum (x : a) . b x) .
+                          parametric (c : forall (x : a) . b x -> U i) .
+                            (parametric (x : a) . forall (y : b x) . c x y) -> unpackt c e
+
+    unpackt_map : forall
+                     (i : level)
+                     (a : U i)
+                     (b : a -> U i)
+                     (c d : forall (x : a) . b x -> U i)
+                     (w : weaksum (x : a) . b x) .
+                     (parametric (x : a) . forall (y : b x) . c x y -> d x y)
+                     -> unpackt c w
+                     -> unpackt d w
+
+    unpackt_assoc : forall
+                       (i : level)
+                       (a : U i)
+                       (b : a -> U i)
+                       (c : U i)
+                       (d : c -> U i)
+                       (e : weaksum (x : a) . b x)
+                       (f : parametric (x : a) . b x -> weaksum (x1 : c) . d x1)
+                       (t : forall (x : c) . d x -> U i) .
+                       unpackt t (unpack e f) <-> (unpackt (x, y) = e in unpackt t (f Ap x y))
+
+    unpackt_commute : forall
+                         (i : level)
+                         (a : U i)
+                         (b : a -> U i)
+                         (c : U i)
+                         (d : c -> U i)
+                         (e : forall (x : a) . b x -> forall (u : c) . d u -> U i)
+                         (s1 : weaksum (x : a) . b x)
+                         (s2 : weaksum (u : c) . d u) .
+                         (unpackt (x, y) = s1 in unpackt (u, v) = s2 in e x y u v)
+                         -> unpackt (u, v) = s2 in unpackt (x, y) = s1 in e x y u v
+
+    unpackt_commute_iff : forall
+                             (i : level)
+                             (a : U i)
+                             (b : a -> U i)
+                             (c : U i)
+                             (d : c -> U i)
+                             (e : forall (x : a) . b x -> forall (u : c) . d u -> U i)
+                             (s1 : weaksum (x : a) . b x)
+                             (s2 : weaksum (u : c) . d u) .
+                             (unpackt (x, y) = s1 in unpackt (u, v) = s2 in e x y u v)
+                               <-> (unpackt (u, v) = s2 in unpackt (x, y) = s1 in e x y u v)
+
+    bindbart_unpack_assoc : forall
+                               (i : level)
+                               (a : U i)
+                               (b : a -> U i)
+                               (c : U i)
+                               (w : weaksum (x : a) . b x)
+                               (f : parametric (x : a) . b x -> Bar.bar c)
+                               (P : c -> U i) .
+                               (bindbart y = unpack w f in P y)
+                                 <-> (unpackt (x, y) = w in bindbart z = f Ap x y in P z)
+
 Impredicative existentials are isomorphic (indeed, extensionally
 equivalent) to weak sums:
 

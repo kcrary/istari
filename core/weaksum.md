@@ -62,6 +62,20 @@ witness term.
 
     `unpackt_elim _ _ _ _ _ (`unpackt_intro _ _ _ x y z) f --> f Ap x y z
 
+Some lemmas for manipulating `unpackt`:
+
+    unpackt_simple : type:unpackt_simple
+
+    unpackt_map : type:unpackt_map
+
+    unpackt_assoc : type:unpackt_assoc
+
+    unpackt_commute : type:unpackt_commute
+
+    unpackt_commute_iff : type:unpackt_commute_iff
+
+    bindbart_unpack_assoc : type:bindbart_unpack_assoc
+
 Impredicative existentials are isomorphic (indeed, extensionally
 equivalent) to weak sums:
 

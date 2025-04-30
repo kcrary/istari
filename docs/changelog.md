@@ -27,7 +27,7 @@
 
 - Library changes:
 
-  + `Bar` has additional lemmas.
+  + `Bar` and `Weaksum` have additional material.
 
 - Added rules `intersectfutIntro`, `futureLeftHidden`,
   `parametricElim'`, `substitutionLater`, and

@@ -51,7 +51,7 @@ stable.isto : decidable.isto logic.isto
 symbol.isto : bool.isto logic.isto partial.isto
 syntactic-equality.isto : nat.isto integer.isto natural.isto symbol.isto
 tuple.isto : datatype.isto misc.isto
-weaksum.isto : kindlike.isto misc.isto
+weaksum.isto : bar.isto kindlike.isto logic.isto misc.isto
 wtype.isto : acc.isto
 
 clean :

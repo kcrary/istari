@@ -2,6 +2,8 @@
 File.import "kindlike-load.iml";
 File.import "irrelevance-load.iml";
 File.import "misc-load.iml";
+File.import "bar-load.iml";
+File.import "logic-load.iml";
 
 File.import "weaksum-aux.iml";
 grammaron Weaksum;
@@ -205,6 +207,202 @@ reductions
 
   unfolding unpackt_elim unpackt_intro paramapp
 /;
+
+
+
+structure Nothing = AfterWeaksumTools ();
+
+
+
+lemma "unpackt_simple"
+/
+  parametric i (a : U i) (b : a -> U i) .
+  forall (e : weaksum (x : a) . b x) .
+  parametric (c : forall (x : a) . b x -> U i) .
+    (parametric x . forall y . c x y)
+    -> `unpackt a b c e
+/;
+
+inference.
+intro /i a b e c Hall/.
+destruct /e/ /x y/.
+so /`unpackt_intro a b c x y __/ /H/.
+  {
+  apply /Hall/.
+  }
+forceExact /H/.
+compat.
+compat.
+extensionality >> auto.
+qed ();
+
+
+
+lemma "unpackt_map"
+/
+  forall i 
+    (a : U i)
+    (b : a -> U i)
+    (c d : forall (x : a) . b x -> U i)
+    (w : weaksum (x : a) . b x) .
+      (parametric (x : a) . forall (y : b x) . c x y -> d x y)
+      -> `unpackt a b c w
+      -> `unpackt a b d w
+/;
+
+inference.
+intro /i a b c d w Himpl Hunpack/.
+unfold /unpackt in Hunpack in concl/.
+destruct /Hunpack/ /x y Heq Hc/.
+witness /pack _ x __/.
+reduce //.
+exists /y/.
+split >> auto.
+witness /Himpl Ap x y Hc/.
+qed ();
+
+
+
+lemma "unpackt_assoc"
+/
+  forall i (a : U i) (b : a -> U i) (c : U i) (d : c -> U i)
+    (e : weaksum (x : a) . b x)
+    (f : parametric (x : a) . b x -> weaksum (x : c) . d x)
+    (t : forall (x : c) . d x -> U i) .
+      `unpackt c d t (`unpack a b (weaksum (x : c) . d x) e f)
+      <->
+      `unpackt a b (fn x y . `unpackt c d t (f Ap x y)) e
+/;
+
+inference.
+intro /i a b c d e f t/.
+split.
+  {
+  destruct /e/ /x y/.
+  intro /Hunpack/.
+  unfold /unpackt in Hunpack in concl/.
+  destruct /Hunpack/ /z w Heq Ht/.
+  reduce /Heq/.
+  witness /pack _ x __/.
+  reduce //.
+  exists /y/.
+  split.
+    {
+    compat.
+    extensionality >> auto.
+    }
+  rewrite /<- Heq/.
+  apply /unpackt_intro z/ >> auto.
+  }
+
+  {
+  intro /Hunpack/.
+  unfold /unpackt in Hunpack in concl/.
+  destruct /Hunpack/ /x y Heq Hunpack/.
+  reduce /Hunpack/.
+  unfold /unpackt in Hunpack/.
+  destruct /Hunpack/ /z w Heq' Ht/.
+  witness /pack _ z __/.
+  reduce //.
+  exists /w/.
+  split >> auto.
+  rewrite /<- Heq/.
+  reduce //.
+  hyp /Heq'/.
+  }
+qed ();
+
+
+
+lemma "unpackt_commute"
+/
+  forall i (a : U i) (b : a -> U i) (c : U i) (d : c -> U i)
+    (e : forall (x : a) . b x -> forall (u : c) . d u -> U i)
+    (s1 : weaksum (x : a) . b x)
+    (s2 : weaksum (u : c) . d u) .
+      (`unpackt a b (fn x y . `unpackt c d (fn u v . e x y u v) s2) s1)
+      -> `unpackt c d (fn u v . `unpackt a b (fn x y . e x y u v) s1) s2
+/;
+
+inference.
+intro /i a b c d e s1 s2/.
+unfold /unpackt at all/.
+intro /Hunpack/.
+destruct /Hunpack/ /x y Heq Hunpack/.
+reduce /Hunpack/.
+destruct /Hunpack/ /u v Heq' He/.
+witness /pack _ u __/.
+reduce //.
+exists /v/.
+split >> auto.
+witness /pack _ x __/.
+reduce //.
+exists /y/.
+auto.
+qed ();
+
+
+
+lemma "unpackt_commute_iff"
+/
+  forall i (a : U i) (b : a -> U i) (c : U i) (d : c -> U i)
+    (e : forall (x : a) . b x -> forall (u : c) . d u -> U i)
+    (s1 : weaksum (x : a) . b x)
+    (s2 : weaksum (u : c) . d u) .
+      (`unpackt a b (fn x y . `unpackt c d (fn u v . e x y u v) s2) s1)
+      <-> 
+      (`unpackt c d (fn u v . `unpackt a b (fn x y . e x y u v) s1) s2)
+/;
+
+inference.
+intro /i a b c d e s1 s2/.
+split >> apply /unpackt_commute/.
+qed ();
+
+
+
+lemma "bindbart_unpack_assoc"
+/
+  forall i 
+    (a : U i) 
+    (b : a -> U i)
+    (c : U i)
+    (w : weaksum (x : a) . b x)
+    (f : parametric (x : a) . b x -> Bar.bar c)
+    (P : c -> U i) .
+      (bindbart y = (`unpack a b (Bar.bar c) w f) in P y)
+      <->
+      `unpackt a b (fn x y . bindbart z = f Ap x y in P z) w
+/;
+
+inference.
+intro /i a b c w f P/.
+split.
+  {
+  destruct /w/ /x y/.
+  reduceParam //.
+  intro /Hprop/.
+  so /`unpackt_intro a b (fn x y . bindbart z = f Ap x y in P z) x y Hprop/ /H/.
+  forceExact /H/.
+  compat.
+  compat.
+  extensionality.
+  auto.
+  }
+
+  {
+  intro /Hprop/.
+  abstractOver /w/ /concl/.
+  goalCaseT
+    /| ? @ _ =>
+       \(fnc t =>
+           witness /`unpackt_elim a b _ \t\ w Hprop __/)\
+    /.
+  reduceParam //.
+  intro /x y Hprop'/.
+  hyp /Hprop'/.
+  }
+qed ();
 
 
 

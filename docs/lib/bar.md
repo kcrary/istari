@@ -169,6 +169,11 @@ of `bar` type.
 
 Several corollaries of induction pertaining to `bindbart`:
 
+    bindbart_simple : parametric (i : level) (a : U i) .
+                         forall (e : bar a) .
+                           parametric (t : a -> U i) .
+                             (forall (x : a) . t x) -> bindbart x = e in t x
+
     bindbart_map : forall (i : level) (a : U i) (b c : a -> U i) (e : bar a) .
                       (forall (x : a) . b x -> c x)
                       -> (bindbart x = e in b x)
