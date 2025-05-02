@@ -6,8 +6,10 @@ UNITS = $(DOCUNITS) datatype syntactic-equality omega
 DOCS = finite-map-class
 
 
+.PHONY : all
 all : $(foreach i, $(UNITS), $(i).isto)
 
+.PHONY : docs
 docs : $(foreach i, $(DOCUNITS), ../docs/lib/$(i).md) $(foreach i, $(DOCS), ../docs/lib/$(i).md)
 
 %.isto : %.ist %-aux.iml
@@ -54,5 +56,6 @@ tuple.isto : datatype.isto misc.isto
 weaksum.isto : kindlike.isto misc.isto
 wtype.isto : acc.isto
 
+.PHONY : clean
 clean :
 	rm -f *.isto

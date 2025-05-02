@@ -1,4 +1,9 @@
 
+.PHONY: all
+all: smlnj
+
+
+.PHONY : smlnj
 smlnj :
 	cd basis; make smlnj
 	cd ipp; make smlnj
@@ -14,11 +19,13 @@ install :
 	cd ui; make install
 
 ## Note: there is no UI for the OCaml version yet.
+.PHONY : ocaml
 ocaml :
 	cd ipp/basis; make ocaml
 	cd cmlibi; make ocaml
 	cd prover; make ocaml
 
+.PHONY : clean
 clean :
 	cd basis; make clean
 	cd ipp; make clean
@@ -27,3 +34,4 @@ clean :
 	cd ui; make clean
 	cd core; make clean
 	cd library; make clean
+
