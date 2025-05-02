@@ -1,6 +1,7 @@
 
 include ../Makefile.inc
 
+.PHONY : all
 all : smlnj
 
 .PHONY : generated
@@ -24,9 +25,11 @@ the-basis.sml : ../basis/BASIS
 install :
 	cp bin/ipp $(INSTALLDIR)
 
+.PHONY : clean
 clean :
 	rm -rf .cm
 
+.PHONY : veryclean
 veryclean : clean
 	rm -f *.cmyacc.sml
 	rm -f *.cmlex.sml

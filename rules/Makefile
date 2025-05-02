@@ -1,8 +1,11 @@
 
+.PHONY : all
 all : dvi
 
+.PHONY : dvi
 dvi : refiner.dvi refiner-db.dvi
 
+.PHONY : pdf
 pdf : refiner.pdf refiner-db.pdf
 
 refiner.dvi : refiner.tex the-rules.tex
@@ -17,5 +20,6 @@ refiner-db.dvi : refiner-db.tex the-rules-db.tex
 refiner-db.pdf : refiner-db.tex the-rules-db.tex
 	pdflatex refiner-db.tex
 
+.PHONY : clean
 clean :
 	rm *.dvi *.aux *.log

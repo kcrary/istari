@@ -8,7 +8,7 @@ INTFS = $(foreach i, $(SOURCES), $(i).cmi)
 IMPLS = $(foreach i, $(SOURCES), $(i).cmo)
 ZARITH = +zarith
 
-.PHONY : all ocaml smlnj
+.PHONY : all ocaml smlnj clean
 
 all : smlnj ocaml
 
