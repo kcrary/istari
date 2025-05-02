@@ -82,6 +82,8 @@ signature SHOW =
       val showPrefixed : string -> Directory.directory -> Term.term -> unit
       val showPP : PrettyPrint.ppstream -> Directory.directory -> Term.term -> unit
 
+      val showHypIndent : int -> Directory.directory -> Judgement.hyp -> unit
+
       val showGoal : goal -> unit
       val showGoalIndent : int -> goal -> unit
       val showContext : Judgement.context -> Directory.directory -> unit
@@ -1142,7 +1144,7 @@ structure ShowInternal
 
 
 
-      fun showHyp pp hyp margin dir =
+      fun showHypMain pp hyp margin dir =
          (case hyp of
              J.Tm a => 
                 showMain pp margin dir precMin a T.id []
@@ -1167,6 +1169,11 @@ structure ShowInternal
 
            | J.Let m =>
                 showMain pp margin dir precMin m T.id [])
+
+
+      fun showHypIndent indent dir hyp =
+         showTop indent
+         (fn pp => showHypMain pp hyp 0 dir)
 
 
       fun hypCategory hyp =
@@ -1200,7 +1207,7 @@ structure ShowInternal
                 PP.print pp "~";
                 PP.print pp (hypCategory hyp);
                 PP.openBox pp PP.Consistent indent;
-                showHyp pp hyp (margin+1) D.empty;
+                showHypMain pp hyp (margin+1) D.empty;
                 PP.closeBox pp;
                 PP.newline pp
                 ))
@@ -1244,7 +1251,7 @@ structure ShowInternal
                                  (
                                  PP.print pp (hypCategory hyp);
                                  PP.openBox pp PP.Consistent indent;
-                                 showHyp pp hyp 0 dir'
+                                 showHypMain pp hyp 0 dir'
                                  )
 
                             | SOME body =>

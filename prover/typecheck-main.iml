@@ -744,7 +744,7 @@ structure TypecheckMain :> TYPECHECK_MAIN =
                      (T.id, ctx, (fn tac => tac), [])
                   else
                      (case (S.expose ctx, D.exposeOpt dir) of
-                         (S.Cons (hyp, rest), SOME (_, dir')) =>
+                         (S.Cons (hyp, rest), SOME (sym, dir')) =>
                             (case
                                 (case hyp of
                                     J.Tm a =>
@@ -765,6 +765,17 @@ structure TypecheckMain :> TYPECHECK_MAIN =
                                 NONE =>
                                    let
                                       val (s, ctx', tacfn, obs) = loop (i+1) rest dir'
+
+                                      val () =
+                                         if !trace then
+                                            let
+                                               val str = String.concat ["binding ", Symbol.toValue sym, " : "]
+                                            in
+                                               print str;
+                                               Show.showHypIndent (String.length str) dir hyp
+                                            end
+                                         else
+                                            ()
                                    in
                                       (T.under 1 s, 
                                        S.cons (J.subHyp hyp s) ctx',
@@ -798,6 +809,17 @@ structure TypecheckMain :> TYPECHECK_MAIN =
                                           (J.make ctx'' (T.apply1 Prim.istp (T.Sub (b, s))), dir'),
                                           dest,
                                           history)
+
+                                      val () =
+                                         if !trace then
+                                            let
+                                               val str = String.concat ["destructing and binding ", Symbol.toValue sym, " : "]
+                                            in
+                                               print str;
+                                               Show.showHypIndent (String.length str) dir (J.Tml b)
+                                            end
+                                         else
+                                            ()
                                    in
                                       (T.Dot (T.Next T.zero, T.compose s T.shift1),
                                        S.cons (J.Tml (T.Sub (b, s))) ctx',
