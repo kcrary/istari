@@ -128,7 +128,7 @@ qed ();
 
 
 
-define /unpackt {a b} t u/
+define /unpackt {a b} u t/
 /
   weaksum (x : a) . exists (y : b x) .
     `pack a b x y = u : (weaksum (x : a) . b x)
@@ -136,8 +136,8 @@ define /unpackt {a b} t u/
 //
   intersect i .
   forall (a : U i) (b : a -> U i) .
-    (forall (x : a) . b x -> U i)
-    -> (weaksum (x : a) . b x)
+    (weaksum (x : a) . b x)
+    -> (forall (x : a) . b x -> U i)
     -> U i
 /;
 
@@ -158,7 +158,7 @@ define /unpackt_intro {a b c} x y z/
   forall 
     (a : U i) (b : a -> U i) (c : forall (x : a) . b x -> U i)
     (x : a) (y : b x) .
-      c x y -> `unpackt a b c (`pack a b x y)
+      c x y -> `unpackt a b (`pack a b x y) c
 /;
 
 unfold /unpackt_intro/.
@@ -183,7 +183,7 @@ define /unpackt_elim {a b c d} z w f/
     (a : U i) (b : a -> U i) (c : forall (x : a) . b x -> U i)
     (d : (weaksum (x : a) . b x) -> U i)
     (z : weaksum (x : a) . b x) .
-      `unpackt a b c z
+      `unpackt a b z c
       -> (parametric (x : a) . forall (y : b x) . c x y -> d (`pack a b x y))
       -> d z
 /;
@@ -220,7 +220,7 @@ lemma "unpackt_simple"
   forall (e : weaksum (x : a) . b x) .
   parametric (c : forall (x : a) . b x -> U i) .
     (parametric x . forall y . c x y)
-    -> `unpackt a b c e
+    -> `unpackt a b e c
 /;
 
 inference.
@@ -246,8 +246,8 @@ lemma "unpackt_map"
     (c d : forall (x : a) . b x -> U i)
     (w : weaksum (x : a) . b x) .
       (parametric (x : a) . forall (y : b x) . c x y -> d x y)
-      -> `unpackt a b c w
-      -> `unpackt a b d w
+      -> `unpackt a b w c
+      -> `unpackt a b w d
 /;
 
 inference.
@@ -269,9 +269,9 @@ lemma "unpackt_assoc"
     (e : weaksum (x : a) . b x)
     (f : parametric (x : a) . b x -> weaksum (x : c) . d x)
     (t : forall (x : c) . d x -> U i) .
-      `unpackt c d t (`unpack a b (weaksum (x : c) . d x) e f)
+      `unpackt c d (`unpack a b (weaksum (x : c) . d x) e f) t
       <->
-      `unpackt a b (fn x y . `unpackt c d t (f Ap x y)) e
+      `unpackt a b e (fn x y . `unpackt c d (f Ap x y) t)
 /;
 
 inference.
@@ -320,8 +320,8 @@ lemma "unpackt_commute"
     (e : forall (x : a) . b x -> forall (u : c) . d u -> U i)
     (s1 : weaksum (x : a) . b x)
     (s2 : weaksum (u : c) . d u) .
-      (`unpackt a b (fn x y . `unpackt c d (fn u v . e x y u v) s2) s1)
-      -> `unpackt c d (fn u v . `unpackt a b (fn x y . e x y u v) s1) s2
+      (`unpackt a b s1 (fn x y . `unpackt c d s2 (fn u v . e x y u v)))
+      -> `unpackt c d s2 (fn u v . `unpackt a b s1 (fn x y . e x y u v))
 /;
 
 inference.
@@ -349,9 +349,9 @@ lemma "unpackt_commute_iff"
     (e : forall (x : a) . b x -> forall (u : c) . d u -> U i)
     (s1 : weaksum (x : a) . b x)
     (s2 : weaksum (u : c) . d u) .
-      (`unpackt a b (fn x y . `unpackt c d (fn u v . e x y u v) s2) s1)
+      (`unpackt a b s1 (fn x y . `unpackt c d s2 (fn u v . e x y u v)))
       <-> 
-      (`unpackt c d (fn u v . `unpackt a b (fn x y . e x y u v) s1) s2)
+      (`unpackt c d s2 (fn u v . `unpackt a b s1 (fn x y . e x y u v)))
 /;
 
 inference.
@@ -372,7 +372,7 @@ lemma "bindbart_unpack_assoc"
     (P : c -> U i) .
       (bindbart y = (`unpack a b (Bar.bar c) w f) in P y)
       <->
-      `unpackt a b (fn x y . bindbart z = f Ap x y in P z) w
+      `unpackt a b w (fn x y . bindbart z = f Ap x y in P z)
 /;
 
 inference.

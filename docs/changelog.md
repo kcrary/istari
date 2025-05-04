@@ -31,6 +31,9 @@
 
 - Library changes:
 
+  + The order of arguments to `Weaksum.unpackt` has changed.  The
+    syntactic sugar is unchanged.
+
   + `Bar` and `Weaksum` have additional material.
 
 - Added rules `intersectfutIntro`, `futureLeftHidden`,

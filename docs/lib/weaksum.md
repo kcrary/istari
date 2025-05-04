@@ -47,14 +47,14 @@ about a weak sum's witness term.  For that, we can define
 
     unpackt : intersect (i : level) .
                  forall (a : U i) (b : a -> U i) .
-                   (forall (x : a) . b x -> U i) -> (weaksum (x : a) . b x) -> U i
-            = fn a b t u .
+                   (weaksum (x : a) . b x) -> (forall (x : a) . b x -> U i) -> U i
+            = fn a b u t .
                  weaksum (x : a) .
                    exists (y : b x) . pack b x y = u : (weaksum (x1 : a) . b x1) & t x y
             (2 implicit arguments)
     
 The syntactic sugar `unpackt (x, y) = u in c` is accepted for
-`unpackt (fn x y . c) u`.
+`unpackt u (fn x y . c)`.
 
 The introduction form for `unpackt` inhabits it when the weak sum
 being unpacked is a known package:
@@ -66,7 +66,7 @@ being unpacked is a known package:
                          (c : forall (x : a) . b x -> U i)
                          (x : a)
                          (y : b x) .
-                         c x y -> unpackt c (pack b x y)
+                         c x y -> unpackt (pack b x y) c
                   = fn a b c x y z .
                        pack
                          (fn x' .
@@ -88,7 +88,7 @@ witness term.
                         (c : forall (x : a) . b x -> U i)
                         (d : (weaksum (x : a) . b x) -> U i)
                         (z : weaksum (x : a) . b x) .
-                        unpackt c z
+                        unpackt z c
                         -> (parametric (x : a) . forall (y : b x) . c x y -> d (pack b x y))
                         -> d z
                  = fn a b c d z w f . unpack (x, w') = w in f Ap x (w' #1) (w' #2 #2)
@@ -101,7 +101,7 @@ Some lemmas for manipulating `unpackt`:
     unpackt_simple : parametric (i : level) (a : U i) (b : a -> U i) .
                         forall (e : weaksum (x : a) . b x) .
                           parametric (c : forall (x : a) . b x -> U i) .
-                            (parametric (x : a) . forall (y : b x) . c x y) -> unpackt c e
+                            (parametric (x : a) . forall (y : b x) . c x y) -> unpackt e c
 
     unpackt_map : forall
                      (i : level)
@@ -110,8 +110,8 @@ Some lemmas for manipulating `unpackt`:
                      (c d : forall (x : a) . b x -> U i)
                      (w : weaksum (x : a) . b x) .
                      (parametric (x : a) . forall (y : b x) . c x y -> d x y)
-                     -> unpackt c w
-                     -> unpackt d w
+                     -> unpackt w c
+                     -> unpackt w d
 
     unpackt_assoc : forall
                        (i : level)
@@ -122,7 +122,7 @@ Some lemmas for manipulating `unpackt`:
                        (e : weaksum (x : a) . b x)
                        (f : parametric (x : a) . b x -> weaksum (x1 : c) . d x1)
                        (t : forall (x : c) . d x -> U i) .
-                       unpackt t (unpack e f) <-> (unpackt (x, y) = e in unpackt t (f Ap x y))
+                       unpackt (unpack e f) t <-> (unpackt (x, y) = e in unpackt (f Ap x y) t)
 
     unpackt_commute : forall
                          (i : level)

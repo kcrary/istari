@@ -42,7 +42,7 @@ about a weak sum's witness term.  For that, we can define
             imp:unpackt
     
 The syntactic sugar `unpackt (x, y) = u in c` is accepted for
-`unpackt (fn x y . c) u`.
+`unpackt u (fn x y . c)`.
 
 The introduction form for `unpackt` inhabits it when the weak sum
 being unpacked is a known package:
