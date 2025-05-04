@@ -1383,6 +1383,24 @@ pages.
   typing goal that `assertLater` does not generate.
 
 
+- `squashConcl`
+
+  Attempts to replace the conclusion `C` with `{ C }` by proving and
+  then using [squash stability](lib/sqstable.html).
+
+  + `squashConclRaw`
+
+    As `squashConcl` but does not invoke the typechecker.
+
+  + `proveSqstable`
+
+    Attempts to prove a goal of the form `sqstable P`.
+
+  + `proveSqstableRaw`
+
+    As `proveSqstable` but does not invoke the typechecker.
+
+
 - `exfalso`
 
   Replaces the current goal with `void`.  Also unhides any hidden hypotheses.
