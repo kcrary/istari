@@ -1,0 +1,143 @@
+
+structure ParseEventually =
+   struct
+
+      structure R = CheckpointedRef
+      structure T = ETerm
+
+      val bindev : Constant.constant R.dest = R.dest ()
+      val bindevt : Constant.constant R.dest = R.dest ()
+
+      fun parseBind x m n = T.apply2 (R.read bindev) m (T.lam (SOME x) n)
+      fun parseBindT x m b = T.apply2 (R.read bindevt) m (T.lam (SOME x) b)
+
+   end
+
+
+grammardef Eventually
+
+   rule Term(0) ::= "bindev" Ident "=" Term(1) "in" Term(0) => ParseEventually.parseBind
+   rule Term(0) ::= "bindevt" Ident "=" Term(1) "in" Term(0) => ParseEventually.parseBindT
+
+   reserved "bindev" "bindevt" : Ident
+
+end
+
+
+functor AfterBindev () :> sig end =
+   struct
+
+      val bindev = resolveGlobal /Eventually.bindev/
+      val bindevt = resolveGlobal /Eventually.bindevt/
+
+      structure U = Show.Unparsing
+
+      val () = CheckpointedRef.write ParseEventually.bindev bindev
+      val () = CheckpointedRef.write ParseEventually.bindevt bindevt
+
+      val () = UnparseTerm.registerLet bindev "bindev "
+      val () = UnparseTerm.registerLet bindevt "bindevt "
+
+      val () =
+         U.reserved :=
+            List.foldl
+               (fns str set => SymbolSet.insert set (Symbol.fromValue str))
+               (!U.reserved)
+               ["bindev", "bindevt"]
+
+   end
+
+
+functor AfterEventuallyAll () :> sig end =
+   struct
+
+      structure D = DestructInternal
+      structure R = Reduction
+      structure T = Term
+      structure H = ConstantTable
+
+      open Tactic
+      open RefineTactic
+      open Case
+
+      val ev = resolveGlobal /Eventually.ev/
+      val ev_unroll = resolveGlobal /Eventually.ev_unroll/
+      val now = resolveGlobal /Eventually.now/
+      val laterf = resolveGlobal /Eventually.laterf/
+      val ev_subtype = resolveGlobal /Eventually.ev_subtype/
+      val ev_eeqtp = resolveGlobal /Eventually.ev_eeqtp/
+      val ev_iter = resolveGlobal /Eventually.ev_iter/
+      val bindevt = resolveGlobal /Eventually.bindevt/
+      val sqstable_bindevt = resolveGlobal /Eventually.sqstable_bindevt/
+
+      val () =
+         Constant2Table.insert TypecheckTables.subtypeTactics (ev, ev)
+            (TypecheckTables.unhideForSubtype >>+ Backchain.applyRaw /\Term.Const ev_subtype\/)
+
+      val () =
+         H.insert InductionInternal.iterators ev (ev_iter, 1, 0)
+
+      fun compatEvEeqtp _ _ tac =
+         (* tac :: A <:> A' *)
+         (* ev A <:> ev A' *)
+         Backchain.witnessPriority /\T.Const ev_eeqtp\ _ _ _ __/
+         >>!
+         (* A <:> A' *)
+         tac
+
+      val () =
+         RewriteInternal.CICTable.insert RewriteInternal.compatibilityTable
+            (ev, 0, Prim.eeqtp)
+            (RewriteTypes.General Prim.eeqtp, true, 0, compatEvEeqtp)
+
+
+      fun destEv i pat set =
+         (case pat of
+             IntroPattern.Or [p1, p2] =>
+                let
+                   do (jud, _) = withgoal
+
+                   val h = Judgement.hyp jud i
+                   val sym = Directory.freshSet set
+                in
+                   hypCaseT h
+                   /
+                   $tm \ev\ ? =>
+                   \(fnc a =>
+                        (* ev A, ... |- C *)
+                        refine (Rule.equivalenceLeftAlt i (T.evar ()) (T.evar ()) (T.evar ()))
+                        >>> [
+                            (* ev A, ... |- ev A = A % future (ev A) : type *)
+                            witnessRaw (ETerm.literal (T.apply2 ev_unroll (T.evar ()) (T.evar ())))
+                            >> idtacM (Seq.cons sym Seq.empty, D.Auxiliary),
+
+                            (* A & future (ev A), ... |- C *)
+                            refine (Rule.sumLeft i (T.evar ()) (T.evar ()) (T.evar ()))
+                            >>> [
+                                (* a, ...[inl 0 . ^] |- C[under_i (inl 0 . ^)] *)
+                                D.refold jud i 1 (T.apply1 now T.zero)
+                                   (* now 0 --> inl 0 *)
+                                   (R.trans [R.unfold, R.beta 1])
+                                >>+
+                                (* a, ...[now 0 . ^] |- C[under_i (now 0 . ^)] *)
+                                D.dest i p1 set,
+    
+                                (* future (ev A), ...[inr 0 . ^] |- C[under_i (inr 0 . ^)] *)
+                                D.refold jud i 1 (T.apply1 laterf T.zero)
+                                   (* laterf 0 --> inr 0 *)
+                                   (R.trans [R.unfold, R.beta 1])
+                                >>+
+                                (* future (ev A), ...[laterf 0 . ^] |- C[under_i (laterf 0 . ^)] *)
+                                D.dest i p2 set
+                                ]
+                            ])\
+                   /
+                end
+
+           | _ =>
+                fail "ev pattern expected")
+
+      val () =
+         H.insert D.destructTactics ev destEv
+
+   end

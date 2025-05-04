@@ -511,7 +511,7 @@ However, Istari's recursive types are *guarded* recursive types, which
 means that every occurrence of `t` in `A` must be guarded by moving
 into the future, usually using the future modality.
 
-For example, the type [`bar A`](lib/bar.html) is defined as
+For example, the type [`ev A`](lib/eventually.html) is defined as
 `rec t . A % future t`, which means `A` at some point in the future.
 The recursive occurrence of `t` is guarded by placing it within the
 `future`.
@@ -539,7 +539,7 @@ Then the following ornamented Y combinator has the type
 Thus, to prove `A` it is sufficient to prove `A` assuming that `A` is
 true in the future.  This is tantamount to proving `A` by induction
 over time.  This is developed (with some minor differences) in the
-[simulated partial types library](lib/bar.html) `Bar`.
+[simulated partial types library](lib/eventually.html) `Eventually`.
 
 One of the main features of the Istari type theory is that recursive
 types are not only legal types, but they are also

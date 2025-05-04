@@ -5,9 +5,9 @@
 The following libraries are pre-loaded:
 
 - [`Acc`](lib/acc.html) (accessibility)
-- [`Bar`](lib/bar.html) (simulated partial computable objects)
 - [`Bool`](lib/bool.html)
 - [`Decidable`](lib/decidable.html)
+- [`Eventually`](lib/eventually.html) (simulated partial computable objects)
 - [`Finite`](lib/finite.html)
 - [`FiniteMap`](lib/finite-map.html)
 - [`Function`](lib/function.html)

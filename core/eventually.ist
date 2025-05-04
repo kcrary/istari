@@ -3,10 +3,10 @@ File.import "misc-load.iml";
 File.import "logic-load.iml";
 File.import "sqstable-load.iml";
 
-File.import "bar-aux.iml";
+File.import "eventually-aux.iml";
 
 
-Namespace.beginModule "Bar";
+Namespace.beginModule "Eventually";
 
 
 lemma "pause_type"
@@ -71,7 +71,7 @@ writeRegistry /unroll_ffix/ /ureduction/ unroll_ffix;
 
 
 
-define /bar a/
+define /ev a/
 /
   rec t . a % future t
 //
@@ -80,19 +80,19 @@ define /bar a/
 
 inference.
 introOf /i/.
-unfoldHead /bar/.
+unfoldHead /ev/.
 typecheck.
 qed ();
 
 
 
-lemma "bar_unroll" 
+lemma "ev_unroll" 
 /
-  forall (i : level) (a : U i) . bar a = (a % future (bar a)) : type
+  forall (i : level) (a : U i) . ev a = (a % future (ev a)) : type
 /;
 
 intro /i a/.
-unrollType /bar/.
+unrollType /ev/.
 reflexivity.
 qed ();
 
@@ -103,13 +103,13 @@ define /now x/
   inl x
 //
   intersect i (a : U i) .
-    a -> bar a
+    a -> ev a
 /;
 
 inference.
 introOf /i a x/.
 unfold /now/.
-rewrite /-> bar_unroll/.
+rewrite /-> ev_unroll/.
 typecheck.
 qed ();
 
@@ -120,13 +120,13 @@ define /laterf x/
   inr x
 //
   intersect i (a : U i) .
-    future (bar a) -> bar a
+    future (ev a) -> ev a
 /;
 
 inference.
 introOf /i a x/.
 unfold /laterf/.
-rewrite /-> bar_unroll/.
+rewrite /-> ev_unroll/.
 typecheck.
 qed ();
 
@@ -137,7 +137,7 @@ define /later x/
   laterf (next x)
 //
   intersect i (a : U i) .
-    bar a -> bar a
+    ev a -> ev a
 /;
 
 inference.
@@ -150,7 +150,7 @@ Constant.setOpacity (parseConstant /later/) Constant.SOFT_STRICT;
 
 
 
-define /bindbar x f/
+define /bindev x f/
 /
   ffix
     (fn g x .
@@ -165,18 +165,18 @@ define /bindbar x f/
     x
 //
   intersect i (a b : U i) .
-    bar a
-    -> (a -> bar b)
-    -> bar b
+    ev a
+    -> (a -> ev b)
+    -> ev b
 /;
 
 inference.
 introOf /i a b x f/.
-unfold /bindbar/.
-folds 2 /ffix ap i ap (bar a -> bar b)/.
-so /bar_unroll i a/ /Heq/.
+unfold /bindev/.
+folds 2 /ffix ap i ap (ev a -> ev b)/.
+so /ev_unroll i a/ /Heq/.
 typecheck.
-unrollType /bar/.
+unrollType /ev/.
 typecheck.
 qed ();
 
@@ -184,16 +184,16 @@ qed ();
 
 reductions 
 /
-bindbar (now x) f --> f x ;
-bindbar (laterf x) f --> let next y = x in later (bindbar y f) ;
-bindbar (later x) f --> later (bindbar x f) ;
-unfolding letnext bindbar now later laterf
+bindev (now x) f --> f x ;
+bindev (laterf x) f --> let next y = x in later (bindev y f) ;
+bindev (later x) f --> later (bindev x f) ;
+unfolding letnext bindev now later laterf
 unrolling ffix
 /;
 
 
 
-define /bindbart x t/
+define /bindevt x t/
 /
   ffix
     (fn g x .
@@ -208,17 +208,17 @@ define /bindbart x t/
     x
 //
   intersect i (a : U i) .
-    bar a 
+    ev a 
     -> (a -> U i)
     -> U i
 /;
 
 inference.
 introOf /i a x t/.
-unfold /bindbart/.
-folds 2 /ffix ap (lsucc i) ap (bar a -> U i)/.
+unfold /bindevt/.
+folds 2 /ffix ap (lsucc i) ap (ev a -> U i)/.
 typecheck.
-unrollType /bar/.
+unrollType /ev/.
 typecheck.
 qed ();
 
@@ -226,40 +226,40 @@ qed ();
 
 reductions
 /
-  bindbart (now x) t --> t x ;
-  bindbart (laterf x) t --> let next y = x in future (bindbart y t) ;
-  bindbart (later x) t --> future (bindbart x t) ;
-  unfolding letnext bindbart now later laterf
+  bindevt (now x) t --> t x ;
+  bindevt (laterf x) t --> let next y = x in future (bindevt y t) ;
+  bindevt (later x) t --> future (bindevt x t) ;
+  unfolding letnext bindevt now later laterf
   unrolling ffix
 /;
 
 
 
-structure Nothing = AfterBindbar ();
-grammaron Bar;
+structure Nothing = AfterBindev ();
+grammaron Eventually;
 
 
 
-lemma "bar_subtype"
+lemma "ev_subtype"
 /
   forall i (a b : U i) .
     a <: b
-    -> bar a <: bar b
+    -> ev a <: ev b
 /;
 
 inference.
 intro /i a b Hsub/.
 apply /ffix/.
-intro /Hsubbar x/.
-rewrite /-> bar_unroll in x in concl/.
+intro /Hsubev x/.
+rewrite /-> ev_unroll in x in concl/.
 destruct /x/ /x | [x]/.
   {
   typecheck.
   }
 
   {
-  destruct /Hsubbar/ /[Hsubbar]/.
-  (* The typechecker won't find Hsubbar because it's in the future when we start.
+  destruct /Hsubev/ /[Hsubev]/.
+  (* The typechecker won't find Hsubev because it's in the future when we start.
      We need to do this in two stages so it refreshes its table after moving into
      the future.
   *)
@@ -271,46 +271,46 @@ qed ();
 
 
 
-lemma "bar_eeqtp"
+lemma "ev_eeqtp"
 /
   forall i (a b : U i) .
     a <:> b
-    -> bar a <:> bar b
+    -> ev a <:> ev b
 /;
 
 inference.
 intro /i/.
 apply /Misc.eeqtp_compat_covariant/.
-apply /bar_subtype/.
+apply /ev_subtype/.
 qed ();
 
 
 
-define /bfix f/
+define /efix f/
 /
   ffix (fn x . f (laterf x))
 //
   intersect i (a : U i) .
-    (bar a -> bar a) -> bar a
+    (ev a -> ev a) -> ev a
 /;
 
 inference.
 introOf /i a f/.
-unfold /bfix/.
+unfold /efix/.
 typecheck.
 qed ();
 
 
 
-val unroll_bfix = makeReduction
+val unroll_efix = makeReduction
 /
-bfix f --> f (later (bfix f)) ;
-unfolding bfix later
+efix f --> f (later (efix f)) ;
+unfolding efix later
 unrolling ffix
 /;
 
-Database.setUnroll (parseConstant /bfix/) (Reduction.user unroll_bfix);
-writeRegistry /unroll_bfix/ /ureduction/ unroll_bfix;
+Database.setUnroll (parseConstant /efix/) (Reduction.user unroll_efix);
+writeRegistry /unroll_efix/ /ureduction/ unroll_efix;
 
 
 
@@ -319,13 +319,13 @@ writeRegistry /unroll_bfix/ /ureduction/ unroll_bfix;
    step-indexed semantics is unable to express liveness properties
    such as termination.  If it could express termination, we would be
    able to draw a contradiction, because the fixed-point typing rule
-   above (bfix_type) does not have Smith's admissibility requirement.
+   above (efix_type) does not have Smith's admissibility requirement.
    (See Smith [1988], theorem 60.)
 *)
 
 
 
-define /bar_iter hn hl y/
+define /ev_iter hn hl y/
 /
   ffix
     (fn iterf y .
@@ -340,23 +340,23 @@ define /bar_iter hn hl y/
               hl (next x) (next (iter x))))
     y
 //
-  intersect i (a : U i) (P : bar a -> U i) .
+  intersect i (a : U i) (P : ev a -> U i) .
     (forall (x : a) . P (now x))
-    -> (forall (xf : future (bar a)) .
+    -> (forall (xf : future (ev a)) .
           let next x = xf
           in
             future (P x) -> P (later x))
-    -> forall (x : bar a) . P x
+    -> forall (x : ev a) . P x
 /;
 
 inference.
 introOf /i a P hn hl y/.
-unfold /bar_iter/.
-folds 2 /ffix ap i ap (forall (y : bar a) . P y)/.
+unfold /ev_iter/.
+folds 2 /ffix ap i ap (forall (y : ev a) . P y)/.
 fold /manual (sum_case _ _ _) within _ _/.
 typecheck.
 reintro /_ IH z/.
-unrollType /bar in z/.
+unrollType /ev in z/.
 destruct /z/ /x | [x]/.
   {
   reduce //.
@@ -376,19 +376,19 @@ qed ();
 
 reductions
 /
-  bar_iter hn _ (now x) --> hn x ;
-  bar_iter hn hl (laterf x) --> let next y = x in hl (next y) (next (bar_iter hn hl y)) ;
-  bar_iter hn hl (later x) --> hl (next x) (next (bar_iter hn hl x)) ;
-  unfolding bar_iter now laterf later letnext
+  ev_iter hn _ (now x) --> hn x ;
+  ev_iter hn hl (laterf x) --> let next y = x in hl (next y) (next (ev_iter hn hl y)) ;
+  ev_iter hn hl (later x) --> hl (next x) (next (ev_iter hn hl x)) ;
+  unfolding ev_iter now laterf later letnext
   unrolling ffix
 /;
 
 
 
-lemma "bindbar_id_left"
+lemma "bindev_id_left"
 /
-  forall i (a b : U i) (e : a) (f : a -> bar b) .
-    (bindbar x = now e in f x) = f e : bar b
+  forall i (a b : U i) (e : a) (f : a -> ev b) .
+    (bindev x = now e in f x) = f e : ev b
 /;
 
 inference.
@@ -399,15 +399,15 @@ qed ();
 
 
 
-lemma "bindbar_id_right"
+lemma "bindev_id_right"
 /
-  forall i (a : U i) (m : bar a) .
-    (bindbar x = m in now x) = m : bar a
+  forall i (a : U i) (m : ev a) .
+    (bindev x = m in now x) = m : ev a
 /;
 
 inference.
 intro /i a/.
-apply /bar_iter/ >> reduce // >> auto.
+apply /ev_iter/ >> reduce // >> auto.
 (* later *)
 intro /[x] [IH]/.
 unfold /later at 0 0/.
@@ -418,19 +418,19 @@ qed ();
 
 
 
-lemma "bindbar_assoc"
+lemma "bindev_assoc"
 /
-  forall i (a b c : U i) (e : bar a) (f : a -> bar b) (g : b -> bar c) .
-    (bindbar y = (bindbar x = e in f x) in g y)
+  forall i (a b c : U i) (e : ev a) (f : a -> ev b) (g : b -> ev c) .
+    (bindev y = (bindev x = e in f x) in g y)
     =
-    (bindbar x = e in bindbar y = f x in g y)
-    : bar c
+    (bindev x = e in bindev y = f x in g y)
+    : ev c
 /;
 
 inference.
 intro /i a b c e f g/.
 revert /e/.
-apply /bar_iter/ >> reduce // >> auto.
+apply /ev_iter/ >> reduce // >> auto.
 (* later *)
 intro /[x] [IH]/.
 unfold /later at 0 0/.
@@ -441,10 +441,10 @@ qed ();
 
 
 
-lemma "bindbart_id_left"
+lemma "bindevt_id_left"
 /
   forall i (a : U i) (e : a) (t : a -> U i) .
-    bindbart x = now e in t x = t e : U i
+    bindevt x = now e in t x = t e : U i
 /;
 
 inference.
@@ -455,19 +455,19 @@ qed ();
 
 
 
-lemma "bindbart_assoc"
+lemma "bindevt_assoc"
 /
-  forall i (a b : U i) (e : bar a) (f : a -> bar b) (t : b -> U i) .
-    (bindbart y = (bindbar x = e in f x) in t y)
+  forall i (a b : U i) (e : ev a) (f : a -> ev b) (t : b -> U i) .
+    (bindevt y = (bindev x = e in f x) in t y)
     =
-    (bindbart x = e in bindbart y = f x in t y)
+    (bindevt x = e in bindevt y = f x in t y)
     : U i
 /;
 
 inference.
 intro /i a b e f t/.
 revert /e/.
-apply /bar_iter/ >> reduce // >> auto.
+apply /ev_iter/ >> reduce // >> auto.
 (* later *)
 intro /[x] [IH]/.
 RuleTactic.futureEqUniv >> auto.
@@ -475,17 +475,17 @@ qed ();
   
   
 
-lemma "bindbart_simple"
+lemma "bindevt_simple"
 /
-  parametric i (a : U i) . forall (e : bar a) . parametric (t : a -> U i) .
+  parametric i (a : U i) . forall (e : ev a) . parametric (t : a -> U i) .
     (forall x . t x)
-    -> bindbart x = e in t x
+    -> bindevt x = e in t x
 /;
 
 inference.
 intro /i a e t Hall/.
 revert /e/.
-apply /bar_iter/ >> reduce //.
+apply /ev_iter/ >> reduce //.
 
 (* now *)
 {
@@ -502,18 +502,18 @@ qed ();
 
 
 
-lemma "bindbart_map"
+lemma "bindevt_map"
 /
-  forall i (a : U i) (b c : a -> U i) (e : bar a) .
+  forall i (a : U i) (b c : a -> U i) (e : ev a) .
     (forall (x : a) . b x -> c x)
-    -> (bindbart x = e in b x)
-    -> (bindbart x = e in c x)
+    -> (bindevt x = e in b x)
+    -> (bindevt x = e in c x)
 /;
 
 inference.
 intro /i a b c e Himpl/.
 revert /e/.
-apply /bar_iter/ >> reduce // >> auto.
+apply /ev_iter/ >> reduce // >> auto.
 (* later *)
 intro /[x] [IH] [H]/.
 split.
@@ -522,16 +522,16 @@ qed ();
 
 
 
-lemma "bindbart_shift_future_out"
+lemma "bindevt_shift_future_out"
 /
-  forall i (a : U i) . forallfut (b : a -> U i) . forall (e : bar a) .
-    (bindbart x = e in future (b x))
-    -> future (bindbart x = e in b x)
+  forall i (a : U i) . forallfut (b : a -> U i) . forall (e : ev a) .
+    (bindevt x = e in future (b x))
+    -> future (bindevt x = e in b x)
 /;
 
 inference.
 intro /i a b/.
-apply /bar_iter/ >> reduce // >> auto.
+apply /ev_iter/ >> reduce // >> auto.
 intro /[xb] [IH] [H]/.
 split.
 apply /IH/ >> auto.
@@ -539,16 +539,16 @@ qed ();
 
 
 
-lemma "bindbart_shift_future_in"
+lemma "bindevt_shift_future_in"
 /
-  forall i (a : U i) . forallfut (b : a -> U i) . forall (e : bar a) .
-    future (bindbart x = e in b x)
-    -> bindbart x = e in future (b x)
+  forall i (a : U i) . forallfut (b : a -> U i) . forall (e : ev a) .
+    future (bindevt x = e in b x)
+    -> bindevt x = e in future (b x)
 /;
 
 inference.
 intro /i a b/.
-apply /bar_iter/ >> reduce // >> auto.
+apply /ev_iter/ >> reduce // >> auto.
 intro /[xb] [IH] [H]/.
 split.
 apply /IH/ >> auto.
@@ -556,33 +556,33 @@ qed ();
 
 
 
-lemma "bindbart_shift_future_iff"
+lemma "bindevt_shift_future_iff"
 /
-  forall i (a : U i) . forallfut (b : a -> U i) . forall (e : bar a) .
-    (bindbart x = e in future (b x))
+  forall i (a : U i) . forallfut (b : a -> U i) . forall (e : ev a) .
+    (bindevt x = e in future (b x))
     <->
-    future (bindbart x = e in b x)
+    future (bindevt x = e in b x)
 /;
 
 inference.
 intro /i a b e/.
-split >> autoWith /bindbart_shift_future_in bindbart_shift_future_out/.
+split >> autoWith /bindevt_shift_future_in bindevt_shift_future_out/.
 qed ();
 
 
 
-lemma "bindbart_commute"
+lemma "bindevt_commute"
 /
-  forall i (a b : U i) (c : a -> b -> U i) (e1 : bar a) (e2 : bar b) .
-    (bindbart x = e1 in bindbart y = e2 in c x y)
-    -> bindbart y = e2 in bindbart x = e1 in c x y
+  forall i (a b : U i) (c : a -> b -> U i) (e1 : ev a) (e2 : ev b) .
+    (bindevt x = e1 in bindevt y = e2 in c x y)
+    -> bindevt y = e2 in bindevt x = e1 in c x y
 /;
 
 inference.
 intro /i a b c e1/.
-apply /bar_iter/ >> reduce // >> auto.
+apply /ev_iter/ >> reduce // >> auto.
 intro /[yb] [IH] Hc/.
-rewrite /-> bindbart_shift_future_iff in Hc/.
+rewrite /-> bindevt_shift_future_iff in Hc/.
 destruct /Hc/ /[H]/.
 split.
 apply /IH/ >> auto.
@@ -590,26 +590,26 @@ qed ();
 
 
 
-lemma "bindbart_commute_iff"
+lemma "bindevt_commute_iff"
 /
-  forall i (a b : U i) (c : a -> b -> U i) (e1 : bar a) (e2 : bar b) .
-    (bindbart x = e1 in bindbart y = e2 in c x y)
+  forall i (a b : U i) (c : a -> b -> U i) (e1 : ev a) (e2 : ev b) .
+    (bindevt x = e1 in bindevt y = e2 in c x y)
     <->
-    (bindbart y = e2 in bindbart x = e1 in c x y)
+    (bindevt y = e2 in bindevt x = e1 in c x y)
 /;
 
 inference.
 intro /i a b c e1 e2/.
-split >> autoWith /bindbart_commute/.
+split >> autoWith /bindevt_commute/.
 qed ();
 
 
 
-lemma "sqstable_bindbart"
+lemma "sqstable_bindevt"
 /
-  intersect i (a : U i) (b : a -> U i) . forall (e : bar a) .
+  intersect i (a : U i) (b : a -> U i) . forall (e : ev a) .
     (forall (x : a) . Sqstable.sqstable (b x))
-    -> Sqstable.sqstable (`bindbart e b)
+    -> Sqstable.sqstable (`bindevt e b)
 /;
 
 inference.
@@ -620,7 +620,7 @@ assert /SyntacticEquality.sequal b (fn x . b x)/ /Heq/.
   }
 rewrite /-> Heq/.
 revert /e/.
-apply /bar_iter/ >> reduce // >> auto.
+apply /ev_iter/ >> reduce // >> auto.
 intro /[x]/.
 reduce //.
 intro /[H]/.
