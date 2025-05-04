@@ -7,6 +7,10 @@
 
 - All rules permit using hidden variables in irrelevant positions.
 
+- New tactics:
+
+  + `setFold` combines `set` and `fold`.
+
 - Tactic changes:
 
   + The behavior of `revert` on hidden hypotheses has changed; it now

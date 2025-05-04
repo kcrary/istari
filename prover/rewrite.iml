@@ -85,6 +85,7 @@ signature REWRITE =
       val reduceSeq         : targets -> tactic
       val reduceParam       : Hyp.hypothesis list -> tactic
       val convertIrr        : ((captures * eterm) * targets) list -> tactic
+      val setFold           : Symbol.symbol -> eterm -> targets -> tactic
 
       val trace : bool ref
 
@@ -2069,6 +2070,31 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                 (fn ((capture, em), targets) => (convertFoldRew capture em, targets))
                 aims)
 
+      fun setFold sym em targets =
+         let
+            do goal = withgoal
+
+            do i =
+               Tactic.tryf
+               (fn () =>
+                   List.foldl
+                      (fns (hyp, _) i =>
+                          (case Hyp.hypothesisToHypOrConcl goal hyp of
+                              NONE => i
+    
+                            | SOME j => Int.max i (j+1)))
+                      0
+                      targets)
+         in
+            Hyp.set sym em
+            >>+
+            Hyp.moven 0 i
+            >>+
+            (* Don't need to adjust targets, because even if contains hypothesis numbers,
+               they will all be less than i, so they will be unaffected.
+            *)
+            fold [(([], ETerm.var sym), targets)]
+         end
 
 
       fun multipleUnfold i m acc =

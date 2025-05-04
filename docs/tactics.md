@@ -421,6 +421,12 @@ which appears in the `Hyp` structure.
 
   Creates a binding of `x = M`.
 
+  + `setFold /[name x]/ /[term M]/ /[short-targets]/`
+
+    As `set` but also folds `M` into `x` at the indicated
+    [targets](rewriting.html).  The new binding will appear
+    immediately before the earliest targeted hypothesis.
+
 
 - `squashHidden /[hyp] ... [hyp]/`
 
