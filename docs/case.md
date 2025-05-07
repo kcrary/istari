@@ -213,6 +213,9 @@ The most important combinators are:
     val whatNat     : (term, 'a, 'a * int) matcher
     val whatInteger : (term, 'a, 'a * IntInf.int) matcher
     val whatSymbol  : (term, 'a, 'a * Symbol.symbol) matcher
+    val whatNotvar : (term, 'a, 'a * term) matcher
+    val whatNotevar : (term, 'a, 'a * term) matcher
+
 
 - `elim m1 m2` matches an elimination form; `m1` matches against the
   head and `m2` matches against the
@@ -249,6 +252,15 @@ The most important combinators are:
 
 - `whatSymbol` matches against symbol literals, producing a binding of
   the corresponding symbol.  In the parser it is written `symbol?`.
+
+- `whatNotvar` matches anything but a variable.  (It can be a
+  nonempty path beginning with a variable.)  In the parser it is
+  written `notvar?`.
+
+- `whatNotevar` matches anything but an evar.  (It can be a nonempty
+  path beginning with an evar.)  In the parser it is
+  written `notevar?`.
+
 
 ##### Other term combinators
 
@@ -534,12 +546,17 @@ is given in brackets.  For example, `Match ; [Match]` indicates that
       Constant                                           (constant)
       \ ... antiquoted constant ... \                    (constant)
       $var \ ... antiquoted index ... \                  (variable)
+      $nat \ ... antiquoted int ... \                    (nat)
+      $integer \ ... antiquoted integer ... \            (integer)
+      $symbol \ ... antiquoted symbol ... \              (symbol)
       const?                                             (whatConstant)
       var?                                               (whatVar)
       evar?                                              (whatEvar)
-      nat?                                               (nat)
-      integer?                                           (integer)
-      symbol?                                            (symbol)
+      nat?                                               (whatNat)
+      integer?                                           (whatInteger)
+      symbol?                                            (whatSymbol)
+      notvar?                                            (whatNotvar)
+      notevar?                                           (whatNotevar)
       ( Match , ... , Match )                            (pair, length at least 2)
 
     Spine ::=

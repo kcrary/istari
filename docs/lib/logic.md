@@ -92,6 +92,27 @@
     neq_symm_iff : forall (i : level) (a : U i) (x y : a) . x != y : a <-> y != x : a
 
 
+### Transport
+
+In Istari's type theory, if the types `A` and `B` are equal, the
+members of `A` are also members of `B`.  It is not type-theoretically
+necessary to transport terms from `A` to `B`.  However, putting an
+explicit transport into a term can make things easier for the
+typechecker.
+
+    transport : intersect (i : level) .
+                   forall (a : U i) (x y : a) (b : a -> U i) . x = y : a -> b x -> b y
+              = fn a x y b h m . m
+              (3 implicit arguments)
+
+Note that `transport` can be folded into or out of existence, as
+desired.
+
+    subtransport : intersect (i : level) . forall (a b : U i) . a <: b -> a -> b
+                 = fn a b h m . m
+                 (2 implicit arguments)
+
+
 ### Constructive choice
 
     function_description : forall

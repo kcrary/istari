@@ -69,3 +69,5 @@
     stable_impl_sqstable : forall (i : level) (P : U i) . Stable.stable P -> sqstable P
 
     sqstable_elim : intersect (i : level) (P : U i) . sqstable P -> { P } -> P
+
+    sqstable_elim_isquash : intersect (i : level) (P : U i) . sqstable P -> isquash P -> P

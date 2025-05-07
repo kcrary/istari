@@ -31,6 +31,8 @@
 
 - Library changes:
 
+  + `Sqstable` added.
+
   + The `Bar` library is renamed to `Eventually`, and many of its
     components have been renamed.  Notably, `bar` is now `ev`.
     Additional material has been added.
@@ -38,7 +40,7 @@
   + The order of arguments to `Weaksum.unpackt` has changed.  The
     syntactic sugar is unchanged.
 
-  + `Weaksum` has additional material.
+  + `Logic` and `Weaksum` have additional material.
 
 - Added rules `intersectfutIntro`, `futureLeftHidden`,
   `parametricElim'`, `substitutionLater`, and

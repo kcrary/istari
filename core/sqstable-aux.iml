@@ -21,6 +21,7 @@ functor AfterSqstableAll () :> SQSTABLE_TACTIC =
       structure T = Term
       structure J = Judgement
       structure N = Namespace
+      structure R = Reduction
       structure H = ConstantTable
 
       open Tactic
@@ -40,6 +41,9 @@ functor AfterSqstableAll () :> SQSTABLE_TACTIC =
              idtacM Secondary,
 
              (* C : type |- sqstable C[^] *)
+             refine (Rule.reduce (R.trans [R.unfold, R.beta 1]))
+             >>+
+             (* C : type |- { C[^] } -> C[^] *)
              refine (Rule.arrowIntro (T.evar ()) (T.evar ()))
              >>> [
                  (* C : type |- istp { C[^] } *)
@@ -72,7 +76,10 @@ functor AfterSqstableAll () :> SQSTABLE_TACTIC =
          >>+
          first
             [
-            assumption >> done,
+            goalContextnCaseB
+              /| $tm notevar? @ _ =>
+                 \(fnc i _ => RefineTactic.refine (Rule.hypothesis i) >> done)\
+              /,
 
             goalCaseT
                /| \sqstable\ ($as (const? @ _)) =>
@@ -137,6 +144,9 @@ functor AfterSqstableAll () :> SQSTABLE_TACTIC =
                 refine (Rule.arrowElim (T.evar ()) (T.evar ()))
                 >>> [
                     (* sqstable C |- { C[^] } -> C[^] *)
+                    refine (Rule.reduceHyp 0 (R.trans [R.unfold, R.beta 1]))
+                    >>+
+                    (* { C } -> C |- { C[^] } -> C[^] *)
                     refine (Rule.hypothesis 0) >> done,
 
                     (* sqstable C |- { C[^] } *)

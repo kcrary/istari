@@ -90,6 +90,26 @@
     neq_symm_iff : type:neq_symm_iff
 
 
+### Transport
+
+In Istari's type theory, if the types `A` and `B` are equal, the
+members of `A` are also members of `B`.  It is not type-theoretically
+necessary to transport terms from `A` to `B`.  However, putting an
+explicit transport into a term can make things easier for the
+typechecker.
+
+    transport : type:transport
+              = def:transport
+              imp:transport              
+
+Note that `transport` can be folded into or out of existence, as
+desired.
+
+    subtransport : type:subtransport
+                 = def:subtransport
+                 imp:subtransport              
+
+
 ### Constructive choice
 
     function_description : type:function_description

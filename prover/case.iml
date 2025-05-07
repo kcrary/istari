@@ -66,6 +66,7 @@ signature CASE =
       val marker : Symbol.symbol -> (term, 'a, 'a) matcher
 
       val whatNotvar : (term, 'a, 'a * term) matcher
+      val whatNotevar : (term, 'a, 'a * term) matcher
 
       val unify : term -> (term, 'a, 'a) matcher
 
@@ -386,7 +387,16 @@ structure Case :> CASE =
          
       fun whatNotvar m x fk sk =
          (case m of
-             T.Var _ =>
+             T.Elim (T.Var _, []) =>
+                fk ()
+
+           | _ => sk ((x, m), fk))
+         
+
+      fun whatNotevar m x fk sk =
+         (case m of
+             T.Elim (T.Sub _, []) =>
+                (* in simple form, a substitution is always an evar *)
                 fk ()
 
            | _ => sk ((x, m), fk))
@@ -923,6 +933,7 @@ grammardef Case
    rule Match(4)      ::= "integer?" => whatInteger
    rule Match(4)      ::= "symbol?" => whatSymbol
    rule Match(4)      ::= "notvar?" => whatNotvar
+   rule Match(4)      ::= "notevar?" => whatNotevar
 
    rule Match(4)      ::= "(" Matches ")" => id
    rule Matches       ::= Match(0) "," Match(0) => pair

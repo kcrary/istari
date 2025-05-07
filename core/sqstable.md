@@ -47,3 +47,5 @@
     stable_impl_sqstable : type:stable_impl_sqstable
 
     sqstable_elim : type:sqstable_elim
+
+    sqstable_elim_isquash : type:sqstable_elim_isquash
