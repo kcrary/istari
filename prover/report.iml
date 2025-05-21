@@ -6,7 +6,8 @@ signature REPORT =
 
       val showAll : unit -> unit
       val showModule : Namespace.address -> unit
-      val show : Namespace.address -> unit
+      val show : Namespace.address -> unit        (* definition then type *)
+      val show' : Namespace.address -> unit       (* type then definition *)
       val showType : Namespace.address -> unit
 
       val search : Constant.constant list -> Namespace.address -> unit
@@ -151,85 +152,120 @@ structure Report :> REPORT =
          end
 
 
+      fun showConstantName const =
+         let
+            val implicits = Database.findImplicits const
+         in
+            print "\n";
+            print (Namespace.toString const);
+
+            if implicits = 0 then
+               print "\n"
+            else
+               (
+               print "  [";
+               print (Int.toString implicits);
+               print " implicit arguments]\n"
+               )
+         end
+
+      fun showConstantDef const =
+         (case Constant.definition const of
+             NONE => ()
+
+           | SOME m =>
+                Show.showPrefixed "  = " Directory.empty m)
+
+      fun showConstantType const =
+         (case typeOf const of
+             NONE =>
+                print " is untyped.\n"
+
+           | SOME t =>
+                Show.showPrefixed "  : " Directory.empty t)
+
       fun beginInsert () = print "\x01i"
       fun endInsert () = print "\x02"
 
-      fun showConstant showDef showApp addr =
+      fun showConstantApp const =
+         (case typeOf const of
+             NONE =>
+                ()
+
+           | SOME t =>
+                let
+                   val implicits = Database.findImplicits const
+                in
+                   beginInsert ();
+                   print " ";
+   
+                   List.app
+                      (fn ORDINARY 1 =>
+                             print "_ "
+   
+                        | ORDINARY n =>
+                             (
+                             print "_# ";
+                             print (Int.toString n);
+                             print " "
+                             )
+   
+                        | PARAMETRIC 1 =>
+                             print "Ap _ "
+   
+                        | PARAMETRIC n =>
+                             (
+                             print "Ap_# ";
+                             print (Int.toString n);
+                             print " "
+                             ))
+                      (argumentCount t implicits);
+   
+                   endInsert ()
+                end)
+                
+      fun showAddr addr f =
          (case Namespace.resolveOpt addr of
              NONE =>
                 print "\nNo such constant.\n"
 
-           | SOME const =>
-                let
-                   val implicits = Database.findImplicits const
-                in
-                   print "\n";
-                   print (Namespace.toString const);
+           | SOME const => f const)
 
-                   if implicits = 0 then
-                      print "\n"
-                   else
-                      (
-                      print "  [";
-                      print (Int.toString implicits);
-                      print " implicit arguments]\n"
-                      );
 
-                   if showDef then
-                      (case Constant.definition const of
-                          NONE => ()
-      
-                        | SOME m =>
-                             Show.showPrefixed "  = " Directory.empty m)
-                   else
-                      ();
+      fun show addr =
+         let
+            do const = showAddr addr
+         in
+            showConstantName const;
+            showConstantDef const;
+            showConstantType const
+         end
+          
+      fun show' addr =
+         let
+            do const = showAddr addr
+         in
+            showConstantName const;
+            showConstantType const;
+            showConstantDef const
+         end
 
-                   (case typeOf const of
-                       NONE =>
-                          print " is untyped.\n"
+      fun showType addr =
+         let
+            do const = showAddr addr
+         in
+            showConstantName const;
+            showConstantType const
+         end
 
-                     | SOME t =>
-                          (
-                          Show.showPrefixed "  : " Directory.empty t;
-
-                          if showApp then
-                             (
-                             beginInsert ();
-                             print " ";
-
-                             List.app
-                                (fn ORDINARY 1 =>
-                                       print "_ "
-
-                                  | ORDINARY n =>
-                                       (
-                                       print "_# ";
-                                       print (Int.toString n);
-                                       print " "
-                                       )
-
-                                  | PARAMETRIC 1 =>
-                                       print "Ap _ "
-
-                                  | PARAMETRIC n =>
-                                       (
-                                       print "Ap_# ";
-                                       print (Int.toString n);
-                                       print " "
-                                       ))
-                                (argumentCount t implicits);
-
-                             endInsert ()
-                             )
-                          else 
-                             ()
-                          ))
-                end)
-                          
-
-      val show = showConstant true false
-      val showType = showConstant false false
-      val insertApp = showConstant false true
+      fun insertApp addr =
+         let
+            do const = showAddr addr
+         in
+            showConstantName const;
+            showConstantType const;
+            showConstantApp const
+         end
 
 
 
