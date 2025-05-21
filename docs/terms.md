@@ -114,6 +114,7 @@ cons is right associative.
       [Term] ap Term                                                 (visibilized application)
       [Term] Ap Term                                                 (parametric application)
       [Term] _# Number                                               (application to multiple evars)
+      [Term] Ap_# Number                                             (parametric application to multiple evars)
       [Term] __# Number                                              (application to multiple holes)
 
       ( Term )

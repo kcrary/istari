@@ -62,9 +62,22 @@ witness term.
 
     `unpackt_elim _ _ _ _ _ (`unpackt_intro _ _ _ x y z) f --> f Ap x y z
 
+Note that the converse of `unpackt_intro` is *not* true.  One cannot
+in general go from `unpackt (x, y) = pack _ m n in P (x, y)` to 
+`P (m, n)`.  This is because the `unpackt` could be proven using some
+choice of `x` other than `m`.
+
+Similarly, one cannot combine `unpackt (x, y) = m in P (x, y)` and
+`unpackt (x, y) = m in Q (x, y)` into `unpackt (x, y) = m in P (x, y)
+& Q (x, y)`.  This is because the two proofs might rely on different
+choices for `x`.
+
+
 Some lemmas for manipulating `unpackt`:
 
     unpackt_simple : type:unpackt_simple
+
+    unpackt_simple_param : type:unpackt_simple_param
 
     unpackt_map : type:unpackt_map
 
@@ -74,7 +87,7 @@ Some lemmas for manipulating `unpackt`:
 
     unpackt_commute_iff : type:unpackt_commute_iff
 
-    bindbart_unpack_assoc : type:bindbart_unpack_assoc
+    bindevt_unpack_assoc : type:bindevt_unpack_assoc
 
 Impredicative existentials are isomorphic (indeed, extensionally
 equivalent) to weak sums:

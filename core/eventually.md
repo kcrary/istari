@@ -16,11 +16,11 @@ total objects.
 Note that fixpoint induction over simulated partial types does not
 have an admissibility requirement, unlike what happens with true
 partial types.  It follows that it is fundamentally impossible to
-implement a halting predicate:  Were halting implementable, one could
+implement a halting predicate: Were halting implementable, one could
 implement [Smith's paradox](smith-paradox.html) (which requires a
 halting predicate) and derive a contradiction.  (One can implement
-predicates that may naively appear to be a halting predicate, but they
-are true too often.)
+predicates that may naively appear to capture halting, but they are
+true too often.)
 
 Thus there seems to be a tradeoff: simulated partial types avoid the
 complication of admissibility but they cannot talk about termination,
@@ -29,8 +29,7 @@ while true partial types provide the opposite.
 ---
 
 Pause is just the identity, but we insert it in various places to
-break up redices so that accidental ill-typed terms don't result in
-runaway reduction:
+break up redices to avoid runaway reduction:
 
     pause : type:pause
           = def:pause
@@ -97,8 +96,10 @@ The monad laws are respected:
     bindev_assoc : type:bindev_assoc
 
 
-Observe that `bindev` always produces an element of some `ev` type.  A
-variation on it, `bindevt`, produces a type instead:
+### Bindevt
+
+Observe that `bindev` always returns some `ev` type.  A variation on
+it, `bindevt`, returns a type instead:
 
     bindevt : type:bindevt
 
@@ -152,7 +153,11 @@ Several corollaries of induction pertaining to `bindevt`:
 
     bindevt_simple : type:bindevt_simple
 
+    bindevt_simple_param : type:bindevt_simple_param
+
     bindevt_map : type:bindevt_map
+
+    bindevt_map_param : type:bindevt_map_param
 
     bindevt_shift_future_out : type:bindevt_shift_future_out
 
@@ -164,4 +169,84 @@ Several corollaries of induction pertaining to `bindevt`:
 
     bindevt_commute_iff : type:bindevt_commute_iff
 
+    bindevt_and : type:bindevt_and
+
     sqstable_bindevt : type:sqstable_bindevt
+
+
+### Sooner
+
+The relation `sooner d e` indicates that the computation `d` converges
+no later then `e`:
+
+    sooner : type:sooner
+           = def:sooner
+
+    sooner (now _) _ --> unit ;
+    sooner (laterf _) (now _) --> void ;
+    sooner (laterf x) (laterf y) --> let next x' = x in let next y' = y in future (sooner x' y') ;
+
+    sooner (later _) (now _) --> void ;
+    sooner (later x) (laterf y) --> let next y' = y in future (sooner x y') ;
+    sooner (laterf x) (later y) --> let next x' = x in future (sooner x' y) ;
+    sooner (later x) (later y) --> future (sooner x y) ;
+
+    sooner_now : type:sooner_now
+
+    sooner_refl : type:sooner_refl
+
+    sooner_trans : type:sooner_trans
+
+A computation `e` finishes no later than `e` followed by `f`:
+
+    sooner_bindev : type:sooner_bindev
+
+But if `f` finishes immediately, the converse also holds:
+
+    sooner_bindev_now : type:sooner_bindev_now
+
+    sooner_bindev_now' : type:sooner_bindev_now'
+
+    sooner_increase : type:sooner_increase
+
+    sooner_increase' : type:sooner_increase'
+
+    sqstable_sooner : type:sqstable_sooner
+
+
+### Combine
+
+Combine mashes together two computations.  The combination 
+`combine e f` is similar to the monadic 
+`bindev x = e in bindev y = f in now (x, y)`, but the former converges
+sooner.  If `e` and `f` converge after `i` and `j` steps, then
+`combine e f` converges after `max i j` steps, while the monadic
+combination converges after `i + j` steps.
+
+    combine : type:combine
+            = def:combine
+
+    combine (now x) y --> bindev y' = y in now (x, y') ;
+    combine (laterf x) (now y) --> bindev x' = laterf x in now (x', y) ;
+    combine (laterf x) (laterf y) --> let next x' = x in let next y' = y in later (combine x' y') ;
+
+    combine (later x) (now y) --> bindev x' = later x in now (x', y) ;
+    combine (laterf x) (later y) --> let next x' = x in later (combine x' y) ;
+    combine (later x) (laterf y) --> let next y' = y in later (combine x y') ;
+    combine (later x) (later y) --> later (combine x y) ;
+
+    sooner_combine_1 : type:sooner_combine_1
+
+    sooner_combine_2 : type:sooner_combine_2
+
+    sooner_combine_lub : type:sooner_combine_lub
+
+    bindevt_into_combine_left : type:bindevt_into_combine_left
+
+    bindevt_into_combine_right : type:bindevt_into_combine_right
+
+    bindevt_combine_out_right : type:bindevt_combine_out_right
+
+    bindevt_combine_out_left : type:bindevt_combine_out_left
+
+    bindevt_combine_later_sooner : type:bindevt_combine_later_sooner

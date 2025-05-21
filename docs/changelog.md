@@ -38,7 +38,9 @@
     Additional material has been added.
 
   + The order of arguments to `Weaksum.unpackt` has changed.  The
-    syntactic sugar is unchanged.
+    syntactic sugar is unchanged.  `Weaksum.unpackt_simple` has been
+    renamed to `Weaksum.unpackt_simple_param` and a simpler lemma has
+    taken its place.
 
   + `Logic` and `Weaksum` have additional material.
 

@@ -326,6 +326,17 @@ structure ParseTerm =
            | GREATER =>
                 appEvars (T.app m T.evar) (n-1))
 
+      fun paramappEvars m n =
+         (case Int.compare n 0 of
+             LESS =>
+                raise (Syntax "negative repetition in apply to evars")
+
+           | EQUAL =>
+                m
+
+           | GREATER =>
+                paramappEvars (T.apply2 Prim.paramapp m T.evar) (n-1))
+
       val zilch = Symbol.fromValue ""
       val hole = T.marker zilch
 
@@ -1262,6 +1273,7 @@ grammardef Term
    rule Term(90)   ::= Term(90) "Ap" Term(91) => paramapp
    rule Term(90)   ::= Term(90) "_#" NUMBER => appEvars
    rule Term(90)   ::= Term(90) "__#" NUMBER => appHoles
+   rule Term(90)   ::= Term(90) "Ap_#" NUMBER => paramappEvars
 
    rule Term(100)  ::= "(" Term ")" => id
    rule Term(100)  ::= "(" TermList ")" => tuple

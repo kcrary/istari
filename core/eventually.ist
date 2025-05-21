@@ -193,6 +193,10 @@ unrolling ffix
 
 
 
+(* Conceptually this should be later, but we need to do define this
+   before bindevt becomes a reserved word.
+*)
+
 define /bindevt x t/
 /
   ffix
@@ -200,8 +204,7 @@ define /bindevt x t/
        (case x of
         | inl y . t y
         | inr y .
-            let next g' = g
-            in
+            let next g' = g in
             let next y' = y
             in
               future (g' y')))
@@ -221,17 +224,6 @@ typecheck.
 unrollType /ev/.
 typecheck.
 qed ();
-
-
-
-reductions
-/
-  bindevt (now x) t --> t x ;
-  bindevt (laterf x) t --> let next y = x in future (bindevt y t) ;
-  bindevt (later x) t --> future (bindevt x t) ;
-  unfolding letnext bindevt now later laterf
-  unrolling ffix
-/;
 
 
 
@@ -441,6 +433,19 @@ qed ();
 
 
 
+(* Bindevt *)
+
+reductions
+/
+  bindevt (now x) t --> t x ;
+  bindevt (laterf x) t --> let next y = x in future (`bindevt y t) ;
+  bindevt (later x) t --> future (`bindevt x t) ;
+  unfolding letnext bindevt now later laterf
+  unrolling ffix
+/;
+
+
+
 lemma "bindevt_id_left"
 /
   forall i (a : U i) (e : a) (t : a -> U i) .
@@ -475,7 +480,7 @@ qed ();
   
   
 
-lemma "bindevt_simple"
+lemma "bindevt_simple_param"
 /
   parametric i (a : U i) . forall (e : ev a) . parametric (t : a -> U i) .
     (forall x . t x)
@@ -502,9 +507,22 @@ qed ();
 
 
 
-lemma "bindevt_map"
+lemma "bindevt_simple"
 /
-  forall i (a : U i) (b c : a -> U i) (e : ev a) .
+  forall i (a : U i) (e : ev a) (t : a -> U i) .
+    (forall x . t x)
+    -> bindevt x = e in t x
+/;
+
+inference.
+exact /bindevt_simple_param/.
+qed ();
+
+
+
+lemma "bindevt_map_param"
+/
+  parametric i (a : U i) (b c : a -> U i) . forall (e : ev a) .
     (forall (x : a) . b x -> c x)
     -> (bindevt x = e in b x)
     -> (bindevt x = e in c x)
@@ -518,6 +536,20 @@ apply /ev_iter/ >> reduce // >> auto.
 intro /[x] [IH] [H]/.
 split.
 apply /IH/ >> auto.
+qed ();
+
+
+
+lemma "bindevt_map"
+/
+  forall i (a : U i) (b c : a -> U i) (e : ev a) .
+    (forall (x : a) . b x -> c x)
+    -> (bindevt x = e in b x)
+    -> (bindevt x = e in c x)
+/;
+
+inference.
+exact /bindevt_map_param/.
 qed ();
 
 
@@ -605,6 +637,25 @@ qed ();
 
 
 
+lemma "bindevt_and"
+/
+  forall i (a : U i) (t u : a -> U i) (e : ev a) .
+    (bindevt x = e in t x)
+    -> (bindevt x = e in u x)
+    -> (bindevt x = e in t x & u x)
+/;
+
+inference.
+intro /i a t u/.
+apply /ev_iter/ >> reduce // >> auto.
+(* later *)
+intro /[x] [IH] [Ht] [Hu]/.
+split.
+auto.
+qed ();
+
+
+
 lemma "sqstable_bindevt"
 /
   intersect i (a : U i) (b : a -> U i) . forall (e : ev a) .
@@ -629,6 +680,633 @@ split.
 hyp /H/.
 qed ();
     
+
+
+structure Nothing = AfterBindevtLemmas ();
+
+
+
+(* Sooner *)
+
+define /sooner x y/
+/
+  ffix
+    (fn g x y .
+       (case x of
+        | inl _ . unit
+
+        | inr x' .
+            (case y of
+             | inl _ . void
+
+             | inr y' .
+                 let next g' = g in
+                 let next x'' = x' in
+                 let next y'' = y'
+                 in
+                   future (g' x'' y''))))
+    x y
+//
+  intersect i (a b : U i) . ev a -> ev b -> U i
+/;
+
+inference.
+introOf /i a b x y/.
+unfold /sooner/.
+folds 2 /ffix ap (lsucc i) ap (ev a -> ev b -> U i)/.
+fold /x1 :> (a % future (ev a)) within g x1 y1/.
+fold /y1 :> (b % future (ev b)) within g x1 y1 _/.
+typecheck.
+  {
+  unrollType /ev/.
+  reflexivity.
+  }
+
+  {
+  unrollType /ev/.
+  reflexivity.
+  }
+qed ();
+
+
+
+reductions
+/
+  sooner (now _) _ --> unit ;
+  sooner (laterf _) (now _) --> void ;
+  sooner (laterf x) (laterf y) --> let next x' = x in let next y' = y in future (sooner x' y') ;
+
+  sooner (later _) (now _) --> void ;
+  sooner (later x) (laterf y) --> let next y' = y in future (sooner x y') ;
+  sooner (laterf x) (later y) --> let next x' = x in future (sooner x' y) ;
+  sooner (later x) (later y) --> future (sooner x y) ;
+
+  unfolding sooner now laterf later letnext
+  unrolling ffix
+/;
+
+
+
+lemma "sooner_now"
+/
+  forall i (a b : U i) (x : a) (e : ev b) .
+    sooner (now x) e
+/;
+
+inference.
+intro /i a b x e/.
+reduce //.
+split.
+qed ();
+
+
+
+lemma "sooner_refl"
+/
+  forall i (a : U i) (e : ev a) .
+    sooner e e
+/;
+
+inference.
+intro /i a e/.
+induction /e/ >> auto.
+intro /[x] [IH]/.
+auto.
+qed ();
+
+
+
+lemma "sooner_trans"
+/
+  forall i (a b c : U i) (e : ev a) (f : ev b) (g : ev c) .
+    sooner e f
+    -> sooner f g
+    -> sooner e g
+/;
+
+inference.
+intro /i a b c e/.
+induction /e/ >> auto.
+intro /[x] [IH] f g Hef Hfg/.
+destruct /f/ /y | [f]/.
+  {
+  reduce /Hef/.
+  so /Hef/ /0/.
+  }
+destruct /g/ /z | [g]/.
+  {
+  reduce /Hfg/.
+  so /Hfg/ /0/.
+  }
+reduce /Hef Hfg concl/.
+destruct /Hef/ /[Hef]/.
+destruct /Hfg/ /[Hfg]/.
+split.
+apply /IH/ >> auto.
+qed ();
+
+
+
+lemma "sooner_bindev"
+/
+  forall i (a b : U i) (e : ev a) (f : a -> ev b) .
+    sooner e (bindev x = e in f x)
+/;
+
+inference.
+intro /i a b e f/.
+induction /e/ >> auto.
+intro /[e] [IH]/.
+split.
+auto.
+qed ();
+
+
+
+lemma "sooner_bindev_now"
+/
+  forall i (a b : U i) (e : ev a) (f : a -> b) .
+    sooner (bindev x = e in now (f x)) e
+/;
+
+inference.
+intro /i a b e f/.
+induction /e/ >> auto.
+intro /[e] [IH]/.
+split.
+auto.
+qed ();
+
+
+
+lemma "sooner_bindev_now'"
+/
+  forall i (a b : U i) (e : ev a) (f : a -> ev b) .
+    (forall x . exists y . f x = now y : ev b)
+    -> sooner (bindev x = e in f x) e
+/;
+
+inference.
+intro /i a b e f Hnow/.
+rewrite /(fn x . f x) = (fn x . now (Hnow x #1)) : (a -> ev b)/.
+  {
+  introEq /x/.
+  reduce //.
+  exact /Hnow x #2/.
+  }
+apply /sooner_bindev_now/.
+qed ();
+
+
+
+lemma "sooner_increase"
+/
+  forall i (a b : U i) (m : ev a) . forallfut (n : ev b) .
+    future (sooner m n)
+    -> sooner m (later n)
+/;
+
+inference.
+intro /i a b m n Hsoon/.
+revert /n Hsoon/.
+induction /m/ >> auto.
+intro /[m] [IH] n [Hsoon]/.
+split.
+destruct /n/ /y | [n]/.
+  {
+  reduce /Hsoon/.
+  so /Hsoon/ /0/.
+  }
+reduce /Hsoon/.
+destruct /Hsoon/ /[Hsoon]/.
+apply /IH/.
+auto.
+qed ();
+
+
+
+lemma "sooner_increase'"
+/
+  forall i (a : U i) (m : ev a) .
+    sooner m (later m)
+/;
+
+inference.
+intro /i a m/.
+apply /sooner_increase/.
+split.
+apply /sooner_refl/.
+qed ();
+
+
+
+lemma "sqstable_sooner"
+/
+  intersect i (a b : U i) . forall (e : ev a) (f : ev b) .
+    Sqstable.sqstable (sooner e f)
+/;
+
+inference.
+intro /i a b e/.
+induction /e/ >> auto.
+intro /[e] [IH] f [Hsoon]/.
+destruct /f/ /x | [f]/ >> reduce /Hsoon/.
+  {
+  exfalso.
+  so /Hsoon/ /0/.
+  }
+reduce //.
+destruct /Hsoon/ /[Hsoon]/.
+split.
+apply /Sqstable.sqstable_elim/ >> auto.
+qed ();
+
+
+
+(* Combine *)
+
+(* combine x y is a lot like (bindev x' = x in bindev y' = y in now (x', y')),
+   but isn't as far in the future.  The former's distance into the future is
+   the maximum of that of x and y, while the latter's is the sum.
+*)
+
+define /combine x y/
+/
+  ffix
+    (fn g x y .
+       (case x of
+        | inl x' . bindev y' = y in now (x', y')
+
+        | inr x' .
+            (case y of
+             | inl y' . bindev x'' = x in now (x'', y')
+
+             | inr y' .
+                 let next g' = g in
+                 let next x'' = x' in
+                 let next y'' = y'
+                 in
+                   later (g' x'' y''))))
+    x y
+//
+  intersect i (a b : U i) . ev a -> ev b -> ev (a & b)
+/;
+
+inference.
+introOf /i a b x y/.
+unfold /combine/.
+folds 2 /ffix ap i ap (ev a -> ev b -> ev (a & b))/.
+fold /x1 :> (a % future (ev a)) within g x1 y1/.
+fold /y1 :> (b % future (ev b)) within g x1 y1 _ at 2/.
+typecheck.
+  {
+  unrollType /ev/.
+  reflexivity.
+  }
+
+  {
+  unrollType /ev/.
+  reflexivity.
+  }
+qed ();
+
+
+
+reductions
+/
+  combine (now x) y --> bindev y' = y in now (x, y') ;
+  combine (laterf x) (now y) --> bindev x' = laterf x in now (x', y) ;
+  combine (laterf x) (laterf y) --> let next x' = x in let next y' = y in later (combine x' y') ;
+
+  combine (later x) (now y) --> bindev x' = later x in now (x', y) ;
+  combine (laterf x) (later y) --> let next x' = x in later (combine x' y) ;
+  combine (later x) (laterf y) --> let next y' = y in later (combine x y') ;
+  combine (later x) (later y) --> later (combine x y) ;
+
+  unfolding combine now laterf later letnext
+  unrolling ffix
+/;
+
+
+
+lemma "sooner_combine_1"
+/
+  forall i (a b : U i) (e : ev a) (f : ev b) .
+    sooner e (combine e f)
+/;
+
+inference.
+intro /i a b e/.
+induction /e/ >> auto.
+intro /[e] [IH] f/.
+destruct /f/ /y | [f]/ >> auto.
+reduce //.
+split.
+apply /sooner_bindev _ _ (a & b)/.
+qed ();
+
+
+
+lemma "sooner_combine_2"
+/
+  forall i (a b : U i) (e : ev a) (f : ev b) .
+    sooner f (combine e f)
+/;
+
+inference.
+intro /i a b e f/.
+revert /e/.
+induction /f/ >> auto.
+intro /[f] [IH] e/.
+destruct /e/ /x | [e]/ >> auto.
+reduce //.
+split.
+apply /sooner_bindev _ _ (a & b)/.
+qed ();
+
+
+
+lemma "sooner_combine_lub"
+/
+  forall i (a b c : U i) (e : ev a) (f : ev b) (g : ev c) .
+    sooner e g
+    -> sooner f g
+    -> sooner (combine e f) g
+/;
+
+inference.
+intro /i a b c e/.
+induction /e/.
+
+(* now *)
+{
+intro /x f g _ Hfg/.
+witness /sooner_trans _ (a & b) _# 5 __ Hfg/.
+apply /sooner_bindev_now _ _ (a & b)/ >> auto.
+}
+
+(* later *)
+{
+intro /[e] [IH] f g Heg Hfg/.
+destruct /g/ /z | [g]/.
+  {
+  reduce /Heg/.
+  so /Heg/ /0/.
+  }
+reduce /Heg/.
+destruct /Heg/ /[Heg]/.
+destruct /f/ /y | [f]/.
+  {
+  reduce //.
+  split.
+  witness /sooner_trans _ (a & b) _# 5 __ Heg/.
+  apply /sooner_bindev_now _ _ (a & b)/.
+  }
+
+  {
+  reduce //.
+  reduce /Hfg/.
+  destruct /Hfg/ /[Hfg]/.
+  split.
+  apply /IH/ >> auto.
+  }
+}
+qed ();
+
+
+
+lemma "bindevt_into_combine_left"
+/
+  forall i (a b : U i) (e : ev a) (e' : ev b) (t : a -> U i) .
+    (bindevt x = e in t x)
+    -> (bindevt x = combine e e' in t (x #1))
+/;
+    
+inference.
+intro /i a b e e' t/.
+revert /e'/.
+induction /e/.
+
+(* now *)
+{
+intro /x y Hx/.
+rewrite /-> bindevt_assoc i b (a & b)/.
+reduce //.
+induction /y/ >> auto.
+intro /[y] [IH]/.
+auto.
+}
+
+(* later *)
+{
+intro /[x] [IH] y [Hx]/.
+destruct /y/ /y | [y]/.
+  {
+  reduce //.
+  split.
+  rewrite /-> bindevt_assoc i a (a & b)/.
+  reduce //.
+  hyp /Hx/.
+  }
+
+  {
+  reduce //.
+  split.
+  apply /IH/ >> auto.
+  }
+}
+qed ();
+
+
+
+lemma "bindevt_into_combine_right"
+/
+  forall i (a b : U i) (e : ev a) (e' : ev b) (t : b -> U i) .
+    (bindevt x = e' in t x)
+    -> (bindevt x = combine e e' in t (x #2))
+/;
+    
+inference.
+intro /i a b e e' t/.
+revert /e/.
+induction /e'/.
+
+(* now *)
+{
+intro /y x Hx/.
+induction /x/ >> auto.
+intro /[x] [IH]/.
+split.
+rewrite /-> bindevt_assoc i a (a & b)/.
+reduce //.
+apply /bindevt_simple/ >> auto.
+}
+
+(* later *)
+{
+intro /[y] [IH] x [Hy]/.
+destruct /x/ /x | [x]/.
+  {
+  reduce //.
+  split.
+  rewrite /-> bindevt_assoc i b (a & b)/.
+  reduce //.
+  hyp /Hy/.
+  }
+
+  {
+  reduce //.
+  split.
+  exact /IH x Hy/.
+  }
+}
+qed ();
+
+
+
+lemma "bindevt_combine_out_right"
+/
+  forall i (a b : U i) (e : ev a) (e' : ev b) (t : b -> U i) .
+    sooner e e'
+    -> (bindevt x = combine e e' in t (x #2))
+    -> bindevt x = e' in t x
+/;
+
+inference.
+intro /i a b e e' t/.
+revert /e/.
+induction /e'/.
+
+(* now *)
+{
+intro /y x Hsoon Hbind/.
+destruct /x/ /x | [x]/.
+1:{
+  reduce /Hsoon/.
+  so /Hsoon/ /0/.
+  }
+reduce /Hbind/.
+hyp /Hbind/.
+}
+
+(* later *)
+{
+intro /[y] [IH] x Hsoon Hbind/.
+destruct /x/ /x | [x]/.
+  {
+  reduce /Hbind/.
+  folds 3 /`bindev ap i ap b ap (a & b) in Hbind/.
+  destruct /Hbind/ /[Hbind]/.
+  unfold /ap in Hbind at all/.
+  split.
+  rewrite /-> bindevt_assoc i b (a & b) in Hbind/.
+  reduce /Hbind/.
+  hyp /Hbind/.
+  }
+
+  {
+  reduce /Hbind Hsoon/.
+  destruct /Hsoon/ /[Hsoon]/.
+  destruct /Hbind/ /[Hbind]/.
+  split.
+  apply /IH/ >> auto.
+  }
+}
+qed ();
+
+
+
+lemma "bindevt_combine_out_left"
+/
+  forall i (a b : U i) (e : ev a) (e' : ev b) (t : a -> U i) .
+    sooner e' e
+    -> (bindevt x = combine e e' in t (x #1))
+    -> bindevt x = e in t x
+/;
+
+inference.
+intro /i a b e e' t/.
+revert /e'/.
+induction /e/.
+
+(* now *)
+{
+intro /x e' Hsoon/.
+folds 3 /`bindev ap i ap b ap (a & b)/.
+intro /Hbind/.
+unfold /ap in Hbind at all/.
+rewrite /-> bindevt_assoc i b (a & b) in Hbind/.
+reduce /Hbind/.
+destruct /e'/ /y | [y]/.
+1:{
+  reduce /Hsoon/.
+  so /Hsoon/ /0/.
+  }
+reduce /Hbind/.
+hyp /Hbind/.
+}
+
+(* later *)
+{
+intro /[x] [IH] e' Hsoon Hbind/.
+destruct /e'/ /y | [y]/.
+  {
+  reduce /Hbind/.
+  folds 3 /`bindev ap i ap a ap (a & b) in Hbind/.
+  destruct /Hbind/ /[Hbind]/.
+  unfold /ap in Hbind at all/.
+  split.
+  rewrite /-> bindevt_assoc i a (a & b) in Hbind/.
+  reduce /Hbind/.
+  hyp /Hbind/.
+  }
+reduce /Hsoon Hbind/.
+destruct /Hsoon/ /[Hsoon]/.
+destruct /Hbind/ /[Hbind]/.
+split.
+apply /IH/ >> auto.
+}
+qed ();
+
+
+
+lemma "bindevt_combine_later_sooner"
+/
+  forall i (a b : U i) (m : ev a) . forallfut (n : ev b) . forall (P : a -> b -> U i) .
+    future (sooner m n)
+    -> future (bindevt x = combine m n in P (x #1) (x #2))
+    -> bindevt x = combine m (later n) in P (x #1) (x #2)
+/;
+
+inference.
+intro /i a b m n P/.
+revert /n/.
+induction /m/.
+
+(* now *)
+{
+intro /x n _/.
+folds 2 /`bindevt ap _ ap (_ & _)/.
+intro /[Hbind]/.
+unfold /ap in Hbind at all/.
+split.
+hyp /Hbind/.
+}
+
+(* later *)
+{
+intro /[m] [IH] n [Hsoon] [Hbind]/.
+split.
+destruct /n/ /y | [n]/.
+  {
+  reduce /Hsoon/.
+  so /Hsoon/ /0/.
+  }
+reduce /Hsoon Hbind/.
+apply /IH/ >> auto.
+}
+qed ();
+
 
 
 endModule ();

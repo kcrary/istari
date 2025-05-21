@@ -107,17 +107,48 @@ structure Report :> REPORT =
 
 
 
-      fun argumentCount a acc =
+        
+
+      datatype appcount = ORDINARY of int | PARAMETRIC of int
+
+      fun argumentCountLoop a acc =
          termCase a
          /| (\Prim.forall\ _ (fn . ?) | \Prim.forallfut\ _ (fn . ?)) =>
-            \(fnc b => argumentCount b (1 + acc))\
+            \(fnc b => 
+                 argumentCountLoop b
+                    (case acc of
+                        ORDINARY n :: rest => ORDINARY (n + 1) :: rest
+
+                      | _ => ORDINARY 1 :: acc))\
+
+          | (\Prim.parametric\ _ (fn . ?) | \Prim.parametricfut\ _ (fn . ?)) =>
+            \(fnc b => 
+                 argumentCountLoop b
+                    (case acc of
+                        PARAMETRIC n :: rest => PARAMETRIC (n + 1) :: rest
+
+                      | _ => PARAMETRIC 1 :: acc))\
 
           | (\Prim.intersect\ _ (fn . ?) | \Prim.intersectfut\ _ (fn . ?)) =>
-            \(fnc b => argumentCount b acc)\
+            \(fnc b => argumentCountLoop b acc)\
 
           | _ =>
-            \(fnc => acc)\
+            \(fnc => List.rev acc)\
          /
+
+      fun argumentCount a implicits =
+         let
+            val l = argumentCountLoop a []
+         in
+            if implicits = 0 then
+               l
+            else
+               (case l of
+                   ORDINARY n :: rest =>
+                      ORDINARY (Int.max 0 (n - implicits)) :: rest
+
+                 | _ => [])
+         end
 
 
       fun beginInsert () = print "\x01i"
@@ -164,17 +195,30 @@ structure Report :> REPORT =
                           if showApp then
                              (
                              beginInsert ();
-                             (case Int.max 0 (argumentCount t 0 - implicits) of
-                                 0 => print " "
+                             print " ";
 
-                               | 1 => print " _ "
+                             List.app
+                                (fn ORDINARY 1 =>
+                                       print "_ "
 
-                               | n =>
-                                    (
-                                    print " _# ";
-                                    print (Int.toString n);
-                                    print " "
-                                    ));
+                                  | ORDINARY n =>
+                                       (
+                                       print "_# ";
+                                       print (Int.toString n);
+                                       print " "
+                                       )
+
+                                  | PARAMETRIC 1 =>
+                                       print "Ap _ "
+
+                                  | PARAMETRIC n =>
+                                       (
+                                       print "Ap_# ";
+                                       print (Int.toString n);
+                                       print " "
+                                       ))
+                                (argumentCount t implicits);
+
                              endInsert ()
                              )
                           else 

@@ -96,12 +96,31 @@ witness term.
 
     `unpackt_elim _ _ _ _ _ (`unpackt_intro _ _ _ x y z) f --> f Ap x y z
 
+Note that the converse of `unpackt_intro` is *not* true.  One cannot
+in general go from `unpackt (x, y) = pack _ m n in P (x, y)` to 
+`P (m, n)`.  This is because the `unpackt` could be proven using some
+choice of `x` other than `m`.
+
+Similarly, one cannot combine `unpackt (x, y) = m in P (x, y)` and
+`unpackt (x, y) = m in Q (x, y)` into `unpackt (x, y) = m in P (x, y)
+& Q (x, y)`.  This is because the two proofs might rely on different
+choices for `x`.
+
+
 Some lemmas for manipulating `unpackt`:
 
-    unpackt_simple : parametric (i : level) (a : U i) (b : a -> U i) .
-                        forall (e : weaksum (x : a) . b x) .
-                          parametric (c : forall (x : a) . b x -> U i) .
-                            (parametric (x : a) . forall (y : b x) . c x y) -> unpackt e c
+    unpackt_simple : forall
+                        (i : level)
+                        (a : U i)
+                        (b : a -> U i)
+                        (e : weaksum (x : a) . b x)
+                        (c : forall (x : a) . b x -> U i) .
+                        (parametric (x : a) . forall (y : b x) . c x y) -> unpackt e c
+
+    unpackt_simple_param : parametric (i : level) (a : U i) (b : a -> U i) .
+                              forall (e : weaksum (x : a) . b x) .
+                                parametric (c : forall (x : a) . b x -> U i) .
+                                  (parametric (x : a) . forall (y : b x) . c x y) -> unpackt e c
 
     unpackt_map : forall
                      (i : level)
@@ -148,16 +167,16 @@ Some lemmas for manipulating `unpackt`:
                              (unpackt (x, y) = s1 in unpackt (u, v) = s2 in e x y u v)
                                <-> (unpackt (u, v) = s2 in unpackt (x, y) = s1 in e x y u v)
 
-    bindbart_unpack_assoc : forall
-                               (i : level)
-                               (a : U i)
-                               (b : a -> U i)
-                               (c : U i)
-                               (w : weaksum (x : a) . b x)
-                               (f : parametric (x : a) . b x -> Bar.bar c)
-                               (P : c -> U i) .
-                               (bindbart y = unpack w f in P y)
-                                 <-> (unpackt (x, y) = w in bindbart z = f Ap x y in P z)
+    bindevt_unpack_assoc : forall
+                              (i : level)
+                              (a : U i)
+                              (b : a -> U i)
+                              (c : U i)
+                              (w : weaksum (x : a) . b x)
+                              (f : parametric (x : a) . b x -> Eventually.ev c)
+                              (P : c -> U i) .
+                              (bindevt y = unpack w f in P y)
+                                <-> (unpackt (x, y) = w in bindevt z = f Ap x y in P z)
 
 Impredicative existentials are isomorphic (indeed, extensionally
 equivalent) to weak sums:

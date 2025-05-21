@@ -15,11 +15,11 @@ total objects.
 Note that fixpoint induction over simulated partial types does not
 have an admissibility requirement, unlike what happens with true
 partial types.  It follows that it is fundamentally impossible to
-implement a halting predicate:  Were halting implementable, one could
+implement a halting predicate: Were halting implementable, one could
 implement [Smith's paradox](smith-paradox.html) (which requires a
 halting predicate) and derive a contradiction.  (One can implement
-predicates that may naively appear to be a halting predicate, but they
-are true too often.)
+predicates that may naively appear to capture halting, but they are
+true too often.)
 
 Thus there seems to be a tradeoff: simulated partial types avoid the
 complication of admissibility but they cannot talk about termination,
@@ -28,8 +28,7 @@ while true partial types provide the opposite.
 ---
 
 Pause is just the identity, but we insert it in various places to
-break up redices so that accidental ill-typed terms don't result in
-runaway reduction:
+break up redices to avoid runaway reduction:
 
     pause : intersect (i : level) (a : U i) . a -> a
           = fn v0 . v0
@@ -103,8 +102,10 @@ The monad laws are respected:
                         : ev c
 
 
-Observe that `bindev` always produces an element of some `ev` type.  A
-variation on it, `bindevt`, produces a type instead:
+### Bindevt
+
+Observe that `bindev` always returns some `ev` type.  A variation on
+it, `bindevt`, returns a type instead:
 
     bindevt : intersect (i : level) (a : U i) . ev a -> (a -> U i) -> U i
 
@@ -163,15 +164,24 @@ of `ev` type.
 
 Several corollaries of induction pertaining to `bindevt`:
 
-    bindevt_simple : parametric (i : level) (a : U i) .
-                        forall (e : ev a) .
-                          parametric (t : a -> U i) .
-                            (forall (x : a) . t x) -> bindevt x = e in t x
+    bindevt_simple : forall (i : level) (a : U i) (e : ev a) (t : a -> U i) .
+                        (forall (x : a) . t x) -> bindevt x = e in t x
+
+    bindevt_simple_param : parametric (i : level) (a : U i) .
+                              forall (e : ev a) .
+                                parametric (t : a -> U i) .
+                                  (forall (x : a) . t x) -> bindevt x = e in t x
 
     bindevt_map : forall (i : level) (a : U i) (b c : a -> U i) (e : ev a) .
                      (forall (x : a) . b x -> c x)
                      -> (bindevt x = e in b x)
                      -> bindevt x = e in c x
+
+    bindevt_map_param : parametric (i : level) (a : U i) (b c : a -> U i) .
+                           forall (e : ev a) .
+                             (forall (x : a) . b x -> c x)
+                             -> (bindevt x = e in b x)
+                             -> bindevt x = e in c x
 
     bindevt_shift_future_out : forall (i : level) (a : U i) .
                                   forallfut (b : a -> U i) .
@@ -203,7 +213,157 @@ Several corollaries of induction pertaining to `bindevt`:
                              (bindevt x = e1 in bindevt y = e2 in c x y)
                                <-> (bindevt y = e2 in bindevt x = e1 in c x y)
 
+    bindevt_and : forall (i : level) (a : U i) (t u : a -> U i) (e : ev a) .
+                     (bindevt x = e in t x) -> (bindevt x = e in u x) -> bindevt x = e in t x & u x
+
     sqstable_bindevt : intersect (i : level) (a : U i) (b : a -> U i) .
                           forall (e : ev a) .
                             (forall (x : a) . Sqstable.sqstable (b x))
                             -> Sqstable.sqstable (`bindevt e b)
+
+
+### Sooner
+
+The relation `sooner d e` indicates that the computation `d` converges
+no later then `e`:
+
+    sooner : intersect (i : level) (a b : U i) . ev a -> ev b -> U i
+           = fn x y .
+                ffix
+                  (fn g x1 y1 .
+                    (case x1 of
+                     | inl v0 . unit
+                     | inr x' .
+                         (case y1 of
+                          | inl v0 . void
+                          | inr y' .
+                              let next g' = g
+                              in
+                              let next x'' = x' in let next y'' = y' in future (g' x'' y''))))
+                  x
+                  y
+
+    sooner (now _) _ --> unit ;
+    sooner (laterf _) (now _) --> void ;
+    sooner (laterf x) (laterf y) --> let next x' = x in let next y' = y in future (sooner x' y') ;
+
+    sooner (later _) (now _) --> void ;
+    sooner (later x) (laterf y) --> let next y' = y in future (sooner x y') ;
+    sooner (laterf x) (later y) --> let next x' = x in future (sooner x' y) ;
+    sooner (later x) (later y) --> future (sooner x y) ;
+
+    sooner_now : forall (i : level) (a b : U i) (x : a) (e : ev b) . sooner (now x) e
+
+    sooner_refl : forall (i : level) (a : U i) (e : ev a) . sooner e e
+
+    sooner_trans : forall (i : level) (a b c : U i) (e : ev a) (f : ev b) (g : ev c) .
+                      sooner e f -> sooner f g -> sooner e g
+
+A computation `e` finishes no later than `e` followed by `f`:
+
+    sooner_bindev : forall (i : level) (a b : U i) (e : ev a) (f : a -> ev b) .
+                       sooner e (bindev x = e in f x)
+
+But if `f` finishes immediately, the converse also holds:
+
+    sooner_bindev_now : forall (i : level) (a b : U i) (e : ev a) (f : a -> b) .
+                           sooner (bindev x = e in now (f x)) e
+
+    sooner_bindev_now' : forall (i : level) (a b : U i) (e : ev a) (f : a -> ev b) .
+                            (forall (x : a) . exists (y : b) . f x = now y : ev b)
+                            -> sooner (bindev x = e in f x) e
+
+    sooner_increase : forall (i : level) (a b : U i) (m : ev a) .
+                         forallfut (n : ev b) . future (sooner m n) -> sooner m (later n)
+
+    sooner_increase' : forall (i : level) (a : U i) (m : ev a) . sooner m (later m)
+
+    sqstable_sooner : intersect (i : level) (a b : U i) .
+                         forall (e : ev a) (f : ev b) . Sqstable.sqstable (sooner e f)
+
+
+### Combine
+
+Combine mashes together two computations.  The combination 
+`combine e f` is similar to the monadic 
+`bindev x = e in bindev y = f in now (x, y)`, but the former converges
+sooner.  If `e` and `f` converge after `i` and `j` steps, then
+`combine e f` converges after `max i j` steps, while the monadic
+combination converges after `i + j` steps.
+
+    combine : intersect (i : level) (a b : U i) . ev a -> ev b -> ev (a & b)
+            = fn x y .
+                 ffix
+                   (fn g x1 y1 .
+                     (case x1 of
+                      | inl x' . bindev y' = y1 in now (x', y')
+                      | inr x' .
+                          (case y1 of
+                           | inl y' . bindev x'' = x1 in now (x'', y')
+                           | inr y' .
+                               let next g' = g
+                               in
+                               let next x'' = x' in let next y'' = y' in later (g' x'' y''))))
+                   x
+                   y
+
+    combine (now x) y --> bindev y' = y in now (x, y') ;
+    combine (laterf x) (now y) --> bindev x' = laterf x in now (x', y) ;
+    combine (laterf x) (laterf y) --> let next x' = x in let next y' = y in later (combine x' y') ;
+
+    combine (later x) (now y) --> bindev x' = later x in now (x', y) ;
+    combine (laterf x) (later y) --> let next x' = x in later (combine x' y) ;
+    combine (later x) (laterf y) --> let next y' = y in later (combine x y') ;
+    combine (later x) (later y) --> later (combine x y) ;
+
+    sooner_combine_1 : forall (i : level) (a b : U i) (e : ev a) (f : ev b) .
+                          sooner e (combine e f)
+
+    sooner_combine_2 : forall (i : level) (a b : U i) (e : ev a) (f : ev b) .
+                          sooner f (combine e f)
+
+    sooner_combine_lub : forall (i : level) (a b c : U i) (e : ev a) (f : ev b) (g : ev c) .
+                            sooner e g -> sooner f g -> sooner (combine e f) g
+
+    bindevt_into_combine_left : forall
+                                   (i : level)
+                                   (a b : U i)
+                                   (e : ev a)
+                                   (e' : ev b)
+                                   (t : a -> U i) .
+                                   (bindevt x = e in t x) -> bindevt x = combine e e' in t (x #1)
+
+    bindevt_into_combine_right : forall
+                                    (i : level)
+                                    (a b : U i)
+                                    (e : ev a)
+                                    (e' : ev b)
+                                    (t : b -> U i) .
+                                    (bindevt x = e' in t x) -> bindevt x = combine e e' in t (x #2)
+
+    bindevt_combine_out_right : forall
+                                   (i : level)
+                                   (a b : U i)
+                                   (e : ev a)
+                                   (e' : ev b)
+                                   (t : b -> U i) .
+                                   sooner e e'
+                                   -> (bindevt x = combine e e' in t (x #2))
+                                   -> bindevt x = e' in t x
+
+    bindevt_combine_out_left : forall
+                                  (i : level)
+                                  (a b : U i)
+                                  (e : ev a)
+                                  (e' : ev b)
+                                  (t : a -> U i) .
+                                  sooner e' e
+                                  -> (bindevt x = combine e e' in t (x #1))
+                                  -> bindevt x = e in t x
+
+    bindevt_combine_later_sooner : forall (i : level) (a b : U i) (m : ev a) .
+                                      forallfut (n : ev b) .
+                                        forall (P : a -> b -> U i) .
+                                          future (sooner m n)
+                                          -> future (bindevt x = combine m n in P (x #1) (x #2))
+                                          -> bindevt x = combine m (later n) in P (x #1) (x #2)
