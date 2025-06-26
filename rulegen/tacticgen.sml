@@ -16,23 +16,11 @@ structure Tacticgen :> TACTICGEN =
 
       fun defined m spine set =
          (case m of
-             Var _ =>
-                List.foldl
-                   (fn (n, set) => defined n [] set)
-                   set
-                   spine
+             Var _ => definedSpine spine set
 
-           | Varfar _ =>
-                List.foldl
-                   (fn (n, set) => defined n [] set)
-                   set
-                   spine
+           | Varfar _ => definedSpine spine set
 
-           | Const _ =>
-                List.foldl
-                   (fn (n, set) => defined n [] set)
-                   set
-                   spine
+           | Const _ => definedSpine spine set
 
            | Metavar (sym, s) =>
                 (case (spine, s) of
@@ -43,19 +31,27 @@ structure Tacticgen :> TACTICGEN =
 
            | Lam m' => defined m' [] set
 
-           | App (m1, m2) => defined m1 (m2 :: spine) set
+           | App (m1, m2) => defined m1 (SOME m2 :: spine) set
 
            | Pair (m1, m2) => defined m2 [] (defined m1 [] set)
 
-           | Pi1 m' => defined m' spine set
+           | Pi1 m' => defined m' (NONE :: spine) set
 
-           | Pi2 m' => defined m' spine set
+           | Pi2 m' => defined m' (NONE :: spine) set
 
            | Next m' => defined m' [] set
 
            | Prev m' => defined m' spine set
 
            | Triv => set)
+
+      and definedSpine spine set =
+         List.foldl
+            (fn (SOME n, set) => defined n [] set
+              | (NONE, set) => set)
+            set
+            spine
+
 
 
       fun spaces outs n =

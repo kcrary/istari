@@ -25,6 +25,9 @@
 
   + `refine` has moved from `Tactic` to `RefineTactic`.
 
+  + In `RuleTactic`, the tactics for several rules that involve
+    projection now take an additional term argument.
+
 - In `Case`, `goalHypCaseT` and `goalHypCaseB` now take names.  The
   old versions that take numbers are renamed to `goalHypnCaseT` and
   `goalHypnCaseB`.

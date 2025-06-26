@@ -220,7 +220,17 @@ structure Tags :>
 
       fun tag infile outs =
          let
-            val ins = TextIO.openIn infile
+            val ins =
+               TextIO.openIn infile
+               handle
+                  IO.Io _ =>
+                     (
+                     print "Unable to open file ";
+                     print infile;
+                     print "\n";
+                     OS.Process.exit OS.Process.failure
+                     )
+
             val s = Lexer.lexUse (Stream.fromTextInstream ins)
             val defs = outerLoop infile s []
             val () = TextIO.closeIn ins
