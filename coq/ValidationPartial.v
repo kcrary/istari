@@ -438,10 +438,18 @@ apply tr_partial_formation_invert; auto.
 Qed.
 
 
-Lemma seqBind_valid : seqBind_obligation.
+Lemma seqBindEq_valid : seqBindEq_obligation.
 Proof.
 prepare.
 intros G a b m n p q ext2 ext1 ext0 Hmn Hpq Hb.
+eapply tr_seq_bind; eauto.
+Qed.
+
+
+Lemma seqBindOf_valid : seqBindOf_obligation.
+Proof.
+prepare.
+intros G a b m n ext2 ext1 ext0 Hm Hn Hb.
 eapply tr_seq_bind; eauto.
 Qed.
 
@@ -750,7 +758,7 @@ apply tr_subtype_intro.
 Qed.
 
 
-Lemma unitTotal_valid : unitTotal_obligation.
+Lemma unitHalts_valid : unitHalts_obligation.
 Proof.
 prepare.
 intros G m ext0 H.
@@ -776,7 +784,7 @@ apply tr_total_strict.
 Qed.
 
 
-Lemma boolTotal_valid : boolTotal_obligation.
+Lemma boolHalts_valid : boolHalts_obligation.
 Proof.
 prepare.
 intros G m ext0 H.
@@ -802,7 +810,7 @@ apply tr_total_strict.
 Qed.
 
 
-Lemma forallTotal_valid : forallTotal_obligation.
+Lemma forallHalts_valid : forallHalts_obligation.
 Proof.
 prepare.
 intros G a b m ext0 H.
@@ -830,7 +838,7 @@ apply tr_total_strict.
 Qed.
 
 
-Lemma forallfutTotal_valid : forallfutTotal_obligation.
+Lemma forallfutHalts_valid : forallfutHalts_obligation.
 Proof.
 prepare.
 intros G a b m ext0 H.
@@ -914,7 +922,7 @@ apply tr_total_strict.
 Qed.
 
 
-Lemma arrowTotal_valid : arrowTotal_obligation.
+Lemma arrowHalts_valid : arrowHalts_obligation.
 Proof.
 prepare.
 intros G a b M ext0 H.
@@ -960,7 +968,7 @@ apply tr_total_strict.
 Qed.
 
 
-Lemma parametricTotal_valid : parametricTotal_obligation.
+Lemma parametricHalts_valid : parametricHalts_obligation.
 Proof.
 prepare.
 intros G a b m ext0 H.
@@ -998,7 +1006,7 @@ apply tr_total_strict.
 Qed.
 
 
-Lemma parametricfutTotal_valid : parametricfutTotal_obligation.
+Lemma parametricfutHalts_valid : parametricfutHalts_obligation.
 Proof.
 prepare.
 intros G a b m ext0 H.
@@ -1164,7 +1172,7 @@ eapply (tr_intersect_strict _#3 m); eauto.
 Qed.
 
 
-Lemma existsTotal_valid : existsTotal_obligation.
+Lemma existsHalts_valid : existsHalts_obligation.
 Proof.
 prepare.
 intros G a b m ext0 H.
@@ -1228,7 +1236,7 @@ apply tr_prod_sigma_equal.
 Qed.
 
 
-Lemma prodTotal_valid : prodTotal_obligation.
+Lemma prodHalts_valid : prodHalts_obligation.
 Proof.
 prepare.
 intros G a b M ext0 H.
@@ -1255,7 +1263,7 @@ apply tr_total_strict.
 Qed.
 
 
-Lemma dprodTotal_valid : dprodTotal_obligation.
+Lemma dprodHalts_valid : dprodHalts_obligation.
 Proof.
 prepare.
 intros G a b M ext0 H.
@@ -1299,7 +1307,7 @@ apply tr_total_strict.
 Qed.
 
 
-Lemma sumTotal_valid : sumTotal_obligation.
+Lemma sumHalts_valid : sumHalts_obligation.
 Proof.
 prepare.
 intros G a b m ext0 H.
@@ -1327,7 +1335,7 @@ apply tr_total_strict.
 Qed.
 
 
-Lemma futureTotal_valid : futureTotal_obligation.
+Lemma futureHalts_valid : futureHalts_obligation.
 Proof.
 prepare.
 intros G a m ext0 Hm.
@@ -2755,7 +2763,7 @@ apply (tr_seq_bind _ (var 3) (var 2)).
 Qed.
 
 
-Lemma natTotal_valid : natTotal_obligation.
+Lemma natHalts_valid : natHalts_obligation.
 Proof.
 prepare.
 intros G m ext0 H.
@@ -2900,7 +2908,7 @@ apply tr_pi_formation.
 Qed.
 
 
-Lemma voidTotal'_valid : voidTotal'_obligation.
+Lemma voidTotal_valid : voidTotal_obligation.
 Proof.
 prepare.
 intro G.
@@ -2929,7 +2937,7 @@ apply tr_sigma_intro.
 Qed.
 
 
-Lemma unitTotal'_valid : unitTotal'_obligation.
+Lemma unitTotal_valid : unitTotal_obligation.
 Proof.
 prepare.
 intro G.
@@ -2959,7 +2967,7 @@ Qed.
 
 
 
-Lemma boolTotal'_valid : boolTotal'_obligation.
+Lemma boolTotal_valid : boolTotal_obligation.
 Proof.
 prepare.
 intro G.
@@ -2990,7 +2998,7 @@ Qed.
 
 Hint Rewrite def_pi : prepare.
 
-Lemma forallTotal'_valid : forallTotal'_obligation.
+Lemma forallTotal_valid : forallTotal_obligation.
 Proof.
 prepare.
 intros G a b ext1 ext0 Ha Hb.
@@ -3023,7 +3031,7 @@ Qed.
 
 Hint Rewrite def_forallfut : prepare.
 
-Lemma forallfutTotal'_valid : forallfutTotal'_obligation.
+Lemma forallfutTotal_valid : forallfutTotal_obligation.
 Proof.
 prepare.
 intros G a b ext1 ext0 Ha Hb.
@@ -3113,7 +3121,7 @@ Qed.
 
 Hint Rewrite def_arrow : prepare.
 
-Lemma arrowTotal'_valid : arrowTotal'_obligation.
+Lemma arrowTotal_valid : arrowTotal_obligation.
 Proof.
 prepare.
 intros G a b ext1 ext0 Ha Hb.
@@ -3145,7 +3153,7 @@ Qed.
 
 Hint Rewrite def_parametric : prepare.
 
-Lemma parametricTotal'_valid : parametricTotal'_obligation.
+Lemma parametricTotal_valid : parametricTotal_obligation.
 Proof.
 prepare.
 intros G a b ext1 ext0 Ha Hb.
@@ -3203,7 +3211,7 @@ Qed.
 
 Hint Rewrite def_parametricfut : prepare.
 
-Lemma parametricfutTotal'_valid : parametricfutTotal'_obligation.
+Lemma parametricfutTotal_valid : parametricfutTotal_obligation.
 Proof.
 prepare.
 intros G a b ext1 ext0 Ha Hb.
@@ -3303,7 +3311,7 @@ Qed.
 
 Hint Rewrite def_sigma : prepare.
 
-Lemma existsTotal'_valid : existsTotal'_obligation.
+Lemma existsTotal_valid : existsTotal_obligation.
 Proof.
 prepare.
 intros G a b ext1 ext0 Ha Hb.
@@ -3336,7 +3344,7 @@ Qed.
 
 Hint Rewrite def_prod : prepare.
 
-Lemma prodTotal'_valid : prodTotal'_obligation.
+Lemma prodTotal_valid : prodTotal_obligation.
 Proof.
 prepare.
 intros G a b ext1 ext0 Ha Hb.
@@ -3366,7 +3374,7 @@ Qed.
 
 Hint Rewrite def_dprod : prepare.
 
-Lemma dprodTotal'_valid : dprodTotal'_obligation.
+Lemma dprodTotal_valid : dprodTotal_obligation.
 Proof.
 prepare.
 intros G a b ext1 ext0 Ha Hb.
@@ -3418,7 +3426,7 @@ Qed.
 
 Hint Rewrite def_sum : prepare.
 
-Lemma sumTotal'_valid : sumTotal'_obligation.
+Lemma sumTotal_valid : sumTotal_obligation.
 Proof.
 prepare.
 intros G a b ext1 ext0 Ha Hb.
@@ -3450,7 +3458,7 @@ Qed.
 
 Hint Rewrite def_fut : prepare.
 
-Lemma futureTotal'_valid : futureTotal'_obligation.
+Lemma futureTotal_valid : futureTotal_obligation.
 Proof.
 prepare.
 intros G a ext0 Ha.
@@ -3480,7 +3488,7 @@ Qed.
 
 Hint Rewrite def_nat : prepare.
 
-Lemma natTotal'_valid : natTotal'_obligation.
+Lemma natTotal_valid : natTotal_obligation.
 Proof.
 prepare.
 intro G.
@@ -3509,7 +3517,7 @@ Qed.
 
 Hint Rewrite def_set : prepare.
 
-Lemma setTotal'_valid : setTotal'_obligation.
+Lemma setTotal_valid : setTotal_obligation.
 Proof.
 prepare.
 intros G a b ext1 m Hb Htot.
@@ -3595,7 +3603,7 @@ Qed.
 
 Hint Rewrite def_iset : prepare.
 
-Lemma isetTotal'_valid : isetTotal'_obligation.
+Lemma isetTotal_valid : isetTotal_obligation.
 Proof.
 prepare.
 intros G a b ext1 m Hb Htot.
@@ -3675,7 +3683,7 @@ Qed.
 Hint Rewrite def_quotient : prepare.
 
 
-Lemma quotientTotal'_valid : quotientTotal'_obligation.
+Lemma quotientTotal_valid : quotientTotal_obligation.
 Proof.
 prepare.
 intros G a b ext2 ext1 m Hquot Hb Htot.
@@ -3898,7 +3906,7 @@ Qed.
 
 Hint Rewrite def_univ : prepare.
 
-Lemma univTotal'_valid : univTotal'_obligation.
+Lemma univTotal_valid : univTotal_obligation.
 Proof.
 prepare.
 intros G i ext Hi.

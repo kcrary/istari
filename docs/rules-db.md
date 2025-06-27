@@ -5095,12 +5095,20 @@ Syntactic equality is intended for internal use only.
       >>
       G |- istp (partial A)
 
-- `seqBind A B M M' N N'`
+- `seqBindEq A B M M' N N'`
 
       G |- eq (partial B) (seq M (fn . N)) (seq M' (fn . N'))
       >>
       G |- eq (partial A) M M'
       G, A |- eq (partial B[^1]) N N'
+      G |- istp B
+
+- `seqBindOf A B M N`
+
+      G |- of (partial B) (seq M (fn . N))
+      >>
+      G |- of (partial A) M
+      G, A |- of (partial B[^1]) N
       G |- istp B
 
 - `activeApp A B M N`
@@ -5222,7 +5230,7 @@ Syntactic equality is intended for internal use only.
       G |- istp A
       G, A |- halts 0
 
-- `voidTotal'`
+- `voidTotal`
 
       G |- total void ext fn . ()
 
@@ -5230,13 +5238,13 @@ Syntactic equality is intended for internal use only.
 
       G |- subtype void (partial void)
 
-- `unitTotal M`
+- `unitHalts M`
 
       G |- halts M
       >>
       G |- of unit M
 
-- `unitTotal'`
+- `unitTotal`
 
       G |- total unit ext fn . ()
 
@@ -5244,13 +5252,13 @@ Syntactic equality is intended for internal use only.
 
       G |- subtype unit (partial unit)
 
-- `boolTotal M`
+- `boolHalts M`
 
       G |- halts M
       >>
       G |- of bool M
 
-- `boolTotal'`
+- `boolTotal`
 
       G |- total bool ext fn . ()
 
@@ -5258,13 +5266,13 @@ Syntactic equality is intended for internal use only.
 
       G |- subtype bool (partial bool)
 
-- `forallTotal A B M`
+- `forallHalts A B M`
 
       G |- halts M
       >>
       G |- of (forall A (fn . B)) M
 
-- `forallTotal' A B`
+- `forallTotal A B`
 
       G |- total (forall A (fn . B)) ext fn . ()
       >>
@@ -5278,13 +5286,13 @@ Syntactic equality is intended for internal use only.
       G |- istp A
       G, A |- istp B
 
-- `forallfutTotal A B M`
+- `forallfutHalts A B M`
 
       G |- halts M
       >>
       G |- of (forallfut A (fn . B)) M
 
-- `forallfutTotal' A B`
+- `forallfutTotal A B`
 
       G |- total (forallfut A (fn . B)) ext (() , fn . ())
       >>
@@ -5298,13 +5306,13 @@ Syntactic equality is intended for internal use only.
       promote(G) |- istp A
       G, (later) A |- istp B
 
-- `arrowTotal A B M`
+- `arrowHalts A B M`
 
       G |- halts M
       >>
       G |- of (arrow A B) M
 
-- `arrowTotal' A B`
+- `arrowTotal A B`
 
       G |- total (arrow A B) ext fn . ()
       >>
@@ -5332,13 +5340,13 @@ Syntactic equality is intended for internal use only.
       promote(G) |- A
       G, (later) A |- subtype B (partial B)
 
-- `parametricTotal A B M`
+- `parametricHalts A B M`
 
       G |- halts M
       >>
       G |- of (parametric A (fn . B)) M
 
-- `parametricTotal' A B`
+- `parametricTotal A B`
 
       G |- total (parametric A (fn . B)) ext (() , fn . ())
       >>
@@ -5352,13 +5360,13 @@ Syntactic equality is intended for internal use only.
       G |- istp A
       G, A |- istp B
 
-- `parametricfutTotal A B M`
+- `parametricfutHalts A B M`
 
       G |- halts M
       >>
       G |- of (parametricfut A (fn . B)) M
 
-- `parametricfutTotal' A B`
+- `parametricfutTotal A B`
 
       G |- total (parametricfut A (fn . B)) ext (() , fn . ())
       >>
@@ -5386,13 +5394,13 @@ Syntactic equality is intended for internal use only.
       promote(G) |- A
       G, (later) A |- subtype B (partial B)
 
-- `existsTotal A B M`
+- `existsHalts A B M`
 
       G |- halts M
       >>
       G |- of (exists A (fn . B)) M
 
-- `existsTotal' A B`
+- `existsTotal A B`
 
       G |- total (exists A (fn . B)) ext fn . ()
       >>
@@ -5406,13 +5414,13 @@ Syntactic equality is intended for internal use only.
       G |- istp A
       G, A |- istp B
 
-- `prodTotal A B M`
+- `prodHalts A B M`
 
       G |- halts M
       >>
       G |- of (prod A B) M
 
-- `prodTotal' A B`
+- `prodTotal A B`
 
       G |- total (prod A B) ext fn . ()
       >>
@@ -5426,13 +5434,13 @@ Syntactic equality is intended for internal use only.
       G |- istp A
       G |- istp B
 
-- `dprodTotal A B M`
+- `dprodHalts A B M`
 
       G |- halts M
       >>
       G |- of (dprod A B) M
 
-- `dprodTotal' A B`
+- `dprodTotal A B`
 
       G |- total (dprod A B) ext (() , fn . ())
       >>
@@ -5446,13 +5454,13 @@ Syntactic equality is intended for internal use only.
       G |- istp A
       G |- istp B
 
-- `sumTotal A B M`
+- `sumHalts A B M`
 
       G |- halts M
       >>
       G |- of (sum A B) M
 
-- `sumTotal' A B`
+- `sumTotal A B`
 
       G |- total (sum A B) ext fn . ()
       >>
@@ -5466,13 +5474,13 @@ Syntactic equality is intended for internal use only.
       G |- istp A
       G |- istp B
 
-- `futureTotal A M`
+- `futureHalts A M`
 
       G |- halts M
       >>
       G |- of (future A) M
 
-- `futureTotal' A`
+- `futureTotal A`
 
       G |- total (future A) ext fn . ()
       >>
@@ -5484,7 +5492,7 @@ Syntactic equality is intended for internal use only.
       >>
       promote(G) |- istp A
 
-- `setTotal' A B`
+- `setTotal A B`
 
       G |- total (set A (fn . B)) ext (() , fn . ())
       >>
@@ -5498,7 +5506,7 @@ Syntactic equality is intended for internal use only.
       G, A |- istp B
       G |- subtype A (partial A)
 
-- `isetTotal' A B`
+- `isetTotal A B`
 
       G |- total (iset A (fn . B)) ext (() , fn . ())
       >>
@@ -5512,7 +5520,7 @@ Syntactic equality is intended for internal use only.
       G, A |- istp B
       G |- subtype A (partial A)
 
-- `quotientTotal' A B`
+- `quotientTotal A B`
 
       G |- total (quotient A (fn . fn . B)) ext (() , fn . ())
       >>
@@ -5520,13 +5528,13 @@ Syntactic equality is intended for internal use only.
       G, A, A[^1] |- istp B
       G |- total A
 
-- `natTotal M`
+- `natHalts M`
 
       G |- halts M
       >>
       G |- of nat M
 
-- `natTotal'`
+- `natTotal`
 
       G |- total nat ext fn . ()
 
@@ -6126,7 +6134,7 @@ Syntactic equality is intended for internal use only.
              timesz
              (fn . fn . integer_from_Integer (Timesz (integer_to_Integer 1) (integer_to_Integer 0)))
 
-- `integerTotal M`
+- `integerHalts M`
 
       G |- halts M
       >>
@@ -6199,7 +6207,7 @@ Syntactic equality is intended for internal use only.
       >>
       G |- eq bool (symbol_eqb M N) true
 
-- `symbolTotal M`
+- `symbolHalts M`
 
       G |- halts M
       >>

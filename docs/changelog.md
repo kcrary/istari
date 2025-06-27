@@ -47,13 +47,25 @@
 
   + `Logic` and `Weaksum` have additional material.
 
-- Added rules `intersectfutIntro`, `futureLeftHidden`,
-  `parametricElim'`, `substitutionLater`, and
-  `substitutionLaterSimple`. Also added rules governing
-  `parametricfut`; and totality, strictness, uptype, and admissibility
-  rules for `forallfut`, `intersectfut`, `parametric`, and
-  `parametricfut`.  Changed the extract of `letIntro` to use a let
-  term.
+  + `Partial.total` is defined using `dprod` instead of `exists`.
+
+- Rule changes:
+
+  + Added rules `intersectfutIntro`, `futureLeftHidden`,
+    `parametricElim'`, `substitutionLater`, and
+    `substitutionLaterSimple`.
+
+  + Added rules governing `parametricfut`.
+
+  + Added totality, strictness, uptype, and admissibility rules for
+    `forallfut`, `intersectfut`, `parametric`, and `parametricfut`.
+
+  + Renamed `seqBind` to `seqBindEq`, and added `seqBindOf`.
+
+  + Renamed type totality rules: for types `t`, `tTotal` becomes
+    `tHalts`, and `tTotal'` becomes `tTotal`.
+
+  + Changed the extract of `letIntro` to use a let term.
 
 - Rule premises from which the extract is not used unhide all their
   hypotheses.  (Previously this was not true for some left rules.)
