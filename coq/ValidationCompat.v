@@ -1088,7 +1088,6 @@ assert (tr G (deqtype b' b')) as Hofb'.
   }
 apply tr_prod_intro.
   {
-  rewrite -> !def_eeqtp.
   apply tr_prod_sub.
     {
     apply tr_subtype_intro.
@@ -1238,7 +1237,6 @@ apply tr_prod_intro.
   }
 
   {
-  rewrite -> !def_eeqtp.
   apply tr_prod_sub.
     {
     apply tr_subtype_intro.

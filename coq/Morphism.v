@@ -564,6 +564,17 @@ apply equiv_ppair; auto.
 Qed.
 
 
+Add Parametric Morphism object : (@prod object)
+  with signature equiv ==> equiv ==> equiv
+  as equiv_prod.
+Proof.
+intros m1 m1' H1 m2 m2' H2.
+unfold prod.
+rewrite H1, H2.
+reflexivity.
+Qed.
+
+
 Add Parametric Morphism object : (@seq object)
   with signature equiv ==> equiv ==> equiv
   as equiv_seq.
@@ -586,6 +597,17 @@ reflexivity.
 Qed.
 
 
+Add Parametric Morphism object : (@sigma object)
+  with signature equiv ==> equiv ==> equiv
+  as equiv_sigma.
+Proof.
+intros m1 m1' H1 m2 m2' H2.
+unfold sigma.
+rewrite H1, H2.
+reflexivity.
+Qed.
+
+
 Add Parametric Morphism object : (@subtype object)
   with signature equiv ==> equiv ==> equiv
   as equiv_subtype.
@@ -595,7 +617,6 @@ unfold subtype.
 rewrite H1, H2.
 reflexivity.
 Qed.
-
 
 
 Lemma equiv_dsubtype :

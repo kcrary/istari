@@ -5080,6 +5080,36 @@ Syntactic equality is intended for internal use only.
       >>
       G |- halts (M N)
 
+- `activeAppArrow A B M N`
+
+      G |- M N : partial B
+      >>
+      G |- M : partial (A -> B)
+      G |- N : A
+      G |- B <: partial B
+
+- `activeAppArrowPartial A B M N`
+
+      G |- M N : partial B
+      >>
+      G |- M : partial (A -> partial B)
+      G |- N : A
+
+- `activeAppForall A B M N`
+
+      G |- M N : partial [N / x]B
+      >>
+      G |- M : partial (forall (x : A) . B)
+      G |- N : A
+      G |- [N / x]B <: partial [N / x]B
+
+- `activeAppForallPartial A B M N`
+
+      G |- M N : partial [N / x]B
+      >>
+      G |- M : partial (forall (x : A) . partial B)
+      G |- N : A
+
 - `activePi1 A B M`
 
       G |- M #1 : partial B
@@ -5102,6 +5132,32 @@ Syntactic equality is intended for internal use only.
       >>
       G |- halts (M #1)
 
+- `activePi1Prod A B M`
+
+      G |- M #1 : partial A
+      >>
+      G |- M : partial (A & B)
+      G |- A <: partial A
+
+- `activePi1ProdPartial A B M`
+
+      G |- M #1 : partial A
+      >>
+      G |- M : partial (partial A & B)
+
+- `activePi1Exists A B M`
+
+      G |- M #1 : partial A
+      >>
+      G |- M : partial (exists (x : A) . B)
+      G |- A <: partial A
+
+- `activePi1ExistsPartial A B M`
+
+      G |- M #1 : partial A
+      >>
+      G |- M : partial (exists (x : partial A) . B)
+
 - `activePi2 A B M`
 
       G |- M #2 : partial B
@@ -5123,6 +5179,20 @@ Syntactic equality is intended for internal use only.
       G |- halts M
       >>
       G |- halts (M #2)
+
+- `activePi2Prod A B M`
+
+      G |- M #2 : partial B
+      >>
+      G |- M : partial (A & B)
+      G |- B <: partial B
+
+- `activePi2ProdPartial A B M`
+
+      G |- M #2 : partial B
+      >>
+      G |- M : partial (A & partial B)
+      G |- B : type
 
 - `prevHaltsInv M`
 

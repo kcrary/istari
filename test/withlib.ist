@@ -14,6 +14,114 @@ fun shouldfail tac goal fk sk =
 
 
 
+lemma "infer_partial_arrow"
+/
+  forall i (a b c : U i) (f : partial (a -> b -> c)) (x : a) (y : b) .
+    c <: partial c
+    -> f x y : partial c
+/;
+
+inference.
+intro /i a b c f x y Hstrict/.
+typecheck.
+qed ();
+
+
+
+lemma "infer_partial_arrow_more"
+/
+  forall i (a b c : U i) (f : partial (a -> b -> partial c)) (x : a) (y : b) .
+    f x y : partial c
+/;
+
+inference.
+intro /i a b c f x y/.
+typecheck.
+qed ();
+
+
+
+lemma "infer_partial_forall"
+/
+  forall i (a : U i) (b c : a -> U i) (f : partial (forall (x : a) . b x -> c x)) (x : a) (y : b x) .
+    (forall x . c x <: partial (c x))
+    -> f x y : partial (c x)
+/;
+
+inference.
+intro /i a b c f x y Hstrict/.
+typecheck.
+qed ();
+
+
+
+lemma "infer_partial_forall_more"
+/
+  forall i (a : U i) (b : a -> U i) (f : partial (forall (x : a) . partial (b x))) (x : a) .
+    f x : partial (b x)
+/;
+
+inference.
+intro /i a b f x/.
+typecheck.
+qed ();
+
+
+
+lemma "infer_partial_prod"
+/
+  forall i (a b c : U i) (f : partial (a & b & c)) .
+    b <: partial b
+    -> f #2 #1 : partial b
+/;
+
+inference.
+intro /i a b c f Hstrict/.
+typecheck.
+qed ();
+
+
+
+lemma "infer_partial_prod_more"
+/
+  forall i (a b c : U i) (f : partial (a & partial (partial b & c))) .
+    f #2 #1 : partial b
+/;
+
+inference.
+intro /i a b c f/.
+typecheck.
+qed ();
+
+
+
+lemma "infer_partial_exists"
+/
+  forall i (a : U i) (b : a -> U i) (f : partial (exists (x : a) . b x)) .
+    a <: partial a
+    -> f #1 : partial a
+/;
+
+inference.
+intro /i a b f Hstrict/.
+typecheck.
+qed ();
+
+
+
+lemma "infer_partial_exists_more"
+/
+  forall i (a : U i) (b : partial a -> U i) (f : partial (exists (x : partial a) . b x)) .
+    f #1 : partial a
+/;
+
+inference.
+intro /i a b f/.
+typecheck.
+qed ();
+
+
+
 lemma "squashConcl"
 /
   forall i (a b c : U i) (d : c -> U i) (m n : nat) .
@@ -1135,7 +1243,6 @@ subsume /integer -> partial integer/.
 introOf /n/.
 reduce //.
 typecheck.
-RuleTactic.activeApp (parseCurr /integer -> partial integer/) (parseCurr /factorial/) (parseCurr /n -z z`1/) >> auto.
 qed ();
 
 

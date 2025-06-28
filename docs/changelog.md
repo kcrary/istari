@@ -32,6 +32,8 @@
   old versions that take numbers are renamed to `goalHypnCaseT` and
   `goalHypnCaseB`.
 
+- The typechecker can infer types for paths whose head is partial.
+
 - Library changes:
 
   + `Sqstable` added.
@@ -59,6 +61,9 @@
 
   + Added totality, strictness, uptype, and admissibility rules for
     `forallfut`, `intersectfut`, `parametric`, and `parametricfut`.
+
+  + Added convenience rules for inferring types of paths whose head is
+    partial.
 
   + Renamed `seqBind` to `seqBindEq`, and added `seqBindOf`.
 

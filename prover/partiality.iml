@@ -28,6 +28,7 @@ structure Partiality :> PARTIALITY =
       structure H = ConstantTable
       structure J = Judgement
       structure RT = RuleTactic
+      structure R = Reduction
       structure T = Term
 
       open Tactic
@@ -55,24 +56,41 @@ structure Partiality :> PARTIALITY =
       val uptypeTactics : tactic H.table = H.table ()      
 
       
-      val proveAdmiss1Raw =
+      fun proveAdmiss1Loop () =
          goalCaseT
          /| \Prim.uptype\ (const? @ _) =>
             \(fnc const =>
                  (case H.find uptypeTactics const of
                      SOME tac => tac
 
-                   | NONE => fail "no uptype rule for this type"))\
+                   | NONE => 
+                        (case Constant.definition const of
+                            SOME _ =>
+                               refine (Rule.reduce (R.within [1] (R.trans [R.unfold, R.betas])))
+                               >>+
+                               lift proveAdmiss1Loop
+
+                          | NONE =>
+                               fail "no uptype rule for this type")))\
 
           | \Prim.admiss\ (const? @ _) =>
             \(fnc const =>
                  (case H.find admissTactics const of
                      SOME tac => tac
 
-                   | NONE => fail "no admissibility rule for this type"))\
+                   | NONE =>
+                        (case Constant.definition const of
+                            SOME _ =>
+                               refine (Rule.reduce (R.within [1] (R.trans [R.unfold, R.betas])))
+                               >>+
+                               lift proveAdmiss1Loop
+
+                          | NONE =>
+                               fail "no admissibility rule for this type")))\
          /
       
-
+         
+      val proveAdmiss1Raw = lift proveAdmiss1Loop
       val proveAdmiss1 = Typecheck.withTypecheck proveAdmiss1Raw
 
 
