@@ -1217,6 +1217,30 @@ The destruction tactics are:
     As `trivialize` but does not invoke the typechecker.
 
 
+- `typecheckFixpoint`
+
+  If the goal has the form `M : A` where `M` unrolls (and reduces) to
+  `fix F`, proves the goal using [fixpoint
+  induction](type-theory.html#partial-types), leaving the main goal 
+  `F : partial A -> A`.  The admissibility subgoal is discharged
+  automatically if possible.
+
+  The tactic requires that `fix F` reduces to a value, which is
+  usually the case.  (Usually the body of `F` is a pair or lambda.)
+
+  To use `typecheckFixpoint` on components of a mutually recursive
+  definition, use it on the mutual group that it defines internally.
+  If the first mutual definition is named `foo`, the group is named
+  `foo_group`.  Note that if the mutual definition takes a pervasive
+  argument, then `foo_group` will unroll to the form `fn x . fix F`,
+  not the form `fix F`.  In such a case, you should use
+  typecheckFixpoint to establish the type of `foo_group` applied to
+  the pervasive arguments, rather than merely `foo_group`.
+
+  + `typecheckFixpointRaw`
+
+    As `typecheckFixpoint` but does not invoke the typechecker.
+
 - `Typecheck.trace : bool -> unit`
 
   When set to true, the typechecker traces its process.

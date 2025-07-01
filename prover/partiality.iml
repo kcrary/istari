@@ -6,6 +6,10 @@ signature PARTIALITY =
       type 'a tacticm = 'a Tactic.tacticm
       type priority = Tactic.priority
 
+      val typecheckFixpoint : tactic
+      val typecheckFixpointRaw : tactic
+      val typecheckFixpointPriority : priority tacticm
+
       val proveAdmiss1Raw : tactic
       val proveAdmiss1 : tactic
       val uptypeAdmiss : tactic
@@ -496,5 +500,83 @@ structure Partiality :> PARTIALITY =
             (Prim.integer, RT.integerUptype),
             (Prim.symbol, RT.symbolUptype),
             ]
+
+
+      fun typecheckFixpointMain () =
+         goalCaseT
+         /| \Prim.ov\ ? (\Prim.fix\ ?) =>
+            \(fnc a f =>
+                 (* fix F : A *)
+                 refine (Rule.partialElimOf (T.evar ()) (T.evar ()))
+                 >>> [
+                     (* fix F : partial A *)
+                     refine (Rule.fixpointInductionOf (T.evar ()) (T.evar ()))
+                     >>> [
+                         (* F : partial A -> partial A *)
+                         refine (Rule.subsumptionOf (T.apply2 Prim.arrow (T.apply1 Prim.partial a) a) (T.evar ()) (T.evar ()))
+                         >>> [
+                             refine (Rule.assert (T.apply2 Prim.subtype a (T.apply1 Prim.partial a)) (T.evar ()))
+                             >>> [
+                                 (* A <: partial A *)
+                                 idtacM Secondary,
+
+                                 (* A <: partial A |- (partial A -> A <: partial A -> partial A)[^] *)
+                                 refine (Rule.arrowSub (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                                 >>> [
+                                     (* partial A[^] <: partial A[^] *)
+                                     refine (Rule.subtypeRefl (T.evar ()))
+                                     >>+
+                                     (* partial A[^] : type *)
+                                     refine (Rule.subtypeIstp2 (T.Sub (a, T.shift1)) (T.evar ()))
+                                     >>+
+                                     (* A[^] <: partial A[^] *)
+                                     refine (Rule.hypothesis 0) >> done,
+    
+                                     (* A[^] <: partial A[^] *)
+                                     refine (Rule.hypothesis 0) >> done
+                                     ],
+                                 ],
+
+                             (* F : partial A -> A *)
+                             idtacM Primary
+                             ],
+
+                         (* admiss A *)
+                         attemptPri proveAdmissPriority
+                         ],
+
+                     (* halts (fix F) *)
+                     refine (Rule.reduce (R.within [1] (R.trans [R.user PrimReduction.unroll_fix, R.betas])))
+                     >>+
+                     (* halts (Fbody [fix F . id]) *)
+                     (setFailure "body is not valuable" $ refine (Rule.haltsValue))
+                     >> done
+                     ])\
+
+          | \Prim.ov\ _ (const? @ _) =>
+            \(fnc _ =>
+                 refine (Rule.reduce (R.within [2] (R.trans [R.unfold, R.betas])))
+                 >>+
+                 lift typecheckFixpointMain)\
+
+          | \Prim.ov\ ? (var? @ ?) =>
+            \(fnc a i spine =>
+                 (* i spine : A  =  (0 spine[^] : A[^])[i . id] *)
+                 refine (Rule.letUnfold i (T.apply2 Prim.ov (T.Sub (a, T.shift1)) (T.Elim (T.zero, T.ssubst spine T.shift1))))
+                 >>+
+                 refine (Rule.reduce (R.within [2] R.betas))
+                 >>+
+                 lift typecheckFixpointMain)\
+
+          | _ =>
+            \(fnc =>
+                 fail "goal has incorrect form for typecheckFixpoint")\
+         /
+
+      val typecheckFixpointPriority = lift typecheckFixpointMain
+
+      val typecheckFixpointRaw = typecheckFixpointPriority >> idtac
+
+      val typecheckFixpoint = Typecheck.withTypecheckSnd typecheckFixpointPriority
 
    end

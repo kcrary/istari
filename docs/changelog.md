@@ -11,6 +11,9 @@
 
   + `setFold` combines `set` and `fold`.
 
+  + `typecheckFixpoint` establishes the type of a recursive definition
+    using fixpoint induction.
+
 - Tactic changes:
 
   + The behavior of `revert` on hidden hypotheses has changed; it now
