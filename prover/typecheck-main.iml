@@ -290,7 +290,8 @@ structure TypecheckMain :> TYPECHECK_MAIN =
       val tabEqkind = 5
       val tabPositive = 6
       val tabTotal = 7
-      val tabLleq = 8
+      val tabStrict = 8
+      val tabLleq = 9
 
 
       (* not checkpointed, since the stuff in it doesn't change *)
@@ -337,7 +338,10 @@ structure TypecheckMain :> TYPECHECK_MAIN =
                         /),
 
             (Prim.total,
-             parseMatch /$ap ? $nil => \(fnc a => (tabTotal, a))\/)
+             parseMatch /$ap ? $nil => \(fnc a => (tabTotal, a))\/),
+
+            (Prim.strict,
+             parseMatch /$ap ? $nil => \(fnc a => (tabStrict, a))\/),
             ]
                         
 
@@ -597,6 +601,7 @@ structure TypecheckMain :> TYPECHECK_MAIN =
        | Eqrefl
        | Positive
        | Total
+       | Strict
        | Lleq
        | Unknown
 
@@ -647,6 +652,10 @@ structure TypecheckMain :> TYPECHECK_MAIN =
 
           | \Prim.total\ @
                ($ap _ $nil => \(fnc => YES Total)\
+                | _ => \(fnc => BAD)\)
+
+          | \Prim.strict\ @
+               ($ap _ $nil => \(fnc => YES Strict)\
                 | _ => \(fnc => BAD)\)
 
           | _ => \(fnc => NO)\
@@ -1770,26 +1779,29 @@ structure TypecheckMain :> TYPECHECK_MAIN =
                        raise Backtrack)\
 
                (* 4. Unify B with partial A and try strictness. *)
-             | const? @ _ ; \Prim.partial\ @ _ =!>
-              \(fnc const =>
-                   if U.unify1 (T.apply1 Prim.partial a) b then
-                      (case H.find strictnessTactics const of
-                          SOME tac =>
-                             tryRule st table history tac goal dest
-                                (fn () =>
-                                    dest :=
-                                       error history "unexpected strictness failure"
-                                       (fn () =>
-                                           (
-                                           showPrefixed " first: " dir a;
-                                           showPrefixed "second: " dir b;
-                                           print "\n"
-                                           )))
-                             (fn () => progress := true)
+             | _ ; \Prim.partial\ @ _ =!>
+               \(fnc =>
+                    if U.unify1 (T.apply1 Prim.partial a) b then
+                       let
+                          val goal' = (J.make ctx (T.apply1 Prim.strict a), dir)
+ 
+                          val dest' = newdest ()
+                       in
+                          progress := true;
 
-                        | NONE => raise Backtrack)
-                   else
-                      raise Backtrack)\
+                          dest :=
+                             (
+                             (* G |- A <: partial A *)
+                             refine (Rule.unreduce (T.apply1 Prim.strict a) (R.trans [R.unfold, R.beta 1]))
+                             >>+
+                             (* G |- strict A *)
+                             play dest'
+                             );
+
+                          enqueue st [(Strict, table, goal', dest', history)]
+                       end
+                    else
+                       raise Backtrack)\
 
                (* 5. Look in the table. *)
              | _ =!>
@@ -2456,6 +2468,57 @@ structure TypecheckMain :> TYPECHECK_MAIN =
 
 
 
+      (*** Strictness checking ***)
+
+      fun typecheckStrict (st as ST { progress }) table (goal as (jud, dir)) dest (history as (origin, hist)) =
+         let
+            val ctx = J.context jud
+            val concl = J.concl jud
+
+            val a =
+               (case N.simplify concl of
+                   T.Elim (_, [T.App a]) => N.whnfBasic a
+
+                 | _ => raise (Fail "precondition"))
+         in
+            if
+               immediate st table history tabStrict a ctx concl dir dest idtac
+            then
+               ()
+            else
+               termCase a
+               /| const? @ _ =>
+                  \(fnc const =>
+                       (case H.find strictnessTactics const of
+                           SOME tac =>
+                              tryRule st table history tac goal dest
+                                 (fn () =>
+                                     dest :=
+                                        error history "ill-formed type expression"
+                                        (fn () =>
+                                            (
+                                            print      "  expected: type\n";
+                                            showPrefixed "expression: " dir a;
+                                            print "\n"
+                                            )))
+                             (fn () => progress := true)
+
+                         | NONE =>
+                              dest :=
+                                 idtacM 
+                                    (Message.addDetail
+                                        (Message.fromString (attach "undischarged typing obligation" origin))
+                                        (errorDetail hist "Strictness obligation" (fn () => ())))))\
+
+                | _ =>
+                  \(fnc =>   
+                       defer st (Strict, table, goal, dest, history))\
+               /
+         end
+
+
+
+
       (*** Level checking ***)
 
       fun showConstraints cons =
@@ -2623,6 +2686,7 @@ structure TypecheckMain :> TYPECHECK_MAIN =
                      | Eqrefl => typecheckEqrefl st table goal dest history'
                      | Positive => typecheckPositive st table goal dest history'
                      | Total => typecheckTotal st table goal dest history'
+                     | Strict => typecheckStrict st table goal dest history'
        
                      | Lleq =>
                           constraints := (table, goal, dest, history) :: !constraints

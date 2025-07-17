@@ -400,3 +400,14 @@ Strong induction for natural numbers:
     nat_dichotomy_weak : type:nat_dichotomy_weak
 
     nat_dichotomy_neq : type:nat_dichotomy_neq
+
+
+### Miscellaneous
+
+    leq_unitary : type:leq_unitary
+
+    lt_unitary : type:lt_unitary
+
+    leq_uptype : type:leq_uptype
+
+    lt_uptype : type:lt_uptype

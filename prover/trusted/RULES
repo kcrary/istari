@@ -4758,7 +4758,7 @@ partial A <: partial B
 
 
 rule partialStrict
-partial A <: partial (partial A)
+strict (partial A)
 >>
 |- A : type ;
 
@@ -4821,6 +4821,14 @@ M = N : partial A
 x : (halts M) |- M = N : A ;
 
 
+rule partialOfExt
+M : partial A
+>>
+|- A : type ;
+|- M : partial B ;
+x : (halts M) |- M : A ;
+
+
 rule partialElimEq
 M = N : A
 >>
@@ -4832,6 +4840,12 @@ rule partialElimOf
 M : A
 >>
 |- M : partial A ;
+|- halts M ;
+
+
+rule haltsIntro
+() : halts M
+>>
 |- halts M ;
 
 
@@ -4854,6 +4868,12 @@ x : (halts M) ... |- C ext N
 ...[() / x] |- C[() / x] ext N ;
 
 
+rule partialElimHalts
+iff (halts M) (halts N) ext ((fn x . ()), (fn x . ()))
+>>
+|- M = N : partial A ;
+
+
 rule fixpointInductionEq
 fix M = fix N : partial A
 >>
@@ -4866,6 +4886,18 @@ fix M : partial A
 >>
 |- M : arrow (partial A) (partial A) ;
 |- admiss A ;
+
+
+rule fixpointInductionShift
+P (fix M) = fix N : partial B
+>>
+|- admiss A ;
+|- admiss B ;
+|- M : arrow (partial A) (partial A) ;
+|- N : arrow (partial B) (partial B) ;
+|- P : arrow (partial A) (partial B) ;
+|- arrow (halts (P bottom)) void ;
+x : (partial A) |- P (M $x) = N (P $x) : partial B ;
 
 
 rule partialFormInv
@@ -4893,6 +4925,14 @@ x : A |- N : partial B ;
 |- B : type ;
 
 
+rule seqHalts
+halts (seq M (fn x . N))
+>>
+|- M : partial A ;
+|- halts M ;
+x : A |- halts N ;
+
+
 rule activeApp
 M N : partial B
 >>
@@ -4909,6 +4949,14 @@ x : A |- $x N : partial B ;
 |- B : type ;
 
 
+rule appHalts
+halts (M N)
+>>
+|- M : partial A ;
+|- halts M ;
+x : A |- halts ($x N) ;
+
+
 rule appHaltsInv
 halts M
 >>
@@ -4920,7 +4968,7 @@ M N : partial B
 >>
 |- M : partial (arrow A B) ;
 |- N : A ;
-|- B <: partial B ;
+|- strict B ;
 
 
 rule activeAppArrowPartial
@@ -4935,7 +4983,7 @@ M N : partial (B [N / x])
 >>
 |- M : partial (forall {x : A} B) ;
 |- N : A ;
-|- B [N / x] <: partial (B [N / x]) ;
+|- strict (B [N / x]) ;
 
 
 rule activeAppForallPartial
@@ -4961,6 +5009,14 @@ x : A |- $x #1 : partial B ;
 |- B : type ;
 
 
+rule pi1Halts
+halts (M #1)
+>>
+|- M : partial A ;
+|- halts M ;
+x : A |- halts ($x #1) ;
+
+
 rule pi1HaltsInv
 halts M
 >>
@@ -4971,7 +5027,7 @@ rule activePi1Prod
 M #1 : partial A
 >>
 |- M : partial (prod A B) ;
-|- A <: partial A ;
+|- strict A ;
 
 
 rule activePi1ProdPartial
@@ -4984,7 +5040,7 @@ rule activePi1Exists
 M #1 : partial A
 >>
 |- M : partial (exists {x : A} B) ;
-|- A <: partial A ;
+|- strict A ;
 
 
 rule activePi1ExistsPartial
@@ -5009,6 +5065,14 @@ x : A |- $x #2 : partial B ;
 |- B : type ;
 
 
+rule pi2Halts
+halts (M #2)
+>>
+|- M : partial A ;
+|- halts M ;
+x : A |- halts ($x #2) ;
+
+
 rule pi2HaltsInv
 halts M
 >>
@@ -5019,7 +5083,7 @@ rule activePi2Prod
 M #2 : partial B
 >>
 |- M : partial (prod A B) ;
-|- B <: partial B ;
+|- strict B ;
 
 
 rule activePi2ProdPartial
@@ -5029,10 +5093,48 @@ M #2 : partial B
 |- B : type ;
 
 
+rule prevHalts
+halts (M #prev)
+>>
+|- M : partial A ;
+|- halts M ;
+x : A |- halts ($x #prev) ;
+
+
 rule prevHaltsInv
 halts M
 >>
 |- halts (M #prev) ;
+
+
+rule activeIte
+ite M N P : partial B
+>>
+|- M : partial A ;
+x : A |- ite $x N P : partial B;
+|- B : type ;
+
+
+rule activeIteSeq
+ite M N P = seq M (fn x . ite $x N P) : partial B
+>>
+|- M : partial A ;
+x : A |- ite $x N P : partial B;
+|- B : type ;
+
+
+rule iteHalts
+halts (ite M N P)
+>>
+|- M : partial A ;
+|- halts M ;
+x : A |- halts (ite $x N P) ;
+
+
+rule iteHaltsInv
+halts M
+>>
+|- halts (ite M N P) ;
 
 
 rule activeCase
@@ -5079,7 +5181,7 @@ sequal (seq M (fn x . N)) (N[M' / x])
 (* Totality / Strictness *)
 
 rule totalStrict
-A <: partial A
+strict A
 >>
 |- A : type ;
 x : A |- halts $x ;
@@ -5091,7 +5193,7 @@ total void ext ((), (fn x . ()))
 
 
 rule voidStrict
-void <: partial void
+strict void
 >>
 
 
@@ -5107,7 +5209,7 @@ total unit ext ((), (fn x . ()))
 
 
 rule unitStrict
-unit <: partial unit
+strict unit
 >>
 
 
@@ -5123,7 +5225,7 @@ total bool ext ((), (fn x . ()))
 
 
 rule boolStrict
-bool <: partial bool
+strict bool
 >>
 
 
@@ -5141,7 +5243,7 @@ x : A |- B : type ;
 
 
 rule forallStrict
-forall {x : A} B <: partial (forall {x : A} B)
+strict (forall {x : A} B)
 >>
 |- A : type ;
 x : A |- B : type ;
@@ -5161,7 +5263,7 @@ x : demote A |- B : type ;
 
 
 rule forallfutStrict
-forallfut {x : A} B <: partial (forallfut {x : A} B)
+strict (forallfut {x : A} B)
 >>
 promote |- A : type ;
 x : demote A |- B : type ;
@@ -5181,7 +5283,7 @@ x : A |- B : type ;
 
 
 rule arrowStrict
-arrow A B <: partial (arrow A B)
+strict (arrow A B)
 >>
 |- A : type ;
 |- B : type ;
@@ -5201,7 +5303,7 @@ x : A |- B : type ;
 
 
 rule parametricStrict
-parametric {x : A} B <: partial (parametric {x : A} B)
+strict (parametric {x : A} B)
 >>
 |- A : type ;
 x : A |- B : type ;
@@ -5221,24 +5323,24 @@ x : demote A |- B : type ;
 
 
 rule parametricfutStrict
-parametricfut {x : A} B <: partial (parametricfut {x : A} B)
+strict (parametricfut {x : A} B)
 >>
 promote |- A : type ;
 x : demote A |- B : type ;
 
 
 rule intersectStrict
-intersect {x : A} B <: partial (intersect {x : A} B)
+strict (intersect {x : A} B)
 >>
 |- A ;
-x : A |- B <: partial B ;
+x : A |- strict B ;
 
 
 rule intersectfutStrict
-intersectfut {x : A} B <: partial (intersectfut {x : A} B)
+strict (intersectfut {x : A} B)
 >>
 promote |- A ;
-x : demote A |- B <: partial B ;
+x : demote A |- strict B ;
 
 
 rule existsHalts
@@ -5255,7 +5357,7 @@ x : A |- B : type ;
 
 
 rule existsStrict
-exists {x : A} B <: partial (exists {x : A} B)
+strict (exists {x : A} B)
 >>
 |- A : type ;
 x : A |- B : type ;
@@ -5275,7 +5377,7 @@ total (prod A B) ext ((), (fn x . ()))
 
 
 rule prodStrict
-prod A B <: partial (prod A B)
+strict (prod A B)
 >>
 |- A : type ;
 |- B : type ;
@@ -5295,10 +5397,10 @@ total (dprod A B) ext ((), (fn x . ()))
 
 
 rule dprodStrict
-dprod A B <: partial (dprod A B)
+strict (dprod A B)
 >>
 |- A : type ;
-|- B : type ;
+x : A |- B : type ;
 
 
 rule sumHalts
@@ -5315,7 +5417,7 @@ total (sum A B) ext ((), (fn x . ()))
 
 
 rule sumStrict
-sum A B <: partial (sum A B)
+strict (sum A B)
 >>
 |- A : type ;
 |- B : type ;
@@ -5334,7 +5436,7 @@ promote |- A : type ;
 
 
 rule futureStrict
-future A <: partial (future A)
+strict (future A)
 >>
 promote |- A : type ;
 
@@ -5347,10 +5449,10 @@ x : A |- B : type ;
 
 
 rule setStrict
-set {x : A} B <: partial (set {x : A} B)
+strict (set {x : A} B)
 >>
 x : A |- B : type ;
-|- A <: partial A ;
+|- strict A ;
 
 
 rule isetTotal
@@ -5361,10 +5463,10 @@ x : A |- B : type ;
 
 
 rule isetStrict
-iset {x : A} B <: partial (iset {x : A} B)
+strict (iset {x : A} B)
 >>
 x : A |- B : type ;
-|- A <: partial A ;
+|- strict A ;
 
 
 rule quotientTotal
@@ -5387,7 +5489,7 @@ total nat ext ((), (fn x . ()))
 
 
 rule natStrict
-nat <: partial nat
+strict nat
 >>
 
 
@@ -5404,7 +5506,7 @@ total Ui ext ((), (fn x . ()))
 
 
 rule univStrict
-Ui <: partial Ui
+strict Ui
 >>
 |- I : level ;
 
@@ -5515,7 +5617,7 @@ rule arrowUptype
 uptype (arrow A B)
 >>
 |- A : type ;
-|- uptype B ;
+x : A |- uptype B ;
 
 
 rule intersectUptype
@@ -5597,6 +5699,12 @@ uptype (A <: B)
 >>
 |- A : type ;
 |- B : type ;
+
+
+rule haltsUptype
+uptype (halts M)
+>>
+|- halts M : type ;
 
 
 rule setUptype
@@ -5754,7 +5862,7 @@ rule arrowAdmiss
 admiss (arrow A B)
 >>
 |- A : type ;
-|- admiss B ;
+x : A |- admiss B ;
 
 
 rule intersectAdmiss
@@ -5790,6 +5898,13 @@ admiss (dprod A B)
 >>
 |- uptype A ;
 x : A |- admiss B ;
+
+
+rule existsAdmiss
+admiss (exists {x : A} B)
+>>
+|- admiss A ;
+|- padmiss {x : A} B ;
 
 
 rule sumAdmiss
@@ -5838,6 +5953,22 @@ admiss (A <: B)
 |- B : type ;
 
 
+rule setAdmiss
+admiss (set {x : A} B)
+>>
+|- admiss A ;
+|- padmiss {x : A} B ;
+x : A, y : hide B |- B ;
+
+
+rule isetAdmiss
+admiss (iset {x : A} B)
+>>
+|- admiss A ;
+|- padmiss {x : A} B ;
+x : A, y : hide B |- B ;
+
+
 rule recAdmiss
 admiss (rec (fn t . A))
 >>
@@ -5864,6 +5995,114 @@ A : type
 |- admiss A : type ;
 
 
+
+(* Predicate admissibility *)
+
+rule padmissForm
+padmiss {x : A} B : type
+>>
+|- A : type ;
+x : A |- B : type ;
+
+
+rule padmissEq
+padmiss {x : A} B = padmiss {x : A'} B' : type
+>>
+|- A = A' : type ;
+x : A |- B = B' : type ;
+
+
+rule padmissFormUniv
+padmiss {x : A} B : Ui
+>>
+|- A : Ui ;
+x : A |- B : Ui ;
+
+
+rule padmissEqUniv
+padmiss {x : A} B = padmiss {x : A'} B' : Ui
+>>
+|- A = A' : Ui ;
+x : A |- B = B' : Ui ;
+
+
+rule padmissTrivialize
+padmiss {x : A} B ext ()
+>>
+|- padmiss {x : A} B ;
+
+
+rule padmissExt
+M = N : padmiss {x : A} B
+>>
+|- M : padmiss {x : A} B ;
+|- N : padmiss {x : A} B ;
+
+
+lrule padmissLeft
+x : (padmiss {x : A} B) ... |- C ext M
+>>
+...[() / x] |- C [() / x] ext M;
+
+
+rule padmissEeqtp
+padmiss {x : A'} B'
+>>
+|- padmiss {x : A} B ;
+|- eeqtp A A' ;
+x : A |- eeqtp B B' ;
+
+
+rule padmissClosed
+padmiss {x : A} B
+>>
+|- A : type ;
+|- admiss B ;
+
+
+rule forallPadmissDomainClosed
+padmiss {x : A} (forall {y : B} C)
+>>
+|- A : type ;
+|- B : type ;
+y : B |- padmiss {x : A} C ;
+
+
+rule arrowPadmissDomainClosed
+padmiss {x : A} (arrow B C)
+>>
+|- A : type ;
+|- B : type ;
+y : B |- padmiss {x : A} C ;
+
+
+rule arrowPadmissDomainHalts
+padmiss {x : A} (arrow (halts M) C)
+>>
+|- padmiss {x : A} C ;
+x : A |- M : partial B ;
+
+
+rule prodPadmiss
+padmiss {x : A} (prod B C)
+>>
+|- padmiss {x : A} B ;
+|- padmiss {x : A} C ;
+
+
+rule padmissFormInv1
+A : type
+>>
+|- padmiss {x : A} B : type ;
+
+
+rule padmissFormInv2
+B [M / x] : type
+>>
+|- padmiss {x : A} B : type ;
+|- M : A ;
+
+
 rule partialType
 partial : intersect {i : level} (arrow (univ $i) (univ $i))
 >>
@@ -5881,6 +6120,11 @@ admiss : intersect {i : level} (arrow (univ $i) (univ $i))
 
 rule uptypeType
 uptype : intersect {i : level} (arrow (univ $i) (univ $i))
+>>
+
+
+rule padmissType
+padmiss : intersect {i : level} (forall {a : (univ $i)} (arrow (arrow $a (univ $i)) (univ $i)))
 >>
 
 
@@ -6432,7 +6676,7 @@ halts M
 
 
 axiom integerStrict
-integer <: partial integer
+strict integer
 >>
 
 
@@ -6501,7 +6745,7 @@ halts M
 
 
 axiom symbolStrict
-symbol <: partial symbol
+strict symbol
 >>
 
 

@@ -1726,6 +1726,17 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr G (deq m m' (tarrow (partial a) (partial a)))
       -> tr G (deq (app theta m) (app theta m') (partial a))
   
+| tr_fixpoint_induction_shift :
+    forall G a b f g h,
+      tr G (deq triv triv (admiss a))
+      -> tr G (deq triv triv (admiss b))
+      -> tr G (deq f f (tarrow (partial a) (partial a)))
+      -> tr G (deq g g (tarrow (partial b) (partial b)))
+      -> tr G (deq h h (tarrow (partial a) (partial b)))
+      -> tr G (deq (lam triv) (lam triv) (tarrow (halts (app h bottom)) voidtp))
+      -> tr (cons (hyp_tm (partial a)) G) (deq (app (subst sh1 h) (app (subst sh1 f) (var 0))) (app (subst sh1 g) (app (subst sh1 h) (var 0))) (partial (subst sh1 b)))
+      -> tr G (deq (app h (app theta f)) (app theta g) (partial b))
+
 | tr_partial_formation_invert :
     forall G a b,
       tr G (deqtype (partial a) (partial b))
@@ -1983,6 +1994,12 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr (cons (hyp_tm a) G) (deq triv triv (admiss b))
       -> tr G (deq triv triv (admiss (sigma a b)))
   
+| tr_sigma_admiss :
+    forall G a b,
+      tr G (deq triv triv (admiss a))
+      -> tr G (deq triv triv (padmiss a b))
+      -> tr G (deq triv triv (admiss (sigma a b)))
+
 | tr_fut_admiss :
     forall G a,
       tr (promote G) (deq triv triv (admiss a))
@@ -2000,8 +2017,90 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr (hyp_tml (admiss (var 0)) :: hyp_tml (univ lv) :: G) (deq triv triv (admiss (subst sh1 a)))
       -> tr G (deq triv triv (admiss (rec a)))
 
+| tr_set_admiss :
+    forall G a b m n,
+      tr G (deq triv triv (admiss a))
+      -> tr G (deq triv triv (padmiss a b))
+      -> tr (cons (hyp_tm b) (cons (hyp_tm a) G)) (deq (subst sh1 m) (subst sh1 n) (subst sh1 b))
+      -> tr G (deq triv triv (admiss (set a b)))
+
+| tr_iset_admiss :
+    forall G a b m n,
+      tr G (deq triv triv (admiss a))
+      -> tr G (deq triv triv (padmiss a b))
+      -> tr (cons (hyp_tm b) (cons (hyp_tm a) G)) (deq (subst sh1 m) (subst sh1 n) (subst sh1 b))
+      -> tr G (deq triv triv (admiss (iset a b)))
+
 | tr_admiss_formation_invert :
     forall G a b,
       tr G (deqtype (admiss a) (admiss b))
       -> tr G (deqtype a b)
+
+(* Predicate admissibility *)
+
+| tr_padmiss_formation :
+    forall G a a' b b',
+      tr G (deqtype a a')
+      -> tr (hyp_tm a :: G) (deqtype b b')
+      -> tr G (deqtype (padmiss a b) (padmiss a' b'))
+
+| tr_padmiss_formation_univ :
+    forall G lv a a' b b',
+      tr G (deq a a' (univ lv))
+      -> tr (cons (hyp_tm a) G) (deq b b' (univ (subst sh1 lv)))
+      -> tr G (deq (padmiss a b) (padmiss a' b') (univ lv))
+
+| tr_padmiss_eta :
+    forall G a b p,
+      tr G (deq p p (padmiss a b))
+      -> tr G (deq p triv (padmiss a b))
+
+| tr_padmiss_eta_hyp :
+    forall G1 G2 a b m n c,
+      tr (substctx (dot triv id) G2 ++ G1) (deq m n (subst (under (length G2) (dot triv id)) c))
+      -> tr (G2 ++ hyp_tm (padmiss a b) :: G1) (deq (subst (under (length G2) sh1) m) (subst (under (length G2) sh1) n) c)
+
+| tr_padmiss_eeqtp :
+    forall G a a' b b',
+      tr G (dsubtype a a')
+      -> tr G (dsubtype a' a)
+      -> tr (cons (hyp_tm a) G) (dsubtype b b')
+      -> tr (cons (hyp_tm a) G) (dsubtype b' b)
+      -> tr G (deq triv triv (padmiss a b))
+      -> tr G (deq triv triv (padmiss a' b'))
+
+| tr_padmiss_closed :
+    forall G a b,
+      tr G (deqtype a a)
+      -> tr G (deq triv triv (admiss b))
+      -> tr G (deq triv triv (padmiss a (subst sh1 b)))
+
+| tr_pi_padmiss_domain_closed :
+    forall G a b c,
+      tr G (deqtype a a)
+      -> tr G (deqtype b b)
+      -> tr (hyp_tm b :: G) (deq triv triv (padmiss (subst sh1 a) (subst (dot (var 1) (dot (var 0) (sh 2))) c)))
+      -> tr G (deq triv triv (padmiss a (pi (subst sh1 b) c)))
+  
+| tr_tarrow_padmiss_domain_halts :
+    forall G a m b c,
+      tr G (deq triv triv (padmiss a c))
+      -> tr (hyp_tm a :: G) (deq m m (partial b))
+      -> tr G (deq triv triv (padmiss a (tarrow (halts m) c)))
+  
+| tr_prod_padmiss :
+    forall G a b c,
+      tr G (deq triv triv (padmiss a b))
+      -> tr G (deq triv triv (padmiss a c))
+      -> tr G (deq triv triv (padmiss a (prod b c)))
+  
+| tr_padmiss_formation_invert1 :
+    forall G a a' b b',
+      tr G (deqtype (padmiss a b) (padmiss a' b'))
+      -> tr G (deqtype a a')
+  
+| tr_padmiss_formation_invert2 :
+    forall G a a' b b',
+      tr G (deqtype (padmiss a b) (padmiss a' b'))
+      -> tr (cons (hyp_tm a) G) (deqtype b b')
 .

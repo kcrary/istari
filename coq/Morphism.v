@@ -535,6 +535,17 @@ reflexivity.
 Qed.
 
 
+Add Parametric Morphism object : (@padmiss object)
+  with signature equiv ==> equiv ==> equiv
+  as equiv_padmiss.
+Proof.
+intros m1 m1' H1 m2 m2' H2.
+unfold padmiss.
+rewrite H1, H2.
+reflexivity.
+Qed.
+
+
 Add Parametric Morphism object : (@partial object)
   with signature equiv ==> equiv
   as equiv_partial.

@@ -1197,6 +1197,16 @@ so (proof_irrelevance _ h h'); subst h'.
 reflexivity.
 }
 
+(* padmiss *)
+{
+intros pg s i a b A B _ IH1 _ IH2 X HX.
+invertc HX.
+intros A' B' Ha Hb <-.
+so (IH1 _ Ha); subst A'.
+so (IH2 _ Hb); subst B'.
+reflexivity.
+}
+
 (* kbasic *)
 {
 intros pg s i k l K _ Hsteps Hl IH X HX.

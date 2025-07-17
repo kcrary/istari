@@ -1,0 +1,207 @@
+
+openModule /Option/;
+openModule /Partial/;
+
+
+
+definerec /div2 n/
+/
+  nat_case n
+    (Some 0)
+    (fn n' . nat_case n' None (fn n'' . map succ (div2 n'')))
+//
+  nat -> option nat
+/;
+
+introOf /n/.
+sinduction /n/.
+reintro /IH/.
+unroll /div2/.
+destruct /n/ /|(| n)/ >> reduce // >> typecheck.
+apply /IH/.
+omega.
+qed ();
+
+
+
+definerec /hailstone n/
+/
+  if n <=? 1 then
+    0
+  else
+    (case div2 n : option of
+     | Some m . 
+         hailstone m
+
+     | None .
+         seq x = hailstone (n * 3 + 1)
+         in
+           succ x)
+//
+  nat -> partial nat
+/;
+
+typecheckFixpoint.
+typecheck.
+qed ();
+
+
+
+typedef
+/
+  datatype
+    intersect (i : level) .
+    U i
+  of
+    hailstonerel : nat -> nat -> type =
+    | Stop : forall n . n <= 1 -> hailstonerel n 0
+
+    | Down : 
+        forall n n' x . 
+          1 < n
+          -> div2 n = Some n' : option nat
+          -> hailstonerel n' x 
+          -> hailstonerel n x
+
+    | Up :
+        forall n x .
+          1 < n
+          -> div2 n = None : option nat
+          -> hailstonerel (n * 3 + 1) x
+          -> hailstonerel n (succ x)
+/;
+
+establishUptype /hailstonerel/;
+
+
+
+lemma "hailstone_complete"
+/
+  forall n x .
+    hailstonerel n x
+    -> hailstone n = x : partial nat
+/;
+
+inference.
+intro /n x Hrel/.
+induction /Hrel/.
+
+(* stop *)
+{
+intro /n Hn/.
+unroll /hailstone/.
+boolEq true /n <=? 1/ >> auto.
+}
+
+(* down *)
+{
+intro /n n' x Hnsmall Hdiv _ IH/.
+unroll /hailstone/.
+boolEq false /n <=? 1/ >>> [omega, idtac].
+rewrite /-> Hdiv/.
+reduce //.
+rewrite /-> IH/.
+reflexivity.
+}
+
+(* up *)
+{
+intro /n x Hnsmall Hdiv _ IH/.
+unroll /hailstone/.
+boolEq false /n <=? 1/ >>> [omega, idtac].
+rewrite /-> Hdiv/.
+reduce //.
+rewrite /-> IH/.
+reduceSeq /concl/ >> auto.
+totality.
+}
+qed ();
+
+
+
+lemma "hailstone_sound"
+/
+  forall n .
+    halts (hailstone n)
+    -> hailstonerel n (outpar (hailstone n))
+/;
+
+inference.
+assert /forall n . halts (hailstone n) -> halts (hailstone n) -> hailstonerel n (outpar (hailstone n))/ /Hprop/ >>> [inference, idtac].
+1:{
+  intro /n H/.
+  apply /Hprop/ >> auto.
+  }
+abstractOverAt /hailstone/ /concl/ /0/.
+fixpointInduction /nat -> partial nat/ >> reduce /concl/.
+
+(* base *)
+{
+intro /f Hif n Hhalt Hhalthail/.
+apply /Hif/ >> auto.
+termination /Hhalt/.
+auto.
+}
+
+(* inductive *)
+{
+intro /f IH n/.
+unroll /hailstone at 1 0/.
+boolCase /n <=? 1/ /Hstop/.
+  {
+  intro /_ _/.
+  unfold /outpar/.
+  apply /Stop/ >> auto.
+  }
+remember' /div2 n/ /_/ /x/ /Heq/.
+destruct /x/ /{| m}/ >> reduce //.
+  {
+  intro /Hhalt Hhalthail/.
+  termination /Hhalt/.
+  reintro /Hhalt'/.
+  termination /Hhalthail/.
+  reintro /Hhalthail'/.
+  reduceSeq /concl/ >> auto.
+  unfold /outpar/.
+  fold /outpar (hailstone _)/.
+  apply /Up/ >>> [omega, auto, idtac].
+  apply /IH/ >> auto.
+  }
+
+  {
+  intro /Hhalt Hhalthail/.
+  apply /Down/ >> auto.
+  omega.
+  }
+}
+qed ();
+
+
+
+(* already exists under the name hailstonerel_uptype *)
+lemma "hailstonerel_upward_closure"
+/
+  forall m n . uptype (hailstonerel m n)
+/;
+
+inference.
+intro /m n/.
+apply /hailstonerel_uptype_condition/.
+splitn 3 >> auto.
+  {
+  (* just for illustration *)
+  RuleTactic.existsUptype.
+    {
+    Partiality.proveAdmiss.
+    }
+  Partiality.proveAdmiss.
+  }
+  
+  {
+  Partiality.proveAdmiss.
+  }
+  
+  {
+  Partiality.proveAdmiss.
+  }
+qed ();

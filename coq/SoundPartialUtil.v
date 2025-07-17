@@ -206,6 +206,82 @@ split.
 Qed.
 
 
+Lemma seq_padmiss :
+  forall G a b,
+    seq G (deq triv triv (padmiss a b))
+    <->
+    (forall i s s',
+       pwctx i s s' G
+       -> exists A B,
+            interp toppg true i (subst s a) A
+            /\ interp toppg false i (subst s' a) A
+            /\ functional the_system toppg true i (den A) (subst (under 1 s) b) B
+            /\ functional the_system toppg false i (den A) (subst (under 1 s') b) B
+            /\ padmissible stop (ceiling (S i) (den A)) (nearrow_compose2 (embed_ceiling_ne (S i) (den A)) (nearrow_compose (ceiling_ne (S i)) den_ne) B)).
+Proof.
+intros G a b.
+rewrite -> seq_deq.
+split.
+  {
+  intros Hseq i s s' Hs.
+  so (Hseq _#3 Hs) as (R & Hl & Hr & H & _).
+  simpsubin Hl.
+  simpsubin Hr.
+  invert (basic_value_inv _#6 value_padmiss Hl).
+  intros A B Hal Hbl Heql.
+  invert (basic_value_inv _#6 value_padmiss Hr).
+  intros A' B' Har Hbr Heqr.
+  so (iupadmiss_inj _#6 (eqtrans Heql (eqsymm Heqr))) as Heq.
+  injectionT Heq.
+  intros <-.
+  injectionT Heq.
+  intros <-.
+  clear Heqr.
+  subst R.
+  exists A, B.
+  do2 4 split; auto.
+  cbn in H.
+  decompose H.
+  intros H _ _ _ _ _.
+  decompose H.
+  intro H.
+  exact H.
+  }
+
+  {
+  intros Hseq i s s' Hs.
+  so (Hseq _#3 Hs) as (A & B & Hal & Har & Hbl & Hbr & H).
+  exists (iupadmiss stop i A B).
+  simpsub.
+  do2 4 split.
+    {
+    apply interp_eval_refl.
+    apply interp_padmiss; auto.
+    }
+
+    {
+    apply interp_eval_refl.
+    apply interp_padmiss; auto.
+    }
+
+    {
+    cbn.
+    do2 5 split; auto using star_refl; prove_hygiene.
+    }
+
+    {
+    cbn.
+    do2 5 split; auto using star_refl; prove_hygiene.
+    }
+
+    {
+    cbn.
+    do2 5 split; auto using star_refl; prove_hygiene.
+    }
+  }
+Qed.
+
+
 Lemma seq_uptype :
   forall G a,
     seq G (deq triv triv (uptype a))

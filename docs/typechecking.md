@@ -135,8 +135,8 @@ A typecheckable proposition has one of the following forms:
 The typechecker seeks to prove typecheckable propositions.  In
 addition, the typechecker will attempt to discharge level constraints
 (`i <l= j`), positivity requirements for inductive types 
-(`positive (fn t . A)`), and totality requirements for partial types
-(`total A`).
+(`positive (fn t . A)`), and totality and strictness requirements for
+partial types.
 
 The algorithm proceeds as follows:
 
@@ -234,8 +234,8 @@ For goals of the form `A <: B`, put `A` and `B` in
    algorithm" when possible.  This usually performs well in practice,
    but occasionally it can have unpredictable results.
 
-4. Attempt to unify B with partial A.  If successful, prove
-   `A <: partial A` using a strictness rule.
+4. Attempt to unify B with partial A.  If successful, restate the goal
+   as `strict A`.
 
 5. If the goal is an instance of a hypothesis, use it.
 

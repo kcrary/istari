@@ -5036,6 +5036,14 @@ Syntactic equality is intended for internal use only.
       G |- iff (halts M) (halts N)
       G, (halts M) |- eq A[^1] M[^1] N[^1]
 
+- `partialOfExt A B M`
+
+      G |- of (partial A) M
+      >>
+      G |- istp A
+      G |- of (partial B) M
+      G, (halts M) |- of A[^1] M[^1]
+
 - `partialElimEq A M N`
 
       G |- eq A M N
@@ -5048,6 +5056,12 @@ Syntactic equality is intended for internal use only.
       G |- of A M
       >>
       G |- of (partial A) M
+      G |- halts M
+
+- `haltsIntro M`
+
+      G |- of (halts M) ()
+      >>
       G |- halts M
 
 - `haltsTrivialize M`
@@ -5075,6 +5089,12 @@ Syntactic equality is intended for internal use only.
       >>
       (where M is valuable)
 
+- `partialElimHalts A M N`
+
+      G |- iff (halts M) (halts N) ext (fn . () , fn . ())
+      >>
+      G |- eq (partial A) M N
+
 - `fixpointInductionEq A M N`
 
       G |- eq (partial A) (fix M) (fix N)
@@ -5088,6 +5108,18 @@ Syntactic equality is intended for internal use only.
       >>
       G |- of (arrow (partial A) (partial A)) M
       G |- admiss A
+
+- `fixpointInductionShift A B M N P`
+
+      G |- eq (partial B) (P (fix M)) (fix N)
+      >>
+      G |- admiss A
+      G |- admiss B
+      G |- of (arrow (partial A) (partial A)) M
+      G |- of (arrow (partial B) (partial B)) N
+      G |- of (arrow (partial A) (partial B)) P
+      G |- arrow (halts (P bottom)) void
+      G, (partial A) |- eq (partial B[^1]) (P[^1] (M[^1] 0)) (N[^1] (P[^1] 0))
 
 - `partialFormInv A`
 
@@ -5111,6 +5143,14 @@ Syntactic equality is intended for internal use only.
       G, A |- of (partial B[^1]) N
       G |- istp B
 
+- `seqHalts A M N`
+
+      G |- halts (seq M (fn . N))
+      >>
+      G |- of (partial A) M
+      G |- halts M
+      G, A |- halts N
+
 - `activeApp A B M N`
 
       G |- of (partial B) (M N)
@@ -5126,6 +5166,14 @@ Syntactic equality is intended for internal use only.
       G |- of (partial A) M
       G, A |- of (partial B[^1]) (0 N[^1])
       G |- istp B
+
+- `appHalts A M N`
+
+      G |- halts (M N)
+      >>
+      G |- of (partial A) M
+      G |- halts M
+      G, A |- halts (0 N[^1])
 
 - `appHaltsInv M N`
 
@@ -5179,6 +5227,14 @@ Syntactic equality is intended for internal use only.
       G, A |- of (partial B[^1]) (0 #1)
       G |- istp B
 
+- `pi1Halts A M`
+
+      G |- halts (M #1)
+      >>
+      G |- of (partial A) M
+      G |- halts M
+      G, A |- halts (0 #1)
+
 - `pi1HaltsInv M`
 
       G |- halts M
@@ -5227,6 +5283,14 @@ Syntactic equality is intended for internal use only.
       G, A |- of (partial B[^1]) (0 #2)
       G |- istp B
 
+- `pi2Halts A M`
+
+      G |- halts (M #2)
+      >>
+      G |- of (partial A) M
+      G |- halts M
+      G, A |- halts (0 #2)
+
 - `pi2HaltsInv M`
 
       G |- halts M
@@ -5247,11 +5311,49 @@ Syntactic equality is intended for internal use only.
       G |- of (partial (prod A (partial B))) M
       G |- istp B
 
+- `prevHalts A M`
+
+      G |- halts (M #prev)
+      >>
+      G |- of (partial A) M
+      G |- halts M
+      G, A |- halts (0 #prev)
+
 - `prevHaltsInv M`
 
       G |- halts M
       >>
       G |- halts (M #prev)
+
+- `activeIte A B M N P`
+
+      G |- of (partial B) (ite M N P)
+      >>
+      G |- of (partial A) M
+      G, A |- of (partial B[^1]) (ite 0 N[^1] P[^1])
+      G |- istp B
+
+- `activeIteSeq A B M N P`
+
+      G |- eq (partial B) (ite M N P) (seq M (fn . ite 0 N[^1] P[^1]))
+      >>
+      G |- of (partial A) M
+      G, A |- of (partial B[^1]) (ite 0 N[^1] P[^1])
+      G |- istp B
+
+- `iteHalts A M N P`
+
+      G |- halts (ite M N P)
+      >>
+      G |- of (partial A) M
+      G |- halts M
+      G, A |- halts (ite 0 N[^1] P[^1])
+
+- `iteHaltsInv M N P`
+
+      G |- halts M
+      >>
+      G |- halts (ite M N P)
 
 - `activeCase A B M P R`
 
@@ -5719,7 +5821,7 @@ Syntactic equality is intended for internal use only.
       G |- uptype (arrow A B)
       >>
       G |- istp A
-      G |- uptype B
+      G, A |- uptype B[^1]
 
 - `intersectUptype A B`
 
@@ -5801,6 +5903,12 @@ Syntactic equality is intended for internal use only.
       >>
       G |- istp A
       G |- istp B
+
+- `haltsUptype M`
+
+      G |- uptype (halts M)
+      >>
+      G |- istp (halts M)
 
 - `setUptype A B`
 
@@ -5951,7 +6059,7 @@ Syntactic equality is intended for internal use only.
       G |- admiss (arrow A B)
       >>
       G |- istp A
-      G |- admiss B
+      G, A |- admiss B[^1]
 
 - `intersectAdmiss A B`
 
@@ -5987,6 +6095,13 @@ Syntactic equality is intended for internal use only.
       >>
       G |- uptype A
       G, A |- admiss B[^1]
+
+- `existsAdmiss A B`
+
+      G |- admiss (exists A (fn . B))
+      >>
+      G |- admiss A
+      G |- padmiss A (fn . B)
 
 - `sumAdmiss A B`
 
@@ -6034,6 +6149,22 @@ Syntactic equality is intended for internal use only.
       G |- istp A
       G |- istp B
 
+- `setAdmiss A B`
+
+      G |- admiss (set A (fn . B))
+      >>
+      G |- admiss A
+      G |- padmiss A (fn . B)
+      G, A, (hidden) B |- B[^1]
+
+- `isetAdmiss A B`
+
+      G |- admiss (iset A (fn . B))
+      >>
+      G |- admiss A
+      G |- padmiss A (fn . B)
+      G, A, (hidden) B |- B[^1]
+
 - `recAdmiss A`
 
       G |- admiss (rec (fn . A))
@@ -6058,6 +6189,111 @@ Syntactic equality is intended for internal use only.
       G |- istp A
       >>
       G |- istp (admiss A)
+
+- `padmissForm A B`
+
+      G |- istp (padmiss A (fn . B))
+      >>
+      G |- istp A
+      G, A |- istp B
+
+- `padmissEq A A' B B'`
+
+      G |- eqtp (padmiss A (fn . B)) (padmiss A' (fn . B'))
+      >>
+      G |- eqtp A A'
+      G, A |- eqtp B B'
+
+- `padmissFormUniv A B I`
+
+      G |- of (univ I) (padmiss A (fn . B))
+      >>
+      G |- of (univ I) A
+      G, A |- of (univ I[^1]) B
+
+- `padmissEqUniv A A' B B' I`
+
+      G |- eq (univ I) (padmiss A (fn . B)) (padmiss A' (fn . B'))
+      >>
+      G |- eq (univ I) A A'
+      G, A |- eq (univ I[^1]) B B'
+
+- `padmissTrivialize A B`
+
+      G |- padmiss A (fn . B)
+      >>
+      G |- padmiss A (fn . B)
+
+- `padmissExt A B M N`
+
+      G |- eq (padmiss A (fn . B)) M N
+      >>
+      G |- of (padmiss A (fn . B)) M
+      G |- of (padmiss A (fn . B)) N
+
+- `padmissLeft n A B C`
+
+      G1, (padmiss A (fn . B)), G2 |- C ext M[under_n (^1)]
+      >>
+      G1, G2[() . id] |- C[under_n (() . id)] ext M
+
+- `padmissEeqtp A A' B B'`
+
+      G |- padmiss A' (fn . B')
+      >>
+      G |- padmiss A (fn . B)
+      G |- eeqtp A A'
+      G, A |- eeqtp B B'
+
+- `padmissClosed A B`
+
+      G |- padmiss A (fn . B[^1])
+      >>
+      G |- istp A
+      G |- admiss B
+
+- `forallPadmissDomainClosed A B C`
+
+      G |- padmiss A (fn . forall B[^1] (fn . C))
+      >>
+      G |- istp A
+      G |- istp B
+      G, B |- padmiss A[^1] (fn . C[1 . 0 . ^2])
+
+- `arrowPadmissDomainClosed A B C`
+
+      G |- padmiss A (fn . arrow B[^1] C)
+      >>
+      G |- istp A
+      G |- istp B
+      G, B |- padmiss A[^1] (fn . C[0 . ^2])
+
+- `arrowPadmissDomainHalts A B C M`
+
+      G |- padmiss A (fn . arrow (halts M) C)
+      >>
+      G |- padmiss A (fn . C)
+      G, A |- of (partial B) M
+
+- `prodPadmiss A B C`
+
+      G |- padmiss A (fn . prod B C)
+      >>
+      G |- padmiss A (fn . B)
+      G |- padmiss A (fn . C)
+
+- `padmissFormInv1 A B`
+
+      G |- istp A
+      >>
+      G |- istp (padmiss A (fn . B))
+
+- `padmissFormInv2 A B M`
+
+      G |- istp B[M . id]
+      >>
+      G |- istp (padmiss A (fn . B))
+      G |- of A M
 
 - `partialType`
 

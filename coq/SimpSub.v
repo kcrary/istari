@@ -481,6 +481,13 @@ prove_subst.
 Qed.
 
 
+Lemma subst_padmiss :
+  forall (s : @sub object) m1 m2, subst s (padmiss m1 m2) = padmiss (subst s m1) (subst (under 1 s) m2).
+Proof.
+prove_subst.
+Qed.
+
+
 Lemma subst_halts :
   forall (s : @sub object) m, subst s (halts m) = halts (subst s m).
 Proof.
@@ -523,7 +530,7 @@ prove_subst.
 Qed.
 
 
-Hint Rewrite subst_univ subst_cty subst_con subst_karrow subst_tarrow subst_pi subst_clam subst_capp subst_ctlam subst_ctapp subst_lam subst_app subst_intersect subst_union subst_constfn subst_fut subst_semifut subst_cnext subst_cprev subst_next subst_prev subst_rec subst_equal subst_triv subst_eqtype subst_sequal subst_subtype subst_kind subst_all subst_alltp subst_exist subst_mu subst_ispositive subst_isnegative subst_voidtp subst_unittp subst_cunit subst_booltp subst_btrue subst_bfalse subst_bite subst_prod subst_sigma subst_cpair subst_cpi1 subst_cpi2 subst_ppair subst_ppi1 subst_ppi2 subst_set subst_iset subst_quotient subst_guard subst_coguard subst_wt subst_partial subst_halts subst_admiss subst_uptype subst_seq subst_ext subst_extt subst_marker : subst.
+Hint Rewrite subst_univ subst_cty subst_con subst_karrow subst_tarrow subst_pi subst_clam subst_capp subst_ctlam subst_ctapp subst_lam subst_app subst_intersect subst_union subst_constfn subst_fut subst_semifut subst_cnext subst_cprev subst_next subst_prev subst_rec subst_equal subst_triv subst_eqtype subst_sequal subst_subtype subst_kind subst_all subst_alltp subst_exist subst_mu subst_ispositive subst_isnegative subst_voidtp subst_unittp subst_cunit subst_booltp subst_btrue subst_bfalse subst_bite subst_prod subst_sigma subst_cpair subst_cpi1 subst_cpi2 subst_ppair subst_ppi1 subst_ppi2 subst_set subst_iset subst_quotient subst_guard subst_coguard subst_wt subst_partial subst_halts subst_admiss subst_padmiss subst_uptype subst_seq subst_ext subst_extt subst_marker : subst.
 
 
 Definition substh s (h : @hyp object) :=
@@ -841,7 +848,7 @@ Arguments substctx {object}.
 Hint Rewrite subst_oper substr_nil substr_cons : subst.
 Hint Rewrite <- substr_compose : subst.
 
-Hint Rewrite subst_univ subst_cty subst_con subst_karrow subst_tarrow subst_pi subst_clam subst_capp subst_ctlam subst_ctapp subst_lam subst_app subst_intersect subst_union subst_constfn subst_fut subst_semifut subst_cnext subst_cprev subst_next subst_prev subst_rec subst_equal subst_triv subst_eqtype subst_sequal subst_subtype subst_kind subst_all subst_alltp subst_exist subst_mu subst_ispositive subst_isnegative subst_voidtp subst_unittp subst_cunit subst_booltp subst_btrue subst_bfalse subst_bite subst_prod subst_sigma subst_cpair subst_cpi1 subst_cpi2 subst_ppair subst_ppi1 subst_ppi2 subst_set subst_iset subst_quotient subst_guard subst_coguard subst_wt subst_partial subst_halts subst_admiss subst_uptype subst_seq subst_ext subst_extt subst_marker : subst.
+Hint Rewrite subst_univ subst_cty subst_con subst_karrow subst_tarrow subst_pi subst_clam subst_capp subst_ctlam subst_ctapp subst_lam subst_app subst_intersect subst_union subst_constfn subst_fut subst_semifut subst_cnext subst_cprev subst_next subst_prev subst_rec subst_equal subst_triv subst_eqtype subst_sequal subst_subtype subst_kind subst_all subst_alltp subst_exist subst_mu subst_ispositive subst_isnegative subst_voidtp subst_unittp subst_cunit subst_booltp subst_btrue subst_bfalse subst_bite subst_prod subst_sigma subst_cpair subst_cpi1 subst_cpi2 subst_ppair subst_ppi1 subst_ppi2 subst_set subst_iset subst_quotient subst_guard subst_coguard subst_wt subst_partial subst_halts subst_admiss subst_padmiss subst_uptype subst_seq subst_ext subst_extt subst_marker : subst.
 
 Hint Rewrite substh_tpl substh_tp substh_tml substh_tm substh_emp : subst.
 

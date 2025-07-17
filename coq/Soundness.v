@@ -307,6 +307,7 @@ intros; eapply sound_halts_eta; eauto; done.
 intros; eapply sound_halts_eta_hyp; eauto; done.
 intros; eapply sound_halts_value; eauto; done.
 intros; eapply sound_fixpoint_induction; eauto; done.
+intros G a b f g h; intros; apply (sound_fixpoint_induction_shift G a b f g h); auto.
 intros; eapply sound_partial_formation_invert; eauto; done.
 intros; eapply sound_seq_bind; eauto; done.
 intros; eapply sound_seq_active; eauto; done.
@@ -351,10 +352,24 @@ intros; eapply sound_pi_admiss; eauto; done.
 intros; eapply sound_intersect_admiss; eauto; done.
 intros; eapply sound_prod_admiss; eauto; done.
 intros; eapply sound_sigma_uptype_admiss; eauto; done.
+intros; eapply sound_sigma_admiss; eauto; done.
 intros; eapply sound_fut_admiss; eauto; done.
 intros; eapply sound_rec_admiss; eauto; done.
 intros; eapply sound_rec_admiss_univ; eauto; done.
+intros; eapply sound_set_admiss; eauto; done.
+intros; eapply sound_iset_admiss; eauto; done.
 intros; eapply sound_admiss_formation_invert; eauto; done.
+intros; eapply sound_padmiss_formation; eauto; done.
+intros; eapply sound_padmiss_formation_univ; eauto; done.
+intros; eapply sound_padmiss_eta; eauto; done.
+intros; eapply sound_padmiss_eta_hyp; eauto; done.
+intros; eapply sound_padmiss_eeqtp; eauto; done.
+intros; eapply sound_padmiss_closed; eauto; done.
+intros; eapply sound_pi_padmiss_domain_closed; eauto; done.
+intros; eapply sound_tarrow_padmiss_domain_halts; eauto; done.
+intros; eapply sound_prod_padmiss; eauto; done.
+intros; eapply sound_padmiss_formation_invert1; eauto; done.
+intros; eapply sound_padmiss_formation_invert2; eauto; done.
 Qed.
 
 

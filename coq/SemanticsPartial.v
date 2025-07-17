@@ -414,9 +414,37 @@ Definition admissible w (A : wurel w) : Prop :=
     -> rel A i (subst1 (app theta f) m) (subst1 (app theta g) p).
 
 
+Definition padmissible w (A : wurel w) (B : urelsp A -n> wurel_ofe w) : Prop :=
+  forall f g i m p b c j (H : rel A i (subst1 (app theta f) b) (subst1 (app theta g) c)),
+    hygiene clo f
+    -> hygiene clo g
+    -> hygiene (permit clo) m
+    -> hygiene (permit clo) p
+    -> hygiene (permit clo) b
+    -> hygiene (permit clo) c
+    -> (forall k, 
+          j <= k
+          -> exists (Hk : rel A i (subst1 (afix k f) b) (subst1 (afix k g) c)),
+               rel 
+                 (pi1 B (urelspinj A i (subst1 (afix k f) b) (subst1 (afix k g) c) Hk))
+                 i
+                 (subst1 (afix k f) m) (subst1 (afix k g) p))
+    -> rel 
+         (pi1 B (urelspinj A i (subst1 (app theta f) b) (subst1 (app theta g) c) H))
+         i
+         (subst1 (app theta f) m) (subst1 (app theta g) p).
+                      
+
 Definition admiss_property w (A : wurel w) : nat -> Prop :=
   fun i =>
     admissible w (ceiling (S i) A).
+
+
+Definition padmiss_property w (A : wurel w) (B : urelsp A -n> wurel_ofe w) : nat -> Prop :=
+  fun i =>
+    padmissible w 
+      (ceiling (S i) A)
+      (nearrow_compose2 (embed_ceiling_ne (S i) A) (ceiling_ne (S i)) B).
 
 
 Lemma admiss_property_downward :
@@ -443,11 +471,58 @@ exact Hrel.
 Qed.
 
 
+Lemma padmiss_property_downward :
+  forall w A B i,
+    padmiss_property w A B (S i)
+    -> padmiss_property w A B i.
+Proof.
+intros w A B i Hadmiss.
+unfold padmiss_property in Hadmiss |- *.
+intros f g i' m p b c j Hbc Hclf Hclg Hclm Hclp Hclb Hclc Hact.
+destruct Hbc as (Hi' & Hbc).
+split; auto.
+assert (i' < 2 + i) as Hi'_2 by omega.
+exploit (Hadmiss f g i' m p b c j (conj Hi'_2 Hbc)) as Hrel; auto.
+  {
+  intros k Hk.
+  so (Hact k Hk) as ((Hi'' & Hbck) & (_ & H)).
+  so (proof_irrelevance _ Hi'' Hi').
+  subst Hi''.
+  exists (conj Hi'_2 Hbck).
+  cbn in H.
+  split; [omega |].
+  force_exact H.
+  clear H.
+  f_equal.
+  f_equal.
+  cbn.
+  rewrite -> embed_ceiling_urelspinj.
+  rewrite -> embed_ceiling_urelspinj.
+  reflexivity.
+  }
+destruct Hrel as (_ & Hrel).
+cbn in Hrel |- *.
+force_exact Hrel.
+f_equal.
+f_equal.
+rewrite -> embed_ceiling_urelspinj.
+rewrite -> embed_ceiling_urelspinj.
+reflexivity.
+Qed.
+
+
 Definition admiss_urel (w : ordinal) (i : nat) (A : wurel w) : wurel w :=
   property_urel
     (admiss_property w A)
     w i
     (admiss_property_downward w A).
+
+
+Definition padmiss_urel (w : ordinal) (i : nat) (A : wurel w) (B : urelsp A -n> wurel_ofe w) : wurel w :=
+  property_urel
+    (padmiss_property w A B)
+    w i
+    (padmiss_property_downward w A B).
 
 
 Lemma ceiling_admiss_internal :
@@ -510,6 +585,89 @@ pextensionality.
 Qed.
 
 
+(* Dealing with the dependent types here is so much harder than it needs to be.
+   It's a good example of the virtue of Istari's approach.
+*)
+Lemma ceiling_padmiss :
+  forall n w i A B,
+    ceiling (S n) (padmiss_urel w i A B)
+    =
+    padmiss_urel w (min i n)
+      (ceiling (S n) A)
+      (nearrow_compose2 (embed_ceiling_ne (S n) A) (ceiling_ne (S n)) B).
+Proof.
+intros n w i A B.
+unfold padmiss_urel.
+apply urel_extensionality.
+fextensionality 3.
+intros j m p.
+pextensionality.
+  {
+  intros Hmp.
+  destruct Hmp as (Hjn & Hmp).
+  destruct Hmp as (Hadmiss & Hji & Hclm & Hclp & Hm & Hp).
+  do2 5 split; auto.
+  2:{
+    so (Min.min_glb i n j).
+    omega.
+    }
+  unfold padmiss_property in Hadmiss |- *.
+  rewrite -> nearrow_compose2_compose.
+  refine (transportdep _ (padmissible w) Hadmiss).
+  assert (S j <= S n) as Hsjn by omega.
+  so (ceiling_combine_le _#3 A Hsjn) as Heq.
+  symmetry in Heq.
+  apply (eq_impl_eq_dep _#6 Heq).
+  apply nearrow_extensionality.
+  intro C.
+  cbn.
+  rewrite -> ceiling_combine_le; auto.
+  rewrite -> (pi1_transport_dep_lift _ _ (fun X => @nonexpansive (urelsp X) (wurel_ofe w)) _ _ Heq).
+  rewrite -> app_transport_dom.
+  cbn.
+  rewrite -> (Model.embed_ceiling_combine_le _#5 Hsjn).
+  f_equal.
+  f_equal.
+  f_equal.
+  f_equal.
+  apply proof_irrelevance.
+  }
+
+  {
+  intro Hmp.
+  destruct Hmp as (Hadmiss & Hj & Hclm & Hclp & Hm & Hp).
+  so (Min.min_glb_l i n j) as Hjinl.
+  so (Min.min_glb_r i n j) as Hjinr.
+  split.
+    {
+    omega.
+    }
+  do2 5 split; auto.
+  unfold padmiss_property in Hadmiss |- *.
+  rewrite -> nearrow_compose2_compose in Hadmiss.
+  refine (transportdep _ (padmissible w) Hadmiss).
+  assert (S j <= S n) as Hsjn by omega.
+  so (ceiling_combine_le _#3 A Hsjn) as Heq.
+  symmetry in Heq.
+  apply eq_dep_sym.
+  apply (eq_impl_eq_dep _#6 Heq).
+  apply nearrow_extensionality.
+  intro C.
+  cbn.
+  rewrite -> ceiling_combine_le; auto.
+  rewrite -> (pi1_transport_dep_lift _ _ (fun X => @nonexpansive (urelsp X) (wurel_ofe w)) _ _ Heq).
+  rewrite -> app_transport_dom.
+  cbn.
+  rewrite -> (Model.embed_ceiling_combine_le _#5 Hsjn).
+  f_equal.
+  f_equal.
+  f_equal.
+  f_equal.
+  apply proof_irrelevance.
+  }
+Qed.
+
+
 Lemma extend_admissible :
   forall v w (A : wurel v),
     v <<= w
@@ -546,6 +704,137 @@ split.
   cbn.
   simpmap.
   auto.
+  }
+Qed.
+
+
+Lemma extend_padmissible :
+  forall v w (h : v <<= w) (A : wurel v) (B : urelsp A -n> wurel_ofe v),
+    padmissible w 
+      (extend_urel v w A)
+      (nearrow_compose2 (deextend_urelsp_ne h A) (extend_urel_ne v w) B)
+    <-> padmissible v A B.
+Proof.
+intros v w Hvw A B.
+split.
+  {
+  intro Hadmiss.
+  intros f g i m p b c j Hbc Hclf Hclg Hclm Hclp Hclb Hclc Hact.
+  assert (rel (extend_urel v w A) i (subst1 (app theta (map_term (extend v w) f)) (map_term (extend v w) b)) (subst1 (app theta (map_term (extend v w) g)) (map_term (extend v w) c))) as Hbc'.
+    {
+    cbn.
+    simpmap.
+    rewrite -> !extend_term_cancel; auto.
+    }
+  exploit (Hadmiss (map_term (extend v w) f) (map_term (extend v w) g) i (map_term (extend v w) m) (map_term (extend v w) p) (map_term (extend v w) b) (map_term (extend v w) c) j Hbc') as Hrel; auto using map_hygiene.
+    {
+    intros k Hk.
+    so (Hact k Hk) as (Hbck & H).
+    assert (rel (extend_urel v w A) i
+              (subst1 (afix k (map_term (extend v w) f)) (map_term (extend v w) b))
+              (subst1 (afix k (map_term (extend v w) g)) (map_term (extend v w) c))) as Hbck'.
+      {
+      cbn.
+      simpmap.
+      rewrite -> !extend_term_cancel; auto.
+      }
+    exists Hbck'.
+    cbn.
+    rewrite -> deextend_urelsp_urelspinj.
+    force_exact H.
+    f_equal.
+      {
+      f_equal.
+      apply urelspinj_equal.
+      simpmap.
+      rewrite -> !extend_term_cancel; auto.
+      }
+
+      {
+      simpmap.
+      rewrite -> !extend_term_cancel; auto.
+      }
+      
+      {
+      simpmap.
+      rewrite -> !extend_term_cancel; auto.
+      }
+    }
+  cbn in Hrel.
+  simpmapin Hrel.
+  rewrite -> !extend_term_cancel in Hrel; auto.
+  force_exact Hrel.
+  f_equal.
+  f_equal.
+  rewrite -> deextend_urelsp_urelspinj.
+  apply urelspinj_equal.
+  simpmap.
+  rewrite -> !extend_term_cancel; auto.
+  }
+
+  {
+  intro Hadmiss.
+  intros f g i m p b c j Hbc Hclf Hclg Hclm Hclp Hclb Hclc Hact.
+  assert (rel A i (subst1 (app theta (map_term (extend w v) f)) (map_term (extend w v) b)) (subst1 (app theta (map_term (extend w v) g)) (map_term (extend w v) c))) as Hbc'.
+    {
+    cbn in Hbc.
+    simpmapin Hbc.
+    exact Hbc.
+    }
+  exploit (Hadmiss (map_term (extend w v) f) (map_term (extend w v) g) i (map_term (extend w v) m) (map_term (extend w v) p) (map_term (extend w v) b) (map_term (extend w v) c) j Hbc') as Hrel; auto using map_hygiene.
+    {
+    intros k Hk.
+    so (Hact k Hk) as (Hbck & H).
+    assert (rel A i (subst1 (afix k (map_term (extend w v) f)) (map_term (extend w v) b)) (subst1 (afix k (map_term (extend w v) g)) (map_term (extend w v) c))) as Hbck'.
+      {
+      cbn in Hbck.
+      clear H.
+      simpmapin Hbck.
+      exact Hbck.
+      }
+    exists Hbck'.
+    cbn in H.
+    rewrite -> deextend_urelsp_urelspinj in H.
+    force_exact H.
+    clear H.
+    f_equal.
+      {
+      f_equal.
+      apply urelspinj_equal.
+      simpmap.
+      exact Hbck'.
+      }
+
+      {
+      simpmap.
+      reflexivity.
+      }
+
+      {
+      simpmap.
+      reflexivity.
+      }
+    }
+  cbn.
+  rewrite -> deextend_urelsp_urelspinj.
+  force_exact Hrel.
+  f_equal.
+    {
+    f_equal.
+    apply urelspinj_equal.
+    simpmap.
+    exact Hbc'.
+    }
+
+    {
+    simpmap.
+    reflexivity.
+    }
+
+    {
+    simpmap.
+    reflexivity.
+    }
   }
 Qed.
 
@@ -613,10 +902,120 @@ pextensionality.
 Qed.
 
 
+Lemma extend_padmiss :
+  forall v w (h : v <<= w) i A B,
+    extend_urel v w (padmiss_urel v i A B)
+    =
+    padmiss_urel w i 
+      (extend_urel v w A)
+      (nearrow_compose2 (deextend_urelsp_ne h A) (extend_urel_ne v w) B).
+Proof.
+intros v w h i A B.
+unfold padmiss_urel.
+apply urel_extensionality.
+fextensionality 3.
+intros j m p.
+cbn.
+pextensionality.
+  {
+  intro H.
+  decompose H.
+  intros Hadmiss Hj Hclm Hclp Hstepsm Hstepsp.
+  do2 5 split; eauto using map_hygiene_conv.
+    {
+    unfold padmiss_property in Hadmiss |- *.
+    rewrite <- (extend_padmissible _ _ h) in Hadmiss.
+    refine (transportdep _ (padmissible w) Hadmiss).
+    so (ceiling_extend_urel v w (S j) A) as Heq.
+    symmetry in Heq.
+    apply (eq_impl_eq_dep _#6 Heq).
+    apply nearrow_extensionality.
+    intro C.
+    cbn.
+    rewrite -> (pi1_transport_dep_lift _ _ (fun X => @nonexpansive (urelsp X) (wurel_ofe w)) _ _ Heq).
+    rewrite -> app_transport_dom.
+    cbn.
+    rewrite -> ceiling_extend_urel.
+    f_equal.
+    f_equal.
+    f_equal.
+    apply exT_extensionality_prop.
+    cbn.
+    fextensionality 2.
+    intros l r.
+    rewrite -> (pi1_transport_lift _ _ urelsp_car_rhs _ _ (eqsymm Heq)).
+    reflexivity.
+    }
+
+    {
+    so (map_steps_form _#5 Hstepsm) as (q & Heq & Hstepsm').
+    so (map_eq_triv_invert _#4 (eqsymm Heq)); subst q.
+    auto.
+    }
+
+    {
+    so (map_steps_form _#5 Hstepsp) as (q & Heq & Hstepsp').
+    so (map_eq_triv_invert _#4 (eqsymm Heq)); subst q.
+    auto.
+    }
+  }
+
+  {
+  intro H.
+  decompose H.
+  intros Hadmiss Hj Hclm Hclp Hstepsm Hstepsp.
+  do2 5 split; eauto using map_hygiene.
+    {
+    unfold padmiss_property in Hadmiss |- *.
+    rewrite <- (extend_padmissible _ _ h).
+    refine (transportdep _ (padmissible w) Hadmiss).
+    so (ceiling_extend_urel v w (S j) A) as Heq.
+    apply (eq_impl_eq_dep _#6 Heq).
+    apply nearrow_extensionality.
+    intro C.
+    cbn.
+    rewrite -> (pi1_transport_dep_lift _ _ (fun X => @nonexpansive (urelsp X) (wurel_ofe w)) _ _ Heq).
+    rewrite -> app_transport_dom.
+    cbn.
+    rewrite -> ceiling_extend_urel.
+    f_equal.
+    f_equal.
+    f_equal.
+    apply exT_extensionality_prop.
+    cbn.
+    fextensionality 2.
+    intros l r.
+    rewrite -> (pi1_transport_lift _ _ urelsp_car_rhs _ _ (eqsymm Heq)).
+    reflexivity.
+    }
+
+    {
+    so (map_steps _ _ (extend w v) _ _ Hstepsm) as H.
+    simpmapin H.
+    auto.
+    }
+
+    {
+    so (map_steps _ _ (extend w v) _ _ Hstepsp) as H.
+    simpmapin H.
+    auto.
+    }
+  }
+Qed.
+
+
 Definition iuadmiss w i A
   :=
   (admiss_urel w i (den A),
    meta_iurel A).
+
+
+Definition iupadmiss w i A B
+  :=
+  (padmiss_urel w i (den A) (nearrow_compose den_ne B),
+   meta_pair (meta_iurel A) 
+     (meta_fn (den A) 
+      (nearrow_compose meta_iurel_ne B))).
 
 
 Lemma iutruncate_iuadmiss :
@@ -645,6 +1044,46 @@ f_equal.
 Qed.
 
 
+Lemma iutruncate_iupadmiss :
+  forall n w i A B,
+    iutruncate (S n) (iupadmiss w i A B)
+    =
+    iupadmiss w (min i n)
+      (iutruncate (S n) A)
+      (nearrow_compose
+         (nearrow_compose (iutruncate_ne (S n)) B)
+         (embed_ceiling_ne (S n) (den A))).
+Proof.
+intros n w i A B.
+unfold iupadmiss.
+unfold iutruncate.
+unfold den.
+cbn [fst snd].
+f_equal.
+  {
+  rewrite -> ceiling_padmiss.
+  f_equal.
+  apply nearrow_extensionality.
+  auto.
+  }
+
+  {
+  assert (S n > 0) as Hgt by omega.
+  rewrite -> !meta_truncate_pair; auto.
+  f_equal.
+    {
+    apply meta_truncate_iurel; auto.
+    }
+  rewrite -> meta_truncate_fn; auto.
+  f_equal.
+  apply nearrow_extensionality.
+  intro C.
+  cbn -[meta_truncate].
+  apply meta_truncate_iurel; auto.
+  }
+Qed.
+
+
 Lemma extend_iuadmiss :
   forall v w (h : v <<= w) i A,
     extend_iurel h (iuadmiss v i A)
@@ -667,6 +1106,45 @@ f_equal.
 Qed.
 
 
+Lemma extend_iupadmiss :
+  forall v w (h : v <<= w) i A B,
+    extend_iurel h (iupadmiss v i A B)
+    =
+    iupadmiss w i (extend_iurel h A)
+      (nearrow_compose
+         (nearrow_compose (extend_iurel_ne h) B)
+         (deextend_urelsp_ne h (den A))).
+Proof.
+intros v w h i A B.
+unfold iupadmiss, extend_iurel.
+cbn.
+f_equal.
+  {
+  rewrite -> (extend_padmiss _ _ h).
+  f_equal.
+  apply nearrow_extensionality; auto.
+
+  }
+
+  {
+  unfold meta_iurel.
+  cbn.
+  rewrite -> !extend_meta_pair.
+  rewrite -> extend_meta_urel.
+  rewrite -> extend_meta_fn.
+  f_equal.
+  f_equal.
+  f_equal.
+  apply exT_extensionality_prop.
+  cbn.
+  fextensionality 1.
+  intro x.
+  rewrite -> extend_meta_iurel.
+  reflexivity.
+  }
+Qed.
+
+
 Lemma iuadmiss_inj :
   forall w i A A',
     iuadmiss w i A = iuadmiss w i A'
@@ -677,6 +1155,29 @@ unfold iupartial in Heq.
 so (f_equal (fun z => snd z) Heq) as Heq'.
 cbn in Heq'.
 exact (meta_iurel_inj _#3 Heq').
+Qed.
+
+
+Lemma iupadmiss_inj :
+  forall w i A A' B B',
+    iupadmiss w i A B = iupadmiss w i A' B'
+    -> eq_dep (wiurel w) (fun r => urelsp (den r) -n> wiurel_ofe w) A B A' B'.
+Proof.
+intros w i A A' B B' Heq.
+unfold iupadmiss in Heq.
+so (f_equal (fun z => snd z) Heq) as Heq'.
+cbn in Heq'.
+so (meta_pair_inj _#5 Heq') as (H3 & H4).
+so (meta_iurel_inj _#3 H3); subst A'.
+so (meta_fn_inj _#5 H4) as H5.
+apply eq_impl_eq_dep_snd.
+clear Heq Heq' H3 H4.
+so (eq_dep_impl_eq_snd _#5 H5) as Heq.
+apply nearrow_extensionality.
+intro x.
+so (f_equal (fun z => pi1 z x) Heq) as Heq'.
+cbn in Heq'.
+eapply meta_iurel_inj; eauto.
 Qed.
 
 

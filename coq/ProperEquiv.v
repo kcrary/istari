@@ -565,6 +565,19 @@ so (hygiene_invert_auto _#5 Hclaa) as (Hcla' & _).
 apply interp_admiss; auto.
 }
 
+(* admiss *)
+{
+intros pg s i a b A B _ IH1 _ IH2 aa Hclaa Hequiv.
+invertc_mc Hequiv.
+intros a' Ha b' Hb.
+fold (padmiss a' b').
+intros <-.
+so (hygiene_invert_auto _#5 Hclaa) as H.
+cbn in H.
+destruct H as (Hcla' & Hclb' & _).
+apply interp_padmiss; auto.
+}
+
 (* uptype *)
 {
 intros pg s i a A _ IH aa Hclaa Hequiv.

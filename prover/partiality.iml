@@ -10,6 +10,18 @@ signature PARTIALITY =
       val typecheckFixpointRaw : tactic
       val typecheckFixpointPriority : priority tacticm
 
+      val termination : Hyp.hypothesis -> tactic
+      val terminationRaw : Hyp.hypothesis -> tactic
+      val terminationPriority : Hyp.hypothesis -> priority tacticm
+
+      val partiality : Hyp.hypothesis -> tactic
+      val partialityRaw : Hyp.hypothesis -> tactic
+      val partialityPriority : Hyp.hypothesis -> priority tacticm
+
+      val totality : tactic
+      val totalityRaw : tactic
+      val totalityPriority : priority tacticm
+
       val proveAdmiss1Raw : tactic
       val proveAdmiss1 : tactic
       val uptypeAdmiss : tactic
@@ -34,6 +46,7 @@ structure Partiality :> PARTIALITY =
       structure RT = RuleTactic
       structure R = Reduction
       structure T = Term
+      structure D = Directory
 
       open Tactic
       open RefineTactic
@@ -59,6 +72,11 @@ structure Partiality :> PARTIALITY =
       val admissTactics : tactic H.table = H.table ()      
       val uptypeTactics : tactic H.table = H.table ()      
 
+
+      val uptypeAdmiss = RuleTactic.uptypeAdmiss
+
+
+      val unsh = Prune.Pundef (Prune.Pshift 0)
       
       fun proveAdmiss1Loop () =
          goalCaseT
@@ -75,7 +93,7 @@ structure Partiality :> PARTIALITY =
                                lift proveAdmiss1Loop
 
                           | NONE =>
-                               fail "no uptype rule for this type")))\
+                               fail ("no uptype rule for " ^ Namespace.toString const))))\
 
           | \Prim.admiss\ (const? @ _) =>
             \(fnc const =>
@@ -90,15 +108,72 @@ structure Partiality :> PARTIALITY =
                                lift proveAdmiss1Loop
 
                           | NONE =>
-                               fail "no admissibility rule for this type")))\
+                               fail ("no admissibility rule for " ^ Namespace.toString const))))\
+
+          | \Prim.padmiss\ ? (fn . ?) =>
+            \(fnc a b =>
+                 (case Prune.prune b unsh of
+                     SOME bunsh =>
+                        refine (Rule.padmissClosed a bunsh)
+
+                   | NONE =>
+                        termCaseT b
+                        /| \Prim.forall\ ?  (fn . ?) =>
+                           \(fnc dom cod =>
+                                (case Prune.prune dom unsh of
+                                    SOME domunsh =>
+                                       RuleTactic.forallPadmissDomainClosed domunsh
+
+                                  | NONE =>
+                                       fail "no predicate admissibility rule for this type"))\
+
+                         | \Prim.arrow\ (\Prim.halts\ ?) ? =>
+                           \(fnc m cod =>
+                                RuleTactic.arrowPadmissDomainHalts (T.evar ()))\
+
+                         | \Prim.arrow\ ? ? =>
+                           \(fnc dom cod =>
+                                (case Prune.prune dom unsh of
+                                    SOME domunsh =>
+                                       RuleTactic.arrowPadmissDomainClosed domunsh
+
+                                  | NONE =>
+                                       fail "no predicate admissibility rule for this type"))\
+
+                         | \Prim.prod\ ? ? =>
+                           \(fnc b1 b2 =>
+                                refine (Rule.prodPadmiss a b1 b2))\
+
+                         | const? @ _ =>
+                           \(fnc const =>
+                                fail ("no predicate admissibility rule for " ^ Namespace.toString const))\
+                         | _ =>
+                           \(fnc =>
+                                fail "improper form for predicate-admissibility goal")\
+                        /))\
+
+          | \Prim.uptype\ _ =>
+            \(fnc =>
+                 fail "no uptype rule for non-constant")\
+
+          | \Prim.admiss\ _ =>
+            \(fnc =>
+                 fail "no admissibility rule for non-constant")\
+
+          | \Prim.padmiss\ _ _ =>
+            \(fnc =>
+                 fail "no predicate admissibility rule for non-constant")\
+
+          | _ =>
+            \(fnc =>
+                 let do goal = withgoal in Show.showGoal goal; idtac end >>
+                 fail "not an admissibility goal")\
          /
       
+                 
          
       val proveAdmiss1Raw = lift proveAdmiss1Loop
       val proveAdmiss1 = Typecheck.withTypecheck proveAdmiss1Raw
-
-
-      val uptypeAdmiss = RuleTactic.uptypeAdmiss
 
 
       fun proveAdmissMain assumtac =
@@ -107,25 +182,54 @@ structure Partiality :> PARTIALITY =
             [
             assumtac >> done,
 
-            proveAdmiss1Raw >> lift (fn () => proveAdmissCont assumtac),
+            let
+               do (jud, _) = withgoal
+            in
+               if TypecheckInternal.isTypecheckGoal jud then
+                  idtacM Secondary
+               else
+                  termCaseT (J.concl jud)
+                  /| \Prim.admiss\ _ =>
+                     \(fnc =>
+                          first
+                             [
+                             uptypeAdmiss >> lift (fn () => proveAdmissMain assumtac),
+                             proveAdmiss1Raw >> lift (fn () => proveAdmissMain assumtac)
+                             ])\
 
-            uptypeAdmiss >>+ lift (fn () => proveAdmissMain assumtac),
+                   | (\Prim.uptype\ _ | \Prim.padmiss\ _ _) =>
+                     \(fnc =>
+                          proveAdmiss1Raw >> lift (fn () => proveAdmissMain assumtac))\
 
-            fail "could not prove admissibility"
+                   | \Prim.forall\ _ (fn . _) =>
+                     \(fnc =>
+                          RT.forallIntro
+                          >>> [
+                              idtacM Secondary,
+                              lift (fn () => proveAdmissMain assumtac)
+                              ])\
+
+                   | \Prim.arrow\ _ _ =>
+                     \(fnc =>
+                          RT.arrowIntro
+                          >>> [
+                              idtacM Secondary,
+                              lift (fn () => proveAdmissMain assumtac)
+                              ])\
+
+                   | _ =>
+                     \(fnc =>
+                          idtacM Primary)\
+                  /
+            end
             ]
 
-      and proveAdmissCont assumtac =
-         let
-            do (jud, _) = withgoal
-         in
-            if TypecheckInternal.isTypecheckGoal jud then
-               idtacM Secondary
-            else
-               proveAdmissMain assumtac
-         end
 
-
-      val proveAdmissPriority : priority tacticm = lift (fn () => proveAdmissMain Hyp.assumption)
+      val proveAdmissPriority : priority tacticm = 
+         lift (fn () => 
+                  refine Rule.normalizeConcl
+                  >>+
+                  proveAdmissMain Hyp.assumption)
 
       val proveAdmissRaw = proveAdmissPriority >> idtac
 
@@ -201,7 +305,6 @@ structure Partiality :> PARTIALITY =
                               lift (fn () => proveAdmissMain assumtac))
 
                              (fn Primary =>
-                                    (* this shouldn't actually happen *)
                                     idtacM Primary
 
                                | Secondary => 
@@ -441,6 +544,10 @@ structure Partiality :> PARTIALITY =
 
 
 
+      val existsAdmiss =
+         first [RT.existsAdmissUptype, RT.existsAdmiss]
+
+
       val () =
          List.app
             (fn (const, tac) => H.insert admissTactics const tac)
@@ -454,11 +561,13 @@ structure Partiality :> PARTIALITY =
             (Prim.arrow, RT.arrowAdmiss),
             (Prim.intersect, RT.intersectAdmiss),
             (Prim.intersectfut, RT.intersectfutAdmiss),
-            (Prim.exists, RT.existsAdmissUptype),
+            (Prim.exists, existsAdmiss),
             (Prim.prod, RT.prodAdmiss),
             (Prim.dprod, RT.dprodAdmissUptype),
             (Prim.sum, RT.sumAdmiss),
             (Prim.future, RT.futureAdmiss),
+            (Prim.set, RT.setAdmiss),
+            (Prim.iset, RT.isetAdmiss),
             (Prim.eq, RT.eqAdmiss),
             (Prim.ov, RT.ofAdmiss),
             (Prim.eqtp, RT.eqtpAdmiss),
@@ -492,6 +601,7 @@ structure Partiality :> PARTIALITY =
             (Prim.eqtp, RT.eqtpUptype),
             (Prim.istp, RT.istpUptype),
             (Prim.subtype, RT.subtypeUptype),
+            (Prim.halts, RT.haltsUptype),
             (Prim.set, RT.setUptype),
             (Prim.iset, RT.isetUptype),
             (Prim.mu, RT.muUptype),
@@ -579,4 +689,445 @@ structure Partiality :> PARTIALITY =
 
       val typecheckFixpoint = Typecheck.withTypecheckSnd typecheckFixpointPriority
 
+
+      fun terminationPriority hyp =
+         let
+            do iopt = Hyp.findhypOrConcl hyp
+            do (jud, dir) = withgoal
+         in
+            (case iopt of
+                NONE =>
+                   goalCaseT
+                   /| \Prim.halts\ ? =>
+                      \(fnc t =>
+                           if Valuability.valuability t > 0 then
+                              refine Rule.haltsValue >> done
+                           else
+                              termCaseT t
+                              /| \Prim.seq\ ? (fn . ?) =>
+                                 \(fnc m n =>
+                                      refine (Rule.seqHalts (T.evar ()) m n)
+                                      >>> [
+                                          (* M : partial A *)
+                                          idtacM Secondary,
+                     
+                                          (* halts M *)
+                                          idtacM Primary,
+                     
+                                          (* A |- halts N[^] *)
+                                          chdir (D.bind0 dir) >>+ idtacM Primary
+                                          ])\
+          
+                               | \Prim.ite\ ? ? ? =>
+                                 \(fnc m n p =>
+                                      refine (Rule.iteHalts (T.evar ()) m n p)
+                                      >>> [
+                                          idtacM Secondary,
+                                          idtacM Primary,
+                                          chdir (D.bind0 dir) >>+ idtacM Primary
+                                          ])\
+
+                               | ? @ ? =>
+                                 \(fnc h spine =>
+                                      (case List.rev spine of
+                                          [] =>
+                                             fail "no strategy for proving termination of object"
+                     
+                                        | elim :: restrev =>
+                                             let
+                                                val spine' = List.rev restrev
+                                             in
+                                                (case elim of
+                                                    T.App n =>
+                                                       refine (Rule.appHalts (T.evar ()) (T.Elim (h, spine')) n)
+                                                       >>> [
+                                                           idtacM Secondary,
+                                                           idtacM Primary,
+                                                           chdir (D.bind0 dir) >>+ idtacM Primary
+                                                           ]
+       
+                                                  | T.Pi1 =>
+                                                       refine (Rule.pi1Halts (T.evar ()) (T.Elim (h, spine')))
+                                                       >>> [
+                                                           idtacM Secondary,
+                                                           idtacM Primary,
+                                                           chdir (D.bind0 dir) >>+ idtacM Primary
+                                                           ]
+       
+                                                  | T.Pi2 =>
+                                                       refine (Rule.pi2Halts (T.evar ()) (T.Elim (h, spine')))
+                                                       >>> [
+                                                           idtacM Secondary,
+                                                           idtacM Primary,
+                                                           chdir (D.bind0 dir) >>+ idtacM Primary
+                                                           ]
+       
+                                                  | T.Prev =>
+                                                       refine (Rule.prevHalts (T.evar ()) (T.Elim (h, spine')))
+                                                       >>> [
+                                                           idtacM Secondary,
+                                                           idtacM Primary,
+                                                           chdir (D.bind0 dir) >>+ idtacM Primary
+                                                           ])
+                                             end))\
+                                                               
+                               | _ =>
+                                 \(fnc =>
+                                      fail "no strategy for proving termination of object")\
+                              /)\
+               
+                    | _ =>
+                      \(fnc =>
+                           fail "not a termination goal")\
+                   /
+
+              | SOME i =>
+                   let
+                      val h = J.subHyp (J.hyp jud i) (T.Shift (i+1))
+                      val dir' = D.bind0 dir
+                   in
+                      (case h of
+                          J.Tm d =>
+                             termCaseT d
+                             /| \Prim.halts\ ? =>
+                                \(fnc t =>
+                                     termCaseT t
+                                     /| \Prim.bottom\ =>
+                                        \(fnc =>
+                                             refine (Rule.voidElim (T.evar ()))
+                                             >>+
+                                             refine Rule.bottomDiverges
+                                             >>+
+                                             refine (Rule.hypothesis i) >> done)\
+
+                                      | \Prim.seq\ ? ? =>
+                                        \(fnc m n =>
+                                             refine (Rule.assert (T.apply1 Prim.halts m) (T.evar ()))
+                                             >>> [
+                                                 refine (Rule.seqHaltsInv m n)
+                                                 >>+
+                                                 refine (Rule.hypothesis i) >> done,
+          
+                                                 chdir dir' >> idtacM Primary
+                                                 ])\
+          
+                                      | \Prim.ite\ ? ? ? =>
+                                        \(fnc m n p =>
+                                             refine (Rule.assert (T.apply1 Prim.halts m) (T.evar ()))
+                                             >>> [
+                                                 refine (Rule.iteHaltsInv m n p)
+                                                 >>+
+                                                 refine (Rule.hypothesis i) >> done,
+
+                                                 chdir dir' >> idtacM Primary
+                                                 ])\
+
+                                      | ? @ ? =>
+                                        \(fnc h spine =>
+                                             (case List.rev spine of
+                                                 [] =>
+                                                    fail "no consequences of object termination"
+                            
+                                               | elim :: restrev =>
+                                                    let
+                                                       val spine' = List.rev restrev
+                                                       val m = T.Elim (h, spine')
+                                                    in
+                                                       (case elim of
+                                                           T.App n =>
+                                                              refine (Rule.assert (T.apply1 Prim.halts m) (T.evar ()))
+                                                              >>> [
+                                                                  refine (Rule.appHaltsInv m n)
+                                                                  >>+
+                                                                  refine (Rule.hypothesis i) >> done,
+          
+                                                                  chdir dir' >> idtacM Primary
+                                                                  ]
+          
+                                                         | T.Pi1 =>
+                                                              refine (Rule.assert (T.apply1 Prim.halts m) (T.evar ()))
+                                                              >>> [
+                                                                  refine (Rule.pi1HaltsInv m)
+                                                                  >>+
+                                                                  refine (Rule.hypothesis i) >> done,
+          
+                                                                  chdir dir' >> idtacM Primary
+                                                                  ]
+          
+                                                         | T.Pi2 =>
+                                                              refine (Rule.assert (T.apply1 Prim.halts m) (T.evar ()))
+                                                              >>> [
+                                                                  refine (Rule.pi2HaltsInv m)
+                                                                  >>+
+                                                                  refine (Rule.hypothesis i) >> done,
+          
+                                                                  chdir dir' >> idtacM Primary
+                                                                  ]
+          
+                                                         | T.Prev =>
+                                                              refine (Rule.assert (T.apply1 Prim.halts m) (T.evar ()))
+                                                              >>> [
+                                                                  refine (Rule.prevHaltsInv m)
+                                                                  >>+
+                                                                  refine (Rule.hypothesis i) >> done,
+          
+                                                                  chdir dir' >> idtacM Primary
+                                                                  ])
+                                                    end))\
+          
+                                      | _ =>
+                                        \(fnc =>
+                                             fail "no consequences of object termination")\
+                                     /)\
+          
+                              | \Prim.eq\ (\Prim.partial\ ?) ? ? =>
+                                \(fnc a m n =>
+                                     refine (Rule.assert (T.apply2 Prim.iff (T.apply1 Prim.halts m) (T.apply1 Prim.halts n)) (T.evar ()))
+                                     >>> [
+                                         refine (Rule.partialElimHalts a m n)
+                                         >>+
+                                         refine (Rule.hypothesis i) >> done,
+
+                                         chdir dir' >> idtacM Primary
+                                         ])\
+
+                              | _ =>
+                                \(fnc =>
+                                     fail "not a termination hypothesis")\
+                             /
+          
+                        | _ =>
+                             fail "hypothesis has improper sort")
+                   end)
+         end
+
+      fun terminationRaw hyp = terminationPriority hyp >> idtac
+
+      fun termination hyp = Typecheck.withTypecheckSnd $ terminationPriority hyp
+
+
+
+      fun partialityPriority hyp =
+         let
+            do iopt = Hyp.findhypOrConcl hyp
+            do (jud, dir) = withgoal
+         in
+            (case iopt of
+                NONE =>
+                   goalCaseT
+                   /| \Prim.eq\ (\Prim.partial\ ?) ? ? =>
+                      \(fnc a m n =>
+                           (* M = N : partial A *)
+                           refine (Rule.subsumptionEq a (T.apply1 Prim.partial a) m n)
+                           >>> [
+                               (* A <: partial A *)
+                               idtacM Secondary,
+
+                               (* M = N : A *)
+                               idtacM Primary
+                               ])\
+
+                    | \Prim.eq\ ? ? ? =>
+                      \(fnc a m n =>
+                           (* M = N : A *)
+                           refine (Rule.partialElimEq a m n)
+                           >>> [
+                               (* M = N : partial A *)
+                               idtacM Primary,
+
+                               (* halts M *)
+                               idtacM Primary
+                               ])\
+
+                    | \Prim.ov\ (\Prim.partial\ ?) ? =>
+                      \(fnc a m =>
+                           (* M : partial A *)
+                           refine (Rule.subsumptionOf a (T.apply1 Prim.partial a) m)
+                           >>> [
+                               (* A <: partial A *)
+                               idtacM Secondary,
+
+                               (* M : A *)
+                               idtacM Primary
+                               ])\
+
+                    | \Prim.ov\ ? ? =>
+                      \(fnc a m =>
+                           (* M : A *)
+                           refine (Rule.partialElimOf a m)
+                           >>> [
+                               (* M : partial A *)
+                               idtacM Primary,
+
+                               (* halts M *)
+                               idtacM Primary
+                               ])\
+
+                    | _ =>
+                      \(fnc =>
+                           fail "not a partiality goal")\
+                   /
+                  
+              | SOME i =>
+                   let
+                      val h = J.subHyp (J.hyp jud i) (T.Shift (i+1))
+                      val dir' = D.bind0 dir
+                   in
+                      (case h of
+                          J.Tm d =>
+                             termCaseT d
+                             /| \Prim.eq\ (\Prim.partial\ (\Prim.partial\ ?)) ? ? =>
+                                \(fnc a m n =>
+                                     refine (Rule.assert (T.apply3 Prim.eq (T.apply1 Prim.partial a) m n) (T.evar ()))
+                                     >>> [
+                                         (* M = N : partial A *)
+                                         refine (Rule.subsumptionEq (T.apply1 Prim.partial (T.apply1 Prim.partial a)) (T.apply1 Prim.partial a) m n)
+                                         >>> [
+                                             (* partial (partial A) <: partial A *)
+                                             refine (Rule.partialStrictConverse a)
+                                             >>+
+                                             (* A : type *)
+                                             idtacM Secondary,
+
+                                             (* M = N : partial A *)
+                                             refine (Rule.hypothesis i) >> done,
+                                             ],
+
+                                         chdir dir' >> idtacM Primary
+                                         ])\
+
+                              | \Prim.eq\ (\Prim.partial\ ?) ? ? =>
+                                \(fnc a m n =>
+                                     refine (Rule.assert (T.apply3 Prim.eq a m n) (T.evar ()))
+                                     >>> [
+                                         (* M = N : A *)
+                                         refine (Rule.partialElimEq a m n)
+                                         >>> [
+                                             (* M = N : partial A *)
+                                             refine (Rule.hypothesis i) >> done,
+
+                                             (* halts M *)
+                                             idtacM Primary
+                                             ],
+
+                                         chdir dir' >> idtacM Primary
+                                         ])\
+
+                              | \Prim.eq\ ? ? ? =>
+                                \(fnc a m n =>
+                                     refine (Rule.assert (T.apply3 Prim.eq (T.apply1 Prim.partial a) m n) (T.evar ()))
+                                     >>> [
+                                         (* M = N : partial A *)
+                                         refine (Rule.subsumptionEq a (T.apply1 Prim.partial a) m n)
+                                         >>> [
+                                             (* A <: partial A *)
+                                             idtacM Secondary,
+
+                                             (* M = N : A *)
+                                             refine (Rule.hypothesis i) >> done
+                                             ],
+
+                                         chdir dir' >> idtacM Primary
+                                         ])\
+
+                              | \Prim.ov\ (\Prim.partial\ (\Prim.partial\ ?)) ? =>
+                                \(fnc a m =>
+                                     refine (Rule.assert (T.apply2 Prim.eq (T.apply1 Prim.partial a) m) (T.evar ()))
+                                     >>> [
+                                         (* M : partial A *)
+                                         refine (Rule.subsumptionOf (T.apply1 Prim.partial (T.apply1 Prim.partial a)) (T.apply1 Prim.partial a) m)
+                                         >>> [
+                                             (* partial (partial A) <: partial A *)
+                                             refine (Rule.partialStrictConverse a)
+                                             >>+
+                                             (* A : type *)
+                                             idtacM Secondary,
+
+                                             (* M : partial A *)
+                                             refine (Rule.hypothesis i) >> done,
+                                             ],
+
+                                         chdir dir' >> idtacM Primary
+                                         ])\
+
+                              | \Prim.ov\ (\Prim.partial\ ?) ? =>
+                                \(fnc a m =>
+                                     refine (Rule.assert (T.apply2 Prim.ov a m) (T.evar ()))
+                                     >>> [
+                                         (* M : A *)
+                                         refine (Rule.partialElimOf a m)
+                                         >>> [
+                                             (* M : partial A *)
+                                             refine (Rule.hypothesis i) >> done,
+
+                                             (* halts M *)
+                                             idtacM Primary
+                                             ],
+
+                                         chdir dir' >> idtacM Primary
+                                         ])\
+
+                              | \Prim.ov\ ? ? =>
+                                \(fnc a m =>
+                                     refine (Rule.assert (T.apply2 Prim.ov (T.apply1 Prim.partial a) m) (T.evar ()))
+                                     >>> [
+                                         (* M : partial A *)
+                                         refine (Rule.subsumptionOf a (T.apply1 Prim.partial a) m)
+                                         >>> [
+                                             (* A <: partial A *)
+                                             idtacM Secondary,
+
+                                             (* M : A *)
+                                             refine (Rule.hypothesis i) >> done
+                                             ],
+
+                                         chdir dir' >> idtacM Primary
+                                         ])\
+
+                              | \Prim.partial\ ? =>
+                                \(fnc a =>
+                                     refine (Rule.assert (T.apply2 Prim.ov a (T.Var i)) (T.evar ()))
+                                     >>> [
+                                         (* i : A *)
+                                         refine (Rule.partialElimOf a (T.Var i))
+                                         >>> [
+                                             (* i : partial A *)
+                                             refine (Rule.hypothesisOf i) >> done,
+
+                                             (* halts i *)
+                                             idtacM Primary
+                                             ],
+
+                                         chdir dir' >> idtacM Primary
+                                         ])\
+
+                              | _ =>
+                                \(fnc =>
+                                     fail "not a partiality hypothesis")\
+
+                             /
+          
+                        | _ =>
+                             fail "hypothesis has improper sort")
+                   end)
+         end
+
+      fun partialityRaw hyp = partialityPriority hyp >> idtac
+
+      fun partiality hyp = Typecheck.withTypecheckSnd $ partialityPriority hyp
+
+
+
+      val totalityPriority =
+         let
+            do () = lift
+         in
+            setFailure "not a totality goal" $ cut $
+               refine (Rule.haltsTotal (T.evar ()) (T.evar ())) >> idtacM Secondary
+         end
+
+      val totalityRaw = totalityPriority >> idtac
+
+      val totality = Typecheck.withTypecheckSnd $ totalityPriority
+                        
    end

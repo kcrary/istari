@@ -626,9 +626,14 @@ functor OmegaFun (structure NaturalTactic : NATURAL_TACTIC) :> OMEGA =
 
       fun lookup (corr as (d, l, n)) m t =
          let
-            val m = N.normalizeHard m
+            (* Use the (hard-)normalized version of m as the key,
+               so that as many terms share as possible.
+               When typechecking m, use the original version.
+            *)
+
+            val m' = N.normalizeHard m
          in
-            (case TD.find d m of
+            (case TD.find d m' of
                 SOME (i, t') =>
                    if tpEq t t' then
                       (corr, i)
@@ -636,7 +641,7 @@ functor OmegaFun (structure NaturalTactic : NATURAL_TACTIC) :> OMEGA =
                       raise mismatch
    
               | NONE =>
-                   ((TD.insert d m (n, t), (m, t) :: l, n+1), n))
+                   ((TD.insert d m' (n, t), (m, t) :: l, n+1), n))
          end
                    
 

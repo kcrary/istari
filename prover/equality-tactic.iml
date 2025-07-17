@@ -1072,6 +1072,21 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
          /
 
       fun unitExt tac = tac >> idtacM Secondary
+
+      val partialExt =
+         goalCaseT
+         /| \Prim.eq\ (\Prim.partial\ ?) ? ? =>
+            \(fnc a m n =>
+                 refine (Rule.partialExt a m n)
+                 >>> [
+                     idtacM Secondary,
+
+                     idtacM Primary,
+
+                     withgoal
+                     (fn (_, dir) => chdir (D.bind0 dir) >> idtacM Primary)
+                     ])\
+         /
              
       structure RT = RuleTactic
 
@@ -1103,6 +1118,7 @@ structure EqualityTacticInternal :> EQUALITY_TACTIC_INTERNAL =
             (Prim.subtype, unitExt RT.subtypeExt),
             (Prim.squash, unitExt RT.squashExt),
             (Prim.isquash, unitExt RT.isquashExt),
+            (Prim.partial, partialExt),
             ]
 
 

@@ -994,6 +994,15 @@ rewrite -> Nat.min_r; auto.
 apply interp_admiss; auto.
 }
 
+(* padmiss *)
+{
+intros pg s i a b A B Ha IH1 Hb IH2 j Hj.
+rewrite -> iutruncate_iupadmiss.
+rewrite -> min_r; auto.
+apply interp_padmiss; auto.
+apply IH2; auto.
+}
+
 (* uptype *)
 {
 intros pg s i a A _ IH j Hj.

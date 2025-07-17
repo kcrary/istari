@@ -27,7 +27,23 @@ Require Import Defined.
 Require Import SumLemmas.
 Require Import NatLemmas.
 
-Hint Rewrite def_partial def_halts def_admiss def_uptype def_seq : prepare.
+
+Lemma def_strict :
+  forall a, equiv (app Defs.strict a) (subtype a (partial a)).
+Proof.
+intro a.
+unfold Defs.strict.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl.
+Qed.
+
+
+Hint Rewrite def_partial def_halts def_admiss def_uptype def_seq def_padmiss def_strict : prepare.
 
 
 Lemma tr_admiss_eta2 :
@@ -39,6 +55,23 @@ intros G p q m Htr.
 assert (tr G (deq p triv (admiss m))) as Htr'.
   {
   apply tr_admiss_eta.
+  apply (tr_transitivity _ _ q); auto.
+  apply tr_symmetry; auto.
+  }
+apply (tr_transitivity _ _ p); auto.
+apply tr_symmetry; auto.
+Qed.
+
+
+Lemma tr_padmiss_eta2 :
+  forall G p q a b,
+    tr G (deq p q (padmiss a b))
+    -> tr G (deq triv triv (padmiss a b)).
+Proof.
+intros G p q a b Htr.
+assert (tr G (deq p triv (padmiss a b))) as Htr'.
+  {
+  apply tr_padmiss_eta.
   apply (tr_transitivity _ _ q); auto.
   apply tr_symmetry; auto.
   }
@@ -323,6 +356,31 @@ apply tr_partial_ext; auto.
 Qed.
 
 
+Lemma partialOfExt_valid : partialOfExt_obligation.
+Proof.
+prepare.
+intros G a b m ext1 ext0 Ha Hmb Hma.
+apply tr_partial_ext; auto.
+  {
+  apply (tr_halts_formation _ b); auto.
+  }
+
+  {
+  apply (tr_halts_formation _ b); auto.
+  }
+
+  {
+  apply (tr_halts_eta2 _ (var 0) (var 0)).
+  eapply hypothesis; auto using index_0.
+  }
+
+  {
+  apply (tr_halts_eta2 _ (var 0) (var 0)).
+  eapply hypothesis; auto using index_0.
+  }
+Qed.
+
+
 Lemma partialElimEq_valid : partialElimEq_obligation.
 Proof.
 prepare.
@@ -336,6 +394,14 @@ Proof.
 prepare.
 intros G a m ext1 ext0 Hm Hhalt.
 apply tr_partial_elim; eauto using tr_halts_eta2.
+Qed.
+
+
+Lemma haltsIntro_valid : haltsIntro_obligation.
+Proof.
+prepare.
+intros G m ext0 H.
+eapply tr_halts_eta2; eauto.
 Qed.
 
 
@@ -370,6 +436,52 @@ intros G1 G2 c m n H.
 unfold Defs.triv in H.
 apply tr_halts_eta_hyp; auto.
 Qed.
+
+
+Hint Rewrite def_iff : prepare.
+
+Lemma partialElimHalts_valid : partialElimHalts_obligation.
+Proof.
+prepare.
+cut (forall G a m n,
+       tr G (deq m n (partial a))
+       -> tr G (deq (lam triv) (lam triv) (pi (halts m) (subst sh1 (halts n))))).
+  {
+  intro Hprop.
+  intros G a m n ext0 Heq.
+  apply tr_prod_intro; eauto using tr_symmetry.
+  }
+intros G a m n Heq.
+apply tr_pi_intro.
+  {
+  apply (tr_halts_formation _ a).
+  eapply tr_eq_reflexivity; eauto.
+  }
+simpsub.
+apply (tr_eqtype_convert _#3 (halts (subst sh1 m))).
+  {
+  apply (tr_halts_formation _ (subst sh1 a)).
+  eapply (weakening _ [_] []).
+    {
+    simpsub; auto.
+    }
+
+    {
+    cbn [length unlift].
+    simpsub.
+    auto.
+    }
+  cbn [length unlift].
+  simpsub.
+  exact Heq.
+  }
+
+  {
+  apply (tr_halts_eta2 _ (var 0) (var 0)).
+  eapply hypothesis; eauto using index_0.
+  }
+Qed.
+
 
 
 Lemma fixpointInductionEq_valid : fixpointInductionEq_obligation.
@@ -417,6 +529,128 @@ apply tr_fixpoint_induction.
   apply (tr_eqtype_convert _#3 (pi (partial a) (subst sh1 (partial a)))); auto.
   apply tr_eqtype_symmetry.
   apply tr_tarrow_pi_equal; auto.
+  }
+Qed.
+
+
+Lemma fixpointInductionShift_valid : fixpointInductionShift_obligation.
+Proof.
+prepare.
+unfold Defs.void.
+unfold Defs.theta.
+unfold Defs.bottom.
+fold (@bottom obj).
+intros G a b f g h ext6 ext5 ext4 ext3 ext2 m ext0 Ha Hb Hf Hg Hh Hstrict Heq.
+rewrite -> def_arrow in Hf, Hg, Hh, Hstrict.
+assert (tr G (deqtype a a)) as Hofa.
+  {
+  apply tr_admiss_formation_invert.
+  eapply tr_inhabitation_formation; eauto.
+  }
+assert (tr G (deqtype b b)) as Hofb.
+  {
+  apply tr_admiss_formation_invert.
+  eapply tr_inhabitation_formation; eauto.
+  }
+assert (tr G (deq bottom bottom (partial a))) as Hbottom.
+  {
+  apply (tr_subtype_elim _ (partial voidtp)).
+    {
+    apply tr_partial_covariant.
+    apply tr_subtype_intro; auto.
+      {
+      apply tr_voidtp_istype.
+      }
+
+      {
+      apply (tr_voidtp_elim _ (var 0) (var 0)).
+      eapply hypothesis; eauto using index_0.
+      }
+    }
+
+    {
+    apply tr_bottom_partial_void.
+    }
+  }
+eapply tr_fixpoint_induction_shift; eauto.
+  {
+  eapply tr_admiss_eta2; eauto.
+  }
+
+  {
+  eapply tr_admiss_eta2; eauto.
+  }
+
+  {
+  eapply tr_eqtype_convert; eauto.
+  apply tr_eqtype_symmetry.
+  apply tr_tarrow_pi_equal; auto using tr_partial_formation.
+  }
+
+  {
+  eapply tr_eqtype_convert; eauto.
+  apply tr_eqtype_symmetry.
+  apply tr_tarrow_pi_equal; auto using tr_partial_formation.
+  }
+
+  {
+  eapply tr_eqtype_convert; eauto.
+  apply tr_eqtype_symmetry.
+  apply tr_tarrow_pi_equal; auto using tr_partial_formation.
+  }
+
+  {
+  apply (tr_eqtype_convert _#3 (pi (halts (app h bottom)) voidtp)).
+    {
+    apply tr_eqtype_symmetry.
+    apply tr_tarrow_pi_equal; auto using tr_voidtp_istype.
+    apply (tr_halts_formation _ b).
+    eapply tr_pi_elim'; eauto.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    apply tr_pi_intro.
+      {
+      apply (tr_halts_formation _ b).
+      eapply tr_pi_elim'; eauto.
+      simpsub.
+      reflexivity.
+      }
+
+      {
+      apply (tr_voidtp_elim _ (app (subst sh1 m) (var 0)) (app (subst sh1 m) (var 0))).
+      eapply (tr_pi_elim' _ (subst sh1 (halts (app h bottom))) voidtp).
+        {
+        eapply (weakening _ [_] []).
+          {
+          cbn [length unlift].
+          simpsub.
+          auto.
+          }
+
+          {
+          cbn [length unlift].
+          simpsub.
+          auto.
+          }
+        cbn [length unlift].
+        simpsub.
+        cbn [List.app].
+        auto.
+        }
+
+        {
+        eapply hypothesis; eauto using index_0.
+        }
+
+        {
+        simpsub.
+        auto.
+        }
+      }
+    }
   }
 Qed.
 
@@ -1759,23 +1993,6 @@ rewrite -> def_dprod.
 apply tr_total_strict.
   {
   apply tr_sigma_formation; auto.
-  eapply (weakening _ [_] []).
-    {
-    simpsub.
-    auto.
-    }
-    
-    {
-    cbn [length].
-    simpsub.
-    rewrite <- compose_assoc.
-    simpsub.
-    auto.
-    }
-  cbn [length].
-  simpsub.
-  cbn [List.app].
-  exact Hb.
   }
 
   {
@@ -2094,21 +2311,6 @@ Proof.
 prepare.
 intros G a b ext1 ext0 Ha Hb.
 apply tr_pi_uptype; auto.
-apply (weakening _ [_] []).
-  {
-  cbn [length unlift].
-  simpsub.
-  auto.
-  }
-
-  {
-  cbn [length unlift].
-  simpsub.
-  auto.
-  }
-cbn [length unlift].
-simpsub.
-cbn [List.app].
 eapply tr_uptype_eta2; eauto.
 Qed.
 
@@ -2448,6 +2650,26 @@ apply tr_unittp_intro.
 Qed.
 
 
+Lemma haltsUptype_valid : haltsUptype_obligation.
+Proof.
+prepare.
+intros G M ext0 Hof.
+apply tr_unitary_uptype.
+apply tr_subtype_intro; auto.
+  {
+  apply tr_unittp_istype.
+  }
+simpsub.
+apply tr_equal_elim.
+replace triv with (@subst obj (under 0 sh1) triv) by (simpsub; auto).
+apply (tr_halts_eta_hyp _ []).
+simpsub.
+cbn [List.app].
+apply tr_equal_intro.
+apply tr_unittp_intro.
+Qed.
+
+
 Lemma setUptype_valid : setUptype_obligation.
 Proof.
 prepare.
@@ -2749,21 +2971,6 @@ Proof.
 prepare.
 intros G a b ext1 ext0 Ha Hb.
 apply tr_pi_admiss; auto.
-apply (weakening _ [_] []).
-  {
-  cbn [length unlift].
-  simpsub.
-  auto.
-  }
-
-  {
-  cbn [length unlift].
-  simpsub.
-  auto.
-  }
-cbn [length unlift].
-simpsub.
-cbn [List.app].
 eapply tr_admiss_eta2; eauto.
 Qed.
 
@@ -2849,6 +3056,14 @@ Proof.
 prepare.
 intros G a b ext1 ext0 Ha Hb.
 apply tr_sigma_uptype_admiss; eauto using tr_uptype_eta2, tr_admiss_eta2.
+Qed.
+
+
+Lemma existsAdmiss_valid : existsAdmiss_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+apply tr_sigma_admiss; eauto using tr_admiss_eta2, tr_padmiss_eta2.
 Qed.
 
 
@@ -3049,6 +3264,197 @@ apply tr_admiss_formation_invert; auto.
 Qed.
 
 
+Lemma padmissForm_valid : padmissForm_obligation.
+Proof.
+prepare.
+intros G a b m n Ha Hb.
+apply tr_padmiss_formation; auto.
+Qed.
+
+
+Lemma padmissEq_valid : padmissEq_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext1 ext0 Ha Hb.
+apply tr_padmiss_formation; auto.
+Qed.
+
+
+Lemma padmissFormUniv_valid : padmissFormUniv_obligation.
+Proof.
+prepare.
+intros G a b i ext1 ext0 Ha Hb.
+apply tr_padmiss_formation_univ; auto.
+Qed.
+
+
+Lemma padmissEqUniv_valid : padmissEqUniv_obligation.
+Proof.
+prepare.
+intros G a a' b b' i ext1 ext0 Ha Hb.
+apply tr_padmiss_formation_univ; auto.
+Qed.
+
+
+Lemma padmissTrivialize_valid : padmissTrivialize_obligation.
+Proof.
+prepare.
+intros G a b ext0 H.
+eapply tr_padmiss_eta2; eauto.
+Qed.
+
+
+Lemma padmissExt_valid : padmissExt_obligation.
+Proof.
+prepare.
+intros G a b n p ext1 ext0 Hn Hp.
+apply (tr_transitivity _ _ triv).
+  {
+  eapply tr_padmiss_eta; eauto.
+  }
+
+  {
+  apply tr_symmetry.
+  eapply tr_padmiss_eta; eauto.
+  }
+Qed.
+
+
+Lemma padmissLeft_valid : padmissLeft_obligation.
+Proof.
+prepare.
+intros G1 G2 a b c m H.
+unfold Defs.triv in H.
+apply tr_padmiss_eta_hyp; auto.
+Qed.
+
+
+Lemma padmissEeqtp_valid : padmissEeqtp_obligation.
+Proof.
+prepare.
+intros G a a' b b' ext2 m p Hadmiss Ha Hb.
+rewrite -> def_eeqtp in Ha, Hb.
+apply (tr_padmiss_eeqtp _ a _ b).
+  {
+  apply (tr_subtype_eta2 _#3 (ppi1 m) (ppi1 m)).
+  eapply tr_prod_elim1; eauto.
+  }
+
+  {
+  apply (tr_subtype_eta2 _#3 (ppi2 m) (ppi2 m)).
+  eapply tr_prod_elim2; eauto.
+  }
+
+  {
+  apply (tr_subtype_eta2 _#3 (ppi1 p) (ppi1 p)).
+  eapply tr_prod_elim1; eauto.
+  }
+
+  {
+  apply (tr_subtype_eta2 _#3 (ppi2 p) (ppi2 p)).
+  eapply tr_prod_elim2; eauto.
+  }
+
+  {
+  eapply tr_padmiss_eta2; eauto.
+  }
+Qed.
+
+
+Lemma padmissClosed_valid : padmissClosed_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+apply tr_padmiss_closed; auto.
+eapply tr_admiss_eta2; eauto.
+Qed.
+
+
+Lemma forallPadmissDomainClosed_valid : forallPadmissDomainClosed_obligation.
+Proof.
+prepare.
+intros G a b c ext2 ext1 ext0 Ha Hb Hadmiss.
+apply tr_pi_padmiss_domain_closed; auto.
+eapply tr_padmiss_eta2; eauto.
+Qed.
+
+
+Lemma arrowPadmissDomainClosed_valid : arrowPadmissDomainClosed_obligation.
+Proof.
+prepare.
+intros G a b c ext2 ext1 ext0 Ha Hb Hadmiss.
+apply tr_pi_padmiss_domain_closed; auto.
+simpsub.
+eapply tr_padmiss_eta2; eauto.
+Qed.
+
+
+Hint Rewrite def_halts : prepare.
+
+Lemma arrowPadmissDomainHalts_valid : arrowPadmissDomainHalts_obligation.
+Proof.
+prepare.
+intros G a b c m ext1 ext0 Hadmiss Hm.
+apply (tr_eqtype_convert _#3 (padmiss a (tarrow (halts m) c))).
+  {
+  apply tr_padmiss_formation.
+    {
+    eapply tr_padmiss_formation_invert1.
+    eapply tr_inhabitation_formation; eauto.
+    }
+  
+    {
+    apply tr_tarrow_pi_equal.
+      {
+      eapply tr_halts_formation; eauto.
+      }
+
+      {
+      eapply tr_padmiss_formation_invert2; eauto.
+      eapply tr_inhabitation_formation; eauto.
+      }
+    }
+  }
+
+  {
+  eapply tr_tarrow_padmiss_domain_halts; eauto.
+  eapply tr_padmiss_eta2; eauto.
+  }
+Qed.
+
+
+Lemma prodPadmiss_valid : prodPadmiss_obligation.
+Proof.
+prepare.
+intros G a b c ext1 ext0 H H0.
+apply tr_prod_padmiss; eauto using tr_padmiss_eta2.
+Qed.
+
+
+Lemma padmissFormInv1_valid : padmissFormInv1_obligation.
+Proof.
+prepare.
+intros G a b ext0 Histp.
+eapply tr_padmiss_formation_invert1; eauto.
+Qed.
+
+
+Lemma padmissFormInv2_valid : padmissFormInv2_obligation.
+Proof.
+prepare.
+intros G a b m ext1 ext0 Hab Hm.
+simpsub.
+cut (tr (hyp_tm a :: G) (deqtype b b)).
+  {
+  intro Hb.
+  so (tr_generalize _#4 Hm Hb) as H.
+  simpsubin H.
+  exact H.
+  }
+eapply tr_padmiss_formation_invert2; eauto.
+Qed.
+
+
 Lemma partialType_valid : partialType_obligation.
 Proof.
 prepare.
@@ -3151,6 +3557,64 @@ apply tr_pi_intro.
   }
 apply tr_uptype_formation_univ.
 eapply hypothesis; eauto using index_0.
+Qed.
+
+
+Lemma padmissType_valid : padmissType_obligation.
+Proof.
+prepare.
+intro G.
+rewrite -> def_intersect.
+unfold Defs.padmiss.
+apply tr_intersect_intro.
+  {
+  apply tr_nattp_formation.
+  }
+simpsub.
+cbn [Nat.add].
+apply tr_pi_intro.
+  {
+  apply tr_univ_formation.
+  unfold pagetp.
+  eapply hypothesis; eauto using index_0.
+  }
+eapply tr_pi_intro.
+  {
+  apply tr_pi_formation.
+    {
+    apply (tr_formation_weaken _ (var 1)).
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    apply tr_univ_formation.
+    unfold pagetp.
+    eapply hypothesis; eauto using index_S, index_0.
+    }
+  }
+apply tr_padmiss_formation_univ.
+  {
+  eapply hypothesis; eauto using index_S, index_0.
+  }
+
+  {
+  eapply tr_pi_elim'.
+    {
+    eapply hypothesis; eauto using index_S, index_0.
+    simpsub.
+    cbn [Nat.add].
+    reflexivity.
+    }
+
+    {
+    eapply hypothesis; eauto using index_0.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
 Qed.
 
 
@@ -4060,6 +4524,20 @@ apply tr_sigma_intro.
 Qed.
 
 
+Lemma setAdmiss_valid : setAdmiss_obligation.
+Proof.
+prepare.
+intros G a b ext2 ext1 m Hhyg Ha Hb Huni.
+apply (tr_set_admiss _#3 (subst1 triv m) (subst1 triv m)); eauto using tr_admiss_eta2, tr_padmiss_eta2.
+simpsub.
+replace (subst (dot triv sh1) m) with m; auto.
+so (subst_into_absent_single _ _ _ triv Hhyg) as H.
+simpsubin H.
+symmetry.
+auto.
+Qed.
+
+
 Hint Rewrite def_iset : prepare.
 
 Lemma isetTotal_valid : isetTotal_obligation.
@@ -4136,6 +4614,20 @@ apply tr_sigma_intro.
   {
   apply total_rhs_formation; auto.
   }
+Qed.
+
+
+Lemma isetAdmiss_valid : isetAdmiss_obligation.
+Proof.
+prepare.
+intros G a b ext2 ext1 m Hhyg Hadmissa Hadmissb Huniform.
+apply (tr_iset_admiss _#3 (subst1 triv m) (subst1 triv m)); eauto using tr_admiss_eta2, tr_padmiss_eta2.
+simpsub.
+replace (subst (dot triv sh1) m) with m; auto.
+so (subst_into_absent_single _ _ _ triv Hhyg) as H.
+simpsubin H.
+symmetry.
+auto.
 Qed.
 
 
@@ -4482,5 +4974,187 @@ apply (tr_sequal_trans _ _ (subst1 m n)).
 
   {
   apply tr_sequal_compat; auto.
+  }
+Qed.
+
+
+Lemma seqHalts_valid : seqHalts_obligation.
+Proof.
+prepare.
+intros G a m n ext2 ext1 ext0 Hm Hhaltm Hhaltn.
+assert (tr G (deq m m a)) as Hm'.
+  {
+  apply tr_partial_elim; auto.
+  eapply tr_halts_eta2; eauto.
+  }
+assert (tr G (deq triv triv (halts (subst1 m n)))) as Hgoal.
+  {
+  replace (deq triv triv (halts (subst1 m n))) with (substj (dot m id) (deq triv triv (halts n))).
+  2:{
+    simpsub.
+    reflexivity.
+    }
+  eapply tr_generalize; eauto.
+  eapply tr_halts_eta2; eauto.
+  }
+apply (tr_eqtype_convert _#3 (halts (subst1 m n))); auto.
+apply tr_sequal_eqtype.
+  {
+  apply tr_sequal_symm.
+  exploit (tr_seq_halts_sequal G m n) as H.
+    {
+    eapply tr_halts_eta2; eauto.
+    }
+  so (tr_sequal_compat _#3 (halts (var 0)) H) as H'.
+  simpsubin H'.
+  exact H'.
+  }
+
+  {
+  eapply tr_inhabitation_formation; eauto.
+  }
+Qed.
+
+
+Lemma appHalts_valid : appHalts_obligation.
+Proof.
+prepare.
+intros G a m n ext2 ext1 ext0 Hm Hhaltm Hhaltn.
+assert (tr G (deq m m a)) as Hm'.
+  {
+  apply tr_partial_elim; auto.
+  eapply tr_halts_eta2; eauto.
+  }
+replace (deq triv triv (halts (app m n))) with (substj (dot m id) (deq triv triv (halts (app (var 0) (subst sh1 n))))).
+2:{
+  simpsub.
+  reflexivity.
+  }
+eapply tr_generalize; eauto.
+eapply tr_halts_eta2; eauto.
+Qed.
+
+
+Lemma pi1Halts_valid : pi1Halts_obligation.
+Proof.
+prepare.
+intros G a m ext2 ext1 ext0 Hm Hhaltm Hhaltproj.
+assert (tr G (deq m m a)) as Hm'.
+  {
+  apply tr_partial_elim; auto.
+  eapply tr_halts_eta2; eauto.
+  }
+replace (deq triv triv (halts (ppi1 m))) with (substj (dot m id) (deq triv triv (halts (ppi1 (var 0))))).
+2:{
+  simpsub.
+  reflexivity.
+  }
+eapply tr_generalize; eauto.
+eapply tr_halts_eta2; eauto.
+Qed.
+
+
+Lemma pi2Halts_valid : pi2Halts_obligation.
+Proof.
+prepare.
+intros G a m ext2 ext1 ext0 Hm Hhaltm Hhaltproj.
+assert (tr G (deq m m a)) as Hm'.
+  {
+  apply tr_partial_elim; auto.
+  eapply tr_halts_eta2; eauto.
+  }
+replace (deq triv triv (halts (ppi2 m))) with (substj (dot m id) (deq triv triv (halts (ppi2 (var 0))))).
+2:{
+  simpsub.
+  reflexivity.
+  }
+eapply tr_generalize; eauto.
+eapply tr_halts_eta2; eauto.
+Qed.
+
+
+Lemma prevHalts_valid : prevHalts_obligation.
+Proof.
+prepare.
+intros G a m ext2 ext1 ext0 Hm Hhaltm Hhaltproj.
+assert (tr G (deq m m a)) as Hm'.
+  {
+  apply tr_partial_elim; auto.
+  eapply tr_halts_eta2; eauto.
+  }
+replace (deq triv triv (halts (prev m))) with (substj (dot m id) (deq triv triv (halts (prev (var 0))))).
+2:{
+  simpsub.
+  reflexivity.
+  }
+eapply tr_generalize; eauto.
+eapply tr_halts_eta2; eauto.
+Qed.
+
+
+Hint Rewrite def_ite : prepare.
+
+Lemma activeIte_valid : activeIte_obligation.
+Proof.
+prepare.
+intros G a b m n p ext2 ext1 ext0 Hm Hite Hb.
+cut (tr G (deq (seq m (bite (var 0) (subst sh1 n) (subst sh1 p))) (subst1 m (bite (var 0) (subst sh1 n) (subst sh1 p))) (partial b))).
+  {
+  intro Hseq.
+  simpsubin Hseq.
+  eapply tr_transitivity; eauto.
+  apply tr_symmetry; eauto.
+  }
+eapply tr_seq_active; eauto.
+apply active_bite.
+apply active_var.
+Qed.
+
+
+
+Lemma activeIteSeq_valid : activeIteSeq_obligation.
+Proof.
+prepare.
+intros G a b m n p ext2 ext1 ext0 Hm Hite Hb.
+apply tr_symmetry.
+replace (bite m n p) with (subst1 m (bite (var 0) (subst sh1 n) (subst sh1 p))) by (simpsub; auto).
+eapply tr_seq_active; eauto.
+apply active_bite.
+apply active_var.
+Qed.
+
+
+Lemma iteHalts_valid : iteHalts_obligation.
+Proof.
+prepare.
+intros G a m n p ext2 ext1 ext0 Hm Hhaltm Hhaltnp.
+assert (tr G (deq m m a)) as Hm'.
+  {
+  apply tr_partial_elim; auto.
+  eapply tr_halts_eta2; eauto.
+  }
+replace (deq triv triv (halts (bite m n p))) with (substj (dot m id) (deq triv triv (halts (bite (var 0) (subst sh1 n) (subst sh1 p))))).
+2:{
+  simpsub.
+  reflexivity.
+  }
+eapply tr_generalize; eauto.
+eapply tr_halts_eta2; eauto.
+Qed.
+
+
+Lemma iteHaltsInv_valid : iteHaltsInv_obligation.
+Proof.
+prepare.
+intros G m n p ext0 Hhalt.
+apply (tr_active_halts_invert _ _ (bite (var 0) (subst sh1 n) (subst sh1 p))).
+  {
+  simpsub.
+  eapply tr_halts_eta2; eauto.
+  }
+
+  {
+  apply active_bite.
+  apply active_var.
   }
 Qed.

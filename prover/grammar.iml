@@ -224,6 +224,8 @@ structure ParseTerm =
 
       fun quotient x y a b = T.apply2 Prim.quotient a (T.lam (SOME x) (T.lam (SOME y) b))
 
+      fun padmiss x a b = T.apply2 Prim.padmiss a (T.lam (SOME x) b)
+
       val arrow = T.apply2 Prim.arrow
 
       val tarrow = T.apply2 Prim.tarrow
@@ -786,6 +788,26 @@ structure UnparseTerm =
                           b 1
                           ]))
 
+      val () =
+         register Prim.padmiss 2 0
+         (U.wrap
+             (U.apply2 Prim.padmiss U.show (U.lam U.show))
+             (fn (a, (arg, b)) =>
+                 U.box $
+                 U.append
+                    [
+                    U.string "padmiss",
+                    U.break 1,
+                    U.string "(",
+                    U.string arg,
+                    U.break 1,
+                    U.string ": ",
+                    U.box $ a 0,
+                    U.string ") .",
+                    U.break 1,
+                    b 0
+                    ]))
+
       val () = registerBinary Prim.arrow "->" 0
 
       val () = registerBinary Prim.tarrow "-t>" 0
@@ -1092,7 +1114,7 @@ structure UnparseTerm =
          List.foldl
             (fns str set => SymbolSet.insert set (Symbol.fromValue str))
             SymbolSet.empty
-            ["Kind", "U", "ap", "case", "exists", "fn", "forall", "forallfut", "iexists", "iforall", "if", "in", "inl", "inr", "intersect", "intersectfut", "let", "mu", "next", "parametric", "parametricfut", "pi1", "pi2", "prev", "quotient", "rec", "seq", "seqt", "then", "else"]
+            ["Kind", "U", "ap", "case", "else", "exists", "fn", "forall", "forallfut", "iexists", "iforall", "if", "in", "inl", "inr", "intersect", "intersectfut", "let", "mu", "next", "padmiss", "parametric", "parametricfut", "pi1", "pi2", "prev", "quotient", "rec", "seq", "seqt", "then"]
 
    end
 
@@ -1221,6 +1243,7 @@ grammardef Term
    rule Term(0)    ::= "rec" Ident "." Term(0) => rec
    rule Term(0)    ::= "mu" Ident "." Term(0) => mu
    rule Term(0)    ::= "quotient" "(" Ident Ident ":" Term(0) ")" "." Term(0) => quotient
+   rule Term(0)    ::= "padmiss" "(" Ident ":" Term(0) ")" "." Term(0) => padmiss
 
    rule Term(0)    ::= Term(1) "->" Term(0) => arrow
    rule Term(0)    ::= Term(1) "-t>" Term(0) => tarrow

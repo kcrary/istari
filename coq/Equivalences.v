@@ -75,6 +75,15 @@ apply step_bite3.
 Qed.
 
 
+Lemma equiv_admiss :
+  forall (m m' : @term object),
+    equiv m m'
+    -> equiv (admiss m) (admiss m').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
 Lemma equiv_all :
   forall (a a' b b' c c' : term object),
     equiv a a'
@@ -231,10 +240,10 @@ prove_equiv_compat.
 Qed.
 
 
-Lemma equiv_semifut :
-  forall (k k' : term object),
-    equiv k k'
-    -> equiv (semifut k) (semifut k').
+Lemma equiv_halts :
+  forall (m m' : @term object),
+    equiv m m'
+    -> equiv (halts m) (halts m').
 Proof.
 prove_equiv_compat.
 Qed.
@@ -245,6 +254,16 @@ Lemma equiv_intersect :
     equiv a a'
     -> equiv b b'
     -> equiv (intersect a b) (intersect a' b').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
+Lemma equiv_iset :
+  forall (a a' b b' : term object),
+    equiv a a'
+    -> equiv b b'
+    -> equiv (iset a b) (iset a' b').
 Proof.
 prove_equiv_compat.
 Qed.
@@ -278,6 +297,16 @@ prove_equiv_compat.
 Qed.
 
 
+Lemma equiv_padmiss :
+  forall (a a' b b' : term object),
+    equiv a a'
+    -> equiv b b'
+    -> equiv (padmiss a b) (padmiss a' b').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
 Lemma equiv_pi :
   forall (a a' b b' : term object),
     equiv a a'
@@ -288,21 +317,20 @@ prove_equiv_compat.
 Qed.
 
 
-Lemma equiv_set :
-  forall (a a' b b' : term object),
-    equiv a a'
-    -> equiv b b'
-    -> equiv (set a b) (set a' b').
+Lemma equiv_semifut :
+  forall (k k' : term object),
+    equiv k k'
+    -> equiv (semifut k) (semifut k').
 Proof.
 prove_equiv_compat.
 Qed.
 
 
-Lemma equiv_iset :
+Lemma equiv_set :
   forall (a a' b b' : term object),
     equiv a a'
     -> equiv b b'
-    -> equiv (iset a b) (iset a' b').
+    -> equiv (set a b) (set a' b').
 Proof.
 prove_equiv_compat.
 Qed.
@@ -375,6 +403,15 @@ prove_equiv_compat.
 Qed.
 
 
+Lemma equiv_partial :
+  forall (m m' : @term object),
+    equiv m m'
+    -> equiv (partial m) (partial m').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
 Lemma equiv_ppair :
   forall (m m' n n' : term object),
     equiv m m'
@@ -412,6 +449,16 @@ prove_equiv_compat.
 Qed.
 
 
+Lemma equiv_seq :
+  forall (m m' n n' : @term object),
+    equiv m m'
+    -> equiv n n'
+    -> equiv (seq m n) (seq m' n').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
 Lemma equiv_sequal :
   forall (m m' n n' : @term object),
     equiv m m'
@@ -422,47 +469,10 @@ prove_equiv_compat.
 Qed.
 
 
-Lemma equiv_partial :
-  forall (m m' : @term object),
-    equiv m m'
-    -> equiv (partial m) (partial m').
-Proof.
-prove_equiv_compat.
-Qed.
-
-
-Lemma equiv_halts :
-  forall (m m' : @term object),
-    equiv m m'
-    -> equiv (halts m) (halts m').
-Proof.
-prove_equiv_compat.
-Qed.
-
-
-Lemma equiv_admiss :
-  forall (m m' : @term object),
-    equiv m m'
-    -> equiv (admiss m) (admiss m').
-Proof.
-prove_equiv_compat.
-Qed.
-
-
 Lemma equiv_uptype :
   forall (m m' : @term object),
     equiv m m'
     -> equiv (uptype m) (uptype m').
-Proof.
-prove_equiv_compat.
-Qed.
-
-
-Lemma equiv_seq :
-  forall (m m' n n' : @term object),
-    equiv m m'
-    -> equiv n n'
-    -> equiv (seq m n) (seq m' n').
 Proof.
 prove_equiv_compat.
 Qed.

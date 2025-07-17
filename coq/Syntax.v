@@ -99,6 +99,7 @@ Inductive operator : list nat -> Type :=
 | oper_partial     : operator [0]
 | oper_halts       : operator [0]
 | oper_admiss      : operator [0]
+| oper_padmiss     : operator [0; 1]
 | oper_uptype      : operator [0]
 | oper_seq         : operator [0; 1]
 
@@ -569,6 +570,7 @@ Definition wt {obj} m1 m2          : @term obj := oper _ (oper_wt _) (rw_cons _ 
 Definition partial {obj} m         : @term obj := oper _ (oper_partial _) (rw_cons _ _ m rw_nil).
 Definition halts {obj} m           : @term obj := oper _ (oper_halts _) (rw_cons _ _ m rw_nil).
 Definition admiss {obj} m          : @term obj := oper _ (oper_admiss _) (rw_cons _ _ m rw_nil).
+Definition padmiss {obj} m1 m2     : @term obj := oper _ (oper_padmiss _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition uptype {obj} m          : @term obj := oper _ (oper_uptype _) (rw_cons _ _ m rw_nil).
 Definition seq {obj} m1 m2         : @term obj := oper _ (oper_seq _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition ext {obj} x             : @term obj := oper _ (oper_ext _ x) rw_nil.
@@ -767,6 +769,9 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 
 | same_admiss :
     same_operator [0] [0] (oper_admiss A) (oper_admiss B)
+
+| same_padmis :
+    same_operator [0; 1] [0; 1] (oper_padmiss A) (oper_padmiss B)
 
 | same_uptype :
     same_operator [0] [0] (oper_uptype A) (oper_uptype B)

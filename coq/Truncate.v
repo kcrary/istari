@@ -539,6 +539,22 @@ apply prod_extensionality.
 Qed.
 
 
+Lemma iutruncate_collapse_conv :
+  forall n (A B : car (wiurel_ofe cur)),
+    iutruncate n A = iutruncate n B
+    -> dist n A B.
+Proof.
+intros n A B Heq.
+apply (dist_trans _ _ _ (iutruncate n A)).
+  {
+  apply dist_symm.
+  apply iutruncate_near.
+  }
+rewrite -> Heq.
+apply iutruncate_near.
+Qed.
+
+
 Lemma den_iutruncate :
   forall n a,
     den (iutruncate n a) = ceiling n (den a).

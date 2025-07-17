@@ -946,6 +946,42 @@ apply equiv_sequal.
 Qed.
 
 
+Lemma def_padmiss :
+  forall a b,
+    equiv (app (app Defs.padmiss a) (lam b)) (padmiss a b).
+Proof.
+intros a m.
+unfold Defs.padmiss.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app1.
+    apply step_app2.
+    }
+  simpsub.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+apply equiv_padmiss; auto using equiv_refl.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl'.
+rewrite <- eqsub_expand_id.
+simpsub.
+reflexivity.
+Qed.
+
+
 Lemma def_partial :
   forall a, equiv (app Defs.partial a) (partial a).
 Proof.

@@ -14,6 +14,16 @@
   + `typecheckFixpoint` establishes the type of a recursive definition
     using fixpoint induction.
 
+  + `fixpointInduction` employs fixpoint induction to prove properties
+    of fixpoints.
+
+  + `termination` reasons about termination.
+
+  + `totality` proves termination for inhabitants of total types.
+
+  + `partiality` reasons about membership or equality in partial
+    types.
+
 - Tactic changes:
 
   + The behavior of `revert` on hidden hypotheses has changed; it now
@@ -23,8 +33,11 @@
 
   + `revert` now works on later and later-hidden hypotheses.
 
-  + `substitution` and `subst` now support substituting for later
+  + `substitution` and `subst` now support substituting for `later`
     hypotheses.
+
+  + `omega` no longer unfolds soft constants in its typing
+    obligations.
 
   + `refine` has moved from `Tactic` to `RefineTactic`.
 
@@ -36,6 +49,9 @@
   `goalHypnCaseB`.
 
 - The typechecker can infer types for paths whose head is partial.
+
+- The typechecker now uses the constant `Partial.strict` for
+  strictness, instead of the underlying `A <: partial A`.
 
 - Library changes:
 
@@ -52,13 +68,19 @@
 
   + `Logic` and `Weaksum` have additional material.
 
-  + `Partial.total` is defined using `dprod` instead of `exists`.
+  + `Partial` has new material.  `Partial.total` is defined using
+    `dprod` instead of `exists`.  A new `Partial.fixpoint_induction`
+    has been added, and the old one is renamed to
+    `Partial.fixpoint_formation`.
 
 - Rule changes:
 
   + Added rules `intersectfutIntro`, `futureLeftHidden`,
-    `parametricElim'`, `substitutionLater`, and
-    `substitutionLaterSimple`.
+    `parametricElim'`, `substitutionLater`, `substitutionLaterSimple`,
+    `partialOfExt`, `fixpointInductionShift`, `haltsIntro`,
+    `haltsUptype`, `partialElimHalts`, `seqHalts`, `appHalts`, `pi1Halts`,
+    `pi2Halts`, and `prevHalts`, `activeIte`, `activeIteSeq`,
+    `iteHalts`, `iteHaltsInv`.
 
   + Added rules governing `parametricfut`.
 
@@ -68,10 +90,18 @@
   + Added convenience rules for inferring types of paths whose head is
     partial.
 
+  + Added rules governing predicate admissibility.
+
   + Renamed `seqBind` to `seqBindEq`, and added `seqBindOf`.
 
   + Renamed type totality rules: for types `t`, `tTotal` becomes
     `tHalts`, and `tTotal'` becomes `tTotal`.
+
+  + The strictness rules use the constant `Partial.strict` instead of
+    the underlying `A <: partial A`.
+
+  + `arrowUptype`, `arrowAdmiss`, and `dprodStrict` now provide a
+    hypothesis to their second premise.
 
   + Changed the extract of `letIntro` to use a let term.
 

@@ -1741,6 +1741,21 @@ rewrite -> extend_iuadmiss.
 reflexivity.
 }  
 
+(* padmiss *)
+{
+intros pg s i a b A B _ IH1 _ IH2 IHo h.
+so (IH1 IHo h) as (A' & ->).
+so (IH2 IHo (den A') (eq_refl _) h) as (B' & ->).
+clear IH1 IH2.
+exists (iupadmiss (cin pg) i A' B').
+rewrite -> extend_iupadmiss.
+f_equal.
+apply nearrow_extensionality.
+intro x.
+cbn.
+reflexivity.
+}
+
 (* uptype *)
 {
 intros pg s i a A _ IH IHo h.
@@ -2134,6 +2149,7 @@ try (intros;
            |eapply interp_subtype
            |eapply interp_partial
            |eapply interp_admiss
+           |eapply interp_padmiss
            |eapply interp_uptype
            ];
      eauto using restriction_hygiene, restriction_decrease;

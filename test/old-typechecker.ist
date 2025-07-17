@@ -1,0 +1,97 @@
+
+File.import "typecheck/1.0.1-load.iml";
+File.import "typecheck/1.1-load.iml";
+
+
+fun shouldfail tac goal fk sk = tac goal (fn _ => idtac goal fk sk) (fn _ => fk "unexpected success");
+
+
+lemma "strictness_checking_curr"
+/
+  forall i (a : U i) (x : a) .
+    Partial.strict (pause a)
+    -> x : partial a
+/;
+
+inference.
+intro /i a x Hstrict/.
+typecheck.
+unfold /pause in Hstrict/ >> hyp /Hstrict/.
+qed ();
+
+
+
+Typecheck_1_1.select ();
+
+
+lemma "strictness_checking_1.1"
+/
+  forall i (a : U i) (x : a) .
+    Partial.strict (pause a)
+    -> x : partial a
+/;
+
+inference.
+intro /i a x Hstrict/.
+typecheck.
+(* proceeds to a = partial a *)
+shouldfail (unfold /pause in Hstrict/ >> hyp /Hstrict/).
+Prover.abandon ();
+
+
+
+lemma "strictness_checking_wrap_1.1"
+/
+  forall i (a : U i) (f : a -> a) .
+    f : partial (a -> a)
+/;
+
+inference.
+intro /i a f/.
+typecheck.
+qed ();
+
+
+
+lemma "guard_subtype_1.1"
+/
+  forall i (a b b' : U i) .
+    b <: b'
+    -> (a -g> b) <: (a -g> b')
+/;
+
+inference.
+intro /i a b b' Hsub/.
+typecheck.
+qed ();
+
+
+
+Typecheck_1_0_1.select ();
+
+
+lemma "strictness_checking_wrap_1.0.1"
+/
+  forall i (a : U i) (f : a -> a) .
+    f : partial (a -> a)
+/;
+
+inference.
+intro /i a f/.
+typecheck.
+qed ();
+
+
+
+lemma "guard_subtype_1.0.1"
+/
+  forall i (a b b' : U i) .
+    b <: b'
+    -> (a -g> b) <: (a -g> b')
+/;
+
+inference.
+intro /i a b b' Hsub/.
+typecheck.
+idtac.  (* outstanding goals exist *)
+Prover.abandon ();

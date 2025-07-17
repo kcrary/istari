@@ -1,4 +1,7 @@
 
+File.import "logic-load.iml";
+
+
 (* Partial types *)
 
 beginModule "Partial";
@@ -7,9 +10,11 @@ beginModule "Partial";
 aliasExport /partial/ Prim.partial;
 aliasExport /halts/ Prim.halts;
 aliasExport /admiss/ Prim.admiss;
+aliasExport /padmiss/ Prim.padmiss;
 aliasExport /uptype/ Prim.uptype;
 aliasExport (Symbol.fromValue "seq") Prim.seq;
 aliasExport /bottom/ Prim.bottom;
+aliasExport /strict/ Prim.strict;
 aliasExport /total/ Prim.total;
 
 
@@ -61,6 +66,18 @@ recordTyping "uptype_type";
 
 
 
+lemma "padmiss_type"
+/
+  `padmiss : intersect i . forall (a : U i) . (a -> U i) -> U i
+/;
+
+inference.
+RuleTactic.padmissType.
+qed ();
+recordTyping "padmiss_type";
+
+
+
 lemma "seq_type"
 /
   `seq : intersect i (a b : U i) . partial a -> (a -> partial b) -> partial b
@@ -99,20 +116,6 @@ qed ();
 
 
 
-lemma "fixpoint_induction"
-/
-  forall i (a : U i) (f : partial a -> partial a) .
-    admiss a
-    -> fix f : partial a
-/;
-
-inference.
-intro /i a f Hadmiss/.
-RuleTactic.fixpointInductionOf >> auto.
-qed ();
-
-
-
 lemma "uptype_impl_admiss"
 /
   forall i (a : U i) . uptype a -> admiss a
@@ -126,12 +129,50 @@ qed ();
 
 
 
+lemma "halts_uptype"
+/
+  forall i (a : U i) (x : partial a) . uptype (halts x)
+/;
+
+inference.
+intro /i a x/.
+RuleTactic.uptypeUnitary.
+intro /y/.
+RuleTactic.haltsLeft 0.
+typecheck.
+qed ();
+
+
+
+(*
+Built-in:
+
+defineRaw /strict a/
+/
+  a <: partial a
+/;
+*)
+
+
+lemma "strict_type"
+/
+  strict : intersect i . U i -> U i
+/;
+
+inference.
+unfold /strict/.
+typecheck.
+qed ();
+recordTyping "strict_type";
+
+
+
 (*
 Built-in:
 
 defineRaw /total a/
 /
-  (a <: partial a) &d (forall (x : a) . halts x)
+  strict a &d (forall (x : a) . halts x)
 /;
 
 The first conjunct is needed because we need to know
@@ -149,6 +190,132 @@ unfold /total/.
 typecheck.
 qed ();
 recordTyping "total_type";
+
+
+
+define /inpar m/
+/
+  m
+//
+  intersect i (a : U i) . forall (m : a) . strict a -g> partial a
+/;
+
+inference.
+introOf /i a m Hstrict/.
+unfold /inpar/.
+partiality /concl/ >> auto.
+qed ();
+
+setOpacity /inpar/ Constant.FIRM;
+
+
+
+define /outpar m/
+/
+  m
+//
+  intersect i (a : U i) . forall (m : partial a) . halts m -g> a
+/;
+
+inference.
+introOf /i a m Hhalt/.
+unfold /outpar/.
+partiality /concl/ >> auto.
+qed ();
+
+setOpacity /outpar/ Constant.FIRM;
+
+
+
+lemma "fixpoint_formation"
+/
+  forall i (a : U i) (f : partial a -> partial a) .
+    admiss a
+    -> fix f : partial a
+/;
+
+inference.
+intro /i a f Hadmiss/.
+RuleTactic.fixpointInductionOf >> auto.
+qed ();
+
+
+
+lemma "fixpoint_induction"
+/
+  forall i (a : U i) (P : partial a -> U i) (f : partial a -> partial a) .
+    admiss a
+    -> (padmiss (x : partial a) . P x)
+    -> (forall (x : partial a) . (halts x -> P x) -> P x)
+    -> (forall (x : partial a) . P x -> P (f x))
+    -> P (fix f)
+/;
+
+inference.
+intro /i a P f Hadma HadmP Hbase Hind/.
+(* Do a little extra work here for a clean extract. *)
+exactRaw /Hbase (fix f) (fn _ . fix (fn y . (f (y #1), Hind (y #1) (Hbase (y #1) (fn _ . y #2)))) #2)/.
+set /F/ /fn y . (f (y #1), Hind (y #1) (Hbase (y #1) (fn _ . y #2)))/.
+fold /F/.
+assert /fix f : partial a/ /Hoffixf/.
+  {
+  RuleTactic.fixpointInductionOf >> auto.
+  }
+assert /F : partial (exists (x : partial a) . P x) -> partial (exists (x : partial a) . P x)/ /HofF/.
+  {
+  unfold /F/.
+  introOf /x/.
+  reduce //.
+  typecheck.
+  reintro /Hhalt/.
+  termination /Hhalt/.
+  reintro /Hhaltx/.
+  fold /outpar x at 1/.
+  typecheck.
+  }
+assert /admiss (exists (x : partial a) . P x)/ /Hadmiss/.
+  {
+  Partiality.proveAdmiss.
+  }
+assert /fix F : partial (exists (x : partial a) . P x)/ /HoffixF/.
+  {
+  RuleTactic.fixpointInductionOf >> auto.
+  }
+assert /fix F #1 = fix f : partial a/ /Heq/.
+  {
+  RuleTactic.fixpointInductionShift (parseCurr /exists (x : partial a) . P x/) (parseCurr /F/) (parseCurr /fn x . x #1/) >> auto.
+    {
+    reduce //.
+    folds 2 /bottom ap i ap (exists (x : partial a) . P x)/.
+    intro /Hhalt/.
+    unfold /ap in Hhalt at all/.
+    termination /Hhalt/.
+    reintro /Hhalt'/.
+    termination /Hhalt'/.
+    }
+
+    {
+    reintro /x/.
+    reduce //.
+    unfold /F/.
+    reflexivity.
+    }
+  }
+typecheck1 >> auto.
+introOf /Hhaltfixf/.
+reduce //.
+subsume /P (fix F #1)/.
+  {
+  typecheck.
+  }
+rewrite /<- Heq in Hhaltfixf/.
+termination /Hhaltfixf/.
+reintro /HhaltfixF/.
+partiality /HoffixF/ >> auto.
+reintro /HoffixF'/.
+inferSpine /HoffixF'/ /__ #2/ /H/.
+hyp /H/.
+qed ();
 
 
 
@@ -188,6 +355,7 @@ rewrite /-> Heq'/.
 typecheck.
 qed ();
 recordTyping "seqt_type";
+
 
 
 endModule ();

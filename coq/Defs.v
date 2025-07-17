@@ -96,6 +96,7 @@ Definition negative : fterm := lam (isnegative (app (var 1) (var 0))).
 Definition nonsense : fterm := guard voidtp voidtp.
 Definition of : fterm := lam (lam (equal (var 1) (var 0) (var 0))).
 Definition orphan : fterm := triv.
+Definition padmiss : fterm := lam (lam (padmiss (var 1) (app (var 1) (var 0)))).
 Definition parametric : fterm := lam (lam (intersect booltp (bite (var 0) (pi (var 2) (app (var 2) (var 0))) constfn))).
 Definition parametricfut : fterm := lam (lam (intersect booltp (bite (var 0) (pi (semifut (var 2)) (app (var 2) (var 0))) constfn))).
 Definition partial : fterm := lam (partial (var 0)).
@@ -153,6 +154,9 @@ Definition irrelevant : fterm :=
 
 Definition paramapp : fterm :=
   lam (lam (app (var 1) Syntax.triv)).
+
+Definition strict : fterm :=
+  lam (subtype (var 0) (Syntax.partial (var 0))).
 
 Definition total : fterm :=
   lam (sigma

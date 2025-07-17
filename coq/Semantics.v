@@ -498,6 +498,12 @@ with basicv : page -> bool -> nat -> sterm -> wiurel stop -> Prop :=
       basic pg s i a A
       -> basicv pg s i (admiss a) (iuadmiss stop i A)
 
+| interp_padmiss :
+    forall pg s i a b (A : wiurel stop) (B : urelsp (den A) -n> wiurel_ofe stop),
+      basic pg s i a A
+      -> functional pg s i (den A) b B
+      -> basicv pg s i (padmiss a b) (iupadmiss stop i A B)
+
 | interp_uptype :
     forall pg s i a (A : wiurel stop),
       basic pg s i a A

@@ -44,6 +44,7 @@ cons is right associative.
       wtype ( Ident : [Term] ) . [Term]                              (W type)
       iset ( Ident : [Term] ) . [Term]                               (intensional set type)
       quotient ( Ident Ident : [Term] ) . [Term]                     (quotient type)
+      padmiss ( Ident : [Term] ) . [Term]                            (predicate admissibility)
       Term -> [Term]                                                 (ordinary arrow)
       Term -t> [Term]                                                (tarrow kind)
       Term -k> [Term]                                                (karrow kind)

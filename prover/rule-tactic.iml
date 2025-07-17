@@ -694,18 +694,24 @@ signature RULE_TACTIC =
       val partialIntroBottomOf : tactic
       val bottomDiverges : tactic
       val partialExt : tactic
+      val partialOfExt : tactic1                  (* B *)
       val partialElimEq : tactic
       val partialElimOf : tactic
+      val haltsIntro : tactic
       val haltsTrivialize : tactic
       val haltsExt : tactic
       val haltsLeft : int -> tactic
+      val partialElimHalts : tactic1              (* A *)
       val fixpointInductionEq : tactic
       val fixpointInductionOf : tactic
+      val fixpointInductionShift : tactic3        (* A M P *)
       val partialFormInv : tactic
       val seqBindEq : tactic1                     (* A *)
       val seqBindOf : tactic1                     (* A *)
+      val seqHalts : tactic1                      (* A *)
       val activeApp : tactic3                     (* A M N *)
       val activeAppSeq : tactic2                  (* A N *)
+      val appHalts : tactic3                      (* A M N *)
       val appHaltsInv : tactic1                   (* N *)
       val activeAppArrow : tactic3                (* A M N *)
       val activeAppArrowPartial : tactic3         (* A M N *)
@@ -713,6 +719,7 @@ signature RULE_TACTIC =
       val activeAppForallPartial : tactic4        (* A B M N *)
       val activePi1 : tactic2                     (* A M *)
       val activePi1Seq : tactic1                  (* A *)
+      val pi1Halts : tactic2                      (* A M *)
       val pi1HaltsInv : tactic
       val activePi1Prod : tactic2                 (* B M *)
       val activePi1ProdPartial : tactic2          (* B M *)
@@ -720,10 +727,16 @@ signature RULE_TACTIC =
       val activePi1ExistsPartial : tactic2        (* B M *)
       val activePi2 : tactic2                     (* A M *)
       val activePi2Seq : tactic1                  (* A *)
+      val pi2Halts : tactic2                      (* A M *)
       val pi2HaltsInv : tactic
       val activePi2Prod : tactic2                 (* A M *)
       val activePi2ProdPartial : tactic2          (* A M *)
+      val prevHalts : tactic1                     (* A *)
       val prevHaltsInv : tactic
+      val activeIte : tactic1                     (* A *)
+      val activeIteSeq : tactic1                  (* A *)
+      val iteHalts : tactic1                      (* A *)
+      val iteHaltsInv : tactic2                   (* N P *)
       val activeCase : tactic1                    (* A *)
       val activeCaseSeq : tactic1                 (* A *)
       val caseHaltsInv : tactic2                  (* P R *)
@@ -811,6 +824,7 @@ signature RULE_TACTIC =
       val eqtpUptype : tactic
       val istpUptype : tactic
       val subtypeUptype : tactic
+      val haltsUptype : tactic
       val setUptype : tactic
       val isetUptype : tactic
       val muUptype : tactic
@@ -840,6 +854,7 @@ signature RULE_TACTIC =
       val existsAdmissUptype : tactic
       val prodAdmiss : tactic
       val dprodAdmissUptype : tactic
+      val existsAdmiss : tactic
       val sumAdmiss : tactic
       val futureAdmiss : tactic
       val eqAdmiss : tactic
@@ -847,14 +862,32 @@ signature RULE_TACTIC =
       val eqtpAdmiss : tactic
       val istpAdmiss : tactic
       val subtypeAdmiss : tactic
+      val setAdmiss : tactic
+      val isetAdmiss : tactic
       val recAdmiss : tactic
       val recAdmissUniv : tactic1                 (* I *)
       val natAdmiss : tactic
       val admissFormInv : tactic
+      val padmissForm : tactic
+      val padmissEq : tactic
+      val padmissFormUniv : tactic
+      val padmissEqUniv : tactic
+      val padmissTrivialize : tactic
+      val padmissExt : tactic
+      val padmissLeft : int -> tactic
+      val padmissEeqtp : tactic2                  (* A B *)
+      val padmissClosed : tactic1                 (* B *)
+      val forallPadmissDomainClosed : tactic1     (* B *)
+      val arrowPadmissDomainClosed : tactic1      (* B *)
+      val arrowPadmissDomainHalts : tactic1       (* B *)
+      val prodPadmiss : tactic
+      val padmissFormInv1 : tactic1               (* B *)
+      val padmissFormInv2 : tactic3               (* A B M *)
       val partialType : tactic
       val haltsType : tactic
       val admissType : tactic
       val uptypeType : tactic
+      val padmissType : tactic
       val seqType : tactic
       val eeqtpRefl : tactic
       val eeqtpSymm : tactic
@@ -7259,6 +7292,18 @@ structure RuleTactic :> RULE_TACTIC =
                 ]
          end
 
+      fun partialOfExt xB =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.partialOfExt (T.evar ()) xB (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                ]
+         end
+
       val partialElimEq =
          let
             do () = lift
@@ -7271,6 +7316,13 @@ structure RuleTactic :> RULE_TACTIC =
             do () = lift
          in
             refine (Rule.partialElimOf (T.evar ()) (T.evar ()))
+         end
+
+      val haltsIntro =
+         let
+            do () = lift
+         in
+            refine (Rule.haltsIntro (T.evar ()))
          end
 
       val haltsTrivialize =
@@ -7301,6 +7353,12 @@ structure RuleTactic :> RULE_TACTIC =
                 ]
          end
 
+      fun partialElimHalts xA =
+         let
+         in
+            refine (Rule.partialElimHalts xA (T.evar ()) (T.evar ()))
+         end
+
       val fixpointInductionEq =
          let
             do () = lift
@@ -7313,6 +7371,22 @@ structure RuleTactic :> RULE_TACTIC =
             do () = lift
          in
             refine (Rule.fixpointInductionOf (T.evar ()) (T.evar ()))
+         end
+
+      fun fixpointInductionShift xA xM xP =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.fixpointInductionShift xA (T.evar ()) xM (T.evar ()) xP)
+            >>> [
+                idtac,
+                idtac,
+                idtac,
+                idtac,
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                ]
          end
 
       val partialFormInv =
@@ -7346,6 +7420,18 @@ structure RuleTactic :> RULE_TACTIC =
                 ]
          end
 
+      fun seqHalts xA =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.seqHalts xA (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                ]
+         end
+
       fun activeApp xA xM xN =
          let
             do (jud, dir) = withgoal
@@ -7367,6 +7453,18 @@ structure RuleTactic :> RULE_TACTIC =
                 idtac,
                 chdir (D.bindsVary dir [NONE, ]),
                 idtac,
+                ]
+         end
+
+      fun appHalts xA xM xN =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.appHalts xA xM xN)
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
                 ]
          end
 
@@ -7421,6 +7519,18 @@ structure RuleTactic :> RULE_TACTIC =
                 idtac,
                 chdir (D.bindsVary dir [NONE, ]),
                 idtac,
+                ]
+         end
+
+      fun pi1Halts xA xM =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.pi1Halts xA xM)
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
                 ]
          end
 
@@ -7479,6 +7589,18 @@ structure RuleTactic :> RULE_TACTIC =
                 ]
          end
 
+      fun pi2Halts xA xM =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.pi2Halts xA xM)
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                ]
+         end
+
       val pi2HaltsInv =
          let
             do () = lift
@@ -7498,11 +7620,65 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.activePi2ProdPartial xA (T.evar ()) xM)
          end
 
+      fun prevHalts xA =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.prevHalts xA (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                ]
+         end
+
       val prevHaltsInv =
          let
             do () = lift
          in
             refine (Rule.prevHaltsInv (T.evar ()))
+         end
+
+      fun activeIte xA =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.activeIte xA (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                idtac,
+                ]
+         end
+
+      fun activeIteSeq xA =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.activeIteSeq xA (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                idtac,
+                ]
+         end
+
+      fun iteHalts xA =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.iteHalts xA (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                ]
+         end
+
+      fun iteHaltsInv xN xP =
+         let
+         in
+            refine (Rule.iteHaltsInv (T.evar ()) xN xP)
          end
 
       fun activeCase xA =
@@ -7642,7 +7818,7 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.forallStrict (T.evar ()) (T.evar ()))
             >>> [
                 idtac,
-                chdir (D.bindsVary dir [binder [2, 1, 2, ] (J.concl jud), ]),
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
                 ]
          end
 
@@ -7672,7 +7848,7 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.forallfutStrict (T.evar ()) (T.evar ()))
             >>> [
                 idtac,
-                chdir (D.bindsVary dir [binder [2, 1, 2, ] (J.concl jud), ]),
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
                 ]
          end
 
@@ -7727,7 +7903,7 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.parametricStrict (T.evar ()) (T.evar ()))
             >>> [
                 idtac,
-                chdir (D.bindsVary dir [binder [2, 1, 2, ] (J.concl jud), ]),
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
                 ]
          end
 
@@ -7757,7 +7933,7 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.parametricfutStrict (T.evar ()) (T.evar ()))
             >>> [
                 idtac,
-                chdir (D.bindsVary dir [binder [2, 1, 2, ] (J.concl jud), ]),
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
                 ]
          end
 
@@ -7769,7 +7945,7 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.intersectStrict (T.evar ()) (T.evar ()))
             >>> [
                 idtac,
-                chdir (D.bindsVary dir [binder [2, 1, 2, ] (J.concl jud), ]),
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
                 ]
          end
 
@@ -7781,7 +7957,7 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.intersectfutStrict (T.evar ()) (T.evar ()))
             >>> [
                 idtac,
-                chdir (D.bindsVary dir [binder [2, 1, 2, ] (J.concl jud), ]),
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
                 ]
          end
 
@@ -7811,7 +7987,7 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.existsStrict (T.evar ()) (T.evar ()))
             >>> [
                 idtac,
-                chdir (D.bindsVary dir [binder [2, 1, 2, ] (J.concl jud), ]),
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
                 ]
          end
 
@@ -7851,8 +8027,13 @@ structure RuleTactic :> RULE_TACTIC =
       val dprodStrict =
          let
             do () = lift
+            do (jud, dir) = withgoal
          in
             refine (Rule.dprodStrict (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                ]
          end
 
       fun sumHalts xA xB =
@@ -7914,7 +8095,7 @@ structure RuleTactic :> RULE_TACTIC =
          in
             refine (Rule.setStrict (T.evar ()) (T.evar ()))
             >>> [
-                chdir (D.bindsVary dir [binder [2, 1, 2, ] (J.concl jud), ]),
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
                 idtac,
                 ]
          end
@@ -7938,7 +8119,7 @@ structure RuleTactic :> RULE_TACTIC =
          in
             refine (Rule.isetStrict (T.evar ()) (T.evar ()))
             >>> [
-                chdir (D.bindsVary dir [binder [2, 1, 2, ] (J.concl jud), ]),
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
                 idtac,
                 ]
          end
@@ -8122,8 +8303,13 @@ structure RuleTactic :> RULE_TACTIC =
       val arrowUptype =
          let
             do () = lift
+            do (jud, dir) = withgoal
          in
             refine (Rule.arrowUptype (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                ]
          end
 
       val intersectUptype =
@@ -8228,6 +8414,13 @@ structure RuleTactic :> RULE_TACTIC =
             do () = lift
          in
             refine (Rule.subtypeUptype (T.evar ()) (T.evar ()))
+         end
+
+      val haltsUptype =
+         let
+            do () = lift
+         in
+            refine (Rule.haltsUptype (T.evar ()))
          end
 
       val setUptype =
@@ -8438,8 +8631,13 @@ structure RuleTactic :> RULE_TACTIC =
       val arrowAdmiss =
          let
             do () = lift
+            do (jud, dir) = withgoal
          in
             refine (Rule.arrowAdmiss (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                ]
          end
 
       val intersectAdmiss =
@@ -8497,6 +8695,13 @@ structure RuleTactic :> RULE_TACTIC =
                 ]
          end
 
+      val existsAdmiss =
+         let
+            do () = lift
+         in
+            refine (Rule.existsAdmiss (T.evar ()) (T.evar ()))
+         end
+
       val sumAdmiss =
          let
             do () = lift
@@ -8546,6 +8751,32 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.subtypeAdmiss (T.evar ()) (T.evar ()))
          end
 
+      val setAdmiss =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.setAdmiss (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [NONE, binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val isetAdmiss =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.isetAdmiss (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [NONE, binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
       val recAdmiss =
          let
             do () = lift
@@ -8583,6 +8814,154 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.admissFormInv (T.evar ()))
          end
 
+      val padmissForm =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.padmissForm (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val padmissEq =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.padmissEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val padmissFormUniv =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.padmissFormUniv (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [2, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val padmissEqUniv =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.padmissEqUniv (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [2, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val padmissTrivialize =
+         let
+            do () = lift
+         in
+            refine (Rule.padmissTrivialize (T.evar ()) (T.evar ()))
+         end
+
+      val padmissExt =
+         let
+            do () = lift
+         in
+            refine (Rule.padmissExt (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+         end
+
+      fun padmissLeft i =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+            val (right, dir') = D.split dir i
+            val left = D.shift dir' 1
+            val set = D.set dir
+         in
+            refine (Rule.padmissLeft i (T.evar ()) (T.evar ()) (T.evar ()))
+            >>> [
+                chdir (rebind left 0 right set),
+                ]
+         end
+
+      fun padmissEeqtp xA xB =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.padmissEeqtp xA (T.evar ()) xB (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                ]
+         end
+
+      fun padmissClosed xB =
+         let
+         in
+            refine (Rule.padmissClosed (T.evar ()) xB)
+         end
+
+      fun forallPadmissDomainClosed xB =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.forallPadmissDomainClosed (T.evar ()) xB (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [binder [2, 0, 2, ] (J.concl jud), ]),
+                ]
+         end
+
+      fun arrowPadmissDomainClosed xB =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.arrowPadmissDomainClosed (T.evar ()) xB (T.evar ()))
+            >>> [
+                idtac,
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                ]
+         end
+
+      fun arrowPadmissDomainHalts xB =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.arrowPadmissDomainHalts (T.evar ()) xB (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [2, ] (J.concl jud), ]),
+                ]
+         end
+
+      val prodPadmiss =
+         let
+            do () = lift
+         in
+            refine (Rule.prodPadmiss (T.evar ()) (T.evar ()) (T.evar ()))
+         end
+
+      fun padmissFormInv1 xB =
+         let
+         in
+            refine (Rule.padmissFormInv1 (T.evar ()) xB)
+         end
+
+      fun padmissFormInv2 xA xB xM =
+         let
+         in
+            refine (Rule.padmissFormInv2 xA xB xM)
+         end
+
       val partialType =
          let
          in
@@ -8605,6 +8984,12 @@ structure RuleTactic :> RULE_TACTIC =
          let
          in
             refine (Rule.uptypeType)
+         end
+
+      val padmissType =
+         let
+         in
+            refine (Rule.padmissType)
          end
 
       val seqType =

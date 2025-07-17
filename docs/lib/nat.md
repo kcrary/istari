@@ -403,3 +403,14 @@ Strong induction for natural numbers:
     nat_dichotomy_weak : forall (m n : nat) . m <= n % n <= m
 
     nat_dichotomy_neq : forall (m n : nat) . m != n : nat -> m < n % n < m
+
+
+### Miscellaneous
+
+    leq_unitary : forall (m n : nat) . (m <= n) <: unit
+
+    lt_unitary : forall (m n : nat) . (m < n) <: unit
+
+    leq_uptype : forall (m n : nat) . Partial.uptype (m <= n)
+
+    lt_uptype : forall (m n : nat) . Partial.uptype (m < n)

@@ -93,6 +93,8 @@ validated using that formalization.
 
 - [Proof irrelevance](proof-irrelevance.html)
 
+- [Partiality](partiality.html)
+
 - [Library](library.html)
 
 - [IML basis](basis.html)

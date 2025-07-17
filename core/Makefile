@@ -40,10 +40,11 @@ irrelevance.isto : function.isto misc.isto
 kindlike.isto : eventually.isto function.isto misc.isto
 list.isto : bool.isto datatype.isto decidable.isto function.ist kindlike.ist logic.isto misc.isto nat.isto option.isto partial.isto
 misc.isto :
-nat.isto : acc.isto bool.isto decidable.isto stable.isto
+nat.isto : acc.isto bool.isto decidable.isto partial.isto stable.isto
 natural.isto : bool.isto integer.isto nat.isto logic.isto
 omega.isto : datatype.isto logic.isto bool.isto nat.isto integer.isto list.isto misc.isto natural.isto
 option.isto : datatype.isto function.isto kindlike.isto integer.isto
+partial.isto : logic.isto
 permutation.isto : list.isto logic.isto misc.isto nat.isto
 quotient.isto : logic.isto
 rational.isto : bool.isto decidable.isto integer.isto logic.isto partial.isto quotient.isto stable.ist

@@ -177,6 +177,7 @@ structure TypecheckMain_1_0_1 :> TYPECHECK_MAIN =
       structure H2 = Constant2Table
 
       open Tactic
+      open RefineTactic
       open CasePervasive
       open TypecheckTables
       exception Backtrack = Case.Backtrack
@@ -1514,6 +1515,29 @@ structure TypecheckMain_1_0_1 :> TYPECHECK_MAIN =
 
       (*** Subtype checking ***)
                       
+      (* Adapt current strictness tables to old expectations. *)
+      fun strictnessWrap tac =
+         goalCaseT
+         /| \Prim.subtype\ ? _ =>
+            \(fnc a =>
+                 (* A <: partial A *)
+                 refine (Rule.unreduce (T.apply1 Prim.strict a) (R.trans [R.unfold, R.beta 1]))
+                 >>+
+                 (* strict A *)
+                 tac
+                 >>
+                 goalCaseT
+                 /| \Prim.strict\ _ =>
+                    \(fnc =>
+                         refine (Rule.reduce (R.trans [R.unfold, R.beta 1])))\
+
+                  | _ =>
+                    \(fnc =>
+                         idtac)\
+                 /)\
+         /
+                    
+
       fun typecheckSubtype (st as ST { progress, constraints }) table (goal as (jud, dir)) dest (history as (origin, _)) =
          let
             val ctx = J.context jud
@@ -1658,7 +1682,7 @@ structure TypecheckMain_1_0_1 :> TYPECHECK_MAIN =
                    if U.unify1 (T.apply1 Prim.partial a) b then
                       (case H.find strictnessTactics const of
                           SOME tac =>
-                             tryRule st table history tac goal dest
+                             tryRule st table history (strictnessWrap tac) goal dest
                              (fn () =>
                                  dest :=
                                     error history "unexpected strictness failure"
@@ -1732,17 +1756,20 @@ structure TypecheckMain_1_0_1 :> TYPECHECK_MAIN =
              | const? @ _ ; _ =!>
                \(fnc const =>
                     (case H.find subtypeLeftTactics const of
-                        SOME tac =>
-                           tryRule st table history tac goal dest
-                           (fn () =>
-                               dest :=
-                                  error history "unexpected subtyping failure"
-                                  (fn () =>
-                                      (
-                                      showPrefixed " first: " dir a;
-                                      showPrefixed "second: " dir b;
-                                      print "\n"
-                                      )))
+                        SOME (pri, tac) =>
+                           if pri > 0 then
+                              raise Backtrack
+                           else
+                              tryRule st table history tac goal dest
+                              (fn () =>
+                                  dest :=
+                                     error history "unexpected subtyping failure"
+                                     (fn () =>
+                                         (
+                                         showPrefixed " first: " dir a;
+                                         showPrefixed "second: " dir b;
+                                         print "\n"
+                                         )))
  
                       | NONE => raise Backtrack))\
 
@@ -1750,17 +1777,20 @@ structure TypecheckMain_1_0_1 :> TYPECHECK_MAIN =
              | _ ; const? @ _ =!>
                \(fnc const =>
                     (case H.find subtypeRightTactics const of
-                        SOME tac =>
-                           tryRule st table history tac goal dest
-                           (fn () =>
-                               dest :=
-                                  error history "unexpected subtyping failure"
-                                  (fn () =>
-                                      (
-                                      showPrefixed " first: " dir a;
-                                      showPrefixed "second: " dir b;
-                                      print "\n"
-                                      )))
+                        SOME (pri, tac) =>
+                           if pri > 0 then
+                              raise Backtrack
+                           else
+                              tryRule st table history tac goal dest
+                              (fn () =>
+                                  dest :=
+                                     error history "unexpected subtyping failure"
+                                     (fn () =>
+                                         (
+                                         showPrefixed " first: " dir a;
+                                         showPrefixed "second: " dir b;
+                                         print "\n"
+                                         )))
  
                       | NONE => raise Backtrack))\
 

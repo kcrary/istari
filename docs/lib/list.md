@@ -38,10 +38,6 @@ A simpler case-analysis operation:
     list_case (nil) n c --> n
     list_case (cons h t) n c --> c h t
 
-Lists are covariant:
-
-    list_subtype : forall (i : level) (a b : U i) . a <: b -> list a <: list b
-
 
 ### Append
 
@@ -620,6 +616,8 @@ constructors)
 
 
 ### Miscellaneous
+
+Lists are covariant:
 
     list_subtype : forall (i : level) (a b : U i) . a <: b -> list a <: list b
 

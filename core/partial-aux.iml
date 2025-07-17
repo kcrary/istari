@@ -1,1 +1,130 @@
-(* empty *)
+
+signature FIXPOINT_INDUCTION_TACTIC =
+   sig
+
+      val fixpointInductionRaw : ETerm.eterm -> Tactic.tactic
+      val fixpointInduction : ETerm.eterm -> Tactic.tactic
+      val fixpointInductionPriority : ETerm.eterm -> Tactic.priority Tactic.tacticm
+
+   end
+
+
+functor FixpointInductionTacticFun () :> FIXPOINT_INDUCTION_TACTIC =
+   struct
+
+      structure T = Term
+      structure J = Judgement
+      structure R = Reduction
+
+      open Tactic
+      open RefineTactic
+      open CasePervasive
+
+      val fixpoint_induction = resolveGlobal /Partial.fixpoint_induction/
+
+      val marker = T.Marker (Symbol.fromValue "")
+
+      fun fixpointInductionPriority ea =
+         let
+            do (jud, dir) = withgoal
+            val a = ETerm.withdir dir ea
+
+            do a' =
+               andthenM $
+               termCaseT (J.concl jud)
+               /| _ @ $ap ? $nil =>
+                  \(fnc m =>
+                       let
+                          val a' =
+                             termCase a
+                             /| evar? =>
+                                \(fnc _ =>
+                                     try
+                                        let
+                                           val (a', _) = Infer.infer (J.context jud) m (fns _ _ => idtac)
+                                        in
+                                           a'
+                                        end
+                                     with _ => a)\
+
+                              | _ =>
+                                \(fnc => a)\
+                             /
+                       in
+                          termCaseT m
+                          /| \Prim.fix\ _ =>
+                             \(fnc =>
+                                  idtacM a')\
+
+                           | const? @ _ =>
+                             \(fnc const =>
+                                  (case Constant.definition const of
+                                      SOME _ =>
+                                         refine (Rule.reduce (R.within [1] (R.trans [R.unfold, R.betas])))
+                                         >>+
+                                         idtacM a'
+              
+                                    | NONE =>
+                                         fail "object is not a fixpoint"))\
+
+                           | _ =>
+                             \(fnc =>
+                                  fail "object is not a fixpoint")\
+                          /
+                       end)\
+   
+                | _ @ $ap _ $nil =>
+                  \(fnc =>
+                       fail "not a fixpoint induction goal")\
+               /
+         in
+            goalCaseT
+            /| ? @ $ap (\Prim.fix\ ?) $nil =>
+               \(fnc p f =>
+                    andthenlPri
+                       (Backchain.witnessPriority
+                           (ETerm.literal $
+                            T.Elim (T.Const fixpoint_induction,
+                                    [
+                                    T.App (T.evar ()),
+                                    T.App a',
+                                    T.App p,
+                                    T.App f,
+                                    T.App marker,
+                                    T.App marker,
+                                    T.App marker,
+                                    T.App marker
+                                    ])))
+                       [
+                       (* admiss A *)
+                       attemptPri Partiality.proveAdmissPriority,
+
+                       (* padmiss A (fn . P[^] 0) *)
+                       attemptPri Partiality.proveAdmissPriority,
+
+                       (* base case, inductive case *)
+                       idtacM Primary,
+                       idtacM Primary,
+                       ])\
+
+             | _ =>
+               \(fnc =>
+                    fail "object is not a fixpoint")\
+            /
+         end
+
+      fun fixpointInductionRaw ea = fixpointInductionPriority ea >> idtac
+      fun fixpointInduction ea = withTypecheckSnd $ fixpointInductionPriority ea
+
+   end
+
+
+functor AfterPartialAll () :> sig end =
+   struct
+
+      val halts_uptype = resolveGlobal /Partial.halts_uptype/
+
+      val () =
+         ConstantTable.insert Partiality.uptypeTactics Prim.halts (applyRaw (ETerm.literal (Term.Const halts_uptype)))
+
+   end

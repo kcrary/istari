@@ -14,10 +14,133 @@ fun shouldfail tac goal fk sk =
 
 
 
+lemma "set_fixpoint"
+/
+  forall i (a : U i) (b : a -> U i) (f : partial { x : a | b x } -> partial { x : a | b x }) .
+    admiss a
+    -> (padmiss (x : a) . b x)
+    -> (forall (x : a) . { b x } -> b x)
+    -> fix f : partial { x : a | b x }
+/;
+
+inference.
+intro /i a b f Hadma Hadmb Hunif/.
+RuleTactic.fixpointInductionOf >> auto.
+Partiality.proveAdmiss.
+auto.
+qed ();
+
+
+
+lemma "ite_halts_inv"
+/
+  forall i (a : U i) (m : partial bool) (n p : partial a) .
+    halts (ite m n p)
+    -> halts m
+/;
+
+inference.
+intro /i a m n p/.
+introRaw /Hhalt/.
+  {
+  typecheck1.
+  RuleTactic.activeIte (parseCurr /bool/) >> auto.
+  }
+termination /Hhalt/.
+auto.
+qed ();
+
+
+
+lemma "ite_halts"
+/
+  forall i (a : U i) (m : partial bool) (n p : partial a) .
+    halts m
+    -> halts n
+    -> halts p
+    -> halts (ite m n p)
+/;
+
+inference.
+intro /i a m n p Hm Hn Hp/.
+termination /concl/ >> auto.
+reintro /b/.
+destruct /b/ /|/ >> auto.
+qed ();
+
+
+
+lemma "strictness_typechecking"
+/
+  forall i (a : U i) (x : a) .
+    a <: partial a
+    -> x : partial a
+/;
+
+inference.
+intro /i a x Hstrict/.
+typecheck.
+unfold /strict/.
+hyp /Hstrict/.
+qed ();
+
+
+
+lemma "seq_commute"
+/
+  forall i (a b c : U i) (m : partial a) (n : partial b) (p : a -> b -> partial c) .
+    (seq x = m in seq y = n in p x y) = (seq y = n in seq x = m in p x y) : partial c
+/;
+
+inference.
+intro /i a b c m n p/.
+extensionality.
+  {
+  split.
+    {
+    intro /H/.
+    termination /H/.
+    reintro /Hm/.
+    reduceSeq /H at 0/ >> auto.
+    termination /H/.
+    reintro /Hn/.
+    reduceSeq /H/ >> auto.
+    reduceSeq /concl/ >> auto.
+    reduceSeq /concl/ >> auto.
+    }
+
+    {
+    intro /H/.
+    termination /H/.
+    reintro /Hm/.
+    reduceSeq /H at 0/ >> auto.
+    termination /H/.
+    reintro /Hn/.
+    reduceSeq /H/ >> auto.
+    reduceSeq /concl/ >> auto.
+    reduceSeq /concl/ >> auto.
+    }
+  }
+reintro /H/.
+termination /H/.
+reintro /Hm/.
+reduceSeq /H at 0/ >> auto.
+termination /H/.
+reduceSeq /H/ >> auto.
+reintro /Hn/.
+reduceSeq /at 0 0 0 0/ >> auto.
+partiality /m/ >> auto.
+partiality /n/ >> auto.
+reintro /Hofm Hofn/.
+partiality /concl/ >> auto.
+qed ();
+
+
+
 lemma "infer_partial_arrow"
 /
   forall i (a b c : U i) (f : partial (a -> b -> c)) (x : a) (y : b) .
-    c <: partial c
+    strict c
     -> f x y : partial c
 /;
 
@@ -44,7 +167,7 @@ qed ();
 lemma "infer_partial_forall"
 /
   forall i (a : U i) (b c : a -> U i) (f : partial (forall (x : a) . b x -> c x)) (x : a) (y : b x) .
-    (forall x . c x <: partial (c x))
+    (forall x . strict (c x))
     -> f x y : partial (c x)
 /;
 
@@ -71,7 +194,7 @@ qed ();
 lemma "infer_partial_prod"
 /
   forall i (a b c : U i) (f : partial (a & b & c)) .
-    b <: partial b
+    strict b
     -> f #2 #1 : partial b
 /;
 
@@ -98,7 +221,7 @@ qed ();
 lemma "infer_partial_exists"
 /
   forall i (a : U i) (b : a -> U i) (f : partial (exists (x : a) . b x)) .
-    a <: partial a
+    strict a
     -> f #1 : partial a
 /;
 
@@ -944,7 +1067,7 @@ lemma "reduceSeq_typing"
 /;
 
 intro /f/.
-reduceSeq //.
+reduceSeq // >> attempt totality.
 reduce //.
 reflexivity.
 qed ();
@@ -957,7 +1080,7 @@ lemma "reduceSeq_typing_hyp"
 /;
 
 intro /f z H/.
-reduceSeq /H/.
+reduceSeq /H/ >> attempt totality.
 reduce /H/.
 hyp /H/.
 qed ();

@@ -1039,6 +1039,27 @@ The destruction tactics are:
     As `rememberRaw` but reverses the direction of the equality.
 
 
+- `abstractOver /[term M]/ /concl/`
+
+  If the conclusion has the form `C[M / x]`, rewrites the conclusion
+  as `(fn x . C) M`.  The type `C` is chosen to capture every
+  appearance of `M`.
+
+  - `abstractOverAt /[term M]/ /concl/ /[numbers]/`
+
+    As `abstractOver` except `C` is chosen to capture only the
+    indicated appearances of `M`.  For example, if `[numbers]` is 
+    `0 2` then the first and third appearances of `M` are captured.
+
+  - `abstractOver /[term M]/ /[hyp h]/`
+
+    As above, but operates on hypothesis `h`.
+
+  - `abstractOverAt /[term M]/ /[hyp h]/ /[numbers]/`
+
+    As above, but operates on hypothesis `h`.
+
+
 - `setEq /[name x]/ /[term M]/ /[term A]/ /[name option H]/`
 
   If `M : A`, creates new hypotheses `x : A` and `H : (x = M : A)`.
@@ -1219,27 +1240,8 @@ The destruction tactics are:
 
 - `typecheckFixpoint`
 
-  If the goal has the form `M : A` where `M` unrolls (and reduces) to
-  `fix F`, proves the goal using [fixpoint
-  induction](type-theory.html#partial-types), leaving the main goal 
-  `F : partial A -> A`.  The admissibility subgoal is discharged
-  automatically if possible.
+  See under [Partiality](#partiality).
 
-  The tactic requires that `fix F` reduces to a value, which is
-  usually the case.  (Usually the body of `F` is a pair or lambda.)
-
-  To use `typecheckFixpoint` on components of a mutually recursive
-  definition, use it on the mutual group that it defines internally.
-  If the first mutual definition is named `foo`, the group is named
-  `foo_group`.  Note that if the mutual definition takes a pervasive
-  argument, then `foo_group` will unroll to the form `fn x . fix F`,
-  not the form `fix F`.  In such a case, you should use
-  typecheckFixpoint to establish the type of `foo_group` applied to
-  the pervasive arguments, rather than merely `foo_group`.
-
-  + `typecheckFixpointRaw`
-
-    As `typecheckFixpoint` but does not invoke the typechecker.
 
 - `Typecheck.trace : bool -> unit`
 
@@ -1380,11 +1382,125 @@ performance.  However, multiple occurrences of the same expression
 will not double the size multiple times.
 
 
+### Partiality
+
+- `typecheckFixpoint`
+
+  If the goal has the form `M : A` where `M` unrolls and reduces to
+  `fix F`, proves the goal using [fixpoint
+  induction](type-theory.html#partial-types), leaving the main goal 
+  `F : partial A -> A`.  The admissibility subgoal is discharged
+  automatically if possible.
+
+  The tactic requires that `fix F` reduces to a value, which is
+  usually the case.  (Usually the body of `F` is a pair or lambda.)
+
+  To use `typecheckFixpoint` on components of a mutually recursive
+  definition, use it on the mutual group that it defines internally.
+  If the first mutual definition is named `foo`, the group is named
+  `foo_group`.  Note that if the mutual definition takes a pervasive
+  argument, then `foo_group` will unroll to the form `fn x . fix F`,
+  not the form `fix F`.  In such a case, you should use
+  typecheckFixpoint to establish the type of `foo_group` applied to
+  the pervasive arguments, rather than merely `foo_group`.
+
+  + `typecheckFixpointRaw`
+
+    As `typecheckFixpoint` but does not invoke the typechecker.
+
+
+- `fixpointInduction /[type A]/`
+
+  If the goal has the form `P M` where `M` unrolls and reduces to
+  `fix F`, proves the goal using predicate fixpoint induction.
+  (Internally, the tactic uses fixpoint induction to prove membership
+  in a set type.)  If the goal does not have the required form, it can
+  be put in that form using `abstractOverAt`.
+
+  The term `M` must have type `partial A`, and `P` must have type
+  `partial A -> U i`.  Often the `A` argument can be omitted and
+  inferred automatically.
+
+  Two main subgoals are generated:
+
+  + `forall (x : partial A) . (halts x -> P x) -> P x`
+
+    This is base case of fixpoint induction.  It is the constructive
+    analogue of `P bottom`.
+
+  + `forall (x : partial A) . P x -> P (F x)`
+
+    This is inductive case of fixpoint induction.
+
+  In addition, `A` must be admissible, and `P` must be
+  predicate-admissible.  These goals are discharged automatically, if
+  possible.
+
+  + `fixpointInductionRaw /[type A]/`
+
+    As `fixpointInduction` but does not invoke the typechecker.
+
+
+- `termination /[hyp h]/`
+
+  Reasons about termination.  If `h`'s type is `halts M`, the tactic
+  generates new termination hypotheses that follow, depending on the
+  structure of `M`.  If `h`'s type is `M = N : partial A`, the tactic
+  generates the hypothesis `M halts <-> N halts`.
+
+  + `termination /concl/`
+
+    If the conclusion is `M halts`, discharges the goal generating
+    termination subgoals, depending on the structure of `M`.
+
+  + `terminationRaw /[hyp h]/`
+
+    As `termination` but does not invoke the typechecker.
+
+  + `terminationRaw /concl/`
+
+    As `termination` but does not invoke the typechecker.
+
+
+- `totality`
+
+  If the conclusion is `M halts`, proves the goal using `M : A` and 
+  `A total`.  The subgoals are discharged by the typechecker.
+
+  + `totalityRaw`
+
+    As `totality` but does not invoke the typchecker.
+
+
+- `partiality /[hyp h]/`
+
+  Reasons about membership in partial types:
+
+  + If `h`'s type is `M : A`, generates the hypothesis 
+    `M : partial A`, provided `A` is strict.
+
+  + If `h`'s type is `M : partial A`, generates the hypothesis 
+    `M : A`, provided `M` halts.
+
+  + If `h`'s type is `M : partial (partial A)`, generates the
+    hypothesis `M : partial A`.
+
+  When `h`'s type is an equality, the tactic does the analogous thing.
+
+  + `partiality /concl/`
+
+    As `partiality` but works backward from the conclusion.
+
+  + `partialityRaw /[hyp h]/`
+
+    As `partiality` but works backward from the conclusion.
+
+
 
 ### Miscellaneous tactics
 
-Rewriting, reordering, and case analysis are documented on their own
-pages.
+[Rewriting](rewriting.html), [reordering](reordering.html), and [case
+analysis](case.html) are documented on their own pages.
 
 - `change /[hyp x]/ /[term A]/`
 
@@ -1442,7 +1558,14 @@ pages.
 - `trustme`
 
   Discharges the current goal.  Can only be used if unsafe mode has
-  been activated by running `Unsafe.allow ();`.
+  been activated by running `Unsafe.allow ();`.  Uses the typechecker
+  to ensure the goal is well-formed.
+
+  + `trustmeRaw`
+
+    As `trustme` but performs no checks whatsoever.  Useful in
+    situations (*e.g.,* typing goals) in which the well-formedness of
+    the conclusion is no easier to establish than its truth.
 
 
 

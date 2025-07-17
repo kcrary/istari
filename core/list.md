@@ -35,10 +35,6 @@ A simpler case-analysis operation:
     list_case (nil) n c --> n
     list_case (cons h t) n c --> c h t
 
-Lists are covariant:
-
-    list_subtype : type:list_subtype
-
 
 ### Append
 
@@ -452,6 +448,8 @@ constructors)
 
 
 ### Miscellaneous
+
+Lists are covariant:
 
     list_subtype : type:list_subtype
 
