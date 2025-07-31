@@ -913,6 +913,7 @@ exact forallPadmissDomainClosed_valid.
 exact arrowPadmissDomainClosed_valid.
 exact arrowPadmissDomainHalts_valid.
 exact prodPadmiss_valid.
+exact eqPadmiss_valid.
 exact padmissFormInv1_valid.
 exact padmissFormInv2_valid.
 exact partialType_valid.

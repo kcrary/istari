@@ -48,6 +48,7 @@ Require Import SemanticsSigma.
 Require Import SemanticsFut.
 Require Import SemanticsSet.
 Require Import SoundSequal.
+Require Import SemanticsEqual.
 
 Local Ltac prove_hygiene :=
   repeat (apply hygiene_auto; cbn; repeat2 split; auto);
@@ -3428,6 +3429,355 @@ destruct i as [| i].
         }
       }
     }
+  }
+Qed.
+
+
+Lemma sound_equal_padmiss :
+  forall G a b m n,
+    pseq G (deq triv triv (padmiss a b))
+    -> pseq (cons (hyp_tm a) G) (deq m m b)
+    -> pseq (cons (hyp_tm a) G) (deq n n b)
+    -> pseq G (deq triv triv (padmiss a (equal b m n))).
+Proof.
+intros G a b m p.
+revert G.
+refine (seq_pseq 3 [hyp_emp] b [hyp_emp] m [hyp_emp] p 3 [] _ [_] _ [_] _ _ _); cbn.
+intros G Hclb Hclm Hclp Hseqadm Hseqm Hseqp.
+rewrite -> seq_padmiss in Hseqadm |- *.
+rewrite -> seq_deq in Hseqm, Hseqp.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (Hseqadm _#3 Hs) as (A & B & Hal & Har & Hbl & Hbr & Hadmiss).
+assert (forall j n q, j <= i -> rel (den A) j n q -> pwctx j (dot n s) (dot q s') (hyp_tm a :: G)) as Hss.
+  {
+  intros j n q Hj Hnq.
+  apply pwctx_cons_tm_seq.
+    {
+    eapply pwctx_downward; eauto.
+    }
+
+    {
+    apply (seqhyp_tm _#5 (iutruncate (S j) A)).
+      {
+      eapply basic_downward; eauto.
+      }
+
+      {
+      eapply basic_downward; eauto.
+      }
+
+      {
+      split; auto.
+      }
+    }
+
+    {
+    intros k t t' Ht.
+    so (Hseqadm _#3 Ht) as (R & _ & Hl & Hr & _).
+    eauto.
+    }
+  }
+clear Hseqadm.
+assert (den A = ceiling (S i) (den A)) as HeqA.
+  {
+  exact (f_equal den (basic_impl_iutruncate _#6 Hal)).
+  }
+exploit (extract_functional toppg i (den A) (subst (under 1 s) (equal b m p)) (subst (under 1 s') (equal b m p))) as H; auto; try prove_hygiene.
+  {
+  intros j n q Hnq.
+  so Hnq as H.
+  rewrite -> HeqA in H.
+  destruct H as (Hj_lt & _).
+  assert (j <= i) as Hj by omega.
+  so (Hseqm _#3 (Hss _#3 Hj Hnq)) as (Rm & Hbml & _ & Hm & _).
+  so (Hseqp _#3 (Hss _#3 Hj Hnq)) as (Rp & Hbpl & Hbpr & Hp & _).
+  invert Hbl.
+  intros _ _ Hact.
+  so (Hact _#3 Hj Hnq) as H.
+  simpsubin H.
+  so (interp_fun _#7 H Hbml).
+  subst Rm.
+  so (interp_fun _#7 H Hbpl).
+  subst Rp.
+  exists (iuequal stop true j (pi1 B (urelspinj _#4 Hnq)) (subst (dot n s) m) (subst (dot n s) p) (subst (dot q s') m) (subst (dot q s') p) Hm Hp).
+  simpsub.
+  split.
+    {
+    apply interp_eval_refl.
+    apply interp_equal; auto.
+    }
+
+    {
+    apply interp_eval_refl.
+    rewrite -> iuequal_swap.
+    cbn.
+    apply interp_equal; auto.
+    }
+  }
+destruct H as (C & Hcl & Hcr).
+exists A, C.
+do2 4 split; auto.
+intros f g i' r t d e j Hde Hclf Hclg Hclr Hclt Hcld Hcle Hadmact.
+destruct Hde as (Hi'_lt, Hde).
+assert (i' <= i) as Hi' by omega.
+split; auto.
+cbn.
+rewrite -> embed_ceiling_urelspinj.
+invert Hbl.
+intros _ _ Hblact.
+invert Hcl.
+intros _ _ Hclact.
+so (Hclact _#3 Hi' Hde) as H.
+simpsubin H.
+invert (basic_value_inv _#6 value_equal H).
+clear H.
+intros u v Bf Hu Hv Hbfl Heq.
+match type of Heq with
+?X = _ =>
+  eassert (rel (den X) _ _ _) as H
+end.
+2:{
+  force_exact H.
+  f_equal.
+  f_equal.
+  exact Heq.
+  }
+clear Heq.
+cbn.
+assert (star step (subst1 (afix j f) r) triv /\ star step (subst1 (afix j g) t) triv) as (Hsteprj & Hsteptj).
+  {
+  so (Hadmact j (le_refl _)) as (Hdej & Hrtj).
+  destruct Hdej as (Hi'_lt' & Hdej).
+  so (proof_irrelevance _ Hi'_lt Hi'_lt').
+  subst Hi'_lt'.
+  cbn in Hrtj.
+  destruct Hrtj as (_ & Hrtj).
+  rewrite -> embed_ceiling_urelspinj in Hrtj.
+  so (Hclact _#3 Hi' Hdej) as Hcfjl.
+  simpsubin Hcfjl.
+  invert (basic_value_inv _#6 value_equal Hcfjl).
+  intros uj vj A' Hmpj Hnqj _ Heq.
+  match type of Heq with
+  ?X = _ =>
+    eassert (rel (den X) _ _ _) as H
+  end.
+    {
+    force_exact Hrtj.
+    f_equal.
+    f_equal.
+    symmetry.
+    exact Heq.
+    }
+  renameover H into Hrtj.
+  cbn in Hrtj.
+  decompose Hrtj.
+  auto.
+  }
+do2 5 split; auto.
+  {
+  exists (subst (dot (subst1 (app theta g) e) s') p).
+  unfold srel in Hu, Hv.
+  split.
+    {
+    exploit (Hadmiss f g i' (subst (dot d (compose s sh1)) m) (subst (dot e (compose s' sh1)) p) d e j (conj Hi'_lt Hde)) as H; auto.
+      {
+      eapply hygiene_subst; eauto.
+      intros l Hl.
+      destruct l as [| l].
+        {
+        simpsub.
+        auto.
+        }
+      simpsub.
+      apply hygiene_shift_permit; auto.
+      }
+    
+      {
+      eapply hygiene_subst; eauto.
+      intros l Hl.
+      destruct l as [| l].
+        {
+        simpsub.
+        auto.
+        }
+      simpsub.
+      apply hygiene_shift_permit; auto.
+      }
+    
+      {
+      intros k Hk.
+      so (Hadmact _ Hk) as (Hdek & Hrtk).
+      exists Hdek.
+      destruct Hdek as (Hi'_lt' & Hdek).
+      so (proof_irrelevance _ Hi'_lt Hi'_lt').
+      subst Hi'_lt'.
+      cbn.
+      split; auto.
+      rewrite -> embed_ceiling_urelspinj.
+      cbn in Hrtk.
+      destruct Hrtk as (_ & Hrtk).
+      rewrite -> embed_ceiling_urelspinj in Hrtk.
+      simpsub.
+      so (Hclact _#3 Hi' Hdek) as H.
+      simpsubin H.
+      invert (basic_value_inv _#6 value_equal H); clear H.
+      intros uk vk Bfk Hmuk Hpvk Hbfkl Heq.
+      simpsubin Hbfkl.
+      match type of Heq with
+      ?X = _ =>
+        eassert (rel (den X) _ _ _) as H
+      end.
+        {
+        force_exact Hrtk.
+        f_equal.
+        f_equal.
+        symmetry.
+        exact Heq.
+        }
+      renameover H into Hrtk.
+      clear Heq.
+      so (Hblact _#3 Hi' Hdek) as Hbfkl'.
+      simpsubin Hbfkl'.
+      so (interp_fun _#7 Hbfkl Hbfkl').
+      subst Bfk.
+      clear Hbfkl'.
+      cbn in Hrtk.
+      decompose Hrtk.
+      intros x Hmx Hpx _ _ _ _ _.
+      eapply urel_zigzag; eauto.
+      so (Hseqp _#3 (Hss _#3 Hi' Hdek)) as (R & Hbfkl' & _ & Hpk & _).
+      so (interp_fun _#7 Hbfkl Hbfkl').
+      subst R.
+      exact Hpk.
+      }
+    cbn in H.
+    destruct H as (_ & H).
+    rewrite -> embed_ceiling_urelspinj in H.
+    so (Hblact _#3 Hi' Hde) as Hbfl'.
+    simpsubin Hbfl'.
+    so (interp_fun _#7 Hbfl Hbfl').
+    subst Bf.
+    simpsubin H.
+    exact H.
+    }
+
+    {
+    exploit (Hadmiss f g i' (subst (dot d (compose s sh1)) p) (subst (dot e (compose s' sh1)) p) d e j (conj Hi'_lt Hde)) as H; auto.
+      {
+      eapply hygiene_subst; eauto.
+      intros l Hl.
+      destruct l as [| l].
+        {
+        simpsub.
+        auto.
+        }
+      simpsub.
+      apply hygiene_shift_permit; auto.
+      }
+    
+      {
+      eapply hygiene_subst; eauto.
+      intros l Hl.
+      destruct l as [| l].
+        {
+        simpsub.
+        auto.
+        }
+      simpsub.
+      apply hygiene_shift_permit; auto.
+      }
+    
+      {
+      intros k Hk.
+      so (Hadmact _ Hk) as (Hdek & Hrtk).
+      exists Hdek.
+      destruct Hdek as (Hi'_lt' & Hdek).
+      so (proof_irrelevance _ Hi'_lt Hi'_lt').
+      subst Hi'_lt'.
+      cbn.
+      split; auto.
+      rewrite -> embed_ceiling_urelspinj.
+      cbn in Hrtk.
+      destruct Hrtk as (_ & Hrtk).
+      rewrite -> embed_ceiling_urelspinj in Hrtk.
+      simpsub.
+      so (Hclact _#3 Hi' Hdek) as H.
+      simpsubin H.
+      invert (basic_value_inv _#6 value_equal H); clear H.
+      intros uk vk Bfk Hmuk Hpvk Hbfkl Heq.
+      simpsubin Hbfkl.
+      match type of Heq with
+      ?X = _ =>
+        eassert (rel (den X) _ _ _) as H
+      end.
+        {
+        force_exact Hrtk.
+        f_equal.
+        f_equal.
+        symmetry.
+        exact Heq.
+        }
+      renameover H into Hrtk.
+      clear Heq.
+      so (Hblact _#3 Hi' Hdek) as Hbfkl'.
+      simpsubin Hbfkl'.
+      so (interp_fun _#7 Hbfkl Hbfkl').
+      subst Bfk.
+      clear Hbfkl'.
+      cbn in Hrtk.
+      decompose Hrtk.
+      intros x Hmx Hpx _ _ _ _ _.
+      eapply urel_zigzag; eauto.
+      so (Hseqp _#3 (Hss _#3 Hi' Hdek)) as (R & Hbfkl' & _ & Hpk & _).
+      so (interp_fun _#7 Hbfkl Hbfkl').
+      subst R.
+      exact Hpk.
+      }
+    cbn in H.
+    destruct H as (_ & H).
+    rewrite -> embed_ceiling_urelspinj in H.
+    so (Hblact _#3 Hi' Hde) as Hbfl'.
+    simpsubin Hbfl'.
+    so (interp_fun _#7 Hbfl Hbfl').
+    subst Bf.
+    simpsubin H.
+    exact H.
+    }
+  }
+
+  {
+  apply hygiene_subst1; prove_hygiene.
+  }
+
+  {
+  apply hygiene_subst1; prove_hygiene.
+  }
+  
+  {
+  assert (approx (subst1 (afix j f) r) (subst1 (app theta f) r)) as Happrox.
+    {
+    apply approx_funct1; auto.
+    apply afix_fix_approx; auto.
+    }
+  so (approx_action _#4 Happrox (conj Hsteprj value_triv)) as (x & Heval & Hmc).
+  destruct Heval as (Hsteps & _).
+  invertc_mc Hmc.
+  intros <-.
+  exact Hsteps.
+  }
+
+  {
+  assert (approx (subst1 (afix j g) t) (subst1 (app theta g) t)) as Happrox.
+    {
+    apply approx_funct1; auto.
+    apply afix_fix_approx; auto.
+    }
+  so (approx_action _#4 Happrox (conj Hsteptj value_triv)) as (x & Heval & Hmc).
+  destruct Heval as (Hsteps & _).
+  invertc_mc Hmc.
+  intros <-.
+  exact Hsteps.
   }
 Qed.
 

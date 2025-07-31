@@ -2094,6 +2094,13 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr G (deq triv triv (padmiss a c))
       -> tr G (deq triv triv (padmiss a (prod b c)))
   
+| tr_equal_padmiss :
+    forall G a b m n,
+      tr G (deq triv triv (padmiss a b))
+      -> tr (cons (hyp_tm a) G) (deq m m b)
+      -> tr (cons (hyp_tm a) G) (deq n n b)
+      -> tr G (deq triv triv (padmiss a (equal b m n)))
+
 | tr_padmiss_formation_invert1 :
     forall G a a' b b',
       tr G (deqtype (padmiss a b) (padmiss a' b'))

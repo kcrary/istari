@@ -368,6 +368,7 @@ intros; eapply sound_padmiss_closed; eauto; done.
 intros; eapply sound_pi_padmiss_domain_closed; eauto; done.
 intros; eapply sound_tarrow_padmiss_domain_halts; eauto; done.
 intros; eapply sound_prod_padmiss; eauto; done.
+intros; eapply sound_equal_padmiss; eauto; done.
 intros; eapply sound_padmiss_formation_invert1; eauto; done.
 intros; eapply sound_padmiss_formation_invert2; eauto; done.
 Qed.

@@ -355,6 +355,10 @@ structure ParseTerm =
 
 
 
+      (* Term 99 *)
+
+
+
       (* Term 100 *)
 
       fun tuple ms =
@@ -371,6 +375,9 @@ structure ParseTerm =
       val squash = T.apply1 Prim.squash
 
       val literal = T.literal
+
+      val capture = T.capture
+      fun capture0 xs m = T.capture xs 0 m
 
       fun literalVariable i = T.literal (Term.Var i)
 
@@ -407,6 +414,8 @@ structure ParseTerm =
       val additional = T.additional 
 
       val exclude = T.exclude
+
+      fun subst x m n = T.subst m x n
 
       fun longConstant address = Namespace.resolve address
 
@@ -1309,6 +1318,8 @@ grammardef Term
    rule Term(100)  ::= EMBED => literal
    rule Term(100)  ::= "e`" EMBED => id
    rule Term(100)  ::= "l`" LTerm(100) => literal
+   rule Term(100)  ::= "capture`" Idents "." LTerm(100) => capture0
+   rule Term(100)  ::= "capture`" Idents "^" NUMBER "." LTerm(100) => capture
    rule Term(100)  ::= "lv`" NUMBER => literalVariable
    rule Term(100)  ::= "lv`" EMBED => literalVariable
    rule Term(100)  ::= LOCATION Ident => short
@@ -1329,7 +1340,8 @@ grammardef Term
 
    rule Term(0)    ::= "additional`" OIdents "." Term(0) => additional
    rule Term(0)    ::= "exclude`" Ident "in" Term(0) => exclude
-
+   rule Term(0)    ::= "substitute`" Ident "=" Term(1) "in" Term(0) => subst
+   
    rule Terms      ::= => null
    rule Terms      ::= Term(100) Terms => cons
 

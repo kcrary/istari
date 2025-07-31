@@ -3431,6 +3431,15 @@ apply tr_prod_padmiss; eauto using tr_padmiss_eta2.
 Qed.
 
 
+Lemma eqPadmiss_valid : eqPadmiss_obligation.
+Proof.
+prepare.
+intros G a b m n ext2 ext1 ext0 Hadm Hm Hn.
+apply tr_equal_padmiss; auto.
+eapply tr_padmiss_eta2; eauto.
+Qed.
+
+
 Lemma padmissFormInv1_valid : padmissFormInv1_obligation.
 Proof.
 prepare.

@@ -1,7 +1,7 @@
 
 ISTARIBIN=../ui/bin
 
-DOCUNITS = girard-paradox smith-paradox
+DOCUNITS = girard-paradox smith-paradox induce
 UNITS = $(DOCUNITS)
 DOCS =
 

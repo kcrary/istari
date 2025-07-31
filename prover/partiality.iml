@@ -18,6 +18,10 @@ signature PARTIALITY =
       val partialityRaw : Hyp.hypothesis -> tactic
       val partialityPriority : Hyp.hypothesis -> priority tacticm
 
+      val tightenPartial : Hyp.hypothesis -> tactic
+      val tightenPartialRaw : Hyp.hypothesis -> tactic
+      val tightenPartialPriority : Hyp.hypothesis -> priority tacticm
+
       val totality : tactic
       val totalityRaw : tactic
       val totalityPriority : priority tacticm
@@ -127,10 +131,6 @@ structure Partiality :> PARTIALITY =
                                   | NONE =>
                                        fail "no predicate admissibility rule for this type"))\
 
-                         | \Prim.arrow\ (\Prim.halts\ ?) ? =>
-                           \(fnc m cod =>
-                                RuleTactic.arrowPadmissDomainHalts (T.evar ()))\
-
                          | \Prim.arrow\ ? ? =>
                            \(fnc dom cod =>
                                 (case Prune.prune dom unsh of
@@ -138,15 +138,28 @@ structure Partiality :> PARTIALITY =
                                        RuleTactic.arrowPadmissDomainClosed domunsh
 
                                   | NONE =>
-                                       fail "no predicate admissibility rule for this type"))\
+                                       termCaseT dom
+                                       /| \Prim.halts\ ? =>
+                                          \(fnc m =>
+                                               RuleTactic.arrowPadmissDomainHalts (T.evar ()))\
+
+                                        | _ =>
+                                          \(fnc =>
+                                               fail "no predicate admissibility rule for this type")\
+                                       /))\
 
                          | \Prim.prod\ ? ? =>
                            \(fnc b1 b2 =>
                                 refine (Rule.prodPadmiss a b1 b2))\
 
+                         | \Prim.eq\ _ _ _ =>
+                           \(fnc =>
+                                RuleTactic.eqPadmiss)\
+
                          | const? @ _ =>
                            \(fnc const =>
                                 fail ("no predicate admissibility rule for " ^ Namespace.toString const))\
+
                          | _ =>
                            \(fnc =>
                                 fail "improper form for predicate-admissibility goal")\
@@ -1115,6 +1128,36 @@ structure Partiality :> PARTIALITY =
       fun partialityRaw hyp = partialityPriority hyp >> idtac
 
       fun partiality hyp = Typecheck.withTypecheckSnd $ partialityPriority hyp
+
+
+
+      fun tightenPartialPriority hyp =
+         let
+            do i = Hyp.findhyp hyp
+            do (_, dir) = withgoal
+         in
+            partialityRaw (Hyp.NUMBER i)
+            >>> [
+                (* halts i *)
+                idtacM Primary,
+   
+                (* i : A |- C *)
+                goalHypnCaseT 0
+                /| $tm \Prim.ov\ ? _ =>
+                   \(fnc a =>
+                        SubtypeTactic.tightenRaw (Hyp.NUMBER (i + 1)) (ETerm.literal a)
+                        >>> [
+                            idtacM Secondary,
+                            refine (Rule.hypothesis 0) >> done,
+                            refine (Rule.weaken 0 1) >> chdir dir >> idtacM Primary
+                            ])\
+                /
+                ]
+         end
+
+      fun tightenPartialRaw hyp = tightenPartialPriority hyp >> idtac
+
+      fun tightenPartial hyp = Typecheck.withTypecheckSnd $ tightenPartialPriority hyp
 
 
 

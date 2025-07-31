@@ -33,6 +33,7 @@ signature ETERM =
       val withdir    : Directory.directory -> eterm -> Term.term
 
       val literal    : Term.term -> eterm
+      val capture    : symbol list -> int -> Term.term -> eterm
 
       val short      : symbol -> eterm
       val var        : symbol -> eterm        (* always a variable *)
@@ -314,6 +315,18 @@ structure ETermInternal
                 additional rest m special (D.ibind dir x) imps spine)
 
       fun literal m _ _ _ spine = elim m spine
+
+      fun capture xs k m _ dir _ spine =
+         let
+            val s =
+               List.foldl
+                  (fns sym s =>
+                      T.Idot (D.lookupVar dir sym, s))
+                  (T.Shift k)
+                  xs
+         in
+            elim (T.Sub (m, s)) spine
+         end
 
       fun explicit m special dir _ spine = m special dir false spine
 

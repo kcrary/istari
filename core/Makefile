@@ -29,6 +29,7 @@ tags :
 ## everything Istari's datatype implementation needs, including stuff datatype.ist doesn't
 datatype.isto : acc.isto misc.isto nat.isto partial.isto     integer.isto
 
+acc.isto : partial.isto
 bool.isto : logic.isto
 decidable.isto : logic.isto bool.isto
 eventually.isto : logic.isto misc.isto sqstable.isto

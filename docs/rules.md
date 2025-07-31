@@ -6215,6 +6215,14 @@ Syntactic equality is intended for internal use only.
       G |- padmiss A (fn x . B)
       G |- padmiss A (fn x . C)
 
+- `eqPadmiss A B M N`
+
+      G |- padmiss A (fn x . M = N : B)
+      >>
+      G |- padmiss A (fn x . B)
+      G, x : A |- M : B
+      G, x : A |- N : B
+
 - `padmissFormInv1 A B`
 
       G |- A : type
