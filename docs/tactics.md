@@ -1462,6 +1462,19 @@ will not double the size multiple times.
     As `termination` but does not invoke the typechecker.
 
 
+- `seqTermination /[hyp h]/`
+
+  Reasons about termination.  If `h`'s type is 
+  `halts (seq x = M in N)`, the tactic generates a new termination
+  hypothesis `halts M`, and replaces `h` with the hypothesis `halts N`
+  in which `x` has been replaced by `outpar M`.  The tactic does this
+  repeatedly until `h` no longer has the required form.
+
+  + `seqTerminationRaw /[hyp h]/`
+
+    As `seqTermination` but does not invoke the typechecker.
+
+
 - `totality`
 
   If the conclusion is `M halts`, proves the goal using `M : A` and 

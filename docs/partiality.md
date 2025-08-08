@@ -607,6 +607,7 @@ The rules of admissibility can be summarized by the grammar:
          | T -> Ap              (if T does not mention the dependency)
          | halts M -> Ap
          | Ap & Ap
+         | M = M : Ap
 
 Most types are upward-closed, with the notable exception of `partial`.
 Datatypes that are defined using upward-closed types will also be

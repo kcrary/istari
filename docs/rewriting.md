@@ -16,7 +16,9 @@ given by the grammar:
                       pos [numbers]              (rewrite the indicated term positions)
                       all                        (rewrite all hits)
 
-In a `[short-target]` (as in reduce) the `in` can be omitted.
+In a `[short-target]` (as used, for example, in `reduce`) the `in` can
+be omitted.  (But when `in` is omitted, a hypothesis number cannot be
+used without the leading `#`.)
 
 Hit numbers are counted in a pre-order, left-to-right traversal
 starting at 0.  Hits are counted anew for each application, so if a
@@ -250,8 +252,12 @@ rewriter's weakening and compatibility tables.
   `N [M / x]`.  If `M` is not valuable, the rewrite generates subgoals
   `M : E` and `total E` (where `E` is a fresh evar) for the
   typechecker to solve.
-  
 
+  + `reduceSeqOutpar /[short-targets]/` 
+
+    Like `reduceSeq` except the occurrence is contracted to 
+    `N [Partial.outpar M / x]` to preserve typeability.
+  
 
 
 ### Rewriting tools

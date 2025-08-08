@@ -81,3 +81,86 @@ extraction forms for partial types:
 Note that both `inpar` and `outpar` are both the identity, so they can
 be folded into existence, and unfolded out of existence.  They are
 used just as hints for the typechecker.
+
+This compatibility lemma is useful for rewriting with `outpar`:
+
+    outpar_compat : forall (i : level) (a : U i) (x y : partial a) .
+                       halts x -> x = y : partial a -> outpar x = outpar y : a
+
+Attempting to rewrite the term immediately beneath an `outpar` tends
+to generate an unprovable termination subgoal.
+
+
+### Inducement
+
+Given some recursive function `h`, we say that `y` induces `x` when
+computing `h y` entails computing `h x`.  If `h y` halts, we can do
+induction using the entailment relation (over the arguments that `y`
+induces), viewing `x` as less than `y` when `y` induces `x`.
+
+In our formulation of inducement, it is convenient not to restrict
+ourselves only to partial functions with a single argument.  Instead,
+we work with partial terms (say, having type `partial a`) and a
+function that adapts such partial terms into partial function with a
+single argument.  Thus the adapter has type:
+
+    partial a -> forall (x : b) . partial (c x)
+
+In the special case where the computation of interest actually is a
+partial function with a single argument, the adapter can be simply the
+eta-expanded identity `fn h x . h x`.
+
+Suppose `p` and `q` are partial terms and `f` is an adapter.  Then we
+say that `p` approximates `q` when `f p` and `f q` agree for every
+argument on which `f p` halts.
+
+    approx : intersect (i : level) .
+                forall (a b : U i) (c : b -> U i) .
+                  (partial a -> forall (x : b) . partial (c x)) -> partial a -> partial a -> U i
+           = fn a b c f p q . forall (x : b) . halts (f p x) -> f p x = f q x : partial (c x)
+           (3 implicit arguments)
+
+Now we say that `y` induces `x` (for adapter `f` and recursive
+operator `g : partial a -> partial a`) when for every `p` that
+approximates `fix g`, the termination of `f (g p) y` implies the
+termination of `f p x`:
+
+    induce : intersect (i : level) .
+                forall (a b : U i) (c : b -> U i) .
+                  admiss a
+                  -g> (partial a -> forall (x : b) . partial (c x))
+                      -> (partial a -> partial a)
+                      -> b
+                      -> b
+                      -> U i
+           = fn a b c f g x y .
+                forall (p : partial a) . approx f p (fix g) -> halts (f (g p) y) -> halts (f p x)
+           (3 implicit arguments)
+
+The proviso that `p` approximates `fix g` is necessary because
+sometimes an argument to a recursive call is determined by the result
+of a previous recursive call, and in such cases we usually need to
+know that previous recursive result was correct.
+
+With these definitions in hand, we can prove that inducement is
+well-founded:
+
+    induce_well_founded : forall
+                             (i : level)
+                             (a b : U i)
+                             (c : b -> U i)
+                             (f : partial a -> forall (x : b) . partial (c x))
+                             (g : partial a -> partial a) .
+                             admiss a
+                             -> uptype b
+                             -> (forall (x : b) . admiss (c x))
+                             -> (forall (p : partial a) (x : b) . halts (f p x) -> halts p)
+                             -> (forall (p q : partial a) . approx f p q -> approx f (g p) (g q))
+                             -> forall (x : b) . halts (f (fix g) x) -> Acc.Acc b (induce f g) x
+
+Note that `Acc` is an uptype whenever the underlying type is an
+uptype.  This fact is necessary because we prove well-foundedness
+using fixpoint induction.
+
+    Acc_uptype : forall (i : level) (a : U i) (P : a -> a -> U i) (x : a) .
+                    uptype a -> uptype (Acc.Acc a P x)

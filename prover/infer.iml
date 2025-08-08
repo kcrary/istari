@@ -591,95 +591,97 @@ structure Infer :> INFER =
                               cod rest tac' invis prove
                         end)\
 
-                 | \Prim.partial\ (\Prim.arrow\ ? (\Prim.partial\ ?)) =>
-                   \(fnc dom cod =>
-                        let
-                           val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
- 
-                           val tac' =
-                              (* G |- M P : partial Cod *)
-                              refine (Rule.activeAppArrowPartial dom cod m p)
-                              >>> [
-                                  (* G |- M : partial (Dom -> partial Cod) *)
-                                  tac,
+                 | \Prim.partial\ ($whnfHard
+                   (| \Prim.arrow\ ? ($whnfHard \Prim.partial\ ?) =>
+                      \(fnc dom cod =>
+                           let
+                              val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
+    
+                              val tac' =
+                                 (* G |- M P : partial Cod *)
+                                 refine (Rule.activeAppArrowPartial dom cod m p)
+                                 >>> [
+                                     (* G |- M : partial (Dom -> partial Cod) *)
+                                     tac,
+   
+                                     (* G |- P : Dom *)
+                                     ptac
+                                     ]
+                           in
+                              inferSpine ctx (T.app m p)
+                                 (T.apply1 Prim.partial cod) rest tac' invis prove
+                           end)\
 
-                                  (* G |- P : Dom *)
-                                  ptac
-                                  ]
-                        in
-                           inferSpine ctx (T.app m p)
-                              (T.apply1 Prim.partial cod) rest tac' invis prove
-                        end)\
+                    | \Prim.arrow\ ? ? =>
+                      \(fnc dom cod =>
+                           let
+                              val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
+                              val stricttac = prove (J.make ctx (T.apply1 Prim.strict cod)) []
+    
+                              val tac' =
+                                 (* G |- M P : partial Cod *)
+                                 refine (Rule.activeAppArrow dom cod m p)
+                                 >>> [
+                                     (* G |- M : partial (Dom -> Cod) *)
+                                     tac,
+   
+                                     (* G |- P : Dom *)
+                                     ptac,
+   
+                                     (* G |- strict Cod *)
+                                     stricttac
+                                     ]
+                           in
+                              inferSpine ctx (T.app m p)
+                                 (T.apply1 Prim.partial cod) rest tac' invis prove
+                           end)\
 
-                 | \Prim.partial\ (\Prim.arrow\ ? ?) =>
-                   \(fnc dom cod =>
-                        let
-                           val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
-                           val stricttac = prove (J.make ctx (T.apply1 Prim.strict cod)) []
- 
-                           val tac' =
-                              (* G |- M P : partial Cod *)
-                              refine (Rule.activeAppArrow dom cod m p)
-                              >>> [
-                                  (* G |- M : partial (Dom -> Cod) *)
-                                  tac,
+                    | \Prim.forall\ ? (fn . $whnfHard \Prim.partial\ ?) =>
+                      \(fnc dom cod =>
+                           let
+                              val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
+                              val codp = T.Sub (cod, T.Dot (p, T.id))
+    
+                              val tac' =
+                                 (* G |- M P : partial Cod[P . id] *)
+                                 refine (Rule.activeAppForallPartial dom cod m p)
+                                 >>> [
+                                     (* G |- M : partial (forall Dom . partial Cod) *)
+                                     tac,
+   
+                                     (* G |- P : Dom *)
+                                     ptac
+                                     ]
+                           in
+                              inferSpine ctx (T.app m p)
+                                 (T.apply1 Prim.partial codp) rest tac' invis prove
+                           end)\
 
-                                  (* G |- P : Dom *)
-                                  ptac,
-
-                                  (* G |- strict Cod *)
-                                  stricttac
-                                  ]
-                        in
-                           inferSpine ctx (T.app m p)
-                              (T.apply1 Prim.partial cod) rest tac' invis prove
-                        end)\
-
-                 | \Prim.partial\ (\Prim.forall\ ? (fn . \Prim.partial\ ?)) =>
-                   \(fnc dom cod =>
-                        let
-                           val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
-                           val codp = T.Sub (cod, T.Dot (p, T.id))
- 
-                           val tac' =
-                              (* G |- M P : partial Cod[P . id] *)
-                              refine (Rule.activeAppForallPartial dom cod m p)
-                              >>> [
-                                  (* G |- M : partial (forall Dom . partial Cod) *)
-                                  tac,
-
-                                  (* G |- P : Dom *)
-                                  ptac
-                                  ]
-                        in
-                           inferSpine ctx (T.app m p)
-                              (T.apply1 Prim.partial codp) rest tac' invis prove
-                        end)\
-
-                 | \Prim.partial\ (\Prim.forall\ ? (fn . ?)) =>
-                   \(fnc dom cod =>
-                        let
-                           val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
-                           val codp = T.Sub (cod, T.Dot (p, T.id))
-                           val stricttac = prove (J.make ctx (T.apply1 Prim.strict codp)) []
- 
-                           val tac' =
-                              (* G |- M P : partial Cod[P . id] *)
-                              refine (Rule.activeAppForall dom cod m p)
-                              >>> [
-                                  (* G |- M : partial (forall Dom . Cod) *)
-                                  tac,
-
-                                  (* G |- P : Dom *)
-                                  ptac,
-
-                                  (* G |- strict Cod[P . id] *)
-                                  stricttac
-                                  ]
-                        in
-                           inferSpine ctx (T.app m p)
-                              (T.apply1 Prim.partial codp) rest tac' invis prove
-                        end)\
+                    | \Prim.forall\ ? (fn . ?) =>
+                      \(fnc dom cod =>
+                           let
+                              val ptac = prove (J.make ctx (T.apply2 Prim.ov dom p)) []
+                              val codp = T.Sub (cod, T.Dot (p, T.id))
+                              val stricttac = prove (J.make ctx (T.apply1 Prim.strict codp)) []
+    
+                              val tac' =
+                                 (* G |- M P : partial Cod[P . id] *)
+                                 refine (Rule.activeAppForall dom cod m p)
+                                 >>> [
+                                     (* G |- M : partial (forall Dom . Cod) *)
+                                     tac,
+   
+                                     (* G |- P : Dom *)
+                                     ptac,
+   
+                                     (* G |- strict Cod[P . id] *)
+                                     stricttac
+                                     ]
+                           in
+                              inferSpine ctx (T.app m p)
+                                 (T.apply1 Prim.partial codp) rest tac' invis prove
+                           end)\
+                   ))
 
                  | ? =>
                    \(fnc a' =>
@@ -727,69 +729,71 @@ structure Infer :> INFER =
                            inferSpine ctx (T.pi1 m) a1 rest tac' invis prove
                         end)\
 
-                 | \Prim.partial\ (\Prim.prod\ (\Prim.partial\ ?) ?) =>
-                   \(fnc a1 a2 =>
-                        let
-                           val tac' =
-                              (* G |- M #1 : partial A1 *)
-                              refine (Rule.activePi1ProdPartial a1 a2 m)
-                              >>+
-                              (* G |- M : partial (partial A1 & A2) *)
-                              tac
-                        in
-                           inferSpine ctx (T.pi1 m) (T.apply1 Prim.partial a1) rest tac' invis prove
-                        end)\
+                 | \Prim.partial\ ($whnfHard
+                   (| \Prim.prod\ ($whnfHard \Prim.partial\ ?) ? =>
+                      \(fnc a1 a2 =>
+                           let
+                              val tac' =
+                                 (* G |- M #1 : partial A1 *)
+                                 refine (Rule.activePi1ProdPartial a1 a2 m)
+                                 >>+
+                                 (* G |- M : partial (partial A1 & A2) *)
+                                 tac
+                           in
+                              inferSpine ctx (T.pi1 m) (T.apply1 Prim.partial a1) rest tac' invis prove
+                           end)\
 
-                 | \Prim.partial\ (\Prim.prod\ ? ?) =>
-                   \(fnc a1 a2 =>
-                        let
-                           val stricttac = prove (J.make ctx (T.apply1 Prim.strict a1)) []
+                    | \Prim.prod\ ? ? =>
+                      \(fnc a1 a2 =>
+                           let
+                              val stricttac = prove (J.make ctx (T.apply1 Prim.strict a1)) []
+   
+                              val tac' =
+                                 (* G |- M #1 : partial A1 *)
+                                 refine (Rule.activePi1Prod a1 a2 m)
+                                 >>> [
+                                     (* G |- M : partial (A1 & A2) *)
+                                     tac,
+   
+                                     (* G |- strict A1 *)
+                                     stricttac
+                                     ]
+                           in
+                              inferSpine ctx (T.pi1 m) (T.apply1 Prim.partial a1) rest tac' invis prove
+                           end)\
 
-                           val tac' =
-                              (* G |- M #1 : partial A1 *)
-                              refine (Rule.activePi1Prod a1 a2 m)
-                              >>> [
-                                  (* G |- M : partial (A1 & A2) *)
-                                  tac,
+                    | \Prim.exists\ ($whnfHard \Prim.partial\ ?) (fn . ?) =>
+                      \(fnc a1 a2 =>
+                           let
+                              val tac' =
+                                 (* G |- M #1 : partial A1 *)
+                                 refine (Rule.activePi1ExistsPartial a1 a2 m)
+                                 >>+
+                                 (* G |- M : partial (exists (partial A1) . A2) *)
+                                 tac
+                           in
+                              inferSpine ctx (T.pi1 m) (T.apply1 Prim.partial a1) rest tac' invis prove
+                           end)\
 
-                                  (* G |- strict A1 *)
-                                  stricttac
-                                  ]
-                        in
-                           inferSpine ctx (T.pi1 m) (T.apply1 Prim.partial a1) rest tac' invis prove
-                        end)\
-
-                 | \Prim.partial\ (\Prim.exists\ (\Prim.partial\ ?) (fn . ?)) =>
-                   \(fnc a1 a2 =>
-                        let
-                           val tac' =
-                              (* G |- M #1 : partial A1 *)
-                              refine (Rule.activePi1ExistsPartial a1 a2 m)
-                              >>+
-                              (* G |- M : partial (exists (partial A1) . A2) *)
-                              tac
-                        in
-                           inferSpine ctx (T.pi1 m) (T.apply1 Prim.partial a1) rest tac' invis prove
-                        end)\
-
-                 | \Prim.partial\ (\Prim.exists\ ? (fn . ?)) =>
-                   \(fnc a1 a2 =>
-                        let
-                           val stricttac = prove (J.make ctx (T.apply1 Prim.strict a1)) []
-
-                           val tac' =
-                              (* G |- M #1 : partial A1 *)
-                              refine (Rule.activePi1Exists a1 a2 m)
-                              >>> [
-                                  (* G |- M : partial (exists A1 . A2) *)
-                                  tac,
-
-                                  (* G |- strict A1 *)
-                                  stricttac
-                                  ]
-                        in
-                           inferSpine ctx (T.pi1 m) (T.apply1 Prim.partial a1) rest tac' invis prove
-                        end)\
+                    | \Prim.exists\ ? (fn . ?) =>
+                      \(fnc a1 a2 =>
+                           let
+                              val stricttac = prove (J.make ctx (T.apply1 Prim.strict a1)) []
+   
+                              val tac' =
+                                 (* G |- M #1 : partial A1 *)
+                                 refine (Rule.activePi1Exists a1 a2 m)
+                                 >>> [
+                                     (* G |- M : partial (exists A1 . A2) *)
+                                     tac,
+   
+                                     (* G |- strict A1 *)
+                                     stricttac
+                                     ]
+                           in
+                              inferSpine ctx (T.pi1 m) (T.apply1 Prim.partial a1) rest tac' invis prove
+                           end)\
+                   ))
 
                  | ? =>
                    \(fnc a' =>
@@ -839,43 +843,45 @@ structure Infer :> INFER =
                               rest tac' invis prove
                         end)\
 
-                 | \Prim.partial\ (\Prim.prod\ ? (\Prim.partial\ ?)) =>
-                   \(fnc a1 a2 =>
-                        let
-                           val a2tac = prove (J.make ctx (T.apply1 Prim.istp a2)) []
+                 | \Prim.partial\ ($whnfHard
+                   (| \Prim.prod\ ? ($whnfHard \Prim.partial\ ?) =>
+                      \(fnc a1 a2 =>
+                           let
+                              val a2tac = prove (J.make ctx (T.apply1 Prim.istp a2)) []
+   
+                              val tac' =
+                                 (* G |- M #2 : partial A2 *)
+                                 refine (Rule.activePi2ProdPartial a1 a2 m)
+                                 >>> [
+                                     (* G |- M : partial (A1 & partial A2) *)
+                                     tac,
+   
+                                     (* G |- A2 : type *)
+                                     a2tac
+                                     ]
+                           in
+                              inferSpine ctx (T.pi2 m) (T.apply1 Prim.partial a2) rest tac' invis prove
+                           end)\
 
-                           val tac' =
-                              (* G |- M #2 : partial A2 *)
-                              refine (Rule.activePi2ProdPartial a1 a2 m)
-                              >>> [
-                                  (* G |- M : partial (A1 & partial A2) *)
-                                  tac,
-
-                                  (* G |- A2 : type *)
-                                  a2tac
-                                  ]
-                        in
-                           inferSpine ctx (T.pi2 m) (T.apply1 Prim.partial a2) rest tac' invis prove
-                        end)\
-
-                 | \Prim.partial\ (\Prim.prod\ ? ?) =>
-                   \(fnc a1 a2 =>
-                        let
-                           val stricttac = prove (J.make ctx (T.apply1 Prim.strict a2)) []
-
-                           val tac' =
-                              (* G |- M #2 : partial A2 *)
-                              refine (Rule.activePi2Prod a1 a2 m)
-                              >>> [
-                                  (* G |- M : partial (A1 & A2) *)
-                                  tac,
-
-                                  (* G |- strict A2 *)
-                                  stricttac
-                                  ]
-                        in
-                           inferSpine ctx (T.pi2 m) (T.apply1 Prim.partial a2) rest tac' invis prove
-                        end)\
+                    | \Prim.prod\ ? ? =>
+                      \(fnc a1 a2 =>
+                           let
+                              val stricttac = prove (J.make ctx (T.apply1 Prim.strict a2)) []
+   
+                              val tac' =
+                                 (* G |- M #2 : partial A2 *)
+                                 refine (Rule.activePi2Prod a1 a2 m)
+                                 >>> [
+                                     (* G |- M : partial (A1 & A2) *)
+                                     tac,
+   
+                                     (* G |- strict A2 *)
+                                     stricttac
+                                     ]
+                           in
+                              inferSpine ctx (T.pi2 m) (T.apply1 Prim.partial a2) rest tac' invis prove
+                           end)\
+                   ))
 
                  | ? =>
                    \(fnc a' =>

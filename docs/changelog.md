@@ -2,6 +2,9 @@
 
 #### Development version
 
+- Substantial new functionality for dealing with potentially
+  nonterminating computations.
+
 - One can now destruct a hidden future hypothesis.  The result will be
   a hypothesis that is both later and hidden.
 
@@ -17,7 +20,7 @@
   + `fixpointInduction` employs fixpoint induction to prove properties
     of fixpoints.
 
-  + `termination` reasons about termination.
+  + `termination` and `seqTermination` reason about termination.
 
   + `totality` proves termination for inhabitants of total types.
 
@@ -43,6 +46,16 @@
 
   + In `RuleTactic`, the tactics for several rules that involve
     projection now take an additional term argument.
+
+- New rewrites:
+
+  + `reduceSeqOutpar` is like `reduceSeq` but it wraps the
+    substitutend with `outpar` to preserve typeability.
+
+- Rewriting changes:
+
+  + Fixed a bug in the parsing of `ShortTargets`, which is used for
+  the targets for rewrites such as `reduce`.
 
 - In `Case`, `goalHypCaseT` and `goalHypCaseB` now take names.  The
   old versions that take numbers are renamed to `goalHypnCaseT` and
@@ -107,6 +120,9 @@
 
 - Rule premises from which the extract is not used unhide all their
   hypotheses.  (Previously this was not true for some left rules.)
+
+- Fixed a sound but incomplete bug in unification in which soft
+  constants were not being unrolled sometimes.
 
 - Fixed an unsound bug in the `letIntro` and `forallLeft` rules that
   allowed hidden variables to appear in extracts.

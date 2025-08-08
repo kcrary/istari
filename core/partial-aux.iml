@@ -1,15 +1,24 @@
 
-signature FIXPOINT_INDUCTION_TACTIC =
+signature PARTIAL_TACTIC =
    sig
 
       val fixpointInductionRaw : ETerm.eterm -> Tactic.tactic
       val fixpointInduction : ETerm.eterm -> Tactic.tactic
       val fixpointInductionPriority : ETerm.eterm -> Tactic.priority Tactic.tacticm
 
+      val reduceSeqOutparRew : Rewrite.rewrite
+      val reduceSeqOutparPriority : Rewrite.targets -> Tactic.priority Tactic.tacticm
+      val reduceSeqOutparRaw : Rewrite.targets -> Tactic.tactic
+      val reduceSeqOutpar : Rewrite.targets -> Tactic.tactic
+
+      val seqTerminationPriority : Hyp.hypothesis -> Tactic.priority Tactic.tacticm
+      val seqTerminationRaw : Hyp.hypothesis -> Tactic.tactic
+      val seqTermination : Hyp.hypothesis -> Tactic.tactic
+
    end
 
 
-functor FixpointInductionTacticFun () :> FIXPOINT_INDUCTION_TACTIC =
+functor PartialTacticFun () :> PARTIAL_TACTIC =
    struct
 
       structure T = Term
@@ -21,6 +30,7 @@ functor FixpointInductionTacticFun () :> FIXPOINT_INDUCTION_TACTIC =
       open CasePervasive
 
       val fixpoint_induction = resolveGlobal /Partial.fixpoint_induction/
+      val outpar = resolveGlobal /Partial.outpar/
 
       val marker = T.Marker (Symbol.fromValue "")
 
@@ -116,6 +126,43 @@ functor FixpointInductionTacticFun () :> FIXPOINT_INDUCTION_TACTIC =
       fun fixpointInductionRaw ea = fixpointInductionPriority ea >> idtac
       fun fixpointInduction ea = withTypecheckSnd $ fixpointInductionPriority ea
 
+
+
+      val unwrap = R.trans [R.unfold, R.beta 1]
+
+      fun reduceSeqOutparRew hyp goal = RewriteInternal.reduceSeqRewGen (fn t => T.apply1 outpar t) unwrap hyp goal
+      fun reduceSeqOutparPriority targets = Rewrite.rewritePriority [(reduceSeqOutparRew, targets)]
+      fun reduceSeqOutparRaw targets = reduceSeqOutparPriority targets >> idtac
+      fun reduceSeqOutpar targets = Typecheck.withTypecheckSnd $ reduceSeqOutparPriority targets
+
+
+
+      fun seqTerminationPriority hyp =
+         let
+            do sym = Hyp.findname hyp
+
+            fun loop () =
+               goalHypCaseT sym
+               /| $tm \Prim.halts\ ($whnfHard \Prim.seq\ _ _) =>
+                  \(fnc =>
+                       Partiality.terminationPriority (Hyp.NAME sym)
+                       >>!
+                       andthenlPri
+                          (reduceSeqOutparPriority [(Hyp.NAME sym, SOME (false, [0]))])
+                          [Hyp.assumption >> done, lift loop])\
+   
+                | _ =>
+                  \(fnc =>
+                       idtacM Primary)\
+               /
+         in
+            loop ()
+         end
+
+      fun seqTerminationRaw hyp = seqTerminationPriority hyp >> idtac
+
+      fun seqTermination hyp = Typecheck.withTypecheckSnd $ seqTerminationPriority hyp
+
    end
 
 
@@ -123,8 +170,29 @@ functor AfterPartialAll () :> sig end =
    struct
 
       val halts_uptype = resolveGlobal /Partial.halts_uptype/
+      val acc_uptype = resolveGlobal /Partial.Acc_uptype/
 
       val () =
          ConstantTable.insert Partiality.uptypeTactics Prim.halts (applyRaw (ETerm.literal (Term.Const halts_uptype)))
 
+      val () =
+         ConstantTable.insert Partiality.uptypeTactics Prim.acc (Backchain.witnessRaw /\Term.Const acc_uptype\ _ _ _ _ __/)
+
    end
+
+
+grammardef PartialTactic
+
+   start reduceSeqOutpar ShortTargets
+   start reduceSeqOutparRaw ShortTargets
+   start seqTermination Hypothesis
+   start seqTerminationRaw Hypothesis
+
+end
+
+
+
+
+
+
+

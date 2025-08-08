@@ -458,6 +458,9 @@ signature REWRITE_INTERNAL =
          appropriate to A and B, so it is missing the extra binding.
       *)
 
+
+      val reduceSeqRewGen : (Term.term -> Term.term) -> Reduction.reduction -> rewrite
+
    end
 
 
@@ -3353,7 +3356,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
 
 
-      fun reduceSeqRew hyp (jud, dir) =
+      fun reduceSeqRewGen wrapper unwrap hyp (jud, dir) =
          let
             fun test _ n =
                (case n of
@@ -3421,14 +3424,22 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                              val tac =
                                                 pretac
                                                 >>+
-                                                (* sequal (seq Arg (fn . Body)) (Body [Arg . id]) *)
+                                                (* sequal (seq Arg (fn . Body)) (Body [wrapper Arg . id]) *)
+                                                refine (Rule.unreduce 
+                                                           (T.apply2 Prim.sequal (T.apply2 Prim.seq (wrapper arg) (T.evar ())) (T.evar ()))
+                                                           (R.within [1, 1] unwrap))
+                                                >>+
+                                                (* sequal (seq (wrapper Arg) (fn . Body)) (Body [wrapper Arg . id]) *)
                                                 refine (Rule.seqHaltsSequal (T.evar ()) (T.evar ()))
+                                                >>+
+                                                (* halts (wrapper Arg) *)
+                                                refine (Rule.reduce (R.within [1] unwrap))
                                                 >>+
                                                 (* halts Arg *)
                                                 idtacM Primary
                                           in
                                              SOME (T.Elim (T.Const const, [T.App arg, T.App bodylam]),
-                                                   T.Sub (body, T.Dot (arg, T.id)),
+                                                   T.Sub (body, T.Dot (wrapper arg, T.id)),
                                                    rest,
                                                    (General Prim.sequal, Forward tac))
                                           end
@@ -3444,6 +3455,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
             Relation (test, act)
          end
 
+      fun reduceSeqRew hyp goal = reduceSeqRewGen (fn t => t) R.refl hyp goal
       fun reduceSeqPriority targets = rewritePriority [(reduceSeqRew, targets)]
       fun reduceSeqRaw targets = reduceSeqPriority targets >> idtac
       fun reduceSeq targets = Typecheck.withTypecheckSnd $ reduceSeqPriority targets
@@ -5998,8 +6010,8 @@ grammardef Rewrite
    rule Targets          ::= Targetsn => id
 
    rule ShortTarget      ::= Target => id
-   rule ShortTarget      ::= Hypothesis "at" Occurrences => targetInAt
-   rule ShortTarget      ::= Hypothesis => targetIn
+   rule ShortTarget      ::= StrictHypothesis "at" Occurrences => targetInAt
+   rule ShortTarget      ::= StrictHypothesis => targetIn
    
    rule ShortTargetsn    ::= ShortTarget => sing
    rule ShortTargetsn    ::= ShortTarget ShortTargetsn => cons

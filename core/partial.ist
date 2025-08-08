@@ -1,5 +1,8 @@
 
+File.import "acc-load.iml";
 File.import "logic-load.iml";
+
+openModule /Acc/;
 
 
 (* Partial types *)
@@ -227,6 +230,21 @@ setOpacity /outpar/ Constant.FIRM;
 
 
 
+lemma "outpar_compat"
+/
+  forall i (a : U i) (x y : partial a) .
+    halts x
+    -> x = y : partial a
+    -> outpar x = outpar y : a
+/;
+
+inference.
+intro /i a x y Hhalt Heq/.
+compat >> auto.
+qed ();
+
+
+
 lemma "fixpoint_formation"
 /
   forall i (a : U i) (f : partial a -> partial a) .
@@ -355,6 +373,161 @@ rewrite /-> Heq'/.
 typecheck.
 qed ();
 recordTyping "seqt_type";
+
+
+
+(* Inducement *)
+
+lemma "Acc_uptype"
+/
+  forall i (a : U i) (P : a -> a -> U i) (x : a) .
+    uptype a
+    -> uptype (Acc a P x)
+/;
+
+inference.
+intro /i a P x Ha/.
+unfold /Acc/.
+RuleTactic.existsUptype.
+  {
+  Partiality.proveAdmiss.
+  }
+reintro /y/.
+revert /x/.
+sinduction /y/.
+reintro /t y Hsub IH/.
+intro /x/.
+unroll /fix/.
+reduce //.
+RuleTactic.existsUptype.
+  {
+  Partiality.proveAdmiss.
+  }
+RuleTactic.forallUptype >> auto.
+RuleTactic.forallUptype >> auto.
+qed ();
+
+
+
+ConstantTable.insert Partiality.uptypeTactics Prim.acc (Backchain.witnessRaw /\Term.Const (parseConstant /Acc_uptype/)\ _ _ _ _ __/);
+
+
+define /approx {a b c} f p q/
+/
+  forall (x : b) . halts (f p x) -> f p x = f q x : partial (c x)
+//
+  intersect i . forall (a b : U i) (c : b -> U i) .
+    (partial a -> forall (x : b) . partial (c x))
+    -> partial a -> partial a -> U i
+/;
+
+unfold /approx/.
+typecheck.
+qed ();
+
+
+
+define /induce {a b c} f g x y/
+/
+  forall (p : partial a) .
+    approx f p (fix g)
+    -> halts (f (g p) y)
+    -> halts (f p x)
+//
+  intersect i . forall (a b : U i) (c : b -> U i) .
+    admiss a
+    -g> (partial a -> forall (x : b) . partial (c x))
+    -> (partial a -> partial a)
+    -> b -> b -> U i
+/;
+
+inference.
+introOf /i a b c Hadmiss f g x y/.
+unfold /induce/.
+typecheck.
+RuleTactic.fixpointInductionOf >> auto.
+qed ();
+
+
+
+lemma "induce_well_founded"
+/
+  forall i (a b : U i) (c : b -> U i)
+    (f : partial a -> forall (x : b) . partial (c x))
+    (g : partial a -> partial a) .
+      admiss a
+      -> uptype b
+      -> (forall (x : b) . admiss (c x))
+      -> (forall p x . halts (f p x) -> halts p)
+      -> (forall p q . approx f p q -> approx f (g p) (g q))
+      -> forall (x : b) . halts (f (fix g) x) -> Acc b (induce f g) x
+/;
+
+inference.
+intro /i a b c f g Ha Hb Hc Hstrict Hmono/.
+assert /fix g : partial a/ /Hoffix/.
+  {
+  RuleTactic.fixpointInductionOf >> auto.
+  }
+assert /forall (x : b) . 
+          halts (f (fix g) x) 
+          -> Acc b (induce f g) x & f (fix g) x = f (fix g) x : partial (c x)/ /H/.
+1:{
+  intro /x Hx/.
+  apply /H/ >> auto.
+  }
+abstractOverAt /fix g/ /concl/ /0 1/.
+goalCaseT
+  /| ? @ _ =>
+     \(fnc p =>
+         apply /fixpoint_induction (lsucc i) a \p\ g/ >> auto)\
+  /.
+
+(* admissibility *)
+{
+reduce //.
+RuleTactic.forallPadmissDomainClosed (parseCurr /b/) >> auto.
+RuleTactic.arrowPadmissDomainHalts (parseCurr /additional` _ . (c x)/) >> auto.
+RuleTactic.prodPadmiss.
+  {
+  Partiality.proveAdmiss.
+  }
+
+  {
+  RuleTactic.eqPadmiss >> auto.
+  RuleTactic.padmissClosed (Term.evar ()) >> auto.
+  RuleTactic.partialAdmiss.
+  auto.
+  }
+}
+
+(* base case *)
+{
+reduce //.
+intro /p Hif x Hhalt/.
+apply /Hif/ >> auto.
+}
+
+(* inductive case *)
+{
+reduce //.
+intro /p IH x Hhalt/.
+split.
+  {
+  apply /Acc_intro/.
+  intro /y Hyx/.
+  apply /IH/.
+  unfold /induce in Hyx/.
+  apply /Hyx/ >> auto.
+  }
+
+  {
+  unroll /fix/.
+  witness /Hmono p (fix g) __ x Hhalt/.
+  auto.
+  }
+}
+qed ();
 
 
 
