@@ -3425,26 +3425,38 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                                 else
                                                    refine (Rule.reduce (R.within [1] R.unfold))
 
+                                             val (shouldwrap, wrappedArg, unwrap) =
+                                                if Constant.eq (const, Prim.seq) then
+                                                   (true, wrapper arg, unwrap)
+                                                else
+                                                   (false, arg, R.refl)
+
                                              (* pretac turns seqt into seq, if necessary *)
                                              val tac =
                                                 pretac
                                                 >>+
                                                 (* sequal (seq Arg (fn . Body)) (Body [wrapper Arg . id]) *)
-                                                refine (Rule.unreduce 
-                                                           (T.apply2 Prim.sequal (T.apply2 Prim.seq (wrapper arg) (T.evar ())) (T.evar ()))
-                                                           (R.within [1, 1] unwrap))
+                                                (if shouldwrap then
+                                                    refine (Rule.unreduce 
+                                                               (T.apply2 Prim.sequal (T.apply2 Prim.seq wrappedArg (T.evar ())) (T.evar ()))
+                                                               (R.within [1, 1] unwrap))
+                                                 else
+                                                    idtac)
                                                 >>+
                                                 (* sequal (seq (wrapper Arg) (fn . Body)) (Body [wrapper Arg . id]) *)
                                                 refine (Rule.seqHaltsSequal (T.evar ()) (T.evar ()))
                                                 >>+
                                                 (* halts (wrapper Arg) *)
-                                                refine (Rule.reduce (R.within [1] unwrap))
+                                                (if shouldwrap then
+                                                    refine (Rule.reduce (R.within [1] unwrap))
+                                                 else
+                                                    idtac)
                                                 >>+
                                                 (* halts Arg *)
                                                 idtacM Primary
                                           in
                                              SOME (T.Elim (T.Const const, [T.App arg, T.App bodylam]),
-                                                   T.Sub (body, T.Dot (wrapper arg, T.id)),
+                                                   T.Sub (body, T.Dot (wrappedArg, T.id)),
                                                    rest,
                                                    (General Prim.sequal, Forward tac))
                                           end

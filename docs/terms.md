@@ -336,17 +336,18 @@ only the invisible arguments explicitly anyway.
 
 #### Opacity
 
-Constants have one of five levels of opacity: soft, firm, soft-strict,
-hard, or opaque:
+Constants have one of six levels of opacity: soft, firm, soft-strict,
+firm-strict, hard, or opaque:
 
                       OPAQUE
                         |
                        HARD
+                        |
+                    FIRM_STRICT
                      /      \
                 FIRM          SOFT_STRICT
                      \      /
                        SOFT
-
 
 - Hard: the default opacity for a constant with a definition.  The
   constant can be unfolded, and a few tactics (notably `intro` and
@@ -379,10 +380,13 @@ hard, or opaque:
   same soft-strict constant, unification will unify the corresponding
   terms along the spine, rather than unfolding the constant.
 
-   Note that Istari does not check that this is correct.  Marking a
-   constant as soft-strict that is not actually strict will not
-   compromise soundness, but it will cause unification to fail
-   sometimes when it need not fail.
+  Note that Istari does not check that this is correct.  Marking a
+  constant as soft-strict that is not actually strict will not
+  compromise soundness, but it will cause unification to fail
+  sometimes when it need not fail.
+
+- Firm-strict: like a firm constant, but strict in unification like
+  soft-strict.
 
 A constant's opacity can be altered using the function `setOpacity`.
 Since opacities can be altered, an opaque constant is not entirely
@@ -395,7 +399,7 @@ function `abstract`.
        sig
           ...
 
-          datatype opacity = SOFT | FIRM | SOFT_STRICT | HARD | OPAQUE
+          datatype opacity = SOFT | FIRM | SOFT_STRICT | FIRM_STRICT | HARD | OPAQUE
     
           (* returns the constant's definition if the constant is not OPAQUE *)
           val definition : constant -> term option
