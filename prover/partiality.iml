@@ -627,7 +627,19 @@ structure Partiality :> PARTIALITY =
 
       fun typecheckFixpointMain () =
          goalCaseT
-         /| \Prim.ov\ ? (\Prim.fix\ ?) =>
+         /| \Prim.ov\ (\Prim.partial\ ?) (\Prim.fix\ ?) =>
+            \(fnc a f =>
+                 (* fix F : partial A *)
+                 refine (Rule.fixpointInductionOf (T.evar ()) (T.evar ()))
+                 >>> [
+                     (* F : partial A -> partial A *)
+                     idtacM Primary,
+
+                     (* admiss A *)
+                     attemptPri proveAdmissPriority
+                     ])\
+
+          | \Prim.ov\ ? (\Prim.fix\ ?) =>
             \(fnc a f =>
                  (* fix F : A *)
                  refine (Rule.partialElimOf (T.evar ()) (T.evar ()))

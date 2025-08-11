@@ -54,6 +54,11 @@
 
 - Rewriting changes:
 
+  + When rewriting, the rewriter invokes type inference on the lemma
+  to fill in its evars if possible.  This reduces the number of
+  spurious hits the rewrite finds, and makes it less likely that a
+  rewrite will be rejected due to its target having an evar head.
+
   + Fixed a bug in the parsing of `ShortTargets`, which is used for
   the targets for rewrites such as `reduce`.
 

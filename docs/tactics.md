@@ -1388,12 +1388,18 @@ will not double the size multiple times.
 
   If the goal has the form `M : A` where `M` unrolls and reduces to
   `fix F`, proves the goal using [fixpoint
-  induction](type-theory.html#partial-types), leaving the main goal 
-  `F : partial A -> A`.  The admissibility subgoal is discharged
-  automatically if possible.
+  induction](type-theory.html#partial-types).
 
-  The tactic requires that `fix F` reduces to a value, which is
-  usually the case.  (Usually the body of `F` is a pair or lambda.)
+  + If `A` has the form `partial A'`, the main subgoal will be 
+    `F : partial A' -> partial A'`.
+
+  + If `A` has any other form, the main subgoal will be 
+    `partial A -> A` and the tactic will require that `fix F` reduces
+    to a value, which is usually the case.  (Usually the body of `F`
+    is a pair or lambda.)
+
+  In either case, the admissibility subgoal is discharged automatically
+  if possible.
 
   To use `typecheckFixpoint` on components of a mutually recursive
   definition, use it on the mutual group that it defines internally.
@@ -1507,6 +1513,15 @@ will not double the size multiple times.
   + `partialityRaw /[hyp h]/`
 
     As `partiality` but works backward from the conclusion.
+
+
+- `Partiality.proveAdmiss`
+
+  Proves admissibility goals.
+
+  + `Partiality.proveAdmissRaw`
+
+    As `Partiality.proveAdmiss` but does not invoke the typechecker.
 
 
 

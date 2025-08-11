@@ -312,24 +312,27 @@ That is because it does not respect beta-equivalence, so each evar's
 binding is uniquely determined.
 
 
-### Delayed typechecking
+### Rewriting and typechecking
 
-Note that rewriting takes place before typechecking.  This can affect
-what hits the rewriter finds.  For example, consider the lemma:
+The rewriter invokes type inference on the on the lemma before it
+searches for hits.  This can affect what hits the rewriter finds.  For
+example, consider the lemma:
 
     min_eq_l : forall (m n : nat) . m <= n -> min m n = m : nat
 
 Suppose `H : (x <= y)` and one rewrites using `-> min_eq_l _ _ H`.
 Istari generates evars to fill in the underscores, say `E1` and `E2`.
-Since typechecking has not taken place yet when the rewriter runs,
-those evars have not yet unified with `x` and `y`.  Thus, the rewriter
-looks for terms it can unify with `min E1 E2`, not with `min x y`.
-The former could easily hit more often than the latter.
+After type inference, the evars become unified with `x` and `y`,
+respectively.  Thus, the rewriter looks for terms that can unify with
+`min x y`, as opposed to the much more flexible `min E1 E2`.
 
-The user can account for this behavior by choosing an appropriate hit
-number, or by rewriting using `-> min_eq_l x y H`.
+(If the rewriter did not use type inference eagerly, it could find
+many more hits, but most of them would result in unprovable typing
+subgoals.  Moreover, if one were to rewrite in the other direction,
+the lemma would simply be rejected because the target term would have
+an evar head.)
 
-(This behavior is intended because the user always has the option to
-deal with typechecking subgoals manually, using `rewriteRaw` for
-example.  It would be confusing if the rewriter behaved differently
-when doing so.)
+Note that type inference is run only for its side effects, as in the
+`inference` tactic.  The actual discharging of typing subgoals is
+deferred until after rewriting, or if `rewriteRaw` is used, they are
+not discharged automatically at all.
