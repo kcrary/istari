@@ -827,6 +827,7 @@ exact natStrict_valid.
 exact typeHalts_valid.
 exact univTotal_valid.
 exact univStrict_valid.
+exact haltsandIntro_valid.
 exact reduceSeqTotal_valid.
 exact haltsTotal_valid.
 exact uptypeForm_valid.

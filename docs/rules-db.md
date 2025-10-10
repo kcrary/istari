@@ -5720,6 +5720,24 @@ Syntactic equality is intended for internal use only.
       >>
       G |- istp A
 
+- `univTotal I`
+
+      G |- total (univ I) ext (() , fn . ())
+      >>
+      G |- of level I
+
+- `univStrict I`
+
+      G |- strict (univ I)
+      >>
+      G |- of level I
+
+- `haltsandIntro A`
+
+      G |- haltsand A ext M
+      >>
+      G |- A ext M
+
 - `reduceSeqTotal A M N`
 
       G |- sequal (seq M (fn . N)) N[M . id]

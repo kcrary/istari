@@ -2,6 +2,10 @@
 File.import "acc-load.iml";
 File.import "logic-load.iml";
 
+File.import "partial-aux.iml";
+
+
+
 openModule /Acc/;
 
 
@@ -19,6 +23,7 @@ aliasExport (Symbol.fromValue "seq") Prim.seq;
 aliasExport /bottom/ Prim.bottom;
 aliasExport /strict/ Prim.strict;
 aliasExport /total/ Prim.total;
+aliasExport /haltsand/ Prim.haltsand;
 
 
 lemma "partial_type"
@@ -242,6 +247,34 @@ inference.
 intro /i a x y Hhalt Heq/.
 compat >> auto.
 qed ();
+
+
+
+(*
+Built-in:
+
+defineRaw /haltsand a/
+/
+  halts a &d a
+/;
+
+*)
+
+
+
+lemma "haltsand_type"
+/
+  haltsand : intersect i . partial (U i) -> U i
+/;
+
+inference.
+unfold /haltsand/.
+introOf /i a/.
+reduce //.
+fold /outpar a at 1/.
+typecheck.
+qed ();
+recordTyping "haltsand_type";
 
 
 
@@ -527,6 +560,118 @@ split.
   auto.
   }
 }
+qed ();
+
+
+
+structure PartialTactic = PartialTacticFun ();
+structure PartialTacticPervasive =
+   struct
+      val fixpointInductionRaw = PartialTactic.fixpointInductionRaw
+      val fixpointInduction = PartialTactic.fixpointInduction
+      val reduceSeqOutparRaw = PartialTactic.reduceSeqOutparRaw
+      val reduceSeqOutpar = PartialTactic.reduceSeqOutpar
+      val seqTerminationRaw = PartialTactic.seqTerminationRaw
+      val seqTermination = PartialTactic.seqTermination
+   end;
+
+open PartialTacticPervasive;
+
+grammaron PartialTactic;
+
+
+
+lemma "seq_unit_left"
+/
+  forall i (a b : U i) (m : a) (f : a -> partial b) .
+    strict a
+    -> halts m
+    -> (seq x = m in f x) = f m : partial b
+/;
+
+inference.
+intro /i a b m f Ha Hhalt/.
+reduceSeq // >> auto.
+qed ();
+
+  
+
+lemma "seq_unit_right"
+/
+  forall i (a : U i) (m : partial a) .
+    strict a
+    -> (seq x = m in x) = m : partial a
+/;
+
+inference.
+intro /i a m Ha/.
+symmetry.
+extensionality.
+  {
+  split.
+    {
+    intro /H/.
+    reduceSeq // >> auto.
+    }
+
+    {
+    intro /H/.
+    seqTermination /H/ >> auto.
+    }
+  }
+
+  {
+  reintro /H/.
+  reduceSeq // >> auto.
+  partiality /concl/ >> auto.
+  }
+qed ();
+
+  
+
+lemma "seq_assoc"
+/
+  forall i (a b c : U i) (m : partial a) (f : a -> partial b) (g : b -> partial c) .
+    (seq y = (seq x = m in f x) in g y)
+    =
+    (seq x = m in seq y = (f x) in g y)
+    : partial c
+/;
+
+inference.
+intro /i a b c m f g/.
+symmetry.
+extensionality.
+  {
+  split.
+    {
+    intro /H/.
+    seqTermination /H/.
+    reintro /H1 H2/.
+    reduceSeqOutpar /at 1 0/ >> auto.
+    }
+
+    {
+    intro /H/.
+    seqTermination /H/.
+    reintro /H1/.
+    seqTermination /H1/.
+    reintro /H2/.
+    reduceSeqOutpar /at 0 0/ >> auto.
+    reduceSeqOutpar /in H/ >> auto.
+    }
+  }
+
+  {
+  reintro /Hhalt/.
+  seqTermination /Hhalt/.
+  reintro /H1 H2/.
+  reduceSeqOutpar /at 0 1 0 0/ >> auto.
+    {
+    reduceSeqOutpar // >> auto.
+    }
+  partiality /concl/ >> auto.
+  }
 qed ();
 
 

@@ -90,6 +90,17 @@ This compatibility lemma is useful for rewriting with `outpar`:
 Attempting to rewrite the term immediately beneath an `outpar` tends
 to generate an unprovable termination subgoal.
 
+When a partial computation (possibly) returns a type, `haltsand P`
+indicates that `P` halts (and is therefore a type) and is inhabited:
+
+    haltsand : intersect (i : level) . partial (U i) -> U i
+             = fn P . halts P &g P
+
+The `haltsandIntro` rule allows `haltsand P` to be proven simply by
+proving `P`, without also having to check that `P` halts.  This is
+sound because any inhabited type is a valid type, and is therefore
+equivalent to a value.
+
 
 ### Inducement
 
@@ -164,3 +175,22 @@ using fixpoint induction.
 
     Acc_uptype : forall (i : level) (a : U i) (P : a -> a -> U i) (x : a) .
                     uptype a -> uptype (Acc.Acc a P x)
+
+
+### Sequencing
+
+    seq_unit_left : forall (i : level) (a b : U i) (m : a) (f : a -> partial b) .
+                       strict a -> halts m -> (seq x = m in f x) = f m : partial b
+
+    seq_unit_right : forall (i : level) (a : U i) (m : partial a) .
+                        strict a -> (seq x = m in x) = m : partial a
+
+    seq_assoc : forall
+                   (i : level)
+                   (a b c : U i)
+                   (m : partial a)
+                   (f : a -> partial b)
+                   (g : b -> partial c) .
+                   (seq y = (seq x = m in f x) in g y)
+                     = (seq x = m in seq y = f x in g y)
+                     : partial c

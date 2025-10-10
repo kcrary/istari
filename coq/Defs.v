@@ -163,6 +163,11 @@ Definition total : fterm :=
          (subtype (var 0) (Syntax.partial (var 0)))
          (pi (var 1) (Syntax.halts (var 0)))).
 
+Definition haltsand : fterm :=
+  lam (Syntax.coguard
+         (Syntax.halts (var 0))
+         (var 0)).
+
 Definition arrow : fterm := lam (lam (pi (var 1) (var 1))).
 Definition pi : fterm := lam (lam (pi (var 1) (app (var 1) (var 0)))).
 Definition set : fterm := lam (lam (set (var 1) (app (var 1) (var 0)))).

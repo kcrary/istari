@@ -5653,6 +5653,24 @@ Syntactic equality is intended for internal use only.
       >>
       G |- A : type
 
+- `univTotal I`
+
+      G |- total (univ I) ext (() , fn x . ())
+      >>
+      G |- I : level
+
+- `univStrict I`
+
+      G |- strict (univ I)
+      >>
+      G |- I : level
+
+- `haltsandIntro A`
+
+      G |- haltsand A ext M
+      >>
+      G |- A ext M
+
 - `reduceSeqTotal A M N`
 
       G |- sequal (seq M (fn x . N)) [M / x]N

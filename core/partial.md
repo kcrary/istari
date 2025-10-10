@@ -80,6 +80,17 @@ This compatibility lemma is useful for rewriting with `outpar`:
 Attempting to rewrite the term immediately beneath an `outpar` tends
 to generate an unprovable termination subgoal.
 
+When a partial computation (possibly) returns a type, `haltsand P`
+indicates that `P` halts (and is therefore a type) and is inhabited:
+
+    haltsand : type:haltsand
+             = def:haltsand
+
+The `haltsandIntro` rule allows `haltsand P` to be proven simply by
+proving `P`, without also having to check that `P` halts.  This is
+sound because any inhabited type is a valid type, and is therefore
+equivalent to a value.
+
 
 ### Inducement
 
@@ -132,3 +143,12 @@ uptype.  This fact is necessary because we prove well-foundedness
 using fixpoint induction.
 
     Acc_uptype : type:Acc_uptype
+
+
+### Sequencing
+
+    seq_unit_left : type:seq_unit_left
+
+    seq_unit_right : type:seq_unit_right
+
+    seq_assoc : type:seq_assoc

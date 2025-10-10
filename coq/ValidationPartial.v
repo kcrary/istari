@@ -4895,6 +4895,19 @@ apply tr_sigma_intro.
 Qed.
 
 
+Lemma haltsandIntro_valid : haltsandIntro_obligation.
+Proof.
+prepare.
+intros G a m H.
+unfold Defs.haltsand.
+rewrite -> equiv_beta.
+simpsub.
+apply (tr_coguard_intro _#3 triv triv); auto.
+apply tr_type_halt.
+eapply tr_inhabitation_formation; eauto.
+Qed.
+
+
 Hint Rewrite def_sequal : prepare.
 
 Lemma reduceSeqTotal_valid : reduceSeqTotal_obligation.
