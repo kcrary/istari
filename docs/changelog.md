@@ -1,6 +1,6 @@
 # Change log
 
-#### Development version
+#### 1.2
 
 - Substantial new functionality for dealing with potentially
   nonterminating computations.
