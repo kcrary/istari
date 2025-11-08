@@ -1420,8 +1420,8 @@ will not double the size multiple times.
   If the goal has the form `P M` where `M` unrolls and reduces to
   `fix F`, proves the goal using predicate fixpoint induction.
   (Internally, the tactic uses fixpoint induction to prove membership
-  in a set type.)  If the goal does not have the required form, it can
-  be put in that form using `abstractOverAt`.
+  in a strong sum.)  If the goal does not have the required form, it
+  can be put in that form using `abstractOverAt`.
 
   The term `M` must have type `partial A`, and `P` must have type
   `partial A -> U i`.  Often the `A` argument can be omitted and

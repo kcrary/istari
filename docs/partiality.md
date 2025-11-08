@@ -240,7 +240,7 @@ in place of `M` resolves the problem by forcing the typechecker to
 infer that `E0` is `partial A`.
 
 In contrast, the typechecker does not reason about termination, so the
-`outpar` form *is* usually necessary if one wishes for to avoid the
+`outpar` form *is* usually necessary if one wishes to avoid the
 typechecker generating auxiliary goals.
 
 In the soundness theorem, `hailstone` returns `partial nat` but the
