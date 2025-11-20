@@ -86,10 +86,10 @@ indicates that `P` halts (and is therefore a type) and is inhabited:
     haltsand : type:haltsand
              = def:haltsand
 
-The `haltsandIntro` rule allows `haltsand P` to be proven simply by
-proving `P`, without also having to check that `P` halts.  This is
-sound because any inhabited type is a valid type, and is therefore
-equivalent to a value.
+The `haltsandIntro` [rule](../rules.html#partial-types) allows `haltsand
+P` to be proven simply by proving `P`, without also having to check
+that `P` halts.  This is sound because any inhabited type is a valid
+type, and is therefore equivalent to a value.
 
 
 ### Inducement
@@ -152,3 +152,20 @@ using fixpoint induction.
     seq_unit_right : type:seq_unit_right
 
     seq_assoc : type:seq_assoc
+
+    seq_nonterminating : type:seq_nonterminating
+
+    seq_bottom : type:seq_bottom
+
+
+### Partial equality inversion
+
+Some basic facts involving equality between total and partial objects:
+
+    eq_partial_total : type:eq_partial_total
+
+    eq_partial_total' : type:eq_partial_total'
+
+    eq_partial_inpar : type:eq_partial_inpar
+
+    eq_partial_inpar' : type:eq_partial_inpar'

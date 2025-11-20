@@ -676,4 +676,131 @@ qed ();
 
 
 
+lemma "seq_nonterminating"
+/
+  forall i (a b : U i) (m : partial a) (f : a -> b) .
+    strict b
+    -> not (halts m)
+    -> (seq x = m in f x) = bottom : partial b
+/;
+
+inference.
+intro /i a b m f Hstrict Hnhalt/.
+extensionality.
+  {
+  split.
+    {
+    intro /Hhalt/.
+    seqTermination /Hhalt/.
+    reintro /H/.
+    so /Hnhalt H/ /0/.
+    }
+
+    {
+    fold /bottom :> (partial b)/.
+    intro /H/.
+    unfold /ann in H/.
+    termination /H/.
+    }
+  }
+
+  {
+  reintro /Hhalt/.
+  seqTermination /Hhalt/.
+  reintro /H/.
+  so /Hnhalt H/ /0/.
+  }
+qed ();
+
+
+
+lemma "seq_bottom"
+/
+  forall i (a b : U i) (f : a -> b) .
+    strict b
+    -> (seq x = bottom in f x) = bottom : partial b
+/;
+
+inference.
+intro /i a b f Hstrict/.
+apply /seq_nonterminating/ >> auto.
+fold /bottom :> (partial b)/.
+intro /H/.
+unfold /ann in H/.
+termination /H/.
+qed ();
+  
+
+
+lemma "eq_partial_total"
+/
+  forall i (a : U i) (x : a) (y : partial a) .
+    strict a
+    -g> total a
+    -g> x = y : partial a
+    -> halts y &d x = outpar y : a
+/;
+
+inference.
+intro /i a x y Hstrict Htotal Heq/.
+partiality /Heq/.
+  {
+  totality.
+  }
+reintro /Heq'/.
+split >> auto.
+rewrite /<- Heq/.
+totality.
+qed ();
+
+
+
+lemma "eq_partial_total'"
+/
+  forall i (a : U i) (x : partial a) (y : a) .
+    strict a
+    -g> total a
+    -g> x = y : partial a
+    -> halts x &d y = outpar x : a
+/;
+
+inference.
+intro /i a x y Hstrict Htotal Heq/.
+symmetryIn /Heq/.
+so /eq_partial_total _# 4 Heq/ /Hhalt Heq'/.
+auto.
+qed ();
+
+
+
+lemma "eq_partial_inpar"
+/
+  forall i (a : U i) (x : a) (y : partial a) .
+    strict a
+    -g> total a
+    -g> inpar x = y : partial a
+    -> halts y &d x = outpar y : a
+/;
+
+inference.
+apply /eq_partial_total/.
+qed ();
+  
+
+
+lemma "eq_partial_inpar'"
+/
+  forall i (a : U i) (x : partial a) (y : a) .
+    strict a
+    -g> total a
+    -g> x = inpar y : partial a
+    -> halts x &d y = outpar x : a
+/;
+
+inference.
+apply /eq_partial_total'/.
+qed ();
+
+
+
 endModule ();

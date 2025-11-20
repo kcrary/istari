@@ -1,5 +1,12 @@
 # Change log
 
+#### Development version
+
+- Library changes:
+
+  + `Partial` has new material.
+
+
 #### 1.2
 
 - Substantial new functionality for dealing with potentially
