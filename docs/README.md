@@ -101,4 +101,6 @@ validated using that formalization.
 
 - [Change log](changelog.html)
 
+- [Pronunciation note](pronunciation.html)
+
 - [Copyright](copyright.html)
