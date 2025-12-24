@@ -1,6 +1,6 @@
 # Change log
 
-#### 1.2
+#### 1.2a
 
 - Substantial new functionality for dealing with potentially
   nonterminating computations.
