@@ -96,13 +96,13 @@ type, and is therefore equivalent to a value.
 
 Given some recursive function `h`, we say that `y` induces `x` when
 computing `h y` entails computing `h x`.  If `h y` halts, we can do
-induction using the entailment relation (over the arguments that `y`
+induction using the inducement relation (over the arguments that `y`
 induces), viewing `x` as less than `y` when `y` induces `x`.
 
 In our formulation of inducement, it is convenient not to restrict
 ourselves only to partial functions with a single argument.  Instead,
 we work with partial terms (say, having type `partial a`) and a
-function that adapts such partial terms into partial function with a
+function that adapts such partial terms into a partial function with a
 single argument.  Thus the adapter has type:
 
     partial a -> forall (x : b) . partial (c x)
