@@ -1,6 +1,8 @@
 # Change log
 
-#### Development version
+#### 1.2.1
+
+- Istari can be compiled on older versions of SML/NJ.
 
 - Library changes:
 
