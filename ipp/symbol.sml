@@ -1,4 +1,7 @@
 
+(*
+These are all provided by cmlib/defaults.sml
+
 structure Symbol =
    SymbolFun (structure Value = StringHashable)
 
@@ -10,6 +13,8 @@ structure SymbolHashTable =
 
 structure SymbolOrdered =
    SymbolOrderedFun (structure Symbol = Symbol)
+
+*)
 
 structure SymbolPickleable =
    SymbolPickleableFun (structure Value = StringPickleable

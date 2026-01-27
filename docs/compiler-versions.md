@@ -6,6 +6,7 @@ confirmed to work, or not.
 
 ### Linux
 
+- 110.79 does not work as is, but there is a [workaround](old-smlnj.html).
 - 110.99.2 works.
 - 110.99.4 works.
 - 110.99.7 does not work.
