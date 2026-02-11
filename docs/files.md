@@ -55,9 +55,9 @@ that attend an Istari file.  We use `Nat` as an example:
 - `nat-aux.iml`: An IML source file that implements tactics, parsing
   and unparsing rules, etc.
 
-- `nat-load.iml`: An IML source file that prepares `Nat` for use.  If
-  `nat-aux.iml` it loads it, and then runs startup code such as
-  calling functors (see below).
+- `nat-load.iml`: An IML source file that prepares `Nat` for use.  It
+  loads `nat.isto`, imports `nat-aux.iml`, and then runs startup code
+  such as calling functors (see below).
 
 If `nat.ist` has IML code that is only needed locally, not by clients,
 then that code can appear directly in `nat.ist`.  However, such code
