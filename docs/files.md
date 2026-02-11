@@ -97,8 +97,8 @@ location is given by the `ISTARILIB` environment variable.  If the
 variable is not defined, the `library` subdirectory of the Istari
 distribution is used.
 
-Additional directories can be added in batch mode using the `-L
-<directory>` flag.  Additional directories are searched before the
+Additional directories can be added in batch mode using the 
+`-L <directory>` flag.  Additional directories are searched before the
 Istari library.
 
 In either mode, the search path can be viewed or altered by reading or
