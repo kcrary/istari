@@ -1,5 +1,16 @@
 # Change log
 
+#### Development version
+
+- Rewriting changes:
+
+  + Fixed a bug in `unrollTypeUniv`.
+
+- Library changes:
+
+  + Added material to `Eventually`.
+
+
 #### 1.2.1
 
 - Istari can be compiled on older versions of SML/NJ.

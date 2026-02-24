@@ -102,6 +102,37 @@ The monad laws are respected:
                         : ev c
 
 
+### Join
+
+The monad operations can be expressed in terms of map and join in the usual way:
+
+    joinev : intersect (i : level) (a : U i) . ev (ev a) -> ev a
+           = fn x . bindev y = x in y
+
+    joinev (now x) --> x
+    joinev (laterf x) --> let next y = x in later (joinev y)
+    joinev (later x) --> later (joinev x)
+
+    mapev : intersect (i : level) (a b : U i) . (a -> b) -> ev a -> ev b
+          = fn f m . bindev x = m in now (f x)
+
+    mapev f (now x) --> now (f x)
+    mapev f (laterf x) --> let next y = x in later (mapev f y)
+    mapev f (later x) --> later (mapev f x)
+
+    joinev_id_left : forall (i : level) (a : U i) (m : ev a) . joinev (now m) = m : ev a
+
+    joinev_id_right : forall (i : level) (a : U i) (m : ev a) . joinev (mapev now m) = m : ev a
+
+    joinev_assoc : forall (i : level) (a : U i) (m : ev (ev (ev a))) .
+                      joinev (mapev joinev m) = joinev (joinev m) : ev a
+
+    mapev_identity : forall (i : level) (a : U i) (m : ev a) . mapev (fn x . x) m = m : ev a
+
+    mapev_compose : forall (i : level) (a b c : U i) (f : b -> c) (g : a -> b) (m : ev a) .
+                       mapev f (mapev g m) = mapev (fn x . f (g x)) m : ev c
+
+
 ### Bindevt
 
 Observe that `bindev` always returns some `ev` type.  A variation on
@@ -231,15 +262,15 @@ no later then `e`:
            = fn x y .
                 ffix
                   (fn g x1 y1 .
-                    (case x1 of
-                     | inl v0 . unit
-                     | inr x' .
-                         (case y1 of
-                          | inl v0 . void
-                          | inr y' .
-                              let next g' = g
-                              in
-                              let next x'' = x' in let next y'' = y' in future (g' x'' y''))))
+                     (case x1 of
+                      | inl v0 . unit
+                      | inr x' .
+                          (case y1 of
+                           | inl v0 . void
+                           | inr y' .
+                               let next g' = g
+                               in
+                               let next x'' = x' in let next y'' = y' in future (g' x'' y''))))
                   x
                   y
 
@@ -295,15 +326,15 @@ combination converges after `i + j` steps.
             = fn x y .
                  ffix
                    (fn g x1 y1 .
-                     (case x1 of
-                      | inl x' . bindev y' = y1 in now (x', y')
-                      | inr x' .
-                          (case y1 of
-                           | inl y' . bindev x'' = x1 in now (x'', y')
-                           | inr y' .
-                               let next g' = g
-                               in
-                               let next x'' = x' in let next y'' = y' in later (g' x'' y''))))
+                      (case x1 of
+                       | inl x' . bindev y' = y1 in now (x', y')
+                       | inr x' .
+                           (case y1 of
+                            | inl y' . bindev x'' = x1 in now (x'', y')
+                            | inr y' .
+                                let next g' = g
+                                in
+                                let next x'' = x' in let next y'' = y' in later (g' x'' y''))))
                    x
                    y
 

@@ -184,11 +184,12 @@ qed ();
 
 reductions 
 /
-bindev (now x) f --> f x ;
-bindev (laterf x) f --> let next y = x in later (bindev y f) ;
-bindev (later x) f --> later (bindev x f) ;
-unfolding letnext bindev now later laterf
-unrolling ffix
+  bindev (now x) f --> f x ;
+  bindev (laterf x) f --> let next y = x in later (bindev y f) ;
+  bindev (later x) f --> later (bindev x f) ;
+
+  unfolding letnext bindev now later laterf
+  unrolling ffix
 /;
 
 
@@ -429,6 +430,155 @@ unfold /later at 0 0/.
 compat.
 compat.
 hyp /IH/.
+qed ();
+
+
+
+(* Join *)
+
+define /joinev x/
+/
+  bindev y = x in y
+//
+  intersect i (a : U i) . ev (ev a) -> ev a
+/;
+
+inference.
+unfold /joinev/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  joinev (now x) --> x ;
+  joinev (laterf x) --> let next y = x in later (joinev y) ;
+  joinev (later x) --> later (joinev x) ;
+
+  unfolding joinev
+/;
+
+
+
+define /mapev f m/
+/
+  bindev x = m in now (f x)
+//
+  intersect i (a b : U i) .
+    (a -> b)
+    -> ev a
+    -> ev b
+/;
+
+inference.
+unfold /mapev/.
+typecheck.
+qed ();
+
+
+
+reductions
+/
+  mapev f (now x) --> now (f x) ;
+  mapev f (laterf x) --> let next y = x in later (mapev f y) ;
+  mapev f (later x) --> later (mapev f x) ;
+
+  unfolding mapev
+/;
+
+
+
+lemma "bindev_as_joinev"
+/
+  forall i (a b : U i) (m : ev a) (f : a -> ev b) .
+    (bindev x = m in f x) = joinev (mapev f m) : ev b
+/;
+
+inference.
+intro /i a b m f/.
+unfold /joinev, mapev/.
+rewrite /-> bindev_assoc/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "joinev_id_left"
+/
+  forall i (a : U i) (m : ev a) .
+    joinev (now m) = m : ev a
+/;
+
+inference.
+intro /i a m/.
+unfold /joinev/.
+reflexivity.
+qed ();
+
+
+
+lemma "joinev_id_right"
+/
+  forall i (a : U i) (m : ev a) .
+    joinev (mapev now m) = m : ev a
+/;
+
+inference.
+intro /i a m/.
+unfold /joinev, mapev/.
+rewrite /-> bindev_assoc/.
+reduce //.
+apply /bindev_id_right/.
+qed ();
+
+
+
+lemma "joinev_assoc"
+/
+  forall i (a : U i) (m : ev (ev (ev a))) .
+    joinev (mapev joinev m) = joinev (joinev m) : ev a
+/;
+
+inference.
+intro /i a m/.
+unfold /mapev, joinev at all/.
+rewrite /-> bindev_assoc at 0 0/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "mapev_identity"
+/
+  forall i (a : U i) (m : ev a) .
+    mapev (fn x . x) m = m : ev a
+/;
+
+inference.
+intro /i a m/.
+unfold /mapev/.
+reduce //.
+apply /bindev_id_right/.
+qed ();
+
+
+
+lemma "mapev_compose"
+/
+  forall i (a b c : U i) (f : b -> c) (g : a -> b) (m : ev a) .
+    mapev f (mapev g m) = mapev (fn x . f (g x)) m : ev c
+/;
+
+inference.
+intro /i a b c f g m/.
+unfold /mapev at all/.
+reduce //.
+rewrite /-> bindev_assoc/.
+reduce //.
+reflexivity.
 qed ();
 
 

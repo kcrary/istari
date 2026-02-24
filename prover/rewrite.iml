@@ -2664,10 +2664,12 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                                 val u = T.apply1 Prim.univ lev
 
                                                 val tac =
-                                                   (* M = Body[M . id] : U lev *)
+                                                   (* M = Body[M . id] : type *)
                                                    replaceConcl 
-                                                      (T.apply3 Prim.eq u m (T.app (T.Lam (NONE, body)) m))
-                                                   >>
+                                                      (T.apply2 Prim.eqtp m (T.app (T.Lam (NONE, body)) m))
+                                                   >>+
+                                                   refine (Rule.univForgetEq (T.evar ()) (T.evar ()) lev)
+                                                   >>+
                                                    (* M = (fn . Body) M : U lev *)
                                                    refine (Rule.reduce (R.compat [R.refl, red, R.trans [R.compat [red], R.beta 1]]))
                                                    >>
@@ -2684,7 +2686,7 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                                        ]
                                              in
                                                 SOME (m, T.Sub (body, T.Dot (m, T.id)), [],
-                                                      (Equality u, Forward tac))
+                                                      (General Prim.eqtp, Forward tac))
                                              end)\
                                       /
                                    else

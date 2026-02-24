@@ -96,6 +96,35 @@ The monad laws are respected:
     bindev_assoc : type:bindev_assoc
 
 
+### Join
+
+The monad operations can be expressed in terms of map and join in the usual way:
+
+    joinev : type:joinev
+           = def:joinev
+
+    joinev (now x) --> x
+    joinev (laterf x) --> let next y = x in later (joinev y)
+    joinev (later x) --> later (joinev x)
+
+    mapev : type:mapev
+          = def:mapev
+
+    mapev f (now x) --> now (f x)
+    mapev f (laterf x) --> let next y = x in later (mapev f y)
+    mapev f (later x) --> later (mapev f x)
+
+    joinev_id_left : type:joinev_id_left
+
+    joinev_id_right : type:joinev_id_right
+
+    joinev_assoc : type:joinev_assoc
+
+    mapev_identity : type:mapev_identity
+
+    mapev_compose : type:mapev_compose
+
+
 ### Bindevt
 
 Observe that `bindev` always returns some `ev` type.  A variation on
