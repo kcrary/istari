@@ -13,7 +13,9 @@ that is, types that cannot be used with
 
     inadmissible_type : type:inadmissible_type
 
-One such type is the type of partial functions from `nat` to `unit`:
+One such type is the type of definitely partial functions from `nat`
+to `unit`.  (By *definitely* partial, we mean not only that the
+function might not be total, but that it is definitely not total.)
 
     { h : nat -> partial unit | not (forall x . halts (h x)) }
 
@@ -21,12 +23,13 @@ Let `T` be this type, and let `f` be the function:
 
     fn g x . if x =? 0 then () else g (x - 1)
 
-Since `f` defers to its argument `g`, it preserves partiality. Thus
-one can show that `f : partial T -> partial T`.  If `T` were
-admissible, we could conclude by fixpoint induction that 
+Since `f` defers to its argument `g`, it preserves definite
+partiality. Thus one can show that `f : partial T -> partial T`.  If
+`T` were admissible, we could conclude by fixpoint induction that 
 `fix f : partial T`.  However `fix f` clearly halts, so it would
-follow that `fix f : T`.  That would mean `fix f` is a partial
-function, but it is easy to show that `fix f` is actually total.
+follow that `fix f : T`.  That would mean `fix f` is a definitely
+partial function, but it is easy to show that `fix f` is actually
+total.
 
 ---
 

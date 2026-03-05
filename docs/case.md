@@ -415,8 +415,7 @@ against `'a`, producing `'c`.  The `frame` combinator coerces the
 former to the latter.  (The other direction is not often required, but
 can be accomplished by instantiating `'b` to `unit` and then wrapping.)
 
-To use `fix`, you would write something like (with types added for
-clarity):
+To use `fix`, you would write something like:
 
     frame (fix (fn m => ... body ...))
 

@@ -1,15 +1,16 @@
 # Partiality
 
 Normally, the Istari type theory deals with total (a.k.a. terminating)
-objects.  For example, the `nat` type contains only `0`, `1`, `2`,
-etc.  It does not contain a divergent "bottom" term, as it does in
-many languages, such as ML.  In some languages, `nat` contains even
-more spurious terms, such as `succ bottom`, `succ (succ bottom)`, etc.
-This strong property allows one to invoke induction for any term
-belonging to `nat`, while in ML one must restrict one's attention to
-values.  (If `succ bottom` is a `nat`, merely restricting to values is
-not enough.)  This makes Istari more convenient for mathematical
-reasoning.
+objects.  For example, the `nat` type contains only the terms `0`,
+`1`, `2`, etc.  It does not also contain a divergent "bottom" term, as
+it does in many languages, such as ML.  In some languages, `nat`
+contains even more spurious terms, such as `succ bottom`, 
+`succ (succ bottom)`, etc.  This strong property of Istari types
+allows one to invoke induction for any term belonging to `nat`, while
+in ML one must restrict one's attention to values.  (If `succ bottom`
+is not the same as `bottom`, but is nevertheless a `nat`, merely
+restricting to values is not enough.)  This makes Istari more
+convenient for mathematical reasoning.
 
 Nevertheless, it is sometimes also useful to reason about partial
 objects.  Istari provides two mechanisms for doing so: partial types,
@@ -18,8 +19,9 @@ and simulated partial types using guarded recursion (the
 have a lot in common, but have two main differences: On the one hand,
 simulated partial types are fundamentally unable to express
 termination, or any idiom that depends on it.  On the other hand,
-simulated partial types need not deal with the hassle of
-admissibility.  In this document we consider partial types.
+partial types (but not simulated partial types) must deal with the
+hassle of *admissibility* (see below).  In this document we consider
+partial types.
 
 As a running example, we implement the "hailstone" sequence from the
 Collatz conjecture.  In the hailstone sequence, any even number *n*
@@ -40,8 +42,8 @@ For example, `hailstone 3 = 2` (3 to 10, and 5 to 16).
 
 It is not known whether `hailstone` terminates on every input.  Thus,
 it is not known whether `hailstone` has type `nat -> nat`, but it does
-have type `nat -> partial nat`.  The type `partial nat` contains all
-the elements of `nat`, and it also contains all nonterminating terms.
+have the type `nat -> partial nat`.  The type `partial nat` contains
+all the elements of `nat`, plus all nonterminating terms.
 
 The reader may find the full hailstone development in Istari
 [here](hailstone.ist).  It may be helpful to load it into Istari and
@@ -54,8 +56,8 @@ To implement `hailstone` in Istari, we first need a helper function:
 
     div2 : nat -> option nat
 
-Given an even argument *n*, `div2` returns Some of *n / 2*, and
-given an odd argument `div2` returns None.
+Given an even argument *n*, `div2` returns `Some` of *n / 2*, and
+given an odd argument `div2` returns `None`.
 
 Now we can define:
 
@@ -149,8 +151,11 @@ is equivalent to the following relational definition:
               -> hailstonerel n (succ x)
     /;
 
+    establishUptype /hailstonerel/;
+
 Specifically, we want to show that `hailstone n` terminates and
-returns `x` exactly when `hailstonerel n x` holds.
+returns `x` exactly when `hailstonerel n x` holds.  (We discuss
+`establishUptype` [below](#establishing-upward-closure).)
 
 The easier side of this proof is completeness:
 
@@ -628,13 +633,13 @@ something like:
 
     forall (x : T) . halts M -> Aa
 
-Here `M` can refer to the dependency, but not `T` or `Aa`.  This is
-the pattern that arises when proving soundness results as illustrated
-above.  For example, the following is predicate-admissible, with a
-dependency on `v0 : nat -> partial nat`:
+Here `M` can refer to the dependency, but `T` and `Aa` cannot.  This
+is the pattern that arises when proving soundness results as
+illustrated above.  For example, the following is
+predicate-admissible, with a dependency on `f : nat -> partial nat`:
 
     forall (n : nat) .
-      halts (v0 n)
+      halts (f n)
       -> halts (hailstone n)
       -> hailstonerel n (outpar (hailstone n)))
 
@@ -642,12 +647,13 @@ dependency on `v0 : nat -> partial nat`:
 #### Establishing upward closure
 
 To prompt Istari to recognize that a datatype is upwards closed, we
-run `establishUptype`.  For example:
+run `establishUptype`.  For example, after defining `hailstonerel`, we
+ran:
 
     establishUptype /hailstonerel/;
 
-If doing so fails, one can diagnose the problem by attempting manually
-to prove the lemma:
+In the example this succeeded.  Had it failed instead, one could
+diagnose the problem by attempting manually to prove the lemma:
 
     forall m n . uptype (hailstonerel m n)
 
@@ -667,6 +673,6 @@ when `hailstonerel` was defined.  That leaves us the goal:
            unit)
     & unit
 
-We can break this up into pieces, using the tactic
+We can break this up into pieces, and then use the tactic
 `Partiality.proveAdmiss` on each piece until we find the one that
 fails.  (In this case, none of them will.)
