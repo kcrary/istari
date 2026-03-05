@@ -1,0 +1,1286 @@
+
+File.import "logic-load.iml";
+File.import "nat-load.iml";
+File.import "omega-load.iml";
+File.import "tuple-load.iml";
+
+openModule /Nat/;
+
+beginModule "Division";
+
+
+
+define /pos/
+/
+  { n : nat | 0 < n }
+//
+  U 0
+/;
+
+unfold /pos/.
+typecheck.
+qed ();
+setOpacity /pos/ Constant.SOFT;
+
+
+
+definerec /div a b/
+/
+  if a <? b then
+    0
+  else
+    succ (div (a - b) b)
+//
+  nat -> pos -> nat
+/;
+
+introOf /a b/.
+destruct /b/ /b Hpos/.
+unhide.
+sinduction /a/.
+reintro /IH/.
+unroll /div/.
+boolCase /a <? b/ /Hlt/ >> auto.
+typecheck.
+apply /IH/.
+omega.
+qed ();
+
+
+
+definerec /mod a b/
+/
+  if a <? b then
+    a
+  else
+    mod (a - b) b
+//
+  nat -> pos -> nat
+/;
+
+introOf /a b/.
+destruct /b/ /b Hpos/.
+unhide.
+sinduction /a/.
+reintro /IH/.
+unroll /mod/.
+boolCase /a <? b/ /Hlt/ >> auto.
+typecheck.
+apply /IH/.
+omega.
+qed ();
+
+
+
+definerec /divmod a b/
+/
+  if a <? b then
+    (0, a)
+  else
+    (let (q, r) = divmod (a - b) b
+     in
+       (succ q, r))
+//
+  nat -> pos -> nat & nat
+/;
+
+introOf /a b/.
+destruct /b/ /b Hpos/.
+unhide.
+sinduction /a/.
+reintro /IH/.
+unroll /divmod/.
+boolCase /a <? b/ /Hlt/ >> auto.
+typecheck.
+apply /IH/.
+omega.
+qed ();
+
+
+
+lemma "divmod_equal"
+/
+  forall a (b : pos) .
+    divmod a b = (div a b, mod a b) : (nat & nat)
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hpos/.
+unhide.
+sinduction /a/.
+reintro /IH/.
+unroll /divmod, div, mod/.
+boolCase /a <? b/ /Hlt/ >> auto.
+exploit /IH (a - b)/ /Heq/.
+  {
+  omega.
+  }
+rewrite /-> Heq/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "mod_lt_r"
+/
+  forall a (b : pos) .
+    mod a b < b
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hpos/.
+unhide.
+sinduction /a/.
+reintro /IH/.
+unroll /mod/.
+boolCase /a <? b/ /Hlt/ >> auto.
+apply /IH/.
+omega.
+qed ();
+
+
+
+lemma "div_prop"
+/
+  forall a (b : pos) .
+    div a b * b + mod a b = a : nat
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hpos/.
+unhide.
+sinduction /a/.
+reintro /IH/.
+unroll /div, mod/.
+boolCase /a <? b/ /Hlt/ >> auto.
+so /IH (a - b) __/ /H/.
+  {
+  omega.
+  }
+omega.
+qed ();
+
+
+
+lemma "mod_prop"
+/
+  forall a (b : pos) .
+    mod a b = a - div a b * b : nat
+/;
+
+inference.
+intro /a b/.
+so /div_prop a b/ /H/.
+omega.
+qed ();
+
+
+
+lemma "division_property"
+/
+  forall a (b : pos) q r .
+    a = q * b + r : nat
+    -> r < b
+    -> div a b = q : nat & mod a b = r : nat
+/;
+
+inference.
+intro /a b q r Hq Hr/.
+destruct /b/ /b Hpos/.
+revert /q Hq/.
+sinduction /a/.
+reintro /IH/.
+intro /q Hq/.
+unroll /div, mod/.
+boolCase /a <? b/ /Hlt/.
+  {
+  destruct /q/ /| q/ >> auto.
+  exfalso.
+  reduce /Hq/.
+    omega.
+  }
+
+  {
+  assert /0 < q/ /Hposq/.
+    {
+    so /eq_nat_decide q 0/ /Heq | Hneq/.
+      {
+      subst /q/.
+      reduce /Hq/.
+      omega.
+      }
+
+      {
+      omega.
+      }
+    }
+  so /IH (a - b) __ (pred q) __/ /Hdiv Hmod/.
+    {
+    omega.
+    }
+
+    {
+    rewrite /-> times_dist_pred_l/.
+    assert /b <= q * b/ /Hleq/.
+      {
+      rewrite /<- times_1_l b/.
+      apply /times_leq 1/ >> auto.
+      omega.
+      }
+    omega.
+    }
+  omega.
+  }
+qed ();
+
+
+
+lemma "division_unique"
+/
+  forall a (b : pos) q q' r r' .
+    a = q * b + r : nat
+    -> a = q' * b + r' : nat
+    -> r < b
+    -> r' < b
+    -> q = q' : nat & r = r' : nat
+/;
+
+inference.
+intro /a b q q' r r' Ha Ha' Hr Hr'/.
+so /division_property _# 4 Ha Hr/ /Hdiv Hmod/.
+so /division_property _# 4 Ha' Hr'/ /Hdiv' Hmod'/.
+omega.
+qed ();
+
+
+
+lemma "div_leq_l"
+/
+  forall a (b : pos) .
+    div a b <= a
+/;
+
+inference.
+intro /a b/.
+rewrite /<- div_prop a b at 1/.
+apply /leq_trans _ (div a b * b)/.
+1:{
+  omega.
+  }
+rewrite /<- times_1_r (div a b)/.
+apply /times_leq/ >> auto.
+destruct /b/ /b Hpos/.
+unhide.
+omega.
+qed ();
+
+
+
+lemma "mod_leq_l"
+/
+  forall a (b : pos) .
+    mod a b <= a
+/;
+
+inference.
+intro /a b/.
+rewrite /<- div_prop a b at 1/.
+omega.
+qed ();
+
+
+
+lemma "div_times_r"
+/
+  forall a (b : pos) .
+    div (a * b) b = a : nat
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hpos/.
+unhide.
+induction /a/.
+  {
+  unroll /div/.
+  boolEq true /0 <? b/ >> auto.
+  }
+intro /a IH/.
+unroll /div/.
+boolEq false /b + a * b <? b/.
+  {
+  omega.
+  }
+rewrite /b + a * b - b = a * b : nat/.
+  {
+  omega.
+  }
+auto.
+qed ();
+
+
+
+lemma "div_times_l"
+/
+  forall a (b : pos) .
+    div (b * a) b = a : nat
+/;
+
+inference.
+intro /a b/.
+rewrite /-> times_commute/.
+apply /div_times_r/.
+qed ();
+
+
+
+lemma "mod_times_r"
+/
+  forall a (b : pos) .
+    mod (a * b) b = 0 : nat
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hpos/.
+unhide.
+induction /a/.
+  {
+  unroll /mod/.
+  boolEq true /0 <? b/ >> auto.
+  }
+intro /a IH/.
+unroll /mod/.
+boolEq false /b + a * b <? b/.
+  {
+  omega.
+  }
+rewrite /b + a * b - b = a * b : nat/.
+  {
+  omega.
+  }
+auto.
+qed ();
+
+
+
+lemma "mod_times_l"
+/
+  forall a (b : pos) .
+    mod (b * a) b = 0 : nat
+/;
+
+inference.
+intro /a b/.
+rewrite /-> times_commute/.
+apply /mod_times_r/.
+qed ();
+
+
+
+lemma "div_0"
+/
+  forall (a : pos) . div 0 a = 0 : nat
+/;
+
+intro /a/.
+rewrite /<- times_0_r a/.
+rewrite /-> div_times_l/.
+auto.
+qed ();
+
+
+
+lemma "mod_0"
+/
+  forall (a : pos) . mod 0 a = 0 : nat
+/;
+
+intro /a/.
+rewrite /-> mod_prop/.
+rewrite /-> div_0/.
+omega.
+qed ();
+
+
+
+lemma "div_1"
+/
+  forall a . div a 1 = a : nat
+/;
+
+inference.
+intro /a/.
+assertThen /0 < 1/ /Hpos/ omega.
+rewrite /<- times_1_r a/.
+rewrite /-> div_times_r/.
+auto.
+qed ();
+
+
+
+lemma "mod_1"
+/
+  forall a . mod a 1 = 0 : nat
+/;
+
+inference.
+intro /a/.
+assertThen /0 < 1/ /Hpos/ omega.
+rewrite /-> mod_prop/.
+rewrite /-> div_1/.
+omega.
+qed ();
+
+
+
+lemma "div_self"
+/
+  forall (a : pos) . div a a = 1 : nat
+/;
+
+inference.
+intro /a/.
+rewrite /<- times_1_r a/.
+rewrite /-> div_times_l/.
+auto.
+qed ();
+
+
+
+lemma "mod_self"
+/
+  forall (a : pos) . mod a a = 0 : nat
+/;
+
+inference.
+intro /a/.
+rewrite /-> mod_prop/.
+rewrite /-> div_self/.
+omega.
+qed ();
+
+
+
+lemma "div_operands_lt"
+/
+  forall a (b : pos) .
+    a < b
+    -> div a b = 0 : nat
+/;
+
+inference.
+intro /a b Hlt/.
+unroll /div/.
+boolEq true /a <? b/ >> auto.
+qed ();
+
+
+
+lemma "mod_operands_lt"
+/
+  forall a (b : pos) .
+    a < b
+    -> mod a b = a : nat
+/;
+
+inference.
+intro /a b Hlt/.
+unroll /mod/.
+boolEq true /a <? b/ >> auto.
+qed ();
+
+
+
+lemma "div_plus_r"
+/
+  forall a (b : pos) .
+    div (a + b) b = succ (div a b) : nat
+/;
+
+inference.
+intro /a b/.
+unroll /div/.
+boolEq false /a + b <? b/.
+  {
+  omega.
+  }
+compat.
+compat.
+omega.
+qed ();
+
+
+
+lemma "div_plus_l"
+/
+  forall a (b : pos) .
+    div (b + a) b = succ (div a b) : nat
+/;
+
+inference.
+intro /a b/.
+rewrite /-> plus_commute/.
+apply /div_plus_r/.
+qed ();
+
+
+
+lemma "mod_plus_r"
+/
+  forall a (b : pos) .
+    mod (a + b) b = mod a b : nat
+/;
+
+inference.
+intro /a b/.
+unroll /mod/.
+boolEq false /a + b <? b/.
+  {
+  omega.
+  }
+compat.
+omega.
+qed ();
+
+
+
+lemma "mod_plus_l"
+/
+  forall a (b : pos) .
+    mod (b + a) b = mod a b : nat
+/;
+
+inference.
+intro /a b/.
+rewrite /-> plus_commute/.
+apply /mod_plus_r/.
+qed ();
+
+
+
+lemma "times_div_l"
+/
+  forall a (b : pos) .
+    div a b * b = a - mod a b : nat
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hpos/.
+unhide.
+sinduction /a/.
+reintro /IH/.
+unroll /div, mod/.
+boolCase /a <? b/ /Hlt/.
+  {
+  omega.
+  }
+
+  {
+  rewrite /-> IH (a - b) __/.
+    {
+    omega.
+    }
+  so /mod_leq_l (a - b) b/ /Hleq/.
+  omega.
+  }
+qed ();
+
+
+
+lemma "times_div_r"
+/
+  forall a (b : pos) .
+    b * div a b = a - mod a b : nat
+/;
+
+inference.
+intro /a b/.
+rewrite /-> times_commute/.
+apply /times_div_l/.
+qed ();
+
+
+
+lemma "div_assoc_with_remainder"
+/
+  forall a (b c : pos) .
+    div (div a b) c = div a (b * c) : nat
+    & mod (div a b) c * b + mod a b = mod a (b * c) : nat
+/;
+
+inference.
+intro /a b c/.
+destruct /b/ /b Hposb/.
+destruct /c/ /c Hposc/.
+unhide.
+assert /0 < b * c/ /Hposbc/.
+  {
+  assert /1 * 1 <= b * c/ /H/ >>> [idtac, omega].
+  apply /times_leq 1 _ 1/ >> omega.
+  }
+apply /division_unique a (b * c)/.
+  {
+  rewrite /<- div_prop a b/.
+  rewrite /<- div_prop (div a b) c/.
+  rewrite /-> times_dist_plus_l/.
+  rewrite /-> times_assoc/.
+  rewrite /-> times_commute at 1/.
+  rewrite /<- plus_assoc/.
+  reflexivity.
+  }
+
+  {
+  symmetry.
+  apply /div_prop/.
+  }
+
+  {
+  apply /lt_leq_trans _ (mod (div a b) c * b + b)/.
+    {
+    so /mod_lt_r a b/ /H/.
+    omega.
+    }
+  rewrite /<- times_1_l b at 2/.
+  rewrite /<- times_dist_plus_l _ 1 b/.
+  rewrite /-> times_commute/.
+  apply /times_leq/ >> auto.
+  so /mod_lt_r (div a b) c/ /H/.
+  omega.
+  }
+
+  {
+  apply /mod_lt_r/.
+  }
+qed ();
+
+
+
+lemma "div_assoc"
+/
+  forall a (b c : pos) .
+    div (div a b) c = div a (b * c) : nat
+/;
+
+inference.
+intro /a b c/.
+apply /div_assoc_with_remainder/.
+qed ();
+
+
+
+lemma "div_assoc_remainder"
+/
+  forall a (b c : pos) .
+    mod (div a b) c * b + mod a b = mod a (b * c) : nat
+/;
+
+inference.
+intro /a b c/.
+apply /div_assoc_with_remainder/.
+qed ();
+
+
+
+(* Divides *)
+
+define /divides a b/
+/
+  exists n . a * n = b : nat
+//
+  nat -> nat -> U 0
+/;
+
+unfold /divides/.
+typecheck.
+qed ();
+
+
+
+lemma "divides_iff_modulus"
+/
+  forall (a : pos) b .
+    divides a b <-> mod b a = 0 : nat
+/;
+
+inference.
+intro /a b/.
+split.
+  {
+  intro /Hdiv/.
+  destruct /Hdiv/ /n Heq/.
+  subst /b/.
+  apply /mod_times_l/.
+  }
+
+  {
+  intro /Heq/.
+  unfold /divides/.
+  exists /div b a/.
+  rewrite /-> times_div_r/.
+  omega.
+  }
+qed ();
+
+
+
+lemma "divides_1"
+/
+  forall a . divides 1 a
+/;
+
+inference.
+intro /a/.
+unfold /divides/.
+exists /a/.
+omega.
+qed ();
+
+
+
+lemma "divides_0"
+/
+  forall a . divides a 0
+/;
+
+inference.
+intro /a/.
+unfold /divides/.
+exists /0/.
+omega.
+qed ();
+
+
+
+lemma "divides_refl"
+/
+  forall a . divides a a
+/;
+
+inference.
+intro /a/.
+unfold /divides/.
+exists /1/.
+omega.
+qed ();
+
+
+
+lemma "divides_trans"
+/
+  forall a b c .
+    divides a b
+    -> divides b c
+    -> divides a c
+/;
+
+inference.
+intro /a b c Hab Hbc/.
+destruct /Hab/ /m Hab/.
+destruct /Hbc/ /n Hbc/.
+unfold /divides/.
+exists /m * n/.
+rewrite /<- times_assoc/.
+rewrite /-> Hab/.
+auto.
+qed ();
+
+
+
+lemma "divides_product_r"
+/
+  forall a b .
+    divides a (a * b)
+/;
+
+inference.
+intro /a b/.
+unfold /divides/.
+exists /b/.
+auto.
+qed ();
+
+
+
+lemma "divides_product_l"
+/
+  forall a b .
+    divides a (b * a)
+/;
+
+inference.
+intro /a b/.
+rewrite /-> times_commute/.
+apply /divides_product_r/.
+qed ();
+    
+
+
+lemma "divides_plus"
+/
+  forall a b c .
+    divides a b
+    -> divides a c
+    -> divides a (b + c)
+/;
+
+inference.
+intro /a b c (m Hab) (n Hac)/.
+unfold /divides/.
+exists /m + n/.
+rewrite /-> times_dist_plus_r/.
+omega.
+qed ();
+
+
+
+lemma "divides_minus"
+/
+  forall a b c .
+    divides a b
+    -> divides a c
+    -> divides a (b - c)
+/;
+
+inference.
+intro /a b c (m Hab) (n Hac)/.
+rewrite /<- Hab, <- Hac/.
+rewrite /<- times_dist_minus_r/.
+apply /divides_product_r/.
+qed ();
+
+
+
+lemma "divides_times_times_r"
+/
+  forall a b c .
+    divides a b
+    -> divides (a * c) (b * c)
+/;
+
+inference.
+intro /a b c (n Hab)/.
+unfold /divides/.
+exists /n/.
+rewrite /<- Hab/.
+rewrite /-> times_assoc at 0 0/.
+rewrite /-> times_commute at 1/.
+reflexivity.
+qed ();
+
+
+    
+lemma "divides_times_times_l"
+/
+  forall a b c .
+    divides a b
+    -> divides (c * a) (c * b)
+/;
+
+inference.
+intro /a b c Hab/.
+rewrite /-> times_commute at 0 1/.
+apply /divides_times_times_r/ >> auto.
+qed ();
+
+
+    
+lemma "divides_times_r"
+/
+  forall a b c .
+    divides a b
+    -> divides a (b * c)
+/;
+
+inference.
+intro /a b c Hab/.
+apply /divides_trans _ (a * c)/.
+  {
+  apply /divides_product_r/.
+  }
+
+  {
+  apply /divides_times_times_r/ >> auto.
+  }
+qed ();
+
+
+
+lemma "divides_times_l"
+/
+  forall a b c .
+    divides a b
+    -> divides a (c * b)
+/;
+
+inference.
+intro /a b c Hab/.
+rewrite /-> times_commute/.
+apply /divides_times_r/ >> auto.
+qed ();
+
+
+
+lemma "divides_mod"
+/
+  forall a b (c : pos) .
+    divides a b
+    -> divides a c
+    -> divides a (mod b c)
+/;
+
+inference.
+intro /a b c Hab Hac/.
+destruct /c/ /c Hposc/.
+unhide.
+destruct /Hab/ /m Hab/.
+destruct /Hac/ /n Hac/.
+unfold /divides/.
+exists /m - div b c * n/.
+rewrite /-> times_dist_minus_r/.
+rewrite /-> mod_prop/.
+rewrite /-> Hab/.
+rewrite /-> times_commute/.
+rewrite /-> times_assoc/.
+rewrite /-> times_commute at 1/.
+rewrite /-> Hac/.
+reflexivity.
+qed ();
+
+
+
+lemma "divides_div"
+/
+  forall a b (c : pos) .
+    divides (a * c) b
+    -> divides a (div b c)
+/;
+
+inference.
+intro /a b c Hacb/.
+destruct /Hacb/ /n Hacn/.
+rewrite /<- Hacn/.
+rewrite /-> times_commute at 1/.
+rewrite /-> times_assoc/.
+rewrite /-> div_times_l/.
+apply /divides_product_r/.
+qed ();
+
+
+
+lemma "divides_impl_leq"
+/
+  forall a b .
+    0 < b
+    -> divides a b
+    -> a <= b
+/;
+
+inference.
+intro /a b Hpos (n Hab)/.
+destruct /n/ /| n/.
+  {
+  omega.
+  }
+
+  {
+  reduce /Hab/.
+  rewrite /-> times_dist_succ_r in Hab/.
+  omega.
+  }
+qed ();
+
+
+
+lemma "divides_antisymm"
+/
+  forall a b .
+    divides a b
+    -> divides b a
+    -> a = b : nat
+/;
+
+inference.
+intro /a b Hab Hba/.
+so /eq_nat_decide a 0/ /Ha | Ha/.
+  {
+  destruct /Hab/ /n Hab/.
+  subst /a/.
+  omega.
+  }
+so /eq_nat_decide b 0/ /Hb | Hb/.
+  {
+  destruct /Hba/ /n Hba/.
+  subst /b/.
+  omega.
+  }
+
+  {
+  apply /leq_antisymm/.
+    {
+    apply /divides_impl_leq/ >> auto.
+    omega.
+    }
+
+    {
+    apply /divides_impl_leq/ >> auto.
+    omega.
+    }
+  }
+qed ();
+
+
+
+(* Greatest common divisor *)
+
+definerec /gcd a b/
+/
+  if mod a b =? 0 then
+    b
+  else
+    gcd b (mod a b)
+//
+  pos -> pos -> pos
+/;
+
+introOf /a b/.
+destruct /a/ /a Hposa/.
+destruct /b/ /b Hposb/.
+unhide.
+revert /a Hposa Hposb/.
+sinduction /b/.
+reintro /IH/.
+intro /a Hposa Hposb/.
+unroll /gcd/.
+boolCase /mod a b =? 0/ /H/ >> auto.
+apply /IH/ >> auto.
+  {
+  apply /mod_lt_r/.
+  }
+
+  {
+  omega.
+  }
+qed ();
+
+
+
+lemma "gcd_positive"
+/
+  forall (a b : pos) .
+    0 < gcd a b
+/;
+
+intro /a b/.
+infer /gcd a b/ /Hof/.
+destructSet /Hof/ /H/.
+unhide.
+auto.
+qed ();
+
+
+
+lemma "gcd_prop"
+/
+  forall (a b : pos) .
+    divides (gcd a b) a
+    & divides (gcd a b) b
+    & (forall n . divides n a -> divides n b -> divides n (gcd a b))
+/;
+
+inference.
+intro /a b/.
+destruct /a/ /a Hposa/.
+destruct /b/ /b Hposb/.
+unhide.
+revert /a Hposa Hposb/.
+sinduction /b/.
+reintro /IH/.
+intro /a Hposa Hposb/.
+unroll /gcd at 2 1 0/.
+boolCase /mod a b =? 0/ /Hzero/.
+  {
+  splitn 2 >> autoWith /divides_refl divides_iff_modulus/.
+  }
+assert /0 < mod a b/ /Hposmod/.
+  {
+  omega.
+  }
+exploit /IH (mod a b) __ b/ /Hdivb Hdivm Hgreatest/ >> auto.
+  {
+  apply /mod_lt_r/.
+  }
+splitn 2 >> auto.
+  {
+  rewrite /<- div_prop a b at 1/.
+  apply /divides_plus/ >> auto.
+  apply /divides_trans _ b/ >> auto.
+  apply /divides_product_l/.
+  }
+
+  {
+  intro /n Hna Hnb/.
+  apply /IH/ >> auto.
+    {
+    apply /mod_lt_r/.
+    }
+
+    {
+    apply /divides_mod/ >> auto.
+    }
+  }
+qed ();
+
+
+
+lemma "gcd_divides_l"
+/
+  forall (a b : pos) .
+    divides (gcd a b) a
+/;
+
+intro /a b/.
+apply /gcd_prop/.
+qed ();
+
+
+
+lemma "gcd_divides_r"
+/
+  forall (a b : pos) .
+    divides (gcd a b) b
+/;
+
+intro /a b/.
+apply /gcd_prop/.
+qed ();
+
+
+
+lemma "gcd_glb"
+/
+  forall (a b : pos) n .
+    divides n a
+    -> divides n b
+    -> divides n (gcd a b)
+/;
+
+inference.
+intro /a b n Ha Hb/.
+apply /gcd_prop/ >> auto.
+qed ();
+
+
+
+lemma "gcd_commute"
+/
+  forall (a b : pos) .
+    gcd a b = gcd b a : nat
+/;
+
+intro /a b/.
+apply /divides_antisymm/.
+  {
+  apply /gcd_glb/ >> autoWith /gcd_divides_l gcd_divides_r/.
+  }
+
+  {
+  apply /gcd_glb/ >> autoWith /gcd_divides_l gcd_divides_r/.
+  }
+qed ();
+
+
+
+lemma "gcd_assoc"
+/
+  forall (a b c : pos) .
+    gcd (gcd a b) c = gcd a (gcd b c) : nat
+/;
+
+intro /a b c/.
+so /gcd_positive a b/ /Hposab/.
+so /gcd_positive b c/ /Hposbc/.
+apply /divides_antisymm/.
+  {
+  apply /gcd_glb/.
+    {
+    apply /divides_trans _ (gcd a b)/ >> autoWith /gcd_divides_l/.
+    }
+
+    {
+    apply /gcd_glb/.
+      {
+      apply /divides_trans _ (gcd a b)/ >> autoWith /gcd_divides_l gcd_divides_r/.
+      }
+
+      {
+      apply /gcd_divides_r/.
+      }
+    }
+  }
+
+  {
+  apply /gcd_glb/.
+    {
+    apply /gcd_glb/.
+      {
+      apply /gcd_divides_l/.
+      }
+
+      {
+      apply /divides_trans _ (gcd b c)/ >> autoWith /gcd_divides_l gcd_divides_r/.
+      }
+    }
+
+    {
+    apply /divides_trans _ (gcd b c)/ >> autoWith /gcd_divides_r/.
+    }
+  }
+qed ();
+
+
+
+lemma "gcd_ann_r"
+/
+  forall (a : pos) . gcd a 1 = 1 : nat
+/;
+
+intro /a/.
+assertThen /0 < 1/ /Hpos1/ omega.
+apply /divides_antisymm/.
+  {
+  apply /gcd_divides_r/.
+  }
+
+  {
+  apply /gcd_glb/ >> apply /divides_1/.
+  }
+qed ();
+
+
+
+lemma "gcd_ann_l"
+/
+  forall (a : pos) . gcd 1 a = 1 : nat
+/;
+
+intro /a/.
+rewrite /-> gcd_commute/.
+  {
+  split.
+  omega.
+  }
+
+  {
+  apply /gcd_ann_r/.
+  }
+qed ();
+
+
+
+endModule ();

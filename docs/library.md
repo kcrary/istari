@@ -7,6 +7,7 @@ The following libraries are pre-loaded:
 - [`Acc`](lib/acc.html) (accessibility)
 - [`Bool`](lib/bool.html)
 - [`Decidable`](lib/decidable.html)
+- [`Division`](lib/division.html) (natural number division)
 - [`Eventually`](lib/eventually.html) (simulated partial computable objects)
 - [`Finite`](lib/finite.html)
 - [`FiniteMap`](lib/finite-map.html)
