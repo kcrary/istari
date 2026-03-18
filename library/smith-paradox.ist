@@ -23,9 +23,8 @@ assert /f : partial T -> nat -> partial unit/ /Hoffpre/.
   unfold /f , T/.
   introOf /g x/.
   reduce //.
-  fold /manual (g _)/.
+  fold /g :> (partial (nat -> partial unit))/.
   typecheck.
-  RuleTactic.activeApp (parseCurr /{h : nat -> partial unit | not (forall (x : nat) . halts (h x))}/) (parseCurr /g/) (parseCurr /pred x/) >> auto.
   }
 assert /forall (g : partial T) . not (forall (x : nat) . halts (f g x))/ /Hpartial/.
   {
@@ -34,37 +33,29 @@ assert /forall (g : partial T) . not (forall (x : nat) . halts (f g x))/ /Hparti
   assert /halts g/ /Hhalts/.
     {
     so /Htotal 1/ /H/.
-    revert /H/.
-    unfold /f/.
-    intro /H/.
-      {
-      RuleTactic.activeApp (parseCurr /{h : nat -> partial unit | not (forall (x : nat) . halts (h x))}/) (parseCurr /g/) (parseCurr /0/) >> auto.
-      }
-    RuleTactic.appHaltsInv (parseCurr /0/).
-    hyp /H/.
+    unfold /f in H/.
+    reduce /H/.
+    termination /H/.
+    auto.
     }
   tighten /g/ /{h : _ | _}/.
     {
-    RuleTactic.partialElimOf >> auto.
+    partiality /g/ >> auto.
     }
   destruct /g/ /[g Hpartial]/.
   unhide.
   witness /Hpartial __/.
   intro /x/.
   so /Htotal (succ x)/ /H/.
-  revert /H/.
-  unfold /f/.
-  reduce //.
-  auto.
+  unfold /f in H/.
+  reduce /H/.
+  hyp /H/.
   }
 assert /f : partial T -> partial T/ /Hoff/.
   {
   unfold /T at 1/.
   introOf /g/.
-  subsume /{ h : nat -> partial unit | not (forall (x : nat) . halts (h x)) }/.
-    {
-    typecheck.
-    }
+  partiality /concl/.
   typecheck.
   split.
   apply /Hpartial/.
@@ -73,22 +64,22 @@ exists /T/.
 intro /Hadmiss/.
 assert /fix f : partial T/ /Hfix/.
   {
-  RuleTactic.fixpointInductionOf >> auto.
+  typecheckFixpoint.
+  typecheck.
   }
 assert /halts (fix f)/ /Hhaltsfix/.
   {
-  RuleTactic.arrowHalts (parseCurr /nat/) (parseCurr /partial unit/).
+  unfold /f/.
   unroll /fix/.
-  inferSpine /Hoffpre/ /__ (fix f)/ /H/.
-  exact /H/.
+  reduce //.
+  termination /concl/.
   }
 assert /fix f : T/ /Hfix'/.
   {
-  RuleTactic.partialElimOf >> auto.
+  partiality /concl/ >> auto.
   }
 unfold /T in Hfix'/.
-Typecheck.withTypecheck $ RuleTactic.setElim (Term.evar ()) (Term.evar ()) (parseCurr /fix f/).
-reintro /Hpartialfix/.
+destructSet /Hfix'/ /Hpartialfix/.
 unhide.
 witness /Hpartialfix __/.
 intro /x/.
@@ -99,7 +90,7 @@ unfold /f/.
 destruct /x/ /| x/.
   {
   reduce //.
-  RuleTactic.unitHalts >> auto.
+  termination /concl/.
   }
 
   {
