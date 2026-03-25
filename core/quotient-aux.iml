@@ -15,11 +15,15 @@ functor AfterQuotient () :> sig end =
       open IntroPattern
 
       val quotient1 = resolveGlobal /Quotient.quotient1/
+      val quotient1r = resolveGlobal /Quotient.quotient1r/
       val quotient2 = resolveGlobal /Quotient.quotient2/
       val qintro1 = resolveGlobal /Quotient.qintro1/
+      val qintro1r = resolveGlobal /Quotient.qintro1r/
       val qintro2 = resolveGlobal /Quotient.qintro2/
-      val quotient1_refl_left = resolveGlobal /Quotient.quotient1_refl_left/
-      val quotient1_refl_right = resolveGlobal /Quotient.quotient1_refl_right/
+      val per_refl_left = resolveGlobal /Quotient.per_refl_left/
+      val per_refl_right = resolveGlobal /Quotient.per_refl_right/
+      val per_refl_left' = resolveGlobal /Quotient.per_refl_left'/
+      val per_refl_right' = resolveGlobal /Quotient.per_refl_right'/
 
       
       fun assert2 a b =
@@ -70,7 +74,7 @@ functor AfterQuotient () :> sig end =
              ]
          
 
-      fun destQuotient1Eq i p1 p2 p3 p4 p5 set a r hper m n copt jud =
+      fun destQuotient1Eq i p1 p2 p3 set a r hper m n copt refl jud =
          let
             val lv = T.evar ()
 
@@ -96,121 +100,106 @@ functor AfterQuotient () :> sig end =
                 relationIstype1 lv a r,
 
                 (* A, A[^], R[^2] 1 0, ...[^2] |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : C[under_i (2 . ^3)] *)
-                assert2
-                   (T.app2 (T.Sub (r, T.Shift (i+3))) (T.Var (i+2)) (T.Var (i+2)))
-                   (T.app2 (T.Sub (r, T.Shift (i+3))) (T.Var (i+1)) (T.Var (i+1)))
-                >>> [
-                    (* A, A[^], R[^2] 1 0, ...[^2] |- R[^i+3] i+2 i+2 *)
-                    refine (Rule.weaken 0 i)
-                    >>+
-                    (* A, A[^], R[^2] 1 0 |- R[^3] 2 2 *)
-                    IntroTactic.exactRaw
-                       (ETerm.literal
-                           (T.Elim (T.Const quotient1_refl_left,
-                                    [T.App (T.Sub (lv, T.Shift 3)),
-                                     T.App (T.Sub (a, T.Shift 3)),
-                                     T.App (T.Sub (r, T.Shift 3)),
-                                     T.App (T.Sub (hper, T.Shift 3)),
-                                     T.App (T.Var 2),
-                                     T.App (T.Var 1),
-                                     T.App (T.Var 0)])))
-                    >> idtacM (tertseq, De.Tertiary),
+                let
+                   do (vars1, set1) = De.andthenp S.empty $ De.dest (i+2) p1 set
+                   do (vars2, set2) = De.andthenp vars1 $ De.dest (i+1) p2 set1
+                   val vars1_2 = S.append vars1 vars2
+                   do (vars3, set3) = De.andthenp vars1_2 $ De.dest i p3 set2
+                   val vars1_3 = S.append vars1_2 vars3
 
-                    (* A, A[^], R[^2] 1 0, ...[^2] |- R[^i+3] i+1 i+1 *)
-                    refine (Rule.weaken 0 i)
-                    >>+
-                    (* A, A[^], R[^2] 1 0 |- R[^3] 1 1 *)
-                    IntroTactic.exactRaw
-                       (ETerm.literal
-                           (T.Elim (T.Const quotient1_refl_right,
-                                    [T.App (T.Sub (lv, T.Shift 3)),
-                                     T.App (T.Sub (a, T.Shift 3)),
-                                     T.App (T.Sub (r, T.Shift 3)),
-                                     T.App (T.Sub (hper, T.Shift 3)),
-                                     T.App (T.Var 2),
-                                     T.App (T.Var 1),
-                                     T.App (T.Var 0)])))
-                    >> idtacM (tertseq, De.Tertiary),
-
-                    (* A, A[^], R[^2] 1 0, ...[^2], R[^i+3] i+2 i+2, R[^i+3] i+1 i+1 |- M[under_i (2 . ^3)][^2] = N[under_i (1 . ^3)][^2] : C[under_i (2 . ^3)] *)
-                    refine (Rule.exchange 1 1 (i+2))
-                    >>+
-                    refine (Rule.exchange 0 1 (i+1))
-                    >>+
-                    (* A, R[^] 0 0, A[^2], R[^3] 0 0, R[^4] 3 1, ...[^4] |- M[under_i (4 . ^5)] = N[under_i (2 . ^5)] : C[under_i (4 . ^5)] *)
-                    let
-                       do (vars1, set1) = De.andthenp S.empty $ De.dest (i+4) p1 set
-                       do (vars2, set2) = De.andthenp vars1 $ De.dest (i+3) p2 set1
-                       val vars1_2 = S.append vars1 vars2
-                       do (vars3, set3) = De.andthenp vars1_2 $ De.dest (i+2) p3 set2
-                       val vars1_3 = S.append vars1_2 vars3
-                       do (vars4, set4) = De.andthenp vars1_3 $ De.dest (i+1) p4 set3
-                       val vars1_4 = S.append vars1_3 vars4
-                       do (vars5, set5) = De.andthenp vars1_4 $ De.dest i p5 set4
-                       val vars1_5 = S.append vars1_4 vars5
-
-                       val x =
-                          T.Elim (T.Const qintro1,
-                                  [T.App (T.Sub (a, T.Shift 5)),
-                                   T.App (T.Sub (r, T.Shift 5)),
-                                   T.App (T.Sub (hper, T.Shift 5)),
-                                   T.App (T.Var 4),
-                                   T.App (T.Var 3)])
-
-                       val y =
-                          T.Elim (T.Const qintro1,
-                                  [T.App (T.Sub (a, T.Shift 5)),
-                                   T.App (T.Sub (r, T.Shift 5)),
-                                   T.App (T.Sub (hper, T.Shift 5)),
+                   val (x, y, red) =
+                      if refl then
+                         (T.Elim (T.Const qintro1r,
+                                  [T.App (T.Sub (a, T.Shift 3)),
+                                   T.App (T.Sub (r, T.Shift 3)),
+                                   T.App (T.Sub (hper, T.Shift 3)),
+                                   T.App (T.Var 2)
+                                   ]),
+                          T.Elim (T.Const qintro1r,
+                                  [T.App (T.Sub (a, T.Shift 3)),
+                                   T.App (T.Sub (r, T.Shift 3)),
+                                   T.App (T.Sub (hper, T.Shift 3)),
+                                   T.App (T.Var 1)
+                                   ]),
+                          R.trans [R.unfold, R.beta 4])
+                      else
+                         (T.Elim (T.Const qintro1,
+                                  [T.App (T.Sub (a, T.Shift 3)),
+                                   T.App (T.Sub (r, T.Shift 3)),
+                                   T.App (T.Sub (hper, T.Shift 3)),
                                    T.App (T.Var 2),
-                                   T.App (T.Var 1)])
-                    in
-                       (* ... |- M[under_i (4 . ^5)] = N[under_i (2 . ^5)] : C[under_i (4 . ^5)]
-                               = M[under_i ((5 . ^6) o (2 . id))] = N[under_i ((0 . ^6) o (2 . id))] : C[under_i ((5 . ^6) o (2 . id))]
-                               = (M[under_i (5 . ^6)] = N[under_i+1 (^5)] : C[under_i (5 . ^6)])[under_i (2 . id)]
-                       *)
-                       refine (Rule.unreduceAt i
-                                  (case copt of
-                                      NONE =>
-                                         T.apply2 Prim.eqtp
-                                            (T.Sub (m, T.under i (T.Idot (5, T.Shift 6))))
-                                            (T.Sub (n, T.underShift (i+1) 5))
+                                   T.App (T.Elim (T.Const per_refl_left,
+                                                  [
+                                                  T.App (T.Sub (a, T.Shift 3)),
+                                                  T.App (T.Sub (r, T.Shift 3)),
+                                                  T.App (T.Sub (hper, T.Shift 3)),
+                                                  T.App (T.Var 2),
+                                                  T.App (T.Var 1),
+                                                  T.App T.zero
+                                                  ]))
+                                   ]),
+                          T.Elim (T.Const qintro1,
+                                  [T.App (T.Sub (a, T.Shift 3)),
+                                   T.App (T.Sub (r, T.Shift 3)),
+                                   T.App (T.Sub (hper, T.Shift 3)),
+                                   T.App (T.Var 1),
+                                   T.App (T.Elim (T.Const per_refl_right,
+                                                  [
+                                                  T.App (T.Sub (a, T.Shift 3)),
+                                                  T.App (T.Sub (r, T.Shift 3)),
+                                                  T.App (T.Sub (hper, T.Shift 3)),
+                                                  T.App (T.Var 2),
+                                                  T.App (T.Var 1),
+                                                  T.App T.zero
+                                                  ]))
+                                   ]),
+                          R.trans [R.unfold, R.beta 5])
+                in
+                   (* ... |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : C[under_i (2 . ^3)]
+                           = M[under_i ((3 . ^4) o (1 . id))] = N[under_i ((0 . ^4) o (1 . id))] : C[under_i ((3 . ^4) o (1 . id))]
+                           = (M[under_i (3 . ^4)] = N[under_i+1 (^3)] : C[under_i (3 . ^4)])[under_i (1 . id)]
+                   *)
+                   refine (Rule.unreduceAt i
+                              (case copt of
+                                  NONE =>
+                                     T.apply2 Prim.eqtp
+                                        (T.Sub (m, T.under i (T.Idot (3, T.Shift 4))))
+                                        (T.Sub (n, T.underShift (i+1) 3))
 
-                                    | SOME c =>
-                                         T.apply3 Prim.eq
-                                            (T.Sub (c, T.under i (T.Idot (5, T.Shift 6))))
-                                            (T.Sub (m, T.under i (T.Idot (5, T.Shift 6))))
-                                            (T.Sub (n, T.underShift (i+1) 5)))
-                                  y
-                                  (R.trans [R.unfold, R.beta 5]))
-                       >>+
-                       (* ... |- M[under_i (4 . ^5)] = N[under_i (Y . ^5)] : C[under_i (4 . ^5)]
-                               = M[under_i ((0 . ^6) o (4 . id))] = N[under_i ((Y[^] . ^6) o (4 . id))] : C[under_i ((0 . ^6) o (4 . id))]
-                               = (M[under_i+1 (^5)] = N[under_i (Y[^] . ^6)] : C[under_i+1 (^5)])[under_i (4 . id)]
-                       *)
-                       refine (Rule.unreduceAt i
-                                  (case copt of
-                                      NONE =>
-                                         T.apply2 Prim.eqtp
-                                            (T.Sub (m, T.underShift (i+1) 5))
-                                            (T.Sub (n, T.under i (T.Dot (T.Sub (y, T.shift1), T.Shift 6))))
+                                | SOME c =>
+                                     T.apply3 Prim.eq
+                                        (T.Sub (c, T.under i (T.Idot (3, T.Shift 4))))
+                                        (T.Sub (m, T.under i (T.Idot (3, T.Shift 4))))
+                                        (T.Sub (n, T.underShift (i+1) 3)))
+                              y
+                              red)
+                   >>+
+                   (* ... |- M[under_i (2 . ^3)] = N[under_i (Y . ^3)] : C[under_i (2 . ^3)]
+                           = M[under_i ((0 . ^4) o (2 . id))] = N[under_i ((Y[^] . ^4) o (2 . id))] : C[under_i ((0 . ^4) o (2 . id))]
+                           = (M[under_i+1 (^3)] = N[under_i (Y[^] . ^4)] : C[under_i+1 (^3)])[under_i (2 . id)]
+                   *)
+                   refine (Rule.unreduceAt i
+                              (case copt of
+                                  NONE =>
+                                     T.apply2 Prim.eqtp
+                                        (T.Sub (m, T.underShift (i+1) 3))
+                                        (T.Sub (n, T.under i (T.Dot (T.Sub (y, T.shift1), T.Shift 4))))
 
-                                    | SOME c =>
-                                         T.apply3 Prim.eq
-                                            (T.Sub (c, T.underShift (i+1) 5))
-                                            (T.Sub (m, T.underShift (i+1) 5))
-                                            (T.Sub (n, T.under i (T.Dot (T.Sub (y, T.shift1), T.Shift 6)))))
-                                  x
-                                  (R.trans [R.unfold, R.beta 5]))
-                       >>+
-                       (* ... |- M[under_i (X . ^5)] = N[under_i (Y . ^5)] : C[under_i (X . ^5)] *)
-                       De.refoldHyps jud i 5
-                          x
-                          (R.trans [R.unfold, R.beta 5])
-                       >>+
-                       idtacM (vars1_5, De.Principal set5)
-                    end
-                    ]
+                                | SOME c =>
+                                     T.apply3 Prim.eq
+                                        (T.Sub (c, T.underShift (i+1) 3))
+                                        (T.Sub (m, T.underShift (i+1) 3))
+                                        (T.Sub (n, T.under i (T.Dot (T.Sub (y, T.shift1), T.Shift 4)))))
+                              x
+                              red)
+                   >>+
+                   (* ... |- M[under_i (X . ^3)] = N[under_i (Y . ^3)] : C[under_i (X . ^3)] *)
+                   De.refoldHyps jud i 3
+                      x
+                      red
+                   >>+
+                   idtacM (vars1_3, De.Principal set3)
+                end
                 ]
          end
          
@@ -274,7 +263,7 @@ functor AfterQuotient () :> sig end =
                           fail "this sort of hypothesis cannot be destructed")
                 end
 
-           | And [p1, p2, p3, p4, p5] =>
+           | And [p1, p2, p3] =>
                 let
                    do (jud, _) = withgoal
                 in
@@ -290,12 +279,12 @@ functor AfterQuotient () :> sig end =
                                           refine (Rule.reduce (R.trans [R.unfold, R.beta 1]))
                                           >>+
                                           (* quotient1 A R Hper, ... |- C = C : type *)
-                                          destQuotient1Eq i p1 p2 p3 p4 p5 set a r hper c c NONE jud)\
+                                          destQuotient1Eq i p1 p2 p3 set a r hper c c NONE false jud)\
 
                                    | \Prim.eqtp\ ? ? =>
                                      \(fnc c d =>
                                           (* quotient1 A R Hper, ... |- C = D : type *)
-                                          destQuotient1Eq i p1 p2 p3 p4 p5 set a r hper c d NONE jud)\
+                                          destQuotient1Eq i p1 p2 p3 set a r hper c d NONE false jud)\
 
                                    | \Prim.ov\ ? ? =>
                                      \(fnc c m =>
@@ -303,12 +292,12 @@ functor AfterQuotient () :> sig end =
                                           refine (Rule.reduce (R.trans [R.unfold, R.beta 1]))
                                           >>+
                                           (* quotient1 A R Hper, ... |- M = M : C *)
-                                          destQuotient1Eq i p1 p2 p3 p4 p5 set a r hper m m (SOME c) jud)\
+                                          destQuotient1Eq i p1 p2 p3 set a r hper m m (SOME c) false jud)\
                                           
                                    | \Prim.eq\ ? ? ? =>
                                      \(fnc c m n =>
                                           (* quotient1 A R Hper, ... |- M = N : C *)
-                                          destQuotient1Eq i p1 p2 p3 p4 p5 set a r hper m n (SOME c) jud)\
+                                          destQuotient1Eq i p1 p2 p3 set a r hper m n (SOME c) false jud)\
                                           
                                    | _ =>
                                      \(fnc =>
@@ -326,6 +315,115 @@ functor AfterQuotient () :> sig end =
 
            | _ =>
                 fail "quotient1 pattern expected")
+
+
+
+      fun destQuotient1r i pat set =
+         (case pat of
+             And [p1] =>
+                let
+                   do (jud, _) = withgoal
+
+                   val lv = T.evar ()
+                in
+                   (case J.hyp jud i of
+                       J.Tm b =>
+                          termCase b
+                          /| $as (\quotient1r\ ? ? ?) =>
+                             \(fnc quot a r hper =>
+                                  (* quotient1r A R Hper, ... |- C *)
+                                  refine (Rule.reduceHyp i (R.trans [R.unfold, R.beta 3]))
+                                  >>+
+                                  (* quotient A (fn . fn . R[^2] 1 0), ... |- C *)
+                                  refine (Rule.quotientLeft i (T.evar ()) (T.evar ()) (T.evar ()))
+                                  >>> [
+                                      (* quotient A (fn . fn . R[^2] 1 0), ... |- C : type *)
+                                      refine (Rule.unreduceHyp i quot (R.trans [R.unfold, R.beta 3]))
+                                      >>+
+                                      (* quotient1r A R Hper, ... |- C : type *)
+                                      let
+                                         val (v, _) = varyAndBindSetPat set p1
+                                      in
+                                         idtacM (S.cons v S.empty, De.Auxiliary)
+                                      end,
+                  
+                                      (* A (hidden), ... |- C *)
+                                      let
+                                         do (vars, set1) = De.andthenp S.empty $ De.dest i p1 set
+                                      in
+                                         De.refold jud i 1
+                                            (T.Elim (T.Const qintro1r,
+                                                     [T.App (T.Sub (a, T.shift1)),
+                                                      T.App (T.Sub (r, T.shift1)),
+                                                      T.App (T.Sub (hper, T.shift1)),
+                                                      T.App (T.Var 0)]))
+                                            (R.trans [R.unfold, R.beta 4])
+                                         >>+
+                                         idtacM (vars, De.Principal set1)
+                                      end
+                                      ])\
+
+                           | _ =>
+                             \(fnc =>
+                                  fail "unexpected subject in destQuotient1r")\
+                          /
+
+                     | _ =>
+                          fail "this sort of hypothesis cannot be destructed")
+                end
+
+           | And [p1, p2, p3] =>
+                let
+                   do (jud, _) = withgoal
+                in
+                   (case J.hyp jud i of
+                       J.Tm b =>
+                          termCase b
+                          /| \quotient1r\ ? ? ? =>
+                             \(fnc a r hper =>
+                                  goalCaseT
+                                  /| \Prim.istp\ ? =>
+                                     \(fnc c =>
+                                          (* quotient1 A R Hper, ... |- C : type *)
+                                          refine (Rule.reduce (R.trans [R.unfold, R.beta 1]))
+                                          >>+
+                                          (* quotient1 A R Hper, ... |- C = C : type *)
+                                          destQuotient1Eq i p1 p2 p3 set a r hper c c NONE true jud)\
+
+                                   | \Prim.eqtp\ ? ? =>
+                                     \(fnc c d =>
+                                          (* quotient1 A R Hper, ... |- C = D : type *)
+                                          destQuotient1Eq i p1 p2 p3 set a r hper c d NONE true jud)\
+
+                                   | \Prim.ov\ ? ? =>
+                                     \(fnc c m =>
+                                          (* quotient1 A R Hper, ... |- M : C *)
+                                          refine (Rule.reduce (R.trans [R.unfold, R.beta 1]))
+                                          >>+
+                                          (* quotient1 A R Hper, ... |- M = M : C *)
+                                          destQuotient1Eq i p1 p2 p3 set a r hper m m (SOME c) true jud)\
+                                          
+                                   | \Prim.eq\ ? ? ? =>
+                                     \(fnc c m n =>
+                                          (* quotient1 A R Hper, ... |- M = N : C *)
+                                          destQuotient1Eq i p1 p2 p3 set a r hper m n (SOME c) true jud)\
+                                          
+                                   | _ =>
+                                     \(fnc =>
+                                          fail "conclusion has improper form for functional quotient elimination")\
+                                  /)\
+
+                           | _ =>
+                             \(fnc =>
+                                  fail "unexpected subject in destQuotient1r")\
+                          /
+
+                     | _ =>
+                          fail "this sort of hypothesis cannot be destructed")
+                end
+
+           | _ =>
+                fail "quotient1r pattern expected")
 
 
 
@@ -645,6 +743,7 @@ functor AfterQuotient () :> sig end =
 
 
       val () = H.insert De.destructTactics quotient1 destQuotient1
+      val () = H.insert De.destructTactics quotient1r destQuotient1r
       val () = H.insert De.destructTactics quotient2 destQuotient2
 
 
@@ -665,6 +764,36 @@ functor AfterQuotient () :> sig end =
                                 (R.within [1] (R.trans [R.unfold, R.beta 3])))
                      >>+
                      (* quotient1 A R Hper : type *)
+                     idtacM Secondary,
+                     
+                     (* M : A *)
+                     idtacM Secondary,
+
+                     (* N : A *)
+                     idtacM Secondary,
+
+                     (* R M N *)
+                     idtacM Primary,
+                     ])\
+         /
+
+
+      val quotient1rExt =
+         goalCaseT
+         /| \Prim.eq\ ($as (\quotient1r\ _ _ _)) _ _ =>
+            \(fnc q =>
+                 (* M = N : quotient1 A R Hper *)
+                 refine (Rule.reduce (R.within [1] (R.trans [R.unfold, R.beta 3])))
+                 >>+
+                 (* M = N : quotient A (fn . fn . R[^2] 1 0) *)
+                 refine (Rule.quotientIntroEq (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                 >>> [
+                     (* quotient A (fn . fn . R[^2] 1 0) : type *)
+                     refine (Rule.unreduce 
+                                (T.apply1 Prim.istp q)
+                                (R.within [1] (R.trans [R.unfold, R.beta 3])))
+                     >>+
+                     (* quotient1r A R Hper : type *)
                      idtacM Secondary,
                      
                      (* M : A *)
@@ -724,6 +853,34 @@ functor AfterQuotient () :> sig end =
 
 
       val () = H.insert EqualityTacticInternal.extensionalityTactics quotient1 quotient1Ext
+      val () = H.insert EqualityTacticInternal.extensionalityTactics quotient1r quotient1rExt
       val () = H.insert EqualityTacticInternal.extensionalityTactics quotient2 quotient2Ext
+
+
+      
+      fun injectionQuotients i =
+         goalHypnCaseT i
+         /| $tm \Prim.eq\ (\quotient1\ _ _ _) _ _ =>
+            \(fnc =>
+                 refine (Rule.reduceHyp i (R.within [1] (R.trans [R.unfold, R.beta 3])))
+                 >>+
+                 EqualityTacticInternal.injectionQuotient i)\
+
+          | $tm \Prim.eq\ (\quotient1r\ _ _ _) _ _ =>
+            \(fnc =>
+                 refine (Rule.reduceHyp i (R.within [1] (R.trans [R.unfold, R.beta 3])))
+                 >>+
+                 EqualityTacticInternal.injectionQuotient i)\
+
+          | $tm \Prim.eq\ (\quotient2\ _ _ _ _) _ _ =>
+            \(fnc =>
+                 refine (Rule.reduceHyp i (R.within [1] (R.trans [R.unfold, R.beta 4])))
+                 >>+
+                 EqualityTacticInternal.injectionQuotient i)\
+         /
+
+      val () =
+         List.app (fn const => H.insert EqualityTacticInternal.injectionTactics const injectionQuotients)
+         [quotient1, quotient1r, quotient2]
 
    end

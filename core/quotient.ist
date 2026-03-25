@@ -22,6 +22,35 @@ qed ();
 
 
 
+define /ER A R/
+/
+  (forall x . R x x)
+  & (forall x y . R x y -> R y x)
+  & (forall x y z . R x y -> R y z -> R x z)
+//
+  intersect i . forall (A : U i) . (A -> A -> U i) -> U i
+/;
+
+unfold /ER/.
+typecheck.
+qed ();
+
+
+
+lemma "per_impl_er"
+/
+  forall i (A : U i) R . ER A R -> PER A R
+/;
+
+inference.
+intro /i A R H/.
+destruct /H/ /_ Hs Ht/.
+unfold /PER/.
+auto.
+qed ();
+
+
+
 lemma "quotient_formation"
 /
   forall i (A : U i) R .
@@ -77,33 +106,98 @@ recordIrrelevance /qintro1/ [0, 1, 2, 4];
 
 
 
-lemma "quotient1_refl_left"
+lemma "per_refl_left"
 /
-  forall i (A : U i) (R : A -> A -> U i) (Hper : PER A R) (x y : A) .
-    R x y
-    -> R x x
+  intersect i . forall (A : U i) (R : A -> A -> U i) .
+    PER A R 
+    -> forall x y . R x y -> R x x
 /;
 
 inference.
-intro /i A R Hper x y Hxy/.
-destruct /Hper/ /Hsymm Htrans/.
+intro /i A R (Hsymm Htrans) x y Hxy/.
 apply /Htrans _ y/ >> auto.
 qed ();
 
 
 
-lemma "quotient1_refl_right"
+lemma "per_refl_right"
 /
-  forall i (A : U i) (R : A -> A -> U i) (Hper : PER A R) (x y : A) .
-    R x y
-    -> R y y
+  intersect i . forall (A : U i) (R : A -> A -> U i) .
+    PER A R 
+    -> forall x y . R x y -> R y y
+/;
+
+inference.
+intro /i A R (Hsymm Htrans) x y Hxy/.
+apply /Htrans _ x/ >> auto.
+qed ();
+
+
+
+lemma "per_refl_left'"
+/
+  forall i (A : U i) (R : A -> A -> U i) .
+    PER A R
+    -> forall x y . R x y -> R x x
 /;
 
 inference.
 intro /i A R Hper x y Hxy/.
-destruct /Hper/ /Hsymm Htrans/.
-apply /Htrans _ x/ >> auto.
+apply /`per_refl_left A R/ >> auto.
 qed ();
+
+
+
+lemma "per_refl_right'"
+/
+  forall i (A : U i) (R : A -> A -> U i) .
+    PER A R
+    -> forall x y . R x y -> R y y
+/;
+
+inference.
+intro /i A R Hper x y Hxy/.
+apply /`per_refl_right A R/ >> auto.
+qed ();
+
+
+
+define /quotient1r A R Her/
+/
+  quotient (x y : A) . R x y
+//
+  intersect i . forall (A : U i) (R : A -> A -> U i) .
+    ER A R -> U i
+/;
+
+inference.
+introOf /i A R Her/.
+unfold /quotient1r/.
+destruct /Her/ /_ Hsymm Htrans/.
+typecheck >> auto.
+qed ();
+
+recordIrrelevance /quotient1r/ [2];
+
+
+
+define /qintro1r A R Her x/
+/
+  x
+//
+  intersect i .
+  forall (A : U i) (R : A -> A -> U i) (Hper : ER A R) (x : A) .
+    quotient1r A R Hper
+/;
+
+inference.
+introOf /i A R Her x/.
+unfold /qintro1r, quotient1r/.
+destruct /Her/ /Hrefl Hsymm Htrans/.
+typecheck >> auto.
+qed ();
+
+recordIrrelevance /qintro1r/ [0, 1, 2];
 
 
 
@@ -194,6 +288,133 @@ recordIrrelevance /qintro2/ [0, 1, 2, 3, 5];
 
 
 structure Nothing = AfterQuotient ();
+
+
+
+lemma "quotient1_representative"
+/
+  forall i (A : U i) (R : A -> A -> U i) (Hper : PER A R) (x : quotient1 A R Hper) .
+    isquash 
+      (exists y h .
+         x = qintro1 A R Hper y h : quotient1 A R Hper)
+/;
+
+inference.
+intro /i A R Hper x/.
+destruct /x/ /[x Hx]/.
+split.
+existsAuto.
+qed ();
+
+
+
+lemma "quotient1r_representative"
+/
+  forall i (A : U i) (R : A -> A -> U i) (Her : ER A R) (x : quotient1r A R Her) .
+    isquash 
+      (exists y .
+         x = qintro1r A R Her y : quotient1r A R Her)
+/;
+
+inference.
+intro /i A R Her x/.
+destruct /x/ /[x]/.
+split.
+existsAuto.
+qed ();
+
+
+
+lemma "quotient2_representative"
+/
+  forall i (A : U i) (Q : A -> U i) (R : A -> A -> U i) (Hper : PER2 A Q R) (x : quotient2 A Q R Hper) .
+    isquash 
+      (exists y h .
+         x = qintro2 A Q R Hper y h : quotient2 A Q R Hper)
+/;
+
+inference.
+intro /i A Q R Hper x/.
+destruct /x/ /[x Hx]/.
+split.
+existsAuto.
+qed ();
+
+
+
+lemma "quotient1_equality"
+/
+  forall i (A : U i) (R : A -> A -> U i) (Hper : PER A R) (x y : quotient1 A R Hper) .
+    { R x y }
+    -> x = y : quotient1 A R Hper
+/;
+
+inference.
+intro /i A R Hper x y/.
+introRaw /Hxy/.
+  {
+  destruct /x/ /[x x' Hxx]/.
+  destruct /y/ /[y y' Hyy]/.
+  typecheck.
+  destruct /Hper/ /Hsymm Htrans/.
+  unfold /qintro1 at all/.
+  split.
+    {
+    intro /Hxy/.
+    apply /Htrans _ x/ >> nauto 3.
+    }
+
+    {
+    intro /Hxy/.
+    apply /Htrans _ x'/ >> nauto 3.
+    }
+  }
+destruct /x/ /[x Hx]/.
+destruct /y/ /[y Hy]/.
+unfold /qintro1 in Hxy at all/.
+destruct /Hxy/ /[Hxy]/.
+unhide.
+unfold /qintro1 at all/.
+extensionality >> auto.
+qed ();
+
+
+
+lemma "quotient1r_equality"
+/
+  forall i (A : U i) (R : A -> A -> U i) (Her : ER A R) (x y : quotient1r A R Her) .
+    { R x y }
+    -> x = y : quotient1r A R Her
+/;
+
+inference.
+intro /i A R Her x y/.
+introRaw /Hxy/.
+  {
+  destruct /x/ /[x x' Hxx]/.
+  destruct /y/ /[y y' Hyy]/.
+  typecheck.
+  destruct /Her/ /Hrefl Hsymm Htrans/.
+  unfold /qintro1r at all/.
+  split.
+    {
+    intro /Hxy/.
+    apply /Htrans _ x/ >> nauto 3.
+    }
+
+    {
+    intro /Hxy/.
+    apply /Htrans _ x'/ >> nauto 3.
+    }
+  }
+destruct /x/ /[x]/.
+destruct /y/ /[y]/.
+unfold /qintro1r in Hxy at all/.
+destruct /Hxy/ /[Hxy]/.
+unhide.
+unfold /qintro1r at all/.
+extensionality >> auto.
+qed ();
 
 
 

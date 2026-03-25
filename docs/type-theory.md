@@ -56,7 +56,7 @@ type.  For example, to prove:
 
 one can show that `M = N : B` assuming `x : A`.
 
-On the other hand, type equivalence in Istari is *intentional*,
+On the other hand, type equivalence in Istari is *intensional*,
 meaning that it depends on the structure of the type expression,
 rather than on its set of members or its equality.  For example,
 consider `A -> B` and `A' -> B'`.  The two types are equal only when
@@ -808,6 +808,12 @@ Also observe that `{ A }` is equal to `{ B }` whenever `A` and `B`
 imply each other.  This means that the squash type collapses all
 inhabited types to a single type, which is useful for some purposes.
 
+We can similarly define an intensional squash type (`isquash A`).
+Like the ordinary squash type, intensional squash suppresses the
+computational content.  Unlike ordinary squash, intensional squash
+does not collapse to a single type, but it has streamlined inference
+rules.
+
 
 #### Quotient types
 
@@ -868,7 +874,7 @@ never belongs to a universe.
 
 For technical reasons, one cannot deduce from 
 `iforall i (t : A) . B : type` that `t : A |- B : type`.  (Briefly,
-constructing intentional versions of impredicative types seems to
+constructing intensional versions of impredicative types seems to
 require a form of self-reference that cannot be shown to be
 well-founded.)  Consequently, eliminating impredicative types (and
 introducing impredicative existentials) requires generating a subgoal
