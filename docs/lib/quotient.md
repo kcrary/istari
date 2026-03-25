@@ -50,6 +50,9 @@ Nevertheless, `quotient (x y : A) . R x y` is interchangeable with
 `quotient1 A R Hper`, and `x` is interchangeable with 
 `qintro1 A R Hper x hx`, simply by using fold and unfold.
 
+Destruction can match against a `quotient1` using `[p1 p2]` or
+`[p1 p2 p3]`.
+
 A common variant is when the relation is also reflexive (and hence is
 an equivalence relation).  In that case, there is no need for a proof
 that `x'` is related to itself, so destructing `x` creates 
@@ -62,6 +65,9 @@ that `x'` is related to itself, so destructing `x` creates
                   forall (A : U i) (R : A -> A -> U i) (Hper : ER A R) (x : A) .
                     quotient1r A R Hper
              = fn A R Her x . x
+
+Destruction can match against a `quotient1r` using `[p1]` or 
+`[p1 p2 p3]`.
 
 Another common pattern for quotient types is to use a constraining
 predicate (`Q` below), as well as a relation between representatives.
@@ -84,6 +90,9 @@ We recapitulate the tools for this common pattern.
                  forall (A : U i) (Q : A -> U i) (R : A -> A -> U i) (Hper : PER2 A Q R) (x : A) .
                    Q x -> quotient2 A Q R Hper
             = fn A Q R Hper x Hx . x
+
+Destruction can match against a `quotient2` using `[p1 p2]` or 
+`[p1 p2 p3 p4 p5]`.
 
 The following lemmas accomplish largely the same thing as the
 `destruct` tactic, and are sometimes convenient:

@@ -10,6 +10,8 @@
 
   + Added material to `Eventually`.
 
+  + Added material to `Quotient`.  Changed the behavior of `destruct` on `Quotient.quotient1`.
+
 
 #### 1.2.1
 
