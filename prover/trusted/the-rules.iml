@@ -486,6 +486,9 @@ signature THE_RULES =
       val eqFormInv1 : term -> term -> term -> rule
       val eqFormInv2 : term -> term -> term -> rule
       val eqFormInv3 : term -> term -> term -> rule
+      val eqEqInv1 : term -> term -> term -> term -> term -> term -> rule
+      val eqEqInv2 : term -> term -> term -> term -> term -> term -> rule
+      val eqEqInv3 : term -> term -> term -> term -> term -> term -> rule
       val ofForm : term -> term -> rule
       val ofEq : term -> term -> term -> term -> rule
       val ofFormUniv : term -> term -> term -> rule
@@ -497,6 +500,10 @@ signature THE_RULES =
       val ofLeft : int -> term -> term -> term -> rule
       val ofEquand1 : term -> term -> term -> rule
       val ofEquand2 : term -> term -> term -> rule
+      val ofFormInv1 : term -> term -> rule
+      val ofFormInv2 : term -> term -> rule
+      val ofEqInv1 : term -> term -> term -> term -> rule
+      val ofEqInv2 : term -> term -> term -> term -> rule
       val eqtpForm : term -> term -> rule
       val eqtpEq : term -> term -> term -> term -> rule
       val eqtpFormUniv : term -> term -> term -> rule
@@ -1554,6 +1561,9 @@ fun eqTrans a m n p = Arg.make "eqTrans" [a, m, n, p, ] [] (Elim (const_eq, [App
 fun eqFormInv1 a m n = Arg.make "eqFormInv1" [a, m, n, ] [] (Elim (const_istp, [App (a), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_eq, [App (a), App (m), App (n), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun eqFormInv2 a m n = Arg.make "eqFormInv2" [a, m, n, ] [] (Elim (const_of, [App (a), App (m), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_eq, [App (a), App (m), App (n), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun eqFormInv3 a m n = Arg.make "eqFormInv3" [a, m, n, ] [] (Elim (const_of, [App (a), App (n), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_eq, [App (a), App (m), App (n), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun eqEqInv1 a a' m m' n n' = Arg.make "eqEqInv1" [a, a', m, m', n, n', ] [] (Elim (const_eqtp, [App (a), App (a'), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (Elim (const_eq, [App (a), App (m), App (n), ])), App (Elim (const_eq, [App (a'), App (m'), App (n'), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun eqEqInv2 a a' m m' n n' = Arg.make "eqEqInv2" [a, a', m, m', n, n', ] [] (Elim (const_eq, [App (a), App (m), App (m'), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (Elim (const_eq, [App (a), App (m), App (n), ])), App (Elim (const_eq, [App (a'), App (m'), App (n'), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun eqEqInv3 a a' m m' n n' = Arg.make "eqEqInv3" [a, a', m, m', n, n', ] [] (Elim (const_eq, [App (a), App (n), App (n'), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (Elim (const_eq, [App (a), App (m), App (n), ])), App (Elim (const_eq, [App (a'), App (m'), App (n'), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun ofForm a m = Arg.make "ofForm" [a, m, ] [] (Elim (const_istp, [App (Elim (const_of, [App (a), App (m), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun ofEq a b m n = Arg.make "ofEq" [a, b, m, n, ] [] (Elim (const_eqtp, [App (Elim (const_of, [App (a), App (m), ])), App (Elim (const_of, [App (b), App (n), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (b), ])), (Arg.Unhide, [], Elim (const_eq, [App (a), App (m), App (n), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun ofFormUniv a i m = Arg.make "ofFormUniv" [a, i, m, ] [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_of, [App (a), App (m), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
@@ -1565,6 +1575,10 @@ fun ofExt a m p q = Arg.make "ofExt" [a, m, p, q, ] [] (Elim (const_eq, [App (El
 fun ofLeft gsize a b p = Arg.lmake "ofLeft" [] gsize [J.Tm (Elim (const_of, [App (a), App (p), ])), ] (b) [(Arg.Nothing, [], SOME (Dot (Triv, Shift 0)), Sub (b, under gsize (Dot (Triv, Shift 0)))), ] (fn [m, ] => Sub (m, under gsize (Shift 1)) | _ => raise Arg.ExtractFailure)
 fun ofEquand1 a m n = Arg.make "ofEquand1" [a, m, n, ] [] (Elim (const_of, [App (a), App (m), ])) [(Arg.Unhide, [], Elim (const_eq, [App (a), App (m), App (n), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun ofEquand2 a m n = Arg.make "ofEquand2" [a, m, n, ] [] (Elim (const_of, [App (a), App (n), ])) [(Arg.Unhide, [], Elim (const_eq, [App (a), App (m), App (n), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun ofFormInv1 a m = Arg.make "ofFormInv1" [a, m, ] [] (Elim (const_istp, [App (a), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_of, [App (a), App (m), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun ofFormInv2 a m = Arg.make "ofFormInv2" [a, m, ] [] (Elim (const_of, [App (a), App (m), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_of, [App (a), App (m), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun ofEqInv1 a a' m m' = Arg.make "ofEqInv1" [a, a', m, m', ] [] (Elim (const_eqtp, [App (a), App (a'), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (Elim (const_of, [App (a), App (m), ])), App (Elim (const_of, [App (a'), App (m'), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun ofEqInv2 a a' m m' = Arg.make "ofEqInv2" [a, a', m, m', ] [] (Elim (const_eq, [App (a), App (m), App (m'), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (Elim (const_of, [App (a), App (m), ])), App (Elim (const_of, [App (a'), App (m'), ])), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun eqtpForm a b = Arg.make "eqtpForm" [a, b, ] [] (Elim (const_istp, [App (Elim (const_eqtp, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun eqtpEq a b c d = Arg.make "eqtpEq" [a, b, c, d, ] [] (Elim (const_eqtp, [App (Elim (const_eqtp, [App (a), App (c), ])), App (Elim (const_eqtp, [App (b), App (d), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (b), ])), (Arg.Unhide, [], Elim (const_eqtp, [App (c), App (d), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun eqtpFormUniv a b i = Arg.make "eqtpFormUniv" [a, b, i, ] [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_eqtp, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), (Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)

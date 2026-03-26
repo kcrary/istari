@@ -159,3 +159,27 @@ prepare.
 intros G a m n ext0 H.
 eapply tr_equal_formation_invert3; eauto.
 Qed.
+
+
+Lemma eqEqInv1_valid : eqEqInv1_obligation.
+Proof.
+prepare.
+intros G a b m n p q ext0 Heq.
+eapply tr_equal_formation_invert1; eauto.
+Qed.
+
+
+Lemma eqEqInv2_valid : eqEqInv2_obligation.
+Proof.
+prepare.
+intros G a b m n p q ext0 Heq.
+eapply tr_equal_formation_invert2; eauto.
+Qed.
+
+
+Lemma eqEqInv3_valid : eqEqInv3_obligation.
+Proof.
+prepare.
+intros G a b m n p q ext0 Heq.
+eapply tr_equal_formation_invert3; eauto.
+Qed.

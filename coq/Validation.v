@@ -503,6 +503,9 @@ exact eqTrans_valid.
 exact eqFormInv1_valid.
 exact eqFormInv2_valid.
 exact eqFormInv3_valid.
+exact eqEqInv1_valid.
+exact eqEqInv2_valid.
+exact eqEqInv3_valid.
 exact ofForm_valid.
 exact ofEq_valid.
 exact ofFormUniv_valid.
@@ -514,6 +517,10 @@ exact ofExt_valid.
 exact ofLeft_valid.
 exact ofEquand1_valid.
 exact ofEquand2_valid.
+exact ofFormInv1_valid.
+exact ofFormInv2_valid.
+exact ofEqInv1_valid.
+exact ofEqInv2_valid.
 exact eqtpForm_valid.
 exact eqtpEq_valid.
 exact eqtpFormUniv_valid.

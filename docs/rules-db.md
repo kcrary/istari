@@ -3382,6 +3382,24 @@ Human-readable rules, using explicit variables, are given
       >>
       G |- istp (eq A M N)
 
+- `eqEqInv1 A A' M M' N N'`
+
+      G |- eqtp A A'
+      >>
+      G |- eqtp (eq A M N) (eq A' M' N')
+
+- `eqEqInv2 A A' M M' N N'`
+
+      G |- eq A M M'
+      >>
+      G |- eqtp (eq A M N) (eq A' M' N')
+
+- `eqEqInv3 A A' M M' N N'`
+
+      G |- eq A N N'
+      >>
+      G |- eqtp (eq A M N) (eq A' M' N')
+
 
 ### Typing
 
@@ -3454,6 +3472,30 @@ Human-readable rules, using explicit variables, are given
       G |- of A N
       >>
       G |- eq A M N
+
+- `ofFormInv1 A M`
+
+      G |- istp A
+      >>
+      G |- istp (of A M)
+
+- `ofFormInv2 A M`
+
+      G |- of A M
+      >>
+      G |- istp (of A M)
+
+- `ofEqInv1 A A' M M'`
+
+      G |- eqtp A A'
+      >>
+      G |- eqtp (of A M) (of A' M')
+
+- `ofEqInv2 A A' M M'`
+
+      G |- eq A M M'
+      >>
+      G |- eqtp (of A M) (of A' M')
 
 
 ### Type equality

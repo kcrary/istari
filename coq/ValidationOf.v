@@ -125,3 +125,35 @@ intros G a m n ext0 H.
 apply (tr_transitivity _ _ m); auto.
 apply tr_symmetry; auto.
 Qed.
+
+
+Lemma ofFormInv1_valid : ofFormInv1_obligation.
+Proof.
+prepare.
+intros G a m ext0 Hof.
+eapply tr_equal_formation_invert1; eauto.
+Qed.
+
+
+Lemma ofFormInv2_valid : ofFormInv2_obligation.
+Proof.
+prepare.
+intros G a m ext0 Hof.
+eapply tr_equal_formation_invert2; eauto.
+Qed.
+
+
+Lemma ofEqInv1_valid : ofEqInv1_obligation.
+Proof.
+prepare.
+intros G a b m n ext0 Heq.
+eapply tr_equal_formation_invert1; eauto.
+Qed.
+
+
+Lemma ofEqInv2_valid : ofEqInv2_obligation.
+Proof.
+prepare.
+intros G a b m n ext0 Heq.
+eapply tr_equal_formation_invert2; eauto.
+Qed.

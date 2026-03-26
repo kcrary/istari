@@ -3384,6 +3384,24 @@ variables.  The official rules, using de Bruijn indices, are given
       >>
       G |- M = N : A : type
 
+- `eqEqInv1 A A' M M' N N'`
+
+      G |- A = A' : type
+      >>
+      G |- (M = N : A) = (M' = N' : A') : type
+
+- `eqEqInv2 A A' M M' N N'`
+
+      G |- M = M' : A
+      >>
+      G |- (M = N : A) = (M' = N' : A') : type
+
+- `eqEqInv3 A A' M M' N N'`
+
+      G |- N = N' : A
+      >>
+      G |- (M = N : A) = (M' = N' : A') : type
+
 
 ### Typing
 
@@ -3456,6 +3474,30 @@ variables.  The official rules, using de Bruijn indices, are given
       G |- N : A
       >>
       G |- M = N : A
+
+- `ofFormInv1 A M`
+
+      G |- A : type
+      >>
+      G |- (M : A) : type
+
+- `ofFormInv2 A M`
+
+      G |- M : A
+      >>
+      G |- (M : A) : type
+
+- `ofEqInv1 A A' M M'`
+
+      G |- A = A' : type
+      >>
+      G |- (M : A) = (M' : A') : type
+
+- `ofEqInv2 A A' M M'`
+
+      G |- M = M' : A
+      >>
+      G |- (M : A) = (M' : A') : type
 
 
 ### Type equality
