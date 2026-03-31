@@ -89,7 +89,7 @@ This is equivalent to:
 
     fn x => fn y => fn z => [body]
 
-Unlike `fn`, neither `fns` cannot accept multiple clauses.
+Unlike `fn`, `fns` cannot accept multiple clauses.
 
 
 

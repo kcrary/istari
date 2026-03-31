@@ -24,6 +24,7 @@ The following libraries are pre-loaded:
 - [`Partial`](lib/partial.html) (partial computable objects)
 - [`Permutation`](lib/permutation.html) (permutations on lists)
 - [`Quotient`](lib/quotient.html) (tools for manipulating quotient types)
+- [`Rational`](lib/rational.html)
 - [`Relations`](lib/relations.html)
 - [`Sqstable`](lib/sqstable.html)
 - [`Stable`](lib/stable.html)
