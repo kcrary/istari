@@ -8,10 +8,10 @@
 
 - Library changes:
 
-  + Added material to `Eventually`.
+  + Added material to `Eventually`, `Integer`, and `Rational`.
 
   + Added material to `Quotient`.  Changed the behavior of `destruct` on `Quotient.quotient1`.
-
+	
 - Added rules `eqEqInv1`, `eqEqInv2`, `eqEqInv3`, `ofFormInv1`,
   `ofFormInv2`, `ofEqInv1`, and `ofEqInv2`.
 

@@ -236,6 +236,8 @@ positive case that works upwards.
 
     integer_to_nat_inv : type:integer_to_nat_inv
 
+    nat_to_integer_injective : type:nat_to_integer_injective
+
     nat_to_integer_nonneg : type:nat_to_integer_nonneg
 
     nat_to_integer_mono : type:nat_to_integer_mono
@@ -482,3 +484,25 @@ positive case that works upwards.
     minz_to_nat : type:minz_to_nat
 
     maxz_to_nat : type:maxz_to_nat
+
+
+### Absolute value
+
+    absz : type:absz
+         = def:absz
+
+    absz_nonneg : type:absz_nonneg
+
+    absz_of_nonneg : type:absz_of_nonneg
+
+    absz_of_nonpos : type:absz_of_nonpos
+
+    absz_negz : type:absz_negz
+
+    absz_timesz : type:absz_timesz
+
+    absz_plusz_leqz : type:absz_plusz_leqz
+
+    absz_minusz_leqz : type:absz_minusz_leqz
+
+    absz_nat_to_integer : type:absz_nat_to_integer

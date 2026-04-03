@@ -3407,6 +3407,22 @@ qed ();
 
 
 
+lemma "nat_to_integer_injective"
+/
+  forall m n .
+    nat_to_integer m = nat_to_integer n : integer
+    -> m = n : nat
+/;
+
+inference.
+intro /m n Heq/.
+rewrite /<- nat_to_integer_inv m/.
+rewrite /<- nat_to_integer_inv n/.
+compat >> auto.
+qed ();
+
+
+
 lemma "integer_to_nat_nonpos"
 /
   forall a .
@@ -5661,6 +5677,316 @@ intro /x/.
 RuleTactic.integerHalts.
 hypof.
 qed ();
+
+
+
+(* Absolute value *)
+
+define /absz a/
+/
+  if z`0 <z=? a then a else negz a
+//
+  integer -> integer
+/;
+
+unfold /absz/.
+typecheck.
+qed ();
+
+
+
+lemma "absz_nonneg"
+/
+  forall a . z`0 <z= absz a
+/;
+
+inference.
+intro /a/.
+unfold /absz/.
+boolCase /z`0 <z=? a/ /Ha/ >> auto.
+apply /negz_leqz _ z`0/.
+apply /ltz_impl_leqz/ >> auto.
+apply /not_leqz/ >> auto.
+qed ();
+
+
+
+lemma "absz_of_nonneg"
+/
+  forall a . z`0 <z= a -> absz a = a : integer
+/;
+
+inference.
+intro /a Hpos/.
+unfold /absz/.
+boolEq true /z`0 <z=? a/ >> auto.
+qed ();
+
+
+
+lemma "absz_of_nonpos"
+/
+  forall a . a <z= z`0 -> absz a = negz a : integer
+/;
+
+inference.
+intro /a Hneg/.
+unfold /absz/.
+boolCase /z`0 <z=? a/ /Hpos/ >> auto.
+so /leqz_antisymm _# 2 Hneg Hpos/ /H/.
+subst /a/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "absz_negz"
+/
+  forall a . absz (negz a) = absz a : integer
+/;
+
+inference.
+intro /a/.
+unfold /absz at 0 0/.
+so /integer_trichotomy z`0 a/ /Hneg | Hzero | Hpos/.
+  {
+  boolEq false /z`0 <z=? ~z a/.
+    {
+    apply /not_leqz/.
+    apply /negz_ltz'/.
+    rewrite /-> negz_invol/.
+    auto.
+    }
+  boolEq true /z`0 <z=? a/.
+    {
+    apply /ltz_impl_leqz/ >> auto.
+    }
+  apply /negz_invol/.
+  }
+
+  {
+  subst /a/.
+  reduce //.
+  reflexivity.
+  }
+
+  {
+  boolEq true /z`0 <z=? ~z a/.
+    {
+    apply /negz_leqz'/.
+    rewrite /-> negz_invol/.
+    reduce //.
+    apply /ltz_impl_leqz/ >> auto.
+    }
+  boolEq false /z`0 <z=? a/.
+    {
+    apply /not_leqz/ >> auto.
+    }
+  auto.
+  }
+qed ();
+
+
+
+lemma "absz_timesz"
+/
+  forall a b .
+    absz (a *z b) = absz a *z absz b : integer
+/;
+
+inference.
+assert /forall a b . z`0 <z= a -> z`0 <z= b -> absz (a *z b) = absz a *z absz b : integer/ /Hprop/.
+  {
+  inference.
+  intro /a b Ha Hb/.
+  unfold /absz at all/.
+  boolEq true /z`0 <z=? a/ >> auto.
+  boolEq true /z`0 <z=? b/ >> auto.
+  boolEq true /z`0 <z=? a *z b/ >> auto.
+  apply /timesz_leqz z`0 _ z`0/ >> autoWith /leqz_refl/.
+  }
+intro /a b/.
+so /integer_dichotomy z`0 a/ /Ha | Ha/.
+  {
+  so /integer_dichotomy z`0 b/ /Hb | Hb/ >> auto.
+    {
+    so /ltz_impl_leqz _ _ (negz_ltz _# 2 Hb)/ /Hb'/.
+    reduce /Hb'/.
+    rewrite /<- absz_negz/.
+    rewrite /-> negz_dist_timesz_r/.
+    rewrite /-> Hprop/ >> auto.
+    rewrite /-> absz_negz/ >> auto.
+    }
+  }
+so /ltz_impl_leqz _ _ (negz_ltz _# 2 Ha)/ /Ha'/.
+reduce /Ha'/.
+so /integer_dichotomy z`0 b/ /Hb | Hb/ >> auto.
+  {
+  rewrite /<- absz_negz/.
+  rewrite /-> negz_dist_timesz_l/.
+  rewrite /-> Hprop/ >> auto.
+  rewrite /-> absz_negz/ >> auto.
+  }
+
+  {
+  so /ltz_impl_leqz _ _ (negz_ltz _# 2 Hb)/ /Hb'/.
+  reduce /Hb'/.
+  rewrite /<- absz_negz/.
+  rewrite /<- absz_negz/.
+  rewrite /-> negz_dist_timesz_l/.
+  rewrite /-> negz_dist_timesz_r/.
+  rewrite /-> Hprop/ >> auto.
+  rewrite /-> absz_negz at 0 0/ >> auto.
+  }
+qed ();
+
+
+
+lemma "absz_plusz_leqz"
+/
+  forall a b . absz (a +z b) <z= absz a +z absz b
+/;
+
+inference.
+intro /a b/.
+unfold /absz at all/.
+boolCase /z`0 <z=? a/ /Ha/.
+  {
+  boolCase /z`0 <z=? b/ /Hb/.
+    {
+    boolEq true /z`0 <z=? a +z b/.
+      {
+      apply /plusz_leqz z`0 _ z`0/ >> auto.
+      }
+    apply /leqz_refl/.
+    }
+
+    {
+    rewrite /-> not_leqz in Hb/.
+    boolCase /z`0 <z=? a +z b/ /Hab/.
+      {
+      apply /plusz_leqz/.
+        {
+        apply /leqz_refl/.
+        }
+
+        {
+        apply /leqz_trans _ z`0/ >> autoWith /ltz_impl_leqz/.
+        apply /negz_leqz _ z`0/.
+        apply /ltz_impl_leqz/ >> auto.
+        }
+      }
+
+      {
+      rewrite /-> negz_plusz/.
+      apply /plusz_leqz/ >> autoWith /leqz_refl/.
+      apply /leqz_trans _ z`0/ >> auto.
+      apply /negz_leqz z`0/ >> auto.
+      }
+    }
+  }
+
+  {
+  rewrite /-> not_leqz in Ha/.
+  boolCase /z`0 <z=? b/ /Hb/.
+    {
+    boolCase /z`0 <z=? a +z b/ /Hab/.
+      {
+      apply /plusz_leqz/ >> autoWith /leqz_refl/.
+      apply /leqz_trans _ z`0/.
+        {
+        apply /ltz_impl_leqz/ >> auto.
+        }
+
+        {
+        apply /negz_leqz _ z`0/.
+        apply /ltz_impl_leqz/ >> auto.
+        }
+      }
+
+      {
+      rewrite /-> not_leqz in Hab/.
+      rewrite /-> negz_plusz/.
+      apply /plusz_leqz/ >> autoWith /leqz_refl/.
+      apply /leqz_trans _ z`0/ >> auto.
+      apply /negz_leqz z`0/ >> auto.
+      }
+    }
+
+    {
+    rewrite /-> not_leqz in Hb/.
+    boolEq false /z`0 <z=? a +z b/.
+      {
+      apply /not_leqz/.
+      apply /plusz_ltz _ z`0 _ z`0/ >> auto.
+      }
+    rewrite /-> negz_plusz/.
+    apply /leqz_refl/.
+    }
+  }
+qed ();
+
+
+
+lemma "absz_minusz_leqz"
+/
+  forall a b . absz (a -z b) <z= absz a +z absz b
+/;
+
+inference.
+intro /a b/.
+unfold /minusz/.
+rewrite /<- absz_negz b/.
+apply /absz_plusz_leqz/.
+qed ();
+
+
+
+lemma "absz_nat_to_integer"
+/
+  forall n . absz (nat_to_integer n) = nat_to_integer n : integer
+/;
+
+inference.
+intro /n/.
+apply /absz_of_nonneg/.
+apply /nat_to_integer_nonneg/.
+qed ();
+
+
+
+lemma "absz_zero"
+/
+  absz z`0 = z`0 : integer
+/;
+
+unfold /absz/.
+reflexivity.
+qed ();
+
+
+
+lemma "absz_one"
+/
+  absz z`1 = z`1 : integer
+/;
+
+unfold /absz/.
+reflexivity.
+qed ();
+
+
+
+lemma "absz_minus_one"
+/
+  absz z`-1 = z`1 : integer
+/;
+
+unfold /absz/.
+reflexivity.
+qed ();
+
 
 
 endModule ();

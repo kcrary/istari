@@ -249,6 +249,9 @@ positive case that works upwards.
     integer_to_nat_inv : forall (a : integer) .
                             z`0 <z= a -> nat_to_integer (integer_to_nat a) = a : integer
 
+    nat_to_integer_injective : forall (m n : nat) .
+                                  nat_to_integer m = nat_to_integer n : integer -> m = n : nat
+
     nat_to_integer_nonneg : forall (n : nat) . z`0 <z= nat_to_integer n
 
     nat_to_integer_mono : forall (m n : nat) . m <= n -> nat_to_integer m <z= nat_to_integer n
@@ -564,3 +567,25 @@ positive case that works upwards.
                      integer_to_nat (maxz a b)
                        = Nat.max (integer_to_nat a) (integer_to_nat b)
                        : nat
+
+
+### Absolute value
+
+    absz : integer -> integer
+         = fn a . if z`0 <z=? a then a else ~z a
+
+    absz_nonneg : forall (a : integer) . z`0 <z= absz a
+
+    absz_of_nonneg : forall (a : integer) . z`0 <z= a -> absz a = a : integer
+
+    absz_of_nonpos : forall (a : integer) . a <z= z`0 -> absz a = ~z a : integer
+
+    absz_negz : forall (a : integer) . absz (~z a) = absz a : integer
+
+    absz_timesz : forall (a b : integer) . absz (a *z b) = absz a *z absz b : integer
+
+    absz_plusz_leqz : forall (a b : integer) . absz (a +z b) <z= absz a +z absz b
+
+    absz_minusz_leqz : forall (a b : integer) . absz (a -z b) <z= absz a +z absz b
+
+    absz_nat_to_integer : forall (n : nat) . absz (nat_to_integer n) = nat_to_integer n : integer

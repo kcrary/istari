@@ -55,7 +55,11 @@ example, zero is ``q`0``.
 
     plusq_shift_rl : type:plusq_shift_rl
 
+    negq_minusq : type:negq_minusq
+
     plusq_compat : type:plusq_compat
+
+    minusq_compat : type:minusq_compat
 
     negq_compat : type:negq_compat
 
@@ -128,6 +132,8 @@ for `invq` to have good properties.
 
     timesq_dist_plusq_r : type:timesq_dist_plusq_r
 
+    negq_dist_plusq : type:negq_dist_plusq
+
     negq_dist_timesq_l : type:negq_dist_timesq_l
 
     negq_dist_timesq_r : type:negq_dist_timesq_r
@@ -135,6 +141,7 @@ for `invq` to have good properties.
     negq_dist_invq : type:negq_dist_invq
 
     negq_as_timesq : type:negq_as_timesq
+
 
 ### Inequalities
 
@@ -183,6 +190,12 @@ This one gives transitivity in the form needed for rewriting:
     neqq_0_1 : type:neqq_0_1
 
     leqq_0_1 : type:leqq_0_1
+
+    ltq_neg1_0 : type:ltq_neg1_0
+
+    leqq_neg1_0 : type:leqq_neg1_0
+
+    neqq_neg1_0 : type:neqq_neg1_0
 
 
 ### Plus and negation inequality
@@ -339,6 +352,32 @@ This one gives transitivity in the form needed for rewriting:
     ltzb_to_rational : type:ltzb_to_rational
 
 
+#### Relation to natural numbers
+
+    nat_to_rational : type:nat_to_rational
+                    = def:nat_to_rational
+
+    nat_to_rational_injective : type:nat_to_rational_injective
+
+    nat_to_rational_neq : type:nat_to_rational_neq
+
+    nat_to_rational_mono : type:nat_to_rational_mono
+
+    nat_to_rational_mono_lt : type:nat_to_rational_mono_lt
+
+    plus_to_rational : type:plus_to_rational
+
+    times_to_rational : type:times_to_rational
+
+    eqb_to_rational : type:eqb_to_rational
+
+    leqb_to_rational : type:leqb_to_rational
+
+    ltb_to_rational : type:ltb_to_rational
+
+    neqb_to_rational : type:neqb_to_rational
+
+
 ### Effective comparisons
 
     (* =q? *)
@@ -399,7 +438,39 @@ This one gives transitivity in the form needed for rewriting:
     rational_dichotomy_neq : type:rational_dichotomy_neq
 
 
+### Absolute value
+
+    absq : type:absq
+         = def:absq
+
+    absq_nonneg : type:absq_nonneg
+
+    absq_of_nonneg : type:absq_of_nonneg
+
+    absq_of_nonpos : type:absq_of_nonpos
+
+    absq_negq : type:absq_negq
+
+    absq_timesq : type:absq_timesq
+
+    absq_plusq_leqq : type:absq_plusq_leqq
+
+    absq_minusq_leqq : type:absq_minusq_leqq
+
+    absz_to_rational : type:absz_to_rational
+
+    absq_zero : type:absq_zero
+
+    absq_one : type:absq_one
+
+    absq_minus_one : type:absq_minus_one
+
+
 ### Miscellaneous
+
+    rational_dense : type:rational_dense
+
+    leqq_from_upper_bounds : type:leqq_from_upper_bounds
 
     rational_total : type:rational_total
 
