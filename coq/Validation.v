@@ -419,7 +419,9 @@ exact boolEq_valid.
 exact boolFormUniv_valid.
 exact boolEqUniv_valid.
 exact boolIntro1Of_valid.
+exact boolIntro1Eq_valid.
 exact boolIntro2Of_valid.
+exact boolIntro2Eq_valid.
 exact boolElimOf_valid.
 exact boolElimOfNondep_valid.
 exact boolElimEq_valid.
@@ -1077,6 +1079,13 @@ apply index_0.
 Qed.
 
 
+Lemma identity_valid :
+  forall G J, tr G J -> tr G J.
+Proof.
+auto.
+Qed.
+
+
 Lemma weaken_valid :
   forall G1 G2 G3 A M,
     tr (G3 ++ G1) (Defs.dof M A)
@@ -1572,30 +1581,30 @@ apply tr_halts_value; auto.
 Qed.
 
 
-(* The remaining rules without validations above are:
+(* The remaining rules without validations given above are:
 
-   1. the reduction rules
+   1. the rules pertaining to definitions
 
-      The reduction rules follow immediately from tr_compute and
-      tr_compute_hyp.
+      Definitions (constants and let-bound variables) do not exist in
+      the type theory, but the rules are simple and it is easy to see
+      they are correct.
 
-   2. sequalCompatPath
+   2. the rules pertaining to reduction
 
-      The rule follows immediately from tr_sequal_compat
-      (assuming the code to rebuild the term is correct).
+      These follow immediately from tr_compute and tr_compute_hyp,
+      (except as they pertain to definitions).
 
    3. checkPositive and checkNegative
 
       The correctness of checkPositive and checkNegative follow
-      immediately from tr_positive_algorithm, and
+      immediately from tr_positive_algorithm and
       tr_negative_algorithm, assuming the checker is implemented
       correctly with respect to the formal algorithm.
 
-   4. the rules pertaining to let hypotheses
+   4. sequalCompatPath
 
-      The let-hypothesis rules pertain to a definition mechanism in
-      the proof assistant that does not exist in the type theory.  But
-      the rules are simple and it is easy to see they are correct.
+      The rule follows immediately from tr_sequal_compat, assuming the
+      code to rebuild the term is correct.
 
    5. the rules pertaining to native data types (integers and symbols)
 
@@ -1603,9 +1612,9 @@ Qed.
       native data types do not exist in the type theory.  These rules
       fall into several categories:
 
-      (a) the formation of the type (b) the membership of literals in
-      the type (c) the flatness of the type (d) in the case of
-      integers, an isomorphism
+      (a) the formation of the type 
+      (b) the membership of literals in the type 
+      (c) the flatness of the type
 
       The correctness of each of these rules is apparent by
       inspection.
@@ -1615,14 +1624,12 @@ Qed.
       expressions that are beta-equivalent to such a value).  There
       are several consequences of flatness:
 
-      (i) totality (by sound_total_flat) (ii) strictness (follows from
-      totality by tr_total_strict) (iii) upward closure (by
-      sound_flat_upward) (iv) admissibility (follows from upward
-      closure by tr_uptype_admiss) (v) equality implies syntactic
-      equality (by sound_flat_sequal)
+      (i) totality (by sound_total_flat) 
+      (ii) strictness (follows from totality by tr_total_strict) 
+      (iii) upward closure (by sound_flat_upward)
+      (iv) admissibility (follows from upward closure by tr_uptype_admiss) 
+      (v) equality implies syntactic equality (by sound_flat_sequal)
 
-      For integers, several rules establish an isomorphism between
-      native integers and defined integers (as quotiented pairs of
-      natural numbers).  The correctness of the isomorphism code is
-      apparent by inspection.
+      For integers, several axioms establish the properties of integer
+      arithmetic.
 *)

@@ -402,7 +402,9 @@ signature THE_RULES =
       val boolFormUniv : term -> rule
       val boolEqUniv : term -> rule
       val boolIntro1Of : rule
+      val boolIntro1Eq : rule
       val boolIntro2Of : rule
+      val boolIntro2Eq : rule
       val boolElimOf : term -> term -> term -> term -> rule
       val boolElimOfNondep : term -> term -> term -> term -> rule
       val boolElimEq : term -> term -> term -> term -> term -> term -> term -> rule
@@ -983,15 +985,25 @@ signature THE_RULES =
       val integerEq : rule
       val integerFormUniv : term -> rule
       val integerEqUniv : term -> rule
-      val integerToDefType : rule
-      val integerFromDefType : rule
-      val integerIsomorphism1 : rule
-      val integerIsomorphism2 : rule
-      val pluszSpec : rule
-      val negzSpec : rule
-      val eqzbSpec : rule
-      val leqzbSpec : rule
-      val timeszSpec : rule
+      val pluszType : rule
+      val pluszCommute : term -> term -> rule
+      val pluszAssoc : term -> term -> term -> rule
+      val pluszIdentity : term -> rule
+      val negzType : rule
+      val pluszInverse : term -> rule
+      val timeszType : rule
+      val timeszCommute : term -> term -> rule
+      val timeszAssoc : term -> term -> term -> rule
+      val timeszIdentity : term -> rule
+      val timeszDistPlusz : term -> term -> term -> rule
+      val eqzbType : rule
+      val eqzbSpec1 : term -> term -> rule
+      val eqzbSpec2 : term -> term -> rule
+      val leqzbType : rule
+      val leqzbSpec1 : term -> term -> rule
+      val leqzbSpec2 : term -> term -> rule
+      val integerCharacteristic : term -> rule
+      val integerElements : term -> rule
       val integerHalts : term -> rule
       val integerStrict : rule
       val integerUptype : rule
@@ -1032,12 +1044,6 @@ val const_admiss = Const Prim.admiss
 val const_arrow = Const Prim.arrow
 val const_bool = Const Prim.bool
 val const_bottom = Const Prim.bottom
-val const_cEqzb = Const Prim.cEqzb
-val const_cInteger = Const Prim.cInteger
-val const_cLeqzb = Const Prim.cLeqzb
-val const_cNegz = Const Prim.cNegz
-val const_cPlusz = Const Prim.cPlusz
-val const_cTimesz = Const Prim.cTimesz
 val const_coguard = Const Prim.coguard
 val const_dprod = Const Prim.dprod
 val const_eeqtp = Const Prim.eeqtp
@@ -1059,8 +1065,8 @@ val const_iforall = Const Prim.iforall
 val const_inl = Const Prim.inl
 val const_inr = Const Prim.inr
 val const_integer = Const Prim.integer
-val const_integer_from_Integer = Const Prim.integer_from_Integer
-val const_integer_to_Integer = Const Prim.integer_to_Integer
+val const_integer_one = Const Prim.integer_one
+val const_integer_zero = Const Prim.integer_zero
 val const_intersect = Const Prim.intersect
 val const_intersectfut = Const Prim.intersectfut
 val const_irrelevant = Const Prim.irrelevant
@@ -1070,6 +1076,7 @@ val const_istp = Const Prim.istp
 val const_ite = Const Prim.ite
 val const_karrow = Const Prim.karrow
 val const_kind = Const Prim.kind
+val const_leqz = Const Prim.leqz
 val const_leqzb = Const Prim.leqzb
 val const_lete = Const Prim.lete
 val const_leth = Const Prim.leth
@@ -1082,6 +1089,7 @@ val const_lzero = Const Prim.lzero
 val const_mu = Const Prim.mu
 val const_nat = Const Prim.nat
 val const_nat_case = Const Prim.nat_case
+val const_nat_to_integer = Const Prim.nat_to_integer
 val const_negz = Const Prim.negz
 val const_nonsense = Const Prim.nonsense
 val const_padmiss = Const Prim.padmiss
@@ -1477,7 +1485,9 @@ val boolEq = Arg.make "boolEq" [] [] (Elim (const_eqtp, [App (const_bool), App (
 fun boolFormUniv i = Arg.make "boolFormUniv" [i, ] [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (const_bool), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_level), App (i), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun boolEqUniv i = Arg.make "boolEqUniv" [i, ] [] (Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (const_bool), App (const_bool), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_level), App (i), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 val boolIntro1Of = Arg.make "boolIntro1Of" [] [] (Elim (const_of, [App (const_bool), App (const_true), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+val boolIntro1Eq = Arg.make "boolIntro1Eq" [] [] (Elim (const_eq, [App (const_bool), App (const_true), App (const_true), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 val boolIntro2Of = Arg.make "boolIntro2Of" [] [] (Elim (const_of, [App (const_bool), App (const_false), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+val boolIntro2Eq = Arg.make "boolIntro2Eq" [] [] (Elim (const_eq, [App (const_bool), App (const_false), App (const_false), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 fun boolElimOf a m p r = Arg.make "boolElimOf" [a, m, p, r, ] [] (Elim (const_of, [App (Sub (a, Dot (m, Shift 0))), App (Elim (const_ite, [App (m), App (p), App (r), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_bool), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (Sub (a, Dot (const_true, Shift 0))), App (p), ])), (Arg.Unhide, [], Elim (const_of, [App (Sub (a, Dot (const_false, Shift 0))), App (r), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun boolElimOfNondep a m p r = Arg.make "boolElimOfNondep" [a, m, p, r, ] [] (Elim (const_of, [App (a), App (Elim (const_ite, [App (m), App (p), App (r), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_bool), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (p), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (r), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
 fun boolElimEq a m n p q r s = Arg.make "boolElimEq" [a, m, n, p, q, r, s, ] [] (Elim (const_eq, [App (Sub (a, Dot (m, Shift 0))), App (Elim (const_ite, [App (m), App (p), App (r), ])), App (Elim (const_ite, [App (n), App (q), App (s), ])), ])) [(Arg.Unhide, [], Elim (const_eq, [App (const_bool), App (m), App (n), ])), (Arg.Unhide, [], Elim (const_eq, [App (Sub (a, Dot (const_true, Shift 0))), App (p), App (q), ])), (Arg.Unhide, [], Elim (const_eq, [App (Sub (a, Dot (const_false, Shift 0))), App (r), App (s), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
@@ -2058,15 +2068,25 @@ val integerForm = Arg.make "integerForm" [] [] (Elim (const_istp, [App (const_in
 val integerEq = Arg.make "integerEq" [] [] (Elim (const_eqtp, [App (const_integer), App (const_integer), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 fun integerFormUniv i = Arg.make "integerFormUniv" [i, ] [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (const_integer), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_level), App (i), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun integerEqUniv i = Arg.make "integerEqUniv" [i, ] [] (Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (const_integer), App (const_integer), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_level), App (i), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
-val integerToDefType = Arg.make "integerToDefType" [] [] (Elim (const_of, [App (Elim (const_arrow, [App (const_integer), App (const_cInteger), ])), App (const_integer_to_Integer), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
-val integerFromDefType = Arg.make "integerFromDefType" [] [] (Elim (const_of, [App (Elim (const_arrow, [App (const_cInteger), App (const_integer), ])), App (const_integer_from_Integer), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
-val integerIsomorphism1 = Arg.make "integerIsomorphism1" [] [] (Elim (const_eq, [App (Elim (const_arrow, [App (const_integer), App (const_integer), ])), App (Lam (NONE, Elim (const_integer_from_Integer, [App (Elim (const_integer_to_Integer, [App (Var 0), ])), ]))), App (Lam (NONE, Var 0)), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
-val integerIsomorphism2 = Arg.make "integerIsomorphism2" [] [] (Elim (const_eq, [App (Elim (const_arrow, [App (const_cInteger), App (const_cInteger), ])), App (Lam (NONE, Elim (const_integer_to_Integer, [App (Elim (const_integer_from_Integer, [App (Var 0), ])), ]))), App (Lam (NONE, Var 0)), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
-val pluszSpec = Arg.make "pluszSpec" [] [] (Elim (const_eq, [App (Elim (const_arrow, [App (const_integer), App (Elim (const_arrow, [App (const_integer), App (const_integer), ])), ])), App (const_plusz), App (Lam (NONE, Lam (NONE, Elim (const_integer_from_Integer, [App (Elim (const_cPlusz, [App (Elim (const_integer_to_Integer, [App (Var 1), ])), App (Elim (const_integer_to_Integer, [App (Var 0), ])), ])), ])))), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
-val negzSpec = Arg.make "negzSpec" [] [] (Elim (const_eq, [App (Elim (const_arrow, [App (const_integer), App (const_integer), ])), App (const_negz), App (Lam (NONE, Elim (const_integer_from_Integer, [App (Elim (const_cNegz, [App (Elim (const_integer_to_Integer, [App (Var 0), ])), ])), ]))), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
-val eqzbSpec = Arg.make "eqzbSpec" [] [] (Elim (const_eq, [App (Elim (const_arrow, [App (const_integer), App (Elim (const_arrow, [App (const_integer), App (const_bool), ])), ])), App (const_eqzb), App (Lam (NONE, Lam (NONE, Elim (const_cEqzb, [App (Elim (const_integer_to_Integer, [App (Var 1), ])), App (Elim (const_integer_to_Integer, [App (Var 0), ])), ])))), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
-val leqzbSpec = Arg.make "leqzbSpec" [] [] (Elim (const_eq, [App (Elim (const_arrow, [App (const_integer), App (Elim (const_arrow, [App (const_integer), App (const_bool), ])), ])), App (const_leqzb), App (Lam (NONE, Lam (NONE, Elim (const_cLeqzb, [App (Elim (const_integer_to_Integer, [App (Var 1), ])), App (Elim (const_integer_to_Integer, [App (Var 0), ])), ])))), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
-val timeszSpec = Arg.make "timeszSpec" [] [] (Elim (const_eq, [App (Elim (const_arrow, [App (const_integer), App (Elim (const_arrow, [App (const_integer), App (const_integer), ])), ])), App (const_timesz), App (Lam (NONE, Lam (NONE, Elim (const_integer_from_Integer, [App (Elim (const_cTimesz, [App (Elim (const_integer_to_Integer, [App (Var 1), ])), App (Elim (const_integer_to_Integer, [App (Var 0), ])), ])), ])))), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+val pluszType = Arg.make "pluszType" [] [] (Elim (const_of, [App (Elim (const_arrow, [App (const_integer), App (Elim (const_arrow, [App (const_integer), App (const_integer), ])), ])), App (const_plusz), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+fun pluszCommute m n = Arg.make "pluszCommute" [m, n, ] [] (Elim (const_eq, [App (const_integer), App (Elim (const_plusz, [App (m), App (n), ])), App (Elim (const_plusz, [App (n), App (m), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_integer), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (const_integer), App (n), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun pluszAssoc m n p = Arg.make "pluszAssoc" [m, n, p, ] [] (Elim (const_eq, [App (const_integer), App (Elim (const_plusz, [App (Elim (const_plusz, [App (m), App (n), ])), App (p), ])), App (Elim (const_plusz, [App (m), App (Elim (const_plusz, [App (n), App (p), ])), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_integer), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (const_integer), App (n), ])), (Arg.Unhide, [], Elim (const_of, [App (const_integer), App (p), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun pluszIdentity m = Arg.make "pluszIdentity" [m, ] [] (Elim (const_eq, [App (const_integer), App (Elim (const_plusz, [App (const_integer_zero), App (m), ])), App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_integer), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+val negzType = Arg.make "negzType" [] [] (Elim (const_of, [App (Elim (const_arrow, [App (const_integer), App (const_integer), ])), App (const_negz), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+fun pluszInverse m = Arg.make "pluszInverse" [m, ] [] (Elim (const_eq, [App (const_integer), App (Elim (const_plusz, [App (m), App (Elim (const_negz, [App (m), ])), ])), App (const_integer_zero), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_integer), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+val timeszType = Arg.make "timeszType" [] [] (Elim (const_of, [App (Elim (const_arrow, [App (const_integer), App (Elim (const_arrow, [App (const_integer), App (const_integer), ])), ])), App (const_timesz), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+fun timeszCommute m n = Arg.make "timeszCommute" [m, n, ] [] (Elim (const_eq, [App (const_integer), App (Elim (const_timesz, [App (m), App (n), ])), App (Elim (const_timesz, [App (n), App (m), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_integer), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (const_integer), App (n), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun timeszAssoc m n p = Arg.make "timeszAssoc" [m, n, p, ] [] (Elim (const_eq, [App (const_integer), App (Elim (const_timesz, [App (Elim (const_timesz, [App (m), App (n), ])), App (p), ])), App (Elim (const_timesz, [App (m), App (Elim (const_timesz, [App (n), App (p), ])), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_integer), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (const_integer), App (n), ])), (Arg.Unhide, [], Elim (const_of, [App (const_integer), App (p), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun timeszIdentity m = Arg.make "timeszIdentity" [m, ] [] (Elim (const_eq, [App (const_integer), App (Elim (const_timesz, [App (const_integer_one), App (m), ])), App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_integer), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun timeszDistPlusz m n p = Arg.make "timeszDistPlusz" [m, n, p, ] [] (Elim (const_eq, [App (const_integer), App (Elim (const_timesz, [App (m), App (Elim (const_plusz, [App (n), App (p), ])), ])), App (Elim (const_plusz, [App (Elim (const_timesz, [App (m), App (n), ])), App (Elim (const_timesz, [App (m), App (p), ])), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_integer), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (const_integer), App (n), ])), (Arg.Unhide, [], Elim (const_of, [App (const_integer), App (p), ])), ] (fn [_, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+val eqzbType = Arg.make "eqzbType" [] [] (Elim (const_of, [App (Elim (const_arrow, [App (const_integer), App (Elim (const_arrow, [App (const_integer), App (const_bool), ])), ])), App (const_eqzb), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+fun eqzbSpec1 m n = Arg.make "eqzbSpec1" [m, n, ] [] (Elim (const_eq, [App (const_bool), App (Elim (const_eqzb, [App (m), App (n), ])), App (const_true), ])) [(Arg.Unhide, [], Elim (const_eq, [App (const_integer), App (m), App (n), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun eqzbSpec2 m n = Arg.make "eqzbSpec2" [m, n, ] [] (Elim (const_eq, [App (const_integer), App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_eq, [App (const_bool), App (Elim (const_eqzb, [App (m), App (n), ])), App (const_true), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+val leqzbType = Arg.make "leqzbType" [] [] (Elim (const_of, [App (Elim (const_arrow, [App (const_integer), App (Elim (const_arrow, [App (const_integer), App (const_bool), ])), ])), App (const_leqzb), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+fun leqzbSpec1 m n = Arg.make "leqzbSpec1" [m, n, ] [] (Elim (const_eq, [App (const_bool), App (Elim (const_leqzb, [App (m), App (n), ])), App (const_true), ])) [(Arg.Unhide, [], Elim (const_leqz, [App (m), App (n), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun leqzbSpec2 m n = Arg.make "leqzbSpec2" [m, n, ] [] (Elim (const_leqz, [App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_eq, [App (const_bool), App (Elim (const_leqzb, [App (m), App (n), ])), App (const_true), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun integerCharacteristic n = Arg.make "integerCharacteristic" [n, ] [] (const_void) [(Arg.Unhide, [], Elim (const_eq, [App (const_integer), App (Elim (const_nat_to_integer, [App (Elim (const_succ, [App (n), ])), ])), App (const_integer_zero), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun integerElements m = Arg.make "integerElements" [m, ] [] (Elim (const_squash, [App (Elim (const_exists, [App (const_nat), App (Lam (NONE, Elim (const_sum, [App (Elim (const_eq, [App (const_integer), App (Sub (m, Shift 1)), App (Elim (const_negz, [App (Elim (const_nat_to_integer, [App (Elim (const_succ, [App (Var 0), ])), ])), ])), ])), App (Elim (const_eq, [App (const_integer), App (Sub (m, Shift 1)), App (Elim (const_nat_to_integer, [App (Var 0), ])), ])), ]))), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_integer), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 fun integerHalts m = Arg.make "integerHalts" [m, ] [] (Elim (const_halts, [App (m), ])) [(Arg.Unhide, [], Elim (const_of, [App (const_integer), App (m), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
 val integerStrict = Arg.make "integerStrict" [] [] (Elim (const_strict, [App (const_integer), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 val integerUptype = Arg.make "integerUptype" [] [] (Elim (const_uptype, [App (const_integer), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)

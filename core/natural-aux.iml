@@ -143,8 +143,8 @@ functor AfterTimesn () :> NATURAL_TACTIC =
 
       (* Extend typechecker to find native integers belong to natural. *)
 
-      val leqz = parseConstant /Integer.leqz/
-      val (leqz_dj, leqz_valid) = Option.valOf (Database.findType leqz)
+      val natural_intro = resolveGlobal /Natural.natural_intro/
+      val (natural_intro_type, natural_intro_tac) = Infer.inferConstant natural_intro
 
       val naturalIntroOf : tactic =
          refine Rule.normalizeConcl
@@ -157,52 +157,32 @@ functor AfterTimesn () :> NATURAL_TACTIC =
                     fail "not a natural number"
                  else
                     (* X : natural *)
-                    refine (Rule.reduce (R.within [1] R.unfold))
-                    >>+
-                    (* X : { n : integer | z`0 <z= n } *)
-                    refine (Rule.setIntroOf (T.evar ()) (T.evar ()) (T.evar ()))
+                    refine (Rule.assert natural_intro_type (T.evar ()))
                     >>> [
-                        (* integer |- z`0 <z= 0 : type *)
-                        refine (Rule.univForgetOf (T.evar ()) (T.Const Prim.lzero))
+                        refine (Rule.inhabitant (T.evar ()) (T.Const natural_intro))
                         >>+
-                        (* integer |- z`0 <z= 0 : U 0 *)
-                        refine (Rule.arrowElimOf 
-                                   (T.Const Prim.integer)
-                                   (T.evar ()) 
-                                   (T.apply1 leqz (T.Native (T.Integer 0I)))
-                                   T.zero)
+                        (* natural_intro : ... *)
+                        natural_intro_tac,
+
+                        (* forall integer . (if ...) -> 0 : natural |- X : natural *)
+                        refine (Rule.forallLeft (T.Native (T.Integer x)))
                         >>> [
-                            (* integer |- leqz z`0 : integer -> integer *)
-                            refine (Rule.arrowElimOf
-                                       (T.Const Prim.integer) 
-                                       (T.evar ())
-                                       (T.Const leqz)
-                                       (T.Native (T.Integer 0I)))
+                            (* X : integer *)
+                            refine Rule.integerIntroOf,
+
+                            (* (if ...) -> X : natural |- X : natural *)
+                            refine (Rule.whnfHyp 0)
+                            >>+
+                            (* unit -> X : natural |- X : natural *)
+                            refine Rule.arrowLeft
                             >>> [
-                                (* integer |- leqz : integer -> integer -> integer *)
-                                cast leqz_dj leqz_valid >> done,
-                                
-                                (* integer |- z`0 : integer *)
-                                refine Rule.integerIntroOf >> done
-                                ],
+                                (* unit *)
+                                refine Rule.unitIntro,
 
-                            (* integer |- 0 : integer *)
-                            refine (Rule.hypothesisOf 0) >> done
-                            ],
-
-                        (* X : integer *)
-                        refine Rule.integerIntroOf >> done,
-
-                        (* z`0 <z= X *)
-                        refine (Rule.reduce 
-                                   (R.trans
-                                       [R.unfold, R.beta 2, R.unfold, R.beta 1]))
-                        >>+
-                        (* if leqzb z`0 X then unit else void *)
-                        refine Rule.whnfConcl
-                        >>+
-                        (* unit *)
-                        refine Rule.unitIntro >> done
+                                (* X : natural |- X : natural *)
+                                refine (Rule.hypothesis 0)
+                                ]
+                            ]
                         ])\
             /
 

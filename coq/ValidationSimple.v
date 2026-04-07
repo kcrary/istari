@@ -278,18 +278,39 @@ Qed.
 
 
 Lemma boolIntro1Of_valid : boolIntro1Of_obligation.
-  unfoldtop. autounfold with valid_hint.
-  intros G.
-  valid_rewrite.
-  do 2 constructor.
-  Qed.
+Proof.
+prepare.
+unfold Defs.true, Defs.bool.
+intros G.
+apply tr_booltp_intro_btrue.
+Qed.
 
- Lemma boolIntro2Of_valid : boolIntro2Of_obligation.
-  unfoldtop. autounfold with valid_hint.
-  intros G.
-  valid_rewrite.
-  do 2 constructor.
- Qed.
+
+Lemma boolIntro1Eq_valid : boolIntro1Eq_obligation.
+Proof.
+prepare.
+unfold Defs.true, Defs.bool.
+intros G.
+apply tr_booltp_intro_btrue.
+Qed.
+
+
+Lemma boolIntro2Of_valid : boolIntro2Of_obligation.
+Proof.
+prepare.
+unfold Defs.true, Defs.bool.
+intros G.
+apply tr_booltp_intro_bfalse.
+Qed.
+
+
+Lemma boolIntro2Eq_valid : boolIntro2Eq_obligation.
+Proof.
+prepare.
+unfold Defs.true, Defs.bool.
+intros G.
+apply tr_booltp_intro_bfalse.
+Qed.
 
 
 Hint Rewrite def_ite : prepare.

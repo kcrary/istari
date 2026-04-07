@@ -73,6 +73,7 @@ variables.  The official rules, using de Bruijn indices, are given
 [Partial types](#partial-types)<br>
 [Let hypotheses](#let-hypotheses)<br>
 [Integers](#integers)<br>
+[Symbols](#symbols)<br>
 [Rewriting](#rewriting)<br>
 
 
@@ -2844,9 +2845,17 @@ variables.  The official rules, using de Bruijn indices, are given
 
       G |- true : bool
 
+- `boolIntro1Eq`
+
+      G |- true = true : bool
+
 - `boolIntro2Of`
 
       G |- false : bool
+
+- `boolIntro2Eq`
+
+      G |- false = false : bool
 
 - `boolElimOf A M P R`
 
@@ -6390,58 +6399,117 @@ Syntactic equality is intended for internal use only.
       G |- M = M : integer
       (where M is an integer literal)
 
+- `pluszType`
 
-The remaining integer rules establish the properties of Istari's
-native integer operations through an isomorphism to `Integer`, which
-defines the integers as a quotient over pairs of natural numbers
-(`quotient (x y : nat & nat) . x #1 + y #2 = x #2 + y #1 : nat`).
+      G |- plusz : integer -> integer -> integer
 
+- `pluszCommute M N`
 
-- `integerToDefType`
+      G |- plusz M N = plusz N M : integer
+      >>
+      G |- M : integer
+      G |- N : integer
 
-      G |- integer_to_Integer : integer -> Integer
+- `pluszAssoc M N P`
 
-- `integerFromDefType`
+      G |- plusz (plusz M N) P = plusz M (plusz N P) : integer
+      >>
+      G |- M : integer
+      G |- N : integer
+      G |- P : integer
 
-      G |- integer_from_Integer : Integer -> integer
+- `pluszIdentity M`
 
-- `integerIsomorphism1`
+      G |- plusz integer_zero M = M : integer
+      >>
+      G |- M : integer
 
-      G |- (fn x . integer_from_Integer (integer_to_Integer x)) = (fn x . x) : (integer -> integer)
+- `negzType`
 
-- `integerIsomorphism2`
+      G |- negz : integer -> integer
 
-      G |- (fn x . integer_to_Integer (integer_from_Integer x)) = (fn x . x) : (Integer -> Integer)
+- `pluszInverse M`
 
-- `pluszSpec`
+      G |- plusz M (negz M) = integer_zero : integer
+      >>
+      G |- M : integer
 
-      G |- plusz 
-            = (fn x . fn y . integer_from_Integer (Plusz (integer_to_Integer x) (integer_to_Integer y))) 
-            : (integer -> integer -> integer)
+- `timeszType`
 
-- `negzSpec`
+      G |- timesz : integer -> integer -> integer
 
-      G |- negz 
-            = (fn x . integer_from_Integer (Negz (integer_to_Integer x))) 
-            : (integer -> integer)
+- `timeszCommute M N`
 
-- `eqzbSpec`
+      G |- timesz M N = timesz N M : integer
+      >>
+      G |- M : integer
+      G |- N : integer
 
-      G |- eqzb 
-            = (fn x . fn y . Eqzb (integer_to_Integer x) (integer_to_Integer y))
-            : (integer -> integer -> bool)
+- `timeszAssoc M N P`
 
-- `leqzbSpec`
+      G |- timesz (timesz M N) P = timesz M (timesz N P) : integer
+      >>
+      G |- M : integer
+      G |- N : integer
+      G |- P : integer
 
-      G |- leqzb 
-            = (fn x . fn y . Leqzb (integer_to_Integer x) (integer_to_Integer y)) 
-            : (integer -> integer -> bool)
+- `timeszIdentity M`
 
-- `timeszSpec`
+      G |- timesz integer_one M = M : integer
+      >>
+      G |- M : integer
 
-      G |- timesz 
-            = (fn x . fn y . integer_from_Integer (Timesz (integer_to_Integer x) (integer_to_Integer y))) 
-            : (integer -> integer -> integer)
+- `timeszDistPlusz M N P`
+
+      G |- timesz M (plusz N P) = plusz (timesz M N) (timesz M P) : integer
+      >>
+      G |- M : integer
+      G |- N : integer
+      G |- P : integer
+
+- `eqzbType`
+
+      G |- eqzb : integer -> integer -> bool
+
+- `eqzbSpec1 M N`
+
+      G |- eqzb M N = true : bool
+      >>
+      G |- M = N : integer
+
+- `eqzbSpec2 M N`
+
+      G |- M = N : integer
+      >>
+      G |- eqzb M N = true : bool
+
+- `leqzbType`
+
+      G |- leqzb : integer -> integer -> bool
+
+- `leqzbSpec1 M N`
+
+      G |- leqzb M N = true : bool
+      >>
+      G |- leqz M N
+
+- `leqzbSpec2 M N`
+
+      G |- leqz M N
+      >>
+      G |- leqzb M N = true : bool
+
+- `integerCharacteristic N`
+
+      G |- void
+      >>
+      G |- nat_to_integer (succ N) = integer_zero : integer
+
+- `integerElements M`
+
+      G |- {exists (n : nat) . M = negz (nat_to_integer (succ n)) : integer % M = nat_to_integer n : integer}
+      >>
+      G |- M : integer
 
 - `integerHalts M`
 
@@ -6451,7 +6519,7 @@ defines the integers as a quotient over pairs of natural numbers
 
 - `integerStrict`
 
-      G |- integer <: partial integer
+      G |- strict integer
 
 - `integerUptype`
 

@@ -13,7 +13,10 @@
   + Added material to `Quotient`.  Changed the behavior of `destruct` on `Quotient.quotient1`.
 	
 - Added rules `eqEqInv1`, `eqEqInv2`, `eqEqInv3`, `ofFormInv1`,
-  `ofFormInv2`, `ofEqInv1`, and `ofEqInv2`.
+  `ofFormInv2`, `ofEqInv1`, `ofEqInv2`, `boolIntro1Eq`, and
+  `boolIntro2Eq`.
+
+- Reworked the integer primitives and axioms.
 
 
 #### 1.2.1

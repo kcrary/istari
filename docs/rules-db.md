@@ -70,6 +70,7 @@ Human-readable rules, using explicit variables, are given
 [Partial types](#partial-types)<br>
 [Let hypotheses](#let-hypotheses)<br>
 [Integers](#integers)<br>
+[Symbols](#symbols)<br>
 [Rewriting](#rewriting)<br>
 
 
@@ -2842,9 +2843,17 @@ Human-readable rules, using explicit variables, are given
 
       G |- of bool true
 
+- `boolIntro1Eq`
+
+      G |- eq bool true true
+
 - `boolIntro2Of`
 
       G |- of bool false
+
+- `boolIntro2Eq`
+
+      G |- eq bool false false
 
 - `boolElimOf A M P R`
 
@@ -6457,56 +6466,117 @@ Syntactic equality is intended for internal use only.
       G |- eq integer M M
       (where M is an integer literal)
 
-- `integerToDefType`
+- `pluszType`
 
-      G |- of (arrow integer Integer) integer_to_def
+      G |- of (arrow integer (arrow integer integer)) plusz
 
-- `integerFromDefType`
+- `pluszCommute M N`
 
-      G |- of (arrow Integer integer) integer_from_def
+      G |- eq integer (plusz M N) (plusz N M)
+      >>
+      G |- of integer M
+      G |- of integer N
 
-- `integerIsomorphism1`
+- `pluszAssoc M N P`
 
-      G |- eq (arrow integer integer) (fn . integer_from_Integer (integer_to_Integer 0)) (fn . 0)
+      G |- eq integer (plusz (plusz M N) P) (plusz M (plusz N P))
+      >>
+      G |- of integer M
+      G |- of integer N
+      G |- of integer P
 
-- `integerIsomorphism2`
+- `pluszIdentity M`
 
-      G |- eq (arrow Integer Integer) (fn . integer_to_Integer (integer_from_Integer 0)) (fn . 0)
+      G |- eq integer (plusz integer_zero M) M
+      >>
+      G |- of integer M
 
-- `pluszSpec`
+- `negzType`
 
-      G |- eq 
-             (arrow integer (arrow integer integer))
-             plusz
-             (fn . fn . integer_from_Integer (Plusz (integer_to_Integer 1) (integer_to_Integer 0)))
+      G |- of (arrow integer integer) negz
 
-- `negzSpec`
+- `pluszInverse M`
 
-      G |- eq 
-             (arrow integer integer)
-             negz 
-             (fn . integer_from_Integer (Negz (integer_to_Integer 0)))
+      G |- eq integer (plusz M (negz M)) integer_zero
+      >>
+      G |- of integer M
 
-- `eqzbSpec`
+- `timeszType`
 
-      G |- eq
-             (arrow integer (arrow integer bool))
-             eqzb
-             (fn . fn . Eqzb (integer_to_Integer 1) (integer_to_Integer 0))
+      G |- of (arrow integer (arrow integer integer)) timesz
 
-- `leqzbSpec`
+- `timeszCommute M N`
 
-      G |- eq 
-             (arrow integer (arrow integer bool))
-             leqzb
-             (fn . fn . Leqzb (integer_to_Integer 1) (integer_to_Integer 0))
+      G |- eq integer (timesz M N) (timesz N M)
+      >>
+      G |- of integer M
+      G |- of integer N
 
-- `timeszSpec`
+- `timeszAssoc M N P`
 
-      G |- eq 
-             (arrow integer (arrow integer integer))
-             timesz
-             (fn . fn . integer_from_Integer (Timesz (integer_to_Integer 1) (integer_to_Integer 0)))
+      G |- eq integer (timesz (timesz M N) P) (timesz M (timesz N P))
+      >>
+      G |- of integer M
+      G |- of integer N
+      G |- of integer P
+
+- `timeszIdentity M`
+
+      G |- eq integer (timesz integer_one M) M
+      >>
+      G |- of integer M
+
+- `timeszDistPlusz M N P`
+
+      G |- eq integer (timesz M (plusz N P)) (plusz (timesz M N) (timesz M P))
+      >>
+      G |- of integer M
+      G |- of integer N
+      G |- of integer P
+
+- `eqzbType`
+
+      G |- of (arrow integer (arrow integer bool)) eqzb
+
+- `eqzbSpec1 M N`
+
+      G |- eq bool (eqzb M N) true
+      >>
+      G |- eq integer M N
+
+- `eqzbSpec2 M N`
+
+      G |- eq integer M N
+      >>
+      G |- eq bool (eqzb M N) true
+
+- `leqzbType`
+
+      G |- of (arrow integer (arrow integer bool)) leqzb
+
+- `leqzbSpec1 M N`
+
+      G |- eq bool (leqzb M N) true
+      >>
+      G |- leqz M N
+
+- `leqzbSpec2 M N`
+
+      G |- leqz M N
+      >>
+      G |- eq bool (leqzb M N) true
+
+- `integerCharacteristic N`
+
+      G |- void
+      >>
+      G |- eq integer (nat_to_integer (succ N)) integer_zero
+
+- `integerElements M`
+
+      G |- squash (exists nat (fn . sum (eq integer M[^1] (negz (nat_to_integer (succ 0)))) (eq integer M[^1] (nat_to_integer 0))))
+      >>
+      G |- of integer M
 
 - `integerHalts M`
 
@@ -6516,7 +6586,7 @@ Syntactic equality is intended for internal use only.
 
 - `integerStrict`
 
-      G |- subtype integer (partial integer)
+      G |- strict integer
 
 - `integerUptype`
 
