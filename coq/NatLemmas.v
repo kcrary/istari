@@ -210,6 +210,22 @@ apply (tr_subtype_elim _ (sumtype unittp nattp)).
 Qed.
 
 
+Lemma tr_natlit_nattp :
+  forall G n, tr G (deq (PageCode.natlit n) (PageCode.natlit n) nattp).
+Proof.
+intros G n.
+induct n; cbn.
+  {
+  apply tr_nzero_nattp.
+  }
+  
+  {
+  intros n IH.
+  apply tr_nsucc_nattp; auto.
+  }
+Qed.
+
+
 Lemma tr_nattp_formation_univ :
   forall G, tr G (deq nattp nattp (univ nzero)).
 Proof.

@@ -13,252 +13,10 @@ Require Import System.
 Require Import Judgement.
 
 
-Lemma upper_bound_all_list :
-  forall (l : list nat),
-    exists n,
-      list_rect (fun _ => Prop)
-        True
-        (fun i _ P => i <= n /\ P)
-        l.
-Proof.
-intros l.
-cut (exists n,
-       forall m,
-         n <= m
-         -> list_rect (fun _ => Prop)
-              True
-              (fun i _ P => i <= m /\ P)
-              l).
-  {
-  intros (n & Hn).
-  exists n.
-  apply Hn; auto.
-  }
-induct l.
-
-(* nil *)
-{
-exists 0.
-cbn.
-auto.
-}
-
-(* cons *)
-{
-intros i l IH.
-destruct IH as (j & Hj).
-exists (max i j).
-intros n Hn.
-cbn.
-split.
-  {
-  so (Nat.le_max_l i j).
-  omega.
-  }
-
-  {
-  apply Hj.
-  so (Nat.le_max_r i j).
-  omega.
-  }
-}
-Qed.
-
-
-Lemma upper_bound_all :
-  forall (n : nat),
-    nat_rect (fun _ => list nat -> Prop)
-      (fun l =>
-         exists n,
-           list_rect (fun _ => Prop)
-             True
-             (fun i _ P => i <= n /\ P)
-             (List.rev l))
-      (fun _ P l =>
-         forall (i : nat), P (cons i l))
-      n
-      nil.
-Proof.
-intro n.
-generalize (@nil nat).
-induct n.
-
-(* 0 *)
-{
-intros l.
-cbn.
-apply upper_bound_all_list.
-}
-
-(* S *)
-{
-intros n IH l.
-cbn.
-intro i.
-apply IH.
-}
-Qed.
-
-
 Section object.
 
 
 Variable object : Type.
-
-
-Lemma can_hygiene :
-  forall (m : @term object),
-    exists i, hygiene (fun j => j < i) m.
-Proof.
-intros m.
-pattern m.
-apply (term_mut_ind _ _
-         (fun a r =>
-            exists i, hygiene_row (fun j => j < i) r)); clear m.
-
-(* var *)
-{
-intros i.
-exists (S i).
-apply hygiene_var.
-omega.
-}
-
-(* oper *)
-{
-intros a th r IH.
-destruct IH as (i & Hi).
-exists i.
-apply hygiene_oper; auto.
-}
-
-(* nil *)
-{
-exists 0.
-apply hygiene_nil.
-}
-
-(* cons *)
-{
-intros j a m IH1 r IH2.
-destruct IH1 as (i1 & Hi1).
-destruct IH2 as (i2 & Hi2).
-exists (max i1 i2).  (* higher than necessary, but that's fine *)
-apply hygiene_cons.
-  {
-  eapply hygiene_weaken; eauto.
-  intros k Hk.
-  so (le_gt_dec j k) as [Hjk | Hkj]; auto.
-  right.
-  split; auto.
-  so (Nat.le_max_l i1 i2).
-  omega.
-  }
-
-  {
-  eapply hygiene_row_weaken; eauto.
-  intros k Hk.
-  so (Nat.le_max_r i1 i2).
-  omega.
-  }
-}
-Qed.
-
-
-Lemma can_hygiene' :
-  forall (m : @term object),
-    exists i, forall j, i <= j -> hygiene (fun k => k < j) m.
-Proof.
-intros m.
-so (can_hygiene m) as (i & Hi).
-exists i.
-intros j Hj.
-eapply hygiene_weaken; eauto.
-intros k.
-omega.
-Qed.
-
-
-Lemma can_hygieneh :
-  forall (h : @hyp object),
-    exists i, hygieneh (fun j => j < i) h.
-Proof.
-intros h.
-induct h.
-
-{
-exists 0.
-apply hygieneh_tpl.
-}
-
-{
-exists 0.
-apply hygieneh_tp.
-}
-
-{
-intros a.
-so (can_hygiene a) as (i & Hi).
-exists i.
-apply hygieneh_tml; auto.
-}
-
-{
-intros a.
-so (can_hygiene a) as (i & Hi).
-exists i.
-apply hygieneh_tm; auto.
-}
-
-{
-exists 0.
-apply hygieneh_emp.
-}
-Qed.
-
-
-Lemma can_hygieneh' :
-  forall (h : @hyp object),
-    exists i, forall j, i <= j -> hygieneh (fun k => k < j) h.
-Proof.
-intros h.
-so (can_hygieneh h) as (i & Hi).
-exists i.
-intros j Hj.
-eapply hygieneh_weaken; eauto.
-intros k.
-omega.
-Qed.
-
-
-Lemma can_hygienej :
-  forall (J : @judgement object),
-    exists i, hygienej (fun j => j < i) J.
-Proof.
-intros J.
-induct J.
-intros m n a.
-so (can_hygiene m) as (i1 & Hm).
-so (can_hygiene n) as (i2 & Hn).
-so (can_hygiene a) as (i3 & Ha).
-so (upper_bound_all 3 i1 i2 i3) as (i & Hi1 & Hi2 & Hi3 & _).
-exists i.
-apply hygienej_deq; eapply hygiene_weaken; eauto; intros j Hj; omega.
-Qed.
-
-
-Lemma can_hygienej' :
-  forall (J : @judgement object),
-    exists i, forall j, i <= j -> hygienej (fun k => k < j) J.
-Proof.
-intros J.
-so (can_hygienej J) as (i & Hi).
-exists i.
-intros j Hj.
-eapply hygienej_weaken; eauto.
-intros k.
-omega.
-Qed.
 
 
 Fixpoint shut n : @context object :=
@@ -274,6 +32,18 @@ Lemma length_shut :
 Proof.
 intro n.
 induct n; auto; intros; cbn; f_equal; auto.
+Qed.
+
+
+Lemma shut_plus :
+  forall i j,
+    shut (i + j) = shut i ++ shut j.
+Proof.
+intros i j.
+induct i; auto.
+intros i IH.
+cbn.
+f_equal; auto.
 Qed.
 
 

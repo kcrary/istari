@@ -535,6 +535,24 @@ reflexivity.
 Qed.
 
 
+Add Parametric Morphism object : (@native_binary object)
+  with signature eq ==> equiv ==> equiv ==> equiv
+  as equiv_native_binary.
+Proof.
+intros f m1 m1' H1 m2 m2' H2.
+apply equiv_native_binary; auto.
+Qed.
+
+
+Add Parametric Morphism object : (@native_unary object)
+  with signature eq ==> equiv ==> equiv
+  as equiv_native_unary.
+Proof.
+intros f m1 m1' H1.
+apply equiv_native_unary; auto.
+Qed.
+
+
 Add Parametric Morphism object : (@padmiss object)
   with signature equiv ==> equiv ==> equiv
   as equiv_padmiss.

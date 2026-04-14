@@ -192,6 +192,79 @@ destruct Hie as ([Hji | (Hji & HPe)] & [Hji' | (Hji' & HQe)]); try omega.
 Qed.
 
 
+Lemma can_hygiene :
+  forall (m : @term object),
+    exists i, hygiene (fun j => j < i) m.
+Proof.
+intros m.
+pattern m.
+apply (term_mut_ind _ _
+         (fun a r =>
+            exists i, hygiene_row (fun j => j < i) _ r)); clear m.
+
+(* var *)
+{
+intros i.
+exists (S i).
+apply hygiene_var.
+omega.
+}
+
+(* oper *)
+{
+intros a th r IH.
+destruct IH as (i & Hi).
+exists i.
+apply hygiene_oper; auto.
+}
+
+(* nil *)
+{
+exists 0.
+apply hygiene_nil.
+}
+
+(* cons *)
+{
+intros j a m IH1 r IH2.
+destruct IH1 as (i1 & Hi1).
+destruct IH2 as (i2 & Hi2).
+exists (max i1 i2).  (* higher than necessary, but that's fine *)
+apply hygiene_cons.
+  {
+  eapply hygiene_weaken; eauto.
+  intros k Hk.
+  so (le_gt_dec j k) as [Hjk | Hkj]; auto.
+  right.
+  split; auto.
+  so (Nat.le_max_l i1 i2).
+  omega.
+  }
+
+  {
+  eapply hygiene_row_weaken; eauto.
+  intros k Hk.
+  so (Nat.le_max_r i1 i2).
+  omega.
+  }
+}
+Qed.
+
+
+Lemma can_hygiene' :
+  forall (m : @term object),
+    exists i, forall j, i <= j -> hygiene (fun k => k < j) m.
+Proof.
+intros m.
+so (can_hygiene m) as (i & Hi).
+exists i.
+intros j Hj.
+eapply hygiene_weaken; eauto.
+intros k.
+omega.
+Qed.
+
+
 Lemma hygiene_shift_under :
   forall P i j m,
     hygiene P m
@@ -1373,6 +1446,21 @@ destruct H as (Hm & Hn & _).
 apply hygiene_subst1; auto.
 }
 
+(* native_unary *)
+{
+intros f x y Heq P Hhyg.
+apply hygiene_auto; cbn.
+trivial.
+}
+
+(* native_binary *)
+{
+intros f x m m' _ IH P Hhyg.
+so (hygiene_invert_auto _#4 Hhyg) as H; cbn in H.
+destruct H as (_ & Hm & _).
+apply hygiene_auto; cbn; auto.
+}
+
 (* cons *)
 {
 intros i a m n r s _ IH1 _ IH2 P Hhyg.
@@ -1646,6 +1734,153 @@ apply hygienej_deq; eauto using hygiene_weaken.
 Qed.
 
 
+Lemma hygienej_subst :
+  forall P Q s (J : @judgement object),
+    hygienej P J
+    -> (forall i, P i -> hygiene Q (project s i))
+    -> hygienej Q (substj s J).
+Proof.
+intros P Q s J HJ Hs.
+destruct J as [m n a].
+simpsub.
+invert HJ.
+intros Hm Hn Ha.
+apply hygienej_deq; eauto using hygiene_subst.
+Qed.
+
+
+Lemma substj_into_absent :
+  forall P s (J : @judgement object),
+    hygienej P J
+    -> (forall i, P i -> project s i = var i)
+    -> substj s J = J.
+Proof.
+intros P s J Hhyg Heq.
+destruct J as [m n a].
+simpsub.
+invert Hhyg.
+intros.
+f_equal; eapply subst_into_absent; eauto.
+Qed.
+
+
+Lemma upper_bound_all_list :
+  forall (l : list nat),
+    exists n,
+      list_rect (fun _ => Prop)
+        True
+        (fun i _ P => i <= n /\ P)
+        l.
+Proof.
+intros l.
+cut (exists n,
+       forall m,
+         n <= m
+         -> list_rect (fun _ => Prop)
+              True
+              (fun i _ P => i <= m /\ P)
+              l).
+  {
+  intros (n & Hn).
+  exists n.
+  apply Hn; auto.
+  }
+induct l.
+
+(* nil *)
+{
+exists 0.
+cbn.
+auto.
+}
+
+(* cons *)
+{
+intros i l IH.
+destruct IH as (j & Hj).
+exists (max i j).
+intros n Hn.
+cbn.
+split.
+  {
+  so (Nat.le_max_l i j).
+  omega.
+  }
+
+  {
+  apply Hj.
+  so (Nat.le_max_r i j).
+  omega.
+  }
+}
+Qed.
+
+
+Lemma upper_bound_all :
+  forall (n : nat),
+    nat_rect (fun _ => list nat -> Prop)
+      (fun l =>
+         exists n,
+           list_rect (fun _ => Prop)
+             True
+             (fun i _ P => i <= n /\ P)
+             (List.rev l))
+      (fun _ P l =>
+         forall (i : nat), P (cons i l))
+      n
+      nil.
+Proof.
+intro n.
+generalize (@nil nat).
+induct n.
+
+(* 0 *)
+{
+intros l.
+cbn.
+apply upper_bound_all_list.
+}
+
+(* S *)
+{
+intros n IH l.
+cbn.
+intro i.
+apply IH.
+}
+Qed.
+
+
+Lemma can_hygienej :
+  forall (J : @judgement object),
+    exists i, hygienej (fun j => j < i) J.
+Proof.
+intros J.
+induct J.
+intros m n a.
+so (can_hygiene m) as (i1 & Hm).
+so (can_hygiene n) as (i2 & Hn).
+so (can_hygiene a) as (i3 & Ha).
+so (upper_bound_all 3 i1 i2 i3) as (i & Hi1 & Hi2 & Hi3 & _).
+exists i.
+apply hygienej_deq; eapply hygiene_weaken; eauto; intros j Hj; omega.
+Qed.
+
+
+Lemma can_hygienej' :
+  forall (J : @judgement object),
+    exists i, forall j, i <= j -> hygienej (fun k => k < j) J.
+Proof.
+intros J.
+so (can_hygienej J) as (i & Hi).
+exists i.
+intros j Hj.
+eapply hygienej_weaken; eauto.
+intros k.
+omega.
+Qed.
+
+
 End object.
 
 
@@ -1653,3 +1888,7 @@ Arguments hygiene {object}.
 Arguments hygienej {object}.
 Arguments hygiene_row {object} P {a}.
 Arguments closub {object}.
+Arguments can_hygiene {object}.
+Arguments can_hygiene' {object}.
+Arguments can_hygienej {object}.
+Arguments can_hygienej' {object}.

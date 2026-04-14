@@ -297,6 +297,25 @@ prove_equiv_compat.
 Qed.
 
 
+Lemma equiv_native_binary :
+  forall object f (a a' b b' : term object),
+    equiv a a'
+    -> equiv b b'
+    -> equiv (native_binary f a b) (native_binary f a' b').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
+Lemma equiv_native_unary :
+  forall object f (a a' : term object),
+    equiv a a'
+    -> equiv (native_unary f a) (native_unary f a').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
 Lemma equiv_padmiss :
   forall (a a' b b' : term object),
     equiv a a'

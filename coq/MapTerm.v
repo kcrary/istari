@@ -67,8 +67,6 @@ Definition map_operator {A B : Type} (f : A -> B) (a : list nat) (th : operator 
   | oper_unittp _ => oper_unittp _
   | oper_cunit _ => oper_cunit _
   | oper_booltp _ => oper_booltp _
-  | oper_btrue _ => oper_btrue _
-  | oper_bfalse _ => oper_bfalse _
   | oper_bite _ => oper_bite _
   | oper_prod _ => oper_prod _
   | oper_sigma _ => oper_sigma _
@@ -91,6 +89,10 @@ Definition map_operator {A B : Type} (f : A -> B) (a : list nat) (th : operator 
   | oper_uptype _ => oper_uptype _
   | oper_seq _ => oper_seq _
   | oper_marker _ x => oper_marker _ x
+  | oper_nativetp _ C f => oper_nativetp _ C f
+  | oper_native_elem _ x => oper_native_elem _ x
+  | oper_native_unary _ f => oper_native_unary _ f
+  | oper_native_binary _ f => oper_native_binary _ f
   end.
 
 
@@ -575,8 +577,35 @@ auto.
 Qed.
 
 
+Lemma map_nativetp :
+  forall A B (f : A -> B) C g, map_term f (nativetp C g) = nativetp C g.
+Proof.
+auto.
+Qed.
 
-Hint Rewrite map_ext map_extt map_var map_univ map_cty map_con map_karrow map_tarrow map_pi map_clam map_capp map_ctlam map_ctapp map_lam map_app map_intersect map_union map_constfn map_fut map_semifut map_cnext map_cprev map_next map_prev map_rec map_equal map_triv map_eqtype map_sequal map_subtype map_kind map_all map_alltp map_exist map_mu map_ispositive map_isnegative map_voidtp map_unittp map_cunit map_booltp map_btrue map_bfalse map_bite map_prod map_sigma map_cpair map_cpi1 map_cpi2 map_ppair map_ppi1 map_ppi2 map_wt map_set map_iset map_quotient map_guard map_coguard map_partial map_halts map_admiss map_padmiss map_uptype map_seq map_marker : map.
+
+Lemma map_native_elem :
+  forall A B (f : A -> B) x, map_term f (native_elem x) = native_elem x.
+Proof.
+auto.
+Qed.
+
+
+Lemma map_native_unary :
+  forall A B (f : A -> B) g m, map_term f (native_unary g m) = native_unary g (map_term f m).
+Proof.
+auto.
+Qed.
+
+
+Lemma map_native_binary :
+  forall A B (f : A -> B) g m1 m2, map_term f (native_binary g m1 m2) = native_binary g (map_term f m1) (map_term f m2).
+Proof.
+auto.
+Qed.
+
+
+Hint Rewrite map_ext map_extt map_var map_univ map_cty map_con map_karrow map_tarrow map_pi map_clam map_capp map_ctlam map_ctapp map_lam map_app map_intersect map_union map_constfn map_fut map_semifut map_cnext map_cprev map_next map_prev map_rec map_equal map_triv map_eqtype map_sequal map_subtype map_kind map_all map_alltp map_exist map_mu map_ispositive map_isnegative map_voidtp map_unittp map_cunit map_booltp map_btrue map_bfalse map_bite map_prod map_sigma map_cpair map_cpi1 map_cpi2 map_ppair map_ppi1 map_ppi2 map_wt map_set map_iset map_quotient map_guard map_coguard map_partial map_halts map_admiss map_padmiss map_uptype map_seq map_marker map_nativetp map_native_elem map_native_unary map_native_binary : map.
 
 
 Lemma map_sumbool :
@@ -1372,6 +1401,18 @@ try (intros; discriminate Heqa);
 try (intros; so (eq_dep_impl_eq_snd _#5 Heq) as Heqth; discriminate Heqth);
 try (intros; apply eq_dep_refl; done);
 try (intros; apply eq_impl_eq_dep_snd; f_equal; cbn in Heq; injection (eq_dep_impl_eq_snd _#5 Heq); auto; done).
+
+(* nativetp *)
+{
+intros C g C' g' _ Heq.
+injectionT Heq.
+intro Heq.
+injectionc Heq.
+intros Heq ->.
+injectionT Heq.
+intros ->.
+reflexivity.
+}
 Qed.
 
 
@@ -1557,6 +1598,20 @@ simpmap.
 apply reduce_seq_beta; auto.
 apply map_value; auto.
 }
+
+(* native_unary *)
+{
+intros g x y Heq.
+simpmap.
+apply reduce_native_unary; auto.
+}
+
+(* native_binary *)
+{
+intros g x m m' _ IH.
+simpmap.
+apply reduce_native_binary; auto.
+}
 Qed.
 
 
@@ -1577,7 +1632,7 @@ Lemma map_step :
 Proof.
 intros A B f m n Hmn.
 induct Hmn;
-try (intros; simpmap; eauto using step_app1, step_app2, step_prev1, step_prev2, step_bite1, step_bite2, step_bite3, step_ppi11, step_ppi12, step_ppi21, step_ppi22, step_seq1, step_seq2, map_value; done).
+try (intros; simpmap; eauto using step_app1, step_app2, step_prev1, step_prev2, step_bite1, step_bite2, step_bite3, step_ppi11, step_ppi12, step_ppi21, step_ppi22, step_seq1, step_seq2, step_native_unary1, step_native_unary2, step_native_binary1, step_native_binary2, map_value; done).
 Qed.
 
 
@@ -1650,6 +1705,13 @@ try (intros;
      intros; subst;
      eauto with same_operator;
      done).
+
+(* nativetp *)
+{
+intros C g th <-.
+cbn.
+apply same_nativetp.
+}
 Qed.
 
 
@@ -1800,6 +1862,7 @@ Proof.
 intros A B f m Heq.
 so (map_eq_oper_invert _#7 Heq) as (th & r & -> & Heqth & _).
 unfold btrue.
+unfold native_elem.
 f_equal.
 2:{
   so (row_nil_invert _ r); subst r.
@@ -1820,6 +1883,7 @@ Proof.
 intros A B f m Heq.
 so (map_eq_oper_invert _#7 Heq) as (th & r & -> & Heqth & _).
 unfold bfalse.
+unfold native_elem.
 f_equal.
 2:{
   so (row_nil_invert _ r); subst r.
@@ -1972,6 +2036,87 @@ injection Heq.
 intros <-.
 exists y; auto.
 Qed.
+
+
+Lemma map_eq_native_elem_invert :
+  forall A B (f : A -> B) m x,
+    map_term f m = native_elem x
+    -> m = native_elem x.
+Proof.
+intros A B f m x Heq.
+so (map_eq_oper_invert _#7 Heq) as (th & r & -> & Heqth & Heqr).
+so (row_invert_auto _ _ r) as H; cbn in H.
+subst r.
+clear Heq Heqr.
+revert Heqth.
+cases th; try (intros; discriminate Heqth).
+intros y Heq.
+cbn in Heq.
+injection Heq.
+intros ->.
+fold (@native_elem A x).
+reflexivity.
+Qed.
+
+
+Lemma map_eq_native_unary_invert :
+  forall A B (f : A -> B) m g n,
+    map_term f m = native_unary g n
+    -> exists n',
+         m = native_unary g n'
+         /\ map_term f n' = n.
+Proof.
+intros A B f m g n Heq.
+so (map_eq_oper_invert _#7 Heq) as (th & r & -> & Heqth & Heqr).
+so (row_invert_auto _ _ r) as H; cbn in H.
+destruct H as (n' & ->).
+exists n'.
+split.
+  {
+  unfold native_unary.
+  f_equal.
+  so (map_operator_same _#6 Heqth) as H.
+  invert H.
+  auto.
+  }
+
+  {
+  cbn in Heqr.
+  injection Heqr.
+  auto.
+  }
+Qed.
+
+
+Lemma map_eq_native_binary_invert :
+  forall A B (f : A -> B) m g n p,
+    map_term f m = native_binary g n p
+    -> exists n' p',
+         m = native_binary g n' p'
+         /\ map_term f n' = n
+         /\ map_term f p' = p.
+Proof.
+intros A B f m g n p Heq.
+so (map_eq_oper_invert _#7 Heq) as (th & r & -> & Heqth & Heqr).
+so (row_invert_auto _ _ r) as H; cbn in H.
+destruct H as (n' & p' & ->).
+exists n', p'.
+split.
+  {
+  unfold native_binary.
+  f_equal.
+  so (map_operator_same _#6 Heqth) as H.
+  invert H.
+  auto.
+  }
+
+  {
+  cbn in Heqr.
+  injection Heqr.
+  auto.
+  }
+Qed.
+
 
 
 Lemma map_step_form :
@@ -2186,6 +2331,64 @@ split.
   eapply anti_map_value; eauto.
   }
 }
+
+(* native_unary1 *)
+{
+intros g m m' _ IH mm Heqx.
+so (map_eq_native_unary_invert _#6 (eqsymm Heqx)) as (n & -> & Hn).
+so (IH _ (eqsymm Hn)) as (p & -> & Hp).
+exists (native_unary g p).
+simpmap.
+split; auto.
+apply step_native_unary1; auto.
+}
+
+(* native_unary2 *)
+{
+intros g x y Heq mm Heqx.
+so (map_eq_native_unary_invert _#6 (eqsymm Heqx)) as (n & -> & Hn).
+so (map_eq_native_elem_invert _#5 Hn).
+subst n.
+exists (native_elem y).
+simpmap.
+split; auto.
+apply step_native_unary2; auto.
+}
+
+(* native_binary1 *)
+{
+intros g m1 m1' m2 _ IH mm Heqx.
+so (map_eq_native_binary_invert _#7 (eqsymm Heqx)) as (n1 & n2 & -> & Hn1 & Hn2).
+so (IH _ (eqsymm Hn1)) as (p & -> & Hp).
+exists (native_binary g p n2).
+simpmap.
+split.
+  {
+  f_equal; auto.
+  }
+
+  {
+  apply step_native_binary1; auto.
+  }
+}
+
+(* native_binary2 *)
+{
+intros g x m2 mm Heqx.
+so (map_eq_native_binary_invert _#7 (eqsymm Heqx)) as (n1 & n2 & -> & Hn1 & Hn2).
+so (map_eq_native_elem_invert _#5 Hn1).
+subst n1.
+exists (native_unary (g x) n2).
+simpmap.
+split.
+  {
+  f_equal; auto.
+  }
+
+  {
+  apply step_native_binary2; auto.
+  }
+}
 Qed.
 
 
@@ -2365,6 +2568,31 @@ split.
   apply reduce_seq_beta; auto.
   eapply anti_map_value; eauto.
   }
+}
+
+(* native_unary *)
+{
+intros g x y Heq mm Heqx.
+so (map_eq_native_unary_invert _#6 (eqsymm Heqx)) as (n & -> & Hn).
+so (map_eq_native_elem_invert _#5 Hn).
+subst n.
+exists (native_elem y).
+simpmap.
+split; auto.
+apply reduce_native_unary; auto.
+}
+
+(* native_binary *)
+{
+intros g x m m' _ IH mm Heqx.
+so (map_eq_native_binary_invert _#7 (eqsymm Heqx)) as (n1 & n2 & -> & Hn1 & <-).
+so (map_eq_native_elem_invert _#5 Hn1).
+subst n1.
+so (IH _ (eq_refl _)) as (n2' & -> & Hn2).
+exists (native_unary (g x) n2').
+simpmap.
+split; auto.
+apply reduce_native_binary; auto.
 }
 
 (* nil *)

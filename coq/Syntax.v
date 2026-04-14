@@ -8,6 +8,7 @@ Require Import Sigma.
 Require Import Equality.
 Require Import Ordinal.
 Require Import Page.
+Require Import Native.
 
 Import List.ListNotations.
 
@@ -73,8 +74,6 @@ Inductive operator : list nat -> Type :=
 | oper_cunit       : operator nil
 
 | oper_booltp      : operator nil
-| oper_btrue       : operator nil
-| oper_bfalse      : operator nil
 | oper_bite        : operator [0; 0; 0]
 
 | oper_prod        : operator [0; 0]
@@ -111,6 +110,12 @@ Inductive operator : list nat -> Type :=
 
 (* Infinite set of constants for the absentia proof. *)
 | oper_marker      : nat -> operator nil
+
+| oper_nativetp    : forall (A : Type), (A -> native) -> operator nil
+
+| oper_native_elem   : native -> operator nil
+| oper_native_unary  : (native -> option native) -> operator [0]
+| oper_native_binary : (native -> native -> option native) -> operator [0; 0]
 .
 
 
@@ -550,8 +555,6 @@ Definition voidtp {obj}            : @term obj := oper _ (oper_voidtp _) rw_nil.
 Definition unittp {obj}            : @term obj := oper _ (oper_unittp _) rw_nil.
 Definition cunit {obj}             : @term obj := oper _ (oper_cunit _) rw_nil.
 Definition booltp {obj}            : @term obj := oper _ (oper_booltp _) rw_nil.
-Definition btrue {obj}             : @term obj := oper _ (oper_btrue _) rw_nil.
-Definition bfalse {obj}            : @term obj := oper _ (oper_bfalse _) rw_nil.
 Definition bite {obj} m1 m2 m3     : @term obj := oper _ (oper_bite _) (rw_cons _ _ m1 (rw_cons _ _ m2 (rw_cons _ _ m3 rw_nil))).
 Definition prod {obj} m1 m2        : @term obj := oper _ (oper_prod _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition sigma {obj} m1 m2       : @term obj := oper _ (oper_sigma _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
@@ -576,8 +579,15 @@ Definition seq {obj} m1 m2         : @term obj := oper _ (oper_seq _) (rw_cons _
 Definition ext {obj} x             : @term obj := oper _ (oper_ext _ x) rw_nil.
 Definition extt {obj} x            : @term obj := oper _ (oper_extt _ x) rw_nil.
 Definition marker {obj} i          : @term obj := oper _ (oper_marker _ i) rw_nil.
+Definition nativetp {obj} A f      : @term obj := oper _ (oper_nativetp _ A f) rw_nil.
+Definition native_elem {obj} x     : @term obj := oper _ (oper_native_elem _ x) rw_nil.
+Definition native_unary {obj} f m  : @term obj := oper _ (oper_native_unary _ f) (rw_cons _ _ m rw_nil).
+Definition native_binary {obj} f m1 m2 : @term obj := oper _ (oper_native_binary _ f) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 
-
+Definition btrue {obj}             : @term obj := native_elem (native_bool true).
+Definition bfalse {obj}            : @term obj := native_elem (native_bool false).
+Definition integertp {obj}         : @term obj := nativetp integer native_integer.
+Definition symboltp {obj}          : @term obj := nativetp symbol native_symbol.
 
 Definition deqtype {object} a b := @deq object triv triv (eqtype a b).
 Definition dsubtype {object} a b := @deq object triv triv (subtype a b).
@@ -710,12 +720,6 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 | same_booltp :
     same_operator nil nil (oper_booltp A) (oper_booltp B)
 
-| same_btrue :
-    same_operator nil nil (oper_btrue A) (oper_btrue B)
-
-| same_bfalse :
-    same_operator nil nil (oper_bfalse A) (oper_bfalse B)
-
 | same_bite :
     same_operator [0; 0; 0] [0; 0; 0] (oper_bite A) (oper_bite B)
 
@@ -787,6 +791,18 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 
 | same_marker {x y} :
     same_operator nil nil (oper_marker A x) (oper_marker B y)
+
+| same_nativetp {C f} :
+    same_operator nil nil (oper_nativetp A C f) (oper_nativetp B C f)
+
+| same_native_elem {x} :
+    same_operator nil nil (oper_native_elem A x) (oper_native_elem B x)
+
+| same_native_unary {f} :
+    same_operator [0] [0] (oper_native_unary A f) (oper_native_unary B f)
+
+| same_native_binary {f} :
+    same_operator [0; 0] [0; 0] (oper_native_binary A f) (oper_native_binary B f)
 .
 
 

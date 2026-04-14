@@ -1,4 +1,95 @@
 
+(* All the rules of Istari are validated here, except those that
+   pertain to definitions.  Definitions do not exist in the semantics,
+   so we cannot validate them.  Nevertheless, the definition rules are
+   simple and are easily seen to be correct.
+
+   All the rules from the rule generator are validated by the theorem
+   all_rules_valid.
+
+   It remains to validate the hardcoded rules from rule.iml.  For
+   each of these it is necessary to observe manually that the
+   validated rule matches the rule's ML code.
+
+   hypothesis
+     Validated by hypothesis_valid.
+
+   hypothesisOf
+     Validated by hypothesisOf_valid.
+
+   hypothesisEq
+     Validated by hypothesisEq_valid.
+
+   hypothesisOfTp
+     Validated by hypothesisOfTp_valid.
+
+   hypothesisEqTp
+     Validated by hypothesisEqTp_valid.
+
+   identity
+     Validated by identity_valid.
+
+   weaken
+     Validated by weaken_valid.
+
+   exchange
+     Validated by exchange_valid.
+
+   reduce, unreduce, reduceHyp, unreduceHyp, reduceAt, unreduceAt, reduceHypAt, unreduceHypAt
+     Validated by the rule tr_compute or tr_compute_hyp, except as
+     equivalence pertains to definitions.  Relies on the correctness
+     of the reduction code.
+
+   whnfHypAt, whnfConclAt, whnfHyp, whnfConcl, whnfHardHyp, whnfHardConcl, normalizeHyp, normalizeConcl
+     Validated by the rule tr_compute or tr_compute_hyp, except as
+     equivalence pertains to definitions.  Relies on the correctness
+     of the normalization code (but nearly everything does).
+
+   checkPositive, checkNegative
+     Validated by the rule tr_positive_algorithm or
+     tr_negative_algorithm.  Relies on the correctness of the
+     positivity checker.
+
+   letIntro, letSubst, letFold, letUnfold, letFoldHyp, letUnfoldHyp
+     All these pertain to definitions.
+
+   sumLeft
+     Validated by sumLeft_valid.
+
+   insert
+     Validated by insert_valid.
+
+   forallLeft
+     Validated by forallLeft_valid.
+
+   arrowLeft
+     Validated by arrowLeft_valid.
+
+   haltsValue
+     Validated by haltsValue_valid.
+
+   sequalCompatPath
+     Validated by the rule tr_sequal_compat.  Relies on the
+     correctness of the code that rebuilds the term.
+
+   integerIntroOf
+     Validated by the integerIntroOf_valid.
+
+   integerIntroEq
+     Validated by the integerIntroEq_valid.
+
+   symbolIntroOf
+     Validated by the symbolIntroOf_valid.
+
+   symbolIntroEq
+     Validated by the symbolIntroEq_valid.
+
+   trustme
+     Not validated, obviously.  This rule is only usable when unsafe
+     actions are allowed.
+*)
+
+
 Require Import Coq.Lists.List.
 
 Require Import Relation.
@@ -36,6 +127,7 @@ Require Import ValidationLevel.
 Require Import ValidationMisc.
 Require Import ValidationMu.
 Require Import ValidationNat.
+Require Import ValidationNative.
 Require Import ValidationOf.
 Require Import ValidationParam.
 Require Import ValidationPartial.
@@ -998,6 +1090,46 @@ exact compatProdEntails0_valid.
 exact compatProdEntails1_valid.
 exact compatDprodEntails0_valid.
 exact compatDprodEntails1_valid.
+exact integerForm_valid.
+exact integerEq_valid.
+exact integerFormUniv_valid.
+exact integerEqUniv_valid.
+exact pluszType_valid.
+exact pluszCommute_valid.
+exact pluszAssoc_valid.
+exact pluszIdentity_valid.
+exact negzType_valid.
+exact pluszInverse_valid.
+exact timeszType_valid.
+exact timeszCommute_valid.
+exact timeszAssoc_valid.
+exact timeszIdentity_valid.
+exact timeszDistPlusz_valid.
+exact eqzbType_valid.
+exact eqzbSpec1_valid.
+exact eqzbSpec2_valid.
+exact leqzbType_valid.
+exact leqzbSpec1_valid.
+exact leqzbSpec2_valid.
+exact integerCharacteristic_valid.
+exact integerElements_valid.
+exact integerHalts_valid.
+exact integerStrict_valid.
+exact integerUptype_valid.
+exact integerAdmiss_valid.
+exact integerSequal_valid.
+exact symbolForm_valid.
+exact symbolEq_valid.
+exact symbolFormUniv_valid.
+exact symbolEqUniv_valid.
+exact symbol_eqbType_valid.
+exact symbol_eqbSpec1_valid.
+exact symbol_eqbSpec2_valid.
+exact symbolHalts_valid.
+exact symbolStrict_valid.
+exact symbolUptype_valid.
+exact symbolAdmiss_valid.
+exact symbolSequal_valid.
 Qed.
   
 
@@ -1581,55 +1713,41 @@ apply tr_halts_value; auto.
 Qed.
 
 
-(* The remaining rules without validations given above are:
+Lemma integerIntroOf_valid :
+  forall G (x : Native.integer),
+    tr G (Defs.dof triv (app (app Defs.of Defs.integer) (native_elem (Native.native_integer x)))).
+Proof.
+prepare.
+intros G x.
+apply tr_nativetp_intro.
+Qed.
 
-   1. the rules pertaining to definitions
 
-      Definitions (constants and let-bound variables) do not exist in
-      the type theory, but the rules are simple and it is easy to see
-      they are correct.
+Lemma integerIntroEq_valid :
+  forall G (x : Native.integer),
+    tr G (Defs.dof triv (app (app (app Defs.eq Defs.integer) (native_elem (Native.native_integer x))) (native_elem (Native.native_integer x)))).
+Proof.
+prepare.
+intros G x.
+apply tr_nativetp_intro.
+Qed.
 
-   2. the rules pertaining to reduction
 
-      These follow immediately from tr_compute and tr_compute_hyp,
-      (except as they pertain to definitions).
+Lemma symbolIntroOf_valid :
+  forall G (x : Native.symbol),
+    tr G (Defs.dof triv (app (app Defs.of Defs.symbol) (native_elem (Native.native_symbol x)))).
+Proof.
+prepare.
+intros G x.
+apply tr_nativetp_intro.
+Qed.
 
-   3. checkPositive and checkNegative
 
-      The correctness of checkPositive and checkNegative follow
-      immediately from tr_positive_algorithm and
-      tr_negative_algorithm, assuming the checker is implemented
-      correctly with respect to the formal algorithm.
-
-   4. sequalCompatPath
-
-      The rule follows immediately from tr_sequal_compat, assuming the
-      code to rebuild the term is correct.
-
-   5. the rules pertaining to native data types (integers and symbols)
-
-      The native data type rules cannot be proven correct because the
-      native data types do not exist in the type theory.  These rules
-      fall into several categories:
-
-      (a) the formation of the type 
-      (b) the membership of literals in the type 
-      (c) the flatness of the type
-
-      The correctness of each of these rules is apparent by
-      inspection.
-
-      A flat type is one in which the elements are precisely a set of
-      values without any internal structure (in addition to
-      expressions that are beta-equivalent to such a value).  There
-      are several consequences of flatness:
-
-      (i) totality (by sound_total_flat) 
-      (ii) strictness (follows from totality by tr_total_strict) 
-      (iii) upward closure (by sound_flat_upward)
-      (iv) admissibility (follows from upward closure by tr_uptype_admiss) 
-      (v) equality implies syntactic equality (by sound_flat_sequal)
-
-      For integers, several axioms establish the properties of integer
-      arithmetic.
-*)
+Lemma symbolIntroEq_valid :
+  forall G (x : Native.symbol),
+    tr G (Defs.dof triv (app (app (app Defs.eq Defs.symbol) (native_elem (Native.native_symbol x))) (native_elem (Native.native_symbol x)))).
+Proof.
+prepare.
+intros G x.
+apply tr_nativetp_intro.
+Qed.

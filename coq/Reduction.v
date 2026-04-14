@@ -309,6 +309,29 @@ eauto using mcr.
 Qed.
 
 
+Lemma mc_native_unary :
+  forall (P : relation term) f m m',
+    P m m'
+    -> mc P (native_unary f m) (native_unary f m').
+Proof.
+intros.
+apply mc_oper.
+eauto using mcr.
+Qed.
+
+
+Lemma mc_native_binary :
+  forall (P : relation term) f m m' n n',
+    P m m'
+    -> P n n'
+    -> mc P (native_binary f m n) (native_binary f m' n').
+Proof.
+intros.
+apply mc_oper.
+eauto using mcr.
+Qed.
+
+
 Lemma star_mcr :
   forall R a (r s : @row object a),
     star (mcr R) r s
@@ -388,6 +411,13 @@ Inductive reduce : @term object -> @term object -> Prop :=
     -> reduce n n'
     -> reduce (seq m n) (subst1 m' n')
 
+| reduce_native_unary {f x y} :
+    f x = Some y
+    -> reduce (native_unary f (native_elem x)) (native_elem y)
+
+| reduce_native_binary {f x m m'} :
+    reduce m m'
+    -> reduce (native_binary f (native_elem x) m) (native_unary (f x) m')
 
 with reducer : forall {a}, row a -> row a -> Prop :=
 | reducer_nil :
@@ -608,6 +638,34 @@ apply reduce_id.
 intros.
 eapply reduce_seq_beta; eauto using reduce_id.
 }
+
+(* native_unary1 *)
+{
+intros.
+apply reduce_compat.
+apply mc_native_unary; auto.
+}
+
+(* native_unary2 *)
+{
+intros.
+apply reduce_native_unary; auto.
+}
+
+(* native_binary1 *)
+{
+intros.
+apply reduce_compat.
+apply mc_native_binary; auto.
+apply reduce_id.
+}
+
+(* native_binary2 *)
+{
+intros.
+apply reduce_native_binary.
+apply reduce_id.
+}
 Qed.
 
 
@@ -742,6 +800,20 @@ relquest.
   }
 simpsub.
 reflexivity.
+}
+
+(* native_unary *)
+{
+intros.
+simpsub.
+apply reduce_native_unary; auto.
+}
+
+(* native_binary *)
+{
+intros.
+simpsub.
+apply reduce_native_binary; auto.
 }
 
 (* nil *)
@@ -968,6 +1040,20 @@ intro H; invert H.
 (* seq *)
 {
 intros m m' p p' _ _ _ _ _ Hval.
+invert Hval.
+intro H; invert H.
+}
+
+(* native_unary *)
+{
+intros f x y _ Hval.
+invert Hval.
+intro H; invert H.
+}
+
+(* native_binary *)
+{
+intros f x m m' _ _ Hval.
 invert Hval.
 intro H; invert H.
 }
@@ -1311,6 +1397,80 @@ invertc Hmp.
     apply reduce_funct1; auto.
     }
   }
+
+  (* oper / native_unary *)
+  {
+  intros f x y Heq <- Heqth Heqr <-.
+  injectionT Heqth.
+  intros <-.
+  injectionT Heqr.
+  intros <-.
+  invertc Hrs.
+  intros n r1 Hmn Hr1 <-.
+  invertc Hr1.
+  intros <-.
+  fold (native_unary f n).
+  invertc Hmn.
+  intros r Hr <-.
+  invertc Hr.
+  intros <-.
+  fold (@native_elem object x).
+  exists (native_elem y).
+  split.
+    {
+    apply reduce_native_unary; auto.
+    }
+    
+    {
+    apply reduce_id.
+    }
+  }
+
+  (* oper / native_binary *)
+  {
+  intros f x m2 m2' Hm2 <- Heqth Heqr <-.
+  injectionT Heqth.
+  intros <-.
+  injectionT Heqr.
+  intros <-.
+  invertc Hrs.
+  intros n1 r1 Hmn1 Hr1 <-.
+  invertc Hr1.
+  intros n2 r2 Hmn2 Hr2 <-.
+  invert Hr2.
+  intros <-.
+  fold (native_binary f n1 n2).
+  invertc Hmn1.
+  intros r Hr <-.
+  invertc Hr.
+  intros <-.
+  so (IH _ (reducer_cons reduce_id (reducer_cons Hm2 (reducer_id _ _)))) as (u & Hru & Htu).
+  invertc Hru.
+  intros q s1 Hq Hs1 <-.
+  invertc Hq.
+  intros r Hr <-.
+  invertc Hr.
+  intros <-.
+  invertc Hs1.
+  intros n2' s2 Hn2 Hs2 <-.
+  invertc Hs2.
+  intros <-.
+  invertc Htu.
+  intros _ Hs.
+  invertc Hs.
+  intros Hmn2' _.
+  fold (@native_elem object x).
+  exists (native_unary (f x) n2').
+  split.
+    {
+    apply reduce_native_binary; auto.
+    }
+
+    {
+    apply reduce_compat.
+    apply mc_native_unary; auto.
+    }
+  }
 }
 
 (* app_beta *)
@@ -1571,6 +1731,95 @@ invertc Hmp.
   }
 }
 
+(* native_unary *)
+{
+intros f x y Heq p Hmp.
+invert Hmp.
+  (* native_unary / oper *)
+  {
+  intros r Hr <-.
+  invertc Hr.
+  intros m1 r1 Hm1 Hr1 <-.
+  invertc Hr1.
+  intros <-.
+  invert Hm1.
+  intros r Hr <-.
+  invertc Hr.
+  intros <-.
+  fold (@native_elem object x).
+  fold (@native_unary object f (@native_elem object x)).
+  exists (native_elem y).
+  split.
+    {
+    apply reduce_id.
+    }
+
+    {
+    apply reduce_native_unary; auto.
+    }
+  }
+
+  (* native_unary / native_unary *)
+  {
+  intros y' Heq' <-.
+  so (eqtrans (eqsymm Heq) Heq') as H.
+  injection H.
+  intros <-.
+  exists (native_elem y).
+  split; apply reduce_id.
+  }
+}
+
+(* native_binary *)
+{
+intros f x m m1 Hm1 IH p Hmp.
+invert Hmp.
+  (* native_binary / oper *)
+  {
+  intros r Hr <-.
+  invertc Hr.
+  intros p r1 Hp Hr1 <-.
+  invertc Hp.
+  intros s Hs <-.
+  invertc Hs.
+  intros <-.
+  invertc Hr1.
+  intros m2 r2 Hm2 Hr2 <-.
+  invertc Hr2.
+  intros <-.
+  fold (@native_elem object x).
+  fold (native_binary f (native_elem x) m2).
+  so (IH _ Hm2) as (m' & Hm1' & Hm2').
+  exists (native_unary (f x) m').
+  split.
+    {
+    apply reduce_compat; auto.
+    apply mc_native_unary; auto.
+    }
+
+    {
+    apply reduce_native_binary; auto.
+    }
+  }
+
+  (* native_binary / native_binary *)
+  {
+  intros m2 Hm2 <-.
+  so (IH _ Hm2) as (m' & Hm1' & Hm2').
+  exists (native_unary (f x) m').
+  split.
+    {
+    apply reduce_compat.
+    apply mc_native_unary; auto.
+    }
+
+    {
+    apply reduce_compat.
+    apply mc_native_unary; auto.
+    }
+  }
+}
+
 (* nil *)
 {
 intros t H.
@@ -1739,6 +1988,22 @@ invert Hcanon.
 (* seq_beta *)
 {
 intros _ _ _ _ _ _ _ <- Heq _ _.
+injectionT Heq.
+intros <-.
+invert Hcanon.
+}
+
+(* native_unary *)
+{
+intros f _ _ _ <- Heq _ _.
+injectionT Heq.
+intros <-.
+invert Hcanon.
+}
+
+(* native_binary *)
+{
+intros f _ _ _ _ <- Heq _ _.
 injectionT Heq.
 intros <-.
 invert Hcanon.
@@ -1974,4 +2239,3 @@ Ltac invertc_mc H :=
   let H' := fresh
   in
     invertc H; []; intros ? H'; invertc_mcr H'.
-

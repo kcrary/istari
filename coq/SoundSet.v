@@ -2181,8 +2181,8 @@ split.
   apply interp_set; auto.
   apply functional_i; auto.
     {
+    replace (squash (subst (dot (var 0) (compose s sh1)) b)) with (subst (under 1 s) (squash b)) by (simpsub; auto).
     eapply subst_closub_under_permit; eauto.
-    unfold squash.
     prove_hygiene.
     }
   intros j m p Hj Hmp.
@@ -2243,8 +2243,8 @@ split.
   apply interp_set; auto.
   apply functional_i; auto.
     {
+    replace (squash (subst (dot (var 0) (compose s' sh1)) b)) with (subst (under 1 s') (squash b)) by (simpsub; auto).
     eapply subst_closub_under_permit; eauto.
-    unfold squash.
     prove_hygiene.
     }
   intros j m p Hj Hmp.

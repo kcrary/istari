@@ -34,6 +34,7 @@ UNITS = \
 	Model \
 	Morphism \
 	MuIndExtract \
+	Native \
 	NatLemmas \
 	Obligations \
 	Ofe \
@@ -64,6 +65,7 @@ UNITS = \
 	SemanticsKnot \
 	SemanticsKind \
 	SemanticsMu \
+	SemanticsNative \
 	SemanticsPartial \
 	SemanticsPi \
 	SemanticsPositive \
@@ -91,6 +93,7 @@ UNITS = \
 	SoundKind \
 	SoundMisc \
 	SoundMu \
+	SoundNative \
 	SoundPartial \
 	SoundPartialUtil \
 	SoundRec \
@@ -122,6 +125,7 @@ UNITS = \
 	Tactics \
 	Truncate \
 	Uniform \
+	Unshut \
 	Urelsp \
 	Validation \
 	ValidationAcc \
@@ -138,6 +142,7 @@ UNITS = \
 	ValidationMisc \
 	ValidationMu \
 	ValidationNat \
+	ValidationNative \
 	ValidationOf \
 	ValidationParam \
 	ValidationPartial \

@@ -57,6 +57,7 @@ Definition dprod : fterm := lam (lam (sigma (var 1) (var 1))).
 Definition eeqtp : fterm := lam (lam (prod (subtype (var 1) (var 0)) (subtype (var 0) (var 1)))).
 Definition eq : fterm := lam (lam (lam (equal (var 2) (var 1) (var 0)))).
 Definition eqtp : fterm := lam (lam (eqtype (var 1) (var 0))).
+Definition eqzb : fterm := lam (lam (native_binary Native.eqzb_native (var 1) (var 0))).
 Definition false : fterm := bfalse.
 Definition forallfut : fterm := lam (lam (pi (semifut (var 1)) (app (var 1) (var 0)))).
 Definition foralltp : fterm := lam (alltp (app (var 1) (var 0))).
@@ -64,6 +65,9 @@ Definition future : fterm := lam (fut (var 0)).
 Definition iexists : fterm := lam (lam (lam (exist (var 2) (var 1) (app (var 1) (var 0))))).
 Definition iff : fterm := lam (lam (prod (pi (var 1) (var 1)) (pi (var 0) (var 2)))).
 Definition iforall : fterm := lam (lam (lam (all (var 2) (var 1) (app (var 1) (var 0))))).
+Definition integer : fterm := nativetp Native.integer Native.native_integer.
+Definition integer_one : fterm := native_elem (Native.native_integer Native.onez).
+Definition integer_zero : fterm := native_elem (Native.native_integer Native.zeroz).
 Definition intersectfut : fterm := lam (lam (intersect (semifut (var 1)) (app (var 1) (var 0)))).
 Definition iset : fterm := lam (lam (iset (var 1) (app (var 1) (var 0)))).
 Definition isquash : fterm := lam (Syntax.iset unittp (var 1)).
@@ -72,6 +76,7 @@ Definition ite : fterm := lam (lam (lam (bite (var 2) (var 1) (var 0)))).
 Definition halts : fterm := lam (halts (var 0)).
 Definition karrow : fterm := lam (lam (karrow (var 1) (var 0))).
 Definition kind : fterm := lam (kind (var 0)).
+Definition leqzb : fterm := lam (lam (native_binary Native.leqzb_native (var 1) (var 0))).
 Definition letnext : fterm := lam (lam (app (var 0) (prev (var 1)))).
 Definition lett : fterm := lam (lam (app (var 0) (var 1))).
 Definition leth : fterm := lam (lam (app (var 0) (var 1))).
@@ -93,6 +98,7 @@ Definition monotone : fterm := lam (alltp (alltp (pi (subtype (var 1) (var 0)) (
 Definition mu : fterm := lam (mu (app (var 1) (var 0))).
 Definition nat : fterm := nattp.
 Definition negative : fterm := lam (isnegative (app (var 1) (var 0))).
+Definition negz : fterm := lam (native_unary Native.negz_native (var 0)).
 Definition nonsense : fterm := guard voidtp voidtp.
 Definition of : fterm := lam (lam (equal (var 1) (var 0) (var 0))).
 Definition orphan : fterm := triv.
@@ -100,6 +106,7 @@ Definition padmiss : fterm := lam (lam (padmiss (var 1) (app (var 1) (var 0)))).
 Definition parametric : fterm := lam (lam (intersect booltp (bite (var 0) (pi (var 2) (app (var 2) (var 0))) constfn))).
 Definition parametricfut : fterm := lam (lam (intersect booltp (bite (var 0) (pi (semifut (var 2)) (app (var 2) (var 0))) constfn))).
 Definition partial : fterm := lam (partial (var 0)).
+Definition plusz : fterm := lam (lam (native_binary Native.plusz_native (var 1) (var 0))).
 Definition prod : fterm := lam (lam (prod (var 1) (var 0))).
 Definition quotient : fterm := lam (lam (quotient (var 1) (app (app (var 2) (var 1)) (var 0)))).
 Definition rec : fterm := lam (rec (app (var 1) (var 0))).
@@ -109,7 +116,10 @@ Definition sequal : fterm := lam (lam (sequal (var 1) (var 0))).
 Definition squash : fterm := lam (set unittp (var 1)).
 Definition succ : fterm := lam (app inr (var 0)).
 Definition sum : fterm := lam (lam (sigma booltp (bite (var 0) (var 2) (var 1)))).
+Definition symbol : fterm := nativetp Native.symbol Native.native_symbol.
+Definition symbol_eqb : fterm := lam (lam (native_binary Native.symbol_eqb_native (var 1) (var 0))).
 Definition tarrow : fterm := lam (lam (tarrow (var 1) (var 0))).
+Definition timesz : fterm := lam (lam (native_binary Native.timesz_native (var 1) (var 0))).
 Definition true : fterm := btrue.
 Definition union : fterm := lam (lam (union (var 1) (app (var 1) (var 0)))).
 Definition unavailable : fterm := triv.
@@ -146,6 +156,10 @@ Definition max : fterm :=
                                     (lam
                                        (app succ
                                           (app (app (var 4) (var 1)) (var 0)))))))))).
+
+Definition nat_to_integer : fterm := app theta (lam (lam (app (app (app nat_case (var 0)) (native_elem (Native.native_integer Native.zeroz))) (lam (app (app plusz (native_elem (Native.native_integer Native.onez))) (app (var 2) (var 0))))))).
+
+Definition leqz : fterm := lam (lam (app isquash (sigma nattp (equal (nativetp Native.integer Native.native_integer) (native_binary Native.plusz_native (var 2) (app nat_to_integer (var 0))) (var 1))))).
 
 
 Definition irrelevant : fterm :=

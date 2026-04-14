@@ -6403,69 +6403,45 @@ Syntactic equality is intended for internal use only.
 
       G |- plusz : integer -> integer -> integer
 
-- `pluszCommute M N`
+- `pluszCommute`
 
-      G |- plusz M N = plusz N M : integer
-      >>
-      G |- M : integer
-      G |- N : integer
+      G |- forall (x : integer) . forall (y : integer) . plusz x y = plusz y x : integer ext fn x . fn y . ()
 
-- `pluszAssoc M N P`
+- `pluszAssoc`
 
-      G |- plusz (plusz M N) P = plusz M (plusz N P) : integer
-      >>
-      G |- M : integer
-      G |- N : integer
-      G |- P : integer
+      G |- forall (x : integer) . forall (y : integer) . forall (z : integer) . plusz (plusz x y) z = plusz x (plusz y z) : integer ext fn x . fn y . fn z . ()
 
-- `pluszIdentity M`
+- `pluszIdentity`
 
-      G |- plusz integer_zero M = M : integer
-      >>
-      G |- M : integer
+      G |- forall (x : integer) . plusz integer_zero x = x : integer ext fn x . ()
 
 - `negzType`
 
       G |- negz : integer -> integer
 
-- `pluszInverse M`
+- `pluszInverse`
 
-      G |- plusz M (negz M) = integer_zero : integer
-      >>
-      G |- M : integer
+      G |- forall (x : integer) . plusz x (negz x) = integer_zero : integer ext fn x . ()
 
 - `timeszType`
 
       G |- timesz : integer -> integer -> integer
 
-- `timeszCommute M N`
+- `timeszCommute`
 
-      G |- timesz M N = timesz N M : integer
-      >>
-      G |- M : integer
-      G |- N : integer
+      G |- forall (x : integer) . forall (y : integer) . timesz x y = timesz y x : integer ext fn x . fn y . ()
 
-- `timeszAssoc M N P`
+- `timeszAssoc`
 
-      G |- timesz (timesz M N) P = timesz M (timesz N P) : integer
-      >>
-      G |- M : integer
-      G |- N : integer
-      G |- P : integer
+      G |- forall (x : integer) . forall (y : integer) . forall (z : integer) . timesz (timesz x y) z = timesz x (timesz y z) : integer ext fn x . fn y . fn z . ()
 
-- `timeszIdentity M`
+- `timeszIdentity`
 
-      G |- timesz integer_one M = M : integer
-      >>
-      G |- M : integer
+      G |- forall (x : integer) . timesz integer_one x = x : integer ext fn x . ()
 
-- `timeszDistPlusz M N P`
+- `timeszDistPlusz`
 
-      G |- timesz M (plusz N P) = plusz (timesz M N) (timesz M P) : integer
-      >>
-      G |- M : integer
-      G |- N : integer
-      G |- P : integer
+      G |- forall (x : integer) . forall (y : integer) . forall (z : integer) . timesz x (plusz y z) = plusz (timesz x y) (timesz x z) : integer ext fn x . fn y . fn z . ()
 
 - `eqzbType`
 
@@ -6481,6 +6457,8 @@ Syntactic equality is intended for internal use only.
 
       G |- M = N : integer
       >>
+      G |- M : integer
+      G |- N : integer
       G |- eqzb M N = true : bool
 
 - `leqzbType`
@@ -6491,25 +6469,25 @@ Syntactic equality is intended for internal use only.
 
       G |- leqzb M N = true : bool
       >>
+      G |- M : integer
+      G |- N : integer
       G |- leqz M N
 
 - `leqzbSpec2 M N`
 
       G |- leqz M N
       >>
+      G |- M : integer
+      G |- N : integer
       G |- leqzb M N = true : bool
 
-- `integerCharacteristic N`
+- `integerCharacteristic`
 
-      G |- void
-      >>
-      G |- nat_to_integer (succ N) = integer_zero : integer
+      G |- forall (x : nat) . nat_to_integer (succ x) = integer_zero : integer -> void ext fn x . fn y . ()
 
-- `integerElements M`
+- `integerElements`
 
-      G |- {exists (n : nat) . M = negz (nat_to_integer (succ n)) : integer % M = nat_to_integer n : integer}
-      >>
-      G |- M : integer
+      G |- forall (x : integer) . isquash (exists (n : nat) . x = negz (nat_to_integer (succ n)) : integer % x = nat_to_integer n : integer) ext fn x . ()
 
 - `integerHalts M`
 
@@ -6537,7 +6515,6 @@ Syntactic equality is intended for internal use only.
 
 
 ### Symbols
-
 
 - `symbolForm`
 
@@ -6583,6 +6560,8 @@ Syntactic equality is intended for internal use only.
 
       G |- M = N : symbol
       >>
+      G |- M : symbol
+      G |- N : symbol
       G |- symbol_eqb M N = true : bool
 
 - `symbolHalts M`
@@ -6593,7 +6572,7 @@ Syntactic equality is intended for internal use only.
 
 - `symbolStrict`
 
-      G |- symbol <: partial symbol
+      G |- strict symbol
 
 - `symbolUptype`
 

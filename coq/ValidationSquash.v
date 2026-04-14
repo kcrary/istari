@@ -1050,6 +1050,7 @@ apply (tr_iset_intro _#5 (var 0)).
   }
 
   {
+  simpsub.
   cbn [Nat.add].
   apply (tr_inhabitation_formation _ (var 1) (var 1)).
   eapply hypothesis; eauto using index_S, index_0.
@@ -1185,6 +1186,7 @@ simpsub.
 cbn [Nat.add].
 apply (tr_iset_elim2 _ unittp (subst (sh 2) a) (var 0)).
   {
+  unfold isquash.
   eapply hypothesis; auto using index_0.
   simpsub.
   auto.
@@ -1195,6 +1197,7 @@ eapply (tr_iset_intro _#5 (app (subst (sh 2) m) (var 0))).
   {
   apply (tr_iset_elim1 _ _ (subst (sh 3) a)).
   eapply hypothesis; eauto using index_0, index_S.
+  unfold isquash.
   simpsub.
   reflexivity.
   }

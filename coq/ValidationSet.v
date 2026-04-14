@@ -26,16 +26,6 @@ Require Import Defined.
 Hint Rewrite def_iff def_set def_iset def_squash : prepare.
 
 
-Lemma subst_squash :
-  forall object (s : @sub object) a, subst s (squash a) = squash (subst s a).
-Proof.
-intros object s a.
-unfold squash.
-simpsub.
-reflexivity.
-Qed.
-
-
 Lemma setForm_valid : setForm_obligation.
 Proof.
 prepare.

@@ -633,6 +633,19 @@ do2 4 split.
 Qed.
    
 
+Lemma sound_exchange_pre :
+  forall G1 G2 h1 h2 m m' a,
+    hygiene (ctxpred (G2 ++ substh sh1 h2 :: h1 :: G1)) a
+    -> seq (substctx (dot (var 1) (dot (var 0) (sh 2))) G2 ++ substh sh1 h1 :: h2 :: G1) (deq m m' (subst (under (length G2) (dot (var 1) (dot (var 0) (sh 2)))) a))
+    -> seq (G2 ++ substh sh1 h2 :: h1 :: G1) (deq (subst (under (length G2) (dot (var 1) (dot (var 0) (sh 2)))) m) (subst (under (length G2) (dot (var 1) (dot (var 0) (sh 2)))) m') a).
+Proof.
+intros G1 G2 h1 h2 m m' a Hcla Hseq.
+eapply subsume_seq_extract; eauto.
+apply subsume_under.
+apply sound_exchange_main; auto.
+Qed.
+
+
 Lemma sound_exchange :
   forall G1 G2 h1 h2 m m' a,
     pseq (substctx (dot (var 1) (dot (var 0) (sh 2))) G2 ++ substh sh1 h1 :: h2 :: G1) (deq m m' (subst (under (length G2) (dot (var 1) (dot (var 0) (sh 2)))) a))
@@ -643,9 +656,7 @@ revert G1.
 refine (seq_pseq_hyp 1 (G2 ++ [substh sh1 h2; h1]) a 1 _ [_; _] _ _ [_; _] _ _); cbn.
 intros G1 Hcla Hseq _.
 autorewrite with canonlist in Hcla.
-eapply subsume_seq_extract; eauto.
-apply subsume_under.
-apply sound_exchange_main; auto.
+apply sound_exchange_pre; auto.
 Qed.
 
 

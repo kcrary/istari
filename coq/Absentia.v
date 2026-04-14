@@ -358,7 +358,7 @@ invertc Hreduce.
   injectionc Heq.
   intros -> -> Heq.
   symmetry in Heq.
-  so (subst1_marker_under_form _#6 (canon_btrue _) Heq) as (r & -> & _).
+  so (subst1_marker_under_form _#6 (canon_native_elem _) Heq) as (r & -> & _).
   so (row_0_invert _ r).
   subst r.
   clear Heq.
@@ -403,7 +403,7 @@ invertc Hreduce.
   injectionc Heq.
   intros -> -> Heq.
   symmetry in Heq.
-  so (subst1_marker_under_form _#6 (canon_bfalse _) Heq) as (r & -> & _).
+  so (subst1_marker_under_form _#6 (canon_native_elem _) Heq) as (r & -> & _).
   so (row_0_invert _ r).
   subst r.
   clear Heq.
@@ -595,6 +595,84 @@ invertc Hreduce.
     }
   simpsub.
   reflexivity.
+  }
+
+  (* native_unary *)
+  {
+  intros f y z Heqz <- Heq1 Heq2 <-.
+  so (row_1_invert _ _ r) as (n & ->).
+  injectionT Heq1.
+  intros <-.
+  injectionT Heq2.
+  intro Heq.
+  simpsubin Heq.
+  injectionc Heq.
+  intro Heq.
+  symmetry in Heq.
+  fold (native_unary f n).
+  so (subst1_marker_under_form _#6 (canon_native_elem _) Heq) as (r & -> & _).
+  so (row_0_invert _ r).
+  subst r.
+  clear Heq.
+  fold (@native_elem object y).
+  exists (native_elem z).
+  split.
+    {
+    apply reduce_native_unary; auto.
+    }
+
+    {
+    simpsub.
+    reflexivity.
+    }
+  }
+
+  (* native_binary *)
+  {
+  intros f y n n' Hred <- Heq1 Heq2.
+  so (row_2_invert _ _ _ r) as (u & v & ->).
+  injectionT Heq1.
+  intros <- <-.
+  injectionT Heq2.
+  intros Heq.
+  simpsubin Heq.
+  injectionc Heq.
+  intros -> Heq.
+  symmetry in Heq.
+  so (subst1_marker_under_form _#6 (canon_native_elem _) Heq) as (r & -> & _).
+  clear Heq.
+  so (row_0_invert _ r).
+  subst r.
+  fold (@native_elem object y).
+  fold (native_binary f (native_elem y) v).
+  exploit (IH i (rw_cons (native_elem y) (rw_cons n' rw_nil))) as H.
+    {
+    simpsub.
+    apply reducer_cons.
+      {
+      fold (@native_elem object y).
+      apply reduce_id.
+      }
+    apply reducer_cons; auto.
+    apply reducer_nil.
+    }
+  fold (@native_elem object y) in H.
+  destruct H as (r & Hreducer & Heq).
+  so (row_2_invert _#3 r) as (p1 & p2 & ->).
+  invertc Hreducer.
+  intros Hred1 Hreducer.
+  invertc Hreducer.
+  intros Hred' _.
+  simpsubin Heq.
+  invertc Heq.
+  intros Heq1 ->.
+  so (subst1_marker_under_form _#6 (canon_native_elem _) (eqsymm Heq1)) as (r & -> & Heq).
+  so (row_0_invert _ r).
+  subst r.
+  exists (native_unary (f y) p2).
+  simpsub.
+  split; auto.
+  apply reduce_native_binary; auto.
   }
 }
 
@@ -992,6 +1070,23 @@ intros m m' n n' Hval _ IH1 _ IH2 Hin.
 cbn.
 right.
 so (markerin_subst_under k 0 _ _ Hin) as [Hin' | Hin']; auto.
+}
+
+(* native_unary *)
+{
+intros f x y Heq Hin.
+cbn in Hin.
+destruct Hin as [H | H]; destruct H.
+}
+
+(* native_binary *)
+{
+intros f x m m' _ IH Hin.
+cbn in Hin.
+destruct Hin as [H | [Hin | H]]; try (destruct H; done).
+cbn.
+right; right; left.
+auto.
 }
 
 (* cons *)

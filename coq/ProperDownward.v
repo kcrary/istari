@@ -36,6 +36,7 @@ Require Import SemanticsGuard.
 Require Import SemanticsKind.
 Require Import SemanticsUniv.
 Require Import SemanticsFut.
+Require Import SemanticsNative.
 Require Import SemanticsQuotient.
 Require Import SemanticsSet.
 Require Import SemanticsWtype.
@@ -1009,6 +1010,15 @@ intros pg s i a A _ IH j Hj.
 rewrite -> iutruncate_iuuptype.
 rewrite -> Nat.min_r; auto.
 apply interp_uptype; auto.
+}
+
+(* native *)
+{
+intros pg s i A f j Hj.
+rewrite -> iutruncate_iubase.
+rewrite -> ceiling_native.
+rewrite -> Nat.min_r; auto.
+apply interp_native.
 }
 
 (* kbasic *)

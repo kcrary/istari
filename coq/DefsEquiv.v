@@ -533,6 +533,53 @@ reflexivity.
 Qed.
 
 
+Lemma def_irrelevant :
+  forall m,
+    equiv 
+      (app Defs.irrelevant (lam m))
+      (intersect nonsense (sequal m (subst (dot triv sh1) m))).
+Proof.
+intro m.
+unfold Defs.irrelevant.
+eapply equiv_trans.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  cbn [Nat.add].
+  apply star_refl.
+  }
+apply equiv_intersect.
+  {
+  apply equiv_refl.
+  }
+apply equiv_sequal.
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  rewrite -> subst_var0_sh1.
+  apply star_refl.
+  }
+
+  {
+  apply steps_equiv.
+  eapply star_step.
+    {
+    apply step_app2.
+    }
+  simpsub.
+  apply star_refl.
+  }
+Qed.
+
+
 Lemma def_iset :
   forall a b,
     equiv (app (app Defs.iset a) (lam b)) (iset a b).
@@ -896,53 +943,6 @@ eapply star_step.
   }
 simpsub.
 apply star_refl.
-Qed.
-
-
-Lemma def_irrelevant :
-  forall m,
-    equiv 
-      (app Defs.irrelevant (lam m))
-      (intersect nonsense (sequal m (subst (dot triv sh1) m))).
-Proof.
-intro m.
-unfold Defs.irrelevant.
-eapply equiv_trans.
-  {
-  apply steps_equiv.
-  eapply star_step.
-    {
-    apply step_app2.
-    }
-  simpsub.
-  cbn [Nat.add].
-  apply star_refl.
-  }
-apply equiv_intersect.
-  {
-  apply equiv_refl.
-  }
-apply equiv_sequal.
-  {
-  apply steps_equiv.
-  eapply star_step.
-    {
-    apply step_app2.
-    }
-  simpsub.
-  rewrite -> subst_var0_sh1.
-  apply star_refl.
-  }
-
-  {
-  apply steps_equiv.
-  eapply star_step.
-    {
-    apply step_app2.
-    }
-  simpsub.
-  apply star_refl.
-  }
 Qed.
 
 
@@ -1323,6 +1323,21 @@ apply equiv_refl.
 Qed.
 
 
+Lemma def_strict :
+  forall a, equiv (app Defs.strict a) (subtype a (partial a)).
+Proof.
+intro a.
+unfold Defs.strict.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl.
+Qed.
+
+
 Lemma def_tarrow :
   forall a b,
     equiv (app (app Defs.tarrow a) b) (tarrow a b).
@@ -1487,10 +1502,11 @@ Qed.
 
 Lemma def_isquash : 
   forall a,
-    equiv (app Defs.isquash a) (iset unittp (subst sh1 a)).
+    equiv (app Defs.isquash a) (isquash a).
 Proof.
 intros a.
 unfold Defs.isquash.
+unfold isquash.
 apply steps_equiv.
 eapply star_step.
   {
@@ -1504,7 +1520,7 @@ eapply star_step.
 Qed.
 
 
-Lemma def_ite: forall m p r, equiv (app (app (app Defs.ite m) p) r) (bite m p r).
+Lemma def_ite : forall m p r, equiv (app (app (app Defs.ite m) p) r) (bite m p r).
 intros m p r.
 unfold Defs.ite.
     apply steps_equiv.

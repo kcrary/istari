@@ -135,72 +135,25 @@ Qed.
 
 (* Substitution *)
 
-Lemma subst_letnext :
-  forall object (s : @sub object) m n, subst s (letnext m n) = letnext (subst s m) (subst (under 1 s) n).
+Lemma subst_theta :
+  forall object (s : @sub object), subst s theta = theta.
 Proof.
-intros.
-unfold letnext.
+intros object s.
+apply subst_into_closed.
+prove_hygiene.
+Qed.
+Hint Rewrite subst_theta : subst.
+
+
+Lemma subst_wind :
+  forall object (s : @sub object) f, subst s (wind f) = wind (subst s f).
+Proof.
+intros object s f.
+unfold wind.
 simpsub.
 reflexivity.
 Qed.
-
-
-Lemma subst_sumtype :
-  forall object (s : @sub object) a b, subst s (sumtype a b) = sumtype (subst s a) (subst s b).
-Proof.
-intros.
-unfold sumtype.
-simpsub.
-reflexivity.
-Qed.
-
-
-Lemma subst_sumleft :
-  forall object (s : @sub object) m, subst s (sumleft m) = sumleft (subst s m).
-Proof.
-prove_subst.
-Qed.
-
-
-Lemma subst_sumright :
-  forall object (s : @sub object) m, subst s (sumright m) = sumright (subst s m).
-Proof.
-prove_subst.
-Qed.
-
-
-Lemma subst_sumcase :
-  forall object (s : @sub object) m n p, subst s (sumcase m n p) = sumcase (subst s m) (subst (under 1 s) n) (subst (under 1 s) p).
-Proof.
-intros.
-unfold sumcase.
-simpsub.
-reflexivity.
-Qed.
-
-
-Lemma subst_nattp :
-  forall object (s : @sub object), subst s nattp = nattp.
-Proof.
-prove_subst.
-Qed.
-
-
-Lemma subst_nzero :
-  forall object (s : @sub object), subst s nzero = nzero.
-Proof.
-prove_subst.
-Qed.
-
-
-Lemma subst_nsucc :
-  forall object (s : @sub object) a, subst s (nsucc a) = nsucc (subst s a).
-Proof.
-intros.
-unfold nsucc.
-simpsub.
-reflexivity.
-Qed.
+Hint Rewrite subst_wind : subst.
 
 
 Lemma subst_natlit :
@@ -215,9 +168,7 @@ rewrite -> subst_nsucc.
 rewrite -> IH.
 reflexivity.
 Qed.
-
-
-Hint Rewrite subst_letnext subst_sumtype subst_sumleft subst_sumright subst_sumcase subst_nattp subst_nzero subst_nsucc subst_natlit : subst.
+Hint Rewrite subst_natlit : subst.
 
 
 Lemma subst_levellit :
@@ -243,31 +194,6 @@ Qed.
 
 
 Hint Rewrite subst_levellit subst_pagelit : subst.
-
-
-Lemma subst_theta :
-  forall object (s : @sub object), subst s theta = theta.
-Proof.
-intros object s.
-apply subst_into_closed.
-prove_hygiene.
-Qed.
-
-
-Hint Rewrite subst_theta : subst.
-
-
-Lemma subst_wind :
-  forall object (s : @sub object) f, subst s (wind f) = wind (subst s f).
-Proof.
-intros object s f.
-unfold wind.
-simpsub.
-reflexivity.
-Qed.
-
-
-Hint Rewrite subst_wind : subst.
 
 
 Lemma subst_leqpagetp :
@@ -557,6 +483,42 @@ prove_hygiene.
 so (hygiene_invert_auto _#5 (steps_hygiene _#4 Hstepsm' Hcl)) as H; cbn in H.
 destruct H as (_ & H & _).
 exact H.
+}
+Qed.
+
+
+Lemma natinterp_invert :
+  forall m i,
+    natinterp m i
+    -> equiv m (natlit i).
+Proof.
+intros m i H.
+induct H.
+
+(* 0 *)
+{
+intros m n p _ Hstepm Hstepn Hstepp.
+cbn.
+unfold nzero.
+unfold sumleft.
+eapply equiv_trans.
+  {
+  apply steps_equiv; eauto.
+  }
+apply equiv_ppair; eauto using steps_equiv.
+}
+
+(* S *)
+{
+intros m n p i _ Hstepsm Hstepsn _ IH.
+cbn.
+unfold nsucc.
+unfold sumright.
+eapply equiv_trans.
+  {
+  apply steps_equiv; eauto.
+  }
+apply equiv_ppair; eauto using steps_equiv.
 }
 Qed.
 
@@ -883,30 +845,3 @@ intros object m.
 apply plus_star.
 apply theta_fix'.
 Qed.
-
-
-(* Nonsense *)
-
-Lemma subst_nonsense :
-  forall object (s : @sub object), subst s nonsense = nonsense.
-Proof.
-prove_subst.
-Qed.
-
-
-Hint Rewrite subst_nonsense : subst.
-
-
-(* Conjoin *)
-
-Lemma subst_conjoin :
-  forall object (s : @sub object) m1 m2, subst s (conjoin m1 m2) = conjoin (subst s m1) (subst s m2).
-Proof.
-unfold conjoin.
-intros object s m1 m2.
-simpsub.
-reflexivity.
-Qed.
-
-
-Hint Rewrite subst_conjoin : subst.

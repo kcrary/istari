@@ -6470,69 +6470,45 @@ Syntactic equality is intended for internal use only.
 
       G |- of (arrow integer (arrow integer integer)) plusz
 
-- `pluszCommute M N`
+- `pluszCommute`
 
-      G |- eq integer (plusz M N) (plusz N M)
-      >>
-      G |- of integer M
-      G |- of integer N
+      G |- forall integer (fn . forall integer (fn . eq integer (plusz 1 0) (plusz 0 1))) ext fn . fn . ()
 
-- `pluszAssoc M N P`
+- `pluszAssoc`
 
-      G |- eq integer (plusz (plusz M N) P) (plusz M (plusz N P))
-      >>
-      G |- of integer M
-      G |- of integer N
-      G |- of integer P
+      G |- forall integer (fn . forall integer (fn . forall integer (fn . eq integer (plusz (plusz 2 1) 0) (plusz 2 (plusz 1 0))))) ext fn . fn . fn . ()
 
-- `pluszIdentity M`
+- `pluszIdentity`
 
-      G |- eq integer (plusz integer_zero M) M
-      >>
-      G |- of integer M
+      G |- forall integer (fn . eq integer (plusz integer_zero 0) 0) ext fn . ()
 
 - `negzType`
 
       G |- of (arrow integer integer) negz
 
-- `pluszInverse M`
+- `pluszInverse`
 
-      G |- eq integer (plusz M (negz M)) integer_zero
-      >>
-      G |- of integer M
+      G |- forall integer (fn . eq integer (plusz 0 (negz 0)) integer_zero) ext fn . ()
 
 - `timeszType`
 
       G |- of (arrow integer (arrow integer integer)) timesz
 
-- `timeszCommute M N`
+- `timeszCommute`
 
-      G |- eq integer (timesz M N) (timesz N M)
-      >>
-      G |- of integer M
-      G |- of integer N
+      G |- forall integer (fn . forall integer (fn . eq integer (timesz 1 0) (timesz 0 1))) ext fn . fn . ()
 
-- `timeszAssoc M N P`
+- `timeszAssoc`
 
-      G |- eq integer (timesz (timesz M N) P) (timesz M (timesz N P))
-      >>
-      G |- of integer M
-      G |- of integer N
-      G |- of integer P
+      G |- forall integer (fn . forall integer (fn . forall integer (fn . eq integer (timesz (timesz 2 1) 0) (timesz 2 (timesz 1 0))))) ext fn . fn . fn . ()
 
-- `timeszIdentity M`
+- `timeszIdentity`
 
-      G |- eq integer (timesz integer_one M) M
-      >>
-      G |- of integer M
+      G |- forall integer (fn . eq integer (timesz integer_one 0) 0) ext fn . ()
 
-- `timeszDistPlusz M N P`
+- `timeszDistPlusz`
 
-      G |- eq integer (timesz M (plusz N P)) (plusz (timesz M N) (timesz M P))
-      >>
-      G |- of integer M
-      G |- of integer N
-      G |- of integer P
+      G |- forall integer (fn . forall integer (fn . forall integer (fn . eq integer (timesz 2 (plusz 1 0)) (plusz (timesz 2 1) (timesz 2 0))))) ext fn . fn . fn . ()
 
 - `eqzbType`
 
@@ -6548,6 +6524,8 @@ Syntactic equality is intended for internal use only.
 
       G |- eq integer M N
       >>
+      G |- of integer M
+      G |- of integer N
       G |- eq bool (eqzb M N) true
 
 - `leqzbType`
@@ -6558,25 +6536,25 @@ Syntactic equality is intended for internal use only.
 
       G |- eq bool (leqzb M N) true
       >>
+      G |- of integer M
+      G |- of integer N
       G |- leqz M N
 
 - `leqzbSpec2 M N`
 
       G |- leqz M N
       >>
+      G |- of integer M
+      G |- of integer N
       G |- eq bool (leqzb M N) true
 
-- `integerCharacteristic N`
+- `integerCharacteristic`
 
-      G |- void
-      >>
-      G |- eq integer (nat_to_integer (succ N)) integer_zero
+      G |- forall nat (fn . arrow (eq integer (nat_to_integer (succ 0)) integer_zero) void) ext fn . fn . ()
 
-- `integerElements M`
+- `integerElements`
 
-      G |- squash (exists nat (fn . sum (eq integer M[^1] (negz (nat_to_integer (succ 0)))) (eq integer M[^1] (nat_to_integer 0))))
-      >>
-      G |- of integer M
+      G |- forall integer (fn . isquash (exists nat (fn . sum (eq integer 1 (negz (nat_to_integer (succ 0)))) (eq integer 1 (nat_to_integer 0))))) ext fn . ()
 
 - `integerHalts M`
 
@@ -6649,6 +6627,8 @@ Syntactic equality is intended for internal use only.
 
       G |- eq symbol M N
       >>
+      G |- of symbol M
+      G |- of symbol N
       G |- eq bool (symbol_eqb M N) true
 
 - `symbolHalts M`
@@ -6659,7 +6639,7 @@ Syntactic equality is intended for internal use only.
 
 - `symbolStrict`
 
-      G |- subtype symbol (partial symbol)
+      G |- strict symbol
 
 - `symbolUptype`
 

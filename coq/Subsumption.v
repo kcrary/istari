@@ -724,6 +724,103 @@ apply IH; auto.
 Qed.
 
     
+Lemma subsume_compose :
+  forall G1 G2 G3 ti ui t u,
+    subsume G1 G2 ti t
+    -> subsume G2 G3 ui u
+    -> subsume G1 G3 (compose ui ti) (compose t u).
+Proof.
+intros G1 G2 G3 ti ui t u H12 H23.
+destruct H12 as (Hhygt & Hhygti & H12).
+destruct H23 as (Hhygu & Hhygui & H23).
+do2 2 split.
+  {
+  intro j.
+  split.
+    {
+    intro Hj.
+    rewrite -> project_compose.
+    eapply hygiene_subst.
+      {
+      apply Hhygt; auto.
+      }
+    intros i Hi.
+    apply Hhygu; auto.
+    }
+
+    {
+    intro Hj.
+    apply Hhygt.
+    rewrite -> project_compose in Hj.
+    so (hygiene_subst_invert _#4 Hj) as H.
+    eapply hygiene_weaken; eauto.
+    intros k Hk.
+    exact (Hhygu _ ander Hk).
+    }
+  }
+
+  {
+  intro j.
+  split.
+    {
+    intro Hj.
+    rewrite -> project_compose.
+    eapply hygiene_subst.
+      {
+      apply Hhygui; auto.
+      }
+    intros i Hi.
+    apply Hhygti; auto.
+    }
+
+    {
+    intro Hj.
+    apply Hhygui.
+    rewrite -> project_compose in Hj.
+    so (hygiene_subst_invert _#4 Hj) as H.
+    eapply hygiene_weaken; eauto.
+    intros k Hk.
+    exact (Hhygti _ ander Hk).
+    }
+  }
+intros i s s' Hs.
+so (H12 i s s' Hs) as (Htis & Hequivtis & Hequivtis' & Hleft & Hright).
+so (H23 i (compose ti s) (compose ti s') Htis) as (Huitis & Hequivuitis & Hequivuitis' & Hleft' & Hright').
+do2 4 split.
+  {
+  rewrite -> !compose_assoc; auto.
+  }
+
+  {
+  apply (equivsub_trans _ _ (compose t (compose ti s))); auto.
+  rewrite -> compose_assoc.
+  apply equivsub_compose; auto using equivsub_refl.
+  rewrite -> compose_assoc.
+  auto.
+  }
+
+  {
+  apply (equivsub_trans _ _ (compose t (compose ti s'))); auto.
+  rewrite -> compose_assoc.
+  apply equivsub_compose; auto using equivsub_refl.
+  rewrite -> compose_assoc.
+  auto.
+  }
+
+  {
+  intros j b s'' Hsmall Hs''.
+  rewrite -> compose_assoc in Hs'' |- *.
+  auto.
+  }
+
+  {
+  intros j b s'' Hsmall Hs''.
+  rewrite -> compose_assoc in Hs'' |- *.
+  auto.
+  }
+Qed.
+
+
 Lemma usubsume_under1 :
   forall G G' h t,
     usubsume G G' t

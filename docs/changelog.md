@@ -18,6 +18,9 @@
 
 - Reworked the integer primitives and axioms.
 
+- The validation now includes the rules pertaining to native types.
+  All the rules are now validated except those pertaining to definitions.
+
 
 #### 1.2.1
 

@@ -589,6 +589,15 @@ so (hygiene_invert_auto _#5 Hclaa) as (Hcla' & _).
 apply interp_uptype; auto.
 }
 
+(* nativetp *)
+{
+intros pg s i A f aa Hclaa Hequiv.
+invertc_mc Hequiv.
+intros <-.
+fold (@nativetp (obj stop) A f).
+apply interp_native.
+}
+
 (* kbasic *)
 {
 intros pg s i k w K _ Hsteps Hl IH k' Hcl Hequiv.

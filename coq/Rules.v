@@ -10,7 +10,9 @@ Require Import Dynamic.
 Require Import Promote.
 Require Import Equivalence.
 Require Import Defined.
+Require Native.
 Require Page.
+Require PageCode.
 Require Candidate.
 
 
@@ -2110,4 +2112,49 @@ Inductive tr : @context obj -> judgement -> Prop :=
     forall G a a' b b',
       tr G (deqtype (padmiss a b) (padmiss a' b'))
       -> tr (cons (hyp_tm a) G) (deqtype b b')
+
+(* Native *)
+
+| tr_nativetp_formation :
+    forall A f G,
+      tr G (deq (nativetp A f) (nativetp A f) (univ nzero))
+
+| tr_nativetp_intro :
+    forall A f x G,
+      tr G (deq (native_elem (f x)) (native_elem (f x)) (nativetp A f))
+  
+| tr_native_unary :
+    forall A1 A2 f1 f2 (g : A1 -> A2) (g' : Native.native -> option Native.native),
+      (forall x, g' (f1 x) = Some (f2 (g x)))
+      -> forall G m p,
+           tr G (deq m p (nativetp A1 f1))
+           -> tr G (deq (native_unary g' m) (native_unary g' p) (nativetp A2 f2))
+
+| tr_native_binary :
+    forall A1 A2 A3 f1 f2 f3 (g : A1 -> A2 -> A3) (g' : Native.native -> Native.native -> option Native.native),
+      (forall x y, g' (f1 x) (f2 y) = Some (f3 (g x y)))
+      -> forall G m n p q,
+           tr G (deq m p (nativetp A1 f1))
+           -> tr G (deq n q (nativetp A2 f2))
+           -> tr G (deq (native_binary g' m n) (native_binary g' p q) (nativetp A3 f3))
+  
+| tr_native_left :
+    forall A f G m n c,
+      (forall x, tr G (deq (subst1 (native_elem (f x)) m) (subst1 (native_elem (f x)) n) (subst1 (native_elem (f x)) c)))
+      -> tr (cons (hyp_tm (nativetp A f)) G) (deq m n c)
+
+| tr_nattp_left :
+    forall G m n c,
+      (forall x, tr G (deq (subst1 (PageCode.natlit x) m) (subst1 (PageCode.natlit x) n) (subst1 (PageCode.natlit x) c)))
+      -> tr (cons (hyp_tm nattp) G) (deq m n c)
+
+| tr_native_contradiction :
+    forall A f x y G p q c,
+      f x <> f y
+      -> tr G (deq (native_elem (f x)) (native_elem (f y)) (nativetp A f))
+      -> tr G (deq p q c)
+
+| tr_nativetp_uptype :
+    forall A f G,
+      tr G (deq triv triv (uptype (nativetp A f)))
 .

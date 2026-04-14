@@ -1174,6 +1174,44 @@ apply (tr_univ_cumulative _ nzero); auto.
 Qed.
 
 
+Lemma tr_booltp_contradiction :
+  forall G m n a,
+    tr G (deq btrue bfalse booltp)
+    -> tr G (deq m n a).
+Proof.
+intros G m n a Htr.
+apply (tr_voidtp_elim _ triv triv).
+apply (tr_eqtype_convert _ _ _ unittp).
+2:{
+  apply tr_unittp_intro.
+  }
+assert (@equiv obj unittp (bite btrue unittp voidtp)) as Hequiv.
+  {
+  apply equiv_symm.
+  apply steps_equiv.
+  apply star_one.
+  apply step_bite2.
+  }
+assert (@equiv obj voidtp (bite bfalse unittp voidtp)) as Hequiv'.
+  {
+  apply equiv_symm.
+  apply steps_equiv.
+  apply star_one.
+  apply step_bite3.
+  }
+rewrite -> Hequiv.
+rewrite -> Hequiv' at 2.
+apply tr_booltp_elim_eqtype; auto.
+  {
+  apply tr_unittp_istype.
+  }
+
+  {
+  apply tr_voidtp_istype.
+  }
+Qed.
+
+
 (* pi *)
 
 Lemma tr_pi_of_ext :
@@ -2545,5 +2583,150 @@ apply tr_subtype_intro; auto.
 apply (tr_conjoin_elim2 _ (subst sh1 a)).
 eapply hypothesis; eauto using index_0.
 simpsub.
+auto.
+Qed.
+
+
+Lemma tr_isquash_formation :
+  forall G a b,
+    tr G (deqtype a b)
+    -> tr G (deqtype (isquash a) (isquash b)).
+Proof.
+intros G a b H.
+unfold isquash.
+apply tr_iset_formation.
+  {
+  apply tr_unittp_istype.
+  }
+eapply (weakening _ [_] []); eauto.
+  {
+  cbn [length].
+  simpsub.
+  unfold sh1.
+  rewrite <- compose_assoc.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  reflexivity.
+  }
+
+  {
+  cbn [length].
+  simpsub.
+  cbn.
+  auto.
+  }
+Qed.
+
+
+Lemma tr_isquash_intro :
+  forall G a m,
+    tr G (deq m m a)
+    -> tr G (deq triv triv (isquash a)).
+Proof.
+intros G a m H.
+unfold isquash.
+apply (tr_iset_intro _#5 m).
+  {
+  apply tr_unittp_intro.
+  }
+
+  {
+  simpsub.
+  auto.
+  }
+
+  {
+  eapply (weakening _ [_] []); eauto.
+    {
+    cbn [length].
+    simpsub.
+    unfold sh1.
+    rewrite <- compose_assoc.
+    rewrite -> compose_sh_unlift.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    cbn [length].
+    simpsub.
+    cbn.
+    eapply tr_inhabitation_formation; eauto.
+    }
+  }
+Qed.
+
+
+Lemma tr_isquash_eta2 :
+  forall G a p q,
+    tr G (deq p q (isquash a))
+    -> tr G (deq triv triv (isquash a)).
+Proof.
+unfold isquash.
+intros G a p q H.
+eapply (tr_iset_elim2 _ unittp (subst sh1 a) p).
+  {
+  eapply tr_eq_reflexivity; eauto.
+  }
+simpsub.
+cbn.
+apply (tr_iset_intro _#5 (var 0)).
+  {
+  apply tr_unittp_intro.
+  }
+
+  {
+  simpsub.
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  apply (tr_inhabitation_formation _ (var 1) (var 1)).
+  eapply hypothesis; eauto using index_S, index_0.
+  }
+Qed.
+
+
+Lemma tr_isquash_left :
+  forall G a J,
+    tr (hyp_tm a :: G) (substj sh1 J)
+    -> tr (hyp_tm (isquash a) :: G) (substj sh1 J).
+Proof.
+intros G a J Htr.
+unfold isquash.
+apply (tr_iset_elim2 _ unittp (subst (sh 2) a) (var 0)).
+  {
+  eapply hypothesis; eauto using index_0.
+  simpsub.
+  reflexivity.
+  }
+simpsub.
+eapply (weakening _ [_] [_]); eauto.
+  {
+  cbn [length].
+  simpsub.
+  rewrite <- compose_assoc.
+  unfold sh1.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  reflexivity.
+  }
+
+  {
+  cbn [length].
+  simpsub.
+  rewrite <- compose_assoc.
+  unfold sh1.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  reflexivity.
+  }
+cbn [length].
+simpsub.
+rewrite <- compose_assoc.
+unfold sh1.
+rewrite -> compose_sh_unlift.
+simpsub.
+cbn [List.app].
 auto.
 Qed.

@@ -36,6 +36,7 @@ Require Import SemanticsUniv.
 Require Import SemanticsFut.
 Require Import SemanticsGuard.
 Require Import SemanticsKind.
+Require Import SemanticsNative.
 Require Import SemanticsQuotient.
 Require Import SemanticsSet.
 Require Import SemanticsSigma.
@@ -1765,6 +1766,14 @@ rewrite -> extend_iuuptype.
 reflexivity.
 }  
 
+(* native *)
+{
+intros pg s i A f H h.
+exists (iubase (native_urel A f (cin pg) i)).
+rewrite -> extend_iubase.
+rewrite -> extend_native; auto.
+}
+
 (* functional *)
 {
 intros pg s i A' b B Hcl Hcoarse Hint IH IHo A heq h.
@@ -2151,6 +2160,7 @@ try (intros;
            |eapply interp_admiss
            |eapply interp_padmiss
            |eapply interp_uptype
+           |eapply interp_native
            ];
      eauto using restriction_hygiene, restriction_decrease;
      done).

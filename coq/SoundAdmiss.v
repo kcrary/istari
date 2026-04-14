@@ -367,15 +367,15 @@ decompose Hmp.
 intros _ _ _ H.
 destruct H as [(Hsteps & Hsteps') | (Hsteps & Hsteps')].
   {
-  exists (oper_btrue _).
+  exists (oper_native_elem _ (Native.native_bool true)).
   do2 2 split; auto.
-  apply canon_btrue.
+  apply canon_native_elem.
   }
 
   {
-  exists (oper_bfalse _).
+  exists (oper_native_elem _ (Native.native_bool false)).
   do2 2 split; auto.
-  apply canon_bfalse.
+  apply canon_native_elem.
   }
 Qed.
 

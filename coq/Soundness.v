@@ -21,6 +21,7 @@ Require Import SoundHyp.
 Require Import SoundKind.
 Require Import SoundMisc.
 Require Import SoundMu.
+Require Import SoundNative.
 Require Import SoundPartial.
 Require Import SoundPi.
 Require Import SoundPositive.
@@ -371,6 +372,14 @@ intros; eapply sound_prod_padmiss; eauto; done.
 intros; eapply sound_equal_padmiss; eauto; done.
 intros; eapply sound_padmiss_formation_invert1; eauto; done.
 intros; eapply sound_padmiss_formation_invert2; eauto; done.
+intros; eapply sound_nativetp_formation; eauto; done.
+intros; eapply sound_nativetp_intro; eauto; done.
+intros; eapply sound_native_unary; eauto; done.
+intros; eapply sound_native_binary; eauto; done.
+intros; eapply sound_native_left; eauto; done.
+intros; eapply sound_nattp_left; eauto; done.
+intros; eapply sound_native_contradiction; eauto; done.
+intros; eapply sound_nativetp_uptype; eauto; done.
 Qed.
 
 

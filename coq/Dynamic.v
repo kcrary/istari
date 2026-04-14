@@ -4,6 +4,7 @@ Require Import Syntax.
 Require Import Relation.
 Require Import Subst.
 Require Import SimpSub.
+Require Import Equality.
 
 
 Section object.
@@ -54,8 +55,6 @@ Inductive canon : forall {a}, @operator object a -> Prop :=
 | canon_unittp         : canon (oper_unittp _)
 | canon_cunit          : canon (oper_cunit _)
 | canon_booltp         : canon (oper_booltp _)
-| canon_btrue          : canon (oper_btrue _)
-| canon_bfalse         : canon (oper_bfalse _)
 | canon_prod           : canon (oper_prod _)
 | canon_sigma          : canon (oper_sigma _)
 | canon_cpair          : canon (oper_cpair _)
@@ -75,6 +74,8 @@ Inductive canon : forall {a}, @operator object a -> Prop :=
 | canon_uptype         : canon (oper_uptype _)
 | canon_ext {x}        : canon (oper_ext _ x)
 | canon_extt {x}       : canon (oper_extt _ x)
+| canon_nativetp {A f} : canon (oper_nativetp _ A f)
+| canon_native_elem {x} : canon (oper_native_elem _ x)
 .
 
 
@@ -131,6 +132,21 @@ Inductive step : @term object -> term -> Prop :=
 | step_seq2 {m1 m2} :
     value m1
     -> step (seq m1 m2) (subst1 m1 m2)
+
+| step_native_unary1 {f m m'} :
+    step m m'
+    -> step (native_unary f m) (native_unary f m')
+
+| step_native_unary2 {f x y} :
+    f x = Some y
+    -> step (native_unary f (native_elem x)) (native_elem y)
+
+| step_native_binary1 {f m1 m1' m2} :
+    step m1 m1'
+    -> step (native_binary f m1 m2) (native_binary f m1' m2)
+
+| step_native_binary2 {f x m2} :
+    step (native_binary f (native_elem x) m2) (native_unary (f x) m2)
 .
 
 
@@ -340,6 +356,68 @@ invert Hstep.
 
   {
   intros _ <-.
+  reflexivity.
+  }
+}
+
+(* unary1 *)
+{
+intros f m m' Hstep1 IH n Hstep.
+invertc Hstep.
+  {
+  intros m'' Hstep <-.
+  f_equal; auto.
+  }
+
+  {
+  intros x y Heq <- <-.
+  invert Hstep1.
+  }
+}
+
+(* unary2 *)
+{
+intros f x y Heq n Hstep.
+invertc Hstep.
+  {
+  intros m'' Hstep <-.
+  invert Hstep.
+  }
+
+  {
+  intros y' Heq' <-.
+  f_equal.
+  so (eqtrans (eqsymm Heq) Heq') as H.
+  injection H; auto.
+  }
+}
+
+(* binary1 *)
+{
+intros f m1 m1' m2 Hstep1 IH n Hstep.
+invertc Hstep.
+  {
+  intros m1'' Hstep1' <-.
+  f_equal; auto.
+  }
+
+  {
+  intros x <- <-.
+  invert Hstep1.
+  }
+}
+
+(* binary2 *)
+{
+intros f x m2 m2' Hstep.
+invertc Hstep.
+  {
+  intros m1' Hstep1 <-.
+  invert Hstep1.
+  }
+
+  {
+  intros <-.
   reflexivity.
   }
 }
@@ -884,6 +962,18 @@ intros; apply value_i; eauto with dynamic.
 Qed.
 
 
+Lemma value_nativetp : forall {A f}, value (nativetp A f).
+Proof.
+intros; apply value_i; eauto with dynamic.
+Qed.
+
+
+Lemma value_native_elem : forall {x}, value (native_elem x).
+Proof.
+intros; apply value_i; eauto with dynamic.
+Qed.
+
+
 End object.
 
 
@@ -950,12 +1040,13 @@ Arguments value_padmiss {object m1 m2}.
 Arguments value_uptype {object m1}.
 Arguments value_ext {object x}.
 Arguments value_extt {object x}.
-
+Arguments value_nativetp {object}.
+Arguments value_native_elem {object x}.
 
 Hint Constructors canon : dynamic.
 
 
-Hint Resolve value_univ value_cty value_con value_karrow value_tarrow value_pi value_clam value_capp value_ctlam value_ctapp value_lam value_intersect value_union value_constfn value_fut value_semifut value_cnext value_cprev value_next value_rec value_equal value_triv value_eqtype value_sequal value_subtype value_kind value_all value_alltp value_exist value_mu value_ispositive value_isnegative value_voidtp value_unittp value_cunit value_booltp value_btrue value_bfalse value_prod value_sigma value_cpair value_cpi1 value_cpi2 value_ppair value_set value_iset value_quotient value_guard value_coguard value_wt value_partial value_halts value_admiss value_padmiss value_uptype value_ext value_extt : dynamic.
+Hint Resolve value_univ value_cty value_con value_karrow value_tarrow value_pi value_clam value_capp value_ctlam value_ctapp value_lam value_intersect value_union value_constfn value_fut value_semifut value_cnext value_cprev value_next value_rec value_equal value_triv value_eqtype value_sequal value_subtype value_kind value_all value_alltp value_exist value_mu value_ispositive value_isnegative value_voidtp value_unittp value_cunit value_booltp value_btrue value_bfalse value_prod value_sigma value_cpair value_cpi1 value_cpi2 value_ppair value_set value_iset value_quotient value_guard value_coguard value_wt value_partial value_halts value_admiss value_padmiss value_uptype value_ext value_extt value_nativetp value_native_elem : dynamic.
 
 
 Hint Resolve var_normal value_normal : dynamic.

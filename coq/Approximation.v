@@ -1648,6 +1648,113 @@ apply (approxc_approx_trans _ (subst1 v n2)).
   apply step_seq2; auto.
   }
 }
+
+(* native_unary1 *)
+{
+intros f m1 m1' _ IH n Hclpi Hcln Hmc.
+invertc_mc Hmc.
+intros n1 H1 Heq.
+fold (native_unary f n1) in Heq.
+subst n.
+so (hygiene_invert_auto _#5 Hclpi) as H; cbn in H.
+destruct H as (Hclm1 & _).
+so (hygiene_invert_auto _#5 Hcln) as H; cbn in H.
+destruct H as (Hcln1 & _).
+apply approxc_compat.
+apply mc_oper.
+repeat (apply mcr_cons); auto using mcr_nil.
+}
+
+(* native_unary2 *)
+{
+intros f x y Heq n Hclpi Hcln Hmc.
+invertc_mc Hmc.
+intros p.
+fold (native_unary f p).
+intros Happrox <-.
+so (hygiene_invert_auto _#5 Hclpi) as H; cbn in H.
+destruct H as (Hclelem & _).
+so (hygiene_invert_auto _#5 Hcln) as H; cbn in H.
+destruct H as (Hclp & _).
+so (approxc_closed_invert _ _ Hclelem Hclp Happrox) as (q & Helem_q & Hqp & Hclq).
+invertc_mc Helem_q.
+fold (@native_elem object x).
+intros <-.
+rewrite <- approx_fixpoint in Hqp.
+so (Hqp anderr _ (conj (star_refl _) value_native_elem)) as (v & Heval & Helem_v).
+invertc_mc Helem_v.
+fold (@native_elem object x).
+intros <-.
+apply ci_approx_implies_approxc.
+intros s _ _.
+simpsub.
+rewrite -> subst_into_closed; auto.
+apply anti_steps_approx.
+  {
+  apply hygiene_auto; cbn; auto.
+  }
+destruct Heval as (Hsteps & _).
+apply (star_trans _#3 (native_unary f (native_elem x))).
+  {
+  apply (star_map' _ _ (native_unary f)); eauto using step_native_unary1.
+  }
+apply star_one.
+apply step_native_unary2; auto.
+}
+
+(* native_binary1 *)
+{
+intros f m1 m1' m2 _ IH n Hclpi Hcln Hmc.
+invertc_mc Hmc.
+intros n1 H1 n2 H2 Heq.
+fold (native_binary f n1 n2) in Heq.
+subst n.
+so (hygiene_invert_auto _#5 Hclpi) as H; cbn in H.
+destruct H as (Hclm1 & Hclm2 & _).
+so (hygiene_invert_auto _#5 Hcln) as H; cbn in H.
+destruct H as (Hcln1 & Hcln2 & _).
+apply approxc_compat.
+apply mc_oper.
+repeat (apply mcr_cons); auto using mcr_nil.
+}
+
+(* native_binary2 *)
+{
+intros f x m2 n Hclpi Hcln Hmc.
+invertc_mc Hmc.
+intros p1 Hp1 p2 Hp2 Heq.
+fold (native_binary f p1 p2) in Heq.
+subst n.
+so (hygiene_invert_auto _#5 Hclpi) as H; cbn in H.
+destruct H as (Hclelem & Hclm2 & _).
+so (hygiene_invert_auto _#5 Hcln) as H; cbn in H.
+destruct H as (Hclp1 & Hclp2 & _).
+so (approxc_closed_invert _ _ Hclelem Hclp1 Hp1) as (q & Helem_q & Hqp1 & Hclq).
+invertc_mc Helem_q.
+fold (@native_elem object x).
+intros <-.
+rewrite <- approx_fixpoint in Hqp1.
+so (Hqp1 anderr _ (conj (star_refl _) value_native_elem)) as (v & Heval & Helem_v).
+invertc_mc Helem_v.
+fold (@native_elem object x).
+intros <-.
+apply (approxc_approx_trans _ (native_unary (f x) p2)).
+2:{
+  apply anti_steps_approx.
+    {
+    apply hygiene_auto; cbn; auto.
+    }
+  destruct Heval as (Hsteps & _).
+  apply (star_trans _#3 (native_binary f (native_elem x) p2)).
+    {
+    apply (star_map' _ _ (fun z => native_binary f z p2)); eauto using step_native_binary1.
+    }
+  apply star_one.
+  apply step_native_binary2; auto.
+  }
+apply approxc_compat.
+apply mc_native_unary; auto.
+}
 Qed.
 
 

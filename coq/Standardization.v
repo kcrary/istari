@@ -71,6 +71,26 @@ apply (star_map' _ _ (fun z => seq z _)); auto using step_seq1.
 Qed.
 
 
+Lemma steps_native_unary :
+  forall object f (m1 m1' : @term object),
+    star step m1 m1'
+    -> star step (native_unary f m1) (native_unary f m1').
+Proof.
+intros.
+apply (star_map' _ _ (fun z => native_unary f z)); auto using step_native_unary1.
+Qed.
+
+
+Lemma steps_native_binary :
+  forall object f (m1 m1' m2 : @term object),
+    star step m1 m1'
+    -> star step (native_binary f m1 m2) (native_binary f m1' m2).
+Proof.
+intros.
+apply (star_map' _ _ (fun z => native_binary f z _)); auto using step_native_binary1.
+Qed.
+
+
 Section object.
 
 
@@ -116,6 +136,15 @@ Inductive ireduce : term object -> term object -> Prop :=
 
 | ireduce_marker {x} :
     ireduce (marker x) (marker x)
+
+| ireduce_native_unary {f m n} :
+    ireduce m n
+    -> ireduce (native_unary f m) (native_unary f n)
+
+| ireduce_native_binary {f m1 n1 m2 n2} :
+    ireduce m1 n1
+    -> reduce m2 n2
+    -> ireduce (native_binary f m1 m2) (native_binary f n1 n2)
 .
 
 
@@ -123,7 +152,7 @@ Lemma ireduce_impl_mc_reduce :
   forall m n, ireduce m n -> mc reduce m n.
 Proof.
 intros m n H.
-induct H; eauto using mc_var, mc_oper, reducer_mcr, reduce_compat, mc_app, mc_prev, mc_bite, mc_ppi1, mc_ppi2, mc_seq, mcr_nil.
+induct H; eauto using mc_var, mc_oper, reducer_mcr, reduce_compat, mc_app, mc_prev, mc_bite, mc_ppi1, mc_ppi2, mc_seq, mc_native_unary, mc_native_binary, mcr_nil.
 Qed.
 
 
@@ -231,6 +260,31 @@ cases th; try (intros; apply ireduce_canon; auto using reducer_id with dynamic; 
   subst r.
   fold (@marker object x).
   apply ireduce_marker.
+  }
+
+  (* native_unary *)
+  {
+  intros f r IH.
+  so (row_invert_auto _ _ r) as H; cbn in H.
+  destruct H as (m1 & ->).
+  fold (native_unary f m1) in *.
+  invertc IH.
+  intros Hm1 _.
+  apply ireduce_native_unary; auto.
+  }
+
+  (* native_binary *)
+  {
+  intros f r IH.
+  so (row_invert_auto _ _ r) as H; cbn in H.
+  destruct H as (m1 & m2 & ->).
+  fold (native_binary f m1 m2) in *.
+  invertc IH.
+  intros Hm1 Hr.
+  invertc Hr.
+  intros Hm2 _.
+  apply ireduce_native_binary; auto.
+  apply reduce_id.
   }
 }
 Qed.
@@ -427,6 +481,55 @@ split.
 Qed.
 
 
+Lemma sreduce_native_unary :
+  forall f m m',
+    sreduce m m'
+    -> sreduce (native_unary f m) (native_unary f m').
+Proof.
+intros f m m' Hm.
+destruct Hm as (Hm & p & Hp & Hpm).
+split.
+  {
+  apply reduce_compat.
+  apply mc_native_unary; auto.
+  }
+exists (native_unary f p).
+split.
+  {
+  apply steps_native_unary; auto.
+  }
+
+  {
+  apply ireduce_native_unary; auto.
+  }
+Qed.
+
+
+Lemma sreduce_native_binary :
+  forall f m m' n n',
+    sreduce m m'
+    -> reduce n n'
+    -> sreduce (native_binary f m n) (native_binary f m' n').
+Proof.
+intros f m m' n n' Hm Hn.
+destruct Hm as (Hm & p & Hp & Hpm).
+split.
+  {
+  apply reduce_compat.
+  apply mc_native_binary; auto.
+  }
+exists (native_binary f p n).
+split.
+  {
+  apply steps_native_binary; eauto.
+  }
+
+  {
+  apply ireduce_native_binary; auto.
+  }
+Qed.
+
+
 Lemma canon_dec :
   forall a (th : @operator object a),
     decidable (canon _ th).
@@ -465,6 +568,7 @@ destruct i as [| i].
   apply sreduce_id.
   }
 }
+
 (* oper *)
 {
 intros a th r IH m' n n' Hm Hn.
@@ -614,7 +718,7 @@ cases th; try (intros; destruct Hncanon; auto with dynamic; done).
 
   (* marker *)
   {
-  intros x r r' Hr IH Hncanon.
+  intros x r r' Hr IH _.
   so (row_invert_auto _ _ r) as H; cbn in H.
   subst r.
   so (row_invert_auto _ _ r') as H; cbn in H.
@@ -622,6 +726,52 @@ cases th; try (intros; destruct Hncanon; auto with dynamic; done).
   fold (@marker object x).
   simpsub.
   apply sreduce_id.
+  }
+
+  (* native_unary *)
+  {
+  intros f r r' Hm IH _.
+  so (row_invert_auto _ _ r) as (m1 & ->).
+  so (row_invert_auto _ _ r') as (m1' & ->).
+  simpsub.
+  fold (native_unary f (subst1 n m1)).
+  fold (native_unary f (subst1 n' m1')).
+  invertc IH.
+  intros IH _.
+  invertc Hm.
+    {
+    intros H _.
+    invert H.
+    }
+  intro Hm1.
+  apply sreduce_native_unary.
+  apply IH; auto.
+  }
+
+  (* native_binary *)
+  {
+  intros f r r' Hm IH _.
+  so (row_invert_auto _ _ r) as (m1 & m2 & ->).
+  so (row_invert_auto _ _ r') as (m1' & m2' & ->).
+  simpsub.
+  fold (native_binary f (subst1 n m1) (subst1 n m2)).
+  fold (native_binary f (subst1 n' m1') (subst1 n' m2')).
+  invertc IH.
+  intros IH1 IH.
+  invertc IH.
+  intros IH2 _.
+  invertc Hm.
+    {
+    intros H _.
+    invert H.
+    }
+
+    {
+    intros Hm1 Hm2.
+    apply sreduce_native_binary; auto.
+    apply reduce_funct1; auto.
+    apply sreduce_impl_reduce; auto.
+    }
   }
 }
 Qed.
@@ -781,6 +931,33 @@ cases th; try (intros; destruct Hncanon; auto with dynamic; done).
   fold (@marker object x).
   apply sreduce_id.
   }
+
+  (* native_unary *)
+  {
+  intros f r s Hrs IH _.
+  so (row_invert_auto _ _ r) as (m & ->).
+  so (row_invert_auto _ _ s) as (n & ->).
+  fold (native_unary f m).
+  fold (native_unary f n).
+  invertc IH.
+  intros Hmn _.
+  apply sreduce_native_unary; auto.
+  }
+
+  (* native_unary *)
+  {
+  intros f r s Hrs IH _.
+  so (row_invert_auto _ _ r) as (m1 & m2 & ->).
+  so (row_invert_auto _ _ s) as (n1 & n2 & ->).
+  fold (native_binary f m1 m2).
+  fold (native_binary f n1 n2).
+  invertc IH.
+  intros Hmn1 H.
+  invertc H.
+  intros Hmn2 _.
+  apply sreduce_native_binary; auto.
+  apply sreduce_impl_reduce; auto.
+  }
 }
 
 (* app_beta *)
@@ -834,6 +1011,20 @@ eapply sreduce_extend; eauto using step_seq2.
 apply reduce_seq_beta; auto.
 }
 
+(* native_unary *)
+{
+intros f x y Heq.
+eapply sreduce_extend; eauto using step_native_unary2, reduce_native_unary.
+apply sreduce_id.
+}
+
+(* native_binary *)
+{
+intros f x m m' Hm IH.
+eapply sreduce_extend; eauto using step_native_binary2, reduce_native_binary.
+apply sreduce_native_unary; auto.
+}
+
 (* nil *)
 {
 apply mcr_nil.
@@ -850,6 +1041,30 @@ apply mcr_cons; auto.
 auto.
 }
 Qed.
+
+
+Lemma ireduce_native_elem_invert :
+  forall m x,
+    ireduce m (native_elem x)
+    -> m = native_elem x.
+Proof.
+intros m x Hred.
+(* for some reason the invert tactic isn't working here, have to do it messily *)
+inversion Hred.
+revert a th r th0 H2 r0 s0 H4 H1 H H0 H3.
+intros a th r th' _ s t Hst Heqm Heqa Heq Heq'.
+subst a.
+subst m.
+invertc Heq.
+intros ->.
+invertc Heq'.
+intros ->.
+invertc Hst.
+intros <-.
+fold (@native_elem object x).
+reflexivity.
+Qed.
+
 
 
 Lemma postponement :
@@ -1038,6 +1253,7 @@ invert Hmn.
     injectionT Heq'.
     intros ->.
     so (row_nil_invert _ r); subst r.
+    fold (@native_elem object (Native.native_bool true)) in *.
     fold (@btrue object) in *.
     exists m2.
     split; auto using step_bite2.
@@ -1061,6 +1277,7 @@ invert Hmn.
     injectionT Heq'.
     intros ->.
     so (row_nil_invert _ r); subst r.
+    fold (@native_elem object (Native.native_bool false)) in *.
     fold (@bfalse object) in *.
     exists m3.
     split; auto using step_bite3.
@@ -1240,7 +1457,88 @@ invert Hmn.
   split; auto.
   apply reduce_id.
   }
-} 
+
+  (* native_unary *)
+  {
+  intros f m1 n1 H1 <- Heq Heq' <-.
+  injectionT Heq.
+  intros <-.
+  injectionT Heq'.
+  intros <-.
+  fold (native_unary f m1) in *.
+  invertc IH.
+  intros IH1 _.
+  invertc Hnp.
+    {
+    intros p1 Hstep <-.
+    so (IH1 _ _ H1 Hstep) as (q1 & Hstep' & Hqp1).
+    exists (native_unary f q1).
+    split.
+      {
+      apply step_native_unary1; auto.
+      }
+
+      {
+      apply reduce_compat.
+      apply mc_native_unary; auto.
+      }
+    }
+
+    {
+    intros x y Heq <- <-.
+    so (ireduce_native_elem_invert _ _ H1).
+    subst m1.
+    exists (native_elem y).
+    split; [| apply reduce_id].
+    apply step_native_unary2; auto.
+    }
+  }
+
+  (* native_binary *)
+  {
+  intros f m1 n1 m2 n2 H1 H2 <- Heq Heq' <-.
+  injectionT Heq.
+  intros <-.
+  injectionT Heq'.
+  intros <-.
+  fold (native_binary f m1 m2) in *.
+  invertc IH.
+  intros IH1 IH.
+  invertc IH.
+  intros IH2 _.
+  invert Hnp.
+    {
+    intros p1 Hstep <-.
+    so (IH1 _ _ H1 Hstep) as (q1 & Hstep' & Hqp1).
+    exists (native_binary f q1 m2).
+    split.
+      {
+      apply step_native_binary1; auto.
+      }
+
+      {
+      apply reduce_compat.
+      apply mc_native_binary; auto.
+      }
+    }
+
+    {
+    intros x <- <-.
+    so (ireduce_native_elem_invert _ _ H1).
+    subst m1.
+    exists (native_unary (f x) m2).
+    split.
+      {
+      apply step_native_binary2.
+      }
+
+      {
+      apply reduce_compat.
+      apply mc_native_unary; auto.
+      }
+    }
+  }
+}
 Qed.
 
 

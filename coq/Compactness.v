@@ -646,6 +646,111 @@ destruct n as [i | a th r].
 Qed.
 
 
+Lemma native_elem_subst_form :
+  forall x p n,
+    @native_elem object x = subst1 p n
+    -> (n = var 0) \/ (n = native_elem x).
+Proof.
+intros x p n Heq.
+destruct n as [i | a th r].
+  {
+  left.
+  destruct i as [| i].
+    {
+    auto.
+    }
+
+    {
+    simpsubin Heq.
+    discriminate Heq.
+    }
+  }
+
+  {
+  simpsubin Heq.
+  unfold native_elem in Heq.
+  injectionc Heq.
+  intros H1 H2 <-.
+  injectionT H2.
+  intros <-.
+  so (row_0_invert _ r).
+  subst r.
+  right.
+  reflexivity.
+  }
+Qed.
+
+
+Lemma native_unary_subst_form :
+  forall f (m1 : @term object) p n,
+    native_unary f m1 = subst1 p n
+    -> (n = var 0) \/ (exists n1, n = native_unary f n1).
+Proof.
+intros f m1 p n Heq.
+destruct n as [i | a th r].
+  {
+  left.
+  destruct i as [| i].
+    {
+    auto.
+    }
+
+    {
+    simpsubin Heq.
+    discriminate Heq.
+    }
+  }
+
+  {
+  right.
+  simpsubin Heq.
+  unfold native_unary in Heq.
+  injectionc Heq.
+  intros _ Heqth <-.
+  injectionT Heqth.
+  intros <-.
+  so (row_1_invert _ _ r) as (n1 & ->).
+  exists n1.
+  reflexivity.
+  }
+Qed.
+
+
+Lemma native_binary_subst_form :
+  forall f (m1 m2 : @term object) p n,
+    native_binary f m1 m2 = subst1 p n
+    -> (n = var 0) \/ (exists n1 n2, n = native_binary f n1 n2).
+Proof.
+intros f m1 m2 p n Heq.
+destruct n as [i | a th r].
+  {
+  left.
+  destruct i as [| i].
+    {
+    auto.
+    }
+
+    {
+    simpsubin Heq.
+    discriminate Heq.
+    }
+  }
+
+  {
+  right.
+  simpsubin Heq.
+  unfold native_binary in Heq.
+  injectionc Heq.
+  intros _ Heqth <-.
+  injectionT Heqth.
+  intros <-.
+  so (row_2_invert _ _ _ r) as (n1 & n2 & ->).
+  exists n1, n2.
+  reflexivity.
+  }
+Qed.
+
+
 (* The main work for compactness is here. *)
 Lemma factor_step :
   forall (t m n : @term object),
@@ -1163,6 +1268,168 @@ relquest.
   }
 simpsub.
 reflexivity.
+}
+
+(* native_unary1 *)
+{
+intros f m1 m1' _ IH m Heq.
+so (native_unary_subst_form _#4 Heq) as [-> | (n1 & Heq')].
+  {
+  right.
+  exists (var 0).
+  simpsub.
+  split; auto.
+  intros t1 t2 Hsteps.
+  simpsub.
+  auto.
+  }
+subst m.
+simpsubin Heq.
+injectionc Heq.
+intros ->.
+so (IH _ (eq_refl _)) as [(q & Hsteps) | (p & Heq & Hsteps)].
+  {
+  left.
+  exists (native_unary f q).
+  intro t'.
+  simpsub.
+  apply step_native_unary1; auto.
+  }
+
+  {
+  subst n1.
+  right.
+  exists (native_unary f p).
+  split.
+    {
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    intros t1 t2 Hstepst.
+    simpsub.
+    apply (plus_map' _ _ (native_unary f)); auto using step_native_unary1.
+    }
+  }
+}
+
+(* native_unary2 *)
+{
+intros f x y Hxy m Heq.
+so (native_unary_subst_form _#4 Heq) as [-> | (n1 & Heq')].
+  {
+  right.
+  exists (var 0).
+  simpsub.
+  split; auto.
+  intros t1 t2 Hsteps.
+  simpsub.
+  auto.
+  }
+subst m.
+simpsubin Heq.
+injectionc Heq.
+intro Heq.
+so (native_elem_subst_form _#3 Heq) as [-> | ->].
+  {
+  right.
+  exists (native_unary f (var 0)).
+  simpsub.
+  split; auto.
+  intros t1 t2 Hsteps.
+  simpsub.
+  apply (plus_map' _ _ (native_unary f)); auto using step_native_unary1.
+  }
+
+  {
+  left.
+  exists (native_elem y).
+  intros t'.
+  simpsub.
+  apply step_native_unary2; auto.
+  }
+}
+
+(* native_binary1 *)
+{
+intros f m1 m1' m2 _ IH m Heq.
+so (native_binary_subst_form _#5 Heq) as [-> | (n1 & n2 & Heq')].
+  {
+  right.
+  exists (var 0).
+  simpsub.
+  split; auto.
+  intros t1 t2 Hsteps.
+  simpsub.
+  auto.
+  }
+subst m.
+simpsubin Heq.
+injectionc Heq.
+intros -> ->.
+so (IH _ (eq_refl _)) as [(q & Hsteps) | (p & Heq & Hsteps)].
+  {
+  left.
+  exists (native_binary f q n2).
+  intro t'.
+  simpsub.
+  apply step_native_binary1; auto.
+  }
+
+  {
+  subst n1.
+  right.
+  exists (native_binary f p (subst sh1 n2)).
+  split.
+    {
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    intros t1 t2 Hstepst.
+    simpsub.
+    apply (plus_map' _ _ (fun z => native_binary f z _)); auto using step_native_binary1.
+    }
+  }
+}
+
+(* native_binary2 *)
+{
+intros f x m2 m Heq.
+so (native_binary_subst_form _#5 Heq) as [-> | (n1 & n2 & Heq')].
+  {
+  right.
+  exists (var 0).
+  simpsub.
+  split; auto.
+  intros t1 t2 Hsteps.
+  simpsub.
+  auto.
+  }
+subst m.
+simpsubin Heq.
+injectionc Heq.
+intros -> Heq.
+so (native_elem_subst_form _#3 Heq) as [-> | ->].
+  {
+  right.
+  exists (native_binary f (var 0) (subst sh1 n2)).
+  simpsub.
+  split; auto.
+  intros t1 t2 Hsteps.
+  simpsub.
+  apply (plus_map' _ _ (fun z => native_binary f z _)); auto using step_native_binary1.
+  }
+
+  {
+  left.
+  exists (native_unary (f x) n2).
+  intros t'.
+  simpsub.
+  apply step_native_binary2; auto.
+  }
 }
 Qed.
 

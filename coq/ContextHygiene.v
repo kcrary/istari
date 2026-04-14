@@ -278,6 +278,45 @@ eapply hygiene_subst; eauto.
 Qed.
 
 
+Lemma substh_into_absent :
+  forall object P s (h : @hyp object),
+    hygieneh P h
+    -> (forall i, P i -> project s i = var i)
+    -> substh s h = h.
+Proof.
+intros object P s h Hhyg Heq.
+invertc Hhyg.
+  {
+  intros <-.
+  simpsub; auto.
+  }
+
+  {
+  intros <-.
+  simpsub; auto.
+  }
+
+  {
+  intros a Ha <-.
+  simpsub.
+  f_equal.
+  eapply subst_into_absent; eauto.
+  }
+
+  {
+  intros a Ha <-.
+  simpsub.
+  f_equal.
+  eapply subst_into_absent; eauto.
+  }
+
+  {
+  intros <-.
+  simpsub; auto.
+  }
+Qed.
+
+
 Lemma substh_closub :
   forall object P s (h : @hyp object),
     closub P s
@@ -377,6 +416,58 @@ split.
   refine (hygieneh_weaken _#4 _ Hhyg').
   intro; intros; eauto.
   }
+Qed.
+
+
+Lemma can_hygieneh :
+  forall object (h : @hyp object),
+    exists i, hygieneh (fun j => j < i) h.
+Proof.
+intros object h.
+induct h.
+
+{
+exists 0.
+apply hygieneh_tpl.
+}
+
+{
+exists 0.
+apply hygieneh_tp.
+}
+
+{
+intros a.
+so (can_hygiene a) as (i & Hi).
+exists i.
+apply hygieneh_tml; auto.
+}
+
+{
+intros a.
+so (can_hygiene a) as (i & Hi).
+exists i.
+apply hygieneh_tm; auto.
+}
+
+{
+exists 0.
+apply hygieneh_emp.
+}
+Qed.
+
+
+Lemma can_hygieneh' :
+  forall object (h : @hyp object),
+    exists i, forall j, i <= j -> hygieneh (fun k => k < j) h.
+Proof.
+intros object h.
+so (can_hygieneh _ h) as (i & Hi).
+exists i.
+intros j Hj.
+eapply hygieneh_weaken; eauto.
+intros k.
+omega.
 Qed.
 
 
@@ -514,6 +605,28 @@ destruct Hi as [Hi | Hi].
 Qed.
 
 
+Lemma hygienectx_weaken :
+  forall object (P Q : nat -> Prop) (G : @context object),
+    hincl P Q
+    -> hygienectx P G
+    -> hygienectx Q G.
+Proof.
+intros object P Q G Hincl.
+induct G.
+  {
+  intros _.
+  apply hygienectx_nil.
+  }
+intros h G IH H.
+invertc H.
+intros HG Hh.
+apply hygienectx_cons; auto.
+eapply hygieneh_weaken; eauto.
+intros l Hl.
+destruct Hl as [Hl | (H1 & H2)]; auto.
+Qed.
+
+
 Lemma hygienectx_subst :
   forall object (P Q : hpred) s (G : @context object),
     hygienectx P G
@@ -556,3 +669,53 @@ split.
   omega.
   }
 Qed.
+
+
+Lemma can_hygienectx :
+  forall object (G : @context object),
+    exists i, hygienectx (fun j => j < i) G.
+Proof.
+intros object G.
+induct G.
+  {
+  exists 0.
+  apply hygienectx_nil.
+  }
+intros h G (i1 & HG).
+so (can_hygieneh _ h) as (i2 & Hh).
+exists (max i1 i2).
+apply hygienectx_cons.
+  {
+  eapply hygienectx_weaken; eauto.
+  intros l Hl.
+  so (Nat.le_max_l i1 i2).
+  omega.
+  }
+
+  {
+  eapply hygieneh_weaken; eauto.
+  intros l Hl.
+  so (Nat.le_max_r i1 i2).
+  omega.
+  }
+Qed.
+
+
+Lemma can_hygienectx' :
+  forall object (G : @context object),
+    exists i, forall j, i <= j -> hygienectx (fun k => k < j) G.
+Proof.
+intros object G.
+so (can_hygienectx _ G) as (i & Hi).
+exists i.
+intros j Hj.
+eapply hygienectx_weaken; eauto.
+intros k.
+omega.
+Qed.
+
+
+Arguments can_hygieneh {object}.
+Arguments can_hygieneh' {object}.
+Arguments can_hygienectx {object}.
+Arguments can_hygienectx' {object}.

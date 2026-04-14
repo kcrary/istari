@@ -37,6 +37,7 @@ Require Import SemanticsFut.
 Require Import SemanticsGuard.
 Require Import SemanticsKind.
 Require Import SemanticsMu.
+Require Import SemanticsNative.
 Require Import SemanticsPi.
 Require Import SemanticsPositive.
 Require Import SemanticsQuotient.
@@ -508,6 +509,10 @@ with basicv : page -> bool -> nat -> sterm -> wiurel stop -> Prop :=
     forall pg s i a (A : wiurel stop),
       basic pg s i a A
       -> basicv pg s i (uptype a) (iuuptype stop i A)
+
+| interp_native :
+    forall pg s i A f,
+      basicv pg s i (nativetp A f) (iubase (native_urel A f stop i))
 
 
 with kbasic : page -> bool -> nat -> sterm -> qkind -> Prop :=

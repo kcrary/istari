@@ -28,21 +28,6 @@ Require Import SumLemmas.
 Require Import NatLemmas.
 
 
-Lemma def_strict :
-  forall a, equiv (app Defs.strict a) (subtype a (partial a)).
-Proof.
-intro a.
-unfold Defs.strict.
-apply steps_equiv.
-eapply star_step.
-  {
-  apply step_app2.
-  }
-simpsub.
-apply star_refl.
-Qed.
-
-
 Hint Rewrite def_partial def_halts def_admiss def_uptype def_seq def_padmiss def_strict : prepare.
 
 
