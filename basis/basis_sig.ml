@@ -387,6 +387,28 @@ module type FILE_SYSTEM =
    end
 
 
+module type PATH = 
+   sig 
+      exception Path 
+
+      val explode : string -> string list
+      val implode : string list -> string
+      val canonize : string -> string
+      val isAbsolute : string -> bool
+      val isRelative : string -> bool
+      val hasPath : string -> bool
+      val makeAbsolute : string -> string -> string
+      val join : string -> string -> string
+      val split : string -> string * string
+      val joinExt : string -> string -> string
+      val splitExt : string -> (string * string) option
+      val toWindowsPath : string -> string
+      val fromWindowsPath : string -> string
+      val fromHybridPath : string -> string
+
+   end
+
+
 module type GENERAL =
    sig
 

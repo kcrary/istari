@@ -955,6 +955,9 @@ module General : GENERAL =
    end
 
 
+module Path : PATH = Path
+
+
 module Cont : CONT =
    struct
 

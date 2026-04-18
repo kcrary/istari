@@ -570,9 +570,14 @@ structure Traverse :> TRAVERSE =
            | Etuple exps =>
                 (Etuple (map (traverseExp ctx) exps), span)
 
-           | Eapprecord (id, fields) =>
-                (Eapprecord (id, map (fn (label, exp) => (label, traverseExp ctx exp)) fields),
-                 span)
+           | Eapprecord (longid, fields) =>
+                (case C.lookupExp ctx longid of
+                    Present (longid', _) =>
+                       (Eapprecord (longid', map (fn (label, exp) => (label, traverseExp ctx exp)) fields),
+                        span)
+
+                  | Absent longid' =>
+                       raise (E.SemanticError ("unbound identifier " ^ longidToString longid', span)))
 
            | Elist exps =>
                 (Elist (map (traverseExp ctx) exps), span)
