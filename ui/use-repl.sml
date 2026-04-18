@@ -1,6 +1,6 @@
 CM.make "sources.cm";
 use "platform-nj.sml";
-CM.make "../ipp/basis/basis.cm";
+CM.make "../basis/basis.cm";
 
 local
 

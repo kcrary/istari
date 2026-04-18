@@ -32,6 +32,8 @@ module type INTEGER =
       val max : int -> int -> int
       val abs : int -> int
 
+      val ediv : int -> int -> int
+      val mod__ : int -> int -> int
       val divmod : int -> int -> int * int
 
       val s__e : int -> int -> bool

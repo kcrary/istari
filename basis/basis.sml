@@ -30,6 +30,8 @@ signature Basis__INTEGER =
       val max : int -> int -> int
       val abs : int -> int
 
+      val ediv : int -> int -> int
+      val mod : int -> int -> int
       val divmod : int -> int -> int * int
 
       val s__e : int -> int -> bool
@@ -519,6 +521,26 @@ structure Basis :> IML__BASIS =
             val minInt = IntInf.minInt
             val maxInt = IntInf.maxInt
 
+            fun ediv x y =
+               if x >= 0 then
+                  IntInf.quot (x, y)
+               else if y >= 0 then
+                  IntInf.quot (x, y) - 1
+               else
+                  IntInf.quot (x, y) + 1
+
+            fun op mod x y =
+               let
+                  val r = IntInf.rem (x, y)
+               in
+                  if r >= 0 then
+                     r
+                  else if y >= 0 then
+                     r + y
+                  else
+                     r - y
+               end
+
             fun divmod x y =
                let
                   val qr as (q, r) = IntInf.quotRem (x, y)
@@ -612,6 +634,26 @@ structure Basis :> IML__BASIS =
             type int = Int.int
             val minInt = Int.minInt
             val maxInt = Int.maxInt
+
+            fun ediv x y =
+               if x >= 0 then
+                  Int.quot (x, y)
+               else if y >= 0 then
+                  Int.quot (x, y) - 1
+               else
+                  Int.quot (x, y) + 1
+
+            fun op mod x y =
+               let
+                  val r = Int.rem (x, y)
+               in
+                  if r >= 0 then
+                     r
+                  else if y >= 0 then
+                     r + y
+                  else
+                     r - y
+               end
 
             fun divmod x y =
                let

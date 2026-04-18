@@ -18,6 +18,8 @@
           val max : int -> int -> int
           val abs : int -> int
 
+          val ediv : int -> int -> int
+          val mod : int -> int -> int
           val divmod : int -> int -> int * int
     
           val (=) : int -> int -> bool
@@ -61,6 +63,14 @@
   Given `x` and `y`, returns `(q, r)` such that `q * y + r = x` and 
   `0 <= r < abs(y)`.  Thus `q` is not necessarily `x div y` and `r` is
   not necessarily `x rem y`.
+
+- `ediv : int -> int -> int`
+
+  Returns the quotient determined by `divmod`.
+
+- `mod : int -> int -> int`
+
+  Returns the modulus determined by `divmod`.
 
 - `toString : int -> string`
 

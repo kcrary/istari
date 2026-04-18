@@ -31,6 +31,24 @@ module Int : INTEGER with type int = int =
       let max x y = if x > y then x else y
       let abs = Int.abs
 
+      let ediv x y =
+         if x >= 0 then
+            Int.div x y
+         else if y >= 0 then
+            Int.div x y - 1
+         else
+            Int.div x y + 1
+
+      let mod__ x y =
+         let r = Int.rem x y
+         in
+            if r >= 0 then
+               r
+            else if y >= 0 then
+               r + y
+            else
+               r - y
+
       let divmod x y =
          let q = Int.div x y 
          in
@@ -122,6 +140,8 @@ module IntInf : INT_INF with type int = Z.t =
          else
             Z.to_string x
 
+      let ediv = Z.ediv
+      let mod__ = Z.erem
       let divmod = Z.ediv_rem
 
       let fromInt = Z.of_int
