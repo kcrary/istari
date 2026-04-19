@@ -1105,6 +1105,11 @@ exact timeszCommute_valid.
 exact timeszAssoc_valid.
 exact timeszIdentity_valid.
 exact timeszDistPlusz_valid.
+exact divzType_valid.
+exact modzType_valid.
+exact modzSpec1_valid.
+exact modzSpec2_valid.
+exact divzSpec_valid.
 exact eqzbType_valid.
 exact eqzbSpec1_valid.
 exact eqzbSpec2_valid.

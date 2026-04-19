@@ -535,6 +535,15 @@ reflexivity.
 Qed.
 
 
+Add Parametric Morphism object : (@isquash object)
+  with signature equiv ==> equiv
+  as equiv_isquash.
+Proof.
+intros m1 m1' H1.
+apply (Defined.equiv_isquash _ m1 m1'); auto.
+Qed.
+
+
 Add Parametric Morphism object : (@native_binary object)
   with signature eq ==> equiv ==> equiv ==> equiv
   as equiv_native_binary.

@@ -506,3 +506,78 @@ positive case that works upwards.
     absz_minusz_leqz : type:absz_minusz_leqz
 
     absz_nat_to_integer : type:absz_nat_to_integer
+
+    absz_zero : type:absz_zero
+
+    absz_zero_invert : type:absz_zero_invert
+
+    absz_one : type:absz_one
+
+    absz_minus_one : type:absz_minus_one
+
+
+### Division
+
+Since divisors must be nonzero, we define `nonzero` as an abbreviation
+(*i.e.,* a soft constant):
+
+    nonzero : type:nonzero
+            = def:nonzero
+
+    divz : type:divz
+    
+    modz : type:modz
+
+    modz_spec : type:modz_spec
+
+    divz_spec : type:divz_spec
+
+    modz_nonneg : type:modz_nonneg
+
+    modz_ltz_r : type:modz_ltz_r
+
+    divz_prop : type:divz_prop
+
+    modz_prop : type:modz_prop
+
+    division_unique : type:division_unique
+
+    division_property : type:division_property
+
+    divz_timesz_r : type:divz_timesz_r
+
+    divz_timesz_l : type:divz_timesz_l
+
+    modz_timesz_r : type:modz_timesz_r
+
+    modz_timesz_l : type:modz_timesz_l
+
+    divz_0 : type:divz_0
+
+    modz_0 : type:modz_0
+
+    divz_1 : type:divz_1
+
+    modz_1 : type:modz_1
+
+    divz_self : type:divz_self
+
+    modz_self : type:modz_self
+
+    divz_plusz_r : type:divz_plusz_r
+
+    divz_plusz_l : type:divz_plusz_l
+
+    modz_plusz_r : type:modz_plusz_r
+
+    modz_plusz_l : type:modz_plusz_l
+
+    divz_minusz : type:divz_minusz
+
+    modz_minusz : type:modz_minusz
+
+    timesz_divz_l : type:timesz_divz_l
+
+    timesz_divz_r : type:timesz_divz_r
+
+

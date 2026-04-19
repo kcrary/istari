@@ -53,6 +53,7 @@ Definition admiss : fterm := lam (admiss (var 0)).
 Definition bool : fterm := booltp.
 Definition bottom : fterm := app theta (lam (var 0)).
 Definition coguard : fterm := lam (lam (coguard (var 1) (var 0))).
+Definition divz : fterm := lam (lam (native_binary Native.divz_native (var 1) (var 0))).
 Definition dprod : fterm := lam (lam (sigma (var 1) (var 1))).
 Definition eeqtp : fterm := lam (lam (prod (subtype (var 1) (var 0)) (subtype (var 0) (var 1)))).
 Definition eq : fterm := lam (lam (lam (equal (var 2) (var 1) (var 0)))).
@@ -94,6 +95,7 @@ Definition lmax : fterm :=
                          (app inr (app (app (var 4) (var 1)) (var 0)))))))).
 Definition lsucc : fterm := lam (app inr (var 0)).
 Definition lzero : fterm := app inl triv.
+Definition modz : fterm := lam (lam (native_binary Native.modz_native (var 1) (var 0))).
 Definition monotone : fterm := lam (alltp (alltp (pi (subtype (var 1) (var 0)) (subst sh1 (subtype (app (var 2) (var 1)) (app (var 2) (var 0))))))).
 Definition mu : fterm := lam (mu (app (var 1) (var 0))).
 Definition nat : fterm := nattp.

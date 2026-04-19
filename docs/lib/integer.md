@@ -75,7 +75,7 @@ example, zero is ``z`0``.
 
     ltz_0_1 : z`0 <z z`1
 
-    leqz_neg1_0 : z`-1 <z z`0
+    leqz_neg1_0 : z`-1 <z= z`0
 
     ltz_neg1_0 : z`-1 <z z`0
 
@@ -179,7 +179,7 @@ This one gives transitivity in the form needed for rewriting:
 
     (* <z? *)
     ltzb : integer -> integer -> bool
-         = fn a b . z`1 +z a <z=? b
+         = fn x y . z`1 +z x <z=? y
 
     (* !z=? *)
     neqzb : integer -> integer -> bool
@@ -242,7 +242,7 @@ positive case that works upwards.
     nat_to_integer (succ n) --> plusz z`1 (nat_to_integer n)
 
     integer_to_nat : integer -> nat
-                   =rec= fn a . if a <z=? z`0 then 0 else succ (integer_to_nat (z`-1 +z a))
+                   =rec= fn x . if x <z=? z`0 then 0 else succ (integer_to_nat (z`-1 +z x))
 
     nat_to_integer_inv : forall (n : nat) . integer_to_nat (nat_to_integer n) = n : nat
 
@@ -589,3 +589,92 @@ positive case that works upwards.
     absz_minusz_leqz : forall (a b : integer) . absz (a -z b) <z= absz a +z absz b
 
     absz_nat_to_integer : forall (n : nat) . absz (nat_to_integer n) = nat_to_integer n : integer
+
+    absz_zero : absz z`0 = z`0 : integer
+
+    absz_zero_invert : forall (a : integer) . absz a = z`0 : integer -> a = z`0 : integer
+
+    absz_one : absz z`1 = z`1 : integer
+
+    absz_minus_one : absz z`-1 = z`1 : integer
+
+
+### Division
+
+Since divisors must be nonzero, we define `nonzero` as an abbreviation
+(*i.e.,* a soft constant):
+
+    nonzero : U 0
+            = { x : integer | x != z`0 : integer }
+
+    divz : integer -> nonzero -> integer
+    
+    modz : integer -> nonzero -> integer
+
+    modz_spec : forall (a : integer) (b : nonzero) . z`0 <z= modz a b & modz a b <z absz b
+
+    divz_spec : forall (a : integer) (b : nonzero) . divz a b *z b +z modz a b = a : integer
+
+    modz_nonneg : forall (a : integer) (b : nonzero) . z`0 <z= modz a b
+
+    modz_ltz_r : forall (a : integer) (b : nonzero) . modz a b <z absz b
+
+    divz_prop : forall (a : integer) (b : nonzero) . divz a b *z b +z modz a b = a : integer
+
+    modz_prop : forall (a : integer) (b : nonzero) . modz a b = a -z divz a b *z b : integer
+
+    division_unique : forall (a : integer) (b : nonzero) (q q' r r' : integer) .
+                         a = q *z b +z r : integer
+                         -> a = q' *z b +z r' : integer
+                         -> z`0 <z= r
+                         -> z`0 <z= r'
+                         -> r <z absz b
+                         -> r' <z absz b
+                         -> q = q' : integer & r = r' : integer
+
+    division_property : forall (a : integer) (b : nonzero) (q r : integer) .
+                           a = q *z b +z r : integer
+                           -> z`0 <z= r
+                           -> r <z absz b
+                           -> divz a b = q : integer & modz a b = r : integer
+
+    divz_timesz_r : forall (a : integer) (b : nonzero) . divz (a *z b) b = a : integer
+
+    divz_timesz_l : forall (a : integer) (b : nonzero) . divz (b *z a) b = a : integer
+
+    modz_timesz_r : forall (a : integer) (b : nonzero) . modz (a *z b) b = z`0 : integer
+
+    modz_timesz_l : forall (a : integer) (b : nonzero) . modz (b *z a) b = z`0 : integer
+
+    divz_0 : forall (a : nonzero) . divz z`0 a = z`0 : integer
+
+    modz_0 : forall (a : nonzero) . modz z`0 a = z`0 : integer
+
+    divz_1 : forall (a : integer) . divz a z`1 = a : integer
+
+    modz_1 : forall (a : integer) . modz a z`1 = z`0 : integer
+
+    divz_self : forall (a : nonzero) . divz a a = z`1 : integer
+
+    modz_self : forall (a : nonzero) . modz a a = z`0 : integer
+
+    divz_plusz_r : forall (a : integer) (b : nonzero) .
+                      divz (a +z b) b = z`1 +z divz a b : integer
+
+    divz_plusz_l : forall (a : integer) (b : nonzero) .
+                      divz (b +z a) b = z`1 +z divz a b : integer
+
+    modz_plusz_r : forall (a : integer) (b : nonzero) . modz (a +z b) b = modz a b : integer
+
+    modz_plusz_l : forall (a : integer) (b : nonzero) . modz (b +z a) b = modz a b : integer
+
+    divz_minusz : forall (a : integer) (b : nonzero) .
+                     divz (a -z b) b = z`-1 +z divz a b : integer
+
+    modz_minusz : forall (a : integer) (b : nonzero) . modz (a -z b) b = modz a b : integer
+
+    timesz_divz_l : forall (a : integer) (b : nonzero) . divz a b *z b = a -z modz a b : integer
+
+    timesz_divz_r : forall (a : integer) (b : nonzero) . b *z divz a b = a -z modz a b : integer
+
+

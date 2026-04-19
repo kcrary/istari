@@ -8,6 +8,8 @@ Parameter onez : integer.
 Parameter plusz : integer -> integer -> integer.
 Parameter negz : integer -> integer.
 Parameter timesz : integer -> integer -> integer.
+Parameter divz : integer -> integer -> option integer.
+Parameter modz : integer -> integer -> option integer.
 Parameter eqzb : integer -> integer -> bool.
 Parameter leqzb : integer -> integer -> bool.
 
@@ -28,6 +30,10 @@ Axiom timesz_commute : forall x y, timesz x y = timesz y x.
 Axiom timesz_assoc : forall x y z, timesz (timesz x y) z = timesz x (timesz y z).
 Axiom timesz_identity : forall x, timesz onez x = x.
 Axiom timesz_dist_plusz : forall x y z, timesz x (plusz y z) = plusz (timesz x y) (timesz x z).
+Axiom divz_nonzero : forall x y, y <> zeroz -> exists z, divz x y = Some z.
+Axiom modz_nonzero : forall x y, y <> zeroz -> exists z, modz x y = Some z.
+Axiom modz_spec : forall x y r, y <> zeroz -> modz x y = Some r -> leqz zeroz r /\ leqz (plusz onez r) (if leqzb zeroz y then y else negz y).
+Axiom divz_spec : forall x y q r, y <> zeroz -> divz x y = Some q -> modz x y = Some r -> plusz (timesz q y) r = x.
 Axiom eqzb_spec : forall x y, eqzb x y = true <-> x = y.
 Axiom leqzb_spec : forall x y, leqzb x y = true <-> leqz x y.
 Axiom integer_characteristic : forall n, ~ (nat_to_integer (S n) = zeroz).
@@ -73,6 +79,28 @@ Definition timesz_native := binary_integer timesz.
 Definition eqzb_native := binary_integer_test eqzb.
 Definition leqzb_native := binary_integer_test leqzb.
 
+
+Definition divz_native (x y : native) : option native :=
+  (match (x, y) with
+   | (native_integer x', native_integer y') => 
+       match divz x' y' with
+       | Some z => Some (native_integer z)
+       | None => None
+       end
+
+   | _ => None
+   end).
+
+Definition modz_native (x y : native) : option native :=
+  (match (x, y) with
+   | (native_integer x', native_integer y') => 
+       match modz x' y' with
+       | Some z => Some (native_integer z)
+       | None => None
+       end
+
+   | _ => None
+   end).
 
 Definition symbol_eqb_native (x y : native) : option native :=
   (match (x, y) with

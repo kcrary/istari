@@ -3,8 +3,11 @@ File.import "logic-load.iml";
 File.import "nat-load.iml";
 File.import "omega-load.iml";
 File.import "tuple-load.iml";
+File.import "integer-load.iml";
 
 openModule /Nat/;
+
+aliasModule /Z/ /Integer/;
 
 beginModule "Division";
 
@@ -1279,6 +1282,82 @@ rewrite /-> gcd_commute/.
   {
   apply /gcd_ann_r/.
   }
+qed ();
+
+
+
+(* Relation to integers *)
+
+lemma "div_and_mod_to_integer"
+/
+  forall a (b : pos) .
+    Z.nat_to_integer (div a b) = Z.divz (Z.nat_to_integer a) (Z.nat_to_integer b) : integer
+    & Z.nat_to_integer (mod a b) = Z.modz (Z.nat_to_integer a) (Z.nat_to_integer b) : integer
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hpos/.
+unhide.
+assert /Z.nat_to_integer b != z`0 : integer/ /Hnonzero/.
+  {
+  intro /Heq/.
+  rewrite /<- Z.nat_to_integer_inv b in Hpos/.
+  rewrite /-> Heq in Hpos/.
+  omega.
+  }
+exploit /Z.division_property (Z.nat_to_integer a) (Z.nat_to_integer b) (Z.nat_to_integer (div a b)) (Z.nat_to_integer (mod a b))/ /Hdiv Hmod/.
+  {
+  symmetry.
+  transitivity /Z.nat_to_integer (div a b * b + mod a b)/.
+  1:{
+    compat.
+    apply /div_prop/.
+    }
+  rewrite /-> Z.plus_to_integer/.
+  rewrite /-> Z.times_to_integer/.
+  reflexivity.
+  }
+
+  {
+  apply /Z.nat_to_integer_nonneg/.
+  }
+
+  {
+  rewrite /-> Z.absz_nat_to_integer/.
+  apply /Z.nat_to_integer_mono_lt/.
+  apply /mod_lt_r/.
+  }
+
+  {
+  auto.
+  }
+qed ();
+
+
+
+lemma "div_to_integer"
+/
+  forall a (b : pos) .
+    Z.nat_to_integer (div a b) = Z.divz (Z.nat_to_integer a) (Z.nat_to_integer b) : integer
+/;
+
+inference.
+intro /a b/.
+apply /div_and_mod_to_integer/.
+qed ();
+
+
+
+lemma "mod_to_integer"
+/
+  forall a (b : pos) .
+    Z.nat_to_integer (mod a b) = Z.modz (Z.nat_to_integer a) (Z.nat_to_integer b) : integer
+/;
+
+inference.
+intro /a b/.
+apply /div_and_mod_to_integer/.
 qed ();
 
 

@@ -6443,6 +6443,26 @@ Syntactic equality is intended for internal use only.
 
       G |- forall (x : integer) . forall (y : integer) . forall (z : integer) . timesz x (plusz y z) = plusz (timesz x y) (timesz x z) : integer ext fn x . fn y . fn z . ()
 
+- `divzType`
+
+      G |- divz : integer -> forall (y : integer) . (y = integer_zero : integer -> void) -g> integer
+
+- `modzType`
+
+      G |- modz : integer -> forall (y : integer) . (y = integer_zero : integer -> void) -g> integer
+
+- `modzSpec1`
+
+      G |- forall (x : integer) . forall (y : integer) . (y = integer_zero : integer -> void) -> leqz integer_zero (modz x y) ext fn x . fn y . fn z . ()
+
+- `modzSpec2`
+
+      G |- forall (x : integer) . forall (y : integer) . (y = integer_zero : integer -> void) -> leqz (plusz integer_one (modz x y)) y ext fn x . fn y . fn z . ()
+
+- `divzSpec`
+
+      G |- forall (x : integer) . forall (y : integer) . (y = integer_zero : integer -> void) -> plusz (timesz (divz x y) y) (modz x y) = x : integer ext fn x . fn y . fn z . ()
+
 - `eqzbType`
 
       G |- eqzb : integer -> integer -> bool

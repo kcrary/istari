@@ -8,7 +8,11 @@
 
 - Library changes:
 
-  + Added material to `Eventually`, `Integer`, and `Rational`.
+  + Added integer division and other material to `Integer`.
+
+  + Added `Division` (natural number division).
+
+  + Added material to `Eventually` and `Rational`.
 
   + Added material to `Quotient`.  Changed the behavior of `destruct` on `Quotient.quotient1`.
 	

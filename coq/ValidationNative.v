@@ -75,6 +75,30 @@ Qed.
 Hint Rewrite subst_plusz : subst.
 
 
+Lemma subst_divz :
+  forall s,
+    subst s Defs.divz = Defs.divz.
+Proof.
+intro s.
+unfold Defs.divz.
+simpsub.
+reflexivity.
+Qed.
+Hint Rewrite subst_divz : subst.
+
+
+Lemma subst_modz :
+  forall s,
+    subst s Defs.modz = Defs.modz.
+Proof.
+intro s.
+unfold Defs.modz.
+simpsub.
+reflexivity.
+Qed.
+Hint Rewrite subst_modz : subst.
+
+
 Lemma nat_to_integer_equiv :
   forall n,
     equiv (app Defs.nat_to_integer (PageCode.natlit n)) (native_elem (native_integer (Native.nat_to_integer n))).
@@ -483,7 +507,51 @@ apply equiv_refl.
 Qed.
 
 
-Hint Rewrite def_integer def_integer_zero def_integer_one def_plusz def_negz def_timesz def_eqzb def_leqzb def_symbol_eqb def_leqz : prepare.
+Lemma def_divz :
+  forall a b,
+    equiv (app (app Defs.divz a) b) (native_binary divz_native a b).
+Proof.
+intros a b.
+unfold Defs.divz.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app1.
+  apply step_app2.
+  }
+simpsub.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl.
+Qed.
+
+
+Lemma def_modz :
+  forall a b,
+    equiv (app (app Defs.modz a) b) (native_binary modz_native a b).
+Proof.
+intros a b.
+unfold Defs.modz.
+apply steps_equiv.
+eapply star_step.
+  {
+  apply step_app1.
+  apply step_app2.
+  }
+simpsub.
+eapply star_step.
+  {
+  apply step_app2.
+  }
+simpsub.
+apply star_refl.
+Qed.
+
+
+Hint Rewrite def_integer def_integer_zero def_integer_one def_plusz def_negz def_timesz def_eqzb def_leqzb def_symbol_eqb def_leqz def_divz def_modz : prepare.
 Hint Rewrite def_pi def_arrow def_nat def_zero def_succ : prepare.
 
 
@@ -873,6 +941,628 @@ rewrite -> (equiv_native_binary_eval _#3 (native_integer (timesz x y))); auto.
 rewrite -> (equiv_native_binary_eval _#3 (native_integer (timesz x z))); auto.
 rewrite -> (equiv_native_binary_eval _#3 (native_integer (plusz (timesz x y) (timesz x z)))); auto.
 rewrite -> timesz_dist_plusz.
+apply tr_nativetp_intro.
+Qed.
+
+
+Lemma divzType_valid : divzType_obligation.
+Proof.
+prepare.
+intro G.
+rewrite -> def_guard.
+unfold Defs.divz.
+simpsub.
+apply tr_pi_intro.
+  {
+  apply tr_nativetp_istype.
+  }
+apply tr_native_left.
+intro x.
+simpsub.
+apply tr_pi_intro.
+  {
+  apply tr_nativetp_istype.
+  }
+apply tr_native_left.
+intro y.
+simpsub.
+apply tr_guard_intro.
+  {
+  apply tr_pi_formation.
+    {
+    apply tr_equal_formation.
+      {
+      apply tr_nativetp_istype.
+      }
+
+      {
+      apply tr_nativetp_intro.
+      }
+
+      {
+      apply tr_nativetp_intro.
+      }
+    }
+
+    {
+    apply tr_voidtp_istype.
+    }
+  }
+simpsub.
+remember (eqzb y zeroz) as b eqn:Heqb.
+symmetry in Heqb.
+destruct b.
+  {
+  rewrite -> eqzb_spec in Heqb.
+  subst y.
+  apply (tr_voidtp_elim _ (app (var 0) triv) (app (var 0) triv)).
+  eapply tr_pi_elim'.
+    {
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    apply tr_equal_intro.
+    apply tr_nativetp_intro.
+    }
+
+    {
+    simpsub.
+    auto.
+    }
+  }
+exploit (divz_nonzero x y) as (z & Heq).
+  {
+  intro H.
+  subst y.
+  rewrite -> (eqzb_spec zeroz zeroz ander (eq_refl _)) in Heqb.
+  discriminate Heqb.
+  }
+rewrite -> (equiv_native_binary_eval _ (native_integer x) (native_integer y) (native_integer z)).
+  {
+  apply tr_nativetp_intro.
+  }
+
+  {
+  cbn.
+  rewrite -> Heq.
+  auto.
+  }
+Qed.
+
+
+Lemma modzType_valid : modzType_obligation.
+Proof.
+prepare.
+intro G.
+rewrite -> def_guard.
+unfold Defs.modz.
+simpsub.
+apply tr_pi_intro.
+  {
+  apply tr_nativetp_istype.
+  }
+apply tr_native_left.
+intro x.
+simpsub.
+apply tr_pi_intro.
+  {
+  apply tr_nativetp_istype.
+  }
+apply tr_native_left.
+intro y.
+simpsub.
+apply tr_guard_intro.
+  {
+  apply tr_pi_formation.
+    {
+    apply tr_equal_formation.
+      {
+      apply tr_nativetp_istype.
+      }
+
+      {
+      apply tr_nativetp_intro.
+      }
+
+      {
+      apply tr_nativetp_intro.
+      }
+    }
+
+    {
+    apply tr_voidtp_istype.
+    }
+  }
+simpsub.
+remember (eqzb y zeroz) as b eqn:Heqb.
+symmetry in Heqb.
+destruct b.
+  {
+  rewrite -> eqzb_spec in Heqb.
+  subst y.
+  apply (tr_voidtp_elim _ (app (var 0) triv) (app (var 0) triv)).
+  eapply tr_pi_elim'.
+    {
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    apply tr_equal_intro.
+    apply tr_nativetp_intro.
+    }
+
+    {
+    simpsub.
+    auto.
+    }
+  }
+exploit (modz_nonzero x y) as (z & Heq).
+  {
+  intro H.
+  subst y.
+  rewrite -> (eqzb_spec zeroz zeroz ander (eq_refl _)) in Heqb.
+  discriminate Heqb.
+  }
+rewrite -> (equiv_native_binary_eval _ (native_integer x) (native_integer y) (native_integer z)).
+  {
+  apply tr_nativetp_intro.
+  }
+
+  {
+  cbn.
+  rewrite -> Heq.
+  auto.
+  }
+Qed.
+
+
+Lemma modzSpec1_valid : modzSpec1_obligation.
+Proof.
+prepare.
+intro G.
+unfold Defs.modz.
+simpsub.
+cbn [Nat.add].
+apply tr_pi_intro.
+  {
+  apply tr_nativetp_istype.
+  }
+apply tr_native_left.
+intro x.
+simpsub.
+apply tr_pi_intro.
+  {
+  apply tr_nativetp_istype.
+  }
+apply tr_native_left.
+intro y.
+simpsub.
+apply tr_pi_intro.
+  {
+  apply tr_pi_formation.
+    {
+    apply tr_equal_formation.
+      {
+      apply tr_nativetp_istype.
+      }
+
+      {
+      apply tr_nativetp_intro.
+      }
+
+      {
+      apply tr_nativetp_intro.
+      }
+    }
+
+    {
+    apply tr_voidtp_istype.
+    }
+  }
+simpsub.
+remember (eqzb y zeroz) as b eqn:Heqb.
+symmetry in Heqb.
+destruct b.
+  {
+  rewrite -> eqzb_spec in Heqb.
+  subst y.
+  apply (tr_voidtp_elim _ (app (var 0) triv) (app (var 0) triv)).
+  eapply tr_pi_elim'.
+    {
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    apply tr_equal_intro.
+    apply tr_nativetp_intro.
+    }
+
+    {
+    simpsub.
+    auto.
+    }
+  }
+assert (y <> zeroz) as Hnonzero.
+  {
+  intro H.
+  subst y.
+  rewrite -> (eqzb_spec zeroz zeroz ander (eq_refl _)) in Heqb.
+  discriminate Heqb.
+  }
+exploit (modz_nonzero x y) as (z & Heq); auto.
+exploit (modz_spec x y z) as (Hleq & _); auto.
+destruct Hleq as (n & Hleq).
+rewrite -> plusz_commute in Hleq.
+rewrite -> plusz_identity in Hleq.
+subst z.
+apply (tr_isquash_intro _ _ (ppair (PageCode.natlit n) triv)).
+apply tr_sigma_intro.
+  {
+  apply tr_natlit_nattp.
+  }
+
+  {
+  simpsub.
+  apply tr_equal_intro.
+  rewrite -> !nat_to_integer_equiv.
+  cbn [Nat.add].
+  rewrite -> (equiv_native_binary_eval _#3 (native_integer (nat_to_integer n))).
+  2:{
+    cbn.
+    rewrite -> plusz_identity.
+    auto.
+    }
+  rewrite -> (equiv_native_binary_eval _#3 (native_integer (nat_to_integer n))).
+  2:{
+    cbn.
+    rewrite -> Heq.
+    auto.
+    }
+  apply tr_nativetp_intro.
+  }
+
+  {
+  apply tr_equal_formation.
+    {
+    apply tr_nativetp_istype.
+    }
+
+    {
+    apply (tr_native_binary _ _ _ native_integer native_integer native_integer plusz); auto.
+      {
+      apply tr_nativetp_intro.
+      }
+      
+      {
+      eapply tr_pi_elim'.
+        {
+        apply nat_to_integer_type.
+        }
+
+        {
+        eapply hypothesis; eauto using index_0.
+        }
+
+        {
+        simpsub; auto.
+        }
+      }
+    }
+
+    {
+    rewrite -> (equiv_native_binary_eval _#3 (native_integer (nat_to_integer n))).
+    2:{
+      cbn.
+      rewrite -> Heq.
+      auto.
+      }
+    apply tr_nativetp_intro.
+    }
+  }
+Qed.
+
+
+Hint Rewrite def_ite : prepare.
+
+
+Lemma modzSpec2_valid : modzSpec2_obligation.
+Proof.
+prepare.
+intro G.
+unfold Defs.modz.
+simpsub.
+cbn [Nat.add].
+apply tr_pi_intro.
+  {
+  apply tr_nativetp_istype.
+  }
+apply tr_native_left.
+intro x.
+simpsub.
+apply tr_pi_intro.
+  {
+  apply tr_nativetp_istype.
+  }
+apply tr_native_left.
+intro y.
+simpsub.
+apply tr_pi_intro.
+  {
+  apply tr_pi_formation.
+    {
+    apply tr_equal_formation.
+      {
+      apply tr_nativetp_istype.
+      }
+
+      {
+      apply tr_nativetp_intro.
+      }
+
+      {
+      apply tr_nativetp_intro.
+      }
+    }
+
+    {
+    apply tr_voidtp_istype.
+    }
+  }
+simpsub.
+remember (eqzb y zeroz) as b eqn:Heqb.
+symmetry in Heqb.
+destruct b.
+  {
+  rewrite -> eqzb_spec in Heqb.
+  subst y.
+  apply (tr_voidtp_elim _ (app (var 0) triv) (app (var 0) triv)).
+  eapply tr_pi_elim'.
+    {
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    apply tr_equal_intro.
+    apply tr_nativetp_intro.
+    }
+
+    {
+    simpsub.
+    auto.
+    }
+  }
+assert (y <> zeroz) as Hnonzero.
+  {
+  intro H.
+  subst y.
+  rewrite -> (eqzb_spec zeroz zeroz ander (eq_refl _)) in Heqb.
+  discriminate Heqb.
+  }
+exploit (modz_nonzero x y) as (z & Heq); auto.
+exploit (modz_spec x y z) as (_ & Hlt); auto.
+destruct Hlt as (n & Hleq).
+apply (tr_isquash_intro _ _ (ppair (PageCode.natlit n) triv)).
+apply tr_sigma_intro.
+  {
+  apply tr_natlit_nattp.
+  }
+
+  {
+  simpsub.
+  apply tr_equal_intro.
+  rewrite -> !nat_to_integer_equiv.
+  cbn [Nat.add].
+  rewrite -> (equiv_native_binary_eval modz_native _ _ (native_integer z)).
+  2:{
+    cbn.
+    rewrite -> Heq.
+    auto.
+    }
+  rewrite -> (equiv_native_binary_eval plusz_native _ _ (native_integer (plusz onez z))).
+  2:{
+    cbn.
+    auto.
+    }
+  rewrite -> (equiv_native_binary_eval plusz_native _ _ (native_integer (plusz (plusz onez z) (nat_to_integer n)))).
+  2:{
+    cbn.
+    auto.
+    }
+  rewrite -> (equiv_native_binary_eval leqzb_native _ _ (native_bool (leqzb zeroz y))).
+  2:{
+    cbn.
+    auto.
+    }
+  rewrite -> (equiv_native_unary_eval negz_native _ (native_integer (negz y))).
+  2:{
+    cbn.
+    auto.
+    }
+  revert Hleq.
+  remember (leqzb zeroz y) as b eqn:Heqb'.
+  destruct b.
+    {
+    fold (@btrue obj).
+    rewrite -> equiv_bite_l.
+    intros <-.
+    rewrite -> plusz_commute.
+    apply tr_nativetp_intro.
+    }
+
+    {
+    fold (@bfalse obj).
+    rewrite -> equiv_bite_r.
+    intros <-.
+    rewrite -> plusz_commute.
+    apply tr_nativetp_intro.
+    }
+  }
+
+  {
+  apply tr_equal_formation.
+    {
+    apply tr_nativetp_istype.
+    }
+
+    {
+    rewrite -> (equiv_native_binary_eval modz_native _ _ (native_integer z)).
+    2:{
+      cbn.
+      rewrite -> Heq.
+      auto.
+      }
+    rewrite -> (equiv_native_binary_eval plusz_native _ _ (native_integer (plusz onez z))); auto.
+    apply (tr_native_binary _ _ _ native_integer native_integer native_integer plusz); auto.
+      {
+      apply tr_nativetp_intro.
+      }
+      
+      {
+      eapply tr_pi_elim'.
+        {
+        apply nat_to_integer_type.
+        }
+
+        {
+        eapply hypothesis; eauto using index_0.
+        }
+
+        {
+        simpsub; auto.
+        }
+      }
+    }
+
+    {
+    replace (nativetp integer native_integer) with (@subst1 obj (native_binary leqzb_native (native_elem (native_integer zeroz)) (native_elem (native_integer y))) (subst sh1 (nativetp integer native_integer))) by (simpsub; auto).
+    apply tr_booltp_elim.
+      {
+      simpsub.
+      rewrite -> (equiv_native_binary_eval leqzb_native _ _ (native_bool (leqzb zeroz y))).
+      2:{
+        cbn.
+        auto.
+        }
+      apply tr_booltp_intro_native.
+      }
+
+      {
+      simpsub.
+      apply tr_nativetp_intro.
+      }
+
+      {
+      simpsub.
+      apply (tr_native_unary _ _ native_integer native_integer negz negz_native); auto.
+      apply tr_nativetp_intro.
+      }
+    }
+  }
+Qed.
+
+
+Lemma divzSpec_valid : divzSpec_obligation.
+Proof.
+prepare.
+intro G.
+unfold Defs.divz, Defs.modz.
+simpsub.
+cbn [Nat.add].
+apply tr_pi_intro.
+  {
+  apply tr_nativetp_istype.
+  }
+apply tr_native_left.
+intro x.
+simpsub.
+apply tr_pi_intro.
+  {
+  apply tr_nativetp_istype.
+  }
+apply tr_native_left.
+intro y.
+simpsub.
+apply tr_pi_intro.
+  {
+  apply tr_pi_formation.
+    {
+    apply tr_equal_formation.
+      {
+      apply tr_nativetp_istype.
+      }
+
+      {
+      apply tr_nativetp_intro.
+      }
+
+      {
+      apply tr_nativetp_intro.
+      }
+    }
+
+    {
+    apply tr_voidtp_istype.
+    }
+  }
+simpsub.
+remember (eqzb y zeroz) as b eqn:Heqb.
+symmetry in Heqb.
+destruct b.
+  {
+  rewrite -> eqzb_spec in Heqb.
+  subst y.
+  apply (tr_voidtp_elim _ (app (var 0) triv) (app (var 0) triv)).
+  eapply tr_pi_elim'.
+    {
+    eapply hypothesis; eauto using index_0.
+    simpsub.
+    reflexivity.
+    }
+
+    {
+    apply tr_equal_intro.
+    apply tr_nativetp_intro.
+    }
+
+    {
+    simpsub.
+    auto.
+    }
+  }
+assert (y <> zeroz) as Hnonzero.
+  {
+  intro H.
+  subst y.
+  rewrite -> (eqzb_spec zeroz zeroz ander (eq_refl _)) in Heqb.
+  discriminate Heqb.
+  }
+exploit (divz_nonzero x y) as (q & Heqq); auto.
+exploit (modz_nonzero x y) as (r & Heqr); auto.
+apply tr_equal_intro.
+rewrite -> (equiv_native_binary_eval divz_native _ _ (native_integer q)).
+2:{
+  cbn.
+  rewrite -> Heqq.
+  auto.
+  }
+rewrite -> (equiv_native_binary_eval modz_native _ _ (native_integer r)).
+2:{
+  cbn.
+  rewrite -> Heqr.
+  auto.
+  }
+rewrite -> (equiv_native_binary_eval timesz_native _ _ (native_integer (timesz q y))); auto.
+rewrite -> (equiv_native_binary_eval plusz_native _ _ (native_integer (plusz (timesz q y) r))); auto.
+erewrite -> divz_spec; eauto.
 apply tr_nativetp_intro.
 Qed.
 
@@ -1365,6 +2055,10 @@ eapply tr_pi_elim3'; eauto.
   reflexivity.
   }
 Qed.
+
+
+
+
 
 
 Lemma integerCharacteristic_valid : integerCharacteristic_obligation.

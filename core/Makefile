@@ -37,7 +37,7 @@ eventually.isto : logic.isto misc.isto sqstable.isto
 finite.isto : logic.isto decidable.isto list.isto
 finite-map.isto : bool.isto decidable.isto function.isto kindlike.isto list.isto logic.isto option.isto permutation.isto
 function.isto : logic.isto
-integer.isto : acc.isto bool.isto decidable.isto nat.isto partial.isto stable.isto
+integer.isto : acc.isto bool.isto decidable.isto logic.isto nat.isto partial.isto stable.isto
 irrelevance.isto : function.isto misc.isto
 kindlike.isto : eventually.isto function.isto misc.isto
 list.isto : bool.isto datatype.isto decidable.isto function.ist kindlike.ist logic.isto misc.isto nat.isto option.isto partial.isto

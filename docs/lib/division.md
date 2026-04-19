@@ -154,3 +154,16 @@ This relates the remainders of the divisions in `div_assoc`:
     gcd_ann_r : forall (a : pos) . gcd a 1 = 1 : nat
 
     gcd_ann_l : forall (a : pos) . gcd 1 a = 1 : nat
+
+
+### Relation to integers
+
+    div_to_integer : forall (a : nat) (b : pos) .
+                        Integer.nat_to_integer (div a b)
+                          = Integer.divz (Integer.nat_to_integer a) (Integer.nat_to_integer b)
+                          : integer
+
+    mod_to_integer : forall (a : nat) (b : pos) .
+                        Integer.nat_to_integer (mod a b)
+                          = Integer.modz (Integer.nat_to_integer a) (Integer.nat_to_integer b)
+                          : integer

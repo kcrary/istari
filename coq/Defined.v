@@ -3,6 +3,7 @@ Require Import Tactics.
 Require Import Syntax.
 Require Import Subst.
 Require Import SimpSub.
+Require Import Equivalence.
 
 
 Definition letnext {object} m n : term object :=
@@ -184,6 +185,18 @@ simpsub.
 reflexivity.
 Qed.
 Hint Rewrite subst_isquash : subst.
+
+
+Lemma equiv_isquash :
+  forall object (a a' : term object),
+    equiv a a'
+    -> equiv (isquash a) (isquash a').
+Proof.
+intros object a a' Ha.
+apply equiv_compat.
+apply mc_oper; repeat2 (apply mcr_cons); [.. | apply mcr_nil]; auto using equiv_refl.
+apply equiv_subst; auto.
+Qed.
 
 
 Definition intersect2 {object} (a b : @term object) :=

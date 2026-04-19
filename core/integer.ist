@@ -17,6 +17,8 @@ aliasExport /leqzb/ Prim.leqzb;
 aliasExport /negz/ Prim.negz;
 aliasExport /plusz/ Prim.plusz;
 aliasExport /timesz/ Prim.timesz;
+aliasExport /divz/ Prim.divz;
+aliasExport /modz/ Prim.modz;
 
 
 (* Built-in:
@@ -4559,6 +4561,23 @@ qed ();
 
 
 
+lemma "absz_zero_invert"
+/
+  forall a . absz a = z`0 : integer -> a = z`0 : integer
+/;
+
+inference.
+intro /a/.
+unfold /absz/.
+boolCase /z`0 <z=? a/ /Hle/ >> auto.
+intro /H1/.
+so /negz_compat _ _ H1/ /H2/.
+rewrite /-> negz_invol in H2/.
+hyp /H2/.
+qed ();
+
+
+
 lemma "absz_one"
 /
   absz z`1 = z`1 : integer
@@ -4577,6 +4596,711 @@ lemma "absz_minus_one"
 
 unfold /absz/.
 reflexivity.
+qed ();
+
+
+
+(* Division *)
+
+define /nonzero/
+/
+  { x : integer | x != z`0 : integer }
+//
+  U 0
+/;
+
+unfold /nonzero/.
+typecheck.
+qed ();
+setOpacity /nonzero/ Constant.SOFT;
+
+
+
+lemma "divz_type"
+/
+  divz : integer -> nonzero -> integer
+/;
+
+assert /_/ /Htype/.
+  {
+  RuleTactic.divzType.
+  }
+fold /not _ within _ in Htype/.
+fold /neq _ _ _ within _ in Htype/.
+unfold /integer_zero in Htype/.
+introOf /x/.
+  {
+  subsume /_/ >>> [idtac, hyp /Htype/].
+  typecheck.
+  }
+introOf /y/.
+  {
+  inferSpine /Htype/ /__ x/ /Htype'/.
+  subsume /_/ >>> [idtac, hyp /Htype'/].
+  typecheck.
+  }
+destruct /y/ /y Hnzero/.
+unhide.
+inferSpine /Htype/ /__ x y/ /H/ >> auto.
+qed ();
+recordTyping "divz_type";
+
+
+
+lemma "modz_type"
+/
+  modz : integer -> nonzero -> integer
+/;
+
+assert /_/ /Htype/.
+  {
+  RuleTactic.modzType.
+  }
+fold /not _ within _ in Htype/.
+fold /neq _ _ _ within _ in Htype/.
+unfold /integer_zero in Htype/.
+introOf /x/.
+  {
+  subsume /_/ >>> [idtac, hyp /Htype/].
+  typecheck.
+  }
+introOf /y/.
+  {
+  inferSpine /Htype/ /__ x/ /Htype'/.
+  subsume /_/ >>> [idtac, hyp /Htype'/].
+  typecheck.
+  }
+destruct /y/ /y Hnzero/.
+unhide.
+inferSpine /Htype/ /__ x y/ /H/ >> auto.
+qed ();
+recordTyping "modz_type";
+
+
+
+lemma "modz_spec"
+/
+  forall (a : integer) (b : nonzero) .
+    leqz z`0 (modz a b) & ltz (modz a b) (absz b)
+/;
+
+intro /x y/.
+destruct /y/ /y Hnzero/.
+split.
+  {
+  unhide.
+  revert /x y Hnzero/.
+  fold /integer_zero at 0 0/.
+  unfold /neq/.
+  unfold /not/.
+  RuleTactic.modzSpec1.
+  }
+
+  {
+  unhide.
+  revert /x y Hnzero/.
+  fold /integer_zero/.
+  unfold /ltz/.
+  fold /integer_one/.
+  unfold /neq/.
+  unfold /not/.
+  unfold /absz/.
+  fold /integer_zero/.
+  RuleTactic.modzSpec2.
+  }
+qed ();
+
+
+
+lemma "divz_spec"
+/
+  forall (a : integer) (b : nonzero) .
+    divz a b *z b +z modz a b = a : integer
+/;
+
+intro /x (y Hnzero)/.
+unhide.
+revert /x y Hnzero/.
+fold /integer_zero/.
+unfold /neq/.
+unfold /not/.
+RuleTactic.divzSpec.
+qed ();
+
+
+
+lemma "modz_nonneg"
+/
+  forall a (b : nonzero) .
+    z`0 <z= modz a b
+/;
+
+inference.
+intro /a b/.
+apply /modz_spec a b/.
+qed ();
+
+
+
+lemma "modz_ltz_r"
+/
+  forall a (b : nonzero) .
+    modz a b <z absz b
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hnzero/.
+unhide.
+exact /modz_spec a b #2/.
+qed ();
+
+
+
+(* same as divz_spec *)
+lemma "divz_prop"
+/
+  forall a (b : nonzero) .
+    divz a b *z b +z modz a b = a : integer
+/;
+
+exact /divz_spec/.
+qed ();
+
+
+
+lemma "modz_prop"
+/
+  forall a (b : nonzero) .
+    modz a b = a -z divz a b *z b : integer
+/;
+
+inference.
+intro /a b/.
+unfold /minusz/.
+apply /plusz_shift_r/.
+rewrite /-> plusz_commute/.
+apply /divz_spec/.
+qed ();
+
+
+
+lemma "division_unique"
+/
+  forall a (b : nonzero) q q' r r' .
+    a = q *z b +z r : integer
+    -> a = q' *z b +z r' : integer
+    -> z`0 <z= r
+    -> z`0 <z= r'
+    -> r <z absz b
+    -> r' <z absz b
+    -> q = q' : integer & r = r' : integer
+/;
+
+inference.
+intro /a b q q' r r' Hdiv Hdiv' Hmodlo Hmodlo' Hmodhi Hmodhi'/.
+so /Hdiv'/ /H/.
+rewrite /-> Hdiv in H/.
+rewrite /-> plusz_shift_l in H/.
+rewrite /<- plusz_assoc in H/.
+rewrite /-> negz_dist_timesz_l in H/.
+rewrite /<- timesz_dist_plusz_l in H/.
+rewrite /-> plusz_commute in H at 1/.
+assert /exists d . (q +z ~z q') *z b = d *z absz b : integer/ /d Hd/.
+  {
+  clear /H/.
+  inference.
+  unfold /absz/.
+  boolCase /z`0 <z=? b/ /Hlt/.
+    {
+    exists /q +z ~z q'/.
+    auto.
+    }
+
+    {
+    exists /~z q +z q'/.
+    rewrite /<- negz_dist_timesz_r/.
+    rewrite /-> negz_dist_timesz_l/.
+    rewrite /-> negz_plusz/.
+    rewrite /-> negz_invol/.
+    reflexivity.
+    }
+  }
+moveBefore /d/ /H/.
+rewrite /-> Hd in H/.
+so /integer_trichotomy d z`0/ /Hlt | Heq | Hlt/.
+1:{
+  subst /d/.
+  rewrite /-> timesz_ann_l in H/.
+  rewrite /-> plusz_id_l in H/.
+  subst /r'/.
+  split >> auto.
+  rewrite /-> timesz_ann_l in Hd/.
+  so /integer_integral_domain _# 2 Hd/ /Heq | Heq/.
+    {
+    rewrite /<- plusz_shift_rl in Heq/.
+    rewrite /-> plusz_id_l in Heq/.
+    auto.
+    }
+
+    {
+    destruct /b/ /b Hnonzero/.
+    unhide.
+    subst /b/.
+    so /Hnonzero ()/ /0/.
+    }
+  }
+
+  {
+  exfalso.
+  rewrite /<- not_ltz in Hmodlo'/.
+  witness /Hmodlo' __/.
+  subst /r'/.
+  so /Hmodhi/ /H/.
+  so /plusz_ltz_r (d *z absz b) (d *z absz b) _ _ (leqz_refl _) H/ /H'/.
+  witness /ltz_leqz_trans _# 3 H' __/.
+  clear /H H'/.
+  rewrite /<- timesz_id_l (absz b) at 1/.
+  rewrite /<- timesz_dist_plusz_l/.
+  apply /timesz_leqz_zero_neg_pos/.
+    {
+    unfold /ltz in Hlt/.
+    rewrite /-> plusz_commute/ >> auto.
+    }
+
+    {
+    apply /absz_nonneg/.
+    }
+  }
+
+  {
+  exfalso.
+  rewrite /<- not_leqz in Hmodhi'/.
+  witness /Hmodhi' __/.
+  subst /r'/.
+  so /Hmodlo/ /H/.
+  apply /leqz_trans _ (d *z absz b)/.
+    {
+    rewrite /<- timesz_id_l (absz b)/.
+    apply /timesz_leqz_r/.
+      {
+      apply /absz_nonneg/.
+      }
+
+      {
+      unfold /ltz in Hlt/.
+      rewrite /-> plusz_id_r in Hlt/.
+      auto.
+      }
+    }
+
+    {
+    rewrite /<- (plusz_id_r (d *z absz b))/.
+    apply /plusz_leqz/ >> auto.
+    apply /leqz_refl/.
+    }
+  }
+qed ();
+
+
+
+lemma "division_property"
+/
+  forall a (b : nonzero) q r .
+    a = q *z b +z r : integer
+    -> z`0 <z= r
+    -> r <z absz b
+    -> divz a b = q : integer & modz a b = r : integer
+/;
+
+inference.
+intro /a b q r Hdiv Hmodlo Hmodhi/.
+apply /division_unique a b/ >> auto.
+  {
+  symmetry.
+  apply /divz_prop/.
+  }
+
+  {
+  apply /modz_nonneg/.
+  }
+
+  {
+  apply /modz_ltz_r/.
+  }
+qed ();
+
+
+
+lemma "divz_timesz_r"
+/
+  forall a (b : nonzero) .
+    divz (a *z b) b = a : integer
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hpos/.
+unhide.
+witness /division_property _ _ a z`0 __ __ __ #1/.
+  {
+  rewrite /-> plusz_id_r/ >> auto.
+  }
+
+  {
+  apply /leqz_refl/.
+  }
+
+  {
+  apply /not_leqz/.
+  contrapositive /Hpos/.
+  apply /absz_zero_invert/.
+  apply /leqz_antisymm/ >> auto.
+  apply /absz_nonneg/.
+  }
+qed ();
+
+
+
+lemma "divz_timesz_l"
+/
+  forall a (b : nonzero) .
+    divz (b *z a) b = a : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> timesz_commute/.
+apply /divz_timesz_r/.
+qed ();
+
+
+
+lemma "modz_timesz_r"
+/
+  forall a (b : nonzero) .
+    modz (a *z b) b = z`0 : integer
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hpos/.
+unhide.
+witness /division_property _ _ a z`0 __ __ __ #2/.
+  {
+  rewrite /-> plusz_id_r/ >> auto.
+  }
+
+  {
+  apply /leqz_refl/.
+  }
+
+  {
+  apply /not_leqz/.
+  contrapositive /Hpos/.
+  apply /absz_zero_invert/.
+  apply /leqz_antisymm/ >> auto.
+  apply /absz_nonneg/.
+  }
+qed ();
+
+
+
+lemma "modz_timesz_l"
+/
+  forall a (b : nonzero) .
+    modz (b *z a) b = z`0 : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> timesz_commute/.
+apply /modz_timesz_r/.
+qed ();
+
+
+
+lemma "divz_0"
+/
+  forall (a : nonzero) . divz z`0 a = z`0 : integer
+/;
+
+intro /a/.
+rewrite /<- timesz_ann_r a/.
+rewrite /-> divz_timesz_l/.
+auto.
+qed ();
+
+
+
+lemma "modz_0"
+/
+  forall (a : nonzero) . modz z`0 a = z`0 : integer
+/;
+
+intro /a/.
+rewrite /-> modz_prop/.
+rewrite /-> divz_0/.
+rewrite /-> timesz_ann_l/.
+unfold /minusz/.
+reflexivity.
+qed ();
+
+
+
+lemma "divz_1"
+/
+  forall a . divz a z`1 = a : integer
+/;
+
+inference.
+intro /a/.
+assert /z`1 != z`0 : integer/ /Hnonzero/.
+  {
+  intro /H/.
+  symmetryIn /H/.
+  so /neq_0_1 H/ /0/.
+  }
+rewrite /<- timesz_id_r a/.
+rewrite /-> divz_timesz_r/.
+auto.
+qed ();
+
+
+
+lemma "modz_1"
+/
+  forall a . modz a z`1 = z`0 : integer
+/;
+
+inference.
+intro /a/.
+assert /z`1 != z`0 : integer/ /Hnonzero/.
+  {
+  intro /H/.
+  symmetryIn /H/.
+  so /neq_0_1 H/ /0/.
+  }
+rewrite /<- timesz_id_r a/.
+rewrite /-> modz_timesz_r/.
+auto.
+qed ();
+
+
+
+lemma "divz_self"
+/
+  forall (a : nonzero) . divz a a = z`1 : integer
+/;
+
+inference.
+intro /a/.
+rewrite /<- timesz_id_r a/.
+rewrite /-> divz_timesz_l/.
+auto.
+qed ();
+
+
+
+lemma "modz_self"
+/
+  forall (a : nonzero) . modz a a = z`0 : integer
+/;
+
+inference.
+intro /a/.
+rewrite /<- timesz_id_r a/.
+rewrite /-> modz_timesz_l/.
+auto.
+qed ();
+
+
+
+lemma "divz_plusz_r"
+/
+  forall a (b : nonzero) .
+    divz (a +z b) b = z`1 +z divz a b : integer
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hnonzero/.
+unhide.
+witness /division_property _ _ (z`1 +z divz a b) (modz a b) __ __ __ #1/.
+  {
+  rewrite /-> timesz_dist_plusz_l/.
+  rewrite /-> timesz_id_l/.
+  rewrite /-> plusz_commute/.
+  rewrite /-> plusz_assoc/.
+  compat.
+  symmetry.
+  apply /divz_spec/.
+  }
+
+  {
+  apply /modz_nonneg/.
+  }
+
+  {
+  apply /modz_spec/.
+  }
+qed ();
+
+
+
+lemma "divz_plusz_l"
+/
+  forall a (b : nonzero) .
+    divz (b +z a) b = z`1 +z divz a b : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> plusz_commute/.
+apply /divz_plusz_r/.
+qed ();
+
+
+
+lemma "modz_plusz_r"
+/
+  forall a (b : nonzero) .
+    modz (a +z b) b = modz a b : integer
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hnonzero/.
+unhide.
+witness /division_property _ _ (z`1 +z divz a b) (modz a b) __ __ __ #2/.
+  {
+  rewrite /-> timesz_dist_plusz_l/.
+  rewrite /-> timesz_id_l/.
+  rewrite /-> plusz_commute/.
+  rewrite /-> plusz_assoc/.
+  compat.
+  symmetry.
+  apply /divz_spec/.
+  }
+
+  {
+  apply /modz_nonneg/.
+  }
+
+  {
+  apply /modz_spec/.
+  }
+qed ();
+
+
+
+lemma "modz_plusz_l"
+/
+  forall a (b : nonzero) .
+    modz (b +z a) b = modz a b : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> plusz_commute/.
+apply /modz_plusz_r/.
+qed ();
+
+
+
+lemma "divz_minusz"
+/
+  forall a (b : nonzero) .
+    divz (a -z b) b = z`-1 +z divz a b : integer
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hnonzero/.
+unhide.
+witness /division_property _ _ (z`-1 +z divz a b) (modz a b) __ __ __ #1/.
+  {
+  unfold /minusz/.
+  rewrite /-> timesz_dist_plusz_l/.
+  rewrite /<- negz_as_timesz/.
+  rewrite /-> plusz_commute/.
+  rewrite /-> plusz_assoc/.
+  compat.
+  symmetry.
+  apply /divz_spec/.
+  }
+
+  {
+  apply /modz_nonneg/.
+  }
+
+  {
+  apply /modz_spec/.
+  }
+qed ();
+
+
+
+lemma "modz_minusz"
+/
+  forall a (b : nonzero) .
+    modz (a -z b) b = modz a b : integer
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hnonzero/.
+unhide.
+witness /division_property _ _ (z`-1 +z divz a b) (modz a b) __ __ __ #2/.
+  {
+  unfold /minusz/.
+  rewrite /-> timesz_dist_plusz_l/.
+  rewrite /<- negz_as_timesz/.
+  rewrite /-> plusz_commute/.
+  rewrite /-> plusz_assoc/.
+  compat.
+  symmetry.
+  apply /divz_spec/.
+  }
+
+  {
+  apply /modz_nonneg/.
+  }
+
+  {
+  apply /modz_spec/.
+  }
+qed ();
+
+
+
+lemma "timesz_divz_l"
+/
+  forall a (b : nonzero) .
+    divz a b *z b = a -z modz a b : integer
+/;
+
+inference.
+intro /a b/.
+destruct /b/ /b Hpos/.
+unhide.
+unfold /minusz/.
+apply /plusz_shift_r/.
+apply /divz_spec/.
+qed ();
+
+
+
+lemma "timesz_divz_r"
+/
+  forall a (b : nonzero) .
+    b *z divz a b = a -z modz a b : integer
+/;
+
+inference.
+intro /a b/.
+rewrite /-> timesz_commute/.
+apply /timesz_divz_l/.
 qed ();
 
 

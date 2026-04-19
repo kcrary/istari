@@ -147,3 +147,10 @@ This relates the remainders of the divisions in `div_assoc`:
     gcd_ann_r : type:gcd_ann_r
 
     gcd_ann_l : type:gcd_ann_l
+
+
+### Relation to integers
+
+    div_to_integer : type:div_to_integer
+
+    mod_to_integer : type:mod_to_integer

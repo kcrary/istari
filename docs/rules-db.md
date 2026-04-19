@@ -6510,6 +6510,26 @@ Syntactic equality is intended for internal use only.
 
       G |- forall integer (fn . forall integer (fn . forall integer (fn . eq integer (timesz 2 (plusz 1 0)) (plusz (timesz 2 1) (timesz 2 0))))) ext fn . fn . fn . ()
 
+- `divzType`
+
+      G |- of (arrow integer (forall integer (fn . guard (arrow (eq integer 0 integer_zero) void) integer))) divz
+
+- `modzType`
+
+      G |- of (arrow integer (forall integer (fn . guard (arrow (eq integer 0 integer_zero) void) integer))) modz
+
+- `modzSpec1`
+
+      G |- forall integer (fn . forall integer (fn . arrow (arrow (eq integer 0 integer_zero) void) (leqz integer_zero (modz 1 0)))) ext fn . fn . fn . ()
+
+- `modzSpec2`
+
+      G |- forall integer (fn . forall integer (fn . arrow (arrow (eq integer 0 integer_zero) void) (leqz (plusz integer_one (modz 1 0)) 0))) ext fn . fn . fn . ()
+
+- `divzSpec`
+
+      G |- forall integer (fn . forall integer (fn . arrow (arrow (eq integer 0 integer_zero) void) (eq integer (plusz (timesz (divz 1 0) 0) (modz 1 0)) 1))) ext fn . fn . fn . ()
+
 - `eqzbType`
 
       G |- of (arrow integer (arrow integer bool)) eqzb
