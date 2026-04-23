@@ -1154,6 +1154,16 @@ structure RewriteInternal :> REWRITE_INTERNAL =
          end
          
 
+      fun chatter msg =
+         if !trace then
+            (
+            print msg; 
+            print "\n"
+            )
+         else
+            ()
+
+
       (* propagateGeneral dir C rconst M N coe fk sk
 
          if    dir is the outer context (i.e., not including C's bindings)
@@ -1163,9 +1173,9 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                        where coe' :: R C{M} C{N}
                        and   R = rconst' rspine'
                        and   fk' is a backtracking opportunity
-               or      calls fk ()
+               or      calls fk (message)
       *)
-      fun propagateGeneral dir c rconst m n coe fk sk =
+      fun propagateGeneral dir c rconst m n coe (fk : unit -> 'a) (sk : constant * coercion * (unit -> 'a) -> 'a) =
          let
             val () =
                if !trace then
@@ -1179,12 +1189,33 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                (case l of
                    [] =>
                       (* nothing left to try; backtrack *)
+                      (
+                      if !trace then
+                         (
+                         print "exhausted weakenings for ";
+                         print (Namespace.toString rconst);
+                         print "\n"
+                         )
+                      else
+                         ();
+                         
                       fk ()
+                      )
 
                  | (rconst', covariant, tacfn) :: rest =>
                       let
                          val coe' = mapCoercion covariant tacfn m n coe
                       in
+                         if !trace then
+                            (
+                            print (Namespace.toString rconst);
+                            print " weakens to ";
+                            print (Namespace.toString rconst');
+                            print "\n"
+                            )
+                         else
+                            ();
+                         
                          propagateGeneral dir c rconst' m n coe'
                             (fn () => 
                                 (
@@ -1203,7 +1234,19 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
             fun tryWeakenings () =
                (case H.find weakeningTable rconst of
-                   NONE => fk ()
+                   NONE => 
+                      (
+                      if !trace then
+                         (
+                         print "no weakenings for ";
+                         print (Namespace.toString rconst);
+                         print "\n"
+                         )
+                      else
+                         ();
+
+                      fk ()
+                      )
 
                  | SOME l => loopWeakenings l)
          in
@@ -1242,7 +1285,22 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                    in
                       (case CICTable.find compatibilityTable (const, i, rconst) of
                           NONE =>
+                             (
+                             if !trace then
+                                (
+                                print "no compatibility for ";
+                                print (Namespace.toString rconst);
+                                print " through ";
+                                print (Namespace.toString const);
+                                print " position ";
+                                print (Int.toString i);
+                                print "\n"
+                                )
+                             else
+                                ();
+
                              tryWeakenings ()
+                             )
 
                         | SOME (rel, covariant, binds, tacfn) =>
                              if binds = lams then
@@ -1266,6 +1324,19 @@ structure RewriteInternal :> REWRITE_INTERNAL =
 
                                    val coe' = mapCoercion covariant tacfn m n coe
                                 in
+                                   if !trace then
+                                      (
+                                      print "found compatibility for ";
+                                      print (Namespace.toString rconst);
+                                      print " through ";
+                                      print (Namespace.toString const);
+                                      print " position ";
+                                      print (Int.toString i);
+                                      print "\n"
+                                      )
+                                   else 
+                                      ();
+
                                    (case rel of
                                        General rconst' =>
                                           if Constant.eq (rconst', Prim.sequal) then
@@ -1274,7 +1345,10 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                                     sk (Prim.sequal, Forward tac, fk)
 
                                                | NONE =>
-                                                    fk ())
+                                                    (
+                                                    chatter "cannot propagate syntactic equality";
+                                                    fk ()
+                                                    ))
                                           else
                                              propagateGeneral dir c'' rconst' m' n' coe'
                                                 (fn () =>
@@ -1384,7 +1458,10 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                        of
                           NONE =>
                              (* wrong direction *)
+                             (
+                             chatter "fails due to direction";
                              fk ()
+                             )
                              
                         | SOME tac =>
                              (* tac :: B |- A[^] *)
@@ -1419,7 +1496,10 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                       end
 
                    else
+                      (
+                      chatter "fails due to unusable top-level relation";
                       fk ()
+                      )
                 end
 
            | SOME hyp =>
@@ -1466,7 +1546,10 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                    (case coe' of
                                        Backward _ =>
                                           (* wrong direction *)
+                                          (
+                                          chatter "fails due to direction";
                                           fk ()
+                                          )
 
                                      | Forward tac =>
                                           (* tac :: A, ... |- A[^hyp+1] <: B[^hyp+1] *)
@@ -1496,7 +1579,10 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                    (case coe' of
                                        Backward _ =>
                                           (* wrong direction *)
+                                          (
+                                          chatter "fails due to direction";
                                           fk ()
+                                          )
       
                                      | Forward tac =>
                                           (* tac :: A, ..., A[^hyp+1] |- B[^hyp+2] *)
@@ -1553,7 +1639,10 @@ structure RewriteInternal :> REWRITE_INTERNAL =
                                    end
 
                                 else
+                                   (
+                                   chatter "fails due to unusable top-level relation";
                                    fk ()
+                                   )
                              end
                        end
 
