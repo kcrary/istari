@@ -49,7 +49,7 @@ option.isto : datatype.isto function.isto kindlike.isto integer.isto
 partial.isto : acc.isto logic.isto
 permutation.isto : list.isto logic.isto misc.isto nat.isto
 quotient.isto : logic.isto
-rational.isto : bool.isto decidable.isto integer.isto logic.isto omega.isto partial.isto quotient.isto stable.ist
+rational.isto : bool.isto decidable.isto integer.isto logic.isto nat.isto omega.isto partial.isto quotient.isto stable.ist
 relations.isto : datatype.isto acc.isto decidable.isto finite.isto
 sqstable.isto : decidable.isto logic.isto stable.isto syntactic-equality.isto
 stable.isto : decidable.isto logic.isto

@@ -16,6 +16,8 @@
 
     decidable_and_dep : type:decidable_and_dep
 
+    decidable_dprod : type:decidable_dprod
+
     decidable_or_dep : type:decidable_or_dep
 
     decidable_implies_dep : type:decidable_implies_dep

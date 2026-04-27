@@ -257,16 +257,34 @@ functor AfterRationalAll () :> sig end =
       structure CR = CheckpointedRef
 
       val rational = resolveGlobal /Rational.rational/
-      val plusq = resolveGlobal /Rational.plusq/
-      val negq = resolveGlobal /Rational.negq/
       val leqq = resolveGlobal /Rational.leqq/
       val ltq = resolveGlobal /Rational.ltq/
+      val plusq = resolveGlobal /Rational.plusq/
+      val negq = resolveGlobal /Rational.negq/
+      val timesq = resolveGlobal /Rational.timesq/
+      val invq = resolveGlobal /Rational.invq/
+      val ceiling = resolveGlobal /Rational.ceiling/
+      val floor = resolveGlobal /Rational.floor/
+
+      val leqz = resolveGlobal /Integer.leqz/
+      val integer_to_rational = resolveGlobal /Rational.integer_to_rational/
+
+      val leq = resolveGlobal /Nat.leq/
+      val nat_to_rational = resolveGlobal /Rational.nat_to_rational/
 
       val leqq_refl = resolveGlobal /Rational.leqq_refl/
       val leqq_trans = resolveGlobal /Rational.leqq_trans/
+      val ltq_impl_leqq = resolveGlobal /Rational.ltq_impl_leqq/;
       val plusq_leqq = resolveGlobal /Rational.plusq_leqq/
       val negq_leqq = resolveGlobal /Rational.negq_leqq/
+      val timesq_leqq = resolveGlobal /Rational.timesq_leqq/
+      val invq_leqq_samesign = resolveGlobal /Rational.invq_leqq_samesign/
+      val ceiling_mono = resolveGlobal /Rational.ceiling_mono/
+      val floor_mono = resolveGlobal /Rational.floor_mono/
       val leqq_implication = resolveGlobal /Rational.leqq_implication/
+      val ltq_implication = resolveGlobal /Rational.ltq_implication/
+      val integer_to_rational_mono = resolveGlobal /Rational.integer_to_rational_mono/
+      val nat_to_rational_mono = resolveGlobal /Rational.nat_to_rational_mono/
       val rational_total = resolveGlobal /Rational.rational_total/
       val rational_strict = resolveGlobal /Rational.rational_strict/
 
@@ -295,12 +313,49 @@ functor AfterRationalAll () :> sig end =
             (negq, 0, leqq, leqq, false,
              andthenOn 0 (B.witnessPriority /\T.Const negq_leqq\ _ _ __/)),
 
+            (timesq, 0, leqq, leqq, true,
+             andthenOn 2 (B.witnessPriority /\T.Const timesq_leqq\ _ _ _ _ __ __ __ __/)),
+            
+            (timesq, 1, leqq, leqq, true,
+             andthenOn 3 (B.witnessPriority /\T.Const timesq_leqq\ _ _ _ _ __ __ __ __/)),
+            
+            (invq, 0, leqq, leqq, false,
+             andthenOn 1 (B.witnessPriority /\T.Const invq_leqq_samesign\ _ _ __ __/)),
+
+            (ceiling, 0, leqq, leqz, true,
+             andthenOn 0 (B.witnessPriority /\T.Const ceiling_mono\ _ _ __/)),
+
+            (floor, 0, leqq, leqz, true,
+             andthenOn 0 (B.witnessPriority /\T.Const floor_mono\ _ _ __/)),
+
+            (integer_to_rational, 0, leqz, leqq, true,
+             andthenOn 0 (B.witnessPriority /\T.Const integer_to_rational_mono\ _ _ __/)),
+
+            (nat_to_rational, 0, leq, leqq, true,
+             andthenOn 0 (B.witnessPriority /\T.Const nat_to_rational_mono\ _ _ __/)),
+
             (leqq, 0, leqq, Prim.arrow, false,
              andthenOn 0 (B.witnessPriority /\T.Const leqq_implication\ _ _ _ _ __ __/)),
           
             (leqq, 1, leqq, Prim.arrow, true,
              andthenOn 1 (B.witnessPriority /\T.Const leqq_implication\ _ _ _ _ __ __/)),
+
+            (ltq, 0, leqq, Prim.arrow, false,
+             andthenOn 0 (B.witnessPriority /\T.Const ltq_implication\ _ _ _ _ __ __/)),
+          
+            (ltq, 1, leqq, Prim.arrow, true,
+             andthenOn 1 (B.witnessPriority /\T.Const ltq_implication\ _ _ _ _ __ __/)),
             ]
+
+      val () =
+         ConstantTable.insert
+           RewriteInternal.weakeningTable
+           ltq
+           [(leqq, true,
+             (fns _ _ tac =>
+                andthenOn 0
+                  (Backchain.witnessPriority /\T.Const ltq_impl_leqq\ _ _ __/)
+                  tac))]
 
       val () =
          H.insert TypecheckTables.totalityTactics rational
@@ -311,3 +366,5 @@ functor AfterRationalAll () :> sig end =
          (exact /\T.Const rational_strict\/)
 
    end
+
+

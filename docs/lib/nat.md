@@ -122,6 +122,14 @@ Strong induction for natural numbers:
 
     plus_leq : forall (m m' n n' : nat) . m <= m' -> n <= n' -> m + n <= m' + n'
 
+    plus_lt_leq : forall (m m' n n' : nat) . m < m' -> n <= n' -> m + n < m' + n'
+
+    plus_leq_lt : forall (m m' n n' : nat) . m <= m' -> n < n' -> m + n < m' + n'
+
+    plus_lt : forall (m m' n n' : nat) . m < m' -> n < n' -> m + n < m' + n'
+
+    plus_lt_r : forall (m n : nat) . 0 < n -> m < m + n
+
     plus_cancel_leq_l : forall (m n p : nat) . p + m <= p + n -> m <= n
 
     plus_cancel_leq_r : forall (m n p : nat) . m + p <= n + p -> m <= n
@@ -129,8 +137,6 @@ Strong induction for natural numbers:
     plus_cancel_leq_leq_l : forall (m m' n n' : nat) . m + n <= m' + n' -> m' <= m -> n <= n'
 
     plus_cancel_leq_leq_r : forall (m m' n n' : nat) . m + n <= m' + n' -> n' <= n -> m <= m'
-
-    plus_lt_r : forall (m n : nat) . 0 < n -> m < m + n
 
     plus_cancel_l : forall (m n p : nat) . p + m = p + n : nat -> m = n : nat
 
@@ -225,6 +231,12 @@ Strong induction for natural numbers:
     times_dist_plus_r : forall (m n p : nat) . m * (n + p) = m * n + m * p : nat
 
     times_leq : forall (m m' n n' : nat) . m <= m' -> n <= n' -> m * n <= m' * n'
+
+    times_lt_l : forall (m n p : nat) . 0 < m -> n < p -> m * n < m * p
+
+    times_lt_r : forall (m n p : nat) . 0 < p -> m < n -> m * p < n * p
+
+    times_lt_zero : forall (m n : nat) . 0 < m -> 0 < n -> 0 < m * n
 
     times_dist_pred_l : forall (m n : nat) . pred m * n = m * n - n : nat
 

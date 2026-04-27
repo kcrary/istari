@@ -1,5 +1,6 @@
 
 File.import "bool-load.iml";
+File.import "nat-load.iml";
 File.import "integer-load.iml";
 File.import "logic-load.iml";
 File.import "quotient-load.iml";
@@ -2557,6 +2558,23 @@ qed ();
 
 
 
+lemma "ltq_implication"
+/
+  forall x x' y y' .
+    x' <q= x
+    -> y <q= y'
+    -> x <q y
+    -> x' <q y'
+/;
+
+inference.
+intro /x x' y y' Hx Hy Hxy/.
+apply /leqq_ltq_trans/ >> auto.
+apply /ltq_leqq_trans/ >> auto.
+qed ();
+
+
+
 lemma "ltq_impl_leqq"
 /
   forall x y .
@@ -4014,6 +4032,477 @@ qed ();
 
 
 
+lemma "timesq_cancel_leqq_l_neg"
+/
+  forall x y z .
+    z <q q`0
+    -> z *q x <q= z *q y
+    -> y <q= x
+/;
+
+inference.
+intro /x y z Hnegz Hleq/.
+so /timesq_leqq_l_neg (invq z) _ _ __ Hleq/ /H/.
+  {
+  apply /ltq_impl_leqq/.
+  apply /invq_negative/ >> auto.
+  }
+rewrite /<- timesq_assoc in H at 0 0/.
+rewrite /-> timesq_inverse_l in H at 0 0/ >> autoWith /ltq_impl_neq/.
+rewrite /-> timesq_id_l in H at 0 0/.
+hyp /H/.
+qed ();
+
+
+
+lemma "timesq_cancel_leqq_r_neg"
+/
+  forall x y z .
+    z <q q`0
+    -> x *q z <q= y *q z
+    -> y <q= x
+/;
+
+inference.
+intro /x y z Hnegz Hleq/.
+apply /timesq_cancel_leqq_l_neg _ _ z/ >> auto.
+rewrite /-> timesq_commute at 0 1/.
+hyp /Hleq/.
+qed ();
+
+
+
+lemma "timesq_cancel_ltq_l_neg"
+/
+  forall x y z .
+    z <q q`0
+    -> z *q x <q z *q y
+    -> y <q x
+/;
+
+inference.
+intro /x y z Negz Hleq/.
+so /timesq_ltq_l_neg (invq z) _ _ __ Hleq/ /H/.
+  {
+  apply /invq_negative/ >> auto.
+  }
+rewrite /<- timesq_assoc in H at 0 0/.
+rewrite /-> timesq_inverse_l in H at 0 0/ >> autoWith /ltq_impl_neq/.
+rewrite /-> timesq_id_l in H at 0 0/.
+hyp /H/.
+qed ();
+
+
+
+lemma "timesq_cancel_ltq_r_neg"
+/
+  forall x y z .
+    z <q q`0
+    -> x *q z <q y *q z
+    -> y <q x
+/;
+
+inference.
+intro /x y z Hnegz Hleq/.
+apply /timesq_cancel_ltq_l_neg _ _ z/ >> auto.
+rewrite /-> timesq_commute at 0 1/.
+hyp /Hleq/.
+qed ();
+
+
+
+lemma "timesq_shift_leqq_r"
+/
+  forall x y z .
+    q`0 <q y
+    -> x *q y <q= z <-> x <q= z *q invq y
+/;
+
+inference.
+intro /x y z Hposy/.
+assert /y != q`0 : rational/ /Hneq/.
+  {
+  symmetry.
+  apply /ltq_impl_neq/ >> auto.
+  }
+split.
+  {
+  intro /Hleq/.
+  apply /timesq_cancel_leqq_l _ _ y/ >> auto.
+  rewrite /-> timesq_commute at 0 1/.
+  rewrite /-> timesq_assoc/.
+  rewrite /-> timesq_inverse_l/ >> auto.
+  rewrite /-> timesq_id_r/.
+  hyp /Hleq/.
+  }
+
+  {
+  intro /Hleq/.
+  apply /timesq_cancel_leqq_r _ _ (invq y)/.
+    {
+    apply /invq_positive/ >> auto.
+    }
+  rewrite /-> timesq_assoc/.
+  rewrite /-> timesq_inverse_r/ >> auto.
+  rewrite /-> timesq_id_r/.
+  hyp /Hleq/.
+  }
+qed ();
+
+  
+
+lemma "timesq_shift_leqq_l"
+/
+  forall x y z .
+    q`0 <q y
+    -> x <q= y *q z <-> invq y *q x <q= z
+/;
+
+inference.
+intro /x y z Hposy/.
+symmetry.
+rewrite /-> timesq_commute at 0 1/.
+rewrite /<- invq_invol y at 1/.
+apply /timesq_shift_leqq_r/.
+apply /invq_positive/ >> auto.
+qed ();
+
+
+
+lemma "timesq_shift_leqq_lr"
+/
+  forall x y z .
+    q`0 <q x
+    -> x *q y <q= z <-> y <q= invq x *q z
+/;
+
+inference.
+intro /x y z Hposx/.
+rewrite /-> timesq_commute at 0 1/.
+apply /timesq_shift_leqq_r/ >> auto.
+qed ();
+
+
+
+lemma "timesq_shift_leqq_rl"
+/
+  forall x y z .
+    q`0 <q z
+    -> x <q= y *q z <-> x *q invq z <q= y
+/;
+
+inference.
+intro /x y z Hposz/.
+rewrite /-> timesq_commute at 0 1/.
+apply /timesq_shift_leqq_l/ >> auto.
+qed ();
+
+
+
+lemma "timesq_shift_ltq_r"
+/
+  forall x y z .
+    q`0 <q y
+    -> x *q y <q z <-> x <q z *q invq y
+/;
+
+inference.
+intro /x y z Hposy/.
+assert /y != q`0 : rational/ /Hneq/.
+  {
+  symmetry.
+  apply /ltq_impl_neq/ >> auto.
+  }
+split.
+  {
+  intro /Hltq/.
+  apply /timesq_cancel_ltq_l _ _ y/ >> auto.
+  rewrite /-> timesq_commute at 0 1/.
+  rewrite /-> timesq_assoc/.
+  rewrite /-> timesq_inverse_l/ >> auto.
+  rewrite /-> timesq_id_r/.
+  hyp /Hltq/.
+  }
+
+  {
+  intro /Hltq/.
+  apply /timesq_cancel_ltq_r _ _ (invq y)/.
+    {
+    apply /invq_positive/ >> auto.
+    }
+  rewrite /-> timesq_assoc/.
+  rewrite /-> timesq_inverse_r/ >> auto.
+  rewrite /-> timesq_id_r/.
+  hyp /Hltq/.
+  }
+qed ();
+
+  
+
+lemma "timesq_shift_ltq_l"
+/
+  forall x y z .
+    q`0 <q y
+    -> x <q y *q z <-> invq y *q x <q z
+/;
+
+inference.
+intro /x y z Hposy/.
+symmetry.
+rewrite /-> timesq_commute at 0 1/.
+rewrite /<- invq_invol y at 1/.
+apply /timesq_shift_ltq_r/.
+apply /invq_positive/ >> auto.
+qed ();
+
+
+
+lemma "timesq_shift_ltq_lr"
+/
+  forall x y z .
+    q`0 <q x
+    -> x *q y <q z <-> y <q invq x *q z
+/;
+
+inference.
+intro /x y z Hposx/.
+rewrite /-> timesq_commute at 0 1/.
+apply /timesq_shift_ltq_r/ >> auto.
+qed ();
+
+
+
+lemma "timesq_shift_ltq_rl"
+/
+  forall x y z .
+    q`0 <q z
+    -> x <q y *q z <-> x *q invq z <q y
+/;
+
+inference.
+intro /x y z Hposz/.
+rewrite /-> timesq_commute at 0 1/.
+apply /timesq_shift_ltq_l/ >> auto.
+qed ();
+
+
+
+lemma "timesq_shift_leqq_r_neg"
+/
+  forall x y z .
+    y <q q`0
+    -> x *q y <q= z <-> z *q invq y <q= x
+/;
+
+inference.
+intro /x y z Hposy/.
+assert /y != q`0 : rational/ /Hneq/.
+  {
+  apply /ltq_impl_neq/ >> auto.
+  }
+split.
+  {
+  intro /Hleq/.
+  apply /timesq_cancel_leqq_l_neg _ _ y/ >> auto.
+  rewrite /-> timesq_commute at 0 1/.
+  rewrite /-> timesq_assoc/.
+  rewrite /-> timesq_inverse_l/ >> auto.
+  rewrite /-> timesq_id_r/.
+  hyp /Hleq/.
+  }
+
+  {
+  intro /Hleq/.
+  apply /timesq_cancel_leqq_r_neg _ _ (invq y)/.
+    {
+    apply /invq_negative/ >> auto.
+    }
+  rewrite /-> timesq_assoc/.
+  rewrite /-> timesq_inverse_r/ >> auto.
+  rewrite /-> timesq_id_r/.
+  hyp /Hleq/.
+  }
+qed ();
+
+  
+
+lemma "timesq_shift_leqq_l_neg"
+/
+  forall x y z .
+    y <q q`0
+    -> x <q= y *q z <-> z <q= invq y *q x
+/;
+
+inference.
+intro /x y z Hnegy/.
+assert /y != q`0 : rational/ /Hneq/.
+  {
+  apply /ltq_impl_neq/ >> auto.
+  }
+split.
+  {
+  intro /Hleq/.
+  apply /timesq_cancel_leqq_l_neg _ _ y/ >> auto.
+  rewrite /<- timesq_assoc/.
+  rewrite /-> timesq_inverse_r/ >> auto.
+  rewrite /-> timesq_id_l/.
+  hyp /Hleq/.
+  }
+
+  {
+  intro /Hleq/.
+  apply /timesq_cancel_leqq_r_neg _ _ (invq y)/.
+    {
+    apply /invq_negative/ >> auto.
+    }
+  rewrite /-> timesq_commute at 0 2/.
+  rewrite /<- timesq_assoc/.
+  rewrite /-> timesq_inverse_l/ >> auto.
+  rewrite /-> timesq_id_l/.
+  hyp /Hleq/.
+  }
+qed ();
+
+
+
+lemma "timesq_shift_leqq_lr_neg"
+/
+  forall x y z .
+    x <q q`0
+    -> x *q y <q= z <-> invq x *q z <q= y
+/;
+
+inference.
+intro /x y z Hnegx/.
+rewrite /-> timesq_commute at 0 1/.
+apply /timesq_shift_leqq_r_neg/ >> auto.
+qed ();
+
+
+
+lemma "timesq_shift_leqq_rl_neg"
+/
+  forall x y z .
+    z <q q`0
+    -> x <q= y *q z <-> y <q= x *q invq z
+/;
+
+inference.
+intro /x y z Hnegz/.
+rewrite /-> timesq_commute at 0 1/.
+apply /timesq_shift_leqq_l_neg/ >> auto.
+qed ();
+
+
+
+lemma "timesq_shift_ltq_r_neg"
+/
+  forall x y z .
+    y <q q`0
+    -> x *q y <q z <-> z *q invq y <q x
+/;
+
+inference.
+intro /x y z Hposy/.
+assert /y != q`0 : rational/ /Hneq/.
+  {
+  apply /ltq_impl_neq/ >> auto.
+  }
+split.
+  {
+  intro /Hltq/.
+  apply /timesq_cancel_ltq_l_neg _ _ y/ >> auto.
+  rewrite /-> timesq_commute at 0 1/.
+  rewrite /-> timesq_assoc/.
+  rewrite /-> timesq_inverse_l/ >> auto.
+  rewrite /-> timesq_id_r/.
+  hyp /Hltq/.
+  }
+
+  {
+  intro /Hltq/.
+  apply /timesq_cancel_ltq_r_neg _ _ (invq y)/.
+    {
+    apply /invq_negative/ >> auto.
+    }
+  rewrite /-> timesq_assoc/.
+  rewrite /-> timesq_inverse_r/ >> auto.
+  rewrite /-> timesq_id_r/.
+  hyp /Hltq/.
+  }
+qed ();
+
+  
+
+lemma "timesq_shift_ltq_l_neg"
+/
+  forall x y z .
+    y <q q`0
+    -> x <q y *q z <-> z <q invq y *q x
+/;
+
+inference.
+intro /x y z Hnegy/.
+assert /y != q`0 : rational/ /Hneq/.
+  {
+  apply /ltq_impl_neq/ >> auto.
+  }
+split.
+  {
+  intro /Hltq/.
+  apply /timesq_cancel_ltq_l_neg _ _ y/ >> auto.
+  rewrite /<- timesq_assoc/.
+  rewrite /-> timesq_inverse_r/ >> auto.
+  rewrite /-> timesq_id_l/.
+  hyp /Hltq/.
+  }
+
+  {
+  intro /Hlt/.
+  apply /timesq_cancel_ltq_r_neg _ _ (invq y)/.
+    {
+    apply /invq_negative/ >> auto.
+    }
+  rewrite /-> timesq_commute at 0 2/.
+  rewrite /<- timesq_assoc/.
+  rewrite /-> timesq_inverse_l/ >> auto.
+  rewrite /-> timesq_id_l/.
+  hyp /Hlt/.
+  }
+qed ();
+
+
+
+lemma "timesq_shift_ltq_lr_neg"
+/
+  forall x y z .
+    x <q q`0
+    -> x *q y <q z <-> invq x *q z <q y
+/;
+
+inference.
+intro /x y z Hnegx/.
+rewrite /-> timesq_commute at 0 1/.
+apply /timesq_shift_ltq_r_neg/ >> auto.
+qed ();
+
+
+
+lemma "timesq_shift_ltq_rl_neg"
+/
+  forall x y z .
+    z <q q`0
+    -> x <q y *q z <-> y <q x *q invq z
+/;
+
+inference.
+intro /x y z Hnegz/.
+rewrite /-> timesq_commute at 0 1/.
+apply /timesq_shift_ltq_l_neg/ >> auto.
+qed ();
+
+
+
 lemma "invq_leqq_pos"
 /
   forall x y .
@@ -4103,6 +4592,53 @@ qed ();
 
 
 
+typedef
+/
+  datatype
+    intersect (i : level) .
+    U i
+  of
+    samesign : rational -> rational -> type =
+
+    | samesign_pos :
+        forall x y .
+          q`0 <q x
+          -> q`0 <q y
+          -> samesign x y
+
+    | samesign_neg :
+        forall x y .
+          x <q q`0
+          -> y <q q`0
+          -> samesign x y
+/;
+
+
+
+lemma "invq_leqq_samesign"
+/
+  forall x y .
+    samesign x y
+    -> x <q= y
+    -> invq y <q= invq x
+/;
+
+inference.
+intro /x y Hsign Hleq/.
+inversion /Hsign/.
+  {
+  reintro /Hposx Hposy/.
+  apply /invq_leqq_pos/ >> auto.
+  }
+
+  {
+  reintro /Hnegx Hnegy/.
+  apply /invq_leqq_neg/ >> auto.
+  }
+qed ();
+
+
+
 lemma "invq_ltq_pos"
 /
   forall x y .
@@ -4154,6 +4690,30 @@ qed ();
 
 
 
+lemma "invq_ltq_samesign"
+/
+  forall x y .
+    samesign x y
+    -> x <q y
+    -> invq y <q invq x
+/;
+
+inference.
+intro /x y Hsign Hleq/.
+inversion /Hsign/.
+  {
+  reintro /Hposx Hposy/.
+  apply /invq_ltq_pos/ >> auto.
+  }
+
+  {
+  reintro /Hnegx Hnegy/.
+  apply /invq_ltq_neg/ >> auto.
+  }
+qed ();
+
+
+
 (* Relation to integers *)
 
 lemma "integer_to_rational_neq"
@@ -4189,6 +4749,25 @@ qed ();
 
 
 
+lemma "integer_to_rational_mono_conv"
+/
+  forall a b .
+    integer_to_rational a <q= integer_to_rational b
+    -> a <z= b
+/;
+
+inference.
+intro /a b Hleq/.
+so /leqq_invert _# 2 Hleq/ /H/.
+unfold /integer_to_rational in H at all/.
+destruct /H/ /[H]/.
+unhide.
+rewrite /-> timesz_id_r in H at 0 0/.
+hyp /H/.
+qed ();
+
+
+
 lemma "integer_to_rational_mono_lt"
 /
   forall a b .
@@ -4207,6 +4786,25 @@ qed ();
 
 
 
+lemma "integer_to_rational_mono_lt_conv"
+/
+  forall a b .
+    integer_to_rational a <q integer_to_rational b
+    -> a <z b
+/;
+
+inference.
+intro /a b Hleq/.
+so /ltq_invert _# 2 Hleq/ /H/.
+unfold /integer_to_rational in H at all/.
+destruct /H/ /[H]/.
+unhide.
+rewrite /-> timesz_id_r in H at 0 0/.
+hyp /H/.
+qed ();
+
+
+
 lemma "plusz_to_rational"
 /
   forall a b .
@@ -4221,6 +4819,22 @@ unfold /plusq, integer_to_rational at all/.
 reduceHard //.
 rewrite /-> timesz_id_r at all/.
 reflexivity.
+qed ();
+
+
+
+lemma "plusq_self"
+/
+  forall a .
+    a +q a = q`2 *q a : rational
+/;
+
+inference.
+intro /a/.
+rewrite /-> plusz_to_rational z`1 z`1/.
+rewrite /-> timesq_dist_plusq_l/.
+rewrite /-> timesq_id_l at all/.
+auto.
 qed ();
 
 
@@ -4432,6 +5046,66 @@ qed ();
 
 
 
+lemma "integer_nat_to_rational_eq"
+/
+  forall a b .
+    a = nat_to_integer b : integer
+    -> integer_to_rational a = nat_to_rational b : rational
+/;
+
+inference.
+intro /a b Heq/.
+unfold /nat_to_rational/.
+auto.
+qed ();
+
+
+
+lemma "nat_integer_to_rational_eq"
+/
+  forall a b .
+    nat_to_integer a = b : integer
+    -> nat_to_rational a = integer_to_rational b : rational
+/;
+
+inference.
+intro /a b Heq/.
+unfold /nat_to_rational/.
+auto.
+qed ();
+
+
+
+lemma "integer_nat_to_rational_neq"
+/
+  forall a b .
+    a != nat_to_integer b : integer
+    -> integer_to_rational a != nat_to_rational b : rational
+/;
+
+inference.
+intro /a b Hleq/.
+unfold /nat_to_rational/.
+apply /integer_to_rational_neq/ >> auto.
+qed ();
+
+
+
+lemma "nat_integer_to_rational_neq"
+/
+  forall a b .
+    nat_to_integer a != b : integer
+    -> nat_to_rational a != integer_to_rational b : rational
+/;
+
+inference.
+intro /a b Hleq/.
+unfold /nat_to_rational/.
+apply /integer_to_rational_neq/ >> auto.
+qed ();
+
+
+
 lemma "nat_to_rational_mono"
 /
   forall a b .
@@ -4444,6 +5118,36 @@ intro /a b Hleq/.
 unfold /nat_to_rational at 0 0/.
 apply /integer_to_rational_mono/.
 apply /nat_to_integer_mono/ >> auto.
+qed ();
+
+
+
+lemma "integer_nat_to_rational_mono"
+/
+  forall a b .
+    a <z= nat_to_integer b
+    -> integer_to_rational a <q= nat_to_rational b
+/;
+
+inference.
+intro /a b Hleq/.
+unfold /nat_to_rational/.
+apply /integer_to_rational_mono/ >> auto.
+qed ();
+
+
+
+lemma "nat_integer_to_rational_mono"
+/
+  forall a b .
+    nat_to_integer a <z= b
+    -> nat_to_rational a <q= integer_to_rational b
+/;
+
+inference.
+intro /a b Hleq/.
+unfold /nat_to_rational/.
+apply /integer_to_rational_mono/ >> auto.
 qed ();
 
 
@@ -4464,6 +5168,51 @@ qed ();
 
 
 
+lemma "integer_nat_to_rational_mono_lt"
+/
+  forall a b .
+    a <z nat_to_integer b
+    -> integer_to_rational a <q nat_to_rational b
+/;
+
+inference.
+intro /a b Hleq/.
+unfold /nat_to_rational/.
+apply /integer_to_rational_mono_lt/ >> auto.
+qed ();
+
+
+
+lemma "nat_integer_to_rational_mono_lt"
+/
+  forall a b .
+    nat_to_integer a <z b
+    -> nat_to_rational a <q integer_to_rational b
+/;
+
+inference.
+intro /a b Hleq/.
+unfold /nat_to_rational/.
+apply /integer_to_rational_mono_lt/ >> auto.
+qed ();
+
+
+
+lemma "nat_to_rational_nonneg"
+/
+  forall n .
+    q`0 <q= nat_to_rational n
+/;
+
+inference.
+intro /n/.
+unfold /nat_to_rational/.
+apply /integer_to_rational_mono z`0/.
+apply /nat_to_integer_nonneg/.
+qed ();
+
+
+
 lemma "plus_to_rational"
 /
   forall a b .
@@ -4475,6 +5224,22 @@ intro /a b/.
 unfold /nat_to_rational at all/.
 rewrite /-> plus_to_integer/.
 apply /plusz_to_rational/.
+qed ();
+
+
+
+lemma "succ_to_rational"
+/
+  forall a .
+    nat_to_rational (succ a) = q`1 +q nat_to_rational a : rational
+/;
+
+inference.
+intro /a/.
+rewrite /-> plus_to_rational 1/.
+unfold /nat_to_rational/.
+reduce //.
+reflexivity.
 qed ();
 
 
@@ -4551,7 +5316,6 @@ unfold /nat_to_rational at all/.
 rewrite /-> neqb_to_integer/.
 apply /neqzb_to_rational/.
 qed ();
-
 
 
 
@@ -4792,6 +5556,43 @@ so /leqq_antisymm _# 2 Hneg Hpos/ /H/.
 subst /a/.
 rewrite /-> negq_zero/.
 reflexivity.
+qed ();
+
+
+
+lemma "absq_ub"
+/
+  forall x . x <q= absq x
+/;
+
+inference.
+intro /x/.
+so /rational_dichotomy_weak q`0 x/ /Hpos | Hneg/.
+  {
+  rewrite /-> absq_of_nonneg/ >> autoWith /leqq_refl/.
+  }
+
+  {
+  rewrite /-> absq_of_nonpos/ >> auto.
+  apply /leqq_trans _ q`0/ >> auto.
+  apply /negq_leqq'/.
+  rewrite /-> negq_invol/.
+  rewrite /-> negq_zero/.
+  auto.
+  }
+qed ();
+
+
+
+lemma "absq_idem"
+/
+  forall x . absq (absq x) = absq x : rational
+/;
+
+inference.
+intro /x/.
+rewrite /-> absq_of_nonneg/ >> auto.
+apply /absq_nonneg/.
 qed ();
 
 
@@ -5052,6 +5853,1257 @@ rewrite /-> absq_of_nonpos/.
   rewrite /<- negz_to_rational/.
   reduce //.
   reflexivity.
+  }
+qed ();
+
+
+
+lemma "absq_minusq_commute"
+/
+  forall a b .
+    absq (a -q b) = absq (b -q a) : rational
+/;
+
+inference.
+intro /a b/.
+rewrite /<- absq_negq/.
+rewrite /-> negq_minusq/.
+reflexivity.
+qed ();
+
+
+
+lemma "absq_minusq_upper_bound"
+/
+  forall a b c .
+    absq (a -q b) <q= c
+    -> a <q= b +q c
+/;
+
+intro /a b c Hleq/.
+rewrite /-> plusq_shift_leqq_l/.
+rewrite /-> plusq_commute/.
+fold /minusq _ _/.
+so /rational_dichotomy_weak (a -q b) q`0/ /Hnonpos | Hnonneg/.
+  {
+  apply /leqq_trans _ q`0/ >> auto.
+  apply /leqq_trans _ (absq (a -q b))/ >> auto.
+  apply /absq_nonneg/.
+  }
+
+  {
+  rewrite /-> absq_of_nonneg in Hleq/ >> auto.
+  }
+qed ();
+
+
+
+lemma "absq_minusq_lower_bound"
+/
+  forall a b c .
+    absq (a -q b) <q= c
+    -> b -q c <q= a
+/;
+
+intro /a b c Hleq/.
+unfold /minusq/.
+rewrite /<- plusq_shift_leqq_rl/.
+apply /absq_minusq_upper_bound/.
+rewrite /-> absq_minusq_commute/.
+hyp /Hleq/.
+qed ();
+
+
+
+lemma "absq_minusq_absq"
+/
+  forall a b .
+    absq (absq a -q absq b) <q= absq (a -q b)
+/;
+
+inference.
+assert /forall a b . q`0 <q= a -> b <q= q`0 -> absq (absq a -q absq b) <q= absq (a -q b)/ /Hacross/.
+  {
+  inference.
+  intro /a b Hposa Hnegb/.
+  rewrite /-> absq_of_nonneg at 1/ >> auto.
+  rewrite /-> absq_of_nonpos at 1/ >> auto.
+  unfold /minusq/.
+  rewrite /-> negq_invol/.
+  rewrite /-> absq_of_nonneg at 1/.
+    {
+    unfold /minusq/.
+    rewrite /<- plusq_id_l q`0/.
+    apply /plusq_leqq/ >> auto.
+    apply /negq_leqq'/.
+    rewrite /-> negq_invol/.
+    rewrite /-> negq_zero/.
+    auto.
+    }
+  apply /leqq_trans/.
+    {
+    apply /absq_plusq_leqq/.
+    }
+
+    typechecker ();
+  rewrite /-> absq_of_nonneg/ >> auto.
+  rewrite /-> absq_of_nonpos/ >> auto.
+  unfold /minusq/.
+  apply /leqq_refl/.
+  }
+intro /a b/.
+so /rational_dichotomy_weak q`0 a/ /Hnnega | Hnposa/ >> so /rational_dichotomy_weak q`0 b/ /Hnnegb | Hnposb/.
+  {
+  rewrite /-> absq_of_nonneg at 1 1/ >> autoWith /leqq_refl/.
+  }
+
+  {
+  apply /Hacross/ >> auto.
+  }
+
+  {
+  rewrite /-> absq_minusq_commute at 0 1/.
+  apply /Hacross/ >> auto.
+  }
+
+  {
+  rewrite /-> absq_of_nonpos at 1 1/ >> auto.
+  unfold /minusq/.
+  rewrite /-> negq_invol/.
+  rewrite /-> plusq_commute/.
+  fold /minusq _ _/.
+  rewrite /-> absq_minusq_commute/.
+  apply /leqq_refl/.
+  }
+qed ();
+
+  
+
+(* Minimum and Maximum *)
+
+define /minq a b/
+/
+  if leqqb a b then a else b
+//
+  rational -> rational -> rational
+/;
+
+unfold /minq/.
+typecheck.
+qed ();
+
+Define.registerNative 0 2 (Define.unfold1 (parseConstant /minq/) 2);
+
+
+
+define /maxq a b/
+/
+  if leqqb a b then b else a
+//
+  rational -> rational -> rational
+/;
+
+unfold /maxq/.
+typecheck.
+qed ();
+
+Define.registerNative 0 2 (Define.unfold1 (parseConstant /maxq/) 2);
+
+
+
+lemma "negq_minq"
+/
+  forall a b . ~q (minq a b) = maxq (~q a) (~q b) : rational
+/;
+
+inference.
+intro /a b/.
+unfold /minq , maxq/.
+boolCase /leqqb a b/ /Hab/ >> boolCase /leqqb (~q a) (~q b)/ /Hba/ >> attempt reflexivity.
+  {
+  reduce //.
+  compat.
+  apply /leqq_antisymm/ >> auto.
+  apply /negq_leqq'/ >> auto.
+  }
+
+  {
+  rewrite /-> not_leqq in Hab/.
+  rewrite /-> not_leqq in Hba/.
+  so /negq_ltq' _ _ Hba/ /Hba'/.
+  so /ltq_irrefl _ (ltq_trans _ _ _ Hba' Hab)/ /0/.
+  }
+qed ();
+
+
+
+lemma "maxq_as_minq"
+/
+  forall a b . maxq a b = ~q (minq (~q a) (~q b)) : rational
+/;
+
+inference.
+intro /a b/.
+rewrite /-> negq_minq/.
+rewrite /-> negq_invol at all/.
+reflexivity.
+qed ();
+
+
+
+lemma "negq_maxq"
+/
+  forall a b . ~q (maxq a b) = minq (~q a) (~q b) : rational
+/;
+
+inference.
+intro /a b/.
+rewrite /-> maxq_as_minq/.
+rewrite /-> negq_invol/.
+reflexivity.
+qed ();
+
+
+
+lemma "minq_as_maxq"
+/
+  forall a b . minq a b = ~q (maxq (~q a) (~q b)) : rational
+/;
+
+inference.
+intro /a b/.
+rewrite /-> negq_maxq/.
+rewrite /-> negq_invol at all/.
+reflexivity.
+qed ();
+
+
+lemma "minq_commute"
+/
+  forall a b . minq a b = minq b a : rational
+/;
+
+inference.
+intro /a b/.
+unfold /minq at all/.
+boolCase /leqqb a b/ /Hab/ >> boolCase /leqqb b a/ /Hba/ >> attempt reflexivity.
+  {
+  apply /leqq_antisymm/ >> auto.
+  }
+
+  {
+  so /Hab __/ /0/.
+  rewrite /-> not_leqq in Hba/.
+  apply /ltq_impl_leqq/ >> auto.
+  }
+qed ();
+
+
+
+lemma "maxq_commute"
+/
+  forall a b . maxq a b = maxq b a : rational
+/;
+
+inference.
+intro /a b/.
+rewrite /-> maxq_as_minq at all/.
+compat.
+apply /minq_commute/.
+qed ();
+
+
+
+lemma "minq_assoc"
+/
+  forall a b c . minq (minq a b) c = minq a (minq b c) : rational
+/;
+
+inference.
+intro /a b c/.
+unfold /minq at all/.
+boolCase /leqqb b c/ /Hbc/ >> reduce // >> boolCase /leqqb a b/ /Hab/ >> attempt reflexivity >> reduce //.
+  {
+  boolCase /leqqb a c/ /Hac/.
+    {
+    reflexivity.
+    }
+  so /Hac __/ /0/.
+  apply /leqq_trans/ >> auto.
+  }
+
+  {
+  boolCase /leqqb b c/ /Hbc'/.
+    {
+    reflexivity.
+    }
+  so /Hbc' Hbc/ /0/.
+  }
+
+  {
+  boolCase /leqqb b c/ /Hbc'/.
+    {
+    so /Hbc Hbc'/ /0/.
+    }
+  boolCase /leqqb a c/ /Hac/.
+  1:{
+    reflexivity.
+    }
+  rewrite /-> not_leqq in Hbc/.
+  rewrite /-> not_leqq in Hab/.
+  apply /leqq_antisymm/ >> auto.
+  apply /ltq_impl_leqq/.
+  apply /ltq_trans/ >> auto.
+  }
+qed ();
+
+
+
+lemma "maxq_assoc"
+/
+  forall a b c . maxq (maxq a b) c = maxq a (maxq b c) : rational
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> maxq_as_minq at all/.
+rewrite /-> negq_invol at all/.
+compat.
+apply /minq_assoc/.
+qed ();
+
+
+
+
+
+lemma "minq_leq_l"
+/
+  forall a b . minq a b <q= a
+/;
+
+inference.
+intro /a b/.
+unfold /minq/.
+boolCase /leqqb a b/ /Hab/.
+  {
+  apply /leqq_refl/.
+  }
+rewrite /-> not_leqq in Hab/.
+apply /ltq_impl_leqq/ >> auto.
+qed ();
+
+
+
+lemma "minq_leq_r"
+/
+  forall a b . minq a b <q= b
+/;
+
+inference.
+intro /a b/.
+rewrite /-> minq_commute/.
+apply /minq_leq_l/.
+qed ();
+
+
+
+lemma "maxq_leq_l"
+/
+  forall a b . a <q= maxq a b
+/;
+
+inference.
+intro /a b/.
+rewrite /-> maxq_as_minq/.
+apply /negq_leqq'/.
+rewrite /-> negq_invol/.
+apply /minq_leq_l/.
+qed ();
+
+
+
+lemma "maxq_leq_r"
+/
+  forall a b . b <q= maxq a b
+/;
+
+inference.
+intro /a b/.
+rewrite /-> maxq_commute/.
+apply /maxq_leq_l/.
+qed ();
+
+
+
+lemma "minq_glb"
+/
+  forall a b c . c <q= a -> c <q= b -> c <q= minq a b
+/;
+
+inference.
+intro /a b c Ha Hb/.
+unfold /minq/.
+boolCase /leqqb a b/ /Hab/ >> auto.
+qed ();
+
+
+
+lemma "maxq_lub"
+/
+  forall a b c . a <q= c -> b <q= c -> maxq a b <q= c
+/;
+
+inference.
+intro /a b c Ha Hb/.
+unfold /maxq/.
+boolCase /leqqb a b/ /Hab/ >> auto.
+qed ();
+
+  
+
+lemma "minq_eq_l"
+/
+  forall a b . a <q= b -> minq a b = a : rational
+/;
+
+inference.
+intro /a b Hab/.
+unfold /minq/.
+boolCase /leqqb a b/ /H/ >> attempt reflexivity.
+rewrite /-> not_leqq in H/.
+so /ltq_irrefl _ (leqq_ltq_trans _ _ _ Hab H)/ /0/.
+qed ();
+
+
+
+lemma "minq_eq_r"
+/
+  forall a b . b <q= a -> minq a b = b : rational
+/;
+
+inference.
+intro /a b Hba/.
+rewrite /-> minq_commute/.
+apply /minq_eq_l/ >> auto.
+qed ();
+
+
+
+lemma "maxq_eq_l"
+/
+  forall a b . b <q= a -> maxq a b = a : rational
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> maxq_as_minq/.
+rewrite /-> minq_eq_l/.
+  {
+  apply /negq_leqq/ >> auto.
+  }
+apply /negq_invol/.
+qed ();
+
+
+
+lemma "maxq_eq_r"
+/
+  forall a b . a <q= b -> maxq a b = b : rational
+/;
+
+inference.
+intro /a b H/.
+rewrite /-> maxq_commute/.
+apply /maxq_eq_l/ >> auto.
+qed ();
+
+
+
+lemma "minq_idem"
+/
+  forall a . minq a a = a : rational
+/;
+
+inference.
+intro /a/.
+rewrite /-> minq_eq_l/ >> auto.
+apply /leqq_refl/.
+qed ();
+
+
+
+lemma "maxq_idem"
+/
+  forall a . maxq a a = a : rational
+/;
+
+inference.
+intro /a/.
+rewrite /-> maxq_eq_l/ >> auto.
+apply /leqq_refl/.
+qed ();
+
+
+
+lemma "minq_dist_maxq_l"
+/
+  forall a b c . minq (maxq a b) c = maxq (minq a c) (minq b c) : rational
+/;
+
+inference.
+intro /a b c/.
+revert /a b/.
+assert /forall a b . a <q= b -> minq (maxq a b) c = maxq (minq a c) (minq b c) : rational/ /H/.
+  {
+  inference.
+  intro /a b Hab/.
+  rewrite /-> maxq_eq_r a b/ >> auto.
+  so /rational_dichotomy_weak b c/ /Hbc | Hcb/.
+    {
+    rewrite /-> minq_eq_l b c at all/ >> auto.
+    rewrite /-> minq_eq_l a c/ >> autoWith /leqq_trans/.
+    rewrite /-> maxq_eq_r/ >> auto.
+    }
+
+    {
+    rewrite /-> minq_eq_r b c at all/ >> auto.
+    so /rational_dichotomy_weak a c/ /Hac | Hca/.
+      {
+      rewrite /-> minq_eq_l/ >> auto.
+      rewrite /-> maxq_eq_r/ >> auto.
+      }
+
+      {
+      rewrite /-> minq_eq_r/ >> auto.
+      symmetry.
+      apply /maxq_idem/.
+      }
+    }
+  }
+intro /a b/.
+so /rational_dichotomy_weak a b/ /Hab | Hba/.
+  {
+  apply /H/ >> auto.
+  }
+
+  {
+  rewrite /-> maxq_commute at 0 1/.
+  apply /H/ >> auto.
+  }
+qed ();
+
+
+
+lemma "minq_dist_maxq_r"
+/
+  forall a b c . minq a (maxq b c) = maxq (minq a b) (minq a c) : rational
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> minq_commute at 0 1 2/.
+apply /minq_dist_maxq_l/.
+qed ();
+
+
+
+lemma "maxq_dist_minq_l"
+/
+  forall a b c . maxq (minq a b) c = minq (maxq a c) (maxq b c) : rational
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> minq_as_maxq at all/.
+rewrite /-> maxq_as_minq at 4 3 0/.
+rewrite /-> negq_invol at all/.
+compat.
+apply /minq_dist_maxq_l/.
+qed ();
+
+
+
+lemma "maxq_dist_minq_r"
+/
+  forall a b c . maxq a (minq b c) = minq (maxq a b) (maxq a c) : rational
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> maxq_commute at 0 1 2/.
+apply /maxq_dist_minq_l/.
+qed ();
+
+
+
+lemma "plusq_dist_minq_r"
+/
+  forall a b c . a +q minq b c = minq (a +q b) (a +q c) : rational
+/;
+
+inference.
+intro /a b c/.
+so /rational_dichotomy_weak b c/ /Hbc | Hcb/.
+  {
+  rewrite /-> minq_eq_l/ >> auto.
+  rewrite /-> minq_eq_l/ >> auto.
+  apply /plusq_leqq/ >> auto.
+  apply /leqq_refl/.
+  }
+
+  {
+  rewrite /-> minq_eq_r/ >> auto.
+  rewrite /-> minq_eq_r/ >> auto.
+  apply /plusq_leqq/ >> auto.
+  apply /leqq_refl/.
+  }
+qed ();
+
+
+
+lemma "plusq_dist_minq_l"
+/
+  forall a b c . minq a b +q c = minq (a +q c) (b +q c) : rational
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusq_commute at 0 1 2/.
+apply /plusq_dist_minq_r/.
+qed ();
+
+
+
+lemma "plusq_dist_maxq_r"
+/
+  forall a b c . a +q maxq b c = maxq (a +q b) (a +q c) : rational
+/;
+
+inference.
+intro /a b c/.
+so /rational_dichotomy_weak b c/ /Hbc | Hcb/.
+  {
+  rewrite /-> maxq_eq_r/ >> auto.
+  rewrite /-> maxq_eq_r/ >> auto.
+  apply /plusq_leqq/ >> auto.
+  apply /leqq_refl/.
+  }
+
+  {
+  rewrite /-> maxq_eq_l/ >> auto.
+  rewrite /-> maxq_eq_l/ >> auto.
+  apply /plusq_leqq/ >> auto.
+  apply /leqq_refl/.
+  }
+qed ();
+
+
+
+lemma "plusq_dist_maxq_l"
+/
+  forall a b c . maxq a b +q c = maxq (a +q c) (b +q c) : rational
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> plusq_commute at 0 1 2/.
+apply /plusq_dist_maxq_r/.
+qed ();
+
+
+
+lemma "minz_to_rational"
+/
+  forall m n . integer_to_rational (Integer.minz m n) = minq (integer_to_rational m) (integer_to_rational n) : rational
+/;
+
+inference.
+assert /forall m n . m <z= n -> integer_to_rational (Integer.minz m n) = minq (integer_to_rational m) (integer_to_rational n) : rational/ /H/.
+  {
+  inference.
+  intro /m n Hmn/.
+  rewrite /-> Integer.minz_eq_l/ >> auto.
+  rewrite /-> minq_eq_l/ >> auto.
+  apply /integer_to_rational_mono/ >> auto.
+  }
+intro /m n/.
+so /Integer.integer_dichotomy_weak m n/ /Hmn | Hnm/ >> auto.
+rewrite /-> Integer.minz_commute/.
+rewrite /-> minq_commute/.
+apply /H/ >> auto.
+qed ();
+
+
+
+lemma "maxz_to_rational"
+/
+  forall m n . integer_to_rational (Integer.maxz m n) = maxq (integer_to_rational m) (integer_to_rational n) : rational
+/;
+
+inference.
+assert /forall m n . n <z= m -> integer_to_rational (Integer.maxz m n) = maxq (integer_to_rational m) (integer_to_rational n) : rational/ /H/.
+  {
+  inference.
+  intro /m n Hmn/.
+  rewrite /-> Integer.maxz_eq_l/ >> auto.
+  rewrite /-> maxq_eq_l/ >> auto.
+  apply /integer_to_rational_mono/ >> auto.
+  }
+intro /m n/.
+so /Integer.integer_dichotomy_weak m n/ /Hmn | Hnm/ >> auto.
+rewrite /-> Integer.maxz_commute/.
+rewrite /-> maxq_commute/.
+apply /H/ >> auto.
+qed ();
+
+
+
+(* Floor and Ceiling *)
+
+define /floor x/
+/
+  divz (x #1) (x #2)
+//
+  rational -> integer
+/;
+
+introOf /x/.
+unfold /rational in x/.
+destruct /x/ /[x x' Hx]/.
+destruct /x/ /a b/.
+destruct /x'/ /a' b'/.
+reduce /Hx/.
+destruct /Hx/ /Hb Hb' Heq/.
+unfold /floor at 0 0/.
+reduce //.
+assert /b != z`0 : integer/ /Hnonzerob/.
+  {
+  omega.
+  }
+assert /b' != z`0 : integer/ /Hnonzerob'/.
+  {
+  omega.
+  }
+so /divz_spec a' b'/ /H/.
+revert /H/.
+so /divz_spec a b/ /H/.
+revert /H/.
+so /modz_spec a' b'/ /H/.
+revert /H/.
+so /modz_spec a b/ /H/.
+revert /H/.
+generalize /divz a b/ /_/ /q/.
+generalize /divz a' b'/ /_/ /q'/.
+generalize /modz a b/ /_/ /r/.
+generalize /modz a' b'/ /_/ /r'/.
+intro /(Hrlo Hrhi) (Hrlo' Hrhi') Hq Hq'/.
+so /timesz_compat _ _ b' b' Hq ()/ /H/.
+rewrite /-> timesz_dist_plusz_l in H/.
+rewrite /-> Heq in H/.
+rewrite /-> plusz_commute in H/.
+rewrite /-> plusz_shift_r in H/.
+witness /division_unique a' b' q q' (a' +z ~z (q *z b')) r' __ __ __ __ __ __ #1/ >> auto.
+  {
+  rewrite /-> plusz_commute at 1/.
+  rewrite /<- plusz_assoc/.
+  rewrite /-> plusz_inverse_r/.
+  rewrite /-> plusz_id_l/.
+  reflexivity.
+  }
+
+  {
+  apply /timesz_cancel_leqz_r _ _ b/ >> auto.
+  rewrite /-> timesz_ann_l/.
+  rewrite /-> timesz_dist_plusz_l/.
+  rewrite /<- negz_dist_timesz_l/.
+  rewrite /-> timesz_assoc/.
+  rewrite /-> timesz_commute at 2/.
+  rewrite /<- timesz_assoc/.
+  rewrite /<- H/.
+  apply /timesz_leqz_zero_pos_pos/ >> autoWith /ltz_impl_leqz/.
+  }
+
+  {
+  apply /timesz_cancel_ltz_r _ _ b/ >> auto.
+  rewrite /-> timesz_dist_plusz_l/.
+  rewrite /<- negz_dist_timesz_l/.
+  rewrite /-> timesz_assoc/.
+  rewrite /-> timesz_commute at 2/.
+  rewrite /<- timesz_assoc/.
+  rewrite /<- H/.
+  rewrite /-> timesz_commute at 1/.
+  rewrite /-> absz_of_nonneg/ >> autoWith /ltz_impl_leqz/.
+  rewrite /-> absz_of_nonneg in Hrhi/ >> autoWith /ltz_impl_leqz/.
+  apply /timesz_ltz_r/ >> auto.
+  }
+qed ();
+
+
+
+lemma "floor_lb"
+/
+  forall x . integer_to_rational (floor x) <q= x
+/;
+
+inference.
+intro /x/.
+so /rational_representative x/ /[Hx]/.
+unhide.
+destruct /Hx/ /(a b) Hx ?/.
+subst /x/.
+reduce /Hx/.
+assert /b != z`0 : integer/ /Hnonzerob/.
+  {
+  omega.
+  }
+apply /rational_leqq/.
+split.
+unfold /qintro at all, floor, integer_to_rational at all/.
+reduce //.
+rewrite /-> timesz_id_r/.
+rewrite /<- divz_spec a b at 1/.
+rewrite /<- plusz_id_r (_ *z _)/.
+apply /plusz_leqz/ >> auto.
+apply /modz_nonneg/.
+qed ();
+
+
+
+lemma "floor_glb"
+/
+  forall x y . 
+    integer_to_rational y <q= x 
+    -> y <z= floor x
+/;
+
+inference.
+intro /x y Hyx/.
+so /rational_representative x/ /[Hx]/.
+unhide.
+destruct /Hx/ /(a b) Hx ?/.
+subst /x/.
+reduce /Hx/.
+assert /b != z`0 : integer/ /Hnonzerob/.
+  {
+  omega.
+  }
+so /leqq_invert _# 2 Hyx/ /H/.
+unfold /integer_to_rational in H at all, qintro in H at all/.
+destruct /H/ /[Hleq]/.
+unhide.
+rewrite /-> timesz_id_r in Hleq/.
+unfold /qintro, floor/.
+reduce //.
+rewrite /<- divz_spec a b in Hleq/.
+apply /timesz_cancel_leqz_r_remainder _ _ b (modz a b)/ >> auto.
+rewrite /<- absz_of_nonneg b at 1/ >> autoWith /ltz_impl_leqz/.
+apply /modz_ltz_r/.
+qed ();
+
+
+
+define /ceiling x/
+/
+  negz (floor (negq x))
+//
+  rational -> integer
+/;
+
+unfold /ceiling/.
+typecheck.
+qed ();
+
+
+
+lemma "ceiling_ub"
+/
+  forall x . x <q= integer_to_rational (ceiling x)
+/;
+
+inference.
+intro /x/.
+unfold /ceiling/.
+rewrite /-> negz_to_rational/.
+rewrite /<- negq_invol x/.
+apply /negq_leqq/.
+apply /floor_lb/.
+qed ();
+
+
+
+lemma "ceiling_lub"
+/
+  forall x y .
+    x <q= integer_to_rational y
+    -> ceiling x <z= y
+/;
+
+inference.
+intro /x y Hxy/.
+unfold /ceiling/.
+rewrite /<- negz_invol y/.
+apply /negz_leqz/.
+apply /floor_glb/.
+rewrite /-> negz_to_rational/.
+apply /negq_leqq/ >> auto.
+qed ();
+
+
+
+lemma "floor_mono"
+/
+  forall x y .
+    x <q= y
+    -> floor x <z= floor y
+/;
+
+inference.
+intro /x y Hxy/.
+apply /floor_glb/.
+apply /leqq_trans/ >> auto.
+apply /floor_lb/.
+qed ();
+
+
+
+lemma "ceiling_mono"
+/
+  forall x y .
+    x <q= y
+    -> ceiling x <z= ceiling y
+/;
+
+inference.
+intro /x y Hxy/.
+apply /ceiling_lub/.
+apply /leqq_trans/ >> auto.
+apply /ceiling_ub/.
+qed ();
+
+
+
+lemma "floor_integer_to_rational"
+/
+  forall x .
+    floor (integer_to_rational x) = x : integer
+/;
+
+inference.
+intro /x/.
+apply /leqz_antisymm/.
+  {
+  apply /integer_to_rational_mono_conv/.
+  apply /floor_lb/.
+  }
+
+  {
+  apply /floor_glb/.
+  apply /leqq_refl/.
+  }
+qed ();
+
+
+
+lemma "ceiling_integer_to_rational"
+/
+  forall x .
+    ceiling (integer_to_rational x) = x : integer
+/;
+
+inference.
+intro /x/.
+apply /leqz_antisymm/.
+  {
+  apply /ceiling_lub/.
+  apply /leqq_refl/.
+  }
+
+  {
+  apply /integer_to_rational_mono_conv/.
+  apply /ceiling_ub/.
+  }
+qed ();
+
+
+
+lemma "floor_plus_r"
+/
+  forall x y .
+    floor (x +q integer_to_rational y) = floor x +z y : integer
+/;
+
+inference.
+intro /x y/.
+apply /leqz_antisymm/.
+  {
+  apply /plusz_shift_leqz_rl/.
+  apply /floor_glb/.
+  rewrite /-> plusz_to_rational/.
+  rewrite /-> negz_to_rational/.
+  apply /plusq_shift_leqq_rl/.
+  apply /floor_lb/.
+  }
+
+  {
+  apply /floor_glb/.
+  rewrite /-> plusz_to_rational/.
+  apply /plusq_leqq/.
+    {
+    apply /floor_lb/.
+    }
+
+    {
+    apply /leqq_refl/.
+    }
+  }
+qed ();
+
+
+
+lemma "floor_plus_l"
+/
+  forall x y .
+    floor (integer_to_rational y +q x) = y +z floor x : integer
+/;
+
+inference.
+intro /x y/.
+rewrite /-> plusz_commute/.
+rewrite /-> plusq_commute/.
+apply /floor_plus_r/.
+qed ();
+
+
+
+lemma "ceiling_plus_r"
+/
+  forall x y .
+    ceiling (x +q integer_to_rational y) = ceiling x +z y : integer
+/;
+
+inference.
+intro /x y/.
+unfold /ceiling at 0 0/.
+rewrite /<- negz_invol y at 1/.
+rewrite /<- negz_plusz/.
+compat.
+rewrite /-> negq_plusq/.
+rewrite /<- negz_to_rational/.
+apply /floor_plus_r/.
+qed ();
+
+
+
+lemma "ceiling_plus_l"
+/
+  forall x y .
+    ceiling (integer_to_rational y +q x) = y +z ceiling x : integer
+/;
+
+inference.
+intro /x y/.
+rewrite /-> plusz_commute/.
+rewrite /-> plusq_commute/.
+apply /ceiling_plus_r/.
+qed ();
+
+
+
+lemma "floor_mono_lt"
+/
+  forall x y .
+    q`1 +q x <q= y
+    -> floor x <z floor y
+/;
+
+inference.
+intro /x y Hq/.
+so /floor_mono _# 2 Hq/ /Hz/.
+rewrite /-> floor_plus_l in Hz/.
+unfold /ltz/.
+hyp /Hz/.
+qed ();
+
+
+
+lemma "ceiling_mono_lt"
+/
+  forall x y .
+    q`1 +q x <q= y
+    -> ceiling x <z ceiling y
+/;
+
+inference.
+intro /x y Hq/.
+so /ceiling_mono _# 2 Hq/ /Hz/.
+rewrite /-> ceiling_plus_l in Hz/.
+unfold /ltz/.
+hyp /Hz/.
+qed ();
+
+
+
+lemma "floor_negq"
+/
+  forall x . floor (negq x) = negz (ceiling x) : integer
+/;
+
+inference.
+intro /x/.
+unfold /ceiling/.
+rewrite /-> negz_invol/.
+reflexivity.
+qed ();
+
+
+
+lemma "ceiling_negq"
+/
+  forall x . ceiling (negq x) = negz (floor x) : integer
+/;
+
+inference.
+intro /x/.
+unfold /ceiling/.
+rewrite /-> negq_invol/.
+reflexivity.
+qed ();
+
+
+
+lemma "floor_nonneg"
+/
+  forall x .
+    q`0 <q= x
+    -> z`0 <z= floor x
+/;
+
+inference.
+intro /x Hleq/.
+apply /floor_glb/ >> auto.
+qed ();
+
+
+
+lemma "floor_nonpos"
+/
+  forall x .
+    x <q= q`0
+    -> floor x <z= z`0
+/;
+
+inference.
+intro /x Hleq/.
+apply /integer_to_rational_mono_conv/.
+apply /leqq_trans/ >> auto.
+apply /floor_lb/.
+qed ();
+
+
+
+lemma "ceiling_nonneg"
+/
+  forall x .
+    q`0 <q= x
+    -> z`0 <z= ceiling x
+/;
+
+inference.
+intro /x Hleq/.
+apply /integer_to_rational_mono_conv/.
+apply /leqq_trans/ >> auto.
+apply /ceiling_ub/.
+qed ();
+
+
+
+lemma "ceiling_nonpos"
+/
+  forall x .
+    x <q= q`0
+    -> ceiling x <z= z`0
+/;
+
+inference.
+intro /x Hleq/.
+apply /ceiling_lub/ >> auto.
+qed ();
+
+
+
+lemma "floor_from_bounds"
+/
+  forall x y .
+    integer_to_rational x <q= y
+    -> y <q integer_to_rational (z`1 +z x)
+    -> floor y = x : integer
+/;
+
+inference.
+intro /x y Hlo Hhi/.
+apply /leqz_antisymm/.
+1:{
+  apply /floor_glb/ >> auto.
+  }
+apply /not_ltz/.
+unfold /ltz/.
+intro /H/.
+apply /ltq_irrefl (integer_to_rational (floor y))/.
+apply /leqq_ltq_trans _ y/.
+  {
+  apply /floor_lb/.
+  }
+apply /ltq_leqq_trans/ >> auto.
+apply /integer_to_rational_mono/ >> auto.
+qed ();
+
+
+
+lemma "ceiling_from_bounds"
+/
+  forall x y .
+    y <q= integer_to_rational x
+    -> integer_to_rational (z`-1 +z x) <q y
+    -> ceiling y = x : integer
+/;
+
+inference.
+intro /x y Hhi Hlo/.
+apply /leqz_antisymm/.
+  {
+  apply /ceiling_lub/ >> auto.
+  }
+apply /not_ltz/.
+unfold /ltz/.
+intro /H/.
+apply /ltq_irrefl (integer_to_rational (ceiling y))/.
+apply /ltq_leqq_trans _ y/.
+1:{
+  apply /ceiling_ub/.
+  }
+apply /leqq_ltq_trans/ >> auto.
+apply /integer_to_rational_mono/.
+apply /plusz_shift_leqz_lr z`1/ >> auto.
+qed ();
+
+
+
+lemma "floor_ceiling_leqz"
+/
+  forall x .
+    floor x <z= ceiling x
+/;
+
+inference.
+intro /x/.
+apply /integer_to_rational_mono_conv/.
+apply /leqq_trans _ x/.
+  {
+  apply /floor_lb/.
+  }
+
+  {
+  apply /ceiling_ub/.
   }
 qed ();
 

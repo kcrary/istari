@@ -142,6 +142,8 @@ for `invq` to have good properties.
 
     negq_as_timesq : type:negq_as_timesq
 
+    plusq_self : type:plusq_self
+
 
 ### Inequalities
 
@@ -178,6 +180,8 @@ for `invq` to have good properties.
 This one gives transitivity in the form needed for rewriting:
 
     leqq_implication : type:leqq_implication
+
+    ltq_implication : type:ltq_implication
 
     not_leqq : type:not_leqq
 
@@ -310,6 +314,46 @@ This one gives transitivity in the form needed for rewriting:
 
     timesq_cancel_ltq_r : type:timesq_cancel_ltq_r
 
+    timesq_cancel_leqq_l_neg : type:timesq_cancel_leqq_l_neg
+
+    timesq_cancel_leqq_r_neg : type:timesq_cancel_leqq_r_neg
+
+    timesq_cancel_ltq_l_neg : type:timesq_cancel_ltq_l_neg
+
+    timesq_cancel_ltq_r_neg : type:timesq_cancel_ltq_r_neg
+
+    timesq_shift_leqq_r : type:timesq_shift_leqq_r
+
+    timesq_shift_leqq_l : type:timesq_shift_leqq_l
+
+    timesq_shift_leqq_lr : type:timesq_shift_leqq_lr
+
+    timesq_shift_leqq_rl : type:timesq_shift_leqq_rl
+
+    timesq_shift_ltq_r : type:timesq_shift_ltq_r
+
+    timesq_shift_ltq_l : type:timesq_shift_ltq_l
+
+    timesq_shift_ltq_lr : type:timesq_shift_ltq_lr
+
+    timesq_shift_ltq_rl : type:timesq_shift_ltq_rl
+
+    timesq_shift_leqq_r_neg : type:timesq_shift_leqq_r_neg
+
+    timesq_shift_leqq_l_neg : type:timesq_shift_leqq_l_neg
+
+    timesq_shift_leqq_lr_neg : type:timesq_shift_leqq_lr_neg
+
+    timesq_shift_leqq_rl_neg : type:timesq_shift_leqq_rl_neg
+
+    timesq_shift_ltq_r_neg : type:timesq_shift_ltq_r_neg
+
+    timesq_shift_ltq_l_neg : type:timesq_shift_ltq_l_neg
+
+    timesq_shift_ltq_lr_neg : type:timesq_shift_ltq_lr_neg
+
+    timesq_shift_ltq_rl_neg : type:timesq_shift_ltq_rl_neg
+
     invq_positive : type:invq_positive
 
     invq_negative : type:invq_negative
@@ -322,6 +366,27 @@ This one gives transitivity in the form needed for rewriting:
 
     invq_ltq_neg : type:invq_ltq_neg
 
+    datatype
+      intersect (i : level) . U i
+    of
+      samesign : rational -> rational -> type =
+  
+      | samesign_pos :
+          forall x y .
+            q`0 <q x
+            -> q`0 <q y
+            -> samesign x y
+  
+      | samesign_neg :
+          forall x y .
+            x <q q`0
+            -> y <q q`0
+            -> samesign x y
+
+    invq_leqq_samesign : type:invq_leqq_samesign
+
+    invq_ltq_samesign : type:invq_ltq_samesign
+
 
 ### Relation to integers
 
@@ -333,7 +398,11 @@ This one gives transitivity in the form needed for rewriting:
 
     integer_to_rational_mono : type:integer_to_rational_mono
 
+    integer_to_rational_mono_conv : type:integer_to_rational_mono_conv
+
     integer_to_rational_mono_lt : type:integer_to_rational_mono_lt
+
+    integer_to_rational_mono_lt_conv : type:integer_to_rational_mono_lt_conv
 
     plusz_to_rational : type:plusz_to_rational
 
@@ -361,11 +430,31 @@ This one gives transitivity in the form needed for rewriting:
 
     nat_to_rational_neq : type:nat_to_rational_neq
 
+    integer_nat_to_rational_eq : type:integer_nat_to_rational_eq
+
+    nat_integer_to_rational_eq : type:nat_integer_to_rational_eq
+
+    integer_nat_to_rational_neq : type:integer_nat_to_rational_neq
+
+    nat_integer_to_rational_neq : type:nat_integer_to_rational_neq
+
     nat_to_rational_mono : type:nat_to_rational_mono
+
+    integer_nat_to_rational_mono : type:integer_nat_to_rational_mono
+
+    nat_integer_to_rational_mono : type:nat_integer_to_rational_mono
 
     nat_to_rational_mono_lt : type:nat_to_rational_mono_lt
 
+    integer_nat_to_rational_mono_lt : type:integer_nat_to_rational_mono_lt
+
+    nat_integer_to_rational_mono_lt : type:nat_integer_to_rational_mono_lt
+
+    nat_to_rational_nonneg : type:nat_to_rational_nonneg
+
     plus_to_rational : type:plus_to_rational
+
+    succ_to_rational : type:succ_to_rational
 
     times_to_rational : type:times_to_rational
 
@@ -438,6 +527,75 @@ This one gives transitivity in the form needed for rewriting:
     rational_dichotomy_neq : type:rational_dichotomy_neq
 
 
+### Minimum/Maximum
+
+    minq : type:minq
+         = def:minq
+
+    maxq : type:maxq
+         = def:maxq
+
+    negq_minq : type:negq_minq
+
+    negq_maxq : type:negq_maxq
+
+    maxq_as_minq : type:maxq_as_minq
+
+    minq_as_maxq : type:minq_as_maxq
+
+    minq_commute : type:minq_commute
+
+    maxq_commute : type:maxq_commute
+
+    minq_assoc : type:minq_assoc
+
+    maxq_assoc : type:maxq_assoc
+
+    minq_leq_l : type:minq_leq_l
+
+    minq_leq_r : type:minq_leq_r
+
+    maxq_leq_l : type:maxq_leq_l
+
+    maxq_leq_r : type:maxq_leq_r
+
+    minq_glb : type:minq_glb
+
+    maxq_lub : type:maxq_lub
+
+    minq_eq_l : type:minq_eq_l
+
+    minq_eq_r : type:minq_eq_r
+
+    maxq_eq_l : type:maxq_eq_l
+
+    maxq_eq_r : type:maxq_eq_r
+
+    minq_idem : type:minq_idem
+
+    maxq_idem : type:maxq_idem
+
+    minq_dist_maxq_l : type:minq_dist_maxq_l
+
+    minq_dist_maxq_r : type:minq_dist_maxq_r
+
+    maxq_dist_minq_l : type:maxq_dist_minq_l
+
+    maxq_dist_minq_r : type:maxq_dist_minq_r
+
+    plusq_dist_minq_l : type:plusq_dist_minq_l
+
+    plusq_dist_minq_r : type:plusq_dist_minq_r
+
+    plusq_dist_maxq_l : type:plusq_dist_maxq_l
+
+    plusq_dist_maxq_r : type:plusq_dist_maxq_r
+
+    minz_to_rational : type:minz_to_rational
+
+    maxz_to_rational : type:maxz_to_rational
+
+
 ### Absolute value
 
     absq : type:absq
@@ -448,6 +606,10 @@ This one gives transitivity in the form needed for rewriting:
     absq_of_nonneg : type:absq_of_nonneg
 
     absq_of_nonpos : type:absq_of_nonpos
+
+    absq_ub : type:absq_ub
+
+    absq_idem : type:absq_idem
 
     absq_negq : type:absq_negq
 
@@ -464,6 +626,68 @@ This one gives transitivity in the form needed for rewriting:
     absq_one : type:absq_one
 
     absq_minus_one : type:absq_minus_one
+
+    absq_minusq_commute : type:absq_minusq_commute
+
+    absq_minusq_upper_bound : type:absq_minusq_upper_bound
+
+    absq_minusq_lower_bound : type:absq_minusq_lower_bound
+
+    absq_minusq_absq : type:absq_minusq_absq
+
+
+### Floor and Ceiling
+
+    floor : type:floor
+
+    ceiling : type:ceiling
+            = def:ceiling
+
+    floor_lb : type:floor_lb
+
+    floor_glb : type:floor_glb
+
+    ceiling_ub : type:ceiling_ub
+
+    ceiling_lub : type:ceiling_lub
+
+    floor_mono : type:floor_mono
+
+    ceiling_mono : type:ceiling_mono
+
+    floor_integer_to_rational : type:floor_integer_to_rational
+
+    ceiling_integer_to_rational : type:ceiling_integer_to_rational
+
+    floor_plus_r : type:floor_plus_r
+
+    floor_plus_l : type:floor_plus_l
+
+    ceiling_plus_r : type:ceiling_plus_r
+
+    ceiling_plus_l : type:ceiling_plus_l
+
+    floor_mono_lt : type:floor_mono_lt
+
+    ceiling_mono_lt : type:ceiling_mono_lt
+
+    floor_negq : type:floor_negq
+
+    ceiling_negq : type:ceiling_negq
+
+    floor_nonneg : type:floor_nonneg
+
+    floor_nonpos : type:floor_nonpos
+
+    ceiling_nonneg : type:ceiling_nonneg
+
+    ceiling_nonpos : type:ceiling_nonpos
+
+    floor_from_bounds : type:floor_from_bounds
+
+    ceiling_from_bounds : type:ceiling_from_bounds
+
+    floor_ceiling_leqz : type:floor_ceiling_leqz
 
 
 ### Miscellaneous

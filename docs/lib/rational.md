@@ -156,6 +156,8 @@ for `invq` to have good properties.
 
     negq_as_timesq : forall (x : rational) . ~q x = q`-1 *q x : rational
 
+    plusq_self : forall (a : rational) . a +q a = q`2 *q a : rational
+
 
 ### Inequalities
 
@@ -193,6 +195,8 @@ This one gives transitivity in the form needed for rewriting:
 
     leqq_implication : forall (x x' y y' : rational) .
                           x' <q= x -> y <q= y' -> x <q= y -> x' <q= y'
+
+    ltq_implication : forall (x x' y y' : rational) . x' <q= x -> y <q= y' -> x <q y -> x' <q y'
 
     not_leqq : forall (x y : rational) . not (x <q= y) <-> y <q x
 
@@ -343,6 +347,60 @@ This one gives transitivity in the form needed for rewriting:
 
     timesq_cancel_ltq_r : forall (x y z : rational) . q`0 <q z -> x *q z <q y *q z -> x <q y
 
+    timesq_cancel_leqq_l_neg : forall (x y z : rational) .
+                                  z <q q`0 -> z *q x <q= z *q y -> y <q= x
+
+    timesq_cancel_leqq_r_neg : forall (x y z : rational) .
+                                  z <q q`0 -> x *q z <q= y *q z -> y <q= x
+
+    timesq_cancel_ltq_l_neg : forall (x y z : rational) . z <q q`0 -> z *q x <q z *q y -> y <q x
+
+    timesq_cancel_ltq_r_neg : forall (x y z : rational) . z <q q`0 -> x *q z <q y *q z -> y <q x
+
+    timesq_shift_leqq_r : forall (x y z : rational) .
+                             q`0 <q y -> x *q y <q= z <-> x <q= z *q invq y
+
+    timesq_shift_leqq_l : forall (x y z : rational) .
+                             q`0 <q y -> x <q= y *q z <-> invq y *q x <q= z
+
+    timesq_shift_leqq_lr : forall (x y z : rational) .
+                              q`0 <q x -> x *q y <q= z <-> y <q= invq x *q z
+
+    timesq_shift_leqq_rl : forall (x y z : rational) .
+                              q`0 <q z -> x <q= y *q z <-> x *q invq z <q= y
+
+    timesq_shift_ltq_r : forall (x y z : rational) . q`0 <q y -> x *q y <q z <-> x <q z *q invq y
+
+    timesq_shift_ltq_l : forall (x y z : rational) . q`0 <q y -> x <q y *q z <-> invq y *q x <q z
+
+    timesq_shift_ltq_lr : forall (x y z : rational) . q`0 <q x -> x *q y <q z <-> y <q invq x *q z
+
+    timesq_shift_ltq_rl : forall (x y z : rational) . q`0 <q z -> x <q y *q z <-> x *q invq z <q y
+
+    timesq_shift_leqq_r_neg : forall (x y z : rational) .
+                                 y <q q`0 -> x *q y <q= z <-> z *q invq y <q= x
+
+    timesq_shift_leqq_l_neg : forall (x y z : rational) .
+                                 y <q q`0 -> x <q= y *q z <-> z <q= invq y *q x
+
+    timesq_shift_leqq_lr_neg : forall (x y z : rational) .
+                                  x <q q`0 -> x *q y <q= z <-> invq x *q z <q= y
+
+    timesq_shift_leqq_rl_neg : forall (x y z : rational) .
+                                  z <q q`0 -> x <q= y *q z <-> y <q= x *q invq z
+
+    timesq_shift_ltq_r_neg : forall (x y z : rational) .
+                                y <q q`0 -> x *q y <q z <-> z *q invq y <q x
+
+    timesq_shift_ltq_l_neg : forall (x y z : rational) .
+                                y <q q`0 -> x <q y *q z <-> z <q invq y *q x
+
+    timesq_shift_ltq_lr_neg : forall (x y z : rational) .
+                                 x <q q`0 -> x *q y <q z <-> invq x *q z <q y
+
+    timesq_shift_ltq_rl_neg : forall (x y z : rational) .
+                                 z <q q`0 -> x <q y *q z <-> y <q x *q invq z
+
     invq_positive : forall (x : rational) . q`0 <q x -> q`0 <q invq x
 
     invq_negative : forall (x : rational) . x <q q`0 -> invq x <q q`0
@@ -354,6 +412,27 @@ This one gives transitivity in the form needed for rewriting:
     invq_ltq_pos : forall (x y : rational) . q`0 <q x -> x <q y -> invq y <q invq x
 
     invq_ltq_neg : forall (x y : rational) . y <q q`0 -> x <q y -> invq y <q invq x
+
+    datatype
+      intersect (i : level) . U i
+    of
+      samesign : rational -> rational -> type =
+  
+      | samesign_pos :
+          forall x y .
+            q`0 <q x
+            -> q`0 <q y
+            -> samesign x y
+  
+      | samesign_neg :
+          forall x y .
+            x <q q`0
+            -> y <q q`0
+            -> samesign x y
+
+    invq_leqq_samesign : forall (x y : rational) . samesign x y -> x <q= y -> invq y <q= invq x
+
+    invq_ltq_samesign : forall (x y : rational) . samesign x y -> x <q y -> invq y <q invq x
 
 
 ### Relation to integers
@@ -371,8 +450,14 @@ This one gives transitivity in the form needed for rewriting:
     integer_to_rational_mono : forall (a b : integer) .
                                   a <z= b -> integer_to_rational a <q= integer_to_rational b
 
+    integer_to_rational_mono_conv : forall (a b : integer) .
+                                       integer_to_rational a <q= integer_to_rational b -> a <z= b
+
     integer_to_rational_mono_lt : forall (a b : integer) .
                                      a <z b -> integer_to_rational a <q integer_to_rational b
+
+    integer_to_rational_mono_lt_conv : forall (a b : integer) .
+                                          integer_to_rational a <q integer_to_rational b -> a <z b
 
     plusz_to_rational : forall (a b : integer) .
                            integer_to_rational (a +z b)
@@ -416,14 +501,51 @@ This one gives transitivity in the form needed for rewriting:
     nat_to_rational_neq : forall (a b : nat) .
                              a != b : nat -> nat_to_rational a != nat_to_rational b : rational
 
+    integer_nat_to_rational_eq : forall (a : integer) (b : nat) .
+                                    a = Integer.nat_to_integer b : integer
+                                    -> integer_to_rational a = nat_to_rational b : rational
+
+    nat_integer_to_rational_eq : forall (a : nat) (b : integer) .
+                                    Integer.nat_to_integer a = b : integer
+                                    -> nat_to_rational a = integer_to_rational b : rational
+
+    integer_nat_to_rational_neq : forall (a : integer) (b : nat) .
+                                     a != Integer.nat_to_integer b : integer
+                                     -> integer_to_rational a != nat_to_rational b : rational
+
+    nat_integer_to_rational_neq : forall (a : nat) (b : integer) .
+                                     Integer.nat_to_integer a != b : integer
+                                     -> nat_to_rational a != integer_to_rational b : rational
+
     nat_to_rational_mono : forall (a b : nat) . a <= b -> nat_to_rational a <q= nat_to_rational b
 
+    integer_nat_to_rational_mono : forall (a : integer) (b : nat) .
+                                      a <z= Integer.nat_to_integer b
+                                      -> integer_to_rational a <q= nat_to_rational b
+
+    nat_integer_to_rational_mono : forall (a : nat) (b : integer) .
+                                      Integer.nat_to_integer a <z= b
+                                      -> nat_to_rational a <q= integer_to_rational b
+
     nat_to_rational_mono_lt : forall (a b : nat) . a < b -> nat_to_rational a <q nat_to_rational b
+
+    integer_nat_to_rational_mono_lt : forall (a : integer) (b : nat) .
+                                         a <z Integer.nat_to_integer b
+                                         -> integer_to_rational a <q nat_to_rational b
+
+    nat_integer_to_rational_mono_lt : forall (a : nat) (b : integer) .
+                                         Integer.nat_to_integer a <z b
+                                         -> nat_to_rational a <q integer_to_rational b
+
+    nat_to_rational_nonneg : forall (n : nat) . q`0 <q= nat_to_rational n
 
     plus_to_rational : forall (a b : nat) .
                           nat_to_rational (a + b)
                             = nat_to_rational a +q nat_to_rational b
                             : rational
+
+    succ_to_rational : forall (a : nat) .
+                          nat_to_rational (succ a) = q`1 +q nat_to_rational a : rational
 
     times_to_rational : forall (a b : nat) .
                            nat_to_rational (a * b)
@@ -501,6 +623,89 @@ This one gives transitivity in the form needed for rewriting:
     rational_dichotomy_neq : forall (x y : rational) . x != y : rational -> x <q y % y <q x
 
 
+### Minimum/Maximum
+
+    minq : rational -> rational -> rational
+         = fn a b . if a <q=? b then a else b
+
+    maxq : rational -> rational -> rational
+         = fn a b . if a <q=? b then b else a
+
+    negq_minq : forall (a b : rational) . ~q (minq a b) = maxq (~q a) (~q b) : rational
+
+    negq_maxq : forall (a b : rational) . ~q (maxq a b) = minq (~q a) (~q b) : rational
+
+    maxq_as_minq : forall (a b : rational) . maxq a b = ~q (minq (~q a) (~q b)) : rational
+
+    minq_as_maxq : forall (a b : rational) . minq a b = ~q (maxq (~q a) (~q b)) : rational
+
+    minq_commute : forall (a b : rational) . minq a b = minq b a : rational
+
+    maxq_commute : forall (a b : rational) . maxq a b = maxq b a : rational
+
+    minq_assoc : forall (a b c : rational) . minq (minq a b) c = minq a (minq b c) : rational
+
+    maxq_assoc : forall (a b c : rational) . maxq (maxq a b) c = maxq a (maxq b c) : rational
+
+    minq_leq_l : forall (a b : rational) . minq a b <q= a
+
+    minq_leq_r : forall (a b : rational) . minq a b <q= b
+
+    maxq_leq_l : forall (a b : rational) . a <q= maxq a b
+
+    maxq_leq_r : forall (a b : rational) . b <q= maxq a b
+
+    minq_glb : forall (a b c : rational) . c <q= a -> c <q= b -> c <q= minq a b
+
+    maxq_lub : forall (a b c : rational) . a <q= c -> b <q= c -> maxq a b <q= c
+
+    minq_eq_l : forall (a b : rational) . a <q= b -> minq a b = a : rational
+
+    minq_eq_r : forall (a b : rational) . b <q= a -> minq a b = b : rational
+
+    maxq_eq_l : forall (a b : rational) . b <q= a -> maxq a b = a : rational
+
+    maxq_eq_r : forall (a b : rational) . a <q= b -> maxq a b = b : rational
+
+    minq_idem : forall (a : rational) . minq a a = a : rational
+
+    maxq_idem : forall (a : rational) . maxq a a = a : rational
+
+    minq_dist_maxq_l : forall (a b c : rational) .
+                          minq (maxq a b) c = maxq (minq a c) (minq b c) : rational
+
+    minq_dist_maxq_r : forall (a b c : rational) .
+                          minq a (maxq b c) = maxq (minq a b) (minq a c) : rational
+
+    maxq_dist_minq_l : forall (a b c : rational) .
+                          maxq (minq a b) c = minq (maxq a c) (maxq b c) : rational
+
+    maxq_dist_minq_r : forall (a b c : rational) .
+                          maxq a (minq b c) = minq (maxq a b) (maxq a c) : rational
+
+    plusq_dist_minq_l : forall (a b c : rational) .
+                           minq a b +q c = minq (a +q c) (b +q c) : rational
+
+    plusq_dist_minq_r : forall (a b c : rational) .
+                           a +q minq b c = minq (a +q b) (a +q c) : rational
+
+    plusq_dist_maxq_l : forall (a b c : rational) .
+                           maxq a b +q c = maxq (a +q c) (b +q c) : rational
+
+    plusq_dist_maxq_r : forall (a b c : rational) .
+                           a +q maxq b c = maxq (a +q b) (a +q c) : rational
+
+    minz_to_rational : forall (m n : integer) .
+                          integer_to_rational (Integer.minz m n)
+                            = minq (integer_to_rational m) (integer_to_rational n)
+                            : rational
+
+    maxz_to_rational : forall (m n : integer) .
+                          integer_to_rational (Integer.maxz m n)
+                            = maxq (integer_to_rational m) (integer_to_rational n)
+                            : rational
+
+
 ### Absolute value
 
     absq : rational -> rational
@@ -511,6 +716,10 @@ This one gives transitivity in the form needed for rewriting:
     absq_of_nonneg : forall (a : rational) . q`0 <q= a -> absq a = a : rational
 
     absq_of_nonpos : forall (a : rational) . a <q= q`0 -> absq a = ~q a : rational
+
+    absq_ub : forall (x : rational) . x <q= absq x
+
+    absq_idem : forall (x : rational) . absq (absq x) = absq x : rational
 
     absq_negq : forall (a : rational) . absq (~q a) = absq a : rational
 
@@ -530,6 +739,80 @@ This one gives transitivity in the form needed for rewriting:
     absq_one : absq q`1 = q`1 : rational
 
     absq_minus_one : absq q`-1 = q`1 : rational
+
+    absq_minusq_commute : forall (a b : rational) . absq (a -q b) = absq (b -q a) : rational
+
+    absq_minusq_upper_bound : forall (a b c : rational) . absq (a -q b) <q= c -> a <q= b +q c
+
+    absq_minusq_lower_bound : forall (a b c : rational) . absq (a -q b) <q= c -> b -q c <q= a
+
+    absq_minusq_absq : forall (a b : rational) . absq (absq a -q absq b) <q= absq (a -q b)
+
+
+### Floor and Ceiling
+
+    floor : rational -> integer
+
+    ceiling : rational -> integer
+            = fn x . ~z (floor (~q x))
+
+    floor_lb : forall (x : rational) . integer_to_rational (floor x) <q= x
+
+    floor_glb : forall (x : rational) (y : integer) . integer_to_rational y <q= x -> y <z= floor x
+
+    ceiling_ub : forall (x : rational) . x <q= integer_to_rational (ceiling x)
+
+    ceiling_lub : forall (x : rational) (y : integer) .
+                     x <q= integer_to_rational y -> ceiling x <z= y
+
+    floor_mono : forall (x y : rational) . x <q= y -> floor x <z= floor y
+
+    ceiling_mono : forall (x y : rational) . x <q= y -> ceiling x <z= ceiling y
+
+    floor_integer_to_rational : forall (x : integer) . floor (integer_to_rational x) = x : integer
+
+    ceiling_integer_to_rational : forall (x : integer) .
+                                     ceiling (integer_to_rational x) = x : integer
+
+    floor_plus_r : forall (x : rational) (y : integer) .
+                      floor (x +q integer_to_rational y) = floor x +z y : integer
+
+    floor_plus_l : forall (x : rational) (y : integer) .
+                      floor (integer_to_rational y +q x) = y +z floor x : integer
+
+    ceiling_plus_r : forall (x : rational) (y : integer) .
+                        ceiling (x +q integer_to_rational y) = ceiling x +z y : integer
+
+    ceiling_plus_l : forall (x : rational) (y : integer) .
+                        ceiling (integer_to_rational y +q x) = y +z ceiling x : integer
+
+    floor_mono_lt : forall (x y : rational) . q`1 +q x <q= y -> floor x <z floor y
+
+    ceiling_mono_lt : forall (x y : rational) . q`1 +q x <q= y -> ceiling x <z ceiling y
+
+    floor_negq : forall (x : rational) . floor (~q x) = ~z (ceiling x) : integer
+
+    ceiling_negq : forall (x : rational) . ceiling (~q x) = ~z (floor x) : integer
+
+    floor_nonneg : forall (x : rational) . q`0 <q= x -> z`0 <z= floor x
+
+    floor_nonpos : forall (x : rational) . x <q= q`0 -> floor x <z= z`0
+
+    ceiling_nonneg : forall (x : rational) . q`0 <q= x -> z`0 <z= ceiling x
+
+    ceiling_nonpos : forall (x : rational) . x <q= q`0 -> ceiling x <z= z`0
+
+    floor_from_bounds : forall (x : integer) (y : rational) .
+                           integer_to_rational x <q= y
+                           -> y <q integer_to_rational (z`1 +z x)
+                           -> floor y = x : integer
+
+    ceiling_from_bounds : forall (x : integer) (y : rational) .
+                             y <q= integer_to_rational x
+                             -> integer_to_rational (z`-1 +z x) <q y
+                             -> ceiling y = x : integer
+
+    floor_ceiling_leqz : forall (x : rational) . floor x <z= ceiling x
 
 
 ### Miscellaneous

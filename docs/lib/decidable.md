@@ -19,6 +19,9 @@
     decidable_and_dep : forall (i : level) (P Q : U i) .
                            decidable P -> (P -> decidable Q) -> decidable (P & Q)
 
+    decidable_dprod : forall (i : level) (P : U i) (Q : P -g> U i) .
+                         decidable P -> (P -> decidable Q) -> decidable (P &d Q)
+
     decidable_or_dep : forall (i : level) (P Q : U i) .
                           decidable P -> (not P -> decidable Q) -> decidable (P % Q)
 

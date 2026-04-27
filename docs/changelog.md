@@ -6,13 +6,18 @@
 
   + Fixed a bug in `unrollTypeUniv`.
 
+  + There are more compatibility principles around arithmetic,
+    which allows rewriting through more things.
+
+  + Better diagnostics.
+
 - Library changes:
 
   + Added integer division and other material to `Integer`.
 
   + Added `Division` (natural number division).
 
-  + Added material to `Eventually` and `Rational`.
+  + Added material to `Decidable`, `Eventually`, `Integer`, `Nat`, and `Rational`.
 
   + Added material to `Quotient`.  Changed the behavior of `destruct` on `Quotient.quotient1`.
 	

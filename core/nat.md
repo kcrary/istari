@@ -121,6 +121,14 @@ Strong induction for natural numbers:
 
     plus_leq : type:plus_leq
 
+    plus_lt_leq : type:plus_lt_leq
+
+    plus_leq_lt : type:plus_leq_lt
+
+    plus_lt : type:plus_lt
+
+    plus_lt_r : type:plus_lt_r
+
     plus_cancel_leq_l : type:plus_cancel_leq_l
 
     plus_cancel_leq_r : type:plus_cancel_leq_r
@@ -128,8 +136,6 @@ Strong induction for natural numbers:
     plus_cancel_leq_leq_l : type:plus_cancel_leq_leq_l
 
     plus_cancel_leq_leq_r : type:plus_cancel_leq_leq_r
-
-    plus_lt_r : type:plus_lt_r
 
     plus_cancel_l : type:plus_cancel_l
 
@@ -223,6 +229,12 @@ Strong induction for natural numbers:
     times_dist_plus_r : type:times_dist_plus_r
 
     times_leq : type:times_leq
+
+    times_lt_l : type:times_lt_l
+
+    times_lt_r : type:times_lt_r
+
+    times_lt_zero : type:times_lt_zero
 
     times_dist_pred_l : type:times_dist_pred_l
 
