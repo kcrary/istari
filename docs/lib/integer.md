@@ -44,13 +44,26 @@ The `integer` type is primitive but aliased in the `Integer` module:
 
     plusz_cancel_r : forall (a b c : integer) . a + c = b + c : integer -> a = b : integer
 
-    plusz_shift_l : forall (a b c : integer) . a = b + c : integer <-> ~ b + a = c : integer
+In each of the shift lemmas, the negation term is the on the right of
+the `<->`.  Then the first letter indicates which direction the
+negated term is moving, the second indicates which operand it is
+before moving, and the third is which operand it is after moving.
 
-    plusz_shift_r : forall (a b c : integer) . a + b = c : integer <-> a = c + ~ b : integer
+    plusz_shift_lll : forall (a b c : integer) . a = b + c : integer <-> ~ b + a = c : integer
 
-    plusz_shift_lr : forall (a b c : integer) . a + b = c : integer <-> b = ~ a + c : integer
+    plusz_shift_lrr : forall (a b c : integer) . a = b + c : integer <-> a + ~ c = b : integer
 
-    plusz_shift_rl : forall (a b c : integer) . a = b + c : integer <-> a + ~ c = b : integer
+    plusz_shift_llr : forall (a b c : integer) . a = b + c : integer <-> a + ~ b = c : integer
+
+    plusz_shift_lrl : forall (a b c : integer) . a = b + c : integer <-> ~ c + a = b : integer
+
+    plusz_shift_rrr : forall (a b c : integer) . a + b = c : integer <-> a = c + ~ b : integer
+
+    plusz_shift_rll : forall (a b c : integer) . a + b = c : integer <-> b = ~ a + c : integer
+
+    plusz_shift_rlr : forall (a b c : integer) . a + b = c : integer <-> b = c + ~ a : integer
+
+    plusz_shift_rrl : forall (a b c : integer) . a + b = c : integer <-> a = ~ b + c : integer
 
     plusz_compat : forall (a a' b b' : integer) .
                       a = a' : integer -> b = b' : integer -> a + b = a' + b' : integer
@@ -119,13 +132,21 @@ This one gives transitivity in the form needed for rewriting:
     plusz_cancel_leqz_leqz_r : forall (a a' b b' : integer) .
                                   a + b <= a' + b' -> b' <= b -> a <= a'
 
-    plusz_shift_leqz_l : forall (a b c : integer) . a <= b + c <-> ~ b + a <= c
+    plusz_shift_leqz_lll : forall (a b c : integer) . a <= b + c <-> ~ b + a <= c
 
-    plusz_shift_leqz_r : forall (a b c : integer) . a + b <= c <-> a <= c + ~ b
+    plusz_shift_leqz_lrr : forall (a b c : integer) . a <= b + c <-> a + ~ c <= b
 
-    plusz_shift_leqz_lr : forall (a b c : integer) . a + b <= c <-> b <= ~ a + c
+    plusz_shift_leqz_llr : forall (a b c : integer) . a <= b + c <-> a + ~ b <= c
 
-    plusz_shift_leqz_rl : forall (a b c : integer) . a <= b + c <-> a + ~ c <= b
+    plusz_shift_leqz_lrl : forall (a b c : integer) . a <= b + c <-> ~ c + a <= b
+
+    plusz_shift_leqz_rrr : forall (a b c : integer) . a + b <= c <-> a <= c + ~ b
+
+    plusz_shift_leqz_rll : forall (a b c : integer) . a + b <= c <-> b <= ~ a + c
+
+    plusz_shift_leqz_rlr : forall (a b c : integer) . a + b <= c <-> b <= c + ~ a
+
+    plusz_shift_leqz_rrl : forall (a b c : integer) . a + b <= c <-> a <= ~ b + c
 
     plusz_ltz_l : forall (a a' b b' : integer) . a < a' -> b <= b' -> a + b < a' + b'
 
@@ -137,13 +158,21 @@ This one gives transitivity in the form needed for rewriting:
 
     plusz_cancel_ltz_r : forall (a b c : integer) . a + c < b + c -> a < b
 
-    plusz_shift_ltz_l : forall (a b c : integer) . a < b + c <-> ~ b + a < c
+    plusz_shift_ltz_lll : forall (a b c : integer) . a < b + c <-> ~ b + a < c
 
-    plusz_shift_ltz_r : forall (a b c : integer) . a + b < c <-> a < c + ~ b
+    plusz_shift_ltz_lrr : forall (a b c : integer) . a < b + c <-> a + ~ c < b
 
-    plusz_shift_ltz_lr : forall (a b c : integer) . a + b < c <-> b < ~ a + c
+    plusz_shift_ltz_llr : forall (a b c : integer) . a < b + c <-> a + ~ b < c
 
-    plusz_shift_ltz_rl : forall (a b c : integer) . a < b + c <-> a + ~ c < b
+    plusz_shift_ltz_lrl : forall (a b c : integer) . a < b + c <-> ~ c + a < b
+
+    plusz_shift_ltz_rrr : forall (a b c : integer) . a + b < c <-> a < c + ~ b
+
+    plusz_shift_ltz_rll : forall (a b c : integer) . a + b < c <-> b < ~ a + c
+
+    plusz_shift_ltz_rlr : forall (a b c : integer) . a + b < c <-> b < c + ~ a
+
+    plusz_shift_ltz_rrl : forall (a b c : integer) . a + b < c <-> a < ~ b + c
 
     negz_leqz : forall (a b : integer) . a <= b -> ~ b <= ~ a
 
@@ -307,10 +336,10 @@ positive case that works upwards.
     ltzb_to_nat : forall (a b : integer) .
                      0 <= a -> 0 <= b -> a <? b = integer_to_nat a <n? integer_to_nat b : bool
 
-    neqb_to_integer : forall (m n : nat) . m !=n? n = nat_to_integer m !=? nat_to_integer n : bool
+    neqb_to_integer : forall (m n : nat) . m !n=? n = nat_to_integer m !=? nat_to_integer n : bool
 
     neqzb_to_nat : forall (a b : integer) .
-                      0 <= a -> 0 <= b -> a !=? b = integer_to_nat a !=n? integer_to_nat b : bool
+                      0 <= a -> 0 <= b -> a !=? b = integer_to_nat a !n=? integer_to_nat b : bool
 
 
 ### Decidability

@@ -46,13 +46,26 @@ The `integer` type is primitive but aliased in the `Integer` module:
 
     plusz_cancel_r : type:plusz_cancel_r
 
-    plusz_shift_l : type:plusz_shift_l
+In each of the shift lemmas, the negation term is the on the right of
+the `<->`.  Then the first letter indicates which direction the
+negated term is moving, the second indicates which operand it is
+before moving, and the third is which operand it is after moving.
 
-    plusz_shift_r : type:plusz_shift_r
+    plusz_shift_lll : type:plusz_shift_lll
 
-    plusz_shift_lr : type:plusz_shift_lr
+    plusz_shift_lrr : type:plusz_shift_lrr
 
-    plusz_shift_rl : type:plusz_shift_rl
+    plusz_shift_llr : type:plusz_shift_llr
+
+    plusz_shift_lrl : type:plusz_shift_lrl
+
+    plusz_shift_rrr : type:plusz_shift_rrr
+
+    plusz_shift_rll : type:plusz_shift_rll
+
+    plusz_shift_rlr : type:plusz_shift_rlr
+
+    plusz_shift_rrl : type:plusz_shift_rrl
 
     plusz_compat : type:plusz_compat
 
@@ -118,13 +131,21 @@ This one gives transitivity in the form needed for rewriting:
 
     plusz_cancel_leqz_leqz_r : type:plusz_cancel_leqz_leqz_r
 
-    plusz_shift_leqz_l : type:plusz_shift_leqz_l
+    plusz_shift_leqz_lll : type:plusz_shift_leqz_lll
 
-    plusz_shift_leqz_r : type:plusz_shift_leqz_r
+    plusz_shift_leqz_lrr : type:plusz_shift_leqz_lrr
 
-    plusz_shift_leqz_lr : type:plusz_shift_leqz_lr
+    plusz_shift_leqz_llr : type:plusz_shift_leqz_llr
 
-    plusz_shift_leqz_rl : type:plusz_shift_leqz_rl
+    plusz_shift_leqz_lrl : type:plusz_shift_leqz_lrl
+
+    plusz_shift_leqz_rrr : type:plusz_shift_leqz_rrr
+
+    plusz_shift_leqz_rll : type:plusz_shift_leqz_rll
+
+    plusz_shift_leqz_rlr : type:plusz_shift_leqz_rlr
+
+    plusz_shift_leqz_rrl : type:plusz_shift_leqz_rrl
 
     plusz_ltz_l : type:plusz_ltz_l
 
@@ -136,13 +157,21 @@ This one gives transitivity in the form needed for rewriting:
 
     plusz_cancel_ltz_r : type:plusz_cancel_ltz_r
 
-    plusz_shift_ltz_l : type:plusz_shift_ltz_l
+    plusz_shift_ltz_lll : type:plusz_shift_ltz_lll
 
-    plusz_shift_ltz_r : type:plusz_shift_ltz_r
+    plusz_shift_ltz_lrr : type:plusz_shift_ltz_lrr
 
-    plusz_shift_ltz_lr : type:plusz_shift_ltz_lr
+    plusz_shift_ltz_llr : type:plusz_shift_ltz_llr
 
-    plusz_shift_ltz_rl : type:plusz_shift_ltz_rl
+    plusz_shift_ltz_lrl : type:plusz_shift_ltz_lrl
+
+    plusz_shift_ltz_rrr : type:plusz_shift_ltz_rrr
+
+    plusz_shift_ltz_rll : type:plusz_shift_ltz_rll
+
+    plusz_shift_ltz_rlr : type:plusz_shift_ltz_rlr
+
+    plusz_shift_ltz_rrl : type:plusz_shift_ltz_rrl
 
     negz_leqz : type:negz_leqz
 

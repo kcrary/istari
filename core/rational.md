@@ -48,13 +48,27 @@ The type of rationals:
 
     plusq_cancel_r : type:plusq_cancel_r
 
-    plusq_shift_l : type:plusq_shift_l
+In each of the shift lemmas, the negation/inverse term is the on the
+right of the `<->`.  Then the first letter indicates which direction
+the negated/inverted term is moving, the second indicates which
+operand it is before moving, and the third is which operand it is
+after moving.
 
-    plusq_shift_r : type:plusq_shift_r
+    plusq_shift_lll : type:plusq_shift_lll
 
-    plusq_shift_lr : type:plusq_shift_lr
+    plusq_shift_lrr : type:plusq_shift_lrr
 
-    plusq_shift_rl : type:plusq_shift_rl
+    plusq_shift_llr : type:plusq_shift_llr
+
+    plusq_shift_lrl : type:plusq_shift_lrl
+
+    plusq_shift_rrr : type:plusq_shift_rrr
+
+    plusq_shift_rll : type:plusq_shift_rll
+
+    plusq_shift_rlr : type:plusq_shift_rlr
+
+    plusq_shift_rrl : type:plusq_shift_rrl
 
     negq_minusq : type:negq_minusq
 
@@ -114,13 +128,21 @@ for `invq` to have good properties.
 
     timesq_cancel_r : type:timesq_cancel_r
 
-    timesq_shift_l : type:timesq_shift_l
+    timesq_shift_lll : type:timesq_shift_lll
 
-    timesq_shift_r : type:timesq_shift_r
+    timesq_shift_lrr : type:timesq_shift_lrr
 
-    timesq_shift_lr : type:timesq_shift_lr
+    timesq_shift_llr : type:timesq_shift_llr
 
-    timesq_shift_rl : type:timesq_shift_rl
+    timesq_shift_lrl : type:timesq_shift_lrl
+
+    timesq_shift_rrr : type:timesq_shift_rrr
+
+    timesq_shift_rll : type:timesq_shift_rll
+
+    timesq_shift_rlr : type:timesq_shift_rlr
+
+    timesq_shift_rrl : type:timesq_shift_rrl
 
     timesq_compat : type:timesq_compat
 
@@ -221,25 +243,41 @@ This one gives transitivity in the form needed for rewriting:
 
     plusq_cancel_leqq_leqq_r : type:plusq_cancel_leqq_leqq_r
 
-    plusq_shift_leqq_l : type:plusq_shift_leqq_l
+    plusq_shift_leqq_lll : type:plusq_shift_leqq_lll
 
-    plusq_shift_leqq_r : type:plusq_shift_leqq_r
+    plusq_shift_leqq_lrr : type:plusq_shift_leqq_lrr
 
-    plusq_shift_leqq_lr : type:plusq_shift_leqq_lr
+    plusq_shift_leqq_llr : type:plusq_shift_leqq_llr
 
-    plusq_shift_leqq_rl : type:plusq_shift_leqq_rl
+    plusq_shift_leqq_lrl : type:plusq_shift_leqq_lrl
+
+    plusq_shift_leqq_rrr : type:plusq_shift_leqq_rrr
+
+    plusq_shift_leqq_rll : type:plusq_shift_leqq_rll
+
+    plusq_shift_leqq_rlr : type:plusq_shift_leqq_rlr
+
+    plusq_shift_leqq_rrl : type:plusq_shift_leqq_rrl
 
     plusq_cancel_ltq_l : type:plusq_cancel_ltq_l
 
     plusq_cancel_ltq_r : type:plusq_cancel_ltq_r
 
-    plusq_shift_ltq_l : type:plusq_shift_ltq_l
+    plusq_shift_ltq_lll : type:plusq_shift_ltq_lll
 
-    plusq_shift_ltq_r : type:plusq_shift_ltq_r
+    plusq_shift_ltq_lrr : type:plusq_shift_ltq_lrr
 
-    plusq_shift_ltq_lr : type:plusq_shift_ltq_lr
+    plusq_shift_ltq_llr : type:plusq_shift_ltq_llr
 
-    plusq_shift_ltq_rl : type:plusq_shift_ltq_rl
+    plusq_shift_ltq_lrl : type:plusq_shift_ltq_lrl
+
+    plusq_shift_ltq_rrr : type:plusq_shift_ltq_rrr
+
+    plusq_shift_ltq_rll : type:plusq_shift_ltq_rll
+
+    plusq_shift_ltq_rlr : type:plusq_shift_ltq_rlr
+
+    plusq_shift_ltq_rrl : type:plusq_shift_ltq_rrl
 
     negq_leqq : type:negq_leqq
 
@@ -323,37 +361,72 @@ This one gives transitivity in the form needed for rewriting:
 
     timesq_cancel_ltq_r_neg : type:timesq_cancel_ltq_r_neg
 
-    timesq_shift_leqq_r : type:timesq_shift_leqq_r
+    timesq_shift_leqq_lll : type:timesq_shift_leqq_lll
 
-    timesq_shift_leqq_l : type:timesq_shift_leqq_l
+    timesq_shift_leqq_lrr : type:timesq_shift_leqq_lrr
 
-    timesq_shift_leqq_lr : type:timesq_shift_leqq_lr
+    timesq_shift_leqq_llr : type:timesq_shift_leqq_llr
 
-    timesq_shift_leqq_rl : type:timesq_shift_leqq_rl
+    timesq_shift_leqq_lrl : type:timesq_shift_leqq_lrl
 
-    timesq_shift_ltq_r : type:timesq_shift_ltq_r
+    timesq_shift_leqq_rrr : type:timesq_shift_leqq_rrr
 
-    timesq_shift_ltq_l : type:timesq_shift_ltq_l
+    timesq_shift_leqq_rll : type:timesq_shift_leqq_rll
 
-    timesq_shift_ltq_lr : type:timesq_shift_ltq_lr
+    timesq_shift_leqq_rlr : type:timesq_shift_leqq_rlr
 
-    timesq_shift_ltq_rl : type:timesq_shift_ltq_rl
+    timesq_shift_leqq_rrl : type:timesq_shift_leqq_rrl
 
-    timesq_shift_leqq_r_neg : type:timesq_shift_leqq_r_neg
+    timesq_shift_ltq_lll : type:timesq_shift_ltq_lll
 
-    timesq_shift_leqq_l_neg : type:timesq_shift_leqq_l_neg
+    timesq_shift_ltq_lrr : type:timesq_shift_ltq_lrr
 
-    timesq_shift_leqq_lr_neg : type:timesq_shift_leqq_lr_neg
+    timesq_shift_ltq_llr : type:timesq_shift_ltq_llr
 
-    timesq_shift_leqq_rl_neg : type:timesq_shift_leqq_rl_neg
+    timesq_shift_ltq_lrl : type:timesq_shift_ltq_lrl
 
-    timesq_shift_ltq_r_neg : type:timesq_shift_ltq_r_neg
+    timesq_shift_ltq_rrr : type:timesq_shift_ltq_rrr
 
-    timesq_shift_ltq_l_neg : type:timesq_shift_ltq_l_neg
+    timesq_shift_ltq_rll : type:timesq_shift_ltq_rll
 
-    timesq_shift_ltq_lr_neg : type:timesq_shift_ltq_lr_neg
+    timesq_shift_ltq_rlr : type:timesq_shift_ltq_rlr
 
-    timesq_shift_ltq_rl_neg : type:timesq_shift_ltq_rl_neg
+    timesq_shift_ltq_rrl : type:timesq_shift_ltq_rrl
+
+In the negative multiplicative shifts, the naming is as though the
+inequality did not reverse on the right.
+
+    timesq_shift_leqq_lll_neg : type:timesq_shift_leqq_lll_neg
+
+    timesq_shift_leqq_lrr_neg : type:timesq_shift_leqq_lrr_neg
+
+    timesq_shift_leqq_llr_neg : type:timesq_shift_leqq_llr_neg
+
+    timesq_shift_leqq_lrl_neg : type:timesq_shift_leqq_lrl_neg
+
+    timesq_shift_leqq_rrr_neg : type:timesq_shift_leqq_rrr_neg
+
+    timesq_shift_leqq_rll_neg : type:timesq_shift_leqq_rll_neg
+
+    timesq_shift_leqq_rlr_neg : type:timesq_shift_leqq_rlr_neg
+
+    timesq_shift_leqq_rrl_neg : type:timesq_shift_leqq_rrl_neg
+
+    timesq_shift_ltq_lll_neg : type:timesq_shift_ltq_lll_neg
+
+    timesq_shift_ltq_lrr_neg : type:timesq_shift_ltq_lrr_neg
+
+    timesq_shift_ltq_llr_neg : type:timesq_shift_ltq_llr_neg
+
+    timesq_shift_ltq_lrl_neg : type:timesq_shift_ltq_lrl_neg
+
+    timesq_shift_ltq_rrr_neg : type:timesq_shift_ltq_rrr_neg
+
+    timesq_shift_ltq_rll_neg : type:timesq_shift_ltq_rll_neg
+
+    timesq_shift_ltq_rlr_neg : type:timesq_shift_ltq_rlr_neg
+
+    timesq_shift_ltq_rrl_neg : type:timesq_shift_ltq_rrl_neg
 
     invq_positive : type:invq_positive
 
