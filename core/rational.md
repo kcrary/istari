@@ -1,12 +1,13 @@
 open:Rational
+overload:rational
 # `Rational`
+
+Expressions in this file are rendered using the `rational`
+[overloading mode](../overloading.html).
 
 The type of rationals:
 
     rational : type:rational
-
-Rational literals are written using a `` q` `` parsing directive.  For
-example, zero is ``q`0``.
 
 
 ### Plus and negation

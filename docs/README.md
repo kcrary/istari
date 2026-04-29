@@ -65,6 +65,8 @@ validated using that formalization.
 
 - [Term syntax](terms.html)
 
+- [Overloading](overloading.html)
+
 - [Theorems](theorems.html)
 
 - [Definitions](definitions.html)

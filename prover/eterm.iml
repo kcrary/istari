@@ -84,6 +84,10 @@ signature ETERM =
       (* evaluates the term when it is interpreted *)
       val lift       : (unit -> eterm) -> eterm
 
+      (* write and read parsing mode *)
+      val useMode    : Overload.parsing_mode -> eterm -> eterm
+      val withMode   : (Overload.parsing_mode -> eterm) -> eterm
+
    end
 
 
@@ -95,6 +99,7 @@ structure ETermInternal
          type eterm_ =
             (Directory.idirectory -> Term.elim list -> Term.term) SymbolDict.dict
             -> Directory.idirectory
+            -> Overload.parsing_mode option
             -> bool
             -> Term.elim list
             -> Term.term
@@ -117,6 +122,7 @@ structure ETermInternal
       type eterm =
          (D.idirectory -> T.elim list -> T.term) SymbolDict.dict  (* special forms *)
          -> D.idirectory   (* identifers *)
+         -> Overload.parsing_mode option
          -> bool           (* insert implicit arguments? *)
          -> T.elim list    (* delayed spine *)
          -> T.term
@@ -145,7 +151,7 @@ structure ETermInternal
       exception Syntax = SyntaxError.Syntax
 
 
-      fun short sym special dir imps spine =
+      fun short sym special dir _ imps spine =
          (case D.lookupOpt dir sym of
              SOME (D.Hvar i) =>
                 elim (T.Var i) spine
@@ -171,7 +177,7 @@ structure ETermInternal
                   | SOME f => f dir spine))
          
 
-      fun var sym _ dir _ spine = elim (T.Var (D.lookupVar dir sym)) spine
+      fun var sym _ dir _ _ spine = elim (T.Var (D.lookupVar dir sym)) spine
          
       fun signalUnknownConstant syms = 
          raise (Syntax (String.concat
@@ -181,7 +187,7 @@ structure ETermInternal
                            "."
                            ]))
 
-      fun long syms _ _ imps spine =
+      fun long syms _ _ _ imps spine =
          (case Namespace.resolveOpt syms of
              NONE =>
                 signalUnknownConstant syms
@@ -195,128 +201,128 @@ structure ETermInternal
                        spine))
          
 
-      fun const const _ _ _ spine = elim (T.Const const) spine
+      fun const const _ _ _ _ spine = elim (T.Const const) spine
 
-      fun lam binder body special dir imps spine =
+      fun lam binder body special dir mode imps spine =
          elim
             (case binder of
                 NONE =>
-                   T.Lam (NONE, body special (D.ibind0 dir) imps [])
+                   T.Lam (NONE, body special (D.ibind0 dir) mode imps [])
    
               | SOME x =>
-                   T.Lam (binder, body special (D.ibind dir x) imps []))
+                   T.Lam (binder, body special (D.ibind dir x) mode imps []))
             spine
 
-      fun lamann binder a body special dir imps spine =
+      fun lamann binder a body special dir mode imps spine =
          elim
             (case binder of
                 NONE =>
                    T.apply2 Prim.fnann
-                      (a special dir imps [])
-                      (T.Lam (NONE, body special (D.ibind0 dir) imps []))
+                      (a special dir mode imps [])
+                      (T.Lam (NONE, body special (D.ibind0 dir) mode imps []))
    
               | SOME x =>
                    T.apply2 Prim.fnann
-                      (a special dir imps [])
-                      (T.Lam (binder, body special (D.ibind dir x) imps [])))
+                      (a special dir mode imps [])
+                      (T.Lam (binder, body special (D.ibind dir x) mode imps [])))
             spine
 
-      fun app m1 m2 special dir imps spine =
-         m1 special dir imps (T.App (m2 special dir imps []) :: spine)
+      fun app m1 m2 special dir mode imps spine =
+         m1 special dir mode imps (T.App (m2 special dir mode imps []) :: spine)
 
-      fun pair m1 m2 special dir imps spine =
+      fun pair m1 m2 special dir mode imps spine =
          elim
-            (T.Pair (m1 special dir imps [],
-                     m2 special dir imps []))
+            (T.Pair (m1 special dir mode imps [],
+                     m2 special dir mode imps []))
             spine
 
-      fun pi1 m special dir imps spine = m special dir imps (T.Pi1 :: spine)
+      fun pi1 m special dir mode imps spine = m special dir mode imps (T.Pi1 :: spine)
 
-      fun pi2 m special dir imps spine = m special dir imps (T.Pi2 :: spine)
+      fun pi2 m special dir mode imps spine = m special dir mode imps (T.Pi2 :: spine)
 
-      fun next m special dir imps spine =
+      fun next m special dir mode imps spine =
          elim
-            (T.Next (m special dir imps []))
+            (T.Next (m special dir mode imps []))
             spine
 
-      fun prev m special dir imps spine = m special dir imps (T.Prev :: spine)
+      fun prev m special dir mode imps spine = m special dir mode imps (T.Prev :: spine)
 
-      fun triv _ _ _ spine = elim T.Triv spine
+      fun triv _ _ _ _ spine = elim T.Triv spine
 
-      fun evar _ _ _ spine = elim (T.evar ()) spine
+      fun evar _ _ _ _ spine = elim (T.evar ()) spine
 
-      fun integer x _ _ _ spine = elim (T.Native (T.Integer x)) spine
+      fun integer x _ _ _ _ spine = elim (T.Native (T.Integer x)) spine
 
-      fun symbol x _ _ _ spine = elim (T.Native (T.Symbol x)) spine
+      fun symbol x _ _ _ _ spine = elim (T.Native (T.Symbol x)) spine
 
       val zilch = Symbol.fromValue ""
 
-      fun hole _ _ _ spine = elim (T.Marker zilch) spine
+      fun hole _ _ _ _ spine = elim (T.Marker zilch) spine
 
-      fun marker sym _ _ _ spine = elim (T.Marker sym) spine
+      fun marker sym _ _ _ _ spine = elim (T.Marker sym) spine
 
-      fun apply1 c m1 special dir imps spine =
-         T.Elim (T.Const c, T.App (m1 special dir imps []) :: spine)
+      fun apply1 c m1 special dir mode imps spine =
+         T.Elim (T.Const c, T.App (m1 special dir mode imps []) :: spine)
 
-      fun apply2 c m1 m2 special dir imps spine =
+      fun apply2 c m1 m2 special dir mode imps spine =
          T.Elim (T.Const c, 
-                 T.App (m1 special dir imps []) 
-                 :: T.App (m2 special dir imps []) 
+                 T.App (m1 special dir mode imps []) 
+                 :: T.App (m2 special dir mode imps []) 
                  :: spine)
 
-      fun apply3 c m1 m2 m3 special dir imps spine =
+      fun apply3 c m1 m2 m3 special dir mode imps spine =
          T.Elim (T.Const c, 
-                 T.App (m1 special dir imps []) 
-                 :: T.App (m2 special dir imps []) 
-                 :: T.App (m3 special dir imps []) 
+                 T.App (m1 special dir mode imps []) 
+                 :: T.App (m2 special dir mode imps []) 
+                 :: T.App (m3 special dir mode imps []) 
                  :: spine)
 
 
-      fun apply4 c m1 m2 m3 m4 special dir imps spine =
+      fun apply4 c m1 m2 m3 m4 special dir mode imps spine =
          T.Elim (T.Const c, 
-                 T.App (m1 special dir imps []) 
-                 :: T.App (m2 special dir imps []) 
-                 :: T.App (m3 special dir imps []) 
-                 :: T.App (m4 special dir imps []) 
+                 T.App (m1 special dir mode imps []) 
+                 :: T.App (m2 special dir mode imps []) 
+                 :: T.App (m3 special dir mode imps []) 
+                 :: T.App (m4 special dir mode imps []) 
                  :: spine)
 
-      fun apply5 c m1 m2 m3 m4 m5 special dir imps spine =
+      fun apply5 c m1 m2 m3 m4 m5 special dir mode imps spine =
          T.Elim (T.Const c, 
-                 T.App (m1 special dir imps []) 
-                 :: T.App (m2 special dir imps []) 
-                 :: T.App (m3 special dir imps []) 
-                 :: T.App (m4 special dir imps []) 
-                 :: T.App (m5 special dir imps []) 
+                 T.App (m1 special dir mode imps []) 
+                 :: T.App (m2 special dir mode imps []) 
+                 :: T.App (m3 special dir mode imps []) 
+                 :: T.App (m4 special dir mode imps []) 
+                 :: T.App (m5 special dir mode imps []) 
                  :: spine)
 
-      fun applyn c l special dir imps spine =
+      fun applyn c l special dir mode imps spine =
          T.Elim (T.Const c, 
                  List.foldr
-                    (fns m rest => T.App (m special dir imps []) :: rest)
+                    (fns m rest => T.App (m special dir mode imps []) :: rest)
                     spine
                     l)
 
-      fun appn m1 l special dir imps spine =
-         m1 special dir imps
+      fun appn m1 l special dir mode imps spine =
+         m1 special dir mode imps
             (List.foldr
-                (fns m rest => T.App (m special dir imps []) :: rest)
+                (fns m rest => T.App (m special dir mode imps []) :: rest)
                 spine
                 l)
 
-      fun additional xs m special dir imps spine =
+      fun additional xs m special dir mode imps spine =
          (case xs of
              [] =>
-                m special dir imps spine
+                m special dir mode imps spine
 
            | NONE :: rest =>
-                additional rest m special (D.ibind0 dir) imps spine
+                additional rest m special (D.ibind0 dir) mode imps spine
 
            | SOME x :: rest =>
-                additional rest m special (D.ibind dir x) imps spine)
+                additional rest m special (D.ibind dir x) mode imps spine)
 
-      fun literal m _ _ _ spine = elim m spine
+      fun literal m _ _ _ _ spine = elim m spine
 
-      fun capture xs k m _ dir _ spine =
+      fun capture xs k m _ dir _ _ spine =
          let
             val s =
                List.foldl
@@ -328,15 +334,15 @@ structure ETermInternal
             elim (T.Sub (m, s)) spine
          end
 
-      fun explicit m special dir _ spine = m special dir false spine
+      fun explicit m special dir mode _ spine = m special dir mode false spine
 
 
 
-      fun closed m = m SD.empty D.iempty true []
+      fun closed m = m SD.empty D.iempty NONE true []
 
-      fun withidir idir m = m SD.empty idir true []
+      fun withidir idir m = m SD.empty idir NONE true []
 
-      fun withdir dir m = m SD.empty (Directory.idir dir) true []
+      fun withdir dir m = m SD.empty (Directory.idir dir) NONE true []
 
 
 
@@ -424,14 +430,14 @@ structure ETermInternal
                       absoluteSub from to depth (T.Idot (k, T.Shift (k+1)))
                 end)
 
-      fun absolute from m _ to _ spine =
+      fun absolute from m _ to _ _ spine =
          elim (absoluteMain from to 0 m) spine
 
 
-      fun subst em sym en special dir imps spine =
+      fun subst em sym en special dir mode imps spine =
          elim
-            (T.Sub (en special (D.ibind dir sym) imps [],
-                    T.Dot (em special dir imps [], T.id)))
+            (T.Sub (en special (D.ibind dir sym) mode imps [],
+                    T.Dot (em special dir mode imps [], T.id)))
             spine
 
 
@@ -441,7 +447,7 @@ structure ETermInternal
          else
             Prune.punder (excludeSub (i-1)) 
 
-      fun exclude sym em special dir imps spine =
+      fun exclude sym em special dir mode imps spine =
          (case D.lookupVarOpt dir sym of
              NONE =>
                 raise (Syntax (String.concat
@@ -453,7 +459,7 @@ structure ETermInternal
 
            | SOME i =>
                 let
-                   val m = em special dir imps []
+                   val m = em special dir mode imps []
                 in
                    (case Prune.prune m (excludeSub i) of
                        NONE =>
@@ -468,9 +474,9 @@ structure ETermInternal
                 end)
 
 
-      fun withloc (r, c) m special dir imps spine =
+      fun withloc (r, c) m special dir mode imps spine =
          try
-            m special dir imps spine
+            m special dir mode imps spine
          with
             D.Unbound sym =>
                raise (Syntax (String.concat
@@ -484,7 +490,17 @@ structure ETermInternal
                                  "."
                                  ]))
 
-      fun lift m special dir imps spine = m () special dir imps spine
+      fun lift m special dir mode imps spine = m () special dir mode imps spine
+
+      fun useMode mode m special dir _ imps spine = m special dir (SOME mode) imps spine
+
+      fun withMode m special dir modeopt imps spine = 
+         (case modeopt of
+             SOME mode =>
+                m mode special dir modeopt imps spine
+
+           | NONE =>
+                m (CR.deref Overload.currentMode) special dir modeopt imps spine)
 
    end
 

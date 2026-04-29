@@ -160,7 +160,8 @@ structure Procdoc
                R.seq [R.string "defrec:", R.capture longid],
                R.seq [R.string "imp:", R.capture longid],
                R.seq [R.string "open:", R.capture longid],
-               R.seq [R.string "load:", R.capture path]
+               R.seq [R.string "load:", R.capture path],
+               R.seq [R.string "overload:", R.capture ident],
                ],
             R.star' (R.set space),
             R.string "\n"
@@ -178,7 +179,7 @@ structure Procdoc
             TextIO.output1 (!theOutstream) #"\n"
          end
 
-
+         
       fun scan () =
          (case input () of
              NONE => ()
@@ -257,6 +258,17 @@ structure Procdoc
                         | SOME [R.Alt (5, [R.One path])] =>
                              (* load *)
                              File.load path
+
+                        | SOME [R.Alt (6, [R.One id])] =>
+                             (* overload *)
+                             if String.= id "natural" then
+                                setArithNatural ()
+                             else if String.= id "integer" then
+                                setArithInteger ()
+                             else if String.= id "rational" then
+                                setArithRational ()
+                             else
+                                signalError p ("unknown parsing mode " ^ id)
 
                         | _ => 
                              raise (Fail "impossible"));

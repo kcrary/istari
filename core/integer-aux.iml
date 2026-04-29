@@ -11,6 +11,7 @@ structure ParseInteger =
       val ltz : constant R.dest = R.dest ()
       val ltzb : constant R.dest = R.dest ()
       val neqzb : constant R.dest = R.dest ()
+      val integerParsingMode : Overload.parsing_mode R.dest = R.dest ()
 
       fun parsePlus m n = T.apply2 Prim.plusz m n
       fun parseMinus m n = T.apply2 (R.read minusz) m n
@@ -23,6 +24,11 @@ structure ParseInteger =
       fun parseLtzb m n = T.apply2 (R.read ltzb) m n
       fun parseNeqzb m n = T.apply2 (R.read neqzb) m n
 
+      fun parseInteger x = T.integer (IntInf.fromInt x)
+      fun parseIntegerEmbed x = T.integer x
+
+      fun parseAsInteger m = T.useMode (R.read integerParsingMode) m
+         
    end
 
 
@@ -33,10 +39,10 @@ grammardef Integer
    rule Term(30)  ::= Term(31) "<z=" Term(31) => parseLeq
    rule Term(30)  ::= Term(31) "<z" Term(31) => parseLt
 
-   rule Term(40)  ::= Term(40) "=z?" Term(41) => parseEqzb
-   rule Term(40)  ::= Term(40) "<z=?" Term(41) => parseLeqzb
-   rule Term(40)  ::= Term(40) "<z?" Term(41) => parseLtzb
-   rule Term(40)  ::= Term(40) "!z=?" Term(41) => parseNeqzb
+   rule Term(40)  ::= Term(41) "=z?" Term(41) => parseEqzb
+   rule Term(40)  ::= Term(41) "<z=?" Term(41) => parseLeqzb
+   rule Term(40)  ::= Term(41) "<z?" Term(41) => parseLtzb
+   rule Term(40)  ::= Term(41) "!z=?" Term(41) => parseNeqzb
 
    rule Term(50)  ::= Term(50) "+z" Term(51) => parsePlus
    rule Term(50)  ::= Term(50) "-z" Term(51) => parseMinus
@@ -45,30 +51,10 @@ grammardef Integer
 
    rule Term(90)  ::= "~z" Term(91) => parseNeg
 
-end
-
-
-grammardef ArithmeticInteger 
-
-   open ParseInteger
-
-   rule Term(30)  ::= Term(31) "<=" Term(31) => parseLeq
-   rule Term(30)  ::= Term(31) "<" Term(31) => parseLt
-
-   rule Term(40)  ::= Term(40) "=?" Term(41) => parseEqzb
-   rule Term(40)  ::= Term(40) "<=?" Term(41) => parseLeqzb
-   rule Term(40)  ::= Term(40) "<?" Term(41) => parseLtzb
-   rule Term(40)  ::= Term(40) "!=?" Term(41) => parseNeqzb
-
-   rule Term(50)  ::= Term(50) "+" Term(51) => parsePlus
-   rule Term(50)  ::= Term(50) "-" Term(51) => parseMinus
-
-   rule Term(60)  ::= Term(60) "*" Term(61) => parseTimes
-
-   rule Term(90)  ::= "~" Term(91) => parseNeg
-
-   rule Term(100) ::= NUMBER => ParseTerm.integer
-   rule Term(100) ::= NNUMBER => ParseTerm.integer
+   rule Term(100) ::= "z`" NUMBER => parseInteger
+   rule Term(100) ::= "z`" NNUMBER => parseInteger
+   rule Term(100) ::= "z`" EMBED => parseIntegerEmbed
+   rule Term(100) ::= "integer`" "(" Term(0) ")" => parseAsInteger
 
 end
 
@@ -94,7 +80,7 @@ structure RegisterInteger =
                                U.break 1, 
                                
                                U.string
-                                  (if Symbol.eq (CR.deref Show.arithmetic, integerSym) then
+                                  (if Symbol.eq (Overload.currentArithmeticMode (), integerSym) then
                                       strpref
                                    else
                                       str),
@@ -143,7 +129,7 @@ functor AfterLtz () :> sig end =
                       U.append
                          [
                          U.string
-                            (if Symbol.eq (CR.deref Show.arithmetic, integerSym) then
+                            (if Symbol.eq (Overload.currentArithmeticMode (), integerSym) then
                                 "~ "
                              else
                                 "~z "),
@@ -178,20 +164,30 @@ functor AfterLeqzInhabitant () :> sig end =
    end
 
 
-functor AfterIstrueNeqzb () :> sig end =
+signature INTEGER_PARSING =
+   sig
+
+      val setArithInteger : unit -> unit
+
+   end
+
+
+functor IntegerParsingFun () :> INTEGER_PARSING =
    struct
 
+      structure T = Term
       structure CR = CheckpointedRef
 
+      val leqz = resolveGlobal /Integer.leqz/
+      val ltz = resolveGlobal /Integer.ltz/
+      val plusz = Prim.plusz
+      val minusz = resolveGlobal /Integer.minusz/
+      val timesz = Prim.timesz
+      val negz = Prim.negz
       val ltzb = resolveGlobal /Integer.ltzb/
       val neqzb = resolveGlobal /Integer.neqzb/
-      val istrue_eqzb = resolveGlobal /Integer.istrue_eqzb/
-      val istrue_leqzb = resolveGlobal /Integer.istrue_leqzb/
-      val istrue_ltzb = resolveGlobal /Integer.istrue_ltzb/
-      val istrue_neqzb = resolveGlobal /Integer.istrue_neqzb/
       val eqzb = Prim.eqzb
       val leqzb = Prim.leqzb
-
 
       val () = CR.write ParseInteger.ltzb ltzb
       val () = CR.write ParseInteger.neqzb neqzb
@@ -201,6 +197,43 @@ functor AfterIstrueNeqzb () :> sig end =
       val () = RegisterInteger.register ltzb 40 40 41 "<? " "<z? "
       val () = RegisterInteger.register neqzb 40 40 41 "!=? " "!z=? "
 
+
+      val integerParsingMode =
+         Overload.ARITHMETIC
+            {
+            mode = Symbol.fromValue "integer",
+            literal = (fn x => SOME (T.Native (T.Integer (IntInf.fromInt x)))),
+            leq = SOME leqz,
+            lt = SOME ltz,
+            eqb = SOME eqzb,
+            leqb = SOME leqzb,
+            ltb = SOME ltzb,
+            neqb = SOME neqzb,
+            plus = SOME plusz,
+            minus = SOME minusz,
+            times = SOME timesz,
+            neg = SOME negz,
+            divide = NONE
+            }
+
+      val () = CR.write ParseInteger.integerParsingMode integerParsingMode
+
+      fun setArithInteger () = Overload.setMode integerParsingMode
+
+   end
+
+
+functor AfterIstrueNeqzb () :> sig end =
+   struct
+
+      val ltzb = resolveGlobal /Integer.ltzb/
+      val neqzb = resolveGlobal /Integer.neqzb/
+      val istrue_eqzb = resolveGlobal /Integer.istrue_eqzb/
+      val istrue_leqzb = resolveGlobal /Integer.istrue_leqzb/
+      val istrue_ltzb = resolveGlobal /Integer.istrue_ltzb/
+      val istrue_neqzb = resolveGlobal /Integer.istrue_neqzb/
+      val eqzb = Prim.eqzb
+      val leqzb = Prim.leqzb
 
       val () =
          ConstantTable.insert BoolTactic.booleanTests eqzb istrue_eqzb

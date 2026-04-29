@@ -78,24 +78,20 @@ cons is right associative.
       Term <= Term                                                   (natural number inequality)
       Term < Term                                                    (natural number inequality)
       Term <l= Term                                                  (level inequality)
-      Term <z= Term                                                  (integer inequality)
-      Term <z Term                                                   (integer inequality)
-      Term <q= Term                                                  (rational inequality)
-      Term <q Term                                                   (rational inequality)
+      Term <= Term                                                   (overloaded inequality)
+      Term < Term                                                    (overloaded inequality)
 
       Term :: [Term]                                                 (cons)
+      Term =? Term                                                   (overloaded equality test)
+      Term <=? Term                                                  (overloaded inequality test)
+      Term <? Term                                                   (overloaded inequality test)
+      Term !=? Term                                                  (overloaded inequality test)
 
-      [Term] + Term                                                  (natural number plus)
-      [Term] - Term                                                  (natural number minus)
-      [Term] +z Term                                                 (integer plus)
-      [Term] -z Term                                                 (integer minus)
-      [Term] +q Term                                                 (rational plus)
-      [Term] -q Term                                                 (rational minus)
+      [Term] + Term                                                  (overloaded plus)
+      [Term] - Term                                                  (overloaded minus)
 
-      [Term] * Term                                                  (natural number times)
-      [Term] *z Term                                                 (integer times)
-      [Term] *q Term                                                 (rational times)
-      [Term] |q Term                                                 (rational divide)
+      [Term] * Term                                                  (overloaded times)
+      [Term] | Term                                                  (overloaded divide)
 
       [Term] Term                                                    (application)
       [Term] #1                                                      (first projection)
@@ -108,6 +104,7 @@ cons is right associative.
       next Term                                                      (future intro)
       inl Term                                                       (sum intro)
       inr Term                                                       (sum intro)
+      ~ Term                                                         (overloaded negation)
       ~z Term                                                        (integer negation)
       U Level                                                        (universe)
       Kind Level                                                     (kind)
@@ -124,13 +121,14 @@ cons is right associative.
       { Ident : Term | Term }                                        (set type)
       { Term }                                                       (squashed type)
       Longident                                                      (identifier)
-      Number                                                         (natural number literal)
+      Number                                                         (overloaded numeric literal)
       _                                                              (evar)
       __                                                             (hole)
       \ ... antiquoted internal term ... \
       ` Longident
       l` LTerm                                                       (literal term)
       level` Level                                                   (level expression)
+      n` Number                                                      (natural number literal)
       z` Number                                                      (integer literal)
       q` Number                                                      (rational literal)
 
@@ -178,6 +176,10 @@ Notes:
   For example, because of how IML [tokenizes
   input](iml.html#tokenization), the `x,` in `(x, y)` forms a single
   token, rather than two, which will result in a syntax error.
+
+- The grammar above shows only the overloaded forms of arithmetic
+  operators.  A list of all arithmetic operators is
+  [here](overloading.html).
 
 - A tick (`` ` ``) before an identifier suppresses the insertion of
   implicit arguments.  (See below.)  It also allows the identifier to

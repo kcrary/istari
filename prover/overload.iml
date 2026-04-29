@@ -1,0 +1,68 @@
+(* For now, overloading is only used for arithmetic, but it wouldn't be hard to generalize. *)
+
+structure Overload =
+   struct
+
+      structure CR = CheckpointedRef
+
+      type symbol = Symbol.symbol
+      type constant = Term.constant
+      type term = Term.term
+
+      datatype arithmetic =
+         ARITHMETIC of
+            {
+            mode : symbol,
+            literal : int -> term option,
+            leq : constant option,
+            lt : constant option,
+            eqb : constant option,
+            leqb : constant option,
+            ltb : constant option,
+            neqb : constant option,
+            plus : constant option,
+            minus : constant option,
+            neg : constant option,
+            times : constant option,
+            divide : constant option
+            }
+
+      type parsing_mode = arithmetic
+
+      val currentMode : parsing_mode CR.cref =
+         CR.new
+            (ARITHMETIC
+                {
+                mode = Symbol.fromValue "",
+                literal = (fn _ => NONE),
+                leq = NONE,
+                lt = NONE,
+                eqb = NONE,
+                leqb = NONE,
+                ltb = NONE,
+                neqb = NONE,
+                plus = NONE,
+                minus = NONE,
+                neg = NONE,
+                times = NONE,
+                divide = NONE,
+                })
+
+      fun setMode mode = CR.assign currentMode mode
+
+      fun showMode () =
+         let
+            val ARITHMETIC { mode } = CR.deref currentMode
+         in
+            print (Symbol.toValue mode);
+            print "\n"
+         end
+
+      fun currentArithmeticMode () =
+         let
+            val ARITHMETIC { mode } = CR.deref currentMode
+         in
+            mode
+         end
+
+   end

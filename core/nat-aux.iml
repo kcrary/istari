@@ -11,6 +11,7 @@ structure ParseNat =
       val minus : constant R.dest = R.dest ()
       val ltb : constant R.dest = R.dest ()
       val neqb : constant R.dest = R.dest ()
+      val natParsingMode : Overload.parsing_mode R.dest = R.dest ()
 
       fun parseLeq m n = T.apply2 (R.read leq) m n
       fun parseLt m n = T.apply2 (R.read lt) m n
@@ -22,6 +23,16 @@ structure ParseNat =
       fun parseLtb m n = T.apply2 (R.read ltb) m n
       fun parseNeqb m n = T.apply2 (R.read neqb) m n
 
+      fun natTerm n =
+         if n <= 0 then
+            Term.Const Prim.zero
+         else
+            Term.apply1 Prim.succ (natTerm (n-1))
+
+      fun parseNat n = T.literal (natTerm n)
+
+      fun parseAsNat m = T.useMode (R.read natParsingMode) m
+
    end
 
 
@@ -32,43 +43,23 @@ grammardef Nat
    rule Term(30)  ::= Term(31) "<n=" Term(31) => parseLeq
    rule Term(30)  ::= Term(31) "<n" Term(31) => parseLt
 
-   rule Term(40)  ::= Term(40) "=n?" Term(41) => parseEqb
-   rule Term(40)  ::= Term(40) "<n=?" Term(41) => parseLeqb
-   rule Term(40)  ::= Term(40) "<n?" Term(41) => parseLtb
-   rule Term(40)  ::= Term(40) "!=n?" Term(41) => parseNeqb
+   rule Term(40)  ::= Term(41) "=n?" Term(41) => parseEqb
+   rule Term(40)  ::= Term(41) "<n=?" Term(41) => parseLeqb
+   rule Term(40)  ::= Term(41) "<n?" Term(41) => parseLtb
+   rule Term(40)  ::= Term(41) "!n=?" Term(41) => parseNeqb
 
    rule Term(50)  ::= Term(50) "+n" Term(51) => parsePlus
    rule Term(50)  ::= Term(50) "-n" Term(51) => parseMinus
 
    rule Term(60)  ::= Term(60) "*n" Term(61) => parseTimes
 
-end
-
-
-grammardef ArithmeticNat 
-
-   open ParseNat
-
-   rule Term(30)  ::= Term(31) "<=" Term(31) => parseLeq
-   rule Term(30)  ::= Term(31) "<" Term(31) => parseLt
-
-   rule Term(40)  ::= Term(40) "=?" Term(41) => parseEqb
-   rule Term(40)  ::= Term(40) "<=?" Term(41) => parseLeqb
-   rule Term(40)  ::= Term(40) "<?" Term(41) => parseLtb
-   rule Term(40)  ::= Term(40) "!=?" Term(41) => parseNeqb
-
-   rule Term(50)  ::= Term(50) "+" Term(51) => parsePlus
-   rule Term(50)  ::= Term(50) "-" Term(51) => parseMinus
-
-   rule Term(60)  ::= Term(60) "*" Term(61) => parseTimes
-
-   rule Term(100) ::= NUMBER => ParseTerm.nat
+   rule Term(100) ::= "n`" NUMBER => parseNat
+   rule Term(100) ::= "nat`" "(" Term(0) ")" => parseAsNat
 
 end
 
 
 grammaron Nat
-grammaron ArithmeticNat
 
 
 structure RegisterNat =
@@ -78,6 +69,39 @@ structure RegisterNat =
       structure U = Show.Unparsing
 
       val natSym = Symbol.fromValue "nat"
+
+      fun natContent n =
+         if Symbol.eq (Overload.currentArithmeticMode (), natSym) then
+            U.string (Int.toString n)
+         else
+            U.append
+               [
+               U.string "n`",
+               U.string (Int.toString n)
+               ]
+
+      val () =
+         UnparseTerm.register Prim.zero 0 100
+         (U.wrap
+             (U.constant Prim.zero)
+             (fn () => natContent 0))
+
+      val () =
+         UnparseTerm.register Prim.succ 1 100
+         (U.wrap
+             (U.fix
+                 (fn unp =>
+                     U.alt
+                        [
+                        U.wrap
+                           (U.constant Prim.zero)
+                           (fn () => 0),
+
+                        U.wrap
+                           (U.apply1 Prim.succ unp)
+                           (fn n => n + 1)
+                        ]))
+             natContent)
 
       fun register const prec lprec rprec strpref str =
          let
@@ -89,7 +113,7 @@ structure RegisterNat =
                                U.break 1, 
                                
                                U.string
-                                  (if Symbol.eq (CR.deref Show.arithmetic, natSym) then
+                                  (if Symbol.eq (Overload.currentArithmeticMode (), natSym) then
                                       strpref
                                    else
                                       str),
@@ -102,12 +126,13 @@ structure RegisterNat =
    end
 
 
-
-functor AfterNat () :>
+signature NAT_TACTIC =
    sig
       val natPrimInduction : Tactic.tactic
    end
-   =
+
+
+functor NatTacticFun () :> NAT_TACTIC =
    struct
 
       structure D = Directory
@@ -337,20 +362,28 @@ functor AfterTimes () :> sig end =
 
 
 
-functor AfterIstrueNeqb () :> sig end =
+signature NAT_PARSING =
+   sig
+
+      val setArithNat : unit -> unit
+
+   end
+
+
+functor NatParsingFun () :> NAT_PARSING =
    struct
 
       structure CR = CheckpointedRef
 
+      val leq = resolveGlobal /Nat.leq/
+      val lt = resolveGlobal /Nat.lt/
+      val plus = Prim.plus
+      val minus = resolveGlobal /Nat.minus/
+      val times = Prim.times
       val eqb = Prim.eqb
       val leqb = Prim.leqb
-
       val ltb = resolveGlobal /Nat.ltb/
       val neqb = resolveGlobal /Nat.neqb/
-      val istrue_eqb = resolveGlobal /Nat.istrue_eqb/
-      val istrue_leqb = resolveGlobal /Nat.istrue_leqb/
-      val istrue_ltb = resolveGlobal /Nat.istrue_ltb/
-      val istrue_neqb = resolveGlobal /Nat.istrue_neqb/
 
       val () = CR.write ParseNat.ltb ltb
       val () = CR.write ParseNat.neqb neqb
@@ -358,8 +391,52 @@ functor AfterIstrueNeqb () :> sig end =
       val () = RegisterNat.register eqb 40 40 41 "=? " "=n? "
       val () = RegisterNat.register leqb 40 40 41 "<=? " "<n=? "
       val () = RegisterNat.register ltb 40 40 41 "<? " "<n? "
-      val () = RegisterNat.register neqb 40 40 41 "!=? " "!=n? "
+      val () = RegisterNat.register neqb 40 40 41 "!=? " "!n=? "
 
+      val natParsingMode =
+         Overload.ARITHMETIC
+            {
+            mode = Symbol.fromValue "nat",
+            literal = (fn n =>
+                          if n < 0 then
+                             NONE
+                          else
+                             SOME (ParseNat.natTerm n)),
+            leq = SOME leq,
+            lt = SOME lt,
+            eqb = SOME eqb,
+            leqb = SOME leqb,
+            ltb = SOME ltb,
+            neqb = SOME neqb,
+            plus = SOME plus,
+            minus = SOME minus,
+            times = SOME times,
+            neg = NONE,
+            divide = NONE
+            }
+
+      val () = CR.write ParseNat.natParsingMode natParsingMode
+
+      fun setArithNat () = Overload.setMode natParsingMode
+
+      val () = setArithNat ()
+
+   end
+
+
+functor AfterIstrueNeqb () :> sig end =
+   struct
+
+      structure CR = CheckpointedRef
+
+      val eqb = Prim.eqb
+      val leqb = Prim.leqb
+      val ltb = resolveGlobal /Nat.ltb/
+      val neqb = resolveGlobal /Nat.neqb/
+      val istrue_eqb = resolveGlobal /Nat.istrue_eqb/
+      val istrue_leqb = resolveGlobal /Nat.istrue_leqb/
+      val istrue_ltb = resolveGlobal /Nat.istrue_ltb/
+      val istrue_neqb = resolveGlobal /Nat.istrue_neqb/
 
       val () =
          ConstantTable.insert BoolTactic.booleanTests eqb istrue_eqb

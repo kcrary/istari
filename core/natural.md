@@ -1,12 +1,17 @@
 open:Natural
+overload:natural
 # `Natural`
 
 A doppleganger of the `Nat` module, but using "native" arithmetic to
 implement natural numbers instead of a datatype.
 
+Expressions in this file are rendered using the `natural` [overloading
+mode](../overloading.html).
+
     natural : type:natural
 
-Zero is written `` z`0 ``.
+Zero is written `` z`0 ``.  (In the `natural` parsing mode used in
+this file, it can also be written simply 0.)
 
     succn : type:succn
           = def:succn

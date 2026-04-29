@@ -3,18 +3,22 @@
 A doppleganger of the `Nat` module, but using "native" arithmetic to
 implement natural numbers instead of a datatype.
 
+Expressions in this file are rendered using the `natural` [overloading
+mode](../overloading.html).
+
     natural : U 0
 
-Zero is written `` z`0 ``.
+Zero is written `` z`0 ``.  (In the `natural` parsing mode used in
+this file, it can also be written simply 0.)
 
     succn : natural -> natural
-          = fn n . z`1 +N n
+          = fn n . 1 + n
 
 The iterator for natural numbers:
 
     natural_iter : intersect (i : level) .
                       forall (P : natural -> U i) .
-                        P z`0
+                        P 0
                         -> (forall (n : natural) . P n -> P (succn n))
                         -> forall (n : natural) . P n
 
@@ -24,14 +28,14 @@ library has equality lemmas:
        natural_iter_zeron : forall
                                (i : level)
                                (P : natural -> U i)
-                               (hz : P z`0)
+                               (hz : P 0)
                                (hs : forall (n : natural) . P n -> P (succn n)) .
-                               natural_iter P hz hs z`0 = hz : P z`0
+                               natural_iter P hz hs 0 = hz : P 0
 
        natural_iter_succn : forall
                                (i : level)
                                (P : natural -> U i)
-                               (hz : P z`0)
+                               (hz : P 0)
                                (hs : forall (n : natural) . P n -> P (succn n))
                                (n : natural) .
                                natural_iter P hz hs (succn n)
@@ -43,7 +47,7 @@ A simpler case-analysis operation:
     natural_case : intersect (i : level) (a : U i) . natural -> a -> (natural -> a) -> a
 
        natural_case_zeron : forall (i : level) (a : U i) (hz : a) (hs : natural -> a) .
-                               natural_case z`0 hz hs = hz : a
+                               natural_case 0 hz hs = hz : a
 
        natural_case_succn : forall
                                (i : level)
@@ -56,9 +60,9 @@ A simpler case-analysis operation:
 
 ### Equality
 
-    eq_0_succn_not : forall (n : natural) . z`0 = succn n : natural -> void
+    eq_0_succn_not : forall (n : natural) . 0 = succn n : natural -> void
 
-    eq_succn_0_not : forall (n : natural) . succn n = z`0 : natural -> void
+    eq_succn_0_not : forall (n : natural) . succn n = 0 : natural -> void
 
     succn_inj : forall (m n : natural) . succn m = succn n : natural -> m = n : natural
 
@@ -71,57 +75,57 @@ A simpler case-analysis operation:
     (* <N *)
     ltn : natural -> natural -> U 0
 
-    leqn_inhabitant : forall (m n : natural) . m <N= n -> () : m <N= n
+    leqn_inhabitant : forall (m n : natural) . m <= n -> () : m <= n
 
-    ltn_inhabitant : forall (m n : natural) . m <N n -> () : m <N n
+    ltn_inhabitant : forall (m n : natural) . m < n -> () : m < n
 
-    leqn_0_min : forall (n : natural) . z`0 <N= n
+    leqn_0_min : forall (n : natural) . 0 <= n
 
-    leqn_succn_0_not : forall (n : natural) . succn n <N= z`0 -> void
+    leqn_succn_0_not : forall (n : natural) . succn n <= 0 -> void
 
-    leqn_succn_succn : forall (m n : natural) . m <N= n -> succn m <N= succn n
+    leqn_succn_succn : forall (m n : natural) . m <= n -> succn m <= succn n
 
-    leqn_succn_invert : forall (m n : natural) . succn m <N= succn n -> m <N= n
+    leqn_succn_invert : forall (m n : natural) . succn m <= succn n -> m <= n
 
-    leqn_succn : forall (n : natural) . n <N= succn n
+    leqn_succn : forall (n : natural) . n <= succn n
 
-    leqn_refl : forall (n : natural) . n <N= n
+    leqn_refl : forall (n : natural) . n <= n
 
-    leqn_refl_eq : forall (m n : natural) . m = n : natural -> m <N= n
+    leqn_refl_eq : forall (m n : natural) . m = n : natural -> m <= n
 
-    leqn_trans : forall (m n p : natural) . m <N= n -> n <N= p -> m <N= p
+    leqn_trans : forall (m n p : natural) . m <= n -> n <= p -> m <= p
 
-    leqn_antisymm : forall (m n : natural) . m <N= n -> n <N= m -> m = n : natural
+    leqn_antisymm : forall (m n : natural) . m <= n -> n <= m -> m = n : natural
 
-    leqn_implication : forall (m m' n n' : natural) . m' <N= m -> n <N= n' -> m <N= n -> m' <N= n'
+    leqn_implication : forall (m m' n n' : natural) . m' <= m -> n <= n' -> m <= n -> m' <= n'
 
-    ltn_impl_leqn : forall (m n : natural) . m <N n -> m <N= n
+    ltn_impl_leqn : forall (m n : natural) . m < n -> m <= n
 
-    ltn_succn_succn : forall (m n : natural) . m <N n -> succn m <N succn n
+    ltn_succn_succn : forall (m n : natural) . m < n -> succn m < succn n
 
-    ltn_succn_invert : forall (m n : natural) . succn m <N succn n -> m <N n
+    ltn_succn_invert : forall (m n : natural) . succn m < succn n -> m < n
 
-    ltn_succn : forall (n : natural) . n <N succn n
+    ltn_succn : forall (n : natural) . n < succn n
 
-    ltn_irrefl : forall (n : natural) . n <N n -> void
+    ltn_irrefl : forall (n : natural) . n < n -> void
 
-    ltn_trans : forall (m n p : natural) . m <N n -> n <N p -> m <N p
+    ltn_trans : forall (m n p : natural) . m < n -> n < p -> m < p
 
-    leqn_ltn_trans : forall (m n p : natural) . m <N= n -> n <N p -> m <N p
+    leqn_ltn_trans : forall (m n p : natural) . m <= n -> n < p -> m < p
 
-    ltn_leqn_trans : forall (m n p : natural) . m <N n -> n <N= p -> m <N p
+    ltn_leqn_trans : forall (m n p : natural) . m < n -> n <= p -> m < p
 
-    ltn_0_succn : forall (n : natural) . z`0 <N succn n
+    ltn_0_succn : forall (n : natural) . 0 < succn n
 
-    ltn_0_not : forall (n : natural) . n <N z`0 -> void
+    ltn_0_not : forall (n : natural) . n < 0 -> void
 
-    not_leqn : forall (m n : natural) . not (m <N= n) <-> n <N m
+    not_leqn : forall (m n : natural) . not (m <= n) <-> n < m
 
-    not_ltn : forall (m n : natural) . not (m <N n) <-> n <N= m
+    not_ltn : forall (m n : natural) . not (m < n) <-> n <= m
 
-    leqn_iff_ltn_succn : forall (m n : natural) . m <N= n <-> m <N succn n
+    leqn_iff_ltn_succn : forall (m n : natural) . m <= n <-> m < succn n
 
-    ltn_from_leqn_neq : forall (m n : natural) . m <N= n -> not (m = n : natural) -> m <N n
+    ltn_from_leqn_neq : forall (m n : natural) . m <= n -> not (m = n : natural) -> m < n
 
 Strong induction for natural numbers:
 
@@ -133,116 +137,114 @@ Strong induction for natural numbers:
     (* +N *)
     plusn : natural -> natural -> natural
 
-       plusn_zeron : forall (n : natural) . z`0 +N n = n : natural
+       plusn_zeron : forall (n : natural) . 0 + n = n : natural
 
-       plusn_succn : forall (m n : natural) . succn m +N n = succn (m +N n) : natural
+       plusn_succn : forall (m n : natural) . succn m + n = succn (m + n) : natural
 
     (* an alias for plusz_zeron *)
-    plusn_0_l : forall (n : natural) . z`0 +N n = n : natural
+    plusn_0_l : forall (n : natural) . 0 + n = n : natural
 
-    plusn_0_r : forall (n : natural) . n +N z`0 = n : natural
+    plusn_0_r : forall (n : natural) . n + 0 = n : natural
 
-    plusn_assoc : forall (m n p : natural) . m +N n +N p = m +N (n +N p) : natural
+    plusn_assoc : forall (m n p : natural) . m + n + p = m + (n + p) : natural
 
-    plusn_shift_r : forall (m n : natural) . m +N succn n = succn (m +N n) : natural
+    plusn_shift_r : forall (m n : natural) . m + succn n = succn (m + n) : natural
 
-    plusn_commute : forall (m n : natural) . m +N n = n +N m : natural
+    plusn_commute : forall (m n : natural) . m + n = n + m : natural
 
-    plusn_leqn_l : forall (m n : natural) . m <N= m +N n
+    plusn_leqn_l : forall (m n : natural) . m <= m + n
 
-    plusn_leqn_r : forall (m n : natural) . n <N= m +N n
+    plusn_leqn_r : forall (m n : natural) . n <= m + n
 
-    plusn_leqn : forall (m m' n n' : natural) . m <N= m' -> n <N= n' -> m +N n <N= m' +N n'
+    plusn_leqn : forall (m m' n n' : natural) . m <= m' -> n <= n' -> m + n <= m' + n'
 
-    plusn_cancel_leqn_l : forall (m n p : natural) . p +N m <N= p +N n -> m <N= n
+    plusn_cancel_leqn_l : forall (m n p : natural) . p + m <= p + n -> m <= n
 
-    plusn_cancel_leqn_r : forall (m n p : natural) . m +N p <N= n +N p -> m <N= n
+    plusn_cancel_leqn_r : forall (m n p : natural) . m + p <= n + p -> m <= n
 
     plusn_cancel_leqn_leqn_l : forall (m m' n n' : natural) .
-                                  m +N n <N= m' +N n' -> m' <N= m -> n <N= n'
+                                  m + n <= m' + n' -> m' <= m -> n <= n'
 
     plusn_cancel_leqn_leqn_r : forall (m m' n n' : natural) .
-                                  m +N n <N= m' +N n' -> n' <N= n -> m <N= m'
+                                  m + n <= m' + n' -> n' <= n -> m <= m'
 
-    plusn_ltn_r : forall (m n : natural) . z`0 <N n -> m <N m +N n
+    plusn_ltn_r : forall (m n : natural) . 0 < n -> m < m + n
 
-    plusn_cancel_l : forall (m n p : natural) . p +N m = p +N n : natural -> m = n : natural
+    plusn_cancel_l : forall (m n p : natural) . p + m = p + n : natural -> m = n : natural
 
     plusn_cancel_l_eq : forall (m n p q : natural) .
-                           m +N n = p +N q : natural -> m = p : natural -> n = q : natural
+                           m + n = p + q : natural -> m = p : natural -> n = q : natural
 
-    plusn_cancel_r : forall (m n p : natural) . m +N p = n +N p : natural -> m = n : natural
+    plusn_cancel_r : forall (m n p : natural) . m + p = n + p : natural -> m = n : natural
 
     plusn_cancel_r_eq : forall (m n p q : natural) .
-                           m +N n = p +N q : natural -> n = q : natural -> m = p : natural
+                           m + n = p + q : natural -> n = q : natural -> m = p : natural
 
     plusn_compat : forall (m m' n n' : natural) .
-                      m = m' : natural -> n = n' : natural -> m +N n = m' +N n' : natural
+                      m = m' : natural -> n = n' : natural -> m + n = m' + n' : natural
 
 
 ### Subtraction
 
     predn : natural -> natural
-          = fn n . n -N z`1
+          = fn n . n - 1
 
-       predn_zeron : predn z`0 = z`0 : natural
+       predn_zeron : predn 0 = 0 : natural
 
        predn_succn : forall (n : natural) . predn (succn n) = n : natural
 
     (* -N *)
     minusn : natural -> natural -> natural
 
-       minusn_zeron : forall (n : natural) . n -N z`0 = n : natural
+       minusn_zeron : forall (n : natural) . n - 0 = n : natural
 
-       minusn_succn_r : forall (m n : natural) . m -N succn n = predn m -N n : natural
+       minusn_succn_r : forall (m n : natural) . m - succn n = predn m - n : natural
 
-    succn_predn : forall (n : natural) . z`0 <N n -> succn (predn n) = n : natural
+    succn_predn : forall (n : natural) . 0 < n -> succn (predn n) = n : natural
 
-    plusn_minusn_cancel_l : forall (m n : natural) . m +N n -N m = n : natural
+    plusn_minusn_cancel_l : forall (m n : natural) . m + n - m = n : natural
 
-    plusn_minusn_cancel_r : forall (m n : natural) . m +N n -N n = m : natural
+    plusn_minusn_cancel_r : forall (m n : natural) . m + n - n = m : natural
 
-    minusn_swap : forall (m n p : natural) . m -N n -N p = m -N p -N n : natural
+    minusn_swap : forall (m n p : natural) . m - n - p = m - p - n : natural
 
-    minusn_plusn_cancel : forall (m n : natural) . n <N= m -> m -N n +N n = m : natural
+    minusn_plusn_cancel : forall (m n : natural) . n <= m -> m - n + n = m : natural
 
-    minusn_0_l : forall (n : natural) . z`0 -N n = z`0 : natural
+    minusn_0_l : forall (n : natural) . 0 - n = 0 : natural
 
     (* an alias for minusn_zeron *)
-    minusn_0_r : forall (n : natural) . n -N z`0 = n : natural
+    minusn_0_r : forall (n : natural) . n - 0 = n : natural
 
-    minusn_proper : forall (m n : natural) . m <N= n -> m -N n = z`0 : natural
+    minusn_proper : forall (m n : natural) . m <= n -> m - n = 0 : natural
 
-    minusn_assoc : forall (m n p : natural) . m -N n -N p = m -N (n +N p) : natural
+    minusn_assoc : forall (m n p : natural) . m - n - p = m - (n + p) : natural
 
-    minusn_succn : forall (m n : natural) . succn m -N succn n = m -N n : natural
+    minusn_succn : forall (m n : natural) . succn m - succn n = m - n : natural
 
-    predn_leqn : forall (n : natural) . predn n <N= n
+    predn_leqn : forall (n : natural) . predn n <= n
 
-    minusn_leqn_l : forall (m n : natural) . m -N n <N= m
+    minusn_leqn_l : forall (m n : natural) . m - n <= m
 
-    minusn_leqn : forall (m m' n n' : natural) . m <N= m' -> n' <N= n -> m -N n <N= m' -N n'
+    minusn_leqn : forall (m m' n n' : natural) . m <= m' -> n' <= n -> m - n <= m' - n'
 
-    minusn_self : forall (n : natural) . n -N n = z`0 : natural
+    minusn_self : forall (n : natural) . n - n = 0 : natural
 
-    minusn_succn_l_leqn : forall (m n : natural) . succn m -N n <N= succn (m -N n)
+    minusn_succn_l_leqn : forall (m n : natural) . succn m - n <= succn (m - n)
 
-    minusn_succn_l_eq : forall (m n : natural) .
-                           n <N= m -> succn m -N n = succn (m -N n) : natural
+    minusn_succn_l_eq : forall (m n : natural) . n <= m -> succn m - n = succn (m - n) : natural
 
-    plusn_minusn_swap : forall (m n p : natural) . p <N= m -> m +N n -N p = m -N p +N n : natural
+    plusn_minusn_swap : forall (m n p : natural) . p <= m -> m + n - p = m - p + n : natural
 
-    plusn_minusn_assoc : forall (m n p : natural) .
-                            p <N= n -> m +N n -N p = m +N (n -N p) : natural
+    plusn_minusn_assoc : forall (m n p : natural) . p <= n -> m + n - p = m + (n - p) : natural
 
     plusn_minusn_assoc_swap : forall (m n p : natural) .
-                                 n <N= p -> m +N n -N p = m -N (p -N n) : natural
+                                 n <= p -> m + n - p = m - (p - n) : natural
 
     minusn_plusn_assoc : forall (m n p : natural) .
-                            p <N= n -> n <N= m -> m -N n +N p = m -N (n -N p) : natural
+                            p <= n -> n <= m -> m - n + p = m - (n - p) : natural
 
     minusn_compat : forall (m m' n n' : natural) .
-                       m = m' : natural -> n = n' : natural -> m -N n = m' -N n' : natural
+                       m = m' : natural -> n = n' : natural -> m - n = m' - n' : natural
 
 
 ### Multiplication
@@ -250,44 +252,44 @@ Strong induction for natural numbers:
     (* *N *)
     timesn : natural -> natural -> natural
 
-       timesn_zeron : forall (n : natural) . z`0 *N n = z`0 : natural
+       timesn_zeron : forall (n : natural) . 0 * n = 0 : natural
     
-       timesn_succn : forall (m n : natural) . succn m *N n = n +N m *N n : natural
+       timesn_succn : forall (m n : natural) . succn m * n = n + m * n : natural
 
     (* an alias for timesn_zeron *)
-    timesn_0_l : forall (n : natural) . z`0 *N n = z`0 : natural
+    timesn_0_l : forall (n : natural) . 0 * n = 0 : natural
 
-    timesn_0_r : forall (n : natural) . n *N z`0 = z`0 : natural
+    timesn_0_r : forall (n : natural) . n * 0 = 0 : natural
 
-    timesn_1_l : forall (n : natural) . z`1 *N n = n : natural
+    timesn_1_l : forall (n : natural) . 1 * n = n : natural
 
-    timesn_1_r : forall (n : natural) . n *N z`1 = n : natural
+    timesn_1_r : forall (n : natural) . n * 1 = n : natural
 
-    timesn_commute : forall (m n : natural) . m *N n = n *N m : natural
+    timesn_commute : forall (m n : natural) . m * n = n * m : natural
 
-    timesn_assoc : forall (m n p : natural) . m *N n *N p = m *N (n *N p) : natural
+    timesn_assoc : forall (m n p : natural) . m * n * p = m * (n * p) : natural
 
-    timesn_dist_succn_r : forall (m n : natural) . m *N succn n = m +N m *N n : natural
+    timesn_dist_succn_r : forall (m n : natural) . m * succn n = m + m * n : natural
 
-    timesn_dist_plusn_l : forall (m n p : natural) . (m +N n) *N p = m *N p +N n *N p : natural
+    timesn_dist_plusn_l : forall (m n p : natural) . (m + n) * p = m * p + n * p : natural
 
-    timesn_dist_plusn_r : forall (m n p : natural) . m *N (n +N p) = m *N n +N m *N p : natural
+    timesn_dist_plusn_r : forall (m n p : natural) . m * (n + p) = m * n + m * p : natural
 
-    timesn_leqn : forall (m m' n n' : natural) . m <N= m' -> n <N= n' -> m *N n <N= m' *N n'
+    timesn_leqn : forall (m m' n n' : natural) . m <= m' -> n <= n' -> m * n <= m' * n'
 
-    timesn_dist_predn_l : forall (m n : natural) . predn m *N n = m *N n -N n : natural
+    timesn_dist_predn_l : forall (m n : natural) . predn m * n = m * n - n : natural
 
-    timesn_dist_predn_r : forall (m n : natural) . m *N predn n = m *N n -N m : natural
+    timesn_dist_predn_r : forall (m n : natural) . m * predn n = m * n - m : natural
 
-    timesn_dist_minusn_l : forall (m n p : natural) . (m -N n) *N p = m *N p -N n *N p : natural
+    timesn_dist_minusn_l : forall (m n p : natural) . (m - n) * p = m * p - n * p : natural
 
-    timesn_dist_minusn_r : forall (m n p : natural) . m *N (n -N p) = m *N n -N m *N p : natural
+    timesn_dist_minusn_r : forall (m n p : natural) . m * (n - p) = m * n - m * p : natural
 
     natural_integral_domain : forall (m n : natural) .
-                                 m *N n = z`0 : natural -> m = z`0 : natural % n = z`0 : natural
+                                 m * n = 0 : natural -> m = 0 : natural % n = 0 : natural
 
     timesn_compat : forall (m m' n n' : natural) .
-                       m = m' : natural -> n = n' : natural -> m *N n = m' *N n' : natural
+                       m = m' : natural -> n = n' : natural -> m * n = m' * n' : natural
 
 
 ### Minimum
@@ -298,31 +300,29 @@ Strong induction for natural numbers:
 
     minn_assoc : forall (m n p : natural) . minn (minn m n) p = minn m (minn n p) : natural
 
-    minn_ann_l : forall (n : natural) . minn z`0 n = z`0 : natural
+    minn_ann_l : forall (n : natural) . minn 0 n = 0 : natural
 
-    minn_ann_r : forall (n : natural) . minn n z`0 = z`0 : natural
+    minn_ann_r : forall (n : natural) . minn n 0 = 0 : natural
 
     minn_succn : forall (m n : natural) . minn (succn m) (succn n) = succn (minn m n) : natural
 
-    minn_leqn_l : forall (m n : natural) . minn m n <N= m
+    minn_leqn_l : forall (m n : natural) . minn m n <= m
 
-    minn_leqn_r : forall (m n : natural) . minn m n <N= n
+    minn_leqn_r : forall (m n : natural) . minn m n <= n
 
-    minn_glb : forall (m n p : natural) . p <N= m -> p <N= n -> p <N= minn m n
+    minn_glb : forall (m n p : natural) . p <= m -> p <= n -> p <= minn m n
 
-    minn_leqn : forall (m m' n n' : natural) . m <N= m' -> n <N= n' -> minn m n <N= minn m' n'
+    minn_leqn : forall (m m' n n' : natural) . m <= m' -> n <= n' -> minn m n <= minn m' n'
 
-    minn_eq_l : forall (m n : natural) . m <N= n -> minn m n = m : natural
+    minn_eq_l : forall (m n : natural) . m <= n -> minn m n = m : natural
 
-    minn_eq_r : forall (m n : natural) . n <N= m -> minn m n = n : natural
+    minn_eq_r : forall (m n : natural) . n <= m -> minn m n = n : natural
 
     minn_idem : forall (n : natural) . minn n n = n : natural
 
-    plusn_dist_minn_l : forall (m n p : natural) .
-                           minn m n +N p = minn (m +N p) (n +N p) : natural
+    plusn_dist_minn_l : forall (m n p : natural) . minn m n + p = minn (m + p) (n + p) : natural
 
-    plusn_dist_minn_r : forall (m n p : natural) .
-                           m +N minn n p = minn (m +N n) (m +N p) : natural
+    plusn_dist_minn_r : forall (m n p : natural) . m + minn n p = minn (m + n) (m + p) : natural
 
 
 ### Maximum
@@ -333,31 +333,29 @@ Strong induction for natural numbers:
 
     maxn_assoc : forall (m n p : natural) . maxn (maxn m n) p = maxn m (maxn n p) : natural
 
-    maxn_id_l : forall (n : natural) . maxn z`0 n = n : natural
+    maxn_id_l : forall (n : natural) . maxn 0 n = n : natural
 
-    maxn_id_r : forall (n : natural) . maxn n z`0 = n : natural
+    maxn_id_r : forall (n : natural) . maxn n 0 = n : natural
 
     maxn_succn : forall (m n : natural) . maxn (succn m) (succn n) = succn (maxn m n) : natural
 
-    maxn_leqn_l : forall (m n : natural) . m <N= maxn m n
+    maxn_leqn_l : forall (m n : natural) . m <= maxn m n
 
-    maxn_leqn_r : forall (m n : natural) . n <N= maxn m n
+    maxn_leqn_r : forall (m n : natural) . n <= maxn m n
 
-    maxn_lub : forall (m n p : natural) . m <N= p -> n <N= p -> maxn m n <N= p
+    maxn_lub : forall (m n p : natural) . m <= p -> n <= p -> maxn m n <= p
 
-    maxn_leqn : forall (m m' n n' : natural) . m <N= m' -> n <N= n' -> maxn m n <N= maxn m' n'
+    maxn_leqn : forall (m m' n n' : natural) . m <= m' -> n <= n' -> maxn m n <= maxn m' n'
 
-    maxn_eq_l : forall (m n : natural) . n <N= m -> maxn m n = m : natural
+    maxn_eq_l : forall (m n : natural) . n <= m -> maxn m n = m : natural
 
-    maxn_eq_r : forall (m n : natural) . m <N= n -> maxn m n = n : natural
+    maxn_eq_r : forall (m n : natural) . m <= n -> maxn m n = n : natural
 
     maxn_idem : forall (n : natural) . maxn n n = n : natural
 
-    plusn_dist_maxn_l : forall (m n p : natural) .
-                           maxn m n +N p = maxn (m +N p) (n +N p) : natural
+    plusn_dist_maxn_l : forall (m n p : natural) . maxn m n + p = maxn (m + p) (n + p) : natural
 
-    plusn_dist_maxn_r : forall (m n p : natural) .
-                           m +N maxn n p = maxn (m +N n) (m +N p) : natural
+    plusn_dist_maxn_r : forall (m n p : natural) . m + maxn n p = maxn (m + n) (m + p) : natural
 
     minn_dist_maxn_l : forall (m n p : natural) .
                           minn (maxn m n) p = maxn (minn m p) (minn n p) : natural
@@ -389,23 +387,23 @@ Strong induction for natural numbers:
 
     (* !N=? *)
     neqnb : natural -> natural -> bool
-         = fn m n . Bool.notb (m =N? n)
+         = fn m n . Bool.notb (m =? n)
 
-    istrue_eqnb : forall (m n : natural) . Bool.istrue (m =N? n) <-> m = n : natural
+    istrue_eqnb : forall (m n : natural) . Bool.istrue (m =? n) <-> m = n : natural
 
-    istrue_neqnb : forall (m n : natural) . Bool.istrue (m !N=? n) <-> m != n : natural
+    istrue_neqnb : forall (m n : natural) . Bool.istrue (m !=? n) <-> m != n : natural
 
-    istrue_leqnb : forall (m n : natural) . Bool.istrue (m <N=? n) <-> m <N= n
+    istrue_leqnb : forall (m n : natural) . Bool.istrue (m <=? n) <-> m <= n
 
-    istrue_ltnb : forall (m n : natural) . Bool.istrue (m <N? n) <-> m <N n
+    istrue_ltnb : forall (m n : natural) . Bool.istrue (m <? n) <-> m < n
 
-    notb_eqnb : forall (m n : natural) . Bool.notb (m =N? n) = m !N=? n : bool
+    notb_eqnb : forall (m n : natural) . Bool.notb (m =? n) = m !=? n : bool
 
-    notb_neqnb : forall (m n : natural) . Bool.notb (m !N=? n) = m =N? n : bool
+    notb_neqnb : forall (m n : natural) . Bool.notb (m !=? n) = m =? n : bool
 
-    notb_leqnb : forall (m n : natural) . Bool.notb (m <N=? n) = n <N? m : bool
+    notb_leqnb : forall (m n : natural) . Bool.notb (m <=? n) = n <? m : bool
 
-    notb_ltnb : forall (m n : natural) . Bool.notb (m <N? n) = n <N=? m : bool
+    notb_ltnb : forall (m n : natural) . Bool.notb (m <? n) = n <=? m : bool
 
 
 ### Decidability
@@ -414,30 +412,30 @@ Strong induction for natural numbers:
 
     neq_natural_decide : forall (m n : natural) . Decidable.decidable (m != n : natural)
 
-    leqn_decide : forall (m n : natural) . Decidable.decidable (m <N= n)
+    leqn_decide : forall (m n : natural) . Decidable.decidable (m <= n)
 
-    ltn_decide : forall (m n : natural) . Decidable.decidable (m <N n)
+    ltn_decide : forall (m n : natural) . Decidable.decidable (m < n)
 
     eq_natural_stable : forall (m n : natural) . Stable.stable (m = n : natural)
 
     neq_natural_stable : forall (m n : natural) . Stable.stable (m != n : natural)
 
-    leqn_stable : forall (m n : natural) . Stable.stable (m <N= n)
+    leqn_stable : forall (m n : natural) . Stable.stable (m <= n)
 
-    ltn_stable : forall (m n : natural) . Stable.stable (m <N n)
+    ltn_stable : forall (m n : natural) . Stable.stable (m < n)
 
-    leqn_iff_ltn_or_eq : forall (m n : natural) . m <N= n <-> m <N n % m = n : natural
+    leqn_iff_ltn_or_eq : forall (m n : natural) . m <= n <-> m < n % m = n : natural
 
-    natural_trichotomy : forall (m n : natural) . m <N n % m = n : natural % n <N m
+    natural_trichotomy : forall (m n : natural) . m < n % m = n : natural % n < m
 
-    natural_dichotomy : forall (m n : natural) . m <N= n % n <N m
+    natural_dichotomy : forall (m n : natural) . m <= n % n < m
 
-    natural_dichotomy_weak : forall (m n : natural) . m <N= n % n <N= m
+    natural_dichotomy_weak : forall (m n : natural) . m <= n % n <= m
 
-    natural_dichotomy_neq : forall (m n : natural) . m != n : natural -> m <N n % n <N m
+    natural_dichotomy_neq : forall (m n : natural) . m != n : natural -> m < n % n < m
 
     natural_cases : forall (n : natural) .
-                       n = z`0 : natural % (exists (n' : natural) . n = succn n' : natural)
+                       n = 0 : natural % (exists (n' : natural) . n = succn n' : natural)
 
 
 ### Relation to `nat`
@@ -450,14 +448,14 @@ Strong induction for natural numbers:
 
     natural_to_nat_inv : forall (n : natural) . nat_to_natural (natural_to_nat n) = n : natural
 
-    nat_to_natural_mono : forall (m n : nat) . m <= n -> nat_to_natural m <N= nat_to_natural n
+    nat_to_natural_mono : forall (m n : nat) . m <n= n -> nat_to_natural m <= nat_to_natural n
 
-    natural_to_nat_mono : forall (m n : natural) . m <N= n -> natural_to_nat m <= natural_to_nat n
+    natural_to_nat_mono : forall (m n : natural) . m <= n -> natural_to_nat m <n= natural_to_nat n
 
-    nat_to_natural_mono_lt : forall (m n : nat) . m < n -> nat_to_natural m <N nat_to_natural n
+    nat_to_natural_mono_lt : forall (m n : nat) . m <n n -> nat_to_natural m < nat_to_natural n
 
     natural_to_nat_mono_lt : forall (m n : natural) .
-                                m <N n -> natural_to_nat m < natural_to_nat n
+                                m < n -> natural_to_nat m <n natural_to_nat n
 
     natural_eq_from_nat : forall (m n : natural) .
                              natural_to_nat m = natural_to_nat n : nat -> m = n : natural
@@ -465,31 +463,31 @@ Strong induction for natural numbers:
     nat_eq_from_natural : forall (m n : nat) .
                              nat_to_natural m = nat_to_natural n : natural -> m = n : nat
 
-    leqn_from_nat : forall (m n : natural) . natural_to_nat m <= natural_to_nat n -> m <N= n
+    leqn_from_nat : forall (m n : natural) . natural_to_nat m <n= natural_to_nat n -> m <= n
 
-    leq_from_natural : forall (m n : nat) . nat_to_natural m <N= nat_to_natural n -> m <= n
+    leq_from_natural : forall (m n : nat) . nat_to_natural m <= nat_to_natural n -> m <n= n
 
-    ltn_from_nat : forall (m n : natural) . natural_to_nat m < natural_to_nat n -> m <N n
+    ltn_from_nat : forall (m n : natural) . natural_to_nat m <n natural_to_nat n -> m < n
 
-    lt_from_natural : forall (m n : nat) . nat_to_natural m <N nat_to_natural n -> m < n
+    lt_from_natural : forall (m n : nat) . nat_to_natural m < nat_to_natural n -> m <n n
 
     plusn_to_nat : forall (m n : natural) .
-                      natural_to_nat (m +N n) = natural_to_nat m + natural_to_nat n : nat
+                      natural_to_nat (m + n) = natural_to_nat m +n natural_to_nat n : nat
 
     plus_to_natural : forall (m n : nat) .
-                         nat_to_natural (m + n) = nat_to_natural m +N nat_to_natural n : natural
+                         nat_to_natural (m +n n) = nat_to_natural m + nat_to_natural n : natural
 
     minusn_to_nat : forall (m n : natural) .
-                       natural_to_nat (m -N n) = natural_to_nat m - natural_to_nat n : nat
+                       natural_to_nat (m - n) = natural_to_nat m -n natural_to_nat n : nat
 
     minus_to_natural : forall (m n : nat) .
-                          nat_to_natural (m - n) = nat_to_natural m -N nat_to_natural n : natural
+                          nat_to_natural (m -n n) = nat_to_natural m - nat_to_natural n : natural
 
     timesn_to_nat : forall (m n : natural) .
-                       natural_to_nat (m *N n) = natural_to_nat m * natural_to_nat n : nat
+                       natural_to_nat (m * n) = natural_to_nat m *n natural_to_nat n : nat
 
     times_to_natural : forall (m n : nat) .
-                          nat_to_natural (m * n) = nat_to_natural m *N nat_to_natural n : natural
+                          nat_to_natural (m *n n) = nat_to_natural m * nat_to_natural n : natural
 
     minn_to_nat : forall (m n : natural) .
                      natural_to_nat (minn m n)
@@ -511,23 +509,23 @@ Strong induction for natural numbers:
                           = maxn (nat_to_natural m) (nat_to_natural n)
                           : natural
 
-    eqnb_to_nat : forall (m n : natural) . m =N? n = natural_to_nat m =? natural_to_nat n : bool
+    eqnb_to_nat : forall (m n : natural) . m =? n = natural_to_nat m =n? natural_to_nat n : bool
 
-    eqb_to_natural : forall (m n : nat) . m =? n = nat_to_natural m =N? nat_to_natural n : bool
+    eqb_to_natural : forall (m n : nat) . m =n? n = nat_to_natural m =? nat_to_natural n : bool
 
     leqnb_to_nat : forall (m n : natural) .
-                      m <N=? n = natural_to_nat m <=? natural_to_nat n : bool
+                      m <=? n = natural_to_nat m <n=? natural_to_nat n : bool
 
-    leqb_to_natural : forall (m n : nat) . m <=? n = nat_to_natural m <N=? nat_to_natural n : bool
+    leqb_to_natural : forall (m n : nat) . m <n=? n = nat_to_natural m <=? nat_to_natural n : bool
 
-    ltnb_to_nat : forall (m n : natural) . m <N? n = natural_to_nat m <? natural_to_nat n : bool
+    ltnb_to_nat : forall (m n : natural) . m <? n = natural_to_nat m <n? natural_to_nat n : bool
 
-    ltb_to_natural : forall (m n : nat) . m <? n = nat_to_natural m <N? nat_to_natural n : bool
+    ltb_to_natural : forall (m n : nat) . m <n? n = nat_to_natural m <? nat_to_natural n : bool
 
     neqnb_to_nat : forall (m n : natural) .
-                      m !N=? n = natural_to_nat m !=? natural_to_nat n : bool
+                      m !=? n = natural_to_nat m !=n? natural_to_nat n : bool
 
-    neqb_to_natural : forall (m n : nat) . m !=? n = nat_to_natural m !N=? nat_to_natural n : bool
+    neqb_to_natural : forall (m n : nat) . m !=n? n = nat_to_natural m !=? nat_to_natural n : bool
 
 
 ### Relation to `integer`
@@ -540,81 +538,79 @@ Strong induction for natural numbers:
                                 integer_to_natural (natural_to_integer n) = n : natural
 
     integer_to_natural_inv : forall (a : integer) .
-                                z`0 <z= a
-                                -> natural_to_integer (integer_to_natural a) = a : integer
+                                0 <z= a -> natural_to_integer (integer_to_natural a) = a : integer
 
-    natural_to_integer_nonneg : forall (n : natural) . z`0 <z= natural_to_integer n
+    natural_to_integer_nonneg : forall (n : natural) . 0 <z= natural_to_integer n
 
     natural_to_integer_mono : forall (m n : natural) .
-                                 m <N= n -> natural_to_integer m <z= natural_to_integer n
+                                 m <= n -> natural_to_integer m <z= natural_to_integer n
 
     natural_to_integer_mono_lt : forall (m n : natural) .
-                                    m <N n -> natural_to_integer m <z natural_to_integer n
+                                    m < n -> natural_to_integer m <z natural_to_integer n
 
-    integer_to_natural_zero : integer_to_natural z`0 = z`0 : natural
+    integer_to_natural_zero : integer_to_natural 0 = 0 : natural
 
     integer_to_natural_succ : forall (a : integer) .
-                                 z`0 <z= a
-                                 -> integer_to_natural (z`1 +z a)
+                                 0 <z= a
+                                 -> integer_to_natural (1 +z a)
                                       = succn (integer_to_natural a)
                                       : natural
 
     integer_to_natural_mono : forall (a b : integer) .
-                                 a <z= b -> integer_to_natural a <N= integer_to_natural b
+                                 a <z= b -> integer_to_natural a <= integer_to_natural b
 
     integer_to_natural_mono_lt : forall (a b : integer) .
-                                    z`0 <z= a
+                                    0 <z= a
                                     -> a <z b
-                                    -> integer_to_natural a <N integer_to_natural b
+                                    -> integer_to_natural a < integer_to_natural b
 
     integer_to_natural_nonpos : forall (a : integer) .
-                                   a <z= z`0 -> integer_to_natural a = z`0 : natural
+                                   a <z= 0 -> integer_to_natural a = 0 : natural
 
-    integer_to_natural_neg : forall (a : integer) .
-                                a <z z`0 -> integer_to_natural a = z`0 : natural
+    integer_to_natural_neg : forall (a : integer) . a <z 0 -> integer_to_natural a = 0 : natural
 
     plusn_to_integer : forall (m n : natural) .
-                          natural_to_integer (m +N n)
+                          natural_to_integer (m + n)
                             = natural_to_integer m +z natural_to_integer n
                             : integer
 
     plusz_to_natural : forall (a b : integer) .
-                          z`0 <z= a
-                          -> z`0 <z= b
+                          0 <z= a
+                          -> 0 <z= b
                           -> integer_to_natural (a +z b)
-                               = integer_to_natural a +N integer_to_natural b
+                               = integer_to_natural a + integer_to_natural b
                                : natural
 
     succn_to_integer : forall (n : natural) .
-                          natural_to_integer (succn n) = z`1 +z natural_to_integer n : integer
+                          natural_to_integer (succn n) = 1 +z natural_to_integer n : integer
 
     predn_to_integer : forall (n : natural) .
-                          z`0 <N n
+                          0 < n
                           -> natural_to_integer (predn n) = z`-1 +z natural_to_integer n : integer
 
     minusn_to_integer : forall (m n : natural) .
-                           n <N= m
-                           -> natural_to_integer (m -N n)
+                           n <= m
+                           -> natural_to_integer (m - n)
                                 = natural_to_integer m -z natural_to_integer n
                                 : integer
 
     minusz_to_natural : forall (a b : integer) .
-                           z`0 <z= b
+                           0 <z= b
                            -> b <z= a
                            -> integer_to_natural (a -z b)
-                                = integer_to_natural a -N integer_to_natural b
+                                = integer_to_natural a - integer_to_natural b
                                 : natural
 
     timesn_to_integer : forall (m n : natural) .
-                           natural_to_integer (m *N n)
+                           natural_to_integer (m * n)
                              = natural_to_integer m *z natural_to_integer n
                              : integer
 
     timesz_to_natural : forall (a b : integer) .
-                           z`0 <z= a
-                           -> z`0 <z= b
+                           0 <z= a
+                           -> 0 <z= b
                            -> integer_to_natural (a *z b)
-                                = integer_to_natural a *N integer_to_natural b
+                                = integer_to_natural a * integer_to_natural b
                                 : natural
 
     minn_to_integer : forall (m n : natural) .
@@ -638,36 +634,36 @@ Strong induction for natural numbers:
                            : natural
 
     eqnb_to_integer : forall (m n : natural) .
-                         m =N? n = natural_to_integer m =z? natural_to_integer n : bool
+                         m =? n = natural_to_integer m =z? natural_to_integer n : bool
 
     eqzb_to_natural : forall (a b : integer) .
-                         z`0 <z= a
-                         -> z`0 <z= b
-                         -> a =z? b = integer_to_natural a =N? integer_to_natural b : bool
+                         0 <z= a
+                         -> 0 <z= b
+                         -> a =z? b = integer_to_natural a =? integer_to_natural b : bool
 
     leqnb_to_integer : forall (m n : natural) .
-                          m <N=? n = natural_to_integer m <z=? natural_to_integer n : bool
+                          m <=? n = natural_to_integer m <z=? natural_to_integer n : bool
 
     leqzb_to_natural : forall (a b : integer) .
-                          z`0 <z= a
-                          -> z`0 <z= b
-                          -> a <z=? b = integer_to_natural a <N=? integer_to_natural b : bool
+                          0 <z= a
+                          -> 0 <z= b
+                          -> a <z=? b = integer_to_natural a <=? integer_to_natural b : bool
 
     ltnb_to_integer : forall (m n : natural) .
-                         m <N? n = natural_to_integer m <z? natural_to_integer n : bool
+                         m <? n = natural_to_integer m <z? natural_to_integer n : bool
 
     ltzb_to_natural : forall (a b : integer) .
-                         z`0 <z= a
-                         -> z`0 <z= b
-                         -> a <z? b = integer_to_natural a <N? integer_to_natural b : bool
+                         0 <z= a
+                         -> 0 <z= b
+                         -> a <z? b = integer_to_natural a <? integer_to_natural b : bool
 
     neqnb_to_integer : forall (m n : natural) .
-                          m !N=? n = natural_to_integer m !z=? natural_to_integer n : bool
+                          m !=? n = natural_to_integer m !z=? natural_to_integer n : bool
 
     neqzb_to_natural : forall (a b : integer) .
-                          z`0 <z= a
-                          -> z`0 <z= b
-                          -> a !z=? b = integer_to_natural a !N=? integer_to_natural b : bool
+                          0 <z= a
+                          -> 0 <z= b
+                          -> a !z=? b = integer_to_natural a !=? integer_to_natural b : bool
 
     natural_to_nat_to_integer : forall (n : natural) .
                                    Integer.nat_to_integer (natural_to_nat n)

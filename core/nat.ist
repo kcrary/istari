@@ -19,6 +19,33 @@ Namespace.aliasExport (parseIdent /succ/) Prim.succ;
 Namespace.aliasExport (parseIdent /nat_case/) Prim.nat_case;
 
 
+(* Set arithmetic to parse as nat until we can get overloading set up. *)
+
+grammardef ArithmeticNat
+
+   open ParseNat
+
+   rule Term(30)  ::= Term(31) "<=" Term(31) => parseLeq
+   rule Term(30)  ::= Term(31) "<" Term(31) => parseLt
+
+   rule Term(40)  ::= Term(40) "=?" Term(41) => parseEqb
+   rule Term(40)  ::= Term(40) "<=?" Term(41) => parseLeqb
+   rule Term(40)  ::= Term(40) "<?" Term(41) => parseLtb
+   rule Term(40)  ::= Term(40) "!=?" Term(41) => parseNeqb
+
+   rule Term(50)  ::= Term(50) "+" Term(51) => parsePlus
+   rule Term(50)  ::= Term(50) "-" Term(51) => parseMinus
+
+   rule Term(60)  ::= Term(60) "*" Term(61) => parseTimes
+
+   rule Term(100) ::= NUMBER => parseNat
+
+end;
+
+grammaroff ArithmeticOverloaded;
+grammaron ArithmeticNat;
+
+
 lemma "nat_type"
 /
   nat : U 0
@@ -74,7 +101,7 @@ unrolling nat_iter
 
 
 
-structure NatTactic = AfterNat ();
+structure NatTactic = NatTacticFun ();
 open NatTactic;
 
 
@@ -3767,6 +3794,13 @@ reductions
 
   unfolding neqb
 /;
+
+
+
+(* Set up overloading. *)
+structure NatParsing = NatParsingFun ();
+grammaroff ArithmeticNat;
+grammaron ArithmeticOverloaded;
 
 
 

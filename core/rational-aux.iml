@@ -18,6 +18,7 @@ structure ParseRational =
       val leqqb : constant R.dest = R.dest ()
       val ltqb : constant R.dest = R.dest ()
       val neqqb : constant R.dest = R.dest ()
+      val rationalParsingMode : Overload.parsing_mode R.dest = R.dest ()
 
       fun parsePlus x y = T.apply2 (R.read plusq) x y
       fun parseTimes x y = T.apply2 (R.read timesq) x y
@@ -31,8 +32,10 @@ structure ParseRational =
       fun parseLtqb x y = T.apply2 (R.read ltqb) x y
       fun parseNeqqb x y = T.apply2 (R.read neqqb) x y
 
-      fun parseNumber n = T.apply1 (R.read integer_to_rational) (ParseTerm.integer n)
-      fun parseNumberEmbed n = T.apply1 (R.read integer_to_rational) (ParseTerm.integerEmbed n)
+      fun parseNumber x = T.apply1 (R.read integer_to_rational) (T.integer (IntInf.fromInt x))
+      fun parseNumberEmbed x = T.apply1 (R.read integer_to_rational) (T.integer x)
+
+      fun parseAsRational m = T.useMode (R.read rationalParsingMode) m
 
    end
 
@@ -44,10 +47,10 @@ grammardef Rational
    rule Term(30)  ::= Term(31) "<q=" Term(31) => parseLeq
    rule Term(30)  ::= Term(31) "<q" Term(31) => parseLt
 
-   rule Term(40)  ::= Term(40) "=q?" Term(41) => parseEqqb
-   rule Term(40)  ::= Term(40) "<q=?" Term(41) => parseLeqqb
-   rule Term(40)  ::= Term(40) "<q?" Term(41) => parseLtqb
-   rule Term(40)  ::= Term(40) "!q=?" Term(41) => parseNeqqb
+   rule Term(40)  ::= Term(41) "=q?" Term(41) => parseEqqb
+   rule Term(40)  ::= Term(41) "<q=?" Term(41) => parseLeqqb
+   rule Term(40)  ::= Term(41) "<q?" Term(41) => parseLtqb
+   rule Term(40)  ::= Term(41) "!q=?" Term(41) => parseNeqqb
 
    rule Term(50)  ::= Term(50) "+q" Term(51) => parsePlus
    rule Term(50)  ::= Term(50) "-q" Term(51) => parseMinus
@@ -60,40 +63,26 @@ grammardef Rational
    rule Term(100) ::= "q`" NUMBER => parseNumber
    rule Term(100) ::= "q`" NNUMBER => parseNumber
    rule Term(100) ::= "q`" EMBED => parseNumberEmbed
+   rule Term(100) ::= "rational`" "(" Term(0) ")" => parseAsRational
 
 end
 
-
-grammardef ArithmeticRational
-
-   open ParseRational
-
-   rule Term(30)  ::= Term(31) "<=" Term(31) => parseLeq
-   rule Term(30)  ::= Term(31) "<" Term(31) => parseLt
-
-   rule Term(40)  ::= Term(40) "=?" Term(41) => parseEqqb
-   rule Term(40)  ::= Term(40) "<=?" Term(41) => parseLeqqb
-   rule Term(40)  ::= Term(40) "<?" Term(41) => parseLtqb
-   rule Term(40)  ::= Term(40) "!=?" Term(41) => parseNeqqb
-
-   rule Term(50)  ::= Term(50) "+" Term(51) => parsePlus
-   rule Term(50)  ::= Term(50) "-" Term(51) => parseMinus
-
-   rule Term(60)  ::= Term(60) "*" Term(61) => parseTimes
-
-   rule Term(90)  ::= "~" Term(91) => parseNeg
-
-   rule Term(100) ::= NUMBER => parseNumber
-   rule Term(100) ::= NNUMBER => parseNumber
-
-end
 
 grammaron Rational
 
 
-functor AfterRationalDefs () =
+signature RATIONAL_PARSING =
+   sig
+
+      val setArithRational : unit -> unit
+      
+   end
+
+
+functor RationalParsingFun () :> RATIONAL_PARSING =
    struct
 
+      structure T = Term
       structure CR = CheckpointedRef
       structure U = Show.Unparsing
       structure H = ConstantTable
@@ -136,7 +125,7 @@ functor AfterRationalDefs () =
                                U.break 1, 
                                
                                U.string
-                                  (if Symbol.eq (CR.deref Show.arithmetic, rationalSym) then
+                                  (if Symbol.eq (Overload.currentArithmeticMode (), rationalSym) then
                                       strpref
                                    else
                                       str),
@@ -166,7 +155,7 @@ functor AfterRationalDefs () =
                       U.append
                          [
                          U.string
-                            (if Symbol.eq (CR.deref Show.arithmetic, rationalSym) then
+                            (if Symbol.eq (Overload.currentArithmeticMode (), rationalSym) then
                                 "~ "
                              else
                                 "~q "),
@@ -185,7 +174,7 @@ functor AfterRationalDefs () =
                   (fn x =>
                       U.append
                          [
-                         if Symbol.eq (CR.deref Show.arithmetic, rationalSym) then
+                         if Symbol.eq (Overload.currentArithmeticMode (), rationalSym) then
                             U.append []
                          else
                             U.string "q`",
@@ -195,6 +184,29 @@ functor AfterRationalDefs () =
          in
             H.insert U.unparsingTable integer_to_rational (1, 100, ref true, unp)
          end
+
+
+      val rationalParsingMode =
+         Overload.ARITHMETIC
+            {
+            mode = Symbol.fromValue "rational",
+            literal = (fn x => SOME (T.apply1 integer_to_rational (T.Native (T.Integer (IntInf.fromInt x))))),
+            leq = SOME leqq,
+            lt = SOME ltq,
+            eqb = SOME eqqb,
+            leqb = SOME leqqb,
+            ltb = SOME ltqb,
+            neqb = SOME neqqb,
+            plus = SOME plusq,
+            minus = SOME minusq,
+            times = SOME timesq,
+            neg = SOME negq,
+            divide = SOME divq,
+            }
+
+      val () = CR.write ParseRational.rationalParsingMode rationalParsingMode
+
+      fun setArithRational () = Overload.setMode rationalParsingMode
 
    end
 
@@ -366,5 +378,4 @@ functor AfterRationalAll () :> sig end =
          (exact /\T.Const rational_strict\/)
 
    end
-
 

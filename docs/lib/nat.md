@@ -1,5 +1,8 @@
 # `Nat`
 
+Expressions in this file are rendered using the `nat` [overloading
+mode](../overloading.html), which is the default.
+
 The `nat` type is primitive, but aliased in the `Nat` module:
 
     nat : U 0

@@ -2,6 +2,8 @@
 
 #### Development version
 
+- Overhauled arithmetic overloading.
+
 - Rewriting changes:
 
   + Fixed a bug in `unrollTypeUniv`.

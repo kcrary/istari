@@ -1,12 +1,13 @@
 open:Integer
+overload:integer
 # `Integer`
+
+Expressions in this file are rendered using the `integer` [overloading
+mode](../overloading.html).
 
 The `integer` type is primitive but aliased in the `Integer` module:
 
     integer : type:integer
-
-Integer literals are written using a `` z` `` parsing directive.  For
-example, zero is ``z`0``.
 
 
 ### Plus and negation
