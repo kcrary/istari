@@ -28,24 +28,38 @@ The `integer` type is primitive but aliased in the `Integer` module:
 
     plusz_assoc : forall (a b c : integer) . a + b + c = a + (b + c) : integer
 
+    minusz_assoc : forall (a b c : integer) . a - b - c = a - (b + c) : integer
+
+    plusz_minusz_assoc : forall (a b c : integer) . a + b - c = a + (b - c) : integer
+
+    minusz_plusz_assoc : forall (a b c : integer) . a - b + c = a - (b - c) : integer
+
     plusz_id_l : forall (a : integer) . 0 + a = a : integer
 
     plusz_id_r : forall (a : integer) . a + 0 = a : integer
+
+    minusz_id_l : forall (a : integer) . 0 - a = ~ a : integer
+
+    minusz_id_r : forall (a : integer) . a - 0 = a : integer
 
     plusz_inverse_l : forall (a : integer) . ~ a + a = 0 : integer
 
     plusz_inverse_r : forall (a : integer) . a + ~ a = 0 : integer
 
+    minusz_self : forall (a : integer) . a - a = 0 : integer
+
     negz_invol : forall (a : integer) . ~ (~ a) = a : integer
 
     negz_plusz : forall (a b : integer) . ~ (a + b) = ~ a + ~ b : integer
+
+    negz_minusz : forall (a b : integer) . ~ (a - b) = b - a : integer
 
     plusz_cancel_l : forall (a b c : integer) . c + a = c + b : integer -> a = b : integer
 
     plusz_cancel_r : forall (a b c : integer) . a + c = b + c : integer -> a = b : integer
 
-In each of the shift lemmas, the negation term is the on the right of
-the `<->`.  Then the first letter indicates which direction the
+In each of the `plusz` shift lemmas, the negation term is on the right
+of the `<->`.  Then the first letter indicates which direction the
 negated term is moving, the second indicates which operand it is
 before moving, and the third is which operand it is after moving.
 
@@ -65,10 +79,32 @@ before moving, and the third is which operand it is after moving.
 
     plusz_shift_rrl : forall (a b c : integer) . a + b = c : integer <-> a = ~ b + c : integer
 
+    minusz_cancel_r : forall (a b c : integer) . a - c = b - c : integer -> a = b : integer
+
+    minusz_cancel_l : forall (a b c : integer) . c - a = c - b : integer -> a = b : integer
+
+In each of the `minusz` shift lemmas, the subtraction term is on the
+right of the `<->`.  Then the first letter indicates which direction
+the subtrahend is moving, the second indicates which operand it is
+before moving.  It is always the right-hand operand after moving.
+
+    minusz_shift_ll : forall (a b c : integer) . a = b + c : integer <-> a - b = c : integer
+
+    minusz_shift_lr : forall (a b c : integer) . a = b + c : integer <-> a - c = b : integer
+
+    minusz_shift_rr : forall (a b c : integer) . a + b = c : integer <-> a = c - b : integer
+
+    minusz_shift_rl : forall (a b c : integer) . a + b = c : integer <-> b = c - a : integer
+
     plusz_compat : forall (a a' b b' : integer) .
                       a = a' : integer -> b = b' : integer -> a + b = a' + b' : integer
 
     negz_compat : forall (a a' : integer) . a = a' : integer -> ~ a = ~ a' : integer
+
+    negz_injective : forall (a b : integer) . ~ a = ~ b : integer -> a = b : integer
+
+    minusz_compat : forall (a a' b b' : integer) .
+                       a = a' : integer -> b = b' : integer -> a - b = a' - b' : integer
 
 
 ### Inequalities
@@ -181,6 +217,32 @@ This one gives transitivity in the form needed for rewriting:
     negz_ltz : forall (a b : integer) . a < b -> ~ b < ~ a
 
     negz_ltz' : forall (a b : integer) . ~ b < ~ a -> a < b
+
+    minusz_leqz : forall (a a' b b' : integer) . a <= a' -> b' <= b -> a - b <= a' - b'
+
+    minusz_cancel_leqz_l : forall (a b c : integer) . c - a <= c - b -> b <= a
+
+    minusz_cancel_leqz_r : forall (a b c : integer) . a - c <= b - c -> a <= b
+
+    minusz_cancel_ltz_l : forall (a b c : integer) . c - a < c - b -> b < a
+
+    minusz_cancel_ltz_r : forall (a b c : integer) . a - c < b - c -> a < b
+
+    minusz_shift_leqz_ll : forall (a b c : integer) . a <= b + c <-> a - b <= c
+
+    minusz_shift_leqz_lr : forall (a b c : integer) . a <= b + c <-> a - c <= b
+
+    minusz_shift_leqz_rr : forall (a b c : integer) . a + b <= c <-> a <= c - b
+
+    minusz_shift_leqz_rl : forall (a b c : integer) . a + b <= c <-> b <= c - a
+
+    minusz_shift_ltz_ll : forall (a b c : integer) . a < b + c <-> a - b < c
+
+    minusz_shift_ltz_lr : forall (a b c : integer) . a < b + c <-> a - c < b
+
+    minusz_shift_ltz_rr : forall (a b c : integer) . a + b < c <-> a < c - b
+
+    minusz_shift_ltz_rl : forall (a b c : integer) . a + b < c <-> b < c - a
 
     not_leqz : forall (a b : integer) . not (a <= b) <-> b < a
 
@@ -395,6 +457,10 @@ positive case that works upwards.
     negz_dist_timesz_l : forall (a b : integer) . ~ (a * b) = ~ a * b : integer
 
     negz_dist_timesz_r : forall (a b : integer) . ~ (a * b) = a * ~ b : integer
+
+    timesz_dist_minusz_l : forall (a b c : integer) . (a - b) * c = a * c - b * c : integer
+
+    timesz_dist_minusz_r : forall (a b c : integer) . a * (b - c) = a * b - a * c : integer
 
     negz_as_timesz : forall (a : integer) . ~ a = -1 * a : integer
 
@@ -684,5 +750,4 @@ Since divisors must be nonzero, we define `nonzero` as an abbreviation
     timesz_divz_l : forall (a : integer) (b : nonzero) . divz a b * b = a - modz a b : integer
 
     timesz_divz_r : forall (a : integer) (b : nonzero) . b * divz a b = a - modz a b : integer
-
 

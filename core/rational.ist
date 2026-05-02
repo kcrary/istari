@@ -556,7 +556,6 @@ qed ();
 
 
 
-
 define /eqqb x y/
 /
   x #1 *z y #2 =z? y #1 *z x #2
@@ -1335,6 +1334,46 @@ qed ();
 
 
 
+lemma "negq_zero"
+/
+  negq q`0 = q`0 : rational
+/;
+
+apply /rational_equality/.
+unfold /negq, integer_to_rational at all/.
+reduceHard //.
+auto.
+qed ();
+
+
+
+lemma "minusq_id_l"
+/
+  forall a . q`0 -q a = ~q a : rational
+/;
+
+inference.
+intro /a/.
+unfold /minusq/.
+apply /plusq_id_l/.
+qed ();
+
+
+
+lemma "minusq_id_r"
+/
+  forall a . a -q q`0 = a : rational
+/;
+
+inference.
+intro /a/.
+unfold /minusq/.
+rewrite /-> negq_zero/.
+apply /plusq_id_r/.
+qed ();
+
+
+
 lemma "negq_invol"
 /
   forall x .
@@ -1397,15 +1436,15 @@ qed ();
 
 
 
-lemma "negq_zero"
+lemma "minusq_self"
 /
-  negq q`0 = q`0 : rational
+  forall x . x -q x = q`0 : rational
 /;
 
-apply /rational_equality/.
-unfold /negq, integer_to_rational at all/.
-reduceHard //.
-auto.
+inference.
+intro /x/.
+unfold /minusq/.
+apply /plusq_inverse_r/.
 qed ();
 
 
@@ -1464,6 +1503,48 @@ reduceHard /Hx Hy concl/.
 rewrite /-> negz_plusz/.
 rewrite /-> negz_dist_timesz_l at 0 0/.
 reflexivity.
+qed ();
+
+
+
+lemma "minusq_assoc"
+/
+  forall a b c . (a -q b) -q c = a -q (b +q c) : rational
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq at all/.
+rewrite /-> negq_plusq/.
+apply /plusq_assoc/.
+qed ();
+
+
+
+lemma "plusq_minusq_assoc"
+/
+  forall a b c . (a +q b) -q c = a +q (b -q c) : rational
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq at all/.
+apply /plusq_assoc/.
+qed ();
+
+
+
+lemma "minusq_plusq_assoc"
+/
+  forall a b c . (a -q b) +q c = a -q (b -q c) : rational
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq at all/.
+rewrite /-> negq_plusq/.
+rewrite /-> negq_invol/.
+apply /plusq_assoc/.
 qed ();
 
 
@@ -1640,6 +1721,101 @@ qed ();
 
 
 
+lemma "minusq_cancel_r"
+/
+  forall a b c .
+    a -q c = b -q c : rational
+    -> a = b : rational
+/;
+
+inference.
+intro /a b c Heq/.
+unfold /minusq in Heq at 0 0/.
+apply /plusq_cancel_r/ >> auto.
+qed ();
+
+
+
+lemma "minusq_cancel_l"
+/
+  forall a b c .
+    c -q a = c -q b : rational
+    -> a = b : rational
+/;
+
+inference.
+intro /a b c Heq/.
+unfold /minusq in Heq at 0 0/.
+apply /negq_injective/.
+apply /plusq_cancel_l/ >> auto.
+qed ();
+
+
+
+lemma "minusq_shift_ll"
+/
+  forall a b c .
+    a = b +q c : rational
+    <->
+    a -q b = c : rational
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq/.
+apply /plusq_shift_llr/.
+qed ();
+
+
+
+lemma "minusq_shift_lr"
+/
+  forall a b c .
+    a = b +q c : rational
+    <->
+    a -q c = b : rational
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq/.
+apply /plusq_shift_lrr/.
+qed ();
+
+
+
+lemma "minusq_shift_rr"
+/
+  forall a b c .
+    a +q b = c : rational
+    <->
+    a = c -q b : rational
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq/.
+apply /plusq_shift_rrr/.
+qed ();
+
+
+
+lemma "minusq_shift_rl"
+/
+  forall a b c .
+    a +q b = c : rational
+    <->
+    b = c -q a : rational
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq/.
+apply /plusq_shift_rlr/.
+qed ();
+
+
+
 lemma "plusq_compat"
 /
   forall x x' y y' .
@@ -1682,21 +1858,6 @@ lemma "minusq_compat"
 inference.
 intro /x x' y y' Hx Hy/.
 subst /x' y'/.
-reflexivity.
-qed ();
-
-
-
-lemma "minusq_self"
-/
-  forall x .
-    x -q x = q`0 : rational
-/;
-
-inference.
-intro /x/.
-unfold /minusq/.
-rewrite /-> plusq_inverse_r/.
 reflexivity.
 qed ();
 
@@ -1963,6 +2124,48 @@ apply /rational_equality/.
 unfold /integer_to_rational at all, invq/.
 reduceHard //.
 auto.
+qed ();
+
+
+
+lemma "divq_id_l"
+/
+  forall a . q`1 |q a = invq a : rational
+/;
+
+inference.
+intro /a/.
+unfold /divq/.
+apply /timesq_id_l/.
+qed ();
+
+
+
+lemma "divq_id_r"
+/
+  forall a . a |q q`1 = a : rational
+/;
+
+inference.
+intro /a/.
+unfold /divq/.
+rewrite /-> invq_one/.
+apply /timesq_id_r/.
+qed ();
+
+
+
+lemma "divq_self"
+/
+  forall a .
+    a != q`0 : rational
+    -> a |q a = q`1 : rational
+/;
+
+inference.
+intro /a Hnzero/.
+unfold /divq/.
+apply /timesq_inverse_r/ >> auto.
 qed ();
 
 
@@ -2239,6 +2442,109 @@ qed ();
 
 
 
+lemma "divq_cancel_r"
+/
+  forall a b c .
+    c != q`0 : rational
+    -> a |q c = b |q c : rational
+    -> a = b : rational
+/;
+
+inference.
+intro /a b c Hnzero Heq/.
+unfold /divq in Heq at 0 0/.
+apply /timesq_cancel_r _ _ (invq c)/ >> auto.
+apply /invq_nonzero/ >> auto.
+qed ();
+
+
+
+lemma "divq_cancel_l"
+/
+  forall a b c .
+    c != q`0 : rational
+    -> c |q a = c |q b : rational
+    -> a = b : rational
+/;
+
+inference.
+intro /a b c Hnzero Heq/.
+unfold /divq in Heq at 0 0/.
+apply /invq_injective/.
+apply /timesq_cancel_l _ _ c/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_ll"
+/
+  forall a b c .
+    b != q`0 : rational
+    -> a = b *q c : rational
+       <->
+       a |q b = c : rational
+/;
+
+inference.
+intro /a b c Hnonzero/.
+unfold /divq/.
+apply /timesq_shift_llr/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_lr"
+/
+  forall a b c .
+    c != q`0 : rational
+    -> a = b *q c : rational
+       <->
+       a |q c = b : rational
+/;
+
+inference.
+intro /a b c Hnonzero/.
+unfold /divq/.
+apply /timesq_shift_lrr/ >> auto.
+qed ();
+
+
+
+
+lemma "divq_shift_rr"
+/
+  forall a b c .
+    b != q`0 : rational
+    -> a *q b = c : rational
+       <->
+       a = c |q b : rational
+/;
+
+inference.
+intro /a b c Hnonzero/.
+unfold /divq/.
+apply /timesq_shift_rrr/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_rl"
+/
+  forall a b c .
+    a != q`0 : rational
+    -> a *q b = c : rational
+       <->
+       b = c |q a : rational
+/;
+
+inference.
+intro /a b c Hnonzero/.
+unfold /divq/.
+apply /timesq_shift_rlr/ >> auto.
+qed ();
+
+
+
 lemma "timesq_compat"
 /
   forall x x' y y' .
@@ -2357,6 +2663,36 @@ qed ();
 
 
 
+lemma "timesq_dist_minusq_r"
+/
+  forall a b c . a *q (b -q c) = a *q b -q a *q c : rational
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq at 0 0/.
+rewrite /-> timesq_dist_plusq_r/.
+rewrite /-> negq_dist_timesq_r/.
+reflexivity.
+qed ();
+
+
+
+lemma "timesq_dist_minusq_l"
+/
+  forall a b c . (a -q b) *q c = a *q c -q b *q c : rational
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq at 0 0/.
+rewrite /-> timesq_dist_plusq_l/.
+rewrite /-> negq_dist_timesq_l/.
+reflexivity.
+qed ();
+
+
+
 lemma "negq_dist_invq"
 /
   forall x .
@@ -2385,6 +2721,35 @@ rewrite /-> plusq_id_r/.
 apply /timesq_inverse_l/ >> auto.
 qed ();
 
+
+
+lemma "negq_dist_divq_l"
+/
+  forall x y .
+    ~q (x |q y) = ~q x |q y : rational
+/;
+
+inference.
+intro /x y/.
+unfold /divq at all/.
+apply /negq_dist_timesq_l/.
+qed ();
+    
+
+
+lemma "negq_dist_divq_r"
+/
+  forall x y .
+    ~q (x |q y) = x |q ~q y : rational
+/;
+
+inference.
+intro /x y/.
+unfold /divq at all/.
+rewrite /<- negq_dist_invq/.
+apply /negq_dist_timesq_r/.
+qed ();
+    
 
 
 lemma "invq_timesq"
@@ -2434,6 +2799,49 @@ apply /timesq_inverse_r/.
 contrapositive /Hnzero/.
 subst /x/.
 apply /timesq_ann_l/.
+qed ();
+
+
+
+lemma "divq_assoc"
+/
+  forall a b c .
+    (a |q b) |q c = a |q (b *q c) : rational
+/;
+
+inference.
+intro /a b c/.
+unfold /divq at all/.
+rewrite /-> invq_timesq/.
+apply /timesq_assoc/.
+qed ();
+
+
+
+lemma "timesq_divq_assoc"
+/
+  forall a b c . (a *q b) |q c = a *q (b |q c) : rational
+/;
+
+inference.
+intro /a b c/.
+unfold /divq at all/.
+apply /timesq_assoc/.
+qed ();
+
+
+
+lemma "divq_timesq_assoc"
+/
+  forall a b c . (a |q b) *q c = a |q (b |q c) : rational
+/;
+
+inference.
+intro /a b c/.
+unfold /divq at all/.
+rewrite /-> invq_timesq/.
+rewrite /-> invq_invol/.
+apply /timesq_assoc/.
 qed ();
 
 
@@ -3360,6 +3768,202 @@ qed ();
 
 
 
+lemma "minusq_cancel_leqq_l"
+/
+  forall a b c . c -q a <q= c -q b -> b <q= a
+/;
+
+inference.
+intro /a b c Hle/.
+unfold /minusq in Hle at 0 0/.
+apply /negq_leqq'/.
+apply /plusq_cancel_leqq_l/ >> auto.
+qed ();
+
+
+
+lemma "minusq_cancel_leqq_r"
+/
+  forall a b c . a -q c <q= b -q c -> a <q= b
+/;
+
+inference.
+intro /a b c Hle/.
+unfold /minusq in Hle at 0 0/.
+apply /plusq_cancel_leqq_r/ >> auto.
+qed ();
+
+
+
+lemma "minusq_cancel_ltq_l"
+/
+  forall a b c . c -q a <q c -q b -> b <q a
+/;
+
+inference.
+intro /a b c Hle/.
+unfold /minusq in Hle at 0 0/.
+apply /negq_ltq'/.
+apply /plusq_cancel_ltq_l/ >> auto.
+qed ();
+
+
+
+lemma "minusq_cancel_ltq_r"
+/
+  forall a b c . a -q c <q b -q c -> a <q b
+/;
+
+inference.
+intro /a b c Hle/.
+unfold /minusq in Hle at 0 0/.
+apply /plusq_cancel_ltq_r/ >> auto.
+qed ();
+
+
+
+lemma "minusq_shift_leqq_ll"
+/
+  forall a b c .
+    a <q= b +q c
+    <->
+    a -q b <q= c
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq/.
+apply /plusq_shift_leqq_llr/.
+qed ();
+
+
+
+lemma "minusq_shift_leqq_lr"
+/
+  forall a b c .
+    a <q= b +q c
+    <->
+    a -q c <q= b
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq/.
+apply /plusq_shift_leqq_lrr/.
+qed ();
+
+
+
+lemma "minusq_shift_leqq_rr"
+/
+  forall a b c .
+    a +q b <q= c
+    <->
+    a <q= c -q b
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq/.
+apply /plusq_shift_leqq_rrr/.
+qed ();
+
+
+
+lemma "minusq_shift_leqq_rl"
+/
+  forall a b c .
+    a +q b <q= c
+    <->
+    b <q= c -q a
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq/.
+apply /plusq_shift_leqq_rlr/.
+qed ();
+
+
+
+lemma "minusq_shift_ltq_ll"
+/
+  forall a b c .
+    a <q b +q c
+    <->
+    a -q b <q c
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq/.
+apply /plusq_shift_ltq_llr/.
+qed ();
+
+
+
+lemma "minusq_shift_ltq_lr"
+/
+  forall a b c .
+    a <q b +q c
+    <->
+    a -q c <q b
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq/.
+apply /plusq_shift_ltq_lrr/.
+qed ();
+
+
+
+lemma "minusq_shift_ltq_rr"
+/
+  forall a b c .
+    a +q b <q c
+    <->
+    a <q c -q b
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq/.
+apply /plusq_shift_ltq_rrr/.
+qed ();
+
+
+
+lemma "minusq_shift_ltq_rl"
+/
+  forall a b c .
+    a +q b <q c
+    <->
+    b <q c -q a
+/;
+
+inference.
+intro /a b c/.
+unfold /minusq/.
+apply /plusq_shift_ltq_rlr/.
+qed ();
+
+
+
+lemma "minusq_leqq"
+/
+  forall a a' b b' . a <q= a' -> b' <q= b -> a -q b <q= a' -q b'
+/;
+
+inference.
+intro /a a' b b' Ha Hb/.
+unfold /minusq at 0 0/.
+apply /plusq_leqq/ >> auto.
+apply /negq_leqq/ >> auto.
+qed ();
+
+
+
 (* Decidability *)
 
 lemma "neq_rational_decide"
@@ -4191,6 +4795,190 @@ qed ();
 
 
 
+lemma "invq_nonnegative"
+/
+  forall x .
+    q`0 <q= x
+    -> q`0 <q= invq x
+/;
+
+inference.
+intro /x Hnneg/.
+so /eq_rational_decide x q`0/ /Hzero | Hnzero/.
+  {
+  subst /x/.
+  rewrite /-> invq_zero/.
+  apply /leqq_refl/.
+  }
+
+  {
+  apply /ltq_impl_leqq/.
+  apply /invq_positive/.
+  apply /ltq_from_leqq_neq/ >> auto.
+  contrapositive /Hnzero/.
+  auto.
+  }
+qed ();
+
+
+
+lemma "invq_nonpositive"
+/
+  forall x .
+    x <q= q`0
+    -> invq x <q= q`0
+/;
+
+inference.
+intro /x Hnpos/.
+so /eq_rational_decide x q`0/ /Hzero | Hnzero/.
+  {
+  subst /x/.
+  rewrite /-> invq_zero/.
+  apply /leqq_refl/.
+  }
+
+  {
+  apply /ltq_impl_leqq/.
+  apply /invq_negative/.
+  apply /ltq_from_leqq_neq/ >> auto.
+  }
+qed ();
+
+
+
+lemma "divq_leqq_zero"
+/
+  forall x y .
+    q`0 <q= x
+    -> q`0 <q= y
+    -> q`0 <q= x |q y
+/;
+
+inference.
+intro /x y Hx Hy/.
+unfold /divq/.
+apply /timesq_leqq_zero/ >> autoWith /invq_nonnegative/.
+qed ();
+
+aliasExport /divq_leqq_zero_pos_pos/ /divq_leqq_zero/;
+
+
+
+lemma "divq_leqq_zero_pos_neg"
+/
+  forall x y .
+    q`0 <q= x
+    -> y <q= q`0
+    -> x |q y <q= q`0
+/;
+
+inference.
+intro /x y Hx Hy/.
+unfold /divq/.
+apply /timesq_leqq_zero_pos_neg/ >> autoWith /invq_nonpositive/.
+qed ();
+
+
+
+lemma "divq_leqq_zero_neg_pos"
+/
+  forall x y .
+    x <q= q`0
+    -> q`0 <q= y
+    -> x |q y <q= q`0
+/;
+
+inference.
+intro /x y Hx Hy/.
+unfold /divq/.
+apply /timesq_leqq_zero_neg_pos/ >> autoWith /invq_nonnegative/.
+qed ();
+
+
+
+lemma "divq_leqq_zero_neg_neg"
+/
+  forall x y .
+    x <q= q`0
+    -> y <q= q`0
+    -> q`0 <q= x |q y
+/;
+
+inference.
+intro /x y Hx Hy/.
+unfold /divq/.
+apply /timesq_leqq_zero_neg_neg/ >> autoWith /invq_nonpositive/.
+qed ();
+
+
+
+lemma "divq_ltq_zero"
+/
+  forall x y .
+    q`0 <q x
+    -> q`0 <q y
+    -> q`0 <q x |q y
+/;
+
+inference.
+intro /x y Hx Hy/.
+unfold /divq/.
+apply /timesq_ltq_zero_pos_pos/ >> autoWith /leqq_refl invq_positive/.
+qed ();
+
+aliasExport /divq_ltq_zero_pos_pos/ /divq_ltq_zero/;
+
+
+
+lemma "divq_ltq_zero_pos_neg"
+/
+  forall x y .
+    q`0 <q x
+    -> y <q q`0
+    -> x |q y <q q`0
+/;
+
+inference.
+intro /x y Hx Hy/.
+unfold /divq/.
+apply /timesq_ltq_zero_pos_neg/ >> autoWith /invq_negative/.
+qed ();
+
+
+
+lemma "divq_ltq_zero_neg_pos"
+/
+  forall x y .
+    x <q q`0
+    -> q`0 <q y
+    -> x |q y <q q`0
+/;
+
+inference.
+intro /x y Hx Hy/.
+unfold /divq/.
+apply /timesq_ltq_zero_neg_pos/ >> autoWith /invq_positive/.
+qed ();
+
+
+
+lemma "divq_ltq_zero_neg_neg"
+/
+  forall x y .
+    x <q q`0
+    -> y <q q`0
+    -> q`0 <q x |q y
+/;
+
+inference.
+intro /x y Hx Hy/.
+unfold /divq/.
+apply /timesq_ltq_zero_neg_neg/ >> autoWith /invq_negative/.
+qed ();
+
+
+
 lemma "timesq_cancel_leqq_l"
 /
   forall x y z .
@@ -4976,6 +5764,279 @@ intro /x y z Hnegz/.
 rewrite /-> timesq_commute at 0/.
 apply /timesq_shift_ltq_lll_neg/ >> auto.
 qed ();
+
+
+
+lemma "divq_shift_leqq_ll"
+/
+  forall a b c .
+    q`0 <q b
+    -> a <q= b *q c
+       <->
+       a |q b <q= c
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_leqq_llr/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_leqq_lr"
+/
+  forall a b c .
+    q`0 <q c
+    -> a <q= b *q c
+       <->
+       a |q c <q= b
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_leqq_lrr/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_leqq_rr"
+/
+  forall a b c .
+    q`0 <q b
+    -> a *q b <q= c
+       <->
+       a <q= c |q b
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_leqq_rrr/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_leqq_rl"
+/
+  forall a b c .
+    q`0 <q a
+    -> a *q b <q= c
+       <->
+       b <q= c |q a
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_leqq_rlr/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_ltq_ll"
+/
+  forall a b c .
+    q`0 <q b
+    -> a <q b *q c
+       <->
+       a |q b <q c
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_ltq_llr/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_ltq_lr"
+/
+  forall a b c .
+    q`0 <q c
+    -> a <q b *q c
+       <->
+       a |q c <q b
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_ltq_lrr/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_ltq_rr"
+/
+  forall a b c .
+    q`0 <q b
+    -> a *q b <q c
+       <->
+       a <q c |q b
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_ltq_rrr/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_ltq_rl"
+/
+  forall a b c .
+    q`0 <q a
+    -> a *q b <q c
+       <->
+       b <q c |q a
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_ltq_rlr/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_leqq_ll_neg"
+/
+  forall a b c .
+    b <q q`0
+    -> a <q= b *q c
+       <->
+       c <q= a |q b
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_leqq_llr_neg/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_leqq_lr_neg"
+/
+  forall a b c .
+    c <q q`0
+    -> a <q= b *q c
+       <->
+       b <q= a |q c
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_leqq_lrr_neg/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_leqq_rr_neg"
+/
+  forall a b c .
+    b <q q`0
+    -> a *q b <q= c
+       <->
+       c |q b <q= a
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_leqq_rrr_neg/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_leqq_rl_neg"
+/
+  forall a b c .
+    a <q q`0
+    -> a *q b <q= c
+       <->
+       c |q a <q= b
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_leqq_rlr_neg/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_ltq_ll_neg"
+/
+  forall a b c .
+    b <q q`0
+    -> a <q b *q c
+       <->
+       c <q a |q b
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_ltq_llr_neg/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_ltq_lr_neg"
+/
+  forall a b c .
+    c <q q`0
+    -> a <q b *q c
+       <->
+       b <q a |q c
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_ltq_lrr_neg/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_ltq_rr_neg"
+/
+  forall a b c .
+    b <q q`0
+    -> a *q b <q c
+       <->
+       c |q b <q a
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_ltq_rrr_neg/ >> auto.
+qed ();
+
+
+
+lemma "divq_shift_ltq_rl_neg"
+/
+  forall a b c .
+    a <q q`0
+    -> a *q b <q c
+       <->
+       c |q a <q b
+/;
+
+inference.
+intro /a b c Hpos/.
+unfold /divq/.
+apply /timesq_shift_ltq_rlr_neg/ >> auto.
+qed ();
+
 
 
 

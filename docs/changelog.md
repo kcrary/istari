@@ -21,14 +21,14 @@
 
   + Added material to `Decidable`, `Eventually`, `Integer`, `Nat`, and `Rational`.
 
-  + Added material to `Quotient`.  Changed the behavior of `destruct` on `Quotient.quotient1`.
-
   + Renamed shift lemmas in `Integer` and `Rational`:
     
         *_r --> *_rrr
         *_l --> *_lll
         *_lr --> *_rll
         *_rl --> *_lrr
+
+  + Added material to `Quotient`.  Changed the behavior of `destruct` on `Quotient.quotient1`.
 	
 - Basis changes:
 

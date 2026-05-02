@@ -30,24 +30,38 @@ The `integer` type is primitive but aliased in the `Integer` module:
 
     plusz_assoc : type:plusz_assoc
 
+    minusz_assoc : type:minusz_assoc
+
+    plusz_minusz_assoc : type:plusz_minusz_assoc
+
+    minusz_plusz_assoc : type:minusz_plusz_assoc
+
     plusz_id_l : type:plusz_id_l
 
     plusz_id_r : type:plusz_id_r
+
+    minusz_id_l : type:minusz_id_l
+
+    minusz_id_r : type:minusz_id_r
 
     plusz_inverse_l : type:plusz_inverse_l
 
     plusz_inverse_r : type:plusz_inverse_r
 
+    minusz_self : type:minusz_self
+
     negz_invol : type:negz_invol
 
     negz_plusz : type:negz_plusz
+
+    negz_minusz : type:negz_minusz
 
     plusz_cancel_l : type:plusz_cancel_l
 
     plusz_cancel_r : type:plusz_cancel_r
 
-In each of the shift lemmas, the negation term is the on the right of
-the `<->`.  Then the first letter indicates which direction the
+In each of the `plusz` shift lemmas, the negation term is on the right
+of the `<->`.  Then the first letter indicates which direction the
 negated term is moving, the second indicates which operand it is
 before moving, and the third is which operand it is after moving.
 
@@ -67,9 +81,30 @@ before moving, and the third is which operand it is after moving.
 
     plusz_shift_rrl : type:plusz_shift_rrl
 
+    minusz_cancel_r : type:minusz_cancel_r
+
+    minusz_cancel_l : type:minusz_cancel_l
+
+In each of the `minusz` shift lemmas, the subtraction term is on the
+right of the `<->`.  Then the first letter indicates which direction
+the subtrahend is moving, the second indicates which operand it is
+before moving.  It is always the right-hand operand after moving.
+
+    minusz_shift_ll : type:minusz_shift_ll
+
+    minusz_shift_lr : type:minusz_shift_lr
+
+    minusz_shift_rr : type:minusz_shift_rr
+
+    minusz_shift_rl : type:minusz_shift_rl
+
     plusz_compat : type:plusz_compat
 
     negz_compat : type:negz_compat
+
+    negz_injective : type:negz_injective
+
+    minusz_compat : type:minusz_compat
 
 
 ### Inequalities
@@ -180,6 +215,32 @@ This one gives transitivity in the form needed for rewriting:
     negz_ltz : type:negz_ltz
 
     negz_ltz' : type:negz_ltz'
+
+    minusz_leqz : type:minusz_leqz
+
+    minusz_cancel_leqz_l : type:minusz_cancel_leqz_l
+
+    minusz_cancel_leqz_r : type:minusz_cancel_leqz_r
+
+    minusz_cancel_ltz_l : type:minusz_cancel_ltz_l
+
+    minusz_cancel_ltz_r : type:minusz_cancel_ltz_r
+
+    minusz_shift_leqz_ll : type:minusz_shift_leqz_ll
+
+    minusz_shift_leqz_lr : type:minusz_shift_leqz_lr
+
+    minusz_shift_leqz_rr : type:minusz_shift_leqz_rr
+
+    minusz_shift_leqz_rl : type:minusz_shift_leqz_rl
+
+    minusz_shift_ltz_ll : type:minusz_shift_ltz_ll
+
+    minusz_shift_ltz_lr : type:minusz_shift_ltz_lr
+
+    minusz_shift_ltz_rr : type:minusz_shift_ltz_rr
+
+    minusz_shift_ltz_rl : type:minusz_shift_ltz_rl
 
     not_leqz : type:not_leqz
 
@@ -364,6 +425,10 @@ positive case that works upwards.
     negz_dist_timesz_l : type:negz_dist_timesz_l
 
     negz_dist_timesz_r : type:negz_dist_timesz_r
+
+    timesz_dist_minusz_l : type:timesz_dist_minusz_l
+
+    timesz_dist_minusz_r : type:timesz_dist_minusz_r
 
     negz_as_timesz : type:negz_as_timesz
 
@@ -609,5 +674,4 @@ Since divisors must be nonzero, we define `nonzero` as an abbreviation
     timesz_divz_l : type:timesz_divz_l
 
     timesz_divz_r : type:timesz_divz_r
-
 

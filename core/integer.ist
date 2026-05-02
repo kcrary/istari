@@ -311,6 +311,33 @@ qed ();
 
 
 
+lemma "minusz_id_l"
+/
+  forall a . z`0 -z a = ~z a : integer
+/;
+
+inference.
+intro /a/.
+unfold /minusz/.
+apply /plusz_id_l/.
+qed ();
+
+
+
+lemma "minusz_id_r"
+/
+  forall a . a -z z`0 = a : integer
+/;
+
+inference.
+intro /a/.
+unfold /minusz/.
+reduce //.
+apply /plusz_id_r/.
+qed ();
+
+
+
 lemma "plusz_inverse_r"
 /
   forall a . a +z ~z a = z`0 : integer
@@ -331,6 +358,19 @@ lemma "plusz_inverse_l"
 inference.
 intro /a/.
 rewrite /-> plusz_commute/.
+apply /plusz_inverse_r/.
+qed ();
+
+
+
+lemma "minusz_self"
+/
+  forall a . a -z a = z`0 : integer
+/;
+
+inference.
+intro /a/.
+unfold /minusz/.
 apply /plusz_inverse_r/.
 qed ();
 
@@ -375,6 +415,64 @@ qed ();
 
 
 
+lemma "negz_minusz"
+/
+  forall a b . ~z (a -z b) = b -z a : integer
+/;
+
+inference.
+intro /a b/.
+unfold /minusz at 0 0/.
+rewrite /-> negz_plusz/.
+rewrite /-> negz_invol/.
+rewrite /-> plusz_commute/.
+reflexivity.
+qed ();
+
+
+
+lemma "minusz_assoc"
+/
+  forall a b c . (a -z b) -z c = a -z (b +z c) : integer
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz at all/.
+rewrite /-> negz_plusz/.
+apply /plusz_assoc/.
+qed ();
+
+
+
+lemma "plusz_minusz_assoc"
+/
+  forall a b c . (a +z b) -z c = a +z (b -z c) : integer
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz at all/.
+apply /plusz_assoc/.
+qed ();
+
+
+
+lemma "minusz_plusz_assoc"
+/
+  forall a b c . (a -z b) +z c = a -z (b -z c) : integer
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz at all/.
+rewrite /-> negz_plusz/.
+rewrite /-> negz_invol/.
+apply /plusz_assoc/.
+qed ();
+
+
+
 lemma "plusz_cancel_l"
 /
   forall a b c .
@@ -400,6 +498,53 @@ lemma "plusz_cancel_r"
 
 intro /a b c Heq/.
 rewrite /-> plusz_commute in Heq at 0 1/.
+apply /plusz_cancel_l/ >> auto.
+qed ();
+
+
+
+lemma "negz_injective"
+/
+  forall a b .
+    ~z a = ~z b : integer
+    -> a = b : integer
+/;
+
+inference.
+intro /a b Heq/.
+rewrite /<- negz_invol a/.
+rewrite /<- negz_invol b/.
+compat >> auto.
+qed ();
+
+
+
+lemma "minusz_cancel_r"
+/
+  forall a b c .
+    a -z c = b -z c : integer
+    -> a = b : integer
+/;
+
+inference.
+intro /a b c Heq/.
+unfold /minusz in Heq at 0 0/.
+apply /plusz_cancel_r/ >> auto.
+qed ();
+
+
+
+lemma "minusz_cancel_l"
+/
+  forall a b c .
+    c -z a = c -z b : integer
+    -> a = b : integer
+/;
+
+inference.
+intro /a b c Heq/.
+unfold /minusz in Heq at 0 0/.
+apply /negz_injective/.
 apply /plusz_cancel_l/ >> auto.
 qed ();
 
@@ -550,6 +695,70 @@ qed ();
 
 
 
+lemma "minusz_shift_ll"
+/
+  forall a b c .
+    a = b +z c : integer
+    <->
+    a -z b = c : integer
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz/.
+apply /plusz_shift_llr/.
+qed ();
+
+
+
+lemma "minusz_shift_lr"
+/
+  forall a b c .
+    a = b +z c : integer
+    <->
+    a -z c = b : integer
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz/.
+apply /plusz_shift_lrr/.
+qed ();
+
+
+
+lemma "minusz_shift_rr"
+/
+  forall a b c .
+    a +z b = c : integer
+    <->
+    a = c -z b : integer
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz/.
+apply /plusz_shift_rrr/.
+qed ();
+
+
+
+lemma "minusz_shift_rl"
+/
+  forall a b c .
+    a +z b = c : integer
+    <->
+    b = c -z a : integer
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz/.
+apply /plusz_shift_rlr/.
+qed ();
+
+
+
 lemma "plusz_compat"
 /
   forall a a' b b' .
@@ -575,6 +784,23 @@ lemma "negz_compat"
 inference.
 intro /a a' Ha/.
 subst /a'/.
+reflexivity.
+qed ();
+
+
+
+lemma "minusz_compat"
+/
+  forall a a' b b' .
+    a = a' : integer
+    -> b = b' : integer
+    -> a -z b = a' -z b' : integer
+/;
+
+inference.
+intro /a a' b b' Ha Hb/.
+subst /a'/.
+subst /b'/.
 reflexivity.
 qed ();
 
@@ -1439,6 +1665,202 @@ intro /a b H/.
 so /negz_ltz _ _ H/ /H'/.
 rewrite /-> negz_invol in H' at all/.
 hyp /H'/.
+qed ();
+
+
+
+lemma "minusz_leqz"
+/
+  forall a a' b b' . a <z= a' -> b' <z= b -> a -z b <z= a' -z b'
+/;
+
+inference.
+intro /a a' b b' Ha Hb/.
+unfold /minusz at 0 0/.
+apply /plusz_leqz/ >> auto.
+apply /negz_leqz/ >> auto.
+qed ();
+
+
+
+lemma "minusz_cancel_leqz_l"
+/
+  forall a b c . c -z a <z= c -z b -> b <z= a
+/;
+
+inference.
+intro /a b c Hle/.
+unfold /minusz in Hle at 0 0/.
+apply /negz_leqz'/.
+apply /plusz_cancel_leqz_l/ >> auto.
+qed ();
+
+
+
+lemma "minusz_cancel_leqz_r"
+/
+  forall a b c . a -z c <z= b -z c -> a <z= b
+/;
+
+inference.
+intro /a b c Hle/.
+unfold /minusz in Hle at 0 0/.
+apply /plusz_cancel_leqz_r/ >> auto.
+qed ();
+
+
+
+lemma "minusz_cancel_ltz_l"
+/
+  forall a b c . c -z a <z c -z b -> b <z a
+/;
+
+inference.
+intro /a b c Hle/.
+unfold /minusz in Hle at 0 0/.
+apply /negz_ltz'/.
+apply /plusz_cancel_ltz_l/ >> auto.
+qed ();
+
+
+
+lemma "minusz_cancel_ltz_r"
+/
+  forall a b c . a -z c <z b -z c -> a <z b
+/;
+
+inference.
+intro /a b c Hle/.
+unfold /minusz in Hle at 0 0/.
+apply /plusz_cancel_ltz_r/ >> auto.
+qed ();
+
+
+
+lemma "minusz_shift_leqz_ll"
+/
+  forall a b c .
+    a <z= b +z c
+    <->
+    a -z b <z= c
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz/.
+apply /plusz_shift_leqz_llr/.
+qed ();
+
+
+
+lemma "minusz_shift_leqz_lr"
+/
+  forall a b c .
+    a <z= b +z c
+    <->
+    a -z c <z= b
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz/.
+apply /plusz_shift_leqz_lrr/.
+qed ();
+
+
+
+lemma "minusz_shift_leqz_rr"
+/
+  forall a b c .
+    a +z b <z= c
+    <->
+    a <z= c -z b
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz/.
+apply /plusz_shift_leqz_rrr/.
+qed ();
+
+
+
+lemma "minusz_shift_leqz_rl"
+/
+  forall a b c .
+    a +z b <z= c
+    <->
+    b <z= c -z a
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz/.
+apply /plusz_shift_leqz_rlr/.
+qed ();
+
+
+
+lemma "minusz_shift_ltz_ll"
+/
+  forall a b c .
+    a <z b +z c
+    <->
+    a -z b <z c
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz/.
+apply /plusz_shift_ltz_llr/.
+qed ();
+
+
+
+lemma "minusz_shift_ltz_lr"
+/
+  forall a b c .
+    a <z b +z c
+    <->
+    a -z c <z b
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz/.
+apply /plusz_shift_ltz_lrr/.
+qed ();
+
+
+
+lemma "minusz_shift_ltz_rr"
+/
+  forall a b c .
+    a +z b <z c
+    <->
+    a <z c -z b
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz/.
+apply /plusz_shift_ltz_rrr/.
+qed ();
+
+
+
+lemma "minusz_shift_ltz_rl"
+/
+  forall a b c .
+    a +z b <z c
+    <->
+    b <z c -z a
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz/.
+apply /plusz_shift_ltz_rlr/.
 qed ();
 
 
@@ -3032,6 +3454,36 @@ intro /a/.
 rewrite /<- timesz_id_l a/.
 rewrite /-> negz_dist_timesz_l/.
 reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "timesz_dist_minusz_r"
+/
+  forall a b c . a *z (b -z c) = a *z b -z a *z c : integer
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz at 0 0/.
+rewrite /-> timesz_dist_plusz_r/.
+rewrite /-> negz_dist_timesz_r/.
+reflexivity.
+qed ();
+
+
+
+lemma "timesz_dist_minusz_l"
+/
+  forall a b c . (a -z b) *z c = a *z c -z b *z c : integer
+/;
+
+inference.
+intro /a b c/.
+unfold /minusz at 0 0/.
+rewrite /-> timesz_dist_plusz_l/.
+rewrite /-> negz_dist_timesz_l/.
 reflexivity.
 qed ();
 
