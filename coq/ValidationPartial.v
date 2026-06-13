@@ -5165,3 +5165,30 @@ apply (tr_active_halts_invert _ _ (bite (var 0) (subst sh1 n) (subst sh1 p))).
   apply active_var.
   }
 Qed.
+
+
+Hint Rewrite def_arrow : prepare.
+
+Lemma markovsPrinciple_valid : markovsPrinciple_obligation.
+Proof.
+prepare.
+unfold Defs.void.
+intros G m n Htr.
+simpsubin Htr.
+apply (tr_markovs_principle _ _ n n).
+apply (tr_eqtype_convert _#3 (pi (pi (halts m) voidtp) voidtp)); auto.
+assert (tr G (deqtype (pi (halts m) voidtp) (pi (halts m) voidtp))) as Hform.
+  {
+  apply (tr_pi_formation_invert1 _ _ _ voidtp voidtp).
+  eapply tr_inhabitation_formation; eauto.
+  }  
+apply (tr_eqtype_transitivity _ _ (tarrow (pi (halts m) voidtp) voidtp)).
+  {
+  apply tr_eqtype_symmetry.
+  apply tr_tarrow_pi_equal; auto using tr_voidtp_istype.
+  }
+apply tr_tarrow_formation; auto using tr_voidtp_istype.
+apply tr_eqtype_symmetry.
+apply tr_tarrow_pi_equal; auto using tr_voidtp_istype.
+eapply tr_pi_formation_invert1; eauto.
+Qed.

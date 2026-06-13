@@ -65,10 +65,6 @@ A simpler case-analysis operation:
 
     leq_antisymm : forall (m n : nat) . m <= n -> n <= m -> m = n : nat
 
-This one gives transitivity in the form needed for rewriting:
-
-    leq_implication : forall (m m' n n' : nat) . m' <= m -> n <= n' -> m <= n -> m' <= n'
-
     lt_impl_leq : forall (m n : nat) . m < n -> m <= n
 
     lt_succ_succ : forall (m n : nat) . m < n -> succ m < succ n
@@ -85,6 +81,12 @@ This one gives transitivity in the form needed for rewriting:
 
     lt_leq_trans : forall (m n p : nat) . m < n -> n <= p -> m < p
 
+These two give transitivity in the form needed for rewriting:
+
+    leq_implication : forall (m m' n n' : nat) . m' <= m -> n <= n' -> m <= n -> m' <= n'
+
+    lt_implication : forall (m m' n n' : nat) . m' <= m -> n <= n' -> m < n -> m' < n'
+
     lt_0_succ : forall (n : nat) . 0 < succ n
 
     lt_0_not : forall (n : nat) . n < 0 -> void
@@ -92,6 +94,8 @@ This one gives transitivity in the form needed for rewriting:
     not_leq : forall (m n : nat) . not (m <= n) <-> n < m
 
     not_lt : forall (m n : nat) . not (m < n) <-> n <= m
+
+    lt_iff_leq_succ : forall (m n : nat) . m < n <-> succ m <= n
 
     leq_iff_lt_succ : forall (m n : nat) . m <= n <-> m < succ n
 
@@ -238,6 +242,8 @@ Strong induction for natural numbers:
     times_lt_l : forall (m n p : nat) . 0 < m -> n < p -> m * n < m * p
 
     times_lt_r : forall (m n p : nat) . 0 < p -> m < n -> m * p < n * p
+
+    times_lt : forall (m m' n n' : nat) . m < m' -> n < n' -> m * n < m' * n'
 
     times_lt_zero : forall (m n : nat) . 0 < m -> 0 < n -> 0 < m * n
 

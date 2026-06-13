@@ -4,6 +4,10 @@
 
 - Overhauled arithmetic overloading.
 
+- Tactic changes:
+
+  + Improved the `unhide` tactic.
+
 - Rewriting changes:
 
   + Fixed a bug in `unrollTypeUniv`.
@@ -33,6 +37,8 @@
 - Basis changes:
 
   + Added `ediv` and `mod` to `Int` and `IntInf`.
+
+- Added Markov's principle.
 
 - Added rules `eqEqInv1`, `eqEqInv2`, `eqEqInv3`, `ofFormInv1`,
   `ofFormInv2`, `ofEqInv1`, `ofEqInv2`, `boolIntro1Eq`, and

@@ -2959,6 +2959,21 @@ qed ();
 
 
 
+lemma "ltq_from_leqq_neq"
+/
+  forall a b . a <q= b -> not (a = b : rational) -> a <q b
+/;
+
+inference.
+intro /a b Hab Hneq/.
+rewrite /<- not_leqq/.
+intro /Hba/.
+witness /Hneq __/.
+apply /leqq_antisymm/ >> auto.
+qed ();
+
+
+
 lemma "leqq_implication"
 /
   forall x x' y y' .
@@ -4164,29 +4179,6 @@ inference.
 intro /x y Hneq/.
 so /rational_trichotomy x y/ /Hlt | Heq | Hgt/ >> auto.
 so /Hneq Heq/ /0/.
-qed ();
-
-
-
-lemma "ltq_from_leqq_neq"
-/
-  forall x y .
-    x <q= y
-    -> not (x = y : rational)
-    -> x <q y
-/;
-
-inference.
-intro /x y Hleq Hneq/.
-so /rational_trichotomy x y/ /Hlt | Heq | Hgt/ >> auto.
-  {
-  so /Hneq Heq/ /0/.
-  }
-
-  {
-  rewrite /<- not_ltq in Hleq/.
-  so /Hleq Hgt/ /0/.
-  }
 qed ();
 
 
@@ -7097,6 +7089,27 @@ qed ();
 
 
 
+lemma "absq_preserves_nonzero"
+/
+  forall x .
+    x != q`0 : rational
+    -> absq x != q`0 : rational
+/;
+
+inference.
+intro /x Hnz/.
+so /rational_dichotomy_neq _ _ Hnz/ /Hneg | Hpos/.
+  {
+  rewrite /-> absq_of_nonpos/ >> autoWith /ltq_impl_leqq negq_nonzero/.
+  }
+
+  {
+  rewrite /-> absq_of_nonneg/ >> autoWith /ltq_impl_leqq/.
+  }
+qed ();
+
+
+
 lemma "absq_ub"
 /
   forall x . x <q= absq x
@@ -7217,6 +7230,30 @@ so /rational_dichotomy q`0 b/ /Hb | Hb/ >> auto.
   rewrite /-> negq_dist_timesq_r/.
   rewrite /-> Hprop/ >> auto.
   rewrite /-> absq_negq at 0 0/ >> auto.
+  }
+qed ();
+
+
+
+lemma "absq_invq"
+/
+  forall x . absq (invq x) = invq (absq x) : rational
+/;
+
+inference.
+intro /x/.
+so /rational_dichotomy_weak x q`0/ /Hneg | Hpos/.
+  {
+  rewrite /-> absq_of_nonpos at 0 0/ >> auto.
+    {
+    apply /invq_nonpositive/ >> auto.
+    }
+  apply /negq_dist_invq/.
+  }
+
+  {
+  rewrite /-> absq_of_nonneg at 0 0/ >> auto.
+  apply /invq_nonnegative/ >> auto.
   }
 qed ();
 
@@ -7390,6 +7427,48 @@ rewrite /-> absq_of_nonpos/.
   rewrite /<- negz_to_rational/.
   reduce //.
   reflexivity.
+  }
+qed ();
+
+
+
+lemma "absq_positive_iff_nonzero"
+/
+  forall x .
+    q`0 <q absq x <-> x != q`0 : rational
+/;
+
+inference.
+intro /x/.
+split.
+  {
+  intro /Habs/.
+  intro /?/.
+  subst /x/.
+  rewrite /-> absq_of_nonneg in Habs/.
+    {
+    apply /leqq_refl/.
+    }
+
+    {
+    so /ltq_irrefl _ Habs/ /0/.
+    }
+  }
+
+  {
+  intro /Hneq/.
+  so /rational_dichotomy_neq _ _ Hneq/ /Hneg | Hpos/.
+    {
+    rewrite /-> absq_of_nonpos/ >> autoWith /ltq_impl_leqq/.
+    apply /negq_ltq'/.
+    rewrite /-> negq_invol/.
+    rewrite /-> negq_zero/.
+    auto.
+    }
+
+    {
+    rewrite /-> absq_of_nonneg/ >> autoWith /ltq_impl_leqq/.
+    }
   }
 qed ();
 

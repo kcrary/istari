@@ -64,10 +64,6 @@ A simpler case-analysis operation:
 
     leq_antisymm : type:leq_antisymm
 
-This one gives transitivity in the form needed for rewriting:
-
-    leq_implication : type:leq_implication
-
     lt_impl_leq : type:lt_impl_leq
 
     lt_succ_succ : type:lt_succ_succ
@@ -84,6 +80,12 @@ This one gives transitivity in the form needed for rewriting:
 
     lt_leq_trans : type:lt_leq_trans
 
+These two give transitivity in the form needed for rewriting:
+
+    leq_implication : type:leq_implication
+
+    lt_implication : type:lt_implication
+
     lt_0_succ : type:lt_0_succ
 
     lt_0_not : type:lt_0_not
@@ -91,6 +93,8 @@ This one gives transitivity in the form needed for rewriting:
     not_leq : type:not_leq
 
     not_lt : type:not_lt
+
+    lt_iff_leq_succ : type:lt_iff_leq_succ
 
     leq_iff_lt_succ : type:leq_iff_lt_succ
 
@@ -236,6 +240,8 @@ Strong induction for natural numbers:
     times_lt_l : type:times_lt_l
 
     times_lt_r : type:times_lt_r
+
+    times_lt : type:times_lt
 
     times_lt_zero : type:times_lt_zero
 

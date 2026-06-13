@@ -835,6 +835,7 @@ exact haltsTrivialize_valid.
 exact haltsExt_valid.
 exact haltsLeft_valid.
 exact partialElimHalts_valid.
+exact markovsPrinciple_valid.
 exact fixpointInductionEq_valid.
 exact fixpointInductionOf_valid.
 exact fixpointInductionShift_valid.

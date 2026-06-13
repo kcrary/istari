@@ -73,6 +73,6 @@ exact (pi2 (description A P (ex_intro (unique P) x Huniq))).
 Qed.
 
 
-(* used in SemanticsGuard and Lattice *)
+(* used in SemanticsGuard, Lattice, and SoundPartial *)
 Definition excluded_middle := Coq.Logic.Classical_Prop.classic.
 Definition proof_by_contradiction := Coq.Logic.Classical_Prop.NNPP.

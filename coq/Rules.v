@@ -1722,6 +1722,11 @@ Inductive tr : @context obj -> judgement -> Prop :=
       value m
       -> tr G (deq triv triv (halts m))
 
+| tr_markovs_principle :
+    forall G m p q,
+      tr G (deq p q (tarrow (tarrow (halts m) voidtp) voidtp))
+      -> tr G (deq triv triv (halts m))
+
 | tr_fixpoint_induction :
     forall G a m m',
       tr G (deq triv triv (admiss a))

@@ -307,6 +307,7 @@ intros; eapply sound_partial_elim; eauto; done.
 intros; eapply sound_halts_eta; eauto; done.
 intros; eapply sound_halts_eta_hyp; eauto; done.
 intros; eapply sound_halts_value; eauto; done.
+intros; eapply sound_markovs_principle; eauto; done.
 intros; eapply sound_fixpoint_induction; eauto; done.
 intros G a b f g h; intros; apply (sound_fixpoint_induction_shift G a b f g h); auto.
 intros; eapply sound_partial_formation_invert; eauto; done.

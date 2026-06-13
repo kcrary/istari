@@ -5093,6 +5093,12 @@ Syntactic equality is intended for internal use only.
       >>
       G |- M = N : partial A
 
+- `markovsPrinciple M`
+
+      G |- halts M
+      >>
+      G |- (halts M -> void) -> void
+
 - `fixpointInductionEq A M N`
 
       G |- fix M = fix N : partial A

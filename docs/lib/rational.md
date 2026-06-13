@@ -291,7 +291,7 @@ This one gives transitivity in the form needed for rewriting:
 
     not_ltq : forall (x y : rational) . not (x < y) <-> y <= x
 
-    ltq_from_leqq_neq : forall (x y : rational) . x <= y -> not (x = y : rational) -> x < y
+    ltq_from_leqq_neq : forall (a b : rational) . a <= b -> not (a = b : rational) -> a < b
 
     ltq_0_1 : 0 < 1
 
@@ -1120,6 +1120,8 @@ inequality did not reverse on the right.
 
     absq_of_nonpos : forall (a : rational) . a <= 0 -> absq a = ~ a : rational
 
+    absq_preserves_nonzero : forall (x : rational) . x != 0 : rational -> absq x != 0 : rational
+
     absq_ub : forall (x : rational) . x <= absq x
 
     absq_idem : forall (x : rational) . absq (absq x) = absq x : rational
@@ -1127,6 +1129,8 @@ inequality did not reverse on the right.
     absq_negq : forall (a : rational) . absq (~ a) = absq a : rational
 
     absq_timesq : forall (a b : rational) . absq (a * b) = absq a * absq b : rational
+
+    absq_invq : forall (x : rational) . absq (invq x) = invq (absq x) : rational
 
     absq_plusq_leqq : forall (a b : rational) . absq (a + b) <= absq a + absq b
 
@@ -1142,6 +1146,8 @@ inequality did not reverse on the right.
     absq_one : absq 1 = 1 : rational
 
     absq_minus_one : absq -1 = 1 : rational
+
+    absq_positive_iff_nonzero : forall (x : rational) . 0 < absq x <-> x != 0 : rational
 
     absq_minusq_commute : forall (a b : rational) . absq (a - b) = absq (b - a) : rational
 

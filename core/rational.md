@@ -1012,6 +1012,8 @@ inequality did not reverse on the right.
 
     absq_of_nonpos : type:absq_of_nonpos
 
+    absq_preserves_nonzero : type:absq_preserves_nonzero
+
     absq_ub : type:absq_ub
 
     absq_idem : type:absq_idem
@@ -1019,6 +1021,8 @@ inequality did not reverse on the right.
     absq_negq : type:absq_negq
 
     absq_timesq : type:absq_timesq
+
+    absq_invq : type:absq_invq
 
     absq_plusq_leqq : type:absq_plusq_leqq
 
@@ -1031,6 +1035,8 @@ inequality did not reverse on the right.
     absq_one : type:absq_one
 
     absq_minus_one : type:absq_minus_one
+
+    absq_positive_iff_nonzero : type:absq_positive_iff_nonzero
 
     absq_minusq_commute : type:absq_minusq_commute
 

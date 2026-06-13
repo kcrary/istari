@@ -3236,3 +3236,83 @@ subst A'.
 exists A.
 auto.
 Qed.
+
+
+Lemma sound_markovs_principle :
+  forall G m p q,
+    pseq G (deq p q (tarrow (tarrow (halts m) voidtp) voidtp))
+    -> pseq G (deq triv triv (halts m)).
+Proof.
+intros G m p q.
+revert G.
+refine (seq_pseq 0 1 [] _ _ _); cbn.
+intros G Hseq.
+rewrite -> seq_deq in Hseq.
+rewrite -> seq_halts.
+intros i s s' Hs.
+so (Hseq _#3 Hs) as (R & Hl & Hr & Hp & _).
+simpsubin Hl.
+simpsubin Hr.
+invert (basic_value_inv _#6 value_tarrow Hl).
+intros R1 V Harrl Hvoidl Heq1.
+invert (basic_value_inv _#6 value_voidtp Hvoidl).
+intros <-.
+clear Hvoidl.
+invert (basic_value_inv _#6 value_tarrow Hr).
+intros R1' V Harrr Hvoidr Heq2.
+invert (basic_value_inv _#6 value_voidtp Hvoidr).
+intros <-.
+clear Hvoidr.
+so (iuarrow_inj _#7 (eqtrans Heq1 (eqsymm Heq2))) as (Heq & _).
+subst R1'.
+subst R.
+clear Heq2.
+invert (basic_value_inv _#6 value_tarrow Harrl).
+intros R2 V Hhaltl Hvoidl Heq1.
+invert (basic_value_inv _#6 value_voidtp Hvoidl).
+intros <-.
+clear Hvoidl.
+invert (basic_value_inv _#6 value_tarrow Harrr).
+intros R2' V Hhaltr Hvoidr Heq2.
+invert (basic_value_inv _#6 value_voidtp Hvoidr).
+intros <-.
+clear Hvoidr.
+so (iuarrow_inj _#7 (eqtrans Heq1 (eqsymm Heq2))) as (Heq & _).
+subst R2'.
+subst R1.
+clear Heq2.
+invert (basic_value_inv _#6 value_halts Hhaltl).
+intros Hclsm Heq1.
+invert (basic_value_inv _#6 value_halts Hhaltr).
+intros Hclsm' Heq2.
+do2 2 split; auto.
+assert (forall n, iubase (halts_urel stop i n) = R2 -> converges n) as Hconvif.
+  {
+  clear Heq1 Heq2.
+  intros n Heq.
+  subst R2.
+  apply Axioms.proof_by_contradiction.
+  intro Hnconv.
+  cbn in Hp.
+  decompose Hp.
+  intros r t _ _ _ _ _ Hact.
+  exploit (Hact i (lam triv) (lam triv)) as H; auto.
+  cbn.
+  exists triv, triv.
+  do2 5 split; auto using star_refl.
+    {
+    prove_hygiene.
+    }
+
+    {
+    prove_hygiene.
+    }
+  intros j u v Hj Huv.
+  exfalso.
+  cbn in Huv.
+  decompose Huv.
+  intros Hconv _ _ _ _ _.
+  exact (Hnconv Hconv).
+  }
+split; auto.
+Qed.

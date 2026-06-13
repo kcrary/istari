@@ -139,7 +139,7 @@ one writes:
 
 ### Do bindings
 
-An IML `let` binding can employ `do` bindings to sequence operations:
+An IML `let` expression can employ `do` bindings to sequence operations:
 
     let
        do x = exp1
