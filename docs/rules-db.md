@@ -2259,6 +2259,31 @@ Human-readable rules, using explicit variables, are given
       promote(G) |- istp A
       G |- isquash (future A)
 
+- `futureArrowIntroOf A B M`
+
+      G |- of (future (arrow A B)) (next (fn . M #prev))
+      >>
+      promote(G) |- istp A
+      promote(G) |- istp B
+      G, (later) A |- of (future B[^1]) M
+
+- `futureArrowIntroEq A B M N`
+
+      G |- eq (future (arrow A B)) (next (fn . M #prev)) (next (fn . N #prev))
+      >>
+      promote(G) |- istp A
+      promote(G) |- istp B
+      G, (later) A |- eq (future B[^1]) M N
+
+- `futureArrowIntro A B`
+
+      G |- future (arrow A B) ext next (fn . M #prev)
+      >>
+      promote(G) |- istp A
+      promote(G) |- istp B
+      G, (later) A |- future B[^1] ext M
+
+
 
 ### Future functions
 

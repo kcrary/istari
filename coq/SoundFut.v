@@ -1430,3 +1430,237 @@ exists R.
 simpsub.
 do2 3 split; auto.
 Qed.
+
+
+Require Import SemanticsPi.
+Require Import Truncate.
+Require Import Ceiling.
+
+Lemma sound_fut_tarrow_intro :
+  forall G a b m n,
+    pseq (promote G) (deqtype a a)
+    -> pseq (promote G) (deqtype b b)
+    -> pseq (cons (hyp_tml a) G) (deq m n (fut (subst sh1 b)))
+    -> pseq G (deq (next (lam (prev m))) (next (lam (prev n))) (fut (tarrow a b))).
+Proof.
+intros G a b m n.
+revert G.
+refine (seq_pseq_promote 4 [] a [] b [hyp_emp] m [hyp_emp] n 3 true [] _ true [] _ false [_] _ _ _); cbn.
+intros G Hcla Hclb Hclm Hcln Hseqa Hseqb Hseqmn.
+rewrite -> seq_eqtype in Hseqa, Hseqb.
+rewrite -> seq_deq in Hseqmn |- *.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+destruct i as [| i].
+  {
+  exists (iufut0 stop).
+  simpsub.
+  do2 4 split.
+    {
+    apply interp_eval_refl.
+    apply interp_fut_zero.
+    prove_hygiene.
+    }
+
+    {
+    apply interp_eval_refl.
+    apply interp_fut_zero.
+    prove_hygiene.
+    }
+
+    {
+    cbn.
+    exists (lam (prev (subst (under 1 s) m))).
+    exists (lam (prev (subst (under 1 s') m))).
+    do2 5 split; auto using star_refl.
+      {
+      prove_hygiene.
+      eapply subst_closub_under_permit; eauto.
+      }
+
+      {
+      prove_hygiene.
+      eapply subst_closub_under_permit; eauto.
+      }
+
+      {
+      intro H.
+      omega.
+      }
+    }
+
+    {
+    cbn.
+    exists (lam (prev (subst (under 1 s) n))).
+    exists (lam (prev (subst (under 1 s') n))).
+    do2 5 split; auto using star_refl.
+      {
+      prove_hygiene.
+      eapply subst_closub_under_permit; eauto.
+      }
+
+      {
+      prove_hygiene.
+      eapply subst_closub_under_permit; eauto.
+      }
+
+      {
+      intro H.
+      omega.
+      }
+    }
+
+    {
+    cbn.
+    exists (lam (prev (subst (under 1 s) m))).
+    exists (lam (prev (subst (under 1 s') n))).
+    do2 5 split; auto using star_refl.
+      {
+      prove_hygiene.
+      eapply subst_closub_under_permit; eauto.
+      }
+
+      {
+      prove_hygiene.
+      eapply subst_closub_under_permit; eauto.
+      }
+
+      {
+      intro H.
+      omega.
+      }
+    }
+  }
+so (pwctx_promote _#4 Hs) as Hs'.
+so (Hseqa _#3 Hs') as (A & Hal & Har & _).
+so (Hseqb _#3 Hs') as (B & Hbl & Hbr & _).
+exists (iufut stop (S i) (iuarrow stop i A B)).
+simpsub.
+do2 2 split.
+  {
+  apply interp_eval_refl.
+  apply interp_fut.
+  apply interp_eval_refl.
+  apply interp_tarrow; auto.
+  }
+
+  {
+  apply interp_eval_refl.
+  apply interp_fut.
+  apply interp_eval_refl.
+  apply interp_tarrow; auto.
+  }
+assert (forall m n,
+         hygiene (permit (ctxpred G)) m
+         -> hygiene (permit (ctxpred G)) n
+         -> (forall i s s',
+               pwctx i s s' (cons (hyp_tml a) G)
+               -> exists R, 
+                    interp toppg true i (fut (subst (compose sh1 s) b)) R
+                    /\ rel (den R) i (subst s m) (subst s' n))
+         -> rel (den (iufut stop (S i) (iuarrow stop i A B))) (S i)
+              (next (lam (prev (subst (under 1 s) m))))
+              (next (lam (prev (subst (under 1 s') n))))) as Hprop.
+  {
+  clear m n Hclm Hcln Hseqmn.
+  intros m n Hclm Hcln Hseqmn.
+  cbn.
+  exists (lam (prev (subst (under 1 s) m))).
+  exists (lam (prev (subst (under 1 s') n))).
+  do2 5 split; auto using star_refl.
+    {
+    prove_hygiene.
+    eapply subst_closub_under_permit; eauto.
+    }
+
+    {
+    prove_hygiene.
+    eapply subst_closub_under_permit; eauto.
+    }
+  intros _.
+  cbn [pred].
+  exists (prev (subst (under 1 s) m)).
+  exists (prev (subst (under 1 s') n)).
+  do2 5 split; auto using star_refl.
+    {
+    prove_hygiene.
+    eapply subst_closub_under_permit; eauto.
+    }
+
+    {
+    prove_hygiene.
+    eapply subst_closub_under_permit; eauto.
+    }
+  intros j p q Hj Hpq.
+  so (urel_closed _#5 Hpq) as (Hclp & Hclq).
+  simpsub.
+  exploit (Hseqmn (S j) (dot p s) (dot q s')) as (R & Hl & Hmn).
+    {
+    apply pwctx_cons_tml_seq; auto.
+      {
+      apply (pwctx_downward (S i)); auto.
+      omega.
+      }
+  
+      {
+      intros _.
+      cbn [pred].
+      apply (seqhyp_tm _#5 (iutruncate (S j) A)).
+        {
+        eapply ProperDownward.basic_downward; eauto.
+        }
+  
+        {
+        eapply ProperDownward.basic_downward; eauto.
+        }
+  
+        {
+        split; auto.
+        }
+      }
+  
+      {
+      intros k t t' Ht.
+      so (Hseqa _#3 Ht) as (R & Hl & Hr & _).
+      eauto.
+      }
+    }
+  simpsubin Hl.
+  invert (basic_value_inv _#6 value_fut Hl).
+  intros B' Hbl' <-.
+  so (interp_fun _#7 (ProperDownward.basic_downward _#7 Hj Hbl) Hbl').
+  subst B'.
+  cut (rel (ceiling (S j) (den B)) j (prev (subst (dot p s) m)) (prev (subst (dot q s') n))).
+    {
+    intros (_ & H).
+    exact H.
+    }
+  apply (fut_action_prev stop (S j)).
+  cbn in Hmn.
+  exact Hmn.
+  }
+do2 2 split.
+  {
+  apply Hprop; auto.
+  intros j t t' Ht.
+  so (Hseqmn _#3 Ht) as (R & Hl & _ & Hm & _).
+  simpsubin Hl.
+  eauto.
+  }
+
+  {
+  apply Hprop; auto.
+  intros j t t' Ht.
+  so (Hseqmn _#3 Ht) as (R & Hl & _ & _ & Hn & _).
+  simpsubin Hl.
+  eauto.
+  }
+
+  {
+  apply Hprop; auto.
+  intros j t t' Ht.
+  so (Hseqmn _#3 Ht) as (R & Hl & _ & _ & _ & Hmn).
+  simpsubin Hl.
+  eauto.
+  }
+Qed.

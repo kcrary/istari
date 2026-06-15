@@ -523,3 +523,46 @@ rewrite -> def_isquash in Hm |- *.
 simpsub.
 eapply tr_isquash_future_swap; eauto.
 Qed.
+
+
+Hint Rewrite def_arrow : prepare.
+
+
+Lemma futureArrowIntroEq_valid : futureArrowIntroEq_obligation.
+Proof.
+prepare.
+intros G a b m n ext2 ext1 ext0 Ha Hb Hmn.
+apply (tr_eqtype_convert _#3 (fut (tarrow a b))).
+  {
+  apply tr_fut_formation.
+  apply tr_tarrow_pi_equal; auto.
+  }
+apply tr_fut_tarrow_intro; auto.
+Qed.
+
+
+
+Lemma futureArrowIntroOf_valid : futureArrowIntroOf_obligation.
+Proof.
+prepare.
+intros G a b m ext2 ext1 ext0 Ha Hb Hm.
+apply (tr_eqtype_convert _#3 (fut (tarrow a b))).
+  {
+  apply tr_fut_formation.
+  apply tr_tarrow_pi_equal; auto.
+  }
+apply tr_fut_tarrow_intro; auto.
+Qed.
+
+
+Lemma futureArrowIntro_valid : futureArrowIntro_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 m Ha Hb Hm.
+apply (tr_eqtype_convert _#3 (fut (tarrow a b))).
+  {
+  apply tr_fut_formation.
+  apply tr_tarrow_pi_equal; auto.
+  }
+apply tr_fut_tarrow_intro; auto.
+Qed.

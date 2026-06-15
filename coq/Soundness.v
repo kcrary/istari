@@ -116,6 +116,7 @@ intros; eapply sound_fut_elim_eqtype; eauto; done.
 intros; eapply sound_fut_eta; eauto; done.
 intros; eapply sound_fut_eta_hyp; eauto; done.
 intros; eapply sound_fut_ext; eauto; done.
+intros; eapply sound_fut_tarrow_intro; eauto; done.
 intros; eapply sound_semifut_formation; eauto; done.
 intros; eapply sound_semifut_formation_univ; eauto; done.
 intros; eapply sound_semifut_intro; eauto; done.

@@ -2261,6 +2261,31 @@ variables.  The official rules, using de Bruijn indices, are given
       promote(G) |- A : type
       G |- isquash (future A)
 
+- `futureArrowIntroOf A B M`
+
+      G |- next (fn x . M #prev) : future (A -> B)
+      >>
+      promote(G) |- A : type
+      promote(G) |- B : type
+      G, x (later) : A |- M : future B
+
+- `futureArrowIntroEq A B M N`
+
+      G |- next (fn x . M #prev) = next (fn x . N #prev) : future (A -> B)
+      >>
+      promote(G) |- A : type
+      promote(G) |- B : type
+      G, x (later) : A |- M = N : future B
+
+- `futureArrowIntro A B`
+
+      G |- future (A -> B) ext next (fn x . M #prev)
+      >>
+      promote(G) |- A : type
+      promote(G) |- B : type
+      G, x (later) : A |- future B ext M
+
+
 
 ### Future functions
 

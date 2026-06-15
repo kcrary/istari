@@ -472,6 +472,9 @@ exact squashFutureSwap_valid.
 exact isquashFutureSwap_valid.
 exact futureSquashSwap_valid.
 exact futureIsquashSwap_valid.
+exact futureArrowIntroOf_valid.
+exact futureArrowIntroEq_valid.
+exact futureArrowIntro_valid.
 exact recKind_valid.
 exact recKindEq_valid.
 exact recForm_valid.

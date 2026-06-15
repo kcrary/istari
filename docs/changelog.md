@@ -33,7 +33,7 @@
         *_rl --> *_lrr
 
   + Added material to `Quotient`.  Changed the behavior of `destruct` on `Quotient.quotient1`.
-	
+
 - Basis changes:
 
   + Added `ediv` and `mod` to `Int` and `IntInf`.
@@ -41,8 +41,9 @@
 - Added Markov's principle.
 
 - Added rules `eqEqInv1`, `eqEqInv2`, `eqEqInv3`, `ofFormInv1`,
-  `ofFormInv2`, `ofEqInv1`, `ofEqInv2`, `boolIntro1Eq`, and
-  `boolIntro2Eq`.
+  `ofFormInv2`, `ofEqInv1`, `ofEqInv2`, `boolIntro1Eq`,
+  `boolIntro2Eq`, `futureArrowIntroOf`, `futureArrowIntroEq`, and
+  `futureArrowIntro`.
 
 - Reworked the integer primitives and axioms.
 
