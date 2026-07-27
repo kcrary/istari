@@ -78,129 +78,150 @@ functor AfterQuotient () :> sig end =
          let
             val lv = T.evar ()
 
-            val tertseq =
+            fun sequel m n copt =
+               (* A, A[^], R[^2] 1 0, ...[^2] |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : C[under_i (2 . ^3)]   (but C might be just type) *)
                let
-                  val (v1, set1) = D.freshAndBindSet set
-                  val (v2, set2) = D.freshAndBindSet set1
-                  val v3 = D.freshSet set2
+                  do (vars1, set1) = De.andthenp S.empty $ De.dest (i+2) p1 set
+                  do (vars2, set2) = De.andthenp vars1 $ De.dest (i+1) p2 set1
+                  val vars1_2 = S.append vars1 vars2
+                  do (vars3, set3) = De.andthenp vars1_2 $ De.dest i p3 set2
+                  val vars1_3 = S.append vars1_2 vars3
+
+                  val (x, y, red) =
+                     if refl then
+                        (T.Elim (T.Const qintro1r,
+                                 [T.App (T.Sub (a, T.Shift 3)),
+                                  T.App (T.Sub (r, T.Shift 3)),
+                                  T.App (T.Sub (hper, T.Shift 3)),
+                                  T.App (T.Var 2)
+                                  ]),
+                         T.Elim (T.Const qintro1r,
+                                 [T.App (T.Sub (a, T.Shift 3)),
+                                  T.App (T.Sub (r, T.Shift 3)),
+                                  T.App (T.Sub (hper, T.Shift 3)),
+                                  T.App (T.Var 1)
+                                  ]),
+                         R.trans [R.unfold, R.beta 4])
+                     else
+                        (T.Elim (T.Const qintro1,
+                                 [T.App (T.Sub (a, T.Shift 3)),
+                                  T.App (T.Sub (r, T.Shift 3)),
+                                  T.App (T.Sub (hper, T.Shift 3)),
+                                  T.App (T.Var 2),
+                                  T.App (T.Elim (T.Const per_refl_left,
+                                                 [
+                                                 T.App (T.Sub (a, T.Shift 3)),
+                                                 T.App (T.Sub (r, T.Shift 3)),
+                                                 T.App (T.Sub (hper, T.Shift 3)),
+                                                 T.App (T.Var 2),
+                                                 T.App (T.Var 1),
+                                                 T.App T.zero
+                                                 ]))
+                                  ]),
+                         T.Elim (T.Const qintro1,
+                                 [T.App (T.Sub (a, T.Shift 3)),
+                                  T.App (T.Sub (r, T.Shift 3)),
+                                  T.App (T.Sub (hper, T.Shift 3)),
+                                  T.App (T.Var 1),
+                                  T.App (T.Elim (T.Const per_refl_right,
+                                                 [
+                                                 T.App (T.Sub (a, T.Shift 3)),
+                                                 T.App (T.Sub (r, T.Shift 3)),
+                                                 T.App (T.Sub (hper, T.Shift 3)),
+                                                 T.App (T.Var 2),
+                                                 T.App (T.Var 1),
+                                                 T.App T.zero
+                                                 ]))
+                                  ]),
+                         R.trans [R.unfold, R.beta 5])
                in
-                  S.cons v1 (S.cons v2 (S.cons v3 S.empty))
+                  (* ... |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : C[under_i (2 . ^3)]
+                          = M[under_i ((3 . ^4) o (1 . id))] = N[under_i ((0 . ^4) o (1 . id))] : C[under_i ((3 . ^4) o (1 . id))]
+                          = (M[under_i (3 . ^4)] = N[under_i+1 (^3)] : C[under_i (3 . ^4)])[under_i (1 . id)]
+                  *)
+                  refine (Rule.unreduceAt i
+                             (case copt of
+                                 NONE =>
+                                    T.apply2 Prim.eqtp
+                                       (T.Sub (m, T.under i (T.Idot (3, T.Shift 4))))
+                                       (T.Sub (n, T.underShift (i+1) 3))
+
+                               | SOME c =>
+                                    T.apply3 Prim.eq
+                                       (T.Sub (c, T.under i (T.Idot (3, T.Shift 4))))
+                                       (T.Sub (m, T.under i (T.Idot (3, T.Shift 4))))
+                                       (T.Sub (n, T.underShift (i+1) 3)))
+                             y
+                             red)
+                  >>+
+                  (* ... |- M[under_i (2 . ^3)] = N[under_i (Y . ^3)] : C[under_i (2 . ^3)]
+                          = M[under_i ((0 . ^4) o (2 . id))] = N[under_i ((Y[^] . ^4) o (2 . id))] : C[under_i ((0 . ^4) o (2 . id))]
+                          = (M[under_i+1 (^3)] = N[under_i (Y[^] . ^4)] : C[under_i+1 (^3)])[under_i (2 . id)]
+                  *)
+                  refine (Rule.unreduceAt i
+                             (case copt of
+                                 NONE =>
+                                    T.apply2 Prim.eqtp
+                                       (T.Sub (m, T.underShift (i+1) 3))
+                                       (T.Sub (n, T.under i (T.Dot (T.Sub (y, T.shift1), T.Shift 4))))
+
+                               | SOME c =>
+                                    T.apply3 Prim.eq
+                                       (T.Sub (c, T.underShift (i+1) 3))
+                                       (T.Sub (m, T.underShift (i+1) 3))
+                                       (T.Sub (n, T.under i (T.Dot (T.Sub (y, T.shift1), T.Shift 4)))))
+                             x
+                             red)
+                  >>+
+                  (* ... |- M[under_i (X . ^3)] = N[under_i (Y . ^3)] : C[under_i (X . ^3)] *)
+                  De.refoldHyps jud i 3
+                     x
+                     red
+                  >>+
+                  idtacM (vars1_3, De.Principal set3)
                end
+
          in
             (* quotient1 A R Hper, ... |- P = Q : C   (but C might be just type) *)
             refine (Rule.reduceHyp i (R.trans [R.unfold, R.beta 3]))
             >>+
-            (* quotient A (fn . fn . R[^2] 1 0), ... |- M = N : Q *)
-            (if Option.isSome copt then
-                refine (Rule.quotientLeftEq i (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
-             else
-                refine (Rule.quotientLeftEqtype i (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ())))
-            >>> [
-                (* A, A[^] |- R[^2] 1 0 : type *)
-                relationIstype1 lv a r,
+            (* quotient A (fn . fn . R[^2] 1 0), ... |- M = N : C *)
+            (case copt of
+                NONE =>
+                   refine (Rule.quotientLeftEqtype i (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                   >>> [
+                       (* A, A[^] |- R[^2] 1 0 : type *)
+                       relationIstype1 lv a r,
 
-                (* A, A[^], R[^2] 1 0, ...[^2] |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : C[under_i (2 . ^3)] *)
-                let
-                   do (vars1, set1) = De.andthenp S.empty $ De.dest (i+2) p1 set
-                   do (vars2, set2) = De.andthenp vars1 $ De.dest (i+1) p2 set1
-                   val vars1_2 = S.append vars1 vars2
-                   do (vars3, set3) = De.andthenp vars1_2 $ De.dest i p3 set2
-                   val vars1_3 = S.append vars1_2 vars3
+                       (* A, A[^], R[^2] 1 0, ...[^2] |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : type *)
+                       sequel m n NONE
+                       ]
 
-                   val (x, y, red) =
-                      if refl then
-                         (T.Elim (T.Const qintro1r,
-                                  [T.App (T.Sub (a, T.Shift 3)),
-                                   T.App (T.Sub (r, T.Shift 3)),
-                                   T.App (T.Sub (hper, T.Shift 3)),
-                                   T.App (T.Var 2)
-                                   ]),
-                          T.Elim (T.Const qintro1r,
-                                  [T.App (T.Sub (a, T.Shift 3)),
-                                   T.App (T.Sub (r, T.Shift 3)),
-                                   T.App (T.Sub (hper, T.Shift 3)),
-                                   T.App (T.Var 1)
-                                   ]),
-                          R.trans [R.unfold, R.beta 4])
-                      else
-                         (T.Elim (T.Const qintro1,
-                                  [T.App (T.Sub (a, T.Shift 3)),
-                                   T.App (T.Sub (r, T.Shift 3)),
-                                   T.App (T.Sub (hper, T.Shift 3)),
-                                   T.App (T.Var 2),
-                                   T.App (T.Elim (T.Const per_refl_left,
-                                                  [
-                                                  T.App (T.Sub (a, T.Shift 3)),
-                                                  T.App (T.Sub (r, T.Shift 3)),
-                                                  T.App (T.Sub (hper, T.Shift 3)),
-                                                  T.App (T.Var 2),
-                                                  T.App (T.Var 1),
-                                                  T.App T.zero
-                                                  ]))
-                                   ]),
-                          T.Elim (T.Const qintro1,
-                                  [T.App (T.Sub (a, T.Shift 3)),
-                                   T.App (T.Sub (r, T.Shift 3)),
-                                   T.App (T.Sub (hper, T.Shift 3)),
-                                   T.App (T.Var 1),
-                                   T.App (T.Elim (T.Const per_refl_right,
-                                                  [
-                                                  T.App (T.Sub (a, T.Shift 3)),
-                                                  T.App (T.Sub (r, T.Shift 3)),
-                                                  T.App (T.Sub (hper, T.Shift 3)),
-                                                  T.App (T.Var 2),
-                                                  T.App (T.Var 1),
-                                                  T.App T.zero
-                                                  ]))
-                                   ]),
-                          R.trans [R.unfold, R.beta 5])
-                in
-                   (* ... |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : C[under_i (2 . ^3)]
-                           = M[under_i ((3 . ^4) o (1 . id))] = N[under_i ((0 . ^4) o (1 . id))] : C[under_i ((3 . ^4) o (1 . id))]
-                           = (M[under_i (3 . ^4)] = N[under_i+1 (^3)] : C[under_i (3 . ^4)])[under_i (1 . id)]
-                   *)
-                   refine (Rule.unreduceAt i
-                              (case copt of
-                                  NONE =>
-                                     T.apply2 Prim.eqtp
-                                        (T.Sub (m, T.under i (T.Idot (3, T.Shift 4))))
-                                        (T.Sub (n, T.underShift (i+1) 3))
+              | SOME c =>
+                   cut $
+                   first
+                      [
+                      refine (Rule.quotientLeftEq i (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                      >>> [
+                          (* A, A[^] |- R[^2] 1 0 : type *)
+                          relationIstype1 lv a r,
+          
+                          (* A, A[^], R[^2] 1 0, ...[^2] |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : C[under_i (2 . ^3)] *)
+                          sequel m n copt
+                          ],
 
-                                | SOME c =>
-                                     T.apply3 Prim.eq
-                                        (T.Sub (c, T.under i (T.Idot (3, T.Shift 4))))
-                                        (T.Sub (m, T.under i (T.Idot (3, T.Shift 4))))
-                                        (T.Sub (n, T.underShift (i+1) 3)))
-                              y
-                              red)
-                   >>+
-                   (* ... |- M[under_i (2 . ^3)] = N[under_i (Y . ^3)] : C[under_i (2 . ^3)]
-                           = M[under_i ((0 . ^4) o (2 . id))] = N[under_i ((Y[^] . ^4) o (2 . id))] : C[under_i ((0 . ^4) o (2 . id))]
-                           = (M[under_i+1 (^3)] = N[under_i (Y[^] . ^4)] : C[under_i+1 (^3)])[under_i (2 . id)]
-                   *)
-                   refine (Rule.unreduceAt i
-                              (case copt of
-                                  NONE =>
-                                     T.apply2 Prim.eqtp
-                                        (T.Sub (m, T.underShift (i+1) 3))
-                                        (T.Sub (n, T.under i (T.Dot (T.Sub (y, T.shift1), T.Shift 4))))
+                      refine (Rule.quotientLeftEqDep i (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                      >>> [
+                          (* A, A[^] |- R[^2] 1 0 : type *)
+                          relationIstype1 lv a r,
+          
+                          (* A, A[^], R[^2] 1 0, ...[^2] |- C[under_i (2 . ^3)] = C[under_i (1 . ^3)] : type *)
+                          sequel c c NONE,
 
-                                | SOME c =>
-                                     T.apply3 Prim.eq
-                                        (T.Sub (c, T.underShift (i+1) 3))
-                                        (T.Sub (m, T.underShift (i+1) 3))
-                                        (T.Sub (n, T.under i (T.Dot (T.Sub (y, T.shift1), T.Shift 4)))))
-                              x
-                              red)
-                   >>+
-                   (* ... |- M[under_i (X . ^3)] = N[under_i (Y . ^3)] : C[under_i (X . ^3)] *)
-                   De.refoldHyps jud i 3
-                      x
-                      red
-                   >>+
-                   idtacM (vars1_3, De.Principal set3)
-                end
-                ]
+                          (* A, A[^], R[^2] 1 0, ...[^2] |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : C[under_i (2 . ^3)] *)
+                          sequel m n copt
+                          ]
+                      ])
          end
          
 
@@ -494,113 +515,133 @@ functor AfterQuotient () :> sig end =
          let
             val lv = T.evar ()
 
-            val tertseq =
+            fun sequel m n copt =
+               (* A, A[^], Q[^2] 1 & Q[^2] 0 & R[^2] 1 0, ...[^2] |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : C[under_i (2 . ^3)]   (but C might just be type) *)
+               refine (Rule.prodLeft i (T.evar ()) (T.evar ()) (T.evar ()))
+               >>+
+               (* A, A[^], Q[^2] 1, Q[^3] 1 & R[^3] 2 1, ...[^3] |- M[under_i (3 . ^4)] = N[under_i (2 . ^4)] : C[under_i (3 . ^4)] *)
+               refine (Rule.prodLeft i (T.evar ()) (T.evar ()) (T.evar ()))
+               >>+
+               (* A, A[^], Q[^2] 1, Q[^3] 1, R[^4] 3 2, ...[^4] |- M[under_i (4 . ^5)] = N[under_i (3 . ^5)] : C[under_i (4 . ^5)] *)
+               refine (Rule.exchange (i+2) 1 1)
+               >>+
+               (* A, Q[^1] 0, A[^2], Q[^3] 0, R[^4] 3 1, ...[^4] |- M[under_i (4 . ^5)] = N[under_i (2 . ^5)] : C[under_i (4 . ^5)] *)
                let
-                  val (v1, set1) = D.freshAndBindSet set
-                  val (v2, set2) = D.freshAndBindSet set1
-                  val v3 = D.freshSet set2
+                  do (vars1, set1) = De.andthenp S.empty $ De.dest (i+4) p1 set
+                  do (vars2, set2) = De.andthenp vars1 $ De.dest (i+3) p2 set1
+                  val vars1_2 = S.append vars1 vars2
+                  do (vars3, set3) = De.andthenp vars1_2 $ De.dest (i+2) p3 set2
+                  val vars1_3 = S.append vars1_2 vars3
+                  do (vars4, set4) = De.andthenp vars1_3 $ De.dest (i+1) p4 set3
+                  val vars1_4 = S.append vars1_3 vars4
+                  do (vars5, set5) = De.andthenp vars1_4 $ De.dest i p5 set4
+                  val vars1_5 = S.append vars1_4 vars5
+
+                  val x =
+                     T.Elim (T.Const qintro2,
+                             [T.App (T.Sub (a, T.Shift 5)),
+                              T.App (T.Sub (q, T.Shift 5)),
+                              T.App (T.Sub (r, T.Shift 5)),
+                              T.App (T.Sub (hper, T.Shift 5)),
+                              T.App (T.Var 4),
+                              T.App (T.Var 3)])
+
+                  val y =
+                     T.Elim (T.Const qintro2,
+                             [T.App (T.Sub (a, T.Shift 5)),
+                              T.App (T.Sub (q, T.Shift 5)),
+                              T.App (T.Sub (r, T.Shift 5)),
+                              T.App (T.Sub (hper, T.Shift 5)),
+                              T.App (T.Var 2),
+                              T.App (T.Var 1)])
                in
-                  S.cons v1 (S.cons v2 (S.cons v3 S.empty))
+                  (* ... |- M[under_i (4 . ^5)] = N[under_i (2 . ^5)] : C[under_i (4 . ^5)]
+                          = M[under_i ((5 . ^6) o (2 . id))] = N[under_i ((0 . ^6) o (2 . id))] : C[under_i ((5 . ^6) o (2 . id))]
+                          = (M[under_i (5 . ^6)] = N[under_i+1 (^5)] : C[under_i (5 . ^6)])[under_i (2 . id)]
+                  *)
+                  refine (Rule.unreduceAt i
+                             (case copt of
+                                 NONE =>
+                                    T.apply2 Prim.eqtp
+                                       (T.Sub (m, T.under i (T.Idot (5, T.Shift 6))))
+                                       (T.Sub (n, T.underShift (i+1) 5))
+
+                               | SOME c =>
+                                    T.apply3 Prim.eq
+                                       (T.Sub (c, T.under i (T.Idot (5, T.Shift 6))))
+                                       (T.Sub (m, T.under i (T.Idot (5, T.Shift 6))))
+                                       (T.Sub (n, T.underShift (i+1) 5)))
+                             y
+                             (R.trans [R.unfold, R.beta 6]))
+                  >>+
+                  (* ... |- M[under_i (4 . ^5)] = N[under_i (Y . ^5)] : C[under_i (4 . ^5)]
+                          = M[under_i ((0 . ^6) o (4 . id))] = N[under_i ((Y[^] . ^6) o (4 . id))] : C[under_i ((0 . ^6) o (4 . id))]
+                          = (M[under_i+1 (^5)] = N[under_i (Y[^] . ^6)] : C[under_i+1 (^5)])[under_i (4 . id)]
+                  *)
+                  refine (Rule.unreduceAt i
+                             (case copt of
+                                 NONE =>
+                                    T.apply2 Prim.eqtp
+                                       (T.Sub (m, T.underShift (i+1) 5))
+                                       (T.Sub (n, T.under i (T.Dot (T.Sub (y, T.shift1), T.Shift 6))))
+
+                               | SOME c =>
+                                    T.apply3 Prim.eq
+                                       (T.Sub (c, T.underShift (i+1) 5))
+                                       (T.Sub (m, T.underShift (i+1) 5))
+                                       (T.Sub (n, T.under i (T.Dot (T.Sub (y, T.shift1), T.Shift 6)))))
+                             x
+                             (R.trans [R.unfold, R.beta 6]))
+                  >>+
+                  (* ... |- M[under_i (X . ^5)] = N[under_i (Y . ^5)] : C[under_i (X . ^5)] *)
+                  De.refoldHyps jud i 5
+                     x
+                     (R.trans [R.unfold, R.beta 6])
+                  >>+
+                  idtacM (vars1_5, De.Principal set5)
                end
+            
          in
             (* quotient2 A Q R Hper, ... |- P = Q : C   (but C might be just type) *)
             refine (Rule.reduceHyp i (R.trans [R.unfold, R.beta 4]))
             >>+
-            (* quotient A (fn . fn . Q[^2] 1 & Q[^2] 0 & R[^2] 1 0), ... |- M = N : Q *)
-            (if Option.isSome copt then
-                refine (Rule.quotientLeftEq i (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
-             else
-                refine (Rule.quotientLeftEqtype i (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ())))
-            >>> [
-                (* A, A[^] |- Q[^2] 1 & Q[^2] 0 & R[^2] 1 0 : type *)
-                relationIstype2 lv a q r,
+            (* quotient A (fn . fn . Q[^2] 1 & Q[^2] 0 & R[^2] 1 0), ... |- M = N : C *)
+            (case copt of
+                NONE =>
+                   refine (Rule.quotientLeftEqtype i (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                   >>> [
+                       (* A, A[^] |- Q[^2] 1 & Q[^2] 0 & R[^2] 1 0 : type *)
+                       relationIstype2 lv a q r,
+                       
+                       (* A, A[^], Q[^2] 1 & Q[^2] 0 & R[^2] 1 0, ...[^2] |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : type *)
+                       sequel m n NONE
+                       ]
 
-                (* A, A[^], Q[^2] 1 & Q[^2] 0 & R[^2] 1 0, ...[^2] |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : C[under_i (2 . ^3)] *)
-                refine (Rule.prodLeft i (T.evar ()) (T.evar ()) (T.evar ()))
-                >>+
-                (* A, A[^], Q[^2] 1, Q[^3] 1 & R[^3] 2 1, ...[^3] |- M[under_i (3 . ^4)] = N[under_i (2 . ^4)] : C[under_i (3 . ^4)] *)
-                refine (Rule.prodLeft i (T.evar ()) (T.evar ()) (T.evar ()))
-                >>+
-                (* A, A[^], Q[^2] 1, Q[^3] 1, R[^4] 3 2, ...[^4] |- M[under_i (4 . ^5)] = N[under_i (3 . ^5)] : C[under_i (4 . ^5)] *)
-                refine (Rule.exchange (i+2) 1 1)
-                >>+
-                (* A, Q[^1] 0, A[^2], Q[^3] 0, R[^4] 3 1, ...[^4] |- M[under_i (4 . ^5)] = N[under_i (2 . ^5)] : C[under_i (4 . ^5)] *)
-                let
-                   do (vars1, set1) = De.andthenp S.empty $ De.dest (i+4) p1 set
-                   do (vars2, set2) = De.andthenp vars1 $ De.dest (i+3) p2 set1
-                   val vars1_2 = S.append vars1 vars2
-                   do (vars3, set3) = De.andthenp vars1_2 $ De.dest (i+2) p3 set2
-                   val vars1_3 = S.append vars1_2 vars3
-                   do (vars4, set4) = De.andthenp vars1_3 $ De.dest (i+1) p4 set3
-                   val vars1_4 = S.append vars1_3 vars4
-                   do (vars5, set5) = De.andthenp vars1_4 $ De.dest i p5 set4
-                   val vars1_5 = S.append vars1_4 vars5
+              | SOME c =>
+                   cut $
+                   first
+                      [
+                      refine (Rule.quotientLeftEq i (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                      >>> [
+                          (* A, A[^] |- Q[^2] 1 & Q[^2] 0 & R[^2] 1 0 : type *)
+                          relationIstype2 lv a q r,
+                          
+                          (* A, A[^], Q[^2] 1 & Q[^2] 0 & R[^2] 1 0, ...[^2] |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : C[under_i (2 . ^3)] *)
+                          sequel m n copt
+                          ],
 
-                   val x =
-                      T.Elim (T.Const qintro2,
-                              [T.App (T.Sub (a, T.Shift 5)),
-                               T.App (T.Sub (q, T.Shift 5)),
-                               T.App (T.Sub (r, T.Shift 5)),
-                               T.App (T.Sub (hper, T.Shift 5)),
-                               T.App (T.Var 4),
-                               T.App (T.Var 3)])
-
-                   val y =
-                      T.Elim (T.Const qintro2,
-                              [T.App (T.Sub (a, T.Shift 5)),
-                               T.App (T.Sub (q, T.Shift 5)),
-                               T.App (T.Sub (r, T.Shift 5)),
-                               T.App (T.Sub (hper, T.Shift 5)),
-                               T.App (T.Var 2),
-                               T.App (T.Var 1)])
-                in
-                   (* ... |- M[under_i (4 . ^5)] = N[under_i (2 . ^5)] : C[under_i (4 . ^5)]
-                           = M[under_i ((5 . ^6) o (2 . id))] = N[under_i ((0 . ^6) o (2 . id))] : C[under_i ((5 . ^6) o (2 . id))]
-                           = (M[under_i (5 . ^6)] = N[under_i+1 (^5)] : C[under_i (5 . ^6)])[under_i (2 . id)]
-                   *)
-                   refine (Rule.unreduceAt i
-                              (case copt of
-                                  NONE =>
-                                     T.apply2 Prim.eqtp
-                                        (T.Sub (m, T.under i (T.Idot (5, T.Shift 6))))
-                                        (T.Sub (n, T.underShift (i+1) 5))
-
-                                | SOME c =>
-                                     T.apply3 Prim.eq
-                                        (T.Sub (c, T.under i (T.Idot (5, T.Shift 6))))
-                                        (T.Sub (m, T.under i (T.Idot (5, T.Shift 6))))
-                                        (T.Sub (n, T.underShift (i+1) 5)))
-                              y
-                              (R.trans [R.unfold, R.beta 6]))
-                   >>+
-                   (* ... |- M[under_i (4 . ^5)] = N[under_i (Y . ^5)] : C[under_i (4 . ^5)]
-                           = M[under_i ((0 . ^6) o (4 . id))] = N[under_i ((Y[^] . ^6) o (4 . id))] : C[under_i ((0 . ^6) o (4 . id))]
-                           = (M[under_i+1 (^5)] = N[under_i (Y[^] . ^6)] : C[under_i+1 (^5)])[under_i (4 . id)]
-                   *)
-                   refine (Rule.unreduceAt i
-                              (case copt of
-                                  NONE =>
-                                     T.apply2 Prim.eqtp
-                                        (T.Sub (m, T.underShift (i+1) 5))
-                                        (T.Sub (n, T.under i (T.Dot (T.Sub (y, T.shift1), T.Shift 6))))
-
-                                | SOME c =>
-                                     T.apply3 Prim.eq
-                                        (T.Sub (c, T.underShift (i+1) 5))
-                                        (T.Sub (m, T.underShift (i+1) 5))
-                                        (T.Sub (n, T.under i (T.Dot (T.Sub (y, T.shift1), T.Shift 6)))))
-                              x
-                              (R.trans [R.unfold, R.beta 6]))
-                   >>+
-                   (* ... |- M[under_i (X . ^5)] = N[under_i (Y . ^5)] : C[under_i (X . ^5)] *)
-                   De.refoldHyps jud i 5
-                      x
-                      (R.trans [R.unfold, R.beta 6])
-                   >>+
-                   idtacM (vars1_5, De.Principal set5)
-                end
-                ]
-
+                      refine (Rule.quotientLeftEqDep i (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()) (T.evar ()))
+                      >>> [
+                          (* A, A[^] |- Q[^2] 1 & Q[^2] 0 & R[^2] 1 0 : type *)
+                          relationIstype2 lv a q r,
+                          
+                          (* A, A[^], Q[^2] 1 & Q[^2] 0 & R[^2] 1 0, ...[^2] |- C[under_i (2 . ^3)] = C[under_i (1 . ^3)] : type *)
+                          sequel c c NONE,
+   
+                          (* A, A[^], Q[^2] 1 & Q[^2] 0 & R[^2] 1 0, ...[^2] |- M[under_i (2 . ^3)] = N[under_i (1 . ^3)] : C[under_i (2 . ^3)] *)
+                          sequel m n copt
+                          ]
+                      ])
          end
          
 
