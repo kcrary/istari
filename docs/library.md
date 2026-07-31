@@ -17,14 +17,17 @@ The following libraries are pre-loaded:
 - [`Kindlike`](lib/kindlike.html) (types eligible for impredicative quantification)
 - [`Logic`](lib/logic.html)
 - [`List`](lib/list.html)
+- [`Markov`](lib/markov.html)
 - [`Misc`](lib/misc.html)
 - [`Nat`](lib/nat.html)
 - [`Natural`](lib/natural.html) (natural numbers using "native" arithmetic)
 - [`Option`](lib/option.html)
 - [`Partial`](lib/partial.html) (partial computable objects)
 - [`Permutation`](lib/permutation.html) (permutations on lists)
+- [`Squish`](lib/squish.html) (like squash, but with computational content)
 - [`Quotient`](lib/quotient.html) (tools for manipulating quotient types)
 - [`Rational`](lib/rational.html)
+- [`Real`](lib/real.html)
 - [`Relations`](lib/relations.html)
 - [`Sqstable`](lib/sqstable.html)
 - [`Stable`](lib/stable.html)
@@ -38,5 +41,6 @@ The following libraries are pre-loaded:
 
 The following libraries can be loaded from the `library` directory:
 
+- [`CantorTheorem`](lib/cantor-theorem.html) (the reals are not enumerable)
 - [`GirardParadox`](lib/girard-paradox.html) (type is not a type)
 - [`SmithParadox`](lib/smith-paradox) (there exist inadmissible types)

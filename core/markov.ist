@@ -1,0 +1,259 @@
+File.import "acc-load.iml";
+File.import "decidable-load.iml";
+File.import "logic-load.iml";
+File.import "misc-load.iml";
+File.import "nat-load.iml";
+File.import "partial-load.iml";
+
+openModule /Logic/;
+openModule /Partial/;
+openModule /Acc/;
+openModule /Nat/;
+openModule /Decidable/;
+
+
+beginModule "Markov";
+
+
+lemma "markov_halts"
+/
+  forall i (a : U i) (m : partial a) .
+    not (not (halts m))
+    -> halts m
+/;
+
+inference.
+intro /i a m H/.
+RuleTactic.markovsPrinciple.
+hyp /H/.
+qed ();
+
+
+
+define /search P dec/
+/
+  fix (fn f i .
+         (case (dec i) of
+          | inl _ . i
+       
+          | inr _ .
+              f (succ i)))
+//
+  intersect lv . forall (P : nat -> U lv) . (forall i . decidable (P i)) -> nat -> partial nat
+/;
+
+inference.
+introOf /lv P dec/.
+typecheckFixpoint.
+typecheck.
+qed ();
+  
+
+
+val red = makeReduction
+/
+  search P dec i --> (case (dec i) of | inl _ . i | inr _ . search P dec (succ i)) ;
+
+  unfolding search
+  unrolling fix
+/;
+
+Database.setUnroll (parseConstant /search/) (Reduction.user red);
+
+
+
+define /search_action P dec f i/
+/
+  (case (dec i) of
+   | inl _ . i
+
+   | inr _ .
+       f (succ i))
+//
+  intersect lv . forall (P : nat -> U lv) .
+    (forall i . decidable (P i))
+    -> partial (nat -> partial nat)
+    -> nat
+    -> partial nat
+/;
+
+inference.
+unfold /search_action/.
+typecheck.
+qed ();
+
+  
+
+lemma "search_well_founded"
+/
+  forall lv (P : nat -> U lv) (dec : forall i . decidable (P i)) i .
+    halts (search P dec i)
+    -> Acc nat (induce (fn g x . g x) (search_action P dec) ) i
+/;
+
+inference.
+intro /lv P dec i Hhalt/.
+so /induce_well_founded lv (nat -> partial nat) nat (fn _ . nat) (fn g x . g x) (search_action P dec) __ __ __ __ __ i Hhalt/ /H/ >> auto >> attempt Partiality.proveAdmiss.
+  {
+  reintro /H/.
+  termination /H/ >> auto.
+  }
+  
+  {
+  reintro /Happrox/.
+  unfold /approx/.
+  reduce //.
+  intro /x Hhaltx/.
+  unfold /search_action at 0 0/.
+  remember /dec x/ /_/ /X/ /HeqX/.
+  destruct /X/ /h | h/ >> reduce // >> auto.
+  so /Happrox (succ x)/ /H/.
+  reduce /H/.
+  apply /H/ >> clear /H/.
+  unfold /search_action in Hhaltx/.
+  rewrite /<- HeqX in Hhaltx/.
+  reduce /Hhaltx/.
+  hyp /Hhaltx/.
+  }
+unfold /search_action/.
+fold /search P dec i/.
+reflexivity.
+qed ();
+
+
+
+(* Went to some trouble to produce a tidy extract. *)
+lemma "markov_search"
+/
+  forall lv (P : nat -> U lv) .
+    (forall i . decidable (P i))
+    -> not (forall i . not (P i))
+    -> exists i . P i
+/;
+
+inference.
+intro /lv P dec Hnotall/.
+exactRaw /let i = search P dec 0 in (i, (case dec i of | inl h . h | inr _ . Misc.bogus))/.
+unfold /let/.
+so /markov_halts _ _ (search P dec 0) __/ /Hhalt/.
+  {
+  contrapositive /Hnotall/.
+  intro /n/.
+  contrapositive /Hnotall/.
+  assertThen /n <= n/ /H/ reflexivity.
+  revert /H/.
+  rewrite /0 = n - n : nat/.
+    {
+    symmetry.
+    apply /minus_self/.
+    }
+  generalizeAt /n/ /_/ /0 3/ /i/.
+  induction /i/.
+    {
+    intro /_/.
+    unroll /search/.
+    remember /dec n/ /_/ /X/ /HeqX/.
+    destruct /X/ /H | H/.
+      {
+      reduce //.
+      totality.
+      }
+
+      {
+      so /H Hnotall/ /0/.
+      }
+    }
+
+    {
+    intro /i IH Hin/.
+    unroll /search/.
+    remember /dec (pred n - i)/ /_/ /X/ /HeqX/.
+    destruct /X/ /H | H/.
+      {
+      reduce //.
+      totality.
+      }
+
+      {
+      reduce //.
+      so /IH __/ /H'/.
+        {
+        apply /leq_trans _ (succ i)/ >> autoWith /leq_succ/.
+        }
+      rewrite /succ (pred n - i) = n - i : nat/.
+        {
+        rewrite /<- minus_succ_l_eq/.
+          {
+          apply /leq_succ_invert/.
+          rewrite /-> succ_pred/ >> auto.
+          apply /lt_leq_trans/ >> auto.
+          apply /lt_0_succ/.
+          }
+
+          {
+          rewrite /-> succ_pred/ >> auto.
+          apply /lt_leq_trans/ >> auto.
+          apply /lt_0_succ/.
+          }
+        }
+      hyp /H'/.
+      }
+    }
+  }
+assert /P (outpar (search P dec 0))/ /HP/.
+  {
+  so /search_well_founded _# 4 Hhalt/ /Hacc/.
+  assert /admiss (nat -> partial nat)/ /Hadmiss/.
+    {
+    Partiality.proveAdmiss.
+    }
+  revert /Hhalt/.
+  revert /Hacc/.
+  generalize /0/ /_/ /i/.
+  intro /Hacc/.
+  sinduction /Hacc/.
+  reintro /IH/.
+  unroll /search at 0 1/.
+  remember /dec i/ /_/ /X/ /HeqX/.
+  destruct /X/ /HPi | HPi/.
+    {
+    reduce //.
+    intro /_/.
+    unfold /outpar/.
+    hyp /HPi/.
+    }
+  
+    {
+    reduce //.
+    intro /Hhalt/.
+    apply /IH (succ i)/ >> auto.
+    unfold /induce/.
+    intro /p _ H/.
+      {
+      unfold /search_action/.
+      fold /search P dec/.
+      typecheck.
+      }
+    reduce /H concl/.
+    unfold /search_action in H/.
+    rewrite /<- HeqX in H/.
+    reduce /H/.
+    hyp /H/.
+    }
+  }
+fold /outpar (search P dec 0) at 0 1/.
+typecheck1 >> auto.
+remember /dec (outpar (search P dec 0))/ /_/ /X/ /HeqX/.
+destruct /X/ /HPi | HPi/.
+  {
+  reduce //.
+  hypof.
+  }
+
+  {
+  so /HPi HP/ /0/.
+  }
+qed ();
+
+
+endModule ();

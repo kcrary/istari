@@ -1,0 +1,167 @@
+File.import "quotient-load.iml";
+
+openModule /Quotient/;
+
+
+beginModule "Squish";
+
+
+lemma "true_er"
+/
+  forall i (A : U i) . ER A (fn _ _ . unit)
+/;
+
+inference.
+intro /i A/.
+unfold /ER/.
+splitn 2 >> reduce // >> auto.
+qed ();
+
+
+
+define /squish A/
+/
+  quotient (x y : A) . unit
+//
+  intersect i . U i -> U i
+/;
+
+inference.
+introOf /i A/.
+unfold /squish/.
+apply /quotient_formation/.
+apply /per_impl_er/.
+apply /true_er/.
+qed ();
+
+
+
+lemma "squish_ext"
+/
+  forall i (A : U i) (x y : squish A) . x = y : squish A
+/;
+
+inference.
+intro /i A x y/.
+unfold /squish in x in y in concl/.
+destruct /x/ /[x x' _]/.
+destruct /y/ /[y y' _]/.
+extensionality.
+split.
+qed ();
+
+
+
+define /squish_ret x/
+/
+  x
+//
+  intersect i (A : U i) . A -> squish A
+/;
+
+inference.
+introOf /i A x/.
+unfold /squish_ret/.
+unfold /squish/.
+typecheck.
+split.
+qed ();
+
+
+
+define /squish_bind x f/
+/
+  f x
+//
+  intersect i (A B : U i) . squish A -> (A -> squish B) -> squish B
+/;
+
+inference.
+introOf /i A B x f/.
+unfold /squish in x/.
+unfold /squish_bind/.
+destruct /x/ /[x x' _]/.
+apply /squish_ext/.
+qed ();
+
+
+
+define /squish_elim x/
+/
+  x
+//
+  intersect i (A : U i) .
+    (forall x y . x = y : A)
+    -g> squish A -> A
+/;
+
+inference.
+introOf /i A Heq x/.
+unfold /squish in x/.
+unfold /squish_elim/.
+destruct /x/ /[x x' _]/.
+apply /Heq/.
+qed ();
+
+
+
+lemma "squish_bind_id_left"
+/
+  forall i (A B : U i) (x : A) (f : A -> squish B) .
+    squish_bind (squish_ret x) f = f x : squish B
+/;
+
+inference.
+intro /i A B x f/.
+unfold /squish_ret, squish_bind/.
+auto.
+qed ();
+
+
+
+lemma "squish_bind_id_right"
+/
+  forall i (A : U i) (m : squish A) .
+    squish_bind m squish_ret = m : squish A
+/;
+
+inference.
+intro /i A m/.
+unfold /squish_ret, squish_bind/.
+auto.
+qed ();
+
+
+
+lemma "squish_bind_assoc"
+/
+  forall i (A B C : U i) (m : squish A) (f : A -> squish B) (g : B -> squish C) .
+    squish_bind (squish_bind m f) g = squish_bind m (fn x . squish_bind (f x) g) : squish C
+/;
+
+inference.
+intro /i A B C m f g/.
+unfold /squish_bind at 2 2/.
+fold /squish_bind m f/.
+fold /squish_bind (squish_bind m f) g/.
+reflexivity.
+qed ();
+
+
+
+lemma "squish_impl_squash"
+/
+  forall i (A : U i) . squish A -> { A }
+/;
+
+inference.
+intro /i A x/.
+unfold /squish in x/.
+exactRaw /()/.
+destruct /x/ /[x x' Hx]/.
+auto.
+qed ();
+
+
+
+endModule ();

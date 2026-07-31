@@ -1,0 +1,192 @@
+
+structure AutoQ :> sig val autoQ : tactic end =
+   struct
+
+      open Case
+      
+      fun applyConst const = apply (ETerm.literal (Term.Const const))
+      
+      val neq = resolveGlobal /Logic.neq/
+      val ltq = resolveGlobal /Rational.ltq/
+      val leqq = resolveGlobal /Rational.leqq/
+      val timesq = resolveGlobal /Rational.timesq/
+      val invq = resolveGlobal /Rational.invq/
+      val absq = resolveGlobal /Rational.absq/
+      val integer_to_rational = resolveGlobal /Rational.integer_to_rational/
+      val nat_to_rational = resolveGlobal /Rational.nat_to_rational/
+      val ltq_impl_leqq = resolveGlobal /Rational.ltq_impl_leqq/
+      val integer_to_rational_mono = resolveGlobal /Rational.integer_to_rational_mono/
+      val nat_to_rational_mono = resolveGlobal /Rational.nat_to_rational_mono/
+      val nat_to_rational_mono_lt = resolveGlobal /Rational.nat_to_rational_mono_lt/
+      val nat_integer_to_rational_mono = resolveGlobal /Rational.nat_integer_to_rational_mono/
+      val integer_nat_to_rational_mono = resolveGlobal /Rational.integer_nat_to_rational_mono/
+      val integer_to_rational_mono_lt = resolveGlobal /Rational.integer_to_rational_mono_lt/
+      val nat_integer_to_rational_mono_lt = resolveGlobal /Rational.nat_integer_to_rational_mono_lt/
+      val integer_nat_to_rational_mono_lt = resolveGlobal /Rational.integer_nat_to_rational_mono_lt/
+      val invq_positive = resolveGlobal /Rational.invq_positive/
+      val invq_negative = resolveGlobal /Rational.invq_negative/
+      val integer_nat_to_rational_eq = resolveGlobal /Rational.integer_nat_to_rational_eq/
+      val nat_integer_to_rational_eq = resolveGlobal /Rational.nat_integer_to_rational_eq/
+      val integer_to_rational_neq = resolveGlobal /Rational.integer_to_rational_neq/
+      val nat_integer_to_rational_neq = resolveGlobal /Rational.nat_integer_to_rational_neq/
+      val integer_nat_to_rational_neq = resolveGlobal /Rational.integer_nat_to_rational_neq/
+      val invq_leqq_samesign = resolveGlobal /Rational.invq_leqq_samesign/
+      val timesq_leqq_zero = resolveGlobal /Rational.timesq_leqq_zero/
+      val timesq_leqq_zero_neg_neg = resolveGlobal /Rational.timesq_leqq_zero_neg_neg/
+      val timesq_ltq_zero = resolveGlobal /Rational.timesq_ltq_zero/
+      val timesq_ltq_zero_neg_neg = resolveGlobal /Rational.timesq_ltq_zero_neg_neg/
+      val absq_nonneg = resolveGlobal /Rational.absq_nonneg/
+      val samesign = resolveGlobal /Rational.samesign/
+      val samesign_pos = resolveGlobal /Rational.samesign_pos/
+      val samesign_neg = resolveGlobal /Rational.samesign_neg/
+      
+      fun autoQMain () =
+         attempt $
+         goalCaseT
+         /| \Prim.eq\ @ $ap _ 
+            (| $ap (\integer_to_rational\ _) $ap (\integer_to_rational\ _) $nil =>
+               \(fnc =>
+                    compat >> omega)\
+
+             | $ap (\nat_to_rational\ _) $ap (\nat_to_rational\ _) $nil =>
+               \(fnc =>
+                    compat >> omega)\
+
+             | $ap (\integer_to_rational\ _) $ap (\nat_to_rational\ _) $nil =>
+               \(fnc =>
+                    applyConst integer_nat_to_rational_eq >>+
+                    omega)\
+
+             | $ap (\nat_to_rational\ _) $ap (\integer_to_rational\ _) $nil =>
+               \(fnc =>
+                    applyConst nat_integer_to_rational_eq >>+
+                    omega)\
+            )
+
+
+          | \leqq\ @
+            (| $ap (\integer_to_rational\ _) $ap (\integer_to_rational\ _) $nil =>
+               \(fnc =>
+                    applyConst integer_to_rational_mono >>+
+                    omega)\
+
+             | $ap (\nat_to_rational\ _) $ap (\nat_to_rational\ _) $nil =>
+               \(fnc =>
+                    applyConst nat_to_rational_mono >>+
+                    omega)\
+      
+             | $ap (\nat_to_rational\ _) $ap (\integer_to_rational\ _) $nil =>
+               \(fnc =>
+                    applyConst nat_integer_to_rational_mono >>+
+                    omega)\
+         
+             | $ap (\integer_to_rational\ _) $ap (\nat_to_rational\ _) $nil =>
+               \(fnc =>
+                    applyConst integer_nat_to_rational_mono >>+
+                    omega)\
+
+             | $ap (integer_to_rational ($integer \0I\)) $ap (\timesq\ _ _) $nil =>
+               \(fnc =>
+                    first
+                       [
+                       applyConst timesq_leqq_zero >> lift autoQMain >> done,
+         
+                       applyConst timesq_leqq_zero_neg_neg >> lift autoQMain >> done,
+                       ])\
+      
+             | $ap (integer_to_rational ($integer \0I\)) $ap (\invq\ _) $nil =>
+               \(fnc =>
+                    applyConst ltq_impl_leqq >>+
+                    lift autoQMain)\
+      
+             | $ap (\invq\ _) $ap (integer_to_rational ($integer \0I\)) $nil =>
+               \(fnc =>
+                    applyConst ltq_impl_leqq >>+
+                    lift autoQMain)\
+      
+             | $ap (\invq\ _) $ap (\invq\ _) $nil =>
+               \(fnc =>
+                    applyConst invq_leqq_samesign >>
+                    lift autoQMain)\
+         
+             | $ap (integer_to_rational ($integer \0I\)) $ap (\absq\ _) $nil =>
+               \(fnc =>
+                    applyConst absq_nonneg >> done)\
+            )
+
+
+          | \ltq\ @
+            (| $ap (\integer_to_rational\ _) $ap (\integer_to_rational\ _) $nil =>
+               \(fnc =>
+                    applyConst integer_to_rational_mono_lt >>+
+                    omega)\
+      
+             | $ap (\nat_to_rational\ _) $ap (\nat_to_rational\ _) $nil =>
+               \(fnc =>
+                    applyConst nat_to_rational_mono_lt >>+
+                    omega)\
+      
+             | $ap (\nat_to_rational\ _) $ap (\integer_to_rational\ _) $nil =>
+               \(fnc =>
+                    applyConst nat_integer_to_rational_mono_lt >>+
+                    omega)\
+         
+             | $ap (\integer_to_rational\ _) $ap (\nat_to_rational\ _) $nil =>
+               \(fnc =>
+                    applyConst integer_nat_to_rational_mono_lt >>+
+                    omega)\
+             
+             | $ap (integer_to_rational ($integer \0I\)) $ap (\timesq\ _ _) $nil =>
+               \(fnc =>
+                    first
+                       [
+                       applyConst timesq_ltq_zero >> lift autoQMain >> done,
+         
+                       applyConst timesq_ltq_zero_neg_neg >> lift autoQMain >> done,
+                       ])\
+         
+             | $ap (integer_to_rational ($integer \0I\)) $ap (\invq\ _) $nil =>
+               \(fnc =>
+                    applyConst invq_positive >>+
+                    lift autoQMain)\
+         
+             | $ap (\invq\ _) $ap (integer_to_rational ($integer \0I\)) $nil =>
+               \(fnc =>
+                    applyConst invq_negative >>+
+                    lift autoQMain)\
+            )
+
+
+          | \neq\ @ $ap _
+            (| $ap (\integer_to_rational\ _) $ap (\integer_to_rational\ _) $nil =>
+               \(fnc =>
+                    applyConst integer_to_rational_neq >>+
+                    omega)\
+   
+             | $ap (\nat_to_rational\ _) $ap (\integer_to_rational\ _) $nil =>
+               \(fnc =>
+                    applyConst nat_integer_to_rational_neq >>+
+                    omega)\
+         
+             | $ap (\integer_to_rational\ _) $ap (\nat_to_rational\ _) $nil =>
+               \(fnc =>
+                    applyConst integer_nat_to_rational_neq >>+
+                    omega)\
+            )
+      
+
+          | \samesign\ _ _ =>
+            \(fnc =>
+                 first
+                    [
+                    applyConst samesign_pos >> lift autoQMain >> done,
+      
+                    applyConst samesign_neg >> lift autoQMain >> done,
+                    ])\
+         /
+      
+      val autoQ = auto >> lift autoQMain
+
+   end
+
+val autoQ = AutoQ.autoQ

@@ -56,6 +56,12 @@ The type of rationals:
 
     negq_plusq : type:negq_plusq
 
+    plusq_commute3 : type:plusq_commute3
+
+    plusq_rotate : type:plusq_rotate
+
+    plusq_rotate4 : type:plusq_rotate4
+
     plusq_cancel_l : type:plusq_cancel_l
 
     plusq_cancel_r : type:plusq_cancel_r
@@ -166,6 +172,12 @@ This only works because of our special definition of `invq`.
     invq_injective : type:invq_injective
 
     rational_integral_domain : type:rational_integral_domain
+
+    timesq_commute3 : type:timesq_commute3
+
+    timesq_rotate : type:timesq_rotate
+
+    timesq_rotate4 : type:timesq_rotate4
 
     timesq_cancel_l : type:timesq_cancel_l
 
@@ -384,7 +396,7 @@ This one gives transitivity in the form needed for rewriting:
     (* an alias for timesq_leqq *)
     timesq_leqq_pos_pos : type:timesq_leqq_pos_pos
 
-    timesq_leqq_neg_neg : type:timesq_leqq_neg_neg
+    timesq_leqq_neg_pos : type:timesq_leqq_neg_pos
 
     timesq_leqq_pos_neg : type:timesq_leqq_pos_neg
 
@@ -409,6 +421,12 @@ This one gives transitivity in the form needed for rewriting:
 
     timesq_leqq_r_neg : type:timesq_leqq_r_neg
 
+    timesq_ltq_leqq : type:timesq_ltq_leqq
+
+    timesq_leqq_ltq : type:timesq_leqq_ltq
+
+    timesq_ltq : type:timesq_ltq
+
     timesq_ltq_l : type:timesq_ltq_l
 
     timesq_ltq_r : type:timesq_ltq_r
@@ -427,12 +445,6 @@ This one gives transitivity in the form needed for rewriting:
     timesq_ltq_zero_neg_pos : type:timesq_ltq_zero_neg_pos
 
     timesq_ltq_zero_neg_neg : type:timesq_ltq_zero_neg_neg
-
-    timesq_neq_zero : type:timesq_neq_zero
-
-    timesq_ltq_zero_invert : type:timesq_ltq_zero_invert
-
-    timesq_ltq_zero_invert_neg : type:timesq_ltq_zero_invert_neg
 
     timesq_cancel_leqq_l : type:timesq_cancel_leqq_l
 
@@ -557,8 +569,15 @@ inequality did not reverse on the right.
 
     invq_nonpositive : type:invq_nonpositive
 
+    timesq_neq_zero : type:timesq_neq_zero
+
+    timesq_ltq_zero_invert : type:timesq_ltq_zero_invert
+
+    timesq_ltq_zero_invert_neg : type:timesq_ltq_zero_invert_neg
+
     divq_leqq_zero : type:divq_leqq_zero
 
+    (* an alias for divq_leqq_zero *)
     divq_leqq_zero_pos_pos : type:divq_leqq_zero_pos_pos
 
     divq_leqq_zero_pos_neg : type:divq_leqq_zero_pos_neg
@@ -567,8 +586,10 @@ inequality did not reverse on the right.
 
     divq_leqq_zero_neg_neg : type:divq_leqq_zero_neg_neg
 
+    (* an alias for divq_ltq_zero *)
     divq_ltq_zero : type:divq_ltq_zero
 
+    (* an alias for timesq_leqq *)
     divq_ltq_zero_pos_pos : type:divq_ltq_zero_pos_pos
 
     divq_ltq_zero_pos_neg : type:divq_ltq_zero_pos_neg
@@ -576,192 +597,6 @@ inequality did not reverse on the right.
     divq_ltq_zero_neg_pos : type:divq_ltq_zero_neg_pos
 
     divq_ltq_zero_neg_neg : type:divq_ltq_zero_neg_neg
-
-    (* an alias for timesq_leqq *)
-    timesq_leqq_pos_pos : type:timesq_leqq_pos_pos
-
-    timesq_leqq_neg_neg : type:timesq_leqq_neg_neg
-
-    timesq_leqq_pos_neg : type:timesq_leqq_pos_neg
-
-    timesq_leqq_neg_neg : type:timesq_leqq_neg_neg
-
-    timesq_leqq_zero : type:timesq_leqq_zero
-
-    (* an alias for timesq_leqq_zero *)
-    timesq_leqq_zero_pos_pos : type:timesq_leqq_zero_pos_pos
-
-    timesq_leqq_zero_pos_neg : type:timesq_leqq_zero_pos_neg
-
-    timesq_leqq_zero_neg_pos : type:timesq_leqq_zero_neg_pos
-
-    timesq_leqq_zero_neg_neg : type:timesq_leqq_zero_neg_neg
-
-    timesq_leqq_l : type:timesq_leqq_l
-
-    timesq_leqq_r : type:timesq_leqq_r
-
-    timesq_leqq_l_neg : type:timesq_leqq_l_neg
-
-    timesq_leqq_r_neg : type:timesq_leqq_r_neg
-
-    timesq_ltq_l : type:timesq_ltq_l
-
-    timesq_ltq_r : type:timesq_ltq_r
-
-    timesq_ltq_l_neg : type:timesq_ltq_l_neg
-
-    timesq_ltq_r_neg : type:timesq_ltq_r_neg
-
-    timesq_ltq_zero : type:timesq_ltq_zero
-
-    (* an alias for timesq_ltq_zero *)
-    timesq_ltq_zero_pos_pos : type:timesq_ltq_zero_pos_pos
-
-    timesq_ltq_zero_pos_neg : type:timesq_ltq_zero_pos_neg
-
-    timesq_ltq_zero_neg_pos : type:timesq_ltq_zero_neg_pos
-
-    timesq_ltq_zero_neg_neg : type:timesq_ltq_zero_neg_neg
-
-    timesq_neq_zero : type:timesq_neq_zero
-
-    timesq_ltq_zero_invert : type:timesq_ltq_zero_invert
-
-    timesq_ltq_zero_invert_neg : type:timesq_ltq_zero_invert_neg
-
-    timesq_cancel_leqq_l : type:timesq_cancel_leqq_l
-
-    timesq_cancel_leqq_r : type:timesq_cancel_leqq_r
-
-    timesq_cancel_ltq_l : type:timesq_cancel_ltq_l
-
-    timesq_cancel_ltq_r : type:timesq_cancel_ltq_r
-
-    timesq_cancel_leqq_l_neg : type:timesq_cancel_leqq_l_neg
-
-    timesq_cancel_leqq_r_neg : type:timesq_cancel_leqq_r_neg
-
-    timesq_cancel_ltq_l_neg : type:timesq_cancel_ltq_l_neg
-
-    timesq_cancel_ltq_r_neg : type:timesq_cancel_ltq_r_neg
-
-    timesq_shift_leqq_lll : type:timesq_shift_leqq_lll
-
-    timesq_shift_leqq_lrr : type:timesq_shift_leqq_lrr
-
-    timesq_shift_leqq_llr : type:timesq_shift_leqq_llr
-
-    timesq_shift_leqq_lrl : type:timesq_shift_leqq_lrl
-
-    timesq_shift_leqq_rrr : type:timesq_shift_leqq_rrr
-
-    timesq_shift_leqq_rll : type:timesq_shift_leqq_rll
-
-    timesq_shift_leqq_rlr : type:timesq_shift_leqq_rlr
-
-    timesq_shift_leqq_rrl : type:timesq_shift_leqq_rrl
-
-    timesq_shift_ltq_lll : type:timesq_shift_ltq_lll
-
-    timesq_shift_ltq_lrr : type:timesq_shift_ltq_lrr
-
-    timesq_shift_ltq_llr : type:timesq_shift_ltq_llr
-
-    timesq_shift_ltq_lrl : type:timesq_shift_ltq_lrl
-
-    timesq_shift_ltq_rrr : type:timesq_shift_ltq_rrr
-
-    timesq_shift_ltq_rll : type:timesq_shift_ltq_rll
-
-    timesq_shift_ltq_rlr : type:timesq_shift_ltq_rlr
-
-    timesq_shift_ltq_rrl : type:timesq_shift_ltq_rrl
-
-In the negative multiplicative shifts, the naming is as though the
-inequality did not reverse on the right.
-
-    timesq_shift_leqq_lll_neg : type:timesq_shift_leqq_lll_neg
-
-    timesq_shift_leqq_lrr_neg : type:timesq_shift_leqq_lrr_neg
-
-    timesq_shift_leqq_llr_neg : type:timesq_shift_leqq_llr_neg
-
-    timesq_shift_leqq_lrl_neg : type:timesq_shift_leqq_lrl_neg
-
-    timesq_shift_leqq_rrr_neg : type:timesq_shift_leqq_rrr_neg
-
-    timesq_shift_leqq_rll_neg : type:timesq_shift_leqq_rll_neg
-
-    timesq_shift_leqq_rlr_neg : type:timesq_shift_leqq_rlr_neg
-
-    timesq_shift_leqq_rrl_neg : type:timesq_shift_leqq_rrl_neg
-
-    timesq_shift_ltq_lll_neg : type:timesq_shift_ltq_lll_neg
-
-    timesq_shift_ltq_lrr_neg : type:timesq_shift_ltq_lrr_neg
-
-    timesq_shift_ltq_llr_neg : type:timesq_shift_ltq_llr_neg
-
-    timesq_shift_ltq_lrl_neg : type:timesq_shift_ltq_lrl_neg
-
-    timesq_shift_ltq_rrr_neg : type:timesq_shift_ltq_rrr_neg
-
-    timesq_shift_ltq_rll_neg : type:timesq_shift_ltq_rll_neg
-
-    timesq_shift_ltq_rlr_neg : type:timesq_shift_ltq_rlr_neg
-
-    timesq_shift_ltq_rrl_neg : type:timesq_shift_ltq_rrl_neg
-
-    divq_shift_leqq_ll : type:divq_shift_leqq_ll
-
-    divq_shift_leqq_lr : type:divq_shift_leqq_lr
-
-    divq_shift_leqq_rr : type:divq_shift_leqq_rr
-
-    divq_shift_leqq_rl : type:divq_shift_leqq_rl
-
-    divq_shift_ltq_ll : type:divq_shift_ltq_ll
-
-    divq_shift_ltq_lr : type:divq_shift_ltq_lr
-
-    divq_shift_ltq_rr : type:divq_shift_ltq_rr
-
-    divq_shift_ltq_rl : type:divq_shift_ltq_rl
-
-    divq_shift_leqq_ll_neg : type:divq_shift_leqq_ll_neg
-
-    divq_shift_leqq_lr_neg : type:divq_shift_leqq_lr_neg
-
-    divq_shift_leqq_rr_neg : type:divq_shift_leqq_rr_neg
-
-    divq_shift_leqq_rl_neg : type:divq_shift_leqq_rl_neg
-
-    divq_shift_ltq_ll_neg : type:divq_shift_ltq_ll_neg
-
-    divq_shift_ltq_lr_neg : type:divq_shift_ltq_lr_neg
-
-    divq_shift_ltq_rr_neg : type:divq_shift_ltq_rr_neg
-
-    divq_shift_ltq_rl_neg : type:divq_shift_ltq_rl_neg
-
-    invq_positive : type:invq_positive
-
-    invq_negative : type:invq_negative
-
-    invq_nonnegative : type:invq_nonnegative
-
-    invq_nonpositive : type:invq_nonpositive
-
-    divq_leqq_zero : type:divq_leqq_zero
-
-    divq_leqq_zero_pos_pos : type:divq_leqq_zero_pos_pos
-
-    divq_leqq_zero_pos_neg : type:divq_leqq_zero_pos_neg
-
-    divq_leqq_zero_neg_pos : type:divq_leqq_zero_neg_pos
-
-    divq_leqq_zero_neg_neg : type:divq_leqq_zero_neg_neg
 
     invq_leqq_pos : type:invq_leqq_pos
 
@@ -778,14 +613,14 @@ inequality did not reverse on the right.
   
       | samesign_pos :
           forall x y .
-            q`0 <q x
-            -> q`0 <q y
+            0 < x
+            -> 0 < y
             -> samesign x y
   
       | samesign_neg :
           forall x y .
-            x <q q`0
-            -> y <q q`0
+            x < 0
+            -> y < 0
             -> samesign x y
 
     invq_leqq_samesign : type:invq_leqq_samesign
@@ -967,6 +802,10 @@ inequality did not reverse on the right.
     minq_glb : type:minq_glb
 
     maxq_lub : type:maxq_lub
+
+    minq_glb_strict : type:minq_glb_strict
+
+    maxq_lub_strict : type:maxq_lub_strict
 
     minq_eq_l : type:minq_eq_l
 

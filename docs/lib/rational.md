@@ -54,6 +54,12 @@ The type of rationals:
 
     negq_plusq : forall (x y : rational) . ~ (x + y) = ~ x + ~ y : rational
 
+    plusq_commute3 : forall (a b c : rational) . a + b + c = a + c + b : rational
+
+    plusq_rotate : forall (a b c : rational) . a + b + c = c + a + b : rational
+
+    plusq_rotate4 : forall (a b c d : rational) . a + b + c + d = a + d + b + c : rational
+
     plusq_cancel_l : forall (x y z : rational) . z + x = z + y : rational -> x = y : rational
 
     plusq_cancel_r : forall (x y z : rational) . x + z = y + z : rational -> x = y : rational
@@ -167,6 +173,12 @@ This only works because of our special definition of `invq`.
 
     rational_integral_domain : forall (x y : rational) .
                                   x * y = 0 : rational -> x = 0 : rational % y = 0 : rational
+
+    timesq_commute3 : forall (a b c : rational) . a * b * c = a * c * b : rational
+
+    timesq_rotate : forall (a b c : rational) . a * b * c = c * a * b : rational
+
+    timesq_rotate4 : forall (a b c d : rational) . a * b * c * d = a * d * b * c : rational
 
     timesq_cancel_l : forall (x y z : rational) .
                          z != 0 : rational -> z * x = z * y : rational -> x = y : rational
@@ -406,8 +418,8 @@ This one gives transitivity in the form needed for rewriting:
     timesq_leqq_pos_pos : forall (x x' y y' : rational) .
                              0 <= x -> 0 <= y -> x <= x' -> y <= y' -> x * y <= x' * y'
 
-    timesq_leqq_neg_neg : forall (x x' y y' : rational) .
-                             x' <= 0 -> y' <= 0 -> x <= x' -> y <= y' -> x' * y' <= x * y
+    timesq_leqq_neg_pos : forall (x x' y y' : rational) .
+                             x' <= 0 -> 0 <= y -> x <= x' -> y <= y' -> x * y' <= x' * y
 
     timesq_leqq_pos_neg : forall (x x' y y' : rational) .
                              0 <= x -> y' <= 0 -> x <= x' -> y <= y' -> x' * y <= x * y'
@@ -434,6 +446,15 @@ This one gives transitivity in the form needed for rewriting:
 
     timesq_leqq_r_neg : forall (x x' y : rational) . x <= x' -> y <= 0 -> x' * y <= x * y
 
+    timesq_ltq_leqq : forall (x y x' y' : rational) .
+                         0 <= x -> 0 < y -> x < x' -> y <= y' -> x * y < x' * y'
+
+    timesq_leqq_ltq : forall (x y x' y' : rational) .
+                         0 < x -> 0 <= y -> x <= x' -> y < y' -> x * y < x' * y'
+
+    timesq_ltq : forall (x y x' y' : rational) .
+                    0 <= x -> 0 <= y -> x < x' -> y < y' -> x * y < x' * y'
+
     timesq_ltq_l : forall (x y y' : rational) . 0 < x -> y < y' -> x * y < x * y'
 
     timesq_ltq_r : forall (x x' y : rational) . 0 < y -> x < x' -> x * y < x' * y
@@ -452,14 +473,6 @@ This one gives transitivity in the form needed for rewriting:
     timesq_ltq_zero_neg_pos : forall (x y : rational) . x < 0 -> 0 < y -> x * y < 0
 
     timesq_ltq_zero_neg_neg : forall (x y : rational) . x < 0 -> y < 0 -> 0 < x * y
-
-    timesq_neq_zero : forall (x y : rational) .
-                         x != 0 : rational -> y != 0 : rational -> x * y != 0 : rational
-
-    timesq_ltq_zero_invert : forall (x y : rational) . 0 < x * y -> x < 0 & y < 0 % 0 < x & 0 < y
-
-    timesq_ltq_zero_invert_neg : forall (x y : rational) .
-                                    x * y < 0 -> x < 0 & 0 < y % 0 < x & y < 0
 
     timesq_cancel_leqq_l : forall (x y z : rational) . 0 < z -> z * x <= z * y -> x <= y
 
@@ -592,8 +605,17 @@ inequality did not reverse on the right.
 
     invq_nonpositive : forall (x : rational) . x <= 0 -> invq x <= 0
 
+    timesq_neq_zero : forall (x y : rational) .
+                         x != 0 : rational -> y != 0 : rational -> x * y != 0 : rational
+
+    timesq_ltq_zero_invert : forall (x y : rational) . 0 < x * y -> x < 0 & y < 0 % 0 < x & 0 < y
+
+    timesq_ltq_zero_invert_neg : forall (x y : rational) .
+                                    x * y < 0 -> x < 0 & 0 < y % 0 < x & y < 0
+
     divq_leqq_zero : forall (x y : rational) . 0 <= x -> 0 <= y -> 0 <= x || y
 
+    (* an alias for divq_leqq_zero *)
     divq_leqq_zero_pos_pos : forall (x y : rational) . 0 <= x -> 0 <= y -> 0 <= x || y
 
     divq_leqq_zero_pos_neg : forall (x y : rational) . 0 <= x -> y <= 0 -> x || y <= 0
@@ -602,8 +624,10 @@ inequality did not reverse on the right.
 
     divq_leqq_zero_neg_neg : forall (x y : rational) . x <= 0 -> y <= 0 -> 0 <= x || y
 
+    (* an alias for divq_ltq_zero *)
     divq_ltq_zero : forall (x y : rational) . 0 < x -> 0 < y -> 0 < x || y
 
+    (* an alias for timesq_leqq *)
     divq_ltq_zero_pos_pos : forall (x y : rational) . 0 < x -> 0 < y -> 0 < x || y
 
     divq_ltq_zero_pos_neg : forall (x y : rational) . 0 < x -> y < 0 -> x || y < 0
@@ -611,206 +635,6 @@ inequality did not reverse on the right.
     divq_ltq_zero_neg_pos : forall (x y : rational) . x < 0 -> 0 < y -> x || y < 0
 
     divq_ltq_zero_neg_neg : forall (x y : rational) . x < 0 -> y < 0 -> 0 < x || y
-
-    (* an alias for timesq_leqq *)
-    timesq_leqq_pos_pos : forall (x x' y y' : rational) .
-                             0 <= x -> 0 <= y -> x <= x' -> y <= y' -> x * y <= x' * y'
-
-    timesq_leqq_neg_neg : forall (x x' y y' : rational) .
-                             x' <= 0 -> y' <= 0 -> x <= x' -> y <= y' -> x' * y' <= x * y
-
-    timesq_leqq_pos_neg : forall (x x' y y' : rational) .
-                             0 <= x -> y' <= 0 -> x <= x' -> y <= y' -> x' * y <= x * y'
-
-    timesq_leqq_neg_neg : forall (x x' y y' : rational) .
-                             x' <= 0 -> y' <= 0 -> x <= x' -> y <= y' -> x' * y' <= x * y
-
-    timesq_leqq_zero : forall (x y : rational) . 0 <= x -> 0 <= y -> 0 <= x * y
-
-    (* an alias for timesq_leqq_zero *)
-    timesq_leqq_zero_pos_pos : forall (x y : rational) . 0 <= x -> 0 <= y -> 0 <= x * y
-
-    timesq_leqq_zero_pos_neg : forall (x y : rational) . 0 <= x -> y <= 0 -> x * y <= 0
-
-    timesq_leqq_zero_neg_pos : forall (x y : rational) . x <= 0 -> 0 <= y -> x * y <= 0
-
-    timesq_leqq_zero_neg_neg : forall (x y : rational) . x <= 0 -> y <= 0 -> 0 <= x * y
-
-    timesq_leqq_l : forall (x y y' : rational) . 0 <= x -> y <= y' -> x * y <= x * y'
-
-    timesq_leqq_r : forall (x x' y : rational) . x <= x' -> 0 <= y -> x * y <= x' * y
-
-    timesq_leqq_l_neg : forall (x y y' : rational) . x <= 0 -> y <= y' -> x * y' <= x * y
-
-    timesq_leqq_r_neg : forall (x x' y : rational) . x <= x' -> y <= 0 -> x' * y <= x * y
-
-    timesq_ltq_l : forall (x y y' : rational) . 0 < x -> y < y' -> x * y < x * y'
-
-    timesq_ltq_r : forall (x x' y : rational) . 0 < y -> x < x' -> x * y < x' * y
-
-    timesq_ltq_l_neg : forall (x y y' : rational) . x < 0 -> y < y' -> x * y' < x * y
-
-    timesq_ltq_r_neg : forall (x x' y : rational) . x < x' -> y < 0 -> x' * y < x * y
-
-    timesq_ltq_zero : forall (x y : rational) . 0 < x -> 0 < y -> 0 < x * y
-
-    (* an alias for timesq_ltq_zero *)
-    timesq_ltq_zero_pos_pos : forall (x y : rational) . 0 < x -> 0 < y -> 0 < x * y
-
-    timesq_ltq_zero_pos_neg : forall (x y : rational) . 0 < x -> y < 0 -> x * y < 0
-
-    timesq_ltq_zero_neg_pos : forall (x y : rational) . x < 0 -> 0 < y -> x * y < 0
-
-    timesq_ltq_zero_neg_neg : forall (x y : rational) . x < 0 -> y < 0 -> 0 < x * y
-
-    timesq_neq_zero : forall (x y : rational) .
-                         x != 0 : rational -> y != 0 : rational -> x * y != 0 : rational
-
-    timesq_ltq_zero_invert : forall (x y : rational) . 0 < x * y -> x < 0 & y < 0 % 0 < x & 0 < y
-
-    timesq_ltq_zero_invert_neg : forall (x y : rational) .
-                                    x * y < 0 -> x < 0 & 0 < y % 0 < x & y < 0
-
-    timesq_cancel_leqq_l : forall (x y z : rational) . 0 < z -> z * x <= z * y -> x <= y
-
-    timesq_cancel_leqq_r : forall (x y z : rational) . 0 < z -> x * z <= y * z -> x <= y
-
-    timesq_cancel_ltq_l : forall (x y z : rational) . 0 < z -> z * x < z * y -> x < y
-
-    timesq_cancel_ltq_r : forall (x y z : rational) . 0 < z -> x * z < y * z -> x < y
-
-    timesq_cancel_leqq_l_neg : forall (x y z : rational) . z < 0 -> z * x <= z * y -> y <= x
-
-    timesq_cancel_leqq_r_neg : forall (x y z : rational) . z < 0 -> x * z <= y * z -> y <= x
-
-    timesq_cancel_ltq_l_neg : forall (x y z : rational) . z < 0 -> z * x < z * y -> y < x
-
-    timesq_cancel_ltq_r_neg : forall (x y z : rational) . z < 0 -> x * z < y * z -> y < x
-
-    timesq_shift_leqq_lll : forall (x y z : rational) . 0 < y -> x <= y * z <-> invq y * x <= z
-
-    timesq_shift_leqq_lrr : forall (x y z : rational) . 0 < z -> x <= y * z <-> x * invq z <= y
-
-    timesq_shift_leqq_llr : forall (x y z : rational) . 0 < y -> x <= y * z <-> x * invq y <= z
-
-    timesq_shift_leqq_lrl : forall (x y z : rational) . 0 < z -> x <= y * z <-> invq z * x <= y
-
-    timesq_shift_leqq_rrr : forall (x y z : rational) . 0 < y -> x * y <= z <-> x <= z * invq y
-
-    timesq_shift_leqq_rll : forall (x y z : rational) . 0 < x -> x * y <= z <-> y <= invq x * z
-
-    timesq_shift_leqq_rlr : forall (x y z : rational) . 0 < x -> x * y <= z <-> y <= z * invq x
-
-    timesq_shift_leqq_rrl : forall (x y z : rational) . 0 < y -> x * y <= z <-> x <= invq y * z
-
-    timesq_shift_ltq_lll : forall (x y z : rational) . 0 < y -> x < y * z <-> invq y * x < z
-
-    timesq_shift_ltq_lrr : forall (x y z : rational) . 0 < z -> x < y * z <-> x * invq z < y
-
-    timesq_shift_ltq_llr : forall (x y z : rational) . 0 < y -> x < y * z <-> x * invq y < z
-
-    timesq_shift_ltq_lrl : forall (x y z : rational) . 0 < z -> x < y * z <-> invq z * x < y
-
-    timesq_shift_ltq_rrr : forall (x y z : rational) . 0 < y -> x * y < z <-> x < z * invq y
-
-    timesq_shift_ltq_rll : forall (x y z : rational) . 0 < x -> x * y < z <-> y < invq x * z
-
-    timesq_shift_ltq_rlr : forall (x y z : rational) . 0 < x -> x * y < z <-> y < z * invq x
-
-    timesq_shift_ltq_rrl : forall (x y z : rational) . 0 < y -> x * y < z <-> x < invq y * z
-
-In the negative multiplicative shifts, the naming is as though the
-inequality did not reverse on the right.
-
-    timesq_shift_leqq_lll_neg : forall (x y z : rational) .
-                                   y < 0 -> x <= y * z <-> z <= invq y * x
-
-    timesq_shift_leqq_lrr_neg : forall (x y z : rational) .
-                                   z < 0 -> x <= y * z <-> y <= x * invq z
-
-    timesq_shift_leqq_llr_neg : forall (x y z : rational) .
-                                   y < 0 -> x <= y * z <-> z <= x * invq y
-
-    timesq_shift_leqq_lrl_neg : forall (x y z : rational) .
-                                   z < 0 -> x <= y * z <-> y <= invq z * x
-
-    timesq_shift_leqq_rrr_neg : forall (x y z : rational) .
-                                   y < 0 -> x * y <= z <-> z * invq y <= x
-
-    timesq_shift_leqq_rll_neg : forall (x y z : rational) .
-                                   x < 0 -> x * y <= z <-> invq x * z <= y
-
-    timesq_shift_leqq_rlr_neg : forall (x y z : rational) .
-                                   x < 0 -> x * y <= z <-> z * invq x <= y
-
-    timesq_shift_leqq_rrl_neg : forall (x y z : rational) .
-                                   y < 0 -> x * y <= z <-> invq y * z <= x
-
-    timesq_shift_ltq_lll_neg : forall (x y z : rational) . y < 0 -> x < y * z <-> z < invq y * x
-
-    timesq_shift_ltq_lrr_neg : forall (x y z : rational) . z < 0 -> x < y * z <-> y < x * invq z
-
-    timesq_shift_ltq_llr_neg : forall (x y z : rational) . y < 0 -> x < y * z <-> z < x * invq y
-
-    timesq_shift_ltq_lrl_neg : forall (x y z : rational) . z < 0 -> x < y * z <-> y < invq z * x
-
-    timesq_shift_ltq_rrr_neg : forall (x y z : rational) . y < 0 -> x * y < z <-> z * invq y < x
-
-    timesq_shift_ltq_rll_neg : forall (x y z : rational) . x < 0 -> x * y < z <-> invq x * z < y
-
-    timesq_shift_ltq_rlr_neg : forall (x y z : rational) . x < 0 -> x * y < z <-> z * invq x < y
-
-    timesq_shift_ltq_rrl_neg : forall (x y z : rational) . y < 0 -> x * y < z <-> invq y * z < x
-
-    divq_shift_leqq_ll : forall (a b c : rational) . 0 < b -> a <= b * c <-> a || b <= c
-
-    divq_shift_leqq_lr : forall (a b c : rational) . 0 < c -> a <= b * c <-> a || c <= b
-
-    divq_shift_leqq_rr : forall (a b c : rational) . 0 < b -> a * b <= c <-> a <= c || b
-
-    divq_shift_leqq_rl : forall (a b c : rational) . 0 < a -> a * b <= c <-> b <= c || a
-
-    divq_shift_ltq_ll : forall (a b c : rational) . 0 < b -> a < b * c <-> a || b < c
-
-    divq_shift_ltq_lr : forall (a b c : rational) . 0 < c -> a < b * c <-> a || c < b
-
-    divq_shift_ltq_rr : forall (a b c : rational) . 0 < b -> a * b < c <-> a < c || b
-
-    divq_shift_ltq_rl : forall (a b c : rational) . 0 < a -> a * b < c <-> b < c || a
-
-    divq_shift_leqq_ll_neg : forall (a b c : rational) . b < 0 -> a <= b * c <-> c <= a || b
-
-    divq_shift_leqq_lr_neg : forall (a b c : rational) . c < 0 -> a <= b * c <-> b <= a || c
-
-    divq_shift_leqq_rr_neg : forall (a b c : rational) . b < 0 -> a * b <= c <-> c || b <= a
-
-    divq_shift_leqq_rl_neg : forall (a b c : rational) . a < 0 -> a * b <= c <-> c || a <= b
-
-    divq_shift_ltq_ll_neg : forall (a b c : rational) . b < 0 -> a < b * c <-> c < a || b
-
-    divq_shift_ltq_lr_neg : forall (a b c : rational) . c < 0 -> a < b * c <-> b < a || c
-
-    divq_shift_ltq_rr_neg : forall (a b c : rational) . b < 0 -> a * b < c <-> c || b < a
-
-    divq_shift_ltq_rl_neg : forall (a b c : rational) . a < 0 -> a * b < c <-> c || a < b
-
-    invq_positive : forall (x : rational) . 0 < x -> 0 < invq x
-
-    invq_negative : forall (x : rational) . x < 0 -> invq x < 0
-
-    invq_nonnegative : forall (x : rational) . 0 <= x -> 0 <= invq x
-
-    invq_nonpositive : forall (x : rational) . x <= 0 -> invq x <= 0
-
-    divq_leqq_zero : forall (x y : rational) . 0 <= x -> 0 <= y -> 0 <= x || y
-
-    divq_leqq_zero_pos_pos : forall (x y : rational) . 0 <= x -> 0 <= y -> 0 <= x || y
-
-    divq_leqq_zero_pos_neg : forall (x y : rational) . 0 <= x -> y <= 0 -> x || y <= 0
-
-    divq_leqq_zero_neg_pos : forall (x y : rational) . x <= 0 -> 0 <= y -> x || y <= 0
-
-    divq_leqq_zero_neg_neg : forall (x y : rational) . x <= 0 -> y <= 0 -> 0 <= x || y
 
     invq_leqq_pos : forall (x y : rational) . 0 < x -> x <= y -> invq y <= invq x
 
@@ -827,14 +651,14 @@ inequality did not reverse on the right.
   
       | samesign_pos :
           forall x y .
-            q`0 <q x
-            -> q`0 <q y
+            0 < x
+            -> 0 < y
             -> samesign x y
   
       | samesign_neg :
           forall x y .
-            x <q q`0
-            -> y <q q`0
+            x < 0
+            -> y < 0
             -> samesign x y
 
     invq_leqq_samesign : forall (x y : rational) . samesign x y -> x <= y -> invq y <= invq x
@@ -1065,6 +889,10 @@ inequality did not reverse on the right.
     minq_glb : forall (a b c : rational) . c <= a -> c <= b -> c <= minq a b
 
     maxq_lub : forall (a b c : rational) . a <= c -> b <= c -> maxq a b <= c
+
+    minq_glb_strict : forall (a b c : rational) . c < a -> c < b -> c < minq a b
+
+    maxq_lub_strict : forall (a b c : rational) . a < c -> b < c -> maxq a b < c
 
     minq_eq_l : forall (a b : rational) . a <= b -> minq a b = a : rational
 

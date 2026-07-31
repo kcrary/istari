@@ -54,6 +54,12 @@ The `integer` type is primitive but aliased in the `Integer` module:
 
     negz_minusz : forall (a b : integer) . ~ (a - b) = b - a : integer
 
+    plusz_commute3 : forall (a b c : integer) . a + b + c = a + c + b : integer
+
+    plusz_rotate : forall (a b c : integer) . a + b + c = c + a + b : integer
+
+    plusz_rotate4 : forall (a b c d : integer) . a + b + c + d = a + d + b + c : integer
+
     plusz_cancel_l : forall (a b c : integer) . c + a = c + b : integer -> a = b : integer
 
     plusz_cancel_r : forall (a b c : integer) . a + c = b + c : integer -> a = b : integer
@@ -466,6 +472,12 @@ positive case that works upwards.
 
     timesz_compat : forall (a a' b b' : integer) .
                        a = a' : integer -> b = b' : integer -> a * b = a' * b' : integer
+
+    timesz_commute3 : forall (a b c : integer) . a * b * c = a * c * b : integer
+
+    timesz_rotate : forall (a b c : integer) . a * b * c = c * a * b : integer
+
+    timesz_rotate4 : forall (a b c d : integer) . a * b * c * d = a * d * b * c : integer
 
     timesz_leqz : forall (a a' b b' : integer) .
                      0 <= a -> 0 <= b -> a <= a' -> b <= b' -> a * b <= a' * b'

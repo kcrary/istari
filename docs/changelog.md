@@ -23,7 +23,12 @@
 
   + Added `Division` (natural number division).
 
-  + Added material to `Decidable`, `Eventually`, `Integer`, `Nat`, and `Rational`.
+  + Added real numbers (`Real`) and a proof of Cantor's theorem
+    (`CantorTheorem`).
+
+  + Added `Squish` (like squash, but with computational content).
+
+  + Added material to `Decidable`, `Eventually`, `Nat`, and `Rational`.
 
   + Renamed shift lemmas in `Integer` and `Rational`:
     
@@ -32,13 +37,14 @@
         *_lr --> *_rll
         *_rl --> *_lrr
 
-  + Added material to `Quotient`.  Changed the behavior of `destruct` on `Quotient.quotient1`.
+  + Added material to `Quotient`.  Changed the behavior of `destruct`
+    on `quotient1`.  Fixed a bug in destruction of `Quotient`'s quotients.
 
 - Basis changes:
 
   + Added `ediv` and `mod` to `Int` and `IntInf`.
 
-- Added Markov's principle.
+- Added Markov's principle and the `Markov` library.
 
 - Added rules `eqEqInv1`, `eqEqInv2`, `eqEqInv3`, `ofFormInv1`,
   `ofFormInv2`, `ofEqInv1`, `ofEqInv2`, `boolIntro1Eq`,

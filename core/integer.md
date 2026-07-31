@@ -56,6 +56,12 @@ The `integer` type is primitive but aliased in the `Integer` module:
 
     negz_minusz : type:negz_minusz
 
+    plusz_commute3 : type:plusz_commute3
+
+    plusz_rotate : type:plusz_rotate
+
+    plusz_rotate4 : type:plusz_rotate4
+
     plusz_cancel_l : type:plusz_cancel_l
 
     plusz_cancel_r : type:plusz_cancel_r
@@ -433,6 +439,12 @@ positive case that works upwards.
     negz_as_timesz : type:negz_as_timesz
 
     timesz_compat : type:timesz_compat
+
+    timesz_commute3 : type:timesz_commute3
+
+    timesz_rotate : type:timesz_rotate
+
+    timesz_rotate4 : type:timesz_rotate4
 
     timesz_leqz : type:timesz_leqz
 
