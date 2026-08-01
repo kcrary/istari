@@ -1,0 +1,325 @@
+
+structure ParseReal =
+   struct
+
+      structure R = CheckpointedRef
+      structure T = ETerm
+      type constant = Constant.constant
+
+      val integer_to_real : constant R.dest = R.dest ()
+      val plusr : constant R.dest = R.dest ()
+      val timesr : constant R.dest = R.dest ()
+      val negr : constant R.dest = R.dest ()
+      val minusr : constant R.dest = R.dest ()
+      val divr : constant R.dest = R.dest ()
+      val leqr : constant R.dest = R.dest ()
+      val ltr : constant R.dest = R.dest ()
+      val realParsingMode : Overload.parsing_mode R.dest = R.dest ()
+
+      fun parsePlus x y = T.apply2 (R.read plusr) x y
+      fun parseTimes x y = T.apply2 (R.read timesr) x y
+      fun parseNeg x = T.apply1 (R.read negr) x
+      fun parseMinus x y = T.apply2 (R.read minusr) x y
+      fun parseDiv x y = T.apply2 (R.read divr) x y
+      fun parseLeq x y = T.apply2 (R.read leqr) x y
+      fun parseLt x y = T.apply2 (R.read ltr) x y
+
+      fun parseNumber x = T.apply1 (R.read integer_to_real) (T.integer (IntInf.fromInt x))
+      fun parseNumberEmbed x = T.apply1 (R.read integer_to_real) (T.integer x)
+
+      fun parseAsReal m = T.useMode (R.read realParsingMode) m
+
+   end
+
+
+grammardef Real 
+
+   open ParseReal
+
+   rule Term(30)  ::= Term(31) "<r=" Term(31) => parseLeq
+   rule Term(30)  ::= Term(31) "<r" Term(31) => parseLt
+
+   rule Term(50)  ::= Term(50) "+r" Term(51) => parsePlus
+   rule Term(50)  ::= Term(50) "-r" Term(51) => parseMinus
+
+   rule Term(60)  ::= Term(60) "*r" Term(61) => parseTimes
+   rule Term(60)  ::= Term(60) "|r" Term(61) => parseDiv
+
+   rule Term(90)  ::= "~r" Term(91) => parseNeg
+
+   rule Term(100) ::= "r`" NUMBER => parseNumber
+   rule Term(100) ::= "r`" NNUMBER => parseNumber
+   rule Term(100) ::= "r`" EMBED => parseNumberEmbed
+   rule Term(100) ::= "real`" "(" Term(0) ")" => parseAsReal
+
+end
+
+
+grammaron Real
+
+
+signature REAL_PARSING =
+   sig
+
+      val setArithReal : unit -> unit
+      
+   end
+
+
+functor RealParsingFun () :> REAL_PARSING =
+   struct
+
+      structure T = Term
+      structure CR = CheckpointedRef
+      structure U = Show.Unparsing
+      structure H = ConstantTable
+
+      val integer_to_real = resolveGlobal /Real.integer_to_real/
+      val plusr = resolveGlobal /Real.plusr/
+      val timesr = resolveGlobal /Real.timesr/
+      val negr = resolveGlobal /Real.negr/
+      val minusr = resolveGlobal /Real.minusr/
+      val divr = resolveGlobal /Real.divr/
+      val leqr = resolveGlobal /Real.leqr/
+      val ltr = resolveGlobal /Real.ltr/
+
+      val () = CR.write ParseReal.integer_to_real integer_to_real
+      val () = CR.write ParseReal.plusr plusr
+      val () = CR.write ParseReal.timesr timesr
+      val () = CR.write ParseReal.negr negr
+      val () = CR.write ParseReal.minusr minusr
+      val () = CR.write ParseReal.divr divr
+      val () = CR.write ParseReal.leqr leqr
+      val () = CR.write ParseReal.ltr ltr
+
+      val realSym = Symbol.fromValue "real"
+
+      fun register const prec lprec rprec strpref str =
+         let
+            val unp =
+               U.wrap
+                 (U.apply2 const U.show U.show)
+                 (fn (a, b) =>
+                     U.append [a lprec,
+                               U.break 1, 
+                               
+                               U.string
+                                  (if Symbol.eq (Overload.currentArithmeticMode (), realSym) then
+                                      strpref
+                                   else
+                                      str),
+
+                               b rprec])
+         in
+            H.insert U.unparsingTable const (2, prec, ref true, unp)
+         end
+
+      val () = register leqr 30 31 31 "<= " "<r= "
+      val () = register ltr 30 31 31 "< " "<r "
+      val () = register plusr 50 50 51 "+ " "+r "
+      val () = register minusr 50 50 51 "- " "-r "
+      val () = register timesr 60 60 61 "* " "*r "
+      val () = register divr 60 60 61 "|| " "|r "
+
+      val () =
+         let
+            val unp =
+               U.wrap
+                  (U.apply1 negr U.show)
+                  (fn a => 
+                      U.append
+                         [
+                         U.string
+                            (if Symbol.eq (Overload.currentArithmeticMode (), realSym) then
+                                "~ "
+                             else
+                                "~r "),
+
+                         a 91
+                         ])
+         in
+            H.insert U.unparsingTable negr (1, 90, ref true, unp)
+         end
+
+      val () =
+         let
+            val unp =
+               U.wrap
+                  (U.apply1 integer_to_real U.integer)
+                  (fn x =>
+                      U.append
+                         [
+                         if Symbol.eq (Overload.currentArithmeticMode (), realSym) then
+                            U.append []
+                         else
+                            U.string "r`",
+
+                         U.string (IntInf.toStringStd x)
+                         ])
+         in
+            H.insert U.unparsingTable integer_to_real (1, 100, ref true, unp)
+         end
+
+
+      val realParsingMode =
+         Overload.ARITHMETIC
+            {
+            mode = Symbol.fromValue "real",
+            literal = (fn x => SOME (T.apply1 integer_to_real (T.Native (T.Integer (IntInf.fromInt x))))),
+            leq = SOME leqr,
+            lt = SOME ltr,
+            eqb = NONE,
+            leqb = NONE,
+            ltb = NONE,
+            neqb = NONE,
+            plus = SOME plusr,
+            minus = SOME minusr,
+            times = SOME timesr,
+            neg = SOME negr,
+            divide = SOME divr,
+            }
+
+      val () = CR.write ParseReal.realParsingMode realParsingMode
+
+      fun setArithReal () = Overload.setMode realParsingMode
+
+   end
+
+
+functor AfterRealInequalitiesStable () :> sig end =
+   struct
+
+      val ltr = resolveGlobal /Real.ltr/
+      val leqr = resolveGlobal /Real.leqr/
+      val leqr_sqstable = resolveGlobal /Real.leqr_sqstable/
+      val ltr_sqstable = resolveGlobal /Real.ltr_sqstable/
+      
+      val () =
+         List.app
+            (fn (const, lemma) =>
+               ConstantTable.insert SqstableTactic.sqstableLemmas const lemma)
+            [
+            (ltr, ltr_sqstable),
+            (leqr, leqr_sqstable),
+            ]
+
+   end
+
+
+functor AfterRealAll () :> sig end =
+   struct
+
+      structure T = Term
+      structure B = BackchainInternal
+      structure H = ConstantTable
+      structure CR = CheckpointedRef
+
+      val real = resolveGlobal /Real.real/
+      val rational_to_real = resolveGlobal /Real.rational_to_real/
+      val integer_to_real = resolveGlobal /Real.integer_to_real/
+      val plusr = resolveGlobal /Real.plusr/
+      val timesr = resolveGlobal /Real.timesr/
+      val negr = resolveGlobal /Real.negr/
+      val invr = resolveGlobal /Real.invr/
+      val leqr = resolveGlobal /Real.leqr/
+      val ltr = resolveGlobal /Real.ltr/
+      val leqq = resolveGlobal /Rational.leqq/
+      val leqz = resolveGlobal /Integer.leqz/
+
+      val ltr_inhabitant = resolveGlobal /Real.ltr_inhabitant/
+      val leqr_inhabitant = resolveGlobal /Real.leqr_inhabitant/
+      val leqr_refl = resolveGlobal /Real.leqr_refl/
+      val leqr_trans = resolveGlobal /Real.leqr_trans/
+      val ltr_impl_leqr = resolveGlobal /Real.ltr_impl_leqr/
+      val plusr_leqr = resolveGlobal /Real.plusr_leqr/
+      val negr_leqr = resolveGlobal /Real.negr_leqr/
+      val timesr_leqr = resolveGlobal /Real.timesr_leqr/
+      val invr_leqr_samesign = resolveGlobal /Real.invr_leqr_samesign/
+      val rational_to_real_mono = resolveGlobal /Real.rational_to_real_mono/
+      val integer_to_real_mono = resolveGlobal /Real.integer_to_real_mono/
+      val leqr_implication = resolveGlobal /Real.leqr_implication/
+      val ltr_implication = resolveGlobal /Real.ltr_implication/
+      val real_total = resolveGlobal /Real.real_total/
+      val real_strict = resolveGlobal /Real.real_strict/
+
+      val () =
+         H.insert TypecheckTables.trivialIntroTactics ltr
+            (Backchain.applyPriority /\T.Const ltr_inhabitant\/)
+
+      val () =
+         H.insert TypecheckTables.semitrivialIntroTactics leqr
+            (T.Lam (NONE, T.Triv),
+             Backchain.applyPriority /\T.Const leqr_inhabitant\/)
+
+      val () =
+         H.insert EqualityTacticInternal.reflexivityTactics leqr
+         (B.witnessPriority /\T.Const leqr_refl\ _/)
+      
+      val () =
+         H.insert EqualityTacticInternal.transitivityTactics leqr
+         (fn n => B.witnessPriority /\T.Const leqr_trans\ _ \n\ _ __ __/)
+
+      val () =
+         List.app 
+            (fn (const, i, rconst, rconst', cov, tacfn) => 
+               RewriteInternal.CICTable.insert 
+                  RewriteInternal.compatibilityTable 
+                  (const, i, rconst)
+                  (RewriteTypes.General rconst', cov, 0, (fns _ _ tac => tacfn tac)))
+            [
+            (plusr, 0, leqr, leqr, true,
+             andthenOn 0 (B.witnessPriority /\T.Const plusr_leqr\ _ _ _ _ __ __/)),
+          
+            (plusr, 1, leqr, leqr, true,
+             andthenOn 1 (B.witnessPriority /\T.Const plusr_leqr\ _ _ _ _ __ __/)),
+          
+            (negr, 0, leqr, leqr, false,
+             andthenOn 0 (B.witnessPriority /\T.Const negr_leqr\ _ _ __/)),
+
+            (timesr, 0, leqr, leqr, true,
+             andthenOn 2 (B.witnessPriority /\T.Const timesr_leqr\ _ _ _ _ __ __ __ __/)),
+            
+            (timesr, 1, leqr, leqr, true,
+             andthenOn 3 (B.witnessPriority /\T.Const timesr_leqr\ _ _ _ _ __ __ __ __/)),
+            
+            (invr, 0, leqr, leqr, false,
+             andthenOn 1 (B.witnessPriority /\T.Const invr_leqr_samesign\ _ _ __ __/)),
+
+            (rational_to_real, 0, leqq, leqr, true,
+             andthenOn 0 (B.witnessPriority /\T.Const rational_to_real_mono\ _ _ __/)),
+
+            (integer_to_real, 0, leqz, leqr, true,
+             andthenOn 0 (B.witnessPriority /\T.Const integer_to_real_mono\ _ _ __/)),
+
+            (leqr, 0, leqr, Prim.arrow, false,
+             andthenOn 0 (B.witnessPriority /\T.Const leqr_implication\ _ _ _ _ __ __/)),
+          
+            (leqr, 1, leqr, Prim.arrow, true,
+             andthenOn 1 (B.witnessPriority /\T.Const leqr_implication\ _ _ _ _ __ __/)),
+
+            (ltr, 0, leqr, Prim.arrow, false,
+             andthenOn 0 (B.witnessPriority /\T.Const ltr_implication\ _ _ _ _ __ __/)),
+          
+            (ltr, 1, leqr, Prim.arrow, true,
+             andthenOn 1 (B.witnessPriority /\T.Const ltr_implication\ _ _ _ _ __ __/)),
+            ]
+
+      val () =
+         ConstantTable.insert
+           RewriteInternal.weakeningTable
+           ltr
+           [(leqr, true,
+             (fns _ _ tac =>
+                andthenOn 0
+                  (Backchain.witnessPriority /\T.Const ltr_impl_leqr\ _ _ __/)
+                  tac))]
+
+      val () =
+         H.insert TypecheckTables.totalityTactics real
+         (exact /\T.Const real_total\/)
+
+      val () =
+         H.insert TypecheckTables.strictnessTactics real
+         (exact /\T.Const real_strict\/)
+
+   end

@@ -1,7 +1,7 @@
 
 ISTARIBIN=../ui/bin
 
-DOCUNITS = girard-paradox smith-paradox
+DOCUNITS = cantor-theorem girard-paradox smith-paradox
 UNITS = $(DOCUNITS)
 DOCS =
 

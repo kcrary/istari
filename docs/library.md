@@ -26,6 +26,7 @@ The following libraries are pre-loaded:
 - [`Permutation`](lib/permutation.html) (permutations on lists)
 - [`Quotient`](lib/quotient.html) (tools for manipulating quotient types)
 - [`Rational`](lib/rational.html)
+- [`Real`](lib/real.html)
 - [`Relations`](lib/relations.html)
 - [`Sqstable`](lib/sqstable.html)
 - [`Squish`](lib/squish.html) (like squash, but with computational content)
@@ -40,5 +41,6 @@ The following libraries are pre-loaded:
 
 The following libraries can be loaded from the `library` directory:
 
+- [`CantorTheorem`](lib/cantor-theorem.html) (the reals are not enumerable)
 - [`GirardParadox`](lib/girard-paradox.html) (type is not a type)
 - [`SmithParadox`](lib/smith-paradox) (there exist inadmissible types)

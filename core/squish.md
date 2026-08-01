@@ -1,4 +1,6 @@
 open:Squish
+open:Real
+overload:real
 # `Squish`
 
 The squish type (`squish A`) is much like the squash type (`{ A }`) in
@@ -33,3 +35,14 @@ squashes.  Instead, squish is best managed as a monad:
     squish_bind_id_right : type:squish_bind_id_right
 
     squish_bind_assoc : type:squish_bind_assoc
+
+Squishes arise when operation on a quotient type depends on the which
+representative of the equivalence class is used.  For example, the
+lemma `Real.plusr_positive_invert` states that if the sum of two
+reals is positive, at least one of them must be positive.  However,
+both of them might be positive, and if so, which one is chosen depends
+on the representation used for the two inputs.  Consequently, we
+cannot return a deterministic inhabitant of the disjunction.
+
+    (* using real overloading *)
+    Real.plusr_positive_invert : type:Real.plusr_positive_invert
