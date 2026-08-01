@@ -9,20 +9,20 @@ indicates the overloaded syntax for the concept.  The remaining
 columns indicate the non-overloaded syntax for the concept in the
 indicated type, and the name of constant that is used for the concept.
 
-|                | overloaded | nat               | natural             | integer            | rational                        | real                        |
-|----------------|------------|-------------------|---------------------|--------------------|---------------------------------|-----------------------------|
-| literal        |            | ``n` `` / *       | ``N` `` / *         | ``z` `` / *        | ``q` `` / `integer_to_rational` | ``r` `` / `integer_to_real` |
-| addition       | `+`        | `+n` / `plus`     | `+N` / `plusn`      | `+z` / `plusz`     | `+q` / `plusq`                  | `+r` / `plusr`              |
-| negation       | `~`        | n/a               | n/a                 | `~z` / `negz`      | `~q` / `negq`                   | `~r` / `negr`               |
-| subtraction    | `-`        | `-n` / `minus`    | `-N` / `minusn`     | `-z` | `minusz`    | `-q` / `minusq`                 | `-r` / `minusr`             |
-| multiplication | `*`        | `*n` / `times`    | `*N` / `timesn`     | `*z` / `timesz`    | `*q` / `timesq`                 | `*q` / `timesr`             |
-| division       | ``\|\|``   | n/a               | n/a                 | n/a                | ``\|q`` / `divq`                | ``\|r`` / `divr`            |
-| less-or-equal  | `<=`       | `<n=` / `leq`     | `<N=` / `leqn`      | `<z=` / `leqz`     | `<q=` / `leqq`                  | `<r=` / `leqr`              |
-| less-than      | `<`        | `<n` / `lt`       | `<N` / `ltn`        | `<z` / `ltz`       | `<q` / `ltq`                    | `<r` / `ltr`                |
-| equality test  | `=?`       | `=n?`             | `=N?`               | `=z?`              | `=q?`                           | n/a                         |
-| leq test       | `<=?`      | `<n=?`            | `<N=?`              | `<z=?`             | `<q=?`                          | n/a                         |
-| lt test        | `<?`       | `<n?`             | `<N?`               | `<z?`              | `<q?`                           | n/a                         |
-| neq test       | `!=?`      | `!n=?`            | `!N=?`              | `!z=?`             | `!q=?`                          | n/a                         |
+|                | overloaded | nat               | natural             | integer            | rational                        |
+|----------------|------------|-------------------|---------------------|--------------------|---------------------------------|
+| literal        |            | ``n` `` / *       | ``N` `` / *         | ``z` `` / *        | ``q` `` / `integer_to_rational` |
+| addition       | `+`        | `+n` / `plus`     | `+N` / `plusn`      | `+z` / `plusz`     | `+q` / `plusq`                  |
+| negation       | `~`        | n/a               | n/a                 | `~z` / `negz`      | `~q` / `negq`                   |
+| subtraction    | `-`        | `-n` / `minus`    | `-N` / `minusn`     | `-z` | `minusz`    | `-q` / `minusq`                 |
+| multiplication | `*`        | `*n` / `times`    | `*N` / `timesn`     | `*z` / `timesz`    | `*q` / `timesq`                 |
+| division       | ``\|\|``   | n/a               | n/a                 | n/a                | ``\|q`` / `divq`                |
+| less-or-equal  | `<=`       | `<n=` / `leq`     | `<N=` / `leqn`      | `<z=` / `leqz`     | `<q=` / `leqq`                  |
+| less-than      | `<`        | `<n` / `lt`       | `<N` / `ltn`        | `<z` / `ltz`       | `<q` / `ltq`                    |
+| equality test  | `=?`       | `=n?`             | `=N?`               | `=z?`              | `=q?`                           |
+| leq test       | `<=?`      | `<n=?`            | `<N=?`              | `<z=?`             | `<q=?`                          |
+| lt test        | `<?`       | `<n?`             | `<N?`               | `<z?`              | `<q?`                           |
+| neq test       | `!=?`      | `!n=?`            | `!N=?`              | `!z=?`             | `!q=?`                          |
 
 Notes:
 
@@ -56,7 +56,6 @@ activation syntax below.  For example ``integer`(0 + 0)`` refers to
 | natural  | `setArithNatural`   | ``natural`(...)``  |
 | integer  | `setArithInteger`   | ``integer`(...)``  |
 | rational | `setArithRational`  | ``rational`(...)`` |
-| real     | `setArithReal`      | ``real`(...)``     |
 
 The overloading mechanism is *not* used for levels, since level
 expressions can always be identified by context.  In a level

@@ -43,14 +43,3 @@ squashes.  Instead, squish is best managed as a monad:
                            squish_bind (squish_bind m f) g
                              = squish_bind m (fn x . squish_bind (f x) g)
                              : squish C
-
-Squishes arise when operation on a quotient type depends on the which
-representative of the equivalence class is used.  For example, the
-lemma `Real.plusr_positive_invert` states that if the sum of two
-reals is positive, at least one of them must be positive.  However,
-both of them might be positive, and if so, which one is chosen depends
-on the representation used for the two inputs.  Consequently, we
-cannot return a deterministic inhabitant of the disjunction.
-
-    (* using real overloading *)
-    Real.plusr_positive_invert : forall (x y : real) . 0 < x + y -> squish (0 < x % 0 < y)
