@@ -1,20 +1,18 @@
 load:cantor-theorem.isto
 open:CantorTheorem
 open:Real
+overload:real
 # `CantorTheorem`
 
 Can be loaded using `File.import "cantor-theorem-load.iml";`
 
 ---
 
-Cantor's classic proof that the real numbers are not enumerable.
-Alas, the diagonal construction is sensitive to the representations of
-the input numbers, which means that the construction must be done
-using prereals, rather than actual reals (which are a quotient of the
-prereals).  This doesn't change anything fundamentally, but it makes
-the result messier.
+Expressions in this file are rendered using the `real`
+[overloading mode](../overloading.html).
 
-The statement and proof is based on the development in Bishop and
+Cantor's classic proof that the real numbers are not enumerable.
+The statement and proof are based on the development in Bishop and
 Bridges [1].
 
     cantors_theorem : type:cantors_theorem

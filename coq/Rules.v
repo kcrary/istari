@@ -1180,6 +1180,12 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deqtype (quotient a b) (quotient a' b'))
       -> tr G (deqtype a a')
 
+| tr_quotient_equal_left :
+    forall G a a' b,
+      tr G (deqtype a a')
+      -> tr G (deqtype (quotient a b) (quotient a b))
+      -> tr G (deqtype (quotient a b) (quotient a' b))
+
 (* Guarded types *)
 
 | tr_guard_formation :
@@ -2169,4 +2175,121 @@ Inductive tr : @context obj -> judgement -> Prop :=
 | tr_nativetp_uptype :
     forall A f G,
       tr G (deq triv triv (uptype (nativetp A f)))
+
+(* Symmetrical *)
+
+| tr_symmetrical_formation :
+    forall G a a',
+      tr G (deqtype a a')
+      -> tr G (deqtype (symmetrical a) (symmetrical a'))
+  
+| tr_symmetrical_formation_univ :
+    forall G lv a a',
+      tr G (deq a a' (univ lv))
+      -> tr G (deq (symmetrical a) (symmetrical a') (univ lv))
+  
+| tr_symmetrical_eta :
+    forall G a p,
+      tr G (deq p p (symmetrical a))
+      -> tr G (deq p triv (symmetrical a))
+
+| tr_symmetrical_eta_hyp :
+    forall G1 G2 a m n b,
+      tr (substctx (dot triv id) G2 ++ G1) (deq m n (subst (under (length G2) (dot triv id)) b))
+      -> tr (G2 ++ hyp_tm (symmetrical a) :: G1) (deq (subst (under (length G2) sh1) m) (subst (under (length G2) sh1) n) b)
+
+| tr_unitary_symmetrical :
+    forall G a,
+      tr G (dsubtype a unittp)
+      -> tr G (deq triv triv (symmetrical a))
+
+| tr_booltp_symmetrical :
+    forall G,
+      tr G (deq triv triv (symmetrical booltp)) 
+
+| tr_nativetp_symmetrical :
+    forall A f G,
+      tr G (deq triv triv (symmetrical (nativetp A f)))
+
+| tr_nattp_symmetrical :
+    forall G,
+      tr G (deq triv triv (symmetrical nattp))
+
+| tr_tarrow_symmetrical :
+    forall G a b,
+      tr G (deq triv triv (symmetrical a))
+      -> tr G (deq triv triv (symmetrical b))
+      -> tr G (deq triv triv (symmetrical (tarrow a b)))
+
+| tr_pi_symmetrical :
+    forall G a b,
+      tr G (deq triv triv (symmetrical a))
+      -> tr (hyp_tm a :: G) (deq triv triv (symmetrical b))
+      -> tr G (deq triv triv (symmetrical (pi a b)))
+
+| tr_intersect_symmetrical :
+    forall G a b,
+      tr G (deqtype a a)
+      -> tr (hyp_tm a :: G) (deq triv triv (symmetrical b))
+      -> tr G (deq triv triv (symmetrical (intersect a b)))
+
+| tr_prod_symmetrical :
+    forall G a b,
+      tr G (deq triv triv (symmetrical a))
+      -> tr G (deq triv triv (symmetrical b))
+      -> tr G (deq triv triv (symmetrical (prod a b)))
+
+| tr_sigma_symmetrical :
+    forall G a b,
+      tr G (deq triv triv (symmetrical a))
+      -> tr (hyp_tm a :: G) (deq triv triv (symmetrical b))
+      -> tr G (deq triv triv (symmetrical (sigma a b)))
+
+| tr_set_symmetrical :
+    forall G a b,
+      tr G (deq triv triv (symmetrical a))
+      -> tr (hyp_tm a :: G) (deqtype b b)
+      -> tr G (deq triv triv (symmetrical (set a b)))
+
+| tr_quotient_symmetrical :
+    forall G a b,
+      tr G (deqtype (quotient a b) (quotient a b))
+      -> tr G (deq triv triv (symmetrical a))
+      -> tr G (deq triv triv (symmetrical (quotient a b)))
+
+| tr_partial_symmetrical :
+    forall G a,
+      tr G (deq triv triv (symmetrical a))
+      -> tr G (deq triv triv (symmetrical (partial a)))
+
+| tr_arrow_quotient_commute :
+    forall G a b c m n ms mt,
+      tr G (deq triv triv (symmetrical a))
+      -> tr G (deq triv triv (symmetrical b))
+      -> tr (hyp_tm (subst sh1 b) :: hyp_tm b :: G) (deqtype c c)
+      (* symmetry *)
+      -> tr (hyp_tm c ::
+              hyp_tm (subst sh1 b) ::
+              hyp_tm b :: 
+              G) 
+           (deq ms ms (subst (dot (var 2) (dot (var 1) (sh 3))) c))
+      (* transitivity *)
+      -> tr (hyp_tm (subst (dot (var 1) (dot (var 2) (sh 4))) c) :: 
+              hyp_tm (subst sh1 c) ::
+              hyp_tm (subst (sh 2) b) :: 
+              hyp_tm (subst sh1 b) :: 
+              hyp_tm b :: 
+              G)
+           (deq mt mt (subst (dot (var 2) (dot (var 4) (sh 5))) c))
+      -> tr (hyp_tm c :: hyp_tm (subst sh1 b) :: hyp_tm b :: G) (deq triv triv (subst sh1 c))
+      -> tr (hyp_tm (equal (subst (sh 2) a) (var 1) (var 0)) :: hyp_tm (subst sh1 a) :: hyp_tm a :: G) (deq triv triv (sequal (var 2) (var 1)))
+      -> tr G (deq m n (tarrow a (quotient b c)))
+      -> tr G (deq m n (quotient (tarrow a b) 
+                          (pi (subst (sh 2) a)
+                             (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (sh 3))) c))))
+
+| tr_symmetrical_formation_invert :
+    forall G a a',
+      tr G (deqtype (symmetrical a) (symmetrical a'))
+      -> tr G (deqtype a a')
 .

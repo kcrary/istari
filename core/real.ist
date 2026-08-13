@@ -15,7 +15,6 @@ File.import "real-aux.iml";
 File.import "autoQ.iml";
 
 openModule /Rational/;
-openModule /Quotient/;
 openModule /Integer/;
 openModule /Nat/;
 openModule /Squish/;
@@ -74,12 +73,43 @@ grammaron Disguise;
 beginModule "Real";
 
 
-(* Primitive definitions and properties *)
-beginModule "Primitive";
-
-
 (* SET PARSING TO RATIONAL *)
 setArithRational ();
+
+
+lemma "jaunt_into_nat"
+/
+  forall a .
+    0 <= a
+    -> a <= nat_to_rational (succ (integer_to_nat (ceiling a)))
+/;
+
+inference.
+intro /a Ha/.
+apply /ltq_impl_leqq/.
+unfold /nat_to_rational/.
+rewrite /-> succ_to_integer/.
+rewrite /-> plusz_to_rational/.
+rewrite /-> integer_to_nat_inv/.
+  {
+  apply /ceiling_nonneg/ >> auto.
+  }
+apply /leqq_ltq_trans _ (integer_to_rational (ceiling a))/.
+  {
+  apply /ceiling_ub/.
+  }
+
+  {
+  rewrite /<- plusq_id_l (integer_to_rational _)/.
+  apply /plusq_ltq_l/ >> auto.
+  apply /ltq_0_1/.
+  }
+qed ();
+
+
+
+(* Primitive definitions and properties *)
+beginModule "Primitive";
 
 
 (* The arithmetic goes much more smoothly if you index from 1.  Thus
@@ -124,37 +154,6 @@ define /realequiv x y/
 
 unfold /realequiv/.
 typecheck.
-qed ();
-
-
-
-lemma "jaunt_into_nat"
-/
-  forall a .
-    0 <= a
-    -> a <= nat_to_rational (succ (integer_to_nat (ceiling a)))
-/;
-
-inference.
-intro /a Ha/.
-apply /ltq_impl_leqq/.
-unfold /nat_to_rational/.
-rewrite /-> succ_to_integer/.
-rewrite /-> plusz_to_rational/.
-rewrite /-> integer_to_nat_inv/.
-  {
-  apply /ceiling_nonneg/ >> auto.
-  }
-apply /leqq_ltq_trans _ (integer_to_rational (ceiling a))/.
-  {
-  apply /ceiling_ub/.
-  }
-
-  {
-  rewrite /<- plusq_id_l (integer_to_rational _)/.
-  apply /plusq_ltq_l/ >> auto.
-  apply /ltq_0_1/.
-  }
 qed ();
 
 
@@ -751,6 +750,21 @@ qed ();
 
 
 
+lemma "realequiv_sqstable"
+/
+  forall (x y : nat -> rational) .
+    regular x
+    -> regular y
+    -> Sqstable.sqstable (realequiv x y)
+/;
+
+intro /x y Hx Hy/.
+apply /Sqstable.stable_impl_sqstable/.
+apply /realequiv_stable/ >> auto.
+qed ();
+
+
+
 lemma "eq_real_stable"
 /
   forall (x y : real) .
@@ -878,9 +892,9 @@ define /rational_to_real x/
 introOf /x/.
 unfold /rational_to_real/.
 unfold /real/.
-fold /quotient2 _ regular realequiv realequiv_per/.
+fold /Q.quotient2 _ regular realequiv realequiv_per/.
 so /constant_regular x/ /Hreg/.
-fold /qintro2 _ _ _ realequiv_per (fn _ . x) Hreg/.
+fold /Q.qintro2 _ _ _ realequiv_per (fn _ . x) Hreg/.
 typecheck.
 qed ();
 
@@ -2977,7 +2991,7 @@ qed ();
 
 
 
-lemma "positive_intro"
+lemma "positive_inhabitant"
 /
   forall x .
     positive x
@@ -3002,12 +3016,29 @@ qed ();
 
 
 val positive = parseConstant /positive/;
-val positive_intro = parseConstant /positive_intro/;
+val positive_inhabitant = parseConstant /positive_inhabitant/;
 
 ConstantTable.insert 
   TypecheckTables.trivialIntroTactics
   positive
-  (Backchain.witnessPriority /\Term.Const positive_intro\ _ __/);
+  (Backchain.witnessPriority /\Term.Const positive_inhabitant\ _ __/);
+
+
+
+lemma "positive_ext"
+/
+  forall x (h h' : positive x) .
+    h = h' : positive x
+/;
+
+inference.
+intro /x' h h'/.
+so /real_representative x'/ /[(x Hregx ?)]/.
+subst /x'/.
+unfold /positive in h in h' in concl/.
+unfold /rintro in h in h' in concl/.
+extensionality.
+qed ();
 
 
 
@@ -4894,6 +4925,268 @@ qed ();
 
 
 
+lemma "real_sequence_to_prereal_sequence"
+/
+  forall (f : nat -> real) .
+    squish (exists (g : nat -> prereal) . f = (fn x . realintro (g x)) : (nat -> real))
+/;
+
+assert /Q.PER (nat -> rational) (fn x y . regular x & regular y & realequiv x y)/ /Hper/.
+  {
+  unfold /Q.PER/.
+  reduce //.
+  split.
+    {
+    intro /x y (Hx Hy Hxy)/.
+    splitn 2 >> auto.
+    apply /realequiv_symm/ >> auto.
+    }
+
+    {
+    intro /x y z (Hx Hy Hxy) (_ Hz Hyz)/.
+    splitn 2 >> auto.
+    apply /realequiv_trans _ y/ >> auto.
+    }
+  }
+assert /Q.PER (nat -> nat -> rational) (fn f g . forall n . regular (f n) & regular (g n) & realequiv (f n) (g n))/ /Hperarr/.
+  {
+  inference.
+  unfold /Q.PER/.
+  reduce //.
+  split.
+    {
+    intro /f g Hfg n/.
+    so /Hfg n/ /Hf Hg H/.
+    splitn 2 >> auto.
+    apply /realequiv_symm/ >> auto.
+    }
+
+    {
+    intro /f g h Hfg Hgh n/.
+    so /Hfg n/ /Hf Hg Hfg'/.
+    so /Hgh n/ /_ Hh Hgh'/.
+    splitn 2 >> auto.
+    apply /realequiv_trans _ (g n)/ >> auto.
+    }
+  }
+intro /f/.
+tightenRaw /f/ /Q.quotient1 (nat -> nat -> rational) (fn f g . forall n . regular (f n) & regular (g n) & realequiv (f n) (g n)) Hper/.
+  {
+  inference.
+  clear /f/.
+  unfold /Q.quotient1/.
+  unfold /real/.
+  apply /Q.arrow_quotient_commute _ nat (nat -> rational) (fn x y . regular x & regular y & realequiv x y)/.
+  auto.
+  }
+
+  {
+  subsume /nat -> real/.
+  1:{
+    hypof.
+    }
+  clear /f/.
+  unfold /real/.
+  unfold /Q.quotient1/.
+  reduce //.
+  apply /Q.nat_arrow_quotient_commute_conv/ >> auto.
+    {
+    RuleTactic.arrowSymmetrical.
+      {
+      RuleTactic.natSymmetrical.
+      }
+    unfold /rational/.
+    RuleTactic.quotientSymmetrical.
+      {
+      fold /rational/.
+      typecheck.
+      }
+    RuleTactic.prodSymmetrical >> RuleTactic.integerSymmetrical.
+    }
+
+    {
+    intro /x y/.
+    reduce //.
+    intro /[H]/.
+    so /regular_sqstable/ /Hstable/.
+    assert /regular x/ /Hx/.
+      {
+      squashConcl >> auto.
+      split.
+      destruct /H/ /? ? ?/.
+      auto.
+      }
+    assert /regular y/ /Hy/.
+      {
+      squashConcl >> auto.
+      split.
+      destruct /H/ /? ? ?/.
+      auto.
+      }
+    splitn 2 >> auto.
+    squashConcl.
+      {
+      apply /realequiv_sqstable/ >> auto.
+      }
+    split.
+    destruct /H/ /? ? ?/.
+    auto.
+    }
+  }
+exactRaw /squish_ret (f, ())/.
+destruct /f/ /[f g Hfg]/.
+  {
+  typecheck.
+  reduce /Hfg/.
+  unfold /Q.qintro1 at 0 0/.
+  introEqRaw /n/.
+    {
+    introOf /n/.
+    fold /rintro (f n) (Hfg n #1)/.
+    typecheck.
+    }
+
+    {
+    introOf /n/.
+    fold /rintro (g n) (Hfg n #2 #1)/.
+    typecheck.
+    }
+  fold /rintro (f n) (Hfg n #1)/.
+  fold /rintro (g n) (Hfg n #2 #1)/.
+  apply /real_equality/.
+  split.
+  unfold /rintro at 0 0/.
+  auto.
+  }
+unfold /Q.qintro1 at all/.
+reduce /Hfg/.
+assert /f : nat -> real/ /Hoff/.
+  {
+  introOf /n/.
+  fold /rintro (f n) (Hfg n #1)/.
+  typecheck.
+  }
+assert /g : nat -> real/ /Hofg/.
+  {
+  introOf /n/.
+  fold /rintro (g n) (Hfg n #2 #1)/.
+  typecheck.
+  }
+assert /f : nat -> prereal/ /Hoff'/.
+  {
+  introOf /n/.
+  unfold /prereal/.
+  typecheck.
+  auto.
+  }
+assert /g : nat -> prereal/ /Hofg'/.
+  {
+  introOf /n/.
+  unfold /prereal/.
+  typecheck.
+  auto.
+  }
+assert /forall (x : nat) . f x : real/ /Hoff''/.
+  {
+  intro /x/.
+  inferSpine /Hoff/ /__ x/ /H/.
+  hyp /H/.
+  }
+assert /forall (x : nat) . g x : real/ /Hofg''/.
+  {
+  intro /x/.
+  inferSpine /Hofg/ /__ x/ /H/.
+  hyp /H/.
+  }
+applyRaw /squish_ext/ >> auto.
+  {
+  typecheck.
+  unfold /realintro/.
+  introEq /x/ >> auto.
+  }
+
+  {
+  typecheck.
+  unfold /realintro/.
+  introEq /x/ >> auto.
+  reduce //.
+  apply /real_equality/.
+  split.
+  apply /Hfg/.
+  }
+qed ();
+
+
+
+lemma "real_sequence_to_prereal_sequence_squash"
+/
+  forall (f : nat -> real) .
+    { exists (g : nat -> prereal) . f = (fn x . realintro (g x)) : (nat -> real) }
+/;
+
+intro /f/.
+apply /squish_impl_squash/.
+apply /real_sequence_to_prereal_sequence/.
+qed ();
+
+
+
+lemma "real_upper_bound"
+/
+  forall (x : real) . squish (exists (y : integer) . ltr x (integer_to_real y))
+/;
+
+intro /x'/.
+witness /squish_bind (real_representative_squish x') __/.
+intro /(x Hx [Heq])/.
+unhide.
+subst /x'/.
+apply /squish_ret/.
+exists /ceiling (x n`2) +z z`2/.
+unfold /ltr/.
+unfold /positive/.
+unfold /rintro/.
+unfold /minusr, plusr, negr/.
+unfold /integer_to_real/.
+unfold /rational_to_real/.
+split.
+unfold /prepositive/.
+exists /n`1/.
+split.
+  {
+  omega.
+  }
+unfold /nat_to_rational/.
+reduce //.
+rewrite /-> invq_one/.
+rewrite /-> plusz_to_rational/.
+rewrite /<- plusq_shift_ltq_rrr/.
+rewrite /-> plusq_commute/.
+apply /plusq_ltq_r/.
+  {
+  apply /ceiling_ub/.
+  }
+
+  {
+  apply /integer_to_rational_mono_lt/.
+  omega.
+  }
+qed ();
+
+
+
+lemma "real_upper_bound_squash"
+/
+  forall (x : real) . { exists (y : integer) . ltr x (integer_to_real y) }
+/;
+
+intro /x/.
+apply /squish_impl_squash/.
+apply /real_upper_bound/.
+qed ();
+
+
+
 endModule ();  (* Primitive *)
 
 openModule /Primitive/;
@@ -4948,16 +5241,35 @@ aliasExport /pretimesr/ /pretimesr/;
 aliasExport /preinvr/ /preinvr/;
 aliasExport /real_to_prereal/ /real_to_prereal/;
 aliasExport /real_to_prereal_squash/ /real_to_prereal_squash/;
+aliasExport /real_sequence_to_prereal_sequence/ /real_sequence_to_prereal_sequence/;
+aliasExport /real_sequence_to_prereal_sequence_squash/ /real_sequence_to_prereal_sequence_squash/;
 aliasExport /rational_to_prereal_to_real/ /rational_to_prereal_to_real/;
 aliasExport /preplusr_to_real/ /preplusr_to_real/;
 aliasExport /prenegr_to_real/ /prenegr_to_real/;
 aliasExport /pretimesr_to_real/ /pretimesr_to_real/;
 aliasExport /preinvr_to_real/ /preinvr_to_real/;
+aliasExport /real_upper_bound/ /real_upper_bound/;
+aliasExport /real_upper_bound_squash/ /real_upper_bound_squash/;
 
 
 (* SET PARSING TO REAL *)
 structure RealParsing = RealParsingFun ();
 RealParsing.setArithReal ();
+
+
+
+lemma "eq_nonzero_real"
+/
+  forall (x y : real) .
+    x != integer_to_real z`0 : real
+    -> x = y : real
+    -> x = y : nonzero_real
+/;
+
+intro /x y Hnonzero Heq/.
+unfold /nonzero_real/.
+extensionality >> auto.
+qed ();
 
 
 
@@ -6485,6 +6797,36 @@ qed ();
 
 
 
+lemma "timesr_dist_minusr_r"
+/
+  forall a b c . a *r (b -r c) = a *r b -r a *r c : real
+/;
+
+inference.
+intro /a b c/.
+unfold /minusr at 0 0/.
+rewrite /-> timesr_dist_plusr_r/.
+rewrite /-> negr_dist_timesr_r/.
+reflexivity.
+qed ();
+
+
+
+lemma "timesr_dist_minusr_l"
+/
+  forall a b c . (a -r b) *r c = a *r c -r b *r c : real
+/;
+
+inference.
+intro /a b c/.
+unfold /minusr at 0 0/.
+rewrite /-> timesr_dist_plusr_l/.
+rewrite /-> negr_dist_timesr_l/.
+reflexivity.
+qed ();
+
+
+
 lemma "timesr_positive_invert"
 /
   forall x y .
@@ -6624,6 +6966,21 @@ qed ();
     
 
 
+lemma "plusr_self"
+/
+  forall x . x +r x = r`2 *r x : real
+/;
+
+inference.
+intro /x/.
+rewrite /-> plusz_to_real z`1 z`1/.
+rewrite /-> timesr_dist_plusr_l/.
+rewrite /-> timesr_id_l at 0 0/.
+reflexivity.
+qed ();
+
+
+
 (* Inequalities *)
 
 lemma "ltr_impl_leqr"
@@ -6679,6 +7036,21 @@ inference.
 intro /x/.
 unfold /leqr/.
 apply /ltr_irrefl/.
+qed ();
+
+
+
+lemma "leqr_refl'"
+/
+  forall x y .
+    x = y : real
+    -> x <= y
+/;
+
+inference.
+intro /x y ?/.
+subst /y/.
+apply /leqr_refl/.
 qed ();
 
 
@@ -6825,7 +7197,7 @@ lemma "ltr_inhabitant"
 inference.
 intro /x y H/.
 unfold /ltr in H in concl/.
-apply /positive_intro/ >> auto.
+apply /positive_inhabitant/ >> auto.
 qed ();
 
 
@@ -6843,6 +7215,35 @@ unfold /leqr/.
 typecheck.
 witness /ltr_irrefl x __/.
 apply /leqr_ltr_trans/ >> auto.
+qed ();
+
+
+
+lemma "ltr_ext"
+/
+  forall x y (h h' : x <r y) .
+    h = h' : (x <r y)
+/;
+
+inference.
+intro /x y h h'/.
+unfold /ltr in h in h' in concl/.
+apply /positive_ext/.
+qed ();
+    
+
+
+lemma "leqr_ext"
+/
+  forall x y (h h' : x <r= y) .
+    h = h' : (x <r= y)
+/;
+
+inference.
+intro /x y h h'/.
+unfold /leqr in h in h' in concl/.
+introEq /Hyx/.
+so /h Hyx/ /0/.
 qed ();
 
 
@@ -7741,7 +8142,7 @@ qed ();
 
 
 
-lemma "rational_nonzero_to_real"
+lemma "rational_to_real_nonzero"
 /
   forall x .
     x != q`0 : rational
@@ -7766,7 +8167,7 @@ lemma "invq_to_real"
 
 inference.
 intro /x Hnz/.
-so /rational_nonzero_to_real _ Hnz/ /Hnz'/.
+so /rational_to_real_nonzero _ Hnz/ /Hnz'/.
 assert /invr (rational_to_real x) = invr (rational_to_real x) : real/ /H/.
   {
   reflexivity.
@@ -7821,6 +8222,23 @@ qed ();
 
 
 (* Relation to integers *)
+
+lemma "integer_to_real_nonzero"
+/
+  forall x .
+    x != z`0 : integer
+    -> integer_to_real x != r`0 : real
+/;
+
+inference.
+intro /x Hx/.
+unfold /integer_to_real at 0 0/.
+apply /rational_to_real_neq/.
+apply /integer_to_rational_neq/.
+auto.
+qed ();
+
+
 
 lemma "integer_to_real_mono"
 /
@@ -8006,6 +8424,171 @@ lemma "negr_minus_one"
 
 rewrite /<- negr_one/.
 apply /negr_invol/.
+qed ();
+
+
+
+(* Relation to natural numbers *)
+
+define /nat_to_real n/
+/
+  rational_to_real (integer_to_rational (nat_to_integer n))
+//
+  nat -> real
+/;
+
+unfold /nat_to_real/.
+typecheck.
+qed ();
+
+
+
+lemma "nat_to_real_injective"
+/
+  forall x y .
+    nat_to_real x = nat_to_real y : real
+    -> x = y : nat
+/;
+
+inference.
+intro /x y Heq/.
+unfold /nat_to_real in Heq at 0 0/.
+apply /nat_to_integer_injective/.
+apply /integer_to_rational_injective/.
+apply /rational_to_real_injective/ >> auto.
+qed ();
+
+
+
+lemma "nat_to_real_neq"
+/
+  forall x y .
+    x != y : nat
+    -> nat_to_real x != nat_to_real y : real
+/;
+
+inference.
+intro /x y Hneq/.
+contrapositive /Hneq/.
+apply /nat_to_real_injective/ >> auto.
+qed ();
+
+
+
+lemma "nat_to_real_nonzero"
+/
+  forall n .
+    n != n`0 : nat
+    -> nat_to_real n != r`0 : real
+/;
+
+inference.
+intro /n Hn/.
+unfold /nat_to_real/.
+unfold /integer_to_real/.
+apply /rational_to_real_neq/.
+apply /integer_to_rational_neq/.
+omega.
+qed ();
+
+
+
+lemma "nat_to_real_mono"
+/
+  forall x y .
+    x <n= y
+    -> nat_to_real x <= nat_to_real y
+/;
+
+inference.
+intro /x y Hlt/.
+unfold /nat_to_real at 0 0/.
+apply /rational_to_real_mono/.
+apply /integer_to_rational_mono/ >> auto.
+apply /nat_to_integer_mono/ >> auto.
+qed ();
+
+
+
+lemma "nat_to_real_mono_lt"
+/
+  forall x y .
+    x <n y
+    -> nat_to_real x < nat_to_real y
+/;
+
+inference.
+intro /x y Hlt/.
+unfold /nat_to_real at 0 0/.
+apply /rational_to_real_mono_lt/.
+apply /integer_to_rational_mono_lt/.
+apply /nat_to_integer_mono_lt/ >> auto.
+qed ();
+
+
+
+lemma "nat_to_real_mono_conv"
+/
+  forall x y .
+    nat_to_real x <= nat_to_real y
+    -> x <n= y
+/;
+
+inference.
+intro /x y Hleq/.
+apply /not_lt/.
+intro /Hyx/.
+so /nat_to_real_mono_lt _ _ Hyx/ /Hlt/.
+apply /ltr_irrefl (nat_to_real x)/.
+apply /leqr_ltr_trans/ >> auto.
+qed ();
+
+
+
+lemma "nat_to_real_mono_lt_conv"
+/
+  forall x y .
+    nat_to_real x < nat_to_real y
+    -> x <n y
+/;
+
+inference.
+intro /x y Hleq/.
+apply /not_leq/.
+intro /Hyx/.
+so /nat_to_real_mono _ _ Hyx/ /Hlt/.
+apply /ltr_irrefl (nat_to_real x)/.
+apply /ltr_leqr_trans/ >> auto.
+qed ();
+
+
+
+lemma "plus_to_real"
+/
+  forall x y . nat_to_real (x +n y) = nat_to_real x +r nat_to_real y : real
+/;
+
+inference.
+intro /x y/.
+unfold /nat_to_real at all/.
+rewrite /-> plus_to_integer/.
+rewrite /-> plusz_to_rational/.
+apply /plusq_to_real/.
+qed ();
+
+
+
+lemma "times_to_real"
+/
+  forall x y . nat_to_real (x *n y) = nat_to_real x *r nat_to_real y : real
+/;
+
+inference.
+intro /x y/.
+unfold /nat_to_real at all/.
+rewrite /-> times_to_integer/.
+rewrite /-> timesz_to_rational/.
+apply /timesq_to_real/.
 qed ();
 
 
@@ -10833,6 +11416,45 @@ qed ();
 
 
 
+lemma "absr_minusr_leqr_lower"
+/
+  forall x y .
+    absr x - absr y <= absr (x - y)
+/;
+
+inference.
+intro /x y/.
+apply /real_dichotomy_weak_if_stable _ _ (absr x) (absr y)/.
+  {
+  apply /leqr_stable/.
+  }
+intro /(Hleq | Hleq)/.
+  {
+  apply /leqr_trans _ 0/.
+    {
+    rewrite /<- minusr_shift_leqr_lr/.
+    rewrite /-> plusr_id_l/.
+    hyp /Hleq/.
+    }
+
+    {
+    apply /absr_nonneg/.
+    }
+  }
+
+  {
+  rewrite /<- absr_of_nonneg (absr x - absr y)/.
+    {
+    rewrite /<- minusr_shift_leqr_rr/.
+    rewrite /-> plusr_id_l/.
+    hyp /Hleq/.
+    }
+  apply /absr_minusr_absr/.
+  }
+qed ();
+
+
+
 (* Minimum and maximum *)
 
 lemma "maxr_leq_r"
@@ -11341,6 +11963,136 @@ qed ();
 
 
 
+lemma "absr_minusr_maxr"
+/
+  forall a b c d .
+    absr (maxr a b - maxr c d) <= maxr (absr (a - c)) (absr (b - d))
+/;
+
+inference.
+intro /a b c d/.
+apply /real_dichotomy_weak_if_stable _ _ a b/.
+  {
+  apply /leqr_stable/.
+  }
+intro /Hab/.
+apply /real_dichotomy_weak_if_stable _ _ c d/.
+  {
+  apply /leqr_stable/.
+  }
+intro /Hcd/.
+destruct /Hab/ /Hab | Hba/ >> destruct /Hcd/ /Hcd | Hdc/.
+  {
+  rewrite /-> maxr_eq_r/ >> auto.
+  rewrite /-> maxr_eq_r/ >> auto.
+  apply /maxr_leq_r/.
+  }
+
+  {
+  rewrite /-> maxr_eq_r/ >> auto.
+  rewrite /-> maxr_eq_l/ >> auto.
+  apply /real_dichotomy_weak_if_stable _ _ b c/.
+    {
+    apply /leqr_stable/.
+    }
+  intro /(Hbc | Hcb)/.
+    {
+    apply /leqr_trans _ (absr (a - c))/.
+    1:{
+      apply /maxr_leq_l/.
+      }
+    rewrite /-> absr_minusr_commute at 0 1/.
+    rewrite /-> absr_of_nonneg/.
+      {
+      rewrite /<- minusr_shift_leqr_rr/.
+      rewrite /-> plusr_id_l/ >> auto.
+      }
+    rewrite /-> absr_of_nonneg/.
+      {
+      rewrite /<- minusr_shift_leqr_rr/.
+      rewrite /-> plusr_id_l/.
+      apply /leqr_trans/ >> auto.
+      }
+    apply /minusr_leqr/ >> autoWith /leqr_refl/.
+    }
+
+    {
+    apply /leqr_trans _ (absr (b - d))/.
+    1:{
+      apply /maxr_leq_r/.
+      }
+    rewrite /-> absr_of_nonneg/.
+      {
+      rewrite /<- minusr_shift_leqr_rr/.
+      rewrite /-> plusr_id_l/ >> auto.
+      }
+    rewrite /-> absr_of_nonneg/.
+      {
+      rewrite /<- minusr_shift_leqr_rr/.
+      rewrite /-> plusr_id_l/.
+      apply /leqr_trans/ >> auto.
+      }
+    apply /minusr_leqr/ >> autoWith /leqr_refl/.
+    }
+  }
+
+  {
+  rewrite /-> maxr_eq_l/ >> auto.
+  rewrite /-> maxr_eq_r/ >> auto.
+  apply /real_dichotomy_weak_if_stable _ _ a d/.
+    {
+    apply /leqr_stable/.
+    }
+  intro /(Had | Hda)/.
+    {
+    apply /leqr_trans _ (absr (b - d))/.
+    1:{
+      apply /maxr_leq_r/.
+      }
+    rewrite /-> absr_minusr_commute at 0 1/.
+    rewrite /-> absr_of_nonneg/.
+      {
+      rewrite /<- minusr_shift_leqr_rr/.
+      rewrite /-> plusr_id_l/ >> auto.
+      }
+    rewrite /-> absr_of_nonneg/.
+      {
+      rewrite /<- minusr_shift_leqr_rr/.
+      rewrite /-> plusr_id_l/.
+      apply /leqr_trans/ >> auto.
+      }
+    apply /minusr_leqr/ >> autoWith /leqr_refl/.
+    }
+
+    {
+    apply /leqr_trans _ (absr (a - c))/.
+    1:{
+      apply /maxr_leq_l/.
+      }
+    rewrite /-> absr_of_nonneg/.
+      {
+      rewrite /<- minusr_shift_leqr_rr/.
+      rewrite /-> plusr_id_l/ >> auto.
+      }
+    rewrite /-> absr_of_nonneg/.
+      {
+      rewrite /<- minusr_shift_leqr_rr/.
+      rewrite /-> plusr_id_l/.
+      apply /leqr_trans/ >> auto.
+      }
+    apply /minusr_leqr/ >> autoWith /leqr_refl/.
+    }
+  }
+
+  {
+  rewrite /-> maxr_eq_l/ >> auto.
+  rewrite /-> maxr_eq_l/ >> auto.
+  apply /maxr_leq_l/.
+  }
+qed ();
+
+
+
 lemma "maxq_to_real"
 /
   forall a b . rational_to_real (maxq a b) = maxr (rational_to_real a) (rational_to_real b) : real
@@ -11624,6 +12376,202 @@ intro /x y Hxy/.
 apply /squish_impl_squash/.
 apply /rational_dense_within_real/ >> auto.
 qed ();
+
+
+
+lemma "infinitely_close"
+/
+  forall x y .
+    (forall k . n`0 <n k -> leqr (absr (x -r y)) (invr (nat_to_real k)))
+    -> x = y : real
+/;
+
+inference.
+assert /forall k . n`0 <n k -> nat_to_real k != r`0 : real/ /Hnonzero/.
+  {
+  inference.
+  intro /k Hk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+assert /forall x y .
+          x <r y
+          -> (forall k . n`0 <n k -> leqr (absr (x -r y)) (invr (nat_to_real k)))
+          -> void/ /Hprop/.
+  {
+  inference.
+  intro /x y Hxy Hclose/ >> auto.
+  so /rational_dense_within_real_squash _# 2 Hxy/ /[(a Hxa Hay)]/.
+  so /rational_dense_within_real_squash _# 2 Hay/ /[(b Hab Hby)]/.
+  so /rational_to_real_mono_lt_conv _# 2 Hab/ /Hab'/.
+  exploit /Hclose (succ (integer_to_nat (ceiling (invq (b -q a)))))/ /Hleq/.
+    {
+    omega.
+    }
+  assert /nat_to_real (succ (integer_to_nat (ceiling (invq (b -q a))))) != r`0 : real/ /Hnonzeroceil/.
+    {
+    apply /nat_to_real_nonzero/.
+    omega.
+    }
+  rewrite /<- not_ltr in Hleq/ >> auto.
+  witness /Hleq __/.
+  assert /absr (x -r y) != r`0 : real/ /Hnonzerodiff/.
+    {
+    apply /absr_preserves_nonzero/.
+    apply /ltr_impl_neq/.
+    rewrite /<- minusr_shift_ltr_ll/.
+    rewrite /-> plusr_id_r/.
+    hyp /Hxy/.
+    }
+  rewrite /<- invr_invol (absr _)/ >> auto.
+  apply /invr_ltr_pos/.
+    {
+    apply /invr_positive/.
+    apply /absr_positive_iff_nonzero/.
+    apply /ltr_impl_neq/.
+    rewrite /<- minusr_shift_ltr_lr/.
+    rewrite /-> plusr_id_l/.
+    hyp /Hxy/.
+    }
+  apply /ltr_leqr_trans/.
+  1:{
+    exploit /jaunt_into_nat (invq (b -q a))/ /H/.
+      {
+      apply /invq_nonnegative/.
+      rewrite /<- minusq_shift_leqq_rr/.
+      rewrite /-> plusq_id_l/.
+      apply /ltq_impl_leqq/.
+      hyp /Hab'/.
+      }
+    unfold /nat_to_real/.
+    fold /nat_to_rational (succ _)/.
+    apply /rational_to_real_mono/.
+      {
+      hyp /H/.
+      }
+
+      typechecker ();
+    }
+
+    typechecker ();
+  rewrite /-> invq_to_real/.
+    {
+    symmetry.
+    apply /ltq_impl_neq/.
+    rewrite /<- minusq_shift_ltq_rr/.
+    rewrite /-> plusq_id_l/.
+    hyp /Hab'/.
+    }
+  apply /invr_ltr_pos/.
+    {
+    unfold /integer_to_real/.
+    apply /rational_to_real_mono_lt/.
+    rewrite /<- minusq_shift_ltq_rr/.
+    rewrite /-> plusq_id_l/.
+    hyp /Hab'/.
+    }
+  rewrite /-> absr_minusr_commute/.
+  rewrite /-> absr_of_nonneg/.
+    {
+    rewrite /<- minusr_shift_leqr_rr/.
+    rewrite /-> plusr_id_l/.
+    apply /ltr_impl_leqr/ >> auto.
+    }
+  rewrite /-> minusq_to_real/.
+  unfold /minusr at 1/.
+  rewrite /<- plusr_id_r (_ +r _)/.
+  rewrite /<- plusr_inverse_l (rational_to_real b)/.
+  rewrite /<- plusr_assoc at all/.
+  rewrite /-> plusr_commute3 at 1/.
+  rewrite /-> plusr_assoc/.
+  apply /ltr_trans _ (r`0 +r (~r x +r rational_to_real b))/.
+  1:{
+    apply /plusr_ltr_l/.
+      {
+      fold /_ -r _/.
+      rewrite /<- minusr_shift_ltr_rr/.
+      rewrite /-> plusr_id_l/ >> auto.
+      }
+      
+      {
+      apply /leqr_refl/.
+      }
+    }
+  rewrite /-> plusr_id_l/.
+  rewrite /<- plusr_id_r (_ +r _)/.
+  rewrite /<- plusr_inverse_l (rational_to_real a)/.
+  rewrite /<- plusr_assoc at all/.
+  rewrite /-> plusr_commute at 2/.
+  rewrite /<- plusr_rotate4/.
+  rewrite /-> plusr_assoc/.
+  rewrite /<- plusr_id_r (_ -r _)/.
+  apply /plusr_ltr_r/.
+    {
+    unfold /minusr/.
+    apply /leqr_refl/.
+    }
+
+    {
+    fold /minusr _ _/.
+    rewrite /<- minusr_shift_ltr_rr/.
+    rewrite /-> plusr_id_l/ >> auto.
+    }
+  }
+intro /x y Hclose/ >> auto.
+apply /eq_real_stable/.
+intro /Hneq/.
+so /real_dichotomy_neq _# 2 Hneq/ /Hlt | Hgt/.  
+  {
+  apply /Hprop/ >> auto.
+  }
+
+  {
+  apply /Hprop/ >> auto.
+  intro /k Hk/.
+  rewrite /-> absr_minusr_commute/ >> auto.
+  }
+qed ();
+
+  
+  
+lemma "real_upper_bound_nat"
+/
+  forall (x : real) .
+    squish
+      (exists (n : nat) . n`0 <n n & x < nat_to_real n)
+/;
+
+intro /x/.
+witness /squish_bind (real_upper_bound x) __/.
+intro /(z Hz)/.
+apply /squish_ret/.
+so /Integer.integer_dichotomy z z`0/ /Hneg | Hpos/.
+  {
+  exists /n`1/.
+  split.
+    {
+    omega.
+    }
+  unfold /nat_to_real/.
+  fold /integer_to_real _/.
+  apply /ltr_leqr_trans _ (integer_to_real z)/ >> auto.
+  apply /integer_to_real_mono/.
+  omega.
+  }
+
+  {
+  exists /Integer.integer_to_nat z/.
+  split.
+    {
+    omega.
+    }
+  unfold /nat_to_real/.
+  fold /integer_to_real _/.
+  rewrite /-> Integer.integer_to_nat_inv/ >> auto.
+  apply /Integer.ltz_impl_leqz/ >> auto.
+  }
+qed ();
+
 
 
 setOpacity /real/ Constant.OPAQUE;

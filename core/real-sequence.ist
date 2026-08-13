@@ -1,0 +1,1623 @@
+File.import "bool-load.iml";
+File.import "integer-load.iml";
+File.import "logic-load.iml";
+File.import "nat-load.iml";
+File.import "omega-load.iml";
+File.import "rational-load.iml";
+File.import "sqstable-load.iml";
+File.import "real-load.iml";
+File.import "squish-load.iml";
+
+openModule /Nat/;
+openModule /Real/;
+openModule /Squish/;
+
+
+Ctrl.use "autoQ.iml";
+
+
+beginModule "RealSequence";
+
+
+(* SET PARSING TO REAL *)
+setArithReal ();
+
+
+define /converges s x/
+/
+  squish
+    (forall k . 
+       n`0 <n k
+       -> exists m . forall n .
+            m <n= n
+            -> absr (s n - x) <= invr (nat_to_real k))
+//
+  intersect i . (nat -> real) -> real -> U i
+/;
+
+inference.
+unfold /converges/.
+typecheck.
+split.
+apply /nat_to_real_nonzero/.
+omega.
+qed ();
+
+
+
+lemma "converges_unique"
+/
+  forall s x y .
+    converges s x
+    -> converges s y
+    -> x = y : real
+/;
+
+inference.
+intro /s x y Hconvx Hconvy/.
+apply /infinitely_close/.
+assert /forall k . n`0 <n k -> nat_to_real k != r`0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hposk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+intro /k Hposk/.
+so /Hnonzeroall k Hposk/ /Hnonzerok/.
+unfold /converges in Hconvx in Hconvy/.
+so /squish_impl_squash _# 2 Hconvx/ /H/ >> auto.
+clear /Hconvx/.
+destruct /H/ /[Hconvx]/ >> auto.
+so /squish_impl_squash _# 2 Hconvy/ /H/ >> auto.
+clear /Hconvy/.
+destruct /H/ /[Hconvy]/ >> auto.
+unhide.
+exploit /Hconvx (k *n n`2)/ /m Hm/.
+  {
+  omega.
+  }
+exploit /Hconvy (k *n n`2)/ /n Hn/.
+  {
+  omega.
+  }
+unfold /minusr/.
+rewrite /<- plusr_id_r (_ +r _)/.
+rewrite /<- plusr_inverse_l (s (max m n))/.
+rewrite /<- plusr_assoc at all/.
+rewrite /-> plusr_commute3 at 1/.
+rewrite /-> plusr_commute3/.
+rewrite /-> plusr_assoc/.
+rewrite /-> absr_plusr_leqr/.
+fold /minusr _ _ at 0 0/.
+rewrite /-> absr_minusr_commute/.
+assert /nat_to_real (k *n n`2) != r`0 : real/ /Hnonzero2k/.
+  {
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+rewrite /-> Hm (max m n)/.
+1:{
+  omega.
+  }
+rewrite /-> Hn (max m n)/.
+1:{
+  omega.
+  }
+rewrite /-> plusr_self/.
+rewrite /nat_to_real (k *n n`2) = nat_to_real k *r r`2 : nonzero_real/.
+  {
+  apply /eq_nonzero_real/.
+    {
+    apply /nat_to_real_nonzero/.
+    omega.
+    }
+
+    {
+    rewrite /-> times_to_real/.
+    compat.
+    unfold /nat_to_real/.
+    fold /integer_to_real _/.
+    reflexivity.
+    }
+  }
+assert /r`2 != r`0 : real/ /Hnonzero2/.
+  {
+  apply /integer_to_real_neq/.
+  omega.
+  }
+rewrite /-> invr_timesr/.
+rewrite /-> timesr_commute/.
+rewrite /-> timesr_assoc/.
+rewrite /-> timesr_inverse_l/.
+rewrite /-> timesr_id_r/.
+reflexivity.
+qed ();
+
+
+
+lemma "converges_equal"
+/
+  forall s s' x .
+    (forall i . n`0 <n i -> s i = s' i : real)
+    -> converges s x
+    -> converges s' x
+/;
+
+inference.
+assert /forall k . n`0 <n k -> nat_to_real k != r`0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hposk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+intro /s s' x Heq Hconv/.
+unfold /converges in Hconv in concl/.
+witness /squish_bind Hconv __/ >> auto.
+clear /Hconv/.
+intro /Hconv/ >> auto.
+apply /squish_ret/ >> auto.
+intro /k Hposk/.
+so /Hconv k Hposk/ /m Hm/.
+exists /succ m/ >> auto.
+intro /n Hn/.
+rewrite /<- Heq/ >> auto.
+  {
+  omega.
+  }
+apply /Hm/.
+omega.
+qed ();
+
+
+
+define /cauchy s/
+/
+  squish
+    (forall k .
+       n`0 <n k
+       -> exists m . forall n p .
+            m <n= n
+            -> m <n= p
+            -> absr (s n - s p) <= invr (nat_to_real k))
+//
+  intersect i . (nat -> real) -> U i
+/;
+
+inference.
+unfold /cauchy/.
+typecheck.
+split.
+apply /nat_to_real_nonzero/.
+omega.
+qed ();
+
+
+
+beginModule "Primitive";
+
+openModule /Rational/;
+openModule /Real.Primitive/;
+
+
+setOpacity /prereal/ Constant.HARD;
+
+
+lemma "cauchy_impl_converges_prereal"
+/
+  forall (s : nat -> prereal) .
+    (forall k .
+       n`0 <n k
+       -> exists m . forall n p .
+            m <n= n
+            -> m <n= p
+            -> absr (realintro (s n) - realintro (s p)) <= invr (nat_to_real k))
+    -> exists (x : prereal) .
+         forall k .
+           n`0 <n k
+           -> exists m . forall n .
+                m <n= n
+                -> absr (realintro (s n) - realintro x) <= invr (nat_to_real k)
+/;
+
+inference.
+assert /forall k . n`0 <n k -> nat_to_real k != r`0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hposk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+intro /s Hcauchy/ >> auto.
+unfold /prereal in s/.
+assert /forall k . regular (s k)/ /Hregs/.
+  {
+  inference.
+  intro /k/.
+  squashConcl.
+    {
+    apply /regular_sqstable/.
+    }
+  infer /s k/ /Hofsk/.
+  destructSet /Hofsk/ /H/.
+  split.
+  hyp /H/.
+  }
+set /M/ /fn k . nat_case k n`0 (fn _ . Hcauchy k () #1)/.
+assert /M : nat -> nat/ /HofM/.
+  {
+  introOf /k/.
+  unfold /M/.
+  reduce //.
+  destruct /k/ /| k/ >> reduce // >> typecheck.
+  omega.
+  }
+set /N/ /fn k . max (k *n n`3) (M (k *n n`2))/.
+assert /N : nat -> nat/ /HofN/.
+  {
+  unfold /N/.
+  typecheck.
+  }
+assert /forall k n p .
+          n`0 <n k
+          -> M k <n= n
+          -> M k <n= p
+          -> absr (rintro (s n) (Hregs n) - rintro (s p) (Hregs p)) <= invr (nat_to_real k)/ /Hcauchy'/.
+  {
+  inference.
+  intro /k n p Hposk Hn Hp/.
+  so /Hcauchy k Hposk #2/ /H/.
+  unfold /rintro at 0 0/.
+  fold /realintro (s n)/.
+  fold /realintro (s p)/.
+  apply /H/.
+    {
+    unfold /M in Hn/.
+    destruct /k/ /| k/ >>> [omega, idtac].
+    reduce /Hn/.
+    forceExact /Hn/.
+    compat.
+    compat.
+    destruct /Hposk/ /()/.
+    typecheck.
+    clear /Hn Hp H/.
+    omega.
+    }
+
+    {
+    unfold /M in Hp/.
+    destruct /k/ /| k/ >>> [omega, idtac].
+    reduce /Hp/.
+    forceExact /Hp/.
+    compat.
+    compat.
+    destruct /Hposk/ /()/.
+    typecheck.
+    clear /Hn Hp H/.
+    omega.
+    }
+  }
+set /x/ /fn k . s (N k) (k *n n`2)/.
+assert /x : nat -> rational/ /Hofx/.
+  {
+  unfold /x/.
+  typecheck.
+  }
+assert /regular x/ /Hregx/.
+  {
+  intro /m n Hposm Hposn/.
+  apply /rational_to_real_mono_conv/.
+  rewrite /-> absq_to_real/.
+  rewrite /-> minusq_to_real/.
+  rewrite /-> plusq_to_real/.
+  unfold /minusr/.
+  rewrite /<- plusr_id_r (_ +r _)/.
+  rewrite /<- plusr_inverse_l (rintro (s (N m)) (Hregs (N m)))/.
+  rewrite /<- plusr_assoc at all/.
+  rewrite /-> plusr_commute3 _ (~ (rational_to_real (x n)))/.
+  rewrite /-> plusr_commute3 _ (~ (rational_to_real (x n)))/.
+  rewrite /-> plusr_assoc/.
+  rewrite /-> absr_plusr_leqr/.
+  rewrite /<- plusr_id_r (_ +r _) at 2/.
+  rewrite /<- plusr_inverse_l (rintro (s (N n)) (Hregs (N n)))/.
+  rewrite /<- plusr_assoc at all/.
+  rewrite /-> plusr_commute3 _ (~ (rational_to_real (x n)))/.
+  rewrite /-> plusr_commute3 _ (~ (rational_to_real (x n)))/.
+  rewrite /-> plusr_assoc/.
+  rewrite /-> absr_plusr_leqr at 1/.
+  fold /minusr _ _ at 0 0 0/.
+  rewrite /-> absr_minusr_commute at 0/.
+  rewrite /-> plusr_commute at 1/.
+  rewrite /<- plusr_assoc/.
+  exploit /approximations_nearby (s (N m)) (Hregs (N m)) (m *n n`2)/ /H/.
+    {
+    omega.
+    }
+  rewrite /s (N m) (m *n n`2) = x m : rational in H/.
+    {
+    unfold /x/.
+    reflexivity.
+    }
+  rewrite /-> H/.
+  clear /H/.
+  exploit /approximations_nearby (s (N n)) (Hregs (N n)) (n *n n`2)/ /H/.
+    {
+    omega.
+    }
+  rewrite /s (N n) (n *n n`2) = x n : rational in H/.
+    {
+    unfold /x/.
+    reflexivity.
+    }
+  rewrite /-> H/.
+  clear /H/.
+  assert /nat_to_real (m *n n`2) != r`0 : real/ /Hnonzero2m/.
+    {
+    apply /nat_to_real_nonzero/.
+    omega.
+    }
+  assert /nat_to_real (n *n n`2) != r`0 : real/ /Hnonzero2n/.
+    {
+    apply /nat_to_real_nonzero/.
+    omega.
+    }
+  assert /absr (rintro (s (N m)) (Hregs (N m)) - rintro (s (N n)) (Hregs (N n))) <= rational_to_real (invq (nat_to_rational (m *n n`2))) + rational_to_real (invq (nat_to_rational (n *n n`2)))/ /H/.
+    {
+    so /nat_dichotomy_weak (M (m *n n`2)) (M (n *n n`2))/ /Hleq | Hleq/.
+      {
+      exploit /Hcauchy' (m *n n`2) (N m) (N n)/ /H/.
+        {
+        omega.
+        }
+       
+        {
+        unfold /N at 0/.
+        omega.
+        }
+        
+        {
+        unfold /N at 0/.
+        omega.
+        }
+      rewrite /-> H/.
+      clear /H/.
+      unfold /nat_to_real/.
+      fold /nat_to_rational _/.
+      rewrite /<- invq_to_real/.
+        {
+        unfold /nat_to_rational/.
+        apply /integer_to_rational_neq/.
+        omega.
+        }
+      rewrite /<- plusr_id_r (rational_to_real _)/.
+      apply /plusr_leqr/ >> auto.
+      unfold /integer_to_real/.
+      apply /rational_to_real_mono/.
+      apply /invq_nonnegative/.
+      unfold /nat_to_rational/.
+      apply /integer_to_rational_mono/.
+      omega.
+      }
+
+      {
+      exploit /Hcauchy' (n *n n`2) (N n) (N m)/ /H/.
+        {
+        omega.
+        }
+       
+        {
+        unfold /N at 0/.
+        omega.
+        }
+        
+        {
+        unfold /N at 0/.
+        omega.
+        }
+      rewrite /-> absr_minusr_commute in H/.
+      rewrite /-> H/.
+      clear /H/.
+      unfold /nat_to_real/.
+      fold /nat_to_rational _/.
+      rewrite /<- invq_to_real/.
+        {
+        unfold /nat_to_rational/.
+        apply /integer_to_rational_neq/.
+        omega.
+        }
+      rewrite /<- plusr_id_l (rational_to_real _)/.
+      apply /plusr_leqr/ >> auto.
+      unfold /integer_to_real/.
+      apply /rational_to_real_mono/.
+      apply /invq_nonnegative/.
+      unfold /nat_to_rational/.
+      apply /integer_to_rational_mono/.
+      omega.
+      }
+    }
+  rewrite /-> H/.
+  clear /H/.
+  rewrite /<- plusr_assoc/.
+  rewrite /<- plusq_to_real at all/.
+  apply /rational_to_real_mono/.
+  rewrite /-> times_to_rational at all/.
+  rewrite /-> invq_timesq at all/.
+  rewrite /-> plusq_commute3 at 1/.
+  rewrite /-> plusq_assoc/.
+  rewrite /<- timesq_dist_plusq_r at 0 0/.
+  assert /invq (nat_to_rational n`2) +q invq (nat_to_rational n`2) = q`1 : rational/ /H/.
+    {
+    rewrite /-> plusq_self/.
+    unfold /nat_to_rational/.
+    reduce //.
+    apply /timesq_inverse_r/.
+    apply /integer_to_rational_neq/.
+    omega.
+    }
+  rewrite /-> H at 0 0/.
+  clear /H/.
+  rewrite /-> timesq_id_r at all/.
+  reflexivity.
+  }
+assert /x : prereal/ /Hofx'/.
+  {
+  unfold /prereal/.
+  typecheck.
+  }
+fold /prereal in s/.
+exists /x/ >> auto.
+clear /Hofx'/.
+unfold /prereal in s/.
+intro /k Hposk/.
+unfold /realintro at 0 0/.
+fold /rintro (s n) (Hregs n) within m n/.
+fold /rintro x Hregx/.
+exists /N k/ >> auto.
+intro /n Hn/.
+so /Hnonzeroall k Hposk/ /Hnonzero/.
+rewrite /-> absr_minusr_commute/.
+unfold /minusr/.
+rewrite /<- plusr_id_r (_ + _)/.
+rewrite /<- plusr_inverse_l (rational_to_real (x n))/.
+rewrite /<- plusr_assoc/.
+rewrite /-> plusr_commute3 at 1/.
+rewrite /-> plusr_commute3 at 0/.
+rewrite /-> plusr_assoc/.
+rewrite /-> absr_plusr_leqr/.
+rewrite /<- plusr_id_r (_ + _) at 2/.
+rewrite /<- plusr_inverse_l (rintro (s (N n)) (Hregs (N n)))/.
+rewrite /<- plusr_assoc/.
+rewrite /-> plusr_commute3 at 1/.
+rewrite /-> plusr_commute3 at 0/.
+rewrite /-> plusr_assoc/.
+rewrite /-> absr_plusr_leqr at 1/.
+rewrite /<- plusr_assoc/.
+assert /n`0 <n n/ /Hposn/.
+  {
+  unfold /N in Hn/.
+  omega.
+  }
+fold /_ - _ at 0 0 0/.
+rewrite /-> approximations_nearby x Hregx n Hposn/.
+unfold /x/.
+rewrite /-> absr_minusr_commute at 0/.
+rewrite /-> approximations_nearby (s (N n)) (Hregs (N n)) (n *n n`2)/.
+1:{
+  omega.
+  }
+assert /nat_to_real (k *n n`2) != r`0 : real/ /Hnonzero2k/.
+  {
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+rewrite /-> Hcauchy' (k *n n`2) (N n) n/.
+1:{
+  omega.
+  }
+
+2:{
+  unfold /N in Hn/.
+  omega.
+  }
+
+1:{
+  apply /leq_trans _ n/.
+    {
+    unfold /N in Hn/.
+    omega.
+    }
+    
+    {
+    unfold /N/.
+    omega.
+    }
+  }
+unfold /nat_to_real/.
+rewrite /<- invq_to_real/.
+  {
+  apply /integer_to_rational_neq/.
+  omega.
+  }
+unfold /nat_to_real/.
+rewrite /<- invq_to_real/.
+  {
+  apply /integer_to_rational_neq/.
+  omega.
+  }
+rewrite /<- plusq_to_real at all/.
+apply /rational_to_real_mono/.
+rewrite /-> times_to_rational/.
+unfold /nat_to_rational at 2/.
+reduce //.
+fold /nat_to_rational _/.
+rewrite /-> times_to_rational/.
+unfold /nat_to_rational at 3/.
+reduce //.
+fold /nat_to_rational _/.
+rewrite /-> invq_timesq at 0 0/.
+assert /k *n n`3 <n= n/ /H/.
+  {
+  unfold /N in Hn/.
+  omega.
+  }
+rewrite /<- H at all/.
+1:{
+  autoQ.
+  }
+
+1:{
+  autoQ.
+  }
+
+1:{
+  apply /samesign_pos/ >> autoQ.
+  }
+
+1:{
+  apply /samesign_pos/ >> autoQ.
+  }
+rewrite /-> times_to_rational at all/.
+unfold /nat_to_rational at 1 2/.
+reduce //.
+rewrite /-> invq_timesq at 0 0/.
+rewrite /-> timesq_assoc/.
+rewrite /<- timesq_dist_plusq_r at all/.
+rewrite /invq q`3 +q invq q`3 *q invq q`2 +q invq q`2 = q`1 : rational/.
+1:{
+  rewrite /-> timesq_id_r/.
+  reflexivity.
+  }
+rewrite /<- invq_timesq/.
+rewrite /<- timesz_to_rational z`3 z`2/.
+reduce //.
+apply /timesq_cancel_r _ _ q`6/.
+  {
+  autoQ.
+  }
+rewrite /-> timesq_id_l/.
+rewrite /-> timesq_dist_plusq_l at 0 0/.
+rewrite /-> timesq_inverse_l q`6/.
+  {
+  autoQ.
+  }
+rewrite /-> timesz_to_rational z`3 z`2/.
+rewrite /<- timesq_assoc/.
+rewrite /-> timesq_inverse_l/.
+  {
+  autoQ.
+  }
+rewrite /-> timesq_id_l/.
+rewrite /-> timesz_to_rational z`2 z`3/.
+rewrite /<- timesq_assoc/.
+rewrite /-> timesq_inverse_l/.
+  {
+  autoQ.
+  }
+rewrite /-> timesq_id_l/.
+rewrite /<- plusz_to_rational at 0 0/.
+reflexivity.
+qed ();
+
+
+
+setOpacity /prereal/ Constant.OPAQUE;
+
+
+
+endModule ();  (* RealSequence.Primitive *)
+
+
+aliasExport /cauchy_impl_converges_prereal/ /Primitive.cauchy_impl_converges_prereal/;
+
+
+
+lemma "cauchy_impl_converges"
+/
+  forall s .
+    cauchy s
+    -> exists x . converges s x
+/;
+
+inference.
+assert /forall k . n`0 <n k -> nat_to_real k != r`0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hposk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+intro /s Hcauchy/.
+assert /squish (exists (x : real) . converges s x)/ /Hprop/.
+  {
+  so /real_sequence_to_prereal_sequence s/ /H/.
+  witness /Squish.squish_bind H __/.
+  intro /(s' ?)/.
+  subst /s/.
+  rename /s'/ /s/.
+  clear /H/.
+  unfold /cauchy in Hcauchy/.
+  witness /squish_bind Hcauchy __/ >> auto.
+  clear /Hcauchy/.
+  intro /Hcauchy/ >> auto.
+  reduce /Hcauchy/.
+  apply /squish_ret/.
+  so /cauchy_impl_converges_prereal s Hcauchy/ /x Hconv/.
+  exists /realintro x/.
+  unfold /converges/.
+  apply /squish_ret/ >> auto.
+  }
+apply /squish_elim/ >> auto.
+intro /(x Hconvx) (y Hconvy)/.
+assert /x = y : real/ /Heq/.
+  {
+  apply /converges_unique s/ >> auto.
+  }
+subst /y/.
+extensionality >> reduce // >> auto.
+unfold /converges in Hconvx in Hconvy in concl/.
+apply /squish_ext/ >> auto.
+qed ();
+
+
+
+lemma "combine_halves"
+/
+  forall k .
+    n`0 <n k
+    -> invr (nat_to_real (k *n n`2)) + invr (nat_to_real (k *n n`2)) = invr (nat_to_real k) : real
+/;
+
+inference.
+intro /k Hposk/.
+assert /nat_to_real k != 0 : real/ /Hnonzerok/.
+  {
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+assert /nat_to_real (k *n n`2) != 0 : real/ /Hnonzero2k/.
+  {
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+assert /nat_to_real n`2 != 0 : real/ /Hnonzero2/.
+  {
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+rewrite /-> plusr_self/.
+rewrite /nat_to_real (k *n n`2) = nat_to_real k * nat_to_real n`2 : nonzero_real/.
+  {
+  apply /eq_nonzero_real/.
+    {
+    apply /nat_to_real_nonzero/.
+    omega.
+    }
+
+    {
+    apply /times_to_real/.
+    }
+  }
+rewrite /-> invr_timesr/.
+rewrite /-> timesr_commute at 1/.
+rewrite /<- timesr_assoc/.
+unfold /nat_to_real/.
+fold /integer_to_real _/.
+rewrite /-> timesr_inverse_r/.
+  {
+  split.
+  apply /integer_to_real_neq/.
+  omega.
+  }
+rewrite /-> timesr_id_l/.
+reflexivity.
+qed ();
+
+
+
+lemma "converges_impl_cauchy"
+/
+  forall s x .
+    converges s x
+    -> cauchy s
+/;
+
+inference.
+assert /forall k . n`0 <n k -> nat_to_real k != r`0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hposk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+intro /s x Hconv/.
+unfold /converges in Hconv/.
+unfold /cauchy/.
+witness /squish_bind Hconv __/ >> auto.
+clear /Hconv/.
+intro /Hconv/ >> auto.
+apply /squish_ret/ >> auto.
+intro /k Hposk/.
+exploit /Hconv (k *n n`2)/ /H/.
+  {
+  omega.
+  }
+destruct /H/ /m Hm/.
+assert /nat_to_real k != 0 : real/ /Hnonzerok/.
+  {
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+exists /m/.
+intro /n p Hn Hp/.
+rewrite /<- plusr_id_r (_ - _)/.
+unfold /minusr/.
+rewrite /<- plusr_inverse_l x/.
+rewrite /<- plusr_assoc at all/.
+rewrite /-> plusr_commute3 at 1/.
+rewrite /-> plusr_assoc/.
+rewrite /-> absr_plusr_leqr/.
+rewrite /-> plusr_commute at 2/.
+fold /_ - _ at 0 0/.
+rewrite /-> absr_minusr_commute at 1/.
+assert /nat_to_real (k *n n`2) != 0 : real/ /Hnonzero2k/.
+  {
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+rewrite /-> Hm n/ >> auto.
+rewrite /-> Hm p/ >> auto.
+rewrite /-> combine_halves/ >> auto.
+qed ();
+
+
+
+lemma "converges_constant"
+/
+  forall x .
+    converges (fn _ . x) x
+/;
+
+inference.
+assert /forall k . n`0 <n k -> nat_to_real k != r`0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hposk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+intro /x/.
+unfold /converges/.
+apply /squish_ret/ >> auto.
+intro /k Hposk/.
+so /Hnonzeroall k Hposk/ /Hnonzerok/.
+exists /n`1/.
+intro /m Hposn/.
+reduce //.
+rewrite /-> minusr_self/.
+rewrite /-> absr_zero/.
+apply /ltr_impl_leqr/.
+apply /invr_positive/.
+unfold /nat_to_real/.
+fold /integer_to_real _/.
+apply /integer_to_real_mono_lt/.
+omega.
+qed ();
+
+
+
+lemma "converges_plusr"
+/
+  forall s s' x y .
+    converges s x
+    -> converges s' y
+    -> converges (fn i . s i + s' i) (x + y)
+/;
+
+inference.
+assert /forall k . n`0 <n k -> nat_to_real k != r`0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hposk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+intro /s s' x y Hconvx Hconvy/.
+unfold /converges in Hconvx in Hconvy in concl/.
+witness /squish_bind Hconvx __/ >> auto.
+clear /Hconvx/.
+intro /Hconvx/ >> auto.
+witness /squish_bind Hconvy __/ >> auto.
+clear /Hconvy/.
+intro /Hconvy/ >> auto.
+apply /squish_ret/ >> auto.
+intro /k Hposk/.
+exploit /Hconvx (k *n n`2)/ /m Hm/.
+  {
+  omega.
+  }
+exploit /Hconvy (k *n n`2)/ /n Hn/.
+  {
+  omega.
+  }
+assert /nat_to_real k != 0 : real/ /Hnonzerok/.
+  {
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+exists /m +n n/.
+intro /p Hp/.
+reduce //.
+unfold /minusr/.
+rewrite /-> negr_plusr/.
+rewrite /<- plusr_assoc at all/.
+rewrite /-> plusr_commute3 at 1/.
+rewrite /-> plusr_assoc/.
+fold /minusr _ _ at 0 0/.
+rewrite /-> absr_plusr_leqr/.
+assert /nat_to_real (k *n n`2) != 0 : real/ /Hnonzero2k/.
+  {
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+rewrite /-> Hm p/.
+1:{
+  omega.
+  }
+rewrite /-> Hn p/.
+1:{
+  omega.
+  }
+rewrite /-> combine_halves/ >> auto.
+qed ();
+
+
+
+lemma "converges_timesr"
+/
+  forall s s' x y .
+    converges s x
+    -> converges s' y
+    -> converges (fn i . s i * s' i) (x * y)
+/;
+
+inference.
+assert /forall k . n`0 <n k -> nat_to_real k != r`0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hposk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+intro /s s' x y Hconvx Hconvy/.
+unfold /converges in Hconvx in Hconvy in concl/.
+witness /squish_bind Hconvx __/ >> auto.
+clear /Hconvx/.
+intro /Hconvx/ >> auto.
+witness /squish_bind Hconvy __/ >> auto.
+clear /Hconvy/.
+intro /Hconvy/ >> auto.
+witness /squish_bind (real_upper_bound (absr x)) __/ >> auto.
+intro /(xb Hxb)/.
+witness /squish_bind (real_upper_bound (absr y)) __/ >> auto.
+intro /(yb Hyb)/.
+apply /squish_ret/ >> auto.
+intro /k Hposk/.
+so /Hnonzeroall k Hposk/ /Hnonzerok/.
+set /m/ /Integer.integer_to_nat (xb +z yb +z z`1)/.
+assert /m : nat/ /Hofm/.
+  {
+  unfold /m/.
+  typecheck.
+  }
+assert /z`0 <z= xb/ /Hxbnneg/.
+  {
+  apply /integer_to_real_mono_conv/.
+  transitivity /absr x/ >> autoWith /ltr_impl_leqr absr_nonneg/.
+  }
+assert /z`0 <z= yb/ /Hybnneg/.
+  {
+  apply /integer_to_real_mono_conv/.
+  transitivity /absr y/ >> autoWith /ltr_impl_leqr absr_nonneg/.
+  }
+assert /absr x + 1 < nat_to_real m/ /Hxm/.
+  {
+  unfold /m/.
+  unfold /nat_to_real/.
+  rewrite /-> Integer.integer_to_nat_inv/.
+    {
+    omega.
+    }
+  fold /integer_to_real _/.
+  rewrite /-> plusz_to_real at 0 0/.
+  rewrite /-> plusr_assoc/.
+  apply /plusr_ltr_l/ >> auto.
+  rewrite /<- plusr_id_l 1/.
+  apply /plusr_leqr/ >> auto.
+  apply /integer_to_real_mono/ >> auto.
+  }
+assert /absr y < nat_to_real m/ /Hym/.
+  {
+  unfold /m/.
+  unfold /nat_to_real/.
+  rewrite /-> Integer.integer_to_nat_inv/.
+    {
+    omega.
+    }
+  fold /integer_to_real _/.
+  rewrite /-> plusz_to_real at 0 0/.
+  rewrite /-> plusr_commute at 1/.
+  rewrite /-> plusr_assoc/.
+  rewrite /<- plusr_id_r (absr y)/.
+  apply /plusr_ltr_l/ >> auto.
+  rewrite /<- plusr_id_l 0/.
+  apply /plusr_leqr/.
+    {
+    apply /integer_to_real_mono/ >> auto.
+    }
+
+    {
+    apply /integer_to_real_mono/.
+    omega.
+    }
+  }
+assert /n`0 <n m/ /Hposm/.
+  {
+  unfold /m/.
+  apply /Integer.integer_to_nat_mono_lt z`0/ >> auto.
+  omega.
+  }
+so /Hconvx (m *n (k *n n`2)) __/ /nx Hnx/.
+  {
+  apply /times_lt_zero/ >> omega.
+  }
+so /Hconvy (m *n (k *n n`2)) __/ /ny Hny/.
+  {
+  apply /times_lt_zero/ >> omega.
+  }
+exists /max nx ny/ >> auto.
+intro /n Hn/.
+reduce //.
+unfold /minusr/.
+rewrite /<- plusr_id_r (_ + _)/.
+rewrite /<- plusr_inverse_l (s n * y)/.
+rewrite /<- plusr_assoc at all/.
+rewrite /-> plusr_commute3 at 1/.
+rewrite /-> negr_dist_timesr_r/.
+rewrite /<- timesr_dist_plusr_r/.
+rewrite /-> plusr_commute3/.
+rewrite /-> negr_dist_timesr_l/.
+rewrite /-> plusr_assoc/.
+rewrite /<- timesr_dist_plusr_l/.
+rewrite /-> timesr_commute at 1/.
+rewrite /-> absr_plusr_leqr/.
+rewrite /-> absr_timesr/.
+rewrite /-> absr_timesr/.
+rewrite /-> Hym/ >> autoWith /absr_nonneg/.
+assert /nat_to_real (m *n (k *n n`2)) != 0 : real/ /Hnonzero2km/.
+  {
+  unfold /nat_to_real/.
+  fold /integer_to_real _/.
+  apply /integer_to_real_neq/.
+  symmetry.
+  apply /Integer.ltz_impl_neq/.
+  apply /Integer.nat_to_integer_mono_lt n`0/.
+  apply /times_lt_zero/ >> omega.
+  }  
+assert /absr (s n) <= nat_to_real m/ /H/.
+  {
+  unfold /m/.
+  unfold /nat_to_real/.
+  rewrite /-> Integer.integer_to_nat_inv/.
+    {
+    omega.
+    }
+  fold /integer_to_real _/.
+  rewrite /-> plusz_to_real at 0 0/.
+  rewrite /-> plusr_commute3/.
+  rewrite /<- plusr_id_r (absr _)/.
+  apply /plusr_leqr/.
+  1:{
+    apply /integer_to_real_mono/ >> auto.
+    }
+  rewrite /<- Hxb/.
+  rewrite /-> plusr_shift_leqr_llr/.
+  fold /minusr _ _/.
+  transitivity /absr (absr (s n) - absr x)/.
+    {
+    apply /absr_ub/.
+    }
+  rewrite /-> absr_minusr_absr/.
+  rewrite /-> Hnx/.
+  1:{
+    omega.
+    }
+  rewrite /<- invr_one/.
+  apply /invr_leqr_pos/.
+    {
+    apply /ltr_0_1/.
+    }
+  unfold /nat_to_real/.
+  fold /integer_to_real _/.
+  apply /integer_to_real_mono/.
+  rewrite /<- Integer.timesz_id_l z`1/.
+  rewrite /-> Integer.times_to_integer/.
+  apply /Integer.timesz_leqz z`1 _ z`1/ >> omega.
+  }
+rewrite /-> H/ >> autoWith /absr_nonneg/.
+clear /H/.
+fold /minusr _ _ at 0 0/.
+rewrite /<- combine_halves k/ >> auto.
+assert /nat_to_real (k *n n`2) != 0 : real/ /Hnonzero2k/.
+  {
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+apply /plusr_leqr/ >> auto.
+  {
+  rewrite /-> Hny/ >> autoWith /absr_nonneg/.
+  1:{
+    unfold /nat_to_real/.
+    fold /integer_to_real _/.
+    apply /integer_to_real_mono/.
+    omega.
+    }
+
+  1:{
+    omega.
+    }
+  rewrite /nat_to_real (m *n (k *n n`2)) = nat_to_real m * nat_to_real (k *n n`2) : nonzero_real/.
+    {
+    apply /eq_nonzero_real/ >> auto.
+    apply /times_to_real/.
+    }
+  assert /nat_to_real m != 0 : real/ /Hnonzerom/.
+    {
+    apply /nat_to_real_nonzero/.
+    omega.
+    }
+  rewrite /-> invr_timesr/.
+  rewrite /<- timesr_assoc/.
+  rewrite /-> timesr_inverse_r/.
+  rewrite /-> timesr_id_l/.
+  reflexivity.
+  }
+
+  {
+  rewrite /-> Hnx/ >> autoWith /absr_nonneg/.
+  1:{
+    unfold /nat_to_real/.
+    fold /integer_to_real _/.
+    apply /integer_to_real_mono/.
+    omega.
+    }
+
+  1:{
+    omega.
+    }
+  rewrite /nat_to_real (m *n (k *n n`2)) = nat_to_real m * nat_to_real (k *n n`2) : nonzero_real/.
+    {
+    apply /eq_nonzero_real/ >> auto.
+    apply /times_to_real/.
+    }
+  assert /nat_to_real m != 0 : real/ /Hnonzerom/.
+    {
+    apply /nat_to_real_nonzero/.
+    omega.
+    }
+  rewrite /-> invr_timesr/.
+  rewrite /<- timesr_assoc/.
+  rewrite /-> timesr_inverse_r/.
+  rewrite /-> timesr_id_l/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "converges_negr"
+/
+  forall s x .
+    converges s x
+    -> converges (fn i . ~ (s i)) (~ x)
+/;
+
+inference.
+intro /s x Hconv/.
+exploit /converges_timesr (fn _ . -1) s -1 x/ /H/ >> auto.
+  {
+  apply /converges_constant/.
+  }
+reduce /H/.
+rewrite /<- negr_as_timesr in H/.
+rewrite /<- negr_as_timesr within i in H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "converges_minusr"
+/
+  forall s s' x y .
+    converges s x
+    -> converges s' y
+    -> converges (fn i . s i - s' i) (x - y)
+/;
+
+inference.
+intro /s s' x y Hconvx Hconvy/.
+unfold /minusr at 0 0/.
+apply /converges_plusr/ >> auto.
+apply /converges_negr/ >> auto.
+qed ();
+
+
+
+lemma "converges_invr"
+/
+  forall (s : nat -> nonzero_real) (x : nonzero_real) .
+    converges s x
+    -> converges (fn i . invr (s i)) (invr x)
+/;
+
+assert /forall k . n`0 <n k -> nat_to_real k != 0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hposk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+intro /s x Hconv/.
+assert /forall i . s i != 0 : real/ /Hnonzeroalls/.
+  {
+  inference.
+  intro /i/.
+  infer /s i/ /H/.
+  destructSet /H/ /H'/.
+  unhide.
+  hyp /H'/.
+  }
+unfold /converges in Hconv in concl/.
+witness /squish_bind Hconv __/ >> auto.
+clear /Hconv/.
+intro /Hconv/ >> auto.
+assert /forall (y : nonzero_real) . absr y != 0 : real/ /Hnonzeroinv/.
+  {
+  intro /y/.
+  apply /absr_preserves_nonzero/.
+  destruct /y/ /y Hy/.
+  unhide.
+  auto.
+  }
+witness /squish_bind (real_upper_bound_nat (invr (absr x))) __/ >> auto.
+intro /(z Hposz Hz)/ >> auto.
+apply /squish_ret/ >> auto.
+intro /k Hposk/.
+so /Hnonzeroall k Hposk/ /Hnonzerok/.
+so /Hconv (z *n n`2) __/ /M HM/.
+  {
+  omega.
+  }
+assert /2 != 0 : real/ /Hneq20/.
+  {
+  apply /integer_to_real_neq/.
+  omega.
+  }
+assert /forall n . M <n= n -> invr 2 * absr x <= absr (s n)/ /HleqM/.
+  {
+  inference.
+  intro /n Hn/.
+  transitivity /absr x - absr (s n - x)/.
+  1:{
+    rewrite /<- minusr_shift_leqr_lr/.
+    rewrite /-> minusr_shift_leqr_ll/.
+    rewrite /-> absr_minusr_commute/.
+    apply /absr_minusr_leqr_lower/.
+    }
+  rewrite /<- minusr_shift_leqr_rl/.
+  rewrite /-> minusr_shift_leqr_rr/.
+  rewrite /<- timesr_id_l (absr x)/.
+  rewrite /<- timesr_dist_minusr_l/.
+  assert /nat_to_real (z *n n`2) != 0 : real/ /Hnonzero3z/.
+    {
+    apply /nat_to_real_nonzero/.
+    omega.
+    }
+  rewrite /-> HM/ >> auto.
+  rewrite /nat_to_real (z *n n`2) = nat_to_real z * 2 : nonzero_real/.
+    {
+    apply /eq_nonzero_real/ >> auto.
+    rewrite /-> times_to_real/.
+    unfold /nat_to_real at 1/.
+    fold /integer_to_real _/.
+    reflexivity.
+    }
+  rewrite /-> invr_timesr/ >> auto.
+  rewrite /-> timesr_commute/ >> auto.
+  apply /timesr_leqr_pos_pos/ >> auto.
+    {
+    apply /ltr_impl_leqr/.
+    apply /invr_positive/.
+    apply /integer_to_real_mono_lt/ >> omega.
+    }
+
+    {
+    apply /ltr_impl_leqr/ >> auto.
+    apply /invr_positive/.
+    unfold /nat_to_real/.
+    fold /integer_to_real _/.
+    apply /integer_to_real_mono_lt/ >> omega.
+    }
+
+    {
+    apply /leqr_refl'/.
+    rewrite /<- minusr_shift_rr/.
+    rewrite /-> plusr_self/.
+    rewrite /-> timesr_inverse_r/.
+    reflexivity.
+    }
+
+    {
+    rewrite /<- invr_invol (absr x)/ >> auto.
+    apply /invr_leqr_pos/ >> auto.
+      {
+      apply /invr_positive/.
+      apply /absr_positive_iff_nonzero/.
+      destruct /x/ /x Hx/.
+      unhide.
+      auto.
+      }
+
+      {
+      apply /ltr_impl_leqr/ >> auto.
+      }
+    }
+  }
+so /Hconv (k *n z *n z *n n`2) __/ /N HN/.
+  {
+  rewrite /-> times_assoc/.
+  apply /times_lt_zero/.
+    {
+    apply /times_lt_zero/ >> omega.
+    }
+    {
+    omega.
+    }
+  }
+exists /max M N/ >> auto.
+intro /n Hn/.
+reduce //.
+assert /s n != 0 : real/ /Hnonzerosn/.
+  {
+  auto.
+  }
+rewrite /invr (s n) - invr x = invr (s n) * invr x * (x - s n) : real/.
+  {
+  rewrite /-> timesr_dist_minusr_r/.
+  rewrite /-> timesr_assoc/.
+  rewrite /-> timesr_inverse_l/.
+  rewrite /-> timesr_id_r/.
+  rewrite /-> timesr_commute at 1/.
+  rewrite /-> timesr_assoc/.
+  rewrite /-> timesr_inverse_l/.
+  rewrite /-> timesr_id_r/.
+  reflexivity.
+  }
+rewrite /-> absr_timesr/.
+rewrite /-> absr_timesr/.
+rewrite /-> absr_minusr_commute/.
+assert /nat_to_real (k *n z *n z *n n`2) != 0 : real/ /Hnonzerokzz/.
+  {
+  apply /nat_to_real_nonzero/.
+  symmetry.
+  apply /lt_impl_neq/.
+  rewrite /-> times_assoc/.
+  apply /times_lt_zero/ >>> [idtac, omega].
+  apply /times_lt_zero/ >> omega.
+  }
+assert /absr x != 0 : real/ /Hnonzeroabsx/.
+  {
+  apply /absr_preserves_nonzero/.
+  destruct /x/ /x Hx/.
+  unhide.
+  auto.
+  }
+assert /invr (absr x) != 0 : real/ /Hnonzeroinvabsx/.
+  {
+  symmetry.
+  apply /ltr_impl_neq/.
+  apply /invr_positive/.
+  apply /absr_positive_iff_nonzero/.
+  destruct /x/ /x Hx/.
+  unhide.
+  auto.
+  }
+assert /2 * invr (absr x) != 0 : real/ /Hnonzero2invabsx/.
+  {
+  apply /timesr_neq_zero/ >> auto.
+  }
+apply /leqr_trans _ ((2 * nat_to_real z) * nat_to_real z * invr (nat_to_real (k *n z *n z *n n`2)))/.
+  {
+  apply /timesr_leqr/ >> auto.
+    {
+    apply /timesr_leqr_zero/ >> apply /absr_nonneg/.
+    }
+
+    {
+    apply /absr_nonneg/.
+    }
+
+    {
+    apply /timesr_leqr/ >> autoWith /absr_nonneg/.
+      {
+      apply /leqr_trans _ (2 * invr (absr x))/.
+        {
+        rewrite /-> absr_invr/.
+        rewrite /<- invr_invol (2 * invr (absr x))/ >> auto.
+        apply /invr_leqr_pos/.
+          {
+          apply /invr_positive/.
+          apply /timesr_ltr_zero/.
+            {
+            apply /integer_to_real_mono_lt/ >> omega.
+            }
+  
+            {
+            apply /invr_positive/.
+            apply /absr_positive_iff_nonzero/.
+            destruct /x/ /x Hx/.
+            unhide.
+            auto.
+            }
+          }
+        rewrite /-> invr_timesr/ >> auto.
+        rewrite /-> invr_invol/.
+        apply /HleqM/.
+        omega.
+        }
+
+        {
+        apply /timesr_leqr_l/.
+          {
+          apply /integer_to_real_mono/ >> omega.
+          }
+
+          {
+          apply /ltr_impl_leqr/ >> auto.
+          }
+        }
+      }
+
+      {
+      rewrite /-> absr_invr/.
+      apply /ltr_impl_leqr/ >> auto.
+      }
+    }
+
+    {
+    apply /HN/.
+    omega.
+    }
+  }
+rewrite /nat_to_real (k *n z *n z *n n`2) = nat_to_real k * nat_to_real z * nat_to_real z * 2 : nonzero_real/.
+  {
+  apply /eq_nonzero_real/.
+    {
+    apply /nat_to_real_nonzero/.
+    symmetry.
+    apply /lt_impl_neq/.
+    apply /times_lt_zero/ >>> [idtac, omega].
+    apply /times_lt_zero/ >> auto.
+    apply /times_lt_zero/ >> auto.
+    }
+
+    {
+    rewrite /-> times_to_real/.
+    rewrite /-> times_to_real/.
+    rewrite /-> times_to_real/.
+    unfold /nat_to_real at 3/.
+    fold /integer_to_real _/.
+    reflexivity.
+    }
+  }
+rewrite /-> invr_timesr/ >> auto.
+  {
+  split.
+  apply /timesr_neq_zero/ >> auto.
+  apply /timesr_neq_zero/ >> auto.
+  }
+rewrite /-> invr_timesr/ >> auto.
+  {
+  split.
+  apply /timesr_neq_zero/ >> auto.
+  }
+assert /nat_to_real z != 0 : real/ /Hnonzeroz/.
+  {
+  auto.
+  }
+rewrite /-> invr_timesr/.
+rewrite /<- timesr_assoc at all/.
+rewrite /-> timesr_rotate4 _ _ _ (invr (nat_to_real k))/.
+rewrite /-> timesr_assoc at 2/.
+rewrite /-> timesr_inverse_r/.
+rewrite /-> timesr_id_r/.
+rewrite /-> timesr_assoc at 1/.
+rewrite /-> timesr_inverse_r/.
+rewrite /-> timesr_id_r/.
+rewrite /-> timesr_commute at 1/.
+rewrite /-> timesr_assoc/.
+rewrite /-> timesr_inverse_r/.
+rewrite /-> timesr_id_r/.
+apply /leqr_refl/.
+qed ();
+
+
+
+lemma "converges_maxr"
+/
+  forall s s' x y .
+    converges s x
+    -> converges s' y
+    -> converges (fn i . maxr (s i) (s' i)) (maxr x y)
+/;
+
+inference.
+assert /forall k . n`0 <n k -> nat_to_real k != r`0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hposk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+intro /s s' x y Hconvx Hconvy/.
+unfold /converges in Hconvx in Hconvy in concl/.
+witness /squish_bind Hconvx __/ >> auto.
+clear /Hconvx/.
+intro /Hconvx/ >> auto.
+witness /squish_bind Hconvy __/ >> auto.
+clear /Hconvy/.
+intro /Hconvy/ >> auto.
+apply /squish_ret/ >> auto.
+intro /k Hposk/.
+so /Hnonzeroall k Hposk/ /Hnonzerok/.
+so /Hconvx k Hposk/ /M HM/.
+so /Hconvy k Hposk/ /N HN/.
+exists /max M N/.
+intro /n Hn/.
+reduce //.
+apply /leqr_trans _ (maxr (absr (s n - x)) (absr (s' n - y)))/.
+  {
+  apply /absr_minusr_maxr/.
+  }
+
+  {
+  apply /maxr_lub/.
+    {
+    apply /HM/.
+    omega.
+    }
+
+    {
+    apply /HN/.
+    omega.
+    }
+  }
+qed ();
+
+
+
+lemma "converges_minr"
+/
+  forall s s' x y .
+    converges s x
+    -> converges s' y
+    -> converges (fn i . minr (s i) (s' i)) (minr x y)
+/;
+
+inference.
+intro /s s' x y Hconvx Hconvy/.
+unfold /minr at 0 0/.
+apply /converges_negr/.
+apply /converges_maxr/ >> apply /converges_negr/ >> auto.
+qed ();
+
+
+
+lemma "maxr_of_signs"
+/
+  forall x .
+    0 <= maxr x (~ x)
+/;
+
+inference.
+intro /x/.
+apply /real_dichotomy_weak_if_stable _ _ 0 x/.
+  {
+  apply /leqr_stable/.
+  }
+intro /(Hpos | Hneq)/.
+  {
+  rewrite /-> maxr_eq_l/ >> auto.
+  apply /leqr_trans _ 0/ >> auto.
+  apply /negr_leqr'/ >> auto.
+  rewrite /-> negr_zero/.
+  rewrite /-> negr_invol/.
+  auto.
+  }
+
+  {
+  rewrite /-> maxr_eq_r/.
+    {
+    apply /leqr_trans _ 0/ >> auto.
+    apply /negr_leqr'/ >> auto.
+    rewrite /-> negr_zero/.
+    rewrite /-> negr_invol/.
+    auto.
+    }
+
+    {
+    apply /negr_leqr'/.
+    rewrite /-> negr_zero/.
+    rewrite /-> negr_invol/.
+    auto.
+    }
+  }
+qed ();
+
+
+
+lemma "converges_leqr"
+/
+  forall s s' x y .
+    converges s x
+    -> converges s' y
+    -> (forall i . n`0 <n i -> s i <= s' i)
+    -> x <= y
+/;
+
+inference.
+intro /s s' x y Hconvx Hconvy Hallleq/.
+rewrite /<- plusr_id_l x/.
+rewrite /-> minusr_shift_leqr_rr/.
+rewrite /y - x = maxr (y - x) (x - y) : real/.
+1:{
+  rewrite /<- negr_minusr at 1/.
+  apply /maxr_of_signs/.
+  }
+apply /converges_unique (fn i . s' i - s i)/.
+  {
+  apply /converges_minusr/ >> auto.
+  }
+apply /converges_equal (fn i . maxr (s' i - s i) (s i - s' i))/.
+  {
+  intro /i Hposi/.
+  reduce //.
+  apply /maxr_eq_l/.
+  apply /minusr_leqr/ >> auto.
+  }
+apply /converges_maxr/ >> apply /converges_minusr/ >> auto.
+qed ();
+
+
+
+endModule ();  (* RealSequence *)

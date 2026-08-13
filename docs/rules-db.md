@@ -13,9 +13,9 @@ Conventions:
 
 Note that no effort was made to keep the set of rules minimal.  Many
 rules that would follow from other rules are nonetheless included for
-the sake of convenience or performance.  Since (nearly) all the rules
-are verified, there is no robustness advantage to minimizing the set
-of rules.
+the sake of convenience or performance.  Since (essentially) all the
+rules are verified, there is no robustness advantage to minimizing the
+set of rules.
 
 Rules are given here in the official form, using de Bruijn indices.
 Human-readable rules, using explicit variables, are given
@@ -6705,6 +6705,163 @@ Syntactic equality is intended for internal use only.
       G |- sequal M N
       >>
       G |- eq symbol M N
+
+
+### Symmetricality
+
+These rules are in service of the rule `arrowQuotientCommute`.
+
+- `symmetricalForm A`
+
+      G |- istp (symmetrical A)
+      >>
+      G |- istp A
+
+- `symmetricalEq A B`
+
+      G |- eqtp (symmetrical A) (symmetrical B)
+      >>
+      G |- eqtp A B
+
+- `symmetricalFormUniv A I`
+
+      G |- of (univ I) (symmetrical A)
+      >>
+      G |- of (univ I) A
+
+- `symmetricalEqUniv A B I`
+
+      G |- eq (univ I) (symmetrical A) (symmetrical B)
+      >>
+      G |- eq (univ I) A B
+
+- `symmetricalLeft n A C`
+
+      G1, (symmetrical A), G2 |- C ext M[under_n (^1)]
+      >>
+      G1, G2[() . id] |- C[under_n (() . id)] ext M
+
+- `symmetricalTrivialize A`
+
+      G |- symmetrical A
+      >>
+      G |- symmetrical A
+
+- `unitarySymmetrical A`
+
+      G |- symmetrical A
+      >>
+      G |- subtype A unit
+
+- `unitSymmetrical`
+
+      G |- symmetrical unit
+
+- `voidSymmetrical`
+
+      G |- symmetrical void
+
+- `integerSymmetrical`
+
+      G |- symmetrical integer
+
+- `symbolSymmetrical`
+
+      G |- symmetrical symbol
+
+- `natSymmetrical`
+
+      G |- symmetrical nat
+
+- `boolSymmetrical`
+
+      G |- symmetrical bool
+
+- `eqSymmetrical A M N`
+
+      G |- symmetrical (eq A M N)
+      >>
+      G |- of A M
+      G |- of A N
+
+- `arrowSymmetrical A B`
+
+      G |- symmetrical (arrow A B)
+      >>
+      G |- symmetrical A
+      G |- symmetrical B
+
+- `forallSymmetrical A B`
+
+      G |- symmetrical (forall A (fn . B))
+      >>
+      G |- symmetrical A
+      G, A |- symmetrical B
+
+- `intersectSymmetrical A B`
+
+      G |- symmetrical (intersect A (fn . B))
+      >>
+      G |- istp A
+      G, A |- symmetrical B
+
+- `prodSymmetrical A B`
+
+      G |- symmetrical (prod A B)
+      >>
+      G |- symmetrical A
+      G |- symmetrical B
+
+- `existsSymmetrical A B`
+
+      G |- symmetrical (exists A (fn . B))
+      >>
+      G |- symmetrical A
+      G, A |- symmetrical B
+
+- `sumSymmetrical A B`
+
+      G |- symmetrical (sum A B)
+      >>
+      G |- symmetrical A
+      G |- symmetrical B
+
+- `setSymmetrical A B`
+
+      G |- symmetrical (set A (fn . B))
+      >>
+      G |- symmetrical A
+      G, A |- istp B
+
+- `quotientSymmetrical A B`
+
+      G |- symmetrical (quotient A (fn . fn . B))
+      >>
+      G |- istp (quotient A (fn . fn . B))
+      G |- symmetrical A
+
+- `partialSymmetrical A`
+
+      G |- symmetrical (partial A)
+      >>
+      G |- symmetrical A
+
+- `arrowQuotientCommute A B C M N`
+
+      G |- eq (quotient (arrow A B) (fn . fn . forall A[^2] (fn . C[1 0 . 2 0 . ^3]))) M N
+      >>
+      G |- symmetrical A
+      G |- symmetrical B
+      G, B, B[^1] |- istp C
+      G, B, B[^1], C |- C[2 . 1 . ^3]
+      G, B, B[^1], B[^2], C[^1], C[1 . 2 . ^4] |- C[2 . ^4]
+      G, B, B[^1], C |- of C[^1] ()
+      G, A, A[^1], (eq A[^2] 1 0) |- sequal 2 1
+      G |- eq (arrow A (quotient B (fn . fn . C))) M N
+
+- `symmetricalType`
+
+      G |- of (intersect level (fn . arrow (univ 0) (univ 0))) symmetrical
 
 
 ### Rewriting

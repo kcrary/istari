@@ -100,6 +100,8 @@ These two give transitivity in the form needed for rewriting:
 
     lt_from_leq_neq : type:lt_from_leq_neq
 
+    lt_impl_neq : type:lt_impl_neq
+
 Strong induction for natural numbers:
 
     lt_well_founded : type:lt_well_founded

@@ -24,6 +24,7 @@ Require Import SemanticsMu.
 Require Import SemanticsProperty.
 Require Import SemanticsPositive.
 Require Import SemanticsPartial.
+Require Import SemanticsSymmetrical.
 Require Import Approximation.
 
 
@@ -587,6 +588,17 @@ fold (uptype a').
 intros <-.
 so (hygiene_invert_auto _#5 Hclaa) as (Hcla' & _).
 apply interp_uptype; auto.
+}
+
+(* symmetrical *)
+{
+intros pg s i a A _ IH aa Hclaa Hequiv.
+invertc_mc Hequiv.
+intros a' Ha.
+fold (symmetrical a').
+intros <-.
+so (hygiene_invert_auto _#5 Hclaa) as (Hcla' & _).
+apply interp_symmetrical; auto.
 }
 
 (* nativetp *)

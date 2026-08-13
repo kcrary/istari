@@ -27,6 +27,7 @@ The following libraries are pre-loaded:
 - [`Quotient`](lib/quotient.html) (tools for manipulating quotient types)
 - [`Rational`](lib/rational.html)
 - [`Real`](lib/real.html)
+- [`RealSequence`](lib/real-sequence.html)
 - [`Relations`](lib/relations.html)
 - [`Sqstable`](lib/sqstable.html)
 - [`Squish`](lib/squish.html) (like squash, but with computational content)

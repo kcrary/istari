@@ -91,6 +91,9 @@
 
     neq_symm_iff : forall (i : level) (a : U i) (x y : a) . x != y : a <-> y != x : a
 
+    neq_inhabitant : forall (i : level) (a : U i) (x y : a) .
+                        x != y : a -> (fn v0 . ()) : x != y : a
+
 
 ### Transport
 

@@ -23,12 +23,13 @@
 
   + Added `Division` (natural number division).
 
-  + Added real numbers (`Real`) and a proof of Cantor's theorem
-    (`CantorTheorem`).
+  + Added real numbers (`Real` and `RealSequence`) and a proof of
+    Cantor's theorem (`CantorTheorem`).
 
   + Added `Squish` (like squash, but with computational content).
 
-  + Added material to `Decidable`, `Eventually`, `Nat`, and `Rational`.
+  + Added material to `Decidable`, `Eventually`, `Logic`, `Nat`, and
+    `Rational`.
 
   + Renamed shift lemmas in `Integer` and `Rational`:
     
@@ -50,6 +51,8 @@
   `ofFormInv2`, `ofEqInv1`, `ofEqInv2`, `boolIntro1Eq`,
   `boolIntro2Eq`, `futureArrowIntroOf`, `futureArrowIntroEq`, and
   `futureArrowIntro`.
+
+- Added the `symmetrical` property, and the rule `arrowQuotientCommute`.
 
 - Reworked the integer primitives and axioms.
 

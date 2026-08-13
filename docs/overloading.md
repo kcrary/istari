@@ -15,7 +15,7 @@ indicated type, and the name of constant that is used for the concept.
 | addition       | `+`        | `+n` / `plus`     | `+N` / `plusn`      | `+z` / `plusz`     | `+q` / `plusq`                  | `+r` / `plusr`              |
 | negation       | `~`        | n/a               | n/a                 | `~z` / `negz`      | `~q` / `negq`                   | `~r` / `negr`               |
 | subtraction    | `-`        | `-n` / `minus`    | `-N` / `minusn`     | `-z` | `minusz`    | `-q` / `minusq`                 | `-r` / `minusr`             |
-| multiplication | `*`        | `*n` / `times`    | `*N` / `timesn`     | `*z` / `timesz`    | `*q` / `timesq`                 | `*q` / `timesr`             |
+| multiplication | `*`        | `*n` / `times`    | `*N` / `timesn`     | `*z` / `timesz`    | `*q` / `timesq`                 | `*r` / `timesr`             |
 | division       | ``\|\|``   | n/a               | n/a                 | n/a                | ``\|q`` / `divq`                | ``\|r`` / `divr`            |
 | less-or-equal  | `<=`       | `<n=` / `leq`     | `<N=` / `leqn`      | `<z=` / `leqz`     | `<q=` / `leqq`                  | `<r=` / `leqr`              |
 | less-than      | `<`        | `<n` / `lt`       | `<N` / `ltn`        | `<z` / `ltz`       | `<q` / `ltq`                    | `<r` / `ltr`                |
@@ -32,8 +32,9 @@ Notes:
   Thus ``z` `` and ``N` `` are effectively the same, except that the
   latter generates a syntax error when the number is negative.
 
-- A rational literal parses as a conversion function applied to a native integer
-  (*e.g.,* ``q`0`` means ``integer_to_rational z`0``).
+- A rational or real literal parses as a conversion function applied
+  to a native integer (*e.g.,* ``q`0`` means 
+  ``integer_to_rational z`0``).
 
 - Using an overloaded operator that is not meaningful in the current
   mode (*e.g.,* negation in `nat`) results in a syntax error.  The
@@ -45,10 +46,10 @@ Notes:
   dispense with the extra bar.
 
 To activate an overloading mode globally, one calls the global
-activation function given below, which has type `unit -> unit`.  To activate
-an overloading mode for a specific scope, one wraps with the local
-activation syntax below.  For example ``integer`(0 + 0)`` refers to
-``plusz z`0 z`0``.
+activation function given below, which has type `unit -> unit`.  To
+activate an overloading mode for a specific scope, one wraps with the
+local activation syntax below.  For example ``integer`(0 + 0)`` refers
+to ``plusz z`0 z`0``.
 
 | mode     | global activation   | local activation   |
 |----------|---------------------|--------------------|

@@ -116,7 +116,67 @@ and `x'` (and `y` and `y'`) are merely related.  However `{ R x y }`
 and `{ R x' y' }` *are* equal types, since squash contracts logical
 equivalence to type equality.)
 
+
+### Commuting with functions
+
+Quotient and function types can be commuted in one direction:
+
+    arrow_quotient_commute : type:arrow_quotient_commute
+
+The other direction is more limited.  Only certain domains can be
+supported (the lemma below uses `nat`), and the codomain type beneath
+the quotient must be *symmetrical*.  Symmetricality is a semantic
+condition that says the type's underlying relation must be symmetric,
+which is generally true whenever the type is built without using
+candidates, as most types are [2].  Also, the relation must be squash
+stable.
+
+This theorem cannot be proven using the usual quotient rules; it
+requires a semantic analysis that is realized by the rule
+`arrowQuotientCommute`.
+
+    symmetrical : type:symmetrical
+
+    nat_arrow_quotient_commute_conv : type:nat_arrow_quotient_commute_conv
+
+    unitary_symmetrical : type:unitary_symmetrical
+
+    unit_symmetrical : type:unit_symmetrical
+
+    void_symmetrical : type:void_symmetrical
+
+    bool_symmetrical : type:bool_symmetrical
+
+    integer_symmetrical : type:integer_symmetrical
+
+    symbol_symmetrical : type:symbol_symmetrical
+
+    nat_symmetrical : type:nat_symmetrical
+
+    eq_symmetrical : type:eq_symmetrical
+
+    arrow_symmetrical : type:arrow_symmetrical
+
+    forall_symmetrical : type:forall_symmetrical
+
+    intersect_symmetrical : type:intersect_symmetrical
+
+    prod_symmetrical : type:prod_symmetrical
+
+    exists_symmetrical : type:exists_symmetrical
+
+    sum_symmetrical : type:sum_symmetrical
+
+    set_symmetrical : type:set_symmetrical
+
+    quotient_symmetrical : type:quotient_symmetrical
+
+    partial_symmetrical : type:partial_symmetrical
+
 ---
 
 [1] except that, in practice, the `quotient2_equality` lemma will
 normally generate fewer subgoals than `extensionality`
+
+[2] The main exception is universes, which are not symmetrical despite
+not mentioning candidates, as they *contain* candidates.

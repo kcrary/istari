@@ -165,8 +165,11 @@ functor AfterIffCompat () :> sig end =
 functor AfterLogicAll () :> sig end =
    struct
 
+      structure T = Term
+
       val neq = resolveGlobal /Logic.neq/
       val neq_symm = resolveGlobal /Logic.neq_symm/
+      val neq_inhabitant = resolveGlobal /Logic.neq_inhabitant/
 
 
       val () = CheckpointedRef.write ParseLogic.neq neq
@@ -175,6 +178,11 @@ functor AfterLogicAll () :> sig end =
       val () =
          ConstantTable.insert EqualityTacticInternal.symmetryTactics neq
          (andthenOn 0 (Backchain.witnessPriority /\Term.Const neq_symm\ _ _ _ _ __/))
+
+      val () =
+         ConstantTable.insert TypecheckTables.semitrivialIntroTactics neq
+            (Term.Lam (NONE, Term.Triv), Backchain.applyPriority /\T.Const neq_inhabitant\/);
+
 
 
       structure U = Show.Unparsing

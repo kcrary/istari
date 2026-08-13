@@ -35,6 +35,7 @@ Require Import SoundSubstitution.
 Require Import SoundSubtype.
 Require Import SoundStructural.
 Require Import SoundSwap.
+Require Import SoundSymmetrical.
 Require Import SoundUniv.
 Require Import SoundWtype.
 Require Import Shut.
@@ -219,6 +220,7 @@ intros; eapply sound_quotient_hyp_eqtype; eauto; done.
 intros; eapply sound_quotient_hyp_eq; eauto; done.
 intros; eapply sound_quotient_hyp_eq_dep; eauto; done.
 intros; eapply sound_quotient_formation_invert; eauto; done.
+intros; eapply sound_quotient_equal_left; eauto; done.
 intros; eapply sound_guard_formation; eauto; done.
 intros; eapply sound_guard_formation_iff; eauto; done.
 intros; eapply sound_guard_formation_univ; eauto; done.
@@ -382,6 +384,24 @@ intros; eapply sound_native_left; eauto; done.
 intros; eapply sound_nattp_left; eauto; done.
 intros; eapply sound_native_contradiction; eauto; done.
 intros; eapply sound_nativetp_uptype; eauto; done.
+intros; eapply sound_symmetrical_formation; eauto; done.
+intros; eapply sound_symmetrical_formation_univ; eauto; done.
+intros; eapply sound_symmetrical_eta; eauto; done.
+intros; eapply sound_symmetrical_eta_hyp; eauto; done.
+intros; eapply sound_unitary_symmetrical; eauto; done.
+intros; eapply sound_booltp_symmetrical; eauto; done.
+intros; eapply sound_nativetp_symmetrical; eauto; done.
+intros; eapply sound_nattp_symmetrical; eauto; done.
+intros; eapply sound_tarrow_symmetrical; eauto; done.
+intros; eapply sound_pi_symmetrical; eauto; done.
+intros; eapply sound_intersect_symmetrical; eauto; done.
+intros; eapply sound_prod_symmetrical; eauto; done.
+intros; eapply sound_sigma_symmetrical; eauto; done.
+intros; eapply sound_set_symmetrical; eauto; done.
+intros; eapply sound_quotient_symmetrical; eauto; done.
+intros; eapply sound_partial_symmetrical; eauto; done.
+intros; eapply sound_arrow_quotient_commute; eauto; done.
+intros; eapply sound_symmetrical_formation_invert; eauto; done.
 Qed.
 
 

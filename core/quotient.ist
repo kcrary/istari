@@ -1,5 +1,7 @@
 
 File.import "logic-load.iml";
+File.import "sqstable-load.iml";
+File.import "syntactic-equality-load.iml";
 
 File.import "quotient-aux.iml";
 
@@ -453,6 +455,472 @@ destruct /Hxy/ /[Hxy]/.
 unhide.
 unfold /qintro2 at all/.
 extensionality >> auto.
+qed ();
+
+
+
+lemma "arrow_quotient_commute"
+/
+  forall i (A B : U i) (R : B -> B -> U i) .
+    PER B R
+    -> (quotient (f g : A -> B) . forall (x : A) . R (f x) (g x))
+       <:
+       (A -> quotient (x y : B) . R x y)
+/;
+
+inference.
+intro /i A B R Hper/.
+assert /PER (A -> B) (fn f g . forall (x : A) . R (f x) (g x))/ /Hperarr/.
+  {
+  unfold /PER in Hper in concl/.
+  destruct /Hper/ /Hsymm Htrans/.
+  split.
+    {
+    reduce //.
+    intro /f g Hfg x/.
+    apply /Hsymm/ >> auto.
+    }
+
+    {
+    reduce //.
+    intro /f g h Hfg Hgh x/.
+    apply /Htrans/ >> auto.
+    }
+  }
+fold /quotient1 B R Hper/.
+fold /quotient1 (A -> B) (fn f g . forall (x : A) . R (f x) (g x)) Hperarr/.
+intro /f/.
+introOfRaw /x/ >> auto.
+  {
+  change /concl/ /_ : forall (_ : void) . B/.
+  fold /void -> B/.
+  destruct /f/ /[f g Hfg]/.
+  unfold /qintro1 at all/.
+  clear /Hfg/.
+  introEq /v/.
+  destruct /v/ /0/.
+  }
+destruct /f/ /[f g Hfg]/.
+reduce /Hfg/.
+unfold /qintro1 at all/.
+extensionality.
+apply /Hfg/.
+qed ();
+
+
+
+aliasExport /symmetrical/ Prim.symmetrical;
+
+
+
+lemma "symmetrical_type"
+/
+  symmetrical : intersect i . U i -> U i
+/;
+
+inference.
+RuleTactic.symmetricalType.
+qed ();
+recordTyping "symmetrical_type";
+
+
+
+lemma "unitary_symmetrical"
+/
+  forall i (A : U i) .
+    A <: unit
+    -> symmetrical A
+/;
+
+inference.
+intro /i A Hsub/.
+RuleTactic.unitarySymmetrical >> auto.
+qed ();
+
+
+
+lemma "unit_symmetrical"
+/
+  symmetrical unit
+/;
+
+RuleTactic.unitSymmetrical.
+qed ();
+
+
+
+lemma "void_symmetrical"
+/
+  symmetrical void
+/;
+
+RuleTactic.voidSymmetrical.
+qed ();
+
+
+
+lemma "bool_symmetrical"
+/
+  symmetrical bool
+/;
+
+RuleTactic.boolSymmetrical.
+qed ();
+
+
+
+lemma "integer_symmetrical"
+/
+  symmetrical integer
+/;
+
+RuleTactic.integerSymmetrical.
+qed ();
+
+
+
+lemma "symbol_symmetrical"
+/
+  symmetrical Symbol.symbol
+/;
+
+RuleTactic.symbolSymmetrical.
+qed ();
+
+
+
+lemma "nat_symmetrical"
+/
+  symmetrical nat
+/;
+
+RuleTactic.natSymmetrical.
+qed ();
+
+
+
+lemma "eq_symmetrical"
+/
+  forall i (A : U i) (m n : A) .
+    symmetrical (m = n : A)
+/;
+
+inference.
+intro /i A m n/.
+apply /unitary_symmetrical/.
+intro /()/.
+typecheck.
+qed ();
+
+
+
+lemma "arrow_symmetrical"
+/
+  forall i (A B : U i) .
+    symmetrical A
+    -> symmetrical B
+    -> symmetrical (A -> B)
+/;
+
+inference.
+intro /i A B Ha Hb/.
+RuleTactic.arrowSymmetrical >> auto.
+qed ();
+
+
+
+lemma "forall_symmetrical"
+/
+  forall i (A : U i) (B : A -> U i) .
+    symmetrical A
+    -> (forall (x : A) . symmetrical (B x))
+    -> symmetrical (forall (x : A) . B x)
+/;
+
+inference.
+intro /i A B Ha Hb/.
+RuleTactic.forallSymmetrical >> auto.
+qed ();
+
+
+
+lemma "intersect_symmetrical"
+/
+  forall i (A : U i) (B : A -> U i) .
+    symmetrical A
+    -> (forall (x : A) . symmetrical (B x))
+    -> symmetrical (intersect (x : A) . B x)
+/;
+
+inference.
+intro /i A B Ha Hb/.
+RuleTactic.intersectSymmetrical >> auto.
+qed ();
+
+
+
+lemma "prod_symmetrical"
+/
+  forall i (A B : U i) .
+    symmetrical A
+    -> symmetrical B
+    -> symmetrical (A & B)
+/;
+
+inference.
+intro /i A B Ha Hb/.
+RuleTactic.prodSymmetrical >> auto.
+qed ();
+
+
+
+lemma "exists_symmetrical"
+/
+  forall i (A : U i) (B : A -> U i) .
+    symmetrical A
+    -> (forall (x : A) . symmetrical (B x))
+    -> symmetrical (exists (x : A) . B x)
+/;
+
+inference.
+intro /i A B Ha Hb/.
+RuleTactic.existsSymmetrical >> auto.
+qed ();
+
+
+
+lemma "sum_symmetrical"
+/
+  forall i (A B : U i) .
+    symmetrical A
+    -> symmetrical B
+    -> symmetrical (A % B)
+/;
+
+inference.
+intro /i A B Ha Hb/.
+RuleTactic.sumSymmetrical >> auto.
+qed ();
+
+
+
+lemma "set_symmetrical"
+/
+  forall i (A : U i) (B : A -> U i) .
+    symmetrical A
+    -> symmetrical { x : A | B x }
+/;
+
+inference.
+intro /i A B Ha/.
+RuleTactic.setSymmetrical >> auto.
+qed ();
+
+
+
+lemma "quotient_symmetrical"
+/
+  forall i (A : U i) (R : A -> A -> U i) .
+    PER A R
+    -> symmetrical A
+    -> symmetrical (quotient (x y : A) . R x y)
+/;
+
+inference.
+intro /i A R Hper Hmet/.
+RuleTactic.quotientSymmetrical >> auto.
+so /quotient_formation _# 3 Hper/ /H/.
+typecheck.
+qed ();
+
+
+
+lemma "partial_symmetrical"
+/
+  forall i (A : U i) .
+    symmetrical A 
+    -> symmetrical (partial A)
+/;
+
+inference.
+intro /i A Ha/.
+RuleTactic.partialSymmetrical >> auto.
+qed ();
+
+
+
+(* This proof can be adapted to other domains by changing the
+   "set /dom/ /nat/" line, and fixing the proofs of a couple of
+   subsequent assertions.  Alas, we cannot just make this proof
+   hypothetical over the domain, because we need to know that the
+   domain is elemental, and elemental-ness is not negatable.
+*)
+
+lemma "nat_arrow_quotient_commute_conv"
+/
+  forall i (B : U i) (R : B -> B -> U i) .
+    PER B R
+    -> symmetrical B
+    -> (forall (x y : B) . Sqstable.sqstable (R x y))
+    -> (nat -> quotient (x y : B) . R x y)
+       <:
+       (quotient (f g : nat -> B) . forall (x : nat) . R (f x) (g x))
+/;
+
+inference.
+set /dom/ /nat/.
+fold /dom at all/.
+intro /i B R Hper Hmet Hstable/.
+assert /dom : U i/ /Hofdom/.
+  {
+  unfold /dom/.
+  typecheck.
+  }
+assert /symmetrical dom/ /Hmetdom/.
+  {
+  unfold /dom/.
+  apply /nat_symmetrical/.
+  }
+assert /forall (x y : dom) . x = y : dom -> SyntacticEquality.sequal x y/ /Helemental/.
+  {
+  unfold /dom at all/.
+  intro /x y/.
+  apply /SyntacticEquality.nat_elemental/ >> auto.
+  }
+so /Hper/ /Hsymm Htrans/.
+assert /PER B (fn x y . { R x y })/ /Hpersq/.
+  {
+  unfold /PER/.
+  split.
+    {
+    reduce //.
+    intro /x y [Hxy]/.
+    split.
+    apply /Hsymm/ >> auto.
+    }
+
+    {
+    reduce //.
+    intro /x y z [Hxy] [Hyz]/.
+    split.
+    apply /Htrans/ >> auto.
+    }
+  }
+assert /PER (dom -> B) (fn f g . forall (x : dom) . R (f x) (g x))/ /Hperarr/.
+  {
+  unfold /PER/.
+  split.
+    {
+    reduce //.
+    intro /f g Hfg x/.
+    apply /Hsymm/ >> auto.
+    }
+
+    {
+    reduce //.
+    intro /f g h Hfg Hgh x/.
+    apply /Htrans/ >> auto.
+    }
+  }
+assert /PER (dom -> B) (fn f g . forall (x : dom) . { R (f x) (g x) })/ /Hpersqarr/.
+  {
+  unfold /PER/.
+  split.
+    {
+    reduce //.
+    intro /f g Hfg x/.
+    so /Hfg x/ /[H]/.
+    split.
+    apply /Hsymm/ >> auto.
+    }
+
+    {
+    reduce //.
+    intro /f g h Hfg Hgh x/.
+    so /Hfg x/ /[Hfg']/.
+    so /Hgh x/ /[Hgh']/.
+    split.
+    apply /Htrans/ >> auto.
+    }
+  }
+fold /quotient1 B R Hper/.
+fold /quotient1 (dom -> B) (fn f g . forall (x : dom) . R (f x) (g x)) Hperarr/.
+intro /h/.
+eqtp /quotient1 (dom -> B) (fn f g . forall (x : dom) . { R (f x) (g x) }) Hpersqarr/.
+  {
+  unfold /quotient1 at 0 0/.
+  typecheck.
+    {
+    reintro /f g Hfg/.
+    reduce /Hfg concl/.
+    intro /x/.
+    so /Hfg x/ /[Hfg']/.
+    squashConcl >> auto.
+    }
+
+    {
+    reintro /f g Hfg/.
+    reduce /Hfg concl/.
+    intro /x/.
+    split >> auto.
+    }
+
+    {
+    reintro /f g Hfg/.
+    reduce /Hfg concl/.
+    intro /x/.
+    so /Hfg x/ /[Hfg']/.
+    split.
+    apply /Hsymm/ >> auto.
+    }
+
+    {
+    reintro /f g k Hfg Hgk/.
+    reduce /Hfg Hgk concl/.
+    intro /x/.
+    so /Hfg x/ /[Hfg']/.
+    so /Hgk x/ /[Hgk']/.
+    split.
+    apply /Htrans _ (g x)/ >> auto.
+    }
+  }
+unfold /quotient1/.
+reduce //.
+unfold /of/.
+RuleTactic.arrowQuotientCommute (parseCurr /additional` x y . { R x y }/) >> auto.
+  {
+  reintro /x y Hxy/.
+  destruct /Hxy/ /[Hxy]/.
+  split.
+  apply /Hsymm/ >> auto.
+  }
+
+  {
+  reintro /x y z Hxy Hyz/.
+  destruct /Hxy/ /[Hxy]/.
+  destruct /Hyz/ /[Hyz]/.
+  split.
+  apply /Htrans/ >> auto.
+  }
+fold /of _ h/.
+fold /quotient1 B (fn x y . { R x y }) Hpersq/.
+eqtp /dom -> quotient1 B R Hper/ >> auto.
+unfold /quotient1 at 0 0/.
+typecheck.
+  {
+  reintro /_ x y Hxy/.
+  squashConcl >> auto.
+  }
+
+  {
+  reintro /_ x y Hxy/.
+  apply /Hsymm/ >> auto.
+  }
+
+  {
+  reintro /_ x y z Hxy Hyz/.
+  apply /Htrans/ >> auto.
+  }
 qed ();
 
 

@@ -52,6 +52,7 @@ Require Import ProperEquiv.
 Require Import ProperClosed.
 Require Import SemanticsPositive.
 Require Import SemanticsPartial.
+Require Import SemanticsSymmetrical.
 Require Import Approximation.
 
 
@@ -1766,6 +1767,15 @@ rewrite -> extend_iuuptype.
 reflexivity.
 }  
 
+(* symmetrical *)
+{
+intros pg s i a A _ IH IHo h.
+so (IH IHo h) as (A' & ->).
+exists (iusymmetrical (cin pg) i A').
+rewrite -> extend_iusymmetrical.
+reflexivity.
+}  
+
 (* native *)
 {
 intros pg s i A f H h.
@@ -2160,6 +2170,7 @@ try (intros;
            |eapply interp_admiss
            |eapply interp_padmiss
            |eapply interp_uptype
+           |eapply interp_symmetrical
            |eapply interp_native
            ];
      eauto using restriction_hygiene, restriction_decrease;

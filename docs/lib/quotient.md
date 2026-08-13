@@ -178,7 +178,90 @@ and `x'` (and `y` and `y'`) are merely related.  However `{ R x y }`
 and `{ R x' y' }` *are* equal types, since squash contracts logical
 equivalence to type equality.)
 
+
+### Commuting with functions
+
+Quotient and function types can be commuted in one direction:
+
+    arrow_quotient_commute : forall (i : level) (A B : U i) (R : B -> B -> U i) .
+                                PER B R
+                                -> (quotient (f g : A -> B) . (forall (x : A) . R (f x) (g x)))
+                                     <: (A -> quotient (x y : B) . R x y)
+
+The other direction is more limited.  Only certain domains can be
+supported (the lemma below uses `nat`), and the codomain type beneath
+the quotient must be *symmetrical*.  Symmetricality is a semantic
+condition that says the type's underlying relation must be symmetric,
+which is generally true whenever the type is built without using
+candidates, as most types are [2].  Also, the relation must be squash
+stable.
+
+This theorem cannot be proven using the usual quotient rules; it
+requires a semantic analysis that is realized by the rule
+`arrowQuotientCommute`.
+
+    symmetrical : intersect (i : level) . U i -> U i
+
+    nat_arrow_quotient_commute_conv : forall (i : level) (B : U i) (R : B -> B -> U i) .
+                                         PER B R
+                                         -> symmetrical B
+                                         -> (forall (x y : B) . Sqstable.sqstable (R x y))
+                                         -> (nat -> quotient (x y : B) . R x y)
+                                              <: (quotient (f g : nat -> B) .
+                                                    (forall (x : nat) . R (f x) (g x)))
+
+    unitary_symmetrical : forall (i : level) (A : U i) . A <: unit -> symmetrical A
+
+    unit_symmetrical : symmetrical unit
+
+    void_symmetrical : symmetrical void
+
+    bool_symmetrical : symmetrical bool
+
+    integer_symmetrical : symmetrical integer
+
+    symbol_symmetrical : symmetrical Symbol.symbol
+
+    nat_symmetrical : symmetrical nat
+
+    eq_symmetrical : forall (i : level) (A : U i) (m n : A) . symmetrical (m = n : A)
+
+    arrow_symmetrical : forall (i : level) (A B : U i) .
+                           symmetrical A -> symmetrical B -> symmetrical (A -> B)
+
+    forall_symmetrical : forall (i : level) (A : U i) (B : A -> U i) .
+                            symmetrical A
+                            -> (forall (x : A) . symmetrical (B x))
+                            -> symmetrical (forall (x : A) . B x)
+
+    intersect_symmetrical : forall (i : level) (A : U i) (B : A -> U i) .
+                               symmetrical A
+                               -> (forall (x : A) . symmetrical (B x))
+                               -> symmetrical (intersect (x : A) . B x)
+
+    prod_symmetrical : forall (i : level) (A B : U i) .
+                          symmetrical A -> symmetrical B -> symmetrical (A & B)
+
+    exists_symmetrical : forall (i : level) (A : U i) (B : A -> U i) .
+                            symmetrical A
+                            -> (forall (x : A) . symmetrical (B x))
+                            -> symmetrical (exists (x : A) . B x)
+
+    sum_symmetrical : forall (i : level) (A B : U i) .
+                         symmetrical A -> symmetrical B -> symmetrical (A % B)
+
+    set_symmetrical : forall (i : level) (A : U i) (B : A -> U i) .
+                         symmetrical A -> symmetrical { x : A | B x }
+
+    quotient_symmetrical : forall (i : level) (A : U i) (R : A -> A -> U i) .
+                              PER A R -> symmetrical A -> symmetrical (quotient (x y : A) . R x y)
+
+    partial_symmetrical : forall (i : level) (A : U i) . symmetrical A -> symmetrical (partial A)
+
 ---
 
 [1] except that, in practice, the `quotient2_equality` lemma will
 normally generate fewer subgoals than `extensionality`
+
+[2] The main exception is universes, which are not symmetrical despite
+not mentioning candidates, as they *contain* candidates.

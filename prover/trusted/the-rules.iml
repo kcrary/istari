@@ -1030,6 +1030,31 @@ signature THE_RULES =
       val symbolUptype : rule
       val symbolAdmiss : rule
       val symbolSequal : term -> term -> rule
+      val symmetricalForm : term -> rule
+      val symmetricalEq : term -> term -> rule
+      val symmetricalFormUniv : term -> term -> rule
+      val symmetricalEqUniv : term -> term -> term -> rule
+      val symmetricalLeft : int -> term -> term -> rule
+      val symmetricalTrivialize : term -> rule
+      val unitarySymmetrical : term -> rule
+      val unitSymmetrical : rule
+      val voidSymmetrical : rule
+      val integerSymmetrical : rule
+      val symbolSymmetrical : rule
+      val natSymmetrical : rule
+      val boolSymmetrical : rule
+      val eqSymmetrical : term -> term -> term -> rule
+      val arrowSymmetrical : term -> term -> rule
+      val forallSymmetrical : term -> term -> rule
+      val intersectSymmetrical : term -> term -> rule
+      val prodSymmetrical : term -> term -> rule
+      val existsSymmetrical : term -> term -> rule
+      val sumSymmetrical : term -> term -> rule
+      val setSymmetrical : term -> term -> rule
+      val quotientSymmetrical : term -> term -> rule
+      val partialSymmetrical : term -> rule
+      val arrowQuotientCommute : term -> term -> term -> term -> term -> rule
+      val symmetricalType : rule
 
    end
 
@@ -1124,6 +1149,7 @@ val const_sum = Const Prim.sum
 val const_sum_case = Const Prim.sum_case
 val const_symbol = Const Prim.symbol
 val const_symbol_eqb = Const Prim.symbol_eqb
+val const_symmetrical = Const Prim.symmetrical
 val const_tarrow = Const Prim.tarrow
 val const_timesz = Const Prim.timesz
 val const_total = Const Prim.total
@@ -2124,5 +2150,30 @@ val symbolStrict = Arg.make "symbolStrict" [] [] (Elim (const_strict, [App (cons
 val symbolUptype = Arg.make "symbolUptype" [] [] (Elim (const_uptype, [App (const_symbol), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 val symbolAdmiss = Arg.make "symbolAdmiss" [] [] (Elim (const_admiss, [App (const_symbol), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 fun symbolSequal m n = Arg.make "symbolSequal" [m, n, ] [] (Elim (const_sequal, [App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_eq, [App (const_symbol), App (m), App (n), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun symmetricalForm a = Arg.make "symmetricalForm" [a, ] [] (Elim (const_istp, [App (Elim (const_symmetrical, [App (a), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun symmetricalEq a b = Arg.make "symmetricalEq" [a, b, ] [] (Elim (const_eqtp, [App (Elim (const_symmetrical, [App (a), ])), App (Elim (const_symmetrical, [App (b), ])), ])) [(Arg.Unhide, [], Elim (const_eqtp, [App (a), App (b), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun symmetricalFormUniv a i = Arg.make "symmetricalFormUniv" [a, i, ] [] (Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (Elim (const_symmetrical, [App (a), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (Elim (const_univ, [App (i), ])), App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun symmetricalEqUniv a b i = Arg.make "symmetricalEqUniv" [a, b, i, ] [] (Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (Elim (const_symmetrical, [App (a), ])), App (Elim (const_symmetrical, [App (b), ])), ])) [(Arg.Unhide, [], Elim (const_eq, [App (Elim (const_univ, [App (i), ])), App (a), App (b), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun symmetricalLeft gsize a c = Arg.lmake "symmetricalLeft" [] gsize [J.Tm (Elim (const_symmetrical, [App (a), ])), ] (c) [(Arg.Nothing, [], SOME (Dot (Triv, Shift 0)), Sub (c, under gsize (Dot (Triv, Shift 0)))), ] (fn [m, ] => Sub (m, under gsize (Shift 1)) | _ => raise Arg.ExtractFailure)
+fun symmetricalTrivialize a = Arg.make "symmetricalTrivialize" [a, ] [] (Elim (const_symmetrical, [App (a), ])) [(Arg.Unhide, [], Elim (const_symmetrical, [App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun unitarySymmetrical a = Arg.make "unitarySymmetrical" [a, ] [] (Elim (const_symmetrical, [App (a), ])) [(Arg.Unhide, [], Elim (const_subtype, [App (a), App (const_unit), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+val unitSymmetrical = Arg.make "unitSymmetrical" [] [] (Elim (const_symmetrical, [App (const_unit), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+val voidSymmetrical = Arg.make "voidSymmetrical" [] [] (Elim (const_symmetrical, [App (const_void), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+val integerSymmetrical = Arg.make "integerSymmetrical" [] [] (Elim (const_symmetrical, [App (const_integer), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+val symbolSymmetrical = Arg.make "symbolSymmetrical" [] [] (Elim (const_symmetrical, [App (const_symbol), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+val natSymmetrical = Arg.make "natSymmetrical" [] [] (Elim (const_symmetrical, [App (const_nat), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+val boolSymmetrical = Arg.make "boolSymmetrical" [] [] (Elim (const_symmetrical, [App (const_bool), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
+fun eqSymmetrical a m n = Arg.make "eqSymmetrical" [a, m, n, ] [] (Elim (const_symmetrical, [App (Elim (const_eq, [App (a), App (m), App (n), ])), ])) [(Arg.Unhide, [], Elim (const_of, [App (a), App (m), ])), (Arg.Unhide, [], Elim (const_of, [App (a), App (n), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun arrowSymmetrical a b = Arg.make "arrowSymmetrical" [a, b, ] [] (Elim (const_symmetrical, [App (Elim (const_arrow, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_symmetrical, [App (a), ])), (Arg.Unhide, [], Elim (const_symmetrical, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun forallSymmetrical a b = Arg.make "forallSymmetrical" [a, b, ] [] (Elim (const_symmetrical, [App (Elim (const_forall, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_symmetrical, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_symmetrical, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun intersectSymmetrical a b = Arg.make "intersectSymmetrical" [a, b, ] [] (Elim (const_symmetrical, [App (Elim (const_intersect, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_symmetrical, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun prodSymmetrical a b = Arg.make "prodSymmetrical" [a, b, ] [] (Elim (const_symmetrical, [App (Elim (const_prod, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_symmetrical, [App (a), ])), (Arg.Unhide, [], Elim (const_symmetrical, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun existsSymmetrical a b = Arg.make "existsSymmetrical" [a, b, ] [] (Elim (const_symmetrical, [App (Elim (const_exists, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_symmetrical, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_symmetrical, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun sumSymmetrical a b = Arg.make "sumSymmetrical" [a, b, ] [] (Elim (const_symmetrical, [App (Elim (const_sum, [App (a), App (b), ])), ])) [(Arg.Unhide, [], Elim (const_symmetrical, [App (a), ])), (Arg.Unhide, [], Elim (const_symmetrical, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun setSymmetrical a b = Arg.make "setSymmetrical" [a, b, ] [] (Elim (const_symmetrical, [App (Elim (const_set, [App (a), App (Lam (NONE, b)), ])), ])) [(Arg.Unhide, [], Elim (const_symmetrical, [App (a), ])), (Arg.Unhide, [J.Tm (a), ], Elim (const_istp, [App (b), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun quotientSymmetrical a b = Arg.make "quotientSymmetrical" [a, b, ] [] (Elim (const_symmetrical, [App (Elim (const_quotient, [App (a), App (Lam (NONE, Lam (NONE, b))), ])), ])) [(Arg.Unhide, [], Elim (const_istp, [App (Elim (const_quotient, [App (a), App (Lam (NONE, Lam (NONE, b))), ])), ])), (Arg.Unhide, [], Elim (const_symmetrical, [App (a), ])), ] (fn [_, _, ] => Triv | _ => raise Arg.ExtractFailure)
+fun partialSymmetrical a = Arg.make "partialSymmetrical" [a, ] [] (Elim (const_symmetrical, [App (Elim (const_partial, [App (a), ])), ])) [(Arg.Unhide, [], Elim (const_symmetrical, [App (a), ])), ] (fn [_, ] => Triv | _ => raise Arg.ExtractFailure)
+fun arrowQuotientCommute a b c m n = Arg.make "arrowQuotientCommute" [a, b, c, m, n, ] [] (Elim (const_eq, [App (Elim (const_quotient, [App (Elim (const_arrow, [App (a), App (b), ])), App (Lam (NONE, Lam (NONE, Elim (const_forall, [App (Sub (a, Shift 2)), App (Lam (NONE, Sub (c, Dot (Elim (Var 1, [App (Var 0), ]), Dot (Elim (Var 2, [App (Var 0), ]), Shift 3))))), ])))), ])), App (m), App (n), ])) [(Arg.Unhide, [], Elim (const_symmetrical, [App (a), ])), (Arg.Unhide, [], Elim (const_symmetrical, [App (b), ])), (Arg.Unhide, [J.Tm (Sub (b, Shift 1)), J.Tm (b), ], Elim (const_istp, [App (c), ])), (Arg.Unhide, [J.Tm (c), J.Tm (Sub (b, Shift 1)), J.Tm (b), ], Sub (c, Idot (2, Idot (1, Shift 3)))), (Arg.Unhide, [J.Tm (Sub (c, Idot (1, Idot (2, Shift 4)))), J.Tm (Sub (c, Shift 1)), J.Tm (Sub (b, Shift 2)), J.Tm (Sub (b, Shift 1)), J.Tm (b), ], Sub (c, Idot (2, Shift 4))), (Arg.Unhide, [J.Tm (c), J.Tm (Sub (b, Shift 1)), J.Tm (b), ], Elim (const_of, [App (Sub (c, Shift 1)), App (Triv), ])), (Arg.Unhide, [J.Tm (Elim (const_eq, [App (Sub (a, Shift 2)), App (Var 1), App (Var 0), ])), J.Tm (Sub (a, Shift 1)), J.Tm (a), ], Elim (const_sequal, [App (Var 2), App (Var 1), ])), (Arg.Unhide, [], Elim (const_eq, [App (Elim (const_arrow, [App (a), App (Elim (const_quotient, [App (b), App (Lam (NONE, Lam (NONE, c))), ])), ])), App (m), App (n), ])), ] (fn [_, _, _, _, _, _, _, _, ] => Triv | _ => raise Arg.ExtractFailure)
+val symmetricalType = Arg.make "symmetricalType" [] [] (Elim (const_of, [App (Elim (const_intersect, [App (const_level), App (Lam (NONE, Elim (const_arrow, [App (Elim (const_univ, [App (Var 0), ])), App (Elim (const_univ, [App (Var 0), ])), ]))), ])), App (const_symmetrical), ])) [] (fn [] => Triv | _ => raise Arg.ExtractFailure)
 
 end

@@ -48,6 +48,7 @@ Require Import SemanticsSubtype.
 Require Import SemanticsUniv.
 Require Import SemanticsWtype.
 Require Import SemanticsPartial.
+Require Import SemanticsSymmetrical.
 Require Import PreSpacify.
 
 
@@ -509,6 +510,11 @@ with basicv : page -> bool -> nat -> sterm -> wiurel stop -> Prop :=
     forall pg s i a (A : wiurel stop),
       basic pg s i a A
       -> basicv pg s i (uptype a) (iuuptype stop i A)
+
+| interp_symmetrical :
+    forall pg s i a (A : wiurel stop),
+      basic pg s i a A
+      -> basicv pg s i (symmetrical a) (iusymmetrical stop i A)
 
 | interp_native :
     forall pg s i A f,

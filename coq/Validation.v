@@ -139,6 +139,7 @@ Require Import ValidationSimple.
 Require Import ValidationSquash.
 Require Import ValidationSubtype.
 Require Import ValidationSum.
+Require Import ValidationSymmetrical.
 Require Import ValidationUniv.
 
 
@@ -1139,6 +1140,31 @@ exact symbolStrict_valid.
 exact symbolUptype_valid.
 exact symbolAdmiss_valid.
 exact symbolSequal_valid.
+exact symmetricalForm_valid.
+exact symmetricalEq_valid.
+exact symmetricalFormUniv_valid.
+exact symmetricalEqUniv_valid.
+exact symmetricalLeft_valid.
+exact symmetricalTrivialize_valid.
+exact unitarySymmetrical_valid.
+exact unitSymmetrical_valid.
+exact voidSymmetrical_valid.
+exact integerSymmetrical_valid.
+exact symbolSymmetrical_valid.
+exact natSymmetrical_valid.
+exact boolSymmetrical_valid.
+exact eqSymmetrical_valid.
+exact arrowSymmetrical_valid.
+exact forallSymmetrical_valid.
+exact intersectSymmetrical_valid.
+exact prodSymmetrical_valid.
+exact existsSymmetrical_valid.
+exact sumSymmetrical_valid.
+exact setSymmetrical_valid.
+exact quotientSymmetrical_valid.
+exact partialSymmetrical_valid.
+exact arrowQuotientCommute_valid.
+exact symmetricalType_valid.
 Qed.
   
 

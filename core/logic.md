@@ -89,6 +89,8 @@
 
     neq_symm_iff : type:neq_symm_iff
 
+    neq_inhabitant : type:neq_inhabitant
+
 
 ### Transport
 

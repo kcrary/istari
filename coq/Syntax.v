@@ -102,6 +102,8 @@ Inductive operator : list nat -> Type :=
 | oper_uptype      : operator [0]
 | oper_seq         : operator [0; 1]
 
+| oper_symmetrical : operator [0]
+
 (* Candidates used for impredicative quantification. *)
 | oper_ext         : object -> operator nil
 
@@ -576,6 +578,7 @@ Definition admiss {obj} m          : @term obj := oper _ (oper_admiss _) (rw_con
 Definition padmiss {obj} m1 m2     : @term obj := oper _ (oper_padmiss _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
 Definition uptype {obj} m          : @term obj := oper _ (oper_uptype _) (rw_cons _ _ m rw_nil).
 Definition seq {obj} m1 m2         : @term obj := oper _ (oper_seq _) (rw_cons _ _ m1 (rw_cons _ _ m2 rw_nil)).
+Definition symmetrical {obj} m     : @term obj := oper _ (oper_symmetrical _) (rw_cons _ _ m rw_nil).
 Definition ext {obj} x             : @term obj := oper _ (oper_ext _ x) rw_nil.
 Definition extt {obj} x            : @term obj := oper _ (oper_extt _ x) rw_nil.
 Definition marker {obj} i          : @term obj := oper _ (oper_marker _ i) rw_nil.
@@ -782,6 +785,9 @@ Inductive same_operator {A B : Type} : forall a b, operator A a -> operator B b 
 
 | same_seq :
     same_operator [0; 1] [0; 1] (oper_seq A) (oper_seq B)
+
+| same_symmetrical :
+    same_operator [0] [0] (oper_symmetrical A) (oper_symmetrical B)
 
 | same_ext {x y} :
     same_operator nil nil (oper_ext A x) (oper_ext B y)

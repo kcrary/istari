@@ -33,6 +33,10 @@ The type of reals:
 
     leqr_inhabitant : type:leqr_inhabitant
 
+    ltr_ext : type:ltr_ext
+
+    leqr_ext : type:leqr_ext
+
     ltr_impl_leqr : type:ltr_impl_leqr
     
     ltr_irrefl : type:ltr_irrefl
@@ -40,6 +44,8 @@ The type of reals:
     ltr_impl_neq : type:ltr_impl_neq
     
     leqr_refl : type:leqr_refl
+    
+    leqr_refl' : type:leqr_refl'
     
     leqr_antisymm : type:leqr_antisymm
     
@@ -62,6 +68,10 @@ This one gives transitivity in the form needed for rewriting:
     not_ltr : type:not_ltr
     
     ltr_from_leqr_neq : type:ltr_from_leqr_neq
+
+This lemma is convenient for rewriting under `invr`:
+
+    eq_nonzero_real : type:eq_nonzero_real
 
 
 ### Plus and negation
@@ -591,11 +601,17 @@ inequality did not reverse on the right.
 
     timesr_ann_r : type:timesr_ann_r
 
+    plusr_self : type:plusr_self
+
     negr_as_timesr : type:negr_as_timesr
 
     negr_dist_timesr_l : type:negr_dist_timesr_l
 
     negr_dist_timesr_r : type:negr_dist_timesr_r
+
+    timesr_dist_minusr_r : type:timesr_dist_minusr_r
+
+    timesr_dist_minusr_l : type:timesr_dist_minusr_l
 
     negr_dist_invr : type:negr_dist_invr
 
@@ -613,6 +629,8 @@ inequality did not reverse on the right.
 
     rational_to_real_neq : type:rational_to_real_neq
 
+    rational_to_real_nonzero : type:rational_to_real_nonzero
+
     rational_to_real_mono : type:rational_to_real_mono
 
     rational_to_real_mono_conv : type:rational_to_real_mono_conv
@@ -620,8 +638,6 @@ inequality did not reverse on the right.
     rational_to_real_mono_lt : type:rational_to_real_mono_lt
 
     rational_to_real_mono_lt_conv : type:rational_to_real_mono_lt_conv
-
-    rational_nonzero_to_real : type:rational_nonzero_to_real
 
     plusq_to_real : type:plusq_to_real
 
@@ -645,6 +661,8 @@ inequality did not reverse on the right.
 
     integer_to_real_neq : type:integer_to_real_neq
 
+    integer_to_real_nonzero : type:integer_to_real_nonzero
+
     integer_to_real_mono : type:integer_to_real_mono
 
     integer_to_real_mono_conv : type:integer_to_real_mono_conv
@@ -660,6 +678,30 @@ inequality did not reverse on the right.
     minusz_to_real : type:minusz_to_real
 
     timesz_to_real : type:timesz_to_real
+
+
+### Relation to natural numbers
+
+    nat_to_real : type:nat_to_real
+                = def:nat_to_real
+
+    nat_to_real_injective : type:nat_to_real_injective
+
+    nat_to_real_neq : type:nat_to_real_neq
+
+    nat_to_real_nonzero : type:nat_to_real_nonzero
+
+    nat_to_real_mono : type:nat_to_real_mono
+
+    nat_to_real_mono_conv : type:nat_to_real_mono_conv
+
+    nat_to_real_mono_lt : type:nat_to_real_mono_lt
+
+    nat_to_real_mono_lt_conv : type:nat_to_real_mono_lt_conv
+
+    plus_to_real : type:plus_to_real
+
+    times_to_real : type:times_to_real
 
 
 ### Significant numbers
@@ -757,6 +799,8 @@ of their inputs:
 
     absr_minusr_absr : type:absr_minusr_absr
 
+    absr_minusr_leqr_lower : type:absr_minusr_leqr_lower
+
     absq_to_real : type:absq_to_real
 
     absz_to_real : type:absz_to_real
@@ -830,6 +874,8 @@ of their inputs:
 
     plusr_dist_maxr_r : type:plusr_dist_maxr_r
 
+    absr_minusr_maxr : type:absr_minusr_maxr
+
     maxq_to_real : type:maxq_to_real
 
     minq_to_real : type:minq_to_real
@@ -844,6 +890,14 @@ of their inputs:
     rational_dense_within_real : type:rational_dense_within_real
 
     rational_dense_within_real_squash : type:rational_dense_within_real_squash
+
+    real_upper_bound : type:real_upper_bound
+
+    real_upper_bound_squash : type:real_upper_bound_squash
+
+    real_upper_bound_nat : type:real_upper_bound_nat
+
+    infinitely_close : type:infinitely_close
 
     real_total : type:real_total
 
@@ -862,6 +916,10 @@ produce a deterministic result.
     real_to_prereal : type:real_to_prereal
 
     real_to_prereal_squash : type:real_to_prereal_squash
+
+    real_sequence_to_prereal_sequence : type:real_sequence_to_prereal_sequence
+
+    real_sequence_to_prereal_sequence_squash : type:real_sequence_to_prereal_sequence_squash
 
     rational_to_prereal : type:rational_to_prereal
 

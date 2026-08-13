@@ -16,9 +16,9 @@ Conventions:
 
 Note that no effort was made to keep the set of rules minimal.  Many
 rules that would follow from other rules are nonetheless included for
-the sake of convenience or performance.  Since (nearly) all the rules
-are verified, there is no robustness advantage to minimizing the set
-of rules.
+the sake of convenience or performance.  Since (essentially) all the
+rules are verified, there is no robustness advantage to minimizing the
+set of rules.
 
 Rules are given here in human-readable format, using explicit
 variables.  The official rules, using de Bruijn indices, are given
@@ -4822,7 +4822,7 @@ variables.  The official rules, using de Bruijn indices, are given
 
 - `arrowLeft`
 
-      G, x : (A -> B) |- C ext [x M / y/N
+      G, x : (A -> B) |- C ext [x M / y]N
       >>
       G |- A ext M
       G, y : B |- C ext N
@@ -6638,6 +6638,163 @@ Syntactic equality is intended for internal use only.
       G |- sequal M N
       >>
       G |- M = N : symbol
+
+
+### Symmetricality
+
+These rules are in service of the rule `arrowQuotientCommute`.
+
+- `symmetricalForm A`
+
+      G |- symmetrical A : type
+      >>
+      G |- A : type
+
+- `symmetricalEq A B`
+
+      G |- symmetrical A = symmetrical B : type
+      >>
+      G |- A = B : type
+
+- `symmetricalFormUniv A I`
+
+      G |- symmetrical A : univ I
+      >>
+      G |- A : univ I
+
+- `symmetricalEqUniv A B I`
+
+      G |- symmetrical A = symmetrical B : univ I
+      >>
+      G |- A = B : univ I
+
+- `symmetricalLeft n A C`
+
+      G1, x : (symmetrical A), G2 |- C ext M
+      >>
+      G1, [() / x]G2 |- [() / x]C ext M
+
+- `symmetricalTrivialize A`
+
+      G |- symmetrical A
+      >>
+      G |- symmetrical A
+
+- `unitarySymmetrical A`
+
+      G |- symmetrical A
+      >>
+      G |- A <: unit
+
+- `unitSymmetrical`
+
+      G |- symmetrical unit
+
+- `voidSymmetrical`
+
+      G |- symmetrical void
+
+- `integerSymmetrical`
+
+      G |- symmetrical integer
+
+- `symbolSymmetrical`
+
+      G |- symmetrical symbol
+
+- `natSymmetrical`
+
+      G |- symmetrical nat
+
+- `boolSymmetrical`
+
+      G |- symmetrical bool
+
+- `eqSymmetrical A M N`
+
+      G |- symmetrical (M = N : A)
+      >>
+      G |- M : A
+      G |- N : A
+
+- `arrowSymmetrical A B`
+
+      G |- symmetrical (A -> B)
+      >>
+      G |- symmetrical A
+      G |- symmetrical B
+
+- `forallSymmetrical A B`
+
+      G |- symmetrical (forall (x : A) . B)
+      >>
+      G |- symmetrical A
+      G, x : A |- symmetrical B
+
+- `intersectSymmetrical A B`
+
+      G |- symmetrical (intersect (x : A) . B)
+      >>
+      G |- A : type
+      G, x : A |- symmetrical B
+
+- `prodSymmetrical A B`
+
+      G |- symmetrical (A & B)
+      >>
+      G |- symmetrical A
+      G |- symmetrical B
+
+- `existsSymmetrical A B`
+
+      G |- symmetrical (exists (x : A) . B)
+      >>
+      G |- symmetrical A
+      G, x : A |- symmetrical B
+
+- `sumSymmetrical A B`
+
+      G |- symmetrical (A % B)
+      >>
+      G |- symmetrical A
+      G |- symmetrical B
+
+- `setSymmetrical A B`
+
+      G |- symmetrical {x : A | B}
+      >>
+      G |- symmetrical A
+      G, x : A |- B : type
+
+- `quotientSymmetrical A B`
+
+      G |- symmetrical (quotient (x y : A) . B)
+      >>
+      G |- (quotient (x y : A) . B) : type
+      G |- symmetrical A
+
+- `partialSymmetrical A`
+
+      G |- symmetrical (partial A)
+      >>
+      G |- symmetrical A
+
+- `arrowQuotientCommute A B C M N`
+
+      G |- M = N : (quotient (x' y' : A -> B) . forall (z : A) . [x' z, y' z / x, y]C)
+      >>
+      G |- symmetrical A
+      G |- symmetrical B
+      G, x : B, y : B |- C : type
+      G, x' : B, y' : B, w : [x', y' / x, y]C |- [y', x' / x, y]C
+      G, x' : B, y' : B, z' : B, w : [x', y' / x, y]C, w' : [y', z' / x, y]C |- [x', z' / x, y]C
+      G, x : B, y : B, z : C |- () : C
+      G, x : A, y : A, w : (x = y : A) |- sequal x y
+      G |- M = N : (A -> quotient (x y : B) . C)
+
+- `symmetricalType`
+
+      G |- symmetrical : intersect (i : level) . univ i -> univ i
 
 
 ### Rewriting

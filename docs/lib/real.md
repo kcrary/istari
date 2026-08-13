@@ -31,6 +31,10 @@ The type of reals:
 
     leqr_inhabitant : forall (x y : real) . x <= y -> (fn v0 . ()) : x <= y
 
+    ltr_ext : forall (x y : real) (h h' : x < y) . h = h' : (x < y)
+
+    leqr_ext : forall (x y : real) (h h' : x <= y) . h = h' : (x <= y)
+
     ltr_impl_leqr : forall (x y : real) . x < y -> x <= y
     
     ltr_irrefl : forall (x : real) . not (x < x)
@@ -38,6 +42,8 @@ The type of reals:
     ltr_impl_neq : forall (x y : real) . x < y -> x != y : real
     
     leqr_refl : forall (x : real) . x <= x
+    
+    leqr_refl' : forall (x y : real) . x = y : real -> x <= y
     
     leqr_antisymm : forall (x y : real) . x <= y -> y <= x -> x = y : real
     
@@ -60,6 +66,10 @@ This one gives transitivity in the form needed for rewriting:
     not_ltr : forall (x y : real) . not (x < y) <-> y <= x
     
     ltr_from_leqr_neq : forall (x y : real) . x <= y -> x != y : real -> x < y
+
+This lemma is convenient for rewriting under `invr`:
+
+    eq_nonzero_real : forall (x y : real) . x != 0 : real -> x = y : real -> x = y : nonzero_real
 
 
 ### Plus and negation
@@ -618,11 +628,17 @@ inequality did not reverse on the right.
 
     timesr_ann_r : forall (x : real) . x * 0 = 0 : real
 
+    plusr_self : forall (x : real) . x + x = 2 * x : real
+
     negr_as_timesr : forall (x : real) . ~ x = -1 * x : real
 
     negr_dist_timesr_l : forall (x y : real) . ~ (x * y) = ~ x * y : real
 
     negr_dist_timesr_r : forall (x y : real) . ~ (x * y) = x * ~ y : real
+
+    timesr_dist_minusr_r : forall (a b c : real) . a * (b - c) = a * b - a * c : real
+
+    timesr_dist_minusr_l : forall (a b c : real) . (a - b) * c = a * c - b * c : real
 
     negr_dist_invr : forall (x : nonzero_real) . ~ (invr x) = invr (~ x) : real
 
@@ -644,6 +660,9 @@ inequality did not reverse on the right.
                               x != y : Rational.rational
                               -> rational_to_real x != rational_to_real y : real
 
+    rational_to_real_nonzero : forall (x : Rational.rational) .
+                                  x != q`0 : Rational.rational -> rational_to_real x != 0 : real
+
     rational_to_real_mono : forall (x y : Rational.rational) .
                                x <q= y -> rational_to_real x <= rational_to_real y
 
@@ -655,9 +674,6 @@ inequality did not reverse on the right.
 
     rational_to_real_mono_lt_conv : forall (x y : Rational.rational) .
                                        rational_to_real x < rational_to_real y -> x <q y
-
-    rational_nonzero_to_real : forall (x : Rational.rational) .
-                                  x != q`0 : Rational.rational -> rational_to_real x != 0 : real
 
     plusq_to_real : forall (x y : Rational.rational) .
                        rational_to_real (x +q y) = rational_to_real x + rational_to_real y : real
@@ -693,6 +709,9 @@ inequality did not reverse on the right.
     integer_to_real_neq : forall (x y : integer) .
                              x != y : integer -> integer_to_real x != integer_to_real y : real
 
+    integer_to_real_nonzero : forall (x : integer) .
+                                 x != z`0 : integer -> integer_to_real x != 0 : real
+
     integer_to_real_mono : forall (x y : integer) .
                               x <z= y -> integer_to_real x <= integer_to_real y
 
@@ -715,6 +734,34 @@ inequality did not reverse on the right.
 
     timesz_to_real : forall (x y : integer) .
                         integer_to_real (x *z y) = integer_to_real x * integer_to_real y : real
+
+
+### Relation to natural numbers
+
+    nat_to_real : nat -> real
+                = fn n .
+                     rational_to_real (Rational.integer_to_rational (Integer.nat_to_integer n))
+
+    nat_to_real_injective : forall (x y : nat) .
+                               nat_to_real x = nat_to_real y : real -> x = y : nat
+
+    nat_to_real_neq : forall (x y : nat) . x != y : nat -> nat_to_real x != nat_to_real y : real
+
+    nat_to_real_nonzero : forall (n : nat) . n != n`0 : nat -> nat_to_real n != 0 : real
+
+    nat_to_real_mono : forall (x y : nat) . x <n= y -> nat_to_real x <= nat_to_real y
+
+    nat_to_real_mono_conv : forall (x y : nat) . nat_to_real x <= nat_to_real y -> x <n= y
+
+    nat_to_real_mono_lt : forall (x y : nat) . x <n y -> nat_to_real x < nat_to_real y
+
+    nat_to_real_mono_lt_conv : forall (x y : nat) . nat_to_real x < nat_to_real y -> x <n y
+
+    plus_to_real : forall (x y : nat) .
+                      nat_to_real (x +n y) = nat_to_real x + nat_to_real y : real
+
+    times_to_real : forall (x y : nat) .
+                       nat_to_real (x *n y) = nat_to_real x * nat_to_real y : real
 
 
 ### Significant numbers
@@ -815,6 +862,8 @@ of their inputs:
 
     absr_minusr_absr : forall (a b : real) . absr (absr a - absr b) <= absr (a - b)
 
+    absr_minusr_leqr_lower : forall (x y : real) . absr x - absr y <= absr (x - y)
+
     absq_to_real : forall (x : Rational.rational) .
                       rational_to_real (Rational.absq x) = absr (rational_to_real x) : real
 
@@ -894,6 +943,9 @@ of their inputs:
 
     plusr_dist_maxr_r : forall (a b c : real) . a + maxr b c = maxr (a + b) (a + c) : real
 
+    absr_minusr_maxr : forall (a b c d : real) .
+                          absr (maxr a b - maxr c d) <= maxr (absr (a - c)) (absr (b - d))
+
     maxq_to_real : forall (a b : Rational.rational) .
                       rational_to_real (Rational.maxq a b)
                         = maxr (rational_to_real a) (rational_to_real b)
@@ -928,6 +980,18 @@ of their inputs:
                                            -> { exists (z : Rational.rational) .
                                                   x < rational_to_real z & rational_to_real z < y }
 
+    real_upper_bound : forall (x : real) .
+                          Squish.squish (exists (y : integer) . x < integer_to_real y)
+
+    real_upper_bound_squash : forall (x : real) . { exists (y : integer) . x < integer_to_real y }
+
+    real_upper_bound_nat : forall (x : real) .
+                              Squish.squish (exists (n : nat) . n`0 <n n & x < nat_to_real n)
+
+    infinitely_close : forall (x y : real) .
+                          (forall (k : nat) . n`0 <n k -> absr (x - y) <= invr (nat_to_real k))
+                          -> x = y : real
+
     real_total : Partial.total real
 
     real_strict : Partial.strict real
@@ -946,6 +1010,15 @@ produce a deterministic result.
                          Squish.squish (exists (y : prereal) . x = realintro y : real)
 
     real_to_prereal_squash : forall (x : real) . { exists (y : prereal) . x = realintro y : real }
+
+    real_sequence_to_prereal_sequence : forall (f : nat -> real) .
+                                           Squish.squish
+                                             (exists (g : nat -> prereal) .
+                                                f = (fn x . realintro (g x)) : (nat -> real))
+
+    real_sequence_to_prereal_sequence_squash : forall (f : nat -> real) .
+                                                  { exists (g : nat -> prereal) .
+                                                      f = (fn x . realintro (g x)) : (nat -> real) }
 
     rational_to_prereal : Rational.rational -> prereal
 

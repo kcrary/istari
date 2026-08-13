@@ -101,6 +101,8 @@ These two give transitivity in the form needed for rewriting:
 
     lt_from_leq_neq : forall (m n : nat) . m <= n -> not (m = n : nat) -> m < n
 
+    lt_impl_neq : forall (m n : nat) . m < n -> m != n : nat
+
 Strong induction for natural numbers:
 
     lt_well_founded : forall (n : nat) . Acc.Acc nat lt n

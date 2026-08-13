@@ -120,6 +120,7 @@ Definition succ : fterm := lam (app inr (var 0)).
 Definition sum : fterm := lam (lam (sigma booltp (bite (var 0) (var 2) (var 1)))).
 Definition symbol : fterm := nativetp Native.symbol Native.native_symbol.
 Definition symbol_eqb : fterm := lam (lam (native_binary Native.symbol_eqb_native (var 1) (var 0))).
+Definition symmetrical : fterm := lam (symmetrical (var 0)).
 Definition tarrow : fterm := lam (lam (tarrow (var 1) (var 0))).
 Definition timesz : fterm := lam (lam (native_binary Native.timesz_native (var 1) (var 0))).
 Definition true : fterm := btrue.

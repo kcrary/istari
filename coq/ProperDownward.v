@@ -45,6 +45,7 @@ Require Import SemanticsSimple.
 Require Import SemanticsSubtype.
 Require Import SemanticsEqtype.
 Require Import SemanticsPartial.
+Require Import SemanticsSymmetrical.
 Require Import ExtSpace.
 Require Import PreSpacify.
 Require Import Lattice.
@@ -1010,6 +1011,14 @@ intros pg s i a A _ IH j Hj.
 rewrite -> iutruncate_iuuptype.
 rewrite -> Nat.min_r; auto.
 apply interp_uptype; auto.
+}
+
+(* symmetrical *)
+{
+intros pg s i a A _ IH j Hj.
+rewrite -> iutruncate_iusymmetrical.
+rewrite -> Nat.min_r; auto.
+apply interp_symmetrical; auto.
 }
 
 (* native *)

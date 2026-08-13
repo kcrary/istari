@@ -75,6 +75,7 @@ UNITS = \
 	SemanticsSigma \
 	SemanticsSimple \
 	SemanticsSubtype \
+	SemanticsSymmetrical \
 	SemanticsUniv \
 	SemanticsWtype \
 	Sequence \
@@ -109,6 +110,7 @@ UNITS = \
 	SoundSubtype \
 	SoundStructural \
 	SoundSwap \
+	SoundSymmetrical \
 	SoundUtil \
 	SoundUniv \
 	SoundWtype \
@@ -156,6 +158,7 @@ UNITS = \
 	ValidationSquash \
 	ValidationSubtype \
 	ValidationSum \
+	ValidationSymmetrical \
 	ValidationUniv \
 	ValidationUtil
 

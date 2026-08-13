@@ -3610,3 +3610,50 @@ clear B' hs' ht' Heq'.
 exists A.
 do2 3 split; auto.
 Qed.
+
+
+Lemma sound_quotient_equal_left :
+  forall G a a' b,
+    pseq G (deqtype a a')
+    -> pseq G (deqtype (quotient a b) (quotient a b))
+    -> pseq G (deqtype (quotient a b) (quotient a' b)).
+Proof.
+intros G a b c.
+revert G.
+refine (seq_pseq 0 2 [] _ [] _ _ _); cbn.
+intros G Hseqa Hseqquot.
+rewrite -> seq_eqtype in Hseqa, Hseqquot |- *.
+intros i s s' Hs.
+so (Hseqquot _#3 Hs) as (R & Hl & Hr & _).
+simpsubin Hl.
+simpsubin Hr.
+cbn [Nat.add] in Hl, Hr.
+exists R.
+simpsub.
+cbn [Nat.add].
+do2 2 split; auto.
+invert (basic_value_inv _#6 value_quotient Hl).
+intros A C hs ht Hal Hcl Heql.
+invert (basic_value_inv _#6 value_quotient Hr).
+intros A' C' hs' ht' Har Hcr Heqr.
+so (eqtrans Heql (eqsymm Heqr)) as Heq.
+so (iuquotient_inj _#9 Heq). 
+subst A'.
+clear Heqr.
+subst R.
+so (Hseqa _#3 Hs) as (A' & Hal' & _ & Hbl & Hbr).
+so (basic_fun _#7 Hal Hal').
+subst A'.
+clear Hal'.
+split.
+  {
+  apply interp_eval_refl.
+  apply interp_quotient; auto.
+  }
+
+  {
+  rewrite -> Heq.
+  apply interp_eval_refl.
+  apply interp_quotient; auto.
+  }
+Qed.
