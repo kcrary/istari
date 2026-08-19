@@ -1,4 +1,4 @@
-# The Istari Proof Assistant
+# The Istari Proof Assistant, User's Guide
 
 Istari is a tactic-oriented proof assistant based on Martin-Lof type
 theory.  It is intended for mathematical developments that involve
@@ -7,7 +7,7 @@ computation -- particularly imperative computation -- and dependent types.
 
 ### Overview
 
-The Istari workflow is similar to proof assistants such as Coq: one
+The Istari workflow is similar to proof assistants such as Rocq: one
 proves a theorem by building a *proof script*, which consists mostly
 of invocations of *tactics*.  Each tactic acts on a current goal, and
 generates zero or more new subgoals.
@@ -19,21 +19,22 @@ built-in tactic library.  As in some earlier proof assistants (notably
 LCF), user tactics can manipulate proof objects (called validations)
 and soundness is ensured using abstract types.
 
-As Istari is based on Martin-Lof type theory, Istari's typing
-judgement is a proposition **within** the type theory, rather than an
-external mechanism (as is more typical in proof assistants).  This
-creates advantages and disadvantages: The main advantage is there is
-no distinction between definitional equality and user-established
-equalities.  Thus, an equality proven by the user is just as valid for
-typechecking purposes as any another.  For example, if `M : A(N)` and
-`N = N'`, then `M : A(N')`.  In many proof assistants, this principle
-works for definitional equalities but not user-established equalities,
-which can create severe challenges when using dependent types.
+As Istari is based on Martin-Lof's extensional type theory, Istari's
+typing judgement is a proposition **within** the type theory, rather
+than an external mechanism (as is more typical in proof assistants).
+This creates advantages and disadvantages: The main advantage is there
+is no distinction between definitional equality and propositional
+(user-established) equality.  Thus, an equality proven by the
+user is just as valid for typechecking purposes as any another.  For
+example, if `M : A(N)` and `N = N'`, then `M : A(N')`.  In many proof
+assistants, this principle works for definitional equalities but not
+user-established equalities, which can create severe challenges when
+using dependent types.
 
 On the disadvantage side, typechecking is undecidable, since it can
 depend on arbitrary mathematical facts.  In practice, the typechecker
 usually attends to typechecking obligations, but sometimes one sees
-proof goals of the form `M : A`.  Often these indicate type errors,
+proof goals of the form `M : A`.  Usually these indicate type errors,
 but sometimes they are true facts that the typechecker was unable to
 prove on its own.
 
@@ -45,7 +46,7 @@ guarded recursive kinds.  Guarded recursive kinds make it possible to
 reason about imperative code that uses higher-order state.
 
 The Istari type theory is itself formalized using a different proof
-assistant (Coq), and essentially all of the Istari inference rules are
+assistant (Rocq), and essentially all of the Istari inference rules are
 validated using that formalization.
 
 ---
