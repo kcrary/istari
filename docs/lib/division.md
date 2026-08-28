@@ -30,7 +30,9 @@ The defining properties of `div` and `mod`:
 
     div_prop : forall (a : nat) (b : pos) . div a b * b + mod a b = a : nat
 
-The latter, restated as a equation for `mod`:
+The latter, restated in two different ways:
+
+    div_prop' : forall (a : nat) (b : pos) . div a b * b = a - mod a b : nat
 
     mod_prop : forall (a : nat) (b : pos) . mod a b = a - div a b * b : nat
 
@@ -74,6 +76,10 @@ The quotient and remainder are uniquely defined:
 
     mod_operands_lt : forall (a : nat) (b : pos) . a < b -> mod a b = a : nat
 
+    div_mono : forall (a b : nat) (c : pos) . a <= b -> div a c <= div b c
+
+    mod_idem : forall (a : nat) (b : pos) . mod a b = mod (mod a b) b : nat
+
     div_plus_r : forall (a : nat) (b : pos) . div (a + b) b = succ (div a b) : nat
 
     div_plus_l : forall (a : nat) (b : pos) . div (b + a) b = succ (div a b) : nat
@@ -92,6 +98,17 @@ This relates the remainders of the divisions in `div_assoc`:
 
     div_assoc_remainder : forall (a : nat) (b c : pos) .
                              mod (div a b) c * b + mod a b = mod a (b * c) : nat
+
+    mod_plus_alt : forall (a b : nat) (c : pos) . mod (a + b) c = mod (mod a c + b) c : nat
+
+    mod_plus_alt2 : forall (a b : nat) (c : pos) . mod (a + b) c = mod (mod a c + mod b c) c : nat
+
+    mod_times_alt : forall (a b : nat) (c : pos) . mod (a * b) c = mod (mod a c * b) c : nat
+
+    mod_times_alt2 : forall (a b : nat) (c : pos) .
+                        mod (a * b) c = mod (mod a c * mod b c) c : nat
+
+    div_times_alt : forall (a b : nat) (c : pos) . div a c * b <= div (a * b) c
 
 
 ### Divides predicate
@@ -133,6 +150,9 @@ This relates the remainders of the divisions in `div_assoc`:
 
     divides_impl_leq : forall (a b : nat) . 0 < b -> divides a b -> a <= b
 
+    modulus_implies_mod_eq : forall (a b : nat) (c : pos) .
+                                a <= b -> divides c (b - a) -> mod a c = mod b c : nat
+
 
 ### Greatest common divisor
 
@@ -154,6 +174,61 @@ This relates the remainders of the divisions in `div_assoc`:
     gcd_ann_r : forall (a : pos) . gcd a 1 = 1 : nat
 
     gcd_ann_l : forall (a : pos) . gcd 1 a = 1 : nat
+
+
+### Logarithms
+
+    exp : nat -> nat -> nat
+        = fn a . (fnind nat_fn : forall (v0 : nat) . nat of
+                   | zero . 1
+                   | succ n . nat_fn n * a)
+
+    exp_positive : forall (a n : nat) . 0 < a -> 0 < exp a n
+
+    exp_plus : forall (a m n : nat) . exp a (m + n) = exp a m * exp a n : nat
+
+    exp_mono_base : forall (a a' b : nat) . a <= a' -> exp a b <= exp a' b
+
+    exp_mono_exponent : forall (a b b' : nat) . 0 < a -> b <= b' -> exp a b <= exp a b'
+
+    exp_mono : forall (a a' b b' : nat) . 0 < a -> a <= a' -> b <= b' -> exp a b <= exp a' b'
+
+We arbitrarily set `log2 0 = 0`, so that `log2` can be defined for every natural number.
+
+    log2 : nat -> nat
+         =rec= fn a . if a <? 2 then 0 else succ (log2 (div a 2))
+
+    log2_mono : forall (a b : nat) . a <= b -> log2 a <= log2 b
+
+    log2_one : log2 1 = 0 : nat
+
+    log2_even : forall (a : nat) . 0 < a -> log2 (a * 2) = succ (log2 a) : nat
+
+    log2_odd : forall (a : nat) . 0 < a -> log2 (succ (a * 2)) = succ (log2 a) : nat
+
+    log2_two : log2 2 = 1 : nat
+
+    log2_exp_inverse : forall (n : nat) . log2 (exp 2 n) = n : nat
+
+    log2_spec : forall (a : nat) .
+                   0 < a -> exists (b : nat) . a = exp 2 (log2 a) + b : nat & b < exp 2 (log2 a)
+
+    log2_unique : forall (a e e' r r' : nat) .
+                     0 < a
+                     -> a = exp 2 e + r : nat
+                     -> a = exp 2 e' + r' : nat
+                     -> r < exp 2 e
+                     -> r' < exp 2 e'
+                     -> e = e' : nat & r = r' : nat
+
+    log2_property : forall (a e r : nat) .
+                       0 < a -> a = exp 2 e + r : nat -> r < exp 2 e -> log2 a = e : nat
+
+    log2_lower : forall (a : nat) . 0 < a -> exp 2 (log2 a) <= a
+
+    log2_upper : forall (a : nat) . a < exp 2 (succ (log2 a))
+
+    log2_times_leq : forall (a b : nat) . 0 < a -> 0 < b -> log2 a + log2 b <= log2 (a * b)
 
 
 ### Relation to integers

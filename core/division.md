@@ -30,7 +30,9 @@ The defining properties of `div` and `mod`:
 
     div_prop : type:div_prop
 
-The latter, restated as a equation for `mod`:
+The latter, restated in two different ways:
+
+    div_prop' : type:div_prop'
 
     mod_prop : type:mod_prop
 
@@ -68,6 +70,10 @@ The quotient and remainder are uniquely defined:
 
     mod_operands_lt : type:mod_operands_lt
 
+    div_mono : type:div_mono
+
+    mod_idem : type:mod_idem
+
     div_plus_r : type:div_plus_r
 
     div_plus_l : type:div_plus_l
@@ -85,6 +91,16 @@ The quotient and remainder are uniquely defined:
 This relates the remainders of the divisions in `div_assoc`:
 
     div_assoc_remainder : type:div_assoc_remainder
+
+    mod_plus_alt : type:mod_plus_alt
+
+    mod_plus_alt2 : type:mod_plus_alt2
+
+    mod_times_alt : type:mod_times_alt
+
+    mod_times_alt2 : type:mod_times_alt2
+
+    div_times_alt : type:div_times_alt
 
 
 ### Divides predicate
@@ -126,6 +142,8 @@ This relates the remainders of the divisions in `div_assoc`:
 
     divides_impl_leq : type:divides_impl_leq
 
+    modulus_implies_mod_eq : type:modulus_implies_mod_eq
+
 
 ### Greatest common divisor
 
@@ -147,6 +165,51 @@ This relates the remainders of the divisions in `div_assoc`:
     gcd_ann_r : type:gcd_ann_r
 
     gcd_ann_l : type:gcd_ann_l
+
+
+### Logarithms
+
+    exp : type:exp
+        = def:exp
+
+    exp_positive : type:exp_positive
+
+    exp_plus : type:exp_plus
+
+    exp_mono_base : type:exp_mono_base
+
+    exp_mono_exponent : type:exp_mono_exponent
+
+    exp_mono : type:exp_mono
+
+We arbitrarily set `log2 0 = 0`, so that `log2` can be defined for every natural number.
+
+    log2 : type:log2
+         =rec= defrec:log2
+
+    log2_mono : type:log2_mono
+
+    log2_one : type:log2_one
+
+    log2_even : type:log2_even
+
+    log2_odd : type:log2_odd
+
+    log2_two : type:log2_two
+
+    log2_exp_inverse : type:log2_exp_inverse
+
+    log2_spec : type:log2_spec
+
+    log2_unique : type:log2_unique
+
+    log2_property : type:log2_property
+
+    log2_lower : type:log2_lower
+
+    log2_upper : type:log2_upper
+
+    log2_times_leq : type:log2_times_leq
 
 
 ### Relation to integers

@@ -259,6 +259,10 @@ Strong induction for natural numbers:
 
     times_compat : type:times_compat
 
+    times_cancel_leq_l : type:times_cancel_leq_l
+
+    times_cancel_leq_r : type:times_cancel_leq_r
+
 
 ### Minimum
 

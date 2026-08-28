@@ -169,6 +169,21 @@ qed ();
 
 
 
+lemma "div_prop'"
+/
+  forall a (b : pos) .
+    div a b * b = a - mod a b : nat
+/;
+
+inference.
+intro /a b/.
+rewrite /<- div_prop a b at 1/.
+rewrite /-> plus_minus_cancel_r/.
+reflexivity.
+qed ();
+
+
+
 lemma "mod_prop"
 /
   forall a (b : pos) .
@@ -499,6 +514,59 @@ qed ();
 
 
 
+lemma "div_mono"
+/
+  forall a b (c : pos) .
+    a <= b
+    -> div a c <= div b c
+/;
+
+inference.
+intro /a/.
+sinduction /a/.
+reintro /IH/.
+intro /b c Hab/.
+unroll /div/.
+boolCase /a <? c/ /Hsmalla/.
+  {
+  omega.
+  }
+unroll /div at 1/.
+boolCase /b <? c/ /Hsmallb/.
+  {
+  exfalso.
+  omega.
+  }
+apply /leq_succ_succ/.
+apply /IH/.
+  {
+  destruct /c/ /c Hpos/.
+  unhide.
+  omega.
+  }
+
+  {
+  omega.
+  }
+qed ();
+
+
+
+lemma "mod_idem"
+/
+  forall a (b : pos) .
+    mod a b = mod (mod a b) b : nat
+/;
+
+inference.
+intro /a b/.
+symmetry.
+apply /mod_operands_lt/.
+apply /mod_lt_r/.
+qed ();
+
+
+
 lemma "div_plus_r"
 /
   forall a (b : pos) .
@@ -687,6 +755,7 @@ inference.
 intro /a b c/.
 apply /div_assoc_with_remainder/.
 qed ();
+
 
 
 
@@ -1039,6 +1108,149 @@ qed ();
 
 
 
+lemma "modulus_implies_mod_eq"
+/
+  forall a b (c : pos) .
+    a <= b
+    -> divides c (b - a)
+    -> mod a c = mod b c : nat
+/;
+
+inference.
+intro /a b c Hab Hdivides/.
+destruct /Hdivides/ /n Heq/.
+symmetry.
+witness /division_property _ _ (div a c + n) (mod a c) __ __ #2/.
+1:{
+  apply /mod_lt_r/.
+  }
+rewrite /-> times_dist_plus_l/.
+rewrite /-> times_commute n c/.
+rewrite /-> Heq/.
+rewrite /<- minus_plus_cancel b a/ >> auto.
+rewrite /-> plus_commute at 2/.
+rewrite /-> plus_assoc/.
+compat.
+symmetry.
+apply /div_prop/.
+qed ();
+
+
+
+lemma "mod_plus_alt"
+/
+  forall a b (c : pos) .
+    mod (a + b) c = mod (mod a c + b) c : nat
+/;
+
+inference.
+intro /a b c/.
+symmetry.
+apply /modulus_implies_mod_eq/.
+  {
+  apply /plus_leq/ >> auto.
+  apply /mod_leq_l/.
+  }
+rewrite /-> plus_commute at 1/.
+rewrite /<- minus_assoc/.
+rewrite /-> plus_minus_cancel_r/.
+rewrite /<- times_div_r/.
+apply /divides_product_r/.
+qed ();
+
+
+
+lemma "mod_plus_alt2"
+/
+  forall a b (c : pos) .
+    mod (a + b) c = mod (mod a c + mod b c) c : nat
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> mod_plus_alt/.
+rewrite /-> plus_commute/.
+rewrite /-> mod_plus_alt/.
+rewrite /-> plus_commute/.
+reflexivity.
+qed ();
+
+
+
+lemma "mod_times_alt"
+/
+  forall a b (c : pos) .
+    mod (a * b) c = mod (mod a c * b) c : nat
+/;
+
+inference.
+intro /a b c/.
+symmetry.
+apply /modulus_implies_mod_eq/.
+  {
+  apply /times_leq/ >> auto.
+  apply /mod_leq_l/.
+  }
+rewrite /<- times_dist_minus_l/.
+apply /divides_times_r/.
+rewrite /<- div_prop'/.
+apply /divides_product_l/.
+qed ();
+
+
+
+lemma "mod_times_alt2"
+/
+  forall a b (c : pos) .
+    mod (a * b) c = mod (mod a c * mod b c) c : nat
+/;
+
+inference.
+intro /a b c/.
+rewrite /-> mod_times_alt/.
+rewrite /-> times_commute/.
+rewrite /-> mod_times_alt/.
+rewrite /-> times_commute/.
+reflexivity.
+qed ();
+
+
+
+lemma "div_times_alt"
+/
+  forall a b (c : pos) .
+    div a c * b <= div (a * b) c
+/;
+
+inference.
+intro /a b c/.
+so /div_prop a c/ /Heqa/.
+so /div_prop (a * b) c/ /Heqab/.
+apply /times_cancel_leq_r _ _ c/.
+  {
+  destruct /c/ /c ?/.
+  unhide.
+  omega.
+  }
+rewrite /-> times_assoc/.
+rewrite /-> times_commute at 1/.
+rewrite /<- times_assoc/.
+so /times_compat _ _ b b Heqa ()/ /Heqab'/.
+so /eq_trans _# 5 Heqab' (eq_symm _# 4 Heqab)/ /Heq1/.
+rewrite /-> times_dist_plus_l in Heq1/.
+so /minus_compat _ _ (mod (a * b) c) (mod (a * b) c) Heq1 ()/ /Heq2/.
+rewrite /-> plus_minus_cancel_r in Heq2/.
+rewrite /-> plus_minus_assoc in Heq2/.
+1:{
+  rewrite /<- Heq2/.
+  apply /plus_leq_l/.
+  }
+rewrite /-> mod_times_alt/.
+apply /mod_leq_l/.
+qed ();
+
+
+
 (* Greatest common divisor *)
 
 definerec /gcd a b/
@@ -1283,6 +1495,615 @@ rewrite /-> gcd_commute/.
   apply /gcd_ann_r/.
   }
 qed ();
+
+
+
+(* Logarithms *)
+
+defineInd /a/
+/
+  exp : nat -> nat of
+  | zero . 1
+
+  | succ n . exp n * a
+//
+  nat -> nat -> nat
+/;
+
+
+
+lemma "exp_positive"
+/
+  forall a n .
+    0 < a
+    -> 0 < exp a n
+/;
+
+inference.
+intro /a n Ha/.
+induction /n/.
+  {
+  omega.
+  }
+intro /n IH/.
+apply /times_lt_zero/ >> auto.
+qed ();
+
+
+
+lemma "exp_plus"
+/
+  forall a m n .
+    exp a (m + n) = exp a m * exp a n : nat
+/;
+
+inference.
+intro /a m n/.
+induction /m/.
+  {
+  omega.
+  }
+intro /m IH/.
+rewrite /-> IH/.
+rewrite /-> times_assoc at 0 0/.
+rewrite /-> times_commute at 1/.
+reflexivity.
+qed ();
+
+
+
+lemma "exp_mono_base"
+/
+  forall a a' b .
+    a <= a'
+    -> exp a b <= exp a' b
+/;
+
+inference.
+intro /a a' b Ha/.
+induction /b/ >> auto.
+intro /b IH/.
+apply /times_leq/ >> auto.
+qed ();
+
+
+
+lemma "exp_mono_exponent"
+/
+  forall a b b' .
+    0 < a
+    -> b <= b'
+    -> exp a b <= exp a b'
+/;
+
+inference.
+intro /a b b' Hpos Hb/.
+rewriteThen /b' = b + (b' - b) : nat/ omega.
+rewrite /-> exp_plus/.
+rewrite /<- times_1_r (exp a b)/.
+apply /times_leq/ >> auto.
+so /exp_positive a (b' - b) Hpos/ /?/.
+omega.
+qed ();
+
+
+
+lemma "exp_mono"
+/
+  forall a a' b b' .
+    0 < a
+    -> a <= a'
+    -> b <= b'
+    -> exp a b <= exp a' b'
+/;
+
+inference.
+intro /a a' b b' Hpos Ha Hb/.
+apply /leq_trans _ (exp a b')/ >> autoWith /exp_mono_base exp_mono_exponent/.
+qed ();
+
+
+
+lemma "div_2_lt"
+/
+  forall a .
+    0 < a
+    -> div a 2 < a
+/;
+
+assert /2 : pos/ /Hpos2/.
+  {
+  typecheck.
+  split.
+  apply /lt_0_succ/.
+  }
+inference.
+intro /a Hpos/.
+rewrite /<- div_prop a 2 at 1/.
+rewrite /<- plus_0_r (div a 2)/.
+destruct /a/ /|(| a)/ >> reduce //.
+  {
+  so /lt_irrefl _ Hpos/ /0/.
+  }
+ 
+  {
+  unroll /div at 0 1/.
+  reduce //.
+  unroll /mod/.
+  reduce //.
+  apply /lt_0_succ/.
+  }
+
+  {
+  unroll /div at 0 1/.
+  reduce //.
+  omega.
+  }
+qed ();
+
+
+
+lemma "div_2_pos"
+/
+  forall a .
+    2 <= a
+    -> 0 < div a 2
+/;
+
+inference.
+intro /a Ha/.
+unroll /div/.
+destruct /a/ /|(| a)/ >> reduce // >> omega.
+split.
+omega.
+qed ();
+
+
+
+(* For convenience, set log2 0 = 0. *)
+definerec /log2 a/
+/
+  if a <? 2 then
+    0
+  else
+    succ (log2 (div a 2))
+//
+  nat -> nat
+/;
+
+assert /2 : pos/ /Hpos2/.
+  {
+  typecheck.
+  split.
+  apply /lt_0_succ/.
+  }
+introOf /a/.
+sinduction /a/.
+reintro /IH/.
+unroll /log2/.
+boolCase /a <? 2/ /Hsmall/ >> auto.
+typecheck1.
+apply /IH/.
+apply /div_2_lt/.
+omega.
+qed ();
+
+
+
+lemma "log2_mono"
+/
+  forall a b .
+    a <= b
+    -> log2 a <= log2 b
+/;
+
+inference.
+assert /2 : pos/ /Hpos2/.
+  {
+  typecheck.
+  split.
+  apply /lt_0_succ/.
+  }
+intro /a/.
+sinduction /a/.
+reintro /IH/.
+intro /b Hab/.
+unroll /log2/.
+boolCase /a <? 2/ /Hsmalla/.
+  {
+  omega.
+  }
+unroll /log2 at 1/.
+boolCase /b <? 2/ /Hsmallb/.
+  {
+  exfalso.
+  omega.
+  }
+apply /leq_succ_succ/.
+apply /IH/.
+  {
+  apply /div_2_lt/.
+  omega.
+  }
+
+  {
+  apply /div_mono/ >> auto.
+  }
+qed ();
+
+
+
+lemma "log2_one"
+/
+  log2 1 = 0 : nat
+/;
+
+unroll /log2/.
+auto.
+qed ();
+
+
+
+lemma "log2_even"
+/
+  forall a .
+    0 < a
+    -> log2 (a * 2) = succ (log2 a) : nat
+/;
+
+inference.
+assert /2 : pos/ /Hpos2/.
+  {
+  typecheck.
+  split.
+  apply /lt_0_succ/.
+  }
+intro /a Hpos/.
+unroll /log2/.
+boolCase /a * 2 <? 2/ /Hsmall/.
+  {
+  omega.
+  }
+rewrite /-> div_times_r/.
+reflexivity.
+qed ();
+
+
+
+lemma "log2_odd"
+/
+  forall a .
+    0 < a
+    -> log2 (succ (a * 2)) = succ (log2 a) : nat
+/;
+
+inference.
+assert /2 : pos/ /Hpos2/.
+  {
+  typecheck.
+  split.
+  apply /lt_0_succ/.
+  }
+intro /a Hpos/.
+unroll /log2/.
+boolCase /succ (a * 2) <? 2/ /Hsmall/.
+  {
+  omega.
+  }
+compat.
+compat.
+witness /division_property _# 3 1 __ __ #1/.
+  {
+  rewrite /-> plus_commute (a * 2) 1/.
+  reflexivity.
+  }
+
+  {
+  apply /lt_succ_succ/.
+  apply /lt_0_succ/.
+  }
+qed ();
+
+
+
+lemma "log2_two"
+/
+  log2 2 = 1 : nat
+/;
+
+rewrite /<- times_1_l 2/.
+rewrite /-> log2_even 1/.
+  {
+  omega.
+  }
+
+  {
+  compat.
+  apply /log2_one/.
+  }
+qed ();
+
+
+
+lemma "log2_exp_inverse"
+/
+  forall n .
+    log2 (exp 2 n) = n : nat
+/;
+
+inference.
+intro /n/.
+induction /n/.
+  {
+  apply /log2_one/.
+  }
+intro /n IH/.
+rewrite /-> log2_even/.
+  {
+  apply /exp_positive/.
+  omega.
+  }
+compat.
+hyp /IH/.
+qed ();
+
+
+
+lemma "log2_spec"
+/
+  forall a .
+    0 < a
+    -> exists b .
+         a = exp 2 (log2 a) + b : nat
+         & b < exp 2 (log2 a)
+/;
+
+inference.
+assert /2 : pos/ /Hpos2/.
+  {
+  typecheck.
+  split.
+  apply /lt_0_succ/.
+  }
+intro /a/.
+sinduction /a/.
+reintro /IH/.
+intro /Hpos/.
+unroll /log2 at 0 1/.
+boolCase /a <? 2/ /Hsmall/.
+  {
+  exists /0/.
+  omega.
+  }
+so /IH (div a 2) __ __/ /b Heq Hb/.
+  {
+  apply /div_2_lt/.
+  omega.
+  }
+
+  {
+  apply /div_2_pos/.
+  omega.
+  }
+exists /b * 2 + mod a 2/.
+split.
+  {
+  rewrite /<- div_prop a 2/.
+  rewrite /-> Heq/.
+  rewrite /-> times_dist_plus_l/.
+  rewrite /-> plus_assoc/.
+  reflexivity.
+  }
+
+  {
+  unfold /lt in Hb in concl/.
+  transitivity /succ b * 2/.
+    {
+    so /mod_lt_r a 2/ /?/.
+    omega.
+    }
+  apply /times_leq (succ b) (exp 2 (log2 (div a 2))) 2 2/ >> auto.
+  }
+qed ();
+
+
+
+lemma "log2_unique"
+/
+  forall a e e' r r' .
+    0 < a
+    -> a = exp 2 e + r : nat
+    -> a = exp 2 e' + r' : nat
+    -> r < exp 2 e
+    -> r' < exp 2 e'
+    -> e = e' : nat & r = r' : nat
+/;
+
+inference.
+intro /a e e' r r' Hpos/.
+revert /e e' r r'/.
+assert /forall e e' r r' .
+          e <= e'
+          -> a = exp 2 e + r : nat
+          -> a = exp 2 e' + r' : nat
+          -> r < exp 2 e
+          -> r' < exp 2 e'
+          -> e = e' : nat & r = r' : nat/ /Hprop/
+>>> [inference, idtac].
+1:{
+  intro /e e' r r' Heq Heq' Hr Hr'/.
+  so /nat_dichotomy_weak e e'/ /Hleq | Hleq/.
+    {
+    apply /Hprop/ >> auto.
+    }
+
+    {
+    exploit /Hprop e' e r' r/ /H1 H2/ >> auto.
+    }
+  }
+intro /e f r s Hleq He Hf Hr Hs/.
+assert /e = f : nat/ /Hef/.
+1:{
+  subst /f/.
+  split >> auto.
+  apply /plus_cancel_l _ _ (exp 2 e)/.
+  transitivity /a/ >> auto.
+  }
+apply /leq_antisymm/ >> auto.
+apply /not_lt/.
+intro /Hlt/.
+apply /lt_irrefl r/.
+witness /lt_leq_trans _# 3 Hr __/.
+rewrite /f = e + (f - e) : nat in Hf/.
+  {
+  omega.
+  }
+rewrite /-> exp_plus in Hf/.
+rewrite /-> He in Hf/.
+assert /exp 2 e <= exp 2 e * exp 2 (f - e)/ /H1/.
+  {
+  rewrite /<- exp_plus/.
+  apply /exp_mono_exponent/ >> omega.
+  }
+assertThen /exp 2 e * exp 2 (f - e) - exp 2 e * 1 + s = r : nat/ /H2/ omega.
+rewrite /<- times_dist_minus_r in H2/.
+rewrite /<- H2/.
+apply /leq_trans _ (exp 2 e * (exp 2 (f - e) - 1))/.
+1:{
+  omega.
+  }
+rewrite /<- times_1_r (exp 2 e)/.
+apply /times_leq/ >> auto.
+assert /2 <= exp 2 (f - e)/ /H3/.
+1:{
+  omega.
+  }
+rewriteThen /f - e = succ (f - e - 1) : nat/ omega.
+reduce //.
+apply /times_leq 1 _ 2 2/ >> auto.
+so /exp_positive 2 (pred (f - e))/ /?/ >> omega.
+qed ();
+
+
+
+lemma "log2_property"
+/
+  forall a e r .
+    0 < a
+    -> a = exp 2 e + r : nat
+    -> r < exp 2 e
+    -> log2 a = e : nat
+/;
+
+inference.
+intro /a e r Hpos Heq Hr/.
+so /log2_spec a Hpos/ /r' Heq' Hr'/.
+apply /log2_unique a (log2 a) e r' r/ >> auto.
+qed ();
+
+
+
+lemma "log2_lower"
+/
+  forall a .
+    0 < a
+    -> exp 2 (log2 a) <= a
+/;
+
+inference.
+intro /a Hpos/.
+so /log2_spec a Hpos/ /b Heq Hb/.
+omega.
+qed ();
+
+
+
+lemma "log2_upper"
+/
+  forall a .
+    a < exp 2 (succ (log2 a))
+/;
+
+inference.
+intro /a/.
+so /lt_decide 0 a/ /Hpos | Hzero/.
+1:{
+  assertThen /a = 0 : nat/ /?/ omega.
+  subst /a/.
+  unroll /log2/.
+  reduce //.
+  omega.
+  }
+so /log2_spec a Hpos/ /b Heq Hb/.
+reduce //.
+omega.
+qed ();
+
+
+
+lemma "log2_times_leq"
+/
+  forall a b .
+    0 < a
+    -> 0 < b
+    -> log2 a + log2 b <= log2 (a * b)
+/;
+
+inference.
+assert /2 : pos/ /Hpos2/.
+  {
+  typecheck.
+  split.
+  apply /lt_0_succ/.
+  }
+intro /a b Hposa Hposb/.
+revert /Hposa/.
+sinduction /a/.
+reintro /IH/.
+intro /Hposa/.
+unroll /log2/.
+boolCase /a <? 2/ /Hsmall/.
+  {
+  apply /log2_mono/.
+  rewrite /<- times_1_l b/.
+  apply /times_leq 1/ >> auto.
+  omega.
+  }
+rewrite /<- div_prop a 2 at 1/.
+rewrite /-> times_dist_plus_l/.
+rewrite /-> times_assoc/.
+rewrite /-> times_commute at 1/.
+rewrite /<- times_assoc/.
+apply /leq_trans _ (log2 (div a 2 * b * 2))/.
+1:{
+  apply /log2_mono/.
+  apply /plus_leq_l/.
+  }
+rewrite /-> log2_even/.
+  {
+  apply /times_lt_zero/.
+    {
+    apply /div_2_pos/.
+    omega.
+    }
+
+    {
+    omega.
+    }
+  }
+apply /leq_succ_succ/.
+apply /IH/.
+  {
+  apply /div_2_lt/.
+  omega.
+  }
+
+  {
+  apply /div_2_pos/.
+  omega.
+  }
+qed ();
+
 
 
 

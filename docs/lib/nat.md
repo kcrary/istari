@@ -262,6 +262,10 @@ Strong induction for natural numbers:
     times_compat : forall (m m' n n' : nat) .
                       m = m' : nat -> n = n' : nat -> m * n = m' * n' : nat
 
+    times_cancel_leq_l : forall (m n p : nat) . 0 < p -> p * m <= p * n -> m <= n
+
+    times_cancel_leq_r : forall (m n p : nat) . 0 < p -> m * p <= n * p -> m <= n
+
 
 ### Minimum
 
