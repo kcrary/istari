@@ -942,6 +942,10 @@ inequality did not reverse on the right.
 
 ### Miscellaneous
 
+    rational_to_fraction : type:rational_to_fraction
+
+    rational_to_fraction_squash : type:rational_to_fraction_squash
+
     rational_dense : type:rational_dense
 
     leqq_from_upper_bounds : type:leqq_from_upper_bounds

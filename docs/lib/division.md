@@ -187,6 +187,8 @@ This relates the remainders of the divisions in `div_assoc`:
 
     exp_plus : forall (a m n : nat) . exp a (m + n) = exp a m * exp a n : nat
 
+    exp_times : forall (a m n : nat) . exp a (m * n) = exp (exp a m) n : nat
+
     exp_mono_base : forall (a a' b : nat) . a <= a' -> exp a b <= exp a' b
 
     exp_mono_exponent : forall (a b b' : nat) . 0 < a -> b <= b' -> exp a b <= exp a b'

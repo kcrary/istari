@@ -176,6 +176,8 @@ This relates the remainders of the divisions in `div_assoc`:
 
     exp_plus : type:exp_plus
 
+    exp_times : type:exp_times
+
     exp_mono_base : type:exp_mono_base
 
     exp_mono_exponent : type:exp_mono_exponent

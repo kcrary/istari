@@ -267,6 +267,7 @@ functor AfterRationalAll () :> sig end =
       structure B = BackchainInternal
       structure H = ConstantTable
       structure CR = CheckpointedRef
+      structure R = Reduction
 
       val rational = resolveGlobal /Rational.rational/
       val leqq = resolveGlobal /Rational.leqq/
@@ -277,12 +278,11 @@ functor AfterRationalAll () :> sig end =
       val invq = resolveGlobal /Rational.invq/
       val ceiling = resolveGlobal /Rational.ceiling/
       val floor = resolveGlobal /Rational.floor/
-
-      val leqz = resolveGlobal /Integer.leqz/
       val integer_to_rational = resolveGlobal /Rational.integer_to_rational/
-
-      val leq = resolveGlobal /Nat.leq/
       val nat_to_rational = resolveGlobal /Rational.nat_to_rational/
+      val nat_to_integer = resolveGlobal /Integer.nat_to_integer/
+      val leqz = resolveGlobal /Integer.leqz/
+      val leq = resolveGlobal /Nat.leq/
 
       val leqq_refl = resolveGlobal /Rational.leqq_refl/
       val leqq_trans = resolveGlobal /Rational.leqq_trans/
@@ -377,5 +377,115 @@ functor AfterRationalAll () :> sig end =
          H.insert TypecheckTables.strictnessTactics rational
          (exact /\T.Const rational_strict\/)
 
+
+      val reduce_zero_to_integer = readRegistry /Integer.reduce_zero_to_integer/ /reduction/
+      val reduce_succ_to_integer = readRegistry /Integer.reduce_succ_to_integer/ /reduction/
+      val regroup_nat_to_rational = readRegistry /Rational.regroup_nat_to_rational/ /reduction/
+      val regroup_plusz_to_rational = readRegistry /Rational.regroup_plusz_to_rational/ /reduction/
+      val regroup_negz_to_rational = readRegistry /Rational.regroup_negz_to_rational/ /reduction/
+      val regroup_timesz_to_rational = readRegistry /Rational.regroup_timesz_to_rational/ /reduction/
+
+      fun reduce_nat_to_integer n =
+         if n = 0 then
+            reduce_zero_to_integer
+         else
+            R.trans
+               [
+               reduce_succ_to_integer,
+               R.within [2] (reduce_nat_to_integer (n-1)),
+               R.native
+               ]
+
+      fun calculate_nat_to_rational m =
+         termCase m
+         /| \nat_to_rational\ nat? =>
+            \(fnc n =>
+                 SOME (T.apply1 integer_to_rational (T.Native (T.Integer (IntInf.fromInt n))),
+                       R.trans
+                          [
+                          regroup_nat_to_rational,
+                          R.within [1] (reduce_nat_to_integer n)
+                          ]))\
+
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable nat_to_rational calculate_nat_to_rational
+
+      fun calculate_integer_to_rational m =
+         termCase m
+         /| \integer_to_rational\ (\nat_to_integer\ nat?) =>
+            \(fnc n =>
+                 SOME (T.apply1 integer_to_rational (T.Native (T.Integer (IntInf.fromInt n))),
+                       R.within [1] (reduce_nat_to_integer n)))\
+
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable integer_to_rational calculate_integer_to_rational
+
+      fun calculate_plusq m =
+         termCase m
+         /| \plusq\ (\integer_to_rational\ integer?) (\integer_to_rational\ integer?) =>
+            \(fnc x y =>
+                 SOME (T.apply1 integer_to_rational (T.Native (T.Integer (IntInf.+ x y))),
+                       R.trans
+                          [
+                          regroup_plusz_to_rational,
+                          R.within [1]
+                             (R.trans
+                                 [
+                                 R.compat [R.native, R.native],
+                                 R.native
+                                 ])
+                          ]))\
+      
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable plusq calculate_plusq
+
+      fun calculate_negq m =
+         termCase m
+         /| \negq\ (\integer_to_rational\ integer?) =>
+            \(fnc x =>
+                 SOME (T.apply1 integer_to_rational (T.Native (T.Integer (IntInf.~ x))),
+                       R.trans
+                          [
+                          regroup_negz_to_rational,
+                          R.within [1] R.native
+                          ]))\
+      
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable negq calculate_negq
+
+      fun calculate_timesq m =
+         termCase m
+         /| \timesq\ (\integer_to_rational\ integer?) (\integer_to_rational\ integer?) =>
+            \(fnc x y =>
+                 SOME (T.apply1 integer_to_rational (T.Native (T.Integer (IntInf.* x y))),
+                       R.trans
+                          [
+                          regroup_timesz_to_rational,
+                          R.within [1] R.native
+                          ]))\
+      
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable timesq calculate_timesq
+ 
    end
 

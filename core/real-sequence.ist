@@ -6,12 +6,15 @@ File.import "omega-load.iml";
 File.import "rational-load.iml";
 File.import "sqstable-load.iml";
 File.import "real-load.iml";
+File.import "real-exponent-load.iml";
 File.import "squish-load.iml";
 
 openModule /Nat/;
 openModule /Real/;
+openModule /RealExponent/;
 openModule /Squish/;
 
+aliasModule /Z/ /Integer/;
 
 Ctrl.use "autoQ.iml";
 
@@ -168,6 +171,42 @@ rewrite /<- Heq/ >> auto.
   }
 apply /Hm/.
 omega.
+qed ();
+
+
+
+lemma "converges_from_tail"
+/
+  forall s n x .
+    converges (fn i . s (i +n n)) x
+    -> converges s x
+/;
+
+inference.
+intro /s n x Hconv/.
+unfold /converges in Hconv in concl/.
+assert /forall k . n`0 <n k -> nat_to_real k != 0 : real/ /Hnonzeroall/.
+  {
+  intro /k Hpos/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+witness /squish_bind Hconv __/ >> auto.
+clear /Hconv/.
+intro /Hconv/ >> auto.
+apply /squish_ret/ >> auto.
+intro /k Hposk/.
+so /Hnonzeroall k Hposk/ /Hnonzerok/.
+so /Hconv k Hposk/ /m Hm/.
+reduce /Hm/.
+exists /n +n m/.
+intro /p Hp/.
+so /Hm (p -n n) __/ /H/.
+  {
+  omega.
+  }
+rewriteThen /p -n n +n n = p : nat in H/ omega.
+hyp /H/.
 qed ();
 
 
@@ -788,6 +827,27 @@ assert /nat_to_real (k *n n`2) != 0 : real/ /Hnonzero2k/.
 rewrite /-> Hm n/ >> auto.
 rewrite /-> Hm p/ >> auto.
 rewrite /-> combine_halves/ >> auto.
+qed ();
+
+
+
+lemma "cauchy_iff_converges"
+/
+  forall s .
+    cauchy s <-> (exists x . converges s x)
+/;
+
+inference.
+intro /s/.
+split.
+  {
+  apply /cauchy_impl_converges/.
+  }
+
+  {
+  intro /(x Hconv)/.
+  apply /converges_impl_cauchy/ >> auto.
+  }
 qed ();
 
 
@@ -1616,6 +1676,604 @@ apply /converges_equal (fn i . maxr (s' i - s i) (s i - s' i)) _ _ n/.
   apply /minusr_leqr/ >> auto.
   }
 apply /converges_maxr/ >> apply /converges_minusr/ >> auto.
+qed ();
+
+
+
+(* Series *)
+
+(* partial sums *)
+defineInd /s/
+/
+  sums : nat -> real of
+  | zero . 0
+
+  | succ n . s n + sums n
+//
+  (nat -> real) -> nat -> real
+/;
+
+
+
+(* We use the word "convergent" (as opposed to "converges"), to say
+   that a series converges.  Since we do not define the term formally,
+   we can use it loosely to refer both to when a series converges (at
+   all) and to when it converges to a particular value.
+*)
+
+
+lemma "convergent_impl_converges_zero"
+/
+  forall s .
+    cauchy (sums s)
+    -> converges s 0
+/;
+
+inference.
+assert /forall k . n`0 <n k -> nat_to_real k != 0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hposk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+intro /s Hconv/.
+unfold /cauchy in Hconv/.
+unfold /converges/.
+witness /squish_bind Hconv __/ >> auto.
+clear /Hconv/.
+intro /Hconv/ >> auto.
+apply /squish_ret/ >> auto.
+intro /k Hposk/.
+so /Hconv k Hposk/ /m Hm/.
+so /Hnonzeroall k Hposk/ /Hnonzerok/.
+exists /succ m/.
+intro /n Hn/.
+rewrite /-> minusr_id_r/.
+so /Hm (succ n) n __ __/ /H/.
+  {
+  omega.
+  }
+
+  {
+  omega.
+  }
+reduce /H/.
+rewrite /-> plusr_minusr_assoc in H/.
+rewrite /-> minusr_self in H/.
+rewrite /-> plusr_id_r in H/.
+hyp /H/.
+qed ();
+
+
+
+lemma "convergent_plusr"
+/
+  forall s s' x y .
+    converges (sums s) x
+    -> converges (sums s') y
+    -> converges (sums (fn i . s i + s' i)) (x + y)
+/;
+
+inference.
+intro /s s' x y Hconvx Hconvy/.
+so /converges_plusr _# 4 Hconvx Hconvy/ /Hconv/.
+forceExact /Hconv/.
+compat.
+introEq /i/.
+reduce //.
+induction /i/.
+  {
+  apply /plusr_id_l/.
+  }
+intro /i IH/.
+rewrite /<- plusr_assoc at all/.
+rewrite /-> plusr_commute3 at 1/.
+rewrite /-> plusr_assoc at 0/.
+compat.
+hyp /IH/.
+qed ();
+
+
+
+lemma "convergent_timesr_const"
+/
+  forall s x y .
+    converges (sums s) y
+    -> converges (sums (fn i . x * s i)) (x * y)
+/;
+
+inference.
+intro /s x y Hconvy/.
+so /converges_timesr _# 4 (converges_constant x) Hconvy/ /Hconv/.
+reduce /Hconv/.
+forceExact /Hconv/.
+compat.
+introEq /i/.
+reduce //.
+induction /i/.
+  {
+  apply /timesr_ann_r/.
+  }
+intro /i IH/.
+rewrite /-> timesr_dist_plusr_r/.
+compat.
+hyp /IH/.
+qed ();
+
+
+
+lemma "sums_nexpr_increment"
+/
+  forall x n .
+    x * sums (fn i . nexpr x i) n = sums (fn i . nexpr x i) (succ n) - 1 : real
+/;
+
+inference.
+intro /x n/.
+induction /n/.
+
+(* 0 *)
+{
+rewrite /-> timesr_ann_r/.
+unfold /minusr/.
+calculate //.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /n IH/.
+rewrite /-> timesr_dist_plusr_r/.
+rewrite /-> IH/.
+unfold /minusr at all/.
+rewrite /<- plusr_assoc at all/.
+reflexivity.
+}
+qed ();
+
+
+
+lemma "convergent_nexpr"
+/
+  forall x .
+    0 < x
+    -> x < 1
+    -> converges (sums (fn i . nexpr x i)) (invr (1 - x))
+/;
+
+inference.
+assert /forall k . n`0 <n k -> nat_to_real k != 0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hposk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+assert /forall x . x < 1 -> 1 - x != 0 : real/ /Hnonzero1minusx/.
+  {
+  intro /x Hx/.
+  symmetry.
+  apply /ltr_impl_neq/.
+  rewrite /<- minusr_shift_ltr_rl/.
+  rewrite /-> plusr_id_r/ >> auto.
+  }
+intro /x' Hxlo Hxhi/.
+unfold /converges/.
+witness /squish_bind (real_to_prereal x') __/ >> auto.
+intro /(x ?)/.
+subst /x'/ >> auto.
+apply /squish_ret/ >> auto.
+assert /realintro x != 0 : real/ /Hnonzerox/.
+  {
+  symmetry.
+  apply /ltr_impl_neq/ >> auto.
+  }
+intro /k Hposk/.
+so /Hnonzeroall k Hposk/ /Hnonzerok/.
+assert /1 != 0 : real/ /Hnonzero1/.
+  {
+  apply /integer_to_real_neq/.
+  omega.
+  }
+assert /realintro (preplusr (integer_to_prereal z`1) (prenegr x)) != 0 : real/ /Hnonzero1minusx1'/.
+  {
+  rewrite /-> preplusr_to_real/.
+  rewrite /-> prenegr_to_real/.
+  fold /minusr _ _/.
+  calculate //.
+  auto.
+  }
+so /logarithm_bound_prereal (preinvr x) (pretimesr (integer_to_prereal (Z.nat_to_integer k)) (preinvr (preplusr (integer_to_prereal z`1) (prenegr x)))) __/ /m Hm/ >> auto.
+  {
+  rewrite /-> preinvr_to_real/.
+  rewrite /<- invr_invol 1/.
+  apply /invr_ltr_pos/ >> auto.
+  rewrite /-> invr_one/ >> auto.
+  }
+rewrite /-> pretimesr_to_real in Hm/.
+rewrite /-> integer_to_prereal_to_real in Hm/.
+unfold /integer_to_real in Hm/.
+fold /nat_to_real k in Hm/.
+rewrite /-> preinvr_to_real in Hm/.
+rewrite /realintro (preplusr (integer_to_prereal z`1) (prenegr x)) = 1 - realintro x : nonzero_real in Hm/.
+  {
+  apply /eq_nonzero_real'/ >> auto.
+  rewrite /-> preplusr_to_real/.
+  calculate //.
+  rewrite /-> prenegr_to_real/.
+  fold /minusr _ _/.
+  reflexivity.
+  }
+rewrite /-> preinvr_to_real in Hm/ >> auto.
+exists /m/ >> auto.
+intro /n Hn/.
+rewrite /<- timesr_shift_ltr_lrr in Hm/.
+  {
+  rewrite /<- minusr_shift_ltr_rr/.
+  rewrite /-> plusr_id_l/.
+  auto.
+  }
+so /invr_ltr_pos _# 2 __ Hm/ /Hm'/.
+  {
+  unfold /nat_to_real/.
+  fold /integer_to_real _/.
+  apply /integer_to_real_mono_lt/.
+  omega.
+  }
+rewrite /-> invr_timesr in Hm'/ >> auto.
+  {
+  split.
+  apply /nexpr_nonzero/.
+  apply /invr_nonzero/.
+  }
+rewrite /<- nexpr_invr in Hm'/ >> auto.
+  {
+  split.
+  apply /invr_nonzero/ >> auto.
+  }
+rewrite /-> invr_invol in Hm'/ >> auto.
+rewrite /<- Hm'/ >> auto.
+clear /Hm Hm'/.
+assert /0 < 1 - realintro x/ /Hpos1minusx/.
+  {
+  rewrite /<- minusr_shift_ltr_rr/.
+  rewrite /-> plusr_id_l/.
+  auto.
+  }
+rewrite /<- timesr_shift_leqr_rrr/ >> auto.
+rewrite /<- absr_of_nonneg (1 - realintro x) at 1/ >> autoWith /ltr_impl_leqr/.
+rewrite /<- absr_timesr/ >> auto.
+rewrite /-> timesr_dist_minusr_l/ >> auto.
+rewrite /-> timesr_inverse_l/ >> auto.
+apply /leqr_trans _ (nexpr (realintro x) n)/.
+1:{
+  rewriteThen /n = m +n (n -n m) : nat/ omega.
+  rewrite /-> nexpr_plus/.
+  rewrite /<- timesr_id_r (nexpr (realintro x) m) at 1/.
+  apply /timesr_leqr_l/.
+    {
+    apply /nexpr_nonnegative/.
+    apply /ltr_impl_leqr/ >> auto.
+    }
+
+    {
+    apply /nexpr_leqr_one/ >> autoWith /ltr_impl_leqr/.
+    }
+  }
+clear /m Hn/.
+apply /leqr_refl'/.
+rewrite /-> absr_minusr_commute/.
+rewrite /<- absr_of_nonneg (nexpr (realintro x) n)/.
+  {
+  apply /nexpr_nonnegative/.
+  apply /ltr_impl_leqr/ >> auto.
+  }
+compat.
+unfold /minusr at all/.
+rewrite /-> timesr_dist_plusr_r/.
+rewrite /-> timesr_id_r/.
+rewrite /-> negr_plusr/.
+rewrite /<- plusr_assoc at all/.
+rewrite /-> negr_dist_timesr_r/.
+rewrite /-> negr_invol/.
+rewrite /<- timesr_commute/.
+rewrite /-> sums_nexpr_increment/.
+reduce //.
+unfold /minusr at all/.
+rewrite /<- plusr_assoc at all/.
+rewrite /-> plusr_rotate at 2/.
+rewrite /-> plusr_rotate4/.
+rewrite /-> plusr_assoc/.
+rewrite /-> plusr_inverse_l/.
+rewrite /-> plusr_id_r/.
+rewrite /-> plusr_assoc/.
+rewrite /-> plusr_inverse_r/.
+rewrite /-> plusr_id_r/.
+reflexivity.
+qed ();
+
+
+
+lemma "comparison_test"
+/
+  forall s s' n .
+    cauchy (sums s')
+    -> (forall i . n <n= i -> absr (s i) <= s' i)
+    -> cauchy (sums s)
+/;
+
+inference.
+assert /forall k . n`0 <n k -> nat_to_real k != 0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hposk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+intro /s s' l Hconv Hbound/.
+unfold /cauchy in Hconv in concl/.
+witness /squish_bind Hconv __/ >> auto.
+clear /Hconv/.
+intro /Hconv/ >> auto.
+apply /squish_ret/ >> auto.
+intro /k Hposk/.
+so /Hnonzeroall k Hposk/ /Hnonzerok/.
+so /Hconv k Hposk/ /m Hm/.
+exists /l +n m/.
+assert /forall n p . l +n m <n= p -> p <n= n -> absr (sums s n - sums s p) <= invr (nat_to_real k)/ /Hprop/ >>> [inference, idtac].
+1:{
+  intro /n p Hn Hp/.
+  so /nat_dichotomy_weak n p/ /Hnp | Hpn/.
+    {
+    rewrite /-> absr_minusr_commute/.
+    apply /Hprop/ >> auto.
+    }
+
+    {
+    apply /Hprop/ >> auto.
+    }
+  }
+intro /n p Hp Hn/.
+rewrite /<- Hm n p/ >>> [idtac, omega, omega].
+assert /forall q n p .
+          l +n m <n= p
+          -> p <n= n
+          -> n -n p = q : nat
+          -> absr (sums s n - sums s p) <= sums s' n - sums s' p/ /Hprop/ >>> [inference, idtac].
+1:{
+  rewrite /-> Hprop (n -n p) n p/ >> auto.
+  apply /absr_ub/.
+  }
+clear /n p Hp Hn/.
+intro /q/.
+induction /q/.
+  {
+  intro /n p Hp Hn Hq/.
+  assertThen /n = p : nat/ /?/ omega.
+  subst /p/.
+  rewrite /-> minusr_self at 0 0/.
+  rewrite /-> absr_zero/.
+  reflexivity.
+  }
+intro /q IH n p Hp Hn Hq/.
+destruct /n/ /| n/.
+  {
+  omega.
+  }
+reduce //.
+rewrite /-> plusr_minusr_assoc at 0 0/.
+rewrite /-> absr_plusr_leqr/.
+apply /plusr_leqr/.
+  {
+  apply /Hbound/.
+  omega.
+  }
+
+  {
+  apply /IH/ >> omega.
+  }
+qed ();
+
+
+
+define /convergent_absolutely s/
+/
+  cauchy (sums (fn i . absr (s i)))
+//
+  (nat -> real) -> U 0
+/;
+
+unfold /convergent_absolutely/.
+typecheck.
+qed ();
+
+
+
+lemma "convergent_absolutely_impl_convergent"
+/
+  forall s .
+    convergent_absolutely s
+    -> cauchy (sums s)
+/;
+
+inference.
+intro /s Hconvabs/.
+unfold /convergent_absolutely in Hconvabs/.
+witness /comparison_test _ _ n`0 Hconvabs __/.
+intro /i _/.
+reduce //.
+reflexivity.
+qed ();
+
+
+
+lemma "sums_split"
+/
+  forall s n i .
+    n <n= i
+    -> sums s i = sums s n + sums (fn j . s (j +n n)) (i -n n) : real
+/;
+
+inference.
+intro /s n i/.
+sinduction /i/.
+reintro /IH/.
+intro /Hi/.
+rewrite /-> Nat.leq_iff_lt_or_eq in Hi/.
+destruct /Hi/ /Hi | ?/.
+1:{
+  subst /i/.
+  rewriteThen /n -n n = n`0 : nat/ omega.
+  reduce //.
+  rewrite /-> plusr_id_r/.
+  reflexivity.
+  }
+destruct /i/ /| i/.
+  {
+  omega.
+  }
+rewriteThen /succ i -n n = succ (i -n n) : nat/ omega.
+reduce //.
+rewrite /-> IH/.
+  {
+  omega.
+  }
+
+  {
+  omega.
+  }
+rewrite /<- plusr_assoc at all/.
+rewrite /-> plusr_commute at 1/.
+compat.
+compat.
+compat.
+omega.
+qed ();
+
+
+
+lemma "convergent_split"
+/
+  forall s n x .
+    converges (sums (fn i . s (i +n n))) x
+    -> converges (sums s) (sums s n + x)
+/;
+
+inference.
+intro /s n x Hconv/.
+apply /converges_equal (fn i . sums s n + sums (fn j . s (j +n n)) (i -n n)) _ _ n/.
+  {
+  intro /i Hi/.
+  reduce //.
+  symmetry.
+  apply /sums_split/ >> auto.
+  }
+apply /converges_plusr/.
+  {
+  apply /converges_constant/.
+  }
+apply /converges_from_tail _ n/.
+reduce //.
+witness /converges_equal _# 3 n __ Hconv/.
+intro /i Hi/.
+reduce //.
+rewrite /-> Nat.plus_minus_cancel_r/.
+reflexivity.
+qed ();
+
+
+
+lemma "convergent_from_tail"
+/
+  forall s n .
+    cauchy (sums (fn i . s (i +n n)))
+    -> cauchy (sums s)
+/;
+
+inference.
+intro /s n Hconv/.
+rewrite /-> cauchy_iff_converges in Hconv in concl/.
+destruct /Hconv/ /x Hconv/.
+exists /sums s n + x/.
+apply /convergent_split/ >> auto.
+qed ();
+
+
+
+lemma "ratio_test"
+/
+  forall s c n .
+    0 < c
+    -> c < 1
+    -> (forall i . n <n= i -> absr (s (succ i)) <= c * (absr (s i)))
+    -> cauchy (sums s)
+/;
+
+inference.
+intro /s c n Hposc Hc Hratio/.
+assert /1 - c != 0 : real/ /Hnonzero1minusc/.
+  {
+  symmetry.
+  apply /ltr_impl_neq/.
+  rewrite /<- minusr_shift_ltr_rr/.
+  rewrite /-> plusr_id_l/.
+  hyp /Hc/.
+  }
+apply /comparison_test _ (fn i . nexpr c (i -n n) * absr (s n)) n/.
+  {
+  apply /convergent_from_tail _ n/.
+  reduce //.
+  rewrite /-> Nat.plus_minus_cancel_r within _/.
+  apply /converges_impl_cauchy _ (absr (s n) * invr (1 - c))/.
+  rewrite /-> timesr_commute within _/.
+  apply /convergent_timesr_const (fn i . nexpr c i)/.
+  apply /convergent_nexpr/ >> auto.
+  }
+reduce //.
+intro /i Hi/.
+revert /Hi/.
+sinduction /i/.
+reintro /IH/.
+intro /Hi/.
+rewrite /-> Nat.leq_iff_lt_or_eq in Hi/.
+destruct /Hi/ /Hi | ?/.
+1:{
+  subst /i/.
+  rewriteThen /n -n n = n`0 : nat/ omega.
+  reduce //.
+  rewrite /-> timesr_id_l/.
+  reflexivity.
+  }
+destruct /i/ /| i/.
+  {
+  exfalso.
+  omega.
+  }
+rewrite /-> Hratio/ >>> [idtac, omega].
+rewrite /-> IH/.
+  {
+  rewriteThen /succ i -n n = succ (i -n n) : nat/ omega.
+  reduce //.
+  rewrite /<- timesr_assoc/.
+  reflexivity.
+  }
+
+  {
+  apply /ltr_impl_leqr/ >> auto.
+  }
+
+  {
+  apply /absr_nonneg/.
+  }
+
+  {
+  omega.
+  }
+
+  {
+  omega.
+  }
 qed ();
 
 

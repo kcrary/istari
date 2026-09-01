@@ -1,0 +1,183 @@
+
+signature CALCULATE =
+   sig
+
+      val calculate : Hyp.hypothesis list -> Tactic.tactic
+
+      (* If calculateTable maps const to f, the head of M is const, and f M = SOME (N, r)
+         then r : M --> N.
+      *)
+      val calculateTable : (Term.term -> (Term.term * Reduction.reduction) option) ConstantTable.table
+
+   end
+
+
+structure Calculate :> CALCULATE =
+   struct
+
+      structure T = Term
+      structure J = Judgement
+      structure R = Reduction
+      structure N = Normalize
+      structure H = ConstantTable
+
+      open Tactic
+      open RefineTactic
+
+
+      val calculateTable : (T.term -> (T.term * R.reduction) option) H.table = H.table ()
+
+
+      fun calculateMain m = 
+         (case N.simplify m of
+             m as T.Elim (h as T.Const const, spine) =>
+                let
+                   val (spine', redsrev, same) = calculateSpine spine [] [] true
+                in
+                   if same then
+                      (case H.find calculateTable const of
+                          NONE =>
+                             NONE
+
+                        | SOME f => f m)
+                   else
+                      let
+                         val m' = T.Elim (h, spine')
+                         val compatred = R.compat (List.rev redsrev)
+                      in
+                         (case H.find calculateTable const of
+                             NONE =>
+                                SOME (m', compatred)
+   
+                           | SOME f =>
+                                (case f m' of
+                                    NONE =>
+                                       SOME (m', compatred)
+   
+                                  | SOME (n, red) =>
+                                       SOME (n, R.trans [compatred, red])))
+                      end
+                end
+
+           | T.Elim (h, spine) =>
+                let
+                   val (spine', redsrev, same) = calculateSpine spine [] [] true
+                in
+                   if same then
+                      NONE
+                   else
+                      SOME (T.Elim (h, spine'), R.compat (List.rev redsrev))
+                end
+                                 
+           | T.Lam (binder, m1) =>
+                (case calculateMain m1 of
+                    NONE => NONE
+
+                  | SOME (n1, red) =>
+                       SOME (T.Lam (binder, n1), R.within [0] red))
+
+           | T.Pair (m1, m2) =>
+                (case (calculateMain m1, calculateMain m2) of
+                    (NONE, NONE) => NONE
+
+                  | (SOME (n1, red1), NONE) =>
+                       SOME (T.Pair (n1, m2), R.within [0] red1)
+
+                  | (NONE, SOME (n2, red2)) =>
+                       SOME (T.Pair (m1, n2), R.within [1] red2)
+
+                  | (SOME (n1, red1), SOME (n2, red2)) =>
+                       SOME (T.Pair (n1, n2), R.trans [R.within [0] red1, R.within [1] red2]))
+
+           | T.Next m1 =>
+                (case calculateMain m1 of
+                    NONE => NONE
+
+                  | SOME (n1, red) =>
+                       SOME (T.Next n1, R.within [0] red))
+
+           | _ => NONE)
+
+      and calculateSpine spine spineAcc redsAcc same =
+         (case spine of
+             nil =>
+                (spineAcc, redsAcc, same)
+
+           | (elim as T.App m) :: rest =>
+                (case calculateMain m of
+                    NONE =>
+                       calculateSpine rest (elim :: spineAcc) (R.refl :: redsAcc) same
+
+                  | SOME (n, red) =>
+                       calculateSpine rest (T.App n :: spineAcc) (red :: redsAcc) false)
+
+           | elim :: rest =>
+                calculateSpine rest (elim :: spineAcc) redsAcc same)
+
+
+
+      fun calculateHyp i a =
+         (case calculateMain a of
+             NONE => idtac
+
+           | SOME (_, red) =>
+                refine (Rule.reduceHyp i red))
+
+
+      fun calculate1 hyp =
+         let
+            do iopt = Hyp.findhypOrConcl hyp
+            do (jud, _) = withgoal
+         in
+            (case iopt of
+                NONE =>
+                   (case calculateMain (J.concl jud) of
+                       NONE =>
+                          idtac
+
+                     | SOME (_, red) =>
+                          refine (Rule.reduce red))
+
+              | SOME i =>
+                   (case J.hyp jud i of
+                       J.Tm a => calculateHyp i a
+                     | J.Tml a => calculateHyp i a
+                     | J.Tmh a => calculateHyp i a
+                     | J.Tmlh a => calculateHyp i a
+                     | J.Let a => calculateHyp i a
+                     | _ => idtac))
+         end
+
+      val concl = Symbol.fromValue "concl"
+
+      fun calculate hyps =
+         (case hyps of
+             nil => 
+                calculate1 (Hyp.NAME concl)
+
+           | [hyp] => 
+                calculate1 hyp
+
+           | hyp :: rest =>
+                calculate1 hyp >>+ calculate rest)
+
+   end
+
+
+structure CalculatePervasive =
+   struct
+
+      val calculate = Calculate.calculate
+
+   end
+
+open CalculatePervasive
+
+
+grammardef Calculate
+
+   start calculate Hypotheses
+
+end
+
+grammaron Calculate

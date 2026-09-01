@@ -1311,6 +1311,13 @@ The destruction tactics are:
 
 ### Arithmetic
 
+- `calculate /[hyp or concl] ... [hyp or concl]/`
+
+  Computes elementary arithmetic expressions in various numeric
+  types, replacing the expression with the answer.  Operates on the
+  conclusion if no hypotheses are given.
+
+
 - `omega`
 
   Solves arithmetic goals using the Omega decision procedure.

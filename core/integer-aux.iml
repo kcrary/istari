@@ -300,6 +300,9 @@ functor AfterIntegerAll () :> sig end =
       structure B = BackchainInternal
       structure H = ConstantTable
       structure T = Term
+      structure R = Reduction
+
+      open Case
       
       val leq = resolveGlobal /Nat.leq/
       val leqz = resolveGlobal /Integer.leqz/
@@ -361,5 +364,34 @@ functor AfterIntegerAll () :> sig end =
       val () =
          H.insert TypecheckTables.totalityTactics Prim.integer
          (exact /\T.Const integer_total\/)
+
+
+      val reduce_zero_to_integer = readRegistry /Integer.reduce_zero_to_integer/ /reduction/
+      val reduce_succ_to_integer = readRegistry /Integer.reduce_succ_to_integer/ /reduction/
+
+      fun reduce_nat_to_integer n =
+         if n = 0 then
+            reduce_zero_to_integer
+         else
+            R.trans
+               [
+               reduce_succ_to_integer,
+               R.within [2] (reduce_nat_to_integer (n-1)),
+               R.native
+               ]
+
+      fun calculate_nat_to_integer m =
+         termCase m
+         /| \nat_to_integer\ nat? =>
+            \(fnc n =>
+                 SOME (T.Native (T.Integer (IntInf.fromInt n)),
+                       reduce_nat_to_integer n))\
+      
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable nat_to_integer calculate_nat_to_integer
 
    end

@@ -4278,6 +4278,70 @@ qed ();
 
 
 
+lemma "plusq_to_prereal"
+/
+  forall x y .
+    rational_to_prereal (plusq x y) = preplusr (rational_to_prereal x) (rational_to_prereal y) : prereal
+/;
+
+inference.
+intro /x y/.
+unfold /rational_to_prereal at all, rational_to_real at all/.
+unfold /preplusr, plusr/.
+unfold /prereal/.
+extensionality >> autoWith /constant_regular/.
+qed ();
+
+
+
+lemma "negq_to_prereal"
+/
+  forall x .
+    rational_to_prereal (negq x) = prenegr (rational_to_prereal x) : prereal
+/;
+
+inference.
+intro /x/.
+unfold /rational_to_prereal at all, rational_to_real at all/.
+unfold /prenegr, negr/.
+unfold /prereal/.
+extensionality >> autoWith /constant_regular/.
+qed ();
+
+
+
+lemma "timesq_to_prereal"
+/
+  forall x y .
+    rational_to_prereal (timesq x y) = pretimesr (rational_to_prereal x) (rational_to_prereal y) : prereal
+/;
+
+inference.
+intro /x y/.
+unfold /rational_to_prereal at all, rational_to_real at all/.
+unfold /pretimesr, timesr/.
+unfold /prereal/.
+extensionality >> autoWith /constant_regular/.
+qed ();
+
+
+
+lemma "invq_to_prereal"
+/
+  forall x .
+    rational_to_prereal (invq x) = preinvr (rational_to_prereal x) : prereal
+/;
+
+inference.
+intro /x/.
+unfold /rational_to_prereal at all, rational_to_real at all/.
+unfold /preinvr, invr/.
+unfold /prereal/.
+extensionality >> autoWith /constant_regular/.
+qed ();
+
+
+
 define /minusr x y/
 /
   plusr x (negr y)
@@ -5131,26 +5195,19 @@ qed ();
 
 
 
-lemma "real_upper_bound"
+lemma "real_upper_bound_prereal"
 /
-  forall (x : real) . squish (exists (y : integer) . ltr x (integer_to_real y))
+  forall (x : prereal) . exists (y : integer) . ltr (realintro x) (integer_to_real y)
 /;
 
-intro /x'/.
-witness /squish_bind (real_representative_squish x') __/.
-intro /(x Hx [Heq])/.
-unhide.
-subst /x'/.
-apply /squish_ret/.
+intro /(x Hx)/.
+unfold /realintro/.
+unfold /integer_to_real, rational_to_real/.
+unfold /ltr, positive/.
+unfold /minusr, negr, plusr/.
 exists /ceiling (x n`2) +z z`2/.
-unfold /ltr/.
-unfold /positive/.
-unfold /rintro/.
-unfold /minusr, plusr, negr/.
-unfold /integer_to_real/.
-unfold /rational_to_real/.
-split.
 unfold /prepositive/.
+split.
 exists /n`1/.
 split.
   {
@@ -5171,18 +5228,6 @@ apply /plusq_ltq_r/.
   apply /integer_to_rational_mono_lt/.
   omega.
   }
-qed ();
-
-
-
-lemma "real_upper_bound_squash"
-/
-  forall (x : real) . { exists (y : integer) . ltr x (integer_to_real y) }
-/;
-
-intro /x/.
-apply /squish_impl_squash/.
-apply /real_upper_bound/.
 qed ();
 
 
@@ -5248,8 +5293,11 @@ aliasExport /preplusr_to_real/ /preplusr_to_real/;
 aliasExport /prenegr_to_real/ /prenegr_to_real/;
 aliasExport /pretimesr_to_real/ /pretimesr_to_real/;
 aliasExport /preinvr_to_real/ /preinvr_to_real/;
-aliasExport /real_upper_bound/ /real_upper_bound/;
-aliasExport /real_upper_bound_squash/ /real_upper_bound_squash/;
+aliasExport /plusq_to_prereal/ /plusq_to_prereal/;
+aliasExport /negq_to_prereal/ /negq_to_prereal/;
+aliasExport /timesq_to_prereal/ /timesq_to_prereal/;
+aliasExport /invq_to_prereal/ /invq_to_prereal/;
+aliasExport /real_upper_bound_prereal/ /real_upper_bound_prereal/;
 
 
 (* SET PARSING TO REAL *)
@@ -5269,6 +5317,18 @@ lemma "eq_nonzero_real"
 intro /x y Hnonzero Heq/.
 unfold /nonzero_real/.
 extensionality >> auto.
+qed ();
+
+
+
+lemma "eq_nonzero_real'"
+/
+  forall (x y : real) . y != 0 : real -> x = y : real -> x = y : nonzero_real
+/;
+
+intro /x y Hnzero Heq/.
+apply /eq_nonzero_real/ >> auto.
+subst /y/ >> auto.
 qed ();
 
 
@@ -6094,6 +6154,68 @@ lemma "minusr_compat"
 inference.
 intro /x x' y y' Hx Hy/.
 subst /x' y'/.
+reflexivity.
+qed ();
+
+
+
+lemma "minusr_swap"
+/
+  forall x y z . x - y - z = x - z - y : real
+/;
+
+inference.
+intro /x y z/.
+unfold /minusr at all/.
+rewrite /-> plusr_assoc at 0 0/.
+rewrite /-> plusr_commute at 1/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusr_minusr_swap"
+/
+  forall x y z . x + y - z = x - z + y : real
+/;
+
+inference.
+intro /x y z/.
+unfold /minusr at all/.
+rewrite /-> plusr_assoc at 0 0/.
+rewrite /-> plusr_commute at 1/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusr_minusr_cancel_r"
+/
+  forall x y . x + y - y = x : real
+/;
+
+inference.
+intro /x y/.
+unfold /minusr/.
+rewrite /-> plusr_assoc/.
+rewrite /-> plusr_inverse_r/.
+rewrite /-> plusr_id_r/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusr_minusr_cancel_l"
+/
+  forall x y . x + y - x = y : real
+/;
+
+inference.
+intro /x y/.
+unfold /minusr/.
+rewrite /-> plusr_rotate/.
+rewrite /-> plusr_inverse_l/.
+rewrite /-> plusr_id_l/.
 reflexivity.
 qed ();
 
@@ -8563,6 +8685,21 @@ qed ();
 
 
 
+lemma "nat_to_real_nonnegative"
+/
+  forall n . 0 <= nat_to_real n
+/;
+
+inference.
+intro /n/.
+unfold /nat_to_real/.
+fold /integer_to_real _/.
+apply /integer_to_real_mono/.
+omega.
+qed ();
+
+
+
 lemma "plus_to_real"
 /
   forall x y . nat_to_real (x +n y) = nat_to_real x +r nat_to_real y : real
@@ -9068,6 +9205,39 @@ inference.
 intro /x y Hx Hy/.
 rewrite /<- timesr_ann_r x/.
 apply /timesr_ltr_l_neg/ >> auto.
+qed ();
+
+
+
+lemma "square_nonnegative"
+/
+  forall x . 0 <= x * x
+/;
+
+inference.
+intro /x/.
+apply /real_dichotomy_weak_if_stable _ _ 0 x/.
+  {
+  apply /leqr_stable/.
+  }
+intro /(Hpos | Hneg)/.
+  {
+  apply /timesr_leqr_zero/ >> auto.
+  }
+
+  {
+  rewrite /<- negr_invol (x * x)/.
+  rewrite /-> negr_dist_timesr_r/.
+  rewrite /-> negr_dist_timesr_l/.
+  assert /0 <= ~ x/ /Hpos/.
+    {
+    apply /negr_leqr'/.
+    rewrite /-> negr_zero/.
+    rewrite /-> negr_invol/.
+    hyp /Hneg/.
+    }
+  apply /timesr_leqr_zero/ >> auto.
+  }
 qed ();
 
 
@@ -12163,6 +12333,83 @@ qed ();
 
 
 
+(* Prereals *)
+
+define /integer_to_prereal x/
+/
+  rational_to_prereal (integer_to_rational x)
+//
+  integer -> prereal
+/;
+
+unfold /integer_to_prereal/.
+typecheck.
+qed ();
+
+
+
+lemma "integer_to_prereal_to_real"
+/
+  forall x .
+    realintro (integer_to_prereal x) = integer_to_real x : real
+/;
+
+inference.
+intro /x/.
+unfold /integer_to_prereal, rational_to_prereal, realintro, integer_to_real/.
+reflexivity.
+qed ();
+
+
+
+lemma "plusz_to_prereal"
+/
+  forall x y .
+    integer_to_prereal (plusz x y) = preplusr (integer_to_prereal x) (integer_to_prereal y) : prereal
+/;
+
+inference.
+intro /x y/.
+unfold /integer_to_prereal at all/.
+rewrite /-> plusz_to_rational/.
+rewrite /-> plusq_to_prereal/.
+reflexivity.
+qed ();
+
+
+
+lemma "negz_to_prereal"
+/
+  forall x .
+    integer_to_prereal (negz x) = prenegr (integer_to_prereal x) : prereal
+/;
+
+inference.
+intro /x/.
+unfold /integer_to_prereal at all/.
+rewrite /-> negz_to_rational/.
+rewrite /-> negq_to_prereal/.
+reflexivity.
+qed ();
+
+
+
+lemma "timesz_to_prereal"
+/
+  forall x y .
+    integer_to_prereal (timesz x y) = pretimesr (integer_to_prereal x) (integer_to_prereal y) : prereal
+/;
+
+inference.
+intro /x y/.
+unfold /integer_to_prereal at all/.
+rewrite /-> timesz_to_rational/.
+rewrite /-> timesq_to_prereal/.
+reflexivity.
+qed ();
+
+
+
 (* Miscellaneous *)
 
 lemma "rational_dense_within_real_prereal"
@@ -12534,17 +12781,44 @@ qed ();
 
   
   
-lemma "real_upper_bound_nat"
+lemma "real_upper_bound"
 /
-  forall (x : real) .
-    squish
-      (exists (n : nat) . n`0 <n n & x < nat_to_real n)
+  forall (x : real) . squish (exists (y : integer) . ltr x (integer_to_real y))
+/;
+
+intro /x'/.
+witness /squish_bind (real_to_prereal x') __/.
+intro /(x Heq)/.
+subst /x'/.
+apply /squish_ret/.
+so /real_upper_bound_prereal x/ /y Hy/.
+existsAuto.
+qed ();
+
+
+
+lemma "real_upper_bound_squash"
+/
+  forall (x : real) . { exists (y : integer) . ltr x (integer_to_real y) }
 /;
 
 intro /x/.
-witness /squish_bind (real_upper_bound x) __/.
-intro /(z Hz)/.
-apply /squish_ret/.
+apply /squish_impl_squash/.
+apply /real_upper_bound/.
+qed ();
+
+
+
+lemma "real_upper_bound_nat_prereal"
+/
+  forall (x : prereal) .
+    exists (n : nat) .
+      n`0 <n n
+      & realintro x < nat_to_real n
+/;
+
+intro /x/.
+so /real_upper_bound_prereal x/ /z Hz/.
 so /Integer.integer_dichotomy z z`0/ /Hneg | Hpos/.
   {
   exists /n`1/.
@@ -12571,6 +12845,179 @@ so /Integer.integer_dichotomy z z`0/ /Hneg | Hpos/.
   apply /Integer.ltz_impl_leqz/ >> auto.
   }
 qed ();
+
+
+
+lemma "real_upper_bound_nat"
+/
+  forall (x : real) .
+    squish
+      (exists (n : nat) . n`0 <n n & x < nat_to_real n)
+/;
+
+intro /x'/.
+witness /squish_bind (real_to_prereal x') __/.
+intro /(x Heq)/.
+subst /x'/.
+apply /squish_ret/.
+so /real_upper_bound_nat_prereal x/ /z Hpos Hz/.
+existsAuto.
+qed ();
+
+
+
+lemma "real_upper_bound_nat_squash"
+/
+  forall (x : real) .
+    { exists (n : nat) . n`0 <n n & x < nat_to_real n }
+/;
+
+intro /x/.
+apply /squish_impl_squash/.
+apply /real_upper_bound_nat/.
+qed ();
+
+
+
+(* Calculate *)
+
+structure R = Reduction;
+
+val regroup_nat_to_real =
+  R.user $
+  makeReduction
+  /
+    nat_to_real n --> integer_to_real (nat_to_integer n) ;
+
+    unfolding nat_to_real integer_to_real
+  /;
+
+writeRegistry /regroup_nat_to_real/ /reduction/ regroup_nat_to_real;
+
+val regroup_integer_to_rational_to_real =
+  R.user $
+  makeReduction
+  /
+    rational_to_real (integer_to_rational x) --> integer_to_real x ;
+
+    unfolding integer_to_real
+  /;
+
+writeRegistry /regroup_integer_to_rational_to_real/ /reduction/ regroup_integer_to_rational_to_real;
+
+val regroup_nat_to_rational_to_real =
+  R.user $
+  makeReduction
+  /
+    rational_to_real (nat_to_rational n) --> integer_to_real (nat_to_integer n) ;
+
+    unfolding integer_to_real nat_to_rational
+  /;
+
+writeRegistry /regroup_nat_to_rational_to_real/ /reduction/ regroup_integer_to_rational_to_real;
+
+val regroup_integer_to_prereal_to_real =
+  R.user $
+  makeReduction
+  /
+    realintro (integer_to_prereal x) --> integer_to_real x ;
+
+    unfolding realintro rational_to_prereal integer_to_prereal integer_to_real
+  /;
+
+writeRegistry /regroup_integer_to_prereal_to_real/ /reduction/ regroup_integer_to_prereal_to_real;
+
+val regroup_integer_to_rational_to_prereal =
+  R.user $
+  makeReduction
+  /
+    rational_to_prereal (integer_to_rational x) --> integer_to_prereal x ;
+
+    unfolding integer_to_prereal
+  /;
+
+writeRegistry /regroup_integer_to_rational_to_prereal/ /reduction/ regroup_integer_to_rational_to_prereal;
+
+val regroup_plusz_to_real = 
+   R.user $
+   makeReduction
+   /
+      plusr (integer_to_real x) (integer_to_real y) --> 
+         integer_to_real (plusz (timesz x z`1) (timesz y z`1)) ;
+
+      unfolding integer_to_real plusr plusq integer_to_rational rational_to_real
+   /;
+
+writeRegistry /regroup_plusz_to_real/ /reduction/ regroup_plusz_to_real;
+
+val regroup_minusz_to_real = 
+   R.user $
+   makeReduction
+   /
+      minusr (integer_to_real x) (integer_to_real y) --> 
+         integer_to_real (plusz (timesz x z`1) (timesz (negz y) z`1)) ;
+
+      unfolding integer_to_real minusr negr negq plusr plusq integer_to_rational rational_to_real
+   /;
+
+writeRegistry /regroup_minusz_to_real/ /reduction/ regroup_minusz_to_real;
+
+val regroup_negz_to_real = 
+   R.user $
+   makeReduction
+   /
+      negr (integer_to_real x) --> integer_to_real (negz x) ;
+
+      unfolding integer_to_real negr negq integer_to_rational rational_to_real
+   /;
+
+writeRegistry /regroup_negz_to_real/ /reduction/ regroup_negz_to_real;
+
+val regroup_timesz_to_real = 
+   R.user $
+   makeReduction
+   /
+      timesr (integer_to_real x) (integer_to_real y) --> integer_to_real (timesz x y) ;
+
+      unfolding integer_to_real timesr timesq integer_to_rational rational_to_real
+   /;
+
+writeRegistry /regroup_timesz_to_real/ /reduction/ regroup_timesz_to_real;
+
+val regroup_plusz_to_prereal =
+   R.user $
+   makeReduction
+   /
+      preplusr (integer_to_prereal x) (integer_to_prereal y) --> 
+         integer_to_prereal (plusz (timesz x z`1) (timesz y z`1)) ;
+
+      unfolding integer_to_real plusr plusq preplusr integer_to_rational rational_to_prereal rational_to_real integer_to_prereal
+   /;
+
+writeRegistry /regroup_plusz_to_prereal/ /reduction/ regroup_plusz_to_prereal;
+
+val regroup_negz_to_prereal =
+   R.user $
+   makeReduction
+   /
+      prenegr (integer_to_prereal x) --> integer_to_prereal (negz x) ;
+
+      unfolding integer_to_real negr negq prenegr integer_to_rational rational_to_prereal rational_to_real integer_to_prereal
+   /;
+
+writeRegistry /regroup_negz_to_prereal/ /reduction/ regroup_negz_to_prereal;
+
+val regroup_timesz_to_prereal =
+   R.user $
+   makeReduction
+   /
+      pretimesr (integer_to_prereal x) (integer_to_prereal y) --> 
+         integer_to_prereal (timesz x y) ;
+
+      unfolding integer_to_real timesr timesq pretimesr integer_to_rational rational_to_prereal rational_to_real integer_to_prereal
+   /;
+
+writeRegistry /regroup_timesz_to_prereal/ /reduction/ regroup_timesz_to_prereal;
 
 
 

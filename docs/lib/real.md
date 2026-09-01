@@ -67,9 +67,11 @@ This one gives transitivity in the form needed for rewriting:
     
     ltr_from_leqr_neq : forall (x y : real) . x <= y -> x != y : real -> x < y
 
-This lemma is convenient for rewriting under `invr`:
+These lemmas are convenient for rewriting under `invr`:
 
     eq_nonzero_real : forall (x y : real) . x != 0 : real -> x = y : real -> x = y : nonzero_real
+
+    eq_nonzero_real' : forall (x y : real) . y != 0 : real -> x = y : real -> x = y : nonzero_real
 
 
 ### Plus and negation
@@ -262,6 +264,14 @@ before moving.  It is always the right-hand operand after moving.
 
     minusr_shift_ltr_rl : forall (a b c : real) . a + b < c <-> b < c - a
 
+    minusr_swap : forall (x y z : real) . x - y - z = x - z - y : real
+
+    plusr_minusr_swap : forall (x y z : real) . x + y - z = x - z + y : real
+
+    plusr_minusr_cancel_r : forall (x y : real) . x + y - y = x : real
+
+    plusr_minusr_cancel_l : forall (x y : real) . x + y - x = y : real
+
     negr_zero : ~ 0 = 0 : real
 
     negr_nonzero : forall (x : real) . x != 0 : real -> ~ x != 0 : real
@@ -320,6 +330,8 @@ before moving.  It is always the right-hand operand after moving.
     timesr_ltr_zero_invert : forall (x y : real) . 0 < x * y -> x < 0 & y < 0 % 0 < x & 0 < y
 
     timesr_ltr_zero_invert_neg : forall (x y : real) . x * y < 0 -> x < 0 & 0 < y % 0 < x & y < 0
+
+    square_nonnegative : forall (x : real) . 0 <= x * x
 
     invr_positive : forall (x : real) . 0 < x -> 0 < invr x
 
@@ -988,6 +1000,9 @@ of their inputs:
     real_upper_bound_nat : forall (x : real) .
                               Squish.squish (exists (n : nat) . n`0 <n n & x < nat_to_real n)
 
+    real_upper_bound_nat_squash : forall (x : real) .
+                                     { exists (n : nat) . n`0 <n n & x < nat_to_real n }
+
     infinitely_close : forall (x y : real) .
                           (forall (k : nat) . n`0 <n k -> absr (x - y) <= invr (nat_to_real k))
                           -> x = y : real
@@ -1022,6 +1037,9 @@ produce a deterministic result.
 
     rational_to_prereal : Rational.rational -> prereal
 
+    integer_to_prereal : integer -> prereal
+                       = fn x . rational_to_prereal (Rational.integer_to_rational x)
+
     preplusr : prereal -> prereal -> prereal
 
     prenegr : prereal -> prereal
@@ -1033,6 +1051,9 @@ produce a deterministic result.
     rational_to_prereal_to_real : forall (x : Rational.rational) .
                                      realintro (rational_to_prereal x) = rational_to_real x : real
 
+    integer_to_prereal_to_real : forall (x : integer) .
+                                    realintro (integer_to_prereal x) = integer_to_real x : real
+
     preplusr_to_real : forall (x y : prereal) .
                           realintro (preplusr x y) = realintro x + realintro y : real
 
@@ -1043,6 +1064,37 @@ produce a deterministic result.
 
     preinvr_to_real : forall (x : { x : prereal | realintro x != 0 : real }) .
                          realintro (preinvr x) = invr (realintro x) : real
+
+    plusq_to_prereal : forall (x y : Rational.rational) .
+                          rational_to_prereal (x +q y)
+                            = preplusr (rational_to_prereal x) (rational_to_prereal y)
+                            : prereal
+
+    negq_to_prereal : forall (x : Rational.rational) .
+                         rational_to_prereal (~q x) = prenegr (rational_to_prereal x) : prereal
+
+    timesq_to_prereal : forall (x y : Rational.rational) .
+                           rational_to_prereal (x *q y)
+                             = pretimesr (rational_to_prereal x) (rational_to_prereal y)
+                             : prereal
+
+    invq_to_prereal : forall (x : Rational.rational) .
+                         rational_to_prereal (Rational.invq x)
+                           = preinvr (rational_to_prereal x)
+                           : prereal
+
+    plusz_to_prereal : forall (x y : integer) .
+                          integer_to_prereal (x +z y)
+                            = preplusr (integer_to_prereal x) (integer_to_prereal y)
+                            : prereal
+
+    negz_to_prereal : forall (x : integer) .
+                         integer_to_prereal (~z x) = prenegr (integer_to_prereal x) : prereal
+
+    timesz_to_prereal : forall (x y : integer) .
+                           integer_to_prereal (x *z y)
+                             = pretimesr (integer_to_prereal x) (integer_to_prereal y)
+                             : prereal
 
     plusr_positive_invert_prereal : forall (x y : prereal) .
                                        0 < realintro x + realintro y
@@ -1057,6 +1109,12 @@ produce a deterministic result.
                                             -> exists (z : Rational.rational) .
                                                  realintro x < rational_to_real z
                                                  & rational_to_real z < realintro y
+
+    real_upper_bound_prereal : forall (x : prereal) .
+                                  exists (y : integer) . realintro x < integer_to_real y
+
+    real_upper_bound_nat_prereal : forall (x : prereal) .
+                                      exists (n : nat) . n`0 <n n & realintro x < nat_to_real n
 
 ---
 

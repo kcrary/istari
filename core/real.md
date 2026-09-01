@@ -69,9 +69,11 @@ This one gives transitivity in the form needed for rewriting:
     
     ltr_from_leqr_neq : type:ltr_from_leqr_neq
 
-This lemma is convenient for rewriting under `invr`:
+These lemmas are convenient for rewriting under `invr`:
 
     eq_nonzero_real : type:eq_nonzero_real
+
+    eq_nonzero_real' : type:eq_nonzero_real'
 
 
 ### Plus and negation
@@ -262,6 +264,14 @@ before moving.  It is always the right-hand operand after moving.
 
     minusr_shift_ltr_rl : type:minusr_shift_ltr_rl
 
+    minusr_swap : type:minusr_swap
+
+    plusr_minusr_swap : type:plusr_minusr_swap
+
+    plusr_minusr_cancel_r : type:plusr_minusr_cancel_r
+
+    plusr_minusr_cancel_l : type:plusr_minusr_cancel_l
+
     negr_zero : type:negr_zero
 
     negr_nonzero : type:negr_nonzero
@@ -318,6 +328,8 @@ before moving.  It is always the right-hand operand after moving.
     timesr_ltr_zero_invert : type:timesr_ltr_zero_invert
 
     timesr_ltr_zero_invert_neg : type:timesr_ltr_zero_invert_neg
+
+    square_nonnegative : type:square_nonnegative
 
     invr_positive : type:invr_positive
 
@@ -897,6 +909,8 @@ of their inputs:
 
     real_upper_bound_nat : type:real_upper_bound_nat
 
+    real_upper_bound_nat_squash : type:real_upper_bound_nat_squash
+
     infinitely_close : type:infinitely_close
 
     real_total : type:real_total
@@ -923,6 +937,9 @@ produce a deterministic result.
 
     rational_to_prereal : type:rational_to_prereal
 
+    integer_to_prereal : type:integer_to_prereal
+                       = def:integer_to_prereal
+
     preplusr : type:preplusr
 
     prenegr : type:prenegr
@@ -933,6 +950,8 @@ produce a deterministic result.
 
     rational_to_prereal_to_real : type:rational_to_prereal_to_real
 
+    integer_to_prereal_to_real : type:integer_to_prereal_to_real
+
     preplusr_to_real : type:preplusr_to_real
 
     prenegr_to_real : type:prenegr_to_real
@@ -941,11 +960,29 @@ produce a deterministic result.
 
     preinvr_to_real : type:preinvr_to_real
 
+    plusq_to_prereal : type:plusq_to_prereal
+
+    negq_to_prereal : type:negq_to_prereal
+
+    timesq_to_prereal : type:timesq_to_prereal
+
+    invq_to_prereal : type:invq_to_prereal
+
+    plusz_to_prereal : type:plusz_to_prereal
+
+    negz_to_prereal : type:negz_to_prereal
+
+    timesz_to_prereal : type:timesz_to_prereal
+
     plusr_positive_invert_prereal : type:plusr_positive_invert_prereal
 
     overlapping_ranges_prereal : type:overlapping_ranges_prereal
 
     rational_dense_within_real_prereal : type:rational_dense_within_real_prereal
+
+    real_upper_bound_prereal : type:real_upper_bound_prereal
+
+    real_upper_bound_nat_prereal : type:real_upper_bound_nat_prereal
 
 ---
 

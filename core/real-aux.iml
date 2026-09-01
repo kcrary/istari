@@ -213,13 +213,19 @@ functor AfterRealAll () :> sig end =
       structure B = BackchainInternal
       structure H = ConstantTable
       structure CR = CheckpointedRef
+      structure R = Reduction
 
       val real = resolveGlobal /Real.real/
       val rational_to_real = resolveGlobal /Real.rational_to_real/
       val integer_to_real = resolveGlobal /Real.integer_to_real/
+      val nat_to_real = resolveGlobal /Real.nat_to_real/
+      val integer_to_rational = resolveGlobal /Rational.integer_to_rational/
+      val nat_to_rational = resolveGlobal /Rational.nat_to_rational/
+      val nat_to_integer = resolveGlobal /Integer.nat_to_integer/
       val plusr = resolveGlobal /Real.plusr/
       val timesr = resolveGlobal /Real.timesr/
       val negr = resolveGlobal /Real.negr/
+      val minusr = resolveGlobal /Real.minusr/
       val invr = resolveGlobal /Real.invr/
       val leqr = resolveGlobal /Real.leqr/
       val ltr = resolveGlobal /Real.ltr/
@@ -321,5 +327,269 @@ functor AfterRealAll () :> sig end =
       val () =
          H.insert TypecheckTables.strictnessTactics real
          (exact /\T.Const real_strict\/)
+
+
+
+      val prereal = resolveGlobal /Real.prereal/
+      val realintro = resolveGlobal /Real.realintro/
+      val rational_to_prereal = resolveGlobal /Real.rational_to_prereal/
+      val integer_to_prereal = resolveGlobal /Real.integer_to_prereal/
+      val preplusr = resolveGlobal /Real.preplusr/
+      val prenegr = resolveGlobal /Real.prenegr/
+      val pretimesr = resolveGlobal /Real.pretimesr/
+      
+      val reduce_zero_to_integer = readRegistry /Integer.reduce_zero_to_integer/ /reduction/
+      val reduce_succ_to_integer = readRegistry /Integer.reduce_succ_to_integer/ /reduction/
+
+      val regroup_nat_to_real = readRegistry /Real.regroup_nat_to_real/ /reduction/
+      val regroup_integer_to_rational_to_real = readRegistry /Real.regroup_integer_to_rational_to_real/ /reduction/
+      val regroup_nat_to_rational_to_real = readRegistry /Real.regroup_nat_to_rational_to_real/ /reduction/
+      val regroup_integer_to_prereal_to_real = readRegistry /Real.regroup_integer_to_prereal_to_real/ /reduction/
+      val regroup_integer_to_rational_to_prereal = readRegistry /Real.regroup_integer_to_rational_to_prereal/ /reduction/
+      val regroup_plusz_to_real = readRegistry /Real.regroup_plusz_to_real/ /reduction/
+      val regroup_negz_to_real = readRegistry /Real.regroup_negz_to_real/ /reduction/
+      val regroup_minusz_to_real = readRegistry /Real.regroup_minusz_to_real/ /reduction/
+      val regroup_timesz_to_real = readRegistry /Real.regroup_timesz_to_real/ /reduction/
+      val regroup_plusz_to_prereal = readRegistry /Real.regroup_plusz_to_prereal/ /reduction/
+      val regroup_negz_to_prereal = readRegistry /Real.regroup_negz_to_prereal/ /reduction/
+      val regroup_timesz_to_prereal = readRegistry /Real.regroup_timesz_to_prereal/ /reduction/
+
+      fun reduce_nat_to_integer n =
+         if n = 0 then
+            reduce_zero_to_integer
+         else
+            R.trans
+               [
+               reduce_succ_to_integer,
+               R.within [2] (reduce_nat_to_integer (n-1)),
+               R.native
+               ]
+
+      fun calculate_nat_to_real m =
+         termCase m
+         /| \nat_to_real\ nat? =>
+            \(fnc n =>
+                 SOME (T.apply1 integer_to_real (T.Native (T.Integer (IntInf.fromInt n))),
+                       R.trans
+                          [
+                          regroup_nat_to_real,
+                          R.within [1] (reduce_nat_to_integer n)
+                          ]))\
+
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable nat_to_real calculate_nat_to_real
+
+      fun calculate_integer_to_real m =
+         termCase m
+         /| \integer_to_real\ (\nat_to_integer\ nat?) =>
+            \(fnc n =>
+                 SOME (T.apply1 integer_to_real (T.Native (T.Integer (IntInf.fromInt n))),
+                       R.within [1] (reduce_nat_to_integer n)))\
+
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable integer_to_real calculate_integer_to_real
+
+      fun calculate_rational_to_real m =
+         termCase m
+         /| \rational_to_real\ (\integer_to_rational\ integer?) =>
+            \(fnc x =>
+                 SOME (T.apply1 integer_to_real (T.Native (T.Integer x)),
+                       regroup_integer_to_rational_to_real))\
+
+          | \rational_to_real\ (\nat_to_rational\ nat?) =>
+            \(fnc n =>
+                 SOME (T.apply1 integer_to_real (T.Native (T.Integer (IntInf.fromInt n))),
+                       R.trans
+                          [
+                          regroup_nat_to_rational_to_real,
+                          R.within [1] (reduce_nat_to_integer n)
+                          ]))\
+
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable rational_to_real calculate_rational_to_real
+
+      fun calculate_realintro m =
+         termCase m
+         /| \realintro\ (\integer_to_prereal\ integer?) =>
+            \(fnc x =>
+                 SOME (T.apply1 integer_to_real (T.Native (T.Integer x)),
+                       regroup_integer_to_prereal_to_real))\
+
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable realintro calculate_realintro
+
+      fun calculate_rational_to_prereal m =
+         termCase m
+         /| \rational_to_prereal\ (\integer_to_rational\ integer?) =>
+            \(fnc x =>
+                 SOME (T.apply1 integer_to_prereal (T.Native (T.Integer x)),
+                       regroup_integer_to_rational_to_prereal))\
+
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable rational_to_prereal calculate_rational_to_prereal
+
+      fun calculate_plusr m =
+         termCase m
+         /| \plusr\ (\integer_to_real\ integer?) (\integer_to_real\ integer?) =>
+            \(fnc x y =>
+                 SOME (T.apply1 integer_to_real (T.Native (T.Integer (IntInf.+ x y))),
+                       R.trans
+                          [
+                          regroup_plusz_to_real,
+                          R.within [1]
+                             (R.trans
+                                 [
+                                 R.compat [R.native, R.native],
+                                 R.native
+                                 ])
+                          ]))\
+      
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable plusr calculate_plusr
+
+      fun calculate_negr m =
+         termCase m
+         /| \negr\ (\integer_to_real\ integer?) =>
+            \(fnc x =>
+                 SOME (T.apply1 integer_to_real (T.Native (T.Integer (IntInf.~ x))),
+                       R.trans
+                          [
+                          regroup_negz_to_real,
+                          R.within [1] R.native
+                          ]))\
+      
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable negr calculate_negr
+
+      fun calculate_minusr m =
+         termCase m
+         /| \minusr\ (\integer_to_real\ integer?) (\integer_to_real\ integer?) =>
+            \(fnc x y =>
+                 SOME (T.apply1 integer_to_real (T.Native (T.Integer (IntInf.+ x y))),
+                       R.trans
+                          [
+                          regroup_minusz_to_real,
+                          R.within [1]
+                             (R.trans
+                                 [
+                                 R.compat [
+                                          R.native,
+                                          R.trans [R.compat [R.native], R.native],
+                                          ],
+                                 R.native
+                                 ])
+                          ]))\
+      
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable minusr calculate_minusr
+
+      fun calculate_timesr m =
+         termCase m
+         /| \timesr\ (\integer_to_real\ integer?) (\integer_to_real\ integer?) =>
+            \(fnc x y =>
+                 SOME (T.apply1 integer_to_real (T.Native (T.Integer (IntInf.* x y))),
+                       R.trans
+                          [
+                          regroup_timesz_to_real,
+                          R.within [1] R.native
+                          ]))\
+      
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable timesr calculate_timesr
+
+      fun calculate_preplusr m =
+         termCase m
+         /| \preplusr\ (\integer_to_prereal\ integer?) (\integer_to_prereal\ integer?) =>
+            \(fnc x y =>
+                 SOME (T.apply1 integer_to_prereal (T.Native (T.Integer (IntInf.+ x y))),
+                       R.trans
+                          [
+                          regroup_plusz_to_prereal,
+                          R.within [1]
+                             (R.trans
+                                 [
+                                 R.compat [R.native, R.native],
+                                 R.native
+                                 ])
+                          ]))\
+      
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable preplusr calculate_preplusr
+
+      fun calculate_prenegr m =
+         termCase m
+         /| \prenegr\ (\integer_to_prereal\ integer?) =>
+            \(fnc x =>
+                 SOME (T.apply1 integer_to_prereal (T.Native (T.Integer (IntInf.~ x))),
+                       R.trans
+                          [
+                          regroup_negz_to_prereal,
+                          R.within [1] R.native
+                          ]))\
+      
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable prenegr calculate_prenegr
+
+      fun calculate_pretimesr m =
+         termCase m
+         /| \pretimesr\ (\integer_to_prereal\ integer?) (\integer_to_prereal\ integer?) =>
+            \(fnc x y =>
+                 SOME (T.apply1 integer_to_prereal (T.Native (T.Integer (IntInf.* x y))),
+                       R.trans
+                          [
+                          regroup_timesz_to_prereal,
+                          R.within [1] R.native
+                          ]))\
+      
+          | _ =>
+            \(fnc =>
+                 NONE)\
+         /
+
+      val () = H.insert Calculate.calculateTable pretimesr calculate_pretimesr
 
    end

@@ -1054,6 +1054,19 @@ inequality did not reverse on the right.
 
 ### Miscellaneous
 
+    rational_to_fraction : forall (a : rational) .
+                              Squish.squish
+                                (exists (b c : integer) .
+                                   z`0 <z c
+                                   &d a = integer_to_rational b || integer_to_rational c : rational)
+
+    rational_to_fraction_squash : forall (a : rational) .
+                                     { exists (b c : integer) .
+                                         z`0 <z c
+                                         &d a
+                                              = integer_to_rational b || integer_to_rational c
+                                              : rational }
+
     rational_dense : forall (a b : rational) . a < b -> exists (c : rational) . a < c & c < b
 
     leqq_from_upper_bounds : forall (x y : rational) .

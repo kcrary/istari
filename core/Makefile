@@ -1,7 +1,7 @@
 
 ISTARIBIN=../ui/bin
 
-DOCUNITS = acc bool decidable division eventually finite finite-map function integer irrelevance kindlike logic list markov misc nat natural option partial permutation quotient rational real real-sequence relations sqstable squish stable symbol tuple weaksum wtype
+DOCUNITS = acc bool decidable division eventually finite finite-map function integer irrelevance kindlike logic list markov misc nat natural option partial permutation quotient rational real real-exponent real-sequence relations sqstable squish stable symbol tuple weaksum wtype
 UNITS = $(DOCUNITS) datatype syntactic-equality omega
 DOCS = finite-map-class
 
@@ -50,9 +50,10 @@ option.isto : datatype.isto function.isto kindlike.isto integer.isto
 partial.isto : acc.isto logic.isto
 permutation.isto : list.isto logic.isto misc.isto nat.isto
 quotient.isto : logic.isto sqstable.isto syntactic-equality.isto
-rational.isto : bool.isto decidable.isto integer.isto logic.isto nat.isto omega.isto partial.isto quotient.isto stable.ist
+rational.isto : bool.isto decidable.isto integer.isto logic.isto nat.isto omega.isto partial.isto quotient.isto squish.isto stable.ist
 real.isto : bool.isto integer.isto logic.isto markov.isto nat.isto omega.isto quotient.isto rational.isto squish.isto sqstable.isto stable.isto
-real-sequence.isto : bool.isto integer.isto logic.isto nat.isto omega.isto rational.isto sqstable.isto real.isto squish.isto
+real-exponent.isto : division.isto integer.isto logic.isto nat.isto omega.isto rational.isto real.isto sqstable.isto squish.isto
+real-sequence.isto : bool.isto integer.isto logic.isto nat.isto omega.isto rational.isto sqstable.isto real.isto real-exponent.isto squish.isto
 relations.isto : datatype.isto acc.isto decidable.isto finite.isto
 sqstable.isto : decidable.isto logic.isto stable.isto syntactic-equality.isto
 squish.isto : quotient.isto

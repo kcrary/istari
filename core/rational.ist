@@ -8,13 +8,16 @@ File.import "decidable-load.iml";
 File.import "stable-load.iml";
 File.import "partial-load.iml";
 File.import "omega-load.iml";
+File.import "squish-load.iml";
 
+File.import "calculate.iml";
 File.import "rational-aux.iml";
 
 aliasModule /Q/ /Quotient/;
 
 
 openModule /Integer/;
+openModule /Squish/;
 
 
 beginModule "Rational";
@@ -751,6 +754,54 @@ inference.
 unfold /rational at all/.
 fold /Q.quotient2 _ ratpred ratequiv ratequiv_per at all/.
 exact /Q.quotient2_equality _ _ ratpred ratequiv ratequiv_per/.
+qed ();
+
+
+
+lemma "rational_representative_squish"
+/
+  forall (x : rational) .
+    squish
+      (exists y h .
+         x = qintro y h : rational)
+/;
+
+inference.
+intro /x/.
+infer /rational/ /Hof/.
+unfold /of in Hof, rational in Hof/.
+unfold /rational in x/.
+fold /Q.quotient2 _ ratpred ratequiv ratequiv_per in Hof in x/.
+exactRaw /squish_ret (x, (), ())/.
+destruct /x/ /[x Hx x' Hx' Hxx]/.
+  {
+  typecheck.
+  unfold /Q.qintro2 at all/.
+  fold /qintro x Hx/.
+  fold /qintro x' Hx'/.
+  apply /rational_equality/.
+  unfold /qintro at all/.
+  auto.
+  }
+
+  {
+  unfold /Q.qintro2 at all/.
+  fold /qintro x Hx/.
+  apply /squish_ext/.
+    {
+    unfold /qintro at 1/.
+    fold /qintro x Hx at 1/.
+    reflexivity.
+    }
+
+    {
+    unfold /qintro at 1/.
+    fold /qintro x' Hx'/.
+    apply /rational_equality/.
+    unfold /qintro at all/.
+    auto.
+    }
+  }
 qed ();
 
 
@@ -7026,6 +7077,58 @@ qed ();
 
 
 
+lemma "rational_to_fraction"
+/
+  forall a . 
+    squish 
+      (exists b c . 
+         z`0 <z c
+         &d a = integer_to_rational b |q integer_to_rational c : rational)
+/;
+
+inference.
+intro /a/.
+witness /squish_bind (rational_representative_squish a) __/.
+intro /((n d) h ?)/.
+reduce /h/.
+subst /a/.
+apply /squish_ret/.
+existses [/n/, /d/].
+split >> auto.
+apply /rational_equality/.
+split.
+unfold /integer_to_rational at all/.
+unfold /divq, invq, timesq/.
+reduce //.
+boolEq false /d =z? z`0/.
+  {
+  omega.
+  }
+boolEq true /z`0 <z? d/ >> auto.
+unfold /qintro/.
+unfold /ratequiv/.
+reduce //.
+rewrite /-> timesz_assoc/ >> auto.
+qed ();
+
+
+
+lemma "rational_to_fraction_squash"
+/
+  forall a .
+    { exists b c .
+        z`0 <z c
+        &d a = integer_to_rational b |q integer_to_rational c : rational }
+/;
+
+inference.
+intro /a/.
+apply /squish_impl_squash/.
+apply /rational_to_fraction/.
+qed ();
+
+
+
 lemma "rational_dense"
 /
   forall a b .
@@ -8888,6 +8991,57 @@ apply /leqq_trans _ x/.
   apply /ceiling_ub/.
   }
 qed ();
+
+
+
+(* Calculate *)
+
+structure R = Reduction;
+
+val regroup_nat_to_rational =
+  R.user $
+  makeReduction
+  /
+    nat_to_rational n --> integer_to_rational (nat_to_integer n) ;
+
+    unfolding nat_to_rational
+  /;
+
+writeRegistry /regroup_nat_to_rational/ /reduction/ regroup_nat_to_rational;
+
+val regroup_plusz_to_rational = 
+   R.user $
+   makeReduction
+   /
+      plusq (integer_to_rational x) (integer_to_rational y) --> 
+         integer_to_rational (plusz (timesz x z`1) (timesz y z`1)) ;
+
+      unfolding integer_to_rational plusq
+   /;
+
+writeRegistry /regroup_plusz_to_rational/ /reduction/ regroup_plusz_to_rational;
+
+val regroup_negz_to_rational = 
+   R.user $
+   makeReduction
+   /
+      negq (integer_to_rational x) --> integer_to_rational (negz x) ;
+
+      unfolding integer_to_rational negq
+   /;
+
+writeRegistry /regroup_negz_to_rational/ /reduction/ regroup_negz_to_rational;
+
+val regroup_timesz_to_rational = 
+   R.user $
+   makeReduction
+   /
+      timesq (integer_to_rational x) (integer_to_rational y) --> integer_to_rational (timesz x y) ;
+
+      unfolding integer_to_rational timesq
+   /;
+
+writeRegistry /regroup_timesz_to_rational/ /reduction/ regroup_timesz_to_rational;
 
 
 

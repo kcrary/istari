@@ -1,0 +1,487 @@
+
+File.import "logic-load.iml";
+File.import "nat-load.iml";
+File.import "division-load.iml";
+File.import "integer-load.iml";
+File.import "rational-load.iml";
+File.import "squish-load.iml";
+File.import "sqstable-load.iml";
+File.import "real-load.iml";
+File.import "omega-load.iml";
+
+openModule /Squish/;
+openModule /Real/;
+
+aliasModule /Z/ /Integer/;
+
+(* SET PARSING TO REAL *)
+setArithReal ();
+
+
+beginModule "RealExponent";
+
+
+defineInd /x/
+/
+  nexpr : nat -> real of
+  | zero . 1
+
+  | succ n . x * nexpr n
+//
+  real -> nat -> real
+/;
+
+
+
+lemma "nexpr_positive"
+/
+  forall a n .
+    0 < a
+    -> 0 < nexpr a n
+/;
+
+inference.
+intro /a n Ha/.
+induction /n/.
+  {
+  apply /ltr_0_1/.
+  }
+intro /n IH/.
+apply /timesr_ltr_zero/ >> auto.
+qed ();
+
+
+
+lemma "nexpr_nonnegative"
+/
+  forall a n .
+    0 <= a
+    -> 0 <= nexpr a n
+/;
+
+inference.
+intro /a n Ha/.
+induction /n/.
+  {
+  apply /leqr_0_1/.
+  }
+intro /n IH/.
+apply /timesr_leqr_zero/ >> auto.
+qed ();
+
+
+
+lemma "nexpr_plus"
+/
+  forall a m n .
+    nexpr a (m +n n) = nexpr a m * nexpr a n : real
+/;
+
+inference.
+intro /a m n/.
+induction /m/.
+  {
+  rewrite /-> timesr_id_l/ >> auto.
+  }
+intro /m IH/.
+rewrite /-> IH/.
+rewrite /-> timesr_assoc/.
+reflexivity.
+qed ();
+
+
+
+lemma "nexpr_times"
+/
+  forall a m n .
+    nexpr a (m *n n) = nexpr (nexpr a m) n : real
+/;
+
+inference.
+intro /a m n/.
+rewrite /-> Nat.times_commute/.
+induction /n/ >> auto.
+intro /n IH/.
+rewrite /-> nexpr_plus/.
+rewrite /-> IH/.
+reflexivity.
+qed ();
+
+
+
+lemma "nexpr_mono_base"
+/
+  forall a a' n .
+    0 <= a
+    -> a <= a'
+    -> nexpr a n <= nexpr a' n
+/;
+
+inference.
+intro /a a' n Hpos Ha/.
+induction /n/ >> auto.
+intro /b IH/.
+apply /timesr_leqr/ >> auto.
+apply /nexpr_nonnegative/ >> auto.
+qed ();
+
+
+
+lemma "nexpr_nonzero"
+/
+  forall x n .
+    x != 0 : real
+    -> nexpr x n != 0 : real
+/;
+
+inference.
+intro /x n Hnonzero/.
+induction /n/.
+
+(* 0 *)
+{
+apply /integer_to_real_neq/.
+omega.
+}
+
+(* succ *)
+{
+intro /n IH/.
+apply /timesr_neq_zero/ >> auto.
+}
+qed ();
+
+
+
+lemma "nexpr_leqr_one"
+/
+  forall x n .
+    0 <= x
+    -> x <= 1
+    -> nexpr x n <= 1
+/;
+
+inference.
+intro /x n Hpos Hx/.
+induction /n/ >> auto.
+intro /n IH/.
+rewrite /<- timesr_id_r 1/.
+apply /timesr_leqr/ >> auto.
+apply /nexpr_nonnegative/ >> auto.
+qed ();
+
+
+
+lemma "nexpr_invr"
+/
+  forall (x : nonzero_real) n .
+    nexpr (invr x) n = invr (nexpr x n) : real
+/;
+
+inference.
+intro /x n/.
+destruct /x/ /x Hpos/.
+unhide.
+assert /forall n . nexpr x n != 0 : real/ /Hnonzero/.
+  {
+  inference.
+  intro /m/.
+  apply /nexpr_nonzero/ >> auto.
+  }
+induction /n/ >> auto.
+
+(* 0 *)
+{
+rewrite /-> invr_one/.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /n IH/ >> auto.
+rewrite /-> invr_timesr/ >> auto.
+}
+qed ();
+
+
+
+lemma "bernoullis_inequality"
+/
+  forall x n .
+    -1 <= x
+    -> 1 + nat_to_real n * x <= nexpr (1 + x) n
+/;
+
+inference.
+intro /x n Hx/.
+induction /n/.
+
+(* 0 *)
+{
+calculate //.
+rewrite /-> timesr_ann_l/.
+rewrite /-> plusr_id_r/.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /n IH/.
+rewrite /-> plus_to_real n`1 n/.
+calculate //.
+rewrite /-> timesr_dist_plusr_l/.
+rewrite /-> timesr_id_l/.
+rewrite /<- plusr_assoc/.
+rewrite /<- timesr_leqr_l (1 + x) _ _ __ IH/.
+1:{
+  rewrite /-> plusr_shift_leqr_lll/.
+  rewrite /-> plusr_id_r/.
+  rewrite /-> negr_one/.
+  hyp /Hx/.
+  }
+rewrite /-> timesr_dist_plusr_l/.
+rewrite /-> timesr_dist_plusr_r at 0 0/.
+rewrite /-> timesr_id_l at all/.
+rewrite /-> timesr_id_r/.
+rewrite /<- plusr_assoc at all/.
+rewrite /-> plusr_commute3 at 2/.
+rewrite /<- plusr_id_r (_ + _ + _)/.
+apply /plusr_leqr/ >> auto.
+rewrite /-> timesr_commute at 1/.
+rewrite /<- timesr_assoc/.
+apply /timesr_leqr_zero/.
+  {
+  apply /square_nonnegative/.
+  }
+
+  {
+  apply /nat_to_real_nonnegative/.
+  }
+}
+qed ();
+
+  
+
+(* Relation to natural numbers *)
+
+lemma "exp_to_real"
+/
+  forall a n .
+    nat_to_real (Division.exp a n) = nexpr (nat_to_real a) n : real
+/;
+
+inference.
+intro /a n/.
+induction /n/.
+
+(* 0 *)
+{
+calculate //.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /n IH/.
+rewrite /-> Nat.times_commute/.
+rewrite /-> times_to_real/.
+compat.
+hyp /IH/.
+}
+qed ();
+
+
+
+(* Prereals *)
+
+defineInd /x/
+/
+  prenexpr : nat -> prereal of
+  | zero . integer_to_prereal z`1
+
+  | succ n . pretimesr x (prenexpr n)
+//
+  prereal -> nat -> prereal
+/;
+
+
+
+lemma "prenexpr_to_real"
+/
+  forall x n .
+    realintro (prenexpr x n) = nexpr (realintro x) n : real
+/;
+
+inference.
+intro /x n/.
+induction /n/.
+
+(* 0 *)
+{
+calculate //.
+reflexivity.
+}
+
+(* succ *)
+{
+intro /n IH/.
+rewrite /-> pretimesr_to_real/.
+compat >> auto.
+}
+qed ();
+
+
+
+lemma "exp_to_prereal"
+/
+  forall a n .
+    integer_to_prereal (Z.nat_to_integer (Division.exp a n))
+    = 
+    prenexpr (integer_to_prereal (Z.nat_to_integer a)) n
+    : prereal
+/;
+
+inference.
+intro /a n/.
+induction /n/ >> auto.
+intro /n IH/.
+rewrite /-> Nat.times_commute/.
+rewrite /-> Z.times_to_integer/.
+rewrite /-> timesz_to_prereal/.
+compat.
+hyp /IH/.
+qed ();
+
+
+
+(* Logarithm bound *)
+
+lemma "logarithm_bound_prereal"
+/
+  forall x y .
+    1 < realintro x
+    -> exists n . realintro y < nexpr (realintro x) n
+/;
+
+inference.
+intro /x y Hx/.
+assert /realintro x - 1 != 0 : real/ /Hnonzerox/.
+  {
+  symmetry.
+  apply /ltr_impl_neq/.
+  rewrite /<- minusr_self 1/.
+  unfold /minusr at 0 0/.
+  apply /plusr_ltr_l/ >> auto.
+  }
+so /real_upper_bound_nat_prereal y/ /a Hposa Ha/.
+assert /realintro (preplusr x (rational_to_prereal q`-1)) != 0 : real/ /Hnonzeroxminus1/.
+  {
+  rewrite /-> preplusr_to_real/.
+  rewrite /-> rational_to_prereal_to_real/.
+  fold /integer_to_real _/.
+  rewrite /<- negr_one/.
+  fold /minusr _ _/.
+  auto.
+  }
+so /real_upper_bound_nat_prereal (preinvr (preplusr x (rational_to_prereal q`-1)))/ /b Hposb Hb/.
+rewrite /-> preinvr_to_real in Hb/.
+rewrite /realintro (preplusr x (rational_to_prereal q`-1)) = realintro x - 1 : nonzero_real in Hb/.
+  {
+  apply /eq_nonzero_real'/ >> auto.
+  rewrite /-> preplusr_to_real/.
+  rewrite /-> rational_to_prereal_to_real/.
+  calculate //.
+  rewrite /<- negr_one/.
+  unfold /minusr/.
+  reflexivity.
+  }
+assert /2 <= nexpr (realintro x) b/ /H2/.
+  {
+  rewrite /<- plusr_id_l (realintro x)/.
+  rewrite /<- plusr_inverse_r 1/.
+  rewrite /-> plusr_assoc/.
+  rewrite /-> plusr_commute at 1/.
+  fold /_ - _/.
+  rewrite /<- bernoullis_inequality/.
+    {
+    rewrite /-> plusz_to_real z`1 z`1/.
+    apply /plusr_leqr/ >> auto.
+    rewrite /<- timesr_inverse_l (realintro x - 1)/.
+    apply /timesr_leqr/ >> auto.
+      {
+      apply /ltr_impl_leqr/.
+      apply /invr_positive/.
+      rewrite /<- minusr_shift_ltr_rl/.
+      rewrite /-> plusr_id_r/.
+      hyp /Hx/.
+      }
+
+      {
+      apply /ltr_impl_leqr/.
+      rewrite /<- minusr_shift_ltr_rl/.
+      rewrite /-> plusr_id_r/.
+      hyp /Hx/.
+      }
+
+      {
+      apply /ltr_impl_leqr/ >> auto.
+      }
+    }
+
+    {
+    rewrite /<- minusr_shift_leqr_rl/.
+    rewrite /<- plusz_to_real z`1 z`-1/.
+    reduce //.
+    apply /leqr_trans _ 1/.
+      {
+      apply /integer_to_real_mono/ >> omega.
+      }
+
+      {
+      apply /ltr_impl_leqr/ >> auto.
+      }
+    }
+  }
+exists /b *n succ (Division.log2 a)/.
+rewrite /-> nexpr_times/.
+apply /ltr_leqr_trans _ (nexpr 2 (succ (Division.log2 a)))/.
+  {
+  apply /ltr_trans/ >> auto.
+  so /exp_to_real n`2 (succ (Division.log2 a))/ /H/.
+  calculate /H/.
+  reduce /H/.
+  rewrite /<- H/.
+  apply /nat_to_real_mono_lt/.
+  apply /Division.log2_upper/.
+  }
+
+  {
+  apply /nexpr_mono_base 2 (nexpr (realintro x) b) (succ (Division.log2 a))/ >> auto.
+  apply /integer_to_real_mono/.
+  omega.
+  }
+qed ();
+
+
+
+lemma "logarithm_bound"
+/
+  forall x y .
+    1 < x
+    -> squish (exists n . y < nexpr x n)
+/;
+
+inference.
+intro /x' y' Hx/.
+witness /squish_bind (real_to_prereal x') __/.
+intro /(x ?)/.
+subst /x'/.
+witness /squish_bind (real_to_prereal y') __/.
+intro /(y ?)/.
+subst /y'/.
+apply /squish_ret/.
+apply /logarithm_bound_prereal/ >> auto.
+qed ();
+
+
+endModule ();
