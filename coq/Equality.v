@@ -788,6 +788,23 @@ Ltac injectionT H :=
     end.
 
 
+Lemma eq_dep_app :
+  forall (A : Type) (B C : A -> Type) (a a' : A) (f : B a -> C a) (f' : B a' -> C a') (b : B a) (b' : B a'),
+    eq_dep A (fun a => B a -> C a) a f a' f'
+    -> eq_dep A B a b a' b'
+    -> eq_dep A C a (f b) a' (f' b').
+Proof.
+intros A B C a a' f f' b b' Heqf Heqb.
+injectionT Heqf.
+intros <-.
+injectionT Heqf.
+intros <-.
+injectionT Heqb.
+intros <-.
+apply eq_dep_refl.
+Qed.
+
+
 Lemma f_equal_dep :
   forall A (B : A -> Type) (C : Type) (a a' : A) (b : B a) (b' : B a') (f : forall a, B a -> C),
     eq_dep A B a b a' b'

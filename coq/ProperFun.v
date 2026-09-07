@@ -1303,4 +1303,19 @@ exact (semantics_fun anderrr).
 Qed.
 
 
+Lemma functional_fun_dep :
+  forall pg s i A A' b B B',
+    A = A'
+    -> functional system pg s i A b B
+    -> functional system pg s i A' b B'
+    -> eq_dep _ (fun A'' => urelsp A'' -n> wiurel_ofe stop) A B A' B'.
+Proof.
+intros pg s i A A' b B B' HeqA Hb Hb'.
+subst A'.
+so (functional_fun _#7 Hb Hb') as HeqB.
+apply eq_impl_eq_dep_snd; auto.
+Qed.
+
+
+
 End semantics.

@@ -667,6 +667,19 @@ eapply tr_functionality_term_term; eauto.
 Qed.
 
 
+Lemma tr_generalize' :
+  forall G a m J J',
+    substj (dot m id) J = J'
+    -> tr G (deq m m a)
+    -> tr (cons (hyp_tm a) G) J
+    -> tr G J'.
+Proof.
+intros G a m J J' Heq Hm HJ.
+subst J'.
+eapply tr_generalize; eauto.
+Qed.
+
+
 Lemma tr_generalize_tp :
   forall G a J,
     tr G (deqtype a a)
@@ -919,6 +932,37 @@ eapply (tr_pi_elim _ (subst (dot p4 (dot p3 (dot p2 (dot p1 id)))) a5)).
 Qed.
 
 
+Lemma tr_pi_elim6' :
+  forall G a1 a2 a3 a4 a5 a6 b c m n p1 q1 p2 q2 p3 q3 p4 q4 p5 q5 p6 q6,
+    tr G (deq m n (pi a1 (pi a2 (pi a3 (pi a4 (pi a5 (pi a6 b)))))))
+    -> tr G (deq p1 q1 a1)
+    -> tr G (deq p2 q2 (subst1 p1 a2))
+    -> tr G (deq p3 q3 (subst (dot p2 (dot p1 id)) a3))
+    -> tr G (deq p4 q4 (subst (dot p3 (dot p2 (dot p1 id))) a4))
+    -> tr G (deq p5 q5 (subst (dot p4 (dot p3 (dot p2 (dot p1 id)))) a5))
+    -> tr G (deq p6 q6 (subst (dot p5 (dot p4 (dot p3 (dot p2 (dot p1 id))))) a6))
+    -> c = subst (dot p6 (dot p5 (dot p4 (dot p3 (dot p2 (dot p1 id)))))) b
+    -> tr G (deq (app (app (app (app (app (app m p1) p2) p3) p4) p5) p6) (app (app (app (app (app (app n q1) q2) q3) q4) q5) q6) c).
+Proof.
+intros G a1 a2 a3 a4 a5 a6 b c m n p1 q1 p2 q2 p3 q3 p4 q4 p5 q5 p6 q6 H1 H2 H3 H4 H5 H6 H7 ->.
+replace (subst (dot p6 (dot p5 (dot p4 (dot p3 (dot p2 (dot p1 id)))))) b) with (subst (dot p6 id) (subst (under 1 (dot p5 (dot p4 (dot p3 (dot p2 (dot p1 id)))))) b)).
+2:{
+  simpsub.
+  auto.
+  }
+eapply (tr_pi_elim _ (subst (dot p5 (dot p4 (dot p3 (dot p2 (dot p1 id))))) a6)).
+  {
+  eapply tr_pi_elim5'; eauto.
+  simpsub.
+  auto.
+  }
+
+  {
+  auto.
+  }
+Qed.
+
+
 Lemma tr_sigma_elim2' :
   forall G a b c m n,
     tr G (deq m n (sigma a b))
@@ -943,6 +987,943 @@ replace J with (substj (dot m id) (substj sh1 J)).
   reflexivity.
   }
 apply (tr_generalize G a m (substj sh1 J)); auto.
+Qed.
+
+
+
+Lemma translate1 :
+  forall G G' k a1 p1 q1 b m n,
+    length G' = k
+    -> tr G (deqtype a1 a1)
+    -> tr (hyp_tm a1 :: G) (deq m n b)
+    -> tr (G' ++ G) (deq p1 q1 (subst (sh k) a1))
+    -> tr (G' ++ G) (deq 
+                       (subst (dot p1 (sh k)) m)
+                       (subst (dot q1 (sh k)) n)
+                       (subst (dot p1 (sh k)) b)).
+Proof.
+intros G G' k a1 p1 q1 b m n Hlen Ha1 Hmn Hpq1.
+assert (tr (G' ++ G) (substj (sh k) (deq (lam m) (lam n) (pi a1 b)))) as Hpi.
+  {
+  apply (weakening G G' []).
+    {
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length].
+    rewrite <- substj_compose.
+    rewrite -> under_zero.
+    rewrite <- compose_assoc.
+    subst k.
+    rewrite -> compose_sh_unlift.
+    auto.
+    }
+  rewrite <- substj_compose.
+  rewrite -> under_zero.
+  subst k.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  cbn [List.app].
+  apply tr_pi_intro; auto.
+  }
+eapply (tr_compute _ _ _ _ 
+          (app (lam (subst (under 1 (sh k)) m)) p1) _
+          (app (lam (subst (under 1 (sh k)) n)) q1)).
+  {
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply equiv_beta.
+    }
+  simpsub.
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply equiv_beta.
+    }
+  simpsub.
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  apply equiv_refl.
+  }
+simpsubin Hpi.
+replace (@dot obj (var 0) (sh (k + 1))) with (@under obj 1 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+eapply tr_pi_elim'; eauto.
+simpsub.
+replace (k + 1) with (1 + k) by omega.
+simpsub.
+reflexivity.
+Qed.
+
+
+Lemma translate2 :
+  forall G G' k a1 p1 q1 a2 p2 q2 b m n,
+    length G' = k
+    -> tr G (deqtype a1 a1)
+    -> tr (hyp_tm a1 :: G) (deqtype a2 a2)
+    -> tr (hyp_tm a2 :: hyp_tm a1 :: G) (deq m n b)
+    -> tr (G' ++ G) (deq p1 q1 (subst (sh k) a1))
+    -> tr (G' ++ G) (deq p2 q2 (subst (dot p1 (sh k)) a2))
+    -> tr (G' ++ G) (deq 
+                       (subst (dot p2 (dot p1 (sh k))) m)
+                       (subst (dot q2 (dot q1 (sh k))) n)
+                       (subst (dot p2 (dot p1 (sh k))) b)).
+Proof.
+intros G G' k a1 p1 q1 a2 p2 q2 b m n Hlen Ha1 Ha2 Hmn Hpq1 Hpq2.
+assert (tr (G' ++ G) (substj (sh k) (deq (lam (lam m)) (lam (lam n)) (pi a1 (pi a2 b))))) as Hpi.
+  {
+  apply (weakening G G' []).
+    {
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length].
+    rewrite <- substj_compose.
+    rewrite -> under_zero.
+    rewrite <- compose_assoc.
+    subst k.
+    rewrite -> compose_sh_unlift.
+    auto.
+    }
+  rewrite <- substj_compose.
+  rewrite -> under_zero.
+  subst k.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  cbn [List.app].
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  }
+eapply (tr_compute _ _ _ _ 
+          (app (app (lam (lam (subst (under 2 (sh k)) m))) p1) p2) _
+          (app (app (lam (lam (subst (under 2 (sh k)) n))) q1) q2)).
+  {
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply equiv_app; [idtac | apply equiv_refl].
+    apply equiv_beta.
+    }
+  simpsub.
+  eapply equiv_trans.
+    {
+    apply equiv_beta.
+    }
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply equiv_app; [idtac | apply equiv_refl].
+    apply equiv_beta.
+    }
+  simpsub.
+  eapply equiv_trans.
+    {
+    apply equiv_beta.
+    }
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  apply equiv_refl.
+  }
+simpsubin Hpi.
+cbn [Nat.add] in Hpi.
+replace (@dot obj (var 0) (dot (var 1) (sh (k + 1 + 1)))) with (@under obj 2 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (sh (k + 1))) with (@under obj 1 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+eapply tr_pi_elim2'; eauto.
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq2.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  reflexivity.
+  }
+Qed.
+
+
+Lemma translate3 :
+  forall G G' k a1 p1 q1 a2 p2 q2 a3 p3 q3 b m n,
+    length G' = k
+    -> tr G (deqtype a1 a1)
+    -> tr (hyp_tm a1 :: G) (deqtype a2 a2)
+    -> tr (hyp_tm a2 :: hyp_tm a1 :: G) (deqtype a3 a3)
+    -> tr (hyp_tm a3 :: hyp_tm a2 :: hyp_tm a1 :: G) (deq m n b)
+    -> tr (G' ++ G) (deq p1 q1 (subst (sh k) a1))
+    -> tr (G' ++ G) (deq p2 q2 (subst (dot p1 (sh k)) a2))
+    -> tr (G' ++ G) (deq p3 q3 (subst (dot p2 (dot p1 (sh k))) a3))
+    -> tr (G' ++ G) (deq 
+                       (subst (dot p3 (dot p2 (dot p1 (sh k)))) m)
+                       (subst (dot q3 (dot q2 (dot q1 (sh k)))) n)
+                       (subst (dot p3 (dot p2 (dot p1 (sh k)))) b)).
+Proof.
+intros G G' k a1 p1 q1 a2 p2 q2 a3 p3 q3 b m n Hlen Ha1 Ha2 Ha3 Hmn Hpq1 Hpq2 Hpq3.
+assert (tr (G' ++ G) (substj (sh k) (deq (lam (lam (lam m))) (lam (lam (lam n))) (pi a1 (pi a2 (pi a3 b)))))) as Hpi.
+  {
+  apply (weakening G G' []).
+    {
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length].
+    rewrite <- substj_compose.
+    rewrite -> under_zero.
+    rewrite <- compose_assoc.
+    subst k.
+    rewrite -> compose_sh_unlift.
+    auto.
+    }
+  rewrite <- substj_compose.
+  rewrite -> under_zero.
+  subst k.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  cbn [List.app].
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  }
+eapply (tr_compute _ _ _ _ 
+          (app (app (app (lam (lam (lam (subst (under 3 (sh k)) m)))) p1) p2) p3) _
+          (app (app (app (lam (lam (lam (subst (under 3 (sh k)) n)))) q1) q2) q3)).
+  {
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply equiv_app; [idtac | apply equiv_refl].
+    eapply equiv_trans.
+      {
+      apply equiv_app; [idtac | apply equiv_refl].
+      apply equiv_beta.
+      }
+    simpsub.
+    cbn [Nat.add].
+    apply equiv_beta.
+    }
+  simpsub.
+  eapply equiv_trans.
+    {
+    apply equiv_beta.
+    }
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply equiv_app; [idtac | apply equiv_refl].
+    eapply equiv_trans.
+      {
+      apply equiv_app; [idtac | apply equiv_refl].
+      apply equiv_beta.
+      }
+    simpsub.
+    cbn [Nat.add].
+    apply equiv_beta.
+    }
+  simpsub.
+  eapply equiv_trans.
+    {
+    apply equiv_beta.
+    }
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  apply equiv_refl.
+  }
+simpsubin Hpi.
+cbn [Nat.add] in Hpi.
+replace (@dot obj (var 0) (dot (var 1) (dot (var 2) (sh (k + 1 + 2))))) with (@under obj 3 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (dot (var 1) (sh (k + 1 + 1)))) with (@under obj 2 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (sh (k + 1))) with (@under obj 1 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+eapply tr_pi_elim3'; eauto.
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq2.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq3.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  reflexivity.
+  }
+Qed.
+
+
+Lemma translate4 :
+  forall G G' k a1 p1 q1 a2 p2 q2 a3 p3 q3 a4 p4 q4 b m n,
+    length G' = k
+    -> tr G (deqtype a1 a1)
+    -> tr (hyp_tm a1 :: G) (deqtype a2 a2)
+    -> tr (hyp_tm a2 :: hyp_tm a1 :: G) (deqtype a3 a3)
+    -> tr (hyp_tm a3 :: hyp_tm a2 :: hyp_tm a1 :: G) (deqtype a4 a4)
+    -> tr (hyp_tm a4 :: hyp_tm a3 :: hyp_tm a2 :: hyp_tm a1 :: G) (deq m n b)
+    -> tr (G' ++ G) (deq p1 q1 (subst (sh k) a1))
+    -> tr (G' ++ G) (deq p2 q2 (subst (dot p1 (sh k)) a2))
+    -> tr (G' ++ G) (deq p3 q3 (subst (dot p2 (dot p1 (sh k))) a3))
+    -> tr (G' ++ G) (deq p4 q4 (subst (dot p3 (dot p2 (dot p1 (sh k)))) a4))
+    -> tr (G' ++ G) (deq 
+                       (subst (dot p4 (dot p3 (dot p2 (dot p1 (sh k))))) m)
+                       (subst (dot q4 (dot q3 (dot q2 (dot q1 (sh k))))) n)
+                       (subst (dot p4 (dot p3 (dot p2 (dot p1 (sh k))))) b)).
+Proof.
+intros G G' k a1 p1 q1 a2 p2 q2 a3 p3 q3 a4 p4 q4 b m n Hlen Ha1 Ha2 Ha3 Ha4 Hmn Hpq1 Hpq2 Hpq3 Hpq4.
+assert (tr (G' ++ G) (substj (sh k) (deq (lam (lam (lam (lam m)))) (lam (lam (lam (lam n)))) (pi a1 (pi a2 (pi a3 (pi a4 b))))))) as Hpi.
+  {
+  apply (weakening G G' []).
+    {
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length].
+    rewrite <- substj_compose.
+    rewrite -> under_zero.
+    rewrite <- compose_assoc.
+    subst k.
+    rewrite -> compose_sh_unlift.
+    auto.
+    }
+  rewrite <- substj_compose.
+  rewrite -> under_zero.
+  subst k.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  cbn [List.app].
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  }
+eapply (tr_compute _ _ _ _ 
+          (app (app (app (app (lam (lam (lam (lam (subst (under 4 (sh k)) m))))) p1) p2) p3) p4) _
+          (app (app (app (app (lam (lam (lam (lam (subst (under 4 (sh k)) n))))) q1) q2) q3) q4)).
+  {
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply equiv_app; [idtac | apply equiv_refl].
+    eapply equiv_trans.
+      {
+      apply equiv_app; [idtac | apply equiv_refl].
+      eapply equiv_trans.
+        {
+        apply equiv_app; [idtac | apply equiv_refl].
+        apply equiv_beta.
+        }
+      simpsub.
+      cbn [Nat.add].
+      apply equiv_beta.
+      }
+    simpsub.
+    cbn [Nat.add].
+    apply equiv_beta.
+    }
+  simpsub.
+  eapply equiv_trans.
+    {
+    apply equiv_beta.
+    }
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply equiv_app; [idtac | apply equiv_refl].
+    eapply equiv_trans.
+      {
+      apply equiv_app; [idtac | apply equiv_refl].
+      eapply equiv_trans.
+        {
+        apply equiv_app; [idtac | apply equiv_refl].
+        apply equiv_beta.
+        }
+      simpsub.
+      cbn [Nat.add].
+      apply equiv_beta.
+      }
+    simpsub.
+    cbn [Nat.add].
+    apply equiv_beta.
+    }
+  simpsub.
+  eapply equiv_trans.
+    {
+    apply equiv_beta.
+    }
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  apply equiv_refl.
+  }
+simpsubin Hpi.
+cbn [Nat.add] in Hpi.
+replace (@dot obj (var 0) (dot (var 1) (dot (var 2) (dot (var 3) (sh (k + 1 + 3)))))) with (@under obj 4 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (dot (var 1) (dot (var 2) (sh (k + 1 + 2))))) with (@under obj 3 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (dot (var 1) (sh (k + 1 + 1)))) with (@under obj 2 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (sh (k + 1))) with (@under obj 1 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+eapply tr_pi_elim4'; eauto.
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq2.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq3.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq4.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  reflexivity.
+  }
+Qed.
+
+
+Lemma translate5 :
+  forall G G' k a1 p1 q1 a2 p2 q2 a3 p3 q3 a4 p4 q4 a5 p5 q5 b m n,
+    length G' = k
+    -> tr G (deqtype a1 a1)
+    -> tr (hyp_tm a1 :: G) (deqtype a2 a2)
+    -> tr (hyp_tm a2 :: hyp_tm a1 :: G) (deqtype a3 a3)
+    -> tr (hyp_tm a3 :: hyp_tm a2 :: hyp_tm a1 :: G) (deqtype a4 a4)
+    -> tr (hyp_tm a4 :: hyp_tm a3 :: hyp_tm a2 :: hyp_tm a1 :: G) (deqtype a5 a5)
+    -> tr (hyp_tm a5 :: hyp_tm a4 :: hyp_tm a3 :: hyp_tm a2 :: hyp_tm a1 :: G) (deq m n b)
+    -> tr (G' ++ G) (deq p1 q1 (subst (sh k) a1))
+    -> tr (G' ++ G) (deq p2 q2 (subst (dot p1 (sh k)) a2))
+    -> tr (G' ++ G) (deq p3 q3 (subst (dot p2 (dot p1 (sh k))) a3))
+    -> tr (G' ++ G) (deq p4 q4 (subst (dot p3 (dot p2 (dot p1 (sh k)))) a4))
+    -> tr (G' ++ G) (deq p5 q5 (subst (dot p4 (dot p3 (dot p2 (dot p1 (sh k))))) a5))
+    -> tr (G' ++ G) (deq 
+                       (subst (dot p5 (dot p4 (dot p3 (dot p2 (dot p1 (sh k)))))) m)
+                       (subst (dot q5 (dot q4 (dot q3 (dot q2 (dot q1 (sh k)))))) n)
+                       (subst (dot p5 (dot p4 (dot p3 (dot p2 (dot p1 (sh k)))))) b)).
+Proof.
+intros G G' k a1 p1 q1 a2 p2 q2 a3 p3 q3 a4 p4 q4 a5 p5 q5 b m n Hlen Ha1 Ha2 Ha3 Ha4 Ha5 Hmn Hpq1 Hpq2 Hpq3 Hpq4 Hpq5.
+assert (tr (G' ++ G) (substj (sh k) (deq (lam (lam (lam (lam (lam m))))) (lam (lam (lam (lam (lam n))))) (pi a1 (pi a2 (pi a3 (pi a4 (pi a5 b)))))))) as Hpi.
+  {
+  apply (weakening G G' []).
+    {
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length].
+    rewrite <- substj_compose.
+    rewrite -> under_zero.
+    rewrite <- compose_assoc.
+    subst k.
+    rewrite -> compose_sh_unlift.
+    auto.
+    }
+  rewrite <- substj_compose.
+  rewrite -> under_zero.
+  subst k.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  cbn [List.app].
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  }
+eapply (tr_compute _ _ _ _ 
+          (app (app (app (app (app (lam (lam (lam (lam (lam (subst (under 5 (sh k)) m)))))) p1) p2) p3) p4) p5) _
+          (app (app (app (app (app (lam (lam (lam (lam (lam (subst (under 5 (sh k)) n)))))) q1) q2) q3) q4) q5)).
+  {
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply equiv_app; [idtac | apply equiv_refl].
+    eapply equiv_trans.
+      {
+      apply equiv_app; [idtac | apply equiv_refl].
+      eapply equiv_trans.
+        {
+        apply equiv_app; [idtac | apply equiv_refl].
+        eapply equiv_trans.
+          {
+          eapply equiv_app; [idtac | apply equiv_refl].
+          apply equiv_beta.
+          }
+        simpsub.
+        cbn [Nat.add].
+        apply equiv_beta.
+        }
+      simpsub.
+      cbn [Nat.add].
+      apply equiv_beta.
+      }
+    simpsub.
+    cbn [Nat.add].
+    apply equiv_beta.
+    }
+  simpsub.
+  eapply equiv_trans.
+    {
+    apply equiv_beta.
+    }
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply equiv_app; [idtac | apply equiv_refl].
+    eapply equiv_trans.
+      {
+      apply equiv_app; [idtac | apply equiv_refl].
+      eapply equiv_trans.
+        {
+        apply equiv_app; [idtac | apply equiv_refl].
+        eapply equiv_trans.
+          {
+          eapply equiv_app; [idtac | apply equiv_refl].
+          apply equiv_beta.
+          }
+        simpsub.
+        cbn [Nat.add].
+        apply equiv_beta.
+        }
+      simpsub.
+      cbn [Nat.add].
+      apply equiv_beta.
+      }
+    simpsub.
+    cbn [Nat.add].
+    apply equiv_beta.
+    }
+  simpsub.
+  eapply equiv_trans.
+    {
+    apply equiv_beta.
+    }
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  apply equiv_refl.
+  }
+simpsubin Hpi.
+cbn [Nat.add] in Hpi.
+replace (@dot obj (var 0) (dot (var 1) (dot (var 2) (dot (var 3) (dot (var 4) (sh (k + 1 + 4))))))) with (@under obj 5 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (dot (var 1) (dot (var 2) (dot (var 3) (sh (k + 1 + 3)))))) with (@under obj 4 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (dot (var 1) (dot (var 2) (sh (k + 1 + 2))))) with (@under obj 3 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (dot (var 1) (sh (k + 1 + 1)))) with (@under obj 2 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (sh (k + 1))) with (@under obj 1 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+eapply tr_pi_elim5'; eauto.
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq2.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq3.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq4.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq5.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  reflexivity.
+  }
+Qed.
+
+
+Lemma translate6 :
+  forall G G' k a1 p1 q1 a2 p2 q2 a3 p3 q3 a4 p4 q4 a5 p5 q5 a6 p6 q6 b m n,
+    length G' = k
+    -> tr G (deqtype a1 a1)
+    -> tr (hyp_tm a1 :: G) (deqtype a2 a2)
+    -> tr (hyp_tm a2 :: hyp_tm a1 :: G) (deqtype a3 a3)
+    -> tr (hyp_tm a3 :: hyp_tm a2 :: hyp_tm a1 :: G) (deqtype a4 a4)
+    -> tr (hyp_tm a4 :: hyp_tm a3 :: hyp_tm a2 :: hyp_tm a1 :: G) (deqtype a5 a5)
+    -> tr (hyp_tm a5 :: hyp_tm a4 :: hyp_tm a3 :: hyp_tm a2 :: hyp_tm a1 :: G) (deqtype a6 a6)
+    -> tr (hyp_tm a6 :: hyp_tm a5 :: hyp_tm a4 :: hyp_tm a3 :: hyp_tm a2 :: hyp_tm a1 :: G) (deq m n b)
+    -> tr (G' ++ G) (deq p1 q1 (subst (sh k) a1))
+    -> tr (G' ++ G) (deq p2 q2 (subst (dot p1 (sh k)) a2))
+    -> tr (G' ++ G) (deq p3 q3 (subst (dot p2 (dot p1 (sh k))) a3))
+    -> tr (G' ++ G) (deq p4 q4 (subst (dot p3 (dot p2 (dot p1 (sh k)))) a4))
+    -> tr (G' ++ G) (deq p5 q5 (subst (dot p4 (dot p3 (dot p2 (dot p1 (sh k))))) a5))
+    -> tr (G' ++ G) (deq p6 q6 (subst (dot p5 (dot p4 (dot p3 (dot p2 (dot p1 (sh k)))))) a6))
+    -> tr (G' ++ G) (deq 
+                       (subst (dot p6 (dot p5 (dot p4 (dot p3 (dot p2 (dot p1 (sh k))))))) m)
+                       (subst (dot q6 (dot q5 (dot q4 (dot q3 (dot q2 (dot q1 (sh k))))))) n)
+                       (subst (dot p6 (dot p5 (dot p4 (dot p3 (dot p2 (dot p1 (sh k))))))) b)).
+Proof.
+intros G G' k a1 p1 q1 a2 p2 q2 a3 p3 q3 a4 p4 q4 a5 p5 q5 a6 p6 q6 b m n Hlen Ha1 Ha2 Ha3 Ha4 Ha5 Ha6 Hmn Hpq1 Hpq2 Hpq3 Hpq4 Hpq5 Hpq6.
+assert (tr (G' ++ G) (substj (sh k) (deq (lam (lam (lam (lam (lam (lam m)))))) (lam (lam (lam (lam (lam (lam n)))))) (pi a1 (pi a2 (pi a3 (pi a4 (pi a5 (pi a6 b))))))))) as Hpi.
+  {
+  apply (weakening G G' []).
+    {
+    simpsub.
+    auto.
+    }
+
+    {
+    cbn [length].
+    rewrite <- substj_compose.
+    rewrite -> under_zero.
+    rewrite <- compose_assoc.
+    subst k.
+    rewrite -> compose_sh_unlift.
+    auto.
+    }
+  rewrite <- substj_compose.
+  rewrite -> under_zero.
+  subst k.
+  rewrite -> compose_sh_unlift.
+  simpsub.
+  cbn [List.app].
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  apply tr_pi_intro; auto.
+  }
+eapply (tr_compute _ _ _ _ 
+          (app (app (app (app (app (app (lam (lam (lam (lam (lam (lam (subst (under 6 (sh k)) m))))))) p1) p2) p3) p4) p5) p6) _
+          (app (app (app (app (app (app (lam (lam (lam (lam (lam (lam (subst (under 6 (sh k)) n))))))) q1) q2) q3) q4) q5) q6)).
+  {
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply equiv_app; [idtac | apply equiv_refl].
+    eapply equiv_trans.
+      {
+      apply equiv_app; [idtac | apply equiv_refl].
+      eapply equiv_trans.
+        {
+        apply equiv_app; [idtac | apply equiv_refl].
+        eapply equiv_trans.
+          {
+          eapply equiv_app; [idtac | apply equiv_refl].
+          eapply equiv_trans.
+            {
+            eapply equiv_app; [idtac | apply equiv_refl].
+            apply equiv_beta.
+            }
+          simpsub.
+          cbn [Nat.add].
+          apply equiv_beta.
+          }
+        simpsub.
+        cbn [Nat.add].
+        apply equiv_beta.
+        }
+      simpsub.
+      cbn [Nat.add].
+      apply equiv_beta.
+      }
+    simpsub.
+    cbn [Nat.add].
+    apply equiv_beta.
+    }
+  simpsub.
+  eapply equiv_trans.
+    {
+    apply equiv_beta.
+    }
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  apply equiv_refl.
+  }
+
+  {
+  apply equiv_symm.
+  eapply equiv_trans.
+    {
+    apply equiv_app; [idtac | apply equiv_refl].
+    eapply equiv_trans.
+      {
+      apply equiv_app; [idtac | apply equiv_refl].
+      eapply equiv_trans.
+        {
+        apply equiv_app; [idtac | apply equiv_refl].
+        eapply equiv_trans.
+          {
+          eapply equiv_app; [idtac | apply equiv_refl].
+          eapply equiv_trans.
+            {
+            eapply equiv_app; [idtac | apply equiv_refl].
+            apply equiv_beta.
+            }
+          simpsub.
+          cbn [Nat.add].
+          apply equiv_beta.
+          }
+        simpsub.
+        cbn [Nat.add].
+        apply equiv_beta.
+        }
+      simpsub.
+      cbn [Nat.add].
+      apply equiv_beta.
+      }
+    simpsub.
+    cbn [Nat.add].
+    apply equiv_beta.
+    }
+  simpsub.
+  eapply equiv_trans.
+    {
+    apply equiv_beta.
+    }
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  replace (k + 1) with (S k) by omega.
+  simpsub.
+  apply equiv_refl.
+  }
+simpsubin Hpi.
+cbn [Nat.add] in Hpi.
+replace (@dot obj (var 0) (dot (var 1) (dot (var 2) (dot (var 3) (dot (var 4) (dot (var 5) (sh (k + 1 + 5)))))))) with (@under obj 6 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (dot (var 1) (dot (var 2) (dot (var 3) (dot (var 4) (sh (k + 1 + 4))))))) with (@under obj 5 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (dot (var 1) (dot (var 2) (dot (var 3) (sh (k + 1 + 3)))))) with (@under obj 4 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (dot (var 1) (dot (var 2) (sh (k + 1 + 2))))) with (@under obj 3 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (dot (var 1) (sh (k + 1 + 1)))) with (@under obj 2 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+replace (@dot obj (var 0) (sh (k + 1))) with (@under obj 1 (sh k)) in Hpi.
+2:{
+  simpsub.
+  reflexivity.
+  }
+eapply tr_pi_elim6'; eauto.
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq2.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq3.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq4.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq5.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  exact Hpq6.
+  }
+
+  {
+  simpsub.
+  replace (k + 1) with (1 + k) by omega.
+  simpsub.
+  reflexivity.
+  }
 Qed.
 
 

@@ -1163,7 +1163,7 @@ exact sumSymmetrical_valid.
 exact setSymmetrical_valid.
 exact quotientSymmetrical_valid.
 exact partialSymmetrical_valid.
-exact arrowQuotientCommute_valid.
+exact forallQuotientCommute_valid.
 exact symmetricalType_valid.
 Qed.
   

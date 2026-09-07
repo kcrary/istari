@@ -1373,2107 +1373,283 @@ split.
 Qed.
 
 
-Lemma sound_arrow_quotient_commute :
-  forall G a b c m n ms mt,
+Lemma sound_pi_quotient_commute :
+  forall G a b c m n,
     pseq G (deq triv triv (symmetrical a))
-    -> pseq G (deq triv triv (symmetrical b))
-    -> pseq (hyp_tm (subst sh1 b) :: hyp_tm b :: G) (deqtype c c)
-    (* symmetry *)
-    -> pseq (hyp_tm c ::
-            hyp_tm (subst sh1 b) ::
-            hyp_tm b :: 
-            G) 
-         (deq ms ms (subst (dot (var 2) (dot (var 1) (sh 3))) c))
-    (* transitivity *)
-    -> pseq (hyp_tm (subst (dot (var 1) (dot (var 2) (sh 4))) c) :: 
-            hyp_tm (subst sh1 c) ::
-            hyp_tm (subst (sh 2) b) :: 
-            hyp_tm (subst sh1 b) :: 
-            hyp_tm b :: 
-            G)
-         (deq mt mt (subst (dot (var 2) (dot (var 4) (sh 5))) c))
-    -> pseq (hyp_tm c :: hyp_tm (subst sh1 b) :: hyp_tm b :: G) (deq triv triv (subst sh1 c))
+    -> pseq (hyp_tm a :: G) (deq triv triv (symmetrical b))
+    -> pseq (hyp_tm (subst sh1 b) :: hyp_tm b :: hyp_tm a :: G) (deqtype c c)
+    -> pseq (hyp_tm a :: G) (deqtype (quotient b c) (quotient b c))
+    -> pseq G (deqtype (quotient (pi a b) (pi (subst (sh 2) a) (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (dot (var 0) (sh 3)))) c))) (quotient (pi a b) (pi (subst (sh 2) a) (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (dot (var 0) (sh 3)))) c))))
+    -> pseq (hyp_tm c :: hyp_tm (subst sh1 b) :: hyp_tm b :: hyp_tm a :: G) (deq triv triv (subst sh1 c))
     -> pseq (hyp_tm (equal (subst (sh 2) a) (var 1) (var 0)) :: hyp_tm (subst sh1 a) :: hyp_tm a :: G) (deq triv triv (sequal (var 2) (var 1)))
-    -> pseq G (deq m n (tarrow a (quotient b c)))
-    -> pseq G (deq m n (quotient (tarrow a b) 
+    -> pseq G (deq m n (pi a (quotient b c)))
+    -> pseq G (deq m n (quotient (pi a b) 
                           (pi (subst (sh 2) a)
-                             (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (sh 3))) c)))).
+                             (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (dot (var 0) (sh 3)))) c)))).
 Proof.
-intros G dom a b m n ms mt.
+intros G a b c m n.
 revert G.
-refine (seq_pseq 3 [] dom [] a [hyp_emp; hyp_emp] b 8 [] _ [] _ [_; _] _ [_; _; _] _ [_; _; _; _; _] _ [_; _; _] _ [_; _; _] _ [] _ _ _); cbn.
-intros G Hcldom Hcla Hclb Hseqdom Hseqa Hseqb Hseqsymm Hseqtrans Hseqtriv Hseqelem Hseqmn.
-rewrite -> seq_symmetrical in Hseqdom, Hseqa.
-rewrite -> seq_eqtype in Hseqb.
-rewrite -> seq_deq in Hseqsymm, Hseqtrans, Hseqtriv, Hseqelem, Hseqmn |- *.
+refine (seq_pseq 3 [] a [hyp_emp] b [hyp_emp; hyp_emp; hyp_emp] c 8 [] _ [_] _ [_; _; _] _ [_] _ [] _ [_; _; _; _] _ [_; _; _] _ [] _ _ _); cbn.
+intros G Hcla Hclb Hclc Hseqa Hseqb Hseqc Hseqquotbc Hseqquotabc Hseqtriv Hseqelem Hseqmn.
+rewrite -> seq_symmetrical in Hseqa, Hseqb.
+rewrite -> seq_eqtype in Hseqc, Hseqquotbc, Hseqquotabc.
+rewrite -> seq_deq in Hseqtriv, Hseqelem, Hseqmn |- *.
 assert (top <<= stop) as Htopstop.
   {
   apply succ_nodecrease.
   }
-assert (forall i s s' A u v x y,
+assert (forall i s s' A j x y,
           pwctx i s s' G
           -> interp toppg true i (subst s a) A
           -> interp toppg false i (subst s' a) A
-          -> rel (den A) i u v
-          -> rel (den A) i x y
-          -> pwctx i (dot x (dot u s)) (dot y (dot v s')) (hyp_tm (subst sh1 a) :: hyp_tm a :: G)) as Hextends.
+          -> rel (den A) j x y
+          -> pwctx j (dot x s) (dot y s') (hyp_tm a :: G)) as HctxA.
   {
-  intros i s s' A u v x y Hs Hal Har Huv Hxy.
-  so (basic_member_index _#9 Hal Huv) as Hj.
+  intros i s s' A j x y Hs Hal Har Hxy.
+  so (basic_member_index _#9 Hal Hxy) as Hj.
   apply pwctx_cons_tm_seq.
-    {
-    apply pwctx_cons_tm_seq.
-      {
-      apply (pwctx_downward i); auto.
-      }
-
-      {
-      apply (seqhyp_tm _#5 A); auto.
-      }
-    
-      {
-      intros k t t' Ht.
-      so (Hseqa _#3 Ht) as (R & Hl & Hr & _).
-      eauto.
-      }
-    }
-
-    {
-    simpsub.
-    apply (seqhyp_tm _#5 A); auto.
-    }
-
-    {
-    intros k tt tt' Htt.
-    invertc Htt.
-    intros p q t t' Ht _ _ _ <- <-.
-    so (Hseqa _#3 Ht) as (R & Hl & Hr & _).
-    exists toppg, R.
-    simpsub.
-    auto.
-    }
-  }
-assert (forall i s s' Dom A u v x y,
-          pwctx i s s' G
-          -> interp toppg true i (subst s dom) Dom
-          -> interp toppg false i (subst s' dom) Dom
-          -> interp toppg true i (subst s a) A
-          -> interp toppg false i (subst s' a) A
-          -> rel (arrow_urel stop i (den Dom) (den A)) i u v
-          -> rel (arrow_urel stop i (den Dom) (den A)) i x y
-          -> exists F,
-               functional the_system toppg true i (den Dom) (subst (dot (app x (var 0)) (dot (app u (var 0)) (compose s sh1))) b) F
-               /\ functional the_system toppg false i (den Dom) (subst (dot (app y (var 0)) (dot (app v (var 0)) (compose s' sh1))) b) F) as Hfnify.
-  {
-  clear m n Hseqmn.
-  intros i s s' Dom A u v x y Hs Hdoml Hdomr Hal Har Huv Hxy.
-  so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
-  so (urel_closed _#5 Huv) as (Hclu & Hclv).
-  so (urel_closed _#5 Hxy) as (Hclx & Hcly).
-  apply (extract_functional toppg i (den Dom)
-             (subst (dot (app x (var 0)) (dot (app u (var 0)) (compose s sh1))) b)
-             (subst (dot (app y (var 0)) (dot (app v (var 0)) (compose s' sh1))) b)).
-    {
-    exact (f_equal den (basic_impl_iutruncate _#6 Hdoml)).
-    }
-
-    {
-    eapply hygiene_subst; eauto.
-    intros k Hk.
-    destruct k as [|[|k]].
-      {
-      simpsub.
-      prove_hygiene.
-      }
-
-      {
-      simpsub.
-      prove_hygiene.
-      }
-
-      {
-      simpsub.
-      apply hygiene_shift_permit.
-      prove_hygiene.
-      }
-    }
-
-    {
-    eapply hygiene_subst; eauto.
-    intros k Hk.
-    destruct k as [|[|k]].
-      {
-      simpsub.
-      prove_hygiene.
-      }
-
-      {
-      simpsub.
-      prove_hygiene.
-      }
-
-      {
-      simpsub.
-      apply hygiene_shift_permit.
-      prove_hygiene.
-      }
-    }
-
-    {
-    intros j m p Hmp.
-    simpsub.
-    unfold subst1.
-    rewrite -> (subst_into_closed _ _ x); auto.
-    rewrite -> (subst_into_closed _ _ y); auto.
-    rewrite -> (subst_into_closed _ _ u); auto.
-    rewrite -> (subst_into_closed _ _ v); auto.
-    so (basic_member_index _#9 Hdoml Hmp) as Hj.
-    exploit (Hextends j s s' (iutruncate (S j) A) (app u m) (app v p) (app x m) (app y p)) as Hs'; auto.
-      {
-      eapply pwctx_downward; eauto.
-      }
-
-      {
-      eapply basic_downward; eauto.
-      }
-
-      {
-      eapply basic_downward; eauto.
-      }
-
-      {
-      split.
-        {
-        omega.
-        }
-      eapply (arrow_action_app _ j); eauto.
-      so (urel_downward_leq _#6 Hj Huv) as (l & l' & _ & Hl).
-      exists l, l'.
-      split; auto.
-      }
-
-      {
-      split.
-        {
-        omega.
-        }
-      eapply (arrow_action_app _ j); eauto.
-      so (urel_downward_leq _#6 Hj Hxy) as (l & l' & _ & Hl).
-      exists l, l'.
-      split; auto.
-      }
-    so (Hseqb _#3 Hs') as (B & Hbl & Hbr & _).
-    exists B.
-    simpsub.
-    unfold subst1.
-    auto.
-    }
-  }
-intros i s s' Hs.
-so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
-so (Hseqdom _#3 Hs) as (Dom & Hdoml & Hdomr & _).
-so (Hseqa _#3 Hs) as (A & Hal & Har & _).
-exploit (extract_functional_dual toppg 
-           (iuarrow stop i Dom A)
-           G
-           (tarrow dom a)
-           (pi (subst (sh 2) dom)
-              (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (sh 3))) b))
-           i s s') as H.
-  {
-  prove_hygiene.
-  eapply hygiene_subst; eauto.
-  intros k Hk.
-  destruct k as [|[|k]].
-    {
-    simpsub.
-    prove_hygiene.
-    }
-
-    {
-    simpsub.
-    prove_hygiene.
-    }
-
-    {
-    simpsub.
-    apply hygiene_var.
-    cbn.
-    prove_hygiene.
-    }
-  }
-
-  {
-  exact Hs.
-  }
-
-  {
-  simpsub.
-  apply interp_eval_refl.
-  apply interp_tarrow; auto.
-  }
-
-  {
-  simpsub.
-  apply interp_eval_refl.
-  apply interp_tarrow; auto.
-  }
-
-  {
-  intros j t Hj Hst.
-  simpsub.
-  apply (relhyp_tm _#4 (iuarrow stop j (iutruncate (S j) Dom) (iutruncate (S j) A))).
-    {
-    apply interp_eval_refl.
-    apply interp_tarrow.
-      {
-      apply (basic_downward _#3 i); auto.
-      }
-
-      {
-      apply (basic_downward _#3 i); auto.
-      }
-    }
-
-    {
-    apply interp_eval_refl.
-    apply interp_tarrow.
-      {
-      so (Hseqdom _#3 Hst) as (Dom' & Hdoml' & Hdomt & _).
-      so (basic_fun _#7 (basic_downward _#7 Hj Hdoml) Hdoml').
-      subst Dom'.
-      exact Hdomt.
-      }
-
-      {
-      so (Hseqa _#3 Hst) as (R' & Hal' & Hat & _).
-      so (basic_fun _#7 (basic_downward _#7 Hj Hal) Hal').
-      subst R'.
-      exact Hat.
-      }
-    }
-  }
-
-  {
-  intros j t Hj Hst.
-  simpsub.
-  apply (relhyp_tm _#4 (iuarrow stop j (iutruncate (S j) Dom) (iutruncate (S j) A))).
-    {
-    apply interp_eval_refl.
-    apply interp_tarrow.
-      {
-      apply (basic_downward _#3 i); auto.
-      }
-
-      {
-      apply (basic_downward _#3 i); auto.
-      }
-    }
-
-    {
-    apply interp_eval_refl.
-    apply interp_tarrow.
-      {
-      so (Hseqdom _#3 Hst) as (Dom' & Hdomt & Hdomr' & _).
-      so (basic_fun _#7 (basic_downward _#7 Hj Hdomr) Hdomr').
-      subst Dom'.
-      exact Hdomt.
-      }
-
-      {
-      so (Hseqa _#3 Hst) as (R' & Hat & Har' & _).
-      so (basic_fun _#7 (basic_downward _#7 Hj Har) Har').
-      subst R'.
-      exact Hat.
-      }
-    }
-  }
-
-  {
-  clear m n ms mt Hseqsymm Hseqtrans Hseqmn i s s' Hs Hcls Hcls' Dom A Hdoml Hdomr Hal Har.
-  intros i ss ss' Hss.
-  simpsubin Hss.
-  invertc Hss.
-  intros x y s1 s1' Hs1 Hxy _ _ <- <-.
-  invertc Hs1.
-  intros u v s s' Hs Huv _ _ <- <-.
-  so (Hseqa _#3 Hs) as (A & Hal & Har & _).
-  so (Hseqdom _#3 Hs) as (Dom & Hdoml & Hdomr & _).
-  simpsubin Huv.
-  invertc Huv.
-  intros Q Harrl _ Huv.
-  so (basic_fun _#7 Harrl (interp_eval_refl _#6 (interp_tarrow _#8 Hdoml Hal))).
-  subst Q.
-  clear Harrl.
-  simpsubin Hxy.
-  invertc Hxy.
-  intros Q Harrl _ Hxy.
-  so (basic_fun _#7 Harrl (interp_eval_refl _#6 (interp_tarrow _#8 Hdoml Hal))).
-  subst Q.
-  clear Harrl.
-  so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
-  so (urel_closed _#5 Huv) as (Hclu & Hclv).
-  so (urel_closed _#5 Hxy) as (Hclx & Hcly).
-  simpsub.
-  exploit (Hfnify i s s' Dom A u v x y) as (B & Hbl & Hbr); auto.
-  exists (iupi stop i Dom B).
-  split.
-    {
-    rewrite -> (subst_into_closed _ _ u); auto.
-    rewrite -> (subst_into_closed _ _ x); auto.
-    apply interp_eval_refl.
-    apply interp_pi; auto.
-    }
-
-    {
-    rewrite -> (subst_into_closed _ _ v); auto.
-    rewrite -> (subst_into_closed _ _ y); auto.
-    apply interp_eval_refl.
-    apply interp_pi; auto.
-    }
-  }
-destruct H as (C & Hcl & Hcr).
-exploit (extract_functional_dual toppg A G a b i s s') as H; auto.
-  {
-  intros j t Hj Hst.
-  so (Hseqa _#3 Hst) as (A' & Hl & Ht & _).
-  so (basic_fun _#7 (basic_downward _#7 Hj Hal) Hl).
-  subst A'.
-  apply (relhyp_tm _#4 (iutruncate (S j) A)); auto.
-  apply (basic_downward _#3 i); auto.
-  }
-
-  {
-  intros j t Hj Hst.
-  so (Hseqa _#3 Hst) as (A' & Ht & Hr & _).
-  so (basic_fun _#7 (basic_downward _#7 Hj Har) Hr).
-  subst A'.
-  apply (relhyp_tm _#4 (iutruncate (S j) A)); auto.
-  apply (basic_downward _#3 i); auto.
-  }
-
-  {
-  intros j t t' Ht.
-  so (Hseqb _#3 Ht) as (R & Hl & Hr & _).
-  eauto.
-  }
-destruct H as (D & Hdl & Hdr).
-assert (symmish stop (den A) (fun X => den (pi1 D X))) as hsold.
-  {
-  clear C Hcl Hcr m n Hseqmn.
-  intros j m n p q u v Hmn Hpq Huv.
-  so (urel_closed _#5 Hmn) as (Hclm & Hcln).
-  so (urel_closed _#5 Hpq) as (Hclp & Hclq).
-  so (basic_member_index _#9 Hal Hmn) as Hj.
-  exploit (Hextends j s s' (iutruncate (S j) A) m n p q) as Hs'; auto.
     {
     eapply pwctx_downward; eauto.
     }
 
     {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    split; auto.
-    }
-
-    {
-    split; auto.
-    }
-  exploit (pwctx_cons_tm_seq j u v (dot p (dot m s)) (dot q (dot n s')) b (hyp_tm (subst sh1 a) :: hyp_tm a :: G)) as Hs''; auto.
-    {
-    eapply seqhyp_tm; eauto.
+    apply (seqhyp_tm _#5 (iutruncate (S j) A)).
       {
-      invert Hdl.
-      intros _ _ Hdact.
-      so (Hdact j (ppair m p) (ppair n q) Hj (prod_action_ppair _#8 Hmn Hpq)) as H.
-      simpsubin H.
-      refine (basic_equiv _#7 _ _ H).
-        {
-        prove_hygiene.
-        }
-
-        {
-        apply equiv_funct; auto using equiv_refl.
-        apply equivsub_dot.
-          {
-          apply equiv_beta2.
-          }
-        apply equivsub_dot.
-          {
-          apply equiv_beta1.
-          }
-        apply equivsub_refl.
-        }
+      eapply basic_downward; eauto.
       }
 
       {
-      invert Hdr.
-      intros _ _ Hdact.
-      so (Hdact j (ppair m p) (ppair n q) Hj (prod_action_ppair _#8 Hmn Hpq)) as H.
-      simpsubin H.
-      refine (basic_equiv _#7 _ _ H).
-        {
-        prove_hygiene.
-        }
+      eapply basic_downward; eauto.
+      }
 
-        {
-        apply equiv_funct; auto using equiv_refl.
-        apply equivsub_dot.
-          {
-          apply equiv_beta2.
-          }
-        apply equivsub_dot.
-          {
-          apply equiv_beta1.
-          }
-        apply equivsub_refl.
-        }
+      {
+      split; auto.
       }
     }
 
     {
     intros k t t' Ht.
-    so (Hseqb _#3 Ht) as (R & Hl & Hr & _).
+    so (Hseqa _#3 Ht) as (R & Hl & Hr & _).
     eauto.
     }
-  so (Hseqsymm _#3 Hs'') as (R & Hl & _ & Hsat & _).
-  simpsubin Hl.
-  exists (subst (dot u (dot p (dot m s))) ms).
-  exists (subst (dot v (dot q (dot n s'))) ms).
-  force_exact Hsat.
-  f_equal.
-  f_equal.
-  clear Hsat.
-  invert Hdl.
-  intros _ _ Hdact.
-  so (Hdact j (ppair p m) (ppair q n) Hj (prod_action_ppair _#8 Hpq Hmn)) as H.
-  simpsubin H.
-  refine (basic_fun _#7 _ H).
-  refine (basic_equiv _#7 _ _ Hl).
-    {
-    prove_hygiene.
-    }
-
-    {
-    apply equiv_symm.
-    apply equiv_funct; auto using equiv_refl.
-    apply equivsub_dot.
-      {
-      apply equiv_beta2.
-      }
-    apply equivsub_dot.
-      {
-      apply equiv_beta1.
-      }
-    apply equivsub_refl.
-    }
   }
-assert (transish stop (den A) (fun X => den (pi1 D X))) as htold.
+assert (forall i s s' A B j x y k m n p q,
+          pwctx i s s' G
+          -> interp toppg true i (subst s a) A
+          -> interp toppg false i (subst s' a) A
+          -> functional the_system toppg true i (den A) (subst (under 1 s) b) B
+          -> functional the_system toppg false i (den A) (subst (under 1 s') b) B
+          -> forall (hxy : rel (den A) j x y),
+               rel (den (pi1 B (urelspinj (den A) j x y hxy))) k m p
+               -> rel (den (pi1 B (urelspinj (den A) j x y hxy))) k n q
+               -> pwctx k (dot n (dot m (dot x s))) (dot q (dot p (dot y s'))) (hyp_tm (subst sh1 b) :: hyp_tm b :: hyp_tm a :: G)) as HctxB.
   {
-  clear C Hcl Hcr m n Hseqmn.
-  intros j m n p q r t u1 v1 u2 v2 Hmn Hpq Hrt Huv1 Huv2.
-  so (urel_closed _#5 Hmn) as (Hclm & Hcln).
-  so (urel_closed _#5 Hpq) as (Hclp & Hclq).
-  so (urel_closed _#5 Hrt) as (Hclr & Hclt).
-  so (basic_member_index _#9 Hal Hmn) as Hj.
-  assert (pwctx j (dot u2 (dot u1 (dot r (dot p (dot m s))))) (dot v2 (dot v1 (dot t (dot q (dot n s'))))) (hyp_tm (subst (dot (var 1) (dot (var 2) (sh 4))) b) :: hyp_tm (subst (sh 1) b) :: hyp_tm (subst (sh 2) a) :: hyp_tm (subst (sh 1) a) :: hyp_tm a :: G)) as Hs'.
+  clear m n Hseqmn.
+  intros i s s' A B j x y k m n p q Hs Hal Har Hbl Hbr Hxy Hmp Hnq.
+  so (basic_member_index _#9 Hal Hxy) as Hj.
+  invert Hbl.
+  intros _ _ Hactb.
+  so (Hactb _#3 Hj Hxy) as Hbxl.
+  simpsubin Hbxl.
+  so (basic_member_index _#9 Hbxl Hmp) as Hk.
+  clear Hbxl.
+  so (le_trans _#3 Hk Hj) as Hki.
+  apply pwctx_cons_tm_seq.
     {
     apply pwctx_cons_tm_seq.
       {
-      apply pwctx_cons_tm_seq.
-        {
-        apply pwctx_cons_tm_seq.
-          {
-          eapply (Hextends _#3 (iutruncate (S j) A)).
-            {
-            eapply pwctx_downward; eauto.
-            }
-        
-            {
-            eapply basic_downward; eauto.
-            }
-        
-            {
-            eapply basic_downward; eauto.
-            }
-        
-            {
-            split; auto.
-            }
-        
-            {
-            split; auto.
-            }
-          }
-        
-          {
-          apply (seqhyp_tm _#5 (iutruncate (S j) A)).
-            {
-            simpsub.
-            eapply basic_downward; eauto.
-            }
-
-            {
-            simpsub.
-            eapply basic_downward; eauto.
-            }
-            
-            {
-            split; auto.
-            }
-          }
-          
-          {
-          intros k zz zz' Hzz.
-          invertc Hzz.
-          intros x1 y1 zz1 zz1' Hzz _ _ _ <- <-.
-          invertc Hzz.
-          intros x2 y2 z z' Hz _ _ _ <- <-.
-          so (Hseqa _#3 Hz) as (R & Hl & Hr & _).
-          exists toppg, R.
-          simpsub.
-          auto.
-          }
-        }
-
-        {
-        simpsub.
-        eapply seqhyp_tm; eauto.
-          {
-          invert Hdl.
-          intros _ _ Hdact.
-          so (Hdact j (ppair m p) (ppair n q) Hj (prod_action_ppair _#8 Hmn Hpq)) as H.
-          simpsubin H.
-          clear Hdact.
-          refine (basic_equiv _#7 _ _ H); clear H.
-            {
-            prove_hygiene.
-            }
-
-            {
-            apply equiv_funct; auto using equiv_refl.
-            apply equivsub_dot.
-              {
-              apply equiv_beta2.
-              }
-            apply equivsub_dot.
-              {
-              apply equiv_beta1.
-              }
-            apply equivsub_refl.
-            }
-          }
-
-          {
-          invert Hdr.
-          intros _ _ Hdact.
-          so (Hdact j (ppair m p) (ppair n q) Hj (prod_action_ppair _#8 Hmn Hpq)) as H.
-          simpsubin H.
-          clear Hdact.
-          refine (basic_equiv _#7 _ _ H); clear H.
-            {
-            prove_hygiene.
-            }
-
-            {
-            apply equiv_funct; auto using equiv_refl.
-            apply equivsub_dot.
-              {
-              apply equiv_beta2.
-              }
-            apply equivsub_dot.
-              {
-              apply equiv_beta1.
-              }
-            apply equivsub_refl.
-            }
-          }
-        }
-
-        {
-        intros k zz zz' Hzz.
-        invertc Hzz.
-        intros x y z z' Hz _ _ _ <- <-.
-        so (Hseqb _#3 Hz) as (R & Hl & Hr & _).
-        exists toppg, R.
-        simpsub.
-        auto.
-        }
+      eapply HctxA; eauto.
+      eapply (urel_downward_leq _ _ _ j); eauto.
       }
 
       {
-      simpsub.
-      eapply seqhyp_tm; eauto.
+      apply (seqhyp_tm _#5 (iutruncate (S k) (pi1 B (urelspinj _#4 Hxy)))); auto.
         {
-        invert Hdl.
-        intros _ _ Hdact.
-        so (Hdact j (ppair p r) (ppair q t) Hj (prod_action_ppair _#8 Hpq Hrt)) as H.
+        apply (basic_downward _ _ _ j); auto.
+        invert Hbl.
+        intros _ _ Hact.
+        so (Hact _#3 Hj Hxy) as H.
         simpsubin H.
-        clear Hdact.
-        refine (basic_equiv _#7 _ _ H); clear H.
-          {
-          prove_hygiene.
-          }
-
-          {
-          apply equiv_funct; auto using equiv_refl.
-          apply equivsub_dot.
-            {
-            apply equiv_beta2.
-            }
-          apply equivsub_dot.
-            {
-            apply equiv_beta1.
-            }
-          apply equivsub_refl.
-          }
+        exact H.
         }
 
         {
-        invert Hdr.
-        intros _ _ Hdact.
-        so (Hdact j (ppair p r) (ppair q t) Hj (prod_action_ppair _#8 Hpq Hrt)) as H.
+        apply (basic_downward _ _ _ j); auto.
+        invert Hbr.
+        intros _ _ Hact.
+        so (Hact _#3 Hj Hxy) as H.
         simpsubin H.
-        clear Hdact.
-        refine (basic_equiv _#7 _ _ H); clear H.
-          {
-          prove_hygiene.
-          }
+        exact H.
+        }
 
-          {
-          apply equiv_funct; auto using equiv_refl.
-          apply equivsub_dot.
-            {
-            apply equiv_beta2.
-            }
-          apply equivsub_dot.
-            {
-            apply equiv_beta1.
-            }
-          apply equivsub_refl.
-          }
+        {
+        split; auto.
         }
       }
-
+      
       {
-      intros k zz zz' Hzz.
-      invertc Hzz.
-      intros x1 y1 zz1 zz1' Hzz _ _ _ <- <-.
-      invertc Hzz.
-      intros x2 y2 zz2 zz2' Hzz Hxy2 _ _ <- <-.
-      invertc Hzz.
-      intros x3 y3 zz3 zz3' Hzz Hxy3 _ _ <- <-.
-      invertc Hzz.
-      intros x4 y4 z z' Hz _ _ _ <- <-.
-      simpsubin Hxy2.
-      simpsubin Hxy3.
+      intros l t t' Ht.
+      so (Hseqb _#3 Ht) as (R & Hl & Hr & _).
+      eauto.
+      }
+    }
+
+    {
+    apply (seqhyp_tm _#5 (iutruncate (S k) (pi1 B (urelspinj _#4 Hxy)))); auto.
+      {
+      apply (basic_downward _ _ _ j); auto.
+      invert Hbl.
+      intros _ _ Hact.
+      so (Hact _#3 Hj Hxy) as H.
+      simpsubin H.
       simpsub.
-      invertc Hxy2.
-      intros R Hl Hr Hxy2.
-      invertc Hxy3.
-      intros R' Hl' _ Hxy3.
-      so (basic_fun _#7 Hl Hl').
-      subst R'.
-      so (Hextends _#8 Hz Hl Hr Hxy3 Hxy2) as Hz'.
-      so (Hseqb _#3 Hz') as (Q & Hql & Hqr & _).
-      eauto.
+      exact H.
       }
-    }
-  so (Hseqtrans _#3 Hs') as (R & Hl & Hr & Hsat & _).
-  simpsubin Hl.
-  simpsubin Hr.
-  exists (subst (dot u2 (dot u1 (dot r (dot p (dot m s))))) mt).
-  exists (subst (dot v2 (dot v1 (dot t (dot q (dot n s'))))) mt).
-  force_exact Hsat.
-  clear Hsat.
-  f_equal.
-  f_equal.
-  invert Hdl.
-  intros _ _ Hdact.
-  so (Hdact j (ppair m r) (ppair n t) Hj (prod_action_ppair _#8 Hmn Hrt)) as H.
-  simpsubin H.
-  refine (basic_fun _#7 _ H).
-  refine (basic_equiv _#7 _ _ Hl).
-    {
-    prove_hygiene.
-    }
 
+      {
+      apply (basic_downward _ _ _ j); auto.
+      invert Hbr.
+      intros _ _ Hact.
+      so (Hact _#3 Hj Hxy) as H.
+      simpsubin H.
+      simpsub.
+      exact H.
+      }
+
+      {
+      split; auto.
+      }
+    }
+    
     {
-    apply equiv_symm.
-    apply equiv_funct; auto using equiv_refl.
-    apply equivsub_dot.
-      {
-      apply equiv_beta2.
-      }
-    apply equivsub_dot.
-      {
-      apply equiv_beta1.
-      }
-    apply equivsub_refl.
+    intros l tt tt' Htt.
+    invert Htt.
+    intros r u t t' Ht _ _ _ <- <-.
+    so (Hseqb _#3 Ht) as (R & Hl & Hr & _).
+    exists toppg, R.
+    simpsub.
+    auto.
     }
   }
-assert (symmish stop (arrow_urel stop i (den Dom) (den A)) (fun X => den (pi1 C X))) as hsnew.
+assert (forall i s s' A B j x y k m n p q C u v,
+          pwctx i s s' G
+          -> interp toppg true i (subst s a) A
+          -> interp toppg false i (subst s' a) A
+          -> functional the_system toppg true i (den A) (subst (under 1 s) b) B
+          -> functional the_system toppg false i (den A) (subst (under 1 s') b) B
+          -> forall 
+               (hxy : rel (den A) j x y)
+               (hmp : rel (den (pi1 B (urelspinj (den A) j x y hxy))) k m p)
+               (hnq : rel (den (pi1 B (urelspinj (den A) j x y hxy))) k n q),
+                 interp toppg true k (subst (dot n (dot m (dot x s))) c) C
+                 -> interp toppg false k (subst (dot q (dot p (dot y s'))) c) C
+                 -> rel (den C) k u v
+                 -> pwctx k (dot u (dot n (dot m (dot x s)))) (dot v (dot q (dot p (dot y s')))) (hyp_tm c :: hyp_tm (subst sh1 b) :: hyp_tm b :: hyp_tm a :: G)) as HctxC.
   {
-  clear m n Hseqmn Hseqtrans.
-  clear D Hdl Hdr hsold htold.
-  intros j m n p q u v Hmn Hpq Huv.
-  so (urel_closed _#5 Hmn) as (Hclm & Hcln).
-  so (urel_closed _#5 Hpq) as (Hclp & Hclq).
-  so (urel_closed _#5 Huv) as (Hclu & Hclv).
-  exploit (basic_member_index the_system toppg true i (tarrow (subst s dom) (subst s a)) (iuarrow stop i Dom A) j m n) as Hj; auto.
+  clear m n Hseqmn.
+  intros i s s' A B j x y k m n p q C u v Hs Hal Har Hbl Hbr Hxy Hmp Hnq Hcl Hcr Huv.
+  apply pwctx_cons_tm_seq.
     {
-    apply interp_eval_refl.
-    apply interp_tarrow; auto.
-    }
-  exists (lam triv), (lam triv).
-  so (Hfnify j s s' (iutruncate (S j) Dom) (iutruncate (S j) A) (ppi1 (ppair p m)) (ppi1 (ppair q n)) (ppi2 (ppair p m)) (ppi2 (ppair q n))) as (F & Hfl & Hfr).
-    {
-    eapply pwctx_downward; eauto.
+    eapply HctxB; eauto.
     }
 
     {
-    eapply basic_downward; eauto.
+    apply (seqhyp_tm _#5 C); auto.
     }
 
     {
-    eapply basic_downward; eauto.
+    intros l t t' Ht.
+    so (Hseqc _#3 Ht) as (R & Hct & Hct' & _).
+    eauto.
     }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eassert _ as Hpq'; [refine (urel_equiv _#4 (ppi1 (ppair p m)) _ (ppi1 (ppair q n)) _ _ _ _ Hpq) |].
-      {
-      prove_hygiene.
-      }
-
-      {
-      prove_hygiene.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta1.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta1.
-      }
-    refine (rel_from_ceiling _#6 _ Hpq').
-    rewrite -> !ceiling_arrow.
-    rewrite -> !Nat.min_r; auto.
-    f_equal.
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-    }
-
-    {
-    eassert _ as Hmn'; [refine (urel_equiv _#4 (ppi2 (ppair p m)) _ (ppi2 (ppair q n)) _ _ _ _ Hmn) |].
-      {
-      prove_hygiene.
-      }
-
-      {
-      prove_hygiene.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta2.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta2.
-      }
-    refine (rel_from_ceiling _#6 _ Hmn').
-    rewrite -> !ceiling_arrow.
-    rewrite -> !Nat.min_r; auto.
-    f_equal.
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-    }
-  so (Hfnify j s s' (iutruncate (S j) Dom) (iutruncate (S j) A) (ppi1 (ppair m p)) (ppi1 (ppair n q)) (ppi2 (ppair m p)) (ppi2 (ppair n q))) as (I & Hil & Hir).
-    {
-    eapply pwctx_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eassert _ as Hmn'; [refine (urel_equiv _#4 (ppi1 (ppair m p)) _ (ppi1 (ppair n q)) _ _ _ _ Hmn) |].
-      {
-      prove_hygiene.
-      }
-
-      {
-      prove_hygiene.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta1.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta1.
-      }
-    refine (rel_from_ceiling _#6 _ Hmn').
-    rewrite -> !ceiling_arrow.
-    rewrite -> !Nat.min_r; auto.
-    f_equal.
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-    }
-
-    {
-    eassert _ as Hpq'; [refine (urel_equiv _#4 (ppi2 (ppair m p)) _ (ppi2 (ppair n q)) _ _ _ _ Hpq) |].
-      {
-      prove_hygiene.
-      }
-
-      {
-      prove_hygiene.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta2.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta2.
-      }
-    refine (rel_from_ceiling _#6 _ Hpq').
-    rewrite -> !ceiling_arrow.
-    rewrite -> !Nat.min_r; auto.
-    f_equal.
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-    }
-  invert Hcl.
-  intros _ _ Hcact.
-  so (Hcact _#3 Hj (prod_action_ppair stop _ _ j p m q n Hpq Hmn)) as H.
-  clear Hcact.
-  simpsubin H.
-  rewrite -> (subst_into_closed _ _ p) in H; auto.
-  rewrite -> (subst_into_closed _ _ m) in H; auto.
-  assert (interp toppg true j (pi (subst s dom) (subst (dot (app (ppi2 (ppair p m)) (var 0)) (dot (app (ppi1 (ppair p m)) (var 0)) (compose s sh1))) b)) (iupi stop j (iutruncate (S j) Dom) F)) as H'.
-    {
-    apply interp_eval_refl.
-    apply interp_pi; auto.
-    eapply basic_downward; eauto.
-    }
-  so (basic_fun _#7 H H') as Heq.
-  clear H H'.
-  cbn in Heq.
-  cut (rel (den (iupi stop j (iutruncate (S j) Dom) F)) j (lam triv) (lam triv)).
-    {
-    intro H.
-    force_exact H.
-    f_equal.
-    f_equal.
-    symmetry.
-    exact Heq.
-    }
-  clear Heq.
-  exists triv, triv.
-  do2 5 split; auto using star_refl; try prove_hygiene.
-  intros j' r t Hj' Hrt.
-  so (urel_closed _#5 Hrt) as (Hclr & Hclt).
-  simpsub.
-  invert Hfl.
-  intros _ _ Hfact.
-  so (Hfact j' r t Hj' Hrt) as H.
-  clear Hfact.
-  simpsubin H.
-  unfold subst1 in H.
-  rewrite -> (subst_into_closed _ _ p) in H; auto.
-  rewrite -> (subst_into_closed _ _ m) in H; auto.
-  eassert _ as Hinterp; [refine (basic_equiv _#5 (subst (dot (app m r) (dot (app p r) s)) b) _ _ _ H) |].
-    {
-    prove_hygiene.
-    }
-
-    {
-    apply equiv_funct; auto using equiv_refl.
-    apply equivsub_dot.
-      {
-      apply equiv_app; auto using equiv_refl.
-      apply equiv_beta2.
-      }
-    apply equivsub_dot.
-      {
-      apply equiv_app; auto using equiv_refl.
-      apply equiv_beta1.
-      }
-    apply equivsub_refl.
-    }
-  clear H.
-  exploit (Hextends j' s s' (iutruncate (S j') A) (app p r) (app q t) (app m r) (app n t)) as Hs'.
-    {
-    apply (pwctx_downward i); auto.
-    omega.
-    }
-
-    {
-    apply (basic_downward _#3 i); auto.
-    omega.
-    }
-
-    {
-    apply (basic_downward _#3 i); auto.
-    omega.
-    }
-
-    {
-    apply (arrow_action_app _ j' (den (iutruncate (S j') Dom)) (den (iutruncate (S j') A))).
-      {
-      cut (rel (ceiling (S j') (arrow_urel stop i (den Dom) (den A))) j' p q).
-        {
-        intro H.
-        rewrite -> ceiling_arrow in H.
-        rewrite -> Nat.min_r in H; auto.
-        omega.
-        }
-      split; auto.
-      eapply urel_downward_leq; eauto.
-      }
-
-      {
-      clear Hinterp.
-      destruct Hrt as (_ & Hrt).
-      split; auto.
-      }
-    }
-
-    {
-    apply (arrow_action_app _ j' (den (iutruncate (S j') Dom)) (den (iutruncate (S j') A))).
-      {
-      cut (rel (ceiling (S j') (arrow_urel stop i (den Dom) (den A))) j' m n).
-        {
-        intro H.
-        rewrite -> ceiling_arrow in H.
-        rewrite -> Nat.min_r in H; auto.
-        omega.
-        }
-      split; auto.
-      eapply urel_downward_leq; eauto.
-      }
-
-      {
-      clear Hinterp.
-      destruct Hrt as (_ & Hrt).
-      split; auto.
-      }
-    }
-  so (Hseqb _#3 Hs') as (R & Hl & Hr & _).
-  so (basic_fun _#7 Hl Hinterp) as HeqR.
-  assert (exists x y,
-            rel (den R) j' x y) as (x & y & Hxy).
-    {
-    subst R.
-    clear Hs' Hl Hr.
-    assert (rel (den A) j' (app m r) (app n t)) as Hmrnt.
-      {
-      apply (arrow_action_app _ j' (den (iutruncate (S j') Dom)) (den (iutruncate (S j') A))).
-        {
-        cut (rel (ceiling (S j') (arrow_urel stop i (den Dom) (den A))) j' m n).
-          {
-          intro H.
-          rewrite -> ceiling_arrow in H.
-          rewrite -> Nat.min_r in H; auto.
-          omega.
-          }
-        split; auto.
-        eapply urel_downward_leq; eauto.
-        }
-  
-        {
-        clear Hinterp.
-        destruct Hrt as (_ & Hrt).
-        split; auto.
-        }
-      }
-    assert (rel (den A) j' (app p r) (app q t)) as Hprqt.
-      {
-      apply (arrow_action_app _ j' (den (iutruncate (S j') Dom)) (den (iutruncate (S j') A))).
-        {
-        cut (rel (ceiling (S j') (arrow_urel stop i (den Dom) (den A))) j' p q).
-          {
-          intro H.
-          rewrite -> ceiling_arrow in H.
-          rewrite -> Nat.min_r in H; auto.
-          omega.
-          }
-        split; auto.
-        eapply urel_downward_leq; eauto.
-        }
-  
-        {
-        clear Hinterp.
-        destruct Hrt as (_ & Hrt).
-        split; auto.
-        }
-      }
-    assert (pwctx j' (dot (app p r) (dot (app m r) s)) (dot (app q t) (dot (app n t) s')) (hyp_tm (subst sh1 a) :: hyp_tm a :: G)) as Hs'.
-      {
-      eapply (Hextends _#3 (iutruncate (S j') A)).
-        {
-        apply (pwctx_downward i); auto.
-        omega.
-        }
-
-        {
-        apply (basic_downward _#3 i); auto.
-        omega.
-        }
-
-        {
-        apply (basic_downward _#3 i); auto.
-        omega.
-        }
-        
-        {
-        split; auto.
-        }
-
-        {
-        split; auto.
-        }
-      }
-    assert (pwctx j' (dot (app u r) (dot (app p r) (dot (app m r) s))) (dot (app v t) (dot (app q t) (dot (app n t) s'))) (hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G)) as Hs''.
-      {
-      apply pwctx_cons_tm_seq.
-        {
-        auto.
-        }
-
-        {
-        invert Hcl.
-        intros _ _ Hcact.
-        so (Hcact _#3 Hj (prod_action_ppair _#8 Hmn Hpq)) as Hl.
-        clear Hcact.
-        simpsubin Hl.
-        rewrite -> (subst_into_closed _ _ m) in Hl; auto.
-        rewrite -> (subst_into_closed _ _ p) in Hl; auto.
-        so (interp_eval_refl _#6 (interp_pi _#8 (basic_downward _#7 Hj Hdoml) Hil)) as H.
-        so (basic_fun _#7 H Hl) as Heq.
-        clear H Hl.
-        assert (rel (den (iupi stop j (iutruncate (S j) Dom) I)) j u v) as Huv'.
-          {
-          rewrite -> Heq.
-          exact Huv.
-          }
-        clear Huv Heq.
-        so (pi_action_app _#10 Hrt Hj' Huv') as Hinh.
-        cbn -[iutruncate] in Hinh.
-        invert Hil.
-        intros _ _ Hiact.
-        so (Hiact j' r t Hj' Hrt) as Hl.
-        clear Hiact.
-        simpsubin Hl.
-        unfold subst1 in Hl.
-        rewrite -> (subst_into_closed _ _ m) in Hl; auto.
-        rewrite -> (subst_into_closed _ _ p) in Hl; auto.
-        invert Hir.
-        intros _ _ Hiact.
-        so (Hiact j' r t Hj' Hrt) as Hr.
-        clear Hiact.
-        simpsubin Hr.
-        unfold subst1 in Hr.
-        rewrite -> (subst_into_closed _ _ n) in Hr; auto.
-        rewrite -> (subst_into_closed _ _ q) in Hr; auto.
-        apply (seqhyp_tm _#5 (pi1 I (urelspinj _ _ _ _ Hrt))); auto.
-          {
-          refine (basic_equiv _#7 _ _ Hl).
-            {
-            prove_hygiene.
-            }
-
-            {
-            apply equiv_funct; auto using equiv_refl.
-            apply equivsub_dot.
-              {
-              apply equiv_app; auto using equiv_refl.
-              apply equiv_beta2.
-              }
-            apply equivsub_dot.
-              {
-              apply equiv_app; auto using equiv_refl.
-              apply equiv_beta1.
-              }
-            apply equivsub_refl.
-            }
-          }
-
-          {
-          refine (basic_equiv _#7 _ _ Hr).
-            {
-            prove_hygiene.
-            }
-
-            {
-            apply equiv_funct; auto using equiv_refl.
-            apply equivsub_dot.
-              {
-              apply equiv_app; auto using equiv_refl.
-              apply equiv_beta2.
-              }
-            apply equivsub_dot.
-              {
-              apply equiv_app; auto using equiv_refl.
-              apply equiv_beta1.
-              }
-            apply equivsub_refl.
-            }
-          }
-        }
-
-        {
-        intros k z z' Hz.
-        so (Hseqb _#3 Hz) as (R & Hl & Hr & _).
-        eauto.
-        }
-      }
-    so (Hseqsymm _#3 Hs'') as (R & Hl & _ & Hsat & _).
-    simpsubin Hl.
-    so (basic_fun _#7 Hinterp Hl).
-    subst R.
-    exists (subst (dot (app u r) (dot (app p r) (dot (app m r) s))) ms).
-    exists (subst (dot (app v t) (dot (app q t) (dot (app n t) s'))) ms).
-    exact Hsat.
-    }
-  assert (pwctx j'
-            (dot x (dot (app m r) (dot (app p r) s)))
-            (dot y (dot (app n t) (dot (app q t) s')))
-            (hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G)) as Hs''.
-    {
-    apply pwctx_cons_tm_seq; auto.
-      {
-      apply (seqhyp_tm _#5 R); auto.
-      }
-
-      {
-      intros k z z' Hz.
-      so (Hseqb _#3 Hz) as (Q & Hql & Hqr & _).
-      eauto.
-      }
-    }
-  so (Hseqtriv _#3 Hs'') as (R' & Hl' & _ & Hrtriv & _).
-  simpsubin Hl'.
-  so (basic_fun _#7 Hl Hl').
-  subst R'.
-  subst R.
-  exact Hrtriv.
   }
-assert (transish stop (arrow_urel stop i (den Dom) (den A)) (fun X => den (pi1 C X))) as htnew.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (Hseqa _#3 Hs) as (A & Hal & Har & Hmeta).
+exploit (extract_functional toppg i (den A) (subst (under 1 s) b) (subst (under 1 s') b)) as H.
   {
-  clear m n Hseqmn Hseqsymm.
-  clear D Hdl Hdr hsold htold.
-  intros j m n p q x y u1 v1 u2 v2 Hmn Hpq Hxy Huv1 Huv2.
-  so (urel_closed _#5 Hmn) as (Hclm & Hcln).
-  so (urel_closed _#5 Hpq) as (Hclp & Hclq).
-  so (urel_closed _#5 Hxy) as (Hclx & Hcly).
-  so (urel_closed _#5 Huv1) as (Hclu1 & Hclv1).
-  so (urel_closed _#5 Huv2) as (Hclu2 & Hclv2).
-  exploit (basic_member_index the_system toppg true i (tarrow (subst s dom) (subst s a)) (iuarrow stop i Dom A) j m n) as Hj; auto.
-    {
-    apply interp_eval_refl.
-    apply interp_tarrow; auto.
-    }
-  exists (lam triv), (lam triv).
-  so (Hfnify j s s' (iutruncate (S j) Dom) (iutruncate (S j) A) (ppi1 (ppair m x)) (ppi1 (ppair n y)) (ppi2 (ppair m x)) (ppi2 (ppair n y))) as (F & Hfl & Hfr).
-    {
-    eapply pwctx_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eassert _ as Hmn'; [refine (urel_equiv _#4 (ppi1 (ppair m x)) _ (ppi1 (ppair n y)) _ _ _ _ Hmn) |].
-      {
-      prove_hygiene.
-      }
-
-      {
-      prove_hygiene.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta1.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta1.
-      }
-    refine (rel_from_ceiling _#6 _ Hmn').
-    rewrite -> !ceiling_arrow.
-    rewrite -> !Nat.min_r; auto.
-    f_equal.
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-    }
-
-    {
-    eassert _ as Hxy'; [refine (urel_equiv _#4 (ppi2 (ppair m x)) _ (ppi2 (ppair n y)) _ _ _ _ Hxy) |].
-      {
-      prove_hygiene.
-      }
-
-      {
-      prove_hygiene.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta2.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta2.
-      }
-    refine (rel_from_ceiling _#6 _ Hxy').
-    rewrite -> !ceiling_arrow.
-    rewrite -> !Nat.min_r; auto.
-    f_equal.
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-    }
-  so (Hfnify j s s' (iutruncate (S j) Dom) (iutruncate (S j) A) (ppi1 (ppair m p)) (ppi1 (ppair n q)) (ppi2 (ppair m p)) (ppi2 (ppair n q))) as (I & Hil & Hir).
-    {
-    eapply pwctx_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eassert _ as Hmn'; [refine (urel_equiv _#4 (ppi1 (ppair m p)) _ (ppi1 (ppair n q)) _ _ _ _ Hmn) |].
-      {
-      prove_hygiene.
-      }
-
-      {
-      prove_hygiene.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta1.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta1.
-      }
-    refine (rel_from_ceiling _#6 _ Hmn').
-    rewrite -> !ceiling_arrow.
-    rewrite -> !Nat.min_r; auto.
-    f_equal.
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-    }
-
-    {
-    eassert _ as Hpq'; [refine (urel_equiv _#4 (ppi2 (ppair m p)) _ (ppi2 (ppair n q)) _ _ _ _ Hpq) |].
-      {
-      prove_hygiene.
-      }
-
-      {
-      prove_hygiene.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta2.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta2.
-      }
-    refine (rel_from_ceiling _#6 _ Hpq').
-    rewrite -> !ceiling_arrow.
-    rewrite -> !Nat.min_r; auto.
-    f_equal.
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-    }
-  so (Hfnify j s s' (iutruncate (S j) Dom) (iutruncate (S j) A) (ppi1 (ppair p x)) (ppi1 (ppair q y)) (ppi2 (ppair p x)) (ppi2 (ppair q y))) as (J & Hjl & Hjr).
-    {
-    eapply pwctx_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eapply basic_downward; eauto.
-    }
-
-    {
-    eassert _ as Hpq'; [refine (urel_equiv _#4 (ppi1 (ppair p x)) _ (ppi1 (ppair q y)) _ _ _ _ Hpq) |].
-      {
-      prove_hygiene.
-      }
-
-      {
-      prove_hygiene.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta1.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta1.
-      }
-    refine (rel_from_ceiling _#6 _ Hpq').
-    rewrite -> !ceiling_arrow.
-    rewrite -> !Nat.min_r; auto.
-    f_equal.
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-    }
-
-    {
-    eassert _ as Hxy'; [refine (urel_equiv _#4 (ppi2 (ppair p x)) _ (ppi2 (ppair q y)) _ _ _ _ Hxy) |].
-      {
-      prove_hygiene.
-      }
-
-      {
-      prove_hygiene.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta2.
-      }
-
-      {
-      apply equiv_symm.
-      apply equiv_beta2.
-      }
-    refine (rel_from_ceiling _#6 _ Hxy').
-    rewrite -> !ceiling_arrow.
-    rewrite -> !Nat.min_r; auto.
-    f_equal.
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-
-      {
-      rewrite -> den_iutruncate.
-      rewrite -> ceiling_idem.
-      auto.
-      }
-    }
-  invert Hcl.
-  intros _ _ Hcact.
-  so (Hcact _#3 Hj (prod_action_ppair stop _ _ j m x n y Hmn Hxy)) as H.
-  clear Hcact.
-  simpsubin H.
-  rewrite -> (subst_into_closed _ _ m) in H; auto.
-  rewrite -> (subst_into_closed _ _ x) in H; auto.
-  assert (interp toppg true j (pi (subst s dom) (subst (dot (app (ppi2 (ppair m x)) (var 0)) (dot (app (ppi1 (ppair m x)) (var 0)) (compose s sh1))) b)) (iupi stop j (iutruncate (S j) Dom) F)) as H'.
-    {
-    apply interp_eval_refl.
-    apply interp_pi; auto.
-    eapply basic_downward; eauto.
-    }
-  so (basic_fun _#7 H H') as Heq.
-  clear H H'.
-  cbn in Heq.
-  cut (rel (den (iupi stop j (iutruncate (S j) Dom) F)) j (lam triv) (lam triv)).
-    {
-    intro H.
-    force_exact H.
-    f_equal.
-    f_equal.
-    symmetry.
-    exact Heq.
-    }
-  clear Heq.
-  exists triv, triv.
-  do2 5 split; auto using star_refl; try prove_hygiene.
-  intros j' r t Hj' Hrt.
-  so (urel_closed _#5 Hrt) as (Hclr & Hclt).
-  simpsub.
-  invert Hfl.
-  intros _ _ Hfact.
-  so (Hfact j' r t Hj' Hrt) as H.
-  clear Hfact.
-  simpsubin H.
-  unfold subst1 in H.
-  rewrite -> (subst_into_closed _ _ m) in H; auto.
-  rewrite -> (subst_into_closed _ _ x) in H; auto.
-  eassert _ as Hinterp; [refine (basic_equiv _#5 (subst (dot (app x r) (dot (app m r) s)) b) _ _ _ H) |].
-    {
-    prove_hygiene.
-    }
-
-    {
-    apply equiv_funct; auto using equiv_refl.
-    apply equivsub_dot.
-      {
-      apply equiv_app; auto using equiv_refl.
-      apply equiv_beta2.
-      }
-    apply equivsub_dot.
-      {
-      apply equiv_app; auto using equiv_refl.
-      apply equiv_beta1.
-      }
-    apply equivsub_refl.
-    }
-  clear H.
-  exploit (Hextends j' s s' (iutruncate (S j') A) (app m r) (app n t) (app x r) (app y t)) as Hs'.
-    {
-    apply (pwctx_downward i); auto.
-    omega.
-    }
-
-    {
-    apply (basic_downward _#3 i); auto.
-    omega.
-    }
-
-    {
-    apply (basic_downward _#3 i); auto.
-    omega.
-    }
-
-    {
-    apply (arrow_action_app _ j' (den (iutruncate (S j') Dom)) (den (iutruncate (S j') A))).
-      {
-      cut (rel (ceiling (S j') (arrow_urel stop i (den Dom) (den A))) j' m n).
-        {
-        intro H.
-        rewrite -> ceiling_arrow in H.
-        rewrite -> Nat.min_r in H; auto.
-        omega.
-        }
-      split; auto.
-      eapply urel_downward_leq; eauto.
-      }
-
-      {
-      clear Hinterp.
-      destruct Hrt as (_ & Hrt).
-      split; auto.
-      }
-    }
-
-    {
-    apply (arrow_action_app _ j' (den (iutruncate (S j') Dom)) (den (iutruncate (S j') A))).
-      {
-      cut (rel (ceiling (S j') (arrow_urel stop i (den Dom) (den A))) j' x y).
-        {
-        intro H.
-        rewrite -> ceiling_arrow in H.
-        rewrite -> Nat.min_r in H; auto.
-        omega.
-        }
-      split; auto.
-      eapply urel_downward_leq; eauto.
-      }
-
-      {
-      clear Hinterp.
-      destruct Hrt as (_ & Hrt).
-      split; auto.
-      }
-    }
-  so (Hseqb _#3 Hs') as (R & Hl & Hr & _).
-  so (basic_fun _#7 Hl Hinterp) as HeqR.
-  assert (exists z w,
-            rel (den R) j' z w) as (z & w & Hzw).
-    {
-    subst R.
-    clear Hs' Hl Hr.
-    assert (rel (den A) j' (app m r) (app n t)) as Hmrnt.
-      {
-      apply (arrow_action_app _ j' (den (iutruncate (S j') Dom)) (den (iutruncate (S j') A))).
-        {
-        cut (rel (ceiling (S j') (arrow_urel stop i (den Dom) (den A))) j' m n).
-          {
-          intro H.
-          rewrite -> ceiling_arrow in H.
-          rewrite -> Nat.min_r in H; auto.
-          omega.
-          }
-        split; auto.
-        eapply urel_downward_leq; eauto.
-        }
-  
-        {
-        clear Hinterp.
-        destruct Hrt as (_ & Hrt).
-        split; auto.
-        }
-      }
-    assert (rel (den A) j' (app p r) (app q t)) as Hprqt.
-      {
-      apply (arrow_action_app _ j' (den (iutruncate (S j') Dom)) (den (iutruncate (S j') A))).
-        {
-        cut (rel (ceiling (S j') (arrow_urel stop i (den Dom) (den A))) j' p q).
-          {
-          intro H.
-          rewrite -> ceiling_arrow in H.
-          rewrite -> Nat.min_r in H; auto.
-          omega.
-          }
-        split; auto.
-        eapply urel_downward_leq; eauto.
-        }
-  
-        {
-        clear Hinterp.
-        destruct Hrt as (_ & Hrt).
-        split; auto.
-        }
-      }
-    assert (rel (den A) j' (app x r) (app y t)) as Hxryt.
-      {
-      apply (arrow_action_app _ j' (den (iutruncate (S j') Dom)) (den (iutruncate (S j') A))).
-        {
-        cut (rel (ceiling (S j') (arrow_urel stop i (den Dom) (den A))) j' x y).
-          {
-          intro H.
-          rewrite -> ceiling_arrow in H.
-          rewrite -> Nat.min_r in H; auto.
-          omega.
-          }
-        split; auto.
-        eapply urel_downward_leq; eauto.
-        }
-  
-        {
-        clear Hinterp.
-        destruct Hrt as (_ & Hrt).
-        split; auto.
-        }
-      }
-    assert (pwctx j' (dot (app u2 r) (dot (app u1 r) (dot (app x r) (dot (app p r) (dot (app m r) s))))) (dot (app v2 t) (dot (app v1 t) (dot (app y t) (dot (app q t) (dot (app n t) s'))))) (hyp_tm (subst (dot (var 1) (dot (var 2) (sh 4))) b) :: hyp_tm (subst sh1 b) :: hyp_tm (subst (sh 2) a) :: hyp_tm (subst sh1 a) :: hyp_tm a :: G)) as Hs''.
-      {
-      apply pwctx_cons_tm_seq.
-        {
-        apply pwctx_cons_tm_seq.
-          {
-          apply pwctx_cons_tm_seq.
-            {
-            apply (Hextends _#3 (iutruncate (S j') A)).
-              {
-              apply (pwctx_downward i); auto.
-              omega.
-              }
-      
-              {
-              apply (basic_downward _#3 i); auto.
-              omega.
-              }
-      
-              {
-              apply (basic_downward _#3 i); auto.
-              omega.
-              }
-              
-              {
-              split; auto.
-              }
-      
-              {
-              split; auto.
-              }
-            }
-
-            {
-            apply (seqhyp_tm _#5 (iutruncate (S j') A)).
-              {
-              simpsub.
-              apply (basic_downward _#3 i); auto.
-              omega.
-              }
-
-              {
-              simpsub.
-              apply (basic_downward _#3 i); auto.
-              omega.
-              }
-
-              {
-              split; auto.
-              }
-            }
-
-            {
-            intros k z z' Hz.
-            invertc Hz.
-            intros c d z1 z1' Hz _ _ _ <- <-.
-            invertc Hz.
-            intros e f z z' Hz _ _ _ <- <-.
-            so (Hseqa _#3 Hz) as (R & Hl & Hr & _).
-            exists toppg, R.
-            simpsub.
-            auto.
-            }
-          }
-
-          {
-          simpsub.
-          invert Hcl.
-          intros _ _ Hcact.
-          so (Hcact _#3 Hj (prod_action_ppair _#8 Hmn Hpq)) as Hl.
-          clear Hcact.
-          simpsubin Hl.
-          rewrite -> (subst_into_closed _ _ m) in Hl; auto.
-          rewrite -> (subst_into_closed _ _ p) in Hl; auto.
-          so (interp_eval_refl _#6 (interp_pi _#8 (basic_downward _#7 Hj Hdoml) Hil)) as H.
-          so (basic_fun _#7 H Hl) as Heq.
-          clear H Hl.
-          assert (rel (den (iupi stop j (iutruncate (S j) Dom) I)) j u1 v1) as Huv1'.
-            {
-            rewrite -> Heq.
-            exact Huv1.
-            }
-          clear Huv1 Heq.
-          so (pi_action_app _#10 Hrt Hj' Huv1') as Hinh.
-          cbn -[iutruncate] in Hinh.
-          invert Hil.
-          intros _ _ Hiact.
-          so (Hiact j' r t Hj' Hrt) as Hl.
-          clear Hiact.
-          simpsubin Hl.
-          unfold subst1 in Hl.
-          rewrite -> (subst_into_closed _ _ m) in Hl; auto.
-          rewrite -> (subst_into_closed _ _ p) in Hl; auto.
-          invert Hir.
-          intros _ _ Hiact.
-          so (Hiact j' r t Hj' Hrt) as Hr.
-          clear Hiact.
-          simpsubin Hr.
-          unfold subst1 in Hr.
-          rewrite -> (subst_into_closed _ _ n) in Hr; auto.
-          rewrite -> (subst_into_closed _ _ q) in Hr; auto.
-          apply (seqhyp_tm _#5 (pi1 I (urelspinj _ _ _ _ Hrt))); auto.
-            {
-            refine (basic_equiv _#7 _ _ Hl).
-              {
-              prove_hygiene.
-              }
-  
-              {
-              apply equiv_funct; auto using equiv_refl.
-              apply equivsub_dot.
-                {
-                apply equiv_app; auto using equiv_refl.
-                apply equiv_beta2.
-                }
-              apply equivsub_dot.
-                {
-                apply equiv_app; auto using equiv_refl.
-                apply equiv_beta1.
-                }
-              apply equivsub_refl.
-              }
-            }
-  
-            {
-            refine (basic_equiv _#7 _ _ Hr).
-              {
-              prove_hygiene.
-              }
-  
-              {
-              apply equiv_funct; auto using equiv_refl.
-              apply equivsub_dot.
-                {
-                apply equiv_app; auto using equiv_refl.
-                apply equiv_beta2.
-                }
-              apply equivsub_dot.
-                {
-                apply equiv_app; auto using equiv_refl.
-                apply equiv_beta1.
-                }
-              apply equivsub_refl.
-              }
-            }
-          }
-
-          {
-          intros k zz zz' Hz.
-          invertc Hz.
-          intros c d z z' Hz _ _ _ <- <-.
-          so (Hseqb _#3 Hz) as (R & Hl & Hr & _).
-          exists toppg, R.
-          simpsub.
-          auto.
-          }
-        }
-
-        {
-        simpsub.
-        invert Hcl.
-        intros _ _ Hcact.
-        so (Hcact _#3 Hj (prod_action_ppair _#8 Hpq Hxy)) as Hl.
-        clear Hcact.
-        simpsubin Hl.
-        rewrite -> (subst_into_closed _ _ p) in Hl; auto.
-        rewrite -> (subst_into_closed _ _ x) in Hl; auto.
-        so (interp_eval_refl _#6 (interp_pi _#8 (basic_downward _#7 Hj Hdoml) Hjl)) as H.
-        so (basic_fun _#7 H Hl) as Heq.
-        clear H Hl.
-        assert (rel (den (iupi stop j (iutruncate (S j) Dom) J)) j u2 v2) as Huv2'.
-          {
-          rewrite -> Heq.
-          exact Huv2.
-          }
-        clear Huv2 Heq.
-        so (pi_action_app _#10 Hrt Hj' Huv2') as Hinh.
-        cbn -[iutruncate] in Hinh.
-        invert Hjl.
-        intros _ _ Hjact.
-        so (Hjact j' r t Hj' Hrt) as Hl.
-        clear Hjact.
-        simpsubin Hl.
-        unfold subst1 in Hl.
-        rewrite -> (subst_into_closed _ _ p) in Hl; auto.
-        rewrite -> (subst_into_closed _ _ x) in Hl; auto.
-        invert Hjr.
-        intros _ _ Hjact.
-        so (Hjact j' r t Hj' Hrt) as Hr.
-        clear Hjact.
-        simpsubin Hr.
-        unfold subst1 in Hr.
-        rewrite -> (subst_into_closed _ _ q) in Hr; auto.
-        rewrite -> (subst_into_closed _ _ y) in Hr; auto.
-        apply (seqhyp_tm _#5 (pi1 J (urelspinj _ _ _ _ Hrt))); auto.
-          {
-          refine (basic_equiv _#7 _ _ Hl).
-            {
-            prove_hygiene.
-            }
-
-            {
-            apply equiv_funct; auto using equiv_refl.
-            apply equivsub_dot.
-              {
-              apply equiv_app; auto using equiv_refl.
-              apply equiv_beta2.
-              }
-            apply equivsub_dot.
-              {
-              apply equiv_app; auto using equiv_refl.
-              apply equiv_beta1.
-              }
-            apply equivsub_refl.
-            }
-          }
-
-          {
-          refine (basic_equiv _#7 _ _ Hr).
-            {
-            prove_hygiene.
-            }
-
-            {
-            apply equiv_funct; auto using equiv_refl.
-            apply equivsub_dot.
-              {
-              apply equiv_app; auto using equiv_refl.
-              apply equiv_beta2.
-              }
-            apply equivsub_dot.
-              {
-              apply equiv_app; auto using equiv_refl.
-              apply equiv_beta1.
-              }
-            apply equivsub_refl.
-            }
-          }
-        }
-
-        {
-        intros k zz zz' Hz.
-        invertc Hz.
-        intros e f ze zf Hz _ _ _ <- <-.
-        invertc Hz.
-        intros c3 d3 z3 z3' Hz Hcd3 _ _ <- <-.
-        invertc Hz.
-        intros c2 d2 z2 z2' Hz Hcd2 _ _ <- <-.
-        invertc Hz.
-        intros c1 d1 z z' Hz _ _ _ <- <-.
-        invertc Hcd2.
-        intros Az Hazl Hazr Hcd2.
-        simpsubin Hazl.
-        simpsubin Hazr.
-        invertc Hcd3.
-        intros Az' Hazl' _ Hcd3.
-        simpsubin Hazl'.
-        so (basic_fun _#7 Hazl Hazl').
-        subst Az'.
-        exploit (Hextends k z z' Az c2 d2 c3 d3) as Hz'; auto.
-        so (Hseqb _#3 Hz') as (R & Hl & Hr & _).
-        exists toppg, R.
-        simpsub.
-        auto.
-        }
-      }
-    so (Hseqtrans _#3 Hs'') as (R & Hl & _ & Hsat & _).
-    simpsubin Hl.
-    so (basic_fun _#7 Hinterp Hl).
-    subst R.
-    exists (subst (dot (app u2 r) (dot (app u1 r) (dot (app x r) (dot (app p r) (dot (app m r) s))))) mt).
-    exists (subst (dot (app v2 t) (dot (app v1 t) (dot (app y t) (dot (app q t) (dot (app n t) s'))))) mt).
-    exact Hsat.
-    }
-  assert (pwctx j'
-            (dot z (dot (app x r) (dot (app m r) s)))
-            (dot w (dot (app y t) (dot (app n t) s')))
-            (hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G)) as Hs''.
-    {
-    apply pwctx_cons_tm_seq; auto.
-      {
-      apply (seqhyp_tm _#5 R); auto.
-      }
-
-      {
-      intros k zz zz' Hzz.
-      so (Hseqb _#3 Hzz) as (Q & Hql & Hqr & _).
-      eauto.
-      }
-    }
-  so (Hseqtriv _#3 Hs'') as (R' & Hl' & _ & Hrtriv & _).
-  simpsubin Hl'.
-  so (basic_fun _#7 Hl Hl').
-  subst R'.
-  subst R.
-  exact Hrtriv.
+  exact (f_equal den (basic_impl_iutruncate _#6 Hal)).
   }
-exists (iuquotient stop (iuarrow stop i Dom A) C hsnew htnew).
+
+  {
+  eapply subst_closub_under_permit; eauto.
+  }
+
+  {
+  eapply subst_closub_under_permit; eauto.
+  }
+
+  {
+  intros j x y Hxy.
+  so (Hseqb _#3 (HctxA _#7 Hs Hal Har Hxy)) as (B & Hbl & Hbr & _).
+  exists B.
+  simpsub.
+  auto.
+  }
+destruct H as (B & Hbl & Hbr).
+so (Hseqquotabc _#3 Hs) as (Q2 & Hq2l & Hq2r & _).
+simpsubin Hq2l.
+simpsubin Hq2r.
+cbn [Nat.add] in Hq2l, Hq2r.
+exists Q2.
 simpsub.
 cbn [Nat.add].
-do2 2 split.
+do2 2 split; auto.
+exploit (extract_functional toppg i (den A) (subst (under 1 s) (quotient b c)) (subst (under 1 s') (quotient b c))) as H.
   {
-  apply interp_eval_refl.
-  apply interp_quotient.
-    {
-    apply interp_eval_refl.
-    apply interp_tarrow; auto.
-    }
+  exact (f_equal den (basic_impl_iutruncate _#6 Hal)).
+  }
 
+  {
+  eapply subst_closub_under_permit; eauto.
+  prove_hygiene.
+  }
+
+  {
+  eapply subst_closub_under_permit; eauto.
+  prove_hygiene.
+  }
+
+  {
+  intros j x y Hxy.
+  so (Hseqquotbc _#3 (HctxA _#7 Hs Hal Har Hxy)) as (R & Hl & Hr & _).
+  exists R.
+  simpsub.
+  simpsubin Hl.
+  simpsubin Hr.
+  cbn [Nat.add] in Hl, Hr |- *.
+  auto.
+  }
+destruct H as (Q1 & Hq1l & Hq1r).
+simpsubin Hq1l.
+simpsubin Hq1r.
+cbn [Nat.add] in Hq1l, Hq1r.
+assert (forall m n,
+          rel (den (iupi stop i A Q1)) i (subst s m) (subst s' n)
+          -> rel (den Q2) i (subst s m) (subst s' n)) as Hprop.
+2:{
+  so (Hseqmn _#3 Hs) as (R & Hl & _ & Hm & Hn & Hmn).
+  simpsubin Hl.
+  assert (interp toppg true i (subst s (pi a (quotient b c))) (iupi stop i A Q1)) as Haq1l.
     {
-    force_exact Hcl.
-    f_equal.
     simpsub.
     cbn [Nat.add].
-    reflexivity.
-    }
-  }
-
-  {
-  apply interp_eval_refl.
-  apply interp_quotient.
-    {
     apply interp_eval_refl.
-    apply interp_tarrow; auto.
+    apply interp_pi; auto.
     }
-
-    {
-    force_exact Hcr.
-    f_equal.
-    simpsub.
-    reflexivity.
-    }
+  simpsubin Haq1l.
+  so (basic_fun _#7 Hl Haq1l).
+  subst R.
+  do2 2 split; apply Hprop; auto.
   }
-so (Hseqmn _#3 Hs) as (R & Hl & _ & Hm & Hn & Hmn).
-simpsubin Hl.
-cbn [Nat.add] in Hl.
-assert (interp toppg true i 
-          (tarrow (subst s dom) (quotient (subst s a) (subst (dot (var 0) (dot (var 1) (compose s (sh 2)))) b)))
-          (iuarrow stop i Dom (iuquotient stop A D hsold htold))) as Harrquot.
+clear m n Hseqmn.
+assert (forall j x y, rel (den A) j x y -> equiv x y) as Hdiagonal.
   {
-  apply interp_eval_refl.
-  apply interp_tarrow; auto.
-  apply interp_eval_refl.
-  apply interp_quotient; auto.
-  force_exact Hdl.
-  f_equal.
-  simpsub.
-  reflexivity.
-  }
-so (basic_fun _#7 Hl Harrquot).
-subst R.
-clear Hl Harrquot.
-assert (forall j x y, rel (den Dom) j x y -> equiv x y) as Hdiagonal.
-  {
-  clear m n A Hal Har C Hcl Hcr D Hdl Hdr hsold htold hsnew htnew Hmn Hm Hn Hextends Hfnify Hseqa Hseqb Hseqsymm Hseqtrans Hseqtriv Hseqmn.
   intros j x y Hxy.
-  so (basic_member_index _#9 Hdoml Hxy) as Hj.
-  so (Hseqdom _#3 Hs) as (Dom' & Hdoml' & _ & Hmetdom).
-  so (basic_fun _#7 Hdoml Hdoml').
-  subst Dom'.
-  clear Hdoml'.
-  so (Hmetdom j x y Hj Hxy) as (Hxx & Hyy).
+  so (basic_member_index _#9 Hal Hxy) as Hj.
+  so (Hmeta j x y Hj Hxy) as (Hxx & Hyy).
   so (urel_zigzag _#7 Hyy Hxy Hxx) as Hyx.
-  assert (pwctx j (dot triv (dot y (dot x s))) (dot triv (dot y (dot x s'))) (hyp_tm (equal (subst (sh 2) dom) (var 1) (var 0)) :: hyp_tm (subst sh1 dom) :: hyp_tm dom :: G)) as Hs'.
+  assert (pwctx j (dot triv (dot y (dot x s))) (dot triv (dot y (dot x s'))) (hyp_tm (equal (subst (sh 2) a) (var 1) (var 0)) :: hyp_tm (subst sh1 a) :: hyp_tm a :: G)) as Hs'.
     {
     apply pwctx_cons_tm_seq.
       {
@@ -3485,7 +1661,7 @@ assert (forall j x y, rel (den Dom) j x y -> equiv x y) as Hdiagonal.
           }
 
           {
-          apply (seqhyp_tm _#5 (iutruncate (S j) Dom)).
+          apply (seqhyp_tm _#5 (iutruncate (S j) A)).
             {
             eapply basic_downward; eauto.
             }
@@ -3501,14 +1677,14 @@ assert (forall j x y, rel (den Dom) j x y -> equiv x y) as Hdiagonal.
 
           {
           intros k t t' Ht.
-          so (Hseqdom _#3 Ht) as (R & Hl & Hr & _).
+          so (Hseqa _#3 Ht) as (R & Hl & Hr & _).
           eauto.
           }
         }
 
         {
         simpsub.
-        apply (seqhyp_tm _#5 (iutruncate (S j) Dom)).
+        apply (seqhyp_tm _#5 (iutruncate (S j) A)).
           {
           eapply basic_downward; eauto.
           }
@@ -3522,12 +1698,11 @@ assert (forall j x y, rel (den Dom) j x y -> equiv x y) as Hdiagonal.
           }
         }
 
-
         {
         intros k tt tt' Htt.
         invertc Htt.
         intros p q t t' Ht _ _ _ <- <-.
-        so (Hseqdom _#3 Ht) as (R & Hl & Hr & _).
+        so (Hseqa _#3 Ht) as (R & Hl & Hr & _).
         simpsub.
         eauto.
         }
@@ -3536,7 +1711,7 @@ assert (forall j x y, rel (den Dom) j x y -> equiv x y) as Hdiagonal.
       {
       simpsub.
       assert (j < S j) as Hjj by omega.
-      apply (seqhyp_tm _#5 (iuequal stop true j (iutruncate (S j) Dom) x y x y (conj Hjj Hxx) (conj Hjj Hyy))).
+      apply (seqhyp_tm _#5 (iuequal stop true j (iutruncate (S j) A) x y x y (conj Hjj Hxx) (conj Hjj Hyy))).
         {
         apply interp_eval_refl.
         apply interp_equal.
@@ -3567,7 +1742,6 @@ assert (forall j x y, rel (den Dom) j x y -> equiv x y) as Hdiagonal.
       }
 
       {
-      clear Dom Hdoml Hdomr Hxy Hxx Hyx Hyy Hmetdom.
       intros k tt tt' Htt.
       invertc Htt.
       intros p q t1 t1' Ht1 Hpq _ _ <- <-.
@@ -3602,460 +1776,464 @@ assert (forall j x y, rel (den Dom) j x y -> equiv x y) as Hdiagonal.
   intros _ _ Hequiv _.
   exact Hequiv.
   }
-assert (forall m n,
-          rel (den (iuarrow stop i Dom (iuquotient stop A D hsold htold))) i (subst s m) (subst s' n)
-          -> rel (den (iuquotient stop (iuarrow stop i Dom A) C hsnew htnew)) i (subst s m) (subst s' n)) as Hprop.
+invert (basic_value_inv _#6 value_quotient Hq2l).
+intros AB AC hs ht Habl Hacl Heq1.
+so (basic_fun _#7 Habl (interp_eval_refl _#6 (interp_pi _#8 Hal Hbl))).
+subst AB.
+clear Habl.
+subst Q2.
+assert (forall j x y (hxy : rel (den A) j x y),
+          exists C hs' ht',
+            functional the_system toppg true j (prod_urel stop (den (pi1 B (urelspinj _#4 hxy))) (den (pi1 B (urelspinj _#4 hxy)))) (subst (dot (ppi2 (var 0)) (dot (ppi1 (var 0)) (dot x (compose s sh1)))) c) C
+            /\ pi1 Q1 (urelspinj _#4 hxy) = iuquotient stop (pi1 B (urelspinj _#4 hxy)) C hs' ht') as Hatoc.
   {
-  clear m n Hseqmn Hm Hn Hmn.
-  intros m n Hmn.
-  so (urel_closed _#5 Hmn) as (Hclm & Hcln').
-  exists (subst s' n).
-  exists (subst s m).
-  exists (lam triv).
-  exists (lam triv).
-  so (Hseqa _#3 Hs) as (A' & Hal' & _ & Hmet).
-  so (basic_fun _#7 Hal Hal').
-  subst A'.
-  clear Hal'.
-  assert (rel (den (iuarrow stop i Dom A)) i (subst s m) (subst s m)) as Hml.
+  intros j x y Hxy.
+  so (basic_member_index _#9 Hal Hxy) as Hj.
+  so (urel_closed _#5 Hxy) as (Hclx & Hcly).
+  exploit (extract_functional toppg j (prod_urel stop (den (pi1 B (urelspinj _#4 Hxy))) (den (pi1 B (urelspinj _#4 Hxy)))) (subst (dot (ppi2 (var 0)) (dot (ppi1 (var 0)) (dot x (compose s sh1)))) c) (subst (dot (ppi2 (var 0)) (dot (ppi1 (var 0)) (dot y (compose s' sh1)))) c)) as (C & Hcl & _).
     {
-    cbn in Hmn |- *.
-    decompose Hmn.
-    intros l l' _ _ _ Hsteps Hsteps' Hact.
-    exists l, l.
-    do2 5 split; auto.
-    intros j p q Hj Hpq.
-    so (urel_closed _#5 Hpq) as (Hclp & Hclq).
-    so (Hact _#3 Hj Hpq) as H.
-    cbn in H.
-    decompose H.
-    intros r t hrel hrel' Hl Hr _.
-    (* Right here is the interesting part. *)
-    exploit (Hmet j (subst1 p l) t) as (Hll & _); auto.
-    refine (urel_equiv _#7 _ _ (equiv_refl _ _) _ Hll).
-      {
-      so (steps_hygiene _#4 Hsteps Hclm) as H.
-      so (hygiene_invert_auto _#5 H) as (Hcll & _).
-      cbn in Hcll.
-      apply hygiene_subst1; auto.
-      }
-
-      {
-      so (steps_hygiene _#4 Hsteps Hclm) as H.
-      so (hygiene_invert_auto _#5 H) as (Hcll & _).
-      cbn in Hcll.
-      apply hygiene_subst1; auto.
-      }
-    unfold subst1.
-    apply equiv_funct; auto using equiv_refl.
-    apply equivsub_dot; auto using equivsub_refl.
-    eapply Hdiagonal; eauto.
-    }
-  assert (rel (den (iuarrow stop i Dom A)) i (subst s' n) (subst s' n)) as Hnr.
-    {
-    cbn in Hmn |- *.
-    decompose Hmn.
-    intros l l' _ _ _ Hsteps Hsteps' Hact.
-    exists l', l'.
-    do2 5 split; auto.
-    intros j p q Hj Hpq.
-    so (urel_closed _#5 Hpq) as (Hclp & Hclq).
-    so (Hact _#3 Hj Hpq) as H.
-    cbn in H.
-    decompose H.
-    intros r t hrel hrel' Hl Hr _.
-    (* The interesting part, repeated. *)
-    exploit (Hmet j r (subst1 q l')) as (_ & Hrr); auto.
-    refine (urel_equiv _#7 _ _ _ (equiv_refl _ _) Hrr).
-      {
-      so (steps_hygiene _#4 Hsteps' Hcln') as H.
-      so (hygiene_invert_auto _#5 H) as (Hcll & _).
-      cbn in Hcll.
-      apply hygiene_subst1; auto.
-      }
-
-      {
-      so (steps_hygiene _#4 Hsteps' Hcln') as H.
-      so (hygiene_invert_auto _#5 H) as (Hcll & _).
-      cbn in Hcll.
-      apply hygiene_subst1; auto.
-      }
-    unfold subst1.
-    apply equiv_funct; auto using equiv_refl.
-    apply equivsub_dot; auto using equivsub_refl.
-    apply equiv_symm.
-    eapply Hdiagonal; eauto.
-    }
-  exists Hml, Hnr.
-  cbn [pi1 nearrow_compose den_ne].
-  invert Hcl.
-  intros _ _ Hactc.
-  so (Hactc _#3 (le_refl _) (prod_action_ppair stop (den (iuarrow stop i Dom A)) (den (iuarrow stop i Dom A)) i (subst s m) (subst s' n) (subst s m) (subst s' n) Hml Hnr)) as H.
-  simpsubin H.
-  eassert _ as H'; [refine (basic_equiv _#5 (pi (subst s dom) (subst (dot (app (subst (compose s' sh1) n) (var 0)) (dot (app (subst (compose s sh1) m) (var 0)) (compose s sh1))) b)) _ _ _ H) |].
-    {
-    prove_hygiene.
-    eapply hygiene_subst; eauto.
-    intros k Hk.
-    destruct k as [|[|k]]; simpsub.
-      {
-      prove_hygiene.
-      rewrite -> subst_compose.
-      apply hygiene_shift_permit; auto.
-      }
-
-      {
-      prove_hygiene.
-      rewrite -> subst_compose.
-      apply hygiene_shift_permit; auto.
-      }
-
-      {
-      apply hygiene_shift_permit; auto.
-      }
-    }
-
-    {
-    apply equiv_pi; auto using equiv_refl.
-    apply equiv_funct; auto using equiv_refl.
-    apply equivsub_dot.
-      {
-      apply equiv_app; auto using equiv_refl.
-      apply equiv_beta2.
-      }
-    apply equivsub_dot.
-      {
-      apply equiv_app; auto using equiv_refl.
-      apply equiv_beta1.
-      }
-    apply equivsub_refl.
-    }
-  clear H.
-  exploit (extract_functional toppg i (den Dom)
-             (subst (dot 
-                       (app (subst (compose s' sh1) n) (var 0))
-                       (dot 
-                          (app (subst (compose s sh1) m) (var 0))
-                          (compose s sh1))) b)
-             (subst (dot 
-                       (app (subst (compose s' sh1) n) (var 0))
-                       (dot 
-                          (app (subst (compose s sh1) m) (var 0))
-                          (compose s' sh1))) b))
-             as H.
-    {
-    exact (f_equal den (basic_impl_iutruncate _#6 Hdoml)).
+    rewrite -> ceiling_prod.
+    invert Hbl.
+    intros _ _ Hactb.
+    so (Hactb _#3 Hj Hxy) as Hl.
+    simpsubin Hl.
+    so (f_equal den (basic_impl_iutruncate _#6 Hl)) as Heq.
+    f_equal; auto.
     }
 
     {
     eapply hygiene_subst; eauto.
     intros k Hk.
-    destruct k as [|[|k]]; simpsub.
-      {
-      prove_hygiene.
-      rewrite -> subst_compose.
-      apply hygiene_shift_permit; auto.
-      }
-
-      {
-      prove_hygiene.
-      rewrite -> subst_compose.
-      apply hygiene_shift_permit; auto.
-      }
-
-      {
-      apply hygiene_shift_permit; auto.
-      }
+    destruct k as [|[|[|k]]]; simpsub; prove_hygiene.
     }
 
     {
     eapply hygiene_subst; eauto.
     intros k Hk.
-    destruct k as [|[|k]]; simpsub.
-      {
-      prove_hygiene.
-      rewrite -> subst_compose.
-      apply hygiene_shift_permit; auto.
-      }
-
-      {
-      prove_hygiene.
-      rewrite -> subst_compose.
-      apply hygiene_shift_permit; auto.
-      }
-
-      {
-      apply hygiene_shift_permit; auto.
-      }
+    destruct k as [|[|[|k]]]; simpsub; prove_hygiene.
     }
-
+  
     {
-    clear H'.
-    intros j p q Hpq.
-    so (basic_member_index _#9 Hdoml Hpq) as Hj.
+    intros k m p Hmp.
+    so (urel_closed _#5 Hmp) as (Hclm & Hclp).
+    cbn in Hmp.
+    decompose Hmp.
+    intros m1 p1 m2 p2 _ _ Hstepsm Hstepsp Hmp1 Hmp2.
+    so (Hseqc _#3 (HctxB _#13 Hs Hal Har Hbl Hbr Hxy Hmp1 Hmp2)) as (R & Hl & Hr & _).
+    exists R.
     simpsub.
-    exploit (Hextends j s s' (iutruncate (S j) A) (app (subst s m) p) (app (subst s m) q) (app (subst s' n) p) (app (subst s' n) q)) as Hs'.
+    unfold subst1.
+    rewrite -> (subst_into_closed _ _ x); auto.
+    rewrite -> (subst_into_closed _ _ y); auto.
+    split.
       {
-      eapply pwctx_downward; eauto.
-      }
-
-      {
-      eapply basic_downward; eauto.
-      }
-
-      {
-      eapply basic_downward; eauto.
-      }
-
-      {
-      split.
-        {
-        omega.
-        }
-      eapply (arrow_action_app _ j); eauto.
-      so (urel_downward_leq _#6 Hj Hml) as (l & l' & _ & Hl).
-      exists l, l'.
-      split; auto.
-      }
-
-      {
-      split.
-        {
-        omega.
-        }
-      eapply (arrow_action_app _ j); eauto.
-      so (urel_downward_leq _#6 Hj Hnr) as (l & l' & _ & Hl).
-      exists l, l'.
-      split; auto.
-      }
-    so (Hseqb _#3 Hs') as (R & Hl & Hr & _).
-    eauto.
-    }
-  destruct H as (E & Hel & Her).
-  assert (interp toppg true i 
-            (pi (subst s dom)
-               (subst (dot 
-                         (app (subst (compose s' sh1) n) (var 0))
-                         (dot (app (subst (compose s sh1) m) (var 0)) (compose s sh1))) b))
-            (iupi stop i Dom E)) as Hinterp.
-    {
-    apply interp_eval_refl.
-    apply interp_pi; auto.
-    }
-  so (basic_fun _#7 H' Hinterp) as Heq.
-  clear H'.
-  assert (rel (den (iupi stop i Dom E)) i (lam triv) (lam triv)) as Hrel.
-    {
-    clear Hinterp Heq.
-    cbn in Hmn |- *.
-    decompose Hmn.
-    intros l l' _ _ _ Hsteps Hsteps' Hact.
-    exists triv, triv.
-    do2 5 split; auto using star_refl.
-      {
-      prove_hygiene.
-      }
-
-      {
-      prove_hygiene.
-      }
-    intros j p q Hj Hpq.
-    so (urel_closed _#5 Hpq) as (Hclp & Hclq).
-    simpsub.
-    so (Hact _#3 Hj Hpq) as Hrel.
-    cbn in Hrel.
-    decompose Hrel.
-    intros r t hrel hrel' Hmpt Hrnq Hacross.
-    invert Hel.
-    intros _ _ Heact.
-    so (Heact _ _ _ Hj Hpq) as H.
-    clear Heact.
-    simpsubin H.
-    exploit (Hextends j s s' (iutruncate (S j) A) (app (subst s m) p) (app (subst s m) q) (app (subst s' n) p) (app (subst s' n) q)) as Hs'.
-      {
-      eapply pwctx_downward; eauto.
-      }
-
-      {
-      eapply basic_downward; eauto.
-      }
-
-      {
-      eapply basic_downward; eauto.
-      }
-
-      {
-      split.
-        {
-        omega.
-        }
-      eapply (arrow_action_app _ j); eauto.
-      so (urel_downward_leq _#6 Hj Hml) as (z & z' & _ & Hz).
-      exists z, z'.
-      split; auto.
-      }
-
-      {
-      split.
-        {
-        omega.
-        }
-      eapply (arrow_action_app _ j); eauto.
-      so (urel_downward_leq _#6 Hj Hnr) as (z & z' & _ & Hz).
-      exists z, z'.
-      split; auto.
-      }
-    so (Hseqb _#3 Hs') as (R & Hl & Hr & _).
-    so (basic_fun _#7 H Hl) as Heq.
-    cut (rel (den R) j triv triv).
-      {
-      intro Hrel.
-      force_exact Hrel.
-      f_equal.
-      f_equal.
-      symmetry; auto.
-      }
-    clear H Heq.
-    assert (exists x y, rel (den R) j x y) as H.
-      {
-      exists hrel, hrel'.
-      force_exact Hacross.
-      f_equal.
-      f_equal.
-      assert (rel (prod_urel stop (den A) (den A)) j (ppair (app (subst s m) p) (app (subst s' n) p)) (ppair (app (subst s m) q) (app (subst s' n) q))) as Hmpnp.
-        {
-        apply prod_action_ppair.
-          {
-          eapply (arrow_action_app _ i _ _ j); eauto.
-          change (rel (den (iuarrow stop i Dom A)) j (subst s m) (subst s m)).
-          apply (urel_downward_leq _ _ _ i); auto.
-          }
-
-          {
-          eapply (arrow_action_app _ i _ _ j); eauto.
-          change (rel (den (iuarrow stop i Dom A)) j (subst s' n) (subst s' n)).
-          apply (urel_downward_leq _ _ _ i); auto.
-          }
-        }
-      invert Hdl.
-      intros _ _ Hdact.
-      so (Hdact _#3 Hj Hmpnp) as H.
-      simpsubin H.
-      eassert _ as H'; [refine (basic_equiv _#5 (subst (dot (app (subst s' n) p) (dot (app (subst s m) p) s)) b) _ _ _ H) |].
+      apply (basic_equiv _ _ _ _ (subst (dot m2 (dot m1 (dot x s))) c)); auto.
         {
         prove_hygiene.
         }
-    
+
         {
         apply equiv_funct; auto using equiv_refl.
         apply equivsub_dot.
           {
-          apply equiv_beta2.
+          apply equiv_symm.
+          apply steps_equiv.
+          eapply star_trans.
+            {
+            apply (star_map' _ _ ppi2); eauto using step_ppi21.
+            }
+          apply star_one.
+          apply step_ppi22.
           }
         apply equivsub_dot.
           {
-          apply equiv_beta1.
+          apply equiv_symm.
+          apply steps_equiv.
+          eapply star_trans.
+            {
+            apply (star_map' _ _ ppi1); eauto using step_ppi11.
+            }
+          apply star_one.
+          apply step_ppi12.
           }
         apply equivsub_refl.
         }
-      clear H.
-      so (basic_fun _#7 Hl H').
-      subst R.
-      clear H'.
-      f_equal.
-      (* The final interesting part. *)
-      apply urelspinj_equal.
-      apply prod_action_ppair.
+      }
+
+      {
+      apply (basic_equiv _ _ _ _ (subst (dot p2 (dot p1 (dot y s'))) c)); auto.
         {
-        apply (urel_equiv_1 _#3 (app (subst s m) p)).
-          {
-          so (steps_hygiene _#4 Hsteps Hclm) as H.
-          so (hygiene_invert_auto _#5 H) as (Hcll & _).
-          cbn in Hcll.
-          apply hygiene_subst1; auto.
-          }
-
-          {
-          apply (equiv_trans _ _ (app (lam l) p)).
-            {
-            apply equiv_app; auto using equiv_refl.
-            apply steps_equiv; auto.
-            }
-
-            {
-            apply equiv_beta.
-            }
-          }
-
-          {
-          eapply (arrow_action_app _ i _ _ j); eauto.
-          change (rel (den (iuarrow stop i Dom A)) j (subst s m) (subst s m)).
-          apply (urel_downward_leq _ _ _ i); auto.
-          }
+        prove_hygiene.
         }
 
         {
-        apply (urel_equiv_2 _#4 (subst1 q l')).
-          {
-          prove_hygiene.
-          }
-
+        apply equiv_funct; auto using equiv_refl.
+        apply equivsub_dot.
           {
           apply equiv_symm.
-          apply (equiv_trans _ _ (app (lam l') q)).
+          apply steps_equiv.
+          eapply star_trans.
             {
-            apply equiv_app; auto using equiv_refl.
-            apply steps_equiv; auto.
+            apply (star_map' _ _ ppi2); eauto using step_ppi21.
             }
-
-            {
-            apply equiv_beta.
-            }
+          apply star_one.
+          apply step_ppi22.
           }
-
+        apply equivsub_dot.
           {
-          exact Hrnq.
+          apply equiv_symm.
+          apply steps_equiv.
+          eapply star_trans.
+            {
+            apply (star_map' _ _ ppi1); eauto using step_ppi11.
+            }
+          apply star_one.
+          apply step_ppi12.
           }
+        apply equivsub_refl.
         }
       }
-    destruct H as (x & y & Hxy).
-    assert (pwctx j 
-              (dot x (dot (app (subst s' n) p) (dot (app (subst s m) p) s)))
-              (dot y (dot (app (subst s' n) q) (dot (app (subst s m) q) s')))
-              (hyp_tm b :: hyp_tm (subst sh1 a) :: hyp_tm a :: G)) as Hs''.
-      {
-      apply pwctx_cons_tm_seq; auto.
-        {
-        apply (seqhyp_tm _#5 R); auto.
-        }
-
-        {
-        intros k u u' Hu.
-        so (Hseqb _#3 Hu) as (Q & Hql & Hqr & _).
-        eauto.
-        }
-      }
-    so (Hseqtriv _#3 Hs'') as (R' & Hl' & _ & Hrtriv & _).
-    simpsubin Hl'.
-    so (basic_fun _#7 Hl Hl').
-    subst R'.
-    clear Hl'.
-    simpsubin Hrtriv.
-    exact Hrtriv.
     }
-  rewrite <- Heq in Hrel.
-  exact Hrel.
+  exists C.
+  invert Hq1l.
+  intros _ _ Hact.
+  so (Hact _#3 Hj Hxy) as Hq1xl.
+  simpsubin Hq1xl.
+  cbn [Nat.add] in Hq1xl.
+  invert (basic_value_inv _#6 value_quotient Hq1xl).
+  intros B' C' hs'' ht'' Hbxl Hcxl Heq.
+  invert Hbl.
+  intros _ _ Hbact.
+  so (Hbact _#3 Hj Hxy) as Hbxl'.
+  simpsubin Hbxl'.
+  so (basic_fun _#7 Hbxl Hbxl').
+  subst B'.
+  clear Hbxl'.
+  simpsubin Hcxl.
+  rewrite -> (subst_into_closed _ _ x) in Hcxl; auto.
+  so (functional_fun _#8 Hcl Hcxl).
+  subst C'.
+  exists hs'', ht''.
+  split; auto.
   }
-do2 2 split.
+intros m n Hmn.
+so (urel_closed _#5 Hmn) as (Hclsm & Hclsn).
+cbn in Hmn.
+decompose Hmn.
+intros l l' _ _ _ Hsteps Hsteps' Hactmn.
+so (hygiene_invert_auto _#5 (steps_hygiene _#4 Hsteps Hclsm)) as H; cbn in H.
+destruct H as (Hcll & _).
+so (hygiene_invert_auto _#5 (steps_hygiene _#4 Hsteps' Hclsn)) as H; cbn in H.
+destruct H as (Hcll' & _).
+assert (rel (den (iupi stop i A B)) i (subst s m) (subst s m)) as Hm.
   {
-  apply Hprop; auto.
+  cbn.
+  exists l, l.
+  do2 5 split; auto.
+  intros j x y Hj Hxy.
+  so (urel_closed _#5 Hxy) as (Hclx & Hcly).
+  so (Hatoc _#3 Hxy) as (C & hs'' & ht'' & Hcxl & Heq).
+  so (Hactmn _#3 Hj Hxy) as Hlxy.
+  assert (rel (den (iuquotient stop (pi1 B (urelspinj _#4 Hxy)) C hs'' ht'')) j (subst1 x l) (subst1 y l')) as Hlxy'.
+    {
+    force_exact Hlxy.
+    f_equal.
+    f_equal.
+    exact Heq.
+    }
+  clear Hlxy.
+  rename Hlxy' into Hlxy.
+  cbn in Hlxy.
+  decompose Hlxy.
+  intros m3 p3 u v Hm Hn Huv.
+  so (Hdiagonal _#3 Hxy) as Hequivxy.
+  so (Hseqb _#3 (HctxA _#7 Hs Hal Har Hxy)) as (B' & Hl & _ & Hmetb).
+  invert Hbl.
+  intros _ _ Hactb.
+  so (Hactb _#3 Hj Hxy) as Hl'.
+  simpsubin Hl'.
+  so (basic_fun _#7 Hl Hl').
+  subst B'.
+  clear Hl Hl'.
+  so (Hmetb _#3 (le_refl _) Hm) as (H & _).
+  apply (urel_equiv_2 _#4 (subst1 x l)).
+    {
+    apply hygiene_subst1; auto.
+    }
+
+    {
+    unfold subst1.
+    apply equiv_funct1; auto using equiv_refl.
+    }
+  exact H.
+  }
+assert (rel (den (iupi stop i A B)) i (subst s' n) (subst s' n)) as Hn.
+  {
+  clear Hm.
+  cbn.
+  exists l', l'.
+  do2 5 split; auto.
+  intros j x y Hj Hxy.
+  so (urel_closed _#5 Hxy) as (Hclx & Hcly).
+  so (Hatoc _#3 Hxy) as (C & hs'' & ht'' & Hcxl & Heq).
+  so (Hactmn _#3 Hj Hxy) as Hlxy.
+  assert (rel (den (iuquotient stop (pi1 B (urelspinj _#4 Hxy)) C hs'' ht'')) j (subst1 x l) (subst1 y l')) as Hlxy'.
+    {
+    force_exact Hlxy.
+    f_equal.
+    f_equal.
+    exact Heq.
+    }
+  clear Hlxy.
+  rename Hlxy' into Hlxy.
+  cbn in Hlxy.
+  decompose Hlxy.
+  intros m3 p3 u v Hm Hn Huv.
+  so (Hdiagonal _#3 Hxy) as Hequivxy.
+  so (Hseqb _#3 (HctxA _#7 Hs Hal Har Hxy)) as (B' & Hl & _ & Hmetb).
+  invert Hbl.
+  intros _ _ Hactb.
+  so (Hactb _#3 Hj Hxy) as Hl'.
+  simpsubin Hl'.
+  so (basic_fun _#7 Hl Hl').
+  subst B'.
+  clear Hl Hl'.
+  so (Hmetb _#3 (le_refl _) Hn) as (_ & H).
+  apply (urel_equiv_1 _#3 (subst1 y l')).
+    {
+    apply hygiene_subst1; auto.
+    }
+
+    {
+    unfold subst1.
+    apply equiv_funct1; auto using equiv_refl, equiv_symm.
+    }
+  exact H.
+  }
+exists (subst s' n), (subst s m), (lam triv), (lam triv).
+exists Hm, Hn.
+cbn.
+invert Hacl.
+intros _ _ Hactac.
+so (Hactac _#3 (le_refl _) (prod_action_ppair stop (den (iupi stop i A B)) (den (iupi stop i A B)) i _ _ _ _ Hm Hn)) as Hacml.
+simpsubin Hacml.
+invert (basic_value_inv _#6 value_pi Hacml).
+clear Hactac Hacml.
+intros A' C Hal' Hcl Heq.
+so (basic_fun _#7 Hal Hal').
+subst A'.
+clear Hal'.
+cut (rel (den (iupi stop i A C)) i (lam triv) (lam triv)).
+  {
+  intro H.
+  force_exact H.
+  f_equal.
+  f_equal.
+  exact Heq.
+  }
+clear Heq.
+exists triv, triv.
+do2 5 split; auto using star_refl; try prove_hygiene.
+intros j x y Hj Hxy.
+so (urel_closed _#5 Hxy) as (Hclx & Hcly).
+simpsub.
+invert Hcl.
+intros _ _ Hactc.
+so (Hactc _#3 Hj Hxy) as Hcmxl.
+clear Hactc.
+simpsubin Hcmxl.
+eassert _ as Hcmxl'; [refine (basic_equiv _#5 (subst (dot (subst1 x l') (dot (subst1 x l) (dot x s))) c) _ _ _ Hcmxl)|].
+  {
+  eapply hygiene_subst; eauto.
+  intros k Hk.
+  destruct k as [|[|[|k]]]; simpsub; auto.
+    {
+    apply hygiene_subst1; auto.
+    }
+
+    {
+    apply hygiene_subst1; auto.
+    }
   }
 
   {
-  apply Hprop; auto.
+  apply equiv_funct; auto using equiv_refl.
+  apply equivsub_dot.
+    {
+    eapply equiv_trans.
+      {
+      apply equiv_app.
+        {
+        eapply equiv_trans.
+          {
+          apply equiv_beta2.
+          }
+        apply steps_equiv; eauto.
+        }
+      apply equiv_refl.
+      }
+    eapply equiv_beta.
+    }
+  apply equivsub_dot.
+    {
+    eapply equiv_trans.
+      {
+      apply equiv_app.
+        {
+        eapply equiv_trans.
+          {
+          apply equiv_beta1.
+          }
+        apply steps_equiv; eauto.
+        }
+      apply equiv_refl.
+      }
+    eapply equiv_beta.
+    }
+  apply equivsub_refl.
+  }
+clear Hcmxl.
+rename Hcmxl' into Hcmxl.
+assert (rel (den (pi1 B (urelspinj _#4 Hxy))) j (subst1 x l) (subst1 y l)) as Hxyl.
+  {
+  cbn in Hm.
+  decompose Hm.
+  intros l'' l''' _ _ _ Hsteps'' Hsteps''' Hact.
+  so (equiv_value _ _ _ value_lam value_lam (equiv_trans _#4 (equiv_symm _#3 (steps_equiv _#3 Hsteps)) (steps_equiv _#3 Hsteps''))) as H.
+  invertc H.
+  intros H _.
+  invertc H.
+  intros Hequiv _.
+  so (equiv_value _ _ _ value_lam value_lam (equiv_trans _#4 (equiv_symm _#3 (steps_equiv _#3 Hsteps)) (steps_equiv _#3 Hsteps'''))) as H.
+  invertc H.
+  intros H _.
+  invertc H.
+  intros Hequiv' _.
+  apply (urel_equiv _#3 (subst1 x l'') _ (subst1 y l''')).
+    {
+    apply hygiene_subst1; auto.
+    }
+
+    {
+    apply hygiene_subst1; auto.
+    }
+
+    {
+    apply equiv_subst1.
+    apply equiv_symm; auto.
+    }
+
+    {
+    apply equiv_subst1.
+    apply equiv_symm; auto.
+    }
+  apply Hact; auto.
+  }
+assert (rel (den (pi1 B (urelspinj _#4 Hxy))) j (subst1 x l') (subst1 y l')) as Hxyl'.
+  {
+  cbn in Hn.
+  decompose Hn.
+  intros l'' l''' _ _ _ Hsteps'' Hsteps''' Hact.
+  so (equiv_value _ _ _ value_lam value_lam (equiv_trans _#4 (equiv_symm _#3 (steps_equiv _#3 Hsteps')) (steps_equiv _#3 Hsteps''))) as H.
+  invertc H.
+  intros H _.
+  invertc H.
+  intros Hequiv _.
+  so (equiv_value _ _ _ value_lam value_lam (equiv_trans _#4 (equiv_symm _#3 (steps_equiv _#3 Hsteps')) (steps_equiv _#3 Hsteps'''))) as H.
+  invertc H.
+  intros H _.
+  invertc H.
+  intros Hequiv' _.
+  apply (urel_equiv _#3 (subst1 x l'') _ (subst1 y l''')).
+    {
+    apply hygiene_subst1; auto.
+    }
+
+    {
+    apply hygiene_subst1; auto.
+    }
+
+    {
+    apply equiv_subst1.
+    apply equiv_symm; auto.
+    }
+
+    {
+    apply equiv_subst1.
+    apply equiv_symm; auto.
+    }
+  apply Hact; auto.
+  }
+so (Hseqc _#3 (HctxB _#13 Hs Hal Har Hbl Hbr Hxy Hxyl Hxyl')) as (Cmx & Hcmxl' & Hcmxr & _).
+so (basic_fun _#7 Hcmxl Hcmxl').
+clear Hcmxl'.
+subst Cmx.
+cut (exists u v, rel (den (pi1 C (urelspinj _#4 Hxy))) j u v).
+  {
+  intros (u & v & Huv).
+  so (Hseqtriv _#3 (HctxC _#16 Hs Hal Har Hbl Hbr Hxy Hxyl Hxyl' Hcmxl Hcmxr Huv)) as (Cmx & Hcmxl' & _ & Htriv & _).
+  simpsubin Hcmxl'.
+  so (basic_fun _#7 Hcmxl Hcmxl').
+  clear Hcmxl'.
+  subst Cmx.
+  simpsubin Htriv.
+  exact Htriv.
+  }
+so (Hactmn _#3 Hj Hxy) as Hxyll.
+so (Hatoc _#3 Hxy) as (Cx & hs' & ht' & Hcxl & Heq).
+assert (rel (den (iuquotient stop (pi1 B (urelspinj _#4 Hxy)) Cx hs' ht')) j (subst1 x l) (subst1 y l')) as Hxyll'.
+  {
+  force_exact Hxyll.
+  f_equal.
+  f_equal.
+  exact Heq.
+  }
+clear Hxyll.
+rename Hxyll' into Hxyll.
+clear Heq.
+cbn in Hxyll.
+decompose Hxyll.
+intros m3 n3 u v Hm3 Hn3 Huv.
+exists u, v.
+invert Hcxl.
+intros _ _ Hact.
+so (Hact _#3 (le_refl _) (prod_action_ppair stop (den (pi1 B (urelspinj (den A) j x y Hxy))) (den (pi1 B (urelspinj (den A) j x y Hxy))) j (subst1 x l) (subst1 x l') (subst1 y l) (subst1 y l') Hxyl Hxyl')) as Hcmxl'.
+simpsubin Hcmxl'.
+eassert _ as Hcmxl''; [refine (basic_equiv _#5 (subst (dot (subst1 x l') (dot (subst1 x l) (dot x s))) c) _ _ _ Hcmxl')|].
+  {
+  eapply hygiene_subst; eauto.
+  intros k Hk.
+  destruct k as [|[|[|k]]]; simpsub; auto.
+    {
+    apply hygiene_subst1; auto.
+    }
+
+    {
+    apply hygiene_subst1; auto.
+    }
   }
 
   {
-  apply Hprop; auto.
+  apply equiv_funct; auto using equiv_refl.
+  apply equivsub_dot.
+    {
+    apply equiv_beta2.
+    }
+  apply equivsub_dot.
+    {
+    apply equiv_beta1.
+    }
+  rewrite -> (subst_into_closed _ _ x); auto.
+  apply equivsub_refl.
   }
+so (basic_fun _#7 Hcmxl Hcmxl'') as Heq.
+clear Hcmxl' Hcmxl''.
+rewrite -> Heq.
+clear Heq.
+force_exact Huv.
+f_equal.
+f_equal.
+f_equal.
+apply urelspinj_equal.
+apply prod_action_ppair; auto.
 Qed.

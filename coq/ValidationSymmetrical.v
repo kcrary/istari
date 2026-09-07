@@ -417,27 +417,73 @@ apply (tr_pi_elim' _ a (subst sh1 b)); auto.
 Qed.
 
 
-Hint Rewrite def_pi def_arrow def_eq def_sequal : prepare.
+Lemma tr_quotient_formation_refl :
+  forall G a b ms mt,
+    tr G (deqtype a a)
+    -> tr (hyp_tm (subst sh1 a) :: hyp_tm a :: G) (deqtype b b)
+    -> tr (hyp_tm b ::
+           hyp_tm (subst sh1 a) ::
+           hyp_tm a :: 
+           G) 
+         (deq ms ms (subst (dot (var 2) (dot (var 1) (sh 3))) b))
+    -> tr (hyp_tm (subst (dot (var 1) (dot (var 2) (sh 4))) b) :: 
+           hyp_tm (subst sh1 b) ::
+           hyp_tm (subst (sh 2) a) :: 
+           hyp_tm (subst sh1 a) :: 
+           hyp_tm a :: 
+           G)
+         (deq mt mt (subst (dot (var 2) (dot (var 4) (sh 5))) b))
+    -> tr G (deqtype (quotient a b) (quotient a b)).
+Proof.
+intros G a b ms mt Ha Hb Hsymm Htrans.
+apply (tr_quotient_formation _#5 (var 0) (var 0) ms mt); auto.
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+
+  {
+  eapply hypothesis; eauto using index_0.
+  }
+Qed.
 
 
-Lemma arrowQuotientCommute_valid : arrowQuotientCommute_obligation.
+Hint Rewrite def_pi def_eq def_sequal : prepare.
+
+
+Lemma forallQuotientCommute_valid : forallQuotientCommute_obligation.
 Proof.
 prepare.
 unfold Defs.triv.
-intros G a b c m n ext9 ext8 ext7 ms mt ext4 ext1 ext0 Ha Hb Hc Hsymm Htrans Htriv Helem Hmn.
-assert (tr G (deq m n (quotient 
-                         (tarrow a b)
-                           (pi (subst (sh 2) a) (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (sh 3))) c))))) as Hmn'.
+intros G a b c m n ext7 ext6 ext5 ms mt ext2 ext1 ext0 Ha Hb Hc Hsymm Htrans Htriv Helem Hmn.
+assert (tr G (deqtype a a)) as Hwfa.
   {
-  apply (tr_arrow_quotient_commute G a b c m n ms mt); auto.
+  apply tr_symmetrical_formation_invert; auto.
+  eapply tr_inhabitation_formation; eauto.
+  }
+assert (tr (hyp_tm a :: G) (deqtype b b)) as Hwfb.
+  {
+  apply tr_symmetrical_formation_invert; auto.
+  eapply tr_inhabitation_formation; eauto.
+  }
+apply tr_pi_quotient_commute; auto.
+  {
+  eapply tr_symmetrical_eta2; eauto.
+  }
+
+  {
+  eapply tr_symmetrical_eta2; eauto.
+  }
+
+  {
+  apply (tr_quotient_formation _#5 (var 0) (var 0) ms mt); auto.
     {
-    eapply tr_symmetrical_eta2; eauto.
+    eapply hypothesis; eauto using index_0.
     }
 
     {
-    eapply tr_symmetrical_eta2; eauto.
+    eapply hypothesis; eauto using index_0.
     }
-
+    
     {
     force_exact Htrans.
     f_equal.
@@ -446,59 +492,489 @@ assert (tr G (deq m n (quotient
     apply eqsub_dotv.
     apply eqsub_expand_sh.
     }
+  }
+
+  {
+  apply (tr_quotient_formation_refl _#3
+           (lam (subst (dot (app (var 1) (var 0))
+                          (dot (app (var 2) (var 0))
+                             (dot (app (var 3) (var 0))
+                                (dot (var 0) (sh 4))))) ms))
+           (lam (subst (dot (app (var 1) (var 0))
+                          (dot (app (var 2) (var 0))
+                             (dot (app (var 3) (var 0))
+                                (dot (app (var 4) (var 0))
+                                   (dot (app (var 5) (var 0))
+                                      (dot (var 0) (sh 6))))))) mt))).
+    {
+    apply tr_pi_formation; auto.
+    }
 
     {
-    eapply tr_sequal_eta2; eauto.
-    }
-  eapply tr_eqtype_convert; eauto.
-    {
-    apply tr_eqtype_symmetry.
-    apply tr_tarrow_pi_equal; auto.
+    apply tr_pi_formation.
       {
-      apply tr_symmetrical_formation_invert.
-      eapply tr_inhabitation_formation; eauto.
+      eapply (weakening _ [_; _] []).
+        {
+        cbn [unlift length].
+        simpsub.
+        auto.
+        }
+
+        {
+        cbn [unlift length].
+        simpsub.
+        auto.
+        }
+      cbn [unlift length].
+      simpsub.
+      exact Hwfa.
       }
-    eapply (tr_quotient_formation G b b c c (var 0) (var 0) ms mt); auto.
+    unfold deqtype.
+    exploit (translate3 G [hyp_tm (subst (sh 2) a); hyp_tm (subst sh1 (pi a b)); hyp_tm (pi a b)] 3
+               a (var 0) (var 0)
+               b (app (var 2) (var 0)) (app (var 2) (var 0))
+               (subst sh1 b) (app (var 1) (var 0)) (app (var 1) (var 0))
+               (eqtype c c) triv triv) as H; auto.
       {
-      apply tr_symmetrical_formation_invert.
-      eapply tr_inhabitation_formation; eauto.
+      eapply (weakening _ [_] []).
+        {
+        simpsub.
+        auto.
+        }
+
+        {
+        cbn [length].
+        simpsub.
+        auto.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      exact Hwfb.
+      }
+
+      {
+      cbn [List.app].
+      eapply hypothesis; eauto using index_S, index_0.
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [List.app].
+      eapply tr_pi_elim'.
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        auto.
+        }
+
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        auto.
+        }
+      simpsub.
+      auto.
+      }
+
+      {
+      cbn [List.app].
+      eapply tr_pi_elim'.
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        auto.
+        }
+
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        auto.
+        }
+      simpsub.
+      auto.
+      }
+    }
+
+    {
+    simpsub.
+    cbn [Nat.add].
+    apply tr_pi_intro.
+      {
+      eapply (weakening _ [_; _; _] []).
+        {
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length].
+        simpsub.
+        auto.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      exact Hwfa.
+      }
+    exploit (translate4 G 
+               [hyp_tm (subst (sh 3) a);
+                hyp_tm (pi (subst (sh 2) a) (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (dot (var 0) (sh 3)))) c));
+                hyp_tm (subst sh1 (pi a b)); hyp_tm (pi a b)] 4
+               a (var 0) (var 0)
+               b (app (var 3) (var 0)) (app (var 3) (var 0))
+               (subst sh1 b) (app (var 2) (var 0)) (app (var 2) (var 0))
+               c (app (var 1) (var 0)) (app (var 1) (var 0))
+               (subst (dot (var 2) (dot (var 1) (sh 3))) c) ms ms) as H; auto.
+      {
+      eapply (weakening _ [_] []).
+        {
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length].
+        simpsub.
+        auto.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      exact Hwfb.
+      }
+  
+      {
+      cbn [List.app].
+      eapply hypothesis; eauto using index_S, index_0.
+      simpsub.
+      auto.
+      }
+  
+      {
+      cbn [List.app].
+      eapply tr_pi_elim'.
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        auto.
+        }
+  
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        auto.
+        }
+      simpsub.
+      auto.
+      }
+  
+      {
+      cbn [List.app].
+      eapply tr_pi_elim'.
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        auto.
+        }
+  
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        auto.
+        }
+      simpsub.
+      auto.
+      }
+  
+      {
+      cbn [List.app].
+      eapply tr_pi_elim'.
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        auto.
+        }
+  
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        auto.
+        }
+      simpsub.
+      auto.
+      }
+    cbn [List.app] in H.
+    simpsubin H.
+    exact H.
+    }
+
+    {
+    simpsub.
+    cbn [Nat.add].
+    apply tr_pi_intro.
+      {
+      eapply (weakening _ [_; _; _; _; _] []).
+        {
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length].
+        simpsub.
+        auto.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      exact Hwfa.
+      }
+    exploit (translate6 G
+               [hyp_tm (subst (sh 5) a);
+                hyp_tm (pi (subst (sh 4) a) (subst (dot (app (var 2) (var 0)) (dot (app (var 3) (var 0)) (dot (var 0) (sh 5)))) c));
+                hyp_tm (pi (subst (sh 3) a) (subst (dot (app (var 2) (var 0)) (dot (app (var 3) (var 0)) (dot (var 0) (sh 4)))) c));
+                hyp_tm (pi (subst (sh 2) a) (subst (dot (var 0) (sh 3)) b));
+                hyp_tm (pi (subst sh1 a) (subst (dot (var 0) (sh 2)) b));
+                hyp_tm (pi a b)] 6
+               a (var 0) (var 0)
+               b (app (var 5) (var 0)) (app (var 5) (var 0))
+               (subst sh1 b) (app (var 4) (var 0)) (app (var 4) (var 0))
+               (subst (sh 2) b) (app (var 3) (var 0)) (app (var 3) (var 0))
+               (subst sh1 c) (app (var 2) (var 0)) (app (var 2) (var 0))
+               (subst (dot (var 1) (dot (var 2) (sh 4))) c) (app (var 1) (var 0)) (app (var 1) (var 0))
+               (subst (dot (var 2) (sh 4)) c) mt mt) as H; auto.
+      {
+      eapply (weakening _ [_] []).
+        {
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length].
+        simpsub.
+        auto.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      exact Hwfb.
+      }
+  
+      {
+      eapply (weakening _ [_; _] []).
+        {
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length].
+        simpsub.
+        auto.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      exact Hwfb.
+      }
+  
+      {
+      eapply (weakening _ [_] []).
+        {
+        simpsub.
+        auto.
+        }
+  
+        {
+        cbn [length].
+        simpsub.
+        auto.
+        }
+      cbn [length].
+      simpsub.
+      cbn [List.app].
+      exact Hc.
+      }
+
+      {
+      unfold deqtype.
+      exploit (translate3 G 
+                 [hyp_tm (subst sh1 c); hyp_tm (subst (sh 2) b); hyp_tm (subst sh1 b); hyp_tm b; hyp_tm a] 5
+                 a (var 4) (var 4)
+                 b (var 2) (var 2)
+                 (subst sh1 b) (var 1) (var 1)
+                 (eqtype c c) triv triv) as H; auto.
+        {
+        eapply (weakening _ [_] []).
+          {
+          simpsub.
+          auto.
+          }
+    
+          {
+          cbn [length].
+          simpsub.
+          auto.
+          }
+        cbn [length].
+        simpsub.
+        cbn [List.app].
+        exact Hwfb.
+        }
+
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        }
+
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        setoid_rewrite <- (subst_var0_sh1 _ b) at 2.
+        simpsub.
+        auto.
+        }
+
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        setoid_rewrite <- (subst_var0_sh1 _ b) at 2.
+        simpsub.
+        auto.
+        }
+      simpsubin H.
+      force_exact H.
+      f_equal.
+      f_equal.
+      f_equal.
+        {
+        apply subst_eqsub.
+        apply eqsub_dotv.
+        apply eqsub_dotv.
+        apply eqsub_symm.
+        apply eqsub_expand_sh.
+        }
+
+        {
+        apply subst_eqsub.
+        apply eqsub_dotv.
+        apply eqsub_dotv.
+        apply eqsub_symm.
+        apply eqsub_expand_sh.
+        }
       }
 
       {
       eapply hypothesis; eauto using index_0.
+      simpsub.
+      auto.
       }
-  
+
       {
-      eapply hypothesis; eauto using index_0.
+      eapply tr_pi_elim'.
+        {
+        eapply hypothesis; eauto 6 using index_S, index_0.
+        simpsub.
+        cbn [Nat.add].
+        auto.
+        }
+
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        cbn [Nat.add].
+        auto.
+        }
+      simpsub.
+      auto.
       }
-  
+
       {
-      force_exact Htrans.
-      f_equal.
-      f_equal.
-      apply subst_eqsub.
-      apply eqsub_dotv.
-      apply eqsub_expand_sh.
+      eapply tr_pi_elim'.
+        {
+        eapply hypothesis; eauto 6 using index_S, index_0.
+        simpsub.
+        cbn [Nat.add].
+        auto.
+        }
+
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        cbn [Nat.add].
+        auto.
+        }
+      simpsub.
+      auto.
       }
+
+      {
+      eapply tr_pi_elim'.
+        {
+        eapply hypothesis; eauto 6 using index_S, index_0.
+        simpsub.
+        cbn [Nat.add].
+        auto.
+        }
+
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        cbn [Nat.add].
+        auto.
+        }
+      simpsub.
+      auto.
+      }
+
+      {
+      eapply tr_pi_elim'.
+        {
+        eapply hypothesis; eauto 6 using index_S, index_0.
+        simpsub.
+        cbn [Nat.add].
+        auto.
+        }
+
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        cbn [Nat.add].
+        auto.
+        }
+      simpsub.
+      auto.
+      }
+
+      {
+      eapply tr_pi_elim'.
+        {
+        eapply hypothesis; eauto 6 using index_S, index_0.
+        simpsub.
+        cbn [Nat.add].
+        auto.
+        }
+
+        {
+        eapply hypothesis; eauto using index_S, index_0.
+        simpsub.
+        cbn [Nat.add].
+        auto.
+        }
+      simpsub.
+      auto.
+      }
+    simpsubin H.
+    cbn [List.app] in H.
+    exact H.
     }
   }
-apply (tr_eqtype_convert _#3 (quotient (tarrow a b) (pi (subst (sh 2) a) (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (sh 3))) c)))); auto.
-apply tr_quotient_equal_left.
-  {
-  apply tr_tarrow_pi_equal; auto.
-    {
-    apply tr_symmetrical_formation_invert.
-    eapply tr_inhabitation_formation; eauto.
-    }
-
-    {
-    apply tr_symmetrical_formation_invert.
-    eapply tr_inhabitation_formation; eauto.
-    }
-  }
 
   {
-  eapply tr_inhabitation_formation; eauto.
+  apply (tr_sequal_eta2 _ ext1 ext1).
+  exact Helem.
   }
 Qed.
 

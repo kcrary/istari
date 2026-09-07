@@ -198,15 +198,27 @@ stable.
 
 This theorem cannot be proven using the usual quotient rules; it
 requires a semantic analysis that is realized by the rule
-`arrowQuotientCommute`.
+`forallQuotientCommute`.
 
     symmetrical : intersect (i : level) . U i -> U i
+
+    forall_nat_quotient_commute_conv : forall
+                                          (i : level)
+                                          (B : nat -> U i)
+                                          (R : forall (x : nat) . B x -> B x -> U i) .
+                                          (forall (x : nat) . PER (B x) (R x))
+                                          -> (forall (x : nat) . symmetrical (B x))
+                                          -> (forall (x : nat) (y z : B x) .
+                                                Sqstable.sqstable (R x y z))
+                                          -> (forall (x : nat) . quotient (y z : B x) . R x y z)
+                                               <: (quotient (f g : forall (x : nat) . B x) .
+                                                     (forall (x : nat) . R x (f x) (g x)))
 
     nat_arrow_quotient_commute_conv : forall (i : level) (B : U i) (R : B -> B -> U i) .
                                          PER B R
                                          -> symmetrical B
-                                         -> (forall (x y : B) . Sqstable.sqstable (R x y))
-                                         -> (nat -> quotient (x y : B) . R x y)
+                                         -> (forall (y z : B) . Sqstable.sqstable (R y z))
+                                         -> (nat -> quotient (y z : B) . R y z)
                                               <: (quotient (f g : nat -> B) .
                                                     (forall (x : nat) . R (f x) (g x)))
 

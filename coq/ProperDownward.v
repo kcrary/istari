@@ -1226,3 +1226,26 @@ rewrite -> Heq in Hrel.
 destruct Hrel as (H & _).
 omega.
 Qed.
+
+
+Lemma functional_member_index :
+  forall system pg s i A b B (X : car (urelsp A)) j m n,
+    A = ceiling (S i) A
+    -> functional system pg s i A b B
+    -> rel (den (pi1 B X)) j m n
+    -> j <= i.
+Proof.
+intros system pg s i A b B X j m n HeqA Hb Hmn.
+so (functional_downward _#8 (le_refl _) Hb) as Hb'.
+so (functional_fun_dep _#9 HeqA Hb Hb') as HeqB.
+so (eq_dep_pi1 _#7 HeqB) as HeqB1.
+so (eq_impl_eq_dep (urel (Candidate.obj stop)) (fun z => car (urelsp z)) _ _ X (transport HeqA (fun z => car (urelsp z)) X) HeqA (eq_refl _)) as HeqX.
+so (eq_dep_app _#9 HeqB1 HeqX) as HeqB1app.
+so (eq_dep_impl_eq_snd_free _#6 HeqB1app) as Heq.
+cbn in Heq.
+cbn in Hmn.
+rewrite -> Heq in Hmn.
+cbn in Hmn.
+destruct Hmn as (H & _).
+omega.
+Qed.

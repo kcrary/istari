@@ -52,7 +52,7 @@
   `boolIntro2Eq`, `futureArrowIntroOf`, `futureArrowIntroEq`, and
   `futureArrowIntro`.
 
-- Added the `symmetrical` property, and the rule `arrowQuotientCommute`.
+- Added the `symmetrical` property, and the rule `forallQuotientCommute`.
 
 - Reworked the integer primitives and axioms.
 

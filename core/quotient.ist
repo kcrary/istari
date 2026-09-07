@@ -756,73 +756,75 @@ qed ();
    domain is elemental, and elemental-ness is not negatable.
 *)
 
-lemma "nat_arrow_quotient_commute_conv"
+lemma "forall_nat_quotient_commute_conv"
 /
-  forall i (B : U i) (R : B -> B -> U i) .
-    PER B R
-    -> symmetrical B
-    -> (forall (x y : B) . Sqstable.sqstable (R x y))
-    -> (nat -> quotient (x y : B) . R x y)
+  forall i (B : nat -> U i) (R : forall (x : nat) . B x -> B x -> U i) .
+    (forall (x : nat) . PER (B x) (R x))
+    -> (forall (x : nat) . symmetrical (B x))
+    -> (forall (x : nat) (y z : B x) . Sqstable.sqstable (R x y z))
+    -> (forall (x : nat) . quotient (y z : B x) . R x y z)
        <:
-       (quotient (f g : nat -> B) . forall (x : nat) . R (f x) (g x))
+       (quotient (f g : forall (x : nat) . B x) . forall (x : nat) . R x (f x) (g x))
 /;
 
 inference.
-set /dom/ /nat/.
-fold /dom at all/.
-intro /i B R Hper Hmet Hstable/.
-assert /dom : U i/ /Hofdom/.
+set /A/ /nat/.
+fold /A at all/.
+intro /i/.
+assert /A : U i/ /Hofdom/.
   {
-  unfold /dom/.
+  unfold /A/.
   typecheck.
   }
-assert /symmetrical dom/ /Hmetdom/.
+intro /B R Hper Hmet Hstable/.
+assert /symmetrical A/ /HmetA/.
   {
-  unfold /dom/.
+  unfold /A/.
   apply /nat_symmetrical/.
   }
-assert /forall (x y : dom) . x = y : dom -> SyntacticEquality.sequal x y/ /Helemental/.
+assert /forall (x y : A) . x = y : A -> SyntacticEquality.sequal x y/ /Helemental/.
   {
-  unfold /dom at all/.
+  unfold /A at all/.
   intro /x y/.
   apply /SyntacticEquality.nat_elemental/ >> auto.
   }
-so /Hper/ /Hsymm Htrans/.
-assert /PER B (fn x y . { R x y })/ /Hpersq/.
+assert /forall (x : A) . PER (B x) (fn y z . { R x y z })/ /Hpersq/.
   {
+  intro /x/.
+  so /Hper x/ /Hsymm Htrans/.
   unfold /PER/.
   split.
     {
     reduce //.
-    intro /x y [Hxy]/.
+    intro /y z [Hyz]/.
     split.
     apply /Hsymm/ >> auto.
     }
 
     {
     reduce //.
-    intro /x y z [Hxy] [Hyz]/.
+    intro /y z w [Hyz] [Hzw]/.
     split.
     apply /Htrans/ >> auto.
     }
   }
-assert /PER (dom -> B) (fn f g . forall (x : dom) . R (f x) (g x))/ /Hperarr/.
+assert /PER (forall (x : A) . B x) (fn f g . forall (x : A) . R x (f x) (g x))/ /Hperarr/.
   {
   unfold /PER/.
   split.
     {
     reduce //.
     intro /f g Hfg x/.
-    apply /Hsymm/ >> auto.
+    apply /Hper x #1/ >> auto.
     }
 
     {
     reduce //.
     intro /f g h Hfg Hgh x/.
-    apply /Htrans/ >> auto.
+    apply /Hper x #2/ >> auto.
     }
   }
-assert /PER (dom -> B) (fn f g . forall (x : dom) . { R (f x) (g x) })/ /Hpersqarr/.
+assert /PER (forall (x : A) . B x) (fn f g . forall (x : A) . { R x (f x) (g x) })/ /Hpersqarr/.
   {
   unfold /PER/.
   split.
@@ -831,7 +833,7 @@ assert /PER (dom -> B) (fn f g . forall (x : dom) . { R (f x) (g x) })/ /Hpersqa
     intro /f g Hfg x/.
     so /Hfg x/ /[H]/.
     split.
-    apply /Hsymm/ >> auto.
+    apply /Hper x #1/ >> auto.
     }
 
     {
@@ -840,13 +842,13 @@ assert /PER (dom -> B) (fn f g . forall (x : dom) . { R (f x) (g x) })/ /Hpersqa
     so /Hfg x/ /[Hfg']/.
     so /Hgh x/ /[Hgh']/.
     split.
-    apply /Htrans/ >> auto.
+    apply /Hper x #2/ >> auto.
     }
   }
-fold /quotient1 B R Hper/.
-fold /quotient1 (dom -> B) (fn f g . forall (x : dom) . R (f x) (g x)) Hperarr/.
+fold /quotient1 (B x) (R x) (Hper x) within x/.
+fold /quotient1 (forall (x : A) . B x) (fn f g . forall (x : A) . R x (f x) (g x)) Hperarr/.
 intro /h/.
-eqtp /quotient1 (dom -> B) (fn f g . forall (x : dom) . { R (f x) (g x) }) Hpersqarr/.
+eqtp /quotient1 (forall (x : A) . B x) (fn f g . forall (x : A) . { R x (f x) (g x) }) Hpersqarr/.
   {
   unfold /quotient1 at 0 0/.
   typecheck.
@@ -871,7 +873,7 @@ eqtp /quotient1 (dom -> B) (fn f g . forall (x : dom) . { R (f x) (g x) }) Hpers
     intro /x/.
     so /Hfg x/ /[Hfg']/.
     split.
-    apply /Hsymm/ >> auto.
+    apply /Hper x #1/ >> auto.
     }
 
     {
@@ -881,46 +883,65 @@ eqtp /quotient1 (dom -> B) (fn f g . forall (x : dom) . { R (f x) (g x) }) Hpers
     so /Hfg x/ /[Hfg']/.
     so /Hgk x/ /[Hgk']/.
     split.
-    apply /Htrans _ (g x)/ >> auto.
+    apply /Hper x #2 _ (g x)/ >> auto.
     }
   }
 unfold /quotient1/.
 reduce //.
 unfold /of/.
-RuleTactic.arrowQuotientCommute (parseCurr /additional` x y . { R x y }/) >> auto.
+RuleTactic.forallQuotientCommute (parseCurr /additional` x y z . { R x y z }/) >> auto.
   {
-  reintro /x y Hxy/.
-  destruct /Hxy/ /[Hxy]/.
+  reintro /x y z Hyz/.
+  destruct /Hyz/ /[Hyz]/.
   split.
-  apply /Hsymm/ >> auto.
+  apply /Hper x #1/ >> auto.
   }
 
   {
-  reintro /x y z Hxy Hyz/.
-  destruct /Hxy/ /[Hxy]/.
+  reintro /x y z w Hyz Hzw/.
   destruct /Hyz/ /[Hyz]/.
+  destruct /Hzw/ /[Hzw]/.
   split.
-  apply /Htrans/ >> auto.
+  apply /Hper x #2/ >> auto.
   }
 fold /of _ h/.
-fold /quotient1 B (fn x y . { R x y }) Hpersq/.
-eqtp /dom -> quotient1 B R Hper/ >> auto.
+fold /quotient1 (B x) (fn y z . { R x y z }) Hpersq within x/.
+eqtp /forall (x : A) . quotient1 (B x) (R x) (Hper x)/ >> auto.
 unfold /quotient1 at 0 0/.
 typecheck.
   {
-  reintro /_ x y Hxy/.
+  reintro /x y z Hyz/.
   squashConcl >> auto.
   }
 
   {
-  reintro /_ x y Hxy/.
-  apply /Hsymm/ >> auto.
+  reintro /x y z Hyz/.
+  apply /Hper x #1/ >> auto.
   }
 
   {
-  reintro /_ x y z Hxy Hyz/.
-  apply /Htrans/ >> auto.
+  reintro /x y z w Hyz Hzw/.
+  apply /Hper x #2/ >> auto.
   }
+qed ();
+
+
+
+lemma "nat_arrow_quotient_commute_conv"
+/
+  forall i (B : U i) (R : B -> B -> U i) .
+    PER B R
+    -> symmetrical B
+    -> (forall (y z : B) . Sqstable.sqstable (R y z))
+    -> (nat -> quotient (y z : B) . R y z)
+       <:
+       (quotient (f g : nat -> B) . forall (x : nat) . R (f x) (g x))
+/;
+
+inference.
+intro /i B R Hper Hmet Hstable/.
+unfold /arrow at 0 0/.
+apply /forall_nat_quotient_commute_conv/ >> auto.
 qed ();
 
 

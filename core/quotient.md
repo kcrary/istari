@@ -133,9 +133,11 @@ stable.
 
 This theorem cannot be proven using the usual quotient rules; it
 requires a semantic analysis that is realized by the rule
-`arrowQuotientCommute`.
+`forallQuotientCommute`.
 
     symmetrical : type:symmetrical
+
+    forall_nat_quotient_commute_conv : type:forall_nat_quotient_commute_conv
 
     nat_arrow_quotient_commute_conv : type:nat_arrow_quotient_commute_conv
 

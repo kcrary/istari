@@ -2262,31 +2262,19 @@ Inductive tr : @context obj -> judgement -> Prop :=
       tr G (deq triv triv (symmetrical a))
       -> tr G (deq triv triv (symmetrical (partial a)))
 
-| tr_arrow_quotient_commute :
-    forall G a b c m n ms mt,
+| tr_pi_quotient_commute :
+    forall G a b c m n,
       tr G (deq triv triv (symmetrical a))
-      -> tr G (deq triv triv (symmetrical b))
-      -> tr (hyp_tm (subst sh1 b) :: hyp_tm b :: G) (deqtype c c)
-      (* symmetry *)
-      -> tr (hyp_tm c ::
-              hyp_tm (subst sh1 b) ::
-              hyp_tm b :: 
-              G) 
-           (deq ms ms (subst (dot (var 2) (dot (var 1) (sh 3))) c))
-      (* transitivity *)
-      -> tr (hyp_tm (subst (dot (var 1) (dot (var 2) (sh 4))) c) :: 
-              hyp_tm (subst sh1 c) ::
-              hyp_tm (subst (sh 2) b) :: 
-              hyp_tm (subst sh1 b) :: 
-              hyp_tm b :: 
-              G)
-           (deq mt mt (subst (dot (var 2) (dot (var 4) (sh 5))) c))
-      -> tr (hyp_tm c :: hyp_tm (subst sh1 b) :: hyp_tm b :: G) (deq triv triv (subst sh1 c))
+      -> tr (hyp_tm a :: G) (deq triv triv (symmetrical b))
+      -> tr (hyp_tm (subst sh1 b) :: hyp_tm b :: hyp_tm a :: G) (deqtype c c)
+      -> tr (hyp_tm a :: G) (deqtype (quotient b c) (quotient b c))
+      -> tr G (deqtype (quotient (pi a b) (pi (subst (sh 2) a) (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (dot (var 0) (sh 3)))) c))) (quotient (pi a b) (pi (subst (sh 2) a) (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (dot (var 0) (sh 3)))) c))))
+      -> tr (hyp_tm c :: hyp_tm (subst sh1 b) :: hyp_tm b :: hyp_tm a :: G) (deq triv triv (subst sh1 c))
       -> tr (hyp_tm (equal (subst (sh 2) a) (var 1) (var 0)) :: hyp_tm (subst sh1 a) :: hyp_tm a :: G) (deq triv triv (sequal (var 2) (var 1)))
-      -> tr G (deq m n (tarrow a (quotient b c)))
-      -> tr G (deq m n (quotient (tarrow a b) 
-                          (pi (subst (sh 2) a)
-                             (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (sh 3))) c))))
+      -> tr G (deq m n (pi a (quotient b c)))
+      -> tr G (deq m n (quotient (pi a b) 
+                            (pi (subst (sh 2) a)
+                               (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (dot (var 0) (sh 3)))) c))))
 
 | tr_symmetrical_formation_invert :
     forall G a a',
