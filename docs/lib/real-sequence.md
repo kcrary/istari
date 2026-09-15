@@ -84,6 +84,33 @@ The partial sum operator turns a series into a sequence:
                     | zero . 0
                     | succ n . s n + nat_fn n)
 
+The segment sum `sums s m n` adds the elements from `s m` (inclusive)
+to `s n` (exclusive):
+
+    ssums_all : forall (s : nat -> real) (n : nat) . sums s n = ssums s n`0 n : real
+
+    ssums_split : forall (s : nat -> real) (m k n : nat) .
+                     m <n= k -> k <n= n -> ssums s m n = ssums s m k + ssums s k n : real
+
+    sums_split : forall (s : nat -> real) (m n : nat) .
+                    m <n= n -> sums s n = sums s m + ssums s m n : real
+
+    sums_difference : forall (s : nat -> real) (m n : nat) .
+                         m <n= n -> ssums s m n = sums s n - sums s m : real
+
+    ssums_empty : forall (s : nat -> real) (n : nat) . ssums s n n = 0 : real
+
+    ssums_singleton : forall (s : nat -> real) (n : nat) . ssums s n (succ n) = s n : real
+
+    ssums_left : forall (s : nat -> real) (m n : nat) .
+                    m <n n -> ssums s m n = s m + ssums s (succ m) n : real
+
+    ssums_right : forall (s : nat -> real) (m n : nat) .
+                     m <n n -> ssums s m n = s (Nat.pred n) + ssums s m (Nat.pred n) : real
+
+    ssums_right_succ : forall (s : nat -> real) (m n : nat) .
+                          m <n= n -> ssums s m (succ n) = s n + ssums s m n : real
+
 We use the word "convergent" (as opposed to "converges"), to say that
 a series converges.  (More precisely, to say that its partial sums
 converge.)  Since we do not define "convergent" formally (we just use
@@ -121,9 +148,6 @@ converges (at all) and to when it converges to a particular value.
                          -> (forall (i : nat) . n <n= i -> absr (s i) <= s' i)
                          -> cauchy (sums s)
 
-    sums_split : forall (s : nat -> real) (n i : nat) .
-                    n <n= i -> sums s i = sums s n + sums (fn j . s (j +n n)) (i -n n) : real
-
     convergent_split : forall (s : nat -> real) (n : nat) (x : real) .
                           converges (sums (fn i . s (i +n n))) x
                           -> converges (sums s) (sums s n + x)
@@ -136,3 +160,9 @@ converges (at all) and to when it converges to a particular value.
                     -> c < 1
                     -> (forall (i : nat) . n <n= i -> absr (s (succ i)) <= c * absr (s i))
                     -> cauchy (sums s)
+
+    convergent_alternation : forall (s : nat -> real) .
+                                (forall (i : nat) . 0 <= s i)
+                                -> (forall (i : nat) . s (succ i) <= s i)
+                                -> converges s 0
+                                -> cauchy (sums (fn i . RealExponent.nexpr -1 i * s i))

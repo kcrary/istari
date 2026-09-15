@@ -32,7 +32,7 @@ datatype.isto : acc.isto misc.isto nat.isto partial.isto     integer.isto
 acc.isto : 
 bool.isto : logic.isto
 decidable.isto : logic.isto bool.isto
-division.isto : logic.isto nat.isto omega.isto tuple.isto
+division.isto : bool.isto logic.isto nat.isto omega.isto tuple.isto
 eventually.isto : logic.isto misc.isto sqstable.isto
 finite.isto : logic.isto decidable.isto list.isto
 finite-map.isto : bool.isto decidable.isto function.isto kindlike.isto list.isto logic.isto option.isto permutation.isto

@@ -52,6 +52,27 @@ The partial sum operator turns a series into a sequence:
     sums : type:sums
          = def:sums
 
+The segment sum `sums s m n` adds the elements from `s m` (inclusive)
+to `s n` (exclusive):
+
+    ssums_all : type:ssums_all
+
+    ssums_split : type:ssums_split
+
+    sums_split : type:sums_split
+
+    sums_difference : type:sums_difference
+
+    ssums_empty : type:ssums_empty
+
+    ssums_singleton : type:ssums_singleton
+
+    ssums_left : type:ssums_left
+
+    ssums_right : type:ssums_right
+
+    ssums_right_succ : type:ssums_right_succ
+
 We use the word "convergent" (as opposed to "converges"), to say that
 a series converges.  (More precisely, to say that its partial sums
 converge.)  Since we do not define "convergent" formally (we just use
@@ -75,10 +96,10 @@ converges (at all) and to when it converges to a particular value.
 
     comparison_test : type:comparison_test
 
-    sums_split : type:sums_split
-
     convergent_split : type:convergent_split
 
     convergent_from_tail : type:convergent_from_tail
 
     ratio_test : type:ratio_test
+
+    convergent_alternation : type:convergent_alternation

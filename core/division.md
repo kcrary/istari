@@ -214,6 +214,16 @@ We arbitrarily set `log2 0 = 0`, so that `log2` can be defined for every natural
     log2_times_leq : type:log2_times_leq
 
 
+### Parity
+
+    is_even : type:is_even
+            = def:is_even
+
+    even_iff_parity_zero : type:even_iff_parity_zero
+
+    odd_iff_parity_one : type:odd_iff_parity_one
+
+
 ### Relation to integers
 
     div_to_integer : type:div_to_integer

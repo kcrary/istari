@@ -21,6 +21,8 @@ setArithReal ();
 beginModule "RealExponent";
 
 
+(* Natural-number exponents *)
+
 defineInd /x/
 /
   nexpr : nat -> real of
@@ -71,7 +73,43 @@ qed ();
 
 
 
-lemma "nexpr_plus"
+lemma "one_leqr_nexpr"
+/
+  forall a n .
+    1 <= a
+    -> 1 <= nexpr a n
+/;
+
+inference.
+intro /a n Ha/.
+induction /n/ >> auto.
+intro /n IH/.
+rewrite /<- timesr_id_l 1/.
+apply /timesr_leqr/ >> autoWith /leqr_0_1/.
+qed ();
+
+
+
+lemma "nexpr_leqr_one"
+/
+  forall x n .
+    0 <= x
+    -> x <= 1
+    -> nexpr x n <= 1
+/;
+
+inference.
+intro /x n Hpos Hx/.
+induction /n/ >> auto.
+intro /n IH/.
+rewrite /<- timesr_id_r 1/.
+apply /timesr_leqr/ >> auto.
+apply /nexpr_nonnegative/ >> auto.
+qed ();
+
+
+
+lemma "nexpr_plus_exponent"
 /
   forall a m n .
     nexpr a (m +n n) = nexpr a m * nexpr a n : real
@@ -91,7 +129,7 @@ qed ();
 
 
 
-lemma "nexpr_times"
+lemma "nexpr_times_exponent"
 /
   forall a m n .
     nexpr a (m *n n) = nexpr (nexpr a m) n : real
@@ -102,8 +140,31 @@ intro /a m n/.
 rewrite /-> Nat.times_commute/.
 induction /n/ >> auto.
 intro /n IH/.
-rewrite /-> nexpr_plus/.
+rewrite /-> nexpr_plus_exponent/.
 rewrite /-> IH/.
+reflexivity.
+qed ();
+
+
+
+lemma "nexpr_times_base"
+/
+  forall a b n .
+    nexpr (a * b) n = nexpr a n * nexpr b n : real
+/;
+
+inference.
+intro /a b n/.
+induction /n/.
+  {
+  calculate //.
+  auto.
+  }
+intro /n IH/.
+rewrite /-> IH/.
+rewrite /<- timesr_assoc at all/.
+rewrite /-> timesr_assoc at 1 2/.
+rewrite /-> timesr_commute at 2/.
 reflexivity.
 qed ();
 
@@ -123,6 +184,59 @@ induction /n/ >> auto.
 intro /b IH/.
 apply /timesr_leqr/ >> auto.
 apply /nexpr_nonnegative/ >> auto.
+qed ();
+
+
+
+lemma "nexpr_mono_exponent"
+/
+  forall a m n .
+    1 <= a
+    -> m <n= n
+    -> nexpr a m <= nexpr a n
+/;
+
+inference.
+intro /a m n Ha Hmn/.
+rewriteThen /n = m +n (n -n m) : nat/ omega.
+rewrite /-> nexpr_plus_exponent/.
+rewrite /<- timesr_id_r (nexpr a m)/.
+apply /timesr_leqr_l/.
+  {
+  apply /nexpr_nonnegative/.
+  apply /leqr_trans _ 1/ >> auto.
+  apply /leqr_0_1/.
+  }
+
+  {
+  apply /one_leqr_nexpr/ >> auto.
+  }
+qed ();
+
+
+
+lemma "nexpr_anti_exponent"
+/
+  forall a m n .
+    0 <= a
+    -> a <= 1
+    -> m <n= n
+    -> nexpr a n <= nexpr a m
+/;
+
+inference.
+intro /a m n Ha0 Ha1 Hmn/.
+rewriteThen /n = m +n (n -n m) : nat/ omega.
+rewrite /-> nexpr_plus_exponent/.
+rewrite /<- timesr_id_r (nexpr a m) at 1/.
+apply /timesr_leqr_l/.
+  {
+  apply /nexpr_nonnegative/ >> auto.
+  }
+
+  {
+  apply /nexpr_leqr_one/ >> auto.
+  }
 qed ();
 
 
@@ -153,23 +267,36 @@ qed ();
 
 
 
-lemma "nexpr_leqr_one"
+lemma "nexpr_one"
 /
-  forall x n .
-    0 <= x
-    -> x <= 1
-    -> nexpr x n <= 1
+  forall n .
+    nexpr 1 n = 1 : real
 /;
 
 inference.
-intro /x n Hpos Hx/.
+intro /n/.
 induction /n/ >> auto.
 intro /n IH/.
-rewrite /<- timesr_id_r 1/.
-apply /timesr_leqr/ >> auto.
-apply /nexpr_nonnegative/ >> auto.
+rewrite /-> timesr_id_l/ >> auto.
 qed ();
 
+
+
+lemma "nexpr_minus_one"
+/
+  forall n .
+    nexpr -1 n = (if Division.is_even n then 1 else -1) : real
+/;
+
+inference.
+intro /n/.
+induction /n/ >> auto.
+intro /n IH/.
+rewrite /-> IH/.
+rewrite /-> Bool.ite_notb/.
+boolCase /Division.is_even n/ /Heven/ >> calculate // >> auto.
+qed ();
+    
 
 
 lemma "nexpr_invr"
@@ -261,6 +388,657 @@ apply /timesr_leqr_zero/.
 qed ();
 
   
+
+lemma "absr_nexpr_minus_one"
+/
+  forall n .
+    absr (nexpr -1 n) = 1 : real
+/;
+
+inference.
+intro /n/.
+rewrite /-> nexpr_minus_one/.
+boolCase /Division.is_even n/ /Heven/.
+  {
+  apply /absr_one/.
+  }
+
+  {
+  apply /absr_minus_one/.
+  }
+qed ();
+
+
+
+lemma "nexpr_minus_one_squared"
+/
+  forall n .
+    nexpr -1 n * nexpr -1 n = 1 : real
+/;
+
+inference.
+intro /n/.
+rewrite /-> nexpr_minus_one at 0 0/.
+boolCase /Division.is_even n/ /Heven/ >> calculate // >> auto.
+qed ();
+
+
+
+(* Integer exponents *)
+
+define /zexpr x k/
+/
+  if z`0 <z=? k then
+    nexpr x (Z.integer_to_nat k)
+  else
+    invr (nexpr x (Z.integer_to_nat (Z.negz k)))
+//
+  nonzero_real -> integer -> real
+/;
+
+unfold /zexpr/.
+typecheck.
+reintro /x k/.
+destruct /x/ /x Hx/.
+split.
+generalize /Z.integer_to_nat (~z k)/ /_/ /n/.
+apply /nexpr_nonzero/ >> auto.
+qed ();
+
+
+
+lemma "zexpr_positive"
+/
+  forall x k .
+    0 < x
+    -> 0 < zexpr x k
+/;
+
+inference.
+intro /a k Hposa/.
+unfold /zexpr/.
+boolCase /z`0 <z=? k/ /Hk/.
+  {
+  apply /nexpr_positive/ >> auto.
+  }
+
+  {
+  apply /invr_positive/.
+  apply /nexpr_positive/ >> auto.
+  }
+qed ();
+
+
+
+lemma "zexpr_nonzero"
+/
+  forall (x : nonzero_real) k .
+    zexpr x k != 0 : real
+/;
+
+inference.
+intro /x k/.
+destruct /x/ /x Hx/.
+unhide.
+unfold /zexpr/.
+boolCase /z`0 <z=? k/ /Hk/.
+  {
+  apply /nexpr_nonzero/ >> auto.
+  }
+
+  {
+  apply /invr_nonzero/.
+  split.
+  apply /nexpr_nonzero/ >> auto.
+  }
+qed ();
+
+
+
+lemma "nexpr_to_zexpr"
+/
+  forall (x : nonzero_real) n .
+    nexpr x n = zexpr x (Z.nat_to_integer n) : real
+/;
+
+inference.
+intro /x n/.
+unfold /zexpr/.
+boolEq true /z`0 <z=? Z.nat_to_integer n/.
+  {
+  apply /Z.nat_to_integer_nonneg/.
+  }
+rewrite /-> Z.nat_to_integer_inv/.
+reflexivity.
+qed ();
+
+
+
+lemma "zexpr_nonneg_exponent"
+/
+  forall (x : nonzero_real) k .
+    z`0 <z= k
+    -> zexpr x k = nexpr x (Z.integer_to_nat k) : real
+/;
+
+inference.
+intro /x k Hk/.
+rewrite /<- Z.integer_to_nat_inv k/ >> auto.
+symmetry.
+apply /nexpr_to_zexpr/.
+qed ();
+
+
+
+lemma "zexpr_nonpos_exponent"
+/
+  forall (x : nonzero_real) k .
+    k <z= z`0
+    -> zexpr x k = invr (nexpr x (Z.integer_to_nat (~z k))) : real
+/;
+
+inference.
+intro /x k Hk/.
+destruct /x/ /x Hx/.
+unhide.
+unfold /zexpr/.
+boolCase /z`0 <z=? k/ /Hk'/.
+  {
+  assertThen /k = z`0 : integer/ /?/ omega.
+  subst /k/ >> autoWith /nexpr_nonzero/.
+  reduce //.
+  symmetry.
+  apply /invr_one/.
+  }
+
+  {
+  reflexivity.
+  split.
+  apply /nexpr_nonzero/ >> auto.
+  }
+qed ();
+
+
+
+lemma "zexpr_invr"
+/
+  forall (x : nonzero_real) k .
+    zexpr (invr x) k = invr (zexpr x k) : real
+/;
+
+inference.
+intro /x k/.
+unfold /zexpr at 0 0/.
+boolCase /z`0 <z=? k/ /Hk/.
+  {
+  apply /nexpr_invr/.
+  }
+
+  {
+  compat.
+  unfold /nonzero_real/.
+  extensionality >> autoWith /nexpr_nonzero invr_nonzero/.
+  apply /nexpr_invr/.
+  }
+qed ();
+
+
+
+lemma "zexpr_plus_exponent"
+/
+  forall (a : nonzero_real) k l .
+    zexpr a (k +z l) = zexpr a k * zexpr a l : real
+/;
+
+inference.
+intro /a k l/.
+destruct /a/ /a Ha/.
+unhide.
+assert /forall k l . z`0 <z= k -> l <z= z`0 -> zexpr a (k +z l) = nexpr a (Z.integer_to_nat k) * invr (nexpr a (Z.integer_to_nat (~z l))) : real/ /Hdiff/.
+  {
+  clear /k l/.
+  inference.
+  intro /k l Hk Hl/.
+  unfold /zexpr/.
+  boolCase /z`0 <z=? k +z l/ /Hsum/.
+    {
+    rewrite /<- timesr_shift_rrr/ >> autoWith /nexpr_nonzero/.
+    rewrite /<- nexpr_plus_exponent/.
+    rewrite /<- Z.plusz_to_nat/ >> attempt omega.
+    compat.
+    compat.
+    omega.
+    }
+
+    {
+    rewrite /-> Z.not_leqz in Hsum/.
+    rewrite /<- timesr_shift_rrr/ >> autoWith /nexpr_nonzero/.
+    rewrite /<- timesr_shift_lll/ >> autoWith /nexpr_nonzero/.
+    rewrite /<- nexpr_plus_exponent/.
+    compat.
+    omega.
+    }
+  }
+unfold /zexpr at 1 1/.
+boolCase /z`0 <z=? k/ /Hk/ >> boolCase /z`0 <z=? l/ /Hl/.
+  {
+  unfold /zexpr/.
+  boolEq true /z`0 <z=? k +z l/ >>> [omega, idtac].
+  rewrite /-> Z.plusz_to_nat/ >> auto.
+  apply /nexpr_plus_exponent/.
+  }
+
+  {
+  apply /Hdiff/ >> omega.
+  }
+
+  {
+  rewrite /-> Z.plusz_commute/ >> autoWith /nexpr_nonzero/.
+  rewrite /-> timesr_commute/ >> autoWith /nexpr_nonzero/.
+  apply /Hdiff/ >> omega.
+  }
+
+  {
+  unfold /zexpr/.
+  boolEq false /z`0 <z=? k +z l/ >>> [omega, idtac].
+  rewrite /<- invr_timesr/ >> autoWith /nexpr_nonzero/.
+  compat.
+  unfold /nonzero_real/.
+  extensionality >> autoWith /nexpr_nonzero/.
+  rewrite /-> Z.negz_plusz/.
+  rewrite /-> Z.plusz_to_nat/ >> attempt omega.
+  apply /nexpr_plus_exponent/.
+  }
+qed ();
+
+
+
+lemma "zexpr_negate_exponent"
+/
+  forall (x : nonzero_real) k .
+    zexpr x (Z.negz k) = invr (zexpr x k) : real
+/;
+
+inference.
+intro /x k/.
+unfold /zexpr at all/.
+so /Z.integer_trichotomy k z`0/ /Hneg | Hzero | Hpos/.
+  {
+  boolEq true /z`0 <z=? ~z k/ >>> [omega, idtac].
+  boolEq false /z`0 <z=? k/ >>> [omega, idtac].
+  rewrite /-> invr_invol/ >> auto.
+  destruct /x/ /x Hx/.
+  split.
+  apply /nexpr_nonzero/ >> auto.
+  }
+
+  {
+  boolEq true /z`0 <z=? ~z k/ >>> [omega, idtac].
+  boolEq true /z`0 <z=? k/ >>> [omega, idtac].
+  subst /k/.
+    {
+    subst /k/.
+    reduce //.
+    split.
+    symmetry.
+    apply /neqr_0_1/.
+    }
+
+    {
+    reduce //.
+    rewrite /-> invr_one/.
+    reflexivity.
+    }
+  }
+
+  {
+  boolEq false /z`0 <z=? ~z k/ >>> [omega, idtac].
+  boolEq true /z`0 <z=? k/ >>> [omega, idtac].
+  compat.
+  unfold /nonzero_real/.
+  extensionality.
+    {
+    rewrite /-> Z.negz_invol/.
+    reflexivity.
+    }
+
+    {
+    destruct /x/ /x Hx/.
+    split.
+    apply /nexpr_nonzero/ >> auto.
+    }
+  }
+qed ();
+
+
+
+lemma "zexpr_negate_exponent'"
+/
+  forall (x : nonzero_real) k .
+    zexpr x k = invr (zexpr x (Z.negz k)) : real
+/;
+
+inference.
+intro /x k/.
+destruct /x/ /x Hx/.
+rewrite /<- Z.negz_invol k/ >> autoWith /zexpr_nonzero/.
+apply /zexpr_negate_exponent/.
+qed ();
+
+
+
+lemma "zexpr_times_exponent"
+/
+  forall (a : nonzero_real) k l .
+    zexpr a (k *z l) = zexpr (zexpr a k) l : real
+/;
+
+inference.
+intro /a k l/.
+destruct /a/ /a Ha/.
+unhide.
+so /Z.integer_dichotomy_weak z`0 k/ /Hk | Hk/.
+  {
+  rewrite /zexpr a k = nexpr a (Z.integer_to_nat k) : nonzero_real/.
+    {
+    unfold /nonzero_real/.
+    extensionality >> autoWith /zexpr_nonzero/.
+    apply /zexpr_nonneg_exponent/ >> auto.
+    }
+  so /Z.integer_dichotomy_weak z`0 l/ /Hl | Hl/.
+    {
+    rewrite /-> zexpr_nonneg_exponent/ >> autoWith /nexpr_nonzero Z.timesz_leqz_zero/.
+    rewrite /-> zexpr_nonneg_exponent/ >> autoWith /nexpr_nonzero/.
+    rewrite /-> Z.timesz_to_nat/ >> auto.
+    apply /nexpr_times_exponent/.
+    }
+
+    {
+    rewrite /-> zexpr_nonpos_exponent/ >> autoWith /nexpr_nonzero Z.timesz_leqz_zero_pos_neg/.
+    rewrite /-> zexpr_nonpos_exponent/ >> autoWith /nexpr_nonzero/.
+    compat.
+    unfold /nonzero_real/.
+    extensionality >> autoWith /nexpr_nonzero Z.timesz_leqz_zero_pos_neg/.
+    rewrite /-> Z.negz_dist_timesz_r/.
+    rewrite /-> Z.timesz_to_nat/ >> auto >> attempt omega.
+    apply /nexpr_times_exponent/.
+    }
+  }
+
+  {
+  rewrite /zexpr a k = invr (nexpr a (Z.integer_to_nat (~z k))) : nonzero_real/.
+    {
+    unfold /nonzero_real/.
+    extensionality >> autoWith /zexpr_nonzero/.
+    apply /zexpr_nonpos_exponent/ >> auto.
+    }
+  so /Z.integer_dichotomy_weak z`0 l/ /Hl | Hl/.
+    {
+    rewrite /-> zexpr_nonpos_exponent/ >> autoWith /nexpr_nonzero Z.timesz_leqz_zero_neg_pos/.
+      {
+      split.
+      apply /invr_nonzero/.
+      split.
+      apply /nexpr_nonzero/ >> auto.
+      }
+    rewrite /-> zexpr_nonneg_exponent/ >> autoWith /nexpr_nonzero/.
+      {
+      split.
+      apply /invr_nonzero/.
+      split.
+      apply /nexpr_nonzero/ >> auto.
+      }
+    rewrite /-> nexpr_invr/ >> autoWith /nexpr_nonzero/.
+    compat.
+    unfold /nonzero_real/.
+    extensionality >> autoWith /nexpr_nonzero Z.timesz_leqz_zero_neg_pos/.
+    rewrite /-> Z.negz_dist_timesz_l/.
+    rewrite /-> Z.timesz_to_nat/ >> auto >> attempt omega.
+    apply /nexpr_times_exponent/.
+    }
+
+    {
+    rewrite /-> zexpr_nonneg_exponent/ >> autoWith /nexpr_nonzero Z.timesz_leqz_zero_neg_neg/.
+      {
+      split.
+      apply /invr_nonzero/.
+      split.
+      apply /nexpr_nonzero/ >> auto.
+      }
+    rewrite /-> zexpr_nonpos_exponent/ >> autoWith /nexpr_nonzero/.
+      {
+      split.
+      apply /invr_nonzero/.
+      split.
+      apply /nexpr_nonzero/ >> auto.
+      }
+    rewrite /<- nexpr_invr/ >> autoWith /nexpr_nonzero/.
+      {
+      split.
+      apply /invr_nonzero/.
+      split.
+      apply /nexpr_nonzero/ >> auto.
+      }
+    rewrite /-> invr_invol/ >> autoWith /nexpr_nonzero/.
+    rewrite /<- Z.negz_invol (_ *z _)/.
+    rewrite /-> Z.negz_dist_timesz_l/.
+    rewrite /-> Z.negz_dist_timesz_r/.
+    rewrite /-> Z.timesz_to_nat/ >> auto >> attempt omega.
+    apply /nexpr_times_exponent/.
+    }
+  }
+qed ();
+
+
+
+lemma "zexpr_times_base"
+/
+  forall (a b : nonzero_real) k .
+    zexpr (a * b) k = zexpr a k * zexpr b k : real
+/;
+
+inference.
+intro /a b k/.
+destruct /a/ /a Ha/.
+destruct /b/ /b Hb/.
+unfold /zexpr at all/.
+boolCase /z`0 <z=? k/ /Hk/.
+  {
+  apply /nexpr_times_base/.
+  }
+
+  {
+  rewrite /<- invr_timesr/ >> autoWith /nexpr_nonzero timesr_neq_zero/.
+  compat.
+  unfold /nonzero_real/.
+  extensionality >> autoWith /nexpr_nonzero timesr_neq_zero/.
+  apply /nexpr_times_base/.
+  }
+qed ();
+
+
+
+lemma "zexpr_mono_base"
+/
+  forall (a a' : real) k .
+    0 < a
+    -> a <= a'
+    -> z`0 <z= k
+    -> zexpr a k <= zexpr a' k
+/;
+
+inference.
+intro /a a' k Ha Haa Hposk/.
+assert /a != 0 : real/ /Hnza/.
+  {
+  symmetry.
+  apply /ltr_impl_neq/ >> auto.
+  }
+assert /a' != 0 : real/ /Hnza'/.
+  {
+  symmetry.
+  apply /ltr_impl_neq/.
+  apply /ltr_leqr_trans _ a/ >> auto.
+  }
+rewrite /-> zexpr_nonneg_exponent at all/ >> auto.
+apply /nexpr_mono_base/ >> auto.
+apply /ltr_impl_leqr/ >> auto.
+qed ();
+
+
+
+lemma "zexpr_anti_base"
+/
+  forall (a a' : real) k .
+    0 < a
+    -> a <= a'
+    -> k <z= z`0
+    -> zexpr a' k <= zexpr a k
+/;
+
+inference.
+intro /a a' k Ha Haa Hk/.
+assert /a != 0 : real/ /Hnza/.
+  {
+  symmetry.
+  apply /ltr_impl_neq/ >> auto.
+  }
+assert /a' != 0 : real/ /Hnza'/.
+  {
+  symmetry.
+  apply /ltr_impl_neq/.
+  apply /ltr_leqr_trans _ a/ >> auto.
+  }
+rewrite /-> zexpr_nonpos_exponent at all/ >> autoWith /nexpr_nonzero/.
+apply /invr_leqr_pos/.
+  {
+  apply /nexpr_positive/.
+  apply /ltr_from_leqr_neq/ >> auto.
+  apply /ltr_impl_leqr/ >> auto.
+  }
+apply /nexpr_mono_base/ >> auto.
+apply /ltr_impl_leqr/ >> auto.
+qed ();
+
+
+
+lemma "zexpr_mono_exponent"
+/
+  forall a k l .
+    1 <= a
+    -> k <z= l
+    -> zexpr a k <= zexpr a l
+/;
+
+inference.
+intro /a k l Ha Hkl/.
+assert /0 < a/ /Hapos/.
+  {
+  apply /ltr_leqr_trans _ 1/ >> auto.
+  apply /ltr_0_1/.
+  }
+assert /a != 0 : real/ /Hnza/.
+  {
+  symmetry.
+  apply /ltr_impl_neq/ >> auto.
+  }
+unfold /zexpr at 0 0/.
+boolCase /z`0 <z=? k/ /Hk/.
+  {
+  boolEq true /z`0 <z=? l/ >>> [omega, idtac].
+  apply /nexpr_mono_exponent/ >> auto.
+  omega.
+  }
+boolCase /z`0 <z=? l/ /Hl/.
+  {
+  rewrite /-> Z.not_leqz in Hk/.
+  apply /leqr_trans _ 1/ >> autoWith /nexpr_nonzero/.
+    {
+    rewrite /<- invr_one/ >> autoWith /nexpr_nonzero/.
+    apply /invr_leqr_pos/.
+      {
+      apply /ltr_0_1/.
+      }
+    apply /one_leqr_nexpr/ >> auto.
+    }
+
+    {
+    apply /one_leqr_nexpr/ >> auto.
+    }
+  }
+
+  {
+  apply /invr_leqr_pos/.
+    {
+    apply /nexpr_positive/ >> auto.
+    }
+  apply /nexpr_mono_exponent/ >> auto.
+  omega.
+  }
+qed ();
+
+
+
+lemma "zexpr_anti_exponent"
+/
+  forall a k l .
+    0 < a
+    -> a <= 1
+    -> k <z= l
+    -> zexpr a l <= zexpr a k
+/;
+
+inference.
+intro /a k l Hposa Ha Hkl/.
+assert /a != 0 : real/ /Hnza/.
+  {
+  symmetry.
+  apply /ltr_impl_neq/ >> auto.
+  }
+rewrite /<- invr_invol (zexpr a l)/ >> autoWith /zexpr_nonzero/.
+rewrite /<- invr_invol (zexpr a k)/ >> autoWith /zexpr_nonzero/.
+  {
+  split.
+  apply /invr_nonzero/ >> autoWith /zexpr_nonzero/.
+  }
+apply /invr_leqr_pos/ >> autoWith /zexpr_nonzero/.
+  {
+  apply /invr_positive/.
+  apply /zexpr_positive/ >> auto.
+  }
+rewrite /<- zexpr_invr/ >> autoWith /zexpr_nonzero/.
+rewrite /<- zexpr_invr/ >> autoWith /invr_nonzero/.
+apply /zexpr_mono_exponent/ >> auto.
+rewrite /<- invr_one/.
+apply /invr_leqr_pos/ >> auto.
+qed ();
+
+
+
+lemma "zexpr_one"
+/
+  forall k .
+    zexpr 1 k = 1 : real
+/;
+
+inference.
+intro /k/.
+unfold /zexpr/.
+boolCase /z`0 <z=? k/ /Hk/.
+  {
+  apply /nexpr_one/.
+  }
+
+  {
+  rewrite /<- invr_one at 1/ >> autoWith /nexpr_nonzero neqr_0_1/.
+  compat.
+  unfold /nonzero_real/.
+  extensionality >> autoWith /nexpr_nonzero neqr_0_1/.
+  apply /nexpr_one/.
+  }
+qed ();
+
+
 
 (* Relation to natural numbers *)
 
@@ -443,7 +1221,7 @@ assert /2 <= nexpr (realintro x) b/ /H2/.
     }
   }
 exists /b *n succ (Division.log2 a)/.
-rewrite /-> nexpr_times/.
+rewrite /-> nexpr_times_exponent/.
 apply /ltr_leqr_trans _ (nexpr 2 (succ (Division.log2 a)))/.
   {
   apply /ltr_trans/ >> auto.

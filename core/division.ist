@@ -1,4 +1,5 @@
 
+File.import "bool-load.iml";
 File.import "logic-load.iml";
 File.import "nat-load.iml";
 File.import "omega-load.iml";
@@ -2122,6 +2123,135 @@ apply /IH/.
   }
 qed ();
 
+
+
+(* Parity *)
+
+defineInd //
+/
+  is_even : nat -> bool of
+  | zero . true
+  | succ n . Bool.notb (is_even n)
+//
+  nat -> bool
+/;
+
+
+
+lemma "is_even_modulus"
+/
+  forall n .
+    (Bool.istrue (is_even n) <-> mod n 2 = 0 : nat)
+    & (Bool.istrue (Bool.notb (is_even n)) <-> mod n 2 = 1 : nat)
+/;
+
+inference.
+intro /n/.
+assertThen /0 < 2/ /H02/ omega.
+induction /n/.
+
+(* 0 *)
+{
+split >> split.
+  {
+  intro /_/.
+  rewrite /-> mod_operands_lt/ >> auto.
+  }
+
+  {
+  intro /_/.
+  apply /Bool.istrue_true/.
+  }
+
+  {
+  intro /H/.
+  so /Bool.not_istrue_false H/ /0/.
+  }
+
+  {
+  intro /H/.
+  rewrite /-> mod_operands_lt in H/ >> auto.
+  injection /H/.
+  }
+}
+
+(* succ *)
+{
+intro /n (IH0 IH1)/.
+split >> split.
+  {
+  intro /Hodd/.
+  so /IH1 #1 Hodd/ /Heq/.
+  rewriteThen /succ n = n + 1 : nat/ omega.
+  rewrite /-> mod_plus_alt/.
+  rewrite /-> Heq/.
+  reduce //.
+  apply /mod_self/.
+  }
+
+  {
+  intro /Heq/.
+  witness /IH1 #2 __/.
+  rewrite /<- mod_plus_l/.
+  rewriteThen /2 + n = succ n + 1 : nat/ omega.
+  rewrite /-> mod_plus_alt (succ n) 1 2/.
+  rewrite /-> Heq/.
+  reduce //.
+  apply /mod_operands_lt/.
+  omega.
+  }
+
+  {
+  intro /Heven/.
+  rewrite /-> Bool.notb_invol in Heven/.
+  so /IH0 #1 Heven/ /Heq/.
+  rewriteThen /succ n = n + 1 : nat/ omega.
+  rewrite /-> mod_plus_alt/.
+  rewrite /-> Heq/.
+  reduce //.
+  apply /mod_operands_lt/.
+  omega.
+  }
+
+  {
+  intro /Heq/.
+  rewrite /-> Bool.notb_invol/.
+  apply /IH0/.
+  rewrite /<- mod_plus_l/.
+  rewriteThen /2 + n = succ n + 1 : nat/ omega.
+  rewrite /-> mod_plus_alt (succ n) 1 2/.
+  rewrite /-> Heq/.
+  reduce //.
+  apply /mod_self/.
+  }
+}
+qed ();
+
+
+
+lemma "even_iff_parity_zero"
+/
+  forall n .
+    Bool.istrue (is_even n) <-> mod n 2 = 0 : nat
+/;
+
+inference.
+intro /n/.
+apply /is_even_modulus/.
+qed ();
+
+
+
+lemma "odd_iff_parity_one"
+/
+  forall n .
+    Bool.istrue (Bool.notb (is_even n)) <-> mod n 2 = 1 : nat
+/;
+
+inference.
+intro /n/.
+apply /is_even_modulus/.
+qed ();
 
 
 

@@ -233,6 +233,19 @@ We arbitrarily set `log2 0 = 0`, so that `log2` can be defined for every natural
     log2_times_leq : forall (a b : nat) . 0 < a -> 0 < b -> log2 a + log2 b <= log2 (a * b)
 
 
+### Parity
+
+    is_even : nat -> bool
+            = (fnind nat_fn : forall (v0 : nat) . bool of
+                | zero . true
+                | succ n . Bool.notb (nat_fn n))
+
+    even_iff_parity_zero : forall (n : nat) . Bool.istrue (is_even n) <-> mod n 2 = 0 : nat
+
+    odd_iff_parity_one : forall (n : nat) .
+                            Bool.istrue (Bool.notb (is_even n)) <-> mod n 2 = 1 : nat
+
+
 ### Relation to integers
 
     div_to_integer : forall (a : nat) (b : pos) .
