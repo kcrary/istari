@@ -953,3 +953,6 @@ inequality did not reverse on the right.
     rational_total : type:rational_total
 
     rational_strict : type:rational_strict
+
+    rational_symmetrical : type:rational_symmetrical
+

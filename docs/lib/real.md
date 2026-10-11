@@ -240,6 +240,10 @@ before moving.  It is always the right-hand operand after moving.
 
     minusr_leqr : forall (a a' b b' : real) . a <= a' -> b' <= b -> a - b <= a' - b'
 
+    minusr_ltr_l : forall (x x' y y' : real) . x < x' -> y' <= y -> x - y < x' - y'
+
+    minusr_ltr_r : forall (x x' y y' : real) . x <= x' -> y' < y -> x - y < x' - y'
+
     minusr_cancel_leqr_l : forall (a b c : real) . c - a <= c - b -> b <= a
 
     minusr_cancel_leqr_r : forall (a b c : real) . a - c <= b - c -> a <= b
@@ -1007,9 +1011,19 @@ of their inputs:
                           (forall (k : nat) . n`0 <n k -> absr (x - y) <= invr (nat_to_real k))
                           -> x = y : real
 
+    leqr_from_upper_bounds : forall (x y : real) . (forall (z : real) . y < z -> x <= z) -> x <= y
+
+    leqr_from_lower_bounds : forall (x y : real) . (forall (z : real) . z < y -> z <= x) -> y <= x
+
     real_total : Partial.total real
 
     real_strict : Partial.strict real
+
+    real_symmetrical : Quotient.symmetrical real
+
+    ltr_symmetrical : forall (x y : real) . Quotient.symmetrical (x < y)
+
+    leqr_symmetrical : forall (x y : real) . Quotient.symmetrical (x <= y)
 
 
 ### Prereals

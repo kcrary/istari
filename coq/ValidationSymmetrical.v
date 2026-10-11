@@ -979,6 +979,73 @@ apply tr_pi_quotient_commute; auto.
 Qed.
 
 
+Hint Rewrite def_prod : prepare.
+
+
+Lemma quotientStrengthenSequalOf_valid : quotientStrengthenSequalOf_obligation.
+Proof.
+prepare.
+intros G a b c f g m ext5 ext4 ext3 ext2 ext1 ext0 Hb Hc Hab Hf Hg Hfgm.
+assert (tr G (deqtype a a)) as Ha.
+  {
+  apply (tr_quotient_formation_invert _ _ _ b b).
+  eapply tr_inhabitation_formation; eauto.
+  }
+apply tr_quotient_strengthen_sequal; auto.
+  {
+  apply (tr_eqtype_convert _ _ _ (pi a (subst sh1 c))); auto.
+  apply tr_eqtype_symmetry.
+  apply tr_tarrow_pi_equal; auto.
+  }
+
+  {
+  apply (tr_eqtype_convert _ _ _ (pi a (subst sh1 c))); auto.
+  apply tr_eqtype_symmetry.
+  apply tr_tarrow_pi_equal; auto.
+  }
+
+  {
+  eapply tr_sequal_eta2; eauto.
+  }
+
+  {
+  eapply tr_sequal_eta2; eauto.
+  }
+Qed.
+
+
+Lemma quotientStrengthenSequalEq_valid : quotientStrengthenSequalEq_obligation.
+Proof.
+prepare.
+intros G a b c f g m n ext6 ext5 ext4 ext3 ext2 ext1 ext0 Hb Hc Hab Hf Hg Hfgm Hfgn.
+assert (tr G (deqtype a a)) as Ha.
+  {
+  apply (tr_quotient_formation_invert _ _ _ b b).
+  eapply tr_inhabitation_formation; eauto.
+  }
+apply tr_quotient_strengthen_sequal; auto.
+  {
+  apply (tr_eqtype_convert _ _ _ (pi a (subst sh1 c))); auto.
+  apply tr_eqtype_symmetry.
+  apply tr_tarrow_pi_equal; auto.
+  }
+
+  {
+  apply (tr_eqtype_convert _ _ _ (pi a (subst sh1 c))); auto.
+  apply tr_eqtype_symmetry.
+  apply tr_tarrow_pi_equal; auto.
+  }
+
+  {
+  eapply tr_sequal_eta2; eauto.
+  }
+
+  {
+  eapply tr_sequal_eta2; eauto.
+  }
+Qed.
+
+
 Hint Rewrite def_intersect : prepare.
 
 

@@ -1075,3 +1075,6 @@ inequality did not reverse on the right.
     rational_total : Partial.total rational
 
     rational_strict : Partial.strict rational
+
+    rational_symmetrical : Quotient.symmetrical rational
+

@@ -36,67 +36,6 @@ setOpacity /ltr/ Constant.HARD;
 beginModule "CantorTheorem";
 
 
-lemma "infinite_sequence"
-/
-  forall lv (A : U lv) (P : (nat -> A) -> nat -> U lv) .
-    A
-    -> (forall f g k . (forall i . i < k -> f i = g i : A) -> P f k -> P g k)
-    -> (forall f . P f 0)
-    -> (forall k (f : nat -> A) .
-          P f k
-          -> exists x . P (fn i . if i =? k then x else f i) (succ k))
-    -> exists (f : nat -> A) . forall (k : nat) . P f k
-/;
-
-inference.
-intro /lv A P x0 Hext Hbase Hind/.
-set /F/
-  /(fnind F : forall (k : nat) . exists (f : nat -> A) . P f k of
-    | zero . ((fn _ . x0), Hbase _)
-
-    | succ n .
-        let y = Hind n (F n #1) (F n #2)
-        in
-          ((fn i . if i =? n then y #1 else (F n #1 i)), y #2))/.
-assert /F : forall (k : nat) . exists (f : nat -> A) . P f k/ /HofF/.
-  {
-  unfold /F/.
-  typecheck.
-  }
-exists /fn i . F (succ i) #1 i/.
-intro /k/.
-so /F k #2/ /HFk/.
-witness /Hext _ _ _ __ HFk/.
-intro /i Hik/.
-reduce //.
-revert /i Hik/.
-clear /HFk/.
-sinduction /k/.
-reintro /IH/.
-intro /i Hik/.
-assertThen /succ i <= k/ /H/ omega.
-rewrite /-> Nat.leq_iff_lt_or_eq in H/.
-destruct /H/ /Hik' | Heq/.
-1:{
-  subst /k/.
-  reflexivity.
-  }
-destruct /k/ /| k/.
-  {
-  omega.
-  }
-unfold /F/.
-fold /F at all/.
-unfold /let/.
-boolEq false /i =? k/.
-  {
-  omega.
-  }
-apply /IH/ >> omega.
-qed ();
-
-
-
 (* SET PARSING TO REAL *)
 setArithReal ();
 
@@ -298,6 +237,9 @@ qed ();
 
 
 
+
+
+
 lemma "cantors_theorem_prereal"
 /
   forall x y (f : nat -> prereal) .
@@ -468,492 +410,334 @@ assert /exists (x y : nat -> rational)  .
       }
     }
   }
-exploit /infinite_sequence lzero (rational & rational)
-           (fn p k .
-              (forall (i j : nat) . n`0 <n i -> i <n= j -> j <n k -> p i #1 <q= p j #1 & p j #2 <q= p i #2)
-              &
-              (forall (i : nat) .
-                 n`0 <n i
-                 -> i <n k
-                 -> realintro x0 <= rational_to_real (p i #1)
-                    & rational_to_real (p i #2) <= realintro y0
-                    & p i #1 <q p i #2
-                    & p i #2 -q p i #1 <q invq (nat_to_rational i))
-              &
-              (forall (i : nat) .
-                 n`1 <n i
-                 -> i <n k
-                 -> realintro (f (i -n n`2)) < rational_to_real (p i #1)
-                    % rational_to_real (p i #2) < realintro (f (i -n n`2))))/ /H/.
+so /rational_dense_within_real_prereal x0 y0 Hxy0/ /a Hxa Hay/.
+so /rational_dense_within_real_prereal (rational_to_prereal a) y0 __/ /b Hab Hby/.
   {
-  exact /(q`0, q`0)/.
+  rewrite /-> rational_to_prereal_to_real/.
+  auto.
   }
-
+setEq /c/ /minq (a +q invq q`2) b/ /_/ /Heqc/.
+exploit /RealSupremum.infinite_sequence lzero (rational & rational)
+           (fn k p .
+              p #1 <q p #2
+              & (p #2 -q p #1 <q invq (nat_to_rational (succ k)))
+              & (forall i .
+                   i <n k
+                   -> realintro (f i) < rational_to_real (p #1)
+                      % rational_to_real (p #2) < realintro (f i)))
+           (fn p q .
+              p #1 <q= q #1
+              & q #2 <q= p #2)
+           (a, c)/ /H/
+>> reduce //.
   {
-  reduce //.
-  intro /g h k Heq Hg/.
   splitn 2.
     {
-    destruct /Hg/ /Hg _/.
-    intro /i j Hi Hij Hjk/.
-    so /Hg i j Hi Hij Hjk/ /H/.
-    forceExact /H/.
-    clear /H/.
-    typecheck.
+    subst /c/.
+    rewrite /-> rational_to_prereal_to_real in Hab/.
+    apply /minq_glb_strict/.
       {
-      decompEq 1 /rational & rational/.
-      apply /Heq/.
-      omega.
+      rewrite /<- plusq_id_r a/.
+      apply /plusq_ltq_r/ >> auto.
+      autoQ.
       }
 
-      {
-      decompEq 1 /rational & rational/.
-      apply /Heq/.
-      omega.
-      }
-
-      {
-      decompEq 1 /rational & rational/.
-      apply /Heq/.
-      omega.
-      }
-
-      {
-      decompEq 1 /rational & rational/.
-      apply /Heq/.
-      omega.
-      }
-    }
-
-    {
-    destruct /Hg/ /_ Hg _/.
-    intro /i Hi Hik/.
-    assert /g i #1 = h i #1 : rational/ /Heq1/.
-      {
-      decompEq 1 /rational & rational/.
-      apply /Heq/.
-      omega.
-      }
-    assert /g i #2 = h i #2 : rational/ /Heq2/.
-      {
-      decompEq 1 /rational & rational/.
-      apply /Heq/.
-      omega.
-      }
-    so /Hg i Hi Hik/ /H/.
-    forceExact /H/.
-    clear /H/.
-    typecheck >> auto.
-    }
-
-    {
-    destruct /Hg/ /_ _ Hg/.
-    intro /i Hi Hik/.
-    assert /g i #1 = h i #1 : rational/ /Heq1/.
-      {
-      decompEq 1 /rational & rational/.
-      apply /Heq/.
-      omega.
-      }
-    assert /g i #2 = h i #2 : rational/ /Heq2/.
-      {
-      decompEq 1 /rational & rational/.
-      apply /Heq/.
-      omega.
-      }
-    so /Hg i Hi Hik/ /H/.
-    forceExact /H/.
-    clear /H/.
-    typecheck >> auto.
-    }
-  }
-
-  (* fake base case *)
-  {
-  intro /g/.
-  reduce //.
-  splitn 2 >> intros >> omega.
-  }
-
-  (* wrapup *)
-1:{
-  destruct /H/ /g Hg/.
-  reduce /Hg/.
-  exists /(fn i . g i #1)/.
-  exists /(fn i . g i #2)/.
-  splitn 2.
-    {
-    reduce //.
-    intro /i j Hi Hij/.
-    apply /Hg (succ j) #1/ >> auto.
-    omega.
-    }
-
-    {
-    reduce //.
-    intro /i Hi/.
-    apply /Hg (succ i) #2 #1/ >> auto.
-    omega.
-    }
-
-    {
-    intro /i Hi/.
-    apply /Hg (succ i) #2 #2/ >> auto.
-    omega.
-    }
-  }
-(* inductive case *)
-reduce //.
-intro /k h (Hinc Hall Havoid)/.
-so /eq_nat_decide k n`0/ /? | Hnot0/.
-  {
-  exists /(q`0, q`0)/.
-  splitn 2 >> intros >> omega.
-  }
-so /eq_nat_decide k n`1/ /? | Hnot1/.
-  (* real base case *)
-  {
-  subst /k/.
-  clear /Hnot0/.
-  so /rational_dense_within_real_prereal x0 y0 Hxy0/ /a Hxa Hay/.
-  so /rational_dense_within_real_prereal (rational_to_prereal a) y0 __/ /b Hab Hby/.
-    {
-    rewrite /-> rational_to_prereal_to_real/.
-    auto.
-    }
-  setEq /c/ /minq (a +q invq q`2) b/ /_/ /Heqc/.
-  exists /(a, c)/.
-  assert /(a, c) : rational & rational/ /Hofac/.
-    {
-    typecheck.
-    }
-  splitn 2.
-    {
-    intro /i j Hi Hij Hjk/.
-    assertThen /i = n`1 : nat/ /?/ omega.
-    assertThen /j = n`1 : nat/ /?/ omega.
-    subst /i j/.
-    auto.
-    }
-
-    {
-    intro /i Hi Hik/.
-    assertThen /i = n`1 : nat/ /?/ omega.
-    subst /i/.
-    reduce //.
-    splitn 3.
-      {
-      apply /ltr_impl_leqr/ >> auto.
-      }
-
-      {
-      apply /leqr_trans _ (rational_to_real b)/.
-      1:{
-        apply /ltr_impl_leqr/ >> auto.
-        }
-      subst /c/.
-      rewrite /-> minq_to_real/.
-      apply /minr_leq_r/.
-      }
-
-      {
-      subst /c/.
-      rewrite /-> rational_to_prereal_to_real in Hab/.
-      apply /minq_glb_strict/.
-        {
-        rewrite /<- plusq_id_r a/.
-        apply /plusq_ltq_r/ >> auto.
-        autoQ.
-        }
-
-        {
-        apply /rational_to_real_mono_lt_conv/ >> auto.
-        }
-      }
-
-      {
-      unfold /nat_to_rational/.
-      reduce //.
-      apply /leqq_ltq_trans _ (invq q`2)/.
-        {
-        rewrite /<- minusq_shift_leqq_ll/.
-        subst /c/.
-        apply /minq_leq_l/.
-        }
-
-        {
-        apply /invq_ltq_pos/ >> autoQ.
-        }
-      }
-    }
-
-    {
-    intro /i Hi Hik/.
-    exfalso.
-    omega.
-    }
-  }
-(* real inductive case *)
-assert /forall x y a .
-          x <q y
-          -> realintro a < rational_to_real y
-          -> exists x' .
-               x <q= x'
-               & x' <q y
-               & realintro a < rational_to_real x'
-               & y -q x' <q invq (nat_to_rational k)/ /Hprop/.
-  {
-  inference.
-  intro /x y a Hxy Hay/.
-  so /rational_dense_within_real_prereal a (rational_to_prereal y) __/ /u Hau Huy/.
-    {
-    rewrite /-> rational_to_prereal_to_real/.
-    hyp /Hay/.
-    }
-  rewrite /-> rational_to_prereal_to_real in Huy/.
-  exists /maxq x (maxq u (y -q invq (nat_to_rational (succ k))))/.
-  splitn 3.
-    {
-    apply /maxq_leq_l/.
-    }
-
-    {
-    apply /maxq_lub_strict/ >> auto.
-    apply /maxq_lub_strict/.
       {
       apply /rational_to_real_mono_lt_conv/ >> auto.
       }
+    }
+
+    {
+    unfold /nat_to_rational/.
+    reduce //.
+    apply /leqq_ltq_trans _ (invq q`2)/.
+      {
+      rewrite /<- minusq_shift_leqq_ll/.
+      subst /c/.
+      apply /minq_leq_l/.
+      }
 
       {
-      rewrite /<- minusq_id_r y at 1/.
-      unfold /minusq at 0 0/.
-      apply /plusq_ltq_r/ >> auto.
-      apply /negq_ltq/.
-      autoQ.
+      apply /invq_ltq_pos/ >> autoQ.
       }
     }
 
     {
-    apply /ltr_leqr_trans _ (rational_to_real u)/ >> auto.
-    apply /rational_to_real_mono/.
-    apply /leqq_trans/.
-    1:{
-      apply /maxq_leq_r/.
-      }
+    intro /i Hi/.
+    omega.
+    }
+  }
 
+  {
+  clear /a Hxa Hay b Hab Hby c Heqc/.
+  intro /k p (Hsep Hdist Havoid)/.
+  assert /forall x y a .
+            x <q y
+            -> realintro a < rational_to_real y
+            -> exists x' .
+                 x <q= x'
+                 & x' <q y
+                 & realintro a < rational_to_real x'
+                 & y -q x' <q invq (nat_to_rational (succ (succ k)))/ /Hprop/.
+    {
+    inference.
+    intro /x y a Hxy Hay/.
+    so /rational_dense_within_real_prereal a (rational_to_prereal y) __/ /u Hau Huy/.
+      {
+      rewrite /-> rational_to_prereal_to_real/.
+      hyp /Hay/.
+      }
+    rewrite /-> rational_to_prereal_to_real in Huy/.
+    exists /maxq x (maxq u (y -q invq (nat_to_rational (succ (succ (succ k))))))/.
+    splitn 3.
       {
       apply /maxq_leq_l/.
       }
-      
-      typechecker ();
+  
+      {
+      apply /maxq_lub_strict/ >> auto.
+      apply /maxq_lub_strict/.
+        {
+        apply /rational_to_real_mono_lt_conv/ >> auto.
+        }
+  
+        {
+        rewrite /<- minusq_id_r y at 1/.
+        unfold /minusq at 0 0/.
+        apply /plusq_ltq_r/ >> auto.
+        apply /negq_ltq/.
+        autoQ.
+        }
+      }
+  
+      {
+      apply /ltr_leqr_trans _ (rational_to_real u)/ >> auto.
+      apply /rational_to_real_mono/.
+      apply /leqq_trans/.
+      1:{
+        apply /maxq_leq_r/.
+        }
+  
+        {
+        apply /maxq_leq_l/.
+        }
+        
+        typechecker ();
+      }
+  
+      {
+      apply /leqq_ltq_trans _ (invq (nat_to_rational (succ (succ (succ k)))))/.
+      1:{
+        apply /invq_ltq_pos/ >> autoQ.
+        }
+      apply /negq_leqq'/.
+      rewrite /-> negq_minusq/.
+      unfold /minusq at all/.
+      rewrite /-> plusq_dist_maxq_l/.
+      rewrite /-> plusq_dist_maxq_l/.
+      apply /leqq_trans/.
+      1:{
+        apply /maxq_leq_r/.
+        }
+  
+        typechecker ();
+      apply /leqq_trans/.
+      1:{
+        apply /maxq_leq_r/.
+        }
+  
+        typechecker ();
+      apply /negq_leqq'/.
+      rewrite /-> negq_plusq at all/.
+      rewrite /-> negq_invol at all/.
+      rewrite /-> plusq_commute at 1/.
+      rewrite /-> plusq_assoc/.
+      rewrite /-> plusq_inverse_l/.
+      rewrite /-> plusq_id_r/.
+      apply /leqq_refl/.
+      }
+    }
+  so /overlapping_ranges_prereal (f k) (rational_to_prereal (p #1)) (rational_to_prereal (p #2)) __/ /Hleft | Hright/.
+    {
+    rewrite /-> rational_to_prereal_to_real at 0 0/.
+    apply /rational_to_real_mono_lt/ >> auto.
     }
 
     {
-    apply /leqq_ltq_trans _ (invq (nat_to_rational (succ k)))/.
-    1:{
-      apply /invq_ltq_pos/ >> autoQ.
-      }
-    apply /negq_leqq'/.
-    rewrite /-> negq_minusq/.
-    unfold /minusq at all/.
-    rewrite /-> plusq_dist_maxq_l/.
-    rewrite /-> plusq_dist_maxq_l/.
-    apply /leqq_trans/.
-    1:{
-      apply /maxq_leq_r/.
-      }
-
-      typechecker ();
-    apply /leqq_trans/.
-    1:{
-      apply /maxq_leq_r/.
-      }
-
-      typechecker ();
-    apply /negq_leqq'/.
-    rewrite /-> negq_plusq at all/.
-    rewrite /-> negq_invol at all/.
-    rewrite /-> plusq_commute at 1/.
-    rewrite /-> plusq_assoc/.
-    rewrite /-> plusq_inverse_l/.
-    rewrite /-> plusq_id_r/.
-    apply /leqq_refl/.
-    }
-  }
-so /Hall (pred k) __ __/ /_ _ Hxy _/ >> attempt omega.
-so /overlapping_ranges_prereal (f (k -n n`2)) (rational_to_prereal (h (pred k) #1)) (rational_to_prereal (h (pred k) #2)) __/ /Hleft | Hright/.
-  {
-  rewrite /-> rational_to_prereal_to_real at 0 0/.
-  apply /rational_to_real_mono_lt/.
-  apply /Hall/ >> omega.
-  }
-
-  {
-  rewrite /-> rational_to_prereal_to_real in Hleft/.
-  so /Hprop (h (pred k) #1) (h (pred k) #2) (f (k -n n`2)) Hxy Hleft/ /z Hxz Hzy Hmiss Hdist/.
-  assertThen /(z, h (pred k) #2) : rational & rational/ /Hof/ typecheck.
-  exists /(z, h (pred k) #2)/.
-  splitn 2.
-    {
-    intro /i j Hi Hij Hjk/.
-    boolCase /i =n? k/ /Hik/.
+    rewrite /-> rational_to_prereal_to_real in Hleft/.
+    so /Hprop (p #1) (p #2) (f k) Hsep Hleft/ /z Hxz Hzy Hmiss Hdist'/.
+    exists /(z, p #2)/.
+    reduce //.
+    splitn 2 >> auto.
+    splitn 2 >> auto.
+    intro /i Hi/.
+    so /Nat.eq_nat_decide i k/ /? | Hneq/.
       {
       subst /i/.
-      assertThen /j = k : nat/ /?/ omega.
-      subst /j/.
-      boolEq true /k =n? k/ >> auto.
+      left >> auto.
       }
-    boolCase /j =n? k/ /Hjk'/.
+    so /Havoid i __/ /Hbelow | Habove/ >> auto.
       {
-      subst /j/.
-      split.
-        {
-        apply /leqq_trans _ (h (pred k) #1)/ >> auto.
-        apply /Hinc/ >> omega.
-        }
-
-        {
-        apply /Hinc/ >> omega.
-        }
+      omega.
       }
-    apply /Hinc/ >> omega.
-    }
-
-    {
-    intro /i Hi Hik/.
-    boolCase /i =n? k/ /Hik'/.
+   
       {
-      subst /i/.
-      splitn 3 >> auto.
-        {
-        apply /leqr_trans _ (rational_to_real (h (pred k) #1))/.
-          {
-          apply /Hall/ >> omega.
-          }
-        apply /rational_to_real_mono/ >> auto.
-        }
-
-        {
-        apply /Hall/ >> omega.
-        }
-      }
-    apply /Hall/ >> omega.
-    }
-
-    {
-    intro /i Hi Hik/.
-    boolCase /i =n? k/ /Hik'/.
-      {
-      subst /i/.
       left.
-      hyp /Hmiss/.
+      apply /ltr_leqr_trans _ (rational_to_real (p #1))/ >> auto.
+      apply /rational_to_real_mono/ >> auto.
       }
-    apply /Havoid/ >> omega.
-    }
-  }
-
-  {
-  rewrite /-> rational_to_prereal_to_real in Hright/.
-  so /Hprop (negq (h (pred k) #2)) (negq (h (pred k) #1)) (prenegr (f (k -n n`2))) __ __/ /z Hyz Hzx Hmiss Hdist/.
-    {
-    apply /negq_ltq/ >> auto.
     }
 
     {
-    rewrite /-> prenegr_to_real/.
-    rewrite /-> negq_to_real/.
-    apply /negr_ltr/ >> auto.
-    }
-  assertThen /(h (pred k) #1, negq z) : rational & rational/ /Hof/ typecheck.
-  exists /(h (pred k) #1, negq z)/.
-  splitn 2.
-    {
-    intro /i j Hi Hij Hjk/.
-    boolCase /i =n? k/ /Hik/.
+    rewrite /-> rational_to_prereal_to_real in Hright/.
+    so /Hprop (negq (p #2)) (negq (p #1)) (prenegr (f k)) __ __/ /z Hyz Hzx Hmiss Hdist'/.
       {
-      subst /i/.
-      assertThen /j = k : nat/ /?/ omega.
-      subst /j/.
-      boolEq true /k =n? k/ >> auto.
+      apply /negq_ltq/ >> auto.
       }
-    boolCase /j =n? k/ /Hjk'/.
+
       {
-      subst /j/.
-      split.
-        {
-        apply /Hinc/ >> omega.
-        }
-
-        {
-        apply /leqq_trans _ (h (pred k) #2)/.
-          {
-          apply /negq_leqq'/.
-          rewrite /-> negq_invol/.
-          auto.
-          }
-
-          {
-          apply /Hinc/ >> omega.
-          }
-        }
+      rewrite /-> prenegr_to_real/.
+      rewrite /-> negq_to_real/.
+      apply /negr_ltr/ >> auto.
       }
-    apply /Hinc/ >> omega.
-    }
-
-    {
-    intro /i Hi Hik/.
-    boolCase /i =n? k/ /Hik'/.
+    exists /(p #1, negq z)/.
+    reduce //.
+    splitn 2 >> auto.
       {
-      subst /i/.
-      splitn 3.
-        {
-        apply /Hall/ >> omega.
-        }
-
-        {
-        apply /leqr_trans _ (rational_to_real (h (pred k) #2))/.
-          {
-          apply /rational_to_real_mono/ >> auto.
-          apply /negq_leqq'/.
-          rewrite /-> negq_invol/.
-          auto.
-          }
-
-          {
-          apply /Hall/ >> omega.
-          }
-        }
-
+      splitn 2.
         {
         apply /negq_ltq'/.
-        rewrite /-> negq_invol/.
-        auto.
+        rewrite /-> negq_invol/ >> auto.
         }
 
         {
-        unfold /minusq/.
+        unfold /minusq in Hdist' in concl/.
         rewrite /-> plusq_commute/.
-        fold /minusq _ _/.
-        auto.
+        hyp /Hdist'/.
+        }
+
+        {
+        intro /i Hi/.
+        so /Nat.eq_nat_decide i k/ /? | Hneq/.
+          {
+          subst /i/.
+          right.
+          rewrite /-> prenegr_to_real in Hmiss/.
+          apply /negr_ltr'/.
+          rewrite /-> negq_to_real/.
+          rewrite /-> negr_invol/.
+          hyp /Hmiss/.
+          }
+        so /Havoid i __/ /Hbelow | Habove/ >> auto.
+          {
+          omega.
+          }
+          
+          {
+          right.
+          apply /leqr_ltr_trans _ (rational_to_real (p #2))/ >> auto.
+          apply /negr_leqr'/.
+          rewrite /<- negq_to_real at 0 0/.
+          apply /rational_to_real_mono/.
+          rewrite /-> negq_invol/.
+          hyp /Hyz/.
+          }
         }
       }
-    apply /Hall/ >> omega.
+
+      {
+      apply /negq_leqq'/.
+      rewrite /-> negq_invol/.
+      hyp /Hyz/.
+      }
+    }
+  }
+destruct /H/ /g Hg0 Hg/.
+reduce /Hg/.
+exists /(fn i . if i =n? n`0 then q`0 else g (pred i) #1)/.
+exists /(fn i . if i =n? n`0 then q`0 else g (pred i) #2)/.
+reduce //.
+assert /forall i j . i <n= j -> g i #1 <q= g j #1 & g j #2 <q= g i #2/ /Hinc/.
+  {
+  inference.
+  intro /i j/.
+  sinduction /j/.
+  reintro /IH/.
+  intro /Hij/.
+  rewrite /-> Nat.leq_iff_lt_or_eq in Hij/.
+  destruct /Hij/ /Hij | ?/.
+    {
+    so /IH (pred j) __ __/ /Hind Hind'/ >>> [omega, omega, idtac].
+    so /Hg (pred j) #2/ /Hstep Hstep'/.
+    rewriteThen /succ (pred j) = j : nat in Hstep/ omega.
+    rewriteThen /succ (pred j) = j : nat in Hstep'/ omega.
+    split >> apply /leqq_trans/ >> auto.
     }
 
     {
-    intro /i Hi Hik/.
-    boolCase /i =n? k/ /Hik'/.
-      {
-      subst /i/.
-      right.
-      rewrite /-> prenegr_to_real in Hmiss/.
-      rewrite /-> negq_to_real/.
-      apply /negr_ltr'/.
-      rewrite /-> negr_invol/.
-      auto.
-      }
-    apply /Havoid/ >> omega.
+    subst /j/.
+    auto.
     }
+  }
+splitn 2.
+  {
+  intro /i j Hi Hij/.
+  boolEq false /i =n? n`0/ >>> [omega, idtac].
+  boolEq false /j =n? n`0/ >>> [omega, idtac].
+  apply /Hinc/.
+  omega.
+  }
+
+  {
+  intro /i Hi/.
+  destruct /i/ /| i/.
+    {
+    omega.
+    }
+  reduce //.
+  splitn 3 >> auto.
+    {
+    transitivity /rational_to_real a/.
+      {
+      apply /ltr_impl_leqr/ >> auto.
+      }
+    apply /rational_to_real_mono/.
+    rewrite /a = g n`0 #1 : rational/.
+      {
+      rewrite /-> Hg0/.
+      reflexivity.
+      }
+    apply /Hinc/.
+    omega.
+    }
+
+    {
+    transitivity /rational_to_real b/.
+    1:{
+      apply /ltr_impl_leqr/ >> auto.
+      }
+    apply /rational_to_real_mono/.
+    transitivity /c/.
+    1:{
+      subst /c/.
+      apply /minq_leq_r/.
+      }
+    rewrite /c = g n`0 #2 : rational/.
+      {
+      rewrite /-> Hg0/.
+      reflexivity.
+      }
+    apply /Hinc/.
+    omega.
+    }
+  }
+
+  {
+  intro /i Hi/.
+  destruct /i/ /|(| i)/ >>> [omega, omega, idtac].
+  reduce //.
+  apply /Hg/.
+  omega.
   }
 qed ();
 

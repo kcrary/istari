@@ -46,3 +46,12 @@ cannot return a deterministic inhabitant of the disjunction.
 
     (* using real overloading *)
     Real.plusr_positive_invert : type:Real.plusr_positive_invert
+
+A squish containing a universal quantifier can be commuted to within
+the quantifier.  The opposite direction depends on the properties of
+the domain and codomain.  There is more information in the [`Quotient`
+library](quotient.html).
+
+    squish_forall_commute : type:squish_forall_commute
+
+    squish_forall_nat : type:squish_forall_nat

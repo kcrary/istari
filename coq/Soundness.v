@@ -401,6 +401,7 @@ intros; eapply sound_set_symmetrical; eauto; done.
 intros; eapply sound_quotient_symmetrical; eauto; done.
 intros; eapply sound_partial_symmetrical; eauto; done.
 intros; eapply sound_pi_quotient_commute; eauto; done.
+intros; eapply sound_quotient_strengthen_sequal; eauto; done.
 intros; eapply sound_symmetrical_formation_invert; eauto; done.
 Qed.
 

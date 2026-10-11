@@ -6859,6 +6859,29 @@ These rules are in service of the rule `arrowQuotientCommute`.
       G, A, A[^1], (eq A[^2] 1 0) |- sequal 2 1
       G |- eq (arrow A (quotient B (fn . fn . C))) M N
 
+- `quotientStrengthenSequalOf A B C F H M`
+
+      G |- of (quotient A (fn . fn . prod B (prod (eq C[^2] (F[^2] 1) (H[^2] 1)) (eq C[^2] (F[^2] 0) (H[^2] 0))))) M
+      >>
+      G, A, A[^1] |- istp B
+      G |- istp C
+      G |- of (quotient A (fn . fn . B)) M
+      G |- of (arrow A C) F
+      G |- of (arrow A C) H
+      G |- sequal (F M) (H M)
+
+- `quotientStrengthenSequalEq A B C F H M N`
+
+      G |- eq (quotient A (fn . fn . prod B (prod (eq C[^2] (F[^2] 1) (H[^2] 1)) (eq C[^2] (F[^2] 0) (H[^2] 0))))) M N
+      >>
+      G, A, A[^1] |- istp B
+      G |- istp C
+      G |- eq (quotient A (fn . fn . B)) M N
+      G |- of (arrow A C) F
+      G |- of (arrow A C) H
+      G |- sequal (F M) (H M)
+      G |- sequal (F N) (H N)
+
 - `symmetricalType`
 
       G |- of (intersect level (fn . arrow (univ 0) (univ 0))) symmetrical

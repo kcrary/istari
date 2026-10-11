@@ -1680,6 +1680,217 @@ qed ();
 
 
 
+lemma "dual_convergence"
+/
+  forall s1 s2 c .
+    0 < c
+    -> c < 1
+    -> (forall i . s1 i <= s2 i)
+    -> (forall i j . i <n= j -> s1 i <= s1 j & s2 j <= s2 i)
+    -> (forall i . s2 (succ i) - s1 (succ i) <= c * (s2 i - s1 i))
+    -> exists x .
+         converges s1 x
+         & converges s2 x
+/;
+
+inference.
+intro /s1 s2 c Hclo Hchi Hsep Hinc Hadj/.
+assert /forall k . n`0 <n k -> nat_to_real k != 0 : real/ /Hnonzeroall/.
+  {
+  inference.
+  intro /k Hk/.
+  apply /nat_to_real_nonzero/.
+  omega.
+  }
+assert /forall m k .
+          n`0 <n k
+          -> nat_to_real k * (s2 n`0 - s1 n`0) < nexpr (invr c) m
+          -> s2 m - s1 m <= invr (nat_to_real k)/ /Hbound/.
+  {
+  inference.
+  assert /c != 0 : real/ /Hnzc/.
+    {
+    symmetry.
+    apply /ltr_impl_neq/ >> auto.
+    }
+  intro /m k Hposk Hm/.
+  rewrite /-> nexpr_invr in Hm/.
+  rewrite /-> timesr_shift_ltr_rll in Hm/.
+    {
+    split.
+    apply /nexpr_nonzero/ >> auto.
+    }
+  
+    {
+    unfold /nat_to_real/.
+    fold /integer_to_real _/.
+    apply /integer_to_real_mono_lt/.
+    omega.
+    }
+  rewrite /<- timesr_shift_ltr_rlr in Hm/ >> auto.
+    {
+    apply /nexpr_positive/ >> auto.
+    }
+  rewrite /<- ltr_impl_leqr _# 2 Hm/ >> auto.
+  clear /Hm/.
+  induction /m/.
+    {
+    rewrite /-> timesr_id_l/.
+    reflexivity.
+    }
+
+    {
+    intro /m IH/.
+    rewrite /-> Hadj/.
+    rewrite /-> IH/.
+      {
+      rewrite /<- timesr_assoc/.
+      reflexivity.
+      }
+
+      {
+      apply /ltr_impl_leqr/ >> auto.
+      }
+
+      {
+      rewrite /<- minusr_shift_leqr_rr/.
+      rewrite /-> plusr_id_l/.
+      apply /Hsep/.
+      }
+    }
+  }
+assert /cauchy s1/ /Hcauchy1/.
+  {
+  unfold /cauchy/.
+  witness /squish_bind (real_to_prereal c) __/ >> auto.
+  intro /(c' ?)/.
+  subst /c/.
+  rename /c'/ /c/.
+  witness /squish_bind (real_to_prereal (s2 n`0 - s1 n`0)) __/ >> auto.
+  intro /(d Hd)/.
+  apply /squish_ret/ >> auto.
+  assert /realintro c != 0 : real/ /Hnzc/.
+    {
+    symmetry.
+    apply /ltr_impl_neq/ >> auto.
+    }
+  intro /k Hposk/.
+  exploit /logarithm_bound_prereal (preinvr c) (pretimesr (integer_to_prereal (Integer.nat_to_integer k)) d)/ /m Hm/.
+    {
+    rewrite /-> preinvr_to_real/.
+    rewrite /<- invr_one/.
+    apply /invr_ltr_pos/ >> auto.
+    }
+  exists /m/ >> auto.
+  rewrite /-> pretimesr_to_real in Hm/.
+  rewrite /-> integer_to_prereal_to_real in Hm/.
+  unfold /integer_to_real in Hm/.
+  fold /nat_to_real _ in Hm/.
+  rewrite /-> preinvr_to_real in Hm/.
+  assert /forall n p .
+            m <n= n
+            -> n <n= p
+            -> absr (s1 n - s1 p) <= invr (nat_to_real k)/ /H/
+  >>> [inference, idtac].
+  1:{
+    intro /n p Hmn Hmp/.
+    so /Nat.nat_dichotomy_weak n p/ /Hnp | Hpn/ >> auto.
+    rewrite /-> absr_minusr_commute/ >> auto.
+    }
+  intro /n p Hmn Hnp/.
+  rewrite /-> absr_minusr_commute/ >> auto.
+  rewrite /-> absr_of_nonneg/ >> auto.
+    {
+    rewrite /<- minusr_shift_leqr_rr/.
+    rewrite /-> plusr_id_l/.
+    apply /Hinc/ >> auto.
+    }
+  transitivity /s2 m - s1 m/ >> auto.
+    {
+    apply /minusr_leqr/.
+      {
+      transitivity /s2 p/ >> auto.
+      apply /Hinc/.
+      omega.
+      }
+
+      {
+      apply /Hinc/ >> auto.
+      }
+    }
+  rewrite /<- Hd in Hm/.
+  apply /Hbound/ >> auto.
+  }
+so /cauchy_impl_converges _ Hcauchy1/ /x Hconv1/.
+exists /x/.
+split >> auto.
+unfold /converges/.
+witness /squish_bind (real_to_prereal c) __/ >> auto.
+intro /(c' ?)/.
+subst /c/.
+rename /c'/ /c/.
+witness /squish_bind (real_to_prereal (s2 n`0 - s1 n`0)) __/ >> auto.
+intro /(d Hd)/.
+apply /squish_ret/ >> auto.
+assert /realintro c != 0 : real/ /Hnzc/.
+  {
+  symmetry.
+  apply /ltr_impl_neq/ >> auto.
+  }
+intro /k Hposk/.
+exploit /logarithm_bound_prereal (preinvr c) (pretimesr (integer_to_prereal (Integer.nat_to_integer k)) d)/ /m Hm/.
+  {
+  rewrite /-> preinvr_to_real/.
+  rewrite /<- invr_one/.
+  apply /invr_ltr_pos/ >> auto.
+  }
+exists /m/ >> auto.
+intro /n Hn/.
+rewrite /-> pretimesr_to_real in Hm/.
+rewrite /-> integer_to_prereal_to_real in Hm/.
+unfold /integer_to_real in Hm/.
+fold /nat_to_real _ in Hm/.
+rewrite /-> preinvr_to_real in Hm/.
+rewrite /-> absr_of_nonneg/ >> auto.
+  {
+  rewrite /<- minusr_shift_leqr_rr/.
+  rewrite /-> plusr_id_l/.
+  apply /converges_leqr s1 (fn _ . s2 n) _ _ n/ >> auto.
+    {
+    apply /converges_constant/.
+    }
+
+    {
+    intro /i Hi/.
+    reduce //.
+    transitivity /s2 i/.
+      {
+      apply /Hsep/.
+      }
+
+      {
+      apply /Hinc/ >> auto.
+      }
+    }
+  }
+transitivity /s2 m - s1 m/ >> auto.
+  {
+  apply /minusr_leqr/.
+    {
+    apply /Hinc/ >> auto.
+    }
+
+    {
+    apply /converges_leqr (fn _ . s1 m) s1 _ _ m/ >> auto.
+    apply /converges_constant/.
+    }
+  }
+rewrite /<- Hd in Hm/.
+apply /Hbound/ >> auto.
+qed ();
+
+
+
 (* Series *)
 
 (* partial sums *)

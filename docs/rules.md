@@ -6792,6 +6792,29 @@ These rules are in service of the rule `arrowQuotientCommute`.
       G, x : A, y : A, w : (x = y : A) |- sequal x y
       G |- M = N : (A -> quotient (x y : B) . C)
 
+- `quotientStrengthenSequalOf A B C F H M`
+
+      G |- M : quotient (x y : A) . B & F x = H x : C & F y = H y : C
+      >>
+      G, x : A, y : A |- B : type
+      G |- C : type
+      G |- M : quotient (x y : A) . B
+      G |- F : A -> C
+      G |- H : A -> C
+      G |- sequal (F M) (H M)
+
+- `quotientStrengthenSequalEq A B C F H M N`
+
+      G |- M = N : (quotient (x y : A) . B & F x = H x : C & F y = H y : C)
+      >>
+      G, x : A, y : A |- B : type
+      G |- C : type
+      G |- M = N : (quotient (x y : A) . B)
+      G |- F : A -> C
+      G |- H : A -> C
+      G |- sequal (F M) (H M)
+      G |- sequal (F N) (H N)
+
 - `symmetricalType`
 
       G |- symmetrical : intersect (i : level) . univ i -> univ i

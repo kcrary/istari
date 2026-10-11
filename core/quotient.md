@@ -64,6 +64,8 @@ We recapitulate the tools for this common pattern.
     PER2 : type:PER2
          = def:PER2
 
+    PER2_impl_PER : type:PER2_impl_PER
+
     quotient2_formation : type:quotient2_formation
 
     quotient2 : type:quotient2
@@ -128,7 +130,7 @@ supported (the lemma below uses `nat`), and the codomain type beneath
 the quotient must be *symmetrical*.  Symmetricality is a semantic
 condition that says the type's underlying relation must be symmetric,
 which is generally true whenever the type is built without using
-candidates, as most types are [2].  Also, the relation must be squash
+universes or candidates [2].  Also, the relation must be squash
 stable.
 
 This theorem cannot be proven using the usual quotient rules; it
@@ -171,6 +173,8 @@ requires a semantic analysis that is realized by the rule
 
     set_symmetrical : type:set_symmetrical
 
+    squash_symmetrical : type:squash_symmetrical
+
     quotient_symmetrical : type:quotient_symmetrical
 
     partial_symmetrical : type:partial_symmetrical
@@ -180,5 +184,6 @@ requires a semantic analysis that is realized by the rule
 [1] except that, in practice, the `quotient2_equality` lemma will
 normally generate fewer subgoals than `extensionality`
 
-[2] The main exception is universes, which are not symmetrical despite
-not mentioning candidates, as they *contain* candidates.
+[2] Candidates are the root source of non-symmetricality.  Universes
+fail to be symmetrical despite not mentioning candidates, because they
+*contain* candidates.

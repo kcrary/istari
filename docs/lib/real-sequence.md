@@ -74,6 +74,18 @@ Expressions in this file are rendered using the `real`
                         -> (forall (i : nat) . n <n= i -> s i <= s' i)
                         -> x <= y
 
+When an increasing sequence and a decreasing sequence, with the
+decreasing sequence above the increasing one, and they grow closer at
+a steady rate, both sequences converge to the same value.
+    
+    dual_convergence : forall (s1 s2 : nat -> real) (c : real) .
+                          0 < c
+                          -> c < 1
+                          -> (forall (i : nat) . s1 i <= s2 i)
+                          -> (forall (i j : nat) . i <n= j -> s1 i <= s1 j & s2 j <= s2 i)
+                          -> (forall (i : nat) . s2 (succ i) - s1 (succ i) <= c * (s2 i - s1 i))
+                          -> exists (x : real) . converges s1 x & converges s2 x
+
 
 ### Series
 

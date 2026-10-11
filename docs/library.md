@@ -28,6 +28,7 @@ The following libraries are pre-loaded:
 - [`Rational`](lib/rational.html)
 - [`Real`](lib/real.html)
 - [`RealExponent`](lib/real-exponent.html)
+- [`RealSupremum`](lib/real-supremum.html)
 - [`RealSequence`](lib/real-sequence.html)
 - [`Relations`](lib/relations.html)
 - [`Sqstable`](lib/sqstable.html)

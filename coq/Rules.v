@@ -2276,6 +2276,21 @@ Inductive tr : @context obj -> judgement -> Prop :=
                             (pi (subst (sh 2) a)
                                (subst (dot (app (var 1) (var 0)) (dot (app (var 2) (var 0)) (dot (var 0) (sh 3)))) c))))
 
+| tr_quotient_strengthen_sequal :
+    forall G a b c m n f g,
+      tr (hyp_tm (subst sh1 a) :: hyp_tm a :: G) (deqtype b b)
+      -> tr G (deq m n (quotient a b))
+      -> tr G (deq f f (tarrow a c))
+      -> tr G (deq g g (tarrow a c))
+      -> tr G (deq triv triv (sequal (app f m) (app g m)))
+      -> tr G (deq triv triv (sequal (app f n) (app g n)))
+      -> tr G (deq m n (quotient a
+                          (prod b
+                             (prod 
+                                (equal (subst (sh 2) c) (app (subst (sh 2) f) (var 1)) (app (subst (sh 2) g) (var 1)))
+                               
+                                (equal (subst (sh 2) c) (app (subst (sh 2) f) (var 0)) (app (subst (sh 2) g) (var 0)))))))
+
 | tr_symmetrical_formation_invert :
     forall G a a',
       tr G (deqtype (symmetrical a) (symmetrical a'))

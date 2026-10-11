@@ -44,6 +44,12 @@ Expressions in this file are rendered using the `real`
 
     converges_leqr : type:converges_leqr
 
+When an increasing sequence and a decreasing sequence, with the
+decreasing sequence above the increasing one, and they grow closer at
+a steady rate, both sequences converge to the same value.
+    
+    dual_convergence : type:dual_convergence
+
 
 ### Series
 

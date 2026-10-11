@@ -1,0 +1,799 @@
+File.import "logic-load.iml";
+File.import "nat-load.iml";
+File.import "integer-load.iml";
+File.import "omega-load.iml";
+File.import "squish-load.iml";
+File.import "sqstable-load.iml";
+File.import "real-load.iml";
+File.import "real-sequence-load.iml";
+
+openModule /Logic/;
+openModule /Squish/;
+openModule /Real/;
+openModule /RealSequence/;
+
+aliasModule /Q/ /Quotient/;
+
+beginModule "RealSupremum";
+
+
+lemma "infinite_sequence"
+/
+  forall lv (A : U lv) (P : nat -> A -> U lv) (R : A -> A -> U lv) a .
+    P 0 a
+    -> (forall i x . P i x -> exists y . P (succ i) y & R x y)
+    -> exists (f : nat -> A) .
+         f 0 = a : A
+         & (forall (i : nat) . 
+              P i (f i)
+              & R (f i) (f (succ i)))
+/;
+
+inference.
+intro /lv A P R a Ha Hnext/.
+set /F/ /(fnind f : forall (i : nat) . exists (y : A) . P i y of
+          | zero . (a, Ha)
+          | succ i . let p = Hnext i (f i #1) (f i #2) in (p #1, p #2 #1))/.
+typecheckLet /F/ /_/ /HofF/.
+reduce /HofF/.
+exists /fn i . F i #1/.
+reduce //.
+split.
+  {
+  unfold /F/.
+  reflexivity.
+  }
+intro /i/.
+split.
+  {
+  exact /F i #2/.
+  }
+
+  {
+  exact /Hnext i (F i #1) (F i #2) #2 #2/.
+  unfold /F at 2/.
+  fold /F i at 0 0/.
+  unfold /let/.
+  reflexivity.
+  }
+qed ();
+
+
+
+lemma "infinite_sequence_squish"
+/
+  forall lv (A : U lv) (P : nat -> A -> U lv) (R : A -> A -> U lv) a .
+    Q.symmetrical A
+    -> (forall i x . Q.symmetrical (P i x))
+    -> (forall x y . Q.symmetrical (R x y))
+    -> P 0 a
+    -> (forall i x . P i x -> squish (exists y . P (succ i) y & R x y))
+    -> squish
+         (exists (f : nat -> A) .
+            f 0 = a : A
+            & (forall (i : nat) . 
+                 P i (f i)
+                 & R (f i) (f (succ i))))
+/;
+
+inference.
+intro /lv A P R a HmetA HmetP HmetR Ha Hnext/.
+set /F/ /(fnind f : forall (i : nat) . squish (exists (y z : A) . P i y & P (succ i) z & R y z) of
+          | zero . 
+              squish_bind (Hnext 0 a Ha)
+              (fn q . squish_ret (a, q #1, Ha, q #2 #1, q #2 #2))
+
+          | succ i .
+              squish_bind (f i)
+              (fn p .
+                 squish_bind (Hnext (succ i) (p #2 #1) (p #2 #2 #2 #1))
+                 (fn q . squish_ret (p #2 #1, q #1, p #2 #2 #2 #1, q #2 #1, q #2 #2))))/.
+typecheckLet /F/ /_/ /HofF/.
+reduce /HofF/.
+assert /F : squish (forall (n : nat) . exists (y z : A) . P n y & P (succ n) z & R y z)/ /HofF'/.
+  {
+  subsume /_/.
+  1:{
+    hyp /HofF/.
+    }
+  apply /squish_forall_nat_subtype/.
+  reduce //.
+  intro /i/.
+  apply /Q.exists_symmetrical/ >> auto.
+  intro /y/.
+  reduce //.
+  apply /Q.exists_symmetrical/ >> auto.
+  intro /z/.
+  reduce //.
+  apply /Q.prod_symmetrical/ >> auto.
+  apply /Q.prod_symmetrical/ >> auto.
+  }
+assert /F : quotient (f g : forall (n : nat) . exists (y z : A) . P n y & P (succ n) z & R y z) .
+               (unit 
+                & (fn i . f i #2 #1) = (fn i . f (succ i) #1) : (nat -> A)
+                & (fn i . g i #2 #1) = (fn i . g (succ i) #1) : (nat -> A))
+               & f 0 #1 = a : A
+               & g 0 #1 = a : A/ /HofF''/.
+  {
+  RuleTactic.quotientStrengthenSequalOf
+    (parseCurr /A/)
+    (parseCurr /fn f . f 0 #1/)
+    (parseCurr /fn _ . a/) >> auto.
+  1:{
+    reduce //.
+    unfold /F/.
+    unfold /squish_bind/.
+    unfold /squish_ret/.
+    RuleTactic.sequalIntro.
+    }
+  RuleTactic.quotientStrengthenSequalOf
+    (parseCurr /nat -> A/)
+    (parseCurr /fn f i . f i #2 #1/)
+    (parseCurr /fn f i . f (succ i) #1/) >> auto.
+    {
+    fold /squish _/.
+    hyp /HofF'/.
+    }
+
+    {
+    reduce //.
+    unfold /F at 1/.
+    fold /F/.
+    unfold /squish_bind at all/.
+    unfold /squish_ret/.
+    RuleTactic.sequalIntro.
+    }
+  }
+clear /HofF HofF'/.
+so /F/ /f/.
+exact /((fn i . f i #1), ((), (fn i . (f i #2 #2 #1, f i #2 #2 #2 #2))))/.
+destruct /f/ /[f g Hfg]/.
+unfold /squish/.
+extensionality >> auto.
+  {
+  reduce //.
+  apply /Hfg/.
+  }
+
+  {
+  reduce //.
+  change /concl/ /(fn i . f i #2 #1) i = (fn i . f (succ i) #1) i : A/.
+  decompEq 1 /nat -> A/ >> auto.
+  apply /Hfg/.
+  }
+
+  {
+  reduce //.
+  apply /Hfg/.
+  }
+
+  {
+  reduce //.
+  change /concl/ /(fn i . g i #2 #1) i = (fn i . g (succ i) #1) i : A/.
+  decompEq 1 /nat -> A/ >> auto.
+  apply /Hfg/.
+  }
+qed ();
+
+
+
+(* SET PARSING TO REAL *)
+setArithReal ();
+
+
+(* This is classically equivalent to the standard definition of least upper bound, 
+   but it is stronger constructively.
+*)
+
+define /supremum P b/
+/
+  (forall (x : real) . P x -> x <= b)
+  & (forall e . 0 < e -> squish (exists (x : real) . P x & b - e < x))
+//
+  intersect (i : level) . (real -> U i) -> real -> U i
+/;
+
+unfold /supremum/.
+typecheck.
+qed ();
+
+
+
+lemma "supremum_ub"
+/
+  forall i (P : real -> U i) b x .
+    supremum P b
+    -> P x
+    -> x <= b
+/;
+
+inference.
+intro /i P b x Hsup Hx/.
+unfold /supremum in Hsup/.
+apply /Hsup/ >> auto.
+qed ();
+
+
+
+lemma "constructive_lub_to_classical"
+/
+  forall i (P : real -> U i) b .
+    (forall e . 0 < e -> squish (exists (x : real) . P x & b - e < x))
+    -> (forall x . (forall y . P y -> y <= x) -> b <= x)
+/;
+
+inference.
+intro /i P b Hlub x Hub/.
+apply /leqr_from_lower_bounds/.
+intro /y Hyb/.
+so /Hlub (b - y) __/ /Hsq/.
+  {
+  rewrite /<- minusr_shift_ltr_rr/.
+  rewrite /-> plusr_id_l/.
+  hyp /Hyb/.
+  }
+so /squish_impl_squash _# 2 Hsq/ /[Hsq']/.
+unhide.
+destruct /Hsq'/ /z Hz Hlt/.
+transitivity /z/ >> auto.
+apply /ltr_impl_leqr/.
+rewrite /<- minusr_plusr_assoc in Hlt/.
+rewrite /-> minusr_self in Hlt/.
+rewrite /-> plusr_id_l in Hlt/.
+hyp /Hlt/.
+qed ();
+
+
+
+lemma "classical_lub_to_constructive"
+/
+  forall i (P : real -> U i) b .
+    (forall x . (forall y . P y -> y <= x) -> b <= x)
+    -> (forall e . 0 < e -> not (not (exists (x : real) . P x & b - e < x)))
+/;
+
+inference.
+intro /i P b Hlub e He/.
+intro /Hnot/.
+apply /ltr_irrefl b/.
+apply /leqr_ltr_trans _ (b - e)/.
+1:{
+  rewrite /<- minusr_shift_ltr_ll/.
+  rewrite /-> minusr_shift_ltr_lr/.
+  rewrite /-> minusr_self/.
+  hyp /He/.
+  }
+apply /Hlub/.
+intro /y Hy/.
+apply /not_ltr/.
+contrapositive /Hnot/.
+exists /y/ >> auto.
+qed ();
+
+
+
+lemma "supremum_lub"
+/
+  forall i (P : real -> U i) b x .
+    supremum P b
+    -> (forall y . P y -> y <= x)
+    -> b <= x
+/;
+
+inference.
+intro /i P b x Hsup Hub/.
+destruct /Hsup/ /_ Hlub/.
+apply /constructive_lub_to_classical i/ >> auto.
+qed ();
+
+
+
+lemma "supremum_unique"
+/
+  forall i (P : real -> U i) b b' .
+    supremum P b
+    -> supremum P b'
+    -> b = b' : real
+/;
+
+inference.
+intro /i P b b' Hsup Hsup'/.
+apply /leqr_antisymm/.
+  {
+  apply /supremum_lub i P/ >> auto.
+  intros.
+  apply /supremum_ub i P/ >> auto.
+  }
+
+  {
+  apply /supremum_lub i P/ >> auto.
+  intros.
+  apply /supremum_ub i P/ >> auto.
+  }
+qed ();
+
+
+
+lemma "supremum_ext"
+/
+  forall i (P : real -> U i) b (h h' : supremum P b) .
+    h = h' : supremum P b
+/;
+
+inference.
+intro /i P b H H'/.
+unfold /supremum in H in H' in concl/.
+extensionality >> reduce //.
+  {
+  introEq /z Hz/.
+  apply /leqr_ext/.
+  }
+
+  {
+  introEq /e He/.
+  apply /squish_ext/.
+  }
+qed ();
+
+
+
+lemma "supremum_exists_symmetrical"
+/
+  forall i (P : real -> U i) a b .
+    (forall x . Q.symmetrical (P x))
+    -> P a
+    -> (forall x . P x -> x <= b)
+    -> (forall x y . x < y -> squish ((exists z . P z & x < z) % (forall z . P z -> z <= y)))
+    -> exists c . supremum P c
+/;
+
+inference.
+intro /lv P a b Hmet Ha Hb Hdecide/.
+apply /squish_elim/.
+1:{
+  intro /(x Hx) (y Hy)/.
+  so /supremum_unique _# 4 Hx Hy/ /?/.
+  subst /y/.
+  extensionality >> reduce // >> auto.
+  apply /supremum_ext/.
+  }
+assert /0 < 4/ /H04/.
+  {
+  apply /integer_to_real_mono_lt/ >> omega.
+  }
+assert /2 != 0 : real/ /Hnz2/.
+  {
+  apply /integer_to_real_neq/.
+  omega.
+  }
+assert /4 != 0 : real/ /Hnz4/.
+  {
+  apply /integer_to_real_neq/.
+  omega.
+  }
+exploit /infinite_sequence_squish lv (real & real)
+           (fn _ p . P (p #1) & (forall z . P z -> z < p #2))
+           (fn p q .
+              p #1 <= q #1
+              & q #2 <= p #2
+              & q #2 - q #1 <= (3 || 4) * (p #2 - p #1))
+           (a, b + 1)/ /H/
+>> reduce /concl/.
+  {
+  apply /Q.prod_symmetrical/ >> autoWith /real_symmetrical/.
+  }
+
+  {
+  intro /i p/.
+  apply /Q.prod_symmetrical/ >> auto.
+  apply /Q.forall_symmetrical/ >> autoWith /real_symmetrical/.
+  intro /z/.
+  reduce //.
+  apply /Q.arrow_symmetrical/ >> auto.
+  apply /ltr_symmetrical/.
+  }
+  
+  {
+  intro /p q/.
+  apply /Q.prod_symmetrical/.
+    {
+    apply /leqr_symmetrical/.
+    }
+  apply /Q.prod_symmetrical/.
+    {
+    apply /leqr_symmetrical/.
+    }
+
+    {
+    apply /leqr_symmetrical/.
+    }
+  }
+
+  {
+  split >> auto.
+  intro /z Hz/.
+  apply /leqr_ltr_trans _ b/.
+    {
+    apply /Hb/ >> auto.
+    }
+
+    {
+    rewrite /<- plusr_id_r b/.
+    apply /plusr_ltr_r/ >> auto.
+    apply /integer_to_real_mono_lt/ >> omega.
+    }
+  }
+
+  {
+  intro /_ (x y) (Hx Hy)/.
+  reduce /Hx Hy concl/.
+  assert /x < y/ /Hxy/ >> auto.
+  so /Hdecide (x + invr 4 * (y - x)) (x + invr 2 * (y - x)) __/ /H/.
+    {
+    apply /plusr_ltr_r/ >> auto.
+    apply /timesr_ltr_r/.
+      {
+      rewrite /<- minusr_shift_ltr_rr/.
+      rewrite /-> plusr_id_l/ >> auto.
+      }
+
+      {
+      apply /invr_ltr_pos/ >> apply /integer_to_real_mono_lt/ >> omega.
+      }
+    }
+  witness /squish_bind H __/.
+  clear /H/.
+  intro /((z Hz Hunder) | Hover)/.
+    {
+    apply /squish_ret/.
+    exists /(z, y)/.
+    reduce //.
+    splitn 3 >> auto.
+      {
+      rewrite /<- Hunder/.
+      rewrite /<- plusr_id_r x/.
+      apply /plusr_leqr/ >> auto.
+      apply /timesr_leqr_zero/.
+        {
+        apply /ltr_impl_leqr/.
+        apply /invr_positive/ >> auto.
+        }
+        
+        {
+        rewrite /<- minusr_shift_leqr_rr/.
+        rewrite /-> plusr_id_l/.
+        apply /ltr_impl_leqr/ >> auto.
+        }
+      }
+
+      {
+      apply /timesr_cancel_leqr_l _ _ 4/ >> auto.
+      unfold /divr/.
+      rewrite /<- timesr_assoc at all/.
+      rewrite /-> timesr_rotate at 1/.
+      rewrite /-> timesr_inverse_l/.
+      calculate //.
+      transitivity /4 * (y - (x + invr 4 * (y - x)))/.
+        {
+        apply /timesr_leqr_l/.
+          {
+          apply /integer_to_real_mono/ >> omega.
+          }
+        apply /minusr_leqr/ >> auto.
+        apply /ltr_impl_leqr/ >> auto.
+        }
+      apply /leqr_refl'/.
+      rewrite /<- minusr_assoc/.
+      rewrite /<- timesr_id_l (y - x)/.
+      rewrite /<- timesr_dist_minusr_l/.
+      rewrite /<- timesr_assoc/.
+      compat.
+      rewrite /-> timesr_dist_minusr_r/.
+      rewrite /-> timesr_inverse_r/.
+      calculate //.
+      reflexivity.
+      }
+    }
+
+    {
+    apply /squish_ret/.
+    set /w/ /x + 3 || 4 * (y - x)/.
+    typecheckLet /w/ /_/ /Hofw/.
+    exists /(x, w)/.
+    reduce //.
+    splitn 3 >> auto.
+      {
+      split >> auto.
+      intro /z Hz/.
+      apply /leqr_ltr_trans _ (x + invr 2 * (y - x))/.
+        {
+        apply /Hover/ >> auto.
+        }
+      unfold /w/.
+      apply /plusr_ltr_r/ >> auto.
+      apply /timesr_ltr_r/.
+        {
+        rewrite /<- minusr_shift_ltr_rr/.
+        rewrite /-> plusr_id_l/ >> auto.
+        }
+      apply /timesr_cancel_ltr_l _ _ (2 * 2)/.
+        {
+        calculate // >> auto.
+        }
+      rewrite /-> timesr_assoc/.
+      rewrite /-> timesr_inverse_r/.
+      calculate //.
+      unfold /divr/.
+      rewrite /-> timesr_commute at 1/.
+      rewrite /<- timesr_assoc/.
+      rewrite /-> timesr_inverse_r/.
+      calculate //.
+      apply /integer_to_real_mono_lt/ >> omega.
+      }
+
+      {
+      subst /w/.
+      apply /timesr_cancel_leqr_l _ _ 4/ >> auto.
+      rewrite /-> timesr_dist_plusr_r/.
+      unfold /divr/.
+      rewrite /<- timesr_assoc at all/.
+      rewrite /-> timesr_commute3 at 1/.
+      rewrite /-> timesr_inverse_r/.
+      calculate //.
+      rewrite /-> timesr_dist_minusr_r/.
+      rewrite /<- plusr_minusr_assoc/.
+      rewrite /-> plusr_commute/.
+      rewrite /-> plusr_minusr_assoc/.
+      rewrite /<- timesr_dist_minusr_l/.
+      calculate //.
+      rewrite /4 = 3 + 1 : real/.
+        {
+        calculate // >> auto.
+        }
+      rewrite /-> timesr_dist_plusr_l/.
+      rewrite /-> timesr_id_l at all/.
+      apply /plusr_leqr/ >> auto.
+      apply /ltr_impl_leqr/ >> auto.
+      }
+
+      {
+      apply /timesr_cancel_leqr_l _ _ 4/ >> auto.
+      unfold /divr/.
+      rewrite /<- timesr_assoc at all/.
+      rewrite /-> timesr_rotate at 1/.
+      rewrite /-> timesr_inverse_l/.
+      calculate //.
+      unfold /w/.
+      rewrite /-> plusr_minusr_swap/.
+      rewrite /-> minusr_self/.
+      rewrite /-> plusr_id_l/.
+      unfold /divr/.
+      rewrite /<- timesr_assoc at all/.
+      rewrite /-> timesr_rotate at 1/.
+      rewrite /-> timesr_inverse_l/.
+      calculate //.
+      apply /leqr_refl/.
+      }
+    }
+  }
+witness /squish_bind H __/.
+clear /H/.
+intro /(f _ Hf)/.
+reduce /Hf/.
+apply /squish_ret/.
+exploit /dual_convergence (fn i . f i #1) (fn i . f i #2) (3 || 4)/ /H/
+>> reduce /concl/.
+  {
+  apply /timesr_cancel_ltr_l _ _ 4/ >> auto.
+  unfold /divr/.
+  rewrite /-> timesr_commute at 2/.
+  rewrite /<- timesr_assoc/.
+  rewrite /-> timesr_inverse_r/.
+  calculate //.
+  apply /integer_to_real_mono_lt/ >> omega.
+  }
+
+  {
+  apply /timesr_cancel_ltr_l _ _ 4/ >> auto.
+  unfold /divr/.
+  rewrite /-> timesr_commute at 1/.
+  rewrite /<- timesr_assoc/.
+  rewrite /-> timesr_inverse_r/.
+  calculate //.
+  apply /integer_to_real_mono_lt/ >> omega.
+  }
+
+  {
+  intro /i/.
+  apply /ltr_impl_leqr/.
+  auto.
+  }
+
+  {
+  intro /i j/.
+  sinduction /j/.
+  reintro /IH/.
+  intro /Hij/.
+  rewrite /-> Nat.leq_iff_lt_or_eq in Hij/.
+  destruct /Hij/ /Hij | ?/.
+  1:{
+    subst /j/.
+    auto.
+    }
+  split.
+    {
+    transitivity /f (Nat.pred j) #1/.
+      {
+      apply /IH/ >> omega.
+      }
+    rewriteThen /j = succ (Nat.pred j) : nat at 1/ omega.
+    apply /Hf/.
+    }
+
+    {
+    transitivity /f (Nat.pred j) #2/.
+    1:{
+      apply /IH/ >> omega.
+      }
+    rewriteThen /j = succ (Nat.pred j) : nat at 0/ omega.
+    apply /Hf/.
+    }
+  }
+
+  {
+  intro /i/.
+  apply /Hf/.
+  }
+destruct /H/ /c Hconvlo Hconvhi/.
+exists /c/.
+unfold /supremum/.
+split.
+  {
+  intro /x Hx/.
+  apply /converges_leqr (fn _ . x) (fn i . f i #2) _ _ n`0/.
+    {
+    apply /converges_constant/.
+    }
+
+    {
+    hyp /Hconvhi/.
+    }
+
+    {
+    reduce //.
+    intro /i _/.
+    apply /ltr_impl_leqr/.
+    auto.
+    }
+  }
+
+  {
+  intro /e Hpose/.
+  so /Hdecide (c - e) (c - invr 2 * e) __/ /H/.
+    {
+    apply /minusr_ltr_r/ >> auto.
+    rewrite /<- timesr_id_l e at 1/.
+    apply /timesr_ltr_r/ >> auto.
+    rewrite /<- invr_one/.
+    apply /invr_ltr_pos/ >> apply /integer_to_real_mono_lt/ >> omega.
+    }
+  witness /squish_bind H __/.
+  clear /H/.
+  intro /((z Hz Hxz) | Hall)/.
+    {
+    apply /squish_ret/.
+    exists /z/ >> auto.
+    }
+
+    {
+    exfalso.
+    apply /ltr_irrefl c/.
+    apply /leqr_ltr_trans _ (c - invr 2 * e)/.
+      {
+      apply /converges_leqr (fn i . f i #1) (fn _ . c - invr 2 * e) _ _ n`0/ >> auto.
+      apply /converges_constant/.
+      }
+
+      {
+      rewrite /<- minusr_id_r c at 1/.
+      apply /minusr_ltr_r/ >> auto.
+      apply /timesr_ltr_zero/ >> auto.
+      apply /invr_positive/.
+      apply /integer_to_real_mono_lt/ >> omega.
+      }
+    }
+  }
+qed ();
+
+
+
+lemma "supremum_exists_sqsq"
+/
+  forall i (P : real -> U i) a b .
+    (forall x . { P x } -> squish (P x))
+    -> P a
+    -> (forall x . P x -> x <= b)
+    -> (forall x y . x < y -> squish ((exists z . P z & x < z) % (forall z . P z -> z <= y)))
+    -> exists c . supremum P c
+/;
+
+inference.
+intro /i P a b Hsqsq Ha Hb Hdecide/.
+assert /exists c . supremum (fn z . { P z }) c/ /c Hc/.
+  {
+  apply /supremum_exists_symmetrical i (fn z . { P z }) a b/ >> auto >> reduce //.
+    {
+    intro /x/.
+    apply /Q.squash_symmetrical/.
+    }
+
+    {
+    intro /z [Hz]/.
+    unhide.
+    apply /Hb/ >> auto.
+    }
+
+    {
+    intro /x y Hxy/.
+    witness /squish_bind (Hdecide _ _ Hxy) __/.
+    intro /((z Hz Hxz) | Hall)/.
+      {
+      apply /squish_ret/.
+      left.
+      exists /z/.
+      auto.
+      }
+
+      {
+      apply /squish_ret/.
+      right.
+      intro /z [Hz]/.
+      unhide.
+      apply /Hall/ >> auto.
+      }
+    }
+  }
+exists /c/.
+unfold /supremum in Hc in concl/.
+split.
+  {
+  intro /x Hx/.
+  apply /Hc/ >> auto.
+  }
+
+  {
+  intro /e He/.
+  so /Hc #2 e He/ /H/.
+  reduce /H/.
+  witness /squish_bind H __/.
+  clear /H/.
+  intro /(x Hxsq Hlt)/.
+  witness /squish_bind (Hsqsq _ Hxsq) __/.
+  intro /Hx/.
+  apply /squish_ret/.
+  existsAuto.
+  }
+qed ();
+
+
+
+lemma "supremum_exists"
+/
+  forall i (P : real -> U i) a b .
+    (forall x . Sqstable.sqstable (P x))
+    -> P a
+    -> (forall x . P x -> x <= b)
+    -> (forall x y . x < y -> squish ((exists z . P z & x < z) % (forall z . P z -> z <= y)))
+    -> exists c . supremum P c
+/;
+
+inference.
+intro /i P a b Hstable Ha Hb Hdecide/.
+apply /supremum_exists_sqsq/ >> auto.
+intro /x Hsq/.
+apply /squish_ret/.
+exact /Hstable x Hsq/.
+qed ();
+
+
+endModule ();

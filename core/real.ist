@@ -8210,6 +8210,40 @@ qed ();
 
 
 
+lemma "minusr_ltr_l"
+/
+  forall x x' y y' .
+    x <r x'
+    -> y' <r= y
+    -> x - y <r x' - y'
+/;
+
+inference.
+intro /x x' y y' Hx Hy/.  
+unfold /minusr at 0 0/.
+apply /plusr_ltr_l/ >> auto.
+apply /negr_leqr/ >> auto.
+qed ();
+
+
+
+lemma "minusr_ltr_r"
+/
+  forall x x' y y' .
+    x <r= x'
+    -> y' <r y
+    -> x - y <r x' - y'
+/;
+
+inference.
+intro /x x' y y' Hx Hy/.  
+unfold /minusr at 0 0/.
+apply /plusr_ltr_r/ >> auto.
+apply /negr_ltr/ >> auto.
+qed ();
+
+
+
 (* Relation to rationals *)
 
 lemma "rational_to_real_neq"
@@ -12875,6 +12909,105 @@ lemma "real_upper_bound_nat_squash"
 intro /x/.
 apply /squish_impl_squash/.
 apply /real_upper_bound_nat/.
+qed ();
+
+
+
+lemma "leqr_from_upper_bounds"
+/
+  forall (x y : real) .
+    (forall z . y < z -> x <= z)
+    -> x <= y
+/;
+
+inference.
+intro /x y Hub/.
+apply /not_ltr/.
+intro /Hyx/.
+so /rational_dense_within_real_squash _# 2 Hyx/ /[(z Hyz Hzx)]/.
+so /Hub _ Hyz/ /Hxz/.
+so /ltr_irrefl _ (ltr_leqr_trans _# 3 Hzx Hxz)/ /0/.
+qed ();
+
+
+
+lemma "leqr_from_lower_bounds"
+/
+  forall (x y : real) .
+    (forall z . z < y -> z <= x)
+    -> y <= x
+/;
+
+inference.
+intro /x y Hub/.
+apply /not_ltr/.
+intro /Hxy/.
+so /rational_dense_within_real_squash _# 2 Hxy/ /[(z Hxz Hzy)]/.
+so /Hub _ Hzy/ /Hzx/.
+so /ltr_irrefl _ (leqr_ltr_trans _# 3 Hzx Hxz)/ /0/.
+qed ();
+
+
+
+lemma "real_symmetrical"
+/
+  Q.symmetrical real
+/;
+
+unfold /real/.
+apply /Q.quotient_symmetrical/.
+  {
+  apply /Q.PER2_impl_PER/.
+  apply /realequiv_per/.
+  }
+
+  {
+  apply /Q.arrow_symmetrical/ >> autoWith /Q.nat_symmetrical rational_symmetrical/.
+  }
+qed ();
+
+
+
+lemma "ltr_symmetrical"
+/
+  forall x y . Q.symmetrical (x <r y)
+/;
+
+inference.
+intro /x y/.
+apply /Q.unitary_symmetrical/.
+so /real_representative x/ /[(x' ? ?)]/.
+so /real_representative y/ /[(y' ? ?)]/.
+subst /x y/.
+intro /H/.
+unfold /ltr in H/.
+unfold /positive in H/.
+unfold /rintro in H at all/.
+unfold /minusr in H/.
+unfold /plusr in H/.
+unfold /negr in H/.
+destruct /H/ /[?]/.
+typecheck.
+qed ();
+
+
+
+lemma "leqr_symmetrical"
+/
+  forall x y . Q.symmetrical (x <r= y)
+/;
+
+inference.
+intro /x y/.
+unfold /leqr/.
+apply /Q.arrow_symmetrical/.
+  {
+  apply /ltr_symmetrical/.
+  }
+
+  {
+  apply /Q.void_symmetrical/.
+  }
 qed ();
 
 

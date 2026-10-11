@@ -79,6 +79,9 @@ We recapitulate the tools for this common pattern.
               & (forall (x y : A) . Q x -> Q y -> R x y -> R y x)
               & (forall (x y z : A) . Q x -> Q y -> Q z -> R x y -> R y z -> R x z)
 
+    PER2_impl_PER : forall (i : level) (A : U i) (Q : A -> U i) (R : A -> A -> U i) .
+                       PER2 A Q R -> PER A (fn x y . Q x & Q y & R x y)
+
     quotient2_formation : forall (i : level) (A : U i) (Q : A -> U i) (R : A -> A -> U i) .
                              PER2 A Q R -> (quotient (x y : A) . Q x & Q y & R x y) : U i
 
@@ -193,7 +196,7 @@ supported (the lemma below uses `nat`), and the codomain type beneath
 the quotient must be *symmetrical*.  Symmetricality is a semantic
 condition that says the type's underlying relation must be symmetric,
 which is generally true whenever the type is built without using
-candidates, as most types are [2].  Also, the relation must be squash
+universes or candidates [2].  Also, the relation must be squash
 stable.
 
 This theorem cannot be proven using the usual quotient rules; it
@@ -265,6 +268,8 @@ requires a semantic analysis that is realized by the rule
     set_symmetrical : forall (i : level) (A : U i) (B : A -> U i) .
                          symmetrical A -> symmetrical { x : A | B x }
 
+    squash_symmetrical : forall (i : level) (A : U i) . symmetrical { A }
+
     quotient_symmetrical : forall (i : level) (A : U i) (R : A -> A -> U i) .
                               PER A R -> symmetrical A -> symmetrical (quotient (x y : A) . R x y)
 
@@ -275,5 +280,6 @@ requires a semantic analysis that is realized by the rule
 [1] except that, in practice, the `quotient2_equality` lemma will
 normally generate fewer subgoals than `extensionality`
 
-[2] The main exception is universes, which are not symmetrical despite
-not mentioning candidates, as they *contain* candidates.
+[2] Candidates are the root source of non-symmetricality.  Universes
+fail to be symmetrical despite not mentioning candidates, because they
+*contain* candidates.

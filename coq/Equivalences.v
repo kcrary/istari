@@ -220,6 +220,17 @@ prove_equiv_compat.
 Qed.
 
 
+Lemma equiv_equal :
+  forall object (a a' m m' n n' : @term object),
+    equiv a a'
+    -> equiv m m'
+    -> equiv n n'
+    -> equiv (equal a m n) (equal a' m' n').
+Proof.
+prove_equiv_compat.
+Qed.
+
+
 Lemma equiv_exist :
   forall (a a' b b' c c' : term object),
     equiv a a'

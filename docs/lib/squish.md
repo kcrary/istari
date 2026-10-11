@@ -54,3 +54,16 @@ cannot return a deterministic inhabitant of the disjunction.
 
     (* using real overloading *)
     Real.plusr_positive_invert : forall (x y : real) . 0 < x + y -> squish (0 < x % 0 < y)
+
+A squish containing a universal quantifier can be commuted to within
+the quantifier.  The opposite direction depends on the properties of
+the domain and codomain.  There is more information in the [`Quotient`
+library](quotient.html).
+
+    squish_forall_commute : forall (i : level) (P : nat -> U i) .
+                               squish (forall (x : nat) . P x) -> forall (x : nat) . squish (P x)
+
+    squish_forall_nat : forall (i : level) (P : nat -> U i) .
+                           (forall (x : nat) . Quotient.symmetrical (P x))
+                           -> (forall (x : nat) . squish (P x))
+                           -> squish (forall (x : nat) . P x)

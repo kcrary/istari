@@ -240,6 +240,10 @@ before moving.  It is always the right-hand operand after moving.
 
     minusr_leqr : type:minusr_leqr
 
+    minusr_ltr_l : type:minusr_ltr_l
+
+    minusr_ltr_r : type:minusr_ltr_r
+
     minusr_cancel_leqr_l : type:minusr_cancel_leqr_l
 
     minusr_cancel_leqr_r : type:minusr_cancel_leqr_r
@@ -913,9 +917,19 @@ of their inputs:
 
     infinitely_close : type:infinitely_close
 
+    leqr_from_upper_bounds : type:leqr_from_upper_bounds
+
+    leqr_from_lower_bounds : type:leqr_from_lower_bounds
+
     real_total : type:real_total
 
     real_strict : type:real_strict
+
+    real_symmetrical : type:real_symmetrical
+
+    ltr_symmetrical : type:ltr_symmetrical
+
+    leqr_symmetrical : type:leqr_symmetrical
 
 
 ### Prereals

@@ -2237,3 +2237,794 @@ f_equal.
 apply urelspinj_equal.
 apply prod_action_ppair; auto.
 Qed.
+
+
+Lemma sound_quotient_strengthen_sequal :
+  forall G a b c m n f g,
+    pseq (hyp_tm (subst sh1 a) :: hyp_tm a :: G) (deqtype b b)
+    -> pseq G (deq m n (quotient a b))
+    -> pseq G (deq f f (tarrow a c))
+    -> pseq G (deq g g (tarrow a c))
+    -> pseq G (deq triv triv (sequal (app f m) (app g m)))
+    -> pseq G (deq triv triv (sequal (app f n) (app g n)))
+    -> pseq G (deq m n (quotient a
+                          (prod b
+                             (prod 
+                                (equal (subst (sh 2) c) (app (subst (sh 2) f) (var 1)) (app (subst (sh 2) g) (var 1)))
+                             
+                                (equal (subst (sh 2) c) (app (subst (sh 2) f) (var 0)) (app (subst (sh 2) g) (var 0))))))).
+Proof.
+intros G a b c m n f g.
+revert G.
+refine (seq_pseq 4 [hyp_emp; hyp_emp] b [] c [] f [] g 6 [_; _] _ [] _ [] _ [] _ [] _ [] _ _ _); cbn.
+intros G Hclb Hclc Hclf Hclg Hseqb Hseqmn Hseqf Hseqg Hseqfgm Hseqfgn.
+rewrite -> seq_eqtype in Hseqb.
+rewrite -> seq_deq in Hseqmn, Hseqf, Hseqg, Hseqfgm, Hseqfgn |- *.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (Hseqmn _#3 Hs) as (Q & Hql & Hqr & Hm & Hn & Hmn).
+simpsubin Hql.
+simpsubin Hqr.
+invert (basic_value_inv _#6 value_quotient Hql).
+intros A B hs ht Hal Hbl Heq.
+invert (basic_value_inv _#6 value_quotient Hqr).
+intros A' B' hs' ht' Har Hbr Heq'.
+so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))).
+subst A'.
+clear Heq'.
+subst Q.
+exploit (extract_functional_dual toppg A G a b i s s') as (B'' & Hbl' & Hbr'); auto.
+  {
+  intros j t Hj Ht.
+  so (Hseqmn _#3 Ht) as (Q' & Hql' & Hqt & _).
+  simpsubin Hql'.
+  simpsubin Hqt.
+  cbn [Nat.add] in Hql', Hqt.
+  invert (basic_value_inv _#6 value_quotient Hql').
+  intros A' B'' hs'' ht'' Hal' _ Heq.
+  invert (basic_value_inv _#6 value_quotient Hqt).
+  intros A'' B''' hs''' ht''' Hat _ Heq'.
+  so (basic_fun _#7 (basic_downward _#7 Hj Hal) Hal').
+  subst A'.
+  so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))).
+  subst A''.
+  apply (relhyp_tm _#4 (iutruncate (S j) A)); auto.
+  eapply basic_downward; eauto.
+  }
+
+  {
+  intros j t Hj Ht.
+  so (Hseqmn _#3 Ht) as (Q' & Hqt & Hqr' & _).
+  simpsubin Hqr'.
+  simpsubin Hqt.
+  cbn [Nat.add] in Hqr', Hqt.
+  invert (basic_value_inv _#6 value_quotient Hqr').
+  intros A' B'' hs'' ht'' Har' _ Heq.
+  invert (basic_value_inv _#6 value_quotient Hqt).
+  intros A'' B''' hs''' ht''' Hat _ Heq'.
+  so (basic_fun _#7 (basic_downward _#7 Hj Har) Har').
+  subst A'.
+  so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))).
+  subst A''.
+  apply (relhyp_tm _#4 (iutruncate (S j) A)); auto.
+  eapply basic_downward; eauto.
+  }
+
+  {
+  intros j t t' Ht.
+  so (Hseqb _#3 Ht) as (R & Hl & Hr & _).
+  eauto.
+  }
+simpsubin Hbl.
+simpsubin Hbr.
+so (functional_fun _#8 Hbl Hbl').
+subst B''.
+so (functional_fun _#8 Hbr Hbr').
+subst B'.
+so (proof_irrelevance _ hs hs').
+subst hs'.
+so (proof_irrelevance _ ht ht').
+subst ht'.
+clear Hql Hqr.
+exploit (extract_functional_dual toppg A G a
+           (prod b
+              (prod
+                 (equal (subst (sh 2) c) (app (subst (sh 2) f) (var 1)) (app (subst (sh 2) g) (var 1)))
+               
+                 (equal (subst (sh 2) c) (app (subst (sh 2) f) (var 0)) (app (subst (sh 2) g) (var 0)))))
+           i s s') as (D & Hdl & Hdr); auto.
+  {
+  prove_hygiene.
+  }
+
+  {
+  intros j t Hj Ht.
+  so (Hseqmn _#3 Ht) as (Q' & Hql' & Hqt & _).
+  simpsubin Hql'.
+  simpsubin Hqt.
+  cbn [Nat.add] in Hql', Hqt.
+  invert (basic_value_inv _#6 value_quotient Hql').
+  intros A' B'' hs'' ht'' Hal' _ Heq.
+  invert (basic_value_inv _#6 value_quotient Hqt).
+  intros A'' B''' hs''' ht''' Hat _ Heq'.
+  so (basic_fun _#7 (basic_downward _#7 Hj Hal) Hal').
+  subst A'.
+  so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))).
+  subst A''.
+  apply (relhyp_tm _#4 (iutruncate (S j) A)); auto.
+  eapply basic_downward; eauto.
+  }
+
+  {
+  intros j t Hj Ht.
+  so (Hseqmn _#3 Ht) as (Q' & Hqt & Hqr' & _).
+  simpsubin Hqr'.
+  simpsubin Hqt.
+  cbn [Nat.add] in Hqr', Hqt.
+  invert (basic_value_inv _#6 value_quotient Hqr').
+  intros A' B'' hs'' ht'' Har' _ Heq.
+  invert (basic_value_inv _#6 value_quotient Hqt).
+  intros A'' B''' hs''' ht''' Hat _ Heq'.
+  so (basic_fun _#7 (basic_downward _#7 Hj Har) Har').
+  subst A'.
+  so (iuquotient_inj _#9 (eqtrans Heq (eqsymm Heq'))).
+  subst A''.
+  apply (relhyp_tm _#4 (iutruncate (S j) A)); auto.
+  eapply basic_downward; eauto.
+  }
+
+  {
+  intros j tt tt' Htt.
+  invert Htt.
+  intros x y t1 t1' Ht1 Hxy _ _ <- <-.
+  invert Ht1.
+  intros z w t t' Ht Hzw _ _ <- <-.
+  so (Hseqb _#3 Htt) as (Bx & Hbxl & Hbxr & _).
+  so (Hseqf _#3 Ht) as (AC & Hacl & Hacr & Hf & _).
+  simpsubin Hacl.
+  simpsubin Hacr.
+  invert (basic_value_inv _#6 value_tarrow Hacl).
+  intros At C Hatl Hctl Heq.
+  invert (basic_value_inv _#6 value_tarrow Hacr).
+  intros At' C' Hatr Hctr Heq'.
+  so (iuarrow_inj _#7 (eqtrans Heq (eqsymm Heq'))) as (? & HeqC).
+  subst At'.
+  clear Heq'.
+  subst AC.
+  so (Hseqg _#3 Ht) as (AC' & Hacl' & _ & Hg & _).
+  simpsubin Hacl'.
+  invert (basic_value_inv _#6 value_tarrow Hacl').
+  intros At' C'' Hatl' Hctl' <-.
+  so (basic_fun _#7 Hatl Hatl').
+  subst At'.
+  clear Hatl'.
+  so (basic_fun _#7 Hctl Hctl').
+  subst C''.
+  clear Hctl'.
+  so (Hseqmn _#3 Ht) as (R & Hqtl & _ & Hmt & _).
+  simpsubin Hqtl.
+  invert (basic_value_inv _#6 value_quotient Hqtl).
+  intros At' Bt hst htt Hatl' _ <-.
+  so (basic_fun _#7 Hatl Hatl').
+  subst At'.
+  clear Hatl'.
+  cbn in Hmt.
+  decompose Hmt.
+  intros _ q _ _ Hmq _ _.
+  so (HeqC _ _ _ Hmq) as HeqC'.
+  simpsubin Hxy.
+  simpsubin Hzw.
+  invertc Hxy.
+  intros At' Hatl' _ Hxy.
+  so (basic_fun _#7 Hatl Hatl').
+  subst At'.
+  clear Hatl'.
+  invertc Hzw.
+  intros At' Hatl' _ Hzw.
+  so (basic_fun _#7 Hatl Hatl').
+  subst At'.
+  clear Hatl'.
+  simpsub.
+  so (arrow_action_app _#9 Hf Hxy) as Hfxy.
+  so (arrow_action_app _#9 Hg Hxy) as Hgxy.
+  so (arrow_action_app _#9 Hf Hzw) as Hfzw.
+  so (arrow_action_app _#9 Hg Hzw) as Hgzw.
+  assert (j < S j) as Hjj by omega.
+  exists (iuprod stop Bx 
+            (iuprod stop
+               (iuequal stop true j (iutruncate (S j) C) _#4 (conj Hjj Hfzw) (conj Hjj Hgzw))
+               (iuequal stop true j (iutruncate (S j) C) _#4 (conj Hjj Hfxy) (conj Hjj Hgxy)))).
+  split.
+    {
+    apply interp_eval_refl.
+    apply interp_prod; auto.
+    apply interp_eval_refl.
+    apply interp_prod.
+      {
+      apply interp_eval_refl.
+      apply interp_equal; eauto using basic_downward.
+      }
+
+      {
+      apply interp_eval_refl.
+      apply interp_equal; eauto using basic_downward.
+      }
+    }
+
+    {
+    apply interp_eval_refl.
+    apply interp_prod; auto.
+    apply interp_eval_refl.
+    apply interp_prod.
+      {
+      apply interp_eval_refl.
+      rewrite -> iuequal_swap.
+      apply interp_equal.
+      rewrite -> HeqC'.
+      eapply basic_downward; eauto.
+      }
+
+      {
+      apply interp_eval_refl.
+      rewrite -> iuequal_swap.
+      apply interp_equal.
+      rewrite -> HeqC'.
+      eapply basic_downward; eauto.
+      }
+    }
+  }
+simpsubin Hdl.
+simpsubin Hdr.
+assert (symmish stop (den A) (fun x => den (pi1 D x))) as hsd.
+  {
+  clear m n Hseqmn Hseqfgm Hseqfgn Hm Hn Hmn.
+  intros j m n p q u v Hmn Hpq Huv.
+  so (basic_member_index _#9 Hal Hmn) as Hj.
+  so (urel_closed _#5 Hmn) as (Hclm & Hcln).
+  so (urel_closed _#5 Hpq) as (Hclp & Hclq).
+  invert Hbl.
+  intros _ _ Hactb.
+  invert Hdl.
+  intros _ _ Hactd.
+  so (Hactb _ _ _ Hj (prod_action_ppair _#8 Hmn Hpq)) as Hbxl.
+  simpsubin Hbxl.
+  so (Hactd _ _ _ Hj (prod_action_ppair _#8 Hmn Hpq)) as Hdxl.
+  simpsubin Hdxl.
+  so (Hactb _ _ _ Hj (prod_action_ppair _#8 Hpq Hmn)) as Hbyl.
+  simpsubin Hbyl.
+  so (Hactd _ _ _ Hj (prod_action_ppair _#8 Hpq Hmn)) as Hdyl.
+  simpsubin Hdyl.
+  invert (basic_value_inv _#6 value_prod Hdxl).
+  intros Bx R Hbxl' Hrl HeqDx.
+  so (basic_fun _#7 Hbxl Hbxl').
+  subst Bx.
+  invert (basic_value_inv _#6 value_prod Hrl).
+  clear Hrl.
+  intros E1 E2 He1l He2l <-.
+  invert (basic_value_inv _#6 value_prod Hdyl).
+  intros By R Hbyl' Hrl HeqDy.
+  so (basic_fun _#7 Hbyl Hbyl').
+  subst By.
+  invert (basic_value_inv _#6 value_prod Hrl).
+  clear Hrl.
+  intros F1 F2 Hf1l Hf2l <-.
+  setoid_rewrite <- HeqDx in Huv.
+  cbn in Huv.
+  decompose Huv.
+  intros u1 v1 u23 v23 _ _ Hstepsu Hstepsv Huv1 Huv23.
+  cbn in Huv23.
+  decompose Huv23.
+  intros u2 v2 u3 v3 _ _ Hstepsu23 Hstepsv23 Huv2 Huv3.
+  so (urel_closed _#5 Huv2) as (Hclu2 & Hclv2).
+  so (urel_closed _#5 Huv3) as (Hclu3 & Hclv3).
+  so (hs j m n p q u1 v1 Hmn Hpq Huv1) as (x & y & Hxy).
+  so (urel_closed _#5 Hxy) as (Hclx & Hcly).
+  exists (ppair x (ppair u3 u2)), (ppair y (ppair v3 v2)).
+  setoid_rewrite <- HeqDy.
+  exists x, y, (ppair u3 u2), (ppair v3 v2).
+  do2 5 split; auto using star_refl; try prove_hygiene.
+  exists u3, v3, u2, v2.
+  do2 5 split; auto using star_refl; try prove_hygiene.
+    {
+    force_exact Huv3.
+    f_equal.
+    f_equal.
+    eassert _ as He2l'; [refine (basic_equiv _#5 (equal (subst s c) (app (subst s f) p) (app (subst s g) p)) _ _ _ He2l) |].
+      {
+      prove_hygiene.
+      }
+
+      {
+      apply equiv_equal; auto using equiv_refl.
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta2.
+        }
+
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta2.
+        }
+      }
+    eassert _ as Hf1l'; [refine (basic_equiv _#5 (equal (subst s c) (app (subst s f) p) (app (subst s g) p)) _ _ _ Hf1l) |].
+      {
+      prove_hygiene.
+      }
+
+      {
+      apply equiv_equal; auto using equiv_refl.
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta1.
+        }
+
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta1.
+        }
+      }
+    exact (basic_fun _#7 He2l' Hf1l').
+    }
+
+    {
+    force_exact Huv2.
+    f_equal.
+    f_equal.
+    eassert _ as He1l'; [refine (basic_equiv _#5 (equal (subst s c) (app (subst s f) m) (app (subst s g) m)) _ _ _ He1l) |].
+      {
+      prove_hygiene.
+      }
+
+      {
+      apply equiv_equal; auto using equiv_refl.
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta1.
+        }
+
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta1.
+        }
+      }
+    eassert _ as Hf2l'; [refine (basic_equiv _#5 (equal (subst s c) (app (subst s f) m) (app (subst s g) m)) _ _ _ Hf2l) |].
+      {
+      prove_hygiene.
+      }
+
+      {
+      apply equiv_equal; auto using equiv_refl.
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta2.
+        }
+
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta2.
+        }
+      }
+    exact (basic_fun _#7 He1l' Hf2l').
+    }
+  }
+assert (transish stop (den A) (fun x => den (pi1 D x))) as htd.
+  {
+  clear m n Hseqmn Hseqfgm Hseqfgn Hm Hn Hmn.
+  intros j m n p q r t u1 v1 u2 v2 Hmn Hpq Hrt Huv1 Huv2.
+  so (basic_member_index _#9 Hal Hmn) as Hj.
+  so (urel_closed _#5 Hmn) as (Hclm & Hcln).
+  so (urel_closed _#5 Hpq) as (Hclp & Hclq).
+  so (urel_closed _#5 Hrt) as (Hclr & Hclt).
+  invert Hbl.
+  intros _ _ Hactb.
+  invert Hdl.
+  intros _ _ Hactd.
+  so (Hactb _ _ _ Hj (prod_action_ppair _#8 Hmn Hpq)) as Hbxl.
+  simpsubin Hbxl.
+  so (Hactb _ _ _ Hj (prod_action_ppair _#8 Hpq Hrt)) as Hbyl.
+  simpsubin Hbyl.
+  so (Hactb _ _ _ Hj (prod_action_ppair _#8 Hmn Hrt)) as Hbzl.
+  simpsubin Hbzl.
+  so (Hactd _ _ _ Hj (prod_action_ppair _#8 Hmn Hpq)) as Hdxl.
+  simpsubin Hdxl.
+  so (Hactd _ _ _ Hj (prod_action_ppair _#8 Hpq Hrt)) as Hdyl.
+  simpsubin Hdyl.
+  so (Hactd _ _ _ Hj (prod_action_ppair _#8 Hmn Hrt)) as Hdzl.
+  simpsubin Hdzl.
+  invert (basic_value_inv _#6 value_prod Hdxl).
+  intros Bx R Hbxl' Hrl HeqDx.
+  so (basic_fun _#7 Hbxl Hbxl').
+  clear Hbxl'.
+  subst Bx.
+  invert (basic_value_inv _#6 value_prod Hrl).
+  clear Hrl.
+  intros E1 E2 He1l He2l <-.
+  invert (basic_value_inv _#6 value_prod Hdyl).
+  intros By R Hbyl' Hrl HeqDy.
+  so (basic_fun _#7 Hbyl Hbyl').
+  clear Hbyl'.
+  subst By.
+  invert (basic_value_inv _#6 value_prod Hrl).
+  clear Hrl.
+  intros F1 F2 Hf1l Hf2l <-.
+  invert (basic_value_inv _#6 value_prod Hdzl).
+  intros Bz R Hbzl' Hrl HeqDz.
+  so (basic_fun _#7 Hbzl Hbzl').
+  subst Bz.
+  invert (basic_value_inv _#6 value_prod Hrl).
+  clear Hrl.
+  intros G1 G2 Hg1l Hg2l <-.
+  setoid_rewrite <- HeqDx in Huv1.
+  cbn in Huv1.
+  decompose Huv1.
+  intros u11 v11 u1_23 v1_23 _ _ Hstepsu1 Hstepsv1 Huv11 Huv1_23.
+  cbn in Huv1_23.
+  decompose Huv1_23.
+  intros u12 v12 u13 v13 _ _ Hstepsu1_23 Hstepsv1_23 Huv12 Huv13.
+  so (urel_closed _#5 Huv12) as (Hclu12 & Hclv12).
+  so (urel_closed _#5 Huv13) as (Hclu13 & Hclv13).
+  setoid_rewrite <- HeqDy in Huv2.
+  cbn in Huv2.
+  decompose Huv2.
+  intros u21 v21 u2_23 v2_23 _ _ Hstepsu2 Hstepsv2 Huv21 Huv2_23.
+  cbn in Huv2_23.
+  decompose Huv2_23.
+  intros u22 v22 u23 v23 _ _ Hstepsu2_23 Hstepsv2_23 Huv22 Huv23.
+  so (urel_closed _#5 Huv22) as (Hclu22 & Hclv22).
+  so (urel_closed _#5 Huv23) as (Hclu23 & Hclv23).
+  so (ht j m n p q r t u11 v11 u21 v21 Hmn Hpq Hrt Huv11 Huv21) as (x & y & Hxy).
+  so (urel_closed _#5 Hxy) as (Hclx & Hcly).
+  exists (ppair x (ppair u12 u23)), (ppair y (ppair v12 v23)).
+  setoid_rewrite <- HeqDz.
+  exists x, y, (ppair u12 u23), (ppair v12 v23).
+  do2 5 split; auto using star_refl; try prove_hygiene.
+  exists u12, v12, u23, v23.
+  do2 5 split; auto using star_refl; try prove_hygiene.
+    {
+    force_exact Huv12.
+    f_equal.
+    f_equal.
+    eassert _ as He1l'; [refine (basic_equiv _#5 (equal (subst s c) (app (subst s f) m) (app (subst s g) m)) _ _ _ He1l) |].
+      {
+      prove_hygiene.
+      }
+
+      {
+      apply equiv_equal; auto using equiv_refl.
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta1.
+        }
+
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta1.
+        }
+      }
+    eassert _ as Hg1l'; [refine (basic_equiv _#5 (equal (subst s c) (app (subst s f) m) (app (subst s g) m)) _ _ _ Hg1l) |].
+      {
+      prove_hygiene.
+      }
+
+      {
+      apply equiv_equal; auto using equiv_refl.
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta1.
+        }
+
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta1.
+        }
+      }
+    exact (basic_fun _#7 He1l' Hg1l').
+    }
+
+    {
+    force_exact Huv23.
+    f_equal.
+    f_equal.
+    eassert _ as Hf2l'; [refine (basic_equiv _#5 (equal (subst s c) (app (subst s f) r) (app (subst s g) r)) _ _ _ Hf2l) |].
+      {
+      prove_hygiene.
+      }
+
+      {
+      apply equiv_equal; auto using equiv_refl.
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta2.
+        }
+
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta2.
+        }
+      }
+    eassert _ as Hg2l'; [refine (basic_equiv _#5 (equal (subst s c) (app (subst s f) r) (app (subst s g) r)) _ _ _ Hg2l) |].
+      {
+      prove_hygiene.
+      }
+
+      {
+      apply equiv_equal; auto using equiv_refl.
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta2.
+        }
+
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_beta2.
+        }
+      }
+    exact (basic_fun _#7 Hf2l' Hg2l').
+    }
+  }
+exists (iuquotient stop A D hsd htd).
+simpsub.
+cbn [Nat.add].
+do2 2 split.
+  {
+  apply interp_eval_refl.
+  apply interp_quotient; auto.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply interp_eval_refl.
+  apply interp_quotient; auto.
+  simpsub.
+  auto.
+  }
+invert Hbl.
+intros _ _ Hactbl.
+invert Hbr.
+intros _ _ Hactbr.
+invert Hdl.
+intros _ _ Hactdl.
+invert Hdr.
+intros _ _ Hactdr.
+so (Hseqf _#3 Hs) as (AC & Hacl & Hacr & Hf & _).
+simpsubin Hacl.
+simpsubin Hacr.
+invert (basic_value_inv _#6 value_tarrow Hacl).
+intros A' C Hal' Hcl Heq.
+so (basic_fun _#7 Hal Hal').
+subst A'.
+clear Hal'.
+invert (basic_value_inv _#6 value_tarrow Hacr).
+intros A' C' Har' Hcr Heq'.
+so (basic_fun _#7 Har Har').
+subst A'.
+clear Har'.
+so (iuarrow_inj _#7 (eqtrans Heq (eqsymm Heq'))) as (_ & HeqC).
+clear Heq'.
+subst AC.
+assert (C = C').
+  {
+  cbn in Hm.
+  decompose Hm.
+  intros _ x _ _ H _ _.
+  so (HeqC _ _ _ H) as Heq.
+  rewrite <- (basic_impl_iutruncate _#6 Hcl) in Heq.
+  rewrite <- (basic_impl_iutruncate _#6 Hcr) in Heq.
+  exact Heq.
+  }
+subst C'.
+so (Hseqg _#3 Hs) as (AC & Hacl' & _ & Hg & _).
+simpsubin Hacl'.
+invert (basic_value_inv _#6 value_tarrow Hacl').
+intros A' C' Hal' Hcl' <-.
+so (basic_fun _#7 Hal Hal').
+subst A'.
+so (basic_fun _#7 Hcl Hcl').
+subst C'.
+clear Hal Hcl'.
+assert (forall m n I I',
+          rel (den (iuquotient stop A B hs ht)) i m n
+          -> interp toppg true i (sequal (app (subst s f) m) (app (subst s g) m)) I
+          -> interp toppg false i (sequal (app (subst s' f) n) (app (subst s' g) n)) I'
+          -> rel (den (iuquotient stop A D hsd htd)) i m n) as Hprop.
+  {
+  clear m n Hm Hn Hmn Hseqmn Hseqfgm Hseqfgn.
+  intros m n I I' Hmn Hi Hi'.
+  cbn in Hmn |- *.
+  decompose Hmn.
+  intros p q r t Hmq Hpn Hrt.
+  so (urel_closed _#5 Hmq) as (Hclm & Hclq).
+  so (urel_closed _#5 Hpn) as (Hclp & Hcln).
+  so (urel_closed _#5 Hrt) as (Hclr & Hclt).
+  exists p, q, (ppair r (ppair triv triv)), (ppair t (ppair triv triv)), Hmq, Hpn.
+  so (Hactbl _#3 (le_refl _) (prod_action_ppair _#8 Hmq Hpn)) as Hbxl.
+  simpsubin Hbxl.
+  so (Hactdl _#3 (le_refl _) (prod_action_ppair _#8 Hmq Hpn)) as Hdxl.
+  simpsubin Hdxl.
+  invert (basic_value_inv _#6 value_prod Hdxl).
+  intros Bx R Hbxl' Hrl Heq.
+  so (basic_fun _#7 Hbxl Hbxl').
+  subst Bx.
+  clear Hbxl'.
+  so (Hactbr _#3 (le_refl _) (prod_action_ppair _#8 Hmq Hpn)) as Hbxr.
+  simpsubin Hbxr.
+  so (Hactdr _#3 (le_refl _) (prod_action_ppair _#8 Hmq Hpn)) as Hdxr.
+  simpsubin Hdxr.
+  invert (basic_value_inv _#6 value_prod Hdxr).
+  intros Bx' R' Hbxr' Hrr Heq'.
+  so (basic_fun _#7 Hbxr Hbxr').
+  subst Bx'.
+  clear Hbxr'.
+  so (iuprod_inj _#5 (eqtrans Heq (eqsymm Heq'))) as (_ & HeqR).
+  clear Heq'.
+  so (HeqR _ _ _ Hrt) as HeqR'.
+  clear HeqR.
+  rewrite <- (basic_impl_iutruncate _#6 Hrl) in HeqR'.
+  rewrite <- (basic_impl_iutruncate _#6 Hrr) in HeqR'.
+  subst R'.
+  cut (rel (den (iuprod stop
+                   (pi1 B
+                      (urelspinj (prod_urel stop (den A) (den A)) i (ppair m p)
+                         (ppair q n)
+                         (prod_action_ppair stop (den A) (den A) i m p q n Hmq Hpn))) R)) i (ppair r (ppair triv triv)) (ppair t (ppair triv triv))).
+    {
+    intro H.
+    rewrite -> Heq in H.
+    exact H.
+    }
+  clear Heq.
+  cbn.
+  exists r, t, (ppair triv triv), (ppair triv triv).
+  do2 5 split; auto using star_refl; try prove_hygiene.
+  invert (basic_value_inv _#6 value_prod Hrl).
+  intros E1 E2 He1l He2l Heq.
+  invert (basic_value_inv _#6 value_prod Hrr).
+  intros E1' E2' He1r He2r Heq'.
+  so (iuprod_inj _#5 (eqtrans Heq (eqsymm Heq'))) as (? & HeqE2).
+  subst E1'.
+  clear Heq'.
+  subst R.
+  cbn.
+  exists triv, triv, triv, triv.
+  assert (rel (den E1) i triv triv) as He1inhabit.
+    {
+    invert (basic_value_inv _#6 value_equal He1l).
+    intros u v C' Hu Hv Hcl' <-.
+    so (basic_fun _#7 Hcl Hcl').
+    subst C'.
+    clear Hcl'.
+    split.
+    2:{
+      do2 4 split; auto using star_refl; prove_hygiene.
+      }
+    exists (app (subst s' f) q).
+    unfold srel in Hu, Hv |- *.
+    split.
+      {
+      apply (urel_equiv_1 _ _ _ (app (subst s f) m)).
+        {
+        prove_hygiene.
+        }
+
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_symm.
+        apply equiv_beta1.
+        }
+      
+        {
+        exact (arrow_action_app _#9 Hf Hmq).
+        }
+      }
+
+      {
+      apply (urel_equiv_1 _ _ _ (app (subst s f) m)).
+        {
+        prove_hygiene.
+        }
+
+        {
+        apply (equiv_trans _ _ (app (subst s g) m)).
+          {
+          invert (basic_value_inv _#6 value_sequal Hi).
+          intros _ _ Hequiv _.
+          exact Hequiv.
+          }
+
+          {
+          apply equiv_app; auto using equiv_refl.
+          apply equiv_symm.
+          apply equiv_beta1.
+          }
+        }
+      
+        {
+        exact (arrow_action_app _#9 Hf Hmq).
+        }
+      }
+    }
+  do2 5 split; auto using star_refl; try prove_hygiene.
+  so (HeqE2 _ _ _ He1inhabit) as HeqE2'.
+  rewrite <- (basic_impl_iutruncate _#6 He2l) in HeqE2'.
+  rewrite <- (basic_impl_iutruncate _#6 He2r) in HeqE2'.
+  subst E2'.
+  clear He1inhabit.
+  invert (basic_value_inv _#6 value_equal He2r).
+  intros u v C' Hu Hv Hcr' <-.
+  so (basic_fun _#7 Hcr Hcr').
+  subst C'.
+  clear Hcr'.
+  split.
+  2:{
+    do2 4 split; auto using star_refl; prove_hygiene.
+    }
+  exists (app (subst s f) p).
+  unfold srel in Hu, Hv |- *.
+  split.
+    {
+    apply (urel_equiv_2 _ _ _ _ (app (subst s' f) n)).
+      {
+      prove_hygiene.
+      }
+
+      {
+      apply equiv_app; auto using equiv_refl.
+      apply equiv_symm.
+      apply equiv_beta2.
+      }
+    
+      {
+      exact (arrow_action_app _#9 Hf Hpn).
+      }
+    }
+
+    {
+    apply (urel_equiv_2 _ _ _ _ (app (subst s' f) n)).
+      {
+      prove_hygiene.
+      }
+
+      {
+      apply (equiv_trans _ _ (app (subst s' g) n)).
+        {
+        invert (basic_value_inv _#6 value_sequal Hi').
+        intros _ _ Hequiv _.
+        exact Hequiv.
+        }
+
+        {
+        apply equiv_app; auto using equiv_refl.
+        apply equiv_symm.
+        apply equiv_beta2.
+        }
+      }
+    
+      {
+      exact (arrow_action_app _#9 Hf Hpn).
+      }
+    }
+  }
+do2 2 split.
+  {
+  so (Hseqfgm _#3 Hs) as (I & Hi & Hi' & _).
+  simpsubin Hi.
+  simpsubin Hi'.
+  apply (Hprop _ _ I I); auto.
+  }
+
+  {
+  so (Hseqfgn _#3 Hs) as (I & Hi & Hi' & _).
+  simpsubin Hi.
+  simpsubin Hi'.
+  apply (Hprop _ _ I I); auto.
+  }
+
+  {
+  so (Hseqfgm _#3 Hs) as (I & Hi & _).
+  so (Hseqfgn _#3 Hs) as (I' & _ & Hi' & _).
+  simpsubin Hi.
+  simpsubin Hi'.
+  apply (Hprop _ _ I I'); auto.
+  }
+Qed.

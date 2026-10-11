@@ -1164,6 +1164,8 @@ exact setSymmetrical_valid.
 exact quotientSymmetrical_valid.
 exact partialSymmetrical_valid.
 exact forallQuotientCommute_valid.
+exact quotientStrengthenSequalOf_valid.
+exact quotientStrengthenSequalEq_valid.
 exact symmetricalType_valid.
 Qed.
   

@@ -164,4 +164,61 @@ qed ();
 
 
 
+lemma "squish_forall_commute"
+/
+  forall i (P : nat -> U i) .
+    squish (forall (x : nat) . P x)
+    -> forall (x : nat) . squish (P x)
+/;
+
+inference.
+intro /i P Hsq x/.
+witness /squish_bind Hsq __/.
+intro /HP/.
+apply /squish_ret/.
+apply /HP/.
+qed ();
+
+
+
+lemma "squish_forall_nat_subtype"
+/
+  forall i (P : nat -> U i) .
+    (forall (x : nat) . Quotient.symmetrical (P x))
+    -> (forall (x : nat) . squish (P x)) <: squish (forall (x : nat) . P x)
+/;
+
+inference.
+intro /i P Hmet/.
+unfold /squish at 0 0/.
+eqtp /_ <: (quotient (x y : forall (x : nat) . P x) . forall (x : nat) . unit)/.
+  {
+  typecheck >> auto.
+  }
+apply /Quotient.forall_nat_quotient_commute_conv/ >> auto.
+intro /x/.
+reduce //.
+unfold /Quotient.PER/ >> split >> intros >> auto.
+qed ();
+
+
+
+lemma "squish_forall_nat"
+/
+  forall i (P : nat -> U i) .
+    (forall (x : nat) . Quotient.symmetrical (P x))
+    -> (forall (x : nat) . squish (P x))
+    -> squish (forall (x : nat) . P x)
+/;
+
+inference.
+intro /i P Hmet H/.
+subsume /_/.
+1:{
+  hyp /H/.
+  }
+apply /squish_forall_nat_subtype/ >> auto.
+qed ();
+
+
 endModule ();
