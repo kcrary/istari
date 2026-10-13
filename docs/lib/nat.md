@@ -45,6 +45,10 @@ A simpler case-analysis operation:
 
     lt_inhabitant : forall (m n : nat) . m < n -> () : m < n
 
+    leq_ext : forall (m n : nat) (h h' : m <= n) . h = h' : (m <= n)
+
+    lt_ext : forall (m n : nat) (h h' : m < n) . h = h' : (m < n)
+
     leq_0_min : forall (n : nat) . 0 <= n
 
     leq_0_minimal : forall (n : nat) . n <= 0 -> n = 0 : nat

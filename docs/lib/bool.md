@@ -14,6 +14,8 @@ The `bool` type is primitive, but aliased in the `Bool` module:
 
     istrue_inhabitant : forall (b : bool) . istrue b -> () : istrue b
 
+    istrue_ext : forall (b : bool) (h h' : istrue b) . h = h' : istrue b
+
     istrue_true : istrue true
 
     not_istrue_false : not (istrue false)

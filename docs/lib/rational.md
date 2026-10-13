@@ -273,6 +273,10 @@ This only works because of our special definition of `invq`.
 
     ltq_inhabitant : forall (x y : rational) . x < y -> () : x < y
 
+    leqq_ext : forall (x y : rational) (h h' : x <= y) . h = h' : (x <= y)
+
+    ltq_ext : forall (x y : rational) (h h' : x < y) . h = h' : (x < y)
+
     leqq_refl : forall (x : rational) . x <= x
 
     leqq_refl_eq : forall (x y : rational) . x = y : rational -> x <= y
@@ -303,7 +307,7 @@ This one gives transitivity in the form needed for rewriting:
 
     not_ltq : forall (x y : rational) . not (x < y) <-> y <= x
 
-    ltq_from_leqq_neq : forall (a b : rational) . a <= b -> not (a = b : rational) -> a < b
+    ltq_from_leqq_neq : forall (a b : rational) . a <= b -> a != b : rational -> a < b
 
     ltq_0_1 : 0 < 1
 

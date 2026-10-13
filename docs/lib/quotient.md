@@ -281,8 +281,6 @@ requires a semantic analysis that is realized by the rule
 
     partial_symmetrical : forall (i : level) (A : U i) . symmetrical A -> symmetrical (partial A)
 
-    list_symmetrical : forall (i : level) (A : U i) . symmetrical A -> symmetrical (List.list A)
-
     rec_symmetrical : forall (i : level) (A : forallfut (v0 : U i) . U i) .
                          (forallfut (t : U i) . future (symmetrical t) -> symmetrical (A t))
                          -> symmetrical (rec t . A t)

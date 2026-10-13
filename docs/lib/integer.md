@@ -126,6 +126,10 @@ before moving.  It is always the right-hand operand after moving.
 
     ltz_inhabitant : forall (a b : integer) . a < b -> () : a < b
 
+    leqz_ext : forall (a b : integer) (h h' : a <= b) . h = h' : (a <= b)
+
+    ltz_ext : forall (a b : integer) (h h' : a < b) . h = h' : (a < b)
+
     leqz_0_1 : 0 <= 1
 
     ltz_0_1 : 0 < 1

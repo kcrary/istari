@@ -183,8 +183,6 @@ requires a semantic analysis that is realized by the rule
 
     partial_symmetrical : type:partial_symmetrical
 
-    list_symmetrical : type:list_symmetrical
-
     rec_symmetrical : type:rec_symmetrical
 
 ---
