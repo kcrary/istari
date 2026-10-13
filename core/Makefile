@@ -49,7 +49,7 @@ omega.isto : datatype.isto logic.isto bool.isto nat.isto integer.isto list.isto 
 option.isto : datatype.isto function.isto kindlike.isto integer.isto
 partial.isto : acc.isto logic.isto
 permutation.isto : list.isto logic.isto misc.isto nat.isto
-quotient.isto : logic.isto sqstable.isto syntactic-equality.isto
+quotient.isto : list.isto logic.isto sqstable.isto syntactic-equality.isto
 rational.isto : bool.isto decidable.isto integer.isto logic.isto nat.isto omega.isto partial.isto quotient.isto squish.isto stable.ist
 real.isto : bool.isto integer.isto logic.isto markov.isto nat.isto omega.isto quotient.isto rational.isto squish.isto sqstable.isto stable.isto
 real-exponent.isto : division.isto integer.isto logic.isto nat.isto omega.isto rational.isto real.isto sqstable.isto squish.isto

@@ -955,6 +955,7 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
       val constDtTotal = loadSymbol datatypeSym "dt_total"
       val constDtStrict = loadSymbol datatypeSym "dt_strict"
       val constDtUptype = loadSymbol datatypeSym "dt_uptype"
+      val constDtSymmetrical = loadSymbol datatypeSym "dt_symmetrical"
 
       val eqzbTac = Susp.delay (fn () => snd (Infer.inferConstant Prim.eqzb))
 
@@ -4427,7 +4428,83 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-            (* 13. Populate the tables *)
+            (* 13. Create the symmetrical lemma *)
+
+            val symmetricalLemmaConst =
+               let
+                  (* within pervasive arguments *)
+
+                  val masterlem =
+                     X.apps (xconstant constDtSymmetrical)
+                        [
+                        univ,
+                        a,
+                        dcons
+                        ]
+
+                  val mastercond =
+                     X.normalizeTp (X.arrowInv1 (X.inhabitedForm masterlem))
+
+                  val lem_def =
+                     X.lam NONE mastercond
+                        (X.tuple
+                            (List.map
+                                (fn (_, _, _, ind, args, _) =>
+                                    snd $
+                                    bifold
+                                       (fns (symopt, c) depth =>
+                                           (depth+1,
+
+                                            (fn t =>
+                                                X.lamAll
+                                                   symopt
+                                                   (X.tweakenUnder (X.forget (X.use c)) depth 1)
+                                                   t)))
+                                       (fn depth =>
+                                           X.apps 
+                                              (X.weaken masterlem (depth + 1))
+                                              [X.var depth mastercond, X.weakenUnder ind depth 1])
+                                       0
+                                       args)
+                                typeInfoList))
+
+                  val lem_t =
+                     T.apply2 Prim.arrow
+                        (X.typ mastercond)
+                        (List.foldr
+                            (fns (const, _, _, _, args, _) t =>
+                                T.apply2 Prim.prod
+                                   (snd
+                                       (bifold
+                                           (fns (symopt, c) depth =>
+                                               (depth+1,
+                                                
+                                                (fn u =>
+                                                    T.apply2 Prim.forall
+                                                       (X.mterm c)
+                                                       (T.Lam (symopt, u)))))
+                                           (fn depth =>
+                                               T.apply1 Prim.symmetrical
+                                                  (T.Elim (T.Const const,
+                                                           Int.natrecUp 
+                                                              (fns i l => T.App (T.Var i) :: l)
+                                                              []
+                                                              (numberOfStatVisibleArgs + depth))))
+                                           0
+                                           args))
+                                   t)
+                            (T.Const Prim.unit)
+                            typeInfoList)
+               in
+                  define
+                     (Symbol.fromValue (firstName ^ "_symmetrical_condition"))
+                     (lwrap lem_def)
+                     (lwraptp lem_t)
+               end
+
+
+
+            (* 14. Populate the tables *)
 
             val tplist =
                map4
@@ -4473,13 +4550,14 @@ structure DatatypeInternal :> DATATYPE_INTERNAL =
 
 
 
-            (* 14. Make all the contants opaque. *)
+            (* 15. Make all the contants opaque. *)
 
             close skeletonConst;
             close subtermConst;
             close subtermTransConst;
             close subtermWellFoundedConst;
             close uptypeLemmaConst;
+            close symmetricalLemmaConst;
 
             List.app 
                (fn (const, _, stripConst, _, _, _) =>

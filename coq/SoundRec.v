@@ -1488,3 +1488,419 @@ do2 4 split; auto.
   }
 }
 Qed.
+
+
+Require Import SemanticsSymmetrical.
+Require Import SoundSymmetrical.
+
+
+Lemma sound_rec_symmetrical :
+  forall G a,
+    pseq (hyp_tml (symmetrical (var 0)) :: hyp_tpl :: G) (deq triv triv (symmetrical (subst sh1 a)))
+    -> pseq G (deq triv triv (symmetrical (rec a))).
+Proof.
+intros G a.
+revert G.
+refine (seq_pseq 1 [hyp_emp] a 1 [_; _] _ _ _); cbn.
+intros G Hcla Hseq.
+rewrite -> seq_symmetrical in Hseq |- *.
+intros i.
+induct i.
+
+(* 0 *)
+{
+intros s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+assert (pwctx 0 (dot triv (dot (rec (subst (under 1 s) a)) s)) (dot triv (dot (rec (subst (under 1 s') a)) s')) (hyp_tml (symmetrical (var 0)) :: hyp_tpl :: G)) as Hsa.
+  {
+  apply pwctx_cons_tml_seq; try prove_hygiene.
+    {
+    apply pwctx_cons_tpl; auto; try omega;
+    prove_hygiene; eapply subst_closub_under_permit; eauto.
+    }
+  
+    {
+    omega.
+    }
+
+    {
+    intros i tt tt' Htt.
+    cbn in Htt.
+    invertc Htt.
+    intros b c t t' Ht Hmp _ _ <- <-.
+    simpsubin Hmp.
+    invertc Hmp.
+    intros R Hl Hr .
+    exists toppg, (iusymmetrical stop i R).
+    simpsub.
+    split; apply interp_eval_refl; apply interp_symmetrical; auto.
+    }
+  }
+so (Hseq _#3 Hsa) as (A & Hal & Har & Hmet).
+simpsubin Hal.
+simpsubin Har.
+exists A.
+simpsub.
+do2 2 split; auto.
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+}
+
+(* S *)
+{
+intros i IH s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (pwctx_downward _#5 (Nat.le_succ_diag_r i) Hs) as Hsi.
+so (IH _ _ Hsi) as (Ri & Hali & Hari & Hmeti).
+clear IH.
+simpsubin Hali.
+simpsubin Hari.
+assert (pwctx (S i) (dot triv (dot (rec (subst (under 1 s) a)) s)) (dot triv (dot (rec (subst (under 1 s') a)) s')) (hyp_tml (symmetrical (var 0)) :: hyp_tpl :: G)) as Hsa.
+  {
+  apply pwctx_cons_tml_seq; try prove_hygiene.
+    {
+    apply pwctx_cons_tpl; auto;
+    try (prove_hygiene; eapply subst_closub_under_permit; eauto; done).
+    intros _.
+    cbn [pred].
+    apply (seqhyp_tp _#3 Ri); auto.
+    }
+  
+    {
+    intros _.
+    simpsub.
+    cbn.
+    apply (seqhyp_tm _#5 (iusymmetrical stop i Ri)).
+      {
+      apply interp_eval_refl; apply interp_symmetrical; auto.
+      }
+
+      {
+      apply interp_eval_refl; apply interp_symmetrical; auto.
+      }
+    cbn.
+    apply property_action_triv; auto.
+    intros j Hj j' m p (Hj' & Hmp).
+    split; split; auto.
+      {
+      refine (Hmeti _ _ _ _ Hmp andel).
+      omega.
+      }
+
+      {
+      refine (Hmeti _ _ _ _ Hmp ander).
+      omega.
+      }
+    }
+
+    {
+    intros j tt tt' Htt.
+    cbn in Htt.
+    invertc Htt.
+    intros b c t t' Ht Hmp _ _ <- <-.
+    simpsubin Hmp.
+    invertc Hmp.
+    intros R Hl Hr .
+    exists toppg, (iusymmetrical stop j R).
+    simpsub.
+    split; apply interp_eval_refl; apply interp_symmetrical; auto.
+    }
+  }
+so (Hseq _#3 Hsa) as (A & Hal & Har & Hmet).
+simpsubin Hal.
+simpsubin Har.
+exists A.
+simpsub.
+do2 2 split; auto.
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+}
+Qed.
+
+
+Lemma sound_rec_symmetrical_univ :
+  forall G lv a,
+    pseq G (deq lv lv pagetp)
+    -> pseq (hyp_tml (univ lv) :: G) (deq a a (univ (subst sh1 lv)))
+    -> pseq (hyp_tml (symmetrical (var 0)) :: hyp_tml (univ lv) :: G) (deq triv triv (symmetrical (subst sh1 a)))
+    -> pseq G (deq triv triv (symmetrical (rec a))).
+Proof.
+intros G lv a.
+revert G.
+refine (seq_pseq 2 [] lv [hyp_emp] a 3 [] _ [_] _ [_; _] _ _ _); cbn.
+intros G Hcllv Hcla Hseqlv Hseqa Hseq.
+rewrite -> seq_deq in Hseqlv.
+rewrite -> seq_univ in Hseqa.
+rewrite -> seq_symmetrical in Hseq |- *.
+eassert _ as Hlv; [refine (seq_pagetp_invert G lv _) |].
+  {
+  intros i t t' Ht.
+  so (Hseqlv _#3 Ht) as (R & Hl & _ & Hlv & _).
+  eauto.
+  }
+intros i.
+cut (forall s s',
+       pwctx i s s' G
+       -> exists pg A,
+            pginterp (subst s lv) pg
+            /\ pginterp (subst s' lv) pg
+            /\ interp pg true i (subst s (rec a)) A
+            /\ interp pg false i (subst s' (rec a)) A
+            /\ symmrel stop (ceiling (S i) (den A))).
+  {
+  intro H.
+  intros s s' Hs.
+  so (H _ _ Hs) as (pg & A & Hlvl & Hlvr & Hal & Har & Hmet).
+  exists A.
+  do2 2 split; auto.
+    {
+    eapply interp_increase; eauto.
+    apply toppg_max.
+    }
+
+    {
+    eapply interp_increase; eauto.
+    apply toppg_max.
+    }
+
+    {
+    intros j m p Hj Hmp.
+    assert (j < S i) as Hj' by omega.
+    split.
+      {
+      exact (Hmet j m p (conj Hj' Hmp) andel ander).
+      }
+
+      {
+      exact (Hmet j m p (conj Hj' Hmp) ander ander).
+      }
+    }
+  }
+induct i.
+
+(* 0 *)
+{
+intros s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (Hlv _#3 Hs) as (pg & Hlvl & Hlvr).
+assert (pwctx 0 (dot (rec (subst (under 1 s) a)) s) (dot (rec (subst (under 1 s') a)) s') (cons (hyp_tml (univ lv)) G)) as Hss.
+  {
+  apply pwctx_cons_tml; auto; prove_hygiene; 
+  try (eapply subst_closub_under_permit; eauto);
+  intros; omega.
+  }
+assert (pwctx 0 (dot triv (dot (rec (subst (under 1 s) a)) s)) (dot triv (dot (rec (subst (under 1 s') a)) s')) (hyp_tml (symmetrical (var 0)) :: hyp_tml (univ lv) :: G)) as Hssa.
+  {
+  apply pwctx_cons_tml_seq; try prove_hygiene.
+    {
+    omega.
+    }
+
+    {
+    intros i tt tt' Htt.
+    cbn in Htt.
+    invertc Htt.
+    intros b c t t' Ht Hmp _ _ <- <-.
+    simpsubin Hmp.
+    invertc Hmp.
+    intros R Hunivl Hunivr Hbc.
+    simpsub.
+    invert (basic_value_inv _#6 value_univ Hunivl).
+    intros pg' Hlvl' _ _ <-.
+    cbn in Hbc.
+    invert Hbc.
+    intros _ (B & Hb & Hc).
+    rewrite -> sint_unroll in Hb, Hc.
+    exists pg', (iusymmetrical stop i B).
+    split; apply interp_eval_refl; apply interp_symmetrical; auto.
+    }
+  }
+so (Hseqa _#3 Hss) as (pg' & A & Hlvl' & _ & Hal & Har & _).
+simpsubin Hlvl'.
+so (pginterp_fun _#3 Hlvl Hlvl').
+subst pg'.
+simpsubin Hal.
+simpsubin Har.
+so (Hseq _#3 Hssa) as (A' & Hal' & _ & Hmet).
+simpsubin Hal'.
+so (interp_fun _#7 Hal Hal').
+subst A'.
+exists pg, A.
+simpsub.
+do2 4 split; auto.
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  intros j m p (Hj & Hmp).
+  assert (j = 0) by omega.
+  subst j.
+  split.
+    {
+    split; [omega |].
+    exact (Hmet 0 m p (le_refl _) Hmp andel).
+    }
+
+    {
+    split; [omega |].
+    exact (Hmet 0 m p (le_refl _) Hmp ander).
+    }
+  }
+}
+
+(* S *)
+{
+intros i IH s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (pwctx_downward _#5 (Nat.le_succ_diag_r i) Hs) as Hsi.
+so (IH _ _ Hsi) as (pg & Ri & Hlvl & Hlvr & Hali & Hari & Hmeti).
+clear IH.
+simpsubin Hali.
+simpsubin Hari.
+assert (pwctx (S i) (dot (rec (subst (under 1 s) a)) s) (dot (rec (subst (under 1 s') a)) s') (cons (hyp_tml (univ lv)) G)) as Hss.
+  {
+  apply pwctx_cons_tml; auto;
+  try (prove_hygiene; eapply subst_closub_under_permit; eauto; done).
+    {
+    intros _.
+    cbn [pred].
+    apply (seqhyp_tm _#5 (iuuniv the_system i pg)); simpsub; auto;
+    try (apply interp_eval_refl; apply interp_univ; eauto using pginterp_str_top, pginterp_cex_top; done).
+    split; auto.
+    exists Ri.
+    rewrite -> sint_unroll; auto.
+    }
+
+    {
+    intros j u Hj Hu.
+    so (Hlv _#3 Hu) as (pg' & Hlvl' & Hlvu).
+    so (pginterp_fun _#3 Hlvl Hlvl'); subst pg'.
+    apply (relhyp_tm _#4 (iuuniv the_system j pg)); simpsub; auto;
+    apply interp_eval_refl; apply interp_univ; eauto using pginterp_str_top, pginterp_cex_top.
+    }
+
+    {
+    intros j u Hj Hu.
+    so (Hlv _#3 Hu) as (pg' & Hlvu & Hlvr').
+    so (pginterp_fun _#3 Hlvr Hlvr'); subst pg'.
+    apply (relhyp_tm _#4 (iuuniv the_system j pg)); simpsub; auto;
+    apply interp_eval_refl; apply interp_univ; eauto using pginterp_str_top, pginterp_cex_top.
+    }
+  }
+assert (pwctx (S i) (dot triv (dot (rec (subst (under 1 s) a)) s)) (dot triv (dot (rec (subst (under 1 s') a)) s')) (hyp_tml (symmetrical (var 0)) :: hyp_tml (univ lv) :: G)) as Hssa.
+  {
+  apply pwctx_cons_tml_seq; try prove_hygiene.
+    {
+    intros _.
+    simpsub.
+    cbn.
+    apply (seqhyp_tm _#5 (iusymmetrical stop i Ri)).
+      {
+      apply (interp_increase pg); auto using toppg_max.
+      apply interp_eval_refl; apply interp_symmetrical; auto.
+      }
+
+      {
+      apply (interp_increase pg); auto using toppg_max.
+      apply interp_eval_refl; apply interp_symmetrical; auto.
+      }
+    cbn.
+    apply property_action_triv; auto.
+    intros j Hj.
+    intros j' m p (Hj' & Hmp).
+    assert (j' < S i) as Hj'' by omega.
+    split; split; auto.
+      {
+      exact (Hmeti j' m p (conj Hj'' Hmp) andel ander).
+      }
+
+      {
+      exact (Hmeti j' m p (conj Hj'' Hmp) ander ander).
+      }
+    }
+
+    {
+    intros j tt tt' Htt.
+    cbn in Htt.
+    invertc Htt.
+    intros b c t t' Ht Hmp _ _ <- <-.
+    simpsubin Hmp.
+    invertc Hmp.
+    intros R Hunivl Hunivr Hbc.
+    simpsub.
+    invert (basic_value_inv _#6 value_univ Hunivl).
+    intros pg' Hlvl' _ _ <-.
+    cbn in Hbc.
+    invert Hbc.
+    intros _ (B & Hb & Hc).
+    rewrite -> sint_unroll in Hb, Hc.
+    exists pg', (iusymmetrical stop j B).
+    split; apply interp_eval_refl; apply interp_symmetrical; auto.
+    }
+  }
+so (Hseqa _#3 Hss) as (pg' & A & Hlvl' & _ & Hal & Har & _).
+simpsubin Hal.
+simpsubin Har.
+simpsubin Hlvl'.
+so (pginterp_fun _#3 Hlvl Hlvl').
+subst pg'.
+so (Hseq _#3 Hssa) as (A' & Hal' & _ & Hmet).
+simpsubin Hal'.
+so (interp_fun _#7 Hal Hal').
+subst A'.
+exists pg, A.
+simpsub.
+do2 4 split; auto.
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  apply interp_eval_refl; apply interp_rec.
+  simpsub.
+  auto.
+  }
+
+  {
+  intros j m p (Hj & Hmp).
+  assert (j <= S i) as Hj' by omega.
+  split; (split; [omega |]).
+    {
+    exact (Hmet _ _ _ Hj' Hmp andel).
+    }
+
+    {
+    exact (Hmet _ _ _ Hj' Hmp ander).
+    }
+  }
+}
+Qed.

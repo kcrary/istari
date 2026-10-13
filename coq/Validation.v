@@ -1161,8 +1161,14 @@ exact prodSymmetrical_valid.
 exact existsSymmetrical_valid.
 exact sumSymmetrical_valid.
 exact setSymmetrical_valid.
+exact isetSymmetrical_valid.
 exact quotientSymmetrical_valid.
+exact futureSymmetrical_valid.
 exact partialSymmetrical_valid.
+exact muSymmetrical_valid.
+exact muSymmetricalUniv_valid.
+exact recSymmetrical_valid.
+exact recSymmetricalUniv_valid.
 exact forallQuotientCommute_valid.
 exact quotientStrengthenSequalOf_valid.
 exact quotientStrengthenSequalEq_valid.

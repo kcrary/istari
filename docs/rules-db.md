@@ -6709,7 +6709,7 @@ Syntactic equality is intended for internal use only.
 
 ### Symmetricality
 
-These rules are in service of the rule `arrowQuotientCommute`.
+These rules are in service of the rule `forallQuotientCommute`.
 
 - `symmetricalForm A`
 
@@ -6833,6 +6833,13 @@ These rules are in service of the rule `arrowQuotientCommute`.
       G |- symmetrical A
       G, A |- istp B
 
+- `isetSymmetrical A B`
+
+      G |- symmetrical (iset A (fn . B))
+      >>
+      G |- symmetrical A
+      G, A |- istp B
+
 - `quotientSymmetrical A B`
 
       G |- symmetrical (quotient A (fn . fn . B))
@@ -6840,24 +6847,62 @@ These rules are in service of the rule `arrowQuotientCommute`.
       G |- istp (quotient A (fn . fn . B))
       G |- symmetrical A
 
+- `futureSymmetrical A`
+
+      G |- symmetrical (future A)
+      >>
+      promote(G) |- symmetrical A
+
 - `partialSymmetrical A`
 
       G |- symmetrical (partial A)
       >>
       G |- symmetrical A
 
-- `arrowQuotientCommute A B C M N`
+- `muSymmetrical A`
 
-      G |- eq (quotient (arrow A B) (fn . fn . forall A[^2] (fn . C[1 0 . 2 0 . ^3]))) M N
+      G |- symmetrical (mu (fn . A))
+      >>
+      G, type |- istp A
+      G, type, (symmetrical 0) |- symmetrical A[^1]
+      G |- positive (fn . A)
+
+- `muSymmetricalUniv A I`
+
+      G |- symmetrical (mu (fn . A))
+      >>
+      G |- of level I
+      G, (univ I) |- of (univ I[^1]) A
+      G, (univ I), (symmetrical 0) |- symmetrical A[^1]
+      G |- positive (fn . A)
+
+- `recSymmetrical A`
+
+      G |- symmetrical (rec (fn . A))
+      >>
+      G, (later) type |- istp A
+      G, (later) type, (later) (symmetrical 0) |- symmetrical A[^1]
+
+- `recSymmetricalUniv A I`
+
+      G |- symmetrical (rec (fn . A))
+      >>
+      G |- of level I
+      G, (later) (univ I) |- of (univ I[^1]) A
+      G, (later) (univ I), (later) (symmetrical 0) |- symmetrical A[^1]
+
+- `forallQuotientCommute A B C M N`
+
+      G |- eq (quotient (forall A (fn . B)) (fn . fn . forall A[^2] (fn . C[1 0 . 2 0 . 0 . ^3]))) M N
       >>
       G |- symmetrical A
-      G |- symmetrical B
-      G, B, B[^1] |- istp C
-      G, B, B[^1], C |- C[2 . 1 . ^3]
-      G, B, B[^1], B[^2], C[^1], C[1 . 2 . ^4] |- C[2 . ^4]
-      G, B, B[^1], C |- of C[^1] ()
+      G, A |- symmetrical B
+      G, A, B, B[^1] |- istp C
+      G, A, B, B[^1], C |- C[2 . 1 . ^3]
+      G, A, B, B[^1], B[^2], C[^1], C[1 . 2 . ^4] |- C[2 . ^4]
+      G, A, B, B[^1], C |- of C[^1] ()
       G, A, A[^1], (eq A[^2] 1 0) |- sequal 2 1
-      G |- eq (arrow A (quotient B (fn . fn . C))) M N
+      G |- eq (forall A (fn . quotient B (fn . fn . C))) M N
 
 - `quotientStrengthenSequalOf A B C F H M`
 

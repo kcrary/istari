@@ -67,3 +67,6 @@ library](quotient.html).
                            (forall (x : nat) . Quotient.symmetrical (P x))
                            -> (forall (x : nat) . squish (P x))
                            -> squish (forall (x : nat) . P x)
+
+    squish_symmetrical : forall (i : level) (A : U i) .
+                            Quotient.symmetrical A -> Quotient.symmetrical (squish A)

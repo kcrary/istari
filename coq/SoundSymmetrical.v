@@ -47,6 +47,7 @@ Require Import SemanticsNative.
 Require Import SemanticsEqual.
 Require Import SemanticsSet.
 Require Import SemanticsEqual.
+Require Import SemanticsFut.
 Require Import SemanticsPartial.
 Require Import Subsumption.
 
@@ -480,6 +481,7 @@ apply sound_flat_symmetrical.
 Qed.
 
 
+(* Redundant *)
 Lemma sound_nattp_symmetrical :
   forall G,
     pseq G (deq triv triv (symmetrical nattp)).
@@ -1210,6 +1212,122 @@ split.
 Qed.
 
 
+Lemma sound_iset_symmetrical :
+  forall G a b,
+    pseq G (deq triv triv (symmetrical a))
+    -> pseq (hyp_tm a :: G) (deqtype b b)
+    -> pseq G (deq triv triv (symmetrical (iset a b))).
+Proof.
+intros G a b.
+revert G.
+refine (seq_pseq 1 [hyp_emp] b 2 [] _ [_] _ _ _); cbn.
+intros G Hclb Hseqa Hseqb.
+rewrite -> seq_symmetrical in Hseqa |- *.
+rewrite -> seq_eqtype in Hseqb.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+so (Hseqa _#3 Hs) as (A & Hal & Har & Hmeta).
+assert (forall j m p,
+          rel (den A) j m p
+          -> pwctx j (dot m s) (dot p s') (hyp_tm a :: G)) as Hextend.
+  {
+  intros j m p Hmp.
+  so (basic_member_index _#9 Hal Hmp) as Hj.
+  apply pwctx_cons_tm_seq.
+    {
+    eapply pwctx_downward; eauto.
+    }
+
+    {
+    apply (seqhyp_tm _#5 (iutruncate (S j) A)).
+      {
+      eapply basic_downward; eauto.
+      }
+
+      {
+      eapply basic_downward; eauto.
+      }
+
+      {
+      split; auto.
+      }
+    }
+
+    {
+    intros k t t' Ht.
+    so (Hseqa _#3 Ht) as (R & Hl & Hr & _).
+    eauto.
+    }
+  }
+exploit (extract_functional toppg i (den A) (subst (under 1 s) b) (subst (under 1 s') b)) as (B & Hbl & Hbr).
+  {
+  setoid_rewrite -> (basic_impl_iutruncate _#6 Hal) at 1.
+  reflexivity.
+  }
+
+  {
+  eapply subst_closub_under_permit; eauto.
+  }
+
+  {
+  eapply subst_closub_under_permit; eauto.
+  }
+
+  {
+  intros j m p Hmp.
+  so (Hextend _#3 Hmp) as Hs'.
+  so (Hseqb _#3 Hs') as (B & Hbl & Hbr & _).
+  exists B.
+  simpsub.
+  auto.
+  }
+exists (iuiset stop A B).
+simpsub.
+do2 2 split.
+  {
+  apply interp_eval_refl.
+  apply interp_iset; auto.
+  }
+
+  {
+  apply interp_eval_refl.
+  apply interp_iset; auto.
+  }
+intros j m p Hj Hmp.
+cbn in Hmp.
+decompose Hmp.
+intros n q Hmp Hnq.
+so (Hmeta _#3 Hj Hmp) as (Hm & Hp).
+so (Hseqb _#3 (Hextend _#3 Hmp)) as (Bn & Hbnl & _ & Hmetbn).
+invert Hbl.
+intros _ _ Hbact.
+so (Hbact _#3 Hj Hmp) as Hinterp.
+simpsubin Hinterp.
+so (basic_fun _#7 Hinterp Hbnl).
+subst Bn.
+split.
+  {
+  exists n, q, Hm.
+  cbn.
+  force_exact Hnq.
+  f_equal.
+  f_equal.
+  f_equal.
+  apply urelspinj_equal; auto.
+  }
+
+  {
+  exists n, q, Hp.
+  cbn.
+  force_exact Hnq.
+  f_equal.
+  f_equal.
+  f_equal.
+  apply urelspinj_equal; auto.
+  }
+Qed.
+
+
 Lemma sound_quotient_symmetrical :
   forall G a b,
     pseq G (deqtype (quotient a b) (quotient a b))
@@ -1312,6 +1430,109 @@ do2 4 split; auto.
 
   {
   do2 5 split; auto using star_refl; try prove_hygiene.
+  }
+Qed.
+
+
+Lemma sound_fut_symmetrical :
+  forall G a,
+    pseq (promote G) (deq triv triv (symmetrical a))
+    -> pseq G (deq triv triv (symmetrical (fut a))).
+Proof.
+intros G a.
+revert G.
+refine (seq_pseq_promote 1 [] a 1 true [] _ _ _); cbn.
+intros G Hcla Hseq.
+rewrite -> seq_symmetrical in Hseq |- *.
+intros i s s' Hs.
+so (pwctx_impl_closub _#4 Hs) as (Hcls & Hcls').
+destruct i as [| i].
+  {
+  exists (iufut0 stop).
+  simpsub.
+  do2 2 split.
+    {
+    apply interp_eval_refl.
+    apply interp_fut_zero.
+    prove_hygiene.
+    }
+
+    {
+    apply interp_eval_refl.
+    apply interp_fut_zero.
+    prove_hygiene.
+    }
+  
+    {
+    intros j m p Hj Hmp.
+    cbn in Hmp.
+    decompose Hmp.
+    intros n q _ Hclm Hclp Hstepsm Hstepsp _.
+    split.
+      {
+      cbn.
+      exists n, n.
+      do2 5 split; auto.
+      intro H.
+      omega.
+      }
+
+      {
+      cbn.
+      exists q, q.
+      do2 5 split; auto.
+      intro H.
+      omega.
+      }
+    }
+  }
+so (pwctx_promote _#4 Hs) as Hs'.
+so (Hseq _#3 Hs') as (A & Hal & Har & Hmet).
+exists (iufut stop (S i) A).
+simpsub.
+do2 2 split.
+  {
+  apply interp_eval_refl.
+  apply interp_fut; auto.
+  }
+
+  {
+  apply interp_eval_refl.
+  apply interp_fut; auto.
+  }
+intros j m p Hj Hmp.
+cbn in Hmp.
+decompose Hmp.
+intros n q _ Hclm Hclp Hstepsm Hstepsp Hact.
+split.
+  {
+  exists n, n.
+  do2 5 split; auto.
+  intros Hj'.
+  exploit (Hmet (pred j) n q) as H.
+    {
+    omega.
+    }
+
+    {
+    apply Hact; auto.
+    }
+  exact (H andel).
+  }
+
+  {
+  exists q, q.
+  do2 5 split; auto.
+  intros Hj'.
+  exploit (Hmet (pred j) n q) as H.
+    {
+    omega.
+    }
+
+    {
+    apply Hact; auto.
+    }
+  exact (H ander).
   }
 Qed.
 

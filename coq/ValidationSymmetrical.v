@@ -22,7 +22,7 @@ Require Import Dots.
 Require Import ValidationUtil.
 Require Import Equivalences.
 Require Import NatLemmas.
-
+Require Import SumLemmas.
 
 
 Lemma def_symmetrical :
@@ -185,15 +185,6 @@ apply tr_nativetp_symmetrical.
 Qed.
 
 
-Lemma natSymmetrical_valid : natSymmetrical_obligation.
-Proof.
-prepare.
-unfold Defs.nat.
-intro G.
-apply tr_nattp_symmetrical.
-Qed.
-
-
 Lemma boolSymmetrical_valid : boolSymmetrical_obligation.
 Proof.
 prepare.
@@ -310,12 +301,13 @@ apply mc_oper; repeat2 (apply mcr_cons); [.. | apply mcr_nil]; auto.
 Qed.
 
 
-Hint Rewrite def_sum : prepare.
-
-Lemma sumSymmetrical_valid : sumSymmetrical_obligation.
+Lemma tr_sumtype_symmetrical :
+  forall G a b,
+    tr G (deq triv triv (symmetrical a))
+    -> tr G (deq triv triv (symmetrical b))
+    -> tr G (deq triv triv (symmetrical (Defined.sumtype a b))).
 Proof.
-prepare.
-intros G a b ext1 ext0 Ha Hb.
+intros G a b Ha Hb.
 unfold Defined.sumtype.
 apply tr_sigma_symmetrical.
   {
@@ -327,22 +319,60 @@ apply (tr_booltp_eta_hyp _ []).
   simpsub.
   cbn [List.app].
   apply (tr_compute _ _ (symmetrical a) _ triv _ triv); auto using equiv_refl.
-    {
-    apply equiv_symmetrical.
-    apply equiv_bite_l.
-    }
-  eapply tr_symmetrical_eta2; eauto.
+  apply equiv_symmetrical.
+  apply equiv_bite_l.
   }
 
   {
   simpsub.
   cbn [List.app].
   apply (tr_compute _ _ (symmetrical b) _ triv _ triv); auto using equiv_refl.
+  apply equiv_symmetrical.
+  apply equiv_bite_r.
+  }
+Qed.
+
+
+Hint Rewrite def_sum : prepare.
+
+Lemma sumSymmetrical_valid : sumSymmetrical_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+apply tr_sumtype_symmetrical; eauto using tr_symmetrical_eta2.
+Qed.
+
+
+Lemma natSymmetrical_valid : natSymmetrical_obligation.
+Proof.
+prepare.
+unfold Defs.nat.
+intro G.
+unfold Defined.nattp.
+apply tr_mu_symmetrical; auto using tr_positive_nattp_body.
+  {
+  apply tr_sumtype_formation.
     {
-    apply equiv_symmetrical.
-    apply equiv_bite_r.
+    apply tr_unittp_istype.
     }
-  eapply tr_symmetrical_eta2; eauto.
+  
+    {
+    apply tr_hyp_tp.
+    apply index_0.
+    }
+  }
+simpsub.
+cbn [Nat.add].
+apply tr_sumtype_symmetrical.
+  {
+  apply tr_unitary_symmetrical.
+  apply tr_subtype_refl.
+  apply tr_unittp_istype.
+  }
+
+  {
+  apply (tr_symmetrical_eta2 _ (var 0) (var 0)).
+  eapply hypothesis; eauto using index_0.
   }
 Qed.
 
@@ -357,6 +387,16 @@ apply tr_set_symmetrical; eauto using tr_symmetrical_eta2.
 Qed.
 
 
+Hint Rewrite def_iset : prepare.
+
+Lemma isetSymmetrical_valid : isetSymmetrical_obligation.
+Proof.
+prepare.
+intros G a b ext1 ext0 Ha Hb.
+apply tr_iset_symmetrical; eauto using tr_symmetrical_eta2.
+Qed.
+
+
 Hint Rewrite def_quotient : prepare.
 
 Lemma quotientSymmetrical_valid : quotientSymmetrical_obligation.
@@ -368,6 +408,17 @@ eapply tr_symmetrical_eta2; eauto.
 Qed.
 
 
+Hint Rewrite def_fut : prepare.
+
+Lemma futureSymmetrical_valid : futureSymmetrical_obligation.
+Proof.
+prepare.
+intros G a ext H.
+apply tr_fut_symmetrical.
+eapply tr_symmetrical_eta2; eauto.
+Qed.
+
+
 Hint Rewrite def_partial : prepare.
 
 Lemma partialSymmetrical_valid : partialSymmetrical_obligation.
@@ -375,6 +426,60 @@ Proof.
 prepare.
 intros G a ext H.
 apply tr_partial_symmetrical.
+eapply tr_symmetrical_eta2; eauto.
+Qed.
+
+
+Hint Rewrite def_mu : prepare.
+
+Lemma muSymmetrical_valid : muSymmetrical_obligation.
+Proof.
+prepare.
+intros G a ext2 ext1 ext0 Ha Hmet Hpos.
+rewrite -> def_positive in Hpos.
+apply tr_mu_symmetrical; auto.
+  {
+  eapply tr_positive_eta2; eauto.
+  }
+
+  {
+  eapply tr_symmetrical_eta2; eauto.
+  }
+Qed.
+
+
+Lemma muSymmetricalUniv_valid : muSymmetricalUniv_obligation.
+Proof.
+prepare.
+intros G a i ext3 ext2 ext1 ext0 Hi Ha Hmet Hpos.
+rewrite -> def_positive in Hpos.
+eapply tr_mu_symmetrical_univ; eauto.
+  {
+  eapply tr_positive_eta2; eauto.
+  }
+
+  {
+  eapply tr_symmetrical_eta2; eauto.
+  }
+Qed.
+
+
+Hint Rewrite def_rec : prepare.
+
+Lemma recSymmetrical_valid : recSymmetrical_obligation.
+Proof.
+prepare.
+intros G a ext1 ext0 Ha Hmet.
+apply tr_rec_symmetrical.
+eapply tr_symmetrical_eta2; eauto.
+Qed.
+
+
+Lemma recSymmetricalUniv_valid : recSymmetricalUniv_obligation.
+Proof.
+prepare.
+intros G a i ext2 ext1 ext0 Hi Ha Hmet.
+eapply tr_rec_symmetrical_univ; eauto.
 eapply tr_symmetrical_eta2; eauto.
 Qed.
 

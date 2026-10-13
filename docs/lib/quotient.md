@@ -268,12 +268,24 @@ requires a semantic analysis that is realized by the rule
     set_symmetrical : forall (i : level) (A : U i) (B : A -> U i) .
                          symmetrical A -> symmetrical { x : A | B x }
 
+    iset_symmetrical : forall (i : level) (A : U i) (B : A -> U i) .
+                          symmetrical A -> symmetrical (iset (x : A) . B x)
+
     squash_symmetrical : forall (i : level) (A : U i) . symmetrical { A }
 
     quotient_symmetrical : forall (i : level) (A : U i) (R : A -> A -> U i) .
                               PER A R -> symmetrical A -> symmetrical (quotient (x y : A) . R x y)
 
+    future_symmetrical : forall (i : level) .
+                            forallfut (A : U i) . future (symmetrical A) -> symmetrical (future A)
+
     partial_symmetrical : forall (i : level) (A : U i) . symmetrical A -> symmetrical (partial A)
+
+    list_symmetrical : forall (i : level) (A : U i) . symmetrical A -> symmetrical (List.list A)
+
+    rec_symmetrical : forall (i : level) (A : forallfut (v0 : U i) . U i) .
+                         (forallfut (t : U i) . future (symmetrical t) -> symmetrical (A t))
+                         -> symmetrical (rec t . A t)
 
 ---
 

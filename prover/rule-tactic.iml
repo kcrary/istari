@@ -1036,8 +1036,14 @@ signature RULE_TACTIC =
       val existsSymmetrical : tactic
       val sumSymmetrical : tactic
       val setSymmetrical : tactic
+      val isetSymmetrical : tactic
       val quotientSymmetrical : tactic
+      val futureSymmetrical : tactic
       val partialSymmetrical : tactic
+      val muSymmetrical : tactic
+      val muSymmetricalUniv : tactic1             (* I *)
+      val recSymmetrical : tactic
+      val recSymmetricalUniv : tactic1            (* I *)
       val forallQuotientCommute : tactic1         (* C *)
       val quotientStrengthenSequalOf : tactic3    (* C F H *)
       val quotientStrengthenSequalEq : tactic3    (* C F H *)
@@ -10251,6 +10257,18 @@ structure RuleTactic :> RULE_TACTIC =
                 ]
          end
 
+      val isetSymmetrical =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.isetSymmetrical (T.evar ()) (T.evar ()))
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [binder [1, 2, ] (J.concl jud), ]),
+                ]
+         end
+
       val quotientSymmetrical =
          let
             do () = lift
@@ -10258,11 +10276,68 @@ structure RuleTactic :> RULE_TACTIC =
             refine (Rule.quotientSymmetrical (T.evar ()) (T.evar ()))
          end
 
+      val futureSymmetrical =
+         let
+            do () = lift
+         in
+            refine (Rule.futureSymmetrical (T.evar ()))
+         end
+
       val partialSymmetrical =
          let
             do () = lift
          in
             refine (Rule.partialSymmetrical (T.evar ()))
+         end
+
+      val muSymmetrical =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.muSymmetrical (T.evar ()))
+            >>> [
+                chdir (D.bindsVary dir [NONE, ]),
+                chdir (D.bindsVary dir [NONE, NONE, ]),
+                idtac,
+                ]
+         end
+
+      fun muSymmetricalUniv xI =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.muSymmetricalUniv (T.evar ()) xI)
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                chdir (D.bindsVary dir [NONE, NONE, ]),
+                idtac,
+                ]
+         end
+
+      val recSymmetrical =
+         let
+            do () = lift
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.recSymmetrical (T.evar ()))
+            >>> [
+                chdir (D.bindsVary dir [NONE, ]),
+                chdir (D.bindsVary dir [NONE, NONE, ]),
+                ]
+         end
+
+      fun recSymmetricalUniv xI =
+         let
+            do (jud, dir) = withgoal
+         in
+            refine (Rule.recSymmetricalUniv (T.evar ()) xI)
+            >>> [
+                idtac,
+                chdir (D.bindsVary dir [NONE, ]),
+                chdir (D.bindsVary dir [NONE, NONE, ]),
+                ]
          end
 
       fun forallQuotientCommute xC =

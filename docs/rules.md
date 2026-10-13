@@ -6642,7 +6642,7 @@ Syntactic equality is intended for internal use only.
 
 ### Symmetricality
 
-These rules are in service of the rule `arrowQuotientCommute`.
+These rules are in service of the rule `forallQuotientCommute`.
 
 - `symmetricalForm A`
 
@@ -6766,6 +6766,13 @@ These rules are in service of the rule `arrowQuotientCommute`.
       G |- symmetrical A
       G, x : A |- B : type
 
+- `isetSymmetrical A B`
+
+      G |- symmetrical (iset A (fn x . B))
+      >>
+      G |- symmetrical A
+      G, x : A |- B : type
+
 - `quotientSymmetrical A B`
 
       G |- symmetrical (quotient (x y : A) . B)
@@ -6773,24 +6780,62 @@ These rules are in service of the rule `arrowQuotientCommute`.
       G |- (quotient (x y : A) . B) : type
       G |- symmetrical A
 
+- `futureSymmetrical A`
+
+      G |- symmetrical (future A)
+      >>
+      promote(G) |- symmetrical A
+
 - `partialSymmetrical A`
 
       G |- symmetrical (partial A)
       >>
       G |- symmetrical A
 
-- `arrowQuotientCommute A B C M N`
+- `muSymmetrical A`
 
-      G |- M = N : (quotient (x' y' : A -> B) . forall (z : A) . [x' z, y' z / x, y]C)
+      G |- symmetrical (mu t . A)
+      >>
+      G, t : type |- A : type
+      G, t : type, x : (symmetrical t) |- symmetrical A
+      G |- positive (fn t . A)
+
+- `muSymmetricalUniv A I`
+
+      G |- symmetrical (mu t . A)
+      >>
+      G |- I : level
+      G, t : (univ I) |- A : univ I
+      G, t : (univ I), x : (symmetrical t) |- symmetrical A
+      G |- positive (fn t . A)
+
+- `recSymmetrical A`
+
+      G |- symmetrical (rec t . A)
+      >>
+      G, t (later) : type |- A : type
+      G, t (later) : type, x (later) : (symmetrical t) |- symmetrical A
+
+- `recSymmetricalUniv A I`
+
+      G |- symmetrical (rec t . A)
+      >>
+      G |- I : level
+      G, t (later) : (univ I) |- A : univ I
+      G, t (later) : (univ I), x (later) : (symmetrical t) |- symmetrical A
+
+- `forallQuotientCommute A B C M N`
+
+      G |- M = N : (quotient (y' z' : forall (x : A) . B) . forall (x : A) . [y' x, z' x / y, z]C)
       >>
       G |- symmetrical A
-      G |- symmetrical B
-      G, x : B, y : B |- C : type
-      G, x' : B, y' : B, w : [x', y' / x, y]C |- [y', x' / x, y]C
-      G, x' : B, y' : B, z' : B, w : [x', y' / x, y]C, w' : [y', z' / x, y]C |- [x', z' / x, y]C
-      G, x : B, y : B, z : C |- () : C
+      G, x : A |- symmetrical B
+      G, x : A, y : B, z : B |- C : type
+      G, x : A, y' : B, z' : B, w : [y', z' / y, z]C |- [z', y' / y, z]C
+      G, x : A, y' : B, z' : B, v' : B, w : [y', z' / y, z]C, w' : [z', v' / y, z]C |- [y', v' / y, z]C
+      G, x : A, y : B, z : B, w : C |- () : C
       G, x : A, y : A, w : (x = y : A) |- sequal x y
-      G |- M = N : (A -> quotient (x y : B) . C)
+      G |- M = N : (forall (x : A) . quotient (y z : B) . C)
 
 - `quotientStrengthenSequalOf A B C F H M`
 

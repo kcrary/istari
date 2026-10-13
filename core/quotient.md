@@ -173,11 +173,19 @@ requires a semantic analysis that is realized by the rule
 
     set_symmetrical : type:set_symmetrical
 
+    iset_symmetrical : type:iset_symmetrical
+
     squash_symmetrical : type:squash_symmetrical
 
     quotient_symmetrical : type:quotient_symmetrical
 
+    future_symmetrical : type:future_symmetrical
+
     partial_symmetrical : type:partial_symmetrical
+
+    list_symmetrical : type:list_symmetrical
+
+    rec_symmetrical : type:rec_symmetrical
 
 ---
 

@@ -2211,10 +2211,6 @@ Inductive tr : @context obj -> judgement -> Prop :=
     forall A f G,
       tr G (deq triv triv (symmetrical (nativetp A f)))
 
-| tr_nattp_symmetrical :
-    forall G,
-      tr G (deq triv triv (symmetrical nattp))
-
 | tr_tarrow_symmetrical :
     forall G a b,
       tr G (deq triv triv (symmetrical a))
@@ -2251,16 +2247,54 @@ Inductive tr : @context obj -> judgement -> Prop :=
       -> tr (hyp_tm a :: G) (deqtype b b)
       -> tr G (deq triv triv (symmetrical (set a b)))
 
+| tr_iset_symmetrical :
+    forall G a b,
+      tr G (deq triv triv (symmetrical a))
+      -> tr (hyp_tm a :: G) (deqtype b b)
+      -> tr G (deq triv triv (symmetrical (iset a b)))
+
 | tr_quotient_symmetrical :
     forall G a b,
       tr G (deqtype (quotient a b) (quotient a b))
       -> tr G (deq triv triv (symmetrical a))
       -> tr G (deq triv triv (symmetrical (quotient a b)))
 
+| tr_fut_symmetrical :
+    forall G a,
+      tr (promote G) (deq triv triv (symmetrical a))
+      -> tr G (deq triv triv (symmetrical (fut a)))
+
 | tr_partial_symmetrical :
     forall G a,
       tr G (deq triv triv (symmetrical a))
       -> tr G (deq triv triv (symmetrical (partial a)))
+
+| tr_mu_symmetrical :
+    forall G a,
+      tr (cons hyp_tp G) (deqtype a a)
+      -> tr G (deq triv triv (ispositive a))
+      -> tr (hyp_tm (symmetrical (var 0)) :: hyp_tp :: G) (deq triv triv (symmetrical (subst sh1 a)))
+      -> tr G (deq triv triv (symmetrical (mu a)))
+  
+| tr_mu_symmetrical_univ :
+    forall G lv a,
+      tr G (deq lv lv pagetp)
+      -> tr (hyp_tm (univ lv) :: G) (deq a a (univ (subst sh1 lv)))
+      -> tr G (deq triv triv (ispositive a))
+      -> tr (hyp_tm (symmetrical (var 0)) :: hyp_tm (univ lv) :: G) (deq triv triv (symmetrical (subst sh1 a)))
+      -> tr G (deq triv triv (symmetrical (mu a)))
+
+| tr_rec_symmetrical :
+    forall G a,
+      tr (hyp_tml (symmetrical (var 0)) :: hyp_tpl :: G) (deq triv triv (symmetrical (subst sh1 a)))
+      -> tr G (deq triv triv (symmetrical (rec a)))
+
+| tr_rec_symmetrical_univ :
+    forall G lv a,
+      tr G (deq lv lv pagetp)
+      -> tr (hyp_tml (univ lv) :: G) (deq a a (univ (subst sh1 lv)))
+      -> tr (hyp_tml (symmetrical (var 0)) :: hyp_tml (univ lv) :: G) (deq triv triv (symmetrical (subst sh1 a)))
+      -> tr G (deq triv triv (symmetrical (rec a)))
 
 | tr_pi_quotient_commute :
     forall G a b c m n,

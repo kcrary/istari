@@ -55,3 +55,5 @@ library](quotient.html).
     squish_forall_commute : type:squish_forall_commute
 
     squish_forall_nat : type:squish_forall_nat
+
+    squish_symmetrical : type:squish_symmetrical
