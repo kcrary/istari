@@ -1,6 +1,6 @@
 # Change log
 
-#### 1.3
+#### 1.3a
 
 - Overhauled arithmetic overloading.
 
