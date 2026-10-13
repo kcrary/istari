@@ -14,7 +14,7 @@ indicated type, and the name of constant that is used for the concept.
 | literal        |            | ``n` `` / *       | ``N` `` / *         | ``z` `` / *        | ``q` `` / `integer_to_rational` | ``r` `` / `integer_to_real` |
 | addition       | `+`        | `+n` / `plus`     | `+N` / `plusn`      | `+z` / `plusz`     | `+q` / `plusq`                  | `+r` / `plusr`              |
 | negation       | `~`        | n/a               | n/a                 | `~z` / `negz`      | `~q` / `negq`                   | `~r` / `negr`               |
-| subtraction    | `-`        | `-n` / `minus`    | `-N` / `minusn`     | `-z` | `minusz`    | `-q` / `minusq`                 | `-r` / `minusr`             |
+| subtraction    | `-`        | `-n` / `minus`    | `-N` / `minusn`     | `-z` / `minusz`    | `-q` / `minusq`                 | `-r` / `minusr`             |
 | multiplication | `*`        | `*n` / `times`    | `*N` / `timesn`     | `*z` / `timesz`    | `*q` / `timesq`                 | `*r` / `timesr`             |
 | division       | ``\|\|``   | n/a               | n/a                 | n/a                | ``\|q`` / `divq`                | ``\|r`` / `divr`            |
 | less-or-equal  | `<=`       | `<n=` / `leq`     | `<N=` / `leqn`      | `<z=` / `leqz`     | `<q=` / `leqq`                  | `<r=` / `leqr`              |
