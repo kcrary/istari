@@ -44,6 +44,10 @@ A simpler case-analysis operation:
 
     lt_inhabitant : type:lt_inhabitant
 
+    leq_ext : type:leq_ext
+
+    lt_ext : type:lt_ext
+
     leq_0_min : type:leq_0_min
 
     leq_0_minimal : type:leq_0_minimal

@@ -8,6 +8,9 @@
 
   + Improved the `unhide` tactic.
 
+  + It is no longer possible to backtrack into the middle of
+    `destructThin` or `inversion`.
+
 - Rewriting changes:
 
   + Fixed a bug in `unrollTypeUniv`.
@@ -28,8 +31,8 @@
 
   + Added `Squish` (like squash, but with computational content).
 
-  + Added material to `Decidable`, `Eventually`, `Logic`, `Nat`, and
-    `Rational`.
+  + Added material to `Bool`, `Decidable`, `Eventually`, `Logic`,
+    `Nat`, and `Rational`.
 
   + Renamed shift lemmas in `Integer` and `Rational`:
     
@@ -37,6 +40,8 @@
         *_l --> *_lll
         *_lr --> *_rll
         *_rl --> *_lrr
+
+  + The type of `Rational.ltq_from_leqq_neq` has changed slightly.
 
   + Added material to `Quotient`.  Changed the behavior of `destruct`
     on `quotient1`.  Fixed a bug in destruction of `Quotient`'s quotients.

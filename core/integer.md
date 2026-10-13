@@ -126,6 +126,10 @@ before moving.  It is always the right-hand operand after moving.
 
     ltz_inhabitant : type:ltz_inhabitant
 
+    leqz_ext : type:leqz_ext
+
+    ltz_ext : type:ltz_ext
+
     leqz_0_1 : type:leqz_0_1
 
     ltz_0_1 : type:ltz_0_1

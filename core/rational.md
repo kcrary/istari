@@ -255,6 +255,10 @@ This only works because of our special definition of `invq`.
 
     ltq_inhabitant : type:ltq_inhabitant
 
+    leqq_ext : type:leqq_ext
+
+    ltq_ext : type:ltq_ext
+
     leqq_refl : type:leqq_refl
 
     leqq_refl_eq : type:leqq_refl_eq
